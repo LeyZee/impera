@@ -15,7 +15,7 @@ import { linkProblems, middleCut, PLACEMENT_LABELS } from './model';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 import './links.css';
 
@@ -79,10 +79,7 @@ export function LinksSection({
 
   if (links === undefined) {
     return read.isError ? (
-      <ServerSilent
-        text={`Les liens de ${creatorName} ne peuvent pas être lus pour l’instant. Rien n’est perdu.`}
-        onRetry={() => void read.refetch()}
-      />
+      <Failure onRetry={() => void read.refetch()} />
     ) : (
       <div className="nv-plate ps-panel cl-loading" aria-busy="true" aria-label="Lecture de ses liens" />
     );
@@ -91,7 +88,7 @@ export function LinksSection({
   return (
     <div className="nv-plate ps-panel">
       <section className="ps-block" aria-labelledby="cl-title">
-        <h3 className="ps-block__title" id="cl-title">
+        <h3 className="nv-h3 ps-block__title" id="cl-title">
           Ses liens
         </h3>
         <p className="ps-lead">

@@ -3,6 +3,8 @@ import type { JSX } from 'react';
 
 import { ReelBrief } from './ReelBrief';
 
+import { NavIcon } from '@/shell/NavIcon';
+
 /**
  * Her shooting sheet (VEI-01 lot d, ADR 0042 § 4): what the agency wants shot, as plain text, its line breaks kept and
  * never read as Markdown; for a Reel, its drawn reel sheet first (ADR 0082 § 3), the text under it. Folded under its
@@ -35,13 +37,19 @@ export function ShootBrief({
   if (!folded)
     return (
       <section className="ag-brief" aria-label="Fiche de tournage">
-        <b className="ag-brief__title">🎬 Fiche de tournage</b>
+        <b className="ag-brief__title">
+          <NavIcon name="clapper" />
+          Fiche de tournage
+        </b>
         {content}
       </section>
     );
   return (
     <details className="ag-brief">
-      <summary className="ag-brief__title">🎬 Fiche de tournage</summary>
+      <summary className="ag-brief__title">
+        <NavIcon name="clapper" />
+        Fiche de tournage
+      </summary>
       {content}
     </details>
   );

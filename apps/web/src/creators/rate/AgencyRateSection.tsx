@@ -186,7 +186,7 @@ function RateSheet({
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <h2 className="ps-title">Part de l’agence</h2>
+            <h2 className="nv-h2 ps-title">Part de l’agence</h2>
           </div>
         </div>
         <div className="ps-head__state" aria-live="polite">

@@ -4,6 +4,7 @@ import { useId, useState, type JSX } from 'react';
 import { proposeSwap, useRefreshPlanning, useSwapCandidates, type Refusal } from '@/scheduling/api';
 import { READ_AGAIN, swapRefusalText, swapShiftLine } from '@/scheduling/model';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 type Candidate = SwapCandidates['candidates'][number];
 
@@ -93,18 +94,12 @@ export function SwapPanel({
         <fieldset className="sc-fieldset">
           <legend className="nv-field__label">À qui</legend>
           {candidates.isError ? (
-            <div className="sc-empty">
-              <p className="tm-warn">Le serveur ne répond pas : tes collègues n’ont pas pu être lus.</p>
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                onClick={() => {
-                  void candidates.refetch();
-                }}
-              >
-                Réessayer
-              </button>
-            </div>
+            <Failure
+              inline
+              onRetry={() => {
+                void candidates.refetch();
+              }}
+            />
           ) : candidates.data === undefined ? (
             <div className="sc-skeleton sc-skeleton--short" aria-hidden="true">
               <i />

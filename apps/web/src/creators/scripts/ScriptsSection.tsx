@@ -19,6 +19,7 @@ import { VaultCard } from '@/creators/vault/VaultCard';
 import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Scripts (SC-03 c2b, ADR 0056 § 7), the owner's and an active manager's: each script she sent, its
@@ -50,19 +51,7 @@ export function ScriptsSection({
   const list = (): JSX.Element => {
     if (content.data === undefined) {
       if (content.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="aa-empty__title">Ses scripts ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void content.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+        return <Failure title="Ses scripts ne se chargent pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const rows = sentScripts(content.data, structures.data ?? []);
@@ -197,7 +186,7 @@ function ScriptCard({
         </span>
       </div>
       <div className="sx-card__body">
-        <h3 id={`${id}-title`} className="sx-title">
+        <h3 id={`${id}-title`} className="nv-h3 sx-title">
           {row.name ?? 'Structure retirée de la bibliothèque'}
         </h3>
         <p className="sx-meta nv-num">

@@ -28,7 +28,7 @@ async function failure(promise: Promise<unknown>): Promise<string> {
 
 /** The statement of the migration that copies the links out of the channel's setting, replayed as it is written. */
 function copyStatement(): string {
-  const file = fileURLToPath(new URL('../migrations/0221_redirect_links.sql', import.meta.url));
+  const file = fileURLToPath(new URL('../migrations/0222_redirect_links.sql', import.meta.url));
   const statement = readFileSync(file, 'utf8')
     .split('--> statement-breakpoint')
     .find((part) => part.includes('INSERT INTO "redirect_links"'));

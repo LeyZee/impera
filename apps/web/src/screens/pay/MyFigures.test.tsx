@@ -188,7 +188,10 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
       expect(screen.getByText('Ma quinzaine')).toBeTruthy();
     });
     expect(text()).toContain('de net vendu à ce jour');
-    expect(screen.getByRole('link', { name: 'Mes chiffres' }).getAttribute('href')).toBe('/commissions');
+    const more = screen.getByRole('link', { name: 'Mes chiffres' });
+    expect(more.getAttribute('href')).toBe('/commissions');
+    // A thumb's target around a line of small text (recette CHT-22).
+    expect(more.classList.contains('nv-hit')).toBe(true);
     expect(document.querySelector('.mf-ring')).toBeNull();
   });
 

@@ -428,7 +428,7 @@ export function MoreSheet({
         aria-labelledby="nv-more-title"
         onKeyDown={keepTabInside}
       >
-        <h2 className="nv-more__title" id="nv-more-title">
+        <h2 className="nv-eyebrow nv-more__title" id="nv-more-title">
           Plus
         </h2>
         {items.map((item, index) => (

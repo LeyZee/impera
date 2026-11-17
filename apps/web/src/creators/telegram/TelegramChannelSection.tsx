@@ -211,7 +211,7 @@ function ChannelForm({
       <div className="nv-plate ps-head" ref={headRef}>
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <h2 className="ps-title">Son canal Telegram</h2>
+            <h2 className="nv-h2 ps-title">Son canal Telegram</h2>
           </div>
           <div className="ps-head__actions">
             {changed && !saving ? (
@@ -262,7 +262,7 @@ function ChannelForm({
 
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-channel">
-          <h3 className="ps-block__title" id="tc-channel">
+          <h3 className="nv-h3 ps-block__title" id="tc-channel">
             Canal
           </h3>
           {choices.length === 0 ? (
@@ -318,7 +318,7 @@ function ChannelForm({
 
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-slots">
-          <h3 className="ps-block__title" id="tc-slots">
+          <h3 className="nv-h3 ps-block__title" id="tc-slots">
             Créneaux
           </h3>
           <p className="ps-lead">{SLOTS_RULE}</p>
@@ -362,7 +362,7 @@ function ChannelForm({
 
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-check">
-          <h3 className="ps-block__title" id="tc-check">
+          <h3 className="nv-h3 ps-block__title" id="tc-check">
             Validation
           </h3>
           <div className="tc-setting tc-setting--select">
@@ -398,7 +398,7 @@ function ChannelForm({
 
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-links">
-          <h3 className="ps-block__title" id="tc-links">
+          <h3 className="nv-h3 ps-block__title" id="tc-links">
             Liens
           </h3>
           <p className="ps-lead">
@@ -455,7 +455,7 @@ function ChannelForm({
 
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="tc-examples">
-          <h3 className="ps-block__title" id="tc-examples">
+          <h3 className="nv-h3 ps-block__title" id="tc-examples">
             Exemples
           </h3>
           <p className="ps-lead">

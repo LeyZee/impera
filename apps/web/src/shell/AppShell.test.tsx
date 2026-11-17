@@ -654,13 +654,34 @@ describe('the account’s security, from its menu (SEC-04)', () => {
     }
   });
 
-  it('opens outside the rail for an operator or a creator, never sent home', async () => {
-    for (const user of [operator, creator]) {
-      const router = renderApp(user, '/compte/securite');
+  it('opens outside the rail for an operator, never sent home, with a way back to his first tab', async () => {
+    const router = renderApp(operator, '/compte/securite');
+    const title = await screen.findByRole('heading', { level: 1, name: 'Sécurité' });
+    expect(router.state.location.pathname).toBe('/compte/securite');
+    expect(document.title).toBe('Sécurité · Impera');
+    expect(screen.queryByRole('heading', { name: 'Comptes de l’agence' })).toBeNull();
+    const back = within(title.parentElement ?? document.body).getByRole('link', { name: '← Dashboard' });
+    expect(back.getAttribute('href')).toBe('/');
+    expect(title.closest('.nv-page')?.getAttribute('data-width')).toBe('narrow');
+  });
+
+  // Recette visuelle 16/11 (CHA-16, CRE-07, GES-11): one page for one's security, not a second one off the rail.
+  it('leads every other account from /compte/securite to its own page, its query kept', async () => {
+    for (const [user, path] of [
+      [manager, '/moi/securite'],
+      [chatter, '/moi/securite'],
+      [creator, '/moi/securite'],
+      [owner, '/reglages/securite'],
+    ] satisfies [Me, string][]) {
+      const router = renderApp(user, '/compte/securite?depuis=menu#codes');
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe(path);
+      });
+      expect(router.state.location.searchStr).toBe('?depuis=menu');
+      expect(router.state.location.hash).toBe('codes');
       expect(await screen.findByRole('heading', { level: 1, name: 'Sécurité' })).toBeDefined();
-      expect(router.state.location.pathname).toBe('/compte/securite');
-      expect(document.title).toBe('Sécurité · Impera');
-      expect(screen.queryByRole('heading', { name: 'Comptes de l’agence' })).toBeNull();
+      // Not refused: it is his own page, nothing to explain.
+      expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
       cleanup();
     }
   });
@@ -799,6 +820,108 @@ describe('the shell while a screen loads (review of #313)', () => {
   });
 });
 
+// Recette visuelle 16/11 (COH-02, CHA-11, CRE-09): one width per section, the reading ones narrow.
+describe('the width of each section without tabs', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+  });
+
+  const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self', creatorIds: ['c1'] };
+  it.each([
+    ['/aujourdhui', 'Aujourd’hui', 'narrow', chatter],
+    ['/planning', 'Planning', 'narrow', chatter],
+    ['/notifications', 'Notifications', 'narrow', chatter],
+    ['/aide/installer', 'Installer Impera', 'narrow', chatter],
+    ['/aide/extension', 'Installer l’extension', 'narrow', chatter],
+    ['/aujourdhui', 'Aujourd’hui', 'narrow', creator],
+    ['/contenu', 'Contenu', 'narrow', creator],
+    ['/agenda', 'Agenda', 'wide', creator],
+    ['/ventes', 'Ventes', 'wide', creator],
+    ['/creatrices', 'Créatrices', 'wide', owner],
+    ['/creatrices/structures', 'Structures de script', 'wide', owner],
+  ] satisfies [string, string, 'wide' | 'narrow', Me][])(
+    'lays %s (« %s ») in the %s column',
+    async (path, title, width, user) => {
+      renderApp(user, path);
+      const heading = await screen.findByRole('heading', { level: 1, name: title });
+      expect(heading.closest('.nv-page')?.getAttribute('data-width')).toBe(width);
+    },
+  );
+});
+
+// Recette visuelle 16/11 (PIL-17): an address of Entraîner with no screen yet leads to the Playground and says so.
+describe('an address of Entraîner with no screen yet', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+  });
+
+  it.each(['/entrainer/corrections', '/entrainer/tests'])(
+    'leads %s to the Playground, and says why',
+    async (path) => {
+      const router = renderApp(owner, path);
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe('/entrainer/playground');
+      });
+      expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
+    },
+  );
+
+  it('says nothing on its own address, which opens the Playground as its first tab', async () => {
+    const router = renderApp(owner, '/entrainer');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/entrainer/playground');
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Chatting' });
+    expect(screen.queryByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeNull();
+  });
+});
+
+// Recette visuelle 16/11 (T9): the guides hang from Réglages for the owner, who has no Moi.
+describe('a guide opened by the owner', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  it('lights Réglages and leads back to it', async () => {
+    renderApp(owner, '/aide/reveal');
+    const title = await screen.findByRole('heading', { level: 1, name: 'Reconnecter Reveal' });
+    const back = within(title.parentElement ?? document.body).getByRole('link', { name: '← Réglages' });
+    expect(back.getAttribute('href')).toBe('/reglages');
+    expect(
+      screen
+        .getByRole('navigation', { name: 'Navigation' })
+        .querySelector('[aria-current="page"]')
+        ?.getAttribute('title'),
+    ).toBe('Réglages');
+  });
+});
+
 describe('the header of a section with sub-tabs (NAV-08)', () => {
   beforeEach(() => {
     vi.stubGlobal(
@@ -838,10 +961,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
         'Parle à la persona comme un fan, avant qu’un vrai fan ne la lise : rien n’est envoyé.',
       ],
       ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
-      [
-        '/creatrices',
-        'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, liens, heures d’activité, accès, pourcentage et profil.',
-      ],
+      ['/creatrices', 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche et tous ses réglages.'],
     ] as const) {
       renderApp(owner, path);
       const title = await screen.findByRole('heading', { level: 1 });
@@ -850,9 +970,98 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
     }
   });
 
-  it('says no sub-tab’s name above the title: the lit sub-tab says it (NAV-09)', async () => {
-    renderApp(owner, '/equipe/rapports');
-    const title = await screen.findByRole('heading', { level: 1, name: 'Équipe' });
-    expect(title.parentElement?.querySelector('.nv-eyebrow')).toBeNull();
-  });
+  // Recette visuelle 16/11 (T1, T2, T3): the section above the title, the open tab as the title, the tabs on a row of
+  // their own (never in the actions), and one width for every tab of a section.
+  it.each([
+    ['/suivi', 'Suivi', 'Conversations', 'wide', owner],
+    ['/suivi/alertes', 'Suivi', 'Historique des alertes', 'wide', owner],
+    ['/entrainer/playground', 'Entraîner', 'Chatting', 'wide', owner],
+    ['/entrainer/canal', 'Entraîner', 'Post du canal', 'wide', owner],
+    ['/equipe/planning', 'Équipe', 'Planning', 'wide', owner],
+    ['/equipe/rapports', 'Équipe', 'Rapports', 'wide', owner],
+    ['/equipe/membres', 'Équipe', 'Membres', 'wide', owner],
+    // Équipe › Reveal: its tab comes with the server's counts, which this shell test never answers.
+    ['/paie/quinzaine', 'Paie', 'Quinzaine', 'wide', owner],
+    ['/paie/releves', 'Paie', 'Historique', 'wide', owner],
+    ['/paie/primes-malus', 'Paie', 'Primes et malus', 'wide', owner],
+    ['/paie/objectifs', 'Paie', 'Objectifs', 'wide', owner],
+    ['/paie/factures', 'Paie', 'Factures', 'wide', owner],
+    ['/paie/exports', 'Paie', 'Exports', 'wide', owner],
+    ['/moi/profil', 'Moi', 'Profil', 'narrow', manager],
+    ['/moi/dossier', 'Moi', 'Dossier', 'narrow', manager],
+    ['/moi/factures', 'Moi', 'Factures', 'narrow', manager],
+    ['/moi/calendrier', 'Moi', 'Calendrier', 'narrow', manager],
+    ['/moi/securite', 'Moi', 'Sécurité', 'narrow', manager],
+    ['/moi/preferences', 'Moi', 'Préférences', 'narrow', manager],
+    ['/commissions', 'Commissions', 'Relevés', 'wide', chatter],
+    ['/commissions/factures', 'Commissions', 'Factures', 'wide', chatter],
+    ['/moi/profil', 'Moi', 'Profil', 'narrow', chatter],
+    [
+      '/moi/persona',
+      'Moi',
+      'Persona',
+      'narrow',
+      { ...base, role: 'creator', team: null, teamScope: 'self' } satisfies Me,
+    ],
+  ] satisfies [string, string, string, 'wide' | 'narrow', Me][])(
+    'titles %s by its tab under « %s » (« %s »), its tabs on their own row, %s',
+    async (path, section, tab, width, user) => {
+      // The Playground listens to the phone's width.
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+      );
+      renderApp(user, path);
+      const title = await screen.findByRole('heading', { level: 1, name: tab });
+      const head = title.closest<HTMLElement>('.nv-page__head');
+      if (head === null) throw new Error('no header');
+      expect(head.querySelector('.nv-page__title > .nv-eyebrow')?.textContent).toBe(section);
+      const tabs = await within(head).findByRole('navigation', { name: section });
+      expect(tabs.closest('.nv-page__tabs')?.parentElement).toBe(head);
+      expect(tabs.closest('.nv-page__actions')).toBeNull();
+      expect(
+        within(tabs)
+          .getByRole('link', { name: new RegExp(`^${tab}`, 'u') })
+          .getAttribute('aria-current'),
+      ).toBe('page');
+      expect(head.closest('.nv-page')?.getAttribute('data-width')).toBe(width);
+    },
+  );
+
+  // Recette visuelle 16/11 (GES-04): Réglages is a list beside its section, not tabs; the header keeps the template.
+  it.each([
+    ['/reglages/modeles-ia', 'Modèles IA'],
+    ['/reglages/ventes', 'Ventes'],
+    ['/reglages/consommation-ia', 'Consommation IA'],
+    ['/reglages/alertes', 'Alertes'],
+    ['/reglages/telegram', 'Telegram'],
+    ['/reglages/regles-de-paie', 'Règles de paie'],
+    ['/reglages/facturation', 'Facturation'],
+    ['/reglages/sauvegardes', 'Sauvegardes'],
+    ['/reglages/securite', 'Sécurité'],
+  ] as const)(
+    'titles %s by its section under « Réglages » (« %s »), its list beside it, wide',
+    async (path, name) => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+      );
+      renderApp(owner, path);
+      const title = await screen.findByRole('heading', { level: 1, name });
+      const head = title.closest<HTMLElement>('.nv-page__head');
+      if (head === null) throw new Error('no header');
+      expect(head.querySelector('.nv-page__title > .nv-eyebrow > .rgl-eyebrow')?.textContent).toBe(
+        'Réglages',
+      );
+      expect(head.querySelector('.nv-page__tabs')).toBeNull();
+      const list = await screen.findByRole('navigation', { name: 'Réglages' });
+      expect(list.closest('.rgl-body')?.parentElement).toBe(head.parentElement);
+      expect(
+        within(list)
+          .getByRole('link', { name: new RegExp(`^${name}`, 'u') })
+          .getAttribute('aria-current'),
+      ).toBe('page');
+      expect(head.closest('.nv-page')?.getAttribute('data-width')).toBe('wide');
+    },
+  );
 });

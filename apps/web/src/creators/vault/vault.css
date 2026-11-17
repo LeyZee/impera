@@ -4,12 +4,10 @@
  * act (a folder without ☀️ or 🌙, its dot the same as its figure's); never a coloured edge.
  */
 .vx-card {
-  --_radius: var(--nv-radius-xl);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: 20px 22px;
-  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-plate-pad);
 }
 
 .vx-head {
@@ -353,10 +351,6 @@
   gap: 8px;
   min-width: 0;
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
-  font-weight: 650;
 }
 .vx-crumbs__name {
   min-width: 0;

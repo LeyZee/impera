@@ -5,8 +5,8 @@ import { MeNav } from './MeNav';
 import { useMyLinks } from './links-api';
 
 import { middleCut, PLACEMENT_LABELS, sameWords } from '@/creators/links/model';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
+import { Empty, Failure } from '@/shell/states';
 
 import './my-links.css';
 
@@ -54,9 +54,9 @@ function LinkCard({ link }: { link: CreatorLinkCard }): JSX.Element {
   }
 
   return (
-    <li className="nv-plate my-links__card">
+    <li className="nv-plate nv-plate--pad my-links__card">
       <div className="my-links__head">
-        <h2 className="my-links__name">{link.name}</h2>
+        <h2 className="nv-h3 my-links__name">{link.name}</h2>
         {/* A name that already says its place needs no chip beside it. */}
         {sameWords(link.name, PLACEMENT_LABELS[link.placement]) ? null : (
           <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
@@ -99,21 +99,17 @@ export function MyLinksPage(): JSX.Element {
       />
       {links === undefined ? (
         read.isError ? (
-          <ServerSilent
-            text="Tes liens ne peuvent pas être lus pour l’instant. Rien n’est perdu : réessaie dans un instant."
-            onRetry={() => void read.refetch()}
-          />
+          <Failure onRetry={() => void read.refetch()} />
         ) : (
           <ul className="my-links" aria-busy="true" aria-label="Lecture de tes liens">
-            <li className="nv-plate my-links__card my-links__card--loading" />
-            <li className="nv-plate my-links__card my-links__card--loading" />
+            <li className="nv-plate nv-plate--pad my-links__card my-links__card--loading" />
+            <li className="nv-plate nv-plate--pad my-links__card my-links__card--loading" />
           </ul>
         )
       ) : links.length === 0 ? (
-        <section className="nv-plate my-links__empty">
-          <h2>Pas encore de lien</h2>
-          <p>Ton agence n’a pas encore placé de lien pour toi. Dès qu’elle le fait, il apparaît ici.</p>
-        </section>
+        <Empty plate title="Pas encore de lien">
+          Ton agence n’a pas encore placé de lien pour toi. Dès qu’elle le fait, il apparaît ici.
+        </Empty>
       ) : (
         <ul className="my-links">
           {links.map((link) => (

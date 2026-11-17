@@ -21,11 +21,12 @@ import './me.css';
  */
 export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Préférences"
-        actions={
+        lead="L’apparence d’Impera, et la façon dont il te prévient."
+        tabs={
           <MeNav
             manager={user.teamScope === 'agency'}
             creator={user.role === 'creator'}

@@ -492,10 +492,13 @@ describe('the chatter’s Planning', () => {
     // The first read and its one retry fail; « Réessayer » reads them.
     serve({ earlier: true, reportsDown: 2 });
     renderPage();
-    const alert = await screen.findByText('Tes rapports n’ont pas pu être lus.', {}, { timeout: 3000 });
-    fireEvent.click(within(alert.parentElement ?? document.body).getByRole('button', { name: 'Réessayer' }));
+    const line = 'Tes rapports n’ont pas pu être lus : réessaie dans un instant.';
+    const alert = await screen.findByText(line, {}, { timeout: 3000 });
+    fireEvent.click(
+      within(alert.closest('[role="alert"]') ?? document.body).getByRole('button', { name: 'Réessayer' }),
+    );
     await waitFor(() => {
-      expect(screen.queryByText('Tes rapports n’ont pas pu être lus.')).toBe(null);
+      expect(screen.queryByText(line)).toBe(null);
     });
     const fold = screen.getByText('Plus tôt cette semaine (2)').closest('summary');
     await waitFor(() => {
@@ -682,7 +685,8 @@ describe('the chatter’s Planning', () => {
     serve({ membersDown: 2 });
     renderPage();
     const warning = await screen.findByRole('alert', {}, { timeout: 4_000 });
-    expect(text(warning)).toContain('Le serveur ne répond pas : ta fiche n’a pas pu être lue');
+    expect(text(warning)).toContain('Le serveur ne répond pas');
+    expect(text(warning)).toContain('Un congé ne peut pas encore être demandé');
     // « Mes congés », where a leave is asked, waits for his record.
     expect(screen.queryByRole('button', { name: 'Demander un congé' })).toBe(null);
     fireEvent.click(within(warning).getByRole('button', { name: 'Réessayer' }));

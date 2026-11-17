@@ -69,6 +69,7 @@ import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Commissions (EQ-05, the chatter's): what they touch for the period whose money is on its way — computed, being
@@ -107,10 +108,11 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   // The period is the hero's own first word: said twice above the fold, it was read as two periods (D-03).
   const head = (): JSX.Element => (
     <PageHeader
-      eyebrow="Mon argent"
-      title="Commissions"
+      // The section above, the open tab as the title, as on Factures (recette visuelle 16/11, CHA-02).
+      eyebrow="Commissions"
+      title="Relevés"
       lead="Ce que tu as gagné sur la quinzaine, et comment ta commission se construit."
-      actions={<CommissionsNav />}
+      tabs={<CommissionsNav />}
     />
   );
 
@@ -168,16 +170,15 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
         {head()}
         <div className="py-board">
           <Panel className="nv-enter">
-            <div className="py-empty">
-              <p className="py-empty__whisper">Ton premier relevé arrive avec ton premier rapport validé.</p>
-              <p className="py-empty__text">
-                Chaque rapport de fin de shift que l’agence valide compte ici, compte par compte, de tes
-                ventes à ce que tu touches.
-              </p>
-              <Link to="/planning" className="nv-btn nv-btn--soft">
-                Voir mon planning
-              </Link>
-            </div>
+            <Empty
+              whisper="Ton premier relevé arrive avec ton premier rapport validé."
+              text="Chaque rapport de fin de shift que l’agence valide compte ici, compte par compte, de tes ventes à ce que tu touches."
+              action={
+                <Link to="/planning" className="nv-btn nv-btn--soft">
+                  Voir mon planning
+                </Link>
+              }
+            />
           </Panel>
         </div>
       </Page>
@@ -361,9 +362,9 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                   </button>
                 ) : null}
                 {periods.isError && !lost ? (
-                  <p className="tm-warn" role="alert">
-                    Le serveur ne répond pas : les quinzaines plus anciennes n’ont pas pu être lues.
-                  </p>
+                  <Failure inline onRetry={() => void periods.fetchNextPage()}>
+                    Les quinzaines plus anciennes n’ont pas pu être lues : réessaie dans un instant.
+                  </Failure>
                 ) : null}
               </div>
             </Panel>

@@ -16,6 +16,7 @@ import '@/payroll/pay.css';
 import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
+import { Failure } from '@/shell/states';
 
 const STEPS = ['Remplir', 'Relire'] as const;
 
@@ -76,18 +77,12 @@ export function ReportGap(): JSX.Element {
       </div>
       {data === undefined ? (
         threshold.isError ? (
-          <div className="rp-account__now">
-            <p className="tm-warn">Le serveur ne répond pas : le seuil n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm tm-self-start"
-              onClick={() => {
-                void threshold.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure
+            inline
+            onRetry={() => {
+              void threshold.refetch();
+            }}
+          />
         ) : (
           <div className="sc-skeleton" aria-hidden="true">
             <i />

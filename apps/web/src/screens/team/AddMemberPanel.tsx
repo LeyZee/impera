@@ -346,7 +346,7 @@ export function AddMemberPanel({
         <div ref={scroller} className="tm-dialog__scroll">
           <header className="tm-dialog__head">
             <div className="tm-dialog__title">
-              <h2 id={`${id}-title`}>
+              <h2 className="nv-h2" id={`${id}-title`}>
                 {created !== null
                   ? `${created.member.displayName} est dans l’équipe`
                   : invite === undefined

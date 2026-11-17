@@ -43,7 +43,7 @@ export function InstallPage(): JSX.Element {
   const order: readonly Exclude<Platform, 'other'>[] =
     platform === 'android' ? ['android', 'ios'] : ['ios', 'android'];
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow={<OffRailBack />}
         title="Installer Impera"

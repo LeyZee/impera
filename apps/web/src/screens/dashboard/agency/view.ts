@@ -262,18 +262,7 @@ export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
   }).filter((slice) => slice.cents > 0 || slice.previousCents > 0);
 }
 
-/** Who sold, by family: the chatters together, the agent, a chatter nobody linked, no chatter. */
-const SELLER_SLICES: readonly {
-  readonly key: DashboardSalesSeller['kind'];
-  readonly label: string;
-  readonly colour: string;
-}[] = [
-  { key: 'member', label: 'Chatteurs', colour: 'var(--nv-data-1)' },
-  { key: 'agent', label: 'Agent IA', colour: 'var(--nv-agent)' },
-  { key: 'unlinked', label: 'Chatteur non relié', colour: 'var(--nv-data-2)' },
-  { key: 'none', label: 'Sans chatteur', colour: OTHER },
-];
-
+/** What a line of « Qui a vendu » that is not a member stands for, in its tip. */
 export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>> = {
   member: 'Les ventes des membres de l’équipe, reliés à leur compte Reveal.',
   agent: 'Ce que l’agent a vendu seul, sur la clé de l’agence.',
@@ -281,18 +270,23 @@ export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>
   none: 'Une vente sans chatteur : un abonnement, un renouvellement, un tip spontané.',
 };
 
-export function sellerSlices(sellers: AgencyInsights['sellers']): Slice[] {
-  return SELLER_SLICES.map((slice) => {
-    const mine = sellers.filter((one) => one.seller.kind === slice.key);
-    return {
-      key: slice.key,
-      label: slice.label,
-      colour: slice.colour,
-      cents: mine.reduce((sum, one) => sum + one.revenueMinor, 0),
-      previousCents: mine.reduce((sum, one) => sum + one.previousRevenueMinor, 0),
-      sales: mine.reduce((sum, one) => sum + one.sales, 0),
-    };
-  }).filter((slice) => slice.cents > 0);
+/** The lines of « Qui a vendu » that are no one's sale: under the sellers, in this order, never ranked. */
+const NOT_A_SELLER: readonly DashboardSalesSeller['kind'][] = ['unlinked', 'none'];
+
+/**
+ * « Qui a vendu » answers with sellers first (recette visuelle 16/11, PIL-03): the members and the agent ranked by
+ * revenue, the biggest first; then the sales of a chatter nobody linked and those with no chatter, unranked, at the
+ * bottom. The amounts are the server's, untouched.
+ */
+export function sellerRanking(sellers: AgencyInsights['sellers']): {
+  ranked: AgencyInsights['sellers'];
+  rest: AgencyInsights['sellers'];
+} {
+  const ranked = sellers
+    .filter((one) => !NOT_A_SELLER.includes(one.seller.kind))
+    .toSorted((a, b) => b.revenueMinor - a.revenueMinor);
+  const rest = NOT_A_SELLER.flatMap((kind) => sellers.filter((one) => one.seller.kind === kind));
+  return { ranked, rest };
 }
 
 /** One stack of the chart of the period: a kind's part of a day or an hour. */

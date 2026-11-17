@@ -3,14 +3,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 720px;
 }
 .me-prefs__body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--nv-space-3);
-  padding: 0 var(--nv-space-6) var(--nv-space-6);
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+/* The choice of theme starts on the panel's text, not 14 px inside it (CHA-13): its menu inset is for the rail. */
+.me-prefs .nv-appearance {
+  padding: 0;
 }
 .me-prefs__body > :first-child:not(p, a, button) {
   align-self: stretch;
@@ -39,7 +42,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 640px;
 }
 /* The facts start where the panel's title does, on a phone as on a computer. */
 .me-profile .tm-facts > div {

@@ -54,6 +54,7 @@ import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Empty, Failure } from '@/shell/states';
 
 /** The chatter's Planning in the address: the week, and the team's calendar by week or month (CR-12). */
 export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | undefined };
@@ -161,7 +162,7 @@ export function MyPlanningPage({
   });
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         title="Planning"
         lead={
@@ -240,30 +241,22 @@ export function MyPlanningPage({
             </div>
           ) : null}
         </div>
-        {members.isError && me === null ? (
-          <div className="sc-inline-warn sc-unread nv-swap" role="alert">
-            <p className="tm-warn">
-              Le serveur ne répond pas : ta fiche n’a pas pu être lue, et un congé ne peut pas encore être
-              demandé.
-            </p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void members.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+        {/* The planning silent says it for the page: the lines of its other reads keep quiet then (ETA-05). */}
+        {members.isError && me === null && !planning.isError ? (
+          <Failure
+            inline
+            className="sc-inline-warn sc-unread nv-swap"
+            onRetry={() => {
+              void members.refetch();
+            }}
+          >
+            Un congé ne peut pas encore être demandé : réessaie dans un instant.
+          </Failure>
         ) : null}
-        {reports.failed ? (
-          <div className="sc-inline-warn sc-unread nv-swap" role="alert">
-            <p className="tm-warn">Tes rapports n’ont pas pu être lus.</p>
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={reports.retry}>
-              Réessayer
-            </button>
-          </div>
+        {reports.failed && !planning.isError ? (
+          <Failure inline className="sc-inline-warn sc-unread nv-swap" onRetry={reports.retry}>
+            Tes rapports n’ont pas pu être lus : réessaie dans un instant.
+          </Failure>
         ) : null}
         {me === null || swaps.data === undefined ? null : (
           <Answers
@@ -280,6 +273,7 @@ export function MyPlanningPage({
             failed={planning.isError && agency === null}
             onRetry={() => {
               void (agency === null ? planning.refetch() : calendar.refetch());
+              if (members.isError) void members.refetch();
             }}
             days={window?.days ?? weekOf(monday)}
             month={byMonth ? month : null}
@@ -290,21 +284,12 @@ export function MyPlanningPage({
             onFocus={setFocus}
           />
         ) : planning.isError ? (
-          <Panel className="nv-coming">
-            <div className="nv-coming__in sc-notice">
-              <h2>Le serveur ne répond pas</h2>
-              <p>Ton planning n’a pas pu être lu. Réessaie dans un instant.</p>
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                onClick={() => {
-                  void planning.refetch();
-                }}
-              >
-                Réessayer
-              </button>
-            </div>
-          </Panel>
+          <Failure
+            onRetry={() => {
+              void planning.refetch();
+              if (members.isError) void members.refetch();
+            }}
+          />
         ) : planning.data === undefined || members.isPending ? (
           <Panel>
             <div className="sc-skeleton" aria-hidden="true">
@@ -513,7 +498,7 @@ function Week({
       aria-labelledby={`sc-day-${day}`}
       data-today={day === today ? 'true' : undefined}
     >
-      <h2 id={`sc-day-${day}`} className="sc-mine__date">
+      <h2 id={`sc-day-${day}`} className="nv-h3 sc-mine__date">
         {day === today ? 'Aujourd’hui' : longDay(day).replace(/^./u, (letter) => letter.toUpperCase())}
       </h2>
       <ul className="sc-mine__list">
@@ -544,14 +529,9 @@ function Week({
     return (
       <div className="sc-mine nv-swap" key={days[0]}>
         {leaves}
-        <Panel className="nv-coming">
-          <div className="nv-coming__in sc-notice">
-            <h2>Aucun shift cette semaine</h2>
-            <p>
-              Ton responsable te place sur le planning : tes shifts s’afficheront ici dès qu’ils sont posés.
-            </p>
-          </div>
-        </Panel>
+        <Empty plate title="Aucun shift cette semaine">
+          Ton responsable te place sur le planning : tes shifts s’afficheront ici dès qu’ils sont posés.
+        </Empty>
       </div>
     );
   }

@@ -138,7 +138,8 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
   it('says the figures do not load, with a way to try again', async () => {
     serve(500, null);
     show();
-    expect(await screen.findByText(/Les chiffres de tes fans n’ont pas pu être lus/u)).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });
 });
 

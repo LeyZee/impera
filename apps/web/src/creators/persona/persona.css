@@ -6,8 +6,8 @@
  */
 
 .ps-page {
-  /* Aligned on the large title, like every page: the eye goes down one edge. The stage scrolls, not the page. */
-  max-width: 820px;
+  /* Aligned on the large title, like every page: the eye goes down one edge. The stage scrolls, not the page. The
+     page's column bounds it (COH-02). */
   width: 100%;
   min-width: 0;
   margin: 0;
@@ -30,7 +30,6 @@
 /* Bounded by the sheet and set right above its head, not across the page (CREA-07). */
 .ps-leave {
   align-self: stretch;
-  max-width: 820px;
   margin: 0;
 }
 .ps-head__state:empty {
@@ -48,8 +47,7 @@
 
 /* ── Head: what dominates ── */
 .ps-head {
-  --_radius: var(--nv-radius-xl);
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -97,10 +95,6 @@
 }
 .ps-title {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
-  font-weight: 650;
   overflow-wrap: anywhere;
 }
 .ps-title[data-placeholder='true'] {
@@ -115,11 +109,15 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+/* The dot stands on the first line of the state, not in the middle of two when it wraps (recette visuelle 16/11). */
 .ps-head__state {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  min-height: 32px;
+  padding-block: calc((32px - var(--nv-text-callout-leading)) / 2);
+}
+.ps-head__state > .ps-dot {
+  margin-top: calc((var(--nv-text-callout-leading) - 9px) / 2);
 }
 .ps-head__text {
   font-size: var(--nv-text-callout);
@@ -245,9 +243,8 @@
 
 /* ── Panel: the work ── */
 .ps-panel {
-  --_radius: var(--nv-radius-xl);
   flex: none;
-  padding: 8px 22px 22px;
+  padding: 8px var(--nv-plate-pad) var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   animation: nv-enter var(--nv-dur-slow) var(--nv-ease-spring) both;
@@ -288,11 +285,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  letter-spacing: var(--nv-text-headline-tracking);
-  font-weight: 650;
-  color: var(--nv-ink);
 }
 .ps-lead {
   margin: 0;
@@ -645,7 +637,7 @@
   max-width: 100%;
   min-width: 0;
   /* A long passion wraps inside its tint, never cut. */
-  min-height: 28px;
+  min-height: var(--nv-pill-choice);
   padding: 3px 4px 3px 11px;
   border-radius: var(--nv-radius-full);
   background: var(--nv-select-strong);
@@ -787,11 +779,6 @@
 @media (max-width: 820px) {
   .ps-page {
     overflow: visible;
-  }
-  .ps-head,
-  .ps-panel {
-    padding-left: 16px;
-    padding-right: 16px;
   }
 }
 
@@ -1020,8 +1007,7 @@
  * each correction on its own line, its section a link to its tab, « Traitée » at its end.
  */
 .ps-corrections {
-  --_radius: var(--nv-radius-xl);
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
@@ -1034,10 +1020,6 @@
 }
 .ps-corrections__title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  letter-spacing: var(--nv-text-headline-tracking);
-  font-weight: 650;
 }
 .ps-corrections__count {
   flex: none;
@@ -1123,10 +1105,6 @@
   font-size: var(--nv-text-footnote);
 }
 @media (max-width: 640px) {
-  .ps-corrections {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
   .ps-corrections__head {
     flex-direction: column;
     align-items: stretch;
@@ -1138,7 +1116,6 @@
  * « Réactiver la version N » at its end. On a phone the action goes under the number and the day.
  */
 .ps-versions {
-  --_radius: var(--nv-radius-xl);
   padding: 6px 8px;
 }
 .ps-versions__lead {
@@ -1221,12 +1198,10 @@
   gap: 10px;
 }
 .ps-sheet-panel {
-  --_radius: var(--nv-radius-xl);
   min-width: 0;
 }
 .ps-sheet-panel__heading {
   margin: 0;
-  font: inherit;
 }
 /* The whole header folds the panel: icon, title, then what is left to fix, the share answered and the chevron. */
 .ps-sheet-panel__toggle {
@@ -1234,17 +1209,15 @@
   width: 100%;
   min-height: 56px;
   margin: 0;
-  padding: 10px 18px 10px 20px;
+  padding: 10px var(--nv-plate-pad);
   display: flex;
   align-items: center;
   gap: 12px;
   border: 0;
   border-radius: var(--_radius);
   background: none;
+  /* The heading's own type (nv-h3), as every title inside a card (COH-05). */
   font: inherit;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  font-weight: 600;
   color: var(--nv-ink);
   text-align: left;
   cursor: pointer;
@@ -1302,7 +1275,7 @@
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 18px 16px;
-  padding: 18px 20px 22px;
+  padding: 18px var(--nv-plate-pad) var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }

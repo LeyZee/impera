@@ -28,9 +28,10 @@ beforeEach(() => {
       disconnect = vi.fn();
     },
   );
+  // A computer's width: the list stands beside the section open.
   vi.stubGlobal(
     'matchMedia',
-    vi.fn(() => ({ matches: true })),
+    vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
   // The pages stay on their loading state: only the tabs are under test.
   vi.stubGlobal(
@@ -44,10 +45,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function settingsTabs(user: Me): Promise<string[]> {
+async function settingsTabs(user: Me, at = '/reglages/modeles-ia'): Promise<string[]> {
   const router = createAppRouter(
     { user, onSignOut: () => undefined },
-    createMemoryHistory({ initialEntries: ['/reglages/modeles-ia'] }),
+    createMemoryHistory({ initialEntries: [at] }),
   );
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -60,7 +61,7 @@ async function settingsTabs(user: Me): Promise<string[]> {
     .map((link) => link.textContent);
 }
 
-describe('Réglages tabs', () => {
+describe('Réglages’ list', () => {
   it('gives Telegram to the owner, whom the server serves it to', async () => {
     expect(await settingsTabs(owner)).toContain('Telegram');
   });
@@ -80,6 +81,70 @@ describe('Réglages tabs', () => {
     const tabs = await settingsTabs(owner);
     expect(tabs).not.toContain('Appareils');
     expect(tabs).not.toContain('Mode de l’agent');
+  });
+});
+
+describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
+  it('groups its sections by theme under a title in sentence case, in the order the tabs had', async () => {
+    const lines = await settingsTabs(owner);
+    expect(lines).toEqual([
+      'Modèles IA',
+      'Ventes',
+      'Consommation IA',
+      'Alertes',
+      'Telegram',
+      'Règles de paie',
+      'Facturation',
+      'Sauvegardes',
+      'Sécurité',
+    ]);
+    const nav = screen.getByRole('navigation', { name: 'Réglages' });
+    expect([...nav.querySelectorAll('.rgl-list__group')].map((title) => title.textContent)).toEqual([
+      'Connexions',
+      'IA et alertes',
+      'Paie et factures',
+      'Données et accès',
+    ]);
+  });
+
+  it('names the section open as the title, « Réglages » above it, and lights its line', async () => {
+    await settingsTabs(owner, '/reglages/regles-de-paie');
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe('Règles de paie');
+    const header = document.querySelector<HTMLElement>('.nv-page__head');
+    if (header === null) throw new Error('no header');
+    expect(within(header).getByText('Réglages').className).toBe('rgl-eyebrow');
+    expect(within(header).getByRole('link', { name: '← Réglages' }).getAttribute('href')).toBe('/reglages');
+    const nav = screen.getByRole('navigation', { name: 'Réglages' });
+    expect(within(nav).getByRole('link', { name: 'Règles de paie' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+  });
+
+  it('is the screen of Réglages on a phone: the list alone, with no section open', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+    const lines = await settingsTabs(owner, '/reglages');
+    expect(lines).toHaveLength(9);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Réglages');
+    expect(screen.queryByRole('link', { name: '← Réglages' })).toBeNull();
+    expect(document.querySelector('.rgl-body')?.hasAttribute('data-open')).toBe(false);
+  });
+
+  it('opens on its first section on a computer', async () => {
+    const router = createAppRouter(
+      { user: owner, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: ['/reglages'] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(router.state.location.pathname).toBe('/reglages/modeles-ia');
+    });
   });
 });
 

@@ -83,7 +83,7 @@ export function Block({
   return (
     <section className="ps-block">
       {title === undefined ? null : (
-        <h3 className="ps-block__title">
+        <h3 className="nv-h3 ps-block__title">
           {title}
           {code ? <CodeTag /> : null}
         </h3>
