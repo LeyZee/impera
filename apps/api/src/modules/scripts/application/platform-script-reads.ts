@@ -1,4 +1,11 @@
-import type { BranchCondition, CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
+import type {
+  BranchCondition,
+  CreatorId,
+  Currency,
+  MediaSlotKind,
+  PlatformStepDiscount,
+  UserRole,
+} from '@impera/contracts';
 
 import { branchGaps, conditionOf, ranksOf, stepsWithoutDefault } from '../domain/branches';
 import {
@@ -9,6 +16,7 @@ import {
 } from '../domain/platform-scripts';
 import type {
   BranchInput,
+  DiscountedPlatformScript,
   IdentityReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
@@ -48,6 +56,8 @@ interface PlatformStepView {
   /** As the platform gives it: minor units, VAT included; 0 for an offered step. Never recalculated. */
   readonly priceMinor: number;
   readonly currency: Currency;
+  /** A « Tarif réduit » set on the platform; `null` when none. The step is blocked while it has one. */
+  readonly discount: PlatformStepDiscount | null;
   readonly media: readonly PlatformStepMediaView[];
   readonly previewMedia: readonly PlatformStepMediaView[];
   /** Every media of the step is in the vault. */
@@ -133,7 +143,10 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     soldMediaRefs: step.media.map((media) => media.ref),
   }));
   const gaps = platformScriptGaps(
-    steps.map((step) => ({ media: [...step.media, ...step.previewMedia] })),
+    steps.map((step) => ({
+      discounted: step.discount !== null,
+      media: [...step.media, ...step.previewMedia],
+    })),
     identity?.validatedAt != null,
     branchGaps(branchSteps, script.branches),
   );
@@ -172,6 +185,20 @@ export async function creatorPlatformScripts(
   const scripts = await deps.store.ofCreator(creatorId, reader.userId);
   if (scripts === null) return null;
   return scripts.map(viewOf);
+}
+
+/**
+ * Her active native scripts kept from being offered by a « Tarif réduit » on the platform (recette 16/11: bloquer et
+ * alerter), the longest waiting first: what « À traiter » warns of until the agency takes the discount off in Reveal.
+ * The owner and her active managers only, like `creatorPlatformScripts`; `null` for a reader who may not read her.
+ */
+export async function discountedPlatformScripts(
+  deps: Deps,
+  reader: PlatformScriptsReader,
+  creatorId: CreatorId,
+): Promise<readonly DiscountedPlatformScript[] | null> {
+  if (reader.role !== 'owner' && reader.role !== 'operator') return null;
+  return deps.store.discountedOf(creatorId, reader.userId);
 }
 
 /**

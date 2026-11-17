@@ -22,6 +22,7 @@ import type {
 import {
   ConnectorError,
   ScriptStepAlreadySent,
+  ScriptStepDiscounted,
   ScriptStepPriceChanged,
   type PlatformConnector,
 } from '../../domain/platform-connector';
@@ -334,8 +335,9 @@ export class RevealApiConnector implements PlatformConnector {
    * One step of a platform script (spec §§ 5, 6; ADR 0018 § 5): its text, its media and its price as `scripts.list`
    * gives them, never a price of ours. The fan's history is read again just before: a step already sent in this
    * conversation is refused for good (`ScriptStepAlreadySent`), and a history that cannot be read sends nothing. The
-   * price `scripts.list` gives must be the one validated (`expectedPrice`), or nothing is sent (`ScriptStepPriceChanged`).
-   * The step is found by its own id in the script (`stepRef`): a branch is never found by its place (ADR 0112 § 1).
+   * price `scripts.list` gives must be the one validated (`expectedPrice`), or nothing is sent (`ScriptStepPriceChanged`);
+   * a step with a « Tarif réduit » on it sends nothing either (`ScriptStepDiscounted`, recette 16/11). The step is found
+   * by its own id in the script (`stepRef`): a branch is never found by its place (ADR 0112 § 1).
    */
   async sendScriptStep(
     conversationRef: ExternalRef,
@@ -361,6 +363,8 @@ export class RevealApiConnector implements PlatformConnector {
     if (step.priceMinor !== expectedPrice.amountMinor || step.currency !== expectedPrice.currency) {
       throw new ScriptStepPriceChanged();
     }
+    // Never sold at a discount, whatever its full price: the fan would pay what nobody chose.
+    if (step.discount !== null) throw new ScriptStepDiscounted();
     const mediaIds = step.media.map((item) => item.ref.id);
     return this.send(conversationRef, prior, { text: step.text, scriptRef: step.ref.id, mediaIds }, () => ({
       scriptId: step.ref.id,

@@ -72,8 +72,9 @@ export interface PlatformConnector {
    * `scripts`: sends one step of a platform script, priced as the platform lists it (never by us). The history is read
    * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
    * `expectedPrice` is the step's price as the person or the agent validated it: the platform listing another one
-   * just before sends nothing (`ScriptStepPriceChanged`). The step is named by its own ref (`stepRef`), never by its
-   * place: the branches of a step share a rank and come in no stable order (ADR 0112 § 1).
+   * just before sends nothing (`ScriptStepPriceChanged`), and so does a reduced price set on the step there
+   * (`ScriptStepDiscounted`). The step is named by its own ref (`stepRef`), never by its place: the branches of a step
+   * share a rank and come in no stable order (ADR 0112 § 1).
    */
   sendScriptStep?(
     conversationRef: ExternalRef,
@@ -134,5 +135,18 @@ export class ScriptStepPriceChanged extends ConnectorError {
   constructor() {
     super('fatal', 'script_price_changed');
     this.name = 'ScriptStepPriceChanged';
+  }
+}
+
+/**
+ * The step carries a reduced price for a time on the platform (Reveal's « Tarif réduit »): Impera never sells at a
+ * discount, so nothing is sent, as for a changed price (Charles, recette 16/11). `fatal`: the draft fails for good
+ * and is never retried; once the agency takes the discount off on the platform, the next import makes the script
+ * proposable again and only a new proposal sends the step.
+ */
+export class ScriptStepDiscounted extends ConnectorError {
+  constructor() {
+    super('fatal', 'script_step_discounted');
+    this.name = 'ScriptStepDiscounted';
   }
 }

@@ -2,8 +2,12 @@ import {
   PLANNING_MAX_DAYS,
   SHIFT_MAX_MINUTES,
   SHIFT_TEMPLATE_HORIZON_DAYS,
+  type CreatorId,
+  type PlanningAway,
   type PlanningConflict,
+  type PlanningWithoutAccess,
   type SchedulingSettings,
+  type TeamMemberId,
   type TeamMemberStatus,
   type TeamScope,
 } from '@impera/contracts';
@@ -100,6 +104,69 @@ export function assertCanWork(member: WorkingMember, creatorId: string, startsAt
   if (member.status !== 'active') throw new MemberNotActive();
   if (!member.creatorIds.includes(creatorId)) throw new MemberCreatorConflict();
   assertJoined(member, startsAt);
+}
+
+/**
+ * A shift its member holds (recette EQP-03, EQU-01): he is at work (`active`) and its creator is still on his list, so
+ * he reads her. Any other shift stays planned and drawn, held by nobody: its créneau is to fill, and nobody is « en
+ * poste » on it. A member the read does not name holds nothing.
+ */
+export function holdsShift(
+  member: Pick<WorkingMember, 'status' | 'creatorIds'> | undefined,
+  shift: { readonly creatorId: string },
+): boolean {
+  return member?.status === 'active' && member.creatorIds.includes(shift.creatorId);
+}
+
+/**
+ * What `shifts` cover, as of `now` (recette EQU-01, EQU-02): a shift its member holds, whole; one he no longer holds,
+ * only what went by. The rule is read from now on: the past stays as it was planned, never emptied by a status or a
+ * list changed since.
+ */
+export function heldUntil<
+  T extends {
+    readonly memberId: string;
+    readonly creatorId: string;
+    readonly startsAt: Date;
+    readonly endsAt: Date;
+  },
+>(
+  members: ReadonlyMap<string, Pick<WorkingMember, 'status' | 'creatorIds'>>,
+  shifts: readonly T[],
+  now: Date,
+): T[] {
+  return shifts.flatMap((shift) => {
+    if (holdsShift(members.get(shift.memberId), shift)) return [shift];
+    if (shift.startsAt >= now) return [];
+    return [shift.endsAt <= now ? shift : { ...shift, endsAt: now }];
+  });
+}
+
+/**
+ * Why nobody holds some of `shifts`, as Planning and the calendar tell the agency: the members not at work, with their
+ * status, and each member with a creator of his shifts no longer on his list (recette EQP-03, EQU-01). A member away
+ * may be in both: the screen says his status first.
+ */
+export function unheldOf(
+  members: readonly (Pick<WorkingMember, 'status' | 'creatorIds'> & { readonly id: TeamMemberId })[],
+  shifts: readonly { readonly memberId: string; readonly creatorId: CreatorId }[],
+): { away: PlanningAway[]; withoutAccess: PlanningWithoutAccess[] } {
+  const named = new Set(shifts.map((shift) => shift.memberId));
+  const byId = new Map<string, (typeof members)[number]>(members.map((member) => [member.id, member]));
+  const pairs = new Map<string, PlanningWithoutAccess>();
+  for (const shift of shifts) {
+    const member = byId.get(shift.memberId);
+    if (member === undefined || member.creatorIds.includes(shift.creatorId)) continue;
+    pairs.set(`${member.id}|${shift.creatorId}`, { memberId: member.id, creatorId: shift.creatorId });
+  }
+  return {
+    away: members.flatMap((member) =>
+      named.has(member.id) && member.status !== 'active'
+        ? [{ memberId: member.id, status: member.status }]
+        : [],
+    ),
+    withoutAccess: [...pairs.values()],
+  };
 }
 
 /** No shift before the member's first day, read in the agency's zone (a moved shift keeps its member). */
