@@ -215,6 +215,15 @@ async function seedCreator(admin: Database, label: string) {
       fingerprint: 'a'.repeat(64),
       attemptStartedAt: at,
     });
+    await tx.insert(s.connectorNoteLines).values({
+      creatorId,
+      platformAccountId: accountId,
+      platformFanId: `fan-${label}`,
+      slot: 'job',
+      lineHash: `v1:${'b'.repeat(64)}`,
+      owner: 'agent',
+      updatedAt: at,
+    });
     await tx.insert(s.killSwitches).values({
       id: newId(MessageIdSchema),
       scope: 'creator',
@@ -231,6 +240,7 @@ async function seedCreator(admin: Database, label: string) {
 const TENANT_TABLES = {
   platform_accounts: s.platformAccounts,
   connector_sends: s.connectorSends,
+  connector_note_lines: s.connectorNoteLines,
   fans: s.fans,
   fan_facts: s.fanFacts,
   fan_summaries: s.fanSummaries,

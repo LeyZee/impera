@@ -52,6 +52,8 @@ export function wireConnectors(
     readonly onVaultSyncAsked?: ConnectorsDeps['onVaultSyncAsked'];
     /** Each sync that went through (ADR 0113 § 5), late bound: `media`, wired after, queues the vault's description. */
     readonly onVaultSynced?: ConnectorsDeps['onVaultSynced'];
+    /** Who a fan is and what his card says (`fans`, ADR 0117 § 4): his client note on the platform follows it. */
+    readonly fanNotes?: ConnectorsDeps['fanNotes'];
     /** Tests only: the connectors' clock. */
     readonly now?: () => Date;
     /** Tests only: the photo copy's fetch and store (CRM-07 a2b). */
@@ -108,6 +110,7 @@ export function wireConnectors(
     ...(deps.now !== undefined && { clock: { now: deps.now } }),
     ...(deps.onVaultSyncAsked !== undefined && { onVaultSyncAsked: deps.onVaultSyncAsked }),
     ...(deps.onVaultSynced !== undefined && { onVaultSynced: deps.onVaultSynced }),
+    ...(deps.fanNotes !== undefined && { fanNotes: deps.fanNotes }),
   });
   return {
     module,
@@ -166,6 +169,12 @@ export function wireConnectors(
         JOB_PAYLOADS['connector.vault_sync'],
         logger,
         (payload, context) => module.jobs.vaultSync(payload, context.logger),
+      ),
+      'connector.sync_fan_note': defineTask(
+        'connector.sync_fan_note',
+        JOB_PAYLOADS['connector.sync_fan_note'],
+        logger,
+        (payload, context) => module.jobs.syncFanNote(payload, context.logger),
       ),
     },
     routes: [

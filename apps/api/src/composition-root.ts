@@ -74,7 +74,7 @@ import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
-import { wireFans } from './wiring/fans';
+import { fanNoteSourceOf, wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
 import { wireMedia, wireVaultDescriptions } from './wiring/media';
@@ -302,6 +302,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     onVaultSyncAsked: (input) => scripts.module.askImport(input),
     // The description of the vault's media still without a file, queued behind each sync that went through (ADR 0113).
     onVaultSynced: (input) => vaultDescriptions.vault.enqueue(input),
+    // His client note on the platform follows his card (ADR 0117).
+    fanNotes: fanNoteSourceOf(fans.module),
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),

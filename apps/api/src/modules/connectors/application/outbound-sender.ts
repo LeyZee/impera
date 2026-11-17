@@ -15,6 +15,14 @@ import type { ConnectorResolver } from './resolver';
 
 type ConversationKey = Parameters<OutboundSender['sendText']>[0];
 
+/** A fan of one account (ADR 0117): his note is his, not a conversation's. */
+interface FanOfAccount {
+  readonly creatorId: ConversationKey['creatorId'];
+  readonly platformAccountId: ConversationKey['platformAccountId'];
+  /** The fan as the platform names him. */
+  readonly platformFanId: string;
+}
+
 /**
  * The writes of ADR 0018 beside the sends of `OutboundSender`, through the same guarded entry point (`run`, writes:
  * true). Each is called only when the connector declares it (`capable`).
@@ -38,6 +46,10 @@ export interface ConnectorWrites {
     text: string,
     idempotencyKey: string,
   ): Promise<void>;
+  /** `fanNoteRead`: his client note read live, never kept (ADR 0018 § 1). Not a write: the guard does not apply. */
+  readFanNote(fan: FanOfAccount): Promise<string>;
+  /** `fanNoteWrite`: the canvas lines of his client note (ADR 0117), through the write guard. */
+  writeFanNote(fan: FanOfAccount, block: string, idempotencyKey: string): Promise<void>;
   /** `markRead`. */
   markRead(conversation: ConversationKey): Promise<void>;
   /** `typing`. */
@@ -73,12 +85,13 @@ export function createOutboundSender(deps: {
   readonly resolver: ConnectorResolver;
   readonly clock: Clock;
 }): OutboundSender & ConnectorWrites {
-  async function run<T>(
-    conversation: ConversationKey,
-    action: (connector: PlatformConnector, ref: ExternalRef) => Promise<T>,
+  async function onAccount<T>(
+    target: Pick<ConversationKey, 'creatorId' | 'platformAccountId'>,
+    trace: string,
+    action: (connector: PlatformConnector, platform: ExternalRef['platform']) => Promise<T>,
     writes: boolean,
   ): Promise<T> {
-    const account = await deps.accounts.get(conversation.creatorId, conversation.platformAccountId);
+    const account = await deps.accounts.get(target.creatorId, target.platformAccountId);
     if (account === null) throw new PlatformAccountNotFound();
     if (writes && !account.config.writes) {
       throw new SendRefused('connector_writes_disabled', 'Envoi désactivé pour ce compte (garde d’écriture)');
@@ -86,7 +99,7 @@ export function createOutboundSender(deps: {
     const connector = await deps.resolver.forAccount(account);
     if (connector === null) throw new ConnectorUnavailable();
     try {
-      return await action(connector, { platform: account.platform, id: conversation.platformConversationId });
+      return await action(connector, account.platform);
     } catch (error) {
       if (error instanceof ScriptStepAlreadySent) {
         throw new SendRefused(
@@ -109,13 +122,30 @@ export function createOutboundSender(deps: {
       if (!(error instanceof ConnectorError)) throw error;
       if (error.code === 'session_expired') {
         await deps.accounts.setSessionState(account.creatorId, account.id, 'expired', {
-          correlationId: `send:${conversation.id}`,
+          correlationId: trace,
           at: deps.clock.now(),
         });
       }
       throw new ConnectorFailed(error.code, { cause: error });
     }
   }
+
+  const run = <T>(
+    conversation: ConversationKey,
+    action: (connector: PlatformConnector, ref: ExternalRef) => Promise<T>,
+    writes: boolean,
+  ): Promise<T> =>
+    onAccount(
+      conversation,
+      `send:${conversation.id}`,
+      (connector, platform) => action(connector, { platform, id: conversation.platformConversationId }),
+      writes,
+    );
+
+  const fanRef = (fan: FanOfAccount, platform: ExternalRef['platform']): ExternalRef => ({
+    platform,
+    id: fan.platformFanId,
+  });
 
   return {
     sendText: (conversation, text, key) => run(conversation, (c, ref) => c.sendText(ref, text, key), true),
@@ -152,6 +182,21 @@ export function createOutboundSender(deps: {
           capable(c, 'fanNoteWrite', (d) =>
             d.setFanNote?.({ platform: ref.platform, id: platformFanId }, text, key),
           ),
+        true,
+      ),
+    readFanNote: (fan) =>
+      onAccount(
+        fan,
+        `fan-note:${fan.platformFanId}`,
+        async (c, platform) =>
+          (await capable(c, 'fanNoteRead', (d) => d.getFanNote?.(fanRef(fan, platform)))).text,
+        false,
+      ),
+    writeFanNote: (fan, block, key) =>
+      onAccount(
+        fan,
+        `fan-note:${fan.platformFanId}`,
+        (c, platform) => capable(c, 'fanNoteWrite', (d) => d.setFanNote?.(fanRef(fan, platform), block, key)),
         true,
       ),
     markRead: (conversation) =>

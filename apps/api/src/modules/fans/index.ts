@@ -1,4 +1,4 @@
-import { KycSlotSchema, type CreatorId, type KycSlot } from '@impera/contracts';
+import { KycSlotSchema, type CreatorId, type FanId, type KycSlot } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -55,14 +55,45 @@ export interface FansDeps {
   readonly db: Database;
   /** Owner role: the retention purge runs for every creator at once. */
   readonly adminDb: Database;
+  /**
+   * Told once his facts changed (a proposal, the AI's read, a chatter's edit), after the write: the platform's note
+   * follows (ADR 0117 § 5). It must not throw: the write is done, the composition root logs a failure to queue.
+   */
+  readonly onFactsChanged?: (creatorId: CreatorId, fanId: FanId) => Promise<void>;
+}
+
+/** The writes of facts, each followed by `onFactsChanged` when it wrote something (ADR 0117 § 5). */
+function told(service: FansService, onFactsChanged: FansDeps['onFactsChanged']): FansService {
+  if (onFactsChanged === undefined) return service;
+  return {
+    ...service,
+    proposeFacts: async (creatorId, fanId, proposals) => {
+      const written = await service.proposeFacts(creatorId, fanId, proposals);
+      if (written.length > 0) await onFactsChanged(creatorId, fanId);
+      return written;
+    },
+    proposeRead: async (creatorId, fanId, read, sources) => {
+      const written = await service.proposeRead(creatorId, fanId, read, sources);
+      if (written.length > 0) await onFactsChanged(creatorId, fanId);
+      return written;
+    },
+    editCard: async (creatorId, fanId, field, edit, author) => {
+      const card = await service.editCard(creatorId, fanId, field, edit, author);
+      await onFactsChanged(creatorId, fanId);
+      return card;
+    },
+  };
 }
 
 export function createFansModule(deps: FansDeps): FansModule {
   const purge = createDrizzleFactPurge(deps.adminDb);
-  const service = createFansService(
-    createDrizzleFanStore(deps.db),
-    createDrizzleFactStore(deps.db),
-    createDrizzleFlagStore(deps.db),
+  const service = told(
+    createFansService(
+      createDrizzleFanStore(deps.db),
+      createDrizzleFactStore(deps.db),
+      createDrizzleFlagStore(deps.db),
+    ),
+    deps.onFactsChanged,
   );
   return {
     name: 'fans',

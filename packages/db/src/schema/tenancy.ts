@@ -1,6 +1,7 @@
 import { PlatformSchema, SessionStateSchema } from '@impera/contracts';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   customType,
   foreignKey,
@@ -8,6 +9,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   unique,
   uniqueIndex,
@@ -115,6 +117,8 @@ export const platformAccounts = pgTable(
 /** States of a `connector_sends` row: the outcome is unknown until the platform's message id is known. */
 const CONNECTOR_SEND_STATES = ['pending', 'sent'] as const;
 
+const CONNECTOR_NOTE_LINE_OWNERS = ['agent', 'human'] as const;
+
 /**
  * The connector's own sends (reveal-connector-spec.md § 5, P2-03): a platform without a nonce (Reveal) makes two
  * messages of two sends, so each attempt is recorded before the call, under its idempotency key, and given the
@@ -160,6 +164,48 @@ export const connectorSends = pgTable(
       .where(sql`${t.platformMessageId} is not null`),
     index('connector_sends_conversation_idx').on(t.platformAccountId, t.platformConversationId),
     index('connector_sends_creator_idx').on(t.creatorId),
+    tenantPolicy(t.creatorId),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * The canvas lines of a fan's client note the agent wrote last (ADR 0117 § 3), one row per account, fan and line:
+ * never the line, its keyed mark (`<key version>:<HMAC-SHA-256>`, key derived from the session keys, never stored), to
+ * know whether a human changed it since. `owner`: `agent` for a line it filled, `human`
+ * for a human's line it completed or corrected; `corrected`: it corrected the human's value once; `locked`: a human
+ * changed the line after that correction, so it is only ever completed. Written by the connector inside the creator's
+ * tenant; never deleted by the application.
+ */
+export const connectorNoteLines = pgTable(
+  'connector_note_lines',
+  {
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    platformFanId: text('platform_fan_id').notNull(),
+    slot: text('slot').notNull(),
+    lineHash: text('line_hash').notNull(),
+    owner: enumText('owner').notNull(),
+    corrected: boolean('corrected').notNull().default(false),
+    locked: boolean('locked').notNull().default(false),
+    updatedAt: timestampTz('updated_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ name: 'connector_note_lines_pk', columns: [t.platformAccountId, t.platformFanId, t.slot] }),
+    enumCheck('connector_note_lines', t.owner, CONNECTOR_NOTE_LINE_OWNERS),
+    check('connector_note_lines_hash_check', sql`${t.lineHash} ~ '^[a-z0-9]{1,16}:[0-9a-f]{64}$'`),
+    check(
+      'connector_note_lines_slot_check',
+      sql`${t.slot} in ('first_name', 'location', 'age', 'job', 'hobbies', 'desires', 'situation')`,
+    ),
+    foreignKey({
+      name: 'connector_note_lines_account_creator_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    index('connector_note_lines_creator_idx').on(t.creatorId),
     tenantPolicy(t.creatorId),
     closedToCreator(),
   ],

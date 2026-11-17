@@ -17,3 +17,5 @@ ADR 0117, ADR 0018, ADR 0085, `docs/reference/reveal-connector-spec.md`, `docs/r
 
 ## Résultat
 - Lot 0 : ADR acceptée le 16/11.
+- Lot a : fait (domaine `agency-note.ts` testé, table `connector_note_lines`, job `connector.sync_fan_note` mis en file par `onFactsChanged` du module `fans`, tests contre FakeReveal en unitaire et en intégration). Numéro de migration provisoire 0221, fixé au signal de fusion.
+- Lot b : attend l'observation de l'écriture du prénom sur le compte fan test.
