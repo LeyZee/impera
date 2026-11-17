@@ -13,6 +13,7 @@ export const CRM_SECTIONS = [
   '/aujourdhui',
   '/agenda',
   '/suivi',
+  '/fans',
   '/entrainer',
   '/planning',
   '/commissions',
@@ -32,6 +33,7 @@ export const CRM_SECTION_LABELS: Readonly<Record<CrmSection, string>> = {
   '/aujourdhui': 'Aujourd’hui',
   '/agenda': 'Agenda',
   '/suivi': 'Suivi',
+  '/fans': 'Fans',
   '/entrainer': 'Entraîner',
   '/planning': 'Planning',
   '/commissions': 'Commissions',
@@ -68,6 +70,8 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
     sections: [
       ['/', null],
       ['/suivi', 'chatting'],
+      // Every fan of a creator, for the agency (ADR 0124 § 4): the owner's and an active manager's.
+      ['/fans', 'chatting'],
       ['/entrainer', 'chatting'],
       ['/equipe', 'agency'],
       ['/paie', 'agency'],
@@ -81,6 +85,7 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
     sections: [
       ['/', null],
       ['/suivi', null],
+      ['/fans', null],
       ['/equipe', null],
       ['/paie', null],
       // Her agenda alone (CR-05 lot c, Charles, 05/11): the other sheets of Créatrices stay the owner's.

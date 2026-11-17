@@ -2,9 +2,8 @@ import { execFile } from 'node:child_process';
 import { availableParallelism } from 'node:os';
 import { promisify } from 'node:util';
 
+import type { FileFamily } from '@impera/contracts';
 import { z } from 'zod';
-
-import type { FileFamily } from '../../domain/sniff';
 
 const execFileAsync = promisify(execFile);
 

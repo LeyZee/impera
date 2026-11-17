@@ -93,8 +93,9 @@ export function trophyCaseOf(
             rank: ahead.rank,
             name: ahead.name,
             thresholdMinor: ahead.thresholdMinor,
-            // A refund may bring the net under a rank already held: the bar never reads below zero.
-            currentMinor: Math.max(0, Math.min(progress.cumulatedNetMinor, ahead.thresholdMinor)),
+            // The true net, even past the threshold while the job has not noted the rank yet (recette CHT-08):
+            // the screen caps its bar, not the figure. A refund may bring it under zero: never shown below.
+            currentMinor: Math.max(0, progress.cumulatedNetMinor),
             currency: progress.currency,
           },
   };

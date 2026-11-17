@@ -22,7 +22,7 @@ import {
   moneyTip,
   OTHER,
   SERIES,
-  sellerSlices,
+  sellerRanking,
   sharesOf,
   shortEuros,
   slotLabel,
@@ -56,16 +56,15 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     ]);
   });
 
-  it('groups who sold by family, the chatters together, in colours no kind of sale wears', () => {
-    const slices = sellerSlices(AGENCY_WEEK.sellers);
-    expect(slices.map((slice) => [slice.label, slice.cents])).toEqual([
-      ['Chatteurs', 98_000],
-      ['Agent IA', 44_600],
-      ['Sans chatteur', 42_000],
-    ]);
-    expect(slices.find((slice) => slice.key === 'agent')?.colour).toBe('var(--nv-agent)');
-    const kinds = new Set<string>(SERIES);
-    expect(slices.filter((slice) => kinds.has(slice.colour))).toEqual([]);
+  it('ranks the sellers by revenue, then the sales of no seller, unranked, at the bottom (PIL-03)', () => {
+    const [theo, agent, none] = AGENCY_WEEK.sellers;
+    if (theo === undefined || agent === undefined || none === undefined) throw new Error('fixture');
+    const unlinked = { ...none, seller: { kind: 'unlinked' as const }, revenueMinor: 500_000 };
+    const big = { ...none, revenueMinor: 900_000 };
+    const { ranked, rest } = sellerRanking([big, agent, unlinked, theo]);
+    expect(ranked).toEqual([theo, agent]);
+    // However big, a sale of no seller never heads the ranking.
+    expect(rest).toEqual([unlinked, big]);
   });
 
   it('cuts a day by kind, in the ring’s order and colours', () => {

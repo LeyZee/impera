@@ -37,8 +37,8 @@ import { useNow } from '@/scheduling/useNow';
 import { MyFortnightCard } from '@/screens/pay/MyFigures';
 import { useMembers } from '@/screens/team/api';
 import { todosAcrossQuery } from '@/screens/tracking/api';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
@@ -66,12 +66,11 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
   });
 
   return (
-    <Page>
+    <Page width="narrow">
       {/* The title and the day say it all: no sentence under them (D-03). */}
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" />
       {mine.isError ? (
-        <ServerSilent
-          text="Tes shifts n’ont pas pu être lus. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void mine.refetch();
           }}
@@ -163,7 +162,7 @@ function Day({
         <MyAwayCard status={away} />
       )}
       {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
-      {away === null ? <ShiftChallengeCard user={user} /> : null}
+      {away === null ? <ShiftChallengeCard user={user} zone={zone} /> : null}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
       {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
@@ -217,7 +216,7 @@ function Hero({
     return (
       <Panel className="sc-hero sc-hero--none nv-enter">
         <p className="sc-hero__kicker">Aucun shift prévu</p>
-        <h2 className="sc-hero__title">Rien pour l’instant</h2>
+        <h2 className="nv-h2 sc-hero__title">Rien pour l’instant</h2>
         <p className="sc-hero__note">
           Ton responsable te place sur le planning : ton prochain shift s’affichera ici.
         </p>
@@ -258,7 +257,7 @@ function Hero({
         </span>
       </div>
       <div className="sc-hero__who">
-        <h2 className="sc-hero__title">{shift.creatorName}</h2>
+        <h2 className="nv-h2 sc-hero__title">{shift.creatorName}</h2>
         <p className="sc-hero__where">{accountLine(shift)}</p>
       </div>
       <p className="sc-hero__hours nv-num">

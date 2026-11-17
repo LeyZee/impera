@@ -218,7 +218,9 @@ export function ConnectSheet({
             <circle cx="26" cy="26" r="24" />
             <path d="M15 27l7 7 15-15" />
           </svg>
-          <h3 id="sv-sheet-title">{guide.name} est connecté</h3>
+          <h3 className="nv-h2" id="sv-sheet-title">
+            {guide.name} est connecté
+          </h3>
         </div>
         <dl className="sv-facts">
           {status.facts
@@ -274,7 +276,7 @@ export function ConnectSheet({
     <Scrim onClose={close}>
       <header className="sv-sheet__head">
         <div className="sv-sheet__title">
-          <h3 id="sv-sheet-title">
+          <h3 className="nv-h2" id="sv-sheet-title">
             {isReplace ? `Remplacer la clé de ${guide.name}` : `Connecter ${guide.name}`}
           </h3>
           <p>{guide.role}</p>

@@ -6,6 +6,7 @@ import { STATUS_LABELS, STATUS_TONES } from './model';
 import { initialOf } from '@/lib/utils';
 import '@/scheduling/exchanges.css';
 import { Panel } from '@/shell/layout';
+import { Empty } from '@/shell/states';
 
 /** The pieces the list, the sheet and the add panel share. */
 
@@ -42,13 +43,9 @@ export function Notice({
   children?: ReactNode;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tm-notice">
-        <h2>{title}</h2>
-        <p>{text}</p>
-        {children}
-      </div>
-    </Panel>
+    <Empty plate title={title} action={children}>
+      {text}
+    </Empty>
   );
 }
 

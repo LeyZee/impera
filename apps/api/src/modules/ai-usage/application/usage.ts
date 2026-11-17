@@ -7,7 +7,7 @@ import {
 } from '@impera/contracts';
 
 import type { Clock, CreditActor, CreditAlerts, CreditLedger, UsageReader } from '../domain/ports';
-import { aiUsage, countFrom, type CapReading } from '../domain/usage';
+import { aiUsage, countFrom, type CapReading, type VoiceQuotaReading } from '../domain/usage';
 
 export interface UsageDeps {
   readonly reader: UsageReader;
@@ -19,6 +19,8 @@ export interface UsageDeps {
   /** The cap's day and rate (`DEFAULT_LLM_CONFIG.dailyBudget`). */
   readonly timeZone: string;
   readonly usdPerEur: number;
+  /** ElevenLabs' month (ADR 0091 § 7), from the providers module; absent, the screen shows no voice card. */
+  readonly voice?: () => Promise<VoiceQuotaReading | null>;
 }
 
 /** How far ahead of the server's clock a line may be dated. */
@@ -45,10 +47,11 @@ function wallClock(now: Date, timeZone: string): { readonly day: string; readonl
 export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
   const now = deps.clock.now();
   const from = new Date(now.getTime() - READ_BACK_MS);
-  const [rows, lastCallAt, entries] = await Promise.all([
+  const [rows, lastCallAt, entries, voice] = await Promise.all([
     deps.reader.rows(from, deps.timeZone),
     deps.reader.lastCallAt(from),
     deps.ledger.list(),
+    deps.voice?.() ?? null,
   ]);
   const providers = AiCreditProviderSchema.options;
   const spent = await Promise.all(
@@ -81,6 +84,7 @@ export async function readUsage(deps: UsageDeps): Promise<AiUsage> {
     entries,
     spentSinceUsd: Object.fromEntries(spent),
     quotaRefusedAt: Object.fromEntries(refused),
+    voice,
   });
 }
 

@@ -41,6 +41,7 @@ export function createMistralVerifier(options: MistralVerifierOptions): Provider
         settings: {},
         voices: [],
         charactersLeft: null,
+        quota: null,
         isLowCredit: false,
       };
     },

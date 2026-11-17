@@ -2,7 +2,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, type JSX, type ReactNode } from 'react';
 
-import { AgencyStrip } from './AgencyStrip';
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
 import { BackupBanner } from './BackupBanner';
@@ -27,7 +26,8 @@ import { CreatorFace } from '@/creators/CreatorFace';
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
 import { NightBanner } from '@/settings/telegram/NightBanner';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /** Why the control cannot change the mode under an operator's global switch: the hero says it too (DASH-08). */
 const GLOBAL_NOTE =
@@ -126,6 +126,7 @@ function Offline({
   const client = useQueryClient();
   return (
     <div className="db">
+      <PageHeader title="Dashboard" />
       {creatorName === null ? null : (
         <header className="db-top nv-enter">
           {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
@@ -142,9 +143,7 @@ function Offline({
         </header>
       )}
       {/* The same face as on Aujourd'hui (DASH-22): the sentence, what it holds back, « Réessayer ». */}
-      <ServerSilent
-        headline
-        text="Les chiffres reviennent dès qu’il répond. Rien ici n’est à jour en attendant."
+      <Failure
         onRetry={() => {
           // The list of creators may be what failed: both are read again.
           void client.refetchQueries({ queryKey: ['creators'] });
@@ -221,6 +220,7 @@ export function DashboardPage({
   if (view.status === 'loading') {
     return (
       <div className="db" aria-busy="true">
+        <PageHeader title="Dashboard" />
         {/* The chips keep their place while her Dashboard loads: nothing jumps when it comes (ADM-21). */}
         {agency === undefined ? null : (
           <header className="db-top">
@@ -328,6 +328,9 @@ function Loaded({
   );
   return (
     <div className="db">
+      {/* The screen's title, as on every other one: the agent's state is a block under it, never the page's title
+          (recette visuelle 16/11, COH-07). */}
+      <PageHeader title="Dashboard" />
       <header className="db-top nv-enter">
         {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
         <CreatorPicker
@@ -375,10 +378,16 @@ function Loaded({
         )}
       </header>
 
-      {/* A creator chosen from the agency: her figures first, the agency's cards after (recette 06/11). */}
-      {agency === undefined ? (
-        agentHero
-      ) : (
+      {/* Read top to bottom (recette visuelle 16/11, PIL-01 and PIL-04): her agent's state and what waits for a human,
+          then the figures, then what the agency runs. */}
+      {agentHero}
+
+      {/* Who is warned of an urgency at night: part of her agent's state, said right under it. The night's alerts and
+          where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
+      <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
+
+      {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
+      {agency === undefined ? null : (
         <AgencyInsightsPanel
           selection={agency.selection}
           onSelection={agency.onSelection}
@@ -388,23 +397,6 @@ function Loaded({
           tip={tip}
         />
       )}
-
-      <BackupBanner enabled={forOwner} />
-
-      {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
-      <PaperworkBanner enabled={forOwner} />
-
-      {/* The reports that wait on the agency, never left unseen in the queue: the owner's and an active manager's to
-          decide (ADR 0073). */}
-      <ReportsBanner enabled={reviewsReports} />
-
-      {/* The night's alerts and where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
-      <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
-
-      {/* The AI budget and the stuck jobs of no creator are the agency's, not her agent's health (reco 18, PRO-10). */}
-      <AgencyStrip agency={data.agency} opensSettings={forOwner} />
-
-      {agency === undefined ? null : agentHero}
 
       {sales === null ? null : (
         <>
@@ -457,6 +449,22 @@ function Loaded({
       </Section>
 
       {/* Until Reveal's purchases are observed, nothing stands for the sales: no « bientôt » line (recette 05/11, PRO-24). */}
+
+      {/* What the agency runs comes after the figures. On a creator chosen from the agency, the export, the invoices and
+          the reports are the agency's, said on its own view, not under each creator (PIL-04). The day's AI budget is
+          never on this screen: on « Toute l'agence » for the owner and an active manager, in Réglages › Consommation IA,
+          never to an operator who can set nothing of it (PIL-27). */}
+      {agency === undefined ? (
+        <>
+          <BackupBanner enabled={forOwner} />
+
+          {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
+          <PaperworkBanner enabled={forOwner} />
+
+          {/* The reports that wait on the agency, never left unseen in the queue (ADR 0073). */}
+          <ReportsBanner enabled={reviewsReports} />
+        </>
+      ) : null}
 
       {tip.element}
     </div>

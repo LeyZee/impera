@@ -4,7 +4,11 @@ import {
   CreatorAgencyRateListSchema,
   CreatorAgencyRateSchema,
   CreatorIdSchema,
+  EventIdSchema,
   newId,
+  payPeriodLastDay,
+  payPeriodOfDay,
+  previousPayPeriod,
   PlatformAccountIdSchema,
   SalesLineIdSchema,
   TeamMemberSchema,
@@ -118,7 +122,7 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
 
   it('says « à régler » while she has none: no value is made up', async () => {
     const { observed, ...read } = await list(anna);
-    expect(read).toEqual({ today: parisDay(0), current: null, rates: [] });
+    expect(read).toEqual({ today: parisDay(0), current: null, rates: [], alerts: [] });
     expect(observed.linked).toBe(false);
     expect(observed.last30Days).toEqual({ from: parisDay(-29), to: parisDay(0), shares: [] });
     expect(observed.fortnights.map((fortnight) => fortnight.shares)).toEqual([[], [], []]);
@@ -301,5 +305,81 @@ describe('Créatrices › Pourcentage de l’agence (/v1/creators/:creatorId/age
     const after = await list(ines);
     expect(after.observed.last30Days.shares).toEqual([{ ...share, differsFromRate: true }]);
     expect(after.observed.fortnights.flatMap((window) => window.shares)).not.toContainEqual(share);
+  });
+
+  it('lists the alerts the automatic check published on the fortnights shown, hers only, newest first (PAY-04)', async () => {
+    const account = newId(PlatformAccountIdSchema);
+    // Published a little while ago: the sheet reads only what was published since its oldest fortnight began.
+    const AT = new Date(Date.now() - 3_600_000).toISOString();
+    const LATER = new Date(Date.now() - 3_540_000).toISOString();
+    const current = payPeriodOfDay(parisDay(0));
+    const previous = previousPayPeriod(current);
+    const long = previousPayPeriod(previousPayPeriod(previous));
+    const changed = (creatorId: CreatorId, from: string, at: string, platformAccountId = account) => ({
+      id: newId(EventIdSchema),
+      creatorId,
+      type: 'agency_share_changed' as const,
+      payload: {
+        creatorId,
+        platform: 'reveal',
+        platformAccountId,
+        from,
+        to: payPeriodLastDay(payPeriodOfDay(from)),
+        currency: 'EUR',
+        previousAgencyBps: 3333,
+        agencyBps: 3750,
+      },
+      actor: 'system',
+      correlationId: 'job:test',
+      createdAt: new Date(at),
+    });
+    const mismatch = {
+      ...changed(anna, previous, AT),
+      type: 'agency_share_mismatch' as const,
+      payload: {
+        creatorId: anna,
+        platform: 'reveal',
+        platformAccountId: account,
+        from: previous,
+        to: payPeriodLastDay(previous),
+        currency: 'EUR',
+        sales: 2,
+        refunds: 0,
+        creatorMinor: 1000,
+        expectedCreatorMinor: 1040,
+        differenceMinor: -40,
+      },
+    };
+    const recent = changed(anna, previous, LATER);
+    await test.admin.db.insert(schema.domainEvents).values([
+      mismatch,
+      recent,
+      // Out of the three fortnights shown, another creator's, and one published too long ago: none is listed.
+      changed(anna, long, AT),
+      changed(ines, previous, AT, newId(PlatformAccountIdSchema)),
+      // Published before the oldest fortnight shown began: out of the bound, whatever its fortnight says.
+      changed(anna, current, '2025-12-02T05:30:00.000Z', newId(PlatformAccountIdSchema)),
+    ]);
+    const { alerts } = await list(anna);
+    const common = {
+      from: previous,
+      to: payPeriodLastDay(previous),
+      platform: 'reveal',
+      platformAccountId: account,
+      currency: 'EUR',
+    };
+    expect(alerts).toEqual([
+      {
+        ...common,
+        id: recent.id,
+        kind: 'changed',
+        at: LATER,
+        previousAgencyBps: 3333,
+        agencyBps: 3750,
+      },
+      { ...common, id: mismatch.id, kind: 'mismatch', at: AT },
+    ]);
+    // Never an amount of a sale on the sheet's alerts, nor a fan.
+    expect(JSON.stringify(alerts)).not.toMatch(/Minor|fan|chatter/iu);
   });
 });

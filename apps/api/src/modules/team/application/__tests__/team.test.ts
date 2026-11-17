@@ -54,6 +54,8 @@ function storeKeeping(asked: (PayPeriod | null)[], roles: AskedRole[] = []): Tea
     addPreset: unused,
     notes: unused,
     addNote: unused,
+    followTimeZone: unused,
+    timeZoneChanges: unused,
   };
 }
 

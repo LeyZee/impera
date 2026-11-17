@@ -279,7 +279,9 @@ function StopDialog({
         inert={!open}
         onKeyDown={keepTabInside}
       >
-        <h3 id="db-stop-title">Arrêter l’agent ?</h3>
+        <h3 className="nv-h2" id="db-stop-title">
+          Arrêter l’agent ?
+        </h3>
         <p>Plus aucun message ne part au nom de {creatorName}, ni proposé ni envoyé.</p>
         <ul>
           <li>Les conversations restent lues et notées.</li>

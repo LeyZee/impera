@@ -78,9 +78,10 @@ export type LlmRole = z.infer<typeof LlmRoleSchema>;
 /**
  * What an LLM call is for, journaled in `llm_calls.purpose` (ADR 0060 § 7). `chatting` is every call that serves
  * the fans and their conversations; `trend_watch` is the trend watch, which has its own cap inside the daily one and
- * never deprives a fan's answer of budget.
+ * never deprives a fan's answer of budget; `probe` is the owner's « Essai réel » of a service (ADR 0091 § 7), one
+ * tiny call on his click, counted in the spend and left out of the agent's health.
  */
-export const LlmPurposeSchema = z.enum(['chatting', 'trend_watch']);
+export const LlmPurposeSchema = z.enum(['chatting', 'trend_watch', 'probe']);
 export type LlmPurpose = z.infer<typeof LlmPurposeSchema>;
 
 /** Who wrote an event: the system, the AI, a dashboard user (`human:<userId>`) or the fan. */

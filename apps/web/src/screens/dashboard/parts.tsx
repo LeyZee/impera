@@ -377,7 +377,7 @@ export function Section({
   return (
     <section className="db-sect nv-enter" style={{ '--nv-i': index }}>
       <div className="db-sect__head">
-        <h2>
+        <h2 className="nv-h2">
           {title}
           <span className="db-sect__sub">{sub}</span>
         </h2>

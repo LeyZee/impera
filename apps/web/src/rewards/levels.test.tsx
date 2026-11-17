@@ -6,9 +6,9 @@ import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { LEVEL_NAMES, LevelInsignia, levelName } from './LevelInsignia';
-import { LevelsPanel, thresholdsTyped } from './LevelsPanel';
+import { LevelsPanel, thresholdFault, thresholdsTyped } from './LevelsPanel';
 import { MemberGameBlock } from './MemberGameBlock';
-import { MyRankCard } from './MyRankCard';
+import { MyRankCard, rankPercent } from './MyRankCard';
 import { challengePercent, ShiftChallengeCard } from './ShiftChallengeCard';
 import { rankOfKind, revealWordsOf } from './reveal-words';
 
@@ -124,7 +124,7 @@ describe('ShiftChallengeCard (ADR 0104 § 14)', () => {
 
   it('shows the chatter’s own target and what is left, and says it has no effect on pay', async () => {
     serve({ challenge: CHALLENGE });
-    show(<ShiftChallengeCard user={THEO_ME} />);
+    show(<ShiftChallengeCard user={THEO_ME} zone="Europe/Paris" />);
     expect(await screen.findByText('Fais mieux que ton jeudi habituel')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Avancée du défi' }).getAttribute('aria-valuenow')).toBe(
       '25',
@@ -134,20 +134,32 @@ describe('ShiftChallengeCard (ADR 0104 § 14)', () => {
     expect(note).toContain('Sans effet sur ta paie.');
   });
 
+  it('names the shift’s day in the member’s zone, not the device’s, and says the figures are net', async () => {
+    // Monday 0 h in Paris is still Sunday evening in New York.
+    serve({ challenge: { ...CHALLENGE, shiftStartsAt: '2026-11-15T23:00:00.000Z' } });
+    show(<ShiftChallengeCard user={THEO_ME} zone="Europe/Paris" />);
+    expect(await screen.findByText('Fais mieux que ton lundi habituel')).toBeTruthy();
+    expect(screen.getByText(/sur 200,00\s€ de net/u)).toBeTruthy();
+    cleanup();
+    serve({ challenge: { ...CHALLENGE, shiftStartsAt: '2026-11-15T23:00:00.000Z' } });
+    show(<ShiftChallengeCard user={THEO_ME} zone="America/New_York" />);
+    expect(await screen.findByText('Fais mieux que ton dimanche habituel')).toBeTruthy();
+  });
+
   it('says a challenge met, and shows nothing without one or to the owner', async () => {
     serve({ challenge: { ...CHALLENGE, netMinor: 21_000, met: true } });
-    show(<ShiftChallengeCard user={THEO_ME} />);
+    show(<ShiftChallengeCard user={THEO_ME} zone="Europe/Paris" />);
     expect(await screen.findByText('Défi réussi')).toBeTruthy();
     cleanup();
     const none = serve({ challenge: null });
-    show(<ShiftChallengeCard user={THEO_ME} />);
+    show(<ShiftChallengeCard user={THEO_ME} zone="Europe/Paris" />);
     await waitFor(() => {
       expect(none.sent).toHaveLength(1);
     });
     expect(document.querySelector('.rw-challenge')).toBeNull();
     cleanup();
     const owner = serve({ challenge: CHALLENGE });
-    show(<ShiftChallengeCard user={OWNER} />);
+    show(<ShiftChallengeCard user={OWNER} zone="Europe/Paris" />);
     expect(owner.sent).toHaveLength(0);
     expect(document.querySelector('.rw-challenge')).toBeNull();
   });
@@ -160,6 +172,16 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
     expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
     expect(screen.getByText(/honorifique/u)).toBeTruthy();
+  });
+
+  it('never fills the bar before the rank is noted, and shows the true net past the threshold', async () => {
+    expect(rankPercent({ currentMinor: 199_999, thresholdMinor: 200_000 })).toBe(99);
+    expect(rankPercent({ currentMinor: 124_400, thresholdMinor: 10_000 })).toBe(99);
+    expect(rankPercent({ currentMinor: 0, thresholdMinor: 10_000 })).toBe(0);
+    serve({ ...CASE, nextLevel: { ...CASE.nextLevel, thresholdMinor: 10_000, currentMinor: 124_400 } });
+    show(<MyRankCard user={THEO_ME} />);
+    expect(await screen.findByText(/1\s244,00\s€ à ce jour/u)).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('99');
   });
 
   it('shows the first rank ahead before any is held, and nothing while no threshold is set', async () => {
@@ -203,6 +225,20 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     expect(thresholdsTyped(['abc'])).toBeNull();
   });
 
+  it('says the one cause that stops the save, on the one field at fault', () => {
+    expect(thresholdFault(['500', '2 000', ''])).toBeNull();
+    expect(thresholdFault(['', '', ''])).toBeNull();
+    expect(thresholdFault(['500', '', '900'])).toEqual({ index: 1, cause: 'gap' });
+    expect(thresholdFault(['500', '12,555'])).toEqual({ index: 1, cause: 'amount' });
+    expect(thresholdFault(['0'])).toEqual({ index: 0, cause: 'amount' });
+    expect(thresholdFault(['10 000 000', '10 000 001'])).toEqual({ index: 1, cause: 'max' });
+    expect(thresholdFault(['500', '99999999999'])).toEqual({ index: 1, cause: 'max' });
+    expect(thresholdFault(['500', '400'])).toEqual({ index: 1, cause: 'order' });
+    // Whatever stops the save has a cause, and nothing else does.
+    for (const fields of [['500', '', '900'], ['abc'], ['500', '500'], ['10 000 000'], ['1', '2', '3']])
+      expect(thresholdFault(fields) === null).toBe(thresholdsTyped(fields) !== null);
+  });
+
   it('shows each rank with its threshold and sends what the owner types', async () => {
     const settings = {
       ranks: LEVEL_NAMES.map((name, index) => ({ rank: index + 1, name })),
@@ -213,6 +249,9 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     expect(await screen.findByText(/à 500,00\s€/u)).toBeTruthy();
     expect(screen.getAllByText('Pas de seuil')).toHaveLength(7);
     fireEvent.click(screen.getByRole('button', { name: 'Régler les seuils' }));
+    const form = screen.getByLabelText('Net cumulé pour le rang Allumeur').closest('ul');
+    expect(form?.querySelectorAll('svg[data-earned="true"]')).toHaveLength(1);
+    expect(form?.querySelectorAll('svg[data-earned="false"]')).toHaveLength(7);
     fireEvent.change(screen.getByLabelText('Net cumulé pour le rang Allumeur'), {
       target: { value: '300' },
     });

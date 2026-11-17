@@ -110,6 +110,11 @@ export interface StoredMember {
   readonly status: TeamMemberStatus;
 }
 
+/** A member as a planner reads him, with the creators on his list: whether he holds his shifts (`holdsShift`). */
+export interface PlannedMember extends StoredMember {
+  readonly creatorIds: readonly string[];
+}
+
 /**
  * What one reader's scope sees of the planning, on every creator asked. The owner and an active manager read every
  * shift, account and template; anyone else reads their own shifts, and no template.
@@ -132,7 +137,7 @@ interface PlanningRead {
   /** Planners only: the approved and cancelled leaves of the templates' members overlapping the range (ADR 0031). */
   readonly leaves: readonly StoredLeave[];
   /** The members the policies let the reader see, among those the shifts and templates name. */
-  readonly members: readonly StoredMember[];
+  readonly members: readonly PlannedMember[];
 }
 
 interface NewShift {
@@ -664,13 +669,19 @@ interface NewAgencyRate {
 export interface AgencyRatesStore {
   /**
    * Her percentages newest first, the day it is at `now` in the agency's zone, and the agency's share read on the
-   * register over the windows of ADR 0054 § 4, in the same transaction.
+   * register over the windows of ADR 0054 § 4, and the alerts the automatic check published on its fortnights
+   * (PAY-04), in the same transaction.
    */
   list(
     actor: UserId,
     creatorId: CreatorId,
     now: Date,
-  ): Promise<{ today: string; rates: StoredAgencyRate[]; observed: CreatorAgencyRateList['observed'] }>;
+  ): Promise<{
+    today: string;
+    rates: StoredAgencyRate[];
+    observed: CreatorAgencyRateList['observed'];
+    alerts: CreatorAgencyRateList['alerts'];
+  }>;
   /** Owner; `created` is false when the same percentage was already recorded. */
   create(
     actor: Actor,
@@ -705,7 +716,7 @@ export interface CalendarReads {
    * One snapshot: the view, the shifts and the agent, the settings, and for `agency` alone the accounts and the shifts
    * of each, read creator by creator (`creatorIds`, the creators that exist) under the same policies as Planning, so
    * that the créneaux to fill, the hours and the coverage agree with the shifts shown; with them, the members of those
-   * shifts who are not at work (`away`), whose shifts hold nothing (recette EQP-03).
+   * shifts, their status and their creators, which say whether they hold them (`holdsShift`, recette EQP-03, EQU-01).
    */
   read(
     actor: UserId,
@@ -718,7 +729,7 @@ export interface CalendarReads {
     planned: PlannedCreators;
     shifts: CalendarRow[];
     agents: CreatorAgent[];
-    agency: { accounts: StoredAccount[]; shifts: StoredShift[]; away: ReadonlySet<string> } | null;
+    agency: { accounts: StoredAccount[]; shifts: StoredShift[]; members: PlannedMember[] } | null;
   }>;
 }
 

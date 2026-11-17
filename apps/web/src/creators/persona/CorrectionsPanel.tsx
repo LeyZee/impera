@@ -50,7 +50,7 @@ export function CorrectionsPanel({
   return (
     <section className="nv-plate ps-corrections" aria-labelledby={titleId}>
       <header className="ps-corrections__head">
-        <h3 className="ps-corrections__title" id={titleId}>
+        <h3 className="nv-h3 ps-corrections__title" id={titleId}>
           Corrections proposées par {who}
         </h3>
         <span className="ps-corrections__count">

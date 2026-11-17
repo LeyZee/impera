@@ -232,7 +232,29 @@ describe('Paie › Primes et malus', () => {
       'ThéoPrime« A formé Lou aux relances, deux soirs. »par Charles le lun. 9 nov.+30,00 €Annuler',
     ]);
     expect(entry('Lou', 'Malus').dataset['cancelled']).toBe('true');
-    expect(screen.getAllByRole('button', { name: /^Ajouter$/u })).toHaveLength(1);
+    // One neon, in the card it adds to, named for what it adds (GES-13).
+    const add = screen.getByRole('button', { name: 'Ajouter une prime ou un malus' });
+    expect(add.className).toContain('nv-btn--neon');
+    expect(add.closest('.nv-panel')?.querySelector('h2')?.textContent).toBe('Saisies');
+    expect(document.querySelector('.nv-page__actions')?.textContent).not.toContain('Ajouter');
+  });
+
+  it('carries the quinzaine on screen to every tab of Paie (recette visuelle 16/11, GES-02)', async () => {
+    renderPage(OWNER, `/paie/primes-malus?quinzaine=${OCT2}`);
+    const nav = await screen.findByRole('navigation', { name: 'Paie' });
+    const hrefs = within(nav)
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href'));
+    expect(hrefs).toEqual(
+      [
+        '/paie/quinzaine',
+        '/paie/releves',
+        '/paie/primes-malus',
+        '/paie/objectifs',
+        '/paie/factures',
+        '/paie/exports',
+      ].map((path) => `${path}?quinzaine=${OCT2}`),
+    );
   });
 
   it('says what a penalty really takes, read in the statement: a percent in euros, a capped one what is kept', async () => {
@@ -328,7 +350,7 @@ describe('Paie › Primes et malus', () => {
       };
     };
     renderPage(IRIS_ME);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter une prime ou un malus' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
     expect(text(within(dialog).getByRole('heading'))).toBe('Ajouter un malus');
@@ -395,7 +417,7 @@ describe('Paie › Primes et malus', () => {
       return Promise.resolve('ok');
     });
     renderPage(IRIS_ME);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter une prime ou un malus' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
     chooseValue(within(dialog).getByRole('combobox', { name: 'Pour' }), LOU.id);
@@ -455,7 +477,7 @@ describe('Paie › Primes et malus', () => {
     );
     answer = () => ({ status: 201, body: adjustmentOf(9, LOU, OCT2) });
     renderPage(OWNER);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter une prime ou un malus' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Ajustement' }));
     chooseValue(within(dialog).getByRole('combobox', { name: 'Pour' }), LOU.id);
@@ -499,7 +521,7 @@ describe('Paie › Primes et malus', () => {
     entries = { [NOV1]: 'down' };
     renderPage(OWNER);
     expect(
-      await screen.findByText('Le serveur ne répond pas : la liste des saisies n’a pas pu être lue.'),
+      await screen.findByText('La liste des saisies n’a pas pu être lue : réessaie dans un instant.'),
     ).toBeTruthy();
     expect(screen.queryByText('Aucune prime ni aucun malus sur cette quinzaine.')).toBeNull();
   });

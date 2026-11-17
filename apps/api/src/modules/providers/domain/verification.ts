@@ -17,8 +17,17 @@ export interface VerifiedKey {
   readonly voices: readonly ProviderVoice[];
   /** Characters left this month when the provider counts them (ElevenLabs), else null. */
   readonly charactersLeft: number | null;
+  /** The month as the provider counts it (ElevenLabs, ADR 0091 § 7), else null. */
+  readonly quota: AccountQuota | null;
   /** Less than 10 % of the month's credit left. */
   readonly isLowCredit: boolean;
+}
+
+/** ElevenLabs' characters of the month: the limit, when they come back, and whether the offer is the free one. */
+export interface AccountQuota {
+  readonly limit: number;
+  readonly resetsAt: Date | null;
+  readonly plan: 'free' | 'paid' | null;
 }
 
 export interface RefusedKey {

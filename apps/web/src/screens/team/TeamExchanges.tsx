@@ -336,12 +336,12 @@ export function OnLeave({
   const opened = away.find((leave) => leave.id === open) ?? null;
   return (
     <section className="sc-duty sc-onleave" aria-labelledby="sc-onleave-title">
-      <h2 id="sc-onleave-title" className="sc-duty__title">
+      <p id="sc-onleave-title" className="sc-duty__title">
         <svg className="sc-onleave__icon" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M3.5 3.5h9a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM2.5 6.5h11M5.5 2v3M10.5 2v3M6 10h4" />
         </svg>
         En congé cette semaine
-      </h2>
+      </p>
       <ul className="sc-duty__list">
         {away.map((leave) => {
           const member = members.get(leave.memberId);

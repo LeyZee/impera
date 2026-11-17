@@ -1,4 +1,4 @@
-import type { BonusTier, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
+import type { BonusTier, CommissionStatement, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
@@ -6,7 +6,7 @@ import { useCurrentPeriod } from './data';
 import './my-figures.css';
 
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
-import { roundAmountText, tierProgress } from '@/payroll/model';
+import { besidesLine, roundAmountText, tierProgress } from '@/payroll/model';
 import {
   barHeight,
   barLabelled,
@@ -230,6 +230,12 @@ const hasFortnight = (figures: MyFigures, period: PayrollPeriod | undefined): bo
  * Aujourd'hui › « Ma quinzaine » (ADR 0104 § 2, § 3, § 4): one compact card under the shift, what the member has
  * earned so far, the fortnight day by day and the way to the next tier. Nothing shows before their first line.
  */
+/** « 0,00 € de net · prime +30,00 € · malus −5,00 € »: what « Ma quinzaine » adds up to, net first. */
+const partsOf = (statement: CommissionStatement): string => {
+  const others = besidesLine(statement);
+  return `${amountText(statement.netMinor, 'EUR')} de net${others === null ? '' : ` · ${others}`}`;
+};
+
 export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX.Element | null {
   const figures = useMyFigures().data;
   const current = useCurrentPeriod();
@@ -247,7 +253,7 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
       className="nv-enter mf mf-card"
       eyebrow={<Named kind="sales">Ma quinzaine</Named>}
       actions={
-        <Link to="/commissions" className="mf-more">
+        <Link to="/commissions" className="mf-more nv-hit">
           Mes chiffres
           <Chevron className="mf-more__chev" />
         </Link>
@@ -292,6 +298,9 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
                 format={(value) => amountText(Math.round(value), 'EUR')}
               />
               <p className="mf-figure__label">gagné à ce jour, avant validation</p>
+              {/* Where the amount comes from, as « Mes relevés » says it: 25 € earned without a sale is never a riddle
+                  (Design, recette CHT-02). */}
+              <p className="mf-figure__parts nv-num">{partsOf(statement)}</p>
             </>
           )}
           <Change change={fortnightChange(figures, currency)} />
