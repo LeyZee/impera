@@ -163,10 +163,10 @@ describe('Créatrices › Canal Telegram (ADR 0080 § 6)', () => {
     expect(screen.queryByRole('button', { name: /Ajouter un lien/u })).toBeNull();
     expect(screen.queryByRole('button', { name: /Retirer le lien/u })).toBeNull();
     expect(screen.getByText('Mène à : mon live TikTok ce soir 21 h')).toBeDefined();
-    const chosen = screen.getByRole('button', { name: 'Lien du canal : le lien « Telegram »' });
-    expect(chosen).toHaveProperty('ariaPressed', 'false');
-    fireEvent.click(chosen);
-    expect(chosen).toHaveProperty('ariaPressed', 'true');
+    // The chosen link says so as a state; the others offer to take its place.
+    fireEvent.click(screen.getByRole('button', { name: 'Choisir le lien « Telegram » pour le canal' }));
+    expect(screen.queryByRole('button', { name: 'Choisir le lien « Telegram » pour le canal' })).toBeNull();
+    expect(screen.getAllByText('Lien du canal')).toHaveLength(1);
     expect(screen.getByLabelText('Texte du lien')).toHaveProperty('value', 'Viens me parler ✨');
     fireEvent.click(save());
     await waitFor(() => {

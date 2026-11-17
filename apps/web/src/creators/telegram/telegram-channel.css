@@ -139,16 +139,19 @@
 /* Each of her links that are on, read here: its name, where it leads, and the chip that makes it the channel's. */
 .tc-link {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
+  gap: 12px;
   padding: 12px;
   border-radius: var(--nv-radius-md);
   background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
 }
+.tc-link[data-chosen='true'] {
+  background: var(--nv-plate-hover);
+}
 .tc-link__read {
   display: grid;
+  flex: 1 1 auto;
   gap: 2px;
   min-width: 0;
 }
@@ -161,10 +164,22 @@
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-/* One width for « Lien du canal » and « Choisir pour le canal », so the chips of every link line up. */
-.tc-link .nv-chip {
-  min-width: 10.75rem;
-  justify-content: center;
+/* The state and the action sit at the same place, on the line of the name; a long name wraps, they never go under. */
+.tc-link__state,
+.tc-link__choose {
+  flex: none;
+}
+.tc-link__state {
+  gap: 6px;
+}
+/* A small button to the eye, 44px to the finger. */
+.tc-link__choose {
+  position: relative;
+}
+.tc-link__choose::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
 }
 /* One label style in the links block: « Où il mène » and « Texte du lien ». */
 .tc-field-label {
@@ -252,9 +267,5 @@
   .tc-day {
     flex: 1 1 0;
     min-width: 0;
-  }
-  .tc-link .nv-chip {
-    min-width: 0;
-    flex: 1 1 100%;
   }
 }

@@ -630,15 +630,24 @@ function LinkLine({
           <span className="tc-link__read-place">Mène à : {link.destination}</span>
         )}
       </span>
-      <button
-        type="button"
-        className="nv-chip"
-        aria-pressed={isChannelLink}
-        aria-label={`Lien du canal : le lien « ${link.name} »`}
-        onClick={onChoose}
-      >
-        {isChannelLink ? 'Lien du canal' : 'Choisir pour le canal'}
-      </button>
+      {isChannelLink ? (
+        // A state, not an action: the link the channel's posts end on.
+        <span className="nv-status nv-status--sent tc-link__state">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none">
+            <path d="M3 8.5l3.2 3.2L13 4.8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          Lien du canal
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm tc-link__choose"
+          aria-label={`Choisir le lien « ${link.name} » pour le canal`}
+          onClick={onChoose}
+        >
+          Choisir pour le canal
+        </button>
+      )}
     </li>
   );
 }
