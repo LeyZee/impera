@@ -14,6 +14,7 @@ import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
 import '@/screens/team/team.css';
+import { useMembers } from '@/screens/team/api';
 import { Page, PageHeader, Panel, type PageWidth } from '@/shell/layout';
 
 /** What the reader opened on a document: his answer, or its detail. */
@@ -48,6 +49,14 @@ export function MyInvoicesPage({
   const down = useAgencySettingsDown();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const years = useInvoiceYears(memberId === undefined ? {} : { memberId }, today);
+  // The day he joined: no year before it to look in (CHA-18). A member reads his own row alone; a manager is named.
+  const members = useMembers().data;
+  const mine =
+    memberId === undefined
+      ? members?.length === 1
+        ? members[0]
+        : undefined
+      : members?.find((member) => member.id === memberId);
   const [opened, setOpened] = useState<Opened | null>(null);
 
   return (
@@ -72,6 +81,7 @@ export function MyInvoicesPage({
               hint="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
               first="Aucune facture sur les dix dernières années : la première s’émet quand ton premier relevé est validé, une fois ton dossier complet."
               older="Les factures plus anciennes n’ont pas pu être lues : réessaie dans un instant."
+              since={mine?.joinedOn ?? null}
               none={{
                 whisper: 'Pas encore de facture.',
                 text: 'Elle arrive avec ton premier relevé validé, une fois ton dossier rempli.',

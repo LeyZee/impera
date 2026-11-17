@@ -12,6 +12,7 @@ import {
   identityLines,
   olderDocuments,
   prefixOf,
+  profileToDo,
   profileBodyOf,
   profileDraftOf,
   profileFields,
@@ -494,5 +495,17 @@ describe('what one’s own file waits on, on Aujourd’hui (D-03)', () => {
         CONTRACT_V1,
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('profileToDo (recette visuelle 16/11, CHA-09)', () => {
+  it('asks for an empty file, whatever the regime, and nothing once it is filled', () => {
+    expect(profileToDo({ profile: null })).toEqual({
+      key: 'profile',
+      title: 'Remplis ton dossier',
+      text: 'Sans lui, pas de facture à ton nom.',
+      go: 'profile',
+    });
+    expect(profileToDo({ profile: profileOf({ legalName: 'Théo Exemple' }) })).toBeNull();
   });
 });

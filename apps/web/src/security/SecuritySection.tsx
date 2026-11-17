@@ -221,7 +221,8 @@ function SessionsPanel(): JSX.Element {
                 {group.current ? null : (
                   <button
                     type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm shrink-0"
+                    // The same tint as « Fermer toutes les autres » above it: both close sessions (CHA-14).
+                    className="nv-btn nv-btn--soft nv-btn--sm shrink-0"
                     disabled={busy !== null}
                     aria-label={
                       group.ids.length === 1
@@ -407,9 +408,12 @@ function PasskeysPanel(): JSX.Element {
             Ce navigateur ne sait pas créer de clé d’accès&nbsp;: ajoute-la depuis ton téléphone.
           </p>
         )}
-        <p className="text-sm text-[var(--nv-ink-faint)]">
-          Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
-        </p>
+        {/* Only once a key exists: before, there is nothing for it to say (CHA-14). */}
+        {keys === null || keys.length === 0 ? null : (
+          <p className="text-sm text-[var(--nv-ink-faint)]">
+            Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
+          </p>
+        )}
         <Outcome error={error} notice={notice} />
       </PanelSection>
     </Panel>
