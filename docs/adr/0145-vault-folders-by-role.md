@@ -1,6 +1,6 @@
 # 0145. Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed, le code lit le rôle et jamais le nom
 
-Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; avenant du § 5 proposé le 17/11/2026, en attente de son mot ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
+Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; avenant du § 5 accepté le 17/11/2026, 14 h 17, « oki parfait » ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
 Date : 2026-11-16
 Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR. Avenant du 17/11 : amende aussi l'ADR 0113 § 5 (la description du coffre ne part plus seule, par lots, mais sur une sélection confirmée).
 Précise : l'ADR 0056 (§ 5 la nomenclature, § 7 vers Reveal dans l'ordre), l'ADR 0113 § 5 (ce qui est décrit), l'ADR 0018 (garde d'écriture), l'ADR 0136 (feed) et l'ADR 0137 (Mass DM).
@@ -53,7 +53,7 @@ La garde vit dans le domaine. Elle est testée en unitaire et contre `FakeReveal
 
 ### 5. Ce qui entre dans le CRM, et ce qui est décrit
 
-*Avenant du 17/11/2026, proposé (demande de Charles, 17/11, 14 h 13 heure de Paris, après avoir ouvert l'écran du coffre : « il ne faut pas que ça importe tout », « je dois pouvoir sélectionner soit les fichiers séparés, soit les dossiers entiers », « des petites coches », « le bouton faire la description par IA avec le coût »). Il remplace la règle précédente de ce paragraphe (les dossiers décrits par défaut, un interrupteur « Décrire » par dossier, une option « Tous les médias »).*
+*Avenant du 17/11/2026, accepté par Charles (« oki parfait », 14 h 17 ; demande de Charles, 17/11, 14 h 13 heure de Paris, après avoir ouvert l'écran du coffre : « il ne faut pas que ça importe tout », « je dois pouvoir sélectionner soit les fichiers séparés, soit les dossiers entiers », « des petites coches », « le bouton faire la description par IA avec le coût »). Il remplace la règle précédente de ce paragraphe (les dossiers décrits par défaut, un interrupteur « Décrire » par dossier, une option « Tous les médias »).*
 
 - **La synchronisation lit tout, le CRM ne garde que ce qui est choisi.** La synchronisation reste la lecture gratuite de la liste du coffre, sans fichier (ADR 0099). Chaque dossier porte une coche « Importer », et chaque média la sienne. Un média est importé si son dossier est coché et que lui-même n'est pas décoché, ou s'il est coché à part.
 - **Rien n'est importé sans un geste.** La racine du coffre et tout dossier qui apparaît dans Reveal arrivent non cochés. Seul un dossier de script créé par le CRM (§ 3) arrive coché, puisqu'il naît d'un dépôt accepté.
