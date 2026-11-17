@@ -216,13 +216,24 @@ export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
  * came one after the other. The CRM does not keep that rank, which moves at each new upload: `media_platform_refs.
  * folder_position` keeps the rank among the media of the same folder uploaded at the same millisecond, in this list's
  * order (`vaultRefsOf`), and the order is rebuilt from the upload time, then that rank. `folder.moment`: ☀️ or 🌙 read in the folder's name, which is what decides. `description`:
- * the platform's text, a starting point never validated. `suggestedPriceMinor`: the platform's suggested range, in the
+ * the platform's text, a starting point never validated. `blurhash`: its blurred preview (`BlurhashSchema`). `suggestedPriceMinor`: the platform's suggested range, in the
  * platform's minor unit (euro cents on Reveal, like its other prices; to confirm at the first real read), only shown.
  */
 /** Longest vault folder name kept (`media_platform_refs.folder_name`, CHECK): longer, the connector cuts it. */
 export const VAULT_FOLDER_NAME_MAX = 200;
 /** Longest platform text on a vault media kept (`media_platform_refs.platform_description`, CHECK): longer, cut. */
 export const VAULT_DESCRIPTION_MAX = 2_000;
+/**
+ * A blurhash (base 83, at most 9 × 9 components: 4 + 2 × 81 characters), the platform's own blurred preview of a media:
+ * a few colours computed from the image, never the image nor a link to it (ADR 0030 § 4). The screen draws it as the
+ * media's blurred tile (`media_platform_refs.preview_blurhash`, CHECK).
+ */
+export const VAULT_BLURHASH_MAX = 166;
+export const BlurhashSchema = z
+  .string()
+  .min(6)
+  .max(VAULT_BLURHASH_MAX)
+  .regex(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/);
 
 export const VaultMediaSchema = z.object({
   ref: ExternalRefSchema,
@@ -239,6 +250,8 @@ export const VaultMediaSchema = z.object({
   createdAt: z.iso.datetime(),
   description: z.string().max(VAULT_DESCRIPTION_MAX).nullable(),
   suggestedPriceMinor: z.object({ min: z.number().int().min(0), max: z.number().int().min(0) }).nullable(),
+  /** The platform's blurred preview; `null` when it gives none or one that does not read as a blurhash. */
+  blurhash: BlurhashSchema.nullable(),
 });
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 
@@ -281,6 +294,8 @@ export const ConnectorCapabilitiesSchema = z.object({
   vault: z.boolean(),
   /** `fetchMedia`: a vault file read to a temporary file, never kept (ADR 0113). */
   mediaDownload: z.boolean(),
+  /** `readVaultPreview`: a vault media's small picture read on demand, never kept (ADR 0138). */
+  vaultPreview: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 

@@ -96,6 +96,21 @@ export interface PlatformConnector {
     mediaRef: ExternalRef,
     opts: { folderRef: ExternalRef | null; path: string },
   ): Promise<FetchedMedia>;
+  /**
+   * `vaultPreview` (ADR 0138): the small picture of one media of the vault (a photo's reduced size, a video's poster),
+   * read now with links fresh from its folder (`null`: the vault's root), and handed back, never kept. `not_found`
+   * for a media the folder no longer lists, or one with no picture (a voice note).
+   */
+  readVaultPreview?(input: { mediaRef: ExternalRef; folderRef: ExternalRef | null }): Promise<VaultPreview>;
+}
+
+/** The image types a vault preview may be, read from its first bytes, never from what the platform says. */
+export type VaultPreviewType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'image/avif';
+
+/** A vault media's small picture, as `readVaultPreview` hands it back. */
+export interface VaultPreview {
+  readonly contentType: VaultPreviewType;
+  readonly bytes: Uint8Array;
 }
 
 /** The only error a connector throws. `retryAfterSeconds` comes with `rate_limited` when the platform says. */

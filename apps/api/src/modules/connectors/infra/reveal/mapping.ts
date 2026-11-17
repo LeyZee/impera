@@ -1,4 +1,5 @@
 import {
+  BlurhashSchema,
   VAULT_DESCRIPTION_MAX,
   VAULT_FOLDER_NAME_MAX,
   type ConversationSnapshot,
@@ -305,5 +306,7 @@ export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null, posit
         ? null
         : cut(media.description, VAULT_DESCRIPTION_MAX),
     suggestedPriceMinor: min === null || max === null || min < 0 || max < 0 ? null : { min, max },
+    // A preview that does not read as a blurhash is dropped, never the media.
+    blurhash: BlurhashSchema.safeParse(media.blurhash).data ?? null,
   };
 }

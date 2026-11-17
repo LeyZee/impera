@@ -7,6 +7,7 @@ import {
   sentStepsOf,
   snapshotOf,
   transactionOf,
+  vaultMediaOf,
   type OwnMessages,
 } from '../mapping';
 import type { RevealAnswer } from '../wire';
@@ -20,6 +21,7 @@ type MessageItem = RevealAnswer<'messages.list'>['data'][number];
 type Media = MessageItem['medias'][number];
 type ScriptItem = RevealAnswer<'scripts.list'>['data'][number];
 type SequenceItem = RevealAnswer<'scriptSequences.list'>[number];
+type VaultItem = RevealAnswer<'vault.medias'>['data'][number];
 
 function media(id: string, type: Media['type'] = 'photo'): Media {
   const url = `https://files.test/${id}`;
@@ -396,5 +398,33 @@ describe('snapshotOf and transactionOf (spec § 4)', () => {
         }).kind,
     );
     expect(kinds).toEqual(['ppv', 'tip', 'subscription', 'other']);
+  });
+
+  describe('vault media preview (ADR 0030 § 4)', () => {
+    const vaultItem = (blurhash: string): VaultItem => ({
+      ...media('vault_test'),
+      blurhash,
+      status: [],
+      sentForFree: false,
+      description: null,
+      suggestedMinPrice: null,
+      suggestedMaxPrice: null,
+      tags: [],
+    });
+
+    it('keeps the platform’s blurhash, never a link', () => {
+      const kept = vaultMediaOf(vaultItem('LKO2?U%2Tw=w]~RBVZRi};RPxuwH'), null, 0);
+      expect(kept.blurhash).toBe('LKO2?U%2Tw=w]~RBVZRi};RPxuwH');
+      expect(JSON.stringify(kept)).not.toMatch(/https?:/u);
+    });
+
+    it('drops a preview that does not read as a blurhash, and keeps the media', () => {
+      for (const odd of ['', 'L0', 'pas un blurhash', 'L'.repeat(200)]) {
+        expect(vaultMediaOf(vaultItem(odd), null, 0)).toMatchObject({
+          ref: { id: 'vault_test' },
+          blurhash: null,
+        });
+      }
+    });
   });
 });

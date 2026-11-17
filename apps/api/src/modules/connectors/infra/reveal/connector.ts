@@ -25,6 +25,7 @@ import {
   ScriptStepDiscounted,
   ScriptStepPriceChanged,
   type PlatformConnector,
+  type VaultPreview,
 } from '../../domain/platform-connector';
 import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain/ports';
 import { SESSION_WARNING_BEFORE_MS } from '../../domain/session-life';
@@ -56,12 +57,19 @@ import {
   type OwnMessages,
 } from './mapping';
 import { withAgencyBlock } from './note';
+import { previewBounds, previewLinkOf, readPreviewFile } from './preview';
 import { fingerprintOf, isSendOf, type SendContent } from './sends';
 import { parseRevealSession, revealTokenExpiry, type RevealSession } from './session';
 import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 
 /** Page sizes of the official client (reveal-api-observed.md § Pagination): no heavier than a chatter. */
 const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10, transactions: 10 } as const;
+/**
+ * How long the links of a folder's small pictures are kept in memory (ADR 0138 § 1): never written anywhere, and
+ * shorter than a link's own life, so that a folder opened is listed once for all its pictures.
+ */
+const PREVIEW_LINKS_MS = 3 * 60_000;
+
 /**
  * The hosts Reveal serves vault files from (ADR 0113 § 2), read on the real vault on 16/11 over 300 media of each kind,
  * each named whole, never its parent domain: the signed storage (photos, non-HLS videos, audios, their thumbnails),
@@ -133,6 +141,7 @@ const CAPABILITIES: ConnectorCapabilities = {
   scriptHistory: true,
   vault: true,
   mediaDownload: true,
+  vaultPreview: true,
 };
 
 export interface RevealApiConnectorOptions {
@@ -197,6 +206,14 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly lastSendIn = new Map<string, number>();
   /** Fan → conversation, as `listConversations` read them: Reveal has one conversation per fan and model. */
   private readonly conversationOfFan = new Map<string, string>();
+  /**
+   * Folder (`''`: the vault's root) → the links of its small pictures by media, read once and shared by the pictures
+   * asked together, until `until` (ADR 0138 § 1). In memory only.
+   */
+  private readonly previewLinks = new Map<
+    string,
+    { readonly until: number; readonly links: Promise<Map<string, string | null>> }
+  >();
 
   constructor(options: RevealApiConnectorOptions) {
     const { session } = options;
@@ -619,6 +636,42 @@ export class RevealApiConnector implements PlatformConnector {
         });
       }
     }
+  }
+
+  /**
+   * ADR 0138: one small picture, by a link fresh from its folder's listing (shared by the pictures asked within a few
+   * minutes). A link the platform refuses is listed again once; then `not_found`.
+   */
+  async readVaultPreview(input: {
+    mediaRef: ExternalRef;
+    folderRef: ExternalRef | null;
+  }): Promise<VaultPreview> {
+    const folder = input.folderRef?.id ?? '';
+    for (const fresh of [false, true]) {
+      const link = (await this.previewLinksOf(folder, fresh)).get(input.mediaRef.id);
+      if (link === undefined)
+        throw new ConnectorError('not_found', 'vault preview: no such media in the folder');
+      if (link === null) throw new ConnectorError('not_found', 'vault preview: no picture for this media');
+      const read = await readPreviewFile(this.fileTransport, link, previewBounds(this.fileBounds));
+      if (read !== 'expired') return read;
+    }
+    throw new ConnectorError('not_found', 'vault preview: link refused after a fresh listing');
+  }
+
+  private previewLinksOf(folder: string, fresh: boolean): Promise<Map<string, string | null>> {
+    const now = this.now().getTime();
+    for (const [key, kept] of this.previewLinks) if (kept.until <= now) this.previewLinks.delete(key);
+    const kept = this.previewLinks.get(folder);
+    if (!fresh && kept !== undefined) return kept.links;
+    const links = this.vaultPages(folder === '' ? null : folder).then(
+      (items) => new Map(items.map((item) => [item.id, previewLinkOf(item)])),
+    );
+    this.previewLinks.set(folder, { until: now + PREVIEW_LINKS_MS, links });
+    // A failed listing is not kept: the next picture lists again.
+    links.catch(() => {
+      if (this.previewLinks.get(folder)?.links === links) this.previewLinks.delete(folder);
+    });
+    return links;
   }
 
   private session(): RevealClient {

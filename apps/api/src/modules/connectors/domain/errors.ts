@@ -275,6 +275,16 @@ export class VaultForbidden extends DomainError {
 }
 
 /**
+ * No small picture for this media (ADR 0138, 404): unknown to her vault, removed from the platform, a voice note, or
+ * a link the platform refused even fresh. The screen keeps the blurred preview.
+ */
+export class VaultPreviewNotFound extends DomainError {
+  constructor() {
+    super('vault_preview_not_found', 'Aucun aperçu net pour ce média');
+  }
+}
+
+/**
  * A platform read cannot be made now (503): no session, a session the platform refused, the breaker open, a connector
  * that does not declare this read, or a platform that failed to answer it.
  */

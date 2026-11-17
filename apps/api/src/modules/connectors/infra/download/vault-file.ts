@@ -86,6 +86,51 @@ function hostAllowed(url: string, bounds: DownloadBounds): string | null {
 }
 
 /**
+ * One GET of a file link, checked (ADR 0113 § 2): HTTPS on a host of `bounds.hosts` named in full, resolving to public
+ * addresses only, connected to the address checked, no header sent but `Referer` to the one host of `bounds.referer`
+ * (ADR 0113 § 2, amendment of 16/11), no redirect followed. `read`: the bytes already read by the caller, against
+ * `bounds.maxBytes`.
+ */
+async function openChecked(
+  transport: FileTransport,
+  url: string,
+  bounds: DownloadBounds,
+  signal: AbortSignal,
+  read: number,
+): Promise<Response> {
+  const host = hostAllowed(url, bounds);
+  if (host === null) throw new VaultFileError('host_refused');
+  let response: Response;
+  try {
+    const addresses = await transport.lookup(host);
+    const [first] = addresses;
+    if (first === undefined || addresses.some((resolved) => isPrivateAddress(resolved.address))) {
+      throw new VaultFileError('host_refused');
+    }
+    const pinned = { address: first.address, family: first.family };
+    const referer =
+      bounds.referer?.host === host && new URL(url).protocol === 'https:' ? bounds.referer.value : null;
+    response =
+      referer === null
+        ? await transport.get(url, signal, pinned)
+        : await transport.get(url, signal, pinned, { referer });
+  } catch (error) {
+    if (error instanceof VaultFileError) throw error;
+    throw new VaultFileError('failed');
+  }
+  const refused = (reason: VaultFileFailure): Promise<never> =>
+    (response.body?.cancel() ?? Promise.resolve()).then(() => {
+      throw new VaultFileError(reason);
+    });
+  if (response.status === 401 || response.status === 403) return refused('expired');
+  if (response.status === 404 || response.status === 410) return refused('gone');
+  if (response.status !== 200 || response.body === null) return refused('failed');
+  const declared = Number(response.headers.get('content-length') ?? Number.NaN);
+  if (Number.isFinite(declared) && read + declared > bounds.maxBytes) return refused('too_large');
+  return response;
+}
+
+/**
  * Downloads one file of the vault to `path` (ADR 0030 § 4, ADR 0099 § 5, ADR 0113): a photo in one GET, a video's HLS
  * playlist resolved to one variant, its AES-128 segments fetched, decrypted and written one after the other into a
  * single MPEG-TS file. Every URL, the playlist's own included, must be HTTPS on a host of `bounds.hosts` that resolves
@@ -102,38 +147,7 @@ export async function downloadVaultFile(
   const signal = AbortSignal.timeout(bounds.timeoutMs);
   let read = 0;
 
-  const request = async (url: string): Promise<Response> => {
-    const host = hostAllowed(url, bounds);
-    if (host === null) throw new VaultFileError('host_refused');
-    let response: Response;
-    try {
-      const addresses = await transport.lookup(host);
-      const [first] = addresses;
-      if (first === undefined || addresses.some((resolved) => isPrivateAddress(resolved.address))) {
-        throw new VaultFileError('host_refused');
-      }
-      const pinned = { address: first.address, family: first.family };
-      const referer =
-        bounds.referer?.host === host && new URL(url).protocol === 'https:' ? bounds.referer.value : null;
-      response =
-        referer === null
-          ? await transport.get(url, signal, pinned)
-          : await transport.get(url, signal, pinned, { referer });
-    } catch (error) {
-      if (error instanceof VaultFileError) throw error;
-      throw new VaultFileError('failed');
-    }
-    const refused = (reason: VaultFileFailure): Promise<never> =>
-      (response.body?.cancel() ?? Promise.resolve()).then(() => {
-        throw new VaultFileError(reason);
-      });
-    if (response.status === 401 || response.status === 403) return refused('expired');
-    if (response.status === 404 || response.status === 410) return refused('gone');
-    if (response.status !== 200 || response.body === null) return refused('failed');
-    const declared = Number(response.headers.get('content-length') ?? Number.NaN);
-    if (Number.isFinite(declared) && read + declared > bounds.maxBytes) return refused('too_large');
-    return response;
-  };
+  const request = (url: string): Promise<Response> => openChecked(transport, url, bounds, signal, read);
 
   /** The body, chunk by chunk as it arrives, counted against the bound before anything is kept. */
   const each = async (response: Response, limit: number, take: (chunk: Uint8Array) => Promise<void>) => {
@@ -248,5 +262,35 @@ export async function downloadVaultFile(
     await file?.close();
     // Only the file this call created: `wx` refused an existing one before `file` was set.
     if (file !== null && !complete) await rm(path, { force: true });
+  }
+}
+
+/**
+ * One small picture of the vault, in memory and never written (ADR 0138 §§ 1-2): the same hosts, transport and checks as
+ * a file (ADR 0113 § 2), one GET, its body cut at `bounds.maxBytes`. The caller reads the type from the bytes.
+ */
+export async function readVaultPicture(
+  transport: FileTransport,
+  url: string,
+  bounds: DownloadBounds,
+): Promise<Uint8Array> {
+  const signal = AbortSignal.timeout(bounds.timeoutMs);
+  const response = await openChecked(transport, url, bounds, signal, 0);
+  if (response.body === null) throw new VaultFileError('failed');
+  const reader: ReadableStreamDefaultReader<Uint8Array> = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let read = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return Buffer.concat(chunks);
+      read += value.byteLength;
+      if (read > bounds.maxBytes) throw new VaultFileError('too_large');
+      chunks.push(value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    if (error instanceof VaultFileError) throw error;
+    throw new VaultFileError('failed');
   }
 }
