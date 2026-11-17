@@ -52,6 +52,8 @@ interface TipContent {
   readonly rows?: readonly (readonly [string, string])[];
   /** A line chart's rows: each row's series drawn as a short stroke before its label (dataviz: line keys). */
   readonly rowKeys?: readonly ('solid' | 'dashed')[];
+  /** As narrow as its words: a phone's curve tip, which must not hide the curve it reads. */
+  readonly compact?: boolean;
   readonly text?: string;
   readonly note?: string;
 }
@@ -314,7 +316,7 @@ export function useFloatingTip(): FloatingTip {
   // On the body: `tipPlacement` works in viewport coordinates, a transformed ancestor would shift it.
   const element = createPortal(
     <div
-      className={`nv-tip nv-glass nv-glass--thick${tip === null ? '' : ' is-on'}`}
+      className={`nv-tip nv-glass nv-glass--thick${content?.compact === true ? ' db-tip--compact' : ''}${tip === null ? '' : ' is-on'}`}
       ref={ref}
       role="tooltip"
     >

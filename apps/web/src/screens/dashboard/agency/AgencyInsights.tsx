@@ -207,6 +207,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
                 : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
             ],
         rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
+        compact: narrowTip(),
       },
       { marker: x },
     );

@@ -902,3 +902,9 @@ div.db-fan {
 .db-tip-key[data-key='dashed'] {
   background: repeating-linear-gradient(90deg, var(--nv-ink-muted) 0 3px, transparent 3px 6px);
 }
+
+/* A phone's curve tip: as narrow as its amounts, so the curve it reads stays in sight. */
+.nv-tip.db-tip--compact {
+  min-width: 0;
+  padding: 8px 10px;
+}
