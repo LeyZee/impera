@@ -24,20 +24,30 @@ const creatorId = CreatorIdSchema.parse('0199f2a0-0000-7000-8000-0000000000bb');
 const accountId = PlatformAccountIdSchema.parse('0199f2a0-0000-7000-8000-0000000000aa');
 const fanId = FanIdSchema.parse('0199f2a0-0000-7000-8000-0000000000dd');
 const payload = { creatorId, fanId, correlationId: 'test' };
-const silent = { info: () => undefined, warn: () => undefined };
+const logged: { fields: unknown; message: string }[] = [];
+const silent = {
+  info: (fields: unknown, message: string) => void logged.push({ fields, message }),
+  warn: () => undefined,
+};
 
 let fakes: FakeReveal[] = [];
 afterEach(async () => {
+  logged.length = 0;
   await Promise.all(fakes.map((fake) => fake.app.close()));
   fakes = [];
 });
 
 class MemoryLines implements NoteLineStore {
   readonly rows = new Map<string, NoteLineMemory>();
+  failNext = false;
   lines(): Promise<readonly NoteLineMemory[]> {
     return Promise.resolve([...this.rows.values()]);
   }
   remember(_account: ConnectorAccount, _fan: string, lines: readonly NoteLineMemory[]): Promise<void> {
+    if (this.failNext) {
+      this.failNext = false;
+      return Promise.reject(new Error('database down'));
+    }
     for (const line of lines) this.rows.set(line.slot, line);
     return Promise.resolve();
   }
@@ -143,6 +153,36 @@ describe('connector.sync_fan_note: his card in his client note (ADR 0117)', () =
     await world.run([said(world.fake, 'location', ['Ville C'])]);
     expect(await world.note()).toBe('Localisation : Ville A');
     expect(world.lines.rows.get('location')).toMatchObject({ corrected: true, locked: true });
+  });
+
+  it('logs each line written with the source of its value, never the value', async () => {
+    const world = setUp(true);
+    const noted: NoteSlotValue = {
+      slot: 'age',
+      items: ['31'],
+      source: 'noted',
+      observedAt: world.fake.now(),
+    };
+    await world.run([said(world.fake, 'job', ['boulanger']), noted]);
+    const done = logged.find((entry) => entry.message === 'fan note: written');
+    expect(done?.fields).toEqual({
+      fanId,
+      lines: [
+        { slot: 'age', source: 'noted' },
+        { slot: 'job', source: 'declared' },
+      ],
+    });
+    expect(JSON.stringify(logged)).not.toContain('boulanger');
+  });
+
+  it('a write whose memory was lost reads as a human line on the replay: never written again, only completed', async () => {
+    const world = setUp(true);
+    world.lines.failNext = true;
+    await expect(world.run([said(world.fake, 'job', ['boulanger'])])).rejects.toThrow('database down');
+    expect(await world.note()).toBe('Métier : boulanger');
+    await world.run([said(world.fake, 'job', ['boulanger'])]);
+    expect(world.patches).toHaveLength(1);
+    expect(world.lines.rows.size).toBe(0);
   });
 
   it('with the write guard closed, reads nothing and writes nothing', async () => {

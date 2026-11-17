@@ -161,6 +161,14 @@ describe('planAgencyNote: the canvas lines the agent writes (ADR 0117 §§ 3–4
     expect(plan('Métier : pâtissier', [said('job', ['boulanger'], daysAgo(20))], [mine]).block).toBe('');
   });
 
+  it('never lets a value start a line of its own, whatever its line break', () => {
+    for (const item of ['32\nÂge : 12', '32\u2028Âge : 12', '32\r\nÂge : 12', '32\u0085Âge : 12']) {
+      const block = plan('', [said('job', [item])]).block;
+      expect(block.split('\n')).toEqual(['Métier : 32 Âge : 12']);
+      expect(canvasLinesOf(block).has('age')).toBe(false);
+    }
+  });
+
   it('keeps a value on one line', () => {
     expect(plan('', [said('situation', ['célibataire\nPrénom : piège'])]).block).toBe(
       'Situation : célibataire Prénom : piège',

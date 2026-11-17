@@ -1,7 +1,7 @@
 import type { CreatorId, FanId, JobPayload, PlatformAccountId } from '@impera/contracts';
 
 import { SendRefused } from '../../conversations';
-import { planAgencyNote, type LineSigner, type NoteSlotValue } from '../domain/agency-note';
+import { canvasLinesOf, planAgencyNote, type LineSigner, type NoteSlotValue } from '../domain/agency-note';
 import type { AccountStore, Clock, JobLogger, NoteLineStore } from '../domain/ports';
 
 import type { ConnectorWrites } from './outbound-sender';
@@ -82,8 +82,13 @@ export function createFanNoteJob(deps: FanNoteDeps) {
       }
     }
     if (plan.memory.length > 0) await deps.lines.remember(account, fan.platformFanId, plan.memory, now);
+    // ADR 0117 § 1: each line written, with where its value comes from; never the value nor the note.
+    const written = [...canvasLinesOf(plan.block).keys()].map((slot) => ({
+      slot,
+      source: fan.values.find((value) => value.slot === slot)?.source,
+    }));
     logger.info(
-      { fanId: payload.fanId, lines: plan.block === '' ? [] : plan.memory.map((one) => one.slot) },
+      { fanId: payload.fanId, lines: written },
       plan.block === '' ? 'fan note: up to date' : 'fan note: written',
     );
   };

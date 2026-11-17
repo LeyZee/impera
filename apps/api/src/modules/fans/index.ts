@@ -3,6 +3,7 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createFansService, type FansService } from './application/fans';
+import { told } from './application/told';
 import { factRetentionCutoff } from './domain/facts';
 import { createDrizzleFactPurge } from './infra/fact-purge';
 import { createDrizzleFactStore } from './infra/fact-store';
@@ -62,39 +63,15 @@ export interface FansDeps {
   readonly onFactsChanged?: (creatorId: CreatorId, fanId: FanId) => Promise<void>;
 }
 
-/** The writes of facts, each followed by `onFactsChanged` when it wrote something (ADR 0117 § 5). */
-function told(service: FansService, onFactsChanged: FansDeps['onFactsChanged']): FansService {
-  if (onFactsChanged === undefined) return service;
-  return {
-    ...service,
-    proposeFacts: async (creatorId, fanId, proposals) => {
-      const written = await service.proposeFacts(creatorId, fanId, proposals);
-      if (written.length > 0) await onFactsChanged(creatorId, fanId);
-      return written;
-    },
-    proposeRead: async (creatorId, fanId, read, sources) => {
-      const written = await service.proposeRead(creatorId, fanId, read, sources);
-      if (written.length > 0) await onFactsChanged(creatorId, fanId);
-      return written;
-    },
-    editCard: async (creatorId, fanId, field, edit, author) => {
-      const card = await service.editCard(creatorId, fanId, field, edit, author);
-      await onFactsChanged(creatorId, fanId);
-      return card;
-    },
-  };
-}
-
 export function createFansModule(deps: FansDeps): FansModule {
   const purge = createDrizzleFactPurge(deps.adminDb);
-  const service = told(
-    createFansService(
-      createDrizzleFanStore(deps.db),
-      createDrizzleFactStore(deps.db),
-      createDrizzleFlagStore(deps.db),
-    ),
-    deps.onFactsChanged,
+  const plain = createFansService(
+    createDrizzleFanStore(deps.db),
+    createDrizzleFactStore(deps.db),
+    createDrizzleFlagStore(deps.db),
   );
+  const service =
+    deps.onFactsChanged === undefined ? plain : { ...plain, ...told(plain, deps.onFactsChanged) };
   return {
     name: 'fans',
     ...service,

@@ -64,9 +64,12 @@ function fold(text: string): string {
     .trim();
 }
 
-/** One line, no line break, no « : » trick that would read as a second label. */
+/**
+ * One line: every space, line break or control character (Unicode ones too, such as U+0085) folded into one space, so that a value never starts a line of
+ * its own and cannot read as a second label (`withAgencyBlock` also refuses any line out of the canvas).
+ */
 function clean(item: string): string {
-  return item.replace(/\s+/gu, ' ').trim();
+  return item.replace(/[\s\p{Cc}\p{Zl}\p{Zp}]+/gu, ' ').trim();
 }
 
 interface CanvasLine {
