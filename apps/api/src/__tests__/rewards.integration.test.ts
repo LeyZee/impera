@@ -12,10 +12,11 @@ import {
   TeamMemberIdSchema,
   ShiftReportIdSchema,
   TrophyCaseSchema,
+  UserIdSchema,
   type TeamMember,
   type TrophyCase,
 } from '@impera/contracts';
-import { schema, withMember } from '@impera/db';
+import { and, eq, schema, sql, withMember } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -581,5 +582,188 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
     expect((await team.call('GET', '/rewards/members/not-an-id/trophy-case', team.owner)).statusCode).toBe(
       400,
     );
+  });
+});
+
+/**
+ * The validated reports feed the game (ADR 0118, CHF-01). Nora works on an account whose pay reads the reports: her
+ * validated report gives her a net, a first sale and a rank; refused afterwards, it takes them back, in silence, and
+ * validated again it gives them anew. Léa reads nothing of it. Everything is invented (ADR 0010).
+ */
+describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qui ne tient plus est repris (ADR 0118)', () => {
+  let team: PayrollTeam;
+  let nora: TeamMember;
+  let lea: TeamMember;
+  let noraCookie: string;
+  let leaCookie: string;
+  let reportId: string;
+
+  const caseOf = async (cookie: string): Promise<TrophyCase> => {
+    const response = await team.call('GET', '/rewards/my-trophy-case', cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    return TrophyCaseSchema.parse(response.json());
+  };
+  const earned = (trophyCase: TrophyCase) =>
+    trophyCase.items.filter((item) => item.earnedAt !== null).map((item) => item.kind);
+  const evaluate = () => team.app.modules.rewards.jobs.evaluate();
+  const gainsOfNora = () =>
+    team.test.admin.db
+      .select()
+      .from(schema.rewardGains)
+      .where(eq(schema.rewardGains.userId, nora.userId))
+      .orderBy(schema.rewardGains.id);
+  /** The review of Nora's report, as the planning leaves it. */
+  const review = (status: 'validated' | 'rejected') =>
+    team.test.admin.db
+      .update(schema.shiftReports)
+      .set({
+        status,
+        reviewedBy: team.ownerId,
+        reviewedAt: new Date('2025-05-20T09:00:00Z'),
+        reviewNote: status === 'rejected' ? 'Montant à revoir' : null,
+      })
+      .where(eq(schema.shiftReports.id, reportId));
+
+  beforeAll(async () => {
+    team = await startPayrollTeam(inject('pgSuperuserUrl'));
+    ({ member: nora, cookie: noraCookie } = await team.addMember('nora@example.test', 'Nora'));
+    ({ member: lea, cookie: leaCookie } = await team.addMember('lea@example.test', 'Léa'));
+    const saved = await team.call('PUT', '/rewards/level-thresholds', team.owner, {
+      thresholdsMinor: [5_000, 20_000],
+    });
+    expect(saved.statusCode, saved.body).toBe(200);
+  });
+
+  afterAll(async () => {
+    await team.close();
+  });
+
+  it('counts nothing for a report still waiting for its review (§ 2)', async () => {
+    reportId = await team.report(nora, P1, 10_000, { status: 'submitted' });
+    expect((await evaluate()).gained).toBe(0);
+    const noras = await caseOf(noraCookie);
+    expect(earned(noras)).toEqual([]);
+    expect(noras.nextLevel).toMatchObject({ rank: 1, currentMinor: 0 });
+  });
+
+  it('counts a validated report at its net: a first sale, a rank, the net toward the next one (§ 1)', async () => {
+    await review('validated');
+    // Two runs at once after a take-back: the key among the gains that hold lets one of them write, never both.
+    const runs = await Promise.all([evaluate(), evaluate()]);
+    expect(runs[0].gained + runs[1].gained).toBe(2);
+    const noras = await caseOf(noraCookie);
+    expect(earned(noras)).toEqual(['first_sale', 'level:1']);
+    expect(noras.level).toEqual({ rank: 1, name: 'Étincelle' });
+    // 100,00 declared, 20 % to the platform: 80,00 of net.
+    expect(noras.nextLevel).toMatchObject({ rank: 2, currentMinor: 8_000, thresholdMinor: 20_000 });
+    const [level] = (await gainsOfNora()).filter((gain) => gain.kind === 'level');
+    expect(level).toMatchObject({ scopeKey: '1', basisMinor: 5_000, takenBackAt: null });
+    // Replayable.
+    expect((await evaluate()).gained).toBe(0);
+  });
+
+  it('reads a chatter her own validated reports alone, never a colleague’s (§ 9)', async () => {
+    const own = await team.app.modules.scheduling.game.ownValidatedShifts(UserIdSchema.parse(nora.userId));
+    expect(own.map((shift) => shift.grossMinor)).toEqual([10_000]);
+    expect(await team.app.modules.scheduling.game.ownValidatedShifts(UserIdSchema.parse(lea.userId))).toEqual(
+      [],
+    );
+    expect(
+      await team.app.modules.scheduling.game.ownValidatedShifts(UserIdSchema.parse(team.ownerId)),
+    ).toEqual([]);
+    const leas = await caseOf(leaCookie);
+    expect(earned(leas)).toEqual([]);
+    expect(leas.nextLevel).toMatchObject({ rank: 1, currentMinor: 0 });
+  });
+
+  it('keeps a rank when the owner empties the thresholds: no new rank opens, nothing is taken back (§ 7)', async () => {
+    const emptied = await team.call('PUT', '/rewards/level-thresholds', team.owner, { thresholdsMinor: [] });
+    expect(emptied.statusCode, emptied.body).toBe(200);
+    expect((await evaluate()).gained).toBe(0);
+    const noras = await caseOf(noraCookie);
+    expect(noras.level).toEqual({ rank: 1, name: 'Étincelle' });
+    expect(noras.nextLevel).toBeNull();
+    const back = await team.call('PUT', '/rewards/level-thresholds', team.owner, {
+      thresholdsMinor: [5_000, 20_000],
+    });
+    expect(back.statusCode, back.body).toBe(200);
+  });
+
+  it('lets the application take no gain back: the job alone does', async () => {
+    const write = withMember(team.app.db.db, nora.userId, (tx) =>
+      tx
+        .update(schema.rewardGains)
+        .set({ takenBackAt: new Date() })
+        .where(eq(schema.rewardGains.userId, nora.userId)),
+    );
+    await expect(write).rejects.toThrow();
+    expect(earned(await caseOf(noraCookie))).toEqual(['first_sale', 'level:1']);
+  });
+
+  it('takes back, in silence, what a refused report had given: the trophy and the rank (§ 4 and § 5)', async () => {
+    const seen = await team.call('POST', '/rewards/my-trophy-case/reveals', noraCookie, {
+      kinds: ['first_sale', 'level:1'],
+    });
+    expect(seen.statusCode, seen.body).toBe(200);
+    await review('rejected');
+    expect((await evaluate()).gained).toBe(0);
+    const noras = await caseOf(noraCookie);
+    expect(earned(noras)).toEqual([]);
+    expect(noras.level).toBeNull();
+    expect(noras.nextLevel).toMatchObject({ rank: 1, currentMinor: 0, thresholdMinor: 5_000 });
+    // No row is deleted: each is dated, and no screen reads it, the owner's file of her included.
+    const rows = await gainsOfNora();
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.takenBackAt !== null)).toBe(true);
+    const file = await team.call('GET', `/rewards/members/${nora.id}/trophy-case`, team.owner);
+    expect(earned(TrophyCaseSchema.parse(file.json()))).toEqual([]);
+    // Replayable: a second run takes nothing more back and dates nothing again.
+    await evaluate();
+    expect(await gainsOfNora()).toEqual(rows);
+  });
+
+  it('gives it again, to be revealed again at its new date, when the net comes back (§ 5)', async () => {
+    const before = await gainsOfNora();
+    await review('validated');
+    // Two runs at once after a take-back: the key among the gains that hold lets one of them write, never both.
+    const runs = await Promise.all([evaluate(), evaluate()]);
+    expect(runs[0].gained + runs[1].gained).toBe(2);
+    const noras = await caseOf(noraCookie);
+    expect(earned(noras)).toEqual(['first_sale', 'level:1']);
+    expect(
+      noras.items.filter((item) => item.earnedAt !== null).every((item) => item.revealedAt === null),
+    ).toBe(true);
+    // The rows taken back stay as they were; two new ones hold.
+    const rows = await gainsOfNora();
+    expect(rows).toHaveLength(4);
+    expect(rows.filter((row) => row.takenBackAt !== null)).toEqual(expect.arrayContaining(before));
+    const held = await team.test.admin.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.rewardGains)
+      .where(and(eq(schema.rewardGains.userId, nora.userId), sql`${schema.rewardGains.takenBackAt} is null`));
+    expect(held).toEqual([{ count: 2 }]);
+  });
+
+  it('never undoes a take-back, whoever asks: a gain earned again is a new row', async () => {
+    const [taken] = (await gainsOfNora()).filter((row) => row.takenBackAt !== null);
+    if (taken === undefined) throw new Error('no gain taken back');
+    for (const takenBackAt of [null, new Date()]) {
+      await expect(
+        team.test.admin.db
+          .update(schema.rewardGains)
+          .set({ takenBackAt })
+          .where(eq(schema.rewardGains.id, taken.id)),
+      ).rejects.toThrow();
+    }
+    expect((await gainsOfNora()).find((row) => row.id === taken.id)).toEqual(taken);
+  });
+
+  it('never reaches pay: taking back and giving again leave the statement as it was (§ 9)', async () => {
+    await team.recalculate(P1);
+    await team.forgetJobs(P1);
+    const before = await team.statementOf(nora, P1);
+    await evaluate();
+    expect(await team.statementOf(nora, P1)).toEqual(before);
+    expect(await team.jobsFor(P1)).toEqual([]);
   });
 });
