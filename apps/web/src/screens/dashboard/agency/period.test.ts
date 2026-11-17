@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   againstText,
+  isDay,
   compareChoices,
   comparable,
   mondayOf,
@@ -97,6 +98,12 @@ describe('the agency’s days (ADR 0146)', () => {
     expect(comparable({ registerSince: '2026-10-20', previousFrom: '2026-10-01' })).toBe(false);
     expect(comparable({ registerSince: '2026-10-01', previousFrom: '2026-10-01' })).toBe(true);
     expect(comparable({ registerSince: null, previousFrom: '2026-10-01' })).toBe(true);
+  });
+
+  it('takes only real calendar days from an address typed by hand', () => {
+    expect(isDay('2026-02-28')).toBe(true);
+    expect(isDay('2026-02-31')).toBe(false);
+    expect(isDay('2026-13-01')).toBe(false);
   });
 
   it('asks the server in its words', () => {

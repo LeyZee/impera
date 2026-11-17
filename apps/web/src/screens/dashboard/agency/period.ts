@@ -41,8 +41,12 @@ export const UNIT_OPTIONS: readonly {
 const DAY_MS = 86_400_000;
 const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
+/** A real calendar day: « 2026-02-31 » is none (Date would roll it to 3 March; the server refuses it). */
 export const isDay = (value: unknown): value is string =>
-  typeof value === 'string' && DAY.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+  typeof value === 'string' &&
+  DAY.test(value) &&
+  !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+  new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
 export function shiftDay(day: string, days: number): string {
   return new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
