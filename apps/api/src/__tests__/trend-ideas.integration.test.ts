@@ -208,6 +208,34 @@ describe('/v1/creators/:creatorId/ideas', () => {
     );
   });
 
+  it('leaves an unreadable idea out of her day rather than failing it (recette PIL-19)', async () => {
+    const day = '2026-11-02';
+    const readable = await seedIdea(nora, { title: 'Idée lisible' });
+    const unreadable = await seedIdea(nora, {
+      title: 'Fiche reel d’une autre forme',
+      category: 'instagram_reel',
+    });
+    // A reel sheet the code would never write: the base takes any object, the read refuses it.
+    await test.admin.db
+      .update(schema.contentIdeas)
+      .set({ reelBrief: { forme: 'inconnue' }, proposedOn: day })
+      .where(eq(schema.contentIdeas.id, unreadable));
+    await test.admin.db
+      .update(schema.contentIdeas)
+      .set({ proposedOn: day })
+      .where(eq(schema.contentIdeas.id, readable));
+    const list = await call('GET', `/v1/creators/${nora}/ideas?day=${day}`, cookies.owner);
+    expect(list.statusCode, list.body).toBe(200);
+    expect(ContentIdeaListSchema.parse(list.json()).items.map((idea) => idea.id)).toEqual([readable]);
+  });
+
+  it('refuses a script idea in the base: a script is never an idea of the day (recette PIL-19)', async () => {
+    const ideaId = await seedIdea(nora);
+    await expect(
+      test.admin.db.execute(sql`update content_ideas set category = 'script' where id = ${ideaId}`),
+    ).rejects.toHaveProperty('cause.constraint', 'content_ideas_category_check');
+  });
+
   it('turns a corrected idea into a suggestion in her first room, its « à tourner » her sheet; replayed, nothing more', async () => {
     const ideaId = await seedIdea(nora);
     const response = await validate(cookies.manager, nora, ideaId, { title: 'Robe rouge au miroir' });

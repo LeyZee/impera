@@ -32,6 +32,7 @@ import {
 
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
+import { useFollowDeviceZone } from '@/pwa/device-zone';
 import { useOnline } from '@/pwa/online';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
@@ -61,6 +62,8 @@ export interface Account {
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   const rail = useMemo(() => railOf(user), [user]);
+  // A member's record takes the zone of the phone at each opening (recette CHT-01): his screens speak his hour.
+  useFollowDeviceZone(user);
   const account = useMemo(
     () => ({
       name: user.name,

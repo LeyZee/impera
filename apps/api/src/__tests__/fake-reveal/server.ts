@@ -41,6 +41,8 @@ import {
 const LINK_TTL_MS = 10 * 60_000;
 const LINK_SECRET = 'fake-reveal-link-secret';
 const PUBLIC_URL = 'http://fake-reveal.test';
+/** The host FakeReveal serves its files from: the one a connector under test may read a vault file or picture from. */
+export const FAKE_REVEAL_FILE_HOST = new URL(PUBLIC_URL).hostname;
 /** Invented: the real agency share never enters the repository. Reveal's own 18 % and VAT 20 % are public. */
 const AGENCY_PERCENTAGE = 30;
 /** Seen on every API answer (headers.md); FakeReveal sends them without counting. */
@@ -180,6 +182,11 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
     atMs: AtSchema,
     scriptId: z.string(),
     priceCents: z.number().int().min(0),
+    /** A « Tarif réduit » put on the step (`null` takes it off); absent, the discount stays as it is. */
+    discount: z
+      .object({ priceCents: z.number().int().min(0), minutes: z.number().int().min(0) })
+      .nullable()
+      .optional(),
   }),
   /** « Message supprimé » (2026-11-16): the message stays listed, with `deletedAt`. */
   z.object({ type: z.literal('message_deleted'), atMs: AtSchema, messageId: z.string() }),
@@ -358,7 +365,10 @@ class FakeRevealWorld {
         return;
       case 'script_changed': {
         const script = this.state.scripts.find((s) => s.id === event.scriptId);
-        if (script !== undefined) script.priceCents = event.priceCents;
+        if (script !== undefined) {
+          script.priceCents = event.priceCents;
+          if (event.discount !== undefined) script.discount = event.discount;
+        }
         return;
       }
       case 'sequence_removed':
@@ -491,7 +501,8 @@ class FakeRevealWorld {
       ...base,
       ...(isHls && { url: this.signedLink(`/hls/${media.id}/index.m3u8`, media.id, expiresMs) }),
       isHls,
-      thumbnailUrl: url,
+      // A video's poster is a picture of its own (ADR 0138), signed like the file.
+      thumbnailUrl: isHls ? this.signedLink(`/files/${media.id}/poster`, media.id, expiresMs) : url,
       moderationStatus: 'approved',
     };
   }
@@ -632,6 +643,9 @@ class FakeRevealWorld {
       name: s.name,
       content: s.content,
       ...(s.priceCents === null ? {} : { price: s.priceCents }),
+      ...(s.discount === null
+        ? {}
+        : { discountedPrice: s.discount.priceCents, discountDurationMinutes: s.discount.minutes }),
     };
   }
 
@@ -745,7 +759,6 @@ export interface FakeReveal {
   readonly userId: string;
   /** `fetch` for the connector, served by `app.inject` (no port opened); any host reaches FakeReveal. */
   readonly fetch: RevealFetch;
-  /** A file download's `fetch` (no header ever sent), served the same way; only FakeReveal's host answers. */
   /** FakeReveal's file links, reached as the server reaches a real one (`downloadVaultFile`); its host resolves to a public test address. */
   readonly fileTransport: FileTransport;
   /** FakeReveal's clock, moved only by `POST /__clock`: a connector under test reads the same time. */
@@ -1310,6 +1323,13 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     if (exp <= world.nowMs()) throw new HttpFault(403, 'Request has expired');
     return { media, exp };
   };
+
+  // A video's poster (ADR 0138): a picture of its own, signed like the file.
+  app.get('/files/:id/poster', (request, reply) => {
+    const { media } = signedMedia(IdParams.parse(request.params).id, request.query);
+    if (media.type !== 'video') throw new HttpFault(404, 'Not Found');
+    return reply.type(FILES.photo.mimeType).send(FILES.photo.data);
+  });
 
   // PROVISIONAL (L14): the playlist of a vault video, its key and its segments, each link signed like the playlist.
   app.get('/hls/:id/index.m3u8', async (request, reply) => {

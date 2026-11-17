@@ -1,6 +1,6 @@
 {
-  "id": "0de570fd-4a6e-49d4-89b3-54697ef8c8e3",
-  "prevId": "0e93d1bd-1f32-4396-a292-538ec4a71cc7",
+  "id": "b094204d-d741-4c19-b8bc-4f3e51cb5363",
+  "prevId": "ecf8c7d0-1095-483b-9619-6702105d1af7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8264,6 +8264,12 @@
           "notNull": true,
           "default": 0
         },
+        "preview_blurhash": {
+          "name": "preview_blurhash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_synced_at": {
           "name": "last_synced_at",
           "type": "timestamp with time zone",
@@ -8425,6 +8431,10 @@
         "media_platform_refs_description_failures_check": {
           "name": "media_platform_refs_description_failures_check",
           "value": "\"media_platform_refs\".\"description_failures\" >= 0"
+        },
+        "media_platform_refs_blurhash_check": {
+          "name": "media_platform_refs_blurhash_check",
+          "value": "char_length(\"media_platform_refs\".\"preview_blurhash\") <= 166"
         },
         "media_platform_refs_duration_check": {
           "name": "media_platform_refs_duration_check",
@@ -17817,6 +17827,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "discount_price_minor": {
+          "name": "discount_price_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_minutes": {
+          "name": "discount_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "currency": {
           "name": "currency",
           "type": "text",
@@ -17907,6 +17929,10 @@
           "name": "platform_script_steps_price_check",
           "value": "\"platform_script_steps\".\"price_minor\" >= 0"
         },
+        "platform_script_steps_discount_check": {
+          "name": "platform_script_steps_discount_check",
+          "value": "coalesce(\"platform_script_steps\".\"discount_price_minor\", 0) >= 0 and coalesce(\"platform_script_steps\".\"discount_minutes\", 0) >= 0"
+        },
         "platform_script_steps_currency_check": {
           "name": "platform_script_steps_currency_check",
           "value": "\"platform_script_steps\".\"currency\" in ('EUR', 'USD')"
@@ -17975,6 +18001,12 @@
         },
         "synced_at": {
           "name": "synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_at": {
+          "name": "version_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
@@ -21860,7 +21892,7 @@
       "checkConstraints": {
         "content_ideas_category_check": {
           "name": "content_ideas_category_check",
-          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
         },
         "content_ideas_suggestion_check": {
           "name": "content_ideas_suggestion_check",

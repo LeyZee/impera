@@ -321,6 +321,8 @@ export function decisionError(status: number, body: unknown): string {
       ? 'Ce message ne peut pas partir : une garde le bloque. Retouche-le ou refuse-le.'
       : `Ce message ne peut pas partir : ${[...new Set(found)].join(', ')}. Retouche-le ou refuse-le.`;
   }
+  if (code === 'script_step_cut_unprocessable')
+    return 'Ce message porte une étape payante que ses limites interdisent maintenant (soin, ventes gelées, âge en doute ou « ne plus lui écrire »). Refuse-le et réponds-lui sans l’étape.';
   if (code === 'persona_inactive_unprocessable')
     return 'Ce message ne peut pas partir : cette créatrice n’a pas de persona active. Active une version dans Créatrices › Persona.';
   if (code === 'creator_archived_conflict')

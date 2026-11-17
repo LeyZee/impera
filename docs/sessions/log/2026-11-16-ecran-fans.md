@@ -1,0 +1,7 @@
+# 2026-11-16 : l'écran « Fans » (ADR 0124)
+
+- **Fiche** : ADR 0124, acceptée par Charles le 16/11 (« ok 0124 »), demande REG-23 de la recette du 16/11.
+- **Fait** : `GET /v1/fans` (module `fans`), lu dans le tenant de la créatrice avec la portée de l'équipe : propriétaire et managers actifs de sa liste, 403 pour un chatteur, un manager d'autres créatrices et la créatrice. Ce que chaque fan a payé vient du registre (`platform_sales`, ventes moins remboursements, par devise), avec sa dernière conversation et ses états. Filtres Tous, Gros payeurs, Ont décroché (21 j), Payeurs, N'ont jamais payé, Sans réponse de nous ; recherche sans accents ; tri ; pagination par clé avec le total. Écran Chatting › Fans (propriétaire et manager, dans « Plus » au téléphone) selon les consignes de Design : colonnes alignées, deux lignes au téléphone, pastilles aux mots de Suivi, « Voir la suite ».
+- **Tests** : intégration (droits, montants et remboursements, filtres, recherche, pagination, curseur invalide), contrat (pliage des accents), écran (liste, filtres, recherche, suite, panne), menus.
+- **Reste** : « Communs à plusieurs créatrices » masqué tant qu'on ne sait pas si Reveal garde l'identifiant d'un fan d'un compte à l'autre ; seuil de « Ont décroché » réglable côté serveur, pas encore à l'écran ; les fans inconnus du CRM attendent l'import de l'ADR 0127.
+- **Découvertes** : aucune migration n'a servi : l'index `platform_sales (creator_id, occurred_at)` suffit à la somme par fan d'une créatrice, le numéro 0222 est rendu au coordinateur.

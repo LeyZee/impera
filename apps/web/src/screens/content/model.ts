@@ -2,7 +2,9 @@ import {
   DROP_CATEGORY_LABELS,
   DROP_FORMAT_RULES,
   DROP_MIME_TYPES,
+  SNIFF_BYTES,
   WITHDRAWABLE_DROP_STATES,
+  headRefusal,
   kindOfMime,
   scriptDropCode,
   type ContentDrop,
@@ -124,6 +126,21 @@ export const sameFile = (
 /** Said when a file is of no type we take, whatever its category. */
 export const UNKNOWN_TYPE = 'Ce type de fichier n’est pas pris : choisis une photo, une vidéo ou un vocal';
 
+/** What her gallery gave cannot be read here: said rather than guessed, the server would refuse it anyway. */
+export const UNREADABLE_HERE = 'Ce fichier ne s’ouvre pas : renvoie-le depuis ta galerie';
+
+/**
+ * Whether the first bytes of a file she picked are what its type says (recette CRE-12): a text renamed `.jpg` is
+ * refused on her phone, before it is counted or sent, with the server's own sentence. `null` when they are.
+ */
+export async function pickedHeadRefusal(file: Blob, mime: DropMime): Promise<string | null> {
+  try {
+    return headRefusal(mime, new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer()));
+  } catch {
+    return UNREADABLE_HERE;
+  }
+}
+
 /** A script she began and has not sent: it stays in « À tourner » until she sends it (recette CRE-12). */
 export const isStartedScript = (drop: ContentDrop): boolean =>
   drop.category === 'script' && drop.state === 'filling';
@@ -138,7 +155,7 @@ export type ToShoot =
  * keeps its place, its day and its progress until she sends it).
  */
 export function toShoot(requests: readonly ContentRequest[], drops: readonly ContentDrop[]): ToShoot[] {
-  const open: ToShoot[] = openRequests(requests).map((request) => ({ kind: 'request', request }));
+  const open: ToShoot[] = openRequests(requests, drops).map((request) => ({ kind: 'request', request }));
   const begun: ToShoot[] = drops.filter(isStartedScript).map((drop) => ({
     kind: 'script',
     drop,
@@ -156,10 +173,17 @@ export function toShoot(requests: readonly ContentRequest[], drops: readonly Con
 export const routeFirst = (moving: readonly ContentDrop[]): boolean =>
   moving.some((drop) => drop.files.some((file) => file.state === 'awaiting'));
 
-/** Her open requests, the nearest first (« À tourner »): those a drop already answers are on their way. */
-export function openRequests(requests: readonly ContentRequest[]): ContentRequest[] {
+/**
+ * Her open requests, the nearest first (« À tourner »): those a drop already answers are on their way, except while
+ * that drop still goes up (recette CRE-12): if its send stops, she must still see what is asked of her.
+ */
+export function openRequests(
+  requests: readonly ContentRequest[],
+  drops: readonly ContentDrop[],
+): ContentRequest[] {
+  const goingUp = new Set(drops.filter((drop) => drop.state === 'uploading').map((drop) => drop.id));
   return requests
-    .filter((request) => request.state === 'open' && request.dropId === null)
+    .filter((request) => request.state === 'open' && (request.dropId === null || goingUp.has(request.dropId)))
     .toSorted((a, b) => a.dueOn.localeCompare(b.dueOn) || a.createdAt.localeCompare(b.createdAt));
 }
 
