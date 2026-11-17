@@ -183,6 +183,7 @@ const CREATOR_DECISIONS: Readonly<
   platform_accounts: 'readsOnly',
   // The connector's own sends (P2-03): written by the agent's connector only.
   connector_sends: 'closed',
+  connector_note_lines: 'closed',
   drafts: 'closed',
   script_runs: 'closed',
   conversation_events: 'closed',
