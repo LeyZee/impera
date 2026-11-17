@@ -12,6 +12,7 @@ import {
   agencyStatusOf,
   amountInput,
   amountText,
+  amountTooLarge,
   incidentsOf,
   currencyTyped,
   estimateLine,
@@ -38,6 +39,8 @@ import {
   toDoOf,
   toneOf,
   uncheckedText,
+  unusualAmount,
+  usualReport,
   validatedTotal,
   WITHOUT_PAY_EFFECT,
   withoutPayEffect,
@@ -120,6 +123,17 @@ describe('an amount typed in a report', () => {
     expect(parseAmount('50000,01')).toBeNull();
     expect(parseAmount('50000')).toBe(5_000_000);
     expect(parseAmount('150 000', false, 100_000_000)).toBe(15_000_000);
+  });
+
+  it('tells an amount too large from one it cannot read (recette 16/11, CHT-29)', () => {
+    expect(amountTooLarge('50000,01')).toBe(true);
+    expect(amountTooLarge('1 000 000')).toBe(true);
+    expect(amountTooLarge('12345678901')).toBe(true);
+    expect(amountTooLarge('-60000', true)).toBe(true);
+    expect(amountTooLarge('50000')).toBe(false);
+    expect(amountTooLarge('douze')).toBe(false);
+    expect(amountTooLarge('-60000')).toBe(false);
+    expect(amountTooLarge('')).toBe(false);
   });
 
   it('takes a sign on a correction', () => {
@@ -408,5 +422,76 @@ describe('a report against its platform (ADR 0073)', () => {
     expect(uncheckedText('chatter_unlinked', 'Reveal', false)).toBe(
       'Ton compte de chatteur sur Reveal n’est pas encore relié : l’agence relit ton rapport.',
     );
+  });
+});
+
+describe('an unusual amount (recette 16/11, CHT-29)', () => {
+  const MEMBER = '01a17ff2-0000-7000-8000-000000000003';
+  const reports = [
+    report(
+      '01a17ff2-0000-7000-8000-000000000101',
+      '01a17ff2-0000-7000-8000-000000000201',
+      8_000,
+      'validated',
+    ),
+    report(
+      '01a17ff2-0000-7000-8000-000000000102',
+      '01a17ff2-0000-7000-8000-000000000202',
+      12_000,
+      'validated',
+    ),
+    report(
+      '01a17ff2-0000-7000-8000-000000000103',
+      '01a17ff2-0000-7000-8000-000000000203',
+      30_000,
+      'validated',
+    ),
+    report(
+      '01a17ff2-0000-7000-8000-000000000104',
+      '01a17ff2-0000-7000-8000-000000000204',
+      900_000,
+      'submitted',
+    ),
+    report(
+      '01a17ff2-0000-7000-8000-000000000105',
+      '01a17ff2-0000-7000-8000-000000000205',
+      400_000,
+      'validated',
+      '01a17ff2-0000-7000-8000-000000000101',
+    ),
+  ];
+
+  it('reads the member’s usual report as the median of their validated reports, corrections left out', () => {
+    expect(usualReport(reports, MEMBER, 'EUR')).toBe(12_000);
+    expect(
+      usualReport(
+        [
+          ...reports,
+          report(
+            '01a17ff2-0000-7000-8000-000000000106',
+            '01a17ff2-0000-7000-8000-000000000206',
+            20_000,
+            'validated',
+          ),
+        ],
+        MEMBER,
+        'EUR',
+      ),
+    ).toBe(16_000);
+    // Fewer than three, another member, another currency: no usual report.
+    expect(usualReport(reports.slice(0, 2), MEMBER, 'EUR')).toBeNull();
+    expect(usualReport(reports, '01a17ff2-0000-7000-8000-000000000009', 'EUR')).toBeNull();
+    expect(usualReport(reports, MEMBER, 'USD')).toBeNull();
+  });
+
+  it('asks from five times the usual report, never below 1 000, and from 2 000 without one', () => {
+    expect(unusualAmount(60_000, 12_000)).toBe(false);
+    expect(unusualAmount(100_000, 12_000)).toBe(true);
+    expect(unusualAmount(-100_000, 12_000)).toBe(true);
+    expect(unusualAmount(300_000, 50_000)).toBe(true);
+    expect(unusualAmount(240_000, 50_000)).toBe(false);
+    expect(unusualAmount(199_999, null)).toBe(false);
+    expect(unusualAmount(200_000, null)).toBe(true);
+    expect(unusualAmount(5_000, 0)).toBe(false);
   });
 });
