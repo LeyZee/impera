@@ -21,9 +21,13 @@ describe('Historique des alertes › mise en page (recette visuelle 16/11)', () 
     );
   });
 
-  it('keeps the filters on one row on a computer, « Tout marquer comme vu » at the end of the header', () => {
-    expect(css).toMatch(/@media \(min-width: 900px\) \{\s*\.hi-filters \{\s*flex-wrap: nowrap;/u);
-    expect(css).toMatch(/\.hi-head__all \{[^}]*margin-inline-start: auto;/u);
+  it('gives each select half of the row on a computer, the chip and « Tout marquer comme vu » the row above', () => {
+    expect(css).toMatch(
+      /@media \(min-width: 900px\) \{\s*\.hi-head \{\s*display: grid;\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/u,
+    );
+    expect(css).toMatch(/\.hi-filters \.hi-select \{\s*grid-row: 2;\s*min-width: 0;\s*max-width: none;/u);
+    expect(css).toMatch(/\.hi-head__all \{\s*grid-area: 1 \/ 2;\s*justify-self: end;/u);
+    expect(css).not.toMatch(/\.hi-filters \{\s*flex-wrap: nowrap;/u);
   });
 
   it('says « Vu » in the muted ink, never the faint one', () => {
