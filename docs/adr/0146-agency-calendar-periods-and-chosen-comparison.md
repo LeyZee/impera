@@ -1,6 +1,6 @@
 # 0146. Le Dashboard de l'agence se lit par jour, semaine, mois ou période choisie, et se compare à la période qu'on choisit
 
-Statut : proposed (demande de Charles du 16/11/2026, 23 h 45, fil « Aligner le dashboard sur Reveal » : « plutôt que de mettre aujourd'hui, 7 jours, 30 jours, 3 mois, Reveal met jour, semaine, mois, et après tu peux personnaliser […] et tu peux choisir le mois auquel tu veux confronter » ; numéro attribué par le coordinateur le 16/11, 23 h 49)
+Statut : accepted (acceptée par Charles le 17/11/2026, 13 h 58, après validation des captures du lot dashboard-periodes-4 ; demande de Charles du 16/11/2026, 23 h 45, fil « Aligner le dashboard sur Reveal » : « plutôt que de mettre aujourd'hui, 7 jours, 30 jours, 3 mois, Reveal met jour, semaine, mois, et après tu peux personnaliser […] et tu peux choisir le mois auquel tu veux confronter » ; numéro attribué par le coordinateur le 16/11, 23 h 49)
 Date : 2026-11-16
 Précise : ADR 0078 § 3 (les périodes) et § 5 (la route). Ne touche ni aux montants (0078 § 2, 0106), ni aux abonnés (0081), ni au bloc de l'agent d'une créatrice.
 

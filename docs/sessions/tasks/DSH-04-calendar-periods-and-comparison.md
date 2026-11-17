@@ -1,5 +1,5 @@
 # DSH-04 Le Dashboard de l'agence par jour, semaine, mois ou période choisie, et la comparaison choisie
-Statut : in_progress (ADR 0146 proposée, à accepter par Charles)
+Statut : done (ADR 0146 acceptée par Charles le 17/11 ; captures dashboard-periodes-4 validées ; fusion sur signal du coordinateur)
 Phase : pilotage
 Dépend de : DSH-01 (ADR 0078), DSH-02 (ADR 0106)
 Branche : claude/project-thread-v704ot

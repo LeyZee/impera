@@ -144,7 +144,7 @@ Branche : task/<id>-<slug>
 | DSH-01 | Le Dashboard de l'agence : insights des ventes | API CRM | done (lots A et B) | CRM-01, ADR 0078 |
 | DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | done | DSH-01, ADR 0106 |
 | DSH-03 | La part de l'agence lue chez Reveal, le pourcentage facultatif | API CRM | review | CR-04, CRM-04 d3, ADR 0054 amendée le 14/11 |
-| DSH-04 | Le Dashboard de l'agence par jour, semaine, mois ou période choisie, la comparaison choisie, la courbe au survol | API CRM | in_progress | DSH-01, ADR 0146 |
+| DSH-04 | Le Dashboard de l'agence par jour, semaine, mois ou période choisie, la comparaison choisie, la courbe au survol | API CRM | done | DSH-01, ADR 0146 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
