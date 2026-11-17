@@ -1,8 +1,9 @@
-import { KycSlotSchema, type CreatorId, type KycSlot } from '@impera/contracts';
+import { KycSlotSchema, type CreatorId, type FanId, type KycSlot } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createFansService, type FansService } from './application/fans';
+import { told } from './application/told';
 import { factRetentionCutoff } from './domain/facts';
 import { createDrizzleFactPurge } from './infra/fact-purge';
 import { createDrizzleFactStore } from './infra/fact-store';
@@ -55,15 +56,22 @@ export interface FansDeps {
   readonly db: Database;
   /** Owner role: the retention purge runs for every creator at once. */
   readonly adminDb: Database;
+  /**
+   * Told once his facts changed (a proposal, the AI's read, a chatter's edit), after the write: the platform's note
+   * follows (ADR 0117 § 5). It must not throw: the write is done, the composition root logs a failure to queue.
+   */
+  readonly onFactsChanged?: (creatorId: CreatorId, fanId: FanId) => Promise<void>;
 }
 
 export function createFansModule(deps: FansDeps): FansModule {
   const purge = createDrizzleFactPurge(deps.adminDb);
-  const service = createFansService(
+  const plain = createFansService(
     createDrizzleFanStore(deps.db),
     createDrizzleFactStore(deps.db),
     createDrizzleFlagStore(deps.db),
   );
+  const service =
+    deps.onFactsChanged === undefined ? plain : { ...plain, ...told(plain, deps.onFactsChanged) };
   return {
     name: 'fans',
     ...service,

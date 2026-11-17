@@ -46,6 +46,7 @@ export const JOB_NAMES = [
   'connector.reconcile',
   'connector.read_conversation',
   'connector.vault_sync',
+  'connector.sync_fan_note',
   'fans.refresh_summary',
   'fans.read_card',
   'fans.purge_facts',
@@ -128,6 +129,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.reconcile': 'Vérification des envois Reveal',
   'connector.read_conversation': 'Lecture d’une conversation ouverte dans le copilote',
   'connector.vault_sync': 'Synchronisation du coffre Reveal',
+  'connector.sync_fan_note': 'Notes des fans écrites par l’IA',
   'fans.refresh_summary': 'Résumé des fans',
   'fans.read_card': 'Fiche des fans remplie par l’IA',
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
@@ -265,6 +267,15 @@ export const JOB_PAYLOADS = {
   'connector.vault_sync': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
+   * What the AI knows of a fan written into the canvas lines of his client note on the platform (ADR 0117 §§ 3–5):
+   * queued two minutes after his facts change, one waiting per fan (`job_key`), replayable.
+   */
+  'connector.sync_fan_note': z.object({
+    creatorId: CreatorIdSchema,
+    fanId: FanIdSchema,
     correlationId: z.string().min(1),
   }),
   'fans.refresh_summary': conversationJob.extend({ fanId: FanIdSchema }),
@@ -596,6 +607,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Asked again by the panel while it stays unknown: no retry of its own.
   'connector.read_conversation': 1,
   'connector.vault_sync': 3,
+  // Replayable: it reads the note again and writes only what is missing.
+  'connector.sync_fan_note': 3,
   'fans.refresh_summary': 3,
   // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).
   'fans.read_card': 3,

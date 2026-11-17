@@ -8,6 +8,7 @@ import type {
   SessionState,
 } from '@impera/contracts';
 
+import type { NoteLineMemory } from './agency-note';
 import type { PlatformConnector } from './platform-connector';
 import type { BreakerState } from './rhythm';
 
@@ -52,6 +53,18 @@ export interface SendJournal {
   settle(idempotencyKey: string, platformMessageId: string, sentAt: Date): Promise<void>;
   /** Which of these platform message ids are sends of ours, in this conversation. */
   ownIds(platformConversationId: string, platformMessageIds: readonly string[]): Promise<ReadonlySet<string>>;
+}
+
+/** `connector_note_lines` (ADR 0117 § 3): what the agent remembers of the note lines it wrote, under her RLS. */
+export interface NoteLineStore {
+  lines(account: ConnectorAccount, platformFanId: string): Promise<readonly NoteLineMemory[]>;
+  /** Kept once the platform took the write: each line replaces the one of its slot. */
+  remember(
+    account: ConnectorAccount,
+    platformFanId: string,
+    lines: readonly NoteLineMemory[],
+    at: Date,
+  ): Promise<void>;
 }
 
 /** What the module gives an adapter besides its session: its account's send journal. */

@@ -14,6 +14,7 @@ import type { OutboundSender } from '../conversations';
 
 import { createConnectorReads, type ConnectorReads } from './application/connector-reads';
 import { createDispatchJob } from './application/dispatch';
+import { createFanNoteJob, type FanNoteSource } from './application/fan-note';
 import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import {
@@ -44,6 +45,7 @@ import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
 import { createDrizzleConnectorReadsStore } from './infra/db/connector-reads-store';
 import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
+import { createNoteLineStore } from './infra/db/note-line-store';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
   createSalesFeedJobs,
@@ -63,6 +65,7 @@ import {
   type SalesFeedTeamRoutesOptions,
 } from './infra/http/sales-feed-team-routes';
 import { createVaultRoutes, type VaultRoutesOptions } from './infra/http/vault-routes';
+import { createLineSigner } from './infra/line-signer';
 import { revealSessionShape } from './infra/reveal/session';
 import { createRevealSalesFeed, isPlausibleRevealKey, type SalesFeedFetch } from './infra/reveal-crm/adapter';
 import { readRevealDelivery } from './infra/reveal-crm/delivery';
@@ -72,6 +75,10 @@ export type { AvatarPorts } from './domain/avatar';
 export { createAvatarFetch } from './infra/avatar/fetch-avatar';
 export { createS3AvatarStore } from './infra/avatar/s3-avatar-store';
 export type { ConnectorRegistry } from './domain/ports';
+export type { FanNoteSource } from './application/fan-note';
+export type { NoteSlotValue } from './domain/agency-note';
+/** @public His facts changed: his note on the platform follows (ADR 0117 § 5), queued by the composition root. */
+export { enqueueFanNoteSync } from './infra/db/fan-note-queue';
 export type { SalesFeedRegistry } from './domain/sales-feed';
 export type { InviteFromPlatform } from './infra/http/sales-feed-team-routes';
 export type { SalesFeedFetch } from './infra/reveal-crm/adapter';
@@ -174,7 +181,7 @@ export interface ConnectorsModule {
   readonly outboundSender: OutboundSender;
   /**
    * The other writes of ADR 0018 (script step, client note, read mark, typing), behind the same write guard as the
-   * sends (P2-03). No caller yet: the selling engine and the fan card will use them.
+   * sends (P2-03). The client note is written by `connector.sync_fan_note` (ADR 0117); the selling engine will use the rest.
    */
   readonly writes: ConnectorWrites;
   readonly sessions: ConnectorSessions;
@@ -201,6 +208,8 @@ export interface ConnectorsModule {
     readDailyStats(logger: JobLogger, correlationId: string): Promise<void>;
     /** Her vault's folders and media mirrored in the CRM, read only (ADR 0099, fiche vault-sync). */
     vaultSync(payload: JobPayload<'connector.vault_sync'>, logger: JobLogger): Promise<void>;
+    /** What the AI knows of a fan written into his client note on the platform (ADR 0117 §§ 3–5). */
+    syncFanNote(payload: JobPayload<'connector.sync_fan_note'>, logger: JobLogger): Promise<void>;
   };
   /**
    * `/v1/creators/:creatorId/vault` and its owner's « Synchroniser » (fiche vault-sync), behind the guards given here.
@@ -319,6 +328,8 @@ export interface ConnectorsDeps {
    * description of the vault behind it, wired by the composition root). Never a write of this module's tables.
    */
   readonly onVaultSynced?: (input: VaultSyncAsked) => Promise<void>;
+  /** Who a fan is and his card's values (the `fans` module, ADR 0117 § 4); without it, no note is ever written. */
+  readonly fanNotes?: FanNoteSource;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -408,6 +419,15 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
         store: vaultStore,
         clock,
         onSynced: deps.onVaultSynced,
+      }),
+      syncFanNote: createFanNoteJob({
+        accounts,
+        lines: createNoteLineStore(deps.db),
+        fans: deps.fanNotes ?? { read: () => Promise.resolve(null) },
+        writes: sender,
+        clock,
+        signerFor: (platformAccountId) =>
+          deps.sessionKeys === null ? null : createLineSigner(deps.sessionKeys, platformAccountId),
       }),
     },
     askConversationRead: createAskConversationRead({
