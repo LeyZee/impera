@@ -44,10 +44,12 @@
 .sv-row:has(.sv-menu) {
   z-index: 2;
 }
+/* The dot sits on the first line of the sentence, its edge and the text's on the list's below (GES-08): the same 12 px
+   dot, the same 14 px after it, the same card inset. */
 .sv-next__head {
   display: flex;
   gap: 14px;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: wrap;
 }
 .sv-next__text {

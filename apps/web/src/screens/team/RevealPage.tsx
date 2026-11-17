@@ -639,6 +639,8 @@ function LinkedRow({
   const isOwn = row.actions.length === 0;
   return (
     <li className={isOwn ? 'sf-imp rv-linked rv-own' : 'sf-imp rv-linked'}>
+      {/* The box's column of the card above, empty: both cards share one grid (GES-10). */}
+      <span className="rv-tick-space" aria-hidden="true" />
       <Face row={row} />
       <Who
         row={row}

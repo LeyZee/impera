@@ -33,7 +33,7 @@ import {
   ppvRate,
   readAtLabel,
   SELLER_NOTES,
-  sellerSlices,
+  sellerRanking,
   shareOf,
   shortDay,
   shortEuros,
@@ -173,14 +173,17 @@ function Tiles({
   from,
   label,
   tip,
+  pair = false,
 }: {
   tiles: readonly Tile[];
   from: number;
   label: string;
   tip: FloatingTip;
+  /** Two tiles on a row of their own: each takes half of it, no empty columns after them. */
+  pair?: boolean;
 }): JSX.Element {
   return (
-    <dl className="ins-tiles" aria-label={label}>
+    <dl className={pair ? 'ins-tiles ins-tiles--pair' : 'ins-tiles'} aria-label={label}>
       {tiles.map((tile, i) => (
         <div
           key={tile.label}
@@ -204,7 +207,7 @@ function Tiles({
               />
             )}
           </dd>
-          <dd className="ins-tile__note">{tile.note}</dd>
+          {tile.note === '' ? null : <dd className="ins-tile__note">{tile.note}</dd>}
         </div>
       ))}
     </dl>
@@ -301,7 +304,6 @@ function Figures({
   tip: FloatingTip;
 }): JSX.Element {
   const { current, previous } = insights.totals;
-  const { fans } = insights;
   const fansVat = current.revenueMinor - current.revenueExclVatMinor;
   const commission = current.revenueExclVatMinor - current.netMinor;
   // ADR 0106 § 4: the parts say their share of the net, the base a percentage agreed with a creator is set on.
@@ -386,24 +388,9 @@ function Figures({
       }),
     },
   ];
+  // The paying fans and their average spend live in « Les fans qui paient », never twice (recette visuelle 16/11,
+  // PIL-21): two figures here, the sales and the refunds.
   const activity: readonly Tile[] = [
-    {
-      label: 'Fans qui ont payé',
-      value: fans.paying.toLocaleString('fr-FR'),
-      note:
-        fans.paying === 0
-          ? 'aucun sur la période'
-          : fans.newPaying === fans.paying
-            ? 'tous pour la première fois'
-            : `dont ${fans.newPaying.toLocaleString('fr-FR')} pour la première fois`,
-      delta: [fans.paying, fans.previousPaying],
-    },
-    {
-      label: 'Dépense moyenne par fan',
-      value: fans.averagePerPayingMinor === null ? '—' : euros(fans.averagePerPayingMinor),
-      note: 'ce qu’un fan payeur a dépensé sur la période',
-      delta: null,
-    },
     {
       label: 'Ventes',
       value: current.sales.toLocaleString('fr-FR'),
@@ -413,11 +400,12 @@ function Figures({
     {
       label: 'Remboursements',
       value: current.refunds.toLocaleString('fr-FR'),
+      // A zero says itself: « aucun remboursement » under it would say it twice (PIL-21).
       note:
         current.sales === 0
           ? 'aucune vente sur la période'
           : current.refunds === 0
-            ? 'aucun remboursement'
+            ? ''
             : `${String(shareOf(current.refunds, current.sales))} % des ventes`,
       delta: [current.refunds, previous.refunds],
       lowerIsBetter: true,
@@ -449,7 +437,7 @@ function Figures({
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
       </div>
       <MoneySplit insights={insights} several={several} tip={tip} />
-      <Tiles tiles={activity} from={7} label="Les fans et les ventes" tip={tip} />
+      <Tiles tiles={activity} from={7} label="Les ventes" tip={tip} pair />
     </div>
   );
 }
@@ -597,13 +585,11 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
 function Ring({
   title,
   slices,
-  notes,
   tipFor,
   tip,
 }: {
   title: string;
   slices: readonly Slice[];
-  notes?: Readonly<Record<string, string>>;
   tipFor?: string;
   tip: FloatingTip;
 }): JSX.Element {
@@ -678,7 +664,7 @@ function Ring({
           </div>
           <ul className="ins-legend">
             {shown.map((slice, i) => {
-              const help = slice.key === tipFor ? OTHER_KINDS_NOTE : notes?.[slice.key];
+              const help = slice.key === tipFor ? OTHER_KINDS_NOTE : undefined;
               const told = help === undefined ? null : tip.bind({ title: slice.label, text: help });
               return (
                 <li key={slice.key}>
@@ -744,22 +730,28 @@ const SELLER_NAME: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
   none: 'Sans chatteur',
 };
 
-/** Who sold, one line each, bars from the same start: widths are shares of the best seller's revenue. */
+/**
+ * Who sold, one line each, bars from the same start: widths are shares of the biggest line's revenue. The sellers come
+ * first, ranked; the sales of no seller after them, unranked, under a rule (recette visuelle 16/11, PIL-03).
+ */
 function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const best = Math.max(0, ...insights.sellers.map((seller) => seller.revenueMinor));
   if (insights.sellers.length === 0)
     return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
+  const { ranked, rest } = sellerRanking(insights.sellers);
   return (
     <ol className="nv-plate ins-rank" aria-label="Classement de qui a vendu">
-      {insights.sellers.map((one, i) => {
+      {[...ranked, ...rest].map((one, i) => {
         const name = one.seller.kind === 'member' ? one.seller.name : SELLER_NAME[one.seller.kind];
         const average = one.sales > 0 ? Math.round(one.revenueMinor / one.sales) : null;
+        const isRanked = i < ranked.length;
         return (
           <li
             key={one.seller.kind === 'member' ? one.seller.memberId : one.seller.kind}
             className="ins-rank__row nv-enter"
             style={{ '--nv-i': i }}
             data-kind={one.seller.kind}
+            data-rule={i === ranked.length && i > 0 ? '' : undefined}
             tabIndex={0}
             {...tip.bind({
               title: name,
@@ -776,7 +768,7 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
             })}
           >
             <span className="ins-rank__pos" aria-hidden="true">
-              {String(i + 1)}
+              {isRanked ? String(i + 1) : null}
             </span>
             <span className="nv-avatar ins-rank__face" aria-hidden="true">
               {one.seller.kind === 'member' ? initialOf(one.seller.name) : SELLER_MARK[one.seller.kind]}
@@ -784,10 +776,14 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
             <span className="ins-rank__who">
               <span className="ins-rank__name">{name}</span>
               <span className="ins-rank__line">
-                {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
+                <span className="ins-nowrap">
+                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
+                </span>
                 {average === null ? null : (
                   <>
-                    {' · '}
+                    <span className="ins-rank__sep" aria-hidden="true">
+                      {' · '}
+                    </span>
                     <span className="ins-nowrap">panier moyen {euros(average)}</span>
                   </>
                 )}
@@ -1015,7 +1011,8 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
           <dt>Nouveaux payeurs</dt>
           <dd>
             <CountUp value={fans.newPaying} format={formatCount} />
-            <span className="ins-fans__part">{String(newShare)}&nbsp;%</span>
+            {/* Their share of the paying fans, in the neutral pill the other figures wear (PIL-21). */}
+            <span className="nv-delta ins-delta-flat">{String(newShare)}&nbsp;%</span>
           </dd>
         </div>
         <div>
@@ -1031,16 +1028,20 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
 const LATER = 'en calcul chez Reveal';
 const countText = (n: number | null): string => (n === null ? '—' : n.toLocaleString('fr-FR'));
 
+type SubscriberDays = NonNullable<AgencyInsights['subscribers']>['days'];
+
+/**
+ * A line needs two days read one after the other: a lone dot, or two far apart, draws a chart of nothing, and the
+ * counts take the whole card instead (recette visuelle 16/11, PIL-08).
+ */
+function hasLine(days: SubscriberDays): boolean {
+  return days.some((one, i) => one.active !== null && (days[i + 1]?.active ?? null) !== null);
+}
+
 /** Active subscribers day by day: a line over the read days, broken where a day is not read yet. */
-function ActiveLine({
-  days,
-  tip,
-}: {
-  days: NonNullable<AgencyInsights['subscribers']>['days'];
-  tip: FloatingTip;
-}): JSX.Element | null {
+function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): JSX.Element | null {
   const read = days.map((one) => one.active).filter((n): n is number => n !== null);
-  if (read.length < 2) return null;
+  if (!hasLine(days)) return null;
   const low = Math.min(...read);
   const high = Math.max(...read);
   const unread = days.length - read.length;
@@ -1187,6 +1188,11 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
   // A comparison needs the whole period before, read: a half-read one would show a false +700 % (ADR 0081 § 4).
   const comparable = previous.daysRead === previous.days;
   const rateBefore = comparable ? ppvRate(previous.ppvSent, previous.ppvPurchased) : null;
+  // The last day not read yet: the last count read stands, with its day, never a bare « — » (PIL-08).
+  const lastRead =
+    current.activeAtEnd === null ? subs.days.findLast((one) => one.active !== null) : undefined;
+  const active = current.activeAtEnd ?? lastRead?.active ?? null;
+  const chart = hasLine(subs.days);
   const tiles: readonly {
     label: string;
     value: string;
@@ -1250,25 +1256,23 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
     },
   ];
   return (
-    <div className="nv-plate ins-subs">
+    <div className={chart ? 'nv-plate ins-subs' : 'nv-plate ins-subs ins-subs--flat'}>
       <div className="ins-subs__lead">
         <div className="nv-figure">
           <span className="nv-figure__label">Abonnés actifs</span>
-          {current.activeAtEnd === null ? (
+          {active === null ? (
             <span className="nv-figure__value ins-lead__value">—</span>
           ) : (
-            <CountUp
-              className="nv-figure__value ins-lead__value"
-              value={current.activeAtEnd}
-              format={formatCount}
-            />
+            <CountUp className="nv-figure__value ins-lead__value" value={active} format={formatCount} />
           )}
           <span className="nv-figure__note">
             {growth === null ? (
               <span>
-                {current.activeAtEnd === null
-                  ? 'le dernier jour n’est pas encore lu'
-                  : 'rien à comparer avant la période'}
+                {current.activeAtEnd !== null
+                  ? 'rien à comparer avant la période'
+                  : lastRead === undefined
+                    ? 'le dernier jour n’est pas encore lu'
+                    : `au ${shortDay(lastRead.day)}, le dernier jour lu`}
               </span>
             ) : (
               <span>
@@ -1354,7 +1358,7 @@ export function AgencyInsightsPanel({
           <Failure onRetry={() => void query.refetch()} />
         ) : (
           // The shape of the figures, so nothing jumps when they come (ADM-21): the lead and its four tiles of money,
-          // the card of where the money goes, the four tiles of fans and sales.
+          // the card of where the money goes, the two tiles of the sales.
           <div
             className="ins-figures-stack"
             aria-label="Chargement des chiffres"
@@ -1370,8 +1374,8 @@ export function AgencyInsightsPanel({
               </div>
             </div>
             <div className="db-loading nv-plate ins-loading--split" />
-            <div className="ins-tiles">
-              {Array.from({ length: 4 }, (_, i) => (
+            <div className="ins-tiles ins-tiles--pair">
+              {Array.from({ length: 2 }, (_, i) => (
                 <div key={i} className="db-loading nv-plate ins-tile ins-loading--tile" />
               ))}
             </div>
@@ -1403,7 +1407,6 @@ export function AgencyInsightsPanel({
   const shown = insights.period;
   const several = !oneCreator && insights.creators.length >= 2;
   const kinds = kindSlices(insights.kinds);
-  const sellers = sellerSlices(insights.sellers);
   let at = index;
   const next = (): number => {
     at += 1;
@@ -1449,14 +1452,15 @@ export function AgencyInsightsPanel({
         <Subscribers insights={insights} tip={tip} />
       </Section>
 
-      <div className="ins-pair nv-enter" style={{ '--nv-i': next() }}>
+      {/* « Qui vend » said the ranking's amounts a second time: one card now, the ranking (recette visuelle 16/11,
+          PIL-02). */}
+      <div className="nv-enter" style={{ '--nv-i': next() }}>
         <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" tip={tip} />
-        <Ring title="Qui vend" slices={sellers} notes={SELLER_NOTES} tip={tip} />
       </div>
 
       <Section
         title="Qui a vendu"
-        sub="chaque chatteur, l’agent et le reste, le plus gros chiffre d’abord"
+        sub="chaque chatteur et l’agent, le plus gros chiffre d’abord ; les ventes sans vendeur en dessous"
         index={next()}
       >
         <Sellers insights={insights} tip={tip} />
