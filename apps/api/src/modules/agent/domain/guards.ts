@@ -23,6 +23,11 @@ export interface GuardSettings {
   readonly petNames?: readonly string[];
   /** Emojis she never uses (`writing_style.emojis_forbidden`, P5-01): one in her answer is a `forbidden_term`. */
   readonly forbiddenEmojis?: readonly string[];
+  /**
+   * What she never does (`never_do`): no guard of her answers reads it, the custom order does (ADR 0090 § A, audit du
+   * 16/11, M3). Carried here as her other limits are, to every composer.
+   */
+  readonly neverDo?: readonly string[];
 }
 
 /**
@@ -323,6 +328,10 @@ const AI_TICS: readonly RegExp[] = [
   /\boh la la\b/,
   /\bje suis la pour toi\b/,
   /\bjuste pour toi\b/,
+  // A note-taker's line, never hers (Playground, Charles 16/11): « je note ton âge », « c'est noté ».
+  /\bje (te |le |l'|ca |bien )?(note|retiens)\b/,
+  /\b(c'est|bien) note\b/,
+  /\bje prends note\b/,
   /—/,
   /^\s*([-*•]|\d+[.)])\s/m,
 ];

@@ -31,7 +31,7 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
-import { measureDesire, type DesireReading } from '../domain/desire';
+import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
   holdDecision,
@@ -108,6 +108,11 @@ export interface AgentComposeInput {
     readonly notes: readonly string[];
     /** The age his card gives, a whole number (`fans`, field `age`); absent when it gives none. */
     readonly cardAge?: number;
+    /**
+     * His card's age was stated, by him or by a human (`declared` or `noted`), never only guessed by the brain: an
+     * adult one then confirms his age (Charles, 16/11).
+     */
+    readonly cardAgeStated?: boolean;
     /** Read by the brain alone (ADR 0085 § 9): when he has money, his attachment, his moods. */
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
@@ -476,6 +481,20 @@ type Held = Extract<AgentComposeResult, { kind: 'held' }>;
 /** Under this age on his card, a human answers him (recette AGE-13). */
 const ADULT_AGE = 18;
 
+/**
+ * His card gives an adult age he stated or a human noted, never one only guessed, and no one disputes it: confirmed like an age he states himself (Charles, 16/11). No
+ * question asked again, no doubt by default. A dispute always wins: the doubt stays until a human lifts it.
+ */
+function adultOnCard(
+  input: { readonly fan: { readonly cardAge?: number; readonly cardAgeStated?: boolean } },
+  flags: { readonly ageDisputed?: unknown } | undefined,
+): boolean {
+  if (flags === undefined || flags.ageDisputed !== undefined) return false;
+  return (
+    input.fan.cardAgeStated === true && input.fan.cardAge !== undefined && input.fan.cardAge >= ADULT_AGE
+  );
+}
+
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
 
 /**
@@ -527,6 +546,29 @@ async function stopped(
     // His limits unknown, nothing is written: a chatter answers.
     return { held: { ...HANDOFF, detail: ['limits_unreadable'] } };
   }
+}
+
+/**
+ * His age is in doubt (`ageDisputed`, set by the policy on a sign of a minor or by a human): the agent writes nothing to
+ * him until the owner or a manager confirms it (Charles, 16/11), and each new message of his goes to a human, as on
+ * the message the doubt opened on. His score drops to 0, as the brain would have counted it.
+ */
+function ageInDoubt(input: AgentComposeInput, lastFanAt: Date | undefined): AgentComposeResult {
+  const held: Held = { ...HANDOFF, cause: 'minor', detail: ['age_disputed'] };
+  if (input.desire === undefined || (lastFanAt !== undefined && input.desire.at >= lastFanAt)) return held;
+  const reading = desireScore({
+    previous: input.desire,
+    signals: [],
+    intent: '',
+    sentiment: '',
+    measured: measureDesire([]),
+    risks: [],
+    ageDisputed: true,
+    now: input.now,
+  });
+  if (!desireMoved(reading)) return held;
+  const { before, score, signals, weightsVersion } = reading;
+  return { ...held, desire: { before, score, signals, weightsVersion } };
 }
 
 /** What the policy needs to let her offer; any of it unknown, there is no offer to decide on (fail closed). */
@@ -821,11 +863,11 @@ async function settle(
   // A custom order with a chatter on shift (ADR 0090 § A): they take it, the voice did not write.
   if (composed.customOrder?.kind === 'handoff')
     return { ...HANDOFF, cause: 'custom_order', detail: ['custom_order'], costUsd };
-  // He stated an adult age himself: confirmed for his next messages (Charles, 27/10), never once his age was
-  // taken back. Not saved, his age stays unconfirmed and she keeps steering back, the safe side: counted.
+  // He stated an adult age himself, or his card gives one: confirmed (Charles, 27/10 and 16/11), never once his age
+  // was taken back. Not saved, his age stays unconfirmed and she keeps steering back, the safe side: counted.
   const his = flags;
   if (
-    composed.ageDeclared !== undefined &&
+    (composed.ageDeclared !== undefined || adultOnCard(input, his)) &&
     his !== undefined &&
     his.ageConfirmedAt === undefined &&
     his.ageDisputed === undefined
@@ -877,6 +919,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const lastAnswer = input.history.findLastIndex((m) => m.direction === 'outbound');
       const sinceAnswer = input.history.slice(lastAnswer + 1);
       const lastFanAt = sinceAnswer.at(-1)?.at;
+      if (stop.flags?.ageDisputed !== undefined) return ageInDoubt(input, lastFanAt);
       const looked = await seeHisMedia(deps.sight, input, sinceAnswer);
       if ('unseen' in looked) return looked.unseen;
       const media = looked.seen.flat();
@@ -961,7 +1004,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         ...(withHer.sexualizationLimits !== undefined && {
           sexualization: {
             limits: withHer.sexualizationLimits,
-            ageConfirmed: stop.flags?.ageConfirmedAt !== undefined,
+            ageConfirmed: stop.flags?.ageConfirmedAt !== undefined || adultOnCard(input, stop.flags),
             noExplicit: stop.flags?.noExplicit === true,
           },
         }),
@@ -981,7 +1024,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
               .filter(ownWords)
               .map((m) => ({ fromFan: m.direction === 'inbound', text: m.text, at: m.at })),
           ),
-          ageDisputed: stop.flags?.ageDisputed !== undefined,
+          // His age in doubt never comes this far (`ageInDoubt`).
+          ageDisputed: false,
           // Counted once per message of his: a second pass after a wait, or a replay, reads it as stored.
           counted: input.desire !== undefined && lastFanAt !== undefined && input.desire.at >= lastFanAt,
         },

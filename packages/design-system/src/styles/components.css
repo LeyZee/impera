@@ -2732,6 +2732,11 @@
   font-weight: 600;
   color: var(--nv-ink-faint);
 }
+/* A group after other options opens with a hairline above its heading. */
+.nv-select__group:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid var(--nv-hairline);
+}
 .nv-select__option {
   display: flex;
   align-items: center;

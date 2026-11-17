@@ -94,7 +94,9 @@ function scriptStepBlock(step: VoiceScriptStep): string {
 
 /**
  * The brief the voice follows; her objection reply, when code chose one, and the script step code decided, each in its
- * own typed block after it.
+ * own typed block after it. `kycMissing` stays with the brain on purpose (audit du 16/11, B4): it decides in
+ * `replyBrief` when a topic is spent and what to learn next; a list of blanks given to the voice would turn getting to
+ * know him into a questionnaire (Charles, 16/11).
  */
 export function describeBrief(
   brief: Brief,

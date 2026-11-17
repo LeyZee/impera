@@ -13,6 +13,11 @@ const NOTES: Readonly<Record<MessageOrigin, string>> = {
     'Ton rappel automatique avant la fin de son abonnement est dans l’historique : ne le répète pas.',
 };
 
+/** Whether a turn is an opener he chose (ADR 0110 § 1), by the note code put on it: not his words. */
+export function isOpener(turn: { readonly originNote?: string }): boolean {
+  return turn.originNote === NOTES.hook;
+}
+
 export function originNote(origin: MessageOrigin | null | undefined): string | undefined {
   return origin === null || origin === undefined ? undefined : NOTES[origin];
 }

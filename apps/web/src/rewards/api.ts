@@ -9,7 +9,7 @@ import {
   type ShiftChallenge,
   type TrophyCase,
 } from '@impera/contracts';
-import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 /*
  * The chatter's own trophy case and the account's own preferences (ADR 0104 § 12 to § 19). Reads and writes name no
@@ -117,6 +117,20 @@ export function useMarkRevealed(): (kinds: readonly string[]) => void {
 }
 
 const HER_CASE_KEY = ['rewards', 'creator-space', 'trophy-case'] as const;
+
+/** When her case is read again after a gesture: the game runs two seconds after it, the second read covers a busy worker. */
+const LOOK_AGAIN_MS = [4_000, 12_000] as const;
+
+/**
+ * After a tick or a drop of hers, her case is read again a few seconds later (ADR 0107 § 14, recette 16/11 CRE-06): the
+ * game, asked by the server in the same transaction, has noted a gain by then, and its reveal plays where she is.
+ */
+export function lookAgainAtHerCase(client: QueryClient): void {
+  for (const delay of LOOK_AGAIN_MS)
+    window.setTimeout(() => {
+      void client.invalidateQueries({ queryKey: HER_CASE_KEY });
+    }, delay);
+}
 
 /** Her own trophy case (ADR 0107 § 10), the creator's; read again every minute, a gain is noted by a job. */
 export function useHerTrophyCase(enabled: boolean): UseQueryResult<TrophyCase> {

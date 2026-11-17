@@ -75,7 +75,15 @@ export function createDrizzleCreatorRewardsStore(
         const rows = await tx
           .select({ userId: user.id, creatorIds: user.creatorIds })
           .from(user)
-          .where(and(eq(user.role, 'creator'), sql`cardinality(${user.creatorIds}) = 1`))
+          .where(
+            and(
+              eq(user.role, 'creator'),
+              sql`cardinality(${user.creatorIds}) = 1`,
+              // An archived creator is out of every list (ADR 0071 § 2): her game waits with her (relecture Bilan).
+              sql`not exists (select 1 from ${schema.creators} where ${schema.creators.id} = ${user.creatorIds}[1]
+                and ${schema.creators.archivedAt} is not null)`,
+            ),
+          )
           .orderBy(user.id);
         return rows.flatMap((row) => {
           const [creatorId] = row.creatorIds;

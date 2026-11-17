@@ -6,7 +6,9 @@ import {
   FanIdSchema,
   McpFanCardGetSchema,
   McpGrantCreatedSchema,
+  McpDailyStatsListSchema,
   McpPayPeriodStateSchema,
+  McpStatsSchema,
   McpSalesListSchema,
   McpWhoamiSchema,
   newId,
@@ -162,6 +164,8 @@ describe('/v1/mcp', () => {
         'whoami',
         'creators_list',
         'creator_get',
+        'stats_get',
+        'platform_daily_stats_list',
       ]);
       const result = await client.callTool({ name: 'whoami', arguments: {} });
       const whoami = McpWhoamiSchema.parse(result.structuredContent);
@@ -498,6 +502,35 @@ describe('/v1/mcp', () => {
     );
     expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
   });
+  it('gives the platform’s daily statistics of the access’s creator, over a bounded period', async () => {
+    const week = { from: '2026-11-01', to: '2026-11-07' };
+    const bound = await createGrant();
+    const hers = McpDailyStatsListSchema.parse(
+      RpcSchema.parse((await rpc(bound.token, callTool('platform_daily_stats_list', week))).json()).result
+        ?.structuredContent,
+    );
+    // Nothing was read in this test's base.
+    expect(hers.creators).toEqual([{ creatorId: nora, days: [] }]);
+    const tooLong = RpcSchema.parse(
+      (
+        await rpc(
+          bound.token,
+          callTool('platform_daily_stats_list', { from: '2026-08-01', to: '2026-11-02' }),
+        )
+      ).json(),
+    );
+    expect(tooLong.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+    const other = RpcSchema.parse(
+      (await rpc(bound.token, callTool('platform_daily_stats_list', { ...week, creatorId: lea }))).json(),
+    );
+    expect(other.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+    // A tool of one creator (ADR 0105 § 4): an access of the agency names none, and is refused.
+    const agency = await createGrant({ creatorId: null });
+    const refused = RpcSchema.parse(
+      (await rpc(agency.token, callTool('platform_daily_stats_list', week))).json(),
+    );
+    expect(refused.result?.structuredContent).toEqual({ refusal: 'creator_required' });
+  });
   it('gives the state of a pay period to an access of the agency, never to one bound to a creator', async () => {
     const agency = await createGrant({ capabilities: ['read:payroll'], creatorId: null });
     const listed = RpcSchema.parse(
@@ -524,6 +557,25 @@ describe('/v1/mcp', () => {
       (await rpc(bound.token, callTool('commission_statements_list', { period: '2026-11-01' }))).json(),
     );
     expect(refused.result?.structuredContent).toEqual({ refusal: 'creator_forbidden' });
+  });
+  it('gives the agency’s figures without a share nor a seller, her own alone to an access bound to a creator', async () => {
+    const agency = await createGrant({ capabilities: ['read:status'], creatorId: null });
+    const stats = McpStatsSchema.parse(
+      RpcSchema.parse((await rpc(agency.token, callTool('stats_get', { period: 'week' }))).json()).result
+        ?.structuredContent,
+    );
+    expect(stats.period).toBe('week');
+    expect(stats.days).toHaveLength(7);
+    expect(JSON.stringify(stats)).not.toMatch(/agencyMinor|creatorMinor|agencyTransferVatMinor|sellers/u);
+    const noPeriod = RpcSchema.parse((await rpc(agency.token, callTool('stats_get'))).json());
+    expect(noPeriod.result?.structuredContent).toEqual({ refusal: 'arguments_invalid' });
+    // An access bound to a creator reads her figures alone (the catalogue's confinement).
+    const bound = await createGrant({ capabilities: ['read:status'] });
+    const hers = McpStatsSchema.parse(
+      RpcSchema.parse((await rpc(bound.token, callTool('stats_get', { period: 'week' }))).json()).result
+        ?.structuredContent,
+    );
+    expect(hers.creators.map((one) => one.creatorId).filter((id) => id !== nora)).toEqual([]);
   });
   it('refuses the steps of a script to an access without read:script_content, even with read:media', async () => {
     const grant = await createGrant({ capabilities: ['read:media'] });

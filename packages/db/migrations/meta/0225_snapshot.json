@@ -1,6 +1,6 @@
 {
-  "id": "1676d596-da92-4c69-b98c-702969cc839c",
-  "prevId": "b9c13c4c-06fa-49a5-8f58-ded911b4ce82",
+  "id": "d57ddecd-c74b-4e43-9609-5df39b49fe27",
+  "prevId": "0e93d1bd-1f32-4396-a292-538ec4a71cc7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7430,6 +7430,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -7941,7 +7947,7 @@
         },
         "media_assets_origin_check": {
           "name": "media_assets_origin_check",
-          "value": "\"media_assets\".\"origin\" in ('creator', 'fan')"
+          "value": "\"media_assets\".\"origin\" in ('creator', 'fan', 'vault')"
         },
         "media_assets_thumbnail_check": {
           "name": "media_assets_thumbnail_check",
@@ -7950,6 +7956,10 @@
         "media_assets_description_failures_check": {
           "name": "media_assets_description_failures_check",
           "value": "\"media_assets\".\"description_failures\" >= 0"
+        },
+        "media_assets_storage_key_check": {
+          "name": "media_assets_storage_key_check",
+          "value": "(\"media_assets\".\"storage_key\" = '') = (\"media_assets\".\"origin\" = 'vault') and (\"media_assets\".\"origin\" <> 'vault' or \"media_assets\".\"erased_at\" is not null)"
         }
       },
       "isRLSEnabled": false
@@ -8148,7 +8158,7 @@
         },
         "media_descriptions_author_check": {
           "name": "media_descriptions_author_check",
-          "value": "\"media_descriptions\".\"author\" in ('sense', 'human')"
+          "value": "\"media_descriptions\".\"author\" in ('sense', 'human', 'platform')"
         },
         "media_descriptions_review_reasons_check": {
           "name": "media_descriptions_review_reasons_check",
@@ -8256,6 +8266,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "description_failures": {
+          "name": "description_failures",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "last_synced_at": {
           "name": "last_synced_at",
@@ -8414,6 +8431,10 @@
         "media_platform_refs_text_check": {
           "name": "media_platform_refs_text_check",
           "value": "char_length(\"media_platform_refs\".\"folder_name\") <= 200 and char_length(\"media_platform_refs\".\"platform_description\") <= 2000"
+        },
+        "media_platform_refs_description_failures_check": {
+          "name": "media_platform_refs_description_failures_check",
+          "value": "\"media_platform_refs\".\"description_failures\" >= 0"
         },
         "media_platform_refs_duration_check": {
           "name": "media_platform_refs_duration_check",

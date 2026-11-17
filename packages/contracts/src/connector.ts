@@ -233,6 +233,16 @@ export const VaultMediaSchema = z.object({
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 
 /**
+ * A vault file read by `fetchMedia` (ADR 0113): written to a temporary file the caller removes, never kept.
+ * `contentType` is what the platform said, `null` when it said nothing; the caller reads the true type from the bytes.
+ */
+export const FetchedMediaSchema = z.object({
+  bytes: z.number().int().min(0),
+  contentType: z.string().nullable(),
+});
+export type FetchedMedia = z.infer<typeof FetchedMediaSchema>;
+
+/**
  * What a connector can do; the core adapts to it, never the other way round. A reading of ADR 0018 is called only
  * when its flag is true, never because the method exists.
  */
@@ -259,6 +269,8 @@ export const ConnectorCapabilitiesSchema = z.object({
   scriptHistory: z.boolean(),
   /** `listVaultMedia`. */
   vault: z.boolean(),
+  /** `fetchMedia`: a vault file read to a temporary file, never kept (ADR 0113). */
+  mediaDownload: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 

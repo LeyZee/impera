@@ -8,6 +8,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  FetchedMedia,
   Money,
   OutboundMedia,
   PlatformScript,
@@ -26,6 +27,14 @@ import {
   type PlatformConnector,
 } from '../../domain/platform-connector';
 import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain/ports';
+import {
+  downloadVaultFile,
+  VaultFileError,
+  SYSTEM_FILE_TRANSPORT,
+  type DownloadBounds,
+  type FileTransport,
+  type VaultFileFailure,
+} from '../download/vault-file';
 
 import {
   createRevealClient,
@@ -55,6 +64,33 @@ import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 
 /** Page sizes of the official client (reveal-api-observed.md § Pagination): no heavier than a chatter. */
 const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10, transactions: 10 } as const;
+/**
+ * The hosts Reveal serves vault files from (ADR 0113 § 2), read on the real vault on 16/11 over 300 media of each kind,
+ * each named whole, never its parent domain: the signed storage (photos, non-HLS videos, audios, their thumbnails),
+ * the photo resizer (the smaller sizes), the HLS videos' CDN (playlists, segments, thumbnails). A host is added by a PR
+ * Sécurité reads, never by a setting. The videos' CDN zone was seen on one account only and is not in the site's public
+ * code: it may differ from one account to another, so a `host_refused` on a second creator's videos reads that way.
+ */
+const REVEAL_FILE_HOSTS: readonly string[] = [
+  'dem02.fra1.digitaloceanspaces.com',
+  'resize.demoiselles.app',
+  'vz-90090929-421.b-cdn.net',
+];
+/** A vault file's bounds (ADR 0113 § 2): a 720-line video of an hour stays under it; past it, nothing is kept. */
+const FILE_MAX_BYTES = 2 * 1024 ** 3;
+const FILE_TIMEOUT_MS = 10 * 60_000;
+/** An HLS video of the vault: an hour in 6-second segments is 600; one key for a file, a few at most. */
+const FILE_MAX_SEGMENTS = 2_000;
+const FILE_MAX_KEYS = 8;
+/** What a failed download is, for the job: the link again later, the media gone, or a file we will never read. */
+const FILE_FAILURES: Record<VaultFileFailure, ConnectorError['code']> = {
+  expired: 'transient',
+  failed: 'transient',
+  gone: 'not_found',
+  too_large: 'fatal',
+  host_refused: 'fatal',
+  unsupported: 'fatal',
+};
 /** A cursor that never ends is a bug or a changed API: stop rather than loop. */
 const MAX_PAGES = 500;
 /** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
@@ -101,6 +137,7 @@ const CAPABILITIES: ConnectorCapabilities = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  mediaDownload: true,
 };
 
 export interface RevealApiConnectorOptions {
@@ -120,6 +157,15 @@ export interface RevealApiConnectorOptions {
    * calling Reveal. Without it, every write is refused: a send nobody records could go twice.
    */
   readonly sends?: SendJournal;
+  /**
+   * How file links are reached (ADR 0113 § 2): never the session's client, no header ever sent; resolved and checked by
+   * the system by default. FakeReveal's in the tests.
+   */
+  readonly fileTransport?: FileTransport;
+  /** The hosts a file link may name; `REVEAL_FILE_HOSTS` by default. */
+  readonly fileHosts?: readonly string[];
+  /** FakeReveal serves plain HTTP: the tests only, a real link is HTTPS. */
+  readonly fileHttpForTests?: boolean;
 }
 
 /** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. */
@@ -163,6 +209,8 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly botDisplayName: string | null;
   private readonly sends: SendJournal | null;
+  private readonly fileTransport: FileTransport;
+  private readonly fileBounds: DownloadBounds;
   /** When the sends of the last minute left, for our own pace (spec § 5). */
   private sentAt: number[] = [];
   private readonly lastSendIn = new Map<string, number>();
@@ -179,6 +227,15 @@ export class RevealApiConnector implements PlatformConnector {
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.botDisplayName = options.botDisplayName ?? null;
     this.sends = options.sends ?? null;
+    this.fileTransport = options.fileTransport ?? SYSTEM_FILE_TRANSPORT;
+    this.fileBounds = {
+      hosts: options.fileHosts ?? REVEAL_FILE_HOSTS,
+      maxBytes: FILE_MAX_BYTES,
+      timeoutMs: FILE_TIMEOUT_MS,
+      maxSegments: FILE_MAX_SEGMENTS,
+      maxKeys: FILE_MAX_KEYS,
+      ...(options.fileHttpForTests === true ? { allowHttp: true } : {}),
+    };
     this.client =
       session === null
         ? null
@@ -551,6 +608,37 @@ export class RevealApiConnector implements PlatformConnector {
     return media;
   }
 
+  /**
+   * One vault file to `path` (ADR 0113): its link read from its folder's page, then downloaded without anything of the
+   * session. A link Reveal no longer signs is read again once; the media no longer in its folder is `not_found`.
+   */
+  async fetchMedia(
+    mediaRef: ExternalRef,
+    opts: { folderRef: ExternalRef | null; path: string },
+  ): Promise<FetchedMedia> {
+    for (let attempt = 0; ; attempt++) {
+      const item = (await this.vaultPages(opts.folderRef?.id ?? null)).find(
+        (media) => media.id === mediaRef.id,
+      );
+      if (item === undefined)
+        throw new ConnectorError('not_found', 'vault.medias: no such media in its folder');
+      try {
+        return await downloadVaultFile(
+          this.fileTransport,
+          { url: item.url, isHls: item.isHls ?? false },
+          opts.path,
+          this.fileBounds,
+        );
+      } catch (error) {
+        if (!(error instanceof VaultFileError)) throw error;
+        if (error.reason === 'expired' && attempt === 0) continue;
+        throw new ConnectorError(FILE_FAILURES[error.reason], `vault file: ${error.reason}`, {
+          cause: error,
+        });
+      }
+    }
+  }
+
   private session(): RevealClient {
     if (this.client === null) throw new ConnectorError('session_expired', 'no Reveal session captured');
     return this.client;
@@ -825,6 +913,12 @@ export function revealApiConnectors(options: {
   readonly log?: (platformAccountId: string, entry: RevealCallLog) => void;
   /** Tests only: FakeReveal's clock, so an attempt and the message it made are dated alike. */
   readonly now?: () => Date;
+  /** Tests only: FakeReveal's file server, its host and its plain HTTP, in place of the system's (ADR 0113 § 2). */
+  readonly files?: {
+    readonly transport: FileTransport;
+    readonly hosts: readonly string[];
+    readonly httpForTests: boolean;
+  };
 }): NonNullable<ConnectorRegistry['reveal']> {
   return (account, session, context) =>
     new RevealApiConnector({
@@ -834,5 +928,12 @@ export function revealApiConnectors(options: {
       ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
       ...(options.now === undefined ? {} : { now: options.now }),
       ...(options.log === undefined ? {} : { log: (entry) => options.log?.(account.id, entry) }),
+      ...(options.files === undefined
+        ? {}
+        : {
+            fileTransport: options.files.transport,
+            fileHosts: options.files.hosts,
+            fileHttpForTests: options.files.httpForTests,
+          }),
     });
 }
