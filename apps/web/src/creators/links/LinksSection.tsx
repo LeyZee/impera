@@ -12,6 +12,7 @@ import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 import { linksQueryKey, saveRedirectLink, useRedirectLinks } from './api';
 import { linkProblems, middleCut, PLACEMENT_LABELS } from './model';
 
+import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 import { ServerSilent } from '@/shell/ServerSilent';
@@ -48,15 +49,20 @@ const writeOf = (draft: Draft) => ({
 export function LinksSection({
   creatorId,
   creatorName,
+  canEdit,
 }: {
   creatorId: string;
   creatorName: string;
+  /** The owner alone sets a link: an address decides where her readers land (ADR 0080 § 6). A manager reads. */
+  canEdit: boolean;
 }): JSX.Element {
   const read = useRedirectLinks(creatorId);
   const client = useQueryClient();
   const [editing, setEditing] = useState<AgencyRedirectLink | 'new' | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** The switch waiting for the password and the code. */
+  const [pending, setPending] = useState<{ link: AgencyRedirectLink; enabled: boolean } | null>(null);
   const links = read.data;
   const refresh = (): Promise<void> => client.invalidateQueries({ queryKey: linksQueryKey(creatorId) });
 
@@ -66,6 +72,7 @@ export function LinksSection({
     const { id, ...write } = link;
     const outcome = await saveRedirectLink(creatorId, id, { ...write, enabled });
     if (outcome.kind === 'refused') setFailed(outcome.message);
+    if (outcome.kind === 'reauth') setPending({ link, enabled });
     await refresh();
     setBusyId(null);
   }
@@ -92,7 +99,9 @@ export function LinksSection({
           avec un bouton pour le copier. Un lien éteint ou sans endroit ne lui est pas montré.
         </p>
         {links.length === 0 ? (
-          <p className="ps-hint">Aucun lien pour l’instant. Ajoute le premier.</p>
+          <p className="ps-hint">
+            {canEdit ? 'Aucun lien pour l’instant. Ajoute le premier.' : 'Aucun lien pour l’instant.'}
+          </p>
         ) : (
           <ul className="cl-list" aria-label="Liens de redirection">
             {links.map((link) => (
@@ -110,30 +119,36 @@ export function LinksSection({
                 ) : (
                   <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
                 )}
-                <label className="cl-row__switch">
-                  <span>{link.enabled ? 'Allumé' : 'Éteint'}</span>
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    className="nv-switch"
-                    checked={link.enabled}
-                    disabled={busyId === link.id}
-                    aria-label={`Lien « ${link.name} » : ${link.enabled ? 'allumé' : 'éteint'}`}
-                    onChange={(event) => {
-                      void toggle(link, event.target.checked);
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
-                  aria-label={`Modifier le lien « ${link.name} »`}
-                  onClick={() => {
-                    setEditing(link);
-                  }}
-                >
-                  Modifier
-                </button>
+                {canEdit ? (
+                  <>
+                    <label className="cl-row__switch">
+                      <span>{link.enabled ? 'Allumé' : 'Éteint'}</span>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        className="nv-switch"
+                        checked={link.enabled}
+                        disabled={busyId === link.id}
+                        aria-label={`Lien « ${link.name} » : ${link.enabled ? 'allumé' : 'éteint'}`}
+                        onChange={(event) => {
+                          void toggle(link, event.target.checked);
+                        }}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="nv-btn nv-btn--soft nv-btn--sm"
+                      aria-label={`Modifier le lien « ${link.name} »`}
+                      onClick={() => {
+                        setEditing(link);
+                      }}
+                    >
+                      Modifier
+                    </button>
+                  </>
+                ) : (
+                  <span className="cl-row__state">{link.enabled ? 'Allumé' : 'Éteint'}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -143,7 +158,22 @@ export function LinksSection({
             {failed}
           </p>
         )}
-        {links.length >= REDIRECT_LINKS_MAX ? (
+        {pending === null ? null : (
+          <PasswordPrompt
+            lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
+            onConfirmed={() => {
+              const { link, enabled } = pending;
+              setPending(null);
+              void toggle(link, enabled);
+            }}
+            onCancel={() => {
+              setPending(null);
+            }}
+          />
+        )}
+        {!canEdit ? (
+          <p className="ps-hint">Seul le propriétaire ajoute ou modifie un lien.</p>
+        ) : links.length >= REDIRECT_LINKS_MAX ? (
           <p className="ps-hint">{String(REDIRECT_LINKS_MAX)} liens au plus.</p>
         ) : (
           <button
@@ -192,24 +222,27 @@ function LinkDialog({
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [reauth, setReauth] = useState(false);
   const problems = tried ? linkProblems(draft) : {};
   const set = <K extends keyof Draft>(key: K, value: Draft[K]): void => {
     setDraft((before) => ({ ...before, [key]: value }));
   };
 
-  async function submit(event: SyntheticEvent): Promise<void> {
-    event.preventDefault();
+  async function save(): Promise<void> {
     setTried(true);
     if (Object.keys(linkProblems(draft)).length > 0) return;
     setBusy(true);
     setRefusal(null);
     const outcome = await saveRedirectLink(creatorId, link?.id ?? null, writeOf(draft));
     setBusy(false);
-    if (outcome.kind === 'refused') {
-      setRefusal(outcome.message);
-      return;
-    }
-    await onSaved();
+    if (outcome.kind === 'refused') setRefusal(outcome.message);
+    else if (outcome.kind === 'reauth') setReauth(true);
+    else await onSaved();
+  }
+
+  function submit(event: SyntheticEvent): void {
+    event.preventDefault();
+    void save();
   }
 
   const field = (
@@ -254,7 +287,7 @@ function LinkDialog({
       busy={busy}
       onClose={onClose}
     >
-      <form className="tm-dialog__body" noValidate onSubmit={(event) => void submit(event)}>
+      <form className="tm-dialog__body" noValidate onSubmit={submit}>
         {field('name', 'Nom', 'Court, comme elle le dirait : « Story du jour ».', {
           maxLength: 60,
           placeholder: 'Story du jour',
@@ -296,6 +329,18 @@ function LinkDialog({
             {refusal}
           </p>
         )}
+        {reauth ? (
+          <PasswordPrompt
+            lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
+            onConfirmed={() => {
+              setReauth(false);
+              void save();
+            }}
+            onCancel={() => {
+              setReauth(false);
+            }}
+          />
+        ) : null}
         <div className="tm-dialog__foot">
           <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
             Annuler

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { REAUTHENTICATION_ERROR_CODE } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -52,10 +53,10 @@ function serve(links: unknown[], answer: (write: Write) => Response = () => new 
   return writes;
 }
 
-function renderSection(): void {
+function renderSection(canEdit = true): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <LinksSection creatorId={CREATOR} creatorName="Nora" />
+      <LinksSection creatorId={CREATOR} creatorName="Nora" canEdit={canEdit} />
     </QueryClientProvider>,
   );
 }
@@ -171,5 +172,35 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     const dialog = screen.getByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
     expect(await within(dialog).findByText('Un autre lien porte déjà ce nom.')).toBeDefined();
+  });
+
+  it('lets a manager read her links, with no switch, no « Modifier » and no « Ajouter »', async () => {
+    serve([STORY, OLD]);
+    renderSection(false);
+    const list = await screen.findByRole('list', { name: 'Liens de redirection' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Modifier/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Ajouter un lien/u })).toBeNull();
+    expect(screen.getByText('Seul le propriétaire ajoute ou modifie un lien.')).toBeDefined();
+  });
+
+  it('asks the password and the code when the sign-in is old, before a switch is written', async () => {
+    const writes = serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: { code: REAUTHENTICATION_ERROR_CODE, message: 'x', details: {}, requestId: 'r1' },
+          }),
+          {
+            status: 403,
+          },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('switch'));
+    expect(await screen.findByText(/Pour changer un de ses liens/u)).toBeDefined();
+    expect(writes).toHaveLength(1);
   });
 });

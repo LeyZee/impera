@@ -214,7 +214,14 @@ export function CreatorsPage({
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
     if (shown === 'links' && current !== undefined) {
-      return <LinksSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
+      return (
+        <LinksSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          canEdit={isOwner}
+        />
+      );
     }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;

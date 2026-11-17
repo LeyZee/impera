@@ -486,6 +486,17 @@ describe('the creator’s Telegram channel on Postgres', () => {
       const unknown = await tryPost(nora, { ...body, linkId: newId(RedirectLinkIdSchema) });
       expect(unknown.statusCode).toBe(400);
       expect(unknown.json()).toMatchObject({ error: { details: { kind: 'link_unknown' } } });
+
+      // A link switched off in « Liens » is no longer one of her channel's: the try refuses it the same way.
+      const on = linksOn.get(nora) ?? [];
+      linksOn.set(
+        nora,
+        on.filter((one) => one.id !== live),
+      );
+      const off = await tryPost(nora, { ...body, kind: 'main', linkId: live });
+      linksOn.set(nora, on);
+      expect(off.statusCode).toBe(400);
+      expect(off.json()).toMatchObject({ error: { details: { kind: 'link_unknown' } } });
     });
 
     it('writes a poll without a link, nor a media, nor a place', async () => {

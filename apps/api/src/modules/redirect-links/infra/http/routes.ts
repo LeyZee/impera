@@ -28,16 +28,20 @@ const CreatorParams = z.object({ creatorId: CreatorIdSchema });
 const LinkParams = CreatorParams.extend({ linkId: RedirectLinkIdSchema });
 
 /**
- * Her redirect links (INS-03, ADR 0121 § 1). The owner and an active manager read and set them for a creator; she
+ * Her redirect links (INS-03, ADR 0121 § 1). The owner and an active manager read them for a creator, the owner alone sets them; she
  * reads « Mes liens », her own links that are on and placed, as cards without a figure. The store reads each
  * person's right again in the base; no route here opens a connection outward.
  */
 export function createRedirectLinkRoutes(
   store: RedirectLinkStore,
   requireRole: RequireRole,
+  /** `requireRecentLogin` (ADR 0016): a write needs a sign-in confirmed under 10 minutes ago, as the channel's did. */
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   return (app) => {
     const agency = { preValidation: requireRole('owner', 'operator') };
+    // An address decides where her readers land (ADR 0080 § 6): the owner alone, freshly confirmed.
+    const write = { preValidation: [requireRole('owner'), recentLogin] };
 
     app.get(
       '/creators/:creatorId/redirect-links',
@@ -50,7 +54,7 @@ export function createRedirectLinkRoutes(
     app.post(
       '/creators/:creatorId/redirect-links',
       {
-        ...agency,
+        ...write,
         schema: {
           params: CreatorParams,
           body: AgencyRedirectLinkWriteSchema,
@@ -63,7 +67,7 @@ export function createRedirectLinkRoutes(
     app.put(
       '/creators/:creatorId/redirect-links/:linkId',
       {
-        ...agency,
+        ...write,
         schema: {
           params: LinkParams,
           body: AgencyRedirectLinkWriteSchema,

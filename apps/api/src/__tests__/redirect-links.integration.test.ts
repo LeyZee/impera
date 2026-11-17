@@ -6,7 +6,7 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -22,7 +22,7 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const PASSWORD = 'correct horse battery';
 
 /**
- * Her redirect links (INS-03, ADR 0121 § 1): the owner and a manager of hers set them, she reads « Mes liens », her
+ * Her redirect links (INS-03, ADR 0121 § 1): the owner alone sets them, a manager of hers reads them, she reads « Mes liens », her
  * own links that are on and placed and nothing else of them. Invented data only (ADR 0010).
  */
 describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', () => {
@@ -124,9 +124,9 @@ describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', (
     await test.close();
   });
 
-  it('lets the owner and her manager set her links, with a line in the audit log', async () => {
+  it('lets the owner set her links and her manager read them, with a line in the audit log', async () => {
     const story = await create(nora, link('Story du jour'));
-    const unplaced = await create(nora, link('Ancien lien', { placement: null, usageNote: '' }), 'manager');
+    const unplaced = await create(nora, link('Ancien lien', { placement: null, usageNote: '' }));
     await create(nora, link('Canal', { placement: 'telegram_channel', enabled: false }));
     await create(ines, link('Story du jour', { usageNote: 'Pour Ines' }));
 
@@ -143,7 +143,7 @@ describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', (
     expect(audit).toEqual([
       {
         action: 'redirect_link.create',
-        details: { placement: 'story_daily', enabled: true, hasUsageNote: true },
+        details: { placement: 'story_daily', enabled: true, hasUsageNote: true, urlChanged: false },
       },
     ]);
   });
@@ -179,6 +179,9 @@ describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', (
       const write = await call('POST', `/v1/creators/${nora}/redirect-links`, who, link('X'));
       expect(write.statusCode, write.body).toBe(403);
     }
+    // Her manager reads, never writes: an address decides where her readers land (ADR 0080 § 6).
+    const managed = await call('POST', `/v1/creators/${nora}/redirect-links`, 'manager', link('X'));
+    expect(managed.statusCode, managed.body).toBe(403);
     for (const who of ['owner', 'manager', 'chatter'] as const)
       expect((await call('GET', '/v1/creator-space/links', who)).statusCode).toBe(403);
     const unknown = await call('GET', `/v1/creators/${newId(CreatorIdSchema)}/redirect-links`, 'owner');
@@ -201,10 +204,26 @@ describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', (
     const canal = links.find((one) => one.name === 'Canal');
     if (canal === undefined) throw new Error('fixture: the link « Canal » is missing');
 
-    const on = await call('PUT', `/v1/creators/${nora}/redirect-links/${canal.id}`, 'manager', {
-      ...link('Canal', { placement: 'telegram_channel' }),
+    const turnOn = { ...link('Canal', { placement: 'telegram_channel' }) };
+    const managed = await call('PUT', `/v1/creators/${nora}/redirect-links/${canal.id}`, 'manager', turnOn);
+    expect(managed.statusCode, managed.body).toBe(403);
+    const on = await call('PUT', `/v1/creators/${nora}/redirect-links/${canal.id}`, 'owner', {
+      ...turnOn,
+      url: 'https://liens.example.test/nora/canal-neuf',
     });
     expect(on.statusCode, on.body).toBe(200);
+    // The audit says the address changed, never the address.
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, canal.id));
+    expect(audit.find((line) => line.action === 'redirect_link.update')?.details).toEqual({
+      placement: 'telegram_channel',
+      enabled: true,
+      hasUsageNote: true,
+      urlChanged: true,
+    });
+    expect(JSON.stringify(audit)).not.toContain('liens.example.test');
     const mine = await call('GET', '/v1/creator-space/links', 'nora');
     expect(mine.json()).toMatchObject({ links: [{ name: 'Story du jour' }, { name: 'Canal' }] });
 
@@ -215,5 +234,14 @@ describe('/v1/creators/:creatorId/redirect-links and /v1/creator-space/links', (
       link('Canal'),
     );
     expect(elsewhere.statusCode, elsewhere.body).toBe(404);
+  });
+
+  it('asks the owner for a fresh confirmation before a write, never before a read', async () => {
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now() - interval '11 minutes'` });
+    const write = await call('POST', `/v1/creators/${nora}/redirect-links`, 'owner', link('Trop tard'));
+    expect(write.statusCode, write.body).toBe(403);
+    expect(write.json()).toMatchObject({ error: { code: 'reauthentication_forbidden' } });
+    expect((await call('GET', `/v1/creators/${nora}/redirect-links`, 'owner')).statusCode).toBe(200);
+    expect((await call('GET', '/v1/creator-space/links', 'nora')).statusCode).toBe(200);
   });
 });

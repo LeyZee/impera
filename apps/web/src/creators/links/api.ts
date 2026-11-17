@@ -2,13 +2,14 @@ import {
   AgencyRedirectLinkSchema,
   AgencyRedirectLinksResponseSchema,
   ApiErrorSchema,
+  REAUTHENTICATION_ERROR_CODE,
   type AgencyRedirectLink,
   type AgencyRedirectLinkWrite,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 /**
- * `/v1/creators/:id/redirect-links` (INS-03, ADR 0121 § 1): her redirect links as the agency sets them. Every answer
+ * `/v1/creators/:id/redirect-links` (INS-03, ADR 0121 § 1): her redirect links as the owner sets them and a manager reads them. Every answer
  * is parsed with the contract: a shape the screen does not expect reads as the server not answering.
  */
 
@@ -45,7 +46,9 @@ export function useRedirectLinks(creatorId: string): UseQueryResult<readonly Age
 
 export type SaveOutcome =
   | { readonly kind: 'ok'; readonly link: AgencyRedirectLink }
-  | { readonly kind: 'refused'; readonly message: string };
+  | { readonly kind: 'refused'; readonly message: string }
+  /** The server wants the password and the code again before this write (ADR 0016). */
+  | { readonly kind: 'reauth' };
 
 /** Adds a link (`id` null) or corrects one; a refusal comes back as the sentence to show, never as a throw. */
 export async function saveRedirectLink(
@@ -70,6 +73,7 @@ export async function saveRedirectLink(
     return link.success ? { kind: 'ok', link: link.data } : { kind: 'refused', message: UNAVAILABLE };
   }
   const error = ApiErrorSchema.safeParse(body);
+  if (error.success && error.data.error.code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
   if (response.status === 401) return { kind: 'refused', message: 'Ta session a expiré. Reconnecte-toi.' };
   if (response.status === 400)
     return { kind: 'refused', message: 'Une ligne ne passe pas : vérifie l’adresse et les textes.' };

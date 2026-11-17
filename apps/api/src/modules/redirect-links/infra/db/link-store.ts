@@ -75,9 +75,11 @@ async function assertAgency<T>(
   actor: RedirectLinkActor,
   creatorId: CreatorId,
   fn: (tx: Transaction) => Promise<T>,
+  /** A write is the owner's alone (ADR 0080 § 6): an address decides where her readers land. */
+  ownerOnly = false,
 ): Promise<T> {
   return withTenantMember(db, creatorId, actor.userId, async (tx, scope) => {
-    if (scope !== 'owner' && scope !== 'agency') throw new RedirectLinkError('forbidden');
+    if (scope !== 'owner' && (ownerOnly || scope !== 'agency')) throw new RedirectLinkError('forbidden');
     // `creators` is the tenant root, without RLS: a creator that does not exist is refused, not a foreign key error.
     const [creator] = await tx.select({ id: creators.id }).from(creators).where(eq(creators.id, creatorId));
     if (creator === undefined) throw new RedirectLinkError('forbidden');
@@ -99,6 +101,8 @@ async function audit(
   actor: RedirectLinkActor,
   action: 'redirect_link.create' | 'redirect_link.update',
   link: StoredRedirectLink,
+  /** The address changed: said as a fact, the address itself never written here. */
+  urlChanged: boolean,
 ): Promise<void> {
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
@@ -107,13 +111,18 @@ async function audit(
     entity: 'redirect_link',
     entityId: link.id,
     ip: actor.ip,
-    details: { placement: link.placement, enabled: link.enabled, hasUsageNote: link.usageNote !== '' },
+    details: {
+      placement: link.placement,
+      enabled: link.enabled,
+      hasUsageNote: link.usageNote !== '',
+      urlChanged,
+    },
   });
 }
 
 /**
  * `redirect_links` through each person's own door. She reads in `withCreatorAccount`, under her policy. The owner and
- * an active manager read in `withTenantMember`. A write is theirs alone: the right is read first in their own
+ * an active manager read in `withTenantMember`. A write is the owner's alone: the right is read first in their own
  * transaction, then the row is written on the service connection, the table having no write policy (INS-03).
  */
 export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database): RedirectLinkStore {
@@ -123,11 +132,12 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
     id: StoredRedirectLink['id'] | undefined,
     values: RedirectLinkWrite,
   ): Promise<StoredRedirectLink> => {
-    await assertAgency(db, actor, creatorId, () => Promise.resolve());
+    await assertAgency(db, actor, creatorId, () => Promise.resolve(), true);
     return withAdmin(adminDb, async (tx) => {
       await lockCreatorLinks(tx, creatorId);
+      const before = await linksOf(tx, creatorId);
       const fault = writeFault(
-        await linksOf(tx, creatorId),
+        before,
         id === undefined ? values : { id, name: values.name, url: values.url },
       );
       if (fault !== null) throw new RedirectLinkError(fault);
@@ -145,7 +155,14 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
               .returning(columns);
       if (saved === undefined) throw new RedirectLinkError('link_not_found');
       const link = toLink(saved);
-      await audit(tx, actor, id === undefined ? 'redirect_link.create' : 'redirect_link.update', link);
+      const previous = before.find((one) => one.id === id);
+      await audit(
+        tx,
+        actor,
+        id === undefined ? 'redirect_link.create' : 'redirect_link.update',
+        link,
+        previous !== undefined && previous.url !== link.url,
+      );
       return link;
     });
   };

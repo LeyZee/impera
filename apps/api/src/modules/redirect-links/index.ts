@@ -1,6 +1,7 @@
 /** Public entry point of the `redirect-links` module (INS-03, ADR 0121 § 1). Other modules import this file only. */
 import type { CreatorId, RedirectLink } from '@impera/contracts';
 import type { Database } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createDrizzleRedirectLinkStore } from './infra/db/link-store';
@@ -23,13 +24,15 @@ export interface RedirectLinksDeps {
   /** Service role: the table has no write policy, a write goes through it after the right is read. */
   readonly adminDb: Database;
   readonly requireRole: RequireRole;
+  /** `requireRecentLogin` (ADR 0016), for the writes. */
+  readonly recentLogin: preValidationAsyncHookHandler;
 }
 
 export function createRedirectLinksModule(deps: RedirectLinksDeps): RedirectLinksModule {
   const store = createDrizzleRedirectLinkStore(deps.db, deps.adminDb);
   return {
     name: 'redirect-links',
-    routes: createRedirectLinkRoutes(store, deps.requireRole),
+    routes: createRedirectLinkRoutes(store, deps.requireRole, deps.recentLogin),
     channelLinks: async (creatorId) => {
       const links = await store.enabledUnscoped(creatorId);
       return links === null
