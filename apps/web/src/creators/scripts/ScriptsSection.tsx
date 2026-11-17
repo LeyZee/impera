@@ -117,8 +117,6 @@ export function ScriptsSection({
             <p className="ps-muted">
               Les scripts envoyés par {creatorName}, le plus récent d’abord. Télécharge l’archive, recopie-la
               dans Reveal en suivant la fiche, puis confirme la copie.
-              {/* Her switch holds for every drop: it stands in Contenu (recette créatrice 6). */}
-              {isOwner ? ' Les descriptions par l’IA s’allument dans l’onglet Contenu.' : null}
             </p>
           </div>
         </div>

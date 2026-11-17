@@ -41,6 +41,8 @@ interface PlatformStepMediaView {
   readonly kind: MediaSlotKind;
   /** `false`: absent from the vault, the step is incomplete. */
   readonly inVault: boolean;
+  /** In the vault and chosen for the CRM (ADR 0145 § 5). */
+  readonly imported: boolean;
   /** The media it is once its file is read; `null` before, or absent from the vault. */
   readonly mediaAssetId: string | null;
   readonly described: boolean;
@@ -119,6 +121,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     ref: media.ref,
     kind: media.kind,
     inVault: media.vault !== null,
+    imported: media.vault?.imported ?? false,
     mediaAssetId: media.vault?.mediaAssetId ?? null,
     described: (media.vault?.descriptionId ?? null) !== null,
   });
