@@ -198,6 +198,7 @@ export async function figureLinesOf(tx: Transaction, memberId: TeamMemberId): Pr
   const rows = await tx
     .select({
       period: commissionStatements.period,
+      platformAccountId: commissionStatementLines.platformAccountId,
       currency: commissionStatementLines.currency,
       sales: commissionStatementLines.sales,
     })
@@ -215,11 +216,13 @@ export async function figureLinesOf(tx: Transaction, memberId: TeamMemberId): Pr
   return rows.flatMap((row) => {
     const period = PayPeriodSchema.parse(row.period);
     const currency = CurrencySchema.parse(row.currency);
+    const platformAccountId = PlatformAccountIdSchema.parse(row.platformAccountId);
     return z
       .array(StoredSaleSchema)
       .parse(row.sales)
       .map((one) => ({
         period,
+        platformAccountId,
         event: one.event,
         currency,
         netMinor: one.netMinor,

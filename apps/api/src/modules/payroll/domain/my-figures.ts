@@ -8,6 +8,7 @@ import {
   type MyFiguresCell,
   type MyFiguresDay,
   type PayPeriod,
+  type PlatformAccountId,
   type SaleEvent,
 } from '@impera/contracts';
 
@@ -19,6 +20,8 @@ import {
 /** A line of one of the member's statements, with the period that statement pays. */
 export interface FigureLine {
   readonly period: PayPeriod;
+  /** The account the line was sold on: a statement line is one account's. */
+  readonly platformAccountId: PlatformAccountId;
   readonly event: SaleEvent;
   readonly currency: Currency;
   readonly netMinor: number;

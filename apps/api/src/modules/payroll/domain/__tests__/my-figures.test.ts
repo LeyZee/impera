@@ -1,4 +1,4 @@
-import { MY_FIGURES_MIN_SALES, PayPeriodSchema } from '@impera/contracts';
+import { MY_FIGURES_MIN_SALES, PayPeriodSchema, PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { mainCurrencyOf, myFigures, weekHourAt, type FigureLine } from '../my-figures';
@@ -8,6 +8,7 @@ const P_OCT_2 = PayPeriodSchema.parse('2026-10-16');
 const P_NOV_1 = PayPeriodSchema.parse('2026-11-01');
 const PARIS = 'Europe/Paris';
 const NOW = new Date('2026-11-05T12:00:00.000Z');
+const ACCOUNT = PlatformAccountIdSchema.parse('00000000-0000-4000-8000-0000000000a1');
 
 const line = (
   period: FigureLine['period'],
@@ -16,6 +17,7 @@ const line = (
   currency: FigureLine['currency'] = 'EUR',
 ): FigureLine => ({
   period,
+  platformAccountId: ACCOUNT,
   event: netMinor < 0 ? 'refund' : 'sale',
   currency,
   netMinor,
