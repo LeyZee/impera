@@ -261,6 +261,19 @@ export class ShiftSwapSelf extends DomainError {
   }
 }
 
+/**
+ * A member away from the team (suspended, on leave, sick, travelling) holds no shift any more (`holdsShift`): nothing of
+ * theirs to offer a colleague, the agency places their shifts (recette 16/11, CHT-31).
+ */
+export class SwapRequesterAway extends DomainError {
+  constructor() {
+    super(
+      'role_forbidden',
+      'Un membre absent de l’équipe ne propose pas d’échange : l’agence replace ses shifts',
+    );
+  }
+}
+
 /** Only the colleague asked answers a swap; only its requester or the agency withdraws it. */
 export class ShiftSwapNotYours extends DomainError {
   constructor() {

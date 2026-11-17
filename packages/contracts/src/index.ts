@@ -13,6 +13,7 @@ export * from './calendar';
 export * from './connector';
 export * from './connector-reads';
 export * from './content-drops';
+export * from './file-sniff';
 export * from './conversations';
 export * from './copilot';
 export * from './creator-space';

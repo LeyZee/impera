@@ -14,6 +14,8 @@
 
 **Un avoir émis pendant un paiement** (ADR 0047 § 1) : l'émission tient le verrou consultatif du prestataire (`invoices.issue:<membre>`) jusqu'à son commit ; un paiement qui arrive entre-temps ne voit aucun des documents du relevé et part en `payout_blocked_conflict` (`documents_not_issued`), jamais enregistré avec un avoir manquant ; une fois les documents émis, le même paiement passe et le virement règle facture et avoir (`__tests__/payroll-payout-gate.integration.test.ts`).
 
+**La confirmation récente** (EQ-15, ADR 0046 § 3, `routes(requireRole, recentLogin)` ; décision de Charles du 16/11) : une contestation (`…/contest`) et sa fin (`…/contest/refuse`, `…/contest/uphold`) demandent le mot de passe et le code donnés sur la session depuis moins de 10 minutes, sinon 403 `reauthentication_forbidden` avant toute lecture du corps. « J'accepte » (`…/accept`), donné à chaque quinzaine, n'en demande pas (`__tests__/billing-gestures.integration.test.ts`).
+
 **Les factures, règles pures** (EQ-06, lot 1 sur 8 ; `domain/billing.ts`, `domain/invoices.ts`, `domain/invoice-acceptance.ts`) :
 
 - le régime d'un prestataire un jour donné, la fin d'une pièce, son état à une date et son rappel sont des règles du dossier (`contractors/domain/billing.ts`), que les factures lisent par `contractors/pure.ts` ; `domain/billing.ts` ne porte ici que la garde d'émission ;

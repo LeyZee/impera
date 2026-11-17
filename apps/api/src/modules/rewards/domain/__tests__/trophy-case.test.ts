@@ -91,6 +91,14 @@ describe('the rank in the case (ADR 0104 § 16)', () => {
     expect(trophyCaseOf([], streak, progress).nextLevel?.rank).toBe(1);
   });
 
+  it('says the true net past a threshold the job has not noted yet', () => {
+    const progress = { steps, cumulatedNetMinor: 124_400, currency: 'EUR' as const };
+    const ahead = trophyCaseOf([], streak, progress).nextLevel;
+    expect(ahead?.rank).toBe(1);
+    expect(ahead?.currentMinor).toBe(124_400);
+    expect(ahead?.currentMinor).toBeGreaterThan(ahead?.thresholdMinor ?? Infinity);
+  });
+
   it('keeps a rank a refund went back under, and never reads below zero', () => {
     const progress = { steps, cumulatedNetMinor: -5_000, currency: 'EUR' as const };
     const trophyCase = trophyCaseOf(ranks, streak, progress);

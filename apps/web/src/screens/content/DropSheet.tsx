@@ -25,6 +25,7 @@ import {
   mediaLabel,
   mimeOf,
   moved,
+  pickedHeadRefusal,
   sameFile,
   weightOf,
 } from './model';
@@ -39,22 +40,27 @@ interface Chosen {
   readonly refusal: string | null;
   /** A video's or a vocal's length, once her phone has read it; `null` before, or when it cannot. */
   readonly ms: number | null;
+  /** Its first bytes read (recette CRE-12), or no need to: « Envoyer » waits for every file's. */
+  readonly checked: boolean;
 }
 
 const chosenOf = (category: DropCategory, file: File): Chosen => {
   const mime = mimeOf(file);
+  const refusal = mime === null ? UNKNOWN_TYPE : declaredFileRefusal(category, { mime, bytes: file.size });
   return {
     id: ContentDropFileIdSchema.parse(crypto.randomUUID()),
     file,
     mime,
-    refusal: mime === null ? UNKNOWN_TYPE : declaredFileRefusal(category, { mime, bytes: file.size }),
+    refusal,
     ms: null,
+    checked: refusal !== null,
   };
 };
 
 /**
  * The drop sheet (ADR 0055 § 8): three gestures, the category (already chosen), the files from her gallery, a sentence
- * if she wants. Each file is checked before anything goes (relecture Extension): its type, its weight, how many.
+ * if she wants. Each file is checked before anything goes (relecture Extension): its type, its weight, how many, and
+ * that its first bytes are what its type says (recette CRE-12: a text renamed `.jpg` is refused here, never sent).
  */
 export function DropSheet({
   category,
@@ -78,7 +84,8 @@ export function DropSheet({
   const countRefusal = chosen.length === 0 ? null : dropCountRefusal(category, chosen.length);
   const total = chosen.reduce((sum, item) => sum + item.file.size, 0);
   const refused = chosen.filter((item) => item.refusal !== null).length;
-  const ready = chosen.length > 0 && countRefusal === null && refused === 0;
+  const ready =
+    chosen.length > 0 && countRefusal === null && refused === 0 && chosen.every((item) => item.checked);
 
   /** Her files added to the list, each video's and vocal's length read after, to say « Vidéo · 8 s ». */
   const add = (picked: readonly File[]): void => {
@@ -90,6 +97,15 @@ export function DropSheet({
       ...fresh.filter((item) => !list.some((one) => sameFile(one.file, item.file))),
     ]);
     for (const item of fresh) {
+      if (!item.checked && item.mime !== null) {
+        void pickedHeadRefusal(item.file, item.mime).then((refusal) => {
+          setChosen((list) =>
+            list.map((one) =>
+              one.id === item.id ? { ...one, refusal: refusal ?? one.refusal, checked: true } : one,
+            ),
+          );
+        });
+      }
       const kind = item.mime === null ? null : kindOfMime(item.mime);
       if (kind !== 'video' && kind !== 'audio') continue;
       void durationOf(item.file, kind).then((ms) => {

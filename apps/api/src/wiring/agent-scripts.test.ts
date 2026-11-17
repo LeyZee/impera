@@ -42,6 +42,7 @@ function step(position: number, ref: string, priceMinor: number, sold: readonly 
     text: 'Texte inventé',
     priceMinor,
     currency: 'EUR',
+    discount: null,
     media: sold.map((each) => media(each)),
     previewMedia: [],
     complete: true,

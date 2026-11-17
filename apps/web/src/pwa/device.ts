@@ -14,14 +14,19 @@ export async function forgetDevice(): Promise<void> {
 
 /** The prefix of her agenda's copies on this device (`screens/agenda/offline.ts`). */
 const AGENDA_PREFIX = 'impera.agenda.';
+/** The prefix of the end-of-shift reports typed and not sent yet (`reports/draft.ts`, recette 16/11 CHT-29). */
+const REPORT_DRAFT_PREFIX = 'impera.report-draft.';
 
-/** Her last reads, the ticks not sent yet and her session: a shared phone keeps nothing of her once she signed out. */
+/**
+ * Her last reads, the ticks not sent yet, the reports not sent yet and her session: a shared phone keeps nothing of
+ * them once they signed out.
+ */
 function dropKept(): void {
   try {
     const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+    const prefixes = [AGENDA_PREFIX, REPORT_DRAFT_PREFIX, SESSION_STORAGE_PREFIX];
     for (const key of keys)
-      if (key !== null && [AGENDA_PREFIX, SESSION_STORAGE_PREFIX].some((prefix) => key.startsWith(prefix)))
-        localStorage.removeItem(key);
+      if (key !== null && prefixes.some((prefix) => key.startsWith(prefix))) localStorage.removeItem(key);
   } catch {
     // Storage blocked: nothing was kept either.
   }

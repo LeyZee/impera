@@ -1,11 +1,13 @@
-import type { Me } from '@impera/contracts';
+import type { Me, TrophyCase } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { HerTrophiesPage } from './HerTrophiesPage';
 import { MeNav } from './MeNav';
 
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
+import { roundAmountText } from '@/payroll/model';
 import { figuresCurrency, netIn } from '@/payroll/my-figures';
+import { LevelInsignia } from '@/rewards/LevelInsignia';
 import { useMarkRevealed, useMyTrophyCase, usePreferences } from '@/rewards/api';
 import { TrophyCaseDown, TrophyCaseLoading, TrophyCaseView } from '@/rewards/case/TrophyCaseView';
 import { chatterCase } from '@/rewards/chatter-case';
@@ -13,7 +15,28 @@ import { tiersOf } from '@/screens/pay/MyFigures';
 import { useCurrentPeriod } from '@/screens/pay/data';
 import { Page, PageHeader } from '@/shell/layout';
 
+/** Without tiers set by the agency, the medal shelf still stands and says why it is empty (CHT-17). */
+const NO_TIERS = {
+  medal: 'L’agence n’a pas encore posé de paliers de prime. Tes médailles apparaîtront ici.',
+} as const;
+
 const shifts = (count: number): string => `${String(count)} ${count > 1 ? 'shifts' : 'shift'}`;
+
+/** The rank at the head of the case: the one held, or the first one ahead while none is (recette 16/11, CHT-17). */
+function rankLine(trophyCase: TrophyCase): { art: JSX.Element; text: string } | null {
+  const { level } = trophyCase;
+  if (level !== null)
+    return {
+      art: <LevelInsignia rank={level.rank} size={44} />,
+      text: `Rang ${level.name}\u00a0: il monte avec ton net depuis ton arrivée et ne redescend jamais`,
+    };
+  const next = trophyCase.nextLevel ?? null;
+  if (next === null) return null;
+  return {
+    art: <LevelInsignia rank={next.rank} earned={false} size={44} />,
+    text: `Premier rang\u00a0: ${next.name}, à ${roundAmountText(next.thresholdMinor, next.currency)} de net depuis ton arrivée`,
+  };
+}
 
 /** Moi › Trophées (ADR 0108): the creator's case, or the chatter's. */
 export function MyTrophiesPage({ user }: { user: Me }): JSX.Element {
@@ -57,11 +80,8 @@ function ChatterTrophiesPage({ user }: { user: Me }): JSX.Element {
                   { label: 'Meilleure série', value: shifts(shift.best) },
                 ]
           }
-          level={
-            shown.trophyCase.level === null
-              ? null
-              : `Rang ${shown.trophyCase.level.name} : il monte avec ton net depuis ton arrivée et ne redescend jamais`
-          }
+          level={rankLine(shown.trophyCase)}
+          emptyShelves={NO_TIERS}
           sound={preferences.sounds}
           onRevealed={(item) => {
             markRevealed(shown.toStoredKinds([item.kind]));

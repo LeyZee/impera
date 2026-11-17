@@ -5,6 +5,7 @@ import { ConnectorFailed, ConnectorUnavailable, PlatformAccountNotFound } from '
 import {
   ConnectorError,
   ScriptStepAlreadySent,
+  ScriptStepDiscounted,
   ScriptStepPriceChanged,
   type PlatformConnector,
 } from '../domain/platform-connector';
@@ -64,7 +65,8 @@ function capable<T>(
  * the send job records. An expired session also stops the account, as a poll would. Every write goes through the
  * account's write guard (`config.writes`, off by default) before the connector is even built; reading what was sent
  * does not. A script step the platform already lists as sent is refused for good (`SendRefused`, ADR 0018 § 5), and
- * so is one whose price changed on the platform since it was validated (`script_price_changed`).
+ * so is one whose price changed on the platform since it was validated (`script_price_changed`), or that carries a
+ * reduced price there (`script_step_discounted`, recette 16/11).
  */
 export function createOutboundSender(deps: {
   readonly accounts: Pick<AccountStore, 'get' | 'setSessionState'>;
@@ -96,6 +98,12 @@ export function createOutboundSender(deps: {
         throw new SendRefused(
           'script_price_changed',
           'Le prix de l’étape a changé sur la plateforme depuis sa validation',
+        );
+      }
+      if (error instanceof ScriptStepDiscounted) {
+        throw new SendRefused(
+          'script_step_discounted',
+          'L’étape a un tarif réduit sur la plateforme : Impera ne vend jamais en remise',
         );
       }
       if (!(error instanceof ConnectorError)) throw error;
