@@ -417,7 +417,7 @@ describe('Paie › Primes et malus', () => {
       return Promise.resolve('ok');
     });
     renderPage(IRIS_ME);
-    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ajouter une prime ou un malus' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('radio', { name: 'Malus' }));
     chooseValue(within(dialog).getByRole('combobox', { name: 'Pour' }), LOU.id);
