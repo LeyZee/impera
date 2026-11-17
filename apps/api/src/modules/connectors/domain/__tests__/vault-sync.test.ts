@@ -25,6 +25,7 @@ function media(id: string, createdAt: string, extra: Partial<VaultMedia> = {}): 
     createdAt,
     description: null,
     suggestedPriceMinor: null,
+    blurhash: null,
     ...extra,
   };
 }
@@ -71,6 +72,15 @@ describe('vault sync plan (ADR 0099 § 2 to 4)', () => {
       upserts: [expect.objectContaining({ platformMediaId: 'm4', folderPosition: 0 })],
       removals: [],
     });
+  });
+
+  it('rewrites a media whose blurred preview changed, and keeps it', () => {
+    const repainted = read.map((m) => (m.ref.id === 'm2a' ? { ...m, blurhash: 'L00000' } : m));
+    const plan = planVaultSync(repainted, stored(read));
+    expect(plan.upserts.map((row) => [row.platformMediaId, row.previewBlurhash])).toEqual([
+      ['m2a', 'L00000'],
+    ]);
+    expect(planVaultSync(repainted, stored(repainted)).upserts).toEqual([]);
   });
 
   it('moves a media to its new folder, marks one no longer listed, and brings it back when listed again', () => {

@@ -13,7 +13,7 @@ import {
   type CreatorId,
   type DraftId,
 } from '@impera/contracts';
-import { and, eq, schema } from '@impera/db';
+import { and, eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -243,6 +243,41 @@ describe('copilot panel (ADR 0086)', () => {
     expect((await draftOf('Hugo', ownerCookie, `?creatorId=${nora.creatorId}`)).view).toEqual({
       state: 'unknown',
     });
+  });
+
+  // Recette du 16/11: calm since before the account's first poll, the conversation was in no list Impera read.
+  it('asks the platform for a conversation it never read, once a minute at most, on her readable accounts', async () => {
+    const reads = async () =>
+      z.array(z.object({ key: z.string(), queue_name: z.string().nullable() })).parse(
+        (
+          await test.admin.db.execute(
+            sql`select j.key, q.queue_name from graphile_worker._private_jobs j
+                  left join graphile_worker._private_job_queues q on q.id = j.job_queue_id
+                  where j.key like 'read:%'`,
+          )
+        ).rows,
+      );
+    // An account whose session cannot be read is never asked.
+    expect((await draftOf('jamais-lue', ownerCookie)).view).toEqual({ state: 'unknown' });
+    expect(await reads()).toEqual([]);
+
+    await test.admin.db
+      .update(schema.platformAccounts)
+      .set({ sessionState: 'valid' })
+      .where(eq(schema.platformAccounts.id, nora.accountId));
+    try {
+      expect((await draftOf('jamais-lue-2', ownerCookie)).view).toEqual({ state: 'unknown' });
+      expect((await draftOf('jamais-lue-2', ownerCookie)).view).toEqual({ state: 'unknown' });
+      expect(await reads()).toEqual([
+        { key: `read:${nora.accountId}:c-jamais-lue-2`, queue_name: `account:${nora.accountId}` },
+      ]);
+    } finally {
+      await test.admin.db
+        .update(schema.platformAccounts)
+        .set({ sessionState: 'none' })
+        .where(eq(schema.platformAccounts.id, nora.accountId));
+      await test.admin.db.execute(sql`delete from graphile_worker._private_jobs where key like 'read:%'`);
+    }
   });
 
   it('lets the owner turn her switches, one at a time, audited, and nobody else', async () => {

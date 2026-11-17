@@ -5,8 +5,14 @@ import { z } from 'zod';
 
 import type { VaultReads } from '../../application/vault';
 import { VaultForbidden } from '../../domain/errors';
+import type { VaultPreview } from '../../domain/platform-connector';
+import type { JobLogger } from '../../domain/ports';
 
 const ParamsSchema = z.object({ creatorId: CreatorIdSchema });
+const PreviewParamsSchema = z.object({
+  creatorId: CreatorIdSchema,
+  platformMediaId: z.string().min(1).max(200),
+});
 
 const userOf = (request: FastifyRequest): string => {
   const id = request.user?.id;
@@ -21,6 +27,13 @@ export interface VaultRoutesOptions {
   readonly ownerGuard: preValidationAsyncHookHandler;
   /** Asks a sync of each of her accounts that may be read now; how many were asked. */
   readonly askSync: (creatorId: CreatorId, correlationId: string) => Promise<number>;
+  /** ADR 0138: one small picture of her vault, read now at the platform, never kept. */
+  readonly preview: (
+    creatorId: CreatorId,
+    userId: string,
+    platformMediaId: string,
+    logger: JobLogger,
+  ) => Promise<VaultPreview>;
 }
 
 /**
@@ -48,6 +61,22 @@ export function createVaultRoutes(reads: VaultReads, options: VaultRoutesOptions
       async (request) => {
         userOf(request);
         return { accounts: await options.askSync(request.params.creatorId, `request:${request.id}`) };
+      },
+    );
+    // ADR 0138: the sharp small picture of one media, asked by a gesture on the screen, served from our own origin
+    // (the CRM's CSP) and never kept, by us or by the browser.
+    app.get(
+      '/creators/:creatorId/vault/media/:platformMediaId/preview',
+      { preValidation: options.teamGuard, schema: { params: PreviewParamsSchema } },
+      async (request, reply) => {
+        const { creatorId, platformMediaId } = request.params;
+        const picture = await options.preview(creatorId, userOf(request), platformMediaId, request.log);
+        return reply
+          .header('content-type', picture.contentType)
+          .header('cache-control', 'no-store')
+          .header('x-content-type-options', 'nosniff')
+          .header('content-disposition', 'inline')
+          .send(Buffer.from(picture.bytes));
       },
     );
     return Promise.resolve();

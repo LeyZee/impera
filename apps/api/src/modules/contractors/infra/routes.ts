@@ -82,9 +82,14 @@ export function createContractorRoutes(
   regimes: PayrollRegimeStore,
   documents: ContractorDocuments,
   requireRole: RequireRole,
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
   const owner = requireRole('owner');
+  // Every write asks for the password and the code given less than 10 minutes ago (EQ-15, Charles 16/11): the owner's,
+  // and the contractor's own on his file (his identity and bank details, his documents, his acceptance of a text).
+  const ownerConfirmed = [owner, recentLogin];
+  const memberConfirmed = [ownerOrMember, recentLogin];
   return (app) => {
     app.addContentTypeParser(
       'image/png',
@@ -110,7 +115,7 @@ export function createContractorRoutes(
     app.put(
       '/payroll/billing-settings',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: { body: UpdateBillingSettingsBodySchema, response: { 200: BillingSettingsViewSchema } },
       },
       (request) => billing.update(actorOf(request), request.body),
@@ -119,12 +124,14 @@ export function createContractorRoutes(
     app.put(
       '/payroll/billing-settings/accounts',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: { body: JournalAccountsSchema, response: { 200: BillingSettingsViewSchema } },
       },
       (request) => billing.updateAccounts(actorOf(request), request.body),
     );
 
+    // A logo only lands on an invoice through the settings' save, which asks: kept without asking, so that picking one
+    // does not stop the dialog midway.
     app.post(
       '/payroll/billing-settings/logos',
       { preValidation: owner, schema: { response: { 200: AgencyLogoSchema, 201: AgencyLogoSchema } } },
@@ -162,7 +169,7 @@ export function createContractorRoutes(
     app.put(
       '/payroll/contractors/:memberId/profile',
       {
-        preValidation: ownerOrMember,
+        preValidation: memberConfirmed,
         schema: {
           params: ContractorParamsSchema,
           body: ContractorProfileBodySchema,
@@ -182,7 +189,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/contractors/:memberId/profile/verify',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: ContractorParamsSchema,
           body: VerifyContractorProfileBodySchema,
@@ -195,7 +202,7 @@ export function createContractorRoutes(
     app.put(
       '/payroll/contractors/:memberId/profile/prefix',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: ContractorParamsSchema,
           body: InvoicePrefixBodySchema,
@@ -214,7 +221,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/contract-texts',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           body: CreateContractTextBodySchema,
           response: { 200: ContractTextSchema, 201: ContractTextSchema },
@@ -229,7 +236,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/contract-texts/:textId/accept',
       {
-        preValidation: ownerOrMember,
+        preValidation: memberConfirmed,
         schema: {
           params: ContractTextParamsSchema,
           body: AcceptContractTextBodySchema,
@@ -255,7 +262,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/billing-regimes',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           body: CreateBillingRegimeBodySchema,
           response: { 200: BillingRegimeSchema, 201: BillingRegimeSchema },
@@ -270,7 +277,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/billing-regimes/:regimeId/validation',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: BillingRegimeParamsSchema,
           body: ValidateBillingRegimeBodySchema,
@@ -290,7 +297,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/contractors/:memberId/regimes',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: ContractorParamsSchema,
           body: AssignContractorRegimeBodySchema,
@@ -322,7 +329,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/contractors/:memberId/documents',
       {
-        preValidation: ownerOrMember,
+        preValidation: memberConfirmed,
         schema: {
           params: ContractorParamsSchema,
           querystring: UploadContractorDocumentQuerySchema,
@@ -366,7 +373,7 @@ export function createContractorRoutes(
     app.post(
       '/payroll/contractors/:memberId/documents/:documentId/review',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: {
           params: ContractorDocumentParamsSchema,
           body: ContractorDocumentReviewSchema,

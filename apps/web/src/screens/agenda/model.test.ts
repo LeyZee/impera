@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { agendaOf, live, MONDAY, post, shoot, stretch, WEDNESDAY } from './fixtures';
 import { timedSuggestionsOf } from './grid';
 import {
+  dueOn,
   firstOf,
   momentOf,
   planOf,
@@ -225,5 +226,18 @@ describe('her day (CR-05)', () => {
     expect(planOf(agendaOf({ suggestions: [routine], today: '2026-10-28' }), MONDAY).suggestions).toEqual([
       routine,
     ]);
+  });
+});
+
+describe('a routine she removed today (recette 16/11, choix de Charles)', () => {
+  const removed = { ...stretch, removedAt: '2026-11-02T20:00:00.000Z' };
+
+  it('stays due the day she removed it, so that removing it never saves her streak', () => {
+    expect(dueOn(removed, MONDAY, 'Europe/Paris')).toBe(true);
+  });
+
+  it('leaves her agenda from the next day', () => {
+    expect(dueOn(removed, WEDNESDAY, 'Europe/Paris')).toBe(false);
+    expect(dueOn(stretch, WEDNESDAY, 'Europe/Paris')).toBe(true);
   });
 });

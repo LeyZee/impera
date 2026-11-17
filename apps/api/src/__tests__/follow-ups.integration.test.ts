@@ -59,6 +59,9 @@ class FakeSender implements OutboundSender {
   sendMedia(): Promise<SendResult> {
     return Promise.reject(new Error('not used'));
   }
+  sendStep(): Promise<SendResult> {
+    return Promise.reject(new Error('not used'));
+  }
   verifySent(): Promise<{ status: 'not_found' }> {
     return Promise.resolve({ status: 'not_found' });
   }

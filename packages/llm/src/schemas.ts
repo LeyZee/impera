@@ -86,6 +86,41 @@ export const BriefSchema = z.object({
 });
 export type Brief = z.infer<typeof BriefSchema>;
 
+/** The brief's lists: a model that writes `null` for one means none. */
+const BRIEF_LISTS = new Set(['factsProposed', 'kycMissing', 'risks', 'toneHints']);
+
+/**
+ * The brief as a model may write it (16/11, relevé du PC: the Mistral fallback failed the format 26 times in 26): a
+ * facultative field written `null` or `""`, or a list written `null`, reads as absent or empty, then the brief is read
+ * strictly. The model is shown this shape (`io: "input"`), so `null` is allowed to it; the code only ever sees a
+ * `Brief`.
+ */
+export const BriefFromModelSchema = BriefSchema.extend({
+  objection: ObjectionKindSchema.nullish(),
+  factsProposed: BriefSchema.shape.factsProposed.nullable(),
+  kycMissing: BriefSchema.shape.kycMissing.nullable(),
+  risks: BriefSchema.shape.risks.nullable(),
+  desireSignals: z.array(z.enum(DESIRE_BRAIN_SIGNALS)).max(DESIRE_BRAIN_SIGNALS.length).nullish(),
+  alertsSeen: z.array(z.string().regex(BRAIN_ALERT_ID)).max(BRAIN_ALERTS_MAX).nullish(),
+  scriptPick: z.union([z.string().regex(BRAIN_SCRIPT_ID), z.literal('')]).nullish(),
+  scriptReply: z.enum(SCRIPT_REPLIES).nullish(),
+  toneHints: BriefSchema.shape.toneHints.nullable(),
+  callback: z.string().nullish(),
+  selfDisclosure: z.string().nullish(),
+})
+  .transform((brief): unknown =>
+    Object.fromEntries(
+      Object.entries(brief).flatMap(([key, value]) =>
+        value === null || (typeof value === 'string' && value.trim() === '' && key !== 'replyBrief')
+          ? BRIEF_LISTS.has(key)
+            ? [[key, []]]
+            : []
+          : [[key, value]],
+      ),
+    ),
+  )
+  .pipe(BriefSchema);
+
 export const VoiceOutputSchema = z.object({
   bubbles: z.array(z.string().min(1)).min(1).max(6),
 });

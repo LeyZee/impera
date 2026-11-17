@@ -15,6 +15,7 @@ import {
 } from './model';
 import './scripts.css';
 
+import { VaultCard } from '@/creators/vault/VaultCard';
 import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
@@ -22,19 +23,25 @@ import '@/creators/agenda/agency-agenda.css';
 /**
  * Créatrices › Scripts (SC-03 c2b, ADR 0056 § 7), the owner's and an active manager's: each script she sent, its
  * archive to download (the sheet first, then each card and each medium in the script's order) and « Copié dans
- * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2).
+ * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2). Above them, her Reveal
+ * vault as last read and, for the owner, « Synchroniser le coffre » (ADR 0099).
  */
 export function ScriptsSection({
   creatorId,
   creatorName,
   timezone,
   isOwner = false,
+  folderId,
+  onFolder,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
   /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9): the owner is told where it stands. */
   isOwner?: boolean;
+  /** Her vault folder opened, from the address; without it, the card keeps its own. */
+  folderId?: string | null;
+  onFolder?: (id: string | null) => void;
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
   const structures = useStructures();
@@ -105,6 +112,15 @@ export function ScriptsSection({
 
   return (
     <section className="ps-page aa-page sx-page" aria-label={`Scripts de ${creatorName}`}>
+      {/* Her Reveal vault first, at the top of the tab: what her scripts are built from, and the owner's sync (Charles,
+          16/11). « Ses scripts » follows in one piece, its head and its list together. */}
+      <VaultCard
+        creatorId={creatorId}
+        creatorName={creatorName}
+        isOwner={isOwner}
+        {...(folderId === undefined ? {} : { folderId })}
+        {...(onFolder === undefined ? {} : { onFolder })}
+      />
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">

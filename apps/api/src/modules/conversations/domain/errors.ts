@@ -7,6 +7,7 @@ import {
 } from '@impera/contracts';
 
 import type { BlockedReason } from './ports';
+import type { StepCut } from './rules';
 import type { ConversationCommand } from './state-machine';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
@@ -32,6 +33,19 @@ export class CreatorNotFound extends DomainError {
 export class DraftNotFound extends DomainError {
   constructor() {
     super('draft_not_found', 'Brouillon introuvable');
+  }
+}
+
+/**
+ * His age is in doubt: the agent writes nothing to him until the owner or a manager confirms it (Charles, 16/11), so
+ * the hand is not given back to it meanwhile.
+ */
+export class AgeInDoubtConflict extends DomainError {
+  constructor() {
+    super(
+      'age_in_doubt_conflict',
+      'Son âge est en doute : l’IA ne lui écrit plus tant que le propriétaire ou un manager ne l’a pas confirmé',
+    );
   }
 }
 
@@ -146,9 +160,46 @@ export class CreatorForbidden extends DomainError {
   }
 }
 
+/**
+ * « Il va mieux » is for whoever reads the whole creator (ADR 0088 § 7): the owner, or a manager she is given; never a
+ * chatter, even with an open access window. He is told so, not that she is out of reach.
+ */
+export class CareCloseForbidden extends DomainError {
+  constructor() {
+    super('care_close_forbidden', 'Seuls le propriétaire et un manager peuvent fermer le mode soin');
+  }
+}
+
 /** A conversation of her that was not given to him, for a member who reads only what he holds (ADR 0024): 403. */
 export class ConversationForbidden extends DomainError {
   constructor() {
     super('conversation_forbidden', 'Cette conversation ne t’a pas été confiée');
+  }
+}
+
+const STEP_CUT_WORDS: Readonly<Record<StepCut, string>> = {
+  care: 'il traverse un moment difficile',
+  do_not_contact: 'il ne doit plus recevoir de message',
+  sales_frozen: 'ses ventes sont gelées',
+  age_disputed: 'son âge est en doute',
+  limits_unreadable: 'ses limites sont illisibles',
+};
+
+/** Why a draft stopped before its paid step, in the words of its `draft_expired` event. */
+export function stepCutExpiryReason(cut: StepCut): string {
+  return `Étape payante retenue à l’envoi : ${STEP_CUT_WORDS[cut]}`;
+}
+
+/**
+ * A draft that carries a paid step of her script, approved while his limits keep it (relecture Sécurité de #812):
+ * nothing is approved, the draft stays as it was. A human answers him without the step.
+ */
+export class ScriptStepCut extends DomainError {
+  constructor(cut: StepCut) {
+    super(
+      'script_step_cut_unprocessable',
+      `Ce message porte une étape payante qui ne peut plus partir : ${STEP_CUT_WORDS[cut]}`,
+      { details: { cut } },
+    );
   }
 }

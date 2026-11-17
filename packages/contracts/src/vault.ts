@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { PlatformScriptMomentSchema } from './connector';
+import { BlurhashSchema, PlatformScriptMomentSchema } from './connector';
 import { PlatformSchema } from './enums';
 import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
 
@@ -20,6 +20,8 @@ export const VaultMediaViewSchema = z.strictObject({
   suggestedPriceMinor: z
     .strictObject({ min: z.number().int().min(0), max: z.number().int().min(0) })
     .nullable(),
+  /** The platform's blurred preview, drawn as the tile (ADR 0030 § 4): a few colours, never the image. */
+  blurhash: BlurhashSchema.nullable(),
   /** No longer listed by the platform at the last sync: kept, with its descriptions (ADR 0030 § 2). */
   removed: z.boolean(),
 });

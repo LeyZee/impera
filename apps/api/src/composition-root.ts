@@ -77,7 +77,7 @@ import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
-import { wireMedia } from './wiring/media';
+import { wireMedia, wireVaultDescriptions } from './wiring/media';
 import { wireNotifications } from './wiring/notifications';
 import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
@@ -300,6 +300,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ingest: (input) => conversations.module.ingestMessage(input),
     // The import of her native scripts, queued behind each vault sync the owner asks (ADR 0099 § 1 time 2).
     onVaultSyncAsked: (input) => scripts.module.askImport(input),
+    // The description of the vault's media still without a file, queued behind each sync that went through (ADR 0113).
+    onVaultSynced: (input) => vaultDescriptions.vault.enqueue(input),
     // The member made by `team`, the account linked by this module's own write, in one transaction (ADR 0076 § 3).
     invite: (actor, input) =>
       team.module.invites(connectors.module.invitationChatterLinks).fromPlatform(actor, input),
@@ -371,6 +373,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
   });
+  // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
+  const vaultDescriptions = wireVaultDescriptions(shared, {
+    vision: options.dropVision ?? llm.gateway,
+    files: connectors.module.vaultFiles,
+    drops: contentDrops.module,
+  });
   const scripts = wireScripts(shared, {
     persona: persona.module,
     contentDrops: contentDrops.module,
@@ -416,6 +424,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     fans: fans.module,
     alerts: alerts.module,
     scheduling: scheduling.module,
+    scripts: scripts.module,
+    connectors: connectors.module,
     ...(options.composer !== undefined && { composer: options.composer }),
   });
   const conversations = wireConversations(shared, {
@@ -433,25 +443,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         return holder === null ? null : currentUserById(db.db, shiftCreators, holder.userId);
       },
       allCreatorIds: persona.allCreatorIds,
+      askRead: (ask) => connectors.module.askConversationRead(ask),
     },
   });
   const backups = wireBackups(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
   const aiUsage = wireAiUsage(shared, llm);
-  const mcp = wireMcp(
-    shared,
-    shiftCreators,
-    persona.module,
-    fans.module,
-    {
-      drops: contentDrops.module,
-      scripts: scripts.module,
-    },
-    scheduling.module,
-    aiUsage.module,
-    connectors.module,
-    payroll.module,
-  );
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
@@ -469,6 +466,21 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     jobNames: () => Object.keys(tasks),
     salesFeeds: connectors.module.salesFeedStates,
   });
+  const mcp = wireMcp(
+    shared,
+    shiftCreators,
+    persona.module,
+    fans.module,
+    {
+      drops: contentDrops.module,
+      scripts: scripts.module,
+    },
+    scheduling.module,
+    aiUsage.module,
+    connectors.module,
+    payroll.module,
+    supervision.module,
+  );
 
   const modules: Modules = {
     alerts: alerts.module,
@@ -513,6 +525,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,
@@ -572,13 +585,18 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         conversations: conversations.module,
       }),
       ...alerts.routes,
-      fans.routes(agent.kycSlotsOf, {
-        holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
-        traceOpening: (creatorId, fanId, trace) =>
-          conversations.module.traceFanOpening(creatorId, fanId, trace),
-        messageTexts: (creatorId, fanId, messageIds) =>
-          conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
-      }),
+      fans.routes(
+        agent.kycSlotsOf,
+        {
+          holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
+          traceOpening: (creatorId, fanId, trace) =>
+            conversations.module.traceFanOpening(creatorId, fanId, trace),
+          messageTexts: (creatorId, fanId, messageIds) =>
+            conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
+        },
+        // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
+        async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+      ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,

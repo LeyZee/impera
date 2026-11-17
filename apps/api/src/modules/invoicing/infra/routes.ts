@@ -47,8 +47,12 @@ export function createInvoicingRoutes(
   downloadPdf: InvoicePdfDownload,
   acceptance: PayrollInvoiceAcceptance,
   requireRole: RequireRole,
+  recentLogin: preValidationAsyncHookHandler,
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
+  // A contest and its end ask for the password and the code given less than 10 minutes ago (EQ-15, Charles 16/11);
+  // « J'accepte », given each fortnight, does not (Charles, same day).
+  const confirmed = [ownerOrMember, recentLogin];
   return (app) => {
     app.get(
       '/payroll/invoices',
@@ -95,7 +99,7 @@ export function createInvoicingRoutes(
     app.post(
       '/payroll/invoices/:invoiceId/contest',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           params: InvoiceParamsSchema,
           body: ContestInvoiceBodySchema,
@@ -108,7 +112,7 @@ export function createInvoicingRoutes(
     app.post(
       '/payroll/invoices/:invoiceId/contest/refuse',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           params: InvoiceParamsSchema,
           body: RefuseInvoiceContestBodySchema,
@@ -121,7 +125,7 @@ export function createInvoicingRoutes(
     app.post(
       '/payroll/invoices/:invoiceId/contest/uphold',
       {
-        preValidation: ownerOrMember,
+        preValidation: confirmed,
         schema: {
           params: InvoiceParamsSchema,
           body: UpholdInvoiceContestBodySchema,
