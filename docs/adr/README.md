@@ -142,6 +142,7 @@ Date : AAAA-MM-JJ
 | 0131 | Choisir le script qui colle aux goûts du fan : familles de fantasme, goûts des scripts et de la fiche, le code classe et l'IA choisit | accepted (précise 0098 § 6, 0056 § 6, 0085 et 0112 § 5) |
 | 0132 | Paliers de dépense : l'IA plus proche et plus attentive avec les gros dépensiers, jamais plus pressante ; prix plus haut par branche de palier | accepted (précise 0085, 0086, 0088, 0128, 0131 ; amende 0112 § 2) |
 | 0133 | L'agent pose une réaction sur un message du fan, en plus de sa réponse, quand le message la justifie | accepted (précise 0018, 0019, 0021, 0086, 0088, 0079) |
+| 0135 | Time waster : le fan qui parle sans jamais acheter reçoit une attention rare, jamais du mépris ; le premier achat la lui rend | accepted (précise 0132, 0128, 0131, 0088, 0085, 0086, 0091) |
 | 0138 | Aperçu net du coffre : la petite image de Reveal lue à la demande, servie sans être gardée | accepted (précise 0099 § 7, 0030 § 4, 0018 ; amende 0099 : l'écran du coffre montre l'image à la demande) |
 | 0140 | La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit | accepted (précise 0042 §§ 3-5, 0055 §§ 4-5, 0056 § 2, 0126, 0136, 0137, 0120, 0082) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
