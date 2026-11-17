@@ -370,6 +370,20 @@
   inset: calc((var(--nv-target-min) - 34px) / -2);
 }
 
+/* A text link smaller than a thumb (a card's « more », a line that leads elsewhere): the words keep their size, the
+   target grows to 44px around them (recette CHT-22). */
+.nv-hit {
+  position: relative;
+}
+.nv-hit::after {
+  content: '';
+  position: absolute;
+  inset-inline: calc(var(--nv-space-2) * -1);
+  top: 50%;
+  height: max(100%, var(--nv-target-min));
+  transform: translateY(-50%);
+}
+
 /* The round close of a sheet or a dialog: quiet (the neon stays on the action), 36px seen, 44px to touch. */
 .nv-close {
   appearance: none;

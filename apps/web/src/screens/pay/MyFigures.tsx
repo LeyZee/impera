@@ -253,7 +253,7 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
       className="nv-enter mf mf-card"
       eyebrow={<Named kind="sales">Ma quinzaine</Named>}
       actions={
-        <Link to="/commissions" className="mf-more">
+        <Link to="/commissions" className="mf-more nv-hit">
           Mes chiffres
           <Chevron className="mf-more__chev" />
         </Link>
