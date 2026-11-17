@@ -25,7 +25,7 @@ import {
   withdrawDrop,
 } from './api';
 import { durationOf } from './media-length';
-import { UNKNOWN_TYPE, fileLine, isInterrupted, mimeOf, type LiveSend } from './model';
+import { UNKNOWN_TYPE, fileLine, isInterrupted, mimeOf, pickedHeadRefusal, type LiveSend } from './model';
 import {
   acceptOfSlot,
   cardDone,
@@ -464,6 +464,12 @@ function SlotTile({
     setRefusal(null);
     // The same file again after a cut send: it goes on where it stopped (the server checks its bytes anyway).
     if (file !== undefined && interrupted && picked.size === file.bytes) {
+      // Its first bytes too (recette CRE-12): a file of the same size that is not what was declared never goes up.
+      const head = await pickedHeadRefusal(picked, file.mime);
+      if (head !== null) {
+        setRefusal(head);
+        return;
+      }
       onResumed(file.id, picked);
       return;
     }
@@ -480,6 +486,13 @@ function SlotTile({
     }
     // Busy from here: reading a video's length can take seconds, a second choice must wait for it.
     setBusy(true);
+    // Its first bytes before anything goes (recette CRE-12): a text renamed `.jpg` never fills a slot.
+    const head = await pickedHeadRefusal(picked, mime);
+    if (head !== null) {
+      setRefusal(head);
+      setBusy(false);
+      return;
+    }
     const kind = kindOfMime(mime);
     if (kind === 'video' || kind === 'audio') {
       const length = slotDurationRefusal(slotLengths(slot.slot), await durationOf(picked, kind));

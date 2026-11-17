@@ -153,6 +153,19 @@ export const PlatformScriptMomentSchema = z.enum(['day', 'night']);
 export type PlatformScriptMoment = z.infer<typeof PlatformScriptMomentSchema>;
 
 /** One step of a platform script: its text, the media it sells, its previews and its price. */
+/** A platform's reduced price on a step: either part may be missing, a discount all the same, never both. */
+export const PlatformStepDiscountSchema = z
+  .object({
+    /** Minor units, VAT included. */
+    priceMinor: z.number().int().min(0).nullable(),
+    /** How long it lasts, in minutes. */
+    minutes: z.number().int().min(0).nullable(),
+  })
+  .refine((discount) => discount.priceMinor !== null || discount.minutes !== null, {
+    message: 'A discount says its price or its duration',
+  });
+export type PlatformStepDiscount = z.infer<typeof PlatformStepDiscountSchema>;
+
 export const PlatformScriptStepSchema = z.object({
   /** The step as the platform names it: what a send of this step refers to. */
   ref: ExternalRefSchema,
@@ -171,6 +184,11 @@ export const PlatformScriptStepSchema = z.object({
   /** Minor units, VAT included; 0 for a free step. */
   priceMinor: z.number().int().min(0),
   currency: CurrencySchema,
+  /**
+   * A reduced price for a time, set on the platform (Reveal's « Tarif réduit »), as it gives it; `null` when the step
+   * has none. Impera never sells at it: such a step is never sent and its script never offered (recette 16/11, Charles).
+   */
+  discount: PlatformStepDiscountSchema.nullable(),
 });
 export type PlatformScriptStep = z.infer<typeof PlatformScriptStepSchema>;
 

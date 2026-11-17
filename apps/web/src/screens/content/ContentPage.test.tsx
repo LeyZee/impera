@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { ContentPage } from './ContentPage';
-import { dropOf, fileOf, requestOf, scriptDropOf } from './fixtures';
+import { dropOf, fileOf, fileWithHead, requestOf, scriptDropOf } from './fixtures';
 
 const queueSend = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const retryNow = vi.hoisted(() => vi.fn());
@@ -230,18 +230,22 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const dialog = screen.getByRole('dialog');
     const input = dialog.querySelector('input[type="file"]');
     if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
-    pick(input, [new File(['abc'], 'IMG_0042.HEIC', { type: '' })]);
+    pick(input, [fileWithHead('IMG_0042.HEIC', 'heic')]);
+    // « Envoyer » waits for its first bytes to be read (recette CRE-12).
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', false);
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
     const drop = calls.find((call) => call.method === 'POST');
-    expect(drop?.body).toMatchObject({ category: 'feed_shoot', files: [{ mime: 'image/heic', bytes: 3 }] });
+    expect(drop?.body).toMatchObject({ category: 'feed_shoot', files: [{ mime: 'image/heic', bytes: 12 }] });
     expect(queueSend).toHaveBeenCalledTimes(1);
   });
 
   it('shows each file on its way, one « Reprendre l’envoi » for a cut drop, and puts it above « Déposer »', async () => {
-    const cutA = fileOf({ position: 1, kind: 'video', mime: 'video/quicktime', state: 'awaiting', bytes: 7 });
+    const cutA = fileOf({ position: 1, kind: 'video', mime: 'video/quicktime', state: 'awaiting', bytes: 8 });
     const cutB = fileOf({ position: 2, kind: 'image', state: 'awaiting', bytes: 3 });
     const drop = dropOf({
       state: 'uploading',
@@ -260,11 +264,13 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const input = section.querySelector('input[type="file"]');
     if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
     pick(input, [
-      new File(['abc'], 'IMG_1.HEIC'),
-      new File(['abcdefg'], 'IMG_2.MOV'),
+      fileWithHead('IMG_1.JPG', 'jpeg'),
+      fileWithHead('IMG_2.MOV', 'mov'),
       new File(['x'], 'autre.jpg'),
     ]);
-    expect(queueSend).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(queueSend).toHaveBeenCalledTimes(2);
+    });
     expect(within(section).getByText(/Un fichier choisi n’est pas de ce dépôt/u)).toBeDefined();
     // Still to go up: « En route » comes before « Déposer » (CRE-09).
     const titles = [...document.querySelectorAll('h2')].map((title) => title.textContent);
@@ -292,6 +298,66 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(sendAgain).toHaveBeenCalledWith([held.id], expect.any(Function));
   });
 
+  it('refuses before sending a file that is not what its name says, and does not send it (recette CRE-12)', async () => {
+    const calls = serve({ requests: [], drops: [] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
+    const dialog = screen.getByRole('dialog');
+    const input = dialog.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [
+      fileWithHead('IMG_0042.HEIC', 'heic'),
+      new File(['juste du texte'], 'faux.jpg', { type: 'image/jpeg' }),
+    ]);
+    expect(
+      await within(dialog).findByText('Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie'),
+    ).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', true);
+    // Only the renamed one is blamed; taken out, the real photo goes.
+    expect(within(dialog).getAllByText(/n’est pas ce qu’il annonce/u)).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole('button', { name: /Enlever Photo 2/u }));
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', false);
+    });
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
+  it('never resumes a cut send with a file of the same size that is not what was declared (recette CRE-12)', async () => {
+    const cut = fileOf({ position: 0, kind: 'image', mime: 'image/jpeg', state: 'awaiting', bytes: 14 });
+    serve({ requests: [], drops: [dropOf({ state: 'uploading', files: [cut] })] });
+    show();
+    const section = (await screen.findByRole('heading', { name: 'En route' })).closest('section');
+    const input = section?.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [new File(['juste du texte'], 'faux.jpg')]);
+    expect(
+      await screen.findByText('Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie'),
+    ).toBeDefined();
+    expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('keeps a request in « À tourner » while its drop goes up, without a second drop (recette CRE-12)', async () => {
+    const drop = dropOf({ state: 'uploading', files: [fileOf({ state: 'awaiting' })] });
+    serve({ requests: [requestOf({ reason: 'La séance promise', dropId: drop.id })], drops: [drop] });
+    show();
+    const section = (await screen.findByRole('heading', { name: 'À tourner' })).closest('section');
+    if (section === null) throw new Error('no section');
+    expect(within(section).getByText('La séance promise')).toBeDefined();
+    expect(
+      within(section).getByText('Ton dépôt est en route. S’il s’arrête, reprends-le dans « En route ».'),
+    ).toBeDefined();
+    expect(within(section).queryByRole('button', { name: 'Déposer' })).toBeNull();
+    expect(within(section).queryByRole('button', { name: 'Je ne peux pas' })).toBeNull();
+  });
+
+  it('takes a request out of « À tourner » once its drop is received', async () => {
+    const drop = dropOf({ state: 'received', files: [fileOf({ state: 'received' })] });
+    serve({ requests: [requestOf({ reason: 'La séance promise', dropId: drop.id })], drops: [drop] });
+    show();
+    expect(await screen.findByRole('heading', { name: 'En route' })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'À tourner' })).toBeNull();
+  });
+
   it('keeps the files in the order she sets: numbered, moved up or down, sent in that order', async () => {
     const calls = serve({ requests: [], drops: [] });
     show();
@@ -299,12 +365,8 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const dialog = screen.getByRole('dialog');
     const input = dialog.querySelector('input[type="file"]');
     if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
-    const first = new File(['a'], 'IMG_1.HEIC', { type: '' });
-    pick(input, [
-      first,
-      new File(['bb'], 'IMG_2.HEIC', { type: '' }),
-      new File(['ccc'], 'IMG_3.HEIC', { type: '' }),
-    ]);
+    const first = fileWithHead('IMG_1.HEIC', 'heic');
+    pick(input, [first, fileWithHead('IMG_2.HEIC', 'heic', 1), fileWithHead('IMG_3.HEIC', 'heic', 2)]);
     // The same file picked again goes once.
     pick(input, [first]);
     // Her file names are kept for a computer's screen only (CSS), in the order she sets.
@@ -315,11 +377,14 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Monter Photo 2' }));
     expect(names()).toEqual([' · IMG_3.HEIC', ' · IMG_1.HEIC', ' · IMG_2.HEIC']);
     expect(within(dialog).getByRole('button', { name: 'Monter Photo 1' })).toHaveProperty('disabled', true);
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', false);
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
     await waitFor(() => {
       expect(calls.some((call) => call.method === 'POST')).toBe(true);
     });
     const drop = calls.find((call) => call.method === 'POST');
-    expect(drop?.body).toMatchObject({ files: [{ bytes: 3 }, { bytes: 1 }, { bytes: 2 }] });
+    expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
   });
 });

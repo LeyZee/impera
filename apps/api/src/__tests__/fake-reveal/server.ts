@@ -180,6 +180,11 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
     atMs: AtSchema,
     scriptId: z.string(),
     priceCents: z.number().int().min(0),
+    /** A « Tarif réduit » put on the step (`null` takes it off); absent, the discount stays as it is. */
+    discount: z
+      .object({ priceCents: z.number().int().min(0), minutes: z.number().int().min(0) })
+      .nullable()
+      .optional(),
   }),
   /** « Message supprimé » (2026-11-16): the message stays listed, with `deletedAt`. */
   z.object({ type: z.literal('message_deleted'), atMs: AtSchema, messageId: z.string() }),
@@ -358,7 +363,10 @@ class FakeRevealWorld {
         return;
       case 'script_changed': {
         const script = this.state.scripts.find((s) => s.id === event.scriptId);
-        if (script !== undefined) script.priceCents = event.priceCents;
+        if (script !== undefined) {
+          script.priceCents = event.priceCents;
+          if (event.discount !== undefined) script.discount = event.discount;
+        }
         return;
       }
       case 'sequence_removed':
@@ -632,6 +640,9 @@ class FakeRevealWorld {
       name: s.name,
       content: s.content,
       ...(s.priceCents === null ? {} : { price: s.priceCents }),
+      ...(s.discount === null
+        ? {}
+        : { discountedPrice: s.discount.priceCents, discountDurationMinutes: s.discount.minutes }),
     };
   }
 
