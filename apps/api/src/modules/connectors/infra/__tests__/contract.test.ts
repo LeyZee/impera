@@ -1,5 +1,10 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
   CreatorNoteSchema,
+  FetchedMediaSchema,
   FanNoteSchema,
   FanPpvStatsSchema,
   FanProfileSchema,
@@ -104,6 +109,9 @@ function revealSubject(): ContractSubject {
       // FakeReveal's clock: an attempt and the message it made are dated alike.
       now: () => fake.now(),
       sends: new MemorySendJournal(),
+      fileTransport: fake.fileTransport,
+      fileHosts: ['fake-reveal.test'],
+      fileHttpForTests: true,
     }),
     conversation: (key) => ids[key],
     fanWrites: async (key, text) => {
@@ -248,6 +256,20 @@ describe.each(Object.entries(READERS))('PlatformConnector contract, reads: %s', 
       const parsed = schema.safeParse(await call());
       expect(parsed.error).toBeUndefined();
     }
+    expect('fetchMedia' in connector, 'fetchMedia').toBe(flags.mediaDownload);
+    const first = flags.mediaDownload ? (await connector.listVaultMedia?.({}))?.[0] : undefined;
+    if (first !== undefined) {
+      const dir = await mkdtemp(join(tmpdir(), 'contract-'));
+      try {
+        const fetched = await connector.fetchMedia?.(first.ref, {
+          folderRef: first.folder?.ref ?? null,
+          path: join(dir, 'file'),
+        });
+        expect(FetchedMediaSchema.safeParse(fetched).error).toBeUndefined();
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    }
   });
 });
 
@@ -313,8 +335,8 @@ describe.each(Object.entries(WRITERS))('PlatformConnector contract, writes: %s',
       const [first] = script.steps;
       if (first === undefined) throw new Error('a platform script has a step');
       const price = { amountMinor: first.priceMinor, currency: first.currency };
-      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
-      const again = await connector.sendScriptStep?.(conversationRef, script.ref, 0, price, 'step-1');
+      const sent = await connector.sendScriptStep?.(conversationRef, script.ref, first.ref, price, 'step-1');
+      const again = await connector.sendScriptStep?.(conversationRef, script.ref, first.ref, price, 'step-1');
       expect(again?.messageRef).toEqual(sent?.messageRef);
       if (flags.scriptHistory) {
         const history = (await connector.getScriptHistory?.(fanRef)) ?? [];

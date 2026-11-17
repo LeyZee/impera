@@ -252,6 +252,13 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+/* What the amount adds up to, under its label: small and faint, never a second figure (recette CHT-02). */
+.mf-figure__parts {
+  margin: -4px 0 8px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
 .mf-card .mf-change {
   font-size: var(--nv-text-footnote);
 }

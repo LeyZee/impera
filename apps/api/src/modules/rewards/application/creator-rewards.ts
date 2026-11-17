@@ -18,8 +18,12 @@ export interface CreatorRewardsDeps {
  */
 export async function evaluateCreatorRewards(
   deps: CreatorRewardsDeps,
+  /** One creator only: the run that follows her gesture, a tick or a drop arrived (recette 16/11, CRE-06). */
+  onlyCreatorId?: string,
 ): Promise<{ players: number; gained: number }> {
-  const players = await deps.creators.players();
+  const every = await deps.creators.players();
+  const players =
+    onlyCreatorId === undefined ? every : every.filter((one) => one.creatorId === onlyCreatorId);
   let gained = 0;
   for (const player of players) {
     const now = deps.now();

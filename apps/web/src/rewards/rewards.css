@@ -106,6 +106,13 @@
 [data-theme='light'] .rw-level__glow {
   opacity: 0.1;
 }
+/* The reveal's stage stays dark in both themes: its fire keeps the night's glow. */
+[data-theme='light'] .rw-reveal .rw-level__ember {
+  opacity: 0.6;
+}
+[data-theme='light'] .rw-reveal .rw-level__glow {
+  opacity: 0.34;
+}
 .rw-mid {
   fill: none;
   stroke: var(--rw-mid);
@@ -578,6 +585,12 @@
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--nv-space-3);
   margin: var(--nv-space-3) 0;
+}
+/* On a phone three facts do not fit side by side: one under the other, none left alone on its line. */
+@media (max-width: 480px) {
+  .rw-member__facts {
+    grid-template-columns: 1fr;
+  }
 }
 .rw-member__facts dt {
   font-size: var(--nv-text-footnote);

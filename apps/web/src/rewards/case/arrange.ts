@@ -19,7 +19,8 @@ export const onShelf = (item: Pick<TrophyCaseItem, 'family'>): boolean =>
  */
 export function percentOf(progress: TrophyCaseProgress | null, earned: boolean): number | null {
   if (earned) return 100;
-  if (progress === null) return null;
+  // An object of one gesture has no way along to draw: 0 of 1 only weighs it as the next trophy (recette 16/11, CRE-14).
+  if (progress === null || progress.unit === 'once') return null;
   const share = Math.floor((progress.current * 100) / progress.target);
   return Math.max(0, Math.min(99, share));
 }
@@ -39,12 +40,15 @@ export interface Shelf {
   readonly earned: number;
 }
 
-/** The three shelves, an empty one left out. The sort is stable: the server's order breaks a tie. */
-export function shelvesOf(trophyCase: TrophyCase): Shelf[] {
+/**
+ * The three shelves, an empty one left out unless the role keeps it to say why it is empty (recette 16/11, CHT-17).
+ * The sort is stable: the server's order breaks a tie.
+ */
+export function shelvesOf(trophyCase: TrophyCase, keepEmpty: readonly ShelfFamily[] = []): Shelf[] {
   return SHELF_ORDER.map((family) => {
     const items = trophyCase.items.filter((item) => item.family === family).toSorted(byShelfOrder);
     return { family, items, earned: items.filter(isEarned).length };
-  }).filter((shelf) => shelf.items.length > 0);
+  }).filter((shelf) => shelf.items.length > 0 || keepEmpty.includes(shelf.family));
 }
 
 /**

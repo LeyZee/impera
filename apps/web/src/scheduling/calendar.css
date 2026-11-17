@@ -417,6 +417,11 @@
 .cal-detail__range {
   color: var(--nv-ink-muted);
 }
+/* « suspendu », « sans accès »: the week's amber signal, on those words alone (Design, 16/11). */
+.cal-detail__unheld {
+  color: var(--nv-warning);
+  font-weight: 650;
+}
 .cal-mine {
   margin: 0;
   font-size: var(--nv-text-footnote);

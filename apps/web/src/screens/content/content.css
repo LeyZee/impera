@@ -162,6 +162,52 @@
   gap: var(--nv-space-2);
 }
 
+/* What a send under way asks of her, said once on its card; out of the flow while there is nothing to say. */
+.ct-card__live {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.ct-card__live:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/* A cut send: one sentence and one button, at the head of its card (recette CRE-10). */
+.ct-resume {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.ct-resume__text {
+  flex: 1 1 220px;
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.ct-resume .ct-file__hint {
+  flex-basis: 100%;
+}
+
+/* A script begun: how far she is, under its name and its day (recette CRE-12). */
+.ct-begun {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ct-begun__count {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+
 /* A drop's state, calm unless she has something to do. */
 .ct-state {
   flex: none;
@@ -304,6 +350,22 @@
   background: var(--nv-fill-soft);
   font-size: 20px;
 }
+.ct-thumb--video {
+  position: relative;
+}
+.ct-thumb__play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 20px;
+  height: 20px;
+}
+.ct-thumb__play circle {
+  fill: color-mix(in srgb, var(--nv-void) 62%, transparent);
+}
+.ct-thumb__play path {
+  fill: var(--nv-ink);
+}
 .ct-thumb img,
 .ct-thumb video {
   width: 100%;
@@ -330,6 +392,23 @@
 .ct-chosen__sub {
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ct-chosen__sub--warn {
+  margin-top: 2px;
+  white-space: normal;
+  line-height: var(--nv-text-caption-leading);
+}
+/* The file's name, on a computer only: on a phone « IMG_4032.HEIC » is noise. */
+.ct-chosen__file {
+  display: none;
+}
+@media (min-width: 900px) {
+  .ct-chosen__file {
+    display: inline;
+  }
 }
 .ct-chosen__sub--warn,
 .ct-warn {
@@ -345,10 +424,21 @@
 .ct-note {
   color: var(--nv-ink-muted);
 }
+/* Her reason, as long as she writes it: no handle, it grows with her text (recette CRE-30). */
+.nv-field__control.ct-reason {
+  resize: none;
+  field-sizing: content;
+  overflow: hidden;
+  min-height: 84px;
+}
 .ct-form__actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--nv-space-2);
+}
+.ct-form__why {
+  margin-top: calc(-1 * var(--nv-space-2));
+  text-align: right;
 }
 
 /* ---- While it reads ---- */

@@ -31,6 +31,11 @@ import {
 } from '@/test/pay';
 import { choose, openList } from '@/test/select';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', () => ({
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 const NBSP = /[\u00a0\u202f]/gu;
 
 const CONTESTED: InvoiceListItem['acceptance'] = {
@@ -57,6 +62,8 @@ let lists: (search: URLSearchParams) => InvoiceListItem[];
 let period: PayrollPeriod | null;
 const reads: string[] = [];
 const writes: { path: string; body: unknown }[] = [];
+/** The codes the next writes are refused with, one each, before they go through. */
+const refusals: string[] = [];
 
 function serve(): void {
   vi.stubGlobal(
@@ -70,6 +77,9 @@ function serve(): void {
           path: url.pathname,
           body: typeof init.body === 'string' ? JSON.parse(init.body) : null,
         });
+        const refused = refusals.shift();
+        if (refused !== undefined)
+          return json({ error: { code: refused, message: 'Refusé', details: {}, requestId: 'test' } }, 403);
         return json({
           invoiceId: LOU_CONTESTED.id,
           kind: 'invoice',
@@ -182,6 +192,7 @@ beforeEach(() => {
   period = null;
   reads.length = 0;
   writes.length = 0;
+  refusals.length = 0;
   serve();
 });
 
@@ -189,6 +200,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  confirmIdentity.mockReset();
 });
 
 describe('Paie › Factures', () => {
@@ -306,6 +318,43 @@ describe('Paie › Factures', () => {
         },
       ]);
     });
+  });
+
+  it('asks for the password and the code before ending a contest, then sends the same answer again (EQ-15)', async () => {
+    confirmIdentity.mockResolvedValue('ok');
+    renderPage(OWNER);
+    const contests = await waitFor(() => panelOf('Contestations à trancher'));
+    fireEvent.click(within(rowIn(contests, LOU_CONTESTED.number)).getByRole('button', { name: 'Trancher' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('radio', { name: 'Refuser la contestation' }));
+    fireEvent.change(within(dialog).getByLabelText('Motif'), {
+      target: { value: 'Le rapport est sur la quinzaine suivante.' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    refusals.push('reauthentication_forbidden');
+    const check = await screen.findByRole('dialog');
+    fireEvent.click(within(check).getByRole('button', { name: 'Refuser' }));
+    // The prompt stands where the buttons were, under the recap it confirms; never « le serveur ne répond pas ».
+    expect(
+      await within(check).findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    expect(within(check).getByText(/Tu refuses la contestation/u)).toBeTruthy();
+    expect(within(check).queryByRole('alert')).toBeNull();
+    fireEvent.change(within(check).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(check).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(check).getByRole('button', { name: 'Confirmer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    const answer = {
+      path: `/v1/payroll/invoices/${LOU_CONTESTED.id}/contest/refuse`,
+      body: { reason: 'Le rapport est sur la quinzaine suivante.' },
+    };
+    expect(writes).toEqual([answer, answer]);
   });
 
   it('lets a manager read the contests, never settle them, and answer his own documents', async () => {

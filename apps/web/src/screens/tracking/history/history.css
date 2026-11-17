@@ -97,9 +97,10 @@
   font-weight: 500;
   color: var(--nv-ink-muted);
 }
-.hi-line__tag {
-  background: var(--nv-glass-fill-strong);
-  color: var(--nv-ink-muted);
+/* Always on its own line under the title, whatever the title's length or the width. */
+.hi-line__tags {
+  display: flex;
+  margin: 2px 0;
 }
 /* The line the server writes is the point of the row: it wraps, never cut. */
 .hi-line__reason {

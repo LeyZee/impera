@@ -7,6 +7,7 @@ import type { JSX } from 'react';
 export type NavIconName =
   | 'dashboard'
   | 'creators'
+  | 'fans'
   | 'train'
   | 'tracking'
   | 'settings'
@@ -45,6 +46,16 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
         <circle cx="9" cy="8" r="3.4" />
         <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4s6.5 2.4 6.5 5.4v.6" />
       </g>
+    </>
+  ),
+  fans: (
+    <>
+      <circle cx="9" cy="8" r="3.4" />
+      <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4 1.6 0 3 .4 4.1 1" />
+      <path
+        className="nav-heart"
+        d="M18 20.5s-4-2.4-4-5.1c0-1.3 1-2.2 2.1-2.2.8 0 1.5.4 1.9 1.1.4-.7 1.1-1.1 1.9-1.1 1.1 0 2.1.9 2.1 2.2 0 2.7-4 5.1-4 5.1z"
+      />
     </>
   ),
   train: (

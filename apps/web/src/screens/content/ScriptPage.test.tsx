@@ -6,15 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { ScriptPage } from './ScriptPage';
-import { fileOf, scriptDropOf } from './fixtures';
+import { fileOf, fileWithHead, scriptDropOf } from './fixtures';
 
 const queueSend = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const sendAgain = vi.hoisted(() => vi.fn());
 const back = vi.hoisted(() => vi.fn());
+const live = vi.hoisted(() => ({ map: new Map<string, unknown>(), held: new Set<string>() }));
 
 vi.mock('./sends', () => ({
-  useLiveSends: () => new Map(),
+  useLiveSends: () => live.map,
   isSending: () => false,
+  holds: (id: string) => live.held.has(id),
   queueSend,
+  retryNow: vi.fn(),
+  sendAgain,
 }));
 
 const DROP_ID = ContentDropIdSchema.parse('00000000-0000-4000-8000-00000000d201');
@@ -59,7 +64,10 @@ const pick = (input: Element | null, files: File[]): void => {
 
 beforeEach(() => {
   queueSend.mockClear();
+  sendAgain.mockClear();
   back.mockClear();
+  live.map = new Map();
+  live.held = new Set();
 });
 
 afterEach(() => {
@@ -74,7 +82,9 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Soirée au salon' })).toBeDefined();
     expect(screen.getByText('Carton 1 sur 4')).toBeDefined();
     expect(screen.getByText('0 / 4 médias')).toBeDefined();
-    expect(screen.getByRole('img', { name: 'Carton E1 : Salon' }).getAttribute('src')).toBe(
+    // Its number in her script, never the agency's code (CRE-14).
+    expect(screen.queryByText('E1')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Carton 1 : Salon' }).getAttribute('src')).toBe(
       `${BASE}/cards/salon`,
     );
     expect(screen.getByText('De face, le regard vers toi')).toBeDefined();
@@ -113,16 +123,55 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     await screen.findByText('Carton 1 sur 4');
     const photo = screen.getByRole('button', { name: 'Choisir une photo' }).parentElement;
     pick(photo?.querySelector('input[type="file"]') ?? null, [
-      new File(['abc'], 'a.jpg', { type: 'image/jpeg' }),
+      fileWithHead('a.jpg', 'jpeg', 0, 'image/jpeg'),
     ]);
     await waitFor(() => {
       expect(queueSend).toHaveBeenCalledTimes(1);
     });
     expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({ mime: 'image/jpeg', bytes: 3 });
-    expect(await screen.findByText('1 / 4 médias')).toBeDefined();
-    // No send runs in this test: the file reads as cut, and the same button takes it again.
-    expect(screen.getByText('Envoi interrompu')).toBeDefined();
+    // No send runs in this test: the file reads as cut, is not counted (CRE-10), and the same button takes it again.
+    expect(await screen.findByText('Envoi interrompu')).toBeDefined();
+    expect(screen.getByText('0 / 4 médias')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Reprendre' })).toBeDefined();
+    expect(screen.getByText(/rechoisis le même fichier dans ta galerie/u)).toBeDefined();
+  });
+
+  it('refuses a file that is not what its name says before anything goes up (recette CRE-12)', async () => {
+    const calls = serve(scriptDropOf({ id: DROP_ID }));
+    show();
+    await screen.findByText('Carton 1 sur 4');
+    const photo = screen.getByRole('button', { name: 'Choisir une photo' }).parentElement;
+    pick(photo?.querySelector('input[type="file"]') ?? null, [
+      new File(['juste du texte'], 'faux.jpg', { type: 'image/jpeg' }),
+    ]);
+    expect(
+      await screen.findByText('Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie'),
+    ).toBeDefined();
+    expect(calls.some((call) => call.method === 'PUT')).toBe(false);
+    expect(queueSend).not.toHaveBeenCalled();
+  });
+
+  it('sends a cut media again without the gallery while the phone still holds it (CRE-10)', async () => {
+    const cut = fileOf({ slotKey: 'salon::0', state: 'awaiting' });
+    live.held = new Set([cut.id]);
+    serve(scriptDropOf({ id: DROP_ID, files: [cut] }));
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Réessayer' }));
+    expect(sendAgain).toHaveBeenCalledWith([cut.id], expect.any(Function));
+  });
+
+  it('withdraws the script from inside it, asked once more (CRE-12)', async () => {
+    const calls = serve(scriptDropOf({ id: DROP_ID }), {
+      [`DELETE /v1/creator-space/drops/${DROP_ID}`]: () => new Response(null, { status: 204 }),
+    });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: 'Retirer ce script' }));
+    expect(screen.getByText(/Les médias déjà ajoutés partent avec lui/u)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer' }));
+    await waitFor(() => {
+      expect(back).toHaveBeenCalledTimes(1);
+    });
+    expect(calls.some((call) => call.method === 'DELETE')).toBe(true);
   });
 
   it('comes back to the preview when every slot is filled, and sends the script', async () => {
@@ -135,7 +184,8 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     });
     show();
     expect(await screen.findByRole('heading', { name: 'Aperçu de ton script' })).toBeDefined();
-    expect(screen.getAllByText('Prêt')).toHaveLength(4);
+    // A quiet check per complete card, no amber pill (CRE-14).
+    expect(screen.getAllByRole('img', { name: 'Complet' })).toHaveLength(4);
     fireEvent.click(screen.getByRole('button', { name: 'Envoyer le script' }));
     await waitFor(() => {
       expect(back).toHaveBeenCalledTimes(1);
@@ -155,9 +205,13 @@ describe('her script, card by card (SC-02 lot b2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Voir l’aperçu' }));
     expect(screen.getByText(/Il manque encore 1 média\./u)).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Envoyer le script' })).toBeNull();
-    const rows = screen.getAllByRole('button', { name: /^E\d/u });
-    expect(rows[0]?.textContent).toContain('E2B');
-    fireEvent.click(screen.getByRole('button', { name: 'Compléter E2B' }));
+    const list = document.querySelector('.sk-preview__list');
+    if (!(list instanceof HTMLElement)) throw new Error('no preview');
+    const rows = [...list.querySelectorAll('button')];
+    // The missing card first, by its number and its whole title.
+    expect(rows[0]?.querySelector('.sk-row__name')?.textContent).toBe('4Chambre · Série B');
+    expect(rows[0]?.textContent).toContain('0 / 1 média');
+    fireEvent.click(screen.getByRole('button', { name: 'Compléter le carton 4' }));
     expect(screen.getByText('Série B · Plein jour')).toBeDefined();
   });
 });

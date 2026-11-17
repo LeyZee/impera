@@ -40,6 +40,7 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
     active: true,
     deactivatedAt: null,
     syncedAt: new Date('2026-11-15T10:00:00Z'),
+    branches: [],
     steps: [
       {
         position: 0,
@@ -49,6 +50,7 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
         text: 'Texte inventé',
         priceMinor: 1_500,
         currency: 'EUR',
+        discount: null,
         media: [{ ref: 'media_1', kind: 'image', vault: { mediaAssetId: null, descriptionId: 'desc_1' } }],
         previewMedia: [],
       },
@@ -60,6 +62,7 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
         text: 'Un vocal',
         priceMinor: 0,
         currency: 'EUR',
+        discount: null,
         media: [{ ref: 'media_2', kind: 'audio', vault: { mediaAssetId: null, descriptionId: null } }],
         previewMedia: [],
       },

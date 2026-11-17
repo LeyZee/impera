@@ -5,6 +5,7 @@ import {
   ConversationIdSchema,
   EventIdSchema,
   ExternalMediaSchema,
+  FanFlagsSchema,
   JOB_MAX_ATTEMPTS,
   KillSwitchIdSchema,
   JOB_PAYLOADS,
@@ -29,7 +30,7 @@ import { z } from 'zod';
 import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
-import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
+import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
@@ -110,7 +111,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             target: [schema.messages.platformAccountId, schema.messages.platformMessageId],
           })
           .returning({ id: schema.messages.id });
-        return inserted.length > 0;
+        if (inserted.length > 0) return true;
+        // A script step is recorded at send with no text (the platform writes it): the synced copy fills it once.
+        if (message.direction === 'outbound' && (message.text !== '' || message.platformMedia.length > 0))
+          await tx
+            .update(schema.messages)
+            .set({ text: message.text, platformMedia: [...message.platformMedia] })
+            .where(
+              and(
+                eq(schema.messages.platformAccountId, message.platformAccountId),
+                eq(schema.messages.platformMessageId, message.platformMessageId),
+                eq(schema.messages.direction, 'outbound'),
+                eq(schema.messages.text, ''),
+                sql`${schema.messages.platformMedia} = '[]'::jsonb`,
+              ),
+            );
+        return false;
       },
       async countForDraft(draftId) {
         const [row] = await tx
@@ -266,10 +282,11 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .for('update');
         return rows.map(toDraft);
       },
-      async insert({ bubbles, softViolations, voice, personaVersionId, facts, ...draft }) {
+      async insert({ bubbles, softViolations, voice, personaVersionId, facts, scriptStep, ...draft }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
+          ...(scriptStep !== undefined && { policyTrace: toStoredPolicyTrace(scriptStep) }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
           guardTrace: { softViolations: [...(softViolations ?? [])] },
@@ -547,6 +564,15 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .from(schema.platformAccounts)
           .where(eq(schema.platformAccounts.id, conversation.platformAccountId));
         return account?.sessionState === 'expired' ? 'session_expired' : null;
+      },
+      async fanFlags(conversation) {
+        const [fan] = await tx
+          .select({ flags: schema.fans.flags })
+          .from(schema.fans)
+          .where(eq(schema.fans.id, conversation.fanId));
+        if (fan === undefined) return null;
+        const parsed = FanFlagsSchema.safeParse(fan.flags ?? {});
+        return parsed.success ? parsed.data : null;
       },
     },
 

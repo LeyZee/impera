@@ -8,6 +8,11 @@ import {
   type ScriptVariantLetter,
 } from '@impera/contracts';
 
+import { isInterrupted, type LiveSend } from './model';
+
+/** The sends this phone runs, by file (`sends.ts`). */
+type Sends = ReadonlyMap<string, LiveSend>;
+
 /*
  * Her script, card by card (SC-02 lot b2, ADR 0056 § 4): one screen per card, a stage with variants giving one card
  * per series (each series is shot whole), then the final preview. Everything here is read from the frozen version
@@ -73,31 +78,35 @@ export function fileOfSlot(files: readonly ContentDropFile[], key: string): Cont
   return files.find((file) => file.slotKey === key);
 }
 
-/** Whether a slot counts for « Envoyer le script »: a file in it, not refused (one still going up counts). */
-export const isFilled = (file: ContentDropFile | undefined): boolean =>
-  file !== undefined && file.state !== 'refused';
+/**
+ * Whether a slot counts for « Envoyer le script »: a file in it, not refused, and not cut on its way up (recette
+ * CRE-10: a media whose send failed is not counted as there). One still going up counts.
+ */
+export const isFilled = (file: ContentDropFile | undefined, sends: Sends): boolean =>
+  file !== undefined && file.state !== 'refused' && !isInterrupted(file, sends.get(file.id));
 
 /** Her progress: the slots she may not leave out, how many are filled. */
 export function progressOf(
   cards: readonly ScriptCard[],
   files: readonly ContentDropFile[],
+  sends: Sends,
 ): { readonly filled: number; readonly required: number } {
   const required = cards.flatMap((card) => card.slots).filter((slot) => !slot.slot.optional);
   return {
     required: required.length,
-    filled: required.filter((slot) => isFilled(fileOfSlot(files, slot.key))).length,
+    filled: required.filter((slot) => isFilled(fileOfSlot(files, slot.key), sends)).length,
   };
 }
 
 /** Whether a card is done: each slot she may not leave out filled. */
-export const cardDone = (card: ScriptCard, files: readonly ContentDropFile[]): boolean =>
-  card.slots.every((slot) => slot.slot.optional || isFilled(fileOfSlot(files, slot.key)));
+export const cardDone = (card: ScriptCard, files: readonly ContentDropFile[], sends: Sends): boolean =>
+  card.slots.every((slot) => slot.slot.optional || isFilled(fileOfSlot(files, slot.key), sends));
 
 /** « 1 / 2 médias », then « · 1 facultatif » when the card has slots she may leave out. */
-export function cardMeta(card: ScriptCard, files: readonly ContentDropFile[]): string {
+export function cardMeta(card: ScriptCard, files: readonly ContentDropFile[], sends: Sends): string {
   const required = card.slots.filter((slot) => !slot.slot.optional);
   const optional = card.slots.length - required.length;
-  const filled = required.filter((slot) => isFilled(fileOfSlot(files, slot.key))).length;
+  const filled = required.filter((slot) => isFilled(fileOfSlot(files, slot.key), sends)).length;
   const count = `${String(filled)} / ${String(required.length)} média${required.length > 1 ? 's' : ''}`;
   return optional === 0 ? count : `${count} · ${String(optional)} facultatif${optional > 1 ? 's' : ''}`;
 }

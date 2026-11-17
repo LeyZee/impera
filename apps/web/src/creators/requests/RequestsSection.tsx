@@ -12,6 +12,8 @@ import { useId, useState, type JSX } from 'react';
 import { askContent, cadenceKey, cancelRequest, setCadence, useCadence } from './api';
 import {
   ASKABLE_CATEGORIES,
+  REASON_MAX,
+  REASON_TOO_LONG,
   STANDING_LABELS,
   askProblems,
   askableStructures,
@@ -441,6 +443,7 @@ function AskDialog({
   const [busy, setBusy] = useState(false);
   const problems: Partial<Record<AskField, string>> = {
     ...(tried ? askProblems(draft, today) : {}),
+    ...(draft.reason.trim().length > REASON_MAX ? { reason: REASON_TOO_LONG } : {}),
     ...(tried && unreadable ? { dueOn: 'Un jour comme 28/11/2026.' } : {}),
     ...(refused === null ? {} : refused.field === null ? {} : { [refused.field]: refused.message }),
   };
@@ -582,7 +585,6 @@ function AskDialog({
             id={`${id}-reason`}
             className="nv-field__control rq-reason-field"
             value={draft.reason}
-            maxLength={160}
             rows={3}
             aria-invalid={problems.reason !== undefined}
             placeholder="Une séance en lingerie noire pour le feed de la semaine"
@@ -590,9 +592,17 @@ function AskDialog({
               set({ reason: event.target.value });
             }}
           />
-          <p className={problems.reason === undefined ? 'rq-hint' : 'rq-error'}>
-            {problems.reason ?? 'Elle lit cette phrase telle quelle sur sa demande.'}
-          </p>
+          <div className="rq-reason-foot">
+            <p className={problems.reason === undefined ? 'rq-hint' : 'rq-error'}>
+              {problems.reason ?? 'Elle lit cette phrase telle quelle sur sa demande.'}
+            </p>
+            <span
+              className="rq-count nv-num"
+              data-near={draft.reason.trim().length > REASON_MAX * 0.9 ? 'true' : undefined}
+            >
+              {draft.reason.trim().length} / {REASON_MAX}
+            </span>
+          </div>
         </div>
         {refused !== null && refused.field === null ? (
           <p className="rq-error nv-swap" role="alert">
