@@ -77,11 +77,14 @@ const PREVIEW_LINKS_MS = 3 * 60_000;
  * Sécurité reads, never by a setting. The videos' CDN zone was seen on one account only and is not in the site's public
  * code: it may differ from one account to another, so a `host_refused` on a second creator's videos reads that way.
  */
+const REVEAL_VIDEO_HOST = 'vz-90090929-421.b-cdn.net';
 const REVEAL_FILE_HOSTS: readonly string[] = [
   'dem02.fra1.digitaloceanspaces.com',
   'resize.demoiselles.app',
-  'vz-90090929-421.b-cdn.net',
+  REVEAL_VIDEO_HOST,
 ];
+/** The videos' host expects the dashboard's origin header (ADR 0113 § 2, amendment of 16/11): this value, to it alone. */
+const REVEAL_VIDEO_REFERER = { host: REVEAL_VIDEO_HOST, value: 'https://dashboard.reveal.me/' } as const;
 /** A vault file's bounds (ADR 0113 § 2): a 720-line video of an hour stays under it; past it, nothing is kept. */
 const FILE_MAX_BYTES = 2 * 1024 ** 3;
 const FILE_TIMEOUT_MS = 10 * 60_000;
@@ -243,6 +246,7 @@ export class RevealApiConnector implements PlatformConnector {
       timeoutMs: FILE_TIMEOUT_MS,
       maxSegments: FILE_MAX_SEGMENTS,
       maxKeys: FILE_MAX_KEYS,
+      referer: REVEAL_VIDEO_REFERER,
       ...(options.fileHttpForTests === true ? { allowHttp: true } : {}),
     };
     this.client =
