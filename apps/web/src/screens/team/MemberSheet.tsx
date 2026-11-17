@@ -317,7 +317,7 @@ function ZoneTrace({ memberId, name }: { memberId: string; name: string }): JSX.
   if (changes.length === 0) return null;
   return (
     <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Fuseau du téléphone">
-      <h3>Fuseau du téléphone</h3>
+      <h3 className="nv-h3">Fuseau du téléphone</h3>
       <p className="tm-hint">
         Sa fiche prend le fuseau du téléphone de {name} à chaque ouverture de l’appli : ses heures s’y
         affichent, sa paie reste à l’heure de l’agence.

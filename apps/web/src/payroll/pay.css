@@ -8,7 +8,7 @@
 }
 /* A panel without a head (Relevés): its list as far from the top edge as from the bottom one. */
 .py-board > .nv-panel > .rp-sec:first-child {
-  padding-top: 22px;
+  padding-top: var(--nv-plate-pad);
 }
 
 /* ── The period on top: one figure leads, three at most beside it ── */
@@ -16,12 +16,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--nv-space-5);
-  padding: var(--nv-space-5) var(--nv-space-6) var(--nv-space-6);
-}
-@media (max-width: 640px) {
-  .py-sum {
-    padding: var(--nv-space-4);
-  }
+  padding: var(--nv-plate-pad);
 }
 .py-sum__head {
   display: flex;
@@ -48,7 +43,7 @@
 @media (min-width: 960px) {
   .py-sum__body {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
-    align-items: center;
+    align-items: start;
   }
 }
 .py-hero {
@@ -97,35 +92,25 @@
 .py-figs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--nv-space-3);
+  gap: var(--nv-space-4) var(--nv-space-6);
 }
 @media (max-width: 640px) {
   .py-figs {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* A figure beside the hero is not a card in the card (GES-19): no frame, its label on the hero's label's line. */
 .py-fig {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: var(--nv-space-4);
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-plate);
-  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.py-fig:hover {
-  background: var(--nv-plate-hover);
-  transform: translateY(-1px);
 }
 .py-fig__label {
   margin: 0;
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
 }
 .py-fig__value {
@@ -586,21 +571,26 @@
 .py-periods {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+/* A list in its card, not cards in the card (GES-20): rows parted by a hairline, the text on the card's own edge, the
+   pointer's tint reaching a little past it. */
+.py-periods > li + li {
+  border-top: 1px solid var(--nv-hairline);
 }
 .py-period {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--nv-space-1) var(--nv-space-4);
-  width: 100%;
-  padding: var(--nv-space-3) var(--nv-space-4);
+  width: calc(100% + 2 * var(--nv-space-3));
+  margin-inline: calc(-1 * var(--nv-space-3));
+  padding: var(--nv-space-3);
   border: 0;
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  background: none;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -983,7 +973,7 @@
   min-width: 0;
 }
 .py-mehero {
-  padding: var(--nv-space-6);
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
@@ -1061,7 +1051,7 @@
 .py-skel {
   display: grid;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-5) var(--nv-space-6);
+  padding: var(--nv-space-5) var(--nv-plate-pad);
 }
 .py-skel i {
   display: block;
