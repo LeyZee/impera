@@ -8,7 +8,7 @@ const VERIFY_TIMEOUT_MS = 10_000;
 
 export type FetchLike = (
   url: string,
-  init: { headers: Record<string, string>; signal: AbortSignal },
+  init: { method?: string; headers: Record<string, string>; body?: string; signal: AbortSignal },
 ) => Promise<{
   readonly status: number;
   text(): Promise<string>;

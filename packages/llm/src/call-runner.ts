@@ -10,7 +10,7 @@ import {
   type LanguageModelUsage,
   type ModelMessage,
 } from 'ai';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import type { CallOutcome, HedgeRole, LlmCallLog } from './call-log';
 import { costUsd } from './catalog';
@@ -31,6 +31,44 @@ interface Classified {
   readonly isEmpty?: boolean;
   /** How long the provider asked to wait (`retry-after`), when it said. */
   readonly retryAfterMs?: number;
+  /** What was wrong with a refused format, without any of the text (`invalidOutputCode`). */
+  readonly errorCode?: string;
+}
+
+/** A Zod issue as the journal may keep it: where and what kind, never the value. */
+const PathKeySchema = z.union([z.string(), z.number(), z.object({ key: z.union([z.string(), z.number()]) })]);
+const IssueSchema = z.object({
+  path: z.array(PathKeySchema).default([]),
+  code: z.string().default('invalid'),
+});
+const IssuesSchema = z.union([
+  z.object({ issues: z.array(IssueSchema).min(1) }).transform(({ issues }) => issues),
+  z.array(IssueSchema).min(1),
+]);
+
+/**
+ * Why a model's answer did not fit its schema, with no content (16/11): `truncated` when it stopped on its length,
+ * `json` when the text was no JSON, otherwise each refused field's path and Zod code (`objection:invalid_value`). At
+ * most 200 characters, read by supervision.
+ */
+function invalidOutputCode(error: unknown): string {
+  let found: unknown = error;
+  for (let depth = 0; depth < 4 && found !== undefined; depth += 1) {
+    if (JSONParseError.isInstance(found)) return 'json';
+    const issues = IssuesSchema.safeParse(found);
+    if (issues.success)
+      return issues.data
+        .slice(0, 6)
+        .map((issue) => {
+          const path = issue.path.map((key) => String(typeof key === 'object' ? key.key : key)).join('.');
+          return `${path === '' ? '(racine)' : path}:${issue.code}`;
+        })
+        .join(' ')
+        .slice(0, 200);
+    if (NoObjectGeneratedError.isInstance(found) && found.finishReason === 'length') return 'truncated';
+    found = found instanceof Error ? found.cause : undefined;
+  }
+  return 'unknown';
 }
 
 /** `retry-after` in seconds or as an HTTP date. */
@@ -77,15 +115,21 @@ export function classify(error: unknown): Classified {
       outcome: isBlocked ? 'refused' : 'invalid_output',
       isTransient: false,
       message: error.message,
+      ...(!isBlocked && { errorCode: invalidOutputCode(error) }),
       ...(isEmpty && { isEmpty }),
       ...(error.usage !== undefined && { usage: error.usage }),
     };
   }
   if (NoOutputGeneratedError.isInstance(error)) {
-    return { outcome: 'invalid_output', isTransient: false, message: error.message };
+    return { outcome: 'invalid_output', isTransient: false, message: error.message, errorCode: 'no_output' };
   }
   if (TypeValidationError.isInstance(error) || JSONParseError.isInstance(error)) {
-    return { outcome: 'invalid_output', isTransient: false, message: error.message };
+    return {
+      outcome: 'invalid_output',
+      isTransient: false,
+      message: error.message,
+      errorCode: invalidOutputCode(error),
+    };
   }
   if (APICallError.isInstance(error)) {
     const status = error.statusCode;
@@ -359,7 +403,7 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
           };
         } catch (error) {
           const classified = classify(error);
-          const { outcome, message, usage, refusedStatus, isEmpty } = classified;
+          const { outcome, message, usage, refusedStatus, isEmpty, errorCode } = classified;
           if (refusedStatus !== undefined) deps.reportRefusal(ref.provider, refusedStatus);
           const cost = usage === undefined ? undefined : costUsd(ref, usage);
           if (isEmpty === true && mayRetryEmpty) {
@@ -371,6 +415,7 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
           }
           note(outcome, latencyMs, {
             errorMessage: message.slice(0, 200),
+            ...(errorCode !== undefined && { errorCode }),
             ...(cost !== undefined && { costUsd: cost }),
           });
           return { kind: 'failed', classified };

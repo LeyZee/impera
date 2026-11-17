@@ -8,6 +8,8 @@ import {
   CreateCommissionPresetBodySchema,
   CreateTeamMemberBodySchema,
   DomainError,
+  FollowTimeZoneBodySchema,
+  OwnTimeZoneSchema,
   SetCommissionRateBodySchema,
   SetTeamRoleBodySchema,
   TeamMemberIdSchema,
@@ -15,9 +17,11 @@ import {
   TeamMemberNoteListSchema,
   TeamMemberNoteSchema,
   TeamMemberSchema,
+  TeamMemberTimeZoneHistorySchema,
   TeamPlatformRemovalListSchema,
   TeamRoleChangeSchema,
   TeamRoleHistorySchema,
+  TimeZoneChangesQuerySchema,
   UpdateTeamMemberBodySchema,
   UserIdSchema,
   type UserId,
@@ -55,6 +59,7 @@ export function createTeamRoutes(
 ): FastifyPluginAsyncZod {
   const ownerOrMember = requireRole('owner', 'operator');
   const owner = requireRole('owner');
+  const teamAccount = requireRole('operator');
   // A member, his rate, role and status, and the presets are money and access: the password and the code given on this
   // session in the last 10 minutes, as for a key (ADR 0016, ADR 0046 § 3, EQ-15). The notes are not.
   const ownerConfirmed = [owner, recentLogin];
@@ -203,6 +208,32 @@ export function createTeamRoutes(
         schema: { body: CreateCommissionPresetBodySchema, response: { 201: CommissionPresetSchema } },
       },
       async (request, reply) => reply.code(201).send(await team.addPreset(actorOf(request), request.body)),
+    );
+
+    // Recette CHT-01 (Charles, 16/11): the member's own zone follows the phone the app opens on. A team account only,
+    // and the session says whose record: the body names no member. Display only; pay keeps the agency's zone.
+    app.put(
+      '/team/me/time-zone',
+      {
+        preValidation: teamAccount,
+        schema: { body: FollowTimeZoneBodySchema, response: { 200: OwnTimeZoneSchema } },
+      },
+      (request) => team.followTimeZone(userOf(request), request.body.timeZone),
+    );
+
+    // The owner reads those changes on the member's record, a page at a time: a zone says where someone is.
+    app.get(
+      '/team/members/:memberId/time-zones',
+      {
+        preValidation: owner,
+        schema: {
+          params: MemberParamsSchema,
+          querystring: TimeZoneChangesQuerySchema,
+          response: { 200: TeamMemberTimeZoneHistorySchema },
+        },
+      },
+      (request) =>
+        team.timeZoneChanges(userOf(request), request.params.memberId, request.query.before ?? null),
     );
     return Promise.resolve();
   };

@@ -87,13 +87,9 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(await screen.findByRole('heading', { name: /D’où vient l’argent/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();
     expect(reads[0]).toBe('/v1/dashboard/agency?period=week');
-    for (const title of [
-      'D’où vient l’argent',
-      'Qui vend',
-      'Qui a vendu',
-      'Les créatrices',
-      'Quand ça vend',
-    ]) {
+    // « Qui vend » said the ranking again: one card now (PIL-02).
+    expect(screen.queryByRole('heading', { name: /Qui vend/u })).toBeNull();
+    for (const title of ['D’où vient l’argent', 'Qui a vendu', 'Les créatrices', 'Quand ça vend']) {
       expect(screen.getByRole('heading', { name: new RegExp(title, 'u') })).toBeTruthy();
     }
     const ranking = screen.getByRole('list', { name: 'Classement de qui a vendu' });
@@ -133,9 +129,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     const ranking = await screen.findByRole('list', { name: 'Classement de qui a vendu' });
     expect(within(ranking).getByText(/11 ventes d’un compte Reveal que personne n’a relié/u)).toBeTruthy();
     expect(within(ranking).getByRole('link', { name: 'Relier' }).getAttribute('href')).toBe('/equipe/reveal');
-    const card = screen.getByRole('heading', { name: /Qui vend/u }).closest('article');
-    if (card === null) throw new Error('card');
-    const row = within(card).getByRole('button', { name: /Chatteur non relié/u });
+    const row = within(ranking).getByText('Chatteur non relié').closest('li');
+    if (row === null) throw new Error('row');
     // No title of the browser: the tip of the screen says it, to the keyboard too.
     expect(row.getAttribute('title')).toBeNull();
     act(() => {
@@ -144,7 +139,24 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Reveal');
   });
 
-  it('waits in the shape of what comes: four tiles of money, the card of the split, four of activity (ADM-21)', async () => {
+  it('ranks the sellers first, the sales of no seller at the bottom, unranked and under a rule (PIL-03)', async () => {
+    const [theo, agent, none] = AGENCY_WEEK.sellers;
+    if (theo === undefined || agent === undefined || none === undefined) throw new Error('fixture');
+    // « Sans chatteur » made the most: it still comes last.
+    serve(200, { ...AGENCY_WEEK, sellers: [{ ...none, revenueMinor: 500_000 }, agent, theo] });
+    show();
+    const ranking = await screen.findByRole('list', { name: 'Classement de qui a vendu' });
+    const rows = within(ranking).getAllByRole('listitem');
+    expect(rows.map((row) => row.querySelector('.ins-rank__name')?.textContent)).toEqual([
+      'Théo',
+      'Agent IA',
+      'Sans chatteur',
+    ]);
+    expect(rows.map((row) => row.querySelector('.ins-rank__pos')?.textContent)).toEqual(['1', '2', '']);
+    expect(rows.map((row) => row.hasAttribute('data-rule'))).toEqual([false, false, true]);
+  });
+
+  it('waits in the shape of what comes: four tiles of money, the card of the split, two of the sales (ADM-21)', async () => {
     // A server that never answers: the placeholders stay.
     vi.stubGlobal(
       'fetch',
@@ -155,11 +167,11 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     const rows = waiting.querySelectorAll('.ins-tiles');
     expect(rows).toHaveLength(2);
     expect(rows[0]?.querySelectorAll('.ins-loading--tile')).toHaveLength(4);
-    expect(rows[1]?.querySelectorAll('.ins-loading--tile')).toHaveLength(4);
+    expect(rows[1]?.querySelectorAll('.ins-loading--tile')).toHaveLength(2);
     expect(waiting.querySelectorAll('.ins-loading--split')).toHaveLength(1);
   });
 
-  it('shows no « 0 % » next to a zero that was already zero, and says there was no refund (ADM-07)', async () => {
+  it('shows no « 0 % » next to a zero that was already zero, nor a line that says the zero again (ADM-07, PIL-21)', async () => {
     const totals = {
       current: { ...AGENCY_WEEK.totals.current, refunds: 0 },
       previous: { ...AGENCY_WEEK.totals.previous, refunds: 0 },
@@ -170,7 +182,20 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     const tile = label.closest<HTMLElement>('.ins-tile');
     if (tile === null) throw new Error('tile');
     expect(tile.querySelector('.nv-delta')).toBeNull();
-    expect(within(tile).getByText('aucun remboursement')).toBeTruthy();
+    expect(within(tile).queryByText('aucun remboursement')).toBeNull();
+    expect(tile.querySelector('.ins-tile__note')).toBeNull();
+  });
+
+  it('says the paying fans once, in « Les fans qui paient », and two figures by the money (PIL-21)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const sales = await screen.findByLabelText('Les ventes');
+    expect(Array.from(sales.querySelectorAll('dt'), (term) => term.textContent)).toEqual([
+      'Ventes',
+      'Remboursements',
+    ]);
+    expect(screen.getAllByText('Fans qui ont payé')).toHaveLength(1);
+    expect(screen.getAllByText(/^Dépense moyenne/u)).toHaveLength(1);
   });
 
   it('walks the map of the hours with the arrows, one stop, each cell saying its hour and its amount (ADM-09)', async () => {
@@ -270,7 +295,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
       byCreator: [AGENCY_WEEK.byCreator[0]],
     });
     show(LINA);
-    expect(await screen.findByRole('heading', { name: /Qui vend/u })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /Qui a vendu/u })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Les chiffres de Lina Test/u })).toBeTruthy();
     expect(reads[0]).toBe(`/v1/dashboard/agency?period=week&creatorId=${LINA}`);
     expect(screen.queryByRole('heading', { name: /Les créatrices/u })).toBeNull();
@@ -295,7 +320,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
   it('says the server is silent and offers to read again', async () => {
     serve(500, { error: 'internal' });
     show();
-    expect(await screen.findByText(/Les chiffres reviennent dès qu’il répond/u)).toBeTruthy();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
 
   it('walks the chart’s columns with the arrows, one stop for the keyboard', async () => {
@@ -423,6 +449,33 @@ describe('Les abonnés (ADR 0081)', () => {
     const block = heading.closest('section');
     if (block === null) throw new Error('section');
     expect(block.querySelectorAll('.nv-delta')).toHaveLength(0);
+  });
+
+  it('says the last count read with its day, and draws no chart of a lone point (PIL-08)', async () => {
+    const subscribers = AGENCY_WEEK.subscribers;
+    if (subscribers === null) throw new Error('fixture');
+    const last = subscribers.days.length - 1;
+    serve(200, {
+      ...AGENCY_WEEK,
+      subscribers: {
+        ...subscribers,
+        current: { ...subscribers.current, activeAtEnd: null },
+        // One day read, the second to last: nothing to draw a line with.
+        days: subscribers.days.map((one, i) => (i === last - 1 ? one : { ...one, active: null })),
+      },
+    });
+    show();
+    const heading = await screen.findByRole('heading', { name: /Les abonnés/u });
+    const block = heading.closest('section');
+    if (block === null) throw new Error('section');
+    const day = subscribers.days[last - 1];
+    if (day === undefined || day.active === null) throw new Error('fixture');
+    expect(block.querySelector('.ins-subs .ins-lead__value')?.textContent).toBe(
+      day.active.toLocaleString('fr-FR'),
+    );
+    expect(block.textContent).toContain('le dernier jour lu');
+    expect(within(block).queryByRole('img', { name: /Abonnés actifs jour par jour/u })).toBeNull();
+    expect(block.querySelector('.ins-subs--flat')).not.toBeNull();
   });
 
   it('waits for the first read when the snapshot is empty', async () => {

@@ -1,9 +1,14 @@
-import { createHmac } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { createCipheriv, createHmac } from 'node:crypto';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import { z, ZodError } from 'zod';
 
-import type { RevealFetch } from '../../modules/connectors';
+import type { FileTransport, RevealFetch } from '../../modules/connectors';
 
 import { FIXTURES, type FixtureName } from './fixtures';
 import {
@@ -36,6 +41,8 @@ import {
 const LINK_TTL_MS = 10 * 60_000;
 const LINK_SECRET = 'fake-reveal-link-secret';
 const PUBLIC_URL = 'http://fake-reveal.test';
+/** The host FakeReveal serves its files from: the one a connector under test may read a vault file or picture from. */
+export const FAKE_REVEAL_FILE_HOST = new URL(PUBLIC_URL).hostname;
 /** Invented: the real agency share never enters the repository. Reveal's own 18 % and VAT 20 % are public. */
 const AGENCY_PERCENTAGE = 30;
 /** Seen on every API answer (headers.md); FakeReveal sends them without counting. */
@@ -68,6 +75,71 @@ const FILES = {
   },
   audio: { mimeType: 'audio/mpeg', data: Buffer.from('4944330300000000000f', 'hex') },
 } as const;
+
+/**
+ * PROVISIONAL (L14, L15): a vault video is served as HLS, its segments AES-128 encrypted (reveal-api-observed.md § 9:
+ * « Vidéos du coffre en HLS (Bunny, AES-128) »). The clip is generated once per process by ffmpeg: two segments of a
+ * second, a test pattern and a tone, never a real media (ADR 0099 § 8).
+ */
+const HLS_KEY = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex');
+const HLS_SEGMENT_SECONDS = 1;
+
+/** The IV of segment `sequence` when the playlist names none (RFC 8216 § 5.2): its media sequence number, 16 bytes. */
+export function hlsDefaultIv(sequence: number): Buffer {
+  const iv = Buffer.alloc(16);
+  iv.writeUInt32BE(sequence, 12);
+  return iv;
+}
+
+let hlsClip: Promise<readonly Buffer[]> | undefined;
+
+/** The clip's segments, encrypted, generated on first use (ffmpeg on the PATH, as for the media tests). */
+function hlsSegments(): Promise<readonly Buffer[]> {
+  hlsClip ??= (async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'fake-reveal-hls-'));
+    try {
+      await promisify(execFile)('ffmpeg', [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-f',
+        'lavfi',
+        '-i',
+        'testsrc=size=160x120:rate=10',
+        '-f',
+        'lavfi',
+        '-i',
+        'sine=frequency=440:sample_rate=22050',
+        '-t',
+        String(2 * HLS_SEGMENT_SECONDS),
+        '-c:v',
+        'libx264',
+        '-g',
+        '10',
+        '-pix_fmt',
+        'yuv420p',
+        '-c:a',
+        'aac',
+        '-f',
+        'segment',
+        '-segment_time',
+        String(HLS_SEGMENT_SECONDS),
+        '-segment_format',
+        'mpegts',
+        join(dir, 'seg-%d.ts'),
+      ]);
+      const names = (await readdir(dir)).filter((name) => name.endsWith('.ts')).sort();
+      const plain = await Promise.all(names.map((name) => readFile(join(dir, name))));
+      return plain.map((segment, sequence) => {
+        const cipher = createCipheriv('aes-128-cbc', HLS_KEY, hlsDefaultIv(sequence));
+        return Buffer.concat([cipher.update(segment), cipher.final()]);
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  })();
+  return hlsClip;
+}
 
 const AtSchema = z.number().int().min(0).default(0);
 
@@ -110,6 +182,11 @@ export const ScenarioEventSchema = z.discriminatedUnion('type', [
     atMs: AtSchema,
     scriptId: z.string(),
     priceCents: z.number().int().min(0),
+    /** A « Tarif réduit » put on the step (`null` takes it off); absent, the discount stays as it is. */
+    discount: z
+      .object({ priceCents: z.number().int().min(0), minutes: z.number().int().min(0) })
+      .nullable()
+      .optional(),
   }),
   /** « Message supprimé » (2026-11-16): the message stays listed, with `deletedAt`. */
   z.object({ type: z.literal('message_deleted'), atMs: AtSchema, messageId: z.string() }),
@@ -288,7 +365,10 @@ class FakeRevealWorld {
         return;
       case 'script_changed': {
         const script = this.state.scripts.find((s) => s.id === event.scriptId);
-        if (script !== undefined) script.priceCents = event.priceCents;
+        if (script !== undefined) {
+          script.priceCents = event.priceCents;
+          if (event.discount !== undefined) script.discount = event.discount;
+        }
         return;
       }
       case 'sequence_removed':
@@ -387,10 +467,18 @@ class FakeRevealWorld {
 
   /* ----------------------------------------------- Wire builders ------------------------------------------------ */
 
-  /** PROVISIONAL (L14): every URL is a FakeReveal link signed for 10 minutes; Reveal serves CDN and HLS links. */
+  /** A FakeReveal link to `path` for `mediaId`, signed until `expiresMs`. */
+  signedLink(path: string, mediaId: string, expiresMs: number): string {
+    return `${PUBLIC_URL}${path}?exp=${String(expiresMs)}&sig=${this.linkSignature(mediaId, expiresMs)}`;
+  }
+
+  /**
+   * PROVISIONAL (L14): every URL is a FakeReveal link signed for 10 minutes; Reveal serves CDN and HLS links. A vault
+   * video's `url` is its HLS playlist; its other links stay a file, as a poster would.
+   */
   wireMedia(media: FakeMedia): WireMedia {
     const expiresMs = this.clockMs + LINK_TTL_MS;
-    const url = `${PUBLIC_URL}/files/${media.id}?exp=${String(expiresMs)}&sig=${this.linkSignature(media.id, expiresMs)}`;
+    const url = this.signedLink(`/files/${media.id}`, media.id, expiresMs);
     const base = {
       id: media.id,
       blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH',
@@ -408,7 +496,15 @@ class FakeRevealWorld {
     };
     // A fan's file carries its sender and none of the vault fields (capture, question 7).
     if (media.fromFanId !== null) return { ...base, incomingMessageMemberId: media.fromFanId };
-    return { ...base, isHls: media.type === 'video', thumbnailUrl: url, moderationStatus: 'approved' };
+    const isHls = media.type === 'video';
+    return {
+      ...base,
+      ...(isHls && { url: this.signedLink(`/hls/${media.id}/index.m3u8`, media.id, expiresMs) }),
+      isHls,
+      // A video's poster is a picture of its own (ADR 0138), signed like the file.
+      thumbnailUrl: isHls ? this.signedLink(`/files/${media.id}/poster`, media.id, expiresMs) : url,
+      moderationStatus: 'approved',
+    };
   }
 
   wireConversation(c: FakeConversation): z.infer<(typeof ENDPOINTS)['conversations.read']['shape']> {
@@ -459,6 +555,7 @@ class FakeRevealWorld {
       content: m.content,
       type: 'default',
       ...(m.deletedAt == null ? {} : { deletedAt: m.deletedAt }),
+      ...(m.storyReply == null ? {} : { replyToStoryId: m.storyReply.storyId }),
     };
   }
 
@@ -532,7 +629,7 @@ class FakeRevealWorld {
           : { displayName: m.author ?? this.state.model.displayName },
       reactions: [],
       replyTo: null,
-      storyReply: null,
+      storyReply: m.storyReply ?? null,
     };
   }
 
@@ -546,6 +643,9 @@ class FakeRevealWorld {
       name: s.name,
       content: s.content,
       ...(s.priceCents === null ? {} : { price: s.priceCents }),
+      ...(s.discount === null
+        ? {}
+        : { discountedPrice: s.discount.priceCents, discountDurationMinutes: s.discount.minutes }),
     };
   }
 
@@ -659,6 +759,8 @@ export interface FakeReveal {
   readonly userId: string;
   /** `fetch` for the connector, served by `app.inject` (no port opened); any host reaches FakeReveal. */
   readonly fetch: RevealFetch;
+  /** FakeReveal's file links, reached as the server reaches a real one (`downloadVaultFile`); its host resolves to a public test address. */
+  readonly fileTransport: FileTransport;
   /** FakeReveal's clock, moved only by `POST /__clock`: a connector under test reads the same time. */
   now(): Date;
 }
@@ -684,7 +786,8 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
   });
 
   const isControl = (url: string): boolean => url.startsWith('/__');
-  const isFile = (url: string): boolean => url.startsWith('/files/') || url.startsWith('/upload/');
+  const isFile = (url: string): boolean =>
+    url.startsWith('/files/') || url.startsWith('/hls/') || url.startsWith('/upload/');
 
   // Faults and the session apply to Reveal's routes only, never to the control routes.
   app.addHook('onRequest', async (request, reply: FastifyReply) => {
@@ -1212,6 +1315,57 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     return reply.type(file.mimeType).send(file.data);
   });
 
+  /** A signed link's media, or 403 as a CDN answers a link it does not sign or that has expired. */
+  const signedMedia = (id: string, query: unknown): { media: FakeMedia; exp: number } => {
+    const { exp, sig } = z.object({ exp: z.coerce.number().int(), sig: z.string() }).parse(query);
+    const media = world.state.media.find((m) => m.id === id);
+    if (media === undefined || sig !== world.linkSignature(id, exp)) throw new HttpFault(403, 'Forbidden');
+    if (exp <= world.nowMs()) throw new HttpFault(403, 'Request has expired');
+    return { media, exp };
+  };
+
+  // A video's poster (ADR 0138): a picture of its own, signed like the file.
+  app.get('/files/:id/poster', (request, reply) => {
+    const { media } = signedMedia(IdParams.parse(request.params).id, request.query);
+    if (media.type !== 'video') throw new HttpFault(404, 'Not Found');
+    return reply.type(FILES.photo.mimeType).send(FILES.photo.data);
+  });
+
+  // PROVISIONAL (L14): the playlist of a vault video, its key and its segments, each link signed like the playlist.
+  app.get('/hls/:id/index.m3u8', async (request, reply) => {
+    const { id } = IdParams.parse(request.params);
+    const { media, exp } = signedMedia(id, request.query);
+    if (media.type !== 'video') throw new HttpFault(404, 'Not Found');
+    const segments = await hlsSegments();
+    const lines = [
+      '#EXTM3U',
+      '#EXT-X-VERSION:3',
+      `#EXT-X-TARGETDURATION:${String(HLS_SEGMENT_SECONDS)}`,
+      '#EXT-X-MEDIA-SEQUENCE:0',
+      `#EXT-X-KEY:METHOD=AES-128,URI="${world.signedLink(`/hls/${id}/key`, id, exp)}"`,
+      ...segments.flatMap((_segment, index) => [
+        `#EXTINF:${String(HLS_SEGMENT_SECONDS)}.0,`,
+        world.signedLink(`/hls/${id}/seg-${String(index)}.ts`, id, exp),
+      ]),
+      '#EXT-X-ENDLIST',
+    ];
+    return reply.type('application/vnd.apple.mpegurl').send(`${lines.join('\n')}\n`);
+  });
+
+  app.get('/hls/:id/key', (request, reply) => {
+    signedMedia(IdParams.parse(request.params).id, request.query);
+    return reply.type('application/octet-stream').send(HLS_KEY);
+  });
+
+  app.get('/hls/:id/:segment', async (request, reply) => {
+    const { id, segment } = z.object({ id: z.string(), segment: z.string() }).parse(request.params);
+    signedMedia(id, request.query);
+    const index = /^seg-(\d+)\.ts$/u.exec(segment)?.[1];
+    const data = index === undefined ? undefined : (await hlsSegments())[Number(index)];
+    if (data === undefined) throw new HttpFault(404, 'Not Found');
+    return reply.type('video/mp2t').send(data);
+  });
+
   /* ------------------------------------------------ Sales and notifications ------------------------------------- */
 
   app.get('/transactions/model/:id', (request) => {
@@ -1299,9 +1453,26 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
     };
   };
 
+  const fileTransport: FileTransport = {
+    lookup: () => Promise.resolve([{ address: '203.0.113.10', family: 4 }]),
+    get: async (url) => {
+      const target = new URL(url);
+      if (target.origin !== PUBLIC_URL) throw new TypeError('fetch failed');
+      const response = await app.inject({ method: 'GET', url: `${target.pathname}${target.search}` });
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(response.headers)) {
+        if (value !== undefined) headers.set(name, String(value));
+      }
+      const copy = new Uint8Array(response.rawPayload.byteLength);
+      copy.set(response.rawPayload);
+      return new Response(copy, { status: response.statusCode, headers });
+    },
+  };
+
   return {
     app,
     fetch,
+    fileTransport,
     state: () => world.state,
     get authorization() {
       return `Bearer ${world.state.sessionToken}`;

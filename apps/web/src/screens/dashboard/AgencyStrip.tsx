@@ -5,19 +5,17 @@ import { gaugeClass } from './logic';
 import type { AgencyState } from './model';
 
 /**
- * What is the agency's on her Dashboard, said once and apart from her agent's health (recette 05/11, reco 18): the
- * day's AI budget, counted for every creator, in one quiet line (amber past its alert, red at its cap). Nothing when
- * there is nothing to say. The same face as the other banners (ADM-26): a medallion, a title, a line, an action on the
- * right; on the agency's view its title alone says it is the agency's.
+ * What is the agency's, said once and apart from any agent's health (recette 05/11, reco 18): the day's AI budget,
+ * counted for every creator, in one quiet line (amber past its alert, red at its cap). Nothing when there is nothing to
+ * say. The same face as the other banners (ADM-26): a medallion, a title, a line, an action on the right. Only on
+ * « Toute l'agence », whose view says it is the agency's: never under a creator, never to an operator (recette visuelle
+ * 16/11, PIL-04 and PIL-27).
  */
 export function AgencyStrip({
   agency,
-  onAgencyView = false,
   opensSettings = false,
 }: {
   agency: AgencyState;
-  /** « Toute l'agence » is the view: « Pour toute l'agence » would say it twice. */
-  onAgencyView?: boolean;
   /** The models and their budget are set in Réglages, the owner's alone. */
   opensSettings?: boolean;
 }): JSX.Element | null {
@@ -39,13 +37,8 @@ export function AgencyStrip({
         </svg>
       </span>
       <div className="db-agency__body">
-        {onAgencyView ? null : (
-          <p className="db-agency__title" id="db-agency-title">
-            Pour toute l’agence
-          </p>
-        )}
         <div className="db-agency__line">
-          <span className="db-agency__label" {...(onAgencyView ? { id: 'db-agency-title' } : {})}>
+          <span className="db-agency__label" id="db-agency-title">
             Budget IA du jour, toutes créatrices
           </span>
           <span className="db-agency__value nv-num">{budget.value}</span>

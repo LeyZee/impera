@@ -17,8 +17,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: 20px 22px;
-  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-plate-pad);
 }
 .rq-cadence__top {
   display: flex;
@@ -75,8 +74,6 @@
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
-  font-size: var(--nv-text-callout);
-  font-weight: 650;
 }
 .rq-count {
   min-width: 22px;
@@ -106,8 +103,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: 20px 22px;
-  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-plate-pad);
 }
 .rq-card__top {
   display: flex;
@@ -248,10 +244,6 @@
 }
 
 @media (max-width: 520px) {
-  .rq-card,
-  .rq-cadence {
-    padding: 16px;
-  }
   /* What and where it stands on the first line, for when on the second: the pill never sits alone on a line. */
   .rq-card__top {
     row-gap: 2px;

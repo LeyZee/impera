@@ -1,5 +1,6 @@
 import type { JSX } from 'react';
 
+import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
 /** The steps of docs/runbooks/session-expired.md, in the owner's words (P2-01). */
@@ -32,8 +33,9 @@ const TROUBLES: readonly { readonly title: string; readonly text: string }[] = [
  */
 export function RevealHelpPage(): JSX.Element {
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
+        eyebrow={<OffRailBack />}
         title="Reconnecter Reveal"
         lead="Quand la session Reveal expire, l’agent s’arrête. Une minute depuis ton PC suffit à le relancer."
       />

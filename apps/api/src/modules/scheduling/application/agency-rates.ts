@@ -39,13 +39,14 @@ export function createAgencyRatesService(
   return {
     list: async (actor, creatorId) => {
       await assertCreatorExists(creatorId);
-      const { today, rates, observed } = await store.list(actor, creatorId, now());
+      const { today, rates, observed, alerts } = await store.list(actor, creatorId, now());
       const current = agencyRateFor(rates, today);
       return {
         today,
         current: current === null ? null : toAgencyRateDto(current),
         rates: rates.map(toAgencyRateDto),
         observed,
+        alerts,
       };
     },
 

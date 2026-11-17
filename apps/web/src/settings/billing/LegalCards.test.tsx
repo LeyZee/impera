@@ -18,6 +18,11 @@ import {
 import { SCHEDULING_SETTINGS } from '@/test/pay';
 import { choose } from '@/test/select';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', () => ({
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 /* Réglages › Facturation, its second half (EQ-06 lot 8c): the journal's accounts, the delays, the texts, the regimes. */
 
 interface Answer {
@@ -105,6 +110,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  confirmIdentity.mockReset();
 });
 
 describe('Réglages › Facturation, comptes du journal', () => {
@@ -280,6 +286,42 @@ describe('Réglages › Facturation, régimes', () => {
         body: { validatedOn: '2026-11-04' },
       },
     ]);
+  });
+
+  it('asks for the password and the code before a validation is noted, then notes the same day (EQ-15)', async () => {
+    confirmIdentity.mockResolvedValue('ok');
+    renderSection();
+    const card = await waitFor(() => cardOf('Régimes de facturation'));
+    await within(card).findByText('Prestataire Bénin, version 2');
+    fireEvent.click(within(card).getByRole('button', { name: 'Noter la validation' }));
+    type('Validé le', '4/11');
+    answer = {
+      status: 403,
+      body: { error: { code: 'reauthentication_forbidden', message: 'x', details: {}, requestId: 'r' } },
+    };
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
+    expect(
+      await within(dialog()).findByText(
+        'Ce geste touche à la facturation : confirme ton mot de passe et ton code.',
+      ),
+    ).toBeTruthy();
+    expect(within(dialog()).queryByRole('alert')).toBeNull();
+    fireEvent.change(within(dialog()).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(dialog()).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Confirmer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    const noted = {
+      method: 'POST',
+      path: `/v1/payroll/billing-regimes/${BENIN_DRAFT.id}/validation`,
+      body: { validatedOn: '2026-11-04' },
+    };
+    expect(writes).toEqual([noted, noted]);
   });
 
   it('writes a regime as the accountant wrote it, the treaty asking for the certificate', async () => {

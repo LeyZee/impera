@@ -60,6 +60,8 @@ export class FakeConnector implements PlatformConnector {
     scripts: false,
     scriptHistory: false,
     vault: false,
+    mediaDownload: false,
+    vaultPreview: false,
   };
 
   readonly sent: FakeSent[] = [];

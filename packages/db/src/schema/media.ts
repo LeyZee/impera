@@ -3,6 +3,7 @@ import {
   DESCRIPTION_REVIEW_REASONS,
   PlatformSchema,
   PlatformScriptMomentSchema,
+  VAULT_BLURHASH_MAX,
   VAULT_DESCRIPTION_MAX,
   VAULT_FOLDER_NAME_MAX,
 } from '@impera/contracts';
@@ -32,8 +33,13 @@ import { creators, platformAccounts } from './tenancy';
 /** Module `media`: files (the bytes live in object storage), their descriptions, and what was sold to whom. */
 
 export const MEDIA_KINDS = ['image', 'video', 'audio'] as const;
-export const MEDIA_ORIGINS = ['creator', 'fan'] as const;
-export const DESCRIPTION_AUTHORS = ['sense', 'human'] as const;
+/**
+ * `creator`: dropped by her, an original that lived in our storage; `fan`: sent by a fan; `vault`: read from the
+ * platform's vault the time of its description, never stored (ADR 0113 § 1): born erased, its `storage_key` empty.
+ */
+export const MEDIA_ORIGINS = ['creator', 'fan', 'vault'] as const;
+/** `platform`: the platform's own text of a vault media, a starting point never validated (ADR 0099 § 4, ADR 0113 § 5). */
+export const DESCRIPTION_AUTHORS = ['sense', 'human', 'platform'] as const;
 
 export const mediaAssets = pgTable(
   'media_assets',
@@ -45,6 +51,7 @@ export const mediaAssets = pgTable(
     kind: enumText('kind').notNull(),
     origin: enumText('origin').notNull(),
     fanId: uuid('fan_id').references(() => fans.id),
+    /** Empty for a vault media only, which never touched the storage (ADR 0113 § 1, `media_assets_storage_key_check`). */
     storageKey: text('storage_key').notNull(),
     mime: text('mime').notNull(),
     bytes: bigint('bytes', { mode: 'number' }).notNull(),
@@ -80,6 +87,11 @@ export const mediaAssets = pgTable(
       sql`${t.thumbnailKey} is null or (${t.thumbnailedAt} is not null and ${t.kind} <> 'audio')`,
     ),
     check('media_assets_description_failures_check', sql`${t.descriptionFailures} >= 0`),
+    // ADR 0113 § 1: the key is empty if and only if the media came from the vault, and a vault media is born erased.
+    check(
+      'media_assets_storage_key_check',
+      sql`(${t.storageKey} = '') = (${t.origin} = 'vault') and (${t.origin} <> 'vault' or ${t.erasedAt} is not null)`,
+    ),
     unique('media_assets_creator_sha256_unique').on(t.creatorId, t.sha256),
     // The originals still held with a date (CR-06 c): `content_drops.erase_originals` reads them each hour.
     index('media_assets_due_idx')
@@ -127,6 +139,15 @@ export const mediaPlatformRefs = pgTable(
     /** The platform's suggested range, in its minor unit: shown to the agency, never applied (ADR 0099 § 4). */
     suggestedMinMinor: integer('suggested_min_minor'),
     suggestedMaxMinor: integer('suggested_max_minor'),
+    /**
+     * The tries of `media.describe_vault` that could not describe it while it has no file (ADR 0113 § 3, § 5): every
+     * vision model failing counts one; a file that does not read (a stream of an unknown form, a picture ffmpeg cannot
+     * open) counts them all at once. At `DESCRIPTION_TRIES` it is no longer taken: it waits for the agency's text
+     * (« À décrire par l'agence »), never an invented description.
+     */
+    descriptionFailures: smallint('description_failures').notNull().default(0),
+    /** The platform's blurred preview (a blurhash, `BlurhashSchema`): a few colours, never the image (ADR 0030 § 4). */
+    previewBlurhash: text('preview_blurhash'),
     lastSyncedAt: timestampTz('last_synced_at').notNull(),
     removedAt: timestampTz('removed_at'),
     createdAt: createdAt(),
@@ -149,6 +170,11 @@ export const mediaPlatformRefs = pgTable(
     check(
       'media_platform_refs_text_check',
       sql`char_length(${t.folderName}) <= ${sql.raw(String(VAULT_FOLDER_NAME_MAX))} and char_length(${t.platformDescription}) <= ${sql.raw(String(VAULT_DESCRIPTION_MAX))}`,
+    ),
+    check('media_platform_refs_description_failures_check', sql`${t.descriptionFailures} >= 0`),
+    check(
+      'media_platform_refs_blurhash_check',
+      sql`char_length(${t.previewBlurhash}) <= ${sql.raw(String(VAULT_BLURHASH_MAX))}`,
     ),
     check(
       'media_platform_refs_duration_check',

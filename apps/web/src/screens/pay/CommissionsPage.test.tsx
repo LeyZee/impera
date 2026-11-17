@@ -62,6 +62,8 @@ let mySales: Record<string, Record<string, MySales>>;
 /** The member's lines read fail. */
 let mySalesDown: boolean;
 let answer: () => { status: number; body: unknown };
+/** The member's end-of-shift reports, as `/v1/scheduling/shift-reports?period=` gives them (CHT-30). */
+let reports: Record<string, unknown[]>;
 const writes: { path: string; body: unknown }[] = [];
 
 const TIERS = tierSetOf(1, OCT1);
@@ -131,7 +133,12 @@ function serve(): void {
         case '/v1/scheduling/settings':
           return json(SCHEDULING_SETTINGS);
         case '/v1/scheduling/shift-reports':
-          return json({ reports: [], shifts: [], accounts: [NORA_REVEAL], members: [] });
+          return json({
+            reports: reports[url.searchParams.get('period') ?? ''] ?? [],
+            shifts: [],
+            accounts: [NORA_REVEAL],
+            members: [],
+          });
         default:
           return json(null, 404);
       }
@@ -193,6 +200,7 @@ beforeEach(() => {
   mySales = {};
   mySalesDown = false;
   answer = () => ({ status: 200, body: null });
+  reports = {};
   writes.length = 0;
   periods = {
     [OCT1]: periodOf(OCT1, [PAID_OCT1], { closing: CLOSED(OCT1, '2026-10-16T08:41:00.000Z') }),
@@ -261,7 +269,9 @@ describe('CommissionsPage', () => {
       expect(text(hero)).toContain('≈ 20 466 FCFA, avant frais WorldRemit');
     });
     expect(text(hero)).toContain('L’agence valide, puis le versement suit.');
-    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Mon argent');
+    // The section above, the tab as the title, as on Factures (recette visuelle 16/11, CHA-02).
+    expect(text(document.querySelector('.nv-eyebrow'))).toBe('Commissions');
+    expect(screen.getByRole('heading', { level: 1, name: 'Relevés' })).toBeTruthy();
 
     expect(text(panel('Le parcours de ton argent'))).toContain('Ta commission');
     // One amount, one name: the path ends on the hero's words.
@@ -289,11 +299,116 @@ describe('CommissionsPage', () => {
 
     const rows = within(panel('Mes relevés')).getAllByRole('button');
     expect(rows.map(text)).toEqual([
-      '1er – 15 novembre300,00 € de net à ce jourEn cours21,25 €à ce jour',
-      '1er – 15 octobre85,00 € de netPayé21,25 €touché',
+      '1er – 15 novembreEn cours300,00 € de net à ce jour21,25 €gagné à ce jour',
+      '1er – 15 octobrePayé85,00 € de net21,25 €touché',
     ]);
     // A chatter reads their own line of the team, for their country, and never its rules.
     expect(asked).not.toContain('/v1/team/pay-rules');
+  });
+
+  it('says in « Mes relevés » what the period under way earned, as « Ma quinzaine », and what the minimum carries (recette CHT-02)', async () => {
+    const running = periods[NOV1];
+    if (running === undefined) throw new Error('No period under way');
+    const [statement] = running.statements;
+    if (statement === undefined) throw new Error('No statement');
+    periods[NOV1] = {
+      ...running,
+      statements: [{ ...statement, totalMinor: 860, payableMinor: 0, carryOverOutMinor: 860 }],
+    };
+    renderPage();
+    await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(within(panel('Mes relevés')).getAllByRole('button')[0])).toBe(
+        '1er – 15 novembreEn cours300,00 € de net à ce jour8,60 €gagné à ce joursous le minimum : reporté si elle finit ainsi',
+      );
+    });
+  });
+
+  it('says a period without tier nor team goal in the eyebrow, never under a strong title (Design, CHT-14)', async () => {
+    const running = periods[NOV1];
+    if (running === undefined) throw new Error('No period under way');
+    const [statement] = running.statements;
+    if (statement === undefined) throw new Error('No statement');
+    periods[NOV1] = {
+      ...running,
+      bonusTiers: null,
+      collectiveGoal: null,
+      statements: [{ ...statement, rules: { ...statement.rules, bonusTiers: [], collectiveGoal: null } }],
+    };
+    renderPage();
+    await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    const performance = await waitFor(() => panel('Ma performance · quinzaine du 1er au 15 novembre'));
+    expect(text(performance)).toContain('Pas de palier ni d’objectif d’équipe sur cette quinzaine');
+    expect(
+      within(performance).queryByRole('heading', { name: 'Quinzaine du 1er au 15 novembre' }),
+    ).toBeNull();
+  });
+
+  it('says beside the net of the period under way what its amount holds besides the commission (recette CHT-02, Design)', async () => {
+    const running = periods[NOV1];
+    if (running === undefined) throw new Error('No period under way');
+    const [statement] = running.statements;
+    if (statement === undefined) throw new Error('No statement');
+    periods[NOV1] = {
+      ...running,
+      statements: [{ ...statement, netMinor: 0, commissionMinor: 0, bonusesMinor: 3_000, totalMinor: 3_000 }],
+    };
+    renderPage();
+    await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    // Two lines meant as such, never a line broken where the dots fall (Design): the net, then the rest.
+    await waitFor(() => {
+      const row = within(panel('Mes relevés')).getAllByRole('button')[0];
+      expect([...(row?.querySelectorAll('.py-period__sub') ?? [])].map(text)).toEqual([
+        '0,00 € de net à ce jour',
+        'prime +30,00 €',
+      ]);
+    });
+    // « prime » and its amount never part at a line's end (Design).
+    expect(within(panel('Mes relevés')).getAllByRole('button')[0]?.textContent).toContain(
+      'prime\u00a0+30,00',
+    );
+  });
+
+  it('says under the amount a report sent and not validated yet, which it does not count (recette 16/11, CHT-30)', async () => {
+    const sent = (n: number, status: string, memberId: string = THEO.id) => ({
+      id: payId(400 + n),
+      shiftId: payId(500 + n),
+      creatorId: NORA_REVEAL.creatorId,
+      platformAccountId: NORA_REVEAL.id,
+      memberId,
+      period: OCT2,
+      correctsId: null,
+      amount: { amountMinor: 12_000, currency: 'EUR' },
+      comment: null,
+      incident: null,
+      status,
+      version: 1,
+      byAgency: false,
+      canReview: false,
+      submittedAt: '2026-11-01T00:30:00.000Z',
+      reviewedAt: status === 'submitted' ? null : '2026-11-02T09:00:00.000Z',
+      reviewNote: null,
+      reviewKind: status === 'submitted' ? null : 'human',
+      explanation: null,
+      check: null,
+      earningsSource: 'declared',
+      createdAt: '2026-11-01T00:30:00.000Z',
+    });
+    reports = { [OCT2]: [sent(1, 'submitted'), sent(2, 'validated')] };
+    renderPage();
+    const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(hero)).toContain('+ 1 rapport en attente de validation, pas encore compté');
+    });
+    cleanup();
+
+    // Two of theirs, and none of another member's (a manager reads the team's list).
+    reports = { [OCT2]: [sent(1, 'submitted'), sent(3, 'submitted'), sent(4, 'submitted', payId(99))] };
+    renderPage();
+    const again = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
+    await waitFor(() => {
+      expect(text(again)).toContain('+ 2 rapports en attente de validation, pas encore comptés');
+    });
   });
 
   it('says the payout delay the owner announced (PAIE-32)', async () => {
@@ -418,7 +533,7 @@ describe('CommissionsPage', () => {
     });
   });
 
-  it('opens on the period under way once nothing is on its way, and spares a manager the team’s goal', async () => {
+  it('opens on the period under way once nothing is on its way, and spares a manager the tiers and the team’s goal', async () => {
     const october = periods[OCT2];
     if (october === undefined) throw new Error('No October');
     periods[OCT2] = periodOf(
@@ -438,13 +553,13 @@ describe('CommissionsPage', () => {
     expect(text(hero)).toContain('validation par l’agence à partir du lun. 16 nov.');
     expect(text(hero)).toContain('Calculé le lun. 2 nov. à 10 h 07 sur tes rapports validés.');
     expect(text(hero.querySelector('.py-mehero__period'))).toBe('1er – 15 novembre');
-    const performance = panel('Ma performance');
-    expect(within(performance).queryByRole('heading')).toBeNull();
-    await waitFor(() => {
-      expect(text(performance)).toContain('Palier Bronze');
-    });
-    expect(text(performance)).not.toContain('Objectif de l’équipe');
-    expect(within(panel('Mes relevés')).getAllByRole('button').map(text)[0]).toContain('Payé31,20 €touché');
+    // A manager, on leave too, takes neither a tier nor the team's goal: no card promises one (recette CHT-03).
+    expect(within(panel('Mes relevés')).getAllByRole('button').map(text)[0]).toMatch(
+      /^16 – 31 octobrePayé.*31,20 €touché$/u,
+    );
+    expect(screen.queryByText('Ma performance')).toBeNull();
+    expect(screen.queryByText(/Palier Bronze/u)).toBeNull();
+    expect(screen.queryByText(/Objectif de l’équipe/u)).toBeNull();
   });
 
   it('says of a period carried over what went on the next one, never « 0,00 € touché »', async () => {
@@ -467,7 +582,9 @@ describe('CommissionsPage', () => {
     renderPage();
     const panelOf = await waitFor(() => panel('Mes relevés'));
     const carried = await within(panelOf).findByRole('button', { name: /^1er – 15 octobre/u });
-    expect(text(carried)).toContain('Reporté6,67 €reporté sur la quinzaine du 16 au 31 octobre');
+    expect(text(carried)).toMatch(
+      /^1er – 15 octobreReporté.*6,67 €reporté sur la quinzaine du 16 au 31 octobre$/u,
+    );
     expect(text(carried)).not.toContain('touché');
   });
 
@@ -860,6 +977,31 @@ describe('CommissionsPage', () => {
     expect(document.querySelector('.py-me')?.getAttribute('data-single')).toBe('true');
   });
 
+  it('says a commission without tier grows sale after sale once the account is paid on its net (recette CHT-14)', async () => {
+    const onNet = euroLine({
+      vatBps: 0,
+      platformFeeBps: 0,
+      grossMinor: 8_500,
+      grossEurMinor: 8_500,
+      exclVatMinor: 8_500,
+      shiftReportIds: [],
+      base: 'platform_net',
+      countedSales: { sales: 3, refunds: 0, late: 0, lateNetMinor: 0 },
+    });
+    periods = {
+      [OCT2]: periodOf(OCT2, [statementOf(THEO, OCT2)]),
+      [NOV1]: periodOf(NOV1, [statementOf(THEO, NOV1, { canValidate: false, lines: [onNet] })]),
+    };
+    renderPage();
+    const performance = await waitFor(() => panel('Ma performance'));
+    await waitFor(() => {
+      expect(text(performance)).toContain(
+        'Pas de palier ni d’objectif d’équipe sur cette quinzaine : ta commission suit ton net, vente après vente.',
+      );
+    });
+    expect(text(performance)).not.toContain('rapport après rapport');
+  });
+
   it('tells a new chatter where their first statement comes from', async () => {
     periods = {};
     renderPage();
@@ -876,7 +1018,7 @@ describe('CommissionsPage', () => {
     await waitFor(
       () => {
         expect(
-          screen.getByText('Le serveur ne répond pas : la liste de tes relevés n’a pas pu être lue.'),
+          screen.getByText('La liste de tes relevés n’a pas pu être lue : réessaie dans un instant.'),
         ).toBeDefined();
       },
       { timeout: 5_000 },

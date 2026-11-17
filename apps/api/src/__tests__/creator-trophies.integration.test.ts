@@ -259,4 +259,21 @@ describe('Trophées de la créatrice : gains notés une fois, sa vitrine, la lec
     // And she has no chatter's case.
     expect((await call('GET', '/rewards/my-trophy-case', 'nora')).statusCode).toBe(403);
   });
+
+  it('leaves an archived creator out of the job, her case kept as it was (relecture Bilan, recette 16/11)', async () => {
+    const before = (await app.modules.rewards.jobs.evaluate()).players;
+    await test.admin.db
+      .update(schema.creators)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.creators.id, ines));
+    try {
+      expect((await app.modules.rewards.jobs.evaluate()).players).toBe(before - 1);
+    } finally {
+      await test.admin.db
+        .update(schema.creators)
+        .set({ archivedAt: null })
+        .where(eq(schema.creators.id, ines));
+    }
+    expect((await app.modules.rewards.jobs.evaluate()).players).toBe(before);
+  });
 });

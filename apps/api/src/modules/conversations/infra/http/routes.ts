@@ -38,7 +38,7 @@ import {
   viewerOf,
   type ConversationViewer,
 } from '../../application/reads';
-import { ConversationForbidden, CreatorForbidden } from '../../domain/errors';
+import { CareCloseForbidden, ConversationForbidden, CreatorForbidden } from '../../domain/errors';
 import type { ConversationReader } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
@@ -334,6 +334,9 @@ export function createConversationRoutes(
         },
       },
       async (request, reply) => {
+        // A chatter, on shift or routed, never closes it, and is told who can (recette AGE-04): only who reads the
+        // whole creator.
+        if (!readsWholeCreator(viewerAt(request), request.query.creatorId)) throw new CareCloseForbidden();
         const { userId } = actorFor(request, request.query.creatorId);
         await commands.closeCare({
           creatorId: request.query.creatorId,

@@ -501,6 +501,16 @@
     transform: scaleX(0.1);
   }
 }
+/* Fans: the heart beats once. */
+.is-playing .nav-heart {
+  transform-origin: 18px 17px;
+  animation: nv-nav-beat var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-beat {
+  35% {
+    transform: scale(1.18);
+  }
+}
 /* Moi: a nod. */
 .is-playing .nav-head {
   animation: nv-nav-nod var(--nv-dur-morph) var(--nv-ease-spring) both;
@@ -582,9 +592,6 @@
 }
 .nv-more__title {
   margin: 4px 12px 6px;
-  color: var(--nv-ink-faint);
-  font-size: 12px;
-  font-weight: 600;
 }
 /* Who is signed in, under the tabs: the desktop's account card, on the phone (NAV-02). */
 .nv-more__account {
@@ -896,12 +903,28 @@
   margin-inline: auto;
 }
 .nv-page {
+  /* The page's column (COH-02): wide unless the screen says narrow, one width per section. */
+  --_page-width: var(--nv-page-wide);
   min-height: 100%;
   display: grid;
   /* minmax(0, 1fr): a header wider than a phone (the Réglages sub-nav) scrolls inside itself, never the page. */
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 28px;
+}
+.nv-page[data-width='narrow'] {
+  --_page-width: var(--nv-page-narrow);
+}
+/* Every block keeps to the column, on the title's left edge; the header too, so its tabs never pass the column's
+   right edge. A screen sets no width of its own on a page-level block (recette visuelle 16/11, COH-02). */
+.nv-page > * {
+  max-width: var(--_page-width);
+}
+/* A state that is the page's whole body keeps its own height: the body's row would stretch its card down the screen
+   and part « Réessayer » from its sentence (ETA-04). */
+.nv-page > .nv-failure,
+.nv-page > .nv-empty {
+  align-self: start;
 }
 /* A screen that holds its own scroller (the Playground thread, composer pinned below) fills the stage instead. */
 .nv-page--fill {
@@ -925,16 +948,31 @@
     filter: blur(4px);
   }
 }
+/* One template for every header (recette visuelle 16/11, COH-01): the title block alone on the first row, the buttons
+   at its right, bottom-aligned; the section's tabs on a row of their own, left edge, 16 px under the lead. The title
+   never moves for what sits beside or under it. */
 .nv-page__head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
   padding-top: 18px;
 }
 .nv-page__title {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: start;
   min-width: 0;
+}
+/* The eyebrow's line is kept on every page, written or not: the title stands at the same height on every screen,
+   with or without a section above it (CHA-10, CRE-09). */
+.nv-page__title:not(:has(> .nv-eyebrow)) {
+  padding-top: 18px;
+}
+/* A section with tabs keeps two lines for its lead, written in one or two: the tabs stand at the same height on every
+   tab of it, and do not jump under the pointer that chose one (COH-01, PIL-13). A lead is one or two lines on a phone,
+   never three. A header whose tabs all go without a lead (a creator's sheet, named by its title) keeps no empty lines. */
+.nv-page__head[data-tabs] > .nv-page__title:has(> .nv-page__lead) {
+  min-height: calc(18px + 2px + var(--nv-text-large-title-leading) + 6px + 2 * 21px);
 }
 /* Large title, bold and left-aligned: the one thing that says where you are. */
 .nv-page__title h1 {
@@ -953,30 +991,35 @@
   color: var(--nv-ink-muted);
 }
 .nv-page__actions {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
   max-width: 100%;
   min-width: 0;
 }
-/* A quiet label above a title or a block: sentence case, never shouted in capitals. */
-.nv-eyebrow {
-  margin: 0;
-  font-size: 13px;
-  line-height: 18px;
-  font-weight: 600;
-  color: var(--nv-ink-faint);
+.nv-page__tabs {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  min-width: 0;
+  margin-top: 16px;
 }
 /* A way back in the eyebrow (« ← Créatrices », « ← Moi › Préférences ») is a plain button: its padding is pulled back so
-   its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. */
+   its text starts on the same line as the title below, the padding staying as the pressed and hovered surface. Its
+   34 px are pulled back too, to the eyebrow's 18 px line: the title stands where every page has it (COH-01). */
 .nv-eyebrow > .nv-btn--plain {
   margin-inline-start: calc(-1 * var(--nv-space-4));
+  margin-block: calc((18px - 34px) / 2);
 }
 
 /* ── Panels: content plates, not glass ── */
+/* One radius for every card, the plate's 26 (COH-03): the panel no longer sets a 34 of its own. */
 .nv-panel {
-  --_radius: var(--nv-radius-xl);
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -987,25 +1030,27 @@
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 20px 24px 12px;
+  padding: var(--nv-plate-pad) var(--nv-plate-pad) var(--nv-space-4);
 }
-.nv-panel__head h2 {
-  margin: 2px 0 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
-  font-weight: 650;
+.nv-panel__head .nv-h2 {
+  margin-top: 2px;
 }
+/* A section of a card: the card's own padding on its sides, a hairline above it. */
 .nv-panel__sec {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 18px 24px;
+  padding: var(--nv-space-4) var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
 }
 .nv-panel__head + .nv-panel__sec,
 .nv-panel__sec:first-child {
   border-top: 0;
+}
+/* Between a card's title and what follows, 16 px, whatever follows (CHA-13): the head keeps them, the first section
+   adds none of its own. */
+.nv-panel__head + .nv-panel__sec {
+  padding-top: 0;
 }
 .nv-scroll {
   min-height: 0;
@@ -1177,80 +1222,19 @@
     transform var(--nv-dur-morph) var(--nv-ease-spring),
     width var(--nv-dur-morph) var(--nv-ease-spring);
 }
+/* The counter of a tab is the design system's `nv-count` (18 px, 11 px figures, COH-08); nothing of its own. */
 .nv-subnav__count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  box-sizing: border-box;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--nv-ink) 16%, transparent);
-  color: var(--nv-ink);
-  font-size: 10px;
-  line-height: 18px;
-  font-weight: 700;
-  text-align: center;
+  flex: none;
 }
 
-/* ── A screen not built yet ── */
-.nv-coming {
+/* ── An empty state on a card of its own (`Empty plate`): the card the height of its words ── */
+.nv-empty-plate {
   justify-content: center;
-}
-.nv-coming__in {
-  max-width: 46ch;
-  margin: 0 auto;
-  padding: 64px 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.nv-coming__in h2 {
-  margin: 0;
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-weight: 400;
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-}
-.nv-coming__in p:last-child {
-  margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
 }
 
 /* ── A page that leads nowhere: a card the height of its words, under a compass (CRE-35) ── */
 .nv-notfound {
   align-self: start;
-}
-.nv-notfound .nv-coming__in {
-  align-items: center;
-  padding-block: var(--nv-space-10);
-}
-.nv-notfound__icon {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: var(--nv-space-2);
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-glass-fill);
-  box-shadow: inset 0 1px 0 var(--nv-glass-edge);
-  color: var(--nv-ink-muted);
-}
-.nv-notfound__icon .nav-icon {
-  width: 26px;
-  height: 26px;
-}
-.nv-notfound__text {
-  margin: 0;
-  text-wrap: balance;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
-}
-.nv-notfound__back {
-  margin-top: var(--nv-space-3);
 }
 
 /* ── Narrow screens: the sidebar keeps its icons only ── */
@@ -1413,6 +1397,19 @@
     font-size: 30px;
     line-height: 36px;
   }
+  /* A phone: the title alone, the tabs right under it at a fixed place, the buttons after them. */
+  .nv-page__head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .nv-page__actions {
+    grid-column: 1;
+    grid-row: 3;
+    justify-content: flex-start;
+    margin-top: 16px;
+  }
+  .nv-page__head[data-tabs] > .nv-page__title:has(> .nv-page__lead) {
+    min-height: calc(18px + 2px + 36px + 6px + 2 * 21px);
+  }
   .nv-subnav {
     max-width: 100%;
     overflow-x: auto;
@@ -1452,50 +1449,6 @@
 /* A sub-tab of the same section: the header stays put, only the content arrives (NAV-08). */
 .nv-stage[data-within] .nv-page > .nv-page__head {
   animation: none;
-}
-
-/* « Le serveur ne répond pas », one face on every screen (DASH-22): the orb, the sentence, « Réessayer ». */
-.nv-silent {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--nv-space-4);
-  align-items: center;
-  align-self: start;
-  max-width: 720px;
-}
-/* The orb's warning ring grows to 1.35 times the orb: the orb keeps that room on its left, so the ring stays inside
-   the page's column instead of passing its edge (recette 11/11, lot A2). */
-.nv-silent > .nv-orb {
-  margin-inline-start: 8px;
-}
-.nv-silent__body {
-  min-width: 0;
-}
-.nv-silent__title {
-  margin: 0;
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-  letter-spacing: var(--nv-text-title-1-tracking);
-  font-weight: 680;
-  text-wrap: balance;
-}
-.nv-silent__title em {
-  font-style: normal;
-  color: var(--nv-warning);
-}
-.nv-silent__text {
-  margin: var(--nv-space-1) 0 0;
-  color: var(--nv-ink-muted);
-  text-wrap: pretty;
-}
-@media (max-width: 560px) {
-  .nv-silent {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .nv-silent__retry {
-    grid-column: 2;
-    justify-self: start;
-  }
 }
 
 /* ── Installable app (CR-01) ── */
@@ -1664,7 +1617,6 @@
   display: grid;
   align-content: start;
   gap: var(--nv-space-4);
-  max-width: 960px;
 }
 .nv-help-install__cards {
   display: grid;
@@ -1828,7 +1780,6 @@
   display: grid;
   align-content: start;
   gap: var(--nv-space-4);
-  max-width: 720px;
 }
 .nv-notif__device {
   display: grid;

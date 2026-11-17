@@ -35,6 +35,7 @@ import {
 } from './view';
 
 import { initialOf } from '@/lib/utils';
+import { Empty, Failure, Skeleton } from '@/shell/states';
 
 /** The reader follows the conversation more closely than the list: a draft or a fan's message shows up quickly. */
 const REFRESH_MS = 10_000;
@@ -146,28 +147,25 @@ export function Reader({
     <section className="nv-plate tr-reader" aria-label="Conversation">
       {loaded ? null : back}
       {query.error instanceof ConversationGone ? (
-        <p className="tr-reader__empty">Cette conversation n’existe plus.</p>
+        <Empty title="Cette conversation n’existe plus." />
       ) : query.error instanceof ConversationClosed ? (
-        <p className="tr-reader__empty" role="status">
-          Cette conversation n’est plus ouverte pour toi&nbsp;: hors de ton shift, seules celles dont tu as la
-          main restent ici.
-        </p>
+        <Empty title="Cette conversation n’est plus ouverte pour toi.">
+          Hors de ton shift, seules celles dont tu as la main restent ici.
+        </Empty>
       ) : query.isError && query.data === undefined ? (
-        <div className="tr-reader__empty" role="status">
-          <p className="tr-warn">Le serveur ne répond pas</p>
-          <p>La conversation n’a pas pu être lue. Impera réessaie tout seul.</p>
-        </div>
+        <Failure inline onRetry={() => void query.refetch()} />
       ) : query.data === undefined ? (
-        <div className="tr-skeleton" aria-busy="true" aria-label="Chargement de la conversation">
-          <i />
-          <i />
-          <i />
-        </div>
+        <Skeleton label="Chargement de la conversation…">
+          <i className="nv-skeleton__bar" />
+          <i className="nv-skeleton__bar" />
+          <i className="nv-skeleton__bar" />
+        </Skeleton>
       ) : (
         <Loaded
           back={back}
           read={query.data}
           stale={query.isError}
+          onRetry={() => void query.refetch()}
           creatorId={creatorId}
           canDecide={canDecide}
           selfScope={selfScope}
@@ -204,6 +202,7 @@ function Loaded({
   back,
   read,
   stale,
+  onRetry,
   creatorId,
   canDecide,
   selfScope,
@@ -217,6 +216,8 @@ function Loaded({
   read: ConversationRead;
   /** The last read failed: what shows is the previous answer, and the screen says so. */
   stale: boolean;
+  /** Reads the thread again, when it is stale. */
+  onRetry: () => void;
   creatorId: string;
   canDecide: boolean;
   selfScope: boolean;
@@ -361,7 +362,7 @@ function Loaded({
             {initialOf(name)}
           </span>
           <span className="tr-reader__who">
-            <h2>{name}</h2>
+            <h2 className="nv-h3">{name}</h2>
             <span className="tr-reader__state">
               <span className={`nv-status ${situation.pill}`}>
                 <span className="nv-status__dot" />
@@ -393,7 +394,9 @@ function Loaded({
         </p>
       ) : null}
       {stale ? (
-        <p className="tr-warn tr-line">Le serveur ne répond pas : ce fil peut avoir changé depuis.</p>
+        <Failure inline onRetry={onRetry}>
+          Ce fil peut avoir changé depuis : réessaie dans un instant.
+        </Failure>
       ) : null}
       {hand.error === null ? null : (
         <p className="tr-warn tr-line" role="alert">

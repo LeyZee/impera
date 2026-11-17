@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 import type { DropStorage, MediaToThumbnail, ScratchRoom, ThumbnailQueue } from '../../domain/ports';
-import { makeThumbnail, thumbnailKeyOf } from '../thumbnail';
+import { makeThumbnail, pictureOf, thumbnailKeyOf } from '../thumbnail';
 
 const NOW = new Date('2026-11-08T22:00:00.000Z');
 
@@ -93,5 +93,24 @@ describe('content-drops › content_drops.make_thumbnail (SC-04 lot c4)', () => 
     const { deps, log } = fakes(photo, 'made', false);
     expect(await makeThumbnail(deps, 'media-1', NOW, 'test')).toBe('later');
     expect(log).toEqual(['later media-1 2026-11-08T22:15:00.000Z']);
+  });
+
+  it('makes no picture when no storage is set, and touches neither ffmpeg nor the disk', async () => {
+    const made: string[] = [];
+    const key = await pictureOf(
+      {
+        storage: null,
+        thumbnailer: {
+          make: (path) => {
+            made.push(path);
+            return Promise.resolve(true);
+          },
+        },
+        scratchDir: '/nowhere',
+      },
+      { creatorId: 'creator', sha256: 'abc', path: '/nowhere/original', kind: 'image' },
+    );
+    expect(key).toBeNull();
+    expect(made).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import { createCreatorLink, creatorAccountKey, useCreatorAccount } from './api';
 
 import { LinkShare, type LinkOutcome } from '@/screens/team/ShareLink';
 import { deadline, invitationState } from '@/screens/team/model';
+import { Failure } from '@/shell/states';
 import './access.css';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
@@ -32,19 +33,7 @@ export function AccessSection({
   const [made, setMade] = useState<InvitationLinkCreated | null>(null);
 
   if (query.isError) {
-    return (
-      <section className="nv-plate ps-panel" aria-label="Accès">
-        <p className="ps-title">Son accès ne se charge pas</p>
-        <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft ps-self-start"
-          onClick={() => void query.refetch()}
-        >
-          Réessayer
-        </button>
-      </section>
-    );
+    return <Failure onRetry={() => void query.refetch()} />;
   }
   if (query.isPending) return <section className="nv-plate ps-panel ps-skeleton" aria-busy="true" />;
 
@@ -61,7 +50,7 @@ export function AccessSection({
     const typed = email.trim();
     return (
       <section className="nv-plate ps-panel cr-access nv-enter" aria-label="Accès">
-        <h2 className="ps-title">Son espace</h2>
+        <h2 className="nv-h2 ps-title">Accès à son espace</h2>
         <p className="ps-muted">
           {creatorName} n’a pas encore de compte. Son e-mail crée son compte et un lien d’accès, valable 72
           heures, que tu lui envoies toi-même.
@@ -98,7 +87,7 @@ export function AccessSection({
   const corrected = target.toLowerCase() !== account.email.trim().toLowerCase();
   return (
     <section className="nv-plate ps-panel cr-access nv-enter" aria-label="Accès">
-      <h2 className="ps-title">Son espace</h2>
+      <h2 className="nv-h2 ps-title">Accès à son espace</h2>
       <p className="ps-muted">
         {access.kind === 'signed-in'
           ? `Son mot de passe est choisi. Elle se connecte avec ${account.email}. Si elle l’oublie, crée-lui un lien pour en choisir un nouveau.`

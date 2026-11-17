@@ -3,18 +3,13 @@
  * agency's persona screen (`ps-head`…) never moves her page. Plates, never glass: it is content.
  */
 .mp-block {
-  --_radius: var(--nv-radius-xl);
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
 }
 .mp-block__title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  letter-spacing: var(--nv-text-headline-tracking);
-  font-weight: 650;
 }
 /* Label in a narrow faint column, value in ink: each block reads at a glance. */
 .mp-fields {

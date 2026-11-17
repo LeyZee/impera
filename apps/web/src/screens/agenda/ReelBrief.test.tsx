@@ -79,16 +79,19 @@ describe('her shooting sheet with a reel sheet', () => {
     expect(more.querySelector('p')?.textContent).toBe('Lumière douce, tenue noire');
   });
 
-  it('shows a sheet without a reel sheet exactly as before', () => {
+  it('shows a sheet without a reel sheet exactly as before, its pictogram in place of the 🎬 (CRE-11)', () => {
     const { container } = render(<ShootBrief brief="Lumière douce" folded />);
+    const icon = container.querySelector('summary > svg.nav-icon--clapper');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    icon?.remove();
     expect(container.innerHTML).toBe(
-      '<details class="ag-brief"><summary class="ag-brief__title">🎬 Fiche de tournage</summary><p class="ag-brief__text">Lumière douce</p></details>',
+      '<details class="ag-brief"><summary class="ag-brief__title">Fiche de tournage</summary><p class="ag-brief__text">Lumière douce</p></details>',
     );
   });
 
   it('shows a reel sheet without free text, folded on a proposal', () => {
     render(<ShootBrief brief={null} reel={sheet} folded />);
-    expect(screen.getByText('🎬 Fiche de tournage').tagName).toBe('SUMMARY');
+    expect(screen.getByText('Fiche de tournage').tagName).toBe('SUMMARY');
     expect(screen.getByRole('img', { hidden: true })).toBeDefined();
   });
 });
