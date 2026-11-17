@@ -55,7 +55,7 @@ export interface PlaygroundClient {
 export const COMPARE_MODEL = 'mistral-large-4';
 
 export type PlaygroundErrorCode =
-  'llm_unavailable' | 'not_deployed' | 'still_writing' | 'forbidden' | 'failed';
+  'llm_unavailable' | 'unreachable' | 'not_deployed' | 'still_writing' | 'forbidden' | 'failed';
 
 /** What went wrong, said plainly on screen. `message` is the server's own French sentence, when it gave one. */
 export class PlaygroundError extends Error {
@@ -79,7 +79,11 @@ async function errorOf(response: Response): Promise<PlaygroundError> {
   }
   // The server keeps the playground to the owner: a refusal, not an outage.
   if (response.status === 403) return new PlaygroundError('forbidden');
-  if (code === 'llm_unavailable' || response.status === 503) return new PlaygroundError('llm_unavailable');
+  // Only the server's own word blames the AI provider (key refused, no credit, rate limit). A 502/503/504 without it is
+  // Impera's API not answering, behind its proxy (recette visuelle V-ETA-06).
+  if (code === 'llm_unavailable') return new PlaygroundError('llm_unavailable');
+  if (response.status === 502 || response.status === 503 || response.status === 504)
+    return new PlaygroundError('unreachable');
   if (code === 'answer_in_progress_conflict') return new PlaygroundError('still_writing');
   return new PlaygroundError('failed', parsed.success ? parsed.data.error.message : undefined);
 }
@@ -97,6 +101,9 @@ async function call<S extends z.ZodType>(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  }).catch(() => {
+    // No answer at all (network down, server stopped): the server, not the AI provider.
+    throw new PlaygroundError('unreachable');
   });
   if (!response.ok) throw await errorOf(response);
   return schema.parse(await response.json());

@@ -315,9 +315,12 @@ describe('Paie › Quinzaine', () => {
     renderPage(OWNER);
     // Nothing validated yet: the amount says it is owed only once validated, never as owed already.
     expect(text(await screen.findByText('À verser une fois validé')).length).toBeGreaterThan(0);
-    // The period is the page's title, alone in its name: the arrows sit in the page's actions.
-    expect(screen.getByRole('heading', { level: 1, name: '16 – 31 octobre 2026' })).toBeTruthy();
+    // The tab is the page's title (recette visuelle 16/11, GES-03); the period sits between its arrows, in the actions.
+    expect(screen.getByRole('heading', { level: 1, name: 'Quinzaine' })).toBeTruthy();
     expect(within(screen.getByRole('heading', { level: 1 })).queryByRole('button')).toBeNull();
+    const arrows = screen.getByRole('group', { name: 'Quinzaine' });
+    expect(text(arrows)).toBe('16 – 31 octobre 2026');
+    expect(arrows.closest('.nv-page__actions')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Quinzaine précédente' })).toBeTruthy();
     expect(text(screen.getByText('À verser une fois validé').nextElementSibling)).toBe('342,50 €');
     expect(screen.getByRole('button', { name: 'Valider (4)' })).toBeTruthy();
@@ -995,7 +998,7 @@ describe('Paie › Quinzaine', () => {
     settingsDown = true;
     renderPage(OWNER);
     const said = await screen.findByText(
-      'Le serveur ne répond pas : la quinzaine en cours n’a pas pu être lue.',
+      'La quinzaine en cours n’a pas pu être lue : réessaie dans un instant.',
     );
     settingsDown = false;
     fireEvent.click(
@@ -1246,7 +1249,7 @@ describe('Paie › Quinzaine', () => {
     periods[OCT2] = 'down';
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
     expect(
-      await screen.findByText('Le serveur ne répond pas : la quinzaine n’a pas pu être lue.'),
+      await screen.findByText('La quinzaine n’a pas pu être lue : réessaie dans un instant.'),
     ).toBeTruthy();
   });
 
@@ -1563,7 +1566,7 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     const list = await panel();
     expect(
       await within(list).findByText(
-        'Le serveur ne répond pas : la liste des ventes en attente n’a pas pu être lue.',
+        'La liste des ventes en attente n’a pas pu être lue : réessaie dans un instant.',
       ),
     ).toBeTruthy();
     held[OCT2] = [heldSaleOf()];

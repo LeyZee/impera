@@ -1,5 +1,5 @@
 # INS-02 Connecteur de liens en lecture seule : clics par endroit et par heure
-Statut : todo
+Statut : in progress (lot a fait : contrats, domaine, faux)
 Phase : Instagram (ADR 0120)
 Dépend de : ADR 0120 acceptée
 Branche : task/ins-02-link-stats-connector

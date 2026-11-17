@@ -36,6 +36,8 @@ export interface RewardsModule {
   readonly jobs: {
     /** What each chatter and each creator earned since the last run; replayable. */
     readonly evaluate: () => Promise<{ players: number; gained: number }>;
+    /** What one creator earned, right after her gesture (ADR 0107 § 14, recette 16/11 CRE-06); replayable. */
+    readonly evaluateCreator: (creatorId: string) => Promise<{ players: number; gained: number }>;
   };
   /**
    * The chatter's case, reveals and challenge, a member's case on their file, the owner's thresholds, the creator's
@@ -74,6 +76,7 @@ export function startRewardsModule(options: RewardsStartOptions): RewardsModule 
         const creators = await evaluateCreatorRewards(creatorDeps);
         return { players: team.players + creators.players, gained: team.gained + creators.gained };
       },
+      evaluateCreator: (creatorId) => evaluateCreatorRewards(creatorDeps, creatorId),
     },
     routes: (routeOptions) =>
       createRewardsRoutes(

@@ -27,6 +27,7 @@ export const READY_SECTIONS = [
   '/aujourdhui',
   '/agenda',
   '/suivi',
+  '/fans',
   '/entrainer',
   '/planning',
   '/commissions',
@@ -56,6 +57,7 @@ const ICONS: Readonly<Record<Section, NavIconName>> = {
   '/aujourdhui': 'today',
   '/agenda': 'planning',
   '/suivi': 'tracking',
+  '/fans': 'fans',
   '/entrainer': 'train',
   '/planning': 'planning',
   '/commissions': 'pay',
@@ -168,12 +170,19 @@ const OFF_RAIL_OF_MOI: ReadonlySet<string> = new Set([
   '/aide/extension',
 ]);
 
+/** The guides (recette visuelle 16/11, T9): under Moi for whoever has it, under Réglages for the owner. */
+const GUIDES: ReadonlySet<string> = new Set(['/aide/installer', '/aide/extension', '/aide/reveal']);
+
 /**
- * The tab lit for an address of no section: Moi for those pages, when the rail holds it; none otherwise. Lit only: the
- * route guard and the stage keep `sectionOf`.
+ * The tab lit for an address of no section: Moi for those pages, when the rail holds it; Réglages for a guide on a rail
+ * without Moi that holds Réglages (the owner's); none otherwise. Lit only: the route guard and the stage keep
+ * `sectionOf`.
  */
 export function offRailSectionOf(pathname: string, rail: Rail): Section | null {
-  return OFF_RAIL_OF_MOI.has(pathname.replace(/\/+$/u, '')) && canOpen(rail, '/moi') ? '/moi' : null;
+  const path = pathname.replace(/\/+$/u, '');
+  if (OFF_RAIL_OF_MOI.has(path) && canOpen(rail, '/moi')) return '/moi';
+  if (GUIDES.has(path) && !canOpen(rail, '/moi') && canOpen(rail, '/reglages')) return '/reglages';
+  return null;
 }
 
 /** What a section is called, in the rail and in the tab's title. */

@@ -15,6 +15,9 @@ import {
   sinceText,
   tokensText,
   useSlices,
+  voiceRunway,
+  voiceShare,
+  voiceTone,
 } from './view';
 
 const NBSP = ' ';
@@ -112,5 +115,38 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
       'Depuis jeudi 12 novembre à 23\u00a0h\u00a035, l’agent répond avec son modèle de repli jusqu’à la remise à zéro.',
     );
     expect(runwayShare(reached)).toBe(0);
+  });
+});
+
+describe('ElevenLabs and the « Essai réel » (ADR 0091 § 7)', () => {
+  it('folds the tests and the essais into one neutral slice', () => {
+    const usage = usageFixture({
+      uses: [
+        { use: 'voice', eur: 10, calls: 100 },
+        { use: 'judge', eur: 1, calls: 4 },
+        { use: 'probe', eur: 0.01, calls: 2 },
+      ],
+    });
+    expect(useSlices(usage).map((s) => [s.key, s.label])).toEqual([
+      ['voice', 'Écrire les messages'],
+      ['tests', 'Tests et essais'],
+    ]);
+    const onlyProbes = usageFixture({ uses: [{ use: 'probe', eur: 0.01, calls: 2 }] });
+    expect(useSlices(onlyProbes).map((s) => s.label)).toEqual(['Essais réels']);
+  });
+
+  it('reads the month left, amber under 10 %, red at nothing', () => {
+    const voice = {
+      used: 9_950,
+      limit: 10_000,
+      resetsAt: null,
+      plan: 'paid' as const,
+      readAt: '2026-11-11T13:00:00.000Z',
+    };
+    expect(voiceTone(voice)).toBe('warn');
+    expect(voiceShare(voice)).toBeCloseTo(0.5, 5);
+    expect(voiceRunway(voice)).toBe('Plus aucun vocal possible ce mois');
+    expect(voiceTone({ ...voice, used: 10_000 })).toBe('bad');
+    expect(voiceRunway({ ...voice, used: 9_800 })).toBe('Environ 2 vocaux encore');
   });
 });

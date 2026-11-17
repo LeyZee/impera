@@ -116,6 +116,7 @@ Branche : task/<id>-<slug>
 | SC-07 | Mode tournage et ordre de tournage sur le téléphone de la créatrice | scripts | todo | SC-02 |
 | SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
+| SCB-01 | Import et envoi des branches d'un script | scripts | in_progress | SC-04 |
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | PUB-03 | Légende Instagram : la fenêtre visible avant « … plus », vérifiée pour le modèle, montrée à tous | publication | blocked (PUB-02) | PUB-02, ADR 0082 |
@@ -129,7 +130,8 @@ Branche : task/<id>-<slug>
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
 | INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | todo (essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
-| INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | todo | ADR 0120, ADR 0080 |
+| INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lot a) | ADR 0120, ADR 0080 |
+| INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | todo | ADR 0121, ADR 0120 § 3 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
@@ -157,6 +159,7 @@ Branche : task/<id>-<slug>
 | OPS-13 | L'essai de restauration connaît les rôles de l'ADR 0087 | exploitation | done | SEC-10 |
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
+| OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -169,6 +172,7 @@ Branche : task/<id>-<slug>
 | SEC-10 | Rôle de service de la base : l'API et le worker ne se connectent plus en propriétaire (ADR 0087, lot a) | exploitation | done | SEC-08, ADR 0087 |
 | SEC-11 | Droits des tables en ajout seul et journaux de la bibliothèque d'authentification alignés sur la doc | exploitation | done | SEC-10 |
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
+| SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
@@ -183,3 +187,5 @@ Branche : task/<id>-<slug>
 | CHF-01 | Chiffres et jeu du chatteur : ses chiffres, puis un jeu fait de faits réels | équipe | in_progress | ADR 0104, CRM-03, EQ-05 |
 | CRB-01 | Trophées et médailles de série de la créatrice | créatrice | review | ADR 0107, CHF-01 |
 | AUT-01 | L'agent tient compte des automatisations de Reveal | agent | in_progress | ADR 0110 |
+| CRE-05 | « Mot de passe oublié » sans Telegram : le lien que le propriétaire crée | exploitation | done | SEC-05, EQ-10, CR-02, ADR 0068 |
+| FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |

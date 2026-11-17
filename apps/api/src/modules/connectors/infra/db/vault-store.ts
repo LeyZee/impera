@@ -44,6 +44,7 @@ const columns = {
   platformDescription: schema.mediaPlatformRefs.platformDescription,
   suggestedMinMinor: schema.mediaPlatformRefs.suggestedMinMinor,
   suggestedMaxMinor: schema.mediaPlatformRefs.suggestedMaxMinor,
+  previewBlurhash: schema.mediaPlatformRefs.previewBlurhash,
   lastSyncedAt: schema.mediaPlatformRefs.lastSyncedAt,
   removedAt: schema.mediaPlatformRefs.removedAt,
 };
@@ -67,6 +68,7 @@ function rowOf(row: Row): VaultRefRow {
     platformDescription: row.platformDescription,
     suggestedMinMinor: row.suggestedMinMinor,
     suggestedMaxMinor: row.suggestedMaxMinor,
+    previewBlurhash: row.previewBlurhash,
     lastSyncedAt: row.lastSyncedAt,
     removedAt: row.removedAt,
   };
@@ -108,6 +110,7 @@ export function createDrizzleVaultStore(db: Database): VaultStore {
             platformDescription: row.platformDescription,
             suggestedMinMinor: row.suggestedMinMinor,
             suggestedMaxMinor: row.suggestedMaxMinor,
+            previewBlurhash: row.previewBlurhash,
             lastSyncedAt: now,
             removedAt: null,
           };
@@ -158,6 +161,33 @@ export function createDrizzleVaultStore(db: Database): VaultStore {
           .from(schema.platformAccounts)
           .where(eq(schema.platformAccounts.creatorId, creatorId));
         return { rows: (await selectRows(tx)).map(rowOf), syncedAt: synced?.at ?? null };
+      }),
+
+    previewTarget: (creatorId, userId, platformMediaId) =>
+      withTenantMember(db, creatorId, userId, async (tx, scope) => {
+        if (!readsCreatorFigures(await readerIn(tx, userId, creatorId, scope))) return 'forbidden' as const;
+        // Still listed by the platform: a media it removed has no link to read (ADR 0138 § 4).
+        const [row] = await tx
+          .select({
+            platformAccountId: schema.mediaPlatformRefs.platformAccountId,
+            folderRef: schema.mediaPlatformRefs.folderRef,
+          })
+          .from(schema.mediaPlatformRefs)
+          .where(
+            and(
+              eq(schema.mediaPlatformRefs.creatorId, creatorId),
+              eq(schema.mediaPlatformRefs.platformMediaId, platformMediaId),
+              sql`${schema.mediaPlatformRefs.removedAt} is null`,
+            ),
+          )
+          .orderBy(schema.mediaPlatformRefs.platformAccountId)
+          .limit(1);
+        return row === undefined
+          ? null
+          : {
+              platformAccountId: PlatformAccountIdSchema.parse(row.platformAccountId),
+              folderRef: row.folderRef,
+            };
       }),
   };
 }

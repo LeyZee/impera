@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { Outlet } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Outlet, useRouterState } from '@tanstack/react-router';
+import { useState, type JSX } from 'react';
 
 import { SecuritySection } from '@/security/SecuritySection';
 import { BudgetSection } from '@/settings/ai-budget/BudgetSection';
+import { aiBudgetQueryKey } from '@/settings/ai-budget/api';
 import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
@@ -39,7 +40,14 @@ const TABS: readonly SubNavItem[] = (
   ] satisfies readonly ScreenPath[]
 ).map((to) => ({ to, label: screenLabel(to) }));
 
+/** The name of the open tab, the page's title (recette visuelle 16/11, GES-03): « Réglages » goes above it. */
+function openTab(pathname: string): string {
+  const path = pathname.replace(/\/+$/u, '');
+  return TABS.find((tab) => tab.to === path)?.label ?? 'Réglages';
+}
+
 export function SettingsLayout(): JSX.Element {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   // A count read in the base: a failure or a wait shows the tab bare, never a wrong number.
   const newModels = useQuery(newModelsQuery).data;
   const countLabel = newModels === undefined ? null : newModelsLabel(newModels);
@@ -49,12 +57,14 @@ export function SettingsLayout(): JSX.Element {
       : item,
   );
   // « Se déconnecter » lives in the account's menu, on the phone too (NAV-02, NAV-04).
+  // Réglages are settings and forms: the narrow column, the same on every tab (COH-02, GES-04).
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
-        title="Réglages"
+        eyebrow="Réglages"
+        title={openTab(pathname)}
         lead="Ce qui règle le CRM pour toute l’agence."
-        actions={<SubNav label="Réglages" items={tabs} />}
+        tabs={<SubNav label="Réglages" items={tabs} />}
       />
       <Outlet />
     </Page>
@@ -63,10 +73,16 @@ export function SettingsLayout(): JSX.Element {
 
 /** Réglages › Modèles IA: the Services page of P3-03, as the Connecteurs thread built it. */
 export function AiModelsPage(): JSX.Element {
+  // One server, two reads: when it is silent, the keys' card says it once and the budget's keeps quiet (ETA-05).
+  const client = useQueryClient();
+  const [down, setDown] = useState(false);
   return (
     <div className="sv-page">
-      <ServicesSection />
-      <BudgetSection />
+      <ServicesSection
+        onDown={setDown}
+        onRetry={() => void client.refetchQueries({ queryKey: aiBudgetQueryKey })}
+      />
+      <BudgetSection quiet={down} />
     </div>
   );
 }

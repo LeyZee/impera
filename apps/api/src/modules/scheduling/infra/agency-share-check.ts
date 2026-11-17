@@ -15,8 +15,10 @@ import {
 import { schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
+import { agencyShareAlertMessage, type AgencyShareEvent } from '../domain/agency-share-alerts';
 import { agencyShareGaps } from '../domain/agency-shares';
 import { agencyShareChanges } from '../domain/observed-shares';
+import type { Notify } from '../domain/ports';
 import { calendarDayIn } from '../domain/time';
 
 import { agencyTimeZone } from './rows';
@@ -31,6 +33,22 @@ export type SalesTotalsRead = (
 ) => Promise<SalesTotals>;
 
 const CreatorRowSchema = z.object({ id: CreatorIdSchema });
+
+const OwnerRowSchema = z.object({ id: z.string().min(1) });
+
+const AlertRowSchema = z.object({
+  id: EventIdSchema,
+  type: z.enum(['agency_share_mismatch', 'agency_share_changed']),
+  payload: z.unknown(),
+  display_name: z.string().min(1),
+});
+
+/** The stored event read again by its own contract: a payload out of it fails here, never on a device. */
+function alertOf(row: z.infer<typeof AlertRowSchema>): AgencyShareEvent {
+  return row.type === 'agency_share_mismatch'
+    ? { type: row.type, payload: EVENT_PAYLOADS.agency_share_mismatch.parse(row.payload) }
+    : { type: row.type, payload: EVENT_PAYLOADS.agency_share_changed.parse(row.payload) };
+}
 
 const RateRowSchema = z.object({
   creator_id: CreatorIdSchema,
@@ -52,10 +70,15 @@ function fortnightBefore(now: Date, timeZone: string): { readonly from: PayPerio
  * reads it on that fortnight against the one before, and one `agency_share_changed` per account and currency whose
  * share moved by more than a point (ADR 0054 § 5, index `domain_events_agency_share_changed_unique`). One transaction
  * per creator and check. It reads the register and writes nothing but the outbox: no amount, no rule, no pay.
+ *
+ * Then each owner's account is told of every alert of that fortnight by a push notification (PAY-04 of the recette of
+ * 16/11: Telegram alone left the CRM silent), once per account and event (`objectKey` is the event's id), so a run
+ * again, or one after a failed send, rings nothing twice and forgets nothing. `notify` is `null` while push is off.
  */
 export function createDrizzleAgencyShareCheck(
   adminDb: Database,
   totalsOf: SalesTotalsRead,
+  notify: Notify | null,
 ): { run(now: Date, correlationId: string): Promise<number> } {
   return {
     async run(now, correlationId) {
@@ -129,7 +152,46 @@ export function createDrizzleAgencyShareCheck(
           return inserted;
         });
       }
+      if (notify !== null) await tellOwners(adminDb, notify, from, now);
       return published;
     },
   };
+}
+
+/** Every alert on the agency's share of the fortnight `from`, to every owner's account, in the agency's zone. */
+async function tellOwners(adminDb: Database, notify: Notify, from: PayPeriod, now: Date): Promise<void> {
+  const { owners, alerts, timeZone } = await withAdmin(adminDb, async (tx) => {
+    const ownerRows = await tx.execute(sql`select id from "user" where role = 'owner' order by id`);
+    const alertRows = await tx.execute(sql`
+      select e.id, e.type, e.payload, c.display_name
+        from domain_events e
+        join creators c on c.id = e.creator_id
+       where e.type in ('agency_share_mismatch', 'agency_share_changed')
+         -- Published after the fortnight ends: bounded by time, as the outbox is never purged.
+         and e.created_at >= ${from}::date
+         and e.payload->>'from' = ${from}
+       order by e.created_at, e.id`);
+    return {
+      owners: ownerRows.rows.map((row) => OwnerRowSchema.parse(row).id),
+      alerts: alertRows.rows.map((row) => {
+        const parsed = AlertRowSchema.parse(row);
+        return { id: parsed.id, alert: alertOf(parsed), name: parsed.display_name };
+      }),
+      timeZone: await agencyTimeZone(tx),
+    };
+  });
+  for (const { id, alert, name } of alerts) {
+    for (const userId of owners) {
+      await notify(
+        {
+          userId,
+          reason: 'agency_share',
+          objectKey: id,
+          timeZone,
+          message: agencyShareAlertMessage(alert, name),
+        },
+        now,
+      );
+    }
+  }
 }

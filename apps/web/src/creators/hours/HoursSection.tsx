@@ -223,7 +223,7 @@ function HoursForm({
         <div className="ps-head__top">
           <div className="ps-head__who">
             {/* The switch above says « Heures d'activité »: the card is titled by whose clock it reads (CREA-24). */}
-            <h2 className="ps-title">{clockHeader(creatorName, stored.timeZone)}</h2>
+            <h2 className="nv-h2 ps-title">{clockHeader(creatorName, stored.timeZone)}</h2>
           </div>
           <div className="ps-head__actions">
             {changed && !saving && !sameHours(draft, stored.hours) ? (

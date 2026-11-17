@@ -5,11 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PasswordPrompt } from './PasswordPrompt';
 import { ServicesSection } from './ServicesSection';
-import { fetchOverview, ServicesError } from './api';
+import { fetchOverview, probeNow, ServicesError } from './api';
 
 vi.mock('./api', async (actual) => ({
   ...(await actual<typeof import('./api')>()),
   fetchOverview: vi.fn(),
+  probeNow: vi.fn(),
 }));
 
 afterEach(() => {
@@ -29,6 +30,9 @@ function status(provider: ProviderStatus['provider'], patch: Partial<ProviderSta
     facts: [],
     settings: {},
     voices: [],
+    probe: null,
+    activity: null,
+    quota: null,
     ...patch,
   };
 }
@@ -95,11 +99,60 @@ describe('Réglages › Modèles IA', () => {
     expect(screen.queryByText(/environnement de développement/)).toBeNull();
   });
 
-  it('says the server does not answer, then what could not be read', async () => {
+  it('runs an « Essai réel » on a click, says what it costs, and shows the answer with the day of calls', async () => {
+    const before: ProviderOverview = {
+      services: [
+        status('mistral', {
+          activity: { calls: 3, troubled: 0, asFallback: 3, lastSuccessAt: null, lastTrouble: null },
+        }),
+      ],
+      next: { kind: 'all_set', lead: 'Tout est connecté', detail: 'd' },
+    };
+    const probed = status('mistral', {
+      probe: { at: new Date().toISOString(), outcome: 'no_credit', latencyMs: 300, model: 'Mistral Large 4' },
+    });
+    vi.mocked(fetchOverview)
+      .mockResolvedValueOnce(before)
+      .mockResolvedValue({ ...before, services: [probed] });
+    vi.mocked(probeNow).mockResolvedValue(probed);
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(<ServicesSection />);
+    expect(await screen.findByText('3 appels, sans erreur')).toBeTruthy();
+    expect(screen.getByText('En relais de Grok')).toBeTruthy();
+    const button = screen.getByRole('button', { name: 'Essai réel' });
+    // The cost is written beside the button, never in a tooltip the phone and the keyboard cannot reach.
+    expect(button.hasAttribute('title')).toBe(false);
+    expect(screen.getByText(/moins d’un centime/)).toBeTruthy();
+    fireEvent.click(button);
+    expect(vi.mocked(probeNow)).toHaveBeenCalledWith('mistral');
+    expect(await screen.findByText('Plus de crédit')).toBeTruthy();
+    expect(screen.getByText(/recharge-le dans la console/)).toBeTruthy();
+    // The answer and its hint are siblings: two keys, or React shows the old answer beside the new one.
+    expect(warn.mock.calls.some((args) => String(args[0]).includes('same key'))).toBe(false);
+    warn.mockRestore();
+  });
+
+  it('shows ElevenLabs’ month and says its free offer, with no « Essai réel » for a key of the environment', async () => {
+    vi.mocked(fetchOverview).mockResolvedValue({
+      services: [
+        status('elevenlabs', {
+          quota: { used: 2_500, limit: 10_000, resetsAt: '2026-12-01T00:00:00Z', plan: 'free' },
+        }),
+        status('xai', { source: 'environment' }),
+      ],
+      next: { kind: 'all_set', lead: 'Tout est connecté', detail: 'd' },
+    });
+    render(<ServicesSection />);
+    expect(await screen.findByRole('meter', { name: 'Caractères ElevenLabs utilisés ce mois' })).toBeTruthy();
+    expect(screen.getByText(/l’usage commercial n’y est pas autorisé/)).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Essai réel' })).toHaveLength(1);
+  });
+
+  it('says the server does not answer, then what to do', async () => {
     vi.mocked(fetchOverview).mockRejectedValue(new ServicesError('unavailable', 'GET : 500'));
     render(<ServicesSection />);
     expect(await screen.findByText('Le serveur ne répond pas')).toBeTruthy();
-    expect(screen.getByText('L’état des clés n’a pas pu être lu. Réessaie dans un instant.')).toBeTruthy();
+    expect(screen.getByText('Réessaie dans un instant.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
 });

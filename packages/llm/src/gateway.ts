@@ -14,8 +14,8 @@ import { generateText, transcribe as transcribeAudio } from 'ai';
 import { budgetStatus, type BudgetStatus } from './budget';
 import type { LlmCallLog } from './call-log';
 import { classify, createCallRunner } from './call-runner';
-import { acceptsInput, MODELS, TRANSCRIPTION_MODEL } from './catalog';
-import type { ProviderId } from './config';
+import { acceptsInput, costUsd, findModel, MODELS, TRANSCRIPTION_MODEL } from './catalog';
+import { LlmRoleSchema, type ProviderId } from './config';
 import {
   alertsBlock,
   describeBrief,
@@ -37,7 +37,7 @@ import type {
 import { computeHealth } from './health';
 import { loadPrompt, renderPrompt } from './prompts';
 import {
-  BriefSchema,
+  BriefFromModelSchema,
   ChannelPollOutputSchema,
   ChannelPostOutputSchema,
   JudgeOutputSchema,
@@ -50,6 +50,10 @@ import { dropSenseContent, senseContent } from './sense-content';
 import { wrapUntrusted } from './untrusted';
 
 export type * from './gateway-types';
+
+/** « Réponds seulement : ok » needs two; Grok's short reasoning shares the budget, and a cut answer still proves the call. */
+const PROBE_MAX_OUTPUT_TOKENS = 16;
+const PROBE_TIMEOUT_MS = 20_000;
 
 export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const now = deps.now ?? (() => new Date());
@@ -209,7 +213,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         prompts.brain,
         system,
         () => Promise.resolve(toMessages(input.history)),
-        BriefSchema,
+        BriefFromModelSchema,
         input.trace,
       );
     },
@@ -425,32 +429,71 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     },
 
     async testConnection(provider) {
-      // Test the model the config actually uses for this provider, else the first one the catalog knows.
-      const configured = Object.values(deps.config.roles)
-        .flatMap((role) => [role, ...(role.fallback ? [role.fallback] : [])])
-        .find((ref) => ref.provider === provider);
-      const ref = configured ?? MODELS.find((m) => m.provider === provider);
-      if (ref === undefined) return { provider, isOk: false, outcome: 'unknown_model' };
+      // The owner's « Essai réel » (ADR 0091 § 7): the model the config actually uses for this provider (its first role
+      // or fallback), else the first one the catalog knows. One tiny call, journaled under `probe` so its cost counts,
+      // stopped by the day's cap like any other, and kept out of the agent's health (health.ts).
+      const configured = LlmRoleSchema.options
+        .flatMap((role) => {
+          const config = deps.config.roles[role];
+          return [
+            { role, ref: { provider: config.provider, model: config.model } },
+            ...(config.fallback ? [{ role, ref: config.fallback }] : []),
+          ];
+        })
+        .find(({ ref }) => ref.provider === provider);
+      const known = MODELS.find((m) => m.provider === provider);
+      const target = configured ?? (known === undefined ? undefined : { role: 'brain' as const, ref: known });
+      if (target === undefined) return { provider, isOk: false, outcome: 'unknown_model' };
+      const { role, ref } = target;
+      const named = { model: ref.model, modelLabel: findModel(ref)?.label ?? ref.model };
       const model = deps.resolveModel(ref);
-      if (model === undefined) return { provider, isOk: false, model: ref.model, outcome: 'missing_key' };
+      if (model === undefined) return { provider, isOk: false, ...named, outcome: 'missing_key' };
+      if (overBudget('probe') !== undefined)
+        return { provider, isOk: false, ...named, outcome: 'budget_reached' };
       const startedAt = now().getTime();
+      const base = {
+        role,
+        provider: ref.provider,
+        model: ref.model,
+        promptHash: 'probe',
+        isFallback: false,
+        purpose: 'probe',
+      } as const;
       try {
-        await generateText({
+        const answer = await generateText({
           model,
           prompt: 'Réponds seulement : ok',
-          maxOutputTokens: 5,
+          maxOutputTokens: PROBE_MAX_OUTPUT_TOKENS,
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(15_000),
+          abortSignal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+          ...(ref.provider === 'xai' && { providerOptions: { xai: { reasoningEffort: 'low' } } }),
         });
-        return {
-          provider,
-          isOk: true,
-          model: ref.model,
-          latencyMs: now().getTime() - startedAt,
+        const latencyMs = now().getTime() - startedAt;
+        const cost = costUsd(ref, answer.usage);
+        log.append({
+          ...base,
+          at: now(),
           outcome: 'ok',
-        };
+          latencyMs,
+          ...(answer.usage.inputTokens !== undefined && { inputTokens: answer.usage.inputTokens }),
+          ...(answer.usage.outputTokens !== undefined && { outputTokens: answer.usage.outputTokens }),
+          ...(cost !== undefined && { costUsd: cost }),
+        });
+        return { provider, isOk: true, ...named, latencyMs, outcome: 'ok' };
       } catch (error) {
-        return { provider, isOk: false, model: ref.model, outcome: classify(error).outcome };
+        const latencyMs = now().getTime() - startedAt;
+        const { outcome, message, usage, refusedStatus } = classify(error);
+        if (refusedStatus !== undefined) reportRefusal(ref.provider, refusedStatus);
+        const cost = usage === undefined ? undefined : costUsd(ref, usage);
+        log.append({
+          ...base,
+          at: now(),
+          outcome,
+          latencyMs,
+          errorMessage: message.slice(0, 200),
+          ...(cost !== undefined && { costUsd: cost }),
+        });
+        return { provider, isOk: false, ...named, latencyMs, outcome };
       }
     },
   };

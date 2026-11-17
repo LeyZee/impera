@@ -158,7 +158,7 @@ export function CheckPanel({
   return (
     <section className="nv-plate sf-check" aria-labelledby={`${id}-title`}>
       <header className="sf-links__head sf-check__head">
-        <h3 id={`${id}-title`} className="sf-links__title">
+        <h3 id={`${id}-title`} className="nv-h3 sf-links__title">
           Vérification de fiabilité
         </h3>
         <p className="sv-muted">

@@ -94,6 +94,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       />
     ));
     const agency = await screen.findByRole('radio', { name: /Toute l’agence/u });
+    // A title, as on every screen (recette visuelle 16/11, PIL-04).
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
     expect(agency.getAttribute('aria-checked')).toBe('true');
     expect(agency.tabIndex).toBe(0);
     expect(await screen.findByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();

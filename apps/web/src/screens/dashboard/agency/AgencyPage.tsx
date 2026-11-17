@@ -13,6 +13,8 @@ import '../dashboard.css';
 
 import { AgencyInsightsPanel } from './AgencyInsights';
 
+import { PageHeader } from '@/shell/layout';
+
 /**
  * The Dashboard of the owner and of an active manager, before any creator is chosen (ADR 0078): « Toute l'agence »
  * checked in front of the creators' chips, what waits on the agency, then the agency's figures. A creator's chip opens
@@ -43,6 +45,8 @@ export function AgencyPage({
   if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
   return (
     <div className="db">
+      {/* The screen's title, as on every other one (recette visuelle 16/11, PIL-04): the rest of the Dashboard as it was. */}
+      <PageHeader title="Dashboard" />
       <header className="db-top nv-enter">
         <CreatorPicker onChoose={onCreator} agency={{ selected: true, onChoose: () => undefined }} />
       </header>

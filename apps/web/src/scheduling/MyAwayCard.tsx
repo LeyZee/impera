@@ -21,7 +21,7 @@ export function MyAwayCard({ status }: { status: MyAwayStatus }): JSX.Element {
           </svg>
         </span>
         <div className="sc-off__text">
-          <h2 className="sc-off__title">{words.title}</h2>
+          <h2 className="nv-h2 sc-off__title">{words.title}</h2>
           <p className="sc-off__lead">{words.text}</p>
         </div>
       </div>

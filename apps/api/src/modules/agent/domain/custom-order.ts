@@ -20,6 +20,10 @@ export interface CustomOrderContext {
    * and no chatter is called: nothing is promised to a fan who may be stopped.
    */
   readonly flags: FanFlags | undefined;
+  /** His age is confirmed now, by a human, by what he says or by his card: no order opens without it (M3). */
+  readonly ageConfirmed?: boolean;
+  /** He asks for something she never does (`never_do`): declined softly, never « je vais y réfléchir » (M3). */
+  readonly neverDoes?: boolean;
 }
 
 export type CustomOrderDecision =
@@ -48,11 +52,14 @@ export function customOrderDecision(context: CustomOrderContext): CustomOrderDec
   if (
     flags?.doNotContact === true ||
     flags?.salesFrozen !== undefined ||
-    context.risks.some((risk) => NO_SALE_RISKS.includes(risk))
+    context.risks.some((risk) => NO_SALE_RISKS.includes(risk)) ||
+    context.neverDoes === true
   ) {
     return { kind: 'reply', brief: CUSTOM_ORDER_DECLINE_BRIEF, opens: false };
   }
-  if (flags === undefined) return { kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: false };
+  // Unknown limits, or his age not confirmed: she commits to nothing, and no order opens nor chatter is called.
+  if (flags === undefined || context.ageConfirmed === false)
+    return { kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: false };
   if (context.orderOpen) return { kind: 'reply', brief: CUSTOM_ORDER_OPEN_BRIEF, opens: false };
   if (context.chatterOnShift) return { kind: 'handoff' };
   return { kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: true };
