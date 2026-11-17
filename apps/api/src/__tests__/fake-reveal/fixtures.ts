@@ -75,6 +75,7 @@ export function defaultFixture(): FakeFixture {
         mediaIds: [`media_${pad(((s * 3 + step) % 15) + 1)}`],
         teasingMediaIds: step === 0 ? [] : [`media_${pad(((s * 3 + step + 7) % 15) + 1)}`],
         priceCents,
+        discount: null,
         createdAt: at(10 + s * 3 + step),
       });
       return scriptId;

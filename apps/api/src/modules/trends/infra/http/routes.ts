@@ -219,8 +219,18 @@ export function createTrendRoutes(
           response: { 200: ContentIdeaListSchema },
         },
       },
-      (request) =>
-        decide.ideas.ofDay(request.params.creatorId, actorOf(request).userId, request.query.day, new Date()),
+      async (request) => {
+        const { unreadable, ...day } = await decide.ideas.ofDay(
+          request.params.creatorId,
+          actorOf(request).userId,
+          request.query.day,
+          new Date(),
+        );
+        // Left out of her day rather than failing it (recette PIL-19), and said here, never in silence.
+        if (unreadable.length > 0)
+          request.log.warn({ ideaIds: unreadable }, 'content ideas unreadable: left out of the day');
+        return day;
+      },
     );
 
     app.post(

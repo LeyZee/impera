@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorSalesPage } from './CreatorSalesPage';
@@ -136,6 +136,8 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     expect(screen.getByText('vince.r')).toBeDefined();
     expect(screen.queryByRole('button', { name: /vince\.r/u })).toBeNull();
     expect(screen.getByText(/pas encore de conversation/u)).toBeDefined();
+    // Before a fan is chosen, the reading side says so on a plate of its own (recette CRE-04).
+    expect(screen.getByText('Choisis un fan pour lire sa conversation.').closest('.nv-plate')).not.toBeNull();
     fireEvent.click(open);
     expect(onSelect).toHaveBeenCalledWith(CONV_A);
   });
@@ -178,6 +180,30 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     show(null);
     expect(await screen.findByText(/Tes fans n’ont pas pu être lus/u)).toBeDefined();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
+  });
+
+  it('says once that the server does not answer when her fans and their figures both fail (CRE-31)', async () => {
+    const fetcher = serve({
+      '/v1/creator-space/fans': { status: 500, body: null },
+      '/v1/creator-space/fan-insights': { status: 500, body: null },
+    });
+    show(null);
+    expect(await screen.findByText(/Tes fans et leurs chiffres n’ont pas pu être lus/u)).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByText(/Les chiffres de tes fans n’ont pas pu être lus/u)).toBeNull();
+    });
+    const retry = screen.getAllByRole('button', { name: 'Réessayer' });
+    expect(retry).toHaveLength(1);
+    fetcher.mockClear();
+    const [again] = retry;
+    if (again === undefined) throw new Error('no retry');
+    fireEvent.click(again);
+    await waitFor(() => {
+      const paths = fetcher.mock.calls.map(([url]) => String(url).split('?')[0]);
+      expect(paths).toEqual(
+        expect.arrayContaining(['/v1/creator-space/fans', '/v1/creator-space/fan-insights']),
+      );
+    });
   });
 
   it('says she has no fan yet', async () => {

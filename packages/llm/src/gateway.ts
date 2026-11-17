@@ -37,7 +37,7 @@ import type {
 import { computeHealth } from './health';
 import { loadPrompt, renderPrompt } from './prompts';
 import {
-  BriefSchema,
+  BriefFromModelSchema,
   ChannelPollOutputSchema,
   ChannelPostOutputSchema,
   JudgeOutputSchema,
@@ -213,7 +213,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         prompts.brain,
         system,
         () => Promise.resolve(toMessages(input.history)),
-        BriefSchema,
+        BriefFromModelSchema,
         input.trace,
       );
     },

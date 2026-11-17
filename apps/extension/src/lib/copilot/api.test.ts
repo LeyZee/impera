@@ -85,6 +85,7 @@ describe('what the panel reads with the CRM’s session (ADR 0086 § 8)', () => 
     expect(await readStanding(ORIGIN, id(1), id(2), id(3), both)).toEqual({
       flags: { fragile: true },
       band: 'playful',
+      fanName: detail.fanDisplayName,
     });
     expect(
       vi
@@ -98,6 +99,7 @@ describe('what the panel reads with the CRM’s session (ADR 0086 § 8)', () => 
     expect(await readStanding(ORIGIN, id(1), id(2), id(3), answer(502, null))).toEqual({
       flags: 'unread',
       band: null,
+      fanName: null,
     });
   });
 });

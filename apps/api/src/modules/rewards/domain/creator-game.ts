@@ -175,8 +175,16 @@ function progressOf(kind: CreatorGainKind, streaks: CreatorStreaks): TrophyCaseI
     const target = DELIVERY_STREAK_TROPHIES[kind];
     return { current: Math.min(streaks.delivery.current, target), target, unit: 'delivery' };
   }
-  return null;
+  // A trophy of one gesture, still ahead: 0 of 1, so that, tied with a streak at nothing, the one gesture comes
+  // first as her next trophy (recette 16/11, CRE-14): « Premier dépôt » before « 5 livraisons à l'heure ».
+  return { current: 0, target: 1, unit: 'once' };
 }
+
+/**
+ * Trophies whose signal does not exist yet (ADR 0107 § 3, ADR 0108 § 18): never shown as if she could earn them,
+ * until the server reads what they need (recette 16/11, CRE-17).
+ */
+const WITHOUT_SIGNAL: readonly CreatorGainKind[] = ['full_stock', 'hit_content'];
 
 /**
  * Her trophy case (§ 10, contracts `trophy-case.ts`): every medal and trophy of her lists, earned or ahead. A medal
@@ -187,7 +195,10 @@ export function creatorTrophyCaseOf(
   gains: readonly StoredCreatorGain[],
   streaks: CreatorStreaks,
 ): TrophyCase {
-  const items: TrophyCaseItem[] = CREATOR_GAIN_KINDS.map((kind) => {
+  const shown = CREATOR_GAIN_KINDS.filter(
+    (kind) => !WITHOUT_SIGNAL.includes(kind) || gains.some((one) => one.kind === kind),
+  );
+  const items: TrophyCaseItem[] = shown.map((kind) => {
     const gain = gains.find((one) => one.kind === kind);
     return {
       kind,

@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react';
 
 import { completeFile, uploadPlan } from './api';
 import type { LiveSend } from './model';
-import { pause, putPart, sendFile, type UploadDoors } from './upload';
+import { UploadStopped, pause, putPart, sendFile, type UploadDoors } from './upload';
 
 /*
  * The sends this phone runs, one file after the other, each in parts (`upload.ts`). Their progress lives here only:
@@ -14,6 +14,10 @@ import { pause, putPart, sendFile, type UploadDoors } from './upload';
 const listeners = new Set<() => void>();
 let live: ReadonlyMap<ContentDropFileId, LiveSend> = new Map();
 let queue: Promise<void> = Promise.resolve();
+/** The file of each send, kept on this phone until it is sent: a send that failed goes again without the gallery. */
+const kept = new Map<ContentDropFileId, { readonly dropId: ContentDropId; readonly file: Blob }>();
+/** Ends the pause of a send waiting to try again: « Réessayer » tries at once. */
+const wakers = new Map<ContentDropFileId, () => void>();
 
 function set(fileId: ContentDropFileId, send: LiveSend): void {
   const next = new Map(live);
@@ -71,6 +75,33 @@ const doorsOf = (dropId: ContentDropId, fileId: ContentDropFileId): UploadDoors 
   pause,
 });
 
+/** A pause that « Réessayer » ends early. */
+const wakeable =
+  (fileId: ContentDropFileId, doors: UploadDoors): UploadDoors['pause'] =>
+  (ms, signal) =>
+    new Promise<void>((resolve, reject) => {
+      wakers.set(fileId, resolve);
+      doors.pause(ms, signal).then(resolve, reject);
+    }).finally(() => {
+      wakers.delete(fileId);
+    });
+
+/** « Réessayer » on a send that waits to try again: it tries at once. */
+export function retryNow(fileId: ContentDropFileId): void {
+  wakers.get(fileId)?.();
+}
+
+/** Whether this phone still holds the file of a send that failed: « Réessayer » sends it again without the gallery. */
+export const holds = (fileId: ContentDropFileId): boolean => kept.has(fileId);
+
+/** Sends again, with the file this phone still holds, each send that failed; those it does not hold are left. */
+export function sendAgain(fileIds: readonly ContentDropFileId[], onSettled: () => void): void {
+  for (const fileId of fileIds) {
+    const held = kept.get(fileId);
+    if (held !== undefined) void queueSend(held.dropId, fileId, held.file, onSettled);
+  }
+}
+
 /**
  * Sends `file` as file `fileId` of drop `dropId`, after the sends already queued: one file at a time, so that the
  * first one is whole as soon as possible. Resolves when it is sent or failed; `onSettled` then reads the drop again.
@@ -83,6 +114,7 @@ export function queueSend(
   doors: UploadDoors = doorsOf(dropId, fileId),
 ): Promise<void> {
   set(fileId, { sent: 0, total: file.size, rate: null, phase: 'queued' });
+  kept.set(fileId, { dropId, file });
   const run = async (): Promise<void> => {
     await keepAwake(true);
     let last = { at: performance.now(), sent: 0 };
@@ -90,7 +122,7 @@ export function queueSend(
     try {
       await sendFile(
         file,
-        doors,
+        { ...doors, pause: wakeable(fileId, doors) },
         ({ sent, phase }) => {
           const now = performance.now();
           if (phase === 'sending' && now - last.at >= 1000) {
@@ -99,12 +131,15 @@ export function queueSend(
             last = { at: now, sent };
           }
           const before = live.get(fileId)?.sent ?? 0;
-          set(fileId, { sent: phase === 'waiting' ? before : sent, total: file.size, rate, phase });
+          set(fileId, { sent: phase === 'sending' ? sent : before, total: file.size, rate, phase });
         },
         new AbortController().signal,
       );
+      kept.delete(fileId);
       set(fileId, { sent: file.size, total: file.size, rate, phase: 'done' });
-    } catch {
+    } catch (error) {
+      // Refused or withdrawn: sending it again would change nothing.
+      if (error instanceof UploadStopped) kept.delete(fileId);
       set(fileId, { sent: live.get(fileId)?.sent ?? 0, total: file.size, rate: null, phase: 'failed' });
     } finally {
       if (!isSending()) await keepAwake(false);
@@ -118,6 +153,8 @@ export function queueSend(
 /** Tests only: forgets every send. */
 export function forgetSends(): void {
   live = new Map();
+  kept.clear();
+  wakers.clear();
   queue = Promise.resolve();
   for (const listener of listeners) listener();
 }

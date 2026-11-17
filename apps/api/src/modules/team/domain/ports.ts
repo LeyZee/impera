@@ -1,4 +1,5 @@
 import type {
+  AuditEntryId,
   CommissionPreset,
   CommissionPresetId,
   CommissionRate,
@@ -12,6 +13,7 @@ import type {
   TeamMemberNote,
   TeamMemberNoteId,
   TeamMemberStatus,
+  TeamMemberTimeZoneHistory,
   TeamPlatformRemoval,
   TeamRole,
   TeamRoleChange,
@@ -126,6 +128,18 @@ export interface TeamStore {
     id: TeamMemberId,
     note: { readonly id: TeamMemberNoteId; readonly body: string },
   ): Promise<TeamMemberNote>;
+  /**
+   * The actor's own record takes `zone`, the session saying whose (`follow_own_time_zone`, migration 0217): nothing
+   * when it is his already, when he left, or after 10 changes that day. The zone his record keeps; `null` when he has
+   * no record. `request_invalid` for a zone the server's time zone base does not know.
+   */
+  followTimeZone(actor: UserId, zone: string): Promise<string | null>;
+  /** Owner. A page of the changes his phone made to the member's zone, newest first; `null` for an unknown member. */
+  timeZoneChanges(
+    actor: UserId,
+    id: TeamMemberId,
+    before: AuditEntryId | null,
+  ): Promise<TeamMemberTimeZoneHistory | null>;
 }
 
 /** A platform's team account, which a member is invited from (ADR 0076 § 3). */

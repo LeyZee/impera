@@ -50,6 +50,23 @@ describe('customOrderDecision (ADR 0090 § A)', () => {
     expect(customOrderDecision({ ...asks, flags: { doNotContact: true } })).toEqual(declined);
   });
 
+  it('declines softly what she never does, never « je vais y réfléchir » (audit du 16/11, M3)', () => {
+    expect(customOrderDecision({ ...asks, neverDoes: true, chatterOnShift: true })).toEqual({
+      kind: 'reply',
+      brief: CUSTOM_ORDER_DECLINE_BRIEF,
+      opens: false,
+    });
+  });
+
+  it('opens no order and calls no chatter while his age is not confirmed (audit du 16/11, M3)', () => {
+    expect(customOrderDecision({ ...asks, ageConfirmed: false, chatterOnShift: true })).toEqual({
+      kind: 'reply',
+      brief: CUSTOM_ORDER_WAIT_BRIEF,
+      opens: false,
+    });
+    expect(customOrderDecision({ ...asks, ageConfirmed: true })).toMatchObject({ opens: true });
+  });
+
   it('with his limits unknown, commits to nothing and opens nothing', () => {
     expect(customOrderDecision({ ...asks, flags: undefined, chatterOnShift: true })).toEqual({
       kind: 'reply',

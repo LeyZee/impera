@@ -12,7 +12,7 @@ ADR 0091 (§ 7), ADR 0016, `apps/api/src/modules/providers`, `packages/llm/src/g
 
 ## À faire
 - [x] Passerelle : `testConnection` journalisé sous `probe`, arrêté par le plafond, refus de clé signalé, hors de la santé de l'agent.
-- [x] Migration 0224 (numéro provisoire, fixé au signal de fusion) : usage `probe`, dernier essai et mois d'ElevenLabs dans `provider_credentials`.
+- [x] Migration 0221 : usage `probe`, dernier essai et mois d'ElevenLabs dans `provider_credentials`.
 - [x] Module `providers` : essai réel par service (passerelle pour Grok, Gemini, Mistral ; « ok » prononcé pour ElevenLabs), un à la fois par service ; santé sur 24 h depuis `llm_calls` ; mois d'ElevenLabs lu par la vérification.
 - [x] Route `POST /v1/settings/providers/:provider/probe` (propriétaire, quatre par minute).
 - [x] Module `ai-usage` : usage « Essais réels », carte ElevenLabs (`voice`).

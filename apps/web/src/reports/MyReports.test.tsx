@@ -163,6 +163,8 @@ describe('Aujourd’hui › Mes rapports (recette 05/11)', () => {
       ['Sans effet sur la paie', 'rp-chip rp-chip--neutral'],
       ['Sans effet sur la paie', 'rp-chip rp-chip--neutral'],
     ]);
-    expect(screen.getByRole('link', { name: 'Ta commission est dans Commissions' })).toBeTruthy();
+    const toPay = screen.getByRole('link', { name: 'Ta commission est dans Commissions' });
+    // A thumb's target around a line of small text (recette CHT-22).
+    expect(toPay.classList.contains('nv-hit')).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  AuditEntryIdSchema,
   CommissionPresetIdSchema,
   CreatorIdSchema,
   TeamMemberIdSchema,
@@ -202,6 +203,52 @@ export type SetTeamRoleBody = z.infer<typeof SetTeamRoleBodySchema>;
 
 /** `GET /v1/team/members/:memberId/role`: every role, newest first, those still to come included. */
 export const TeamRoleHistorySchema = z.object({ roles: z.array(TeamRoleChangeSchema) });
+
+/**
+ * A zone as a phone gives it (`Intl.DateTimeFormat().resolvedOptions().timeZone`), of the IANA regions only:
+ * « Région/Ville » (Africa … Pacific), 64 characters at most. Never `Etc/`, `posix/`, `UTC`, `Factory` nor
+ * `localtime`: a phone that gives one leaves the record's zone as it is.
+ */
+export const DEVICE_TIME_ZONE_PATTERN =
+  /^(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific)\/[A-Za-z0-9_+-]+(\/[A-Za-z0-9_+-]+)?$/u;
+export const DeviceTimeZoneSchema = z.string().max(64).regex(DEVICE_TIME_ZONE_PATTERN).pipe(TimezoneSchema);
+
+/**
+ * `PUT /v1/team/me/time-zone` (recette CHT-01, Charles 16/11): the zone of the phone the app opens on, for the member's
+ * own record and nothing else; no member is named, the session says whose. The zone is display only (his planning's
+ * hours, a report's reminder, « Mes chiffres »): pay, its fortnights and its thresholds keep the agency's.
+ */
+export const FollowTimeZoneBodySchema = z.strictObject({ timeZone: DeviceTimeZoneSchema });
+export type FollowTimeZoneBody = z.infer<typeof FollowTimeZoneBodySchema>;
+
+/**
+ * The zone the record keeps: the one asked, or the one it had when it was his already, when he left, or after 10
+ * changes that day.
+ */
+export const OwnTimeZoneSchema = z.object({ timeZone: TimezoneSchema });
+export type OwnTimeZone = z.infer<typeof OwnTimeZoneSchema>;
+
+/** A change of a member's zone made by his phone: the zone before and after, never an IP nor a device. */
+export const TeamMemberTimeZoneChangeSchema = z.object({
+  id: AuditEntryIdSchema,
+  from: TimezoneSchema,
+  to: TimezoneSchema,
+  at: z.iso.datetime(),
+});
+export type TeamMemberTimeZoneChange = z.infer<typeof TeamMemberTimeZoneChangeSchema>;
+
+/** A page of `GET /v1/team/members/:memberId/time-zones`. */
+export const TIME_ZONE_CHANGES_PAGE = 20;
+
+/** `?before=`: the page older than this change, the newest page without it. */
+export const TimeZoneChangesQuerySchema = z.strictObject({ before: AuditEntryIdSchema.optional() });
+
+/** The owner alone: newest first, `nextBefore` for the page after, `null` on the last one. */
+export const TeamMemberTimeZoneHistorySchema = z.object({
+  changes: z.array(TeamMemberTimeZoneChangeSchema).max(TIME_ZONE_CHANGES_PAGE),
+  nextBefore: AuditEntryIdSchema.nullable(),
+});
+export type TeamMemberTimeZoneHistory = z.infer<typeof TeamMemberTimeZoneHistorySchema>;
 
 /** An internal note, read by the owner and the active managers only, never by the member it is about. */
 export const TeamMemberNoteSchema = z.object({
