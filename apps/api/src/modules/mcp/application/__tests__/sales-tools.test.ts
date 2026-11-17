@@ -5,10 +5,13 @@ import {
   McpSalesListSchema,
   newId,
   PlatformAccountIdSchema,
+  DailyStatsOfCreatorSchema,
+  McpDailyStatsListSchema,
   SalesOfCreatorSchema,
   TeamMemberIdSchema,
   UserIdSchema,
   type CreatorId,
+  type DailyStatsOfCreator,
   type SalesOfCreator,
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
@@ -94,6 +97,43 @@ const read: SalesOfCreator = SalesOfCreatorSchema.parse({
   readings: [{ platform: 'reveal', readAt: '2026-11-07T23:00:00.000Z', pausedUntil: null }],
 });
 
+/** Lea's account's two days, one the platform has not finished computing. */
+const stats: DailyStatsOfCreator = DailyStatsOfCreatorSchema.parse({
+  creatorId: lea,
+  from: week.from,
+  to: week.to,
+  days: [
+    {
+      platform: 'reveal',
+      platformAccountId: account,
+      day: '2026-11-01',
+      newSubscribers: 3,
+      unsubscribes: 1,
+      activeSubscribers: 120,
+      renewals: 4,
+      ppvSent: 10,
+      ppvPurchased: 2,
+      messagesSent: 80,
+      messagesReceived: 95,
+      readAt: '2026-11-02T06:00:00.000Z',
+    },
+    {
+      platform: 'reveal',
+      platformAccountId: account,
+      day: '2026-11-02',
+      newSubscribers: 1,
+      unsubscribes: null,
+      activeSubscribers: 121,
+      renewals: null,
+      ppvSent: null,
+      ppvPurchased: 0,
+      messagesSent: null,
+      messagesReceived: null,
+      readAt: '2026-11-03T06:00:00.000Z',
+    },
+  ],
+});
+
 function sources(): {
   sales: SalesReader & { asked: [string, readonly CreatorId[], { from: string; to: string }][] };
   creators: CreatorReader & { asked: (readonly CreatorId[] | 'all')[] };
@@ -109,6 +149,11 @@ function sources(): {
         return Promise.resolve([
           { ...read, ...{ agencyMinor: 300, creatorMinor: 500, rateBasisPoints: 2000 } },
         ]);
+      },
+      dailyStats: (userId, creatorIds, range) => {
+        salesAsked.push([userId, creatorIds, range]);
+        // What the connectors could give besides, never copied: a fan and an amount.
+        return Promise.resolve([{ ...stats, ...{ topFan: 'fan-invente', revenueMinor: 9_999 } }]);
       },
     },
     creators: {
@@ -213,5 +258,38 @@ describe('sales_list (ADR 0105 § 3 and § 4, read:sales, decision A)', () => {
     expect(McpSalesInputSchema.safeParse({ from: '2026-08-01', to: '2026-11-01' }).success).toBe(true);
     expect(McpSalesInputSchema.safeParse({ from: '2026-08-01', to: '2026-11-02' }).success).toBe(false);
     expect(McpSalesInputSchema.safeParse({ ...week, seller: 'x' }).success).toBe(false);
+  });
+});
+
+describe('platform_daily_stats_list (ADR 0081, ADR 0105 § 4, read:status)', () => {
+  it('reads as the access’s person, and gives the platform’s counters only, unknown ones as null', async () => {
+    const { sales, creators } = sources();
+    const tool = salesTools(sales, creators)['platform_daily_stats_list'];
+    if (tool === undefined) throw new Error('no platform_daily_stats_list');
+    const out = McpDailyStatsListSchema.parse(
+      await tool.run({ grant, actor: manager, creatorId: null }, week),
+    );
+    expect(creators.asked).toEqual([[lea]]);
+    expect(sales.asked).toEqual([[grant.userId, [lea], week]]);
+    expect(out.creators.map((one) => one.creatorId)).toEqual([lea]);
+    expect(out.creators[0]?.days.map((one) => [one.day, one.activeSubscribers, one.renewals])).toEqual([
+      ['2026-11-01', 120, 4],
+      ['2026-11-02', 121, null],
+    ]);
+    const text = JSON.stringify(out);
+    for (const leak of ['fan-invente', 'revenueMinor', 'topFan']) expect(text).not.toContain(leak);
+  });
+
+  it('reads the access’s creator only when it is bound, and nothing when the person reads none', async () => {
+    const { sales, creators } = sources();
+    const tool = salesTools(sales, creators)['platform_daily_stats_list'];
+    if (tool === undefined) throw new Error('no platform_daily_stats_list');
+    await tool.run({ grant, actor: manager, creatorId: nora }, week);
+    expect(sales.asked).toEqual([[grant.userId, [nora], week]]);
+    const none = await tool.run(
+      { grant, actor: { ...manager, readableCreatorIds: [] }, creatorId: null },
+      week,
+    );
+    expect(none).toEqual({ from: week.from, to: week.to, creators: [] });
   });
 });

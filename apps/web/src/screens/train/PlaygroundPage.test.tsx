@@ -193,6 +193,25 @@ describe('Playground', () => {
     expect(box).toHaveProperty('value', '');
   });
 
+  it('says the server does not answer on a bare 503, and names Grok only when the server says so (V-ETA-06)', async () => {
+    answer = (method, path) => (method === 'GET' && path === '/v1/playground' ? json(503, null) : undefined);
+    open();
+    const title = await screen.findByText('Le serveur ne répond pas');
+    expect(title.classList.contains('is-warn')).toBe(true);
+    expect(screen.queryByText(/Grok/)).toBeNull();
+    expect(screen.getByText('Réessaie dans un instant.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
+    cleanup();
+    answer = (method, path) =>
+      method === 'GET' && path === '/v1/playground' ? failure(503, 'llm_unavailable') : undefined;
+    open();
+    expect(await screen.findByText('Grok ne répond pas')).toBeTruthy();
+    expect(screen.getByText('Ajoute ou vérifie sa clé dans Réglages › Modèles IA.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ouvrir Modèles IA' }).getAttribute('href')).toBe(
+      '/reglages/modeles-ia',
+    );
+  });
+
   it('names the fan by his first name only, without repeating the fan type in the header', async () => {
     answer = serve({ ...BASE, fanNotes: ['Prénom : Théo'] });
     open();

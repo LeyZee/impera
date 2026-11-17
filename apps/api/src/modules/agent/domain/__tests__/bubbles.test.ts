@@ -10,13 +10,16 @@ describe('bubbleBudget (Charles 16/11 : « trois rarement »)', () => {
     expect(bubbleBudget([her('Coucou'), fan('ça va ?')])).toBe(1);
   });
 
-  it('gives two to two messages of his, or to a long one', () => {
-    expect(bubbleBudget([her('Coucou'), fan('ça va ?'), fan('tu fais quoi')])).toBe(2);
+  it('gives two to a long message, never to two short ones (audit du 16/11, B1)', () => {
+    expect(bubbleBudget([her('Coucou'), fan('ça va ?'), fan('tu fais quoi')])).toBe(1);
+    expect(bubbleBudget([her('Coucou'), fan('ok'), fan('😂')])).toBe(1);
     expect(bubbleBudget([fan('a'.repeat(140))])).toBe(2);
+    expect(bubbleBudget([fan('a'.repeat(70)), fan('b'.repeat(70))])).toBe(2);
   });
 
-  it('gives three only when he wrote three messages or more', () => {
-    expect(bubbleBudget([fan('hey'), fan('t’es là ?'), fan('réponds 😅'), fan('allô')])).toBe(3);
+  it('gives three only when he wrote long in three messages or more', () => {
+    expect(bubbleBudget([fan('hey'), fan('t’es là ?'), fan('réponds 😅'), fan('allô')])).toBe(1);
+    expect(bubbleBudget([fan('a'.repeat(50)), fan('b'.repeat(50)), fan('c'.repeat(50))])).toBe(3);
   });
 
   it('reads only what he wrote since her last message, and gives one to a follow-up', () => {

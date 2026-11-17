@@ -473,6 +473,9 @@ describe('the chatter’s Planning', () => {
     const wednesday = await screen.findByRole('region', { name: 'Mercredi 28 octobre' });
     expect(text(wednesday)).toContain('22 h – 4 h');
     expect(text(wednesday)).not.toContain('En poste');
+    // Away, he holds no shift: the one ahead, at 19 h, is not his to offer (recette 16/11, CHT-31).
+    expect(screen.getByText('19 h – 1 h')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Échanger/u })).toBe(null);
   });
 
   it('keeps a week gone by in its order, with no fold', async () => {

@@ -3,6 +3,7 @@ import {
   INVOICE_ERROR_CODES,
   InvoiceAcceptanceViewSchema,
   InvoiceListSchema,
+  REAUTHENTICATION_ERROR_CODE,
   type ContestInvoiceBody,
   type InvoiceAcceptanceView,
   type InvoiceErrorCode,
@@ -129,6 +130,8 @@ export type InvoiceRefusal =
       readonly code: InvoiceRefusalCode;
       readonly details: z.infer<typeof DetailsSchema>;
     }
+  /** 403 `reauthentication_forbidden` (EQ-15): the password and the code are asked again, then the write runs again. */
+  | { readonly kind: 'reauth' }
   | { readonly kind: 'failed' };
 
 export type InvoiceOutcome<T> = { readonly kind: 'ok'; readonly value: T } | InvoiceRefusal;
@@ -144,6 +147,7 @@ const isKnown = (code: string): code is InvoiceRefusalCode => KNOWN.has(code);
 
 async function refusalOf(response: Response): Promise<InvoiceRefusal> {
   const parsed = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  if (parsed.success && parsed.data.error.code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
   if (!parsed.success || !isKnown(parsed.data.error.code)) return { kind: 'failed' };
   const details = DetailsSchema.safeParse(parsed.data.error.details);
   return { kind: 'refused', code: parsed.data.error.code, details: details.success ? details.data : {} };

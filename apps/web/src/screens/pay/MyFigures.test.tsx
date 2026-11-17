@@ -215,6 +215,19 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
     );
   });
 
+  it('dit sous le montant d’où il vient, net d’abord, comme « Mes relevés » (recette CHT-02, Design)', async () => {
+    period = periodOf(NOV1, [
+      statementOf(THEO, NOV1, { netMinor: 0, commissionMinor: 0, bonusesMinor: 3_000, totalMinor: 3_000 }),
+    ]);
+    renderIn(() => <MyFortnightCard />);
+    await waitFor(() => {
+      expect(text()).toContain('gagné à ce jour, avant validation');
+    });
+    expect(document.querySelector('.mf-figure__parts')?.textContent.replace(NBSP, ' ')).toBe(
+      '0,00 € de net · prime +30,00 €',
+    );
+  });
+
   it('ne promet aucun palier à un manager : la paie ne lui en donne pas', async () => {
     const tiers = tierSetOf(1, NOV1);
     const plain = statementOf(THEO, NOV1);

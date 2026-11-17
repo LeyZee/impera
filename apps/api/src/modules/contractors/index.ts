@@ -1,5 +1,6 @@
 import type { CommissionStatementId } from '@impera/contracts';
 import { withAdmin, type Database } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createPayrollBillingSettings } from './application/billing-settings';
@@ -51,8 +52,11 @@ export { contractorReadsForInvoicing } from './infra/invoicing-reads';
  */
 export interface ContractorsModule {
   readonly name: 'contractors';
-  /** Mounted under `/v1` by the server: `/payroll/billing-settings`, `/payroll/contractors/…`, `/payroll/contract-texts`, `/payroll/billing-regimes`. */
-  routes(requireRole: RequireRole): FastifyPluginAsyncZod;
+  /**
+   * Mounted under `/v1` by the server: `/payroll/billing-settings`, `/payroll/contractors/…`, `/payroll/contract-texts`,
+   * `/payroll/billing-regimes`; `recentLogin` guards every write (EQ-15).
+   */
+  routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   readonly jobs: {
     /**
      * `payroll.remind_documents`, each hour (EQ-06 lot 5c-2): each document a contractor's regime asks for that comes
@@ -99,7 +103,7 @@ export function createContractorsModule(deps: ContractorsDeps): ContractorsModul
   const { primary, copy } = deps.buckets;
   return {
     name: 'contractors',
-    routes: (requireRole) =>
+    routes: (requireRole, recentLogin) =>
       createContractorRoutes(
         createPayrollBillingSettings(
           createDrizzlePayrollBillingSettingsStore(deps.db, deps.requeue, now),
@@ -120,6 +124,7 @@ export function createContractorsModule(deps: ContractorsDeps): ContractorsModul
           copy,
         }),
         requireRole,
+        recentLogin,
       ),
     jobs: {
       remindDocuments: () =>

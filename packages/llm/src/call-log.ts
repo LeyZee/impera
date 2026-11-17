@@ -45,6 +45,8 @@ export interface LlmCallRecord {
   readonly outputTokens?: number;
   readonly costUsd?: number;
   readonly errorMessage?: string;
+  /** Why an answer did not fit its schema, with no content: safe to store (`invalidOutputCode`). */
+  readonly errorCode?: string;
   /** Who paid for it: the real cost per creator, conversation and draft (llm_calls). */
   readonly creatorId?: string;
   readonly conversationId?: string;

@@ -112,3 +112,14 @@ export const scriptDropOf = (drop: Partial<ContentDrop> = {}): ScriptDrop =>
     name: 'Soirée au salon',
     segments: scriptSegments,
   });
+
+/** Invented first bytes that open as their type says (recette CRE-12): a HEIC's `ftyp`, a QuickTime atom, a JPEG's. */
+const HEADS = {
+  heic: [0, 0, 0, 0x18, ...new TextEncoder().encode('ftypheic')],
+  mov: [0, 0, 0, 8, ...new TextEncoder().encode('moov')],
+  jpeg: [0xff, 0xd8, 0xff],
+} as const;
+
+/** A file of her gallery, invented: its type's first bytes then `pad` more (12, 8 or 3 bytes before the pad). */
+export const fileWithHead = (name: string, head: keyof typeof HEADS, pad = 0, type = ''): File =>
+  new File([new Uint8Array([...HEADS[head], ...new Uint8Array(pad)])], name, { type });
