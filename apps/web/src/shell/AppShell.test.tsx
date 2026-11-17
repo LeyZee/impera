@@ -686,6 +686,13 @@ describe('the account’s security, from its menu (SEC-04)', () => {
     }
   });
 
+  it('draws his rail as one list, no gap between tabs of families without a heading (PIL-15)', async () => {
+    renderApp(operator, '/');
+    const rail = await screen.findByRole('navigation', { name: 'Navigation' });
+    expect(rail.querySelectorAll('.nv-rail__heading')).toHaveLength(0);
+    expect(rail.querySelectorAll('.nv-rail__gap')).toHaveLength(0);
+  });
+
   it('is in « Plus » on the phone', async () => {
     renderApp(operator, '/');
     fireEvent.click(await screen.findByRole('button', { name: 'Plus' }));

@@ -25,6 +25,7 @@ import {
   moneyParts,
   moneyShares,
   moneyTip,
+  percentText,
   sharesOf,
   type MoneyPart,
   OTHER,
@@ -40,6 +41,7 @@ import {
   signedCount,
   slotLabel,
   STACKS,
+  topFansWords,
   WEEKDAYS,
   WEEKDAYS_SHORT,
   zoneLabel,
@@ -310,7 +312,7 @@ function Figures({
   // The two parts' shares of the net are rounded together, to 100 %, as in « Où va l'argent ».
   const shares = moneyShares(current);
   const ofNet = (key: 'creator' | 'agency'): string =>
-    current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
+    current.netMinor > 0 ? `${percentText(shares.ofNet[key])} du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
   const tipOf = (
     title: string,
@@ -414,7 +416,24 @@ function Figures({
   return (
     <div className="ins-figures-stack">
       <div className="ins-figures">
-        <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
+        {/* A money tile, so its tip too (ADR 0106 § 12, PAY-16): to the cent, against the period before. */}
+        <div
+          className="nv-plate ins-lead nv-enter"
+          style={{ '--nv-i': 1 }}
+          tabIndex={0}
+          {...tip.bind(
+            moneyTip({
+              title: 'Chiffre d’affaires',
+              cents: current.revenueMinor,
+              previousCents: previous.revenueMinor,
+              // The whole itself: no share of it to say.
+              revenueMinor: 0,
+              netMinor: null,
+              text: 'Ce que les fans ont payé, TVA comprise, avant la commission de la plateforme.',
+            }),
+            { around: true },
+          )}
+        >
           <div className="nv-figure">
             <span className="nv-figure__label">Chiffre d’affaires</span>
             <CountUp
@@ -982,13 +1001,15 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   if (fans.paying === 0) return <p className="nv-plate ins-empty">Aucun fan n’a payé sur la période.</p>;
   const newShare = shareOf(fans.newPaying, fans.paying);
   const top = fans.topTenShare ?? 0;
+  // Ten at most: with fewer paying fans, the count they are (PAY-16, « Les 10 fans » for 3).
+  const biggest = topFansWords(fans.paying);
   return (
     <div className="nv-plate ins-fans">
       <div className="ins-fans__meter">
         <p className="ins-fans__lead">
-          Les 10 fans qui dépensent le plus font <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
+          {biggest.lead} <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
         </p>
-        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par les 10 plus gros fans`}>
+        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par ${biggest.short}`}>
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
         <p className="ins-fans__hint">

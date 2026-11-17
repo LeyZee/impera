@@ -4,22 +4,59 @@
  * a seen one fades a little; what asks for a hand is in « À traiter ».
  */
 
-/* The chip and the compact selects share the column; a select never shrinks under its words (« Toutes les
- * créatrices »): when they do not fit, they go to the next line (recette 11/11). */
+/* The list has room for its lines on a computer (recette visuelle 16/11): « Agent en pause » and the server's line no
+ * longer wrap in 300 px. It grows to 440–460 px once the conversation has its own minimum; the reading side (the
+ * conversation, and from 1320 px the fan beside it) keeps the rest. Two classes: over Suivi's own columns. */
+@media (min-width: 900px) {
+  .tr-layout.hi-layout {
+    grid-template-columns: minmax(320px, 460px) minmax(360px, 1fr);
+  }
+}
+@media (min-width: 1320px) {
+  .tr-layout.hi-layout {
+    grid-template-columns: minmax(360px, 440px) minmax(320px, 1fr) minmax(240px, 300px);
+  }
+}
+
+/* The list's header: its filters, then « Tout marquer comme vu » at its end, on the list's own side edges. When both
+ * do not fit, the button goes under, still at the end; never alone and off its edge above the filters. */
+.hi-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+}
+.hi-head__all {
+  flex: none;
+  margin-inline-start: auto;
+}
+/* The chip and the compact selects share one row; a select never shrinks under its words (« Toutes les
+ * créatrices »): on a phone, when they do not fit, they go to the next line whole (recette 11/11). */
 .hi-filters {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-2) var(--nv-space-2) var(--nv-space-3);
 }
 .hi-filters .nv-chip {
   flex: none;
 }
 .hi-filters .hi-select {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 10.5rem;
   max-width: 240px;
+}
+/* On a computer, one tidy row: the selects share what the chip leaves, their words cut at the end only if need be. */
+@media (min-width: 900px) {
+  .hi-filters {
+    flex-wrap: nowrap;
+  }
+  .hi-filters .hi-select {
+    min-width: 7.5rem;
+  }
 }
 .hi-filters .hi-select .nv-select__field {
   width: 100%;
@@ -115,7 +152,8 @@
 .hi-line__seen {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-faint);
+  /* Read, not guessed: the faint ink failed its contrast in Jour (recette visuelle 16/11). */
+  color: var(--nv-ink-muted);
 }
 .hi-line__see {
   position: absolute;

@@ -10,3 +10,23 @@ describe('Historique des alertes › filtres (recette 11/11)', () => {
     expect(css).toMatch(/\.hi-filters \.hi-select \{[^}]*min-width: 10\.5rem;/u);
   });
 });
+
+describe('Historique des alertes › mise en page (recette visuelle 16/11)', () => {
+  it('gives the list up to 440–460 px on a computer, never Suivi’s 300, the reading side the rest', () => {
+    expect(css).toMatch(
+      /@media \(min-width: 900px\) \{\s*\.tr-layout\.hi-layout \{\s*grid-template-columns: minmax\(320px, 460px\) minmax\(360px, 1fr\);/u,
+    );
+    expect(css).toMatch(
+      /@media \(min-width: 1320px\) \{\s*\.tr-layout\.hi-layout \{\s*grid-template-columns: minmax\(360px, 440px\) minmax\(320px, 1fr\) minmax\(240px, 300px\);/u,
+    );
+  });
+
+  it('keeps the filters on one row on a computer, « Tout marquer comme vu » at the end of the header', () => {
+    expect(css).toMatch(/@media \(min-width: 900px\) \{\s*\.hi-filters \{\s*flex-wrap: nowrap;/u);
+    expect(css).toMatch(/\.hi-head__all \{[^}]*margin-inline-start: auto;/u);
+  });
+
+  it('says « Vu » in the muted ink, never the faint one', () => {
+    expect(css).toMatch(/\.hi-line__seen \{[^}]*color: var\(--nv-ink-muted\);/u);
+  });
+});
