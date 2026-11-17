@@ -99,10 +99,10 @@ Branche : task/<id>-<slug>
 | CR-05 | Agenda de la créatrice : créneaux, tâches, routine, suggestions et disponibilités | espaces | todo | CR-01, CR-02, CR-12 (couche des shifts) |
 | CR-06 | Dépôt de contenu : feed et Mass DM, depuis le téléphone | espaces | in_progress (lot a fait) | CR-02, ADR 0030 (médiathèque), le stockage objet de production (ADR 0027, 0037) |
 | CR-07 | Topo de la semaine : faits calculés, suggestions rédigées, relues par l'agence | espaces | blocked (clé xAI) | CR-04, CR-05, CR-06, la passerelle LLM (P3-01) et la clé du fournisseur |
-| CR-08 | Plan de publication du feed : la semaine préparée, acceptée d'un geste, programmée dans Reveal | espaces | blocked (capture Reveal) | CR-06, CR-07, la capture Reveal, le connecteur Reveal (lot A), la garde d'écriture (ADR 0018) |
+| CR-08 | Feed et stories Reveal : la semaine préparée, validée puis publiée seule, avec droit de retrait | espaces | todo (lot a) | CR-06, ADR 0136, ADR 0145, la garde d'écriture (ADR 0018) |
 | CR-09 | Contrôle du rapport de fin de shift et validation automatique par les ventes de Reveal | espaces | todo (total inhabituel) ; blocked (signaux par vente, rapprochement) | EQ-03 ; CR-03 pour les signaux par vente ; CRM-01 et CRM-03 pour le rapprochement |
 | CR-10 | Retours de l'IA aux chatteurs, chaque semaine, sans effet sur la paie | espaces | blocked (lecture des messages de Reveal avec leur auteur, clé du fournisseur) | le connecteur Reveal (messages et auteur), la passerelle LLM, la rubrique des évaluations |
-| CR-11 | Mass DM : les médias déposés, envoyés aux listes de fans, jamais deux fois | espaces | blocked (capture Reveal) | CR-06, CR-08, la capture Reveal |
+| CR-11 | Mass DM automatiques : annonce après chaque publication, réveil, et jamais un fan submergé | espaces | todo (lot a) | CR-06, CR-08 lot b, ADR 0137, ADR 0145 |
 | CR-12 | Calendrier des shifts pour toute l'équipe et la créatrice : lecture, vue Mois, lien de calendrier | espaces | todo | EQ-02, CR-02 |
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
