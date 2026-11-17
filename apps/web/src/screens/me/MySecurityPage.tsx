@@ -15,7 +15,7 @@ import { Page, Panel, PanelSection, PageHeader } from '@/shell/layout';
  */
 export function MySecurityPage({ user }: { user: Me }): JSX.Element {
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Sécurité"
@@ -26,7 +26,7 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
               ? 'Les appareils où ton compte est ouvert, tes codes de secours, ton chat Telegram et l’extension de veille.'
               : 'Les appareils où ton compte est ouvert, tes codes de secours et ton chat Telegram.'
         }
-        actions={
+        tabs={
           <MeNav
             manager={user.teamScope === 'agency'}
             creator={user.role === 'creator'}

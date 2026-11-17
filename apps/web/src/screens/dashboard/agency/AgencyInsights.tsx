@@ -48,7 +48,7 @@ import {
 import './agency.css';
 
 import { initialOf } from '@/lib/utils';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /*
  * « L'agence en chiffres » (ADR 0078): what the registers of sales say about the agency, or about one creator, over a
@@ -245,7 +245,7 @@ function MoneySplit({
     });
   return (
     <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
-      <h3 className="ins-card__title">
+      <h3 className="nv-h3 ins-card__title">
         Où va l’argent
         {whole > 0 ? <span className="ins-card__total">{euros(revenue)}</span> : null}
       </h3>
@@ -626,7 +626,7 @@ function Ring({
   const litShare = lit === null ? 0 : (shares[lit] ?? 0);
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">{title}</h3>
+      <h3 className="nv-h3 ins-card__title">{title}</h3>
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (
@@ -1351,10 +1351,7 @@ export function AgencyInsightsPanel({
     return (
       <Section title={title} sub="lus dans le registre des ventes" index={index} control={control}>
         {query.isError ? (
-          <ServerSilent
-            text="Les chiffres reviennent dès qu’il répond."
-            onRetry={() => void query.refetch()}
-          />
+          <Failure onRetry={() => void query.refetch()} />
         ) : (
           // The shape of the figures, so nothing jumps when they come (ADM-21): the lead and its four tiles of money,
           // the card of where the money goes, the four tiles of fans and sales.

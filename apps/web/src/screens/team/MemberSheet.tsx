@@ -86,7 +86,7 @@ export function MemberSheet({
       <header className="tm-sheet__head">
         <Avatar member={member} large />
         <div className="tm-sheet__who">
-          <h2>{member.displayName}</h2>
+          <h2 className="nv-h2">{member.displayName}</h2>
           <p>
             {member.firstName} {member.lastName} · {ROLE_LABELS[member.teamRole]}
             {arrivedDays >= 0 && arrivedDays < NEW_DAYS ? <span className="tm-new">Nouveau</span> : null}
@@ -257,7 +257,7 @@ export function MemberSheet({
           id={memberAccessId(member.id)}
           tabIndex={-1}
         >
-          <h3>Accès</h3>
+          <h3 className="nv-h3">Accès</h3>
           <p className="tm-hint">
             {access.kind === 'signed-in'
               ? `Son mot de passe est choisi. S’il l’oublie, ${canManage ? 'crée-lui' : 'le propriétaire peut lui créer'} un lien pour en choisir un nouveau.`
@@ -317,7 +317,7 @@ function ZoneTrace({ memberId, name }: { memberId: string; name: string }): JSX.
   if (changes.length === 0) return null;
   return (
     <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Fuseau du téléphone">
-      <h3>Fuseau du téléphone</h3>
+      <h3 className="nv-h3">Fuseau du téléphone</h3>
       <p className="tm-hint">
         Sa fiche prend le fuseau du téléphone de {name} à chaque ouverture de l’appli : ses heures s’y
         affichent, sa paie reste à l’heure de l’agence.
@@ -385,7 +385,7 @@ function Notes({ memberId, name }: { memberId: string; name: string }): JSX.Elem
   const list = notes.data ?? [];
   return (
     <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Notes internes">
-      <h3>Notes internes</h3>
+      <h3 className="nv-h3">Notes internes</h3>
       <p className="tm-hint">Lues par toi et les managers, jamais par {name}.</p>
       {notes.isError ? (
         <p className="tm-warn">Les notes n’ont pas pu être lues.</p>

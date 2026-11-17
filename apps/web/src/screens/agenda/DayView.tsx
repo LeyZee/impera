@@ -107,7 +107,9 @@ export function DayView({
         // Titled like « Sans date » above it, so that a dated card is never read as one of those (CRE-07).
         <section className="ag-sec" aria-labelledby={decideId}>
           <div className="ag-sec__head">
-            <h2 id={decideId}>{isToday ? 'Proposé pour aujourd’hui' : 'Proposé ce jour-là'}</h2>
+            <h2 className="nv-h2" id={decideId}>
+              {isToday ? 'Proposé pour aujourd’hui' : 'Proposé ce jour-là'}
+            </h2>
             <span className="ag-count nv-num">{cards.length}</span>
           </div>
           {cards.map((suggestion) => (
@@ -125,7 +127,7 @@ export function DayView({
         {plan.todo.length === 0 ? null : (
           <section className="ag-sec">
             <div className="ag-sec__head">
-              <h2>À faire</h2>
+              <h2 className="nv-h2">À faire</h2>
               <span className="ag-count nv-num">{plan.todo.filter((item) => !item.done).length || '✓'}</span>
             </div>
             <ul className="ag-list">
@@ -137,7 +139,7 @@ export function DayView({
         )}
         <section className="ag-sec">
           <div className="ag-sec__head">
-            <h2>Programme</h2>
+            <h2 className="nv-h2">Programme</h2>
             <span className="ag-count">{timedCount(plan)}</span>
           </div>
           {proposed.length === 0 ? null : (

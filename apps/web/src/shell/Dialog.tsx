@@ -100,7 +100,9 @@ export function Dialog({
         <div ref={scroller} className="tm-dialog__scroll">
           <header className="tm-dialog__head">
             <div className="tm-dialog__title">
-              <h2 id={`${id}-title`}>{title}</h2>
+              <h2 className="nv-h2" id={`${id}-title`}>
+                {title}
+              </h2>
               {lead === undefined ? null : <p>{lead}</p>}
             </div>
             <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>

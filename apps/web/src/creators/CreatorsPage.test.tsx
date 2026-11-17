@@ -147,6 +147,9 @@ const picked = (name: string): Promise<void> =>
     expect(screen.getByRole('link', { name: '← Créatrices' })).toBeDefined();
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
     expect(within(views).getByRole('link', { name: 'Persona' }).getAttribute('aria-current')).toBe('page');
+    // Her sheets on the header's row of tabs, never among its buttons (recette visuelle 16/11, T1).
+    expect(views.closest('.nv-page__tabs')).not.toBeNull();
+    expect(views.closest('.nv-page__actions')).toBeNull();
   });
 
 /** The card of a creator in the list. */
@@ -257,8 +260,8 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'acces', creatrice: ANNA.id });
     });
-    // Her account: the list answers 404 here, so the sheet says it does not load, never a form to fill.
-    expect(await screen.findByText('Son accès ne se charge pas')).toBeDefined();
+    // Her account: the list answers 404 here, so the sheet says the server is silent, never a form to fill.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
 
     cleanup();
     await serve([ANNA]);
@@ -266,6 +269,18 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
     });
+    // A sheet asked by name and refused says why, as any page that is not his (recette visuelle 16/11, PIL-26).
+    expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+
+    // No sheet asked: his first one, without a word.
+    cleanup();
+    await serve([ANNA]);
+    const plain = renderAt(operator, `/creatrices?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(plain.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Anna' });
+    expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
   });
 
   it('gives the owner her Profil, where her name is changed, and keeps it from anyone else (ADR 0071)', async () => {
@@ -381,8 +396,8 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
     });
-    // The suggestions answer 404 here: the sheet says they do not load, and still offers to propose.
-    expect(await screen.findByText('Ses propositions ne se chargent pas')).toBeDefined();
+    // The suggestions answer 404 here: the sheet says the server is silent, and still offers to propose.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
   });
 
@@ -439,7 +454,7 @@ describe('Créatrices, what a member without the list reads', () => {
   it('says the list does not load, with a way to try again', async () => {
     await serve(null);
     renderAt(owner, '/creatrices');
-    expect(await screen.findByText('La liste des créatrices ne se charge pas')).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });
 });

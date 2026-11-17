@@ -44,7 +44,7 @@ import './ai-usage.css';
 
 import { arcs, OTHER } from '@/screens/dashboard/agency/view';
 import { CountUp, Section, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /*
  * Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge. Every figure is the server's,
@@ -185,7 +185,7 @@ function CreditCard({
   return (
     <article className="nv-plate cia-credit nv-enter" style={{ '--nv-i': index }} data-tone={tone}>
       <header className="cia-credit__head">
-        <h3 className="cia-credit__name">{providerLabel(card.provider)}</h3>
+        <h3 className="nv-h3 cia-credit__name">{providerLabel(card.provider)}</h3>
         <span className={`cia-badge cia-badge--${tone}`}>{CREDIT_BADGE[card.state]}</span>
       </header>
       {card.mode === 'subscription' ? (
@@ -263,7 +263,7 @@ function VoiceCard({ voice, index, now }: { voice: AiUsageVoice; index: number; 
   return (
     <article className="nv-plate cia-credit cia-voice nv-enter" style={{ '--nv-i': index }} data-tone={tone}>
       <header className="cia-credit__head">
-        <h3 className="cia-credit__name">ElevenLabs</h3>
+        <h3 className="nv-h3 cia-credit__name">ElevenLabs</h3>
         <span className={`cia-badge cia-badge--${tone}`}>{VOICE_BADGE[tone]}</span>
       </header>
       <p className="cia-credit__balance nv-num">
@@ -559,7 +559,7 @@ function Ring({
   const litSlice = lit === null ? undefined : slices[lit];
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">
+      <h3 className="nv-h3 ins-card__title">
         {title}
         {total > 0 ? <span className="ins-card__total">{eurText(total)}</span> : null}
       </h3>
@@ -670,10 +670,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
     return (
       <div className="ins-body cia-body">
         {query.isError ? (
-          <ServerSilent
-            text="La consommation revient dès qu’il répond."
-            onRetry={() => void query.refetch()}
-          />
+          <Failure onRetry={() => void query.refetch()} />
         ) : (
           <div
             className="db-loading nv-plate ins-loading"

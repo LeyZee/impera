@@ -7,6 +7,7 @@ import { saveAiBudget, useAiBudget, useSetAiBudget, type SaveOutcome } from './a
 import { amountOf, boundsText, consequenceOf, eurOf, todayOf, typedOf, type Field } from './view';
 
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 import './ai-budget.css';
 
 const NOT_SAVED: Readonly<Record<Exclude<SaveOutcome['kind'], 'ok' | 'reauth' | 'refused'>, string>> = {
@@ -18,15 +19,20 @@ const NOT_SAVED: Readonly<Record<Exclude<SaveOutcome['kind'], 'ok' | 'reauth' | 
  * Réglages › Modèles IA › Budget IA (choix de Charles 12/11): what the AI may spend a day, for every creator, and the
  * trend watch's share of it. The owner's alone, like the page.
  */
-export function BudgetSection(): JSX.Element | null {
+export function BudgetSection({
+  quiet = false,
+}: {
+  /** The page already says the server is silent (ETA-05): the card then says nothing of its own. */
+  quiet?: boolean;
+} = {}): JSX.Element | null {
   const query = useAiBudget();
   const [editing, setEditing] = useState(false);
   const budget = query.data;
   if (budget === undefined) {
-    return query.isError ? (
+    return query.isError && !quiet ? (
       <div className="nv-plate aib-card">
         <p className="sv-lead">Budget IA</p>
-        <p className="sv-muted">Le budget n’a pas pu être lu. Réessaie dans un instant.</p>
+        <Failure inline onRetry={() => void query.refetch()} />
       </div>
     ) : null;
   }

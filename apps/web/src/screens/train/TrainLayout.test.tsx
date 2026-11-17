@@ -57,8 +57,12 @@ describe('Entraîner header', () => {
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
-    expect(await screen.findByRole('heading', { name: 'Entraîner' })).toBeTruthy();
+    // The section above, the open tab as the title (recette visuelle 16/11, T2); the tabs on their own row.
+    const title = await screen.findByRole('heading', { level: 1, name: 'Chatting' });
+    expect(title.parentElement?.querySelector('.nv-eyebrow')?.textContent).toBe('Entraîner');
     const tabs = screen.getByRole('navigation', { name: 'Entraîner' });
+    expect(tabs.closest('.nv-page__tabs')).not.toBeNull();
+    expect(tabs.closest('.nv-page__actions')).toBeNull();
     expect(within(tabs).getByRole('link', { name: 'Chatting' })).toBeTruthy();
     expect(within(tabs).getByRole('link', { name: 'Post du canal' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Corrections' })).toBeNull();

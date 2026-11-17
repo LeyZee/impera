@@ -96,7 +96,11 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
   it('says who he is in the team: his creators, his rate and since when, his country and zone', async () => {
     serve([THEO_HERE]);
     renderPage(THEO_ME);
-    expect(await screen.findByRole('heading', { name: 'Théo' })).toBeDefined();
+    // The tab is the page's title, his name the card's, which no longer says « Profil » again (recette visuelle 16/11,
+    // CHA-12).
+    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Théo' })).toBeDefined();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Profil' })).toBeNull();
     const facts = await screen.findByText('Nora Vidal');
     const list = facts.closest('dl');
     if (list === null) throw new Error('No facts');

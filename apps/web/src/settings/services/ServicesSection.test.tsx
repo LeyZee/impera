@@ -148,11 +148,11 @@ describe('Réglages › Modèles IA', () => {
     expect(screen.getAllByRole('button', { name: 'Essai réel' })).toHaveLength(1);
   });
 
-  it('says the server does not answer, then what could not be read', async () => {
+  it('says the server does not answer, then what to do', async () => {
     vi.mocked(fetchOverview).mockRejectedValue(new ServicesError('unavailable', 'GET : 500'));
     render(<ServicesSection />);
     expect(await screen.findByText('Le serveur ne répond pas')).toBeTruthy();
-    expect(screen.getByText('L’état des clés n’a pas pu être lu. Réessaie dans un instant.')).toBeTruthy();
+    expect(screen.getByText('Réessaie dans un instant.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
 });

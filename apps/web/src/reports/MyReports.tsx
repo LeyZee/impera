@@ -24,6 +24,7 @@ import { swapShiftLine } from '@/scheduling/model';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /** What the member's reports read: the period running in the agency's zone, and the one before for a late report. */
 export interface MyReports {
@@ -86,12 +87,7 @@ export function MyReportsCard({
     return (
       <Panel className="rp-mine nv-enter" eyebrow="Mes rapports">
         <div className="rp-sec">
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : tes rapports n’ont pas pu être lus.</p>
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={reports.refetch}>
-              Réessayer
-            </button>
-          </div>
+          <Failure inline onRetry={reports.refetch} />
         </div>
       </Panel>
     );

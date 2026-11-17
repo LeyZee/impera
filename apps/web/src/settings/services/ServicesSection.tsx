@@ -17,7 +17,9 @@ import {
 } from './api';
 import { GUIDES, isDashboardProvider, type DashboardProvider } from './guide';
 import { checkedAgo, dotOf, dotOfNext, leadOf, shortStateOf, verifyNotice } from './view';
+
 import './services.css';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /** The list refreshes on its own: a key revoked while the page is open turns red without a reload. */
 const REFRESH_MS = 30_000;
@@ -34,7 +36,15 @@ type Notice = ShownError & { tone: 'error' | 'warning' };
  * Réglages › Modèles IA › Services (fiche P3-03, ADR 0016): what to do now, then one line per service. Connecting
  * happens in a sheet; nothing on this page ever shows a key.
  */
-export function ServicesSection(): JSX.Element {
+export function ServicesSection({
+  onDown,
+  onRetry,
+}: {
+  /** Whether the server is silent on this page: the page's other cards then keep quiet (ETA-05). */
+  onDown?: (down: boolean) => void;
+  /** Also run by « Réessayer », for the page's other reads. */
+  onRetry?: () => void;
+} = {}): JSX.Element {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [sheet, setSheet] = useState<Sheet>(null);
   const [menu, setMenu] = useState<DashboardProvider | null>(null);
@@ -159,36 +169,40 @@ export function ServicesSection(): JSX.Element {
     [refresh],
   );
 
-  if (load.kind !== 'ready') {
+  const down = load.kind === 'failed' && !load.isForbidden && !load.error.isSessionExpired;
+  useEffect(() => {
+    onDown?.(down);
+  }, [down, onDown]);
+
+  if (load.kind === 'loading') {
     return (
-      <section className="sv-page" aria-busy={load.kind === 'loading'}>
-        {load.kind === 'failed' ? (
+      <section className="sv-page">
+        <Skeleton label="Chargement des modèles IA…">
+          <SkeletonCard lines={1} />
+          <SkeletonCard lines={4} />
+        </Skeleton>
+      </section>
+    );
+  }
+  if (load.kind === 'failed') {
+    return (
+      <section className="sv-page">
+        {load.isForbidden || load.error.isSessionExpired ? (
           <div className="nv-plate sv-next">
             <p className="sv-lead">
-              {load.isForbidden
-                ? 'Seul le propriétaire règle les modèles IA'
-                : load.error.isSessionExpired
-                  ? 'Ta session a expiré'
-                  : 'Le serveur ne répond pas'}
+              {load.isForbidden ? 'Seul le propriétaire règle les modèles IA' : 'Ta session a expiré'}
             </p>
-            <p className="sv-muted">
-              {load.isForbidden || load.error.isSessionExpired
-                ? load.error.message
-                : 'L’état des clés n’a pas pu être lu. Réessaie dans un instant.'}
-            </p>
-            {load.isForbidden ? null : load.error.isSessionExpired ? (
-              <SignInAgain />
-            ) : (
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft sv-self-start"
-                onClick={() => void refresh()}
-              >
-                Réessayer
-              </button>
-            )}
+            <p className="sv-muted">{load.error.message}</p>
+            {load.isForbidden ? null : <SignInAgain />}
           </div>
-        ) : null}
+        ) : (
+          <Failure
+            onRetry={() => {
+              void refresh();
+              onRetry?.();
+            }}
+          />
+        )}
       </section>
     );
   }

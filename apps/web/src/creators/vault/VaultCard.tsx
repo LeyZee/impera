@@ -28,6 +28,7 @@ import './vault.css';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
 import { setMediaBlur, useMediaBlur } from '@/shell/media-blur';
+import { Failure } from '@/shell/states';
 
 /**
  * « Son coffre Reveal » (ADR 0099 §§ 2-4): when her vault was last read, her folders as tiles, and a folder opened as the
@@ -99,17 +100,8 @@ export function VaultCard({
     if (vault.data === undefined) {
       if (vault.isError)
         return (
-          <div className="vx-empty">
-            <p className="vx-empty__title">Son coffre ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm ps-self-start"
-              onClick={() => void vault.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          // The common failure, inside her card: one line, one way to try again (recette visuelle, ETA-04).
+          <Failure inline title="Son coffre ne se charge pas" onRetry={() => void vault.refetch()} />
         );
       return <div className="ps-skeleton vx-skeleton" aria-busy="true" />;
     }
@@ -303,7 +295,7 @@ function FolderView({
           <span className="vx-crumbs__sep" aria-hidden="true">
             /
           </span>
-          <h3 className="vx-crumbs__here" ref={title} tabIndex={-1} aria-current="page">
+          <h3 className="nv-h2 vx-crumbs__here" ref={title} tabIndex={-1} aria-current="page">
             {folder.folderRef !== null && folder.moment === null ? (
               <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
             ) : null}

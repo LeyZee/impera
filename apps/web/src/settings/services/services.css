@@ -5,11 +5,10 @@
  */
 
 .sv-page {
-  max-width: 680px;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-5);
+  gap: var(--nv-card-gap);
 }
 /* The one line under the tab, in the style of every Réglages sub-page (tg-lede, bk-lede). */
 .sv-lede {
@@ -24,9 +23,6 @@
 }
 .sv-lead {
   margin: 0;
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 .sv-self-start {
@@ -38,7 +34,7 @@
 
 /* What to do now: the first thing read, with the one neon button of the page. */
 .sv-next {
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -108,7 +104,7 @@
   grid-template-columns: auto 1fr auto;
   gap: 2px 14px;
   align-items: center;
-  padding: 16px 14px 16px 20px;
+  padding: 16px 14px 16px var(--nv-plate-pad);
   position: relative;
   animation: sv-rise var(--nv-dur-base) var(--nv-ease-out) both;
 }
@@ -276,12 +272,11 @@
 }
 .sv-sheet h3 {
   margin: 0;
-  font-size: 22px;
-  letter-spacing: -0.02em;
 }
 .sv-sheet__title p {
   margin: 2px 0 0;
   font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
 .sv-steps {
@@ -517,9 +512,6 @@ input.sv-key__secret[data-shown='true'] {
   stroke-dasharray: 30;
   stroke-dashoffset: 30;
   animation: sv-draw var(--nv-dur-base) calc(var(--nv-stagger) * 7) var(--nv-ease-out) forwards;
-}
-.sv-done h3 {
-  font-size: 17px;
 }
 .sv-facts {
   margin: 0;

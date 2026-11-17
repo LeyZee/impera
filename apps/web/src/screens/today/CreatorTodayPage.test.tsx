@@ -143,7 +143,8 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
   it('says the planning does not load, with a way to try again', async () => {
     serve({}, 500);
     show();
-    expect(await screen.findByText(/Le planning n’a pas pu être lu/u)).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });
 });
 
@@ -185,7 +186,7 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
   it('keeps who answers her fans when her agenda cannot be read', async () => {
     serve({ current: [], next: [] });
     show();
-    expect(await screen.findByText(/Ton agenda n’a pas pu être lu/u)).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByText('Personne n’est prévu dans les prochaines 24 heures.')).toBeDefined();
   });
 });
@@ -218,9 +219,7 @@ describe('Aujourd’hui, her kept copy (CRE-02)', () => {
   it('says the server is silent, with the copy’s age and « Réessayer », never silently', async () => {
     serve({ current: [], next: [] }, 200, null);
     show();
-    expect(
-      await screen.findByText(/^Le serveur ne répond pas : tu vois ta dernière lecture, hier à 21\sh\.$/u),
-    ).toBeDefined();
+    expect(await screen.findByText(/^Tu vois ta dernière lecture, hier à 21\sh\.$/u)).toBeDefined();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
     expect(screen.queryByText(/Hors ligne/u)).toBeNull();
   });

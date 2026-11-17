@@ -185,7 +185,7 @@ describe('Aujourd’hui', () => {
       { name: 'Le serveur ne répond pas', level: 2 },
       { timeout: 4000 },
     );
-    expect(silent.closest('.nv-silent')).not.toBeNull();
+    expect(silent.closest('[role="alert"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
 

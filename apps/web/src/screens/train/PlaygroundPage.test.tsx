@@ -130,7 +130,7 @@ describe('Playground', () => {
     expect(await screen.findByText('Le serveur ne répond pas')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Essayer avec des réponses écrites à l’avance' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
-    expect(await screen.findByRole('heading', { name: 'Entraîner' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chatting' })).toBeTruthy();
     await waitFor(() => {
       expect(screen.getByText('Fan fictif')).toBeTruthy();
     });

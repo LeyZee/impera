@@ -203,6 +203,15 @@ describe('offRailSectionOf', () => {
     },
   );
 
+  // Recette visuelle 16/11 (T9): the owner has no Moi; his guides hang from Réglages, as an operator's from nothing.
+  it.each(['/aide/installer', '/aide/extension', '/aide/reveal'])(
+    'lights Réglages on %s for the owner',
+    (path) => {
+      expect(offRailSectionOf(path, railOf(owner))).toBe('/reglages');
+      expect(offRailSectionOf(path, railOf(operator))).toBeNull();
+    },
+  );
+
   it('lights nothing for an account without Moi, nor on other pages', () => {
     for (const me of [owner, operator]) expect(offRailSectionOf('/notifications', railOf(me))).toBeNull();
     expect(offRailSectionOf('/aide/reveal', railOf(chatter))).toBeNull();

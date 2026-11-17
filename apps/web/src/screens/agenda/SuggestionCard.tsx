@@ -172,7 +172,7 @@ export function UndatedSuggestions({
   return (
     <section className="ag-sec">
       <div className="ag-sec__head">
-        <h2>Sans date</h2>
+        <h2 className="nv-h2">Sans date</h2>
         <span className="ag-count nv-num">{undated.length}</span>
       </div>
       {undated.map((suggestion) => (

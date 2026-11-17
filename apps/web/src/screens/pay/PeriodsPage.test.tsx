@@ -166,9 +166,7 @@ describe('Paie › Historique', () => {
     // The list tries twice more before it says so.
     await waitFor(
       () => {
-        expect(
-          screen.getByText('Le serveur ne répond pas : les quinzaines n’ont pas pu être lues.'),
-        ).toBeTruthy();
+        expect(screen.getByText('Le serveur ne répond pas')).toBeTruthy();
       },
       { timeout: 5_000 },
     );

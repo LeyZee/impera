@@ -247,7 +247,7 @@ describe('Agenda, the creator’s (CR-05)', () => {
     // Wednesday's, Friday's 22 h – 2 h, and its end on Saturday from 0 h (CREA-02).
     expect(screen.getAllByText(/Dispo pour l’agence/u).length).toBe(3);
     // The shooting sheet of a proposal, folded under its name until she opens it (VEI-01 d).
-    const brief = screen.getByText('🎬 Fiche de tournage');
+    const brief = screen.getByText('Fiche de tournage');
     expect(brief.tagName).toBe('SUMMARY');
     expect(brief.parentElement?.textContent).toContain('Ambiance Nuit, noir et dentelle');
   });
@@ -369,10 +369,8 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     keepYesterday();
     serveAgenda(() => Promise.resolve(new Response('{}', { status: 500 })));
     show();
-    const silent = await screen.findByText(
-      /^Le serveur ne répond pas : tu vois ta dernière lecture, hier à 21\sh\.$/u,
-    );
-    expect(silent.closest('.ag-offline')).not.toBeNull();
+    const silent = await screen.findByText(/^Tu vois ta dernière lecture, hier à 21\sh\.$/u);
+    expect(silent.closest('[role="alert"]')?.textContent).toContain('Le serveur ne répond pas');
     expect(screen.queryByText(/Hors ligne/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });

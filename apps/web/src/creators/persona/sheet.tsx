@@ -136,7 +136,7 @@ function Panel({
       data-open={open ? 'true' : undefined}
       aria-labelledby={`${id}-title`}
     >
-      <h3 className="ps-sheet-panel__heading">
+      <h3 className="nv-h3 ps-sheet-panel__heading">
         <button
           type="button"
           className="ps-sheet-panel__toggle"
@@ -151,7 +151,7 @@ function Panel({
           {edited ? <span className="ps-changed ps-changed--on" aria-label="modifié" /> : null}
           <span className="ps-sheet-panel__meta">
             {toFix > 0 ? (
-              <span className="nv-subnav__count" aria-label={`${String(toFix)} à corriger`}>
+              <span className="nv-count nv-subnav__count" aria-label={`${String(toFix)} à corriger`}>
                 {toFix}
               </span>
             ) : null}
