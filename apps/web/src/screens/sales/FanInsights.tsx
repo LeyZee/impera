@@ -15,7 +15,10 @@ import {
   PLACE_LABELS,
   SITUATION_LABELS,
   slotLabel,
+  shareText,
   TIER_LABELS,
+  waitingLines,
+  type InsightBlock,
 } from './insights-view';
 import './insights.css';
 
@@ -25,15 +28,13 @@ import { Panel, PanelSection } from '@/shell/layout';
 /*
  * « Qui sont tes fans » (CR-15, ADR 0065 § 2, ADR 0074 § 8): in front of Ventes, figures on all her fans, never one.
  * Rings and bars that draw in, a case lit on hover, focus or touch, its share in the middle of the ring. The server
- * sends shares only: no case says how many fans it holds, and a block under ten fans says so in words.
+ * sends shares only: no case says how many fans it holds, and a block under its threshold says in words what it waits for.
  */
 
 interface Case {
   readonly key: string;
   readonly share: number;
 }
-
-const TOO_FEW = 'Pas encore assez de fans pour le dire.';
 
 function Count({ value, format = String }: { value: number; format?: (n: number) => string }): JSX.Element {
   const ref = useRef<HTMLSpanElement>(null);
@@ -48,7 +49,12 @@ function Count({ value, format = String }: { value: number; format?: (n: number)
   return <span ref={ref} />;
 }
 
-const percent = (n: number) => `${String(n)}\u00a0%`;
+const percent = shareText;
+/**
+ * A share said as it is: for a number that counts up from 0 (`shareText` would say « moins de 1 % » on its first
+ * frame) and for a slot of « Quand ils t'écrivent », where 0 % is a slot nobody wrote in.
+ */
+const plain = (n: number) => `${String(n)}\u00a0%`;
 
 /** A ring of cases and its legend; the lit case shows in the middle, the legend lights with it. */
 function RingCard({
@@ -127,7 +133,7 @@ function RingCard({
             ) : first !== undefined ? (
               <>
                 <b className="fi-ring__value">
-                  <Count value={first.share} format={percent} />
+                  <Count value={first.share} format={first.share === 0 ? percent : plain} />
                 </b>
                 <span className="fi-ring__sub">{label(first.key)}</span>
               </>
@@ -234,22 +240,6 @@ function BarsCard({
   );
 }
 
-function EmptyCard({ title, index }: { title: string; index: number }): JSX.Element {
-  return (
-    <article className="fi-card fi-card--empty nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">{title}</h3>
-      <div className="fi-ring-row">
-        <div className="fi-ring fi-ring--empty" aria-hidden="true">
-          <svg viewBox="0 0 132 132">
-            <circle className="fi-ring__track" cx="66" cy="66" r={52} />
-          </svg>
-        </div>
-        <p className="fi-empty">{TOO_FEW}</p>
-      </div>
-    </article>
-  );
-}
-
 function SpendingCard({
   spending,
   index,
@@ -263,6 +253,14 @@ function SpendingCard({
     );
   const radius = 52;
   const [arc] = arcsOf([spending.payingShare, 100 - spending.payingShare], radius, 0);
+  // Nobody unlocked yet: one sentence, not a ring at 0 % beside a bar « Rien débloqué » at 100 % (recette CRE-04).
+  if (spending.payingShare === 0)
+    return (
+      <article className="fi-card fi-card--full nv-enter" style={{ '--nv-i': index }}>
+        <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
+        <p className="fi-none">Aucun de tes fans n’a encore débloqué de message.</p>
+      </article>
+    );
   return (
     <article className="fi-card fi-card--wide nv-enter" style={{ '--nv-i': index }}>
       <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
@@ -288,7 +286,7 @@ function SpendingCard({
             </svg>
             <span className="fi-ring__middle" aria-hidden="true">
               <b className="fi-ring__value">
-                <Count value={spending.payingShare} format={percent} />
+                <Count value={spending.payingShare} format={plain} />
               </b>
               <span className="fi-ring__sub">ont déjà débloqué</span>
             </span>
@@ -389,7 +387,7 @@ function ActivityCard({
           )
         ) : (
           <>
-            {say(lit)} : <b>{percent(lit.share)}</b> de leurs messages
+            {say(lit)} : <b>{plain(lit.share)}</b> de leurs messages
           </>
         )}
       </p>
@@ -421,7 +419,7 @@ function ActivityCard({
                     '--_h': heatOf(cell.share, busiest),
                     '--_i': d * 8 + slot,
                   }}
-                  aria-label={`${say(cell)} : ${percent(cell.share)}`}
+                  aria-label={`${say(cell)} : ${plain(cell.share)}`}
                   aria-pressed={on}
                   onPointerEnter={() => {
                     setLit(cell);
@@ -471,9 +469,14 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
   );
 }
 
-/** The panel: three numbers, then a card per question, each one honest when it has too few fans. */
-export function FanInsights(): JSX.Element {
+/**
+ * The panel: three numbers, then a card per question that has enough fans, and for those that wait, what they wait
+ * for (recette CRE-04). Under ten fans in all, one short sentence and nothing else. `silent`: the page says once that
+ * the server does not answer, when its fans do not load either (recette CRE-31).
+ */
+export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Element | null {
   const insights = useCreatorFanInsights();
+  if (insights.isError && insights.data === undefined && silent) return null;
   if (insights.isError && insights.data === undefined)
     return (
       <ServerSilent
@@ -497,6 +500,30 @@ export function FanInsights(): JSX.Element {
     );
   const data = insights.data;
   const age = data.age;
+  const waiting = (['age', 'place', 'situation', 'job', 'spending', 'activity'] as const).filter(
+    (block: InsightBlock) => data[block].status !== 'enough',
+  );
+  // Under ten fans in all, every block waits for the same reason: one short card. With more fans, the panel keeps
+  // its numbers and says block by block what is missing, since each block counts something else (recette CRE-04).
+  if (waiting.length === 6 && data.fans.total === null)
+    return (
+      <Panel
+        className="fi-panel nv-enter"
+        title={
+          <>
+            Qui sont <em className="fi-serif">tes fans</em>
+          </>
+        }
+      >
+        <PanelSection>
+          <p className="fi-few">
+            Encore trop peu de fans pour le dire. Ça s’affichera à partir de dix, pour qu’aucun ne s’y
+            reconnaisse.
+          </p>
+        </PanelSection>
+      </Panel>
+    );
+  const lines = waitingLines(waiting);
   return (
     <Panel
       className="fi-panel nv-enter"
@@ -523,9 +550,7 @@ export function FanInsights(): JSX.Element {
               idle={{ value: `${String(age.averageAge)}\u00a0ans`, sub: 'en moyenne' }}
               index={0}
             />
-          ) : (
-            <EmptyCard title="Leur âge" index={0} />
-          )}
+          ) : null}
           {data.place.status === 'enough' ? (
             <RingCard
               title="D’où ils t’écrivent"
@@ -534,9 +559,7 @@ export function FanInsights(): JSX.Element {
               aboutFans={data.place.aboutFans}
               index={1}
             />
-          ) : (
-            <EmptyCard title="D’où ils t’écrivent" index={1} />
-          )}
+          ) : null}
           {data.situation.status === 'enough' ? (
             <RingCard
               title="Leur situation"
@@ -545,9 +568,7 @@ export function FanInsights(): JSX.Element {
               aboutFans={data.situation.aboutFans}
               index={2}
             />
-          ) : (
-            <EmptyCard title="Leur situation" index={2} />
-          )}
+          ) : null}
           {data.job.status === 'enough' ? (
             <BarsCard
               title="Leur métier"
@@ -556,20 +577,17 @@ export function FanInsights(): JSX.Element {
               aboutFans={data.job.aboutFans}
               index={3}
             />
-          ) : (
-            <EmptyCard title="Leur métier" index={3} />
-          )}
-          {data.spending.status === 'enough' ? (
-            <SpendingCard spending={data.spending} index={4} />
-          ) : (
-            <EmptyCard title="Ce qu’ils débloquent" index={4} />
-          )}
-          {data.activity.status === 'enough' ? (
-            <ActivityCard cells={data.activity.cells} index={5} />
-          ) : (
-            <EmptyCard title="Quand ils t’écrivent" index={5} />
-          )}
+          ) : null}
+          {data.spending.status === 'enough' ? <SpendingCard spending={data.spending} index={4} /> : null}
+          {data.activity.status === 'enough' ? <ActivityCard cells={data.activity.cells} index={5} /> : null}
         </div>
+        {lines.length === 0 ? null : (
+          <div className="fi-waiting">
+            {lines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        )}
         <p className="fi-note">
           Ce que tes fans ont dit eux-mêmes en conversation, arrêté chaque nuit à minuit. Une case ne
           s’affiche qu’à partir de dix fans, pour qu’aucun ne s’y reconnaisse.

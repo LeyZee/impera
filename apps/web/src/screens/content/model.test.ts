@@ -1,7 +1,7 @@
-import { DROP_CATEGORY_LABELS } from '@impera/contracts';
+import { DROP_CATEGORY_LABELS, NOT_WHAT_IT_SAYS } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { dropOf, fileOf, requestOf } from './fixtures';
+import { dropOf, fileOf, fileWithHead, requestOf } from './fixtures';
 import {
   acceptOf,
   contentsOf,
@@ -9,18 +9,25 @@ import {
   dropName,
   dueOf,
   fileLine,
+  lengthOf,
+  matchResumed,
+  mediaLabel,
   mimeOf,
   moved,
   onTheirWay,
   openRequests,
   outLine,
+  pickedHeadRefusal,
   published,
   mayWithdrawHere,
   refusedOf,
   remainingOf,
+  routeFirst,
   sameFile,
   shotMomentOf,
   stateTone,
+  toShoot,
+  UNREADABLE_HERE,
   weightOf,
 } from './model';
 
@@ -43,7 +50,42 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     const sooner = requestOf({ dueOn: '2026-11-06' });
     const answered = requestOf({ dueOn: '2026-11-05', dropId: dropOf().id });
     const refused = requestOf({ state: 'refused' });
-    expect(openRequests([later, answered, sooner, refused]).map((r) => r.id)).toEqual([sooner.id, later.id]);
+    expect(openRequests([later, answered, sooner, refused], []).map((r) => r.id)).toEqual([
+      sooner.id,
+      later.id,
+    ]);
+  });
+
+  it('keeps a request in « À tourner » while its drop still goes up, until it is received (recette CRE-12)', () => {
+    const goingUp = dropOf({ state: 'uploading' });
+    const received = dropOf({ state: 'received' });
+    const filling = dropOf({ category: 'script', state: 'filling' });
+    const waiting = requestOf({ dueOn: '2026-11-06', dropId: goingUp.id });
+    const answered = requestOf({ dueOn: '2026-11-07', dropId: received.id });
+    const shooting = requestOf({ dueOn: '2026-11-08', category: 'script', dropId: filling.id });
+    const open = requestOf({ dueOn: '2026-11-09' });
+    expect(
+      openRequests([open, shooting, answered, waiting], [goingUp, received, filling]).map((r) => r.id),
+    ).toEqual([waiting.id, open.id]);
+    // Its drop not read: it is answered, as the server says.
+    expect(openRequests([waiting], [])).toEqual([]);
+  });
+
+  it('reads a picked file’s first bytes as the server does (recette CRE-12)', async () => {
+    expect(await pickedHeadRefusal(fileWithHead('a.jpg', 'jpeg'), 'image/jpeg')).toBeNull();
+    expect(await pickedHeadRefusal(fileWithHead('a.heic', 'heic'), 'image/heic')).toBeNull();
+    expect(await pickedHeadRefusal(fileWithHead('a.mov', 'mov'), 'video/quicktime')).toBeNull();
+    expect(await pickedHeadRefusal(new File(['juste du texte'], 'faux.jpg'), 'image/jpeg')).toBe(
+      NOT_WHAT_IT_SAYS,
+    );
+    // A HEIC renamed `.jpg` is not what it says either.
+    expect(await pickedHeadRefusal(fileWithHead('a.jpg', 'heic'), 'image/jpeg')).toBe(NOT_WHAT_IT_SAYS);
+    // A file her phone cannot open here is said, never guessed.
+    const broken = new File(['x'], 'x.jpg');
+    broken.slice = () => {
+      throw new Error('unreadable');
+    };
+    expect(await pickedHeadRefusal(broken, 'image/jpeg')).toBe(UNREADABLE_HERE);
   });
 
   it('puts a drop on its way until it is out, and never shows a withdrawn one', () => {
@@ -111,6 +153,10 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     ).toBe('50 % · encore 2 min');
     expect(fileLine(awaiting, { sent: 5, total: 10, rate: 1, phase: 'waiting' })).toBe(
       'Réseau coupé : ça reprend tout seul',
+    );
+    // The server answers with an error: not the network, said otherwise (recette CRE-10).
+    expect(fileLine(awaiting, { sent: 5, total: 10, rate: null, phase: 'stalled' })).toBe(
+      'L’envoi n’aboutit pas pour l’instant',
     );
     expect(fileLine(fileOf({ state: 'received' }), undefined)).toBe('En préparation');
     expect(fileLine(fileOf({ state: 'duplicate' }), undefined)).toBe('Déjà dans ta médiathèque');
@@ -188,5 +234,40 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     const file = { name: 'IMG_1.HEIC', size: 3, lastModified: 1 };
     expect(sameFile(file, { ...file })).toBe(true);
     expect(sameFile(file, { ...file, lastModified: 2 })).toBe(false);
+  });
+
+  it('keeps a script she began in « À tourner » with its request, by due day, out of « En route » (CRE-12)', () => {
+    const script = requestOf({ category: 'script', dueOn: '2026-11-08' });
+    const begun = dropOf({ category: 'script', state: 'filling', files: [], requestId: script.id });
+    const soon = requestOf({ dueOn: '2026-11-06' });
+    const later = requestOf({ dueOn: '2026-11-10' });
+    const items = toShoot([later, { ...script, dropId: begun.id }, soon], [begun]);
+    expect(
+      items.map((item) => (item.kind === 'script' ? `script:${item.request?.id ?? ''}` : item.request.id)),
+    ).toEqual([soon.id, `script:${script.id}`, later.id]);
+    expect(onTheirWay([begun])).toEqual([]);
+  });
+
+  it('puts « En route » first while a file is still to go up (CRE-09)', () => {
+    expect(routeFirst([dropOf({ state: 'uploading', files: [fileOf({ state: 'awaiting' })] })])).toBe(true);
+    expect(routeFirst([dropOf({ state: 'received', files: [fileOf({ state: 'received' })] })])).toBe(false);
+    expect(routeFirst([])).toBe(false);
+  });
+
+  it('matches the files she chose again to the cut ones by weight, once each (CRE-10)', () => {
+    const a = fileOf({ bytes: 3 });
+    const b = fileOf({ bytes: 7 });
+    const { pairs, unmatched } = matchResumed([a, b], [{ size: 7 }, { size: 3 }, { size: 3 }, { size: 1 }]);
+    expect(pairs.map((pair) => pair.fileId)).toEqual([b.id, a.id]);
+    expect(unmatched).toBe(2);
+  });
+
+  it('names a chosen file by its kind and length, never by its name (CRE-16)', () => {
+    expect(mediaLabel('image', null)).toBe('Photo');
+    expect(mediaLabel('video', 8_200)).toBe('Vidéo · 8 s');
+    expect(mediaLabel('video', null)).toBe('Vidéo');
+    expect(mediaLabel('audio', 65_000)).toBe('Vocal · 1 min 05');
+    expect(mediaLabel(null, null)).toBe('Fichier');
+    expect(lengthOf(200)).toBe('1 s');
   });
 });

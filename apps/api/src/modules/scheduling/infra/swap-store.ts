@@ -34,6 +34,7 @@ import {
   ShiftSwapNotFound,
   ShiftSwapOpen,
   ShiftSwapRevert,
+  SwapRequesterAway,
 } from '../domain/errors';
 import type { ColleagueReads, StoredAccount, StoredShift, StoredSwap, SwapStore } from '../domain/ports';
 import { assertCanWork, type WorkingMember } from '../domain/shifts';
@@ -317,6 +318,9 @@ export function createDrizzleSwapStore(
         }
         const offered = await shiftNow(tx, swap.shiftId);
         assertOffered(offered, me, now);
+        // Away from the team, they hold no shift any more: nothing of theirs to offer (recette 16/11, CHT-31).
+        const own = await ownWork(tx, actor.userId);
+        if (own.status !== 'active') throw new SwapRequesterAway();
         assertColleague(me, swap.targetMemberId);
         const colleague = await colleagues.memberWorkUnscoped(swap.targetMemberId);
         if (colleague === null) throw new MemberNotFound();
@@ -324,7 +328,7 @@ export function createDrizzleSwapStore(
         const back = swap.targetShiftId === null ? null : await colleagues.shiftUnscoped(swap.targetShiftId);
         if (swap.targetShiftId !== null) {
           assertOffered(back, swap.targetMemberId, now);
-          assertCanWork(await ownWork(tx, actor.userId), back.creatorId, back.startsAt);
+          assertCanWork(own, back.creatorId, back.startsAt);
           // The requester reads their own leaves: no shift comes back to them during one.
           await assertNotOnLeave(tx, me, back.startsAt, back.endsAt);
         }

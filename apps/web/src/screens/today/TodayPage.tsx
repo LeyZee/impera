@@ -163,7 +163,7 @@ function Day({
         <MyAwayCard status={away} />
       )}
       {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
-      {away === null ? <ShiftChallengeCard user={user} /> : null}
+      {away === null ? <ShiftChallengeCard user={user} zone={zone} /> : null}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
       {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}

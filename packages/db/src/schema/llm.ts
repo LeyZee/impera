@@ -77,6 +77,8 @@ export const llmCalls = pgTable(
     isFallback: boolean('is_fallback').notNull().default(false),
     traceId: text('trace_id'),
     hedge: enumText('hedge'),
+    /** Why an answer did not fit its schema: field paths and kinds only, never content (16/11, relevé du PC). */
+    errorCode: text('error_code'),
     createdAt: createdAt(),
   },
   (t) => [

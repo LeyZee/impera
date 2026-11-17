@@ -32,6 +32,7 @@ import type {
   FactCategory,
   FactKind,
   FanCardRead,
+  FanFlags,
   FanId,
   GuardCode,
   MediaAssetId,
@@ -42,8 +43,10 @@ import type {
   MessageDirection,
   MessageId,
   MessageView,
+  Money,
   OutboundMedia,
   PlatformAccountId,
+  SafetyEvent,
   ScriptRunId,
   ScriptRunStatus,
   ScriptStepKind,
@@ -101,6 +104,24 @@ export interface Draft {
   readonly createdAt: Date;
   /** What the brief learnt about the fan for this draft, written as facts once a human approves it (P3-02). */
   readonly facts: readonly DraftFact[];
+  /** The step of her script the code decided with this draft (ADR 0098): it leaves after the bubbles. */
+  readonly scriptStep: DraftScriptStep | null;
+}
+
+/**
+ * A step of a platform script that goes with a draft (ADR 0098 § 5): the platform sends its text, media and price, at
+ * the price the code decided (`priceMinor`, 0 for an offered step or a bridge), or nothing if that price changed.
+ */
+export interface DraftScriptStep {
+  readonly scriptRef: string;
+  readonly stepIndex: number;
+  /** The step as the platform names it: what is sent (ADR 0112, a branch has no stable index). */
+  readonly stepRef: string;
+  readonly priceMinor: number;
+  /** It sends a media of her vault: the bubbles may announce it (`media_not_sent` is not read). */
+  readonly hasMedia: boolean;
+  /** One key per conversation, script and step: a replay never sends it twice (ADR 0018 § 5). */
+  readonly idempotencyKey: string;
 }
 
 /** A fact read in the fan's messages, kept with the draft until a human approves it (P3-02). */
@@ -158,7 +179,8 @@ export interface AwayHolds {
 }
 
 interface MessageRepository {
-  /** `false` when the platform message is already known (unique per account): ingestion is idempotent. */
+  /** `false` when the platform message is already known (unique per account): ingestion is idempotent. A known outbound
+   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media. */
   insertIfNew(message: NewMessage): Promise<boolean>;
   /** Bubbles of this draft already on the platform; a retried send resumes after them. */
   countForDraft(draftId: DraftId): Promise<number>;
@@ -200,6 +222,8 @@ interface DraftRepository {
     personaVersionId?: string;
     /** Facts the brief proposed, confirmed when a human approves the draft (P3-02). */
     facts?: readonly DraftFact[];
+    /** The step of her script decided with it (ADR 0098). */
+    scriptStep?: DraftScriptStep;
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
   /**
@@ -271,6 +295,8 @@ export type BlockedReason = 'creator_archived' | 'kill_switch' | 'session_expire
 
 interface RespondGate {
   blockedReason(conversation: ConversationKey): Promise<BlockedReason | null>;
+  /** His limits as they are now (`fans.flags`), read in the transaction; `null` when they cannot be read. */
+  fanFlags(conversation: ConversationKey): Promise<FanFlags | null>;
 }
 
 /** The creator's kill switch and the global one (message-flow.md §6): the latest row of each scope decides. */
@@ -423,6 +449,8 @@ export interface GuardReadContext {
   readonly history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[];
   /** A care episode is open (ADR 0088 § 3, § 5): the care guard reads the bubbles too, whoever wrote them. */
   readonly care?: boolean;
+  /** The draft leaves with a step of her script that sends a media (ADR 0098): announcing it is no lie. */
+  readonly hasMedia?: boolean;
 }
 
 /**
@@ -457,11 +485,25 @@ export interface FanDirectory {
     read: FanCardRead,
     sources: readonly { readonly number: number; readonly messageId: MessageId; readonly at: Date }[],
   ): Promise<readonly { readonly id: string; readonly key: string }[]>;
+  /** His limits (`fans.flags`): a hand is never given back to the agent while his age is in doubt. */
+  flags(creatorId: CreatorId, fanId: FanId): Promise<{ readonly ageDisputed?: unknown }>;
   /** Her active facts about this fan, as the engine reads them (sorted, 40 at most). */
   activeFacts(
     creatorId: CreatorId,
     fanId: FanId,
-  ): Promise<readonly { readonly category: FactCategory; readonly key: string; readonly value: string }[]>;
+  ): Promise<
+    readonly {
+      readonly category: FactCategory;
+      readonly key: string;
+      readonly value: string;
+      /** `declared` (he said it), `noted` (a human wrote it) or `inferred` (the brain guessed it). */
+      readonly kind?: string;
+      /** How sure the brain was; a declared age confirms only when sure (relecture Sécurité, #798). */
+      readonly confidence?: number;
+      /** His message the brain read it in: a declared age confirms only when the number is in it. */
+      readonly sourceMessageId?: string | null;
+    }[]
+  >;
 }
 
 /**
@@ -471,6 +513,17 @@ export interface FanDirectory {
 export interface OutboundSender {
   sendText(conversation: ConversationKey, text: string, idempotencyKey: string): Promise<SendResult>;
   sendMedia(conversation: ConversationKey, media: OutboundMedia, idempotencyKey: string): Promise<SendResult>;
+  /**
+   * One step of a platform script, its text, media and price as the platform lists them (ADR 0018 § 5): refused for
+   * good (`SendRefused`) when the platform already sent it to him or its price is no longer `expectedPrice`.
+   */
+  sendStep(
+    conversation: ConversationKey,
+    /** The script and its step (the branch that leaves) as the platform names them, on the conversation's account. */
+    step: { readonly scriptRef: string; readonly stepRef: string },
+    expectedPrice: Money,
+    idempotencyKey: string,
+  ): Promise<SendResult>;
   /** After a send whose outcome is unknown, whether the message reached the platform. */
   verifySent(
     conversation: ConversationKey,
@@ -517,6 +570,8 @@ interface FanContext extends FanStats {
   readonly brainNotes?: readonly string[];
   /** The age his card gives, a whole number; under 18, a human answers him (recette AGE-13). */
   readonly cardAge?: number;
+  /** His card's age was stated by him or noted by a human, not only guessed: an adult one confirms his age. */
+  readonly cardAgeStated?: boolean;
 }
 
 /** A fact as the brief proposes it: its category is the model's word until `conversations` reads it (P3-02). */
@@ -590,6 +645,8 @@ interface ComposedScriptRun {
   readonly opened?: { readonly run: ScriptRunState; readonly events: readonly ScriptRunJournalEvent[] };
   /** A paid step went into the draft: one `offer_made` at its catalogue price. */
   readonly offer?: { readonly amountMinor: number; readonly currency: Currency };
+  /** The step decided, paid or not: it goes with the draft, once its run is written. */
+  readonly step?: DraftScriptStep;
 }
 
 /**
@@ -889,13 +946,17 @@ export interface AlertNames {
   ): Promise<ReadonlyMap<CustomAlertId, { readonly groupId: CustomAlertGroupId; readonly name: string }>>;
 }
 
-/** One trigger of the history as the journal has it (P4-01): the alert's name is added by the route. */
+/**
+ * One line of the history as the journal has it (P4-01): the alert that rang, or what the agent's safety did (recette
+ * 16/11 AGE-05), one of the two. The alert's name is added by the route.
+ */
 export interface AlertTriggerRow {
   readonly id: EventId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;
   readonly fanDisplayName: string;
-  readonly trigger: AlertTrigger;
+  readonly trigger: AlertTrigger | null;
+  readonly safety: SafetyEvent | null;
   readonly pausedAgent: boolean;
   readonly at: Date;
   readonly seenAt: Date | null;
@@ -907,14 +968,16 @@ export interface AlertTriggerFilter {
   readonly alert?:
     | { readonly kind: 'custom'; readonly id: CustomAlertId }
     | { readonly kind: 'system'; readonly code: SystemAlertCode }
+    /** One kind of what the agent's safety did. */
+    | { readonly kind: 'safety'; readonly event: SafetyEvent }
     /** One of her alerts that never watched her: it has no trigger. */
     | { readonly kind: 'none' }
     | undefined;
 }
 
 /**
- * The history of her alerts (P4-01): her `alert_triggered` events and the `handoff_requested` that carry a trigger,
- * newest first, with the agency's « vu » (`alert_seen`, owned here: a mark on an event of the journal).
+ * The history of her alerts (P4-01): her `alert_triggered` events, the `handoff_requested` that carry a trigger, and
+ * what the agent's safety did (a hand-off for a minor or her budget, a care mode opened), newest first, with the agency's « vu » (`alert_seen`, owned here: a mark on an event of the journal).
  */
 export interface AlertHistory {
   list(creatorId: CreatorId, filter: AlertTriggerFilter, page: PageRequest): Promise<Page<AlertTriggerRow>>;

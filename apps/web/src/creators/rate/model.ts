@@ -1,5 +1,6 @@
 import {
   agencyRateFor,
+  type AgencyShareAlert,
   type CreatorAgencyRate,
   type CreatorAgencyRateList,
   type ObservedAgencyShare,
@@ -60,6 +61,8 @@ export const confirmSentence = (bps: number, fromDay: string): string =>
 
 const DAY_OF_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', timeZone: 'UTC' });
 const DAY_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+/** The day an alert was sent, on the reader's own clock. */
+const DAY_MONTH_HERE = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 const atNoon = (day: string): Date => new Date(`${day}T12:00:00Z`);
 
 /**
@@ -86,10 +89,9 @@ export function readAt(shares: readonly ObservedAgencyShare[]): string {
  * has several accounts (« Reveal 2 »), its currency when it is not the euro (« en USD »); `null` for her one account in
  * euros, which the card's title already names.
  */
-export function shareWhere(
-  share: ObservedAgencyShare,
-  shares: readonly ObservedAgencyShare[],
-): string | null {
+type AccountOf = Pick<ObservedAgencyShare, 'platform' | 'platformAccountId' | 'currency'>;
+
+export function shareWhere(share: AccountOf, shares: readonly AccountOf[]): string | null {
   const platforms = new Set(shares.map((one) => one.platform));
   const accounts = [
     ...new Set(shares.filter((one) => one.platform === share.platform).map((one) => one.platformAccountId)),
@@ -228,4 +230,21 @@ export function sheetHead(
     lead: `À régler : relie Reveal ou règle un pourcentage pour ${creatorName}.`,
     then: null,
   };
+}
+
+/**
+ * An alert the automatic check published on a fortnight shown (PAY-04, ADR 0054 §§ 2 and 5), in words: dated, so that
+ * a gap put right since is not read as present (relecture d'Équipe), then the fortnight,
+ * the account when she has several (`shareWhere` on her shares and alerts), and what it found. The figures of a gap
+ * are in the fortnight's line below; a change says both shares.
+ */
+export function alertText(alert: AgencyShareAlert, list: CreatorAgencyRateList): string {
+  const { last30Days, fortnights } = list.observed;
+  const accounts = [...[last30Days, ...fortnights].flatMap((window) => window.shares), ...list.alerts];
+  const where = shareWhere(alert, accounts);
+  const sent = withFirstOfMonth(DAY_MONTH_HERE.formatToParts(new Date(alert.at)));
+  const fortnight = `Alerte du ${sent}, quinzaine ${windowLabel(alert, list.today)}${where === null ? '' : `, ${where}`}`;
+  return alert.kind === 'mismatch'
+    ? `${fortnight} : sa part lue s’écartait du pourcentage réglé.`
+    : `${fortnight} : la part de l’agence est passée de ${percentOf(alert.previousAgencyBps)} à ${percentOf(alert.agencyBps)}.`;
 }

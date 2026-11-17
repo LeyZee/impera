@@ -89,7 +89,9 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = LlmConfigSchema.parse({
       model: 'grok-4.7',
       temperature: 0.3,
       maxOutputTokens: 800,
-      timeoutMs: 30_000,
+      // 45 s, not 30 (relevé du PC, 16/11): a long reading takes 25 to 29 s when Grok is well, and both requests hit
+      // 30 s when it is slow. Reversible: the second request still leaves at 22 s.
+      timeoutMs: 45_000,
       hedgeAfterMs: 22_000,
       reasoningEffort: 'low',
       fallback: MISTRAL_FALLBACK,

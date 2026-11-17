@@ -1,0 +1,7 @@
+# 2026-11-16 — SCB-01 Import et envoi des branches — in_progress
+Fait : branches d'un même rang dans un ordre stable (par `stepRef`) à la lecture Reveal et à l'import ; empreinte par branche ; `sendScriptStep` par `stepRef` ; table `platform_script_branches` (migration 0214, RLS forcée, fermée au compte de la créatrice, lecture seule pour le rôle de service) et route `PUT …/steps/:platformIndex/branches` ; manques `branch_unsettled`, `branch_two_defaults`, `branch_cheaper_on_spend`, `branch_previous_unknown`, `media_twice` à la place de `branched_step` ; avertissement `step_without_default` ; prix de P6-01 chemin par chemin.
+Pas fait : choix de la branche par l'agent (lot 2), condition en texte et messages après le média (lot 3), éditeur (lot 4), `script_writer` (lot 5) ; identité d'un script à branches par le cerveau (son prompt lit les étapes à la suite : l'agence l'écrit à la main).
+Décisions : ADR 0112 ; condition structurée limitée à `spent_at_least` et `previous_branch` (la donnée de fiche du fan attend l'ADR 0131) ; « même média vendu deux fois » vaut pour tout script, à branches ou non (ADR 0112 § 14).
+Découvertes : un script linéaire déjà importé qui vend deux fois le même média cesse d'être proposable (`media_twice`) : voulu par l'ADR, à signaler à l'agence.
+Candidats à suppression : aucun.
+Vérifié : pnpm check, pnpm test ; intégration en CI (pas de Docker dans la session).

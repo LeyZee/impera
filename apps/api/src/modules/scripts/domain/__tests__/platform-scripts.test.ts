@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   PLATFORM_SCRIPT_NAME_MAX,
   PLATFORM_SCRIPT_REF_MAX,
@@ -35,6 +37,7 @@ function script(id: string, prices: readonly number[] = [0, 1_500, 3_000]): Plat
       previewMedia: [],
       priceMinor,
       currency: 'EUR' as const,
+      discount: null,
     })),
   };
 }
@@ -151,37 +154,56 @@ describe('the import of the native scripts (ADR 0099 § 1, time 2)', () => {
 
 describe('the price warnings of P6-01, never a refusal', () => {
   const eur = (priceMinor: number) => ({ priceMinor, currency: 'EUR' as const });
+  /** A script without branches: each step on its own rank. */
+  const line = (...steps: { priceMinor: number; currency: 'EUR' | 'USD' }[]) =>
+    steps.map((step, platformIndex) => ({ ...step, platformIndex }));
+  const at = (platformIndex: number, priceMinor: number) => ({ ...eur(priceMinor), platformIndex });
 
   it('warns a paid step over twice the paid step before it, offered steps skipped', () => {
-    expect(priceWarnings([eur(1_000), eur(0), eur(2_000), eur(2_100), eur(0), eur(4_300)])).toEqual([
+    expect(priceWarnings(line(eur(1_000), eur(0), eur(2_000), eur(2_100), eur(0), eur(4_300)))).toEqual([
       { code: 'price_more_than_double', position: 5 },
       { code: 'price_above_ceiling', position: 5 },
     ]);
   });
 
   it('warns a step above 40 € VAT included, and none at exactly 40 €', () => {
-    expect(priceWarnings([eur(4_000), eur(4_001)])).toEqual([{ code: 'price_above_ceiling', position: 1 }]);
+    expect(priceWarnings(line(eur(4_000), eur(4_001)))).toEqual([
+      { code: 'price_above_ceiling', position: 1 },
+    ]);
   });
 
   it('compares nothing across two currencies, nor the first paid step', () => {
-    expect(priceWarnings([eur(500), { priceMinor: 2_000, currency: 'USD' }])).toEqual([]);
-    expect(priceWarnings([eur(0), eur(3_000)])).toEqual([]);
+    expect(priceWarnings(line(eur(500), { priceMinor: 2_000, currency: 'USD' }))).toEqual([]);
+    expect(priceWarnings(line(eur(0), eur(3_000)))).toEqual([]);
+  });
+
+  it('reads branches path by path, never one branch after its neighbour (ADR 0112 § 14)', () => {
+    // Rank 1 has a cheap branch and a premium one: 2 500 follows 1 000 on one path only, still warned.
+    expect(priceWarnings([at(0, 1_000), at(1, 1_200), at(1, 2_500), at(2, 2_400)])).toEqual([
+      { code: 'price_more_than_double', position: 2 },
+    ]);
+    // Two branches at the same price, side by side: neither follows the other.
+    expect(priceWarnings([at(0, 500), at(1, 900), at(1, 900)])).toEqual([]);
+  });
+
+  it('keeps the paid step before an offered branch on its path', () => {
+    // An offered branch at rank 1 carries the 1 000 of rank 0 to rank 2: 2 100 is more than double on that path.
+    expect(priceWarnings([at(0, 1_000), at(1, 0), at(1, 1_500), at(2, 2_100)])).toEqual([
+      { code: 'price_more_than_double', position: 3 },
+    ]);
   });
 });
 
 describe('what keeps a native script from being proposable', () => {
   const inVault = { kind: 'image' as const, inVault: true, described: true };
   const step = (
-    platformIndex: number,
+    _platformIndex: number,
     ...media: (typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; described: boolean })[]
-  ) => ({
-    platformIndex,
-    media,
-  });
+  ) => ({ discounted: false, media });
 
   it('needs each media in the vault and described, and the identity validated', () => {
-    expect(platformScriptGaps([step(0, inVault), step(1, inVault)], true)).toEqual([]);
-    expect(platformScriptGaps([step(0, inVault)], false)).toEqual(['identity_not_validated']);
+    expect(platformScriptGaps([step(0, inVault), step(1, inVault)], true, [])).toEqual([]);
+    expect(platformScriptGaps([step(0, inVault)], false, [])).toEqual(['identity_not_validated']);
     expect(
       platformScriptGaps(
         [
@@ -189,24 +211,59 @@ describe('what keeps a native script from being proposable', () => {
           step(1, { kind: 'image', inVault: true, described: false }),
         ],
         true,
+        [],
       ),
     ).toEqual(['media_absent', 'media_not_described']);
   });
 
   it('never waits for a voice note to be described: the vision never hears one', () => {
-    expect(platformScriptGaps([step(0, { kind: 'audio', inVault: true, described: false })], true)).toEqual(
-      [],
-    );
+    expect(
+      platformScriptGaps([step(0, { kind: 'audio', inVault: true, described: false })], true, []),
+    ).toEqual([]);
   });
 
-  it('never offers a script whose steps share a platform rank: branches, until ADR 0112', () => {
-    expect(platformScriptGaps([step(0, inVault), step(1, inVault), step(1, inVault)], true)).toEqual([
-      'branched_step',
+  it('never offers a script with a « Tarif réduit » on a step: never sold at a discount (recette 16/11)', () => {
+    expect(
+      platformScriptGaps([step(0, inVault), { ...step(1, inVault), discounted: true }], true, []),
+    ).toEqual(['step_discounted']);
+  });
+
+  it('adds what its branches lack (ADR 0112)', () => {
+    expect(platformScriptGaps([step(0, inVault), step(1, inVault)], true, ['branch_unsettled'])).toEqual([
+      'branch_unsettled',
     ]);
   });
 });
 
 describe('the fingerprint of a native script', () => {
+  it('changes when a « Tarif réduit » is set or taken off, and stays the same for a step without one', () => {
+    const plain = script('s1');
+    const discounted: PlatformScript = {
+      ...plain,
+      steps: plain.steps.map((each, index) =>
+        index === 1 ? { ...each, discount: { priceMinor: 1_000, minutes: 60 } } : each,
+      ),
+    };
+    expect(platformScriptFingerprint(discounted)).not.toBe(platformScriptFingerprint(plain));
+    // The fingerprint of a script without one is the one it had before discounts were read: no rewrite for nothing.
+    const canonical = JSON.stringify([
+      plain.name,
+      plain.moment,
+      plain.steps.map((step) => [
+        step.ref.id,
+        step.index,
+        step.platformIndex,
+        step.name,
+        step.text,
+        step.priceMinor,
+        step.currency,
+        step.media.map((media) => [media.ref.id, media.kind]),
+        step.previewMedia.map((media) => [media.ref.id, media.kind]),
+      ]),
+    ]);
+    expect(platformScriptFingerprint(plain)).toBe(createHash('sha256').update(canonical).digest('hex'));
+  });
+
   it('changes with the platform rank of a step, so that branches appearing rewrite the script', () => {
     const plain = script('s1');
     const branched: PlatformScript = {

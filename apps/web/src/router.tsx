@@ -19,7 +19,7 @@ import { NotificationsPage } from './pwa/NotificationsPage';
 import { RevealHelpPage } from './pwa/RevealHelpPage';
 import { CreatorRewardRevealGate } from './rewards/CreatorRewardRevealGate';
 import { playsTheGame } from './rewards/api';
-import { parseCalendarSearch } from './scheduling/calendar';
+import { myPlanningSearch, teamPlanningSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
@@ -35,6 +35,7 @@ import {
   parseDashboardSearch,
   periodOf,
 } from './screens/dashboard/logic';
+import { FansPage } from './screens/fans/FansPage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
@@ -70,7 +71,7 @@ import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
 import { RevealPage } from './screens/team/RevealPage';
-import { parsePlanningSearch, parseReportsSearch, parseTeamSearch } from './screens/team/model';
+import { parseReportsSearch, parseTeamSearch } from './screens/team/model';
 import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
 import { ChatterTrackingPage } from './screens/tracking/ChatterTrackingPage';
@@ -85,6 +86,7 @@ import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
+import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
 import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
 
@@ -218,6 +220,8 @@ const creators = createRoute({
         tab={tab}
         creatorId={creatrice ?? null}
         onCreator={(id) => void navigate({ search: creatorsSearch(tab, id) })}
+        folderId={search.dossier ?? null}
+        onFolder={(id) => void navigate({ search: creatorsSearch(tab, creatrice ?? null, id) })}
       />
     );
   },
@@ -237,6 +241,19 @@ const scriptStructures = createRoute({
   },
   component: StructuresPage,
 });
+// Every fan of a creator (ADR 0124), the owner's and an active manager's: anyone else is sent back home.
+const fansList = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/fans',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner' && context.user.teamScope !== 'agency') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: FansPage,
+});
+
 const tracking = createRoute({
   getParentRoute: () => rootRoute,
   path: '/suivi',
@@ -411,10 +428,7 @@ const contentScript = createRoute({
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
   path: '/planning',
-  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => {
-    const { semaine } = parsePlanningSearch(search);
-    return { ...(semaine === undefined ? {} : { semaine }), ...parseCalendarSearch(search) };
-  },
+  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => myPlanningSearch(search),
   component: function MyPlanning() {
     const { user } = rootRoute.useRouteContext();
     const search = myPlanning.useSearch();
@@ -442,10 +456,7 @@ const teamIndex = createRoute({
 const teamPlanning = createRoute({
   getParentRoute: () => team,
   path: '/planning',
-  validateSearch: (search: Record<string, unknown>) => ({
-    ...parsePlanningSearch(search),
-    ...parseCalendarSearch(search),
-  }),
+  validateSearch: teamPlanningSearch,
   component: function TeamPlanning() {
     const { semaine, membre, affichage, mois } = teamPlanning.useSearch();
     const navigate = teamPlanning.useNavigate();
@@ -1052,6 +1063,7 @@ const routeTree = rootRoute.addChildren([
   train.addChildren([trainIndex, playground, channelPost, corrections, tests]),
   tracking,
   trackingAlerts,
+  fansList,
   today,
   agenda,
   sales,
@@ -1096,6 +1108,8 @@ const buildRouter = (context: RouterContext, history?: RouterHistory) =>
     defaultPreload: 'intent',
     // An unknown address keeps the rail and says so in French, in place of the router's « Not Found ».
     defaultNotFoundComponent: NotFoundPage,
+    // A screen that throws says so in French, the rail kept, never the router's « Something went wrong! » (CHT-06).
+    defaultErrorComponent: ErrorPage,
     ...(history === undefined ? {} : { history }),
   });
 

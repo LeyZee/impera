@@ -79,6 +79,16 @@ describe('llm_calls as the gateway journal (LlmCallStore)', () => {
     expect(since.map((record) => record.hedge)).toEqual(['winner', 'loser', undefined]);
   });
 
+  it('keeps where an output failed its schema and of what kind, never what it said', async () => {
+    const start = new Date(Date.now() - 1_000);
+    await store.insert(
+      call({ promptHash: 'code-a', outcome: 'invalid_output', errorCode: 'intent:invalid_value' }),
+    );
+    await store.insert(call({ promptHash: 'code-b' }));
+    const since = (await store.listSince(start)).filter((record) => record.promptHash.startsWith('code-'));
+    expect(since.map((record) => record.errorCode)).toEqual(['intent:invalid_value', undefined]);
+  });
+
   it('gives each call a UUID v7, like every other row (ADR 0011)', async () => {
     await store.insert(call());
     const rows = await test.admin.db.select({ id: schema.llmCalls.id }).from(schema.llmCalls);

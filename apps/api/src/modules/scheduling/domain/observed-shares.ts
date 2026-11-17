@@ -29,6 +29,13 @@ const WHOLE_BPS = 10_000;
 const AGENCY_SHARE_CHANGE_BPS = 100;
 
 /**
+ * Below this net on a fortnight, in the account's currency's cents, a cent of rounding moves the share by more than a
+ * point: such a fortnight is compared with nothing (PAY-04 of the recette of 16/11: 0,03 € of net raised the alert).
+ * 20 in the currency: Charles's choice of 16/11.
+ */
+export const AGENCY_SHARE_CHANGE_MIN_NET_MINOR = 2_000;
+
+/**
  * `part / whole` in basis points, rounded to the nearest, a half up: whole numbers only. `null` without a positive
  * whole, or for a part out of it (refunds heavier than the sales leave no share to read).
  */
@@ -109,21 +116,22 @@ export interface AgencyShareChange {
 
 /**
  * The accounts and currencies read in both fortnights, each with a share, whose share moved by more than
- * `AGENCY_SHARE_CHANGE_BPS`. A fortnight without a net on an account is compared with nothing.
+ * `AGENCY_SHARE_CHANGE_BPS`. A fortnight whose net on an account is below `AGENCY_SHARE_CHANGE_MIN_NET_MINOR` is
+ * compared with nothing: its share is the rounding of a few cents.
  */
 export function agencyShareChanges(
   previous: readonly ObservedTotalsRow[],
   current: readonly ObservedTotalsRow[],
 ): AgencyShareChange[] {
+  const enough = (share: ShareSums): boolean => share.netMinor >= AGENCY_SHARE_CHANGE_MIN_NET_MINOR;
   const before = new Map(
-    observedShares(previous).map((share) => [
-      `${share.platform}:${share.platformAccountId}:${share.currency}`,
-      share.agencyBps,
-    ]),
+    observedShares(previous)
+      .filter(enough)
+      .map((share) => [keyOf(share), share.agencyBps]),
   );
   const changes: AgencyShareChange[] = [];
-  for (const share of observedShares(current)) {
-    const previousAgencyBps = before.get(`${share.platform}:${share.platformAccountId}:${share.currency}`);
+  for (const share of observedShares(current).filter(enough)) {
+    const previousAgencyBps = before.get(keyOf(share));
     if (previousAgencyBps === undefined || previousAgencyBps === null || share.agencyBps === null) continue;
     if (Math.abs(share.agencyBps - previousAgencyBps) <= AGENCY_SHARE_CHANGE_BPS) continue;
     changes.push({

@@ -68,4 +68,4 @@ Et un **tableau de bord opérationnel** dans `apps/web` alimenté par des vues S
 ## Fournisseurs externes : règles de bonne conduite
 
 - Vers Reveal : jamais plus vite qu'un humain (délais, jitter), repli exponentiel sur erreur, coupe-circuit après N erreurs consécutives (arrêt des appels 10 min + alerte), un seul client par compte, User-Agent et en-têtes cohérents avec le vrai client.
-- Vers les LLM : timeouts explicites (sens 60 s, cerveau 30 s, voix 30 s), retries bornés, fallback de fournisseur par rôle, cache des descriptions de médias (jamais deux fois le même média).
+- Vers les LLM : timeouts explicites (sens 60 s, cerveau 45 s, voix 30 s), retries bornés, fallback de fournisseur par rôle, cache des descriptions de médias (jamais deux fois le même média).
