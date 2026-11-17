@@ -1,4 +1,10 @@
-import type { Destination, PlaygroundComparison, PlaygroundMedia, Verdict } from '@impera/contracts';
+import type {
+  Destination,
+  PlaygroundBrief,
+  PlaygroundComparison,
+  PlaygroundMedia,
+  Verdict,
+} from '@impera/contracts';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { Composer, Conversation, LessonCard, type LocalMode } from './playground/Conversation';
@@ -15,6 +21,7 @@ import {
   stepOf,
 } from './playground/logic';
 import { filedAck, isHandoff, isWaiting, suggestedDestination } from './playground/model';
+import { revealTimes } from './playground/reveal';
 import { usePlayground } from './playground/usePlayground';
 
 import { initialOf } from '@/lib/utils';
@@ -42,6 +49,9 @@ const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
   failed: 'Le serveur n’a pas répondu. Réessaie dans un instant.',
 };
 
+/** How often the screen asks for the brain's reading while the voice writes. */
+const READING_POLL_MS = 1500;
+
 /**
  * Entraîner > Playground (spec moteur-ia/playground-entrainement.md): the same path as production with no
  * connection, one number on top, three gestures under each answer, every correction becomes a lesson.
@@ -53,6 +63,14 @@ export function PlaygroundPage(): JSX.Element {
   const [lesson, setLesson] = useState<{ verdict: Verdict; destination: Destination } | undefined>(undefined);
   const [comparison, setComparison] = useState<PlaygroundComparison | undefined>(undefined);
   const [writing, setWriting] = useState(false);
+  /** When the last answer arrived, while its bubbles still appear one by one; null once all are shown. */
+  const [revealFrom, setRevealFrom] = useState<number | null>(null);
+  /** How many of its bubbles are shown while they appear; undefined: all of them. */
+  const [shown, setShown] = useState<number | undefined>(undefined);
+  /** While the voice writes: the brain's reading of his message, asked of the server as soon as it is done. */
+  const [reading, setReading] = useState<PlaygroundBrief | undefined>(undefined);
+  /** His message while she answers it, shown before the server sends the conversation back. */
+  const [sent, setSent] = useState<string | undefined>(undefined);
   const [whyManual, setWhyManual] = useState<boolean | undefined>(undefined);
   /** Where the last lesson went, said until the next message. */
   const [filed, setFiled] = useState<Destination | undefined>(undefined);
@@ -88,6 +106,63 @@ export function PlaygroundPage(): JSX.Element {
     setWhyManual(undefined);
   }, [pending]);
 
+  // Two steps: the brain reads him in a few seconds, the voice takes longer; its reading shows as soon as it is done.
+  const client = pg.client;
+  useEffect(() => {
+    if (!writing) {
+      setReading(undefined);
+      return;
+    }
+    let live = true;
+    const ask = (): void => {
+      client
+        .state()
+        .then((s) => {
+          if (live && s.reading !== undefined) setReading(s.reading);
+        })
+        .catch(() => undefined);
+    };
+    const timer = setInterval(ask, READING_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [writing, client]);
+
+  // Her bubbles one by one, each after her typing time, as a fan sees them (Charles, 16/11).
+  const delays = pending?.delaysMs;
+  useEffect(() => {
+    if (revealFrom === null || delays === undefined || delays.length < 1) {
+      setShown(undefined);
+      return;
+    }
+    const times = revealTimes(delays);
+    const elapsed = Date.now() - revealFrom;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    setShown(times.filter((t) => t <= elapsed).length);
+    times.forEach((t, i) => {
+      if (t > elapsed)
+        timers.push(
+          setTimeout(() => {
+            setShown(i + 1);
+          }, t - elapsed),
+        );
+    });
+    const last = times.at(-1) ?? 0;
+    timers.push(
+      setTimeout(
+        () => {
+          setRevealFrom(null);
+        },
+        Math.max(0, last - elapsed),
+      ),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [revealFrom, delays]);
+  const revealing = shown !== undefined && delays !== undefined && shown < delays.length ? shown : undefined;
+
   const reset = (): void => {
     setMode('idle');
     setLesson(undefined);
@@ -111,14 +186,18 @@ export function PlaygroundPage(): JSX.Element {
 
   const answerTo = async (call: () => Promise<boolean>): Promise<boolean> => {
     setWriting(true);
+    setRevealFrom(null);
     reset();
     const done = await call();
     setWriting(false);
+    setSent(undefined);
+    if (done) setRevealFrom(Date.now());
     return done;
   };
 
   const send = (text: string, media: PlaygroundMedia[]): Promise<boolean> => {
     setFiled(undefined);
+    setSent(text);
     return answerTo(() => pg.run((c) => c.send(text, media)));
   };
   const replay = (n: number): void => {
@@ -146,6 +225,8 @@ export function PlaygroundPage(): JSX.Element {
       }
       const target = event.target;
       if (target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      // While her bubbles still appear, there is nothing to rate yet.
+      if (revealing !== undefined) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const key = event.key.toLowerCase();
       if (event.key === 'Escape' && mode !== 'idle') reset();
@@ -274,6 +355,9 @@ export function PlaygroundPage(): JSX.Element {
           mode={mode}
           busy={pg.busy}
           writing={writing}
+          revealing={revealing}
+          reading={reading}
+          sent={sent}
           error={pg.error === undefined ? undefined : ERRORS[pg.error]}
           errorTone={pg.error === 'llm_unavailable' ? 'warn' : 'bad'}
           lesson={lesson?.verdict}
@@ -336,11 +420,14 @@ export function PlaygroundPage(): JSX.Element {
             placeholder={
               !state.voice.reachable
                 ? 'Ajoute d’abord une clé'
-                : pending === null
-                  ? `Écris comme ${name === FALLBACK_NAME ? 'le fan' : name}…`
-                  : isWaiting(pending)
-                    ? 'Note d’abord son réflexe'
-                    : 'Note d’abord la réponse'
+                : writing || revealing !== undefined
+                  ? // Nothing to rate yet: « Note d’abord la réponse » waits for her last bubble (avis Design 16/11).
+                    'Elle écrit…'
+                  : pending === null
+                    ? `Écris comme ${name === FALLBACK_NAME ? 'le fan' : name}…`
+                    : isWaiting(pending)
+                      ? 'Note d’abord son réflexe'
+                      : 'Note d’abord la réponse'
             }
             onSend={send}
           />
@@ -348,6 +435,7 @@ export function PlaygroundPage(): JSX.Element {
       </section>
       <WhyPanel
         state={state}
+        reading={writing ? reading : undefined}
         open={whyOpen}
         onToggle={() => {
           setWhyManual(!whyOpen);

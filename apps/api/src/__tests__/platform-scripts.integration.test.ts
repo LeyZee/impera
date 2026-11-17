@@ -508,9 +508,14 @@ describe('the native scripts imported from the platform', () => {
       })
       .where(eq(schema.creators.id, nora));
 
-  const post = async (who: 'owner' | 'manager' | 'chatter' | 'nora', url: string, payload: object) =>
+  const post = async (
+    who: 'owner' | 'manager' | 'chatter' | 'nora',
+    url: string,
+    payload: object,
+    method: 'POST' | 'PUT' = 'POST',
+  ) =>
     server.inject({
-      method: 'POST',
+      method,
       url,
       headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
       payload,
@@ -688,23 +693,161 @@ describe('the native scripts imported from the platform', () => {
     await switchOn(true);
   });
 
-  it('never offers a script whose step has branches, and never tells it to the brain (ADR 0112)', async () => {
-    // A loose step joins sequence 4 on the rank of its second step: a human would choose between the two.
+  it('keeps the branches of a step in one order, offered only once the agency set each condition (ADR 0112)', async () => {
+    // A loose step joins sequence 4 on the rank of its second step: two branches of one step.
     await scenario([
       { type: 'sequence_branched', sequenceId: 'sequence_4', scriptId: 'script_2_1', stepIndex: 1 },
     ]);
     await importOf(noraAccount, nora, new Date('2026-11-15T11:00:00Z'));
     const view = await ownerView('sequence_4');
-    expect(view?.steps.map((step) => [step.ref, step.position, step.platformIndex])).toEqual([
-      ['script_4_1', 0, 0],
-      ['script_4_2', 1, 1],
-      ['script_2_1', 2, 1],
-      ['script_4_3', 3, 2],
+    if (view === undefined) throw new Error('imported');
+    // The branches of rank 1 by their ref, whatever order Reveal listed them in.
+    expect(view.steps.map((step) => [step.ref, step.position, step.platformIndex, step.branches])).toEqual([
+      ['script_4_1', 0, 0, 1],
+      ['script_2_1', 1, 1, 2],
+      ['script_4_2', 2, 1, 2],
+      ['script_4_3', 3, 2, 1],
     ]);
-    expect(view?.gaps).toContain('branched_step');
-    expect(view?.proposable).toBe(false);
+    expect(view.steps.map((step) => step.condition)).toEqual([null, null, null, null]);
+    expect(view.gaps).toContain('branch_unsettled');
+    expect(view.proposable).toBe(false);
+    // The brain's prompt reads steps one after the other: such an identity is written by hand.
     const before = told.length;
     expect(await identify('sequence_4')).toBe('branched');
     expect(told).toHaveLength(before);
+
+    const url = `/v1/creators/${nora}/platform-scripts/${view.id}/steps/1/branches`;
+    const body = {
+      branches: [
+        { stepRef: 'script_4_2', condition: { kind: 'none' } },
+        { stepRef: 'script_2_1', condition: { kind: 'text', text: "S'il a parlé de son travail" } },
+      ],
+    };
+    // A chatter, her own account, a creator who is not on the manager's list: never.
+    expect((await post('chatter', url, body, 'PUT')).statusCode).toBe(404);
+    expect((await post('nora', url, body, 'PUT')).statusCode).toBe(403);
+    expect(
+      (
+        await post(
+          'manager',
+          `/v1/creators/${ines}/platform-scripts/${view.id}/steps/1/branches`,
+          body,
+          'PUT',
+        )
+      ).statusCode,
+    ).toBe(403);
+    // A step without branches, or branches that are not those of the step: nothing written.
+    expect(
+      (
+        await post(
+          'manager',
+          `/v1/creators/${nora}/platform-scripts/${view.id}/steps/0/branches`,
+          body,
+          'PUT',
+        )
+      ).statusCode,
+    ).toBe(404);
+    const stale = await post(
+      'manager',
+      url,
+      { branches: [body.branches[0], { stepRef: 'script_9_9', condition: { kind: 'none' } }] },
+      'PUT',
+    );
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json<{ error: { code: string } }>().error.code).toBe(
+      'platform_script_branches_stale_conflict',
+    );
+    // A condition outside the closed list: refused by the schema.
+    const unknown = { branches: [body.branches[0], { stepRef: 'script_2_1', condition: { kind: 'mood' } }] };
+    expect((await post('manager', url, unknown, 'PUT')).statusCode).toBe(400);
+
+    const response = await post('manager', url, body, 'PUT');
+    expect(response.statusCode).toBe(200);
+    const set = PlatformScriptViewSchema.parse(response.json());
+    // In the agency's order, each with its condition; nothing left to set on the branches.
+    expect(set.steps.map((step) => [step.ref, step.condition?.kind ?? null])).toEqual([
+      ['script_4_1', null],
+      ['script_4_2', 'none'],
+      ['script_2_1', 'text'],
+      ['script_4_3', null],
+    ]);
+    expect(set.gaps).not.toContain('branch_unsettled');
+    const audit = await test.admin.db
+      .select({ userId: schema.auditLog.userId, action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(
+        and(
+          eq(schema.auditLog.entityId, view.id),
+          eq(schema.auditLog.action, 'platform_script.branches_set'),
+        ),
+      );
+    expect(audit).toEqual([{ userId: ids.manager, action: 'platform_script.branches_set' }]);
+
+    // Reveal lists the branches again in another order: the import keeps the same, and the settings outlive it.
+    await scenario([{ type: 'script_changed', scriptId: 'script_4_3', priceCents: 3_100 }]);
+    await importOf(noraAccount, nora, new Date('2026-11-15T12:00:00Z'));
+    const again = await ownerView('sequence_4');
+    expect(again?.steps.map((step) => [step.ref, step.condition?.kind ?? null])).toEqual([
+      ['script_4_1', null],
+      ['script_4_2', 'none'],
+      ['script_2_1', 'text'],
+      ['script_4_3', null],
+    ]);
+    // Two by default: refused at once.
+    const twoDefaults = {
+      branches: [body.branches[0], { stepRef: 'script_2_1', condition: { kind: 'none' } }],
+    };
+    const refused = PlatformScriptViewSchema.parse((await post('owner', url, twoDefaults, 'PUT')).json());
+    expect(refused.gaps).toContain('branch_two_defaults');
+  });
+
+  it('never offers a script with a « Tarif réduit » on a step, and offers it again once taken off (recette 16/11)', async () => {
+    const stepsOf = async () =>
+      (await ownerView('sequence_4'))?.steps.map((step) => [step.ref, step.discount]);
+    await scenario([
+      {
+        type: 'script_changed',
+        scriptId: 'script_4_3',
+        priceCents: 3_000,
+        discount: { priceCents: 1_500, minutes: 60 },
+      },
+    ]);
+    await importOf(noraAccount, nora, new Date('2026-11-15T12:00:00Z'));
+    const view = await ownerView('sequence_4');
+    expect(view?.gaps).toContain('step_discounted');
+    // « À traiter » warns of it, since the import that read the discount, for the owner and a manager of her list.
+    const warned = [{ id: view?.id, name: view?.name, steps: 1, since: new Date('2026-11-15T12:00:00Z') }];
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual(
+      warned,
+    );
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.manager, role: 'operator' })).toEqual(
+      warned,
+    );
+    expect(
+      await scripts().reads.discountedScripts(ines, { userId: ids.manager, role: 'operator' }),
+    ).toBeNull();
+    expect(
+      await scripts().reads.discountedScripts(nora, { userId: ids.chatter, role: 'operator' }),
+    ).toBeNull();
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
+    // A later import that changes nothing keeps the day it began.
+    await importOf(noraAccount, nora, new Date('2026-11-15T12:30:00Z'));
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual(
+      warned,
+    );
+    expect(view?.proposable).toBe(false);
+    // Read as it is, on its step only; the price stays the full one.
+    expect(await stepsOf()).toEqual([
+      ['script_4_1', null],
+      ['script_4_2', null],
+      ['script_2_1', null],
+      ['script_4_3', { priceMinor: 1_500, minutes: 60 }],
+    ]);
+    expect(view?.steps.find((step) => step.ref === 'script_4_3')?.priceMinor).toBe(3_000);
+    await scenario([{ type: 'script_changed', scriptId: 'script_4_3', priceCents: 3_000, discount: null }]);
+    await importOf(noraAccount, nora, new Date('2026-11-15T13:00:00Z'));
+    expect((await ownerView('sequence_4'))?.gaps).not.toContain('step_discounted');
+    expect((await stepsOf())?.every(([, discount]) => discount === null)).toBe(true);
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual([]);
   });
 });

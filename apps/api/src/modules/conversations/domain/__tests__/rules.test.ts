@@ -12,6 +12,7 @@ import {
   followUpRetry,
   nextFollowUp,
   respondAt,
+  stepCutBy,
 } from '../rules';
 
 const AT = new Date('2026-10-17T20:00:00Z');
@@ -105,5 +106,22 @@ describe('fanAwaitsAnswer', () => {
     expect(fanAwaitsAnswer({ lastInboundAt: at(2), lastOutboundAt: at(3) })).toBe(false);
     // A follow-up to a fan who never wrote answers nothing.
     expect(fanAwaitsAnswer({ lastInboundAt: null, lastOutboundAt: at(3) })).toBe(false);
+  });
+});
+
+describe('stepCutBy (relecture Sécurité de #812)', () => {
+  const since = '2026-11-16T20:00:00.000Z';
+
+  it('keeps a paid step under care, not to contact, sales frozen, age in doubt, or limits it cannot read', () => {
+    expect(stepCutBy({}, new Date(since))).toBe('care');
+    expect(stepCutBy({ doNotContact: true }, null)).toBe('do_not_contact');
+    expect(stepCutBy({ salesFrozen: { reason: 'distress', since } }, null)).toBe('sales_frozen');
+    expect(stepCutBy({ ageDisputed: { since, by: 'policy' } }, null)).toBe('age_disputed');
+    expect(stepCutBy(null, null)).toBe('limits_unreadable');
+  });
+
+  it('lets it leave otherwise, whatever else he set', () => {
+    expect(stepCutBy({}, null)).toBeNull();
+    expect(stepCutBy({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, null)).toBeNull();
   });
 });

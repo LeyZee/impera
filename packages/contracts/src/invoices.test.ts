@@ -385,7 +385,7 @@ describe('invoices', () => {
   it('save a SIREN only with its check key, and the VAT number that SIREN gives', () => {
     // Invented numbers; La Poste's SIREN is public, and passes like any other.
     for (const siren of ['123456782', '987654324', '356000000']) expect(sirenChecksOut(siren)).toBe(true);
-    for (const siren of ['123456789', '987654321', '12345678', '12345678a']) {
+    for (const siren of ['123456789', '987654321', '12345678', '12345678a', '000000000']) {
       expect(sirenChecksOut(siren)).toBe(false);
     }
     expect(frenchVatNumberOf('123456782')).toBe('FR11123456782');
@@ -618,6 +618,27 @@ describe('invoices', () => {
       expect(refused({ ...company, shareCapitalMinor: null })).toEqual(['legalForm']);
       expect(refused({ ...company, individualEntrepreneur: true })).toEqual(['legalForm']);
       expect(refused({ ...company, shareCapitalMinor: 0 })).toEqual(['shareCapitalMinor']);
+    });
+
+    it('refuses an emoji in the legal name and a SIREN of nine zeros (recette 16/11, CHT-23)', () => {
+      const issues = (body: object): string[] => {
+        const result = ContractorProfileBodySchema.safeParse(body);
+        return result.success
+          ? []
+          : result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
+      };
+      expect(issues({ ...company, legalName: 'Exemple SAS 🎉' })).toEqual([
+        'legalName: Le nom tel qu’il s’imprime sur une facture : sans emoji ni pictogramme.',
+      ]);
+      expect(issues({ ...company, legalName: 'Exemple 🇫🇷' })).toHaveLength(1);
+      // Accents, other alphabets, digits and the punctuation of a name still pass.
+      for (const legalName of ['Zoé L’Exemple-Durand', 'Ðorđe Exemple', 'Exemple & Fils 2 SAS']) {
+        expect(issues({ ...company, legalName })).toEqual([]);
+      }
+      expect(issues({ ...company, businessId: '000000000', vatNumber: null })).toEqual([
+        'businessId: Ce numéro n’est pas un SIREN : l’INSEE n’en attribue aucun fait de zéros.',
+      ]);
+      expect(issues({ ...company, businessId: '00000000000000', vatNumber: null })).toHaveLength(1);
     });
 
     it('keeps a contract text exactly as pasted, a mandate with its delay to contest', () => {

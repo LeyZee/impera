@@ -1,12 +1,10 @@
 import {
-  ContentIdeaIdSchema,
   ContentIdeaSchema,
   ContentIdeaStateSchema,
-  CreatorIdSchema,
   IdeaDropCategorySchema,
-  TrendSignalIdSchema,
   TrendSignalSchema,
   type ContentIdea,
+  type ContentIdeaList,
   type TrendSignal,
 } from '@impera/contracts';
 import {
@@ -55,22 +53,25 @@ function dayIn(now: Date, timeZone: string): string {
   }).format(now);
 }
 
+/** An idea's fields as the row holds them, for `ContentIdeaSchema` to parse. */
+const fieldsOf = (row: IdeaRow) => ({
+  id: row.id,
+  creatorId: row.creatorId,
+  signalId: row.signalId,
+  title: row.title,
+  category: row.category,
+  toShoot: row.toShoot,
+  reason: row.reason,
+  shootMinutes: row.shootMinutes,
+  // Parsed on read (docs/architecture/jsonb.md).
+  reelBrief: row.reelBrief,
+  state: row.state,
+  proposedOn: row.proposedOn,
+  refusalReason: row.refusalReason,
+});
+
 function ideaOf(row: IdeaRow): ContentIdea {
-  return ContentIdeaSchema.parse({
-    id: ContentIdeaIdSchema.parse(row.id),
-    creatorId: CreatorIdSchema.parse(row.creatorId),
-    signalId: TrendSignalIdSchema.parse(row.signalId),
-    title: row.title,
-    category: row.category,
-    toShoot: row.toShoot,
-    reason: row.reason,
-    shootMinutes: row.shootMinutes,
-    // Parsed on read (docs/architecture/jsonb.md).
-    reelBrief: row.reelBrief,
-    state: row.state,
-    proposedOn: row.proposedOn,
-    refusalReason: row.refusalReason,
-  });
+  return ContentIdeaSchema.parse(fieldsOf(row));
 }
 
 /** Her idea of that id, locked for its decision; RLS (`team_all`) hides another creator's. */
@@ -111,7 +112,19 @@ export function createDrizzleIdeaStore(db: Database): IdeaStore {
           .innerJoin(signals, eq(signals.id, ideas.signalId))
           .where(eq(ideas.proposedOn, day))
           .orderBy(ideas.createdAt, ideas.id);
-        return { day, items: rows.map((row) => ({ ...ideaOf(row.idea), signal: signalOf(row.signal) })) };
+        // A row that does not read (a script idea written by hand before the base refused it, a reel sheet of another
+        // shape) is left out, never the whole day with it (recette PIL-19); its id goes back to be logged.
+        const items: ContentIdeaList['items'] = [];
+        const unreadable: string[] = [];
+        for (const row of rows) {
+          const idea = ContentIdeaSchema.safeParse(fieldsOf(row.idea));
+          if (!idea.success) {
+            unreadable.push(row.idea.id);
+            continue;
+          }
+          items.push({ ...idea.data, signal: signalOf(row.signal) });
+        }
+        return { day, items, unreadable };
       }),
 
     validate: (creatorId, userId, ideaId, correction, check, now) =>

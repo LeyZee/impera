@@ -26,10 +26,12 @@ import {
 
 import { safetySigns } from '../../agent';
 import {
+  AgeInDoubtConflict,
   AutomaticLocked,
   CreatorNotFound,
   DraftGuarded,
   PersonaInactive,
+  ScriptStepCut,
   SendBlocked,
 } from '../domain/errors';
 import type {
@@ -43,7 +45,7 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt } from '../domain/rules';
+import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt, stepCutBy } from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -375,8 +377,14 @@ export function createConversationCommands({
             text: message.text,
           })),
           care: conversation.careSince !== null,
+          hasMedia: draft.scriptStep?.hasMedia === true,
         });
         if (verdict.isBlocked) throw new DraftGuarded(verdict.codes);
+        // A paid step leaves only if his limits, read now, still let it (relecture Sécurité de #812).
+        if (draft.scriptStep !== null) {
+          const cut = stepCutBy(await tx.gate.fanFlags(conversation), conversation.careSince);
+          if (cut !== null) throw new ScriptStepCut(cut);
+        }
         const meta = humanMeta(input);
         await appendEvent(
           tx,
@@ -496,7 +504,14 @@ export function createConversationCommands({
       });
     },
 
-    release(input) {
+    async release(input) {
+      // His age in doubt: the agent may not answer him, so the hand stays with the team (Charles, 16/11).
+      const fanId = await uow.inTenant(
+        input.creatorId,
+        async (tx) => (await lockConversation(tx, input.conversationId)).fanId,
+      );
+      if ((await fans.flags(input.creatorId, fanId)).ageDisputed !== undefined)
+        throw new AgeInDoubtConflict();
       return uow.inTenant(input.creatorId, async (tx) => {
         const conversation = await lockConversation(tx, input.conversationId);
         const meta = humanMeta(input);

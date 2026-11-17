@@ -31,6 +31,11 @@ import {
 } from '@/test/contractors';
 import { IRIS, IRIS_ME, THEO, THEO_ME } from '@/test/pay';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', () => ({
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 const NBSP = /[\u00a0\u202f]/gu;
 
 let server: FileServer;
@@ -90,7 +95,21 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  confirmIdentity.mockReset();
 });
+
+/** The password and the code typed and confirmed in the prompt that stands in a dialog (EQ-15). */
+function confirmInPrompt(within_: HTMLElement): void {
+  fireEvent.change(within(within_).getByLabelText('Mot de passe'), {
+    target: { value: 'mot-de-passe-invente' },
+  });
+  fireEvent.change(within(within_).getByLabelText('Code à 6 chiffres ou de secours'), {
+    target: { value: '123456' },
+  });
+  fireEvent.click(within(within_).getByRole('button', { name: 'Confirmer' }));
+}
+
+const REAUTH = { status: 403, code: 'reauthentication_forbidden' } as const;
 
 describe('Moi › Dossier', () => {
   it('asks an empty file to be filled, with the fields of his country, and sends it', async () => {
@@ -334,5 +353,86 @@ describe('Moi › Dossier', () => {
     server.members = [];
     renderPage();
     await screen.findByText('Ta fiche d’équipe est introuvable : le propriétaire peut la vérifier.');
+  });
+});
+
+describe('Moi › Dossier asks for the password and the code before a write (EQ-15)', () => {
+  it('asks them before his acceptance of a text, then sends the same acceptance again', async () => {
+    server.texts = [MANDATE_V2, MANDATE_V1, CONTRACT_V1];
+    server.file = fileOf({
+      acceptances: [
+        acceptanceOf(1, MANDATE_V1, '2026-10-30T10:00:00.000Z'),
+        acceptanceOf(2, CONTRACT_V1, '2026-10-30T10:01:00.000Z'),
+      ],
+    });
+    confirmIdentity.mockResolvedValue('ok');
+    renderPage();
+    const texts = await waitFor(() => panelOf('Tes textes'));
+    const mandate = await waitFor(() => itemOf(texts, 'Mandat de facturation'));
+    fireEvent.click(within(mandate).getByRole('button', { name: 'Lire et accepter' }));
+    server.refusal = REAUTH;
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'J’accepte la version 2' }));
+    // Never « le serveur ne répond pas »: the prompt, in place of the text, the same one as everywhere.
+    expect(
+      await within(dialog()).findByText(
+        'Ce geste touche à la facturation : confirme ton mot de passe et ton code.',
+      ),
+    ).toBeTruthy();
+    expect(within(dialog()).queryByRole('alert')).toBeNull();
+    expect(within(dialog()).getByRole('button', { name: 'Confirmer' }).className).toContain('nv-btn--neon');
+    confirmInPrompt(dialog());
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(confirmIdentity).toHaveBeenCalledWith('mot-de-passe-invente', '123456');
+    const accept = {
+      method: 'POST',
+      path: `/v1/payroll/contract-texts/${MANDATE_V2.id}/accept`,
+      body: { sha256: MANDATE_V2.sha256 },
+    };
+    expect(server.writes).toEqual([expect.objectContaining(accept), expect.objectContaining(accept)]);
+  });
+
+  it('keeps his file as typed when the prompt is given up, nothing sent again', async () => {
+    server.file = fileOf({ profile: null, regimes: [] });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Remplir mon dossier' }));
+    fireEvent.change(within(dialog()).getByLabelText('Nom'), { target: { value: 'Théo Exemple' } });
+    fireEvent.change(within(dialog()).getByLabelText('Adresse'), { target: { value: 'Rue 12\nCotonou' } });
+    fireEvent.change(within(dialog()).getByLabelText('E-mail des factures'), {
+      target: { value: 'theo@example.test' },
+    });
+    server.refusal = REAUTH;
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Enregistrer' }));
+    await within(dialog()).findByLabelText('Mot de passe');
+    // While it asks, nothing of the file can be changed: what is sent again is what was read.
+    expect(within(dialog()).queryByLabelText('Nom')).toBeNull();
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Annuler' }));
+    expect(await within(dialog()).findByLabelText('Nom')).toHaveProperty('value', 'Théo Exemple');
+    expect(server.writes.map((one) => [one.method, one.path])).toEqual([
+      ['PUT', `/v1/payroll/contractors/${THEO.id}/profile`],
+    ]);
+  });
+
+  it('asks them before a document filed, then files the same one under the same key', async () => {
+    confirmIdentity.mockResolvedValue('ok');
+    renderPage();
+    const documents = await waitFor(() => panelOf('Tes pièces'));
+    const certificate = await waitFor(() => itemOf(documents, 'Attestation de résidence fiscale'));
+    fireEvent.click(within(certificate).getByRole('button', { name: 'Déposer' }));
+    const file = new File(['%PDF-1.7 invented'], 'attestation.pdf', { type: 'application/pdf' });
+    fireEvent.change(within(dialog()).getByLabelText('Le fichier'), { target: { files: [file] } });
+    fireEvent.change(within(dialog()).getByLabelText('Délivrée le'), { target: { value: '2026-10-20' } });
+    server.refusal = REAUTH;
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Déposer' }));
+    await within(dialog()).findByLabelText('Mot de passe');
+    confirmInPrompt(dialog());
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    const [first, second] = server.writes;
+    expect(server.writes).toHaveLength(2);
+    expect(second?.path).toBe(first?.path);
+    expect(second?.search.get('id')).toBe(first?.search.get('id'));
   });
 });
