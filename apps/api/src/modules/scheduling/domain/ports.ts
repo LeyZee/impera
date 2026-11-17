@@ -669,13 +669,19 @@ interface NewAgencyRate {
 export interface AgencyRatesStore {
   /**
    * Her percentages newest first, the day it is at `now` in the agency's zone, and the agency's share read on the
-   * register over the windows of ADR 0054 § 4, in the same transaction.
+   * register over the windows of ADR 0054 § 4, and the alerts the automatic check published on its fortnights
+   * (PAY-04), in the same transaction.
    */
   list(
     actor: UserId,
     creatorId: CreatorId,
     now: Date,
-  ): Promise<{ today: string; rates: StoredAgencyRate[]; observed: CreatorAgencyRateList['observed'] }>;
+  ): Promise<{
+    today: string;
+    rates: StoredAgencyRate[];
+    observed: CreatorAgencyRateList['observed'];
+    alerts: CreatorAgencyRateList['alerts'];
+  }>;
   /** Owner; `created` is false when the same percentage was already recorded. */
   create(
     actor: Actor,
