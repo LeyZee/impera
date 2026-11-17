@@ -141,6 +141,21 @@
   gap: 10px;
   min-width: 0;
   padding: 18px 20px 14px;
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+/* A card lifts under the pointer, as the Dashboard's (ADR 0091 § 7, « ok essai IA » : de beaux survols). */
+.cia-credit:hover {
+  transform: translateY(-2px);
+  background: var(--nv-plate-hover);
+  box-shadow: var(--nv-shadow-lift);
+}
+/* ElevenLabs' free offer: said in amber, never a block. */
+.cia-credit__runway.cia-voice__plan {
+  font-weight: 500;
+  color: var(--nv-warning);
 }
 .cia-credit__head {
   display: flex;
@@ -395,6 +410,9 @@
   .cia-gauge__fill,
   .cia-runway__fill {
     animation: none;
+  }
+  .cia-credit:hover {
+    transform: none;
   }
 }
 

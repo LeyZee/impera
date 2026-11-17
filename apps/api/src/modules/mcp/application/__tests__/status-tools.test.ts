@@ -72,6 +72,7 @@ const usage = AiUsageSchema.parse({
   },
   lastCallAt: '2026-11-14T09:58:00.000Z',
   credits: [],
+  voice: null,
 });
 
 const noStats: StatsReader = { agencyInsights: () => Promise.reject(new Error('not read here')) };

@@ -26,6 +26,10 @@ const ProviderParamsSchema = z.object({ provider: AiProviderSchema });
 const PROVIDER_CALLS_PER_MINUTE = 10;
 const providerCallLimit = { rateLimit: { max: PROVIDER_CALLS_PER_MINUTE, timeWindow: '1 minute' } };
 
+/** « Essai réel » costs a little each time (ADR 0091 § 7): a few a minute is plenty for a person checking. */
+const PROBES_PER_MINUTE = 4;
+const probeLimit = { rateLimit: { max: PROBES_PER_MINUTE, timeWindow: '1 minute' } };
+
 /** Who touches a key, for `audit_log`: the guard has set `request.user`. */
 function actorOf(request: FastifyRequest): KeyActor {
   return { userId: request.user?.id ?? null, ip: request.ip };
@@ -94,6 +98,15 @@ export function createProvidersRoutes(
         schema: { params: ProviderParamsSchema, response: { 200: ProviderStatusSchema } },
       },
       (request) => providers.reverify(request.params.provider),
+    );
+
+    app.post(
+      '/settings/providers/:provider/probe',
+      {
+        config: probeLimit,
+        schema: { params: ProviderParamsSchema, response: { 200: ProviderStatusSchema } },
+      },
+      (request) => providers.probe(request.params.provider),
     );
 
     app.put(

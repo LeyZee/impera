@@ -665,8 +665,60 @@ describe('failures and connection tests', () => {
     const xai = scripted([{ text: 'ok' }]);
     const { gateway } = setup({ xai });
 
-    expect(await gateway.testConnection('xai')).toMatchObject({ isOk: true, model: 'grok-4.7' });
+    expect(await gateway.testConnection('xai')).toMatchObject({
+      isOk: true,
+      model: 'grok-4.7',
+      modelLabel: 'Grok 4.7',
+    });
     expect(await gateway.testConnection('venice')).toMatchObject({ isOk: false, outcome: 'unknown_model' });
+  });
+
+  it('journals the « Essai réel » under probe, out of the agent health, and says when the account is used up', async () => {
+    const xai = scripted([{ text: 'ok' }]);
+    const { gateway, log } = setup({ xai });
+
+    await gateway.testConnection('xai');
+
+    expect(log.since(new Date(0))).toMatchObject([
+      { purpose: 'probe', provider: 'xai', model: 'grok-4.7', outcome: 'ok', isFallback: false },
+    ]);
+    expect(gateway.health().roles.find((r) => r.role === 'voice')?.lastSuccessAt).toBeUndefined();
+  });
+
+  it('reports a key the « Essai réel » sees refused, like a refusal in production (ADR 0091 § 7)', async () => {
+    // On purpose, not a side effect: the key is truly refused, the agent must stop using it too.
+    const refusals: KeyRefusal[] = [];
+    const { gateway } = setup({ xai: scripted([{ status: 401 }]) }, ALL_KEYS, (refusal) =>
+      refusals.push(refusal),
+    );
+    expect(await gateway.testConnection('xai')).toMatchObject({ isOk: false, outcome: 'auth' });
+    expect(refusals).toEqual([{ provider: 'xai', status: 401 }]);
+  });
+
+  it('tells an account with nothing left from a refused key, and never calls past the cap', async () => {
+    const mistral = scripted([{ status: 402, body: '{"message":"no credits"}' }]);
+    const { gateway } = setup({ mistral });
+    expect(await gateway.testConnection('mistral')).toMatchObject({
+      isOk: false,
+      model: 'mistral-large-4',
+      outcome: 'quota_exhausted',
+    });
+
+    const xai = scripted([{ text: 'ok' }]);
+    const capped = setup({ xai }, ALL_KEYS, undefined, { dailyCapEur: () => 0.000_001 });
+    capped.log.append({
+      at: new Date('2026-10-17T11:00:00Z'),
+      role: 'voice',
+      provider: 'xai',
+      model: 'grok-4.7',
+      promptHash: 'h',
+      outcome: 'ok',
+      latencyMs: 1,
+      isFallback: false,
+      costUsd: 1,
+    });
+    expect(await capped.gateway.testConnection('xai')).toMatchObject({ outcome: 'budget_reached' });
+    expect(xai.doGenerateCalls).toHaveLength(0);
   });
 });
 
