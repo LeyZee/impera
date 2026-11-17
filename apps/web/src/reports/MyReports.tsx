@@ -171,7 +171,7 @@ export function MyReportsCard({
 
         {sums.length === 0 && without === 0 ? null : (
           // His commission is computed by the pay, from the net: Commissions says it, never an estimate here.
-          <Link to="/commissions" className="rp-mine__pay">
+          <Link to="/commissions" className="rp-mine__pay nv-hit">
             Ta commission est dans Commissions
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <path d="m6 3.5 4.5 4.5-4.5 4.5" />

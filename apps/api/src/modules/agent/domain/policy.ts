@@ -93,15 +93,34 @@ export function maySulk(flags: FanFlags): boolean {
 }
 
 /**
- * What the brain read that the policy needs: he sexualizes now (the cursor follows him there), or asks for paid
- * content himself.
+ * What makes his message a sexual advance, for the cursor that may slow him down (P3-09): he sexts, or says in his own
+ * words what he wants, takes her there, or plays a sexual role. A flirt, a compliment, his mood alone or a question on
+ * her outfit is not one: a compliment, even an insistent one, is welcomed, never slowed down (Charles, 16/11). The gate
+ * of the first teaser reads a wider sign (`sexualizes`, ADR 0103 § 11): a sale may wait for less than a brake needs.
  */
-export function offerSignals(brief: { readonly intent: string; readonly sentiment: string }): {
+const SEXUAL_ADVANCE_SIGNALS: readonly string[] = [
+  'explicit_language',
+  'states_desire',
+  'steers_to_intimate',
+  'roleplay',
+];
+
+/**
+ * What the brain read that the policy needs: he makes a sexual advance now (the cursor follows him there or slows him
+ * down), or asks for paid content himself.
+ */
+export function offerSignals(brief: {
+  readonly intent: string;
+  readonly sentiment: string;
+  readonly desireSignals?: readonly string[] | undefined;
+}): {
   readonly fanSexualizes: boolean;
   readonly fanAsksForPaid: boolean;
 } {
   return {
-    fanSexualizes: brief.intent === 'flirt' || brief.intent === 'sexting' || brief.sentiment === 'aroused',
+    fanSexualizes:
+      brief.intent === 'sexting' ||
+      (brief.desireSignals ?? []).some((signal) => SEXUAL_ADVANCE_SIGNALS.includes(signal)),
     fanAsksForPaid: brief.intent === 'asks_for_media',
   };
 }

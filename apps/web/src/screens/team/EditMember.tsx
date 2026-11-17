@@ -4,6 +4,7 @@ import {
   UpdateTeamMemberBodySchema,
   type CommissionPreset,
   type CreatorSummary,
+  type Shift,
   type TeamMember,
   type TeamMemberStatus,
 } from '@impera/contracts';
@@ -158,6 +159,10 @@ export function EditMemberPanel({
     ...(sameCreators ? {} : { creatorIds }),
   });
   const ready = name !== '' && body.success;
+  // The creators taken off his list: their shifts left on his name are said before saving (recette EQU-01).
+  const removed = creators.filter(
+    (creator) => member.creatorIds.includes(creator.id) && !creatorIds.includes(creator.id),
+  );
 
   return (
     <Dialog title={`Modifier ${member.displayName}`} busy={busy} onClose={onClose}>
@@ -223,6 +228,7 @@ export function EditMemberPanel({
             )}
             <span className="tm-hint">Celles de son travail, à partir de maintenant.</span>
           </div>
+          {removed.length === 0 ? null : <CreatorShiftsLeft member={member} removed={removed} />}
           <Foot busy={busy} problem={problem} ready={ready} label="Enregistrer" onClose={onClose} />
         </form>
       ) : (
@@ -448,8 +454,8 @@ const STATUS_LEAD = (name: string): string =>
 /** The planning read ahead for a member's shifts still set: what make-shifts lays, four weeks, inside the read's six. */
 const AHEAD_DAYS = 42;
 
-/** His shifts still to come: nobody holds them once he is away or gone, and the planning shows them to fill (EQP-03). */
-function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
+/** His shifts not over yet (under way or ahead), from the planning read once when the panel opens. */
+function useShiftsLeft(member: TeamMember): { failed: boolean; from: string; shifts: readonly Shift[] } {
   const [range] = useState(() => {
     const from = new Date();
     return {
@@ -459,8 +465,20 @@ function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
     };
   });
   const planning = usePlanning(range);
+  return {
+    failed: planning.isError,
+    from: range.from,
+    shifts: (planning.data?.shifts ?? []).filter(
+      (shift) => shift.memberId === member.id && shift.stoppedAt === null && shift.endsAt > range.from,
+    ),
+  };
+}
+
+/** His shifts still to come: nobody holds them once he is away or gone, and the planning shows them to fill (EQP-03). */
+function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
+  const left = useShiftsLeft(member);
   // Unread is not « none »: the owner is sent to the planning rather than told nothing is left.
-  if (planning.isError) {
+  if (left.failed) {
     return (
       <p className="tm-warn nv-swap">
         Ses shifts à venir n’ont pas pu être lus.{' '}
@@ -470,9 +488,7 @@ function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
       </p>
     );
   }
-  const count = (planning.data?.shifts ?? []).filter(
-    (shift) => shift.memberId === member.id && shift.stoppedAt === null && shift.startsAt > range.from,
-  ).length;
+  const count = left.shifts.filter((shift) => shift.startsAt > left.from).length;
   if (count === 0) return null;
   return (
     <p className="tm-warn nv-swap">
@@ -482,6 +498,68 @@ function ShiftsLeft({ member }: { member: TeamMember }): JSX.Element | null {
         Voir ses shifts
       </Link>
     </p>
+  );
+}
+
+/**
+ * His shifts not over on the creators taken off his list, said before « Enregistrer » (recette EQU-01): from then he
+ * no longer reads her, nobody holds them, and the planning shows them to fill, « Sans accès ». The access goes at
+ * once all the same: a creator is never kept open to a member for the sake of a shift.
+ */
+function CreatorShiftsLeft({
+  member,
+  removed,
+}: {
+  member: TeamMember;
+  removed: readonly CreatorSummary[];
+}): JSX.Element | null {
+  const left = useShiftsLeft(member);
+  const toPlanning = (
+    <Link className="tm-warn__link" to="/equipe/planning" search={{ membre: member.id }}>
+      {left.failed ? 'Vérifier au planning' : 'Voir ses shifts'}
+    </Link>
+  );
+  if (left.failed) {
+    return (
+      <div className="tm-warn nv-swap" role="status">
+        <p>
+          Ses shifts sur {removed.map((creator) => creator.displayName).join(' et ')} n’ont pas pu être lus.
+        </p>
+        {toPlanning}
+      </div>
+    );
+  }
+  const lines = removed.flatMap((creator) => {
+    const hers = left.shifts.filter((shift) => shift.creatorId === creator.id);
+    const live = hers.filter((shift) => shift.startsAt <= left.from).length;
+    const ahead = hers.length - live;
+    if (hers.length === 0) return [];
+    const many = hers.length > 1;
+    const counted = [
+      live === 0 ? null : `${String(live)} shift en cours`,
+      ahead === 0
+        ? null
+        : live === 0
+          ? `${String(ahead)} shift${ahead > 1 ? 's' : ''} à venir`
+          : `${String(ahead)} à venir`,
+    ]
+      .filter((part) => part !== null)
+      .join(' et ');
+    return [
+      {
+        id: creator.id,
+        text: `${counted} sur ${creator.displayName} ${many ? 'restent' : 'reste'} à son nom. Sans ${creator.displayName} dans ses créatrices, personne ne ${many ? 'les' : 'le'} tiendra et le planning ${many ? 'les' : 'le'} montre à pourvoir : donne-${many ? 'les' : 'le'} à un autre membre ou annule-${many ? 'les' : 'le'}.`,
+      },
+    ];
+  });
+  if (lines.length === 0) return null;
+  return (
+    <div className="tm-warn nv-swap" role="status">
+      {lines.map((line) => (
+        <p key={line.id}>{line.text}</p>
+      ))}
+      {toPlanning}
+    </div>
   );
 }
 

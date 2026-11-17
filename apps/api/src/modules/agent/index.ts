@@ -12,6 +12,7 @@ import {
   type ComposerPersonaFields,
   type DraftComposerDeps,
   type MediaSight,
+  type ScriptSource,
 } from './infra/draft-composer';
 import { createFanLimits } from './infra/fan-limits';
 import { guardSettingsOf, type PersonaForModels } from './infra/persona-file';
@@ -32,6 +33,7 @@ export { holdDecision, type HoldDecision } from './domain/hold';
 export { withoutOrders } from './domain/injection';
 /** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
 export { safetySigns } from './domain/safety-net';
+export { declaredAdultAge } from './domain/sexualization';
 export { bubbleDelays } from './domain/bubbles';
 /** @public */
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';
@@ -89,6 +91,9 @@ export {
 export { guardSettingsOf, readPersonaFile, type PersonaForModels } from './infra/persona-file';
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
+/** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
+export type { ScriptSource } from './infra/draft-composer';
+export type { PlatformScriptView as AgentScriptView, ScriptHistoryView } from './domain/script-run';
 
 /** @public Her persona and guards for a post of her Telegram channel (ADR 0080 § 5), the `telegram` port. */
 export { channelWriterPersona } from './infra/channel-persona';
@@ -128,6 +133,10 @@ export interface DraftComposerStartOptions {
   readonly alertsOf?: DraftComposerDeps['alertsOf'];
   /** Whether a chatter is on shift on her accounts (`scheduling`): a doubt on who she is goes to them (P4-01). */
   readonly chatterOnShift?: DraftComposerDeps['chatterOnShift'];
+  /** Her scripts on the platform and his history (ADR 0098); without it, no script moves and nothing is sold. */
+  readonly scripts?: ScriptSource;
+  /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
+  readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
 }
 
 /**
@@ -170,6 +179,8 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.onLimitsNotSaved !== undefined && { onLimitsNotSaved: options.onLimitsNotSaved }),
     ...(options.alertsOf !== undefined && { alertsOf: options.alertsOf }),
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
+    ...(options.scripts !== undefined && { scripts: options.scripts }),
+    ...(options.lastOfferAt !== undefined && { lastOfferAt: options.lastOfferAt }),
   });
 }
 

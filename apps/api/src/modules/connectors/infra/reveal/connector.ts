@@ -8,6 +8,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  FetchedMedia,
   Money,
   OutboundMedia,
   PlatformScript,
@@ -17,15 +18,25 @@ import type {
   VaultMedia,
   VerifyResult,
 } from '@impera/contracts';
-import { z } from 'zod';
 
 import {
   ConnectorError,
   ScriptStepAlreadySent,
+  ScriptStepDiscounted,
   ScriptStepPriceChanged,
   type PlatformConnector,
+  type VaultPreview,
 } from '../../domain/platform-connector';
 import type { ConnectorRegistry, ConnectorSend, SendJournal } from '../../domain/ports';
+import { SESSION_WARNING_BEFORE_MS } from '../../domain/session-life';
+import {
+  downloadVaultFile,
+  VaultFileError,
+  SYSTEM_FILE_TRANSPORT,
+  type DownloadBounds,
+  type FileTransport,
+  type VaultFileFailure,
+} from '../download/vault-file';
 
 import {
   createRevealClient,
@@ -46,16 +57,51 @@ import {
   type OwnMessages,
 } from './mapping';
 import { withAgencyBlock } from './note';
+import { previewBounds, previewLinkOf, readPreviewFile } from './preview';
 import { fingerprintOf, isSendOf, type SendContent } from './sends';
-import { parseRevealSession, type RevealSession } from './session';
+import { parseRevealSession, revealTokenExpiry, type RevealSession } from './session';
 import { REVEAL_ENDPOINTS, type RevealAnswer } from './wire';
 
 /** Page sizes of the official client (reveal-api-observed.md § Pagination): no heavier than a chatter. */
 const TAKE = { conversations: 20, messages: 10, ppv: 10, scripts: 20, vault: 10, transactions: 10 } as const;
+/**
+ * How long the links of a folder's small pictures are kept in memory (ADR 0138 § 1): never written anywhere, and
+ * shorter than a link's own life, so that a folder opened is listed once for all its pictures.
+ */
+const PREVIEW_LINKS_MS = 3 * 60_000;
+
+/**
+ * The hosts Reveal serves vault files from (ADR 0113 § 2), read on the real vault on 16/11 over 300 media of each kind,
+ * each named whole, never its parent domain: the signed storage (photos, non-HLS videos, audios, their thumbnails),
+ * the photo resizer (the smaller sizes), the HLS videos' CDN (playlists, segments, thumbnails). A host is added by a PR
+ * Sécurité reads, never by a setting. The videos' CDN zone was seen on one account only and is not in the site's public
+ * code: it may differ from one account to another, so a `host_refused` on a second creator's videos reads that way.
+ */
+const REVEAL_VIDEO_HOST = 'vz-90090929-421.b-cdn.net';
+const REVEAL_FILE_HOSTS: readonly string[] = [
+  'dem02.fra1.digitaloceanspaces.com',
+  'resize.demoiselles.app',
+  REVEAL_VIDEO_HOST,
+];
+/** The videos' host expects the dashboard's origin header (ADR 0113 § 2, amendment of 16/11): this value, to it alone. */
+const REVEAL_VIDEO_REFERER = { host: REVEAL_VIDEO_HOST, value: 'https://dashboard.reveal.me/' } as const;
+/** A vault file's bounds (ADR 0113 § 2): a 720-line video of an hour stays under it; past it, nothing is kept. */
+const FILE_MAX_BYTES = 2 * 1024 ** 3;
+const FILE_TIMEOUT_MS = 10 * 60_000;
+/** An HLS video of the vault: an hour in 6-second segments is 600; one key for a file, a few at most. */
+const FILE_MAX_SEGMENTS = 2_000;
+const FILE_MAX_KEYS = 8;
+/** What a failed download is, for the job: the link again later, the media gone, or a file we will never read. */
+const FILE_FAILURES: Record<VaultFileFailure, ConnectorError['code']> = {
+  expired: 'transient',
+  failed: 'transient',
+  gone: 'not_found',
+  too_large: 'fatal',
+  host_refused: 'fatal',
+  unsupported: 'fatal',
+};
 /** A cursor that never ends is a bug or a changed API: stop rather than loop. */
 const MAX_PAGES = 500;
-/** `health` warns this long before a readable expiry (spec § 2): the token lives 24 h only (V1). */
-const WARNING_BEFORE_MS = 2 * 3_600_000;
 /**
  * `verifySent` reads this many of the newest messages (spec § 5, point 3): two pages of the official client's ten.
  * A watch point (spec § 5): over 20 messages written in the conversation between the attempt and its check, the
@@ -94,6 +140,8 @@ const CAPABILITIES: ConnectorCapabilities = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  mediaDownload: true,
+  vaultPreview: true,
 };
 
 export interface RevealApiConnectorOptions {
@@ -113,20 +161,15 @@ export interface RevealApiConnectorOptions {
    * calling Reveal. Without it, every write is refused: a send nobody records could go twice.
    */
   readonly sends?: SendJournal;
-}
-
-/** `exp` of a JWT bearer, when the token is one (spec § 2, V2); `null` otherwise. */
-function expiryOf(bearer: string): number | null {
-  const payload = bearer.split('.')[1];
-  if (payload === undefined) return null;
-  try {
-    const parsed = z
-      .object({ exp: z.number() })
-      .safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')));
-    return parsed.success ? parsed.data.exp * 1_000 : null;
-  } catch {
-    return null;
-  }
+  /**
+   * How file links are reached (ADR 0113 § 2): never the session's client, no header ever sent; resolved and checked by
+   * the system by default. FakeReveal's in the tests.
+   */
+  readonly fileTransport?: FileTransport;
+  /** The hosts a file link may name; `REVEAL_FILE_HOSTS` by default. */
+  readonly fileHosts?: readonly string[];
+  /** FakeReveal serves plain HTTP: the tests only, a real link is HTTPS. */
+  readonly fileHttpForTests?: boolean;
 }
 
 /** What `prior` found of a key before a send. */
@@ -156,20 +199,40 @@ export class RevealApiConnector implements PlatformConnector {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly botDisplayName: string | null;
   private readonly sends: SendJournal | null;
+  private readonly fileTransport: FileTransport;
+  private readonly fileBounds: DownloadBounds;
   /** When the sends of the last minute left, for our own pace (spec § 5). */
   private sentAt: number[] = [];
   private readonly lastSendIn = new Map<string, number>();
   /** Fan → conversation, as `listConversations` read them: Reveal has one conversation per fan and model. */
   private readonly conversationOfFan = new Map<string, string>();
+  /**
+   * Folder (`''`: the vault's root) → the links of its small pictures by media, read once and shared by the pictures
+   * asked together, until `until` (ADR 0138 § 1). In memory only.
+   */
+  private readonly previewLinks = new Map<
+    string,
+    { readonly until: number; readonly links: Promise<Map<string, string | null>> }
+  >();
 
   constructor(options: RevealApiConnectorOptions) {
     const { session } = options;
     this.now = options.now ?? (() => new Date());
     this.modelId = session?.modelId ?? '';
-    this.expiresAt = session === null ? null : expiryOf(session.bearer);
+    this.expiresAt = session === null ? null : (revealTokenExpiry(session.bearer)?.getTime() ?? null);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.botDisplayName = options.botDisplayName ?? null;
     this.sends = options.sends ?? null;
+    this.fileTransport = options.fileTransport ?? SYSTEM_FILE_TRANSPORT;
+    this.fileBounds = {
+      hosts: options.fileHosts ?? REVEAL_FILE_HOSTS,
+      maxBytes: FILE_MAX_BYTES,
+      timeoutMs: FILE_TIMEOUT_MS,
+      maxSegments: FILE_MAX_SEGMENTS,
+      maxKeys: FILE_MAX_KEYS,
+      referer: REVEAL_VIDEO_REFERER,
+      ...(options.fileHttpForTests === true ? { allowHttp: true } : {}),
+    };
     this.client =
       session === null
         ? null
@@ -193,7 +256,7 @@ export class RevealApiConnector implements PlatformConnector {
       if (error instanceof ConnectorError && error.code === 'session_expired') return 'expired';
       throw error;
     }
-    if (this.expiresAt !== null && this.expiresAt - this.now().getTime() < WARNING_BEFORE_MS)
+    if (this.expiresAt !== null && this.expiresAt - this.now().getTime() < SESSION_WARNING_BEFORE_MS)
       return 'warning';
     return 'valid';
   }
@@ -293,12 +356,14 @@ export class RevealApiConnector implements PlatformConnector {
    * One step of a platform script (spec §§ 5, 6; ADR 0018 § 5): its text, its media and its price as `scripts.list`
    * gives them, never a price of ours. The fan's history is read again just before: a step already sent in this
    * conversation is refused for good (`ScriptStepAlreadySent`), and a history that cannot be read sends nothing. The
-   * price `scripts.list` gives must be the one validated (`expectedPrice`), or nothing is sent (`ScriptStepPriceChanged`).
+   * price `scripts.list` gives must be the one validated (`expectedPrice`), or nothing is sent (`ScriptStepPriceChanged`);
+   * a step with a « Tarif réduit » on it sends nothing either (`ScriptStepDiscounted`, recette 16/11). The step is found
+   * by its own id in the script (`stepRef`): a branch is never found by its place (ADR 0112 § 1).
    */
   async sendScriptStep(
     conversationRef: ExternalRef,
     scriptRef: ExternalRef,
-    stepIndex: number,
+    stepRef: ExternalRef,
     expectedPrice: Money,
     idempotencyKey: string,
   ): Promise<SendResult> {
@@ -312,13 +377,15 @@ export class RevealApiConnector implements PlatformConnector {
     );
     const steps = await this.scriptPages([['withConversations', 'false']]);
     const script = scriptsOf(sequences, steps, () => null).find((item) => item.ref.id === scriptRef.id);
-    const step = script?.steps[stepIndex];
+    const step = script?.steps.find((each) => each.ref.id === stepRef.id);
     if (step === undefined) throw new ConnectorError('not_found', 'scripts.list: no such script step');
     const history = sentStepsOf(await this.scriptPages([['conversationId', conversationRef.id]]));
     if (history.some((sent) => sent.stepRef.id === step.ref.id)) throw new ScriptStepAlreadySent();
     if (step.priceMinor !== expectedPrice.amountMinor || step.currency !== expectedPrice.currency) {
       throw new ScriptStepPriceChanged();
     }
+    // Never sold at a discount, whatever its full price: the fan would pay what nobody chose.
+    if (step.discount !== null) throw new ScriptStepDiscounted();
     const mediaIds = step.media.map((item) => item.ref.id);
     return this.send(conversationRef, prior, { text: step.text, scriptRef: step.ref.id, mediaIds }, () => ({
       scriptId: step.ref.id,
@@ -538,6 +605,73 @@ export class RevealApiConnector implements PlatformConnector {
       }
     }
     return media;
+  }
+
+  /**
+   * One vault file to `path` (ADR 0113): its link read from its folder's page, then downloaded without anything of the
+   * session. A link Reveal no longer signs is read again once; the media no longer in its folder is `not_found`.
+   */
+  async fetchMedia(
+    mediaRef: ExternalRef,
+    opts: { folderRef: ExternalRef | null; path: string },
+  ): Promise<FetchedMedia> {
+    for (let attempt = 0; ; attempt++) {
+      const item = (await this.vaultPages(opts.folderRef?.id ?? null)).find(
+        (media) => media.id === mediaRef.id,
+      );
+      if (item === undefined)
+        throw new ConnectorError('not_found', 'vault.medias: no such media in its folder');
+      try {
+        return await downloadVaultFile(
+          this.fileTransport,
+          { url: item.url, isHls: item.isHls ?? false },
+          opts.path,
+          this.fileBounds,
+        );
+      } catch (error) {
+        if (!(error instanceof VaultFileError)) throw error;
+        if (error.reason === 'expired' && attempt === 0) continue;
+        throw new ConnectorError(FILE_FAILURES[error.reason], `vault file: ${error.reason}`, {
+          cause: error,
+        });
+      }
+    }
+  }
+
+  /**
+   * ADR 0138: one small picture, by a link fresh from its folder's listing (shared by the pictures asked within a few
+   * minutes). A link the platform refuses is listed again once; then `not_found`.
+   */
+  async readVaultPreview(input: {
+    mediaRef: ExternalRef;
+    folderRef: ExternalRef | null;
+  }): Promise<VaultPreview> {
+    const folder = input.folderRef?.id ?? '';
+    for (const fresh of [false, true]) {
+      const link = (await this.previewLinksOf(folder, fresh)).get(input.mediaRef.id);
+      if (link === undefined)
+        throw new ConnectorError('not_found', 'vault preview: no such media in the folder');
+      if (link === null) throw new ConnectorError('not_found', 'vault preview: no picture for this media');
+      const read = await readPreviewFile(this.fileTransport, link, previewBounds(this.fileBounds));
+      if (read !== 'expired') return read;
+    }
+    throw new ConnectorError('not_found', 'vault preview: link refused after a fresh listing');
+  }
+
+  private previewLinksOf(folder: string, fresh: boolean): Promise<Map<string, string | null>> {
+    const now = this.now().getTime();
+    for (const [key, kept] of this.previewLinks) if (kept.until <= now) this.previewLinks.delete(key);
+    const kept = this.previewLinks.get(folder);
+    if (!fresh && kept !== undefined) return kept.links;
+    const links = this.vaultPages(folder === '' ? null : folder).then(
+      (items) => new Map(items.map((item) => [item.id, previewLinkOf(item)])),
+    );
+    this.previewLinks.set(folder, { until: now + PREVIEW_LINKS_MS, links });
+    // A failed listing is not kept: the next picture lists again.
+    links.catch(() => {
+      if (this.previewLinks.get(folder)?.links === links) this.previewLinks.delete(folder);
+    });
+    return links;
   }
 
   private session(): RevealClient {
@@ -778,6 +912,12 @@ export function revealApiConnectors(options: {
   readonly log?: (platformAccountId: string, entry: RevealCallLog) => void;
   /** Tests only: FakeReveal's clock, so an attempt and the message it made are dated alike. */
   readonly now?: () => Date;
+  /** Tests only: FakeReveal's file server, its host and its plain HTTP, in place of the system's (ADR 0113 § 2). */
+  readonly files?: {
+    readonly transport: FileTransport;
+    readonly hosts: readonly string[];
+    readonly httpForTests: boolean;
+  };
 }): NonNullable<ConnectorRegistry['reveal']> {
   return (account, session, context) =>
     new RevealApiConnector({
@@ -787,5 +927,12 @@ export function revealApiConnectors(options: {
       ...(options.baseUrl === undefined ? {} : { baseUrl: options.baseUrl }),
       ...(options.now === undefined ? {} : { now: options.now }),
       ...(options.log === undefined ? {} : { log: (entry) => options.log?.(account.id, entry) }),
+      ...(options.files === undefined
+        ? {}
+        : {
+            fileTransport: options.files.transport,
+            fileHosts: options.files.hosts,
+            fileHttpForTests: options.files.httpForTests,
+          }),
     });
 }
