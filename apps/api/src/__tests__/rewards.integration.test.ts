@@ -2,6 +2,7 @@ import {
   AccountPayRulesIdSchema,
   ApiErrorSchema,
   LevelSettingsSchema,
+  MyFiguresSchema,
   MyShiftChallengeSchema,
   newId,
   payPeriodAt,
@@ -798,6 +799,23 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
     await evaluate();
     expect(await team.statementOf(nora, P1)).toEqual(before);
     expect(await team.jobsFor(P1)).toEqual([]);
+  });
+
+  it('gives « Mes chiffres » the same lines: her own validated reports, never a colleague’s (§ 10)', async () => {
+    const figuresOf = async (cookie: string) => {
+      const response = await team.call('GET', '/payroll/my-figures', cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return MyFiguresSchema.parse(response.json());
+    };
+    const noras = await figuresOf(noraCookie);
+    // 100,00 declared, corrected down then up again: 80,00 of net, the game's own.
+    expect(noras.records.bestPeriod).toEqual({ period: P1, currency: 'EUR', netMinor: 8_000 });
+    expect(noras.records.bestDay).toMatchObject({ currency: 'EUR', netMinor: 8_000 });
+    // A report has no hour of sale.
+    expect(noras.hours.cells).toEqual([]);
+    for (const cookie of [leaCookie, team.owner]) {
+      expect((await figuresOf(cookie)).records).toEqual({ bestDay: null, bestPeriod: null });
+    }
   });
 
   it('leaves a report aside on an account whose pay reads the sales, from the period it does (§ 3)', async () => {

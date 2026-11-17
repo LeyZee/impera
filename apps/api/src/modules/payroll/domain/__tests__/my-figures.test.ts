@@ -37,8 +37,8 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     ]);
     expect(read.today).toBe('2026-11-05');
     expect(read.days).toEqual([
-      { day: '2026-11-02', sales: 1, refunds: 0, nets: [{ currency: 'EUR', netMinor: 3_000 }] },
-      { day: '2026-11-03', sales: 1, refunds: 1, nets: [{ currency: 'EUR', netMinor: 4_000 }] },
+      { day: '2026-11-02', sales: 1, refunds: 0, reports: 0, nets: [{ currency: 'EUR', netMinor: 3_000 }] },
+      { day: '2026-11-03', sales: 1, refunds: 1, reports: 0, nets: [{ currency: 'EUR', netMinor: 4_000 }] },
     ]);
     expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 7_000 }]);
   });
@@ -57,7 +57,7 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
       line(P_NOV_1, '2026-11-01T10:00:00.000Z', 1_000),
     ]);
     expect(read.days).toEqual([
-      { day: '2026-11-01', sales: 2, refunds: 1, nets: [{ currency: 'EUR', netMinor: 5_000 }] },
+      { day: '2026-11-01', sales: 2, refunds: 1, reports: 0, nets: [{ currency: 'EUR', netMinor: 5_000 }] },
     ]);
     expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 5_000 }]);
     // Le record garde le vrai jour de la vente.
@@ -148,5 +148,28 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     expect(none.previous).toBeNull();
     expect(none.hours.cells).toEqual([]);
     expect(none.records).toEqual({ bestDay: null, bestPeriod: null });
+  });
+
+  it('compte un shift au rapport validé dans le net, le jour et les records, jamais parmi les ventes ni les heures (ADR 0118 § 10)', () => {
+    const read = myFigures({
+      lines: [line(P_NOV_1, '2026-11-03T20:00:00.000Z', 5_000)],
+      reportLines: [
+        line(P_NOV_1, '2026-11-03T17:00:00.000Z', 8_000),
+        line(P_NOV_1, '2026-11-04T17:00:00.000Z', 20_000),
+      ],
+      now: NOW,
+      agencyZone: PARIS,
+      memberZone: PARIS,
+      period: P_NOV_1,
+    });
+    expect(read.days).toEqual([
+      { day: '2026-11-03', sales: 1, refunds: 0, reports: 1, nets: [{ currency: 'EUR', netMinor: 13_000 }] },
+      { day: '2026-11-04', sales: 0, refunds: 0, reports: 1, nets: [{ currency: 'EUR', netMinor: 20_000 }] },
+    ]);
+    expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 33_000 }]);
+    expect(read.records.bestDay).toEqual({ day: '2026-11-04', currency: 'EUR', netMinor: 20_000 });
+    expect(read.records.bestPeriod).toEqual({ period: P_NOV_1, currency: 'EUR', netMinor: 33_000 });
+    // Un rapport donne un total, pas l'heure d'une vente : la grille ne lit que la vente relevée.
+    expect(read.hours).toMatchObject({ sales: 1, cells: [{ weekday: 2, hour: 21, sales: 1 }] });
   });
 });

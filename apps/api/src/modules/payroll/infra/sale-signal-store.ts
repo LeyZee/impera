@@ -43,6 +43,7 @@ import {
   PaySaleSignalNotFound,
   PaySaleSignalStateConflict,
 } from '../domain/errors';
+import { reportLines } from '../domain/game-facts';
 import { myFigures, type FigureLine } from '../domain/my-figures';
 import {
   myDays,
@@ -546,22 +547,28 @@ export function createDrizzleSaleSignalStore(
   now: () => Date = () => new Date(),
 ): PayrollSaleSignalStore {
   return {
-    myFigures: (userId) =>
-      withMember(db, userId, async (tx) => {
+    myFigures: async (userId) => {
+      // Read before the member's transaction opens: the planning's door holds its own.
+      const validatedShifts = await reads.ownValidatedShifts(userId);
+      return withMember(db, userId, async (tx) => {
         const at = now();
         const agencyZone = await reads.agencyTimeZone(tx);
         const member = await ownMemberOf(tx, userId);
         const memberZone = member === null ? null : await ownZoneOf(tx, member);
+        const lines = member === null ? [] : await figureLinesOf(tx, member);
         return MyFiguresSchema.parse(
           myFigures({
-            lines: member === null ? [] : await figureLinesOf(tx, member),
+            lines,
+            // ADR 0118 § 10: the same lines as the game, a shift left to its sales as soon as one was read in it.
+            reportLines: member === null ? [] : reportLines(validatedShifts, lines),
             now: at,
             agencyZone,
             memberZone: memberZone ?? agencyZone,
             period: payPeriodAt(at, agencyZone),
           }),
         );
-      }),
+      });
+    },
 
     mySales: (userId, query) =>
       withMember(db, userId, async (tx) => {
