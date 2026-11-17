@@ -501,6 +501,16 @@
     transform: scaleX(0.1);
   }
 }
+/* Fans: the heart beats once. */
+.is-playing .nav-heart {
+  transform-origin: 18px 17px;
+  animation: nv-nav-beat var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-beat {
+  35% {
+    transform: scale(1.18);
+  }
+}
 /* Moi: a nod. */
 .is-playing .nav-head {
   animation: nv-nav-nod var(--nv-dur-morph) var(--nv-ease-spring) both;

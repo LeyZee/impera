@@ -194,6 +194,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Profil du fan (plateforme) | `FanProfile`, `getFanProfile` | Ce que la plateforme montre d'un fan à côté de la conversation : inscription, abonnement, total dépensé, dernier paiement, carte vérifiée (ADR 0018). Distinct de la fiche du fan. |
 | Statistiques PPV | `FanPpvStats`, `getFanPpvStats` | L'onglet PPV d'un fan sur la plateforme : bundles achetés sur bundles payants proposés, prix le plus haut et le plus bas, date de la dernière offre payante (`lastOfferAt`), et chaque bundle envoyé (ADR 0018). |
 | Note client | `fan_note` | La note libre qu'une plateforme attache à un fan, lue et écrite par les chatteurs et l'agent. Distincte de `fan_fact`. |
+| Réaction (à un message) | `ReactionFit`, `reactToMessage` | Un emoji que la créatrice pose sur un message du fan, en plus de sa réponse. Le cerveau dit ce que le message appelle, le code décide d'en poser une (ADR 0133). |
 | Notes du modèle | `creator_note` | Les notes que Reveal affiche à côté de chaque conversation sur la créatrice : sa fiche persona vue par la plateforme. |
 | Bundle (PPV) | `bundle` | Le PPV de Reveal : médias floutés vendus (au moins un), prix TTC, tarif réduit optionnel, aperçu gratuit de 10 médias au plus. |
 | Coffre | `vault` | Les médias de la créatrice stockés sur la plateforme, réutilisables à l'envoi. |
@@ -320,6 +321,10 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Place | `scheduling_slot_seats` | Le nombre de chatteurs qu'un compte veut en même temps sur un créneau (1 par défaut, 2 au plus) ; « à pourvoir » compte les places manquantes (ADR 0049). |
 | Renfort | `reinforcement` | Un shift posé sur un compte qui a déjà un chatteur à cette heure, pour tout le créneau ou une partie ; trois chatteurs au plus en même temps sur un compte (ADR 0049). |
 | Fan confié | `shift_fan_assignment` | Quand plusieurs membres sont en poste sur un compte, le fan que le code confie à l'un d'eux : il le voit en tête, en reçoit la passation, et la vente lui revient (ADR 0049). |
+| Liste des fans | `fan_list` | L'écran Chatting › Fans (ADR 0124) : chaque fan que le CRM connaît pour une créatrice, pour le propriétaire et les managers actifs, en lecture seule. |
+| Gros payeurs | `big_payers` | Filtre de la liste des fans : ceux qui ont payé sur la période, du plus gros au plus petit (ADR 0092 § 3). |
+| Ont décroché | `lapsed` | Filtre de la liste des fans : ont payé avant, plus rien depuis 21 jours par défaut (ADR 0124 § 2). |
+| Sans réponse de nous | `unanswered` | Filtre de la liste des fans : son dernier message est plus récent que notre dernier envoi. |
 | En poste | `onShift` | Le membre dont le shift couvre cet instant sur cette créatrice ; il reçoit en premier les passages à l'humain pour vendre (à plusieurs, ceux de ses fans confiés, ADR 0049). Un chatteur ne traite les conversations d'une créatrice qu'en poste, plus une marge (ADR 0025). |
 | Modèle de shift | `shift_template` | Un shift qui revient chaque semaine (jour, heure de début et de fin dans le fuseau de la grille) et fait d'avance les shifts des semaines à venir. Jamais modifié : on le termine et on en crée un autre (EQ-02). |
 | Congé | `leave_request` | Des jours entiers où un membre ne chatte pour aucune créatrice. Il les demande dans son fuseau ; le propriétaire ou un manager actif valide une fois ses shifts de la période donnés à d'autres, et aucun shift ne se pose sur lui pendant le congé (ADR 0031). Distinct du statut « en congé » de sa fiche, que le propriétaire règle. |

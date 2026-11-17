@@ -122,6 +122,22 @@ export function createOutboundSender(deps: {
     sendMedia: (conversation, media, key) =>
       run(conversation, (c, ref) => c.sendMedia(ref, media, key), true),
     verifySent: (conversation, key) => run(conversation, (c, ref) => c.verifySent(ref, key), false),
+    // The send job's step (ADR 0098): the refs it keeps are the platform's, on the conversation's account.
+    sendStep: (conversation, step, expectedPrice, key) =>
+      run(
+        conversation,
+        (c, ref) =>
+          capable(c, 'scripts', (d) =>
+            d.sendScriptStep?.(
+              ref,
+              { platform: ref.platform, id: step.scriptRef },
+              { platform: ref.platform, id: step.stepRef },
+              expectedPrice,
+              key,
+            ),
+          ),
+        true,
+      ),
     sendScriptStep: (conversation, scriptRef, stepRef, expectedPrice, key) =>
       run(
         conversation,

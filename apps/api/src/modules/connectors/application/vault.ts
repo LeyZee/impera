@@ -1,5 +1,7 @@
 import {
+  FanPpvStatsSchema,
   PlatformScriptSchema,
+  SentScriptStepSchema,
   VaultMediaSchema,
   VaultViewSchema,
   type CreatorId,
@@ -7,6 +9,7 @@ import {
   type Platform,
   type PlatformAccountId,
   type PlatformScript,
+  type SentScriptStep,
   type VaultFolderView,
   type VaultView,
 } from '@impera/contracts';
@@ -226,6 +229,13 @@ export function createVaultPreview(deps: VaultDeps) {
 export interface PlatformReads {
   /** The account's scripts as the platform lists them (`listPlatformScripts`); `platform_read_unavailable` otherwise. */
   scripts(platformAccountId: PlatformAccountId): Promise<PlatformScript[]>;
+  /**
+   * For the agent's script decision (ADR 0098, ADR 0018 § 5), the fan named by his platform id: the steps already sent
+   * to him (`getScriptHistory`), and when a priced bundle was last offered to him, bought or not (`getFanPpvStats`).
+   * `platform_read_unavailable` when the account's connector cannot tell: the agent then sells nothing.
+   */
+  scriptHistory(platformAccountId: PlatformAccountId, platformFanId: string): Promise<SentScriptStep[]>;
+  lastOfferAt(platformAccountId: PlatformAccountId, platformFanId: string): Promise<Date | null>;
 }
 
 export function createPlatformReads(deps: Omit<VaultDeps, 'store'>): PlatformReads {
@@ -247,20 +257,44 @@ export function createPlatformReads(deps: Omit<VaultDeps, 'store'>): PlatformRea
     return { account, connector };
   }
 
+  async function read<T>(read: () => Promise<T>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      if (error instanceof ConnectorError) {
+        throw new PlatformReadUnavailable(error.code === 'session_expired' ? 'session' : 'failed');
+      }
+      throw error;
+    }
+  }
+
   return {
     async scripts(platformAccountId) {
       const { connector } = await connectorOf(platformAccountId);
       if (!connector.capabilities.scripts || connector.listPlatformScripts === undefined) {
         throw new PlatformReadUnavailable('unsupported');
       }
-      try {
-        return z.array(PlatformScriptSchema).parse(await connector.listPlatformScripts());
-      } catch (error) {
-        if (error instanceof ConnectorError) {
-          throw new PlatformReadUnavailable(error.code === 'session_expired' ? 'session' : 'failed');
-        }
-        throw error;
+      const list = connector.listPlatformScripts.bind(connector);
+      return read(async () => z.array(PlatformScriptSchema).parse(await list()));
+    },
+    async scriptHistory(platformAccountId, platformFanId) {
+      const { account, connector } = await connectorOf(platformAccountId);
+      if (!connector.capabilities.scriptHistory || connector.getScriptHistory === undefined) {
+        throw new PlatformReadUnavailable('unsupported');
       }
+      const history = connector.getScriptHistory.bind(connector);
+      const fanRef = { platform: account.platform, id: platformFanId };
+      return read(async () => z.array(SentScriptStepSchema).parse(await history(fanRef)));
+    },
+    async lastOfferAt(platformAccountId, platformFanId) {
+      const { account, connector } = await connectorOf(platformAccountId);
+      if (!connector.capabilities.ppvStats || connector.getFanPpvStats === undefined) {
+        throw new PlatformReadUnavailable('unsupported');
+      }
+      const stats = connector.getFanPpvStats.bind(connector);
+      const fanRef = { platform: account.platform, id: platformFanId };
+      const { lastOfferAt } = await read(async () => FanPpvStatsSchema.parse(await stats(fanRef)));
+      return lastOfferAt === null ? null : new Date(lastOfferAt);
     },
   };
 }

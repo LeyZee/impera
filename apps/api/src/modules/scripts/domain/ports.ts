@@ -274,6 +274,11 @@ export interface PlatformScriptReadStore {
    * (`forJobs.platformScript`). `null` when it is not hers.
    */
   oneForJob(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
+  /** Hers on one account, active or not, as the service role: what the agent decides on for a fan (ADR 0098). */
+  ofAccountForJob(
+    creatorId: CreatorId,
+    platformAccountId: PlatformAccountId,
+  ): Promise<readonly StoredPlatformScript[]>;
   /**
    * Her active native scripts with a « Tarif réduit » on a step (recette 16/11), read as `ofCreator` is and under the
    * same rights, without their texts nor their media: what « À traiter » warns of. `null` for a reader who may not

@@ -1,4 +1,4 @@
-import type { ConversationState, DraftStatus } from '@impera/contracts';
+import type { ConversationState, DraftStatus, FanFlags } from '@impera/contracts';
 
 /** Default wait after the last fan message before answering, so that three messages get one answer. */
 export const DEFAULT_DEBOUNCE_SECONDS = 45;
@@ -137,4 +137,21 @@ export function followUpRetry(retryAt: Date | undefined, now: Date): Date | null
   if (retryAt === undefined) return null;
   const ahead = retryAt.getTime() - now.getTime();
   return ahead > 0 && ahead <= FOLLOW_UP_RETRY_MAX_HOURS * HOUR_MS ? retryAt : null;
+}
+
+/** Why a paid step of her script may no longer leave, read again at the approval and at the send. */
+export type StepCut = 'care' | 'do_not_contact' | 'sales_frozen' | 'age_disputed' | 'limits_unreadable';
+
+/**
+ * His limits as they are now, against the step a draft carries (relecture Sécurité de #812, même logique que la borne
+ * 21 de l'ADR 0143): a care episode, « ne plus lui écrire », sales frozen or his age in doubt keep it from leaving,
+ * whoever approved the draft and whenever. Limits that cannot be read keep it too (fail closed). `null`: it may leave.
+ */
+export function stepCutBy(flags: FanFlags | null, careSince: Date | null): StepCut | null {
+  if (careSince !== null) return 'care';
+  if (flags === null) return 'limits_unreadable';
+  if (flags.doNotContact === true) return 'do_not_contact';
+  if (flags.salesFrozen !== undefined) return 'sales_frozen';
+  if (flags.ageDisputed !== undefined) return 'age_disputed';
+  return null;
 }
