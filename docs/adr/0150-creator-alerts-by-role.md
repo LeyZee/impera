@@ -1,6 +1,6 @@
 # 0150. Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine
 
-Statut : proposed (demande de Charles du 17/11/2026, 13 h 28 et 13 h 31, fil « Créer les alertes par créatrice »)
+Statut : accepted (demande de Charles du 17/11/2026, 13 h 28 et 13 h 31, fil « Créer les alertes par créatrice » ; acceptée par Charles le 17/11/2026 à 14 h 39, « ok alertes »)
 Date : 2026-11-17
 Précise : P4-01 (Réglages › Alertes), ADR 0020 (notifications Telegram), ADR 0042 § 7 (notifications push), ADR 0091 (dépense IA), ADR 0128 § C (stock de scripts), ADR 0143 § 13 (note quand l'agent oriente vers un compte). S'insère dans la fiche créatrice à sept onglets (ADR 0149, 6e onglet « Alertes », `/creatrices?onglet=alertes&creatrice=<id>`) et prend le choix par sorte des notifications de la créatrice que lui confie l'ADR 0149 § 4. Ne remplace aucun ADR.
 
