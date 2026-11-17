@@ -78,8 +78,16 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+/* The password asked for a switch: under its own line, in its plate. It takes the row's width and never widens the card. */
+.cl-row__confirm {
+  flex: 1 1 100%;
+  min-width: 0;
+  contain: inline-size;
+  padding-top: 10px;
+  border-top: 1px solid var(--nv-hairline);
+}
 @media (max-width: 640px) {
-  .cl-row .nv-btn {
+  .cl-row > .nv-btn {
     flex: 1 1 100%;
     min-height: 44px;
   }

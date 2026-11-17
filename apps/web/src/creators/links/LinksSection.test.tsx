@@ -199,8 +199,20 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
         ),
     );
     renderSection();
-    fireEvent.click(await screen.findByRole('switch'));
-    expect(await screen.findByText(/Pour changer un de ses liens/u)).toBeDefined();
+    const toggle = await screen.findByRole<HTMLInputElement>('switch');
+    const before = toggle.getAttribute('aria-label');
+    const wasOn = toggle.checked;
+    fireEvent.click(toggle);
+    // The prompt names the gesture and sits in the link's own row; the switch keeps its state, « Annuler » too.
+    const lead = await screen.findByText(
+      /^Pour (allumer|éteindre) « .+ », confirme ton mot de passe et ton code\.$/u,
+    );
+    expect(lead.closest('li')).toBe(toggle.closest('li'));
+    expect(writes).toHaveLength(1);
+    expect(screen.getByRole<HTMLInputElement>('switch').checked).toBe(wasOn);
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByText(/confirme ton mot de passe/u)).toBeNull();
+    expect(screen.getByRole('switch').getAttribute('aria-label')).toBe(before);
     expect(writes).toHaveLength(1);
   });
 });

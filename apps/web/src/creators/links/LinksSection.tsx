@@ -61,7 +61,7 @@ export function LinksSection({
   const [editing, setEditing] = useState<AgencyRedirectLink | 'new' | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  /** The switch waiting for the password and the code. */
+  /** The switch waiting for the password and the code: it keeps its state until then, and « Annuler » leaves it. */
   const [pending, setPending] = useState<{ link: AgencyRedirectLink; enabled: boolean } | null>(null);
   const links = read.data;
   const refresh = (): Promise<void> => client.invalidateQueries({ queryKey: linksQueryKey(creatorId) });
@@ -149,6 +149,21 @@ export function LinksSection({
                 ) : (
                   <span className="cl-row__state">{link.enabled ? 'Allumé' : 'Éteint'}</span>
                 )}
+                {pending?.link.id === link.id ? (
+                  <div className="cl-row__confirm">
+                    <PasswordPrompt
+                      lead={`Pour ${pending.enabled ? 'allumer' : 'éteindre'} « ${link.name} », confirme ton mot de passe et ton code.`}
+                      onConfirmed={() => {
+                        const { enabled } = pending;
+                        setPending(null);
+                        void toggle(link, enabled);
+                      }}
+                      onCancel={() => {
+                        setPending(null);
+                      }}
+                    />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -157,19 +172,6 @@ export function LinksSection({
           <p className="ps-error" role="alert">
             {failed}
           </p>
-        )}
-        {pending === null ? null : (
-          <PasswordPrompt
-            lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
-            onConfirmed={() => {
-              const { link, enabled } = pending;
-              setPending(null);
-              void toggle(link, enabled);
-            }}
-            onCancel={() => {
-              setPending(null);
-            }}
-          />
         )}
         {!canEdit ? (
           <p className="ps-hint">Seul le propriétaire ajoute ou modifie un lien.</p>
