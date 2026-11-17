@@ -1,5 +1,5 @@
 {
-  "id": "d381a18a-2bc1-4a02-a8b5-95c99bb7f4f5",
+  "id": "f05cf055-17ec-43bf-a6e4-1d86bfccb903",
   "prevId": "ecf8c7d0-1095-483b-9619-6702105d1af7",
   "version": "7",
   "dialect": "postgresql",
@@ -9070,7 +9070,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share')"
         }
       },
       "isRLSEnabled": false
@@ -17434,167 +17434,6 @@
         "shifts_template_check": {
           "name": "shifts_template_check",
           "value": "(\"shifts\".\"template_id\" is null) = (\"shifts\".\"template_starts_at\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.redirect_links": {
-      "name": "redirect_links",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "url": {
-          "name": "url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "destination": {
-          "name": "destination",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "placement": {
-          "name": "placement",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "usage_note": {
-          "name": "usage_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "redirect_links_creator_idx": {
-          "name": "redirect_links_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "redirect_links_creator_id_creators_id_fk": {
-          "name": "redirect_links_creator_id_creators_id_fk",
-          "tableFrom": "redirect_links",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "redirect_links_updated_by_user_id_fk": {
-          "name": "redirect_links_updated_by_user_id_fk",
-          "tableFrom": "redirect_links",
-          "tableTo": "user",
-          "columnsFrom": ["updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "redirect_links_creator_name_unique": {
-          "name": "redirect_links_creator_name_unique",
-          "nullsNotDistinct": false,
-          "columns": ["creator_id", "name"]
-        }
-      },
-      "policies": {
-        "creator_read": {
-          "name": "creator_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"redirect_links\".\"enabled\" and \"redirect_links\".\"placement\" is not null"
-        },
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        }
-      },
-      "checkConstraints": {
-        "redirect_links_placement_check": {
-          "name": "redirect_links_placement_check",
-          "value": "\"redirect_links\".\"placement\" in ('story_highlight', 'story_daily', 'telegram_channel', 'other_network')"
-        },
-        "redirect_links_name_check": {
-          "name": "redirect_links_name_check",
-          "value": "char_length(\"redirect_links\".\"name\") between 1 and 60"
-        },
-        "redirect_links_url_check": {
-          "name": "redirect_links_url_check",
-          "value": "\"redirect_links\".\"url\" ~ '^https://[^[:space:]]+$' and char_length(\"redirect_links\".\"url\") <= 2048"
-        },
-        "redirect_links_destination_check": {
-          "name": "redirect_links_destination_check",
-          "value": "char_length(\"redirect_links\".\"destination\") <= 120"
-        },
-        "redirect_links_usage_note_check": {
-          "name": "redirect_links_usage_note_check",
-          "value": "char_length(\"redirect_links\".\"usage_note\") <= 120"
         }
       },
       "isRLSEnabled": false

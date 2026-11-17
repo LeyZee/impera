@@ -119,6 +119,7 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
             last30Days: { from: '2026-10-05', to: '2026-11-03', shares: [] },
             fortnights: [],
           },
+          alerts: [],
         });
       }
       return json({}, 404);
