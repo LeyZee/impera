@@ -128,7 +128,10 @@ describe('creatorTrophyCaseOf (ADR 0107 § 10)', () => {
   it('lists every medal and trophy of hers, in the shape of the shared case, with no level', () => {
     const empty = creatorTrophyCaseOf([], streaks);
     expect(TrophyCaseSchema.safeParse(empty).success).toBe(true);
-    expect(empty.items.map((item) => item.kind)).toEqual([...CREATOR_GAIN_KINDS]);
+    // « Stock plein » and « Contenu qui a cartonné » wait for their signal (recette 16/11, CRE-17).
+    expect(empty.items.map((item) => item.kind)).toEqual(
+      CREATOR_GAIN_KINDS.filter((kind) => kind !== 'full_stock' && kind !== 'hit_content'),
+    );
     expect(empty.level).toBeNull();
     expect(empty.streaks).toEqual([
       { kind: 'day', current: 9, best: 9 },
@@ -151,8 +154,23 @@ describe('creatorTrophyCaseOf (ADR 0107 § 10)', () => {
       family: 'streak',
       progress: { current: 3, target: 5, unit: 'delivery' },
     });
-    expect(item('full_stock')).toMatchObject({ family: 'trophy', progress: null, earnedAt: null });
+    // A trophy of one gesture still ahead counts 0 of 1 (recette 16/11, CRE-14).
+    expect(item('first_drop')).toMatchObject({
+      family: 'trophy',
+      progress: { current: 0, target: 1, unit: 'once' },
+      earnedAt: null,
+    });
     expect(owedReveals(trophyCase).map((one) => one.kind)).toEqual(['day_streak_7']);
+  });
+
+  it('shows a trophy without its signal once it is earned, never before (CRE-17)', () => {
+    const trophyCase = creatorTrophyCaseOf(
+      [{ kind: 'hit_content', earnedAt: new Date('2026-11-10T08:00:00Z'), revealedAt: null }],
+      streaks,
+    );
+    const kinds = trophyCase.items.map((one) => one.kind);
+    expect(kinds).toContain('hit_content');
+    expect(kinds).not.toContain('full_stock');
   });
 
   it('never shows a best day streak under the streak of now', () => {

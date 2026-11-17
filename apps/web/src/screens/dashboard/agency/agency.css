@@ -9,7 +9,7 @@
 .ins-body {
   display: flex;
   flex-direction: column;
-  gap: 40px;
+  gap: var(--nv-group-gap);
   transition: opacity var(--nv-dur-fast);
 }
 .ins-body[aria-busy='true'] {
@@ -20,19 +20,19 @@
 .ins-figures-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--nv-card-gap);
 }
 .ins-figures {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 2fr);
-  gap: 12px;
+  gap: var(--nv-card-gap);
 }
 .ins-lead {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 18px;
-  padding: 22px 24px 18px;
+  padding: var(--nv-plate-pad);
   min-width: 0;
 }
 .nv-figure__value.ins-lead__value {
@@ -66,10 +66,11 @@
 .ins-tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--nv-card-gap);
   margin: 0;
 }
-.ins-figures > .ins-tiles {
+.ins-figures > .ins-tiles,
+.ins-tiles--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .ins-lead__sub {
@@ -85,7 +86,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 22px 18px;
+  padding: var(--nv-plate-pad);
 }
 .ins-body [data-part='fansVat'] {
   --_c: var(--nv-series-other);
@@ -217,7 +218,7 @@
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 14px var(--nv-plate-pad);
   transition: background var(--nv-dur-fast);
 }
 .ins-tile dt {
@@ -283,7 +284,7 @@
 
 /* ── Daily revenue: stacked columns from one baseline, a recessive grid. */
 .ins-daily {
-  padding: 18px 20px 14px;
+  padding: var(--nv-plate-pad);
 }
 .ins-daily__plot {
   position: relative;
@@ -424,7 +425,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 18px 20px;
+  padding: var(--nv-plate-pad);
   min-width: 0;
 }
 .ins-card__title {
@@ -433,10 +434,6 @@
   justify-content: space-between;
   gap: 12px;
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  letter-spacing: var(--nv-text-headline-tracking);
-  font-weight: 650;
 }
 .ins-ring-row {
   display: flex;
@@ -596,16 +593,20 @@
 }
 
 /* ── Who sold: a ranking, bars from the same start, a single hue (magnitude, not identity). */
+/* The columns are the list's and every line a subgrid of them: the amounts' column is as wide as the widest, so every
+   bar starts and ends at the same place (recette visuelle 16/11, PIL-03). */
 .ins-rank {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 20px 36px minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  column-gap: 12px;
   margin: 0;
   padding: 6px;
   list-style: none;
 }
 .ins-rank__row {
   display: grid;
-  grid-template-columns: 20px 36px minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   gap: 12px;
   align-items: center;
   min-height: 56px;
@@ -620,6 +621,13 @@
 }
 .ins-rank__row:focus-visible {
   box-shadow: inset 0 0 0 2px var(--nv-focus);
+}
+/* The sales of no seller, unranked, under a rule. */
+.ins-rank__row[data-rule] {
+  margin-top: 6px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: 1px solid var(--nv-plate-edge);
 }
 .ins-rank__pos {
   font-size: var(--nv-text-footnote);
@@ -779,7 +787,7 @@
 
 /* ── When it sells: a sequential ramp of one hue, from the track to the full series colour. */
 .ins-hours {
-  padding: 18px 20px;
+  padding: var(--nv-plate-pad);
 }
 .ins-hours__lead {
   margin: 0 0 16px;
@@ -856,7 +864,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: 24px;
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
 }
 .ins-fans__meter {
   display: flex;
@@ -911,16 +919,11 @@
   font-variant-numeric: tabular-nums;
   color: var(--nv-ink);
 }
-.ins-fans__part {
-  font-size: var(--nv-text-footnote);
-  font-weight: 500;
-  color: var(--nv-ink-faint);
-}
 
 /* ── Empty, nothing linked, loading. */
 .ins-empty {
   margin: 0;
-  padding: 18px 20px;
+  padding: var(--nv-plate-pad);
   color: var(--nv-ink-muted);
 }
 .ins-ring-card .ins-empty {
@@ -932,7 +935,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
 }
 .ins-none p {
   flex: 1 1 320px;
@@ -964,7 +967,14 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   gap: 8px 24px;
-  padding: 20px 22px 16px;
+  padding: var(--nv-plate-pad);
+}
+/* No line to draw: the lead on its own row, the six counts across the whole card, three by three (PIL-08). */
+.ins-subs--flat {
+  grid-template-columns: minmax(0, 1fr);
+}
+.nv-plate.ins-subs--flat .ins-subs__tiles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .ins-subs__lead {
   display: flex;
@@ -1076,27 +1086,14 @@
   }
   .ins-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .ins-money {
-    padding: 16px 16px 14px;
   }
   .ins-money__legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 14px;
   }
-  .ins-tile {
-    padding: 12px 14px;
-  }
   .ins-tile__value {
     font-size: 22px;
     line-height: 28px;
-  }
-  .ins-lead {
-    padding: 18px 18px 14px;
-  }
-  .ins-daily {
-    padding: 14px 12px 10px;
   }
   .ins-daily__plot {
     height: 180px;
@@ -1112,10 +1109,22 @@
   .ins-ring {
     align-self: center;
   }
+  .ins-rank {
+    display: flex;
+    flex-direction: column;
+  }
   .ins-rank__row {
     grid-template-columns: 36px minmax(0, 1fr) auto;
     grid-template-areas: 'face who value' 'face bar bar';
     row-gap: 6px;
+  }
+  /* « panier moyen » on its own line, never a « · » left alone at the end of one (PIL-22). */
+  .ins-rank__line {
+    display: flex;
+    flex-direction: column;
+  }
+  .ins-rank__sep {
+    display: none;
   }
   .ins-rank__pos {
     display: none;
@@ -1156,9 +1165,6 @@
   .ins-creator__delta {
     grid-area: delta;
   }
-  .ins-hours {
-    padding: 14px 12px;
-  }
   .ins-heat {
     grid-template-columns: 28px repeat(24, minmax(0, 1fr));
     gap: 2px;
@@ -1173,12 +1179,13 @@
   .ins-fans {
     grid-template-columns: minmax(0, 1fr);
     gap: 18px;
-    padding: 16px;
   }
   .ins-subs {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
-    padding: 16px;
+  }
+  .nv-plate.ins-subs--flat .ins-subs__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1192,7 +1199,9 @@
   .ins-meter > span {
     animation: none;
   }
-  .ins-spark {
+  /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
+  .ins-spark,
+  .ins-subs__plot svg {
     clip-path: none;
   }
   .ins-ring__arc {

@@ -20,9 +20,9 @@ const NIGHT: PlatformScriptView = {
   moment: 'night',
   description: 'Soirée de démonstration',
   steps: [
-    { kind: 'free', priceMinor: null, mediaRefs: [] },
-    { kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
-    { kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'free', priceMinor: null, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
   ],
   mediaValidated: true,
   descriptionValidated: true,

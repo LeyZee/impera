@@ -85,6 +85,11 @@ export const FakeMessageSchema = z.object({
   createdAt: iso,
   /** Deleted on Reveal: still listed, with `deletedAt` (2026-11-16). */
   deletedAt: iso.nullable().optional(),
+  /** The fan answered one of her stories (2026-11-16): `replyToStoryId` and `storyReply` on the wire. */
+  storyReply: z
+    .object({ storyId: id, thumbnailUrl: z.string(), mediaType: z.string(), isExpired: z.boolean() })
+    .nullable()
+    .optional(),
 });
 export type FakeMessage = z.infer<typeof FakeMessageSchema>;
 
@@ -112,6 +117,11 @@ export const FakeScriptSchema = z.object({
   teasingMediaIds: z.array(id),
   /** `null` = no price set on the step (sent as a free message or priced at send time). */
   priceCents: z.number().int().min(0).nullable(),
+  /** « Tarif réduit » (2026-11-15): a reduced price for a time, both or neither on Reveal; `null` = none. */
+  discount: z
+    .object({ priceCents: z.number().int().min(0), minutes: z.number().int().min(0) })
+    .nullable()
+    .default(null),
   createdAt: iso,
 });
 export type FakeScript = z.infer<typeof FakeScriptSchema>;
@@ -226,4 +236,6 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   scripts: true,
   scriptHistory: true,
   vault: true,
+  mediaDownload: true,
+  vaultPreview: true,
 } as const;

@@ -132,7 +132,7 @@ export function createFollowUpJob({ uow, clock, fans, composer, followUps, reply
       platformAccountId: read.conversation.platformAccountId,
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
-      fan: { ...read.stats, ...fanNotesOf(notes) },
+      fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       followUp: { step: payload.step, steps, silentSince: anchor },
       ...(hours !== null && { hours: hours.hours }),
     };

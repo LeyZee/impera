@@ -15,6 +15,8 @@
 //  9. The session journal is one file per session: docs/sessions/log/<date>-<slug>.md whose first line starts
 //     with `# <date>`, and no row beyond the frozen count of the index of docs/sessions/LOG.md (the shared table made every
 //     merge conflict; `pnpm sessions:log` reads the folder instead).
+// 10. No merge conflict marker left in a text file: a line opening with seven `<` or seven `>` and a space (#775 let
+//     two through to main, in Markdown that no compiler reads).
 // No dependency: Node 22 only.
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -44,6 +46,9 @@ const FORBIDDEN_NAMES = [
   /_final/i,
   /(^|\/)(tmp|old|backup)\//i,
 ];
+// Built from parts so that this file never holds a marker itself.
+const CONFLICT_MARKER = new RegExp(`^(${'<'.repeat(7)}|${'>'.repeat(7)})( |$)`);
+const TEXT_FILE = /\.(md|ts|tsx|mts|mjs|js|cjs|json|ya?ml|sql|css|html|txt|toml)$/;
 const TODO_WITHOUT_ID = /\b(TODO|FIXME|XXX)\b(?!\((P\d-\d\d|H-\d\d|D-\d\d)\))/;
 const PNPM_BUILTINS = new Set([
   'install',
@@ -96,7 +101,7 @@ const files = stagedOnly
 // Forward slashes on every OS: the checks below compare against POSIX paths (`scripts/check-repo`, `tmp/`).
 const rel = (f) => relative(root, f).split(sep).join('/');
 
-// 3. Size, 4. Forbidden names, 5. TODO without id
+// 3. Size, 4. Forbidden names, 10. Conflict markers, 5. TODO without id
 for (const f of files) {
   const r = rel(f);
   // The compiler's incremental state (`incremental` in tsconfig.base.json) is ignored by git and rewritten by every
@@ -107,6 +112,13 @@ for (const f of files) {
     r.endsWith('.tsbuildinfo') || /^packages\/db\/migrations\/meta\/\d{4}_snapshot\.json$/.test(r);
   if (statSync(f).size > MAX_BYTES && !generated) errors.push(`${r}: larger than 500 KB`);
   if (FORBIDDEN_NAMES.some((re) => re.test(r))) errors.push(`${r}: forbidden file name (hygiene.md)`);
+  if (TEXT_FILE.test(r) && !generated) {
+    readFileSync(f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (CONFLICT_MARKER.test(line)) errors.push(`${r}:${i + 1}: merge conflict marker left in the file`);
+      });
+  }
   if (/\.(ts|tsx|mjs|js)$/.test(r) && !r.startsWith('scripts/check-repo')) {
     const lines = readFileSync(f, 'utf8').split('\n');
     lines.forEach((line, i) => {

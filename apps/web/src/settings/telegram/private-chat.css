@@ -184,7 +184,7 @@
 
 /* In Réglages › Telegram, the block sits on its own plate under the tab's eyebrow. */
 .pc-plate {
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 
 /* No bot yet: the sentence, then its one way out, spaced like the other blocks. */

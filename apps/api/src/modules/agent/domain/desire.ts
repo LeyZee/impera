@@ -9,7 +9,7 @@ import { NO_SALE_RISKS } from './policy';
  */
 
 /** Bumped whenever a weight, a bound or the emoji list changes: each score says which counting it came from. */
-export const DESIRE_WEIGHTS_VERSION = 'desire-2';
+export const DESIRE_WEIGHTS_VERSION = 'desire-3';
 
 /** Defaults of the persona's thresholds, when her file sets none. */
 export const DEFAULT_MIN_DESIRE_TO_OPEN = DESIRE_BAND_FLOORS.playful;
@@ -62,7 +62,7 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
 /** At most this many suggestive emojis count in one message: a row of 🔥 is not ten times hotter. */
 const MAX_EMOJIS_COUNTED = 3;
 // Suggestive on their own; a heart or a laugh says nothing of his heat.
-const SUGGESTIVE_EMOJIS = ['🔥', '😈', '😏', '🥵', '💦', '🍑', '🍆', '👅', '🤤'] as const;
+export const SUGGESTIVE_EMOJIS = ['🔥', '😈', '😏', '🥵', '💦', '🍑', '🍆', '👅', '🤤'] as const;
 
 const LONG_RATIO = 1.5;
 const SHORT_RATIO = 0.5;
@@ -86,6 +86,11 @@ export interface DesireMeasure {
   readonly suggestiveEmojis: number;
   /** His messages in a row without her answer. */
   readonly inARow: number;
+  /**
+   * He asks her something back in his last message(s): « j'ai 31 ans et toi ? » is short and still engaged, so a
+   * short answer is not counted against him (Playground, Charles 16/11).
+   */
+  readonly asksBack?: boolean;
 }
 
 export const NO_MEASURE: DesireMeasure = {
@@ -128,6 +133,7 @@ export function measureDesire(
     replySeconds: hers === undefined ? null : Math.max(0, (first.at.getTime() - hers.at.getTime()) / 1_000),
     suggestiveEmojis: last.reduce((sum, turn) => sum + countEmojis(turn.text), 0),
     inARow: last.length,
+    asksBack: last.some((turn) => turn.text.includes('?')),
   };
 }
 
@@ -179,7 +185,8 @@ const reading = (
 function measuredSignals(measured: DesireMeasure): CountedSignal[] {
   const signals: CountedSignal[] = [];
   if (measured.lengthRatio !== null && measured.lengthRatio >= LONG_RATIO) signals.push('long_reply');
-  if (measured.lengthRatio !== null && measured.lengthRatio <= SHORT_RATIO) signals.push('short_reply');
+  if (measured.lengthRatio !== null && measured.lengthRatio <= SHORT_RATIO && measured.asksBack !== true)
+    signals.push('short_reply');
   if (measured.replySeconds !== null && measured.replySeconds < QUICK_REPLY_S) signals.push('quick_reply');
   if (measured.replySeconds !== null && measured.replySeconds > SLOW_REPLY_S) signals.push('slow_reply');
   const emojis = Math.min(MAX_EMOJIS_COUNTED, measured.suggestiveEmojis);

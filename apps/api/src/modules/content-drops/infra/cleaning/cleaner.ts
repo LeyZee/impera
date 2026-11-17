@@ -1,8 +1,9 @@
 import { readFile, stat, writeFile } from 'node:fs/promises';
 
+import type { FileFamily } from '@impera/contracts';
+
 import { UnreadableFile } from '../../domain/errors';
 import type { CleanedFile, FileCleaner } from '../../domain/ports';
-import type { FileFamily } from '../../domain/sniff';
 
 import { cleanAv, probeAv, videoRouteOf, type ProbedAv } from './av';
 import { cleanHeif, cleanJpeg, cleanPng, cleanWebp, type CleanedStill } from './stills';

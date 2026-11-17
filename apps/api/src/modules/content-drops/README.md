@@ -35,7 +35,7 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 Le même job, une fois le fichier reçu, le télécharge dans un dossier temporaire, puis :
 
-- **lit ce qu'il est** par ses premiers octets (`domain/sniff.ts`), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
+- **lit ce qu'il est** par ses premiers octets (`sniff` de `@impera/contracts`, que la feuille de dépôt lit aussi avant tout envoi), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
 - **retire ses métadonnées** (`infra/cleaning/`) :
   - une photo octet par octet, sans la décoder ni la réencoder. JPEG : EXIF, XMP, commentaires et tout ce qui suit la fin de l'image (l'iPhone y met une seconde image avec son propre EXIF) ; l'orientation est réécrite seule dans un EXIF minimal ; le profil de couleur ICC, JFIF et Adobe restent. PNG : `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`. WebP : `EXIF`, `XMP ` et leurs drapeaux. HEIC : les items EXIF et XMP recouverts de zéros sur place, aucun décalage ne bouge ;
   - une vidéo ou un vocal par ffmpeg, flux copiés sans réencodage dans un conteneur neuf : ni étiquettes globales (position ISO 6709, marque, modèle, logiciel, dates), ni celles des flux, ni chapitres, ni pistes de données (`mebx` d'Apple), ni ID3 ; la rotation, propriété du flux, reste ;
@@ -97,6 +97,7 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 ## Vignettes et médias en grand (ADR 0030 § 4, SC-04 lot c4, migration 0158)
 
 - Chaque photo et vidéo gardée reçoit une **vignette** : le job `content_drops.make_thumbnail`, mis en file avec sa description quand le média entre dans sa médiathèque, la fait avec ffmpeg (JPEG de 640 px de large au plus, métadonnées retirées ; pour une vidéo, la première image parlante de ses 60 premières). Elle est écrite sous `thumbnails/<creatorId>/<sha256>.jpg`, puis la ligne est marquée (`thumbnail_key`, `thumbnailed_at`). Une seule tentative : un fichier qu'ffmpeg ne lit pas garde `thumbnailed_at` sans vignette, et l'écran montre sa tuile. Une machine à court de disque reprend 15 min plus tard. Pas de vignette pour un vocal (`media_assets_thumbnail_check`).
+- `picture` (exporté par le module) fait la même vignette, sous la même clé, d'un fichier qu'un autre module a lu et ne garde pas : un média du coffre (ADR 0113), pour `media.describe_vault`. Elle naît dans un dossier à elle, effacé après ; un stockage qui ne répond pas lève, et le job de l'appelant réessaie.
 - `content_drops.thumbnail_backlog` (chaque heure, à la 50e minute) remet en file jusqu'à 200 médias gardés sans tentative, pour ceux d'avant ce lot.
 - La vignette reste après l'effacement de l'original (ADR 0044 § 2) ; elle a sa colonne plutôt que de reprendre `storage_key`, qui garde la trace de l'original effacé.
 - `GET /v1/creators/:creatorId/drops/:id/files/:fileId/thumbnail` (propriétaire, manager actif) : la vignette, `image/jpeg`, `private, max-age=300`, `nosniff` ; sans vignette, 404 `content_drop_file_not_found`.

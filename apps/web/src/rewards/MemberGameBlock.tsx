@@ -25,7 +25,7 @@ export function MemberGameBlock({ memberId, name }: { memberId: string; name: st
   const { level } = trophyCase;
   return (
     <section className="tm-block nv-enter rw-member" style={{ '--nv-i': 5 }} aria-label="Jeu">
-      <h3>Jeu</h3>
+      <h3 className="nv-h3">Jeu</h3>
       <p className="tm-hint">Ce que {name} a gagné dans son jeu. En lecture : rien ici ne touche sa paie.</p>
       <dl className="rw-member__facts">
         <div>

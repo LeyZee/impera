@@ -10,6 +10,7 @@ import type {
   FanNote,
   FanPpvStats,
   FanProfile,
+  FetchedMedia,
   Money,
   OutboundMedia,
   Platform,
@@ -71,8 +72,9 @@ export interface PlatformConnector {
    * `scripts`: sends one step of a platform script, priced as the platform lists it (never by us). The history is read
    * again just before: a step already sent in this conversation is refused for good (`ScriptStepAlreadySent`).
    * `expectedPrice` is the step's price as the person or the agent validated it: the platform listing another one
-   * just before sends nothing (`ScriptStepPriceChanged`). The step is named by its own ref (`stepRef`), never by its
-   * place: the branches of a step share a rank and come in no stable order (ADR 0112 § 1).
+   * just before sends nothing (`ScriptStepPriceChanged`), and so does a reduced price set on the step there
+   * (`ScriptStepDiscounted`). The step is named by its own ref (`stepRef`), never by its place: the branches of a step
+   * share a rank and come in no stable order (ADR 0112 § 1).
    */
   sendScriptStep?(
     conversationRef: ExternalRef,
@@ -85,6 +87,30 @@ export interface PlatformConnector {
   getScriptHistory?(fanRef: ExternalRef): Promise<SentScriptStep[]>;
   /** `vault`: every media of the vault, or of one folder. */
   listVaultMedia?(opts: { folderRef?: ExternalRef }): Promise<VaultMedia[]>;
+  /**
+   * `mediaDownload`: reads one vault file to `path` (ADR 0113), the media named by its `ref` and its folder as
+   * `listVaultMedia` gave them (`null` at the vault's root). A link the platform no longer signs is read again from the
+   * folder once. The file at `path` is the caller's to remove, failed or not. Never writes to the platform.
+   */
+  fetchMedia?(
+    mediaRef: ExternalRef,
+    opts: { folderRef: ExternalRef | null; path: string },
+  ): Promise<FetchedMedia>;
+  /**
+   * `vaultPreview` (ADR 0138): the small picture of one media of the vault (a photo's reduced size, a video's poster),
+   * read now with links fresh from its folder (`null`: the vault's root), and handed back, never kept. `not_found`
+   * for a media the folder no longer lists, or one with no picture (a voice note).
+   */
+  readVaultPreview?(input: { mediaRef: ExternalRef; folderRef: ExternalRef | null }): Promise<VaultPreview>;
+}
+
+/** The image types a vault preview may be, read from its first bytes, never from what the platform says. */
+export type VaultPreviewType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' | 'image/avif';
+
+/** A vault media's small picture, as `readVaultPreview` hands it back. */
+export interface VaultPreview {
+  readonly contentType: VaultPreviewType;
+  readonly bytes: Uint8Array;
 }
 
 /** The only error a connector throws. `retryAfterSeconds` comes with `rate_limited` when the platform says. */
@@ -124,5 +150,18 @@ export class ScriptStepPriceChanged extends ConnectorError {
   constructor() {
     super('fatal', 'script_price_changed');
     this.name = 'ScriptStepPriceChanged';
+  }
+}
+
+/**
+ * The step carries a reduced price for a time on the platform (Reveal's « Tarif réduit »): Impera never sells at a
+ * discount, so nothing is sent, as for a changed price (Charles, recette 16/11). `fatal`: the draft fails for good
+ * and is never retried; once the agency takes the discount off on the platform, the next import makes the script
+ * proposable again and only a new proposal sends the step.
+ */
+export class ScriptStepDiscounted extends ConnectorError {
+  constructor() {
+    super('fatal', 'script_step_discounted');
+    this.name = 'ScriptStepDiscounted';
   }
 }

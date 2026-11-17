@@ -21,7 +21,7 @@ import {
   useCurrentPeriod,
   usePayNames,
   usePeriodBlock,
-  usePeriodToOpen,
+  useShownPeriod,
   type PayMember,
   type PayNames,
   type PeriodBlock,
@@ -35,7 +35,6 @@ import {
   LockIcon,
   PayoutHoldLine,
   PeriodArrows,
-  PeriodHeading,
   Swatch,
   Unreachable,
 } from './parts';
@@ -85,6 +84,7 @@ import '@/payroll/pay.css';
 import '@/reports/reports.css';
 import {
   amountText,
+  awaitsDecision,
   followingPeriod,
   gapWaits,
   percentText,
@@ -119,12 +119,7 @@ export function PeriodPage({
   member?: string | null;
   onPeriod: (period: PayPeriod | null) => void;
 }): JSX.Element {
-  const toOpen = usePeriodToOpen(user.role === 'owner');
-  // The period opened stays the one shown: validating or paying its last statement changes which one would open, and
-  // the screen never jumps to it under an open dialog or before the result is said.
-  const [first, setFirst] = useState<PayPeriod | null>(null);
-  if (first === null && toOpen !== null) setFirst(toOpen);
-  const period = chosen ?? first ?? toOpen;
+  const period = useShownPeriod(chosen, user.role === 'owner');
   return (
     <PeriodView key={period ?? 'none'} user={user} period={period} member={member} onPeriod={onPeriod} />
   );
@@ -326,12 +321,14 @@ function PeriodView({
   const head = (
     <PageHeader
       eyebrow="Paie"
-      title={period === null ? 'Quinzaine' : <PeriodHeading period={period} />}
+      title="Quinzaine"
       lead={leadOf(data, blocked, owner)}
+      tabs={<PayNav user={user} period={period} />}
       actions={
         <>
-          {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav user={user} />
+          {period === null ? null : (
+            <PeriodArrows period={period} current={current} onPeriod={onPeriod} named />
+          )}
           {reread !== undefined ? (
             <button
               type="button"
@@ -423,9 +420,8 @@ function PeriodView({
         />
         <Panel
           className="py-statements nv-enter"
-          eyebrow={
-            ended || data.beforeFirstClosing ? 'Relevés de commissions' : 'À ce jour, membre par membre'
-          }
+          // A title, not an eyebrow alone, as every card of Paie (recette visuelle 16/11, GES-07).
+          title={ended || data.beforeFirstClosing ? 'Relevés de commissions' : 'À ce jour, membre par membre'}
           actions={
             rows.length === 0 ? undefined : (
               <button
@@ -714,7 +710,7 @@ function Summary({
   /** « +12 % par rapport à la quinzaine du 16 au 30 septembre »: a change, and what it is against, in French (EQP-13). */
   const against = (now: number): ReactNode =>
     previous === undefined ? null : previousNet === null ? (
-      'pas de quinzaine avant pour comparer'
+      'Première quinzaine : rien à comparer'
     ) : (
       <>
         <Delta bps={changeBps(now, previousNet)} title={`${amountText(previousNet, 'EUR')} de net`} /> par
@@ -1235,6 +1231,7 @@ function BlockNotice({
     );
   }
   const count = block.reports.length;
+  const toDecide = block.reports.filter((report) => awaitsDecision(report, now)).length;
   // A gap still waiting for its member cannot be validated yet, and holds the period too (ADR 0073 § 5): sending it
   // back frees the period, the report then counts on a later one once validated.
   const explaining = block.reports.filter((report) => gapWaits(report, now)).length;
@@ -1266,9 +1263,17 @@ function BlockNotice({
                 : ` ${String(explaining)} rapports en écart attendent l’explication de leur membre, 48 h au plus : les renvoyer libère la quinzaine.`}
           </p>
         </div>
-        <Link to="/equipe/rapports" className="nv-btn nv-btn--neon nv-btn--sm">
-          {count === 1 ? 'Relire le rapport' : `Relire les ${String(count)} rapports`}
-        </Link>
+        {/* What the reader decides now, as Équipe › Rapports counts it: a manager never reviews his own, and a gap
+            waiting for its member is not to decide yet (recette visuelle 16/11, GES-19). */}
+        {toDecide === 0 ? (
+          <Link to="/equipe/rapports" className="nv-btn nv-btn--soft nv-btn--sm">
+            Voir les rapports
+          </Link>
+        ) : (
+          <Link to="/equipe/rapports" className="nv-btn nv-btn--neon nv-btn--sm">
+            {toDecide === 1 ? 'Relire le rapport' : `Relire les ${String(toDecide)} rapports`}
+          </Link>
+        )}
       </div>
     </div>
   );

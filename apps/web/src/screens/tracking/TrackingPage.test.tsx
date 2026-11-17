@@ -305,11 +305,11 @@ describe('TrackingPage', () => {
             },
     });
     renderPage();
-    const warning = await screen.findByText(/« À traiter » n’a pas pu être lu/u);
-    expect(warning.classList.contains('tr-warn')).toBe(true);
+    const warning = await screen.findByText(/Une urgence peut manquer ici/u);
+    expect(warning.closest('[role="alert"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByRole('list', { name: 'À traiter' })).toBeDefined();
-    expect(screen.queryByText(/« À traiter » n’a pas pu être lu/u)).toBeNull();
+    expect(screen.queryByText(/Une urgence peut manquer ici/u)).toBeNull();
   });
 
   it('never tells a chatter there is nothing for him while « À traiter » could not be read (relecture #538)', async () => {
@@ -319,7 +319,7 @@ describe('TrackingPage', () => {
       todos: { status: 500 },
     });
     renderPage('/suivi', true, false, true, 'Rien à suivre');
-    expect(await screen.findByText(/« À traiter » n’a pas pu être lu/u)).toBeDefined();
+    expect(await screen.findByText(/Une urgence peut manquer ici/u)).toBeDefined();
     expect(screen.queryByText('Rien à suivre')).toBeNull();
   });
 
