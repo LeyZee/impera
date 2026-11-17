@@ -187,3 +187,4 @@ Branche : task/<id>-<slug>
 | CRB-01 | Trophées et médailles de série de la créatrice | créatrice | review | ADR 0107, CHF-01 |
 | AUT-01 | L'agent tient compte des automatisations de Reveal | agent | in_progress | ADR 0110 |
 | CRE-05 | « Mot de passe oublié » sans Telegram : le lien que le propriétaire crée | exploitation | done | SEC-05, EQ-10, CR-02, ADR 0068 |
+| FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |
