@@ -216,6 +216,8 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  // The drafts the panel keeps on the device (CHT-29): each test starts from none.
+  localStorage.clear();
 });
 
 describe('Faire mon rapport', () => {
@@ -313,6 +315,86 @@ describe('Faire mon rapport', () => {
     await act(() => vi.advanceTimersByTimeAsync(6_000));
     expect(writes).toEqual([]);
     expect(amountField()).toBe(screen.getByDisplayValue('45'));
+  });
+
+  it('keeps what was typed through a reload, and forgets it once sent (recette 16/11, CHT-29)', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    await screen.findByRole('dialog');
+    fireEvent.change(amountField(), { target: { value: '45' } });
+    fireEvent.change(screen.getByLabelText(/Un mot pour l’agence/u), { target: { value: 'Un pack a plu' } });
+    // The page reloads: the panel opens again with what was typed, and says where it comes from.
+    cleanup();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(amountField()).toBe(screen.getByDisplayValue('45'));
+    expect(screen.getByDisplayValue('Un pack a plu')).toBeTruthy();
+    expect(within(dialog).getByText('Repris du brouillon gardé sur cet appareil.')).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer mon rapport' }));
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(writes).toHaveLength(1);
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('impera.report-draft.'))).toEqual([]);
+  });
+
+  it('says the limit of an amount too large (recette 16/11, CHT-29)', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(amountField(), { target: { value: '50 000,01' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer mon rapport' }));
+    expect(said(dialog)).toContain('Au plus 50 000,00 € par rapport : vérifie le montant.');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('asks once to look again at an amount far above the usual report, then sends it (CHT-29)', async () => {
+    served.reports = [301, 302, 303].map((n, index) =>
+      report({
+        id: id(n),
+        status: 'validated',
+        amount: { amountMinor: [8_000, 9_000, 30_000][index], currency: 'EUR' },
+      }),
+    );
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(amountField(), { target: { value: '500' } });
+    fireEvent.change(amountField(), { target: { value: '5000' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer mon rapport' }));
+    expect(screen.queryByRole('status', { name: /Envoi du rapport/u })).toBeNull();
+    const asked = within(dialog).getByRole('status');
+    expect([...asked.querySelectorAll('p')].map(said)).toEqual([
+      '5 000,00 € : vérifie le montant',
+      'Plus de cinq fois ton rapport habituel (90,00 €). S’il est juste, appuie encore pour l’envoyer.',
+    ]);
+    // Another amount takes the question away; the same one again finds it answered once, and is sent.
+    fireEvent.change(amountField(), { target: { value: '500' } });
+    expect(within(dialog).queryByRole('status')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Envoyer mon rapport' })).toBeTruthy();
+    fireEvent.change(amountField(), { target: { value: '5000' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Oui, l’envoyer' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]?.body).toMatchObject({ amountMinor: 500_000 });
+  });
+
+  it('asks the same from 2 000 € when there is no usual report to compare with (CHT-29)', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Faire mon rapport' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(amountField(), { target: { value: '1999' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer mon rapport' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Annuler' }));
+    const again = await screen.findByRole('dialog');
+    fireEvent.change(amountField(), { target: { value: '50000' } });
+    fireEvent.click(within(again).getByRole('button', { name: 'Envoyer mon rapport' }));
+    expect([...within(again).getByRole('status').querySelectorAll('p')].map(said)).toEqual([
+      '50 000,00 € : vérifie le montant',
+      'C’est beaucoup pour un shift. S’il est juste, appuie encore pour l’envoyer.',
+    ]);
   });
 
   it('asks for an amount it can read, and an incident in words', async () => {

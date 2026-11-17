@@ -5,7 +5,7 @@ import { useState, type JSX } from 'react';
 
 import { EditMemberPanel, RatePanel, StatusPanel } from './EditMember';
 import { ShareLink } from './ShareLink';
-import { addNote, useNotes, useRates } from './api';
+import { addNote, useNotes, useRates, useTimeZoneChanges } from './api';
 import {
   creatorNames,
   deadline,
@@ -17,6 +17,7 @@ import {
   rateAhead,
   removalLine,
   ROLE_LABELS,
+  zoneChangeAt,
 } from './model';
 import { Avatar, StatusPill } from './parts';
 
@@ -289,6 +290,9 @@ export function MemberSheet({
         </section>
       )}
 
+      {/* Where his phone took his hours (recette CHT-01): the owner's alone, a zone says where someone is. */}
+      {canManage && !isSelf ? <ZoneTrace memberId={member.id} name={member.displayName} /> : null}
+
       {/* The owner and a manager do not play: they read his rank, streak and trophies here (ADR 0104 § 20). */}
       {member.teamRole === 'chatter' && !gone && !isSelf ? (
         <MemberGameBlock memberId={member.id} name={member.displayName} />
@@ -299,6 +303,53 @@ export function MemberSheet({
       {editing === 'member' ? <EditMemberPanel member={member} creators={creators} onClose={close} /> : null}
       {editing === 'rate' ? <RatePanel member={member} presets={presets} onClose={close} /> : null}
       {editing === 'status' ? <StatusPanel member={member} onClose={close} /> : null}
+    </section>
+  );
+}
+
+/**
+ * The changes his phone made to his zone, newest first: from where to where, and when, in the reader's hour. Nothing
+ * while it never moved: the record keeps the zone of his arrival. His pay stays on the agency's hour.
+ */
+function ZoneTrace({ memberId, name }: { memberId: string; name: string }): JSX.Element | null {
+  const trace = useTimeZoneChanges(memberId, true);
+  const changes = trace.data?.pages.flatMap((page) => page.changes) ?? [];
+  if (changes.length === 0) return null;
+  return (
+    <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Fuseau du téléphone">
+      <h3>Fuseau du téléphone</h3>
+      <p className="tm-hint">
+        Sa fiche prend le fuseau du téléphone de {name} à chaque ouverture de l’appli : ses heures s’y
+        affichent, sa paie reste à l’heure de l’agence.
+      </p>
+      <ul className="tm-zones">
+        {changes.map((change, i) => (
+          <li key={change.id} className="nv-enter" style={{ '--nv-i': i + 1 }}>
+            <span className="tm-zones__move">
+              {cityOf(change.from)}
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 8h9M9 4.5 12.5 8 9 11.5" />
+              </svg>
+              <span className="tm-zones__sr">à </span>
+              {cityOf(change.to)}
+            </span>
+            <span className="tm-zones__at nv-num">{zoneChangeAt(change.at)}</span>
+          </li>
+        ))}
+      </ul>
+      {trace.hasNextPage ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--plain nv-btn--sm tm-self-start"
+          disabled={trace.isFetchingNextPage}
+          aria-busy={trace.isFetchingNextPage}
+          onClick={() => {
+            void trace.fetchNextPage();
+          }}
+        >
+          {trace.isFetchingNextPage ? 'Lecture…' : 'Changements plus anciens'}
+        </button>
+      ) : null}
     </section>
   );
 }

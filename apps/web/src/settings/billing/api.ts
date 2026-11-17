@@ -6,6 +6,7 @@ import {
   BillingRegimeSchema,
   BillingSettingsViewSchema,
   ContractTextSchema,
+  REAUTHENTICATION_ERROR_CODE,
   type AgencyLogo,
   type AgencyLogoRefusal,
   type BillingRegime,
@@ -55,6 +56,8 @@ export type BillingRefusal =
   | { readonly kind: 'logo_missing' }
   | { readonly kind: 'invalid' }
   | { readonly kind: 'forbidden' }
+  /** 403 `reauthentication_forbidden` (EQ-15): the password and the code are asked again, then the write runs again. */
+  | { readonly kind: 'reauth' }
   | { readonly kind: 'failed' };
 
 export type BillingOutcome<T> = { readonly kind: 'ok'; readonly value: T } | BillingRefusal;
@@ -73,6 +76,7 @@ async function refusalOf(response: Response): Promise<BillingRefusal> {
   if (code === 'agency_logo_not_found') return { kind: 'logo_missing' };
   if (code === 'request_invalid') return { kind: 'invalid' };
   if (code === 'role_forbidden' || code === 'payroll_forbidden') return { kind: 'forbidden' };
+  if (code === REAUTHENTICATION_ERROR_CODE) return { kind: 'reauth' };
   return { kind: 'failed' };
 }
 

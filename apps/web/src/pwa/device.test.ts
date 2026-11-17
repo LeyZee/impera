@@ -40,12 +40,16 @@ describe('forgetDevice', () => {
     expect(unsubscribe).toHaveBeenCalledOnce();
   });
 
-  it('drops her agenda and her session kept for offline, and nothing else (CREA-04)', async () => {
+  it('drops her agenda, the reports not sent and her session kept for offline, and nothing else (CREA-04, CHT-29)', async () => {
     localStorage.setItem('impera.agenda.pending', '[]');
+    localStorage.setItem('impera.report-draft.0190a0b0-0000-7000-8000-000000000001.report', '{}');
     localStorage.setItem('impera.session.me', '{}');
     localStorage.setItem('impera.appearance', 'night');
     await forgetDevice();
     expect(localStorage.getItem('impera.agenda.pending')).toBeNull();
+    expect(
+      localStorage.getItem('impera.report-draft.0190a0b0-0000-7000-8000-000000000001.report'),
+    ).toBeNull();
     expect(localStorage.getItem('impera.session.me')).toBeNull();
     expect(localStorage.getItem('impera.appearance')).toBe('night');
     localStorage.clear();

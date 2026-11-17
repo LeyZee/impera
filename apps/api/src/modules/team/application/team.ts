@@ -7,6 +7,7 @@ import {
   TeamMemberIdSchema,
   TeamMemberNoteIdSchema,
   UserIdSchema,
+  type AuditEntryId,
   type CommissionPreset,
   type CommissionRate,
   type CreateCommissionPresetBody,
@@ -17,7 +18,9 @@ import {
   type TeamMember,
   type TeamMemberId,
   type TeamMemberNote,
+  type OwnTimeZone,
   type TeamMemberStatus,
+  type TeamMemberTimeZoneHistory,
   type TeamRoleChange,
   type UpdateTeamMemberBody,
   type UserId,
@@ -71,6 +74,14 @@ export interface TeamService {
   addPreset(actor: Actor, body: CreateCommissionPresetBody): Promise<CommissionPreset>;
   notes(actor: UserId, id: TeamMemberId): Promise<TeamMemberNote[]>;
   addNote(actor: Actor, id: TeamMemberId, body: string): Promise<TeamMemberNote>;
+  /** The member's own zone follows his phone (recette CHT-01): display only, pay keeps the agency's. */
+  followTimeZone(actor: UserId, zone: string): Promise<OwnTimeZone>;
+  /** Owner: the trace of those changes on the member's record. */
+  timeZoneChanges(
+    actor: UserId,
+    id: TeamMemberId,
+    before: AuditEntryId | null,
+  ): Promise<TeamMemberTimeZoneHistory>;
 }
 
 export interface TeamServiceOptions {
@@ -238,5 +249,17 @@ export function createTeamService(
     },
 
     addNote: (actor, id, body) => store.addNote(actor, id, { id: newId(TeamMemberNoteIdSchema), body }),
+
+    followTimeZone: async (actor, zone) => {
+      const kept = await store.followTimeZone(actor, zone);
+      if (kept === null) throw new MemberNotFound();
+      return { timeZone: kept };
+    },
+
+    timeZoneChanges: async (actor, id, before) => {
+      const page = await store.timeZoneChanges(actor, id, before);
+      if (page === null) throw new MemberNotFound();
+      return page;
+    },
   };
 }

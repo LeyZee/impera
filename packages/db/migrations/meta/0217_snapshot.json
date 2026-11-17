@@ -1,5 +1,5 @@
 {
-  "id": "4c28b9b8-fdcb-4acd-95fc-d7823d3704b6",
+  "id": "657c53be-e14b-4a83-9289-ea4e41652822",
   "prevId": "0e93d1bd-1f32-4396-a292-538ec4a71cc7",
   "version": "7",
   "dialect": "postgresql",
@@ -17775,18 +17775,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "discount_price_minor": {
-          "name": "discount_price_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "discount_minutes": {
-          "name": "discount_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
         "currency": {
           "name": "currency",
           "type": "text",
@@ -17877,10 +17865,6 @@
           "name": "platform_script_steps_price_check",
           "value": "\"platform_script_steps\".\"price_minor\" >= 0"
         },
-        "platform_script_steps_discount_check": {
-          "name": "platform_script_steps_discount_check",
-          "value": "coalesce(\"platform_script_steps\".\"discount_price_minor\", 0) >= 0 and coalesce(\"platform_script_steps\".\"discount_minutes\", 0) >= 0"
-        },
         "platform_script_steps_currency_check": {
           "name": "platform_script_steps_currency_check",
           "value": "\"platform_script_steps\".\"currency\" in ('EUR', 'USD')"
@@ -17949,12 +17933,6 @@
         },
         "synced_at": {
           "name": "synced_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version_at": {
-          "name": "version_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
@@ -21840,7 +21818,7 @@
       "checkConstraints": {
         "content_ideas_category_check": {
           "name": "content_ideas_category_check",
-          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
         },
         "content_ideas_suggestion_check": {
           "name": "content_ideas_suggestion_check",

@@ -37,11 +37,13 @@ import {
 } from '@/contractors/model';
 import '@/contractors/contractors.css';
 import type { InvoiceOutcome, InvoiceRefusal } from '@/invoices/api';
+import { useConfirmedWrite } from '@/invoices/confirmed-write';
 import { invoiceRefusalText } from '@/invoices/model';
 import { countryName } from '@/lib/country';
 import { useGrowingArea } from '@/lib/growing-area';
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
 import { weightText } from '@/settings/billing/model';
+import { BILLING_LEAD } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
@@ -62,31 +64,32 @@ export interface FileReader {
 const readsAgain = (refusal: InvoiceRefusal): boolean =>
   refusal.kind === 'refused' && (refusal.code.endsWith('_conflict') || refusal.code.endsWith('_not_found'));
 
-/** A write's ending: done, the file read again and the dialog closed; refused, its sentence. */
+/**
+ * A write's ending: done, the file read again and the dialog closed; refused, its sentence. Every write of the file
+ * asks for the password and the code when the last ones are over 10 minutes old (EQ-15): `prompt` then stands in
+ * place of the form, and the write is sent again once they are given.
+ */
 export function useFileSend(onDone: () => void): {
   busy: boolean;
   refusal: InvoiceRefusal | null;
+  prompt: JSX.Element | null;
   send: (write: () => Promise<InvoiceOutcome<unknown>>) => void;
 } {
   const refresh = useRefreshFile();
-  const [busy, setBusy] = useState(false);
-  const [refusal, setRefusal] = useState<InvoiceRefusal | null>(null);
+  const { busy, refusal, prompt, send: confirmed } = useConfirmedWrite(BILLING_LEAD);
   const send = (write: () => Promise<InvoiceOutcome<unknown>>): void => {
-    setBusy(true);
-    setRefusal(null);
-    void write().then(async (outcome) => {
-      if (outcome.kind === 'ok') {
+    confirmed(
+      write,
+      async () => {
         await refresh();
-        setBusy(false);
         onDone();
-        return;
-      }
-      setBusy(false);
-      setRefusal(outcome);
-      if (readsAgain(outcome)) await refresh();
-    });
+      },
+      async (refused) => {
+        if (readsAgain(refused)) await refresh();
+      },
+    );
   };
-  return { busy, refusal, send };
+  return { busy, refusal, prompt, send };
 }
 
 export function Refusal({ refusal }: { refusal: InvoiceRefusal | null }): JSX.Element | null {
@@ -243,7 +246,7 @@ export function TextDialog({
   reader: FileReader;
   onClose: () => void;
 }): JSX.Element {
-  const { busy, refusal, send } = useFileSend(onClose);
+  const { busy, refusal, prompt, send } = useFileSend(onClose);
   const accepting = reader.self && standing.kind === 'to_accept';
   return (
     <Dialog
@@ -257,29 +260,33 @@ export function TextDialog({
       className="cf-text-dialog"
       onClose={onClose}
     >
-      <form
-        className="tm-dialog__body"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (accepting && !busy) send(() => acceptText(text.id, text.sha256));
-        }}
-      >
-        <div className="cf-text nv-glass" tabIndex={0} aria-label="Texte">
-          {text.body}
-        </div>
-        <Refusal refusal={refusal} />
-        <div className="tm-dialog__foot">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            {accepting ? 'Plus tard' : 'Fermer'}
-          </button>
-          {accepting ? (
-            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-              {busy ? 'Envoi…' : `J’accepte la version ${String(text.version)}`}
+      {prompt === null ? (
+        <form
+          className="tm-dialog__body"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (accepting && !busy) send(() => acceptText(text.id, text.sha256));
+          }}
+        >
+          <div className="cf-text nv-glass" tabIndex={0} aria-label="Texte">
+            {text.body}
+          </div>
+          <Refusal refusal={refusal} />
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              {accepting ? 'Plus tard' : 'Fermer'}
             </button>
-          ) : null}
-        </div>
-      </form>
+            {accepting ? (
+              <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+                {busy ? 'Envoi…' : `J’accepte la version ${String(text.version)}`}
+              </button>
+            ) : null}
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
@@ -502,7 +509,7 @@ export function UploadDialog({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, refusal, send } = useFileSend(onClose);
+  const { busy, refusal, prompt, send } = useFileSend(onClose);
   const [chosen, setChosen] = useState<{ readonly file: File; readonly key: string } | null>(null);
   const [issuedOn, setIssuedOn] = useState('');
   const [validUntil, setValidUntil] = useState('');
@@ -548,132 +555,136 @@ export function UploadDialog({
       busy={busy}
       onClose={onClose}
     >
-      <form className="tm-dialog__body" noValidate onSubmit={submit}>
-        <div className="nv-field tm-field">
-          <span className="nv-field__label" id={`${id}-file-label`}>
-            Le fichier
-          </span>
-          <div className="cf-pick">
-            {/* The browser's own file button speaks its language, not the page's: a pill of ours over the input. */}
-            <label
-              className="nv-btn nv-btn--soft nv-btn--sm cf-file"
-              data-invalid={fileShown ? 'true' : undefined}
-            >
-              <input
-                id={`${id}-file`}
-                type="file"
-                accept={ACCEPTED_FILES}
-                aria-labelledby={`${id}-file-label`}
-                aria-describedby={`${id}-file-hint`}
-                aria-invalid={fileShown ? true : undefined}
-                data-autofocus
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  setChosen(file === undefined ? null : { file, key: crypto.randomUUID() });
-                }}
-              />
-              <span aria-hidden="true">
-                {chosen === null ? 'Choisir le fichier' : 'Choisir un autre fichier'}
-              </span>
-            </label>
-            {chosen === null ? null : <span className="cf-picked">{chosen.file.name}</span>}
-          </div>
-          <p id={`${id}-file-hint`} className={fileShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {problem ??
-              (touched && chosen === null
-                ? 'Choisis le fichier de la pièce.'
-                : `Un PDF, ou une photo nette en JPEG ou en PNG, ${weightText(CONTRACTOR_DOCUMENT_MAX_BYTES)} au plus.`)}
-          </p>
-        </div>
-        <div
-          className="nv-field tm-field"
-          data-invalid={issuedShown ? 'true' : undefined}
-          onFocus={() => {
-            setIssuedLeft(false);
-          }}
-          onBlur={() => {
-            setIssuedLeft(true);
-          }}
-        >
-          <label className="nv-field__label" htmlFor={`${id}-issued`}>
-            Délivrée le
-          </label>
-          <DayField
-            id={`${id}-issued`}
-            value={issuedOn}
-            invalid={issuedShown}
-            describedBy={`${id}-issued-hint`}
-            onChange={(next) => {
-              setIssuedOn(next);
-            }}
-            today={today}
-            toward="past"
-            onUnreadable={(bad, noSuchDay) => {
-              setIssuedUnreadable(bad);
-              setIssuedNoSuch(noSuchDay);
-            }}
-          />
-          <p id={`${id}-issued-hint`} className={issuedShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-            {issuedTold
-              ? issuedNoSuch
-                ? NO_SUCH_DAY
-                : 'Un jour comme 12/05/2026, ou 12/5.'
-              : touched && !issuedOk
-                ? 'La date écrite sur la pièce, au plus tard aujourd’hui.'
-                : kind === 'tax_residence'
-                  ? 'La date écrite sur l’attestation : elle vaut pour l’année civile de sa délivrance.'
-                  : 'La date écrite sur l’attestation.'}
-          </p>
-        </div>
-        {kind === 'tax_residence' ? null : (
-          <div
-            className="nv-field tm-field"
-            data-invalid={untilShown ? 'true' : undefined}
-            onFocus={() => {
-              setUntilLeft(false);
-            }}
-            onBlur={() => {
-              setUntilLeft(true);
-            }}
-          >
-            <label className="nv-field__label" htmlFor={`${id}-until`}>
-              Valable jusqu’au <span className="cf-quiet">(si elle le dit)</span>
-            </label>
-            <DayField
-              id={`${id}-until`}
-              value={validUntil}
-              invalid={untilShown}
-              describedBy={`${id}-until-hint`}
-              onChange={(next) => {
-                setValidUntil(next);
-              }}
-              optional
-              onUnreadable={(bad, noSuchDay) => {
-                setUntilUnreadable(bad);
-                setUntilNoSuch(noSuchDay);
-              }}
-            />
-            <p id={`${id}-until-hint`} className={untilShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-              {untilTold
-                ? untilNoSuch
-                  ? NO_SUCH_DAY
-                  : 'Un jour comme 12/11/2026, ou rien.'
-                : touched && !untilOk
-                  ? 'La fin suit la date de délivrance.'
-                  : 'Sans fin écrite, elle tient six mois à partir de sa délivrance.'}
+      {prompt === null ? (
+        <form className="tm-dialog__body" noValidate onSubmit={submit}>
+          <div className="nv-field tm-field">
+            <span className="nv-field__label" id={`${id}-file-label`}>
+              Le fichier
+            </span>
+            <div className="cf-pick">
+              {/* The browser's own file button speaks its language, not the page's: a pill of ours over the input. */}
+              <label
+                className="nv-btn nv-btn--soft nv-btn--sm cf-file"
+                data-invalid={fileShown ? 'true' : undefined}
+              >
+                <input
+                  id={`${id}-file`}
+                  type="file"
+                  accept={ACCEPTED_FILES}
+                  aria-labelledby={`${id}-file-label`}
+                  aria-describedby={`${id}-file-hint`}
+                  aria-invalid={fileShown ? true : undefined}
+                  data-autofocus
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    setChosen(file === undefined ? null : { file, key: crypto.randomUUID() });
+                  }}
+                />
+                <span aria-hidden="true">
+                  {chosen === null ? 'Choisir le fichier' : 'Choisir un autre fichier'}
+                </span>
+              </label>
+              {chosen === null ? null : <span className="cf-picked">{chosen.file.name}</span>}
+            </div>
+            <p id={`${id}-file-hint`} className={fileShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+              {problem ??
+                (touched && chosen === null
+                  ? 'Choisis le fichier de la pièce.'
+                  : `Un PDF, ou une photo nette en JPEG ou en PNG, ${weightText(CONTRACTOR_DOCUMENT_MAX_BYTES)} au plus.`)}
             </p>
           </div>
-        )}
-        <Refusal refusal={refusal} />
-        <div className="tm-dialog__foot">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-            {busy ? 'Envoi…' : 'Déposer'}
-          </button>
-        </div>
-      </form>
+          <div
+            className="nv-field tm-field"
+            data-invalid={issuedShown ? 'true' : undefined}
+            onFocus={() => {
+              setIssuedLeft(false);
+            }}
+            onBlur={() => {
+              setIssuedLeft(true);
+            }}
+          >
+            <label className="nv-field__label" htmlFor={`${id}-issued`}>
+              Délivrée le
+            </label>
+            <DayField
+              id={`${id}-issued`}
+              value={issuedOn}
+              invalid={issuedShown}
+              describedBy={`${id}-issued-hint`}
+              onChange={(next) => {
+                setIssuedOn(next);
+              }}
+              today={today}
+              toward="past"
+              onUnreadable={(bad, noSuchDay) => {
+                setIssuedUnreadable(bad);
+                setIssuedNoSuch(noSuchDay);
+              }}
+            />
+            <p id={`${id}-issued-hint`} className={issuedShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+              {issuedTold
+                ? issuedNoSuch
+                  ? NO_SUCH_DAY
+                  : 'Un jour comme 12/05/2026, ou 12/5.'
+                : touched && !issuedOk
+                  ? 'La date écrite sur la pièce, au plus tard aujourd’hui.'
+                  : kind === 'tax_residence'
+                    ? 'La date écrite sur l’attestation : elle vaut pour l’année civile de sa délivrance.'
+                    : 'La date écrite sur l’attestation.'}
+            </p>
+          </div>
+          {kind === 'tax_residence' ? null : (
+            <div
+              className="nv-field tm-field"
+              data-invalid={untilShown ? 'true' : undefined}
+              onFocus={() => {
+                setUntilLeft(false);
+              }}
+              onBlur={() => {
+                setUntilLeft(true);
+              }}
+            >
+              <label className="nv-field__label" htmlFor={`${id}-until`}>
+                Valable jusqu’au <span className="cf-quiet">(si elle le dit)</span>
+              </label>
+              <DayField
+                id={`${id}-until`}
+                value={validUntil}
+                invalid={untilShown}
+                describedBy={`${id}-until-hint`}
+                onChange={(next) => {
+                  setValidUntil(next);
+                }}
+                optional
+                onUnreadable={(bad, noSuchDay) => {
+                  setUntilUnreadable(bad);
+                  setUntilNoSuch(noSuchDay);
+                }}
+              />
+              <p id={`${id}-until-hint`} className={untilShown ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+                {untilTold
+                  ? untilNoSuch
+                    ? NO_SUCH_DAY
+                    : 'Un jour comme 12/11/2026, ou rien.'
+                  : touched && !untilOk
+                    ? 'La fin suit la date de délivrance.'
+                    : 'Sans fin écrite, elle tient six mois à partir de sa délivrance.'}
+              </p>
+            </div>
+          )}
+          <Refusal refusal={refusal} />
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+              {busy ? 'Envoi…' : 'Déposer'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
@@ -693,7 +704,7 @@ export function ReviewDialog({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, refusal, send } = useFileSend(onClose);
+  const { busy, refusal, prompt, send } = useFileSend(onClose);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [reason, setReason] = useState('');
   const reasonArea = useGrowingArea(reason);
@@ -719,83 +730,87 @@ export function ReviewDialog({
       busy={busy}
       onClose={onClose}
     >
-      <form className="tm-dialog__body" noValidate onSubmit={submit}>
-        {document.purgedAt === null ? (
-          <p className="tm-hint">
-            <a href={documentFileUrl(memberId, document.id)} download>
-              Ouvrir le fichier
-            </a>{' '}
-            et vérifie le nom, la date et ce qu’il atteste avant de décider.
-          </p>
-        ) : null}
-        <div className="nv-field tm-field" data-invalid={touched && decision === null ? 'true' : undefined}>
-          <span className="nv-field__label" id={`${id}-decision`}>
-            Ta décision
-          </span>
-          <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-decision`}>
-            {(
-              [
-                ['accepted', 'Accepter'],
-                ['refused', 'Refuser'],
-              ] as const
-            ).map(([one, label]) => (
-              <button
-                key={one}
-                type="button"
-                role="radio"
-                className="nv-chip"
-                aria-checked={decision === one}
-                onClick={() => {
-                  setDecision(one);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {touched && decision === null ? (
-            <p className="tm-hint tm-hint--error">Choisis ta décision.</p>
-          ) : null}
-        </div>
-        {decision === 'refused' ? (
-          <div className="nv-field tm-field" data-invalid={touched && !reasonOk ? 'true' : undefined}>
-            <label className="nv-field__label" htmlFor={`${id}-reason`}>
-              Motif
-            </label>
-            <textarea
-              ref={reasonArea}
-              id={`${id}-reason`}
-              className="nv-field__control nv-glass sc-note grow-area"
-              rows={3}
-              maxLength={DOCUMENT_REFUSAL_REASON_MAX}
-              value={reason}
-              placeholder="L’année n’est pas lisible : dépose une photo plus nette."
-              aria-invalid={touched && !reasonOk}
-              aria-describedby={`${id}-reason-hint`}
-              onChange={(event) => {
-                setReason(event.target.value);
-              }}
-            />
-            <p
-              id={`${id}-reason-hint`}
-              className={touched && !reasonOk ? 'tm-hint tm-hint--error' : 'tm-hint'}
-            >
-              {touched && !reasonOk
-                ? `Le motif est obligatoire, ${String(DOCUMENT_REFUSAL_REASON_MAX)} caractères au plus.`
-                : `${name} le lit et dépose une nouvelle pièce.`}
+      {prompt === null ? (
+        <form className="tm-dialog__body" noValidate onSubmit={submit}>
+          {document.purgedAt === null ? (
+            <p className="tm-hint">
+              <a href={documentFileUrl(memberId, document.id)} download>
+                Ouvrir le fichier
+              </a>{' '}
+              et vérifie le nom, la date et ce qu’il atteste avant de décider.
             </p>
+          ) : null}
+          <div className="nv-field tm-field" data-invalid={touched && decision === null ? 'true' : undefined}>
+            <span className="nv-field__label" id={`${id}-decision`}>
+              Ta décision
+            </span>
+            <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-decision`}>
+              {(
+                [
+                  ['accepted', 'Accepter'],
+                  ['refused', 'Refuser'],
+                ] as const
+              ).map(([one, label]) => (
+                <button
+                  key={one}
+                  type="button"
+                  role="radio"
+                  className="nv-chip"
+                  aria-checked={decision === one}
+                  onClick={() => {
+                    setDecision(one);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {touched && decision === null ? (
+              <p className="tm-hint tm-hint--error">Choisis ta décision.</p>
+            ) : null}
           </div>
-        ) : null}
-        <Refusal refusal={refusal} />
-        <div className="tm-dialog__foot">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-            {busy ? 'Envoi…' : decision === 'refused' ? 'Refuser' : 'Accepter'}
-          </button>
-        </div>
-      </form>
+          {decision === 'refused' ? (
+            <div className="nv-field tm-field" data-invalid={touched && !reasonOk ? 'true' : undefined}>
+              <label className="nv-field__label" htmlFor={`${id}-reason`}>
+                Motif
+              </label>
+              <textarea
+                ref={reasonArea}
+                id={`${id}-reason`}
+                className="nv-field__control nv-glass sc-note grow-area"
+                rows={3}
+                maxLength={DOCUMENT_REFUSAL_REASON_MAX}
+                value={reason}
+                placeholder="L’année n’est pas lisible : dépose une photo plus nette."
+                aria-invalid={touched && !reasonOk}
+                aria-describedby={`${id}-reason-hint`}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                }}
+              />
+              <p
+                id={`${id}-reason-hint`}
+                className={touched && !reasonOk ? 'tm-hint tm-hint--error' : 'tm-hint'}
+              >
+                {touched && !reasonOk
+                  ? `Le motif est obligatoire, ${String(DOCUMENT_REFUSAL_REASON_MAX)} caractères au plus.`
+                  : `${name} le lit et dépose une nouvelle pièce.`}
+              </p>
+            </div>
+          ) : null}
+          <Refusal refusal={refusal} />
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+              {busy ? 'Envoi…' : decision === 'refused' ? 'Refuser' : 'Accepter'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }

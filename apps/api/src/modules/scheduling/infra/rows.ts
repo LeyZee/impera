@@ -32,7 +32,14 @@ import {
   ShiftReportExists,
 } from '../domain/errors';
 import { leaveCover } from '../domain/leaves';
-import type { Actor, StoredLeave, StoredMember, StoredShift, StoredTemplate } from '../domain/ports';
+import type {
+  Actor,
+  PlannedMember,
+  StoredLeave,
+  StoredMember,
+  StoredShift,
+  StoredTemplate,
+} from '../domain/ports';
 import {
   assertCanWork,
   assertJoined,
@@ -224,6 +231,28 @@ const StoredMemberSchema = z.object({
   color: z.string().nullable(),
   status: TeamMemberStatusSchema,
 });
+
+/** A member with the creators on his list, for a read joined on `user` (`PlannedMember`). */
+const plannedMemberColumns = { ...memberColumns, creatorIds: user.creatorIds };
+
+const PlannedMemberSchema = StoredMemberSchema.extend({ creatorIds: z.array(z.string()) });
+
+/**
+ * The members named by a planner's read, with their creators: `user` sits outside the policies, `team_members` under
+ * them, so a member the reader may not see is not read.
+ */
+export async function plannedMembersOf(
+  tx: Transaction,
+  memberIds: readonly string[],
+): Promise<PlannedMember[]> {
+  if (memberIds.length === 0) return [];
+  const rows = await tx
+    .select(plannedMemberColumns)
+    .from(teamMembers)
+    .innerJoin(user, eq(user.id, teamMembers.userId))
+    .where(inArray(teamMembers.id, [...memberIds]));
+  return rows.map((row) => PlannedMemberSchema.parse(row));
+}
 
 export const toShift = (row: unknown): StoredShift => StoredShiftSchema.parse(row);
 export const toTemplate = (row: unknown): StoredTemplate => StoredTemplateSchema.parse(row);
