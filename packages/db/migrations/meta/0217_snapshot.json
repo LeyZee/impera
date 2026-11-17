@@ -1,5 +1,5 @@
 {
-  "id": "bb2153a6-984f-4298-8532-9c208953c231",
+  "id": "657c53be-e14b-4a83-9289-ea4e41652822",
   "prevId": "0e93d1bd-1f32-4396-a292-538ec4a71cc7",
   "version": "7",
   "dialect": "postgresql",
@@ -8264,12 +8264,6 @@
           "notNull": true,
           "default": 0
         },
-        "preview_blurhash": {
-          "name": "preview_blurhash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "last_synced_at": {
           "name": "last_synced_at",
           "type": "timestamp with time zone",
@@ -8431,10 +8425,6 @@
         "media_platform_refs_description_failures_check": {
           "name": "media_platform_refs_description_failures_check",
           "value": "\"media_platform_refs\".\"description_failures\" >= 0"
-        },
-        "media_platform_refs_blurhash_check": {
-          "name": "media_platform_refs_blurhash_check",
-          "value": "char_length(\"media_platform_refs\".\"preview_blurhash\") <= 166"
         },
         "media_platform_refs_duration_check": {
           "name": "media_platform_refs_duration_check",

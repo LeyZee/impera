@@ -247,6 +247,11 @@ export const platformScripts = pgTable(
     deactivatedAt: timestampTz('deactivated_at'),
     /** The last import that listed it. */
     syncedAt: timestampTz('synced_at').notNull(),
+    /**
+     * The import that wrote its current version: added, or rewritten because it changed on the platform (recette
+     * 16/11). Since when a « Tarif réduit » on one of its steps keeps it from being offered.
+     */
+    versionAt: timestampTz('version_at').notNull(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -297,6 +302,13 @@ export const platformScriptSteps = pgTable(
     name: text('name').notNull(),
     text: text('text').notNull(),
     priceMinor: integer('price_minor').notNull(),
+    /**
+     * A « Tarif réduit » set on the platform (recette 16/11): its price and how long, as read; `null` when the step has
+     * none (both `null`; Reveal gives both or neither, either one alone is a discount all the same). A step with one is
+     * never sent, its script never offered: Impera never sells at a discount.
+     */
+    discountPriceMinor: integer('discount_price_minor'),
+    discountMinutes: integer('discount_minutes'),
     currency: enumText('currency').notNull(),
   },
   (t) => [
@@ -317,6 +329,10 @@ export const platformScriptSteps = pgTable(
       sql`char_length(${t.name}) <= ${sql.raw(String(PLATFORM_SCRIPT_NAME_MAX))} and char_length(${t.text}) <= ${sql.raw(String(PLATFORM_SCRIPT_STEP_TEXT_MAX))} and char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
     ),
     check('platform_script_steps_price_check', sql`${t.priceMinor} >= 0`),
+    check(
+      'platform_script_steps_discount_check',
+      sql`coalesce(${t.discountPriceMinor}, 0) >= 0 and coalesce(${t.discountMinutes}, 0) >= 0`,
+    ),
     enumCheck('platform_script_steps', t.currency, CurrencySchema.options),
     pgPolicy('team_read', {
       for: 'select',

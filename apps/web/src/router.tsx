@@ -19,7 +19,7 @@ import { NotificationsPage } from './pwa/NotificationsPage';
 import { RevealHelpPage } from './pwa/RevealHelpPage';
 import { CreatorRewardRevealGate } from './rewards/CreatorRewardRevealGate';
 import { playsTheGame } from './rewards/api';
-import { parseCalendarSearch } from './scheduling/calendar';
+import { myPlanningSearch, teamPlanningSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
@@ -70,7 +70,7 @@ import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
 import { RevealPage } from './screens/team/RevealPage';
-import { parsePlanningSearch, parseReportsSearch, parseTeamSearch } from './screens/team/model';
+import { parseReportsSearch, parseTeamSearch } from './screens/team/model';
 import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
 import { ChatterTrackingPage } from './screens/tracking/ChatterTrackingPage';
@@ -85,6 +85,7 @@ import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
+import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
 import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
 
@@ -413,10 +414,7 @@ const contentScript = createRoute({
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
   path: '/planning',
-  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => {
-    const { semaine } = parsePlanningSearch(search);
-    return { ...(semaine === undefined ? {} : { semaine }), ...parseCalendarSearch(search) };
-  },
+  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => myPlanningSearch(search),
   component: function MyPlanning() {
     const { user } = rootRoute.useRouteContext();
     const search = myPlanning.useSearch();
@@ -444,10 +442,7 @@ const teamIndex = createRoute({
 const teamPlanning = createRoute({
   getParentRoute: () => team,
   path: '/planning',
-  validateSearch: (search: Record<string, unknown>) => ({
-    ...parsePlanningSearch(search),
-    ...parseCalendarSearch(search),
-  }),
+  validateSearch: teamPlanningSearch,
   component: function TeamPlanning() {
     const { semaine, membre, affichage, mois } = teamPlanning.useSearch();
     const navigate = teamPlanning.useNavigate();
@@ -1098,6 +1093,8 @@ const buildRouter = (context: RouterContext, history?: RouterHistory) =>
     defaultPreload: 'intent',
     // An unknown address keeps the rail and says so in French, in place of the router's « Not Found ».
     defaultNotFoundComponent: NotFoundPage,
+    // A screen that throws says so in French, the rail kept, never the router's « Something went wrong! » (CHT-06).
+    defaultErrorComponent: ErrorPage,
     ...(history === undefined ? {} : { history }),
   });
 

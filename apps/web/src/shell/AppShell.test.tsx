@@ -472,6 +472,15 @@ describe('an address that leads nowhere (recette 28/10, M1)', () => {
   });
 });
 
+describe('a broken link (recette 16/11, CHT-06)', () => {
+  it('opens a chatter’s planning on this week, never an error in English', async () => {
+    renderApp(chatter, '/planning?semaine=abc&mois=zz');
+    expect(await screen.findByRole('heading', { name: 'Planning', level: 1 })).toBeDefined();
+    expect(screen.queryByText(/Something went wrong/u)).toBeNull();
+    expect(screen.queryByText('Cette page n’a pas pu s’afficher')).toBeNull();
+  });
+});
+
 describe('the tab’s title (recette 28/10, M2)', () => {
   it('names the screen on show', async () => {
     const router = renderApp(owner, '/suivi');

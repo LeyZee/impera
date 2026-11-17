@@ -4,10 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { DropMime } from '@impera/contracts';
+import { sniff, type DropMime } from '@impera/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { sniff } from '../../../domain/sniff';
 import { probeAv } from '../av';
 import { createFileCleaner } from '../cleaner';
 

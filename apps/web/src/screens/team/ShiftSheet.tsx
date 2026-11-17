@@ -35,7 +35,14 @@ import {
   type Outcome,
   type Refusal,
 } from '@/scheduling/api';
-import { accountLine, ERROR_MESSAGES, phaseOf, templateLine, type Phase } from '@/scheduling/model';
+import {
+  accountLine,
+  ERROR_MESSAGES,
+  phaseOf,
+  templateLine,
+  unheldReader,
+  type Phase,
+} from '@/scheduling/model';
 import {
   addDays,
   cityOf,
@@ -100,8 +107,8 @@ export function ShiftSheet({
   const record = members.find((member) => member.id === shift.memberId) ?? null;
   const template = templates.find((one) => one.id === shift.templateId) ?? null;
   const phase = phaseOf(shift, now);
-  // His status when he is away: nobody holds the shift (EQP-03).
-  const away = planning.away.find((one) => one.memberId === shift.memberId)?.status ?? null;
+  // His status when he is away, or her taken off his list: nobody holds the shift (recette EQP-03, EQU-01).
+  const unheld = unheldReader(planning, now)(shift);
   // The reader's own shift: a manager who chats (EQP-02). The owner has no record, so never one.
   const mine = record !== null && record.userId === userId;
   const report = reports === null ? null : reportOf(reports, shift.id);
@@ -215,16 +222,19 @@ export function ShiftSheet({
           </div>
           <span className={`nv-status sc-phase sc-phase--${phase}`}>
             <span
-              className={`nv-dot${phase === 'live' && away === null ? ' nv-tone--ok nv-dot--live' : ''}`}
+              className={`nv-dot${phase === 'live' && unheld === null ? ' nv-tone--ok nv-dot--live' : ''}`}
             />
-            {/* Under way with its member away: nobody is « en poste » (EQP-03). */}
-            {phase === 'live' && away !== null ? 'En cours' : PHASE_LABELS[phase]}
+            {/* Under way with nobody holding it: nobody is « en poste » (EQP-03). */}
+            {phase === 'live' && unheld !== null ? 'En cours' : PHASE_LABELS[phase]}
           </span>
         </div>
-        {away === null || phase === 'past' ? null : (
+        {unheld === null || phase === 'past' ? null : (
           <p className="tm-warn sc-sheet__away" role="status">
-            {shown?.displayName ?? 'Ce membre'} est {AWAY_WORDS[away]} : personne ne{' '}
-            {phase === 'live' ? 'tient ce shift en ce moment' : 'tiendra ce shift'}.{' '}
+            {`${shown?.displayName ?? 'Ce membre'} ${
+              unheld.kind === 'away'
+                ? `est ${AWAY_WORDS[unheld.status]}`
+                : `n’a plus ${account?.creatorName ?? 'cette créatrice'} dans ses créatrices`
+            } : personne ne ${phase === 'live' ? 'tient ce shift en ce moment' : 'tiendra ce shift'}. `}
             {phase === 'live'
               ? 'Arrête-le, puis ouvre un shift à un autre membre.'
               : 'Choisis un autre membre, ou annule-le.'}

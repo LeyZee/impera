@@ -246,6 +246,30 @@ describe('scriptsOf (spec § 6)', () => {
     ]);
   });
 
+  it('reads a « Tarif réduit » on a step as it is, never as its price (recette 16/11)', () => {
+    const discounted = (id: string, extra: Partial<ScriptItem['script']>): ScriptItem => ({
+      ...loose(id, { price: 2000 }),
+      script: { ...step(id, { price: 2000 }), ...extra },
+    });
+    const scripts = scriptsOf(
+      [],
+      [
+        discounted('step_both', { discountedPrice: 1500, discountDurationMinutes: 60 }),
+        // Reveal gives both or neither; one alone is a discount all the same, never read as none.
+        discounted('step_price_only', { discountedPrice: 1500 }),
+        discounted('step_minutes_only', { discountDurationMinutes: 30 }),
+        loose('step_none', { price: 2000 }),
+      ],
+      () => null,
+    );
+    expect(scripts.map((s) => [s.ref.id, s.steps[0]?.priceMinor, s.steps[0]?.discount])).toEqual([
+      ['step_both', 2000, { priceMinor: 1500, minutes: 60 }],
+      ['step_price_only', 2000, { priceMinor: 1500, minutes: null }],
+      ['step_minutes_only', 2000, { priceMinor: null, minutes: 30 }],
+      ['step_none', 2000, null],
+    ]);
+  });
+
   it('makes a step in no sequence a script of one step, and leaves an empty sequence out', () => {
     const scripts = scriptsOf(
       [sequence('seq_empty', 'Vide', []), sequence('seq_1', 'Séquence', [{ id: 'step_a', index: 0 }])],

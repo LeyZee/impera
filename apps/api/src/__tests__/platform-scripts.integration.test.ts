@@ -800,4 +800,54 @@ describe('the native scripts imported from the platform', () => {
     const refused = PlatformScriptViewSchema.parse((await post('owner', url, twoDefaults, 'PUT')).json());
     expect(refused.gaps).toContain('branch_two_defaults');
   });
+
+  it('never offers a script with a « Tarif réduit » on a step, and offers it again once taken off (recette 16/11)', async () => {
+    const stepsOf = async () =>
+      (await ownerView('sequence_4'))?.steps.map((step) => [step.ref, step.discount]);
+    await scenario([
+      {
+        type: 'script_changed',
+        scriptId: 'script_4_3',
+        priceCents: 3_000,
+        discount: { priceCents: 1_500, minutes: 60 },
+      },
+    ]);
+    await importOf(noraAccount, nora, new Date('2026-11-15T12:00:00Z'));
+    const view = await ownerView('sequence_4');
+    expect(view?.gaps).toContain('step_discounted');
+    // « À traiter » warns of it, since the import that read the discount, for the owner and a manager of her list.
+    const warned = [{ id: view?.id, name: view?.name, steps: 1, since: new Date('2026-11-15T12:00:00Z') }];
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual(
+      warned,
+    );
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.manager, role: 'operator' })).toEqual(
+      warned,
+    );
+    expect(
+      await scripts().reads.discountedScripts(ines, { userId: ids.manager, role: 'operator' }),
+    ).toBeNull();
+    expect(
+      await scripts().reads.discountedScripts(nora, { userId: ids.chatter, role: 'operator' }),
+    ).toBeNull();
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.nora, role: 'creator' })).toBeNull();
+    // A later import that changes nothing keeps the day it began.
+    await importOf(noraAccount, nora, new Date('2026-11-15T12:30:00Z'));
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual(
+      warned,
+    );
+    expect(view?.proposable).toBe(false);
+    // Read as it is, on its step only; the price stays the full one.
+    expect(await stepsOf()).toEqual([
+      ['script_4_1', null],
+      ['script_4_2', null],
+      ['script_2_1', null],
+      ['script_4_3', { priceMinor: 1_500, minutes: 60 }],
+    ]);
+    expect(view?.steps.find((step) => step.ref === 'script_4_3')?.priceMinor).toBe(3_000);
+    await scenario([{ type: 'script_changed', scriptId: 'script_4_3', priceCents: 3_000, discount: null }]);
+    await importOf(noraAccount, nora, new Date('2026-11-15T13:00:00Z'));
+    expect((await ownerView('sequence_4'))?.gaps).not.toContain('step_discounted');
+    expect((await stepsOf())?.every(([, discount]) => discount === null)).toBe(true);
+    expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual([]);
+  });
 });

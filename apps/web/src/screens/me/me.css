@@ -41,6 +41,10 @@
   gap: var(--nv-space-4);
   max-width: 640px;
 }
+/* The facts start where the panel's title does, on a phone as on a computer. */
+.me-profile .tm-facts > div {
+  padding-inline: 24px;
+}
 /* « Flou des médias » (SC-04 lot c4): its row on the panel's inset, its icon under the panel's text. */
 .me-prefs .nv-more__blur {
   align-self: stretch;

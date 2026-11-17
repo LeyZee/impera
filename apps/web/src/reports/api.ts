@@ -329,9 +329,18 @@ export const rejectReport = (
 export const addPayRules = (body: CreateAccountPayRulesBody): Promise<GuardedOutcome<AccountPayRules>> =>
   write('POST', '/v1/team/pay-rules', body, (json) => AccountPayRulesSchema.parse(json), guardedRefusalOf);
 
-/** The owner's threshold, from the next comparisons on; a validation keeps the one it saw. */
-export const saveReportGap = (body: ReportGapThreshold): Promise<ReportOutcome<ReportGapThreshold>> =>
-  send('PUT', '/v1/scheduling/report-gap', body, (json) => ReportGapThresholdSchema.parse(json));
+/**
+ * The owner's threshold, from the next comparisons on; a validation keeps the one it saw. Asked with the password and
+ * the code, like the pay rules (EQ-15).
+ */
+export const saveReportGap = (body: ReportGapThreshold): Promise<GuardedOutcome<ReportGapThreshold>> =>
+  write(
+    'PUT',
+    '/v1/scheduling/report-gap',
+    body,
+    (json) => ReportGapThresholdSchema.parse(json),
+    guardedRefusalOf,
+  );
 
 /** After a write, and after a refusal that says the list is read again: the reports and the planning. */
 export function useRefreshReports(): () => Promise<void> {

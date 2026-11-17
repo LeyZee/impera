@@ -42,6 +42,62 @@ export function parseAmount(text: string, signed = false, max = SHIFT_REPORT_MAX
   return sign === '-' || sign === '−' ? -minor : minor;
 }
 
+/**
+ * Whether `text` is an amount, but above what one report or correction can say (`SHIFT_REPORT_MAX_MINOR`): the panel
+ * then says the limit rather than how to type an amount (recette 16/11, CHT-29).
+ */
+export function amountTooLarge(text: string, signed = false): boolean {
+  const bare = text.replace(/[\s\u00a0\u202f€$]/gu, '').replace(/^(EUR|USD)|(EUR|USD)$/giu, '');
+  const match = /^([+\-−]?)\d+(?:[.,]\d{1,2})?$/u.exec(bare);
+  if (match === null || (match[1] !== '' && !signed)) return false;
+  return parseAmount(text, signed) === null;
+}
+
+/**
+ * An amount the panel asks to confirm before sending (recette 16/11, CHT-29): five times the member's usual report,
+ * and never below 1 000 in the account's currency; without three reports to compare with, from 2 000. A slip of the
+ * finger (a zero too many) is caught, a good shift is not questioned.
+ */
+const UNUSUAL_REPORT_FACTOR = 5;
+const UNUSUAL_REPORT_MIN_MINOR = 100_000;
+const UNUSUAL_REPORT_FLOOR_MINOR = 200_000;
+const USUAL_REPORT_MIN_COUNT = 3;
+
+/**
+ * The member's usual report: the median of their validated reports in `currency`, corrections left out; `null` with
+ * fewer than three.
+ */
+export function usualReport(
+  reports: readonly ShiftReport[],
+  memberId: string,
+  currency: Currency,
+): number | null {
+  const amounts = reports
+    .filter(
+      (report) =>
+        report.memberId === memberId &&
+        report.correctsId === null &&
+        report.status === 'validated' &&
+        report.amount.currency === currency,
+    )
+    .map((report) => report.amount.amountMinor)
+    .sort((left, right) => left - right);
+  if (amounts.length < USUAL_REPORT_MIN_COUNT) return null;
+  const middle = Math.floor(amounts.length / 2);
+  return amounts.length % 2 === 1
+    ? (amounts[middle] ?? 0)
+    : Math.round(((amounts[middle - 1] ?? 0) + (amounts[middle] ?? 0)) / 2);
+}
+
+/** Whether `minor`, a report or a correction, is far enough above the member's usual report to be confirmed first. */
+export function unusualAmount(minor: number, usual: number | null): boolean {
+  const threshold =
+    usual === null
+      ? UNUSUAL_REPORT_FLOOR_MINOR
+      : Math.max(usual * UNUSUAL_REPORT_FACTOR, UNUSUAL_REPORT_MIN_MINOR);
+  return Math.abs(minor) >= threshold;
+}
+
 const MONEY = new Map<string, Intl.NumberFormat>();
 
 /** An amount in French, the true minus sign « − » in place of the hyphen `Intl` gives. */
