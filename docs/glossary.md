@@ -27,6 +27,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Gardes | `guards` | Vérifications en code après la voix (dégoûts, répétition, longueur, argent, identité). |
 | Deuxième demande | `hedgeAfterMs` | La même demande envoyée une deuxième fois au modèle principal d'un rôle, en parallèle, quand la première n'a pas répondu après ce délai ; la première bonne réponse gagne et l'autre est journalisée avec son coût, marquée `loser` dans `llm_calls.hedge` (OPS-15). |
 | Budget de bulles | `bubbleBudget` | Le nombre de bulles qu'elle peut écrire à ce tour, fixé par le code : une par défaut, deux s'il a écrit deux messages ou un long, trois seulement s'il en a écrit trois ou plus. Les bulles partent l'une après l'autre, chacune après le temps de la taper (`bubbleDelays`). |
+| Essai réel | `probe` (`llm_calls.purpose = 'probe'`, `POST /v1/settings/providers/:provider/probe`) | Un tout petit appel réel à un service (un « ok » à générer ou à prononcer), lancé par le propriétaire depuis Réglages › Services pour prouver que le compte peut encore payer une génération, au-delà de la vérification gratuite de la clé ; compté dans la dépense, jamais lancé par une tâche (ADR 0091 § 7). |
 | Repli | `fallback` | Le modèle de secours d'un rôle LLM, utilisé quand le modèle actif refuse, ne répond pas ou n'a pas de clé. |
 | Santé (des modèles) | `health` | État des rôles LLM (`ok`, `degraded`, `down`), latences, erreurs, coût du jour face au budget ; alimente le panneau « Modèles IA ». |
 | Plafond du jour | `dailyBudget`, `budget_reached` | Dépense IA maximale sur une journée, heure de Paris (20 € par défaut, réglable de 1 € à 200 € par le propriétaire dans Réglages › Modèles IA, `ai_budget_settings`) : alerte à 80 %, au-delà plus aucune génération et les chatteurs reprennent. |
@@ -200,7 +201,11 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Profil du fan (plateforme) | `FanProfile`, `getFanProfile` | Ce que la plateforme montre d'un fan à côté de la conversation : inscription, abonnement, total dépensé, dernier paiement, carte vérifiée (ADR 0018). Distinct de la fiche du fan. |
 | Statistiques PPV | `FanPpvStats`, `getFanPpvStats` | L'onglet PPV d'un fan sur la plateforme : bundles achetés sur bundles payants proposés, prix le plus haut et le plus bas, date de la dernière offre payante (`lastOfferAt`), et chaque bundle envoyé (ADR 0018). |
 | Note client | `fan_note` | La note libre qu'une plateforme attache à un fan, lue et écrite par les chatteurs et l'agent. Distincte de `fan_fact`. |
+<<<<<<< HEAD
+| Prénom du membre | `memberFirstname`, `setFanFirstName` | Le champ prénom qu'une plateforme attache à un fan, distinct de la note client ; sur Reveal, la source de `%NAME%`. L'agent ne l'écrit que vide et avec un prénom que le fan a dit lui-même (ADR 0117). |
+=======
 | Réaction (à un message) | `ReactionFit`, `reactToMessage` | Un emoji que la créatrice pose sur un message du fan, en plus de sa réponse. Le cerveau dit ce que le message appelle, le code décide d'en poser une (ADR 0133). |
+>>>>>>> origin/main
 | Notes du modèle | `creator_note` | Les notes que Reveal affiche à côté de chaque conversation sur la créatrice : sa fiche persona vue par la plateforme. |
 | Bundle (PPV) | `bundle` | Le PPV de Reveal : médias floutés vendus (au moins un), prix TTC, tarif réduit optionnel, aperçu gratuit de 10 médias au plus. |
 | Coffre | `vault` | Les médias de la créatrice stockés sur la plateforme, réutilisables à l'envoi. |

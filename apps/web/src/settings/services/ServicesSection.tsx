@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { ConnectSheet } from './ConnectSheet';
 import { PasswordPrompt, SignInAgain } from './PasswordPrompt';
+import { ServiceHealth } from './ServiceHealth';
 import {
   disconnect,
   fetchOverview,
   isForbidden,
   isSessionExpired,
+  probeNow,
   ReauthRequired,
   showError,
   verifyNow,
@@ -50,6 +52,8 @@ export function ServicesSection({
   /** A removal waiting for the password (ADR 0016). */
   const [reauthFor, setReauthFor] = useState<DashboardProvider | null>(null);
   const [verifying, setVerifying] = useState<DashboardProvider | null>(null);
+  /** The services whose « Essai réel » is running: each its own, side by side. */
+  const [probing, setProbing] = useState<ReadonlySet<DashboardProvider>>(new Set());
   const [now, setNow] = useState(() => new Date());
   const [notice, setNotice] = useState<Notice | null>(null);
   /** Only the latest refresh may land: an older answer arriving late would show a stale state. */
@@ -125,6 +129,29 @@ export function ServicesSection({
         });
       },
     );
+  };
+
+  /** « Essai réel » (ADR 0091 § 7): the answer replaces the line at once, then the list refreshes. */
+  const probe = (provider: DashboardProvider): void => {
+    setNotice(null);
+    setProbing((current) => new Set(current).add(provider));
+    probeNow(provider)
+      .then(
+        () => refresh(),
+        (error: unknown) => {
+          setNotice({
+            ...showError(error, `L’essai réel de ${GUIDES[provider].name} n’a pas pu partir.`),
+            tone: 'error',
+          });
+        },
+      )
+      .finally(() => {
+        setProbing((current) => {
+          const next = new Set(current);
+          next.delete(provider);
+          return next;
+        });
+      });
   };
 
   const open = (provider: DashboardProvider, isReplace: boolean): void => {
@@ -265,6 +292,22 @@ export function ServicesSection({
               <p className="sv-row__line" data-state={status.state}>
                 {line}
               </p>
+              {status.state === 'not_connected' && !isFromEnvironment ? null : (
+                <ServiceHealth
+                  provider={provider}
+                  status={status}
+                  now={now}
+                  isProbing={probing.has(provider)}
+                  // A key read from the environment is the developer's, and an unreadable one cannot be sent.
+                  onProbe={
+                    isSaved && !status.isUnreadable
+                      ? () => {
+                          probe(provider);
+                        }
+                      : null
+                  }
+                />
+              )}
               {menu === provider ? (
                 <RowMenu
                   provider={provider}
