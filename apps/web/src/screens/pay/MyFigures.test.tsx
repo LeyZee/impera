@@ -125,7 +125,7 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
     expect(text()).toContain('90,00 €');
     expect(text()).toContain('encore 70,00 € pour battre ton meilleur jour');
     expect(text()).toContain('Meilleure quinzaine');
-    expect(text()).toContain('Heures de ton fuseau (Africa/Porto-Novo)');
+    expect(text()).toContain('Heures de ton fuseau (Porto-Novo)');
   });
 
   it('dit une baisse en encre neutre, sans rouge ni alerte (§ 10)', async () => {
@@ -280,6 +280,18 @@ describe('Aujourd’hui › Ma quinzaine (CHF-01, ADR 0104 § 2 à § 4)', () =>
       expect(text()).toContain('220,00 € de net · 2 ventes · 2 rapports validés');
     });
     expect(document.querySelectorAll('.mf-bar')).toHaveLength(15);
+    // Under the pointer or the keyboard: the figures first, how to read a report last, only on a day that has one.
+    const bars = [...document.querySelectorAll<HTMLElement>('.mf-bar')];
+    bars[3]?.focus();
+    await waitFor(() => {
+      expect(document.querySelector('.nv-tip')?.textContent.replace(NBSP, ' ')).toBe(
+        'Mercredi 4 novembreNet80,00 €Rapports validés1Un rapport validé compte au jour de son shift, pour son total.',
+      );
+    });
+    bars[2]?.focus();
+    await waitFor(() => {
+      expect(document.querySelector('.nv-tip')?.textContent).not.toContain('Un rapport validé compte');
+    });
   });
 
   it('ne compte aucune vente à qui n’a que des rapports validés', async () => {

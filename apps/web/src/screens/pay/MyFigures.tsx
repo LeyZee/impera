@@ -34,7 +34,7 @@ import {
 import { amountText, periodLine } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
-import { dayNumber, longDay } from '@/scheduling/time';
+import { cityOf, dayNumber, longDay } from '@/scheduling/time';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
 import { Panel } from '@/shell/layout';
 
@@ -87,7 +87,7 @@ function dayTip(bar: DayBar, currency: Currency): Parameters<FloatingTip['bind']
       ...sourceRows(bar.sales, bar.reports),
       ...(bar.refunds === 0 ? [] : [['Remboursements', String(bar.refunds)] as const]),
     ],
-    ...(bar.reports === 0 ? {} : { text: 'Un rapport validé compte au jour de son shift, pour son total.' }),
+    ...(bar.reports === 0 ? {} : { aside: 'Un rapport validé compte au jour de son shift, pour son total.' }),
   };
 }
 
@@ -119,7 +119,7 @@ function DayBars({
           data-ahead={bar.ahead}
           data-best={bar.netMinor === max && max > 0}
           style={{ '--_h': barHeight(bar.netMinor, max), '--nv-i': index }}
-          {...(bar.ahead ? {} : tip.bind(dayTip(bar, currency), { above: true }))}
+          {...(bar.ahead ? {} : tip.bind(dayTip(bar, currency), { beside: true }))}
           tabIndex={bar.ahead ? undefined : 0}
         >
           <span className="mf-bar__col">
@@ -431,7 +431,7 @@ function Hours({
           <i />
           <span>plus</span>
         </div>
-        <p className="mf-note">Heures de ton fuseau ({figures.timeZone.replace(/_/gu, ' ')}).</p>
+        <p className="mf-note">Heures de ton fuseau ({cityOf(figures.timeZone)}).</p>
       </div>
     </Panel>
   );
