@@ -16,6 +16,11 @@ import { createConnectorReads, type ConnectorReads } from './application/connect
 import { createDispatchJob } from './application/dispatch';
 import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
+import {
+  createAskConversationRead,
+  createReadConversationJob,
+  type ConversationReadAsk,
+} from './application/read-conversation';
 import { createReconcileJob } from './application/reconcile';
 import { createConnectorResolver } from './application/resolver';
 import { createSalesFeeds, type SalesFeedDeps } from './application/sales-feed';
@@ -23,12 +28,14 @@ import { createConnectorSessions, type ConnectorSessions } from './application/s
 import {
   createAskVaultSync,
   createPlatformReads,
+  createVaultPreview,
   createVaultReads,
   createVaultSyncJob,
   type PlatformReads,
   type VaultReads,
   type VaultSyncAsked,
 } from './application/vault';
+import { createVaultFiles, type VaultFiles } from './application/vault-files';
 import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
@@ -99,6 +106,8 @@ export { FakeConnector } from './infra/fake/FakeConnector';
 /** Reveal's private API, read with the « bot » member's captured session (P2-02): the registry's factory. */
 export { revealApiConnectors } from './infra/reveal/connector';
 export type { RevealFetch } from './infra/reveal/client';
+export type { FileTransport } from './infra/download/vault-file';
+export type { VaultFiles } from './application/vault-files';
 /** @public The errors `platformReads` throws, for the adapter that reads through it (`reason` says why a read is refused). */
 export { PlatformAccountNotFound, PlatformReadUnavailable } from './domain/errors';
 /** @public Reveal's observed shapes, one copy: FakeReveal serves them (`__tests__/fake-reveal`). */
@@ -176,6 +185,8 @@ export interface ConnectorsModule {
     dispatch(logger: JobLogger): Promise<void>;
     poll(payload: JobPayload<'connector.poll'>, logger: JobLogger): Promise<void>;
     reconcile(payload: JobPayload<'connector.reconcile'>, logger: JobLogger): Promise<void>;
+    /** One conversation the copilot opened and no poll read (recette du 16/11). */
+    readConversation(payload: JobPayload<'connector.read_conversation'>, logger: JobLogger): Promise<void>;
     /** Every connected sales feed, from its cursor (ADR 0050 § 3); `woken` by a webhook delivery: now. */
     readSales(logger: JobLogger, correlationId: string, woken?: boolean): Promise<void>;
     /** The automatic check of the fortnight just over, or its second look a day later (CRM-04 b3). */
@@ -195,7 +206,12 @@ export interface ConnectorsModule {
    * `/v1/creators/:creatorId/vault` and its owner's « Synchroniser » (fiche vault-sync), behind the guards given here.
    * Nothing else starts a read of the platform's vault: no cron.
    */
-  readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync'>) => FastifyPluginAsyncZod;
+  /**
+   * The copilot panel found a conversation Impera never read (recette du 16/11): its read queued on the accounts of
+   * these creators on that platform, at most once a minute per conversation. How many reads were queued.
+   */
+  readonly askConversationRead: (ask: ConversationReadAsk) => Promise<number>;
+  readonly vaultRoutes: (options: Omit<VaultRoutesOptions, 'askSync' | 'preview'>) => FastifyPluginAsyncZod;
   /** Her vault as the last sync read it, as the person reading (the owner, an active manager of her list). */
   readonly vault: VaultReads;
   /**
@@ -203,6 +219,11 @@ export interface ConnectorsModule {
    * each behind its `capabilities` flag, never a write.
    */
   readonly platformReads: PlatformReads;
+  /**
+   * One vault file read to a path of the caller's (ADR 0113), for `media.describe_vault`: through the resolver, behind
+   * `mediaDownload`, never a write. What became of it, typed; the file is the caller's to remove.
+   */
+  readonly vaultFiles: VaultFiles;
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
@@ -293,6 +314,11 @@ export interface ConnectorsDeps {
    * (fiche vault-sync; asked by `media`, wired by the composition root). Never a write of this module's tables.
    */
   readonly onVaultSyncAsked?: (input: VaultSyncAsked) => Promise<void>;
+  /**
+   * Told of each `connector.vault_sync` that went through, once its rows are written (ADR 0113 § 5; `media` queues the
+   * description of the vault behind it, wired by the composition root). Never a write of this module's tables.
+   */
+  readonly onVaultSynced?: (input: VaultSyncAsked) => Promise<void>;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -371,15 +397,34 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       }),
       poll: createPollJob(accountJobs),
       reconcile: createReconcileJob(accountJobs),
+      readConversation: createReadConversationJob(accountJobs),
       readSales: (logger, correlationId, woken = false) => salesFeeds.read(logger, correlationId, woken),
       checkSales: (payload, logger, correlationId) => salesFeeds.autoCheck(payload, logger, correlationId),
       readDailyStats: (logger, correlationId) => salesFeeds.readDailyStats(logger, correlationId),
       copyAvatar: (payload, logger) => salesFeeds.copyAvatar(payload, logger),
-      vaultSync: createVaultSyncJob({ accounts, resolver, store: vaultStore, clock }),
+      vaultSync: createVaultSyncJob({
+        accounts,
+        resolver,
+        store: vaultStore,
+        clock,
+        onSynced: deps.onVaultSynced,
+      }),
     },
-    vaultRoutes: (options) => createVaultRoutes(vaultReads, { ...options, askSync: askVaultSync }),
+    askConversationRead: createAskConversationRead({
+      accounts,
+      jobs: accountJobQueue,
+      platforms: resolver.platforms,
+      clock,
+    }),
+    vaultRoutes: (options) =>
+      createVaultRoutes(vaultReads, {
+        ...options,
+        askSync: askVaultSync,
+        preview: createVaultPreview({ accounts, resolver, store: vaultStore, clock }),
+      }),
     vault: vaultReads,
     platformReads: createPlatformReads({ accounts, resolver, clock }),
+    vaultFiles: createVaultFiles({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),

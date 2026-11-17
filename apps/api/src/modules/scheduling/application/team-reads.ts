@@ -12,8 +12,20 @@ import type {
 } from '@impera/contracts';
 
 import { TeamScheduleReadForbidden } from '../domain/errors';
-import type { CreatorDirectory, NamedMember, PlanningStore, ShiftReportStore } from '../domain/ports';
-import { assertPlanningRange, covers, plansCreator, type PlannedCreators } from '../domain/shifts';
+import type {
+  CreatorDirectory,
+  NamedMember,
+  PlannedMember,
+  PlanningStore,
+  ShiftReportStore,
+} from '../domain/ports';
+import {
+  assertPlanningRange,
+  covers,
+  holdsShift,
+  plansCreator,
+  type PlannedCreators,
+} from '../domain/shifts';
 import { boundCreators, readsTeamSchedule, type CreatorBound } from '../domain/team-reads';
 
 /**
@@ -95,7 +107,7 @@ export interface SchedulingReads {
   ): Promise<ListedShiftReport[]>;
   /**
    * Who is on shift at `at` (the MCP's `on_shift_now`): the shifts that cover it (`covers`: the start included, the
-   * end excluded), of active members, read as `shifts` reads them. Nothing of the account nor of the margin (ADR 0025).
+   * end excluded), that their members hold (`holdsShift`), read as `shifts` reads them. Nothing of the account nor of the margin (ADR 0025).
    * Unlike the module's `onShift`, which the system reads for the routing of a handover, this read is the person's.
    */
   onShiftNow(reader: ScheduleReader, creators: CreatorBound, at: Date): Promise<OnShiftNow[]>;
@@ -211,18 +223,15 @@ export function createSchedulingReads(
         from: at,
         to: new Date(at.getTime() + 1),
       });
-      const active = new Map(
-        read.members
-          .filter((member) => member.status === 'active')
-          .map((member) => [member.id, member.displayName]),
-      );
+      const members = new Map<string, PlannedMember>(read.members.map((member) => [member.id, member]));
       return read.shifts
         .filter((shift) => shown(read, shift) && covers(shift, at))
         .flatMap((shift) => {
-          const memberName = active.get(shift.memberId);
-          return memberName === undefined
+          // Away, or her taken off his list: nobody is on it (`holdsShift`, recette EQP-03, EQU-01).
+          const member = members.get(shift.memberId);
+          return member === undefined || !holdsShift(member, shift)
             ? []
-            : [{ at: shift.startsAt.getTime(), id: shift.id, shift, memberName }];
+            : [{ at: shift.startsAt.getTime(), id: shift.id, shift, memberName: member.displayName }];
         })
         .sort(byTime)
         .map(({ shift, memberName }) => ({

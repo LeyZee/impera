@@ -35,7 +35,16 @@ PR A, majeures :
 - [x] CRE-02 : sa meilleure série à côté de la série en cours, et sa meilleure suite de livraisons, une fois cassées.
 - [x] CHT-05 : pas d'onglet « Trophées » pour un manager, même en congé (même règle que la route).
 
-PR B, mineures : CRE-06 (le gain constaté juste après la coche ou le dépôt), créatrice archivée hors du job (remarque Bilan), CRE-13 (la pastille mène à Mes trophées), CHT-10 et CRE-18 (carillon), CRE-15, CRE-17, prochain trophée de CRE-14, bandeau d'un jour à venir (Design), et une routine retirée reste due le jour même (choix de Charles du 16/11 : la retirer ne sauve plus la série).
+PR B, mineures :
+- [x] CRE-06 : `rewards.evaluate_creator` demandé dans la transaction d'une coche ou d'un dépôt arrivé ; l'écran relit sa vitrine 4 s puis 12 s après.
+- [x] Créatrice archivée hors du job (remarque Bilan).
+- [x] CRE-13 : la pastille de série mène à Mes trophées ; le nom de la médaille dans son nom accessible.
+- [x] CHT-10 et CRE-18 : carillon seulement après un geste, un seul contexte audio.
+- [x] CRE-14 : unité `once` (0 sur 1) pour un trophée d'un geste, « Premier dépôt » en tête pour une nouvelle ; « Encore 5 ».
+- [x] CRE-15 : « Coche toutes tes routines du jour ».
+- [x] CRE-17 : textes pour elle ; « Stock plein » et « Contenu qui a cartonné » cachés tant que leur signal manque.
+- [x] Bandeau d'un jour à venir : « N choses prévues », jamais une routine pour commencer (Design).
+- [x] Une routine retirée reste due le jour même (`removedAt`), choix de Charles du 16/11.
 PR C : sa vitrine sur sa fiche côté agence (lot 2).
 
 ## Critères d'acceptation

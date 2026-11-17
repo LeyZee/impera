@@ -289,6 +289,39 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     }
   });
 
+  it('says to the agency alone who holds none of his shifts, and counts their créneaux to fill (recette EQU-01, EQU-02)', async () => {
+    const stretch = (start: number, end: number) => [
+      { startsAt: parisInstant(day, start).toISOString(), endsAt: parisInstant(day, end).toISOString() },
+    ];
+    const annaToFill = (read: Awaited<ReturnType<typeof calendar>>) =>
+      read.agency?.toFill.filter((slot) => slot.platformAccountId === annaAccount).map((slot) => slot.open);
+    const wholeDay = [stretch(0, 360), stretch(360, 720), stretch(720, 1080), stretch(1080, 1440)];
+    expect((await calendar(owner)).away).toEqual([]);
+    expect(annaToFill(await calendar(owner))).not.toEqual(wholeDay);
+    await setStatus(theo, 'suspended');
+    try {
+      expect((await calendar(owner)).away).toEqual([{ memberId: theo.id, status: 'suspended' }]);
+      // A chatter reads the shifts of the team, never a colleague's status.
+      expect((await calendar(basileCookie)).away).toEqual([]);
+    } finally {
+      await setStatus(theo, 'active');
+    }
+    // Anna taken off Théo's list: he no longer reads her, his shift on her holds nothing.
+    await test.admin.db.update(schema.user).set({ creatorIds: [] }).where(eq(schema.user.id, theo.userId));
+    try {
+      const read = await calendar(owner);
+      expect(read.shifts.some((shift) => shift.memberId === theo.id)).toBe(true);
+      expect(read.withoutAccess).toEqual([{ memberId: theo.id, creatorId: anna }]);
+      expect(annaToFill(read)).toEqual(wholeDay);
+      expect((await calendar(basileCookie)).withoutAccess).toEqual([]);
+    } finally {
+      await test.admin.db
+        .update(schema.user)
+        .set({ creatorIds: [anna] })
+        .where(eq(schema.user.id, theo.userId));
+    }
+  });
+
   it('filters by creator and by member, never beyond what the reader may read', async () => {
     const annaOnly = await calendar(owner, { creatorId: anna });
     expect(annaOnly.shifts.map((shift) => shift.creatorId)).toEqual([anna]);

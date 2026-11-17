@@ -12,8 +12,13 @@ import {
 } from '@impera/contracts';
 import { z } from 'zod';
 
-import { PlatformAccountNotFound, PlatformReadUnavailable, VaultForbidden } from '../domain/errors';
-import { ConnectorError, type PlatformConnector } from '../domain/platform-connector';
+import {
+  PlatformAccountNotFound,
+  PlatformReadUnavailable,
+  VaultForbidden,
+  VaultPreviewNotFound,
+} from '../domain/errors';
+import { ConnectorError, type PlatformConnector, type VaultPreview } from '../domain/platform-connector';
 import type { AccountJobs, AccountStore, Clock, ConnectorAccount, JobLogger } from '../domain/ports';
 import {
   compareVaultFolders,
@@ -32,6 +37,11 @@ export interface VaultDeps {
   readonly resolver: ConnectorResolver;
   readonly store: VaultStore;
   readonly clock: Clock;
+  /**
+   * Told of each sync that went through (ADR 0113 § 5), once its rows are written: `media` queues the description of
+   * the media still without a file behind it. Thrown, the job fails and is replayed: a sync writes nothing twice.
+   */
+  readonly onSynced?: ((input: VaultSyncAsked) => Promise<void>) | undefined;
 }
 
 /**
@@ -63,11 +73,17 @@ export function createVaultSyncJob(deps: VaultDeps) {
       logger.info({ platformAccountId: account.id, ...outcome }, 'vault sync: done');
     } catch (error) {
       await recordConnectorFailure(deps.accounts, account, error, { meta, logger, jobName: 'vault_sync' });
+      return;
     }
+    await deps.onSynced?.({
+      platformAccountId: account.id,
+      creatorId: account.creatorId,
+      correlationId: payload.correlationId,
+    });
   };
 }
 
-/** What `onVaultSyncAsked` is told: one account whose sync the owner's « Synchroniser » queued. */
+/** What `onVaultSyncAsked` is told: one account whose sync the owner's « Synchroniser » queued (or, `onSynced`, read). */
 export interface VaultSyncAsked {
   readonly platformAccountId: PlatformAccountId;
   readonly creatorId: CreatorId;
@@ -108,6 +124,7 @@ function mediaOf(row: VaultRefRow): VaultFolderView['media'][number] {
       row.suggestedMinMinor === null || row.suggestedMaxMinor === null
         ? null
         : { min: row.suggestedMinMinor, max: row.suggestedMaxMinor },
+    blurhash: row.previewBlurhash,
     removed: row.removedAt !== null,
   };
 }
@@ -149,6 +166,56 @@ export function createVaultReads(store: VaultStore): VaultReads {
       if (read === null) throw new VaultForbidden();
       return vaultViewOf(creatorId, read);
     },
+  };
+}
+
+/**
+ * ADR 0138: one small picture of her vault, read now at the platform and handed back, never kept. For the owner and an
+ * active manager of her list (`vault_forbidden`); `vault_preview_not_found` for a media she has not, or no longer, or
+ * without a picture; `platform_read_unavailable` when her account cannot be read now. A session the platform refused,
+ * or a platform that did not answer, counts as any other read does (the breaker); a single media's answer does not.
+ */
+export function createVaultPreview(deps: VaultDeps) {
+  return async (
+    creatorId: CreatorId,
+    userId: string,
+    platformMediaId: string,
+    logger: JobLogger,
+  ): Promise<VaultPreview> => {
+    const target = await deps.store.previewTarget(creatorId, userId, platformMediaId);
+    if (target === 'forbidden') throw new VaultForbidden();
+    if (target === null) throw new VaultPreviewNotFound();
+    const now = deps.clock.now();
+    const account = await loadActiveAccount(
+      deps,
+      { creatorId, platformAccountId: target.platformAccountId, correlationId: 'vault-preview' },
+      now,
+    );
+    if (account === 'unknown account') throw new VaultPreviewNotFound();
+    if (typeof account === 'string') throw new PlatformReadUnavailable('session');
+    const connector = await deps.resolver.forAccount(account);
+    if (connector?.capabilities.vaultPreview !== true || connector.readVaultPreview === undefined) {
+      throw new PlatformReadUnavailable('unsupported');
+    }
+    try {
+      return await connector.readVaultPreview({
+        mediaRef: { platform: account.platform, id: platformMediaId },
+        folderRef: target.folderRef === null ? null : { platform: account.platform, id: target.folderRef },
+      });
+    } catch (error) {
+      if (!(error instanceof ConnectorError)) throw error;
+      if (error.code === 'not_found') throw new VaultPreviewNotFound();
+      if (error.code === 'fatal') {
+        logger.warn({ platformAccountId: account.id, reason: error.message }, 'vault preview: refused');
+        throw new PlatformReadUnavailable('failed');
+      }
+      await recordConnectorFailure(deps.accounts, account, error, {
+        meta: { correlationId: 'vault-preview', at: now },
+        logger,
+        jobName: 'vault_preview',
+      });
+      throw new PlatformReadUnavailable(error.code === 'session_expired' ? 'session' : 'failed');
+    }
   };
 }
 

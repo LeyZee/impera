@@ -7,6 +7,11 @@ import { BillingSection } from './BillingSection';
 
 import { choose } from '@/test/select';
 
+const confirmIdentity = vi.fn<(password: string, code: string) => Promise<string>>();
+vi.mock('@/settings/services/api', () => ({
+  confirmIdentity: (password: string, code: string) => confirmIdentity(password, code),
+}));
+
 /* An invented agency and logo (ADR 0010): 123 456 782 carries a right Luhn key, FR11 is its VAT key. */
 const SHA = 'b'.repeat(64);
 const LOGO = { sha256: SHA, mediaType: 'image/png', width: 1_200, height: 340, byteLength: 120_000 };
@@ -102,6 +107,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  confirmIdentity.mockReset();
 });
 
 describe('Réglages › Facturation', () => {
@@ -335,6 +341,53 @@ describe('Réglages › Facturation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(await screen.findByText(/ne trouve plus ce logo/u)).toBeDefined();
     expect(screen.getByRole('dialog')).toBeDefined();
+  });
+
+  it('asks for the password and the code before a save, then sends the same settings again (EQ-15)', async () => {
+    confirmIdentity.mockImplementation(() => {
+      onPut = { status: 200, body: { settings: { ...SETTINGS, dueDays: 45 }, logo: LOGO } };
+      return Promise.resolve('ok');
+    });
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Changer : Paiement' }));
+    type('Échéance', '45');
+    onPut = refused('reauthentication_forbidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    const dialog = screen.getByRole('dialog', { name: 'Paiement' });
+    expect(
+      await within(dialog).findByText(
+        'Ce geste touche à la facturation : confirme ton mot de passe et ton code.',
+      ),
+    ).toBeDefined();
+    // The fields give way to the prompt: what is sent again is what was read.
+    expect(within(dialog).queryByLabelText('Échéance')).toBeNull();
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Mot de passe'), {
+      target: { value: 'mot-de-passe-invente' },
+    });
+    fireEvent.change(within(dialog).getByLabelText('Code à 6 chiffres ou de secours'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(writes).toHaveLength(2);
+    expect(writes[1]).toEqual(writes[0]);
+    expect(writes[0]?.body).toMatchObject({ dueDays: 45 });
+  });
+
+  it('keeps the step as typed when the prompt is given up, nothing sent again (EQ-15)', async () => {
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Changer : Paiement' }));
+    type('Échéance', '45');
+    onPut = refused('reauthentication_forbidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    const dialog = screen.getByRole('dialog', { name: 'Paiement' });
+    await within(dialog).findByLabelText('Mot de passe');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }));
+    expect(await within(dialog).findByLabelText('Échéance')).toHaveProperty('value', '45');
+    expect(writes).toHaveLength(1);
   });
 
   it('says a server that does not answer, and reads again on demand', async () => {

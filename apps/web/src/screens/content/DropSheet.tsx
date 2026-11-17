@@ -15,14 +15,17 @@ import { useRef, useState, type JSX } from 'react';
 
 import { Thumb } from './Thumb';
 import { Refused, createDrop } from './api';
+import { durationOf } from './media-length';
 import {
   CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   HEAVY_BYTES,
   UNKNOWN_TYPE,
   acceptOf,
+  mediaLabel,
   mimeOf,
   moved,
+  pickedHeadRefusal,
   sameFile,
   weightOf,
 } from './model';
@@ -35,21 +38,29 @@ interface Chosen {
   readonly file: File;
   readonly mime: DropMime | null;
   readonly refusal: string | null;
+  /** A video's or a vocal's length, once her phone has read it; `null` before, or when it cannot. */
+  readonly ms: number | null;
+  /** Its first bytes read (recette CRE-12), or no need to: « Envoyer » waits for every file's. */
+  readonly checked: boolean;
 }
 
 const chosenOf = (category: DropCategory, file: File): Chosen => {
   const mime = mimeOf(file);
+  const refusal = mime === null ? UNKNOWN_TYPE : declaredFileRefusal(category, { mime, bytes: file.size });
   return {
     id: ContentDropFileIdSchema.parse(crypto.randomUUID()),
     file,
     mime,
-    refusal: mime === null ? UNKNOWN_TYPE : declaredFileRefusal(category, { mime, bytes: file.size }),
+    refusal,
+    ms: null,
+    checked: refusal !== null,
   };
 };
 
 /**
  * The drop sheet (ADR 0055 § 8): three gestures, the category (already chosen), the files from her gallery, a sentence
- * if she wants. Each file is checked before anything goes (relecture Extension): its type, its weight, how many.
+ * if she wants. Each file is checked before anything goes (relecture Extension): its type, its weight, how many, and
+ * that its first bytes are what its type says (recette CRE-12: a text renamed `.jpg` is refused here, never sent).
  */
 export function DropSheet({
   category,
@@ -72,7 +83,36 @@ export function DropSheet({
 
   const countRefusal = chosen.length === 0 ? null : dropCountRefusal(category, chosen.length);
   const total = chosen.reduce((sum, item) => sum + item.file.size, 0);
-  const ready = chosen.length > 0 && countRefusal === null && chosen.every((item) => item.refusal === null);
+  const refused = chosen.filter((item) => item.refusal !== null).length;
+  const ready =
+    chosen.length > 0 && countRefusal === null && refused === 0 && chosen.every((item) => item.checked);
+
+  /** Her files added to the list, each video's and vocal's length read after, to say « Vidéo · 8 s ». */
+  const add = (picked: readonly File[]): void => {
+    const fresh = picked
+      .filter((file) => !chosen.some((item) => sameFile(item.file, file)))
+      .map((file) => chosenOf(category, file));
+    setChosen((list) => [
+      ...list,
+      ...fresh.filter((item) => !list.some((one) => sameFile(one.file, item.file))),
+    ]);
+    for (const item of fresh) {
+      if (!item.checked && item.mime !== null) {
+        void pickedHeadRefusal(item.file, item.mime).then((refusal) => {
+          setChosen((list) =>
+            list.map((one) =>
+              one.id === item.id ? { ...one, refusal: refusal ?? one.refusal, checked: true } : one,
+            ),
+          );
+        });
+      }
+      const kind = item.mime === null ? null : kindOfMime(item.mime);
+      if (kind !== 'video' && kind !== 'audio') continue;
+      void durationOf(item.file, kind).then((ms) => {
+        setChosen((list) => list.map((one) => (one.id === item.id ? { ...one, ms } : one)));
+      });
+    }
+  };
 
   const send = (): void => {
     const files = chosen.flatMap((item) =>
@@ -125,12 +165,7 @@ export function DropSheet({
           onChange={(event) => {
             const picked = [...(event.target.files ?? [])];
             event.target.value = '';
-            setChosen((list) => [
-              ...list,
-              ...picked
-                .filter((file) => !list.some((item) => sameFile(item.file, file)))
-                .map((file) => chosenOf(category, file)),
-            ]);
+            add(picked);
           }}
         />
         <button
@@ -144,63 +179,74 @@ export function DropSheet({
 
         {chosen.length === 0 ? null : (
           <ul className="ct-chosen">
-            {chosen.map((item, index) => (
-              <li key={item.id} className="ct-chosen__item">
-                <span className="ct-chosen__visual">
-                  <Thumb file={item.file} kind={item.mime === null ? null : kindOfMime(item.mime)} />
-                  <span className="ct-chosen__rank nv-num" aria-hidden="true">
-                    {index + 1}
+            {chosen.map((item, index) => {
+              const kind = item.mime === null ? null : kindOfMime(item.mime);
+              const label = mediaLabel(kind, item.ms);
+              const named = `${label.split(' · ')[0] ?? label} ${String(index + 1)}`;
+              return (
+                <li key={item.id} className="ct-chosen__item">
+                  <span className="ct-chosen__visual">
+                    <Thumb file={item.file} kind={kind} />
+                    <span className="ct-chosen__rank nv-num" aria-hidden="true">
+                      {index + 1}
+                    </span>
                   </span>
-                </span>
-                <div className="ct-chosen__text">
-                  <span className="ct-chosen__name">{item.file.name}</span>
-                  <span
-                    className={
-                      item.refusal === null ? 'ct-chosen__sub nv-num' : 'ct-chosen__sub ct-chosen__sub--warn'
-                    }
+                  <div className="ct-chosen__text">
+                    <span className="ct-chosen__name nv-num">{label}</span>
+                    <span
+                      className={
+                        item.refusal === null
+                          ? 'ct-chosen__sub nv-num'
+                          : 'ct-chosen__sub ct-chosen__sub--warn'
+                      }
+                    >
+                      {item.refusal ?? weightOf(item.file.size)}
+                      {/* Its name only where there is room for it (a computer); on a phone it is noise. */}
+                      {item.refusal === null ? (
+                        <span className="ct-chosen__file"> · {item.file.name}</span>
+                      ) : null}
+                    </span>
+                  </div>
+                  {chosen.length > 1 ? (
+                    <span className="ct-chosen__move">
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--plain nv-btn--sm"
+                        aria-label={`Monter ${named}`}
+                        disabled={busy || index === 0}
+                        onClick={() => {
+                          setChosen((list) => moved(list, index, -1));
+                        }}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--plain nv-btn--sm"
+                        aria-label={`Descendre ${named}`}
+                        disabled={busy || index === chosen.length - 1}
+                        onClick={() => {
+                          setChosen((list) => moved(list, index, 1));
+                        }}
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--sm"
+                    aria-label={`Enlever ${named}`}
+                    disabled={busy}
+                    onClick={() => {
+                      setChosen((list) => list.filter((other) => other.id !== item.id));
+                    }}
                   >
-                    {item.refusal ?? weightOf(item.file.size)}
-                  </span>
-                </div>
-                {chosen.length > 1 ? (
-                  <span className="ct-chosen__move">
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--plain nv-btn--sm"
-                      aria-label={`Monter ${item.file.name}`}
-                      disabled={busy || index === 0}
-                      onClick={() => {
-                        setChosen((list) => moved(list, index, -1));
-                      }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--plain nv-btn--sm"
-                      aria-label={`Descendre ${item.file.name}`}
-                      disabled={busy || index === chosen.length - 1}
-                      onClick={() => {
-                        setChosen((list) => moved(list, index, 1));
-                      }}
-                    >
-                      ↓
-                    </button>
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
-                  aria-label={`Enlever ${item.file.name}`}
-                  disabled={busy}
-                  onClick={() => {
-                    setChosen((list) => list.filter((other) => other.id !== item.id));
-                  }}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+                    ✕
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
         {countRefusal === null ? null : <p className="ct-warn">{countRefusal}</p>}
@@ -237,6 +283,14 @@ export function DropSheet({
             {busy ? 'Un instant…' : 'Envoyer'}
           </button>
         </div>
+        {/* Why « Envoyer » stays grey, beside it: the refused line may be out of sight in a long list (CRE-16). */}
+        {refused === 0 ? null : (
+          <p className="ct-warn ct-form__why">
+            {refused === 1
+              ? 'Retire le fichier refusé pour envoyer.'
+              : `Retire les ${String(refused)} fichiers refusés pour envoyer.`}
+          </p>
+        )}
       </div>
     </Dialog>
   );

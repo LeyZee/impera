@@ -16,6 +16,7 @@ import { identifyPlatformScript, type IdentifyOutcome } from './application/iden
 import { importPlatformScripts, type ImportPlatformScriptsRun } from './application/import-platform-scripts';
 import {
   creatorPlatformScripts,
+  discountedPlatformScripts,
   platformScriptForJob,
   type PlatformScriptsReader,
   type PlatformScriptView,
@@ -23,6 +24,7 @@ import {
 import { creatorQueue, queuedDigest, type QueuedDigest, type ScriptsReader } from './application/reads';
 import { cardContent, cardSvg } from './domain/cards';
 import type {
+  DiscountedPlatformScript,
   LimitsOf,
   PlatformScriptSource,
   RasterizeCard,
@@ -30,6 +32,7 @@ import type {
   ScriptStructureStore,
 } from './domain/ports';
 import { createCardRasterizer } from './infra/card-rasterizer';
+import { createDrizzleScriptBranchStore } from './infra/db/branch-store';
 import { createDrizzleCadenceStore } from './infra/db/cadence-store';
 import {
   createDrizzleScriptIdentityJobStore,
@@ -90,6 +93,15 @@ export interface ScriptsModule {
       creatorId: CreatorId,
       reader: PlatformScriptsReader,
     ): Promise<readonly PlatformScriptView[] | null>;
+    /**
+     * Her active native scripts with a « Tarif réduit » on a step (recette 16/11, bloquer et alerter), the longest
+     * waiting first, with how many steps and since which import: what « À traiter » warns of, in amber, until the
+     * agency takes the discount off in Reveal. Light (no text, no media), the same rights as `platformScripts`.
+     */
+    discountedScripts(
+      creatorId: CreatorId,
+      reader: PlatformScriptsReader,
+    ): Promise<readonly DiscountedPlatformScript[] | null>;
   };
   /**
    * Reads out of any person, as the service role: for a job only (ADR 0026 § 1). Never called with an id a request
@@ -206,6 +218,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       queue: async (creatorId, reader) =>
         (await creatorQueue(structures, reader, creatorId))?.map(queuedDigest) ?? null,
       platformScripts: (creatorId, reader) => creatorPlatformScripts(platformReads, reader, creatorId),
+      discountedScripts: (creatorId, reader) => discountedPlatformScripts(platformReads, reader, creatorId),
     },
     forJobs: {
       platformScript: (creatorId, scriptId) => platformScriptForJob(platformReads, creatorId, scriptId),
@@ -217,6 +230,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
     platformScriptRoutes: createPlatformScriptRoutes(
       platformReads.store,
       createDrizzleScriptIdentityReviewStore(deps.db),
+      createDrizzleScriptBranchStore(deps.db),
       deps.requireRole,
     ),
     jobs: {

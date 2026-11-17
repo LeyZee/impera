@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
@@ -14,6 +14,19 @@ describe('the case on a phone (recette 16/11, CRE-14)', () => {
   });
 
   it('lays a shelf three objects to a row', () => {
-    expect(phone).toMatch(/\.tc-slot \{\s*width: 33\.33%;/u);
+    expect(phone).toMatch(/\.tc-place \{\s*width: 33\.33%;/u);
+  });
+});
+
+describe('the case’s class names', () => {
+  it('collide with no other stylesheet of the app: `.tc-slot` belonged to the Telegram channel (16/11)', () => {
+    const src = new URL('../../', import.meta.url);
+    const classesOf = (text: string): Set<string> =>
+      new Set([...text.matchAll(/\.(tc-[\w-]+)/gu)].map((m) => m[1] ?? ''));
+    const ours = classesOf(css);
+    const others = readdirSync(src, { recursive: true, encoding: 'utf8' })
+      .filter((path) => path.endsWith('.css') && !path.endsWith('trophy-case.css'))
+      .flatMap((path) => [...classesOf(readFileSync(new URL(path, src), 'utf8'))]);
+    expect(others.filter((name) => ours.has(name))).toEqual([]);
   });
 });

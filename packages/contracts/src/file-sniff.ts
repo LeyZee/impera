@@ -1,8 +1,9 @@
-import type { DropMime } from '@impera/contracts';
+import type { DropMime } from './content-drops';
 
 /**
  * What a file is by its first bytes, never by the type her phone declared (ADR 0055 § 3): the cleaning that follows
- * is the one of the family found, and a file that is not what it says is refused.
+ * is the one of the family found, and a file that is not what it says is refused. Shared by the server, which decides,
+ * and her drop sheet, which says it before anything goes (recette CRE-12).
  */
 export type FileFamily = 'jpeg' | 'png' | 'webp' | 'heif' | 'isobmff' | 'ebml' | 'avi' | 'mp3' | 'adts';
 
@@ -12,7 +13,10 @@ const ascii = (bytes: Uint8Array, from: number, length: number): string =>
 /** The brands of an `ftyp` that mean a still image (HEIF, HEIC, AVIF are refused as not in the list). */
 const HEIF_BRANDS = new Set(['heic', 'heix', 'heim', 'heis', 'mif1', 'msf1']);
 
-/** The family of a file from its first 32 bytes at least; `null` when none of the accepted ones. */
+/** How many first bytes `sniff` reads. */
+export const SNIFF_BYTES = 32;
+
+/** The family of a file from its first `SNIFF_BYTES` bytes at least; `null` when none of the accepted ones. */
 export function sniff(head: Uint8Array): FileFamily | null {
   if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return 'jpeg';
   if (head.length >= 8 && ascii(head, 0, 8) === '\x89PNG\r\n\x1a\n') return 'png';
@@ -56,3 +60,15 @@ const FAMILIES_OF: Readonly<Record<DropMime, readonly FileFamily[]>> = {
 
 /** Whether the bytes found are of the type declared. */
 export const holds = (mime: DropMime, family: FileFamily): boolean => FAMILIES_OF[mime].includes(family);
+
+/** Said when the bytes are not of the type declared (a renamed file), on her sheet as by the server. */
+export const NOT_WHAT_IT_SAYS = 'Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie';
+
+/**
+ * Why a file declared `mime` cannot go, from its first bytes: `NOT_WHAT_IT_SAYS` when they are of no accepted family
+ * or of another one than declared, `null` when they hold what it says. The server decides again on the bytes received.
+ */
+export function headRefusal(mime: DropMime, head: Uint8Array): string | null {
+  const family = sniff(head);
+  return family === null || !holds(mime, family) ? NOT_WHAT_IT_SAYS : null;
+}
