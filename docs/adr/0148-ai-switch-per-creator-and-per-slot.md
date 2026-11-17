@@ -26,8 +26,9 @@ Charles veut un interrupteur visible là où on gère la créatrice, et régler 
 
 ### 2. Ses heures à elle, dessinées sur une frise
 
-- Dans l'onglet IA de la fiche (ADR 0149), les champs d'heures deviennent **une frise de la semaine** : sept lignes de 0 h à 24 h. On glisse sur une ligne pour créer une plage, on tire ses bords pour l'ajuster, on la déplace, on la retire ; pas de 15 min. « Copier partout » recopie un jour sur la semaine.
-- Les heures de l'IA ne dépendent pas des shifts des chatteurs. Ces shifts sont dessinés en fin trait doré sous chaque ligne, **pour repère seulement**, et peuvent être masqués. Un geste « Couvrir les heures sans chatteur » remplit d'un coup les trous de la semaine affichée ; ensuite, les plages vivent seules.
+- Dans l'onglet IA de la fiche (ADR 0149), les champs d'heures deviennent **une frise de la semaine** : sept jours de 0 h à 24 h, chacun sur deux lignes, « IA » et « Équipe ».
+- **On clique, on ne glisse pas** (Charles, 17/11 14 h 52 : le glisser était difficile, surtout sur un petit écran). Un clic sur une plage ouvre une fenêtre avec son début et sa fin, réglés par boutons −1 h, −15, +15, +1 h ; la plage change de taille à l'écran pendant qu'on règle. « Aussi ces jours-là » recopie la plage sur d'autres jours ; « Retirer la plage » la supprime. Un clic sur un endroit vide de la ligne IA ajoute une plage de 2 h à cet endroit et ouvre la même fenêtre. Au clavier, Échap ferme.
+- Les heures de l'IA ne dépendent pas des shifts des chatteurs. La ligne « Équipe », en dessous, dit en clair qui est en shift (« Kévin 14 h – 19 h ») et où **personne ne répond** (pointillés ambre), **pour repère seulement**. Un geste « Mettre l'IA là où personne ne répond » remplit ces trous d'un coup ; ensuite, les plages vivent seules.
 - Les lives prévus de la créatrice (ADR 0126) sont dessinés sur la frise : l'IA s'y tait d'elle-même, sans réglage.
 - « Toujours » reste le choix par défaut ; les plages sont gardées quand on y passe.
 - Stockage de la semaine type : `creators.agent_hours`, tel quel.
@@ -55,7 +56,7 @@ Positives :
 
 Négatives, à surveiller :
 - La pause ajoute une heure de fin à l'arrêt de la créatrice : toute lecture de l'arrêt (Dashboard, agent, relances, calendrier) doit ignorer une pause échue.
-- Une frise à la souris doit rester utilisable au clavier et au doigt : flèches pour déplacer un bord de 15 min, appui long sur téléphone.
+- Sur téléphone, la frise de 24 h est trop étroite pour être touchée : chaque jour s'y lit en liste de plages, avec la même fenêtre de réglage.
 
 Mise en œuvre, en lots : (a) contrats et base, pause avec fin et exceptions (Bilan) ; (b) lecture des exceptions par l'agent et les relances (Agent) ; (c) interrupteur, pause et frise (Design) ; (d) les plages et exceptions de l'IA visibles dans le planning (Équipe, avec l'ADR 0126). Captures Nuit/Jour, PC/téléphone, sur données inventées, avis Design avant Charles ; Sécurité relit droits et gardes.
 
