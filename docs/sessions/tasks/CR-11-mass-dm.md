@@ -15,7 +15,7 @@ Les Mass DM partent seuls vers une liste que le code calcule et vérifie : une a
 - [ ] Clé d'idempotence par Mass DM ; réponse perdue = relire les Mass DM avant toute tentative, jamais de renvoi à l'aveugle, ambre avec sa raison.
 - [ ] Un ajout de fan qui échoue retire ce fan de l'envoi.
 
-## Lot b : le plan, la liste et les gardes (fil désigné par le coordinateur ; exclusions lues dans l'état de l'agent, fil Agent en relecture)
+## Lot b : le plan, la liste et les gardes (fil « Publier posts et stories automatiquement » ; exclusions lues dans l'état de l'agent, fil Agent en relecture ; « OK » du fil Médias sur ce qui touche `content-drops`)
 - [ ] Types : annonce (30 min après une publication confirmée, à tous les abonnés et anciens abonnés sauf ceux qui ont écrit dans les 30 dernières minutes) ; réveil (moins de 5 fans actifs en 3 h ou aucun Mass DM depuis 5 jours, au plus tous les 3 jours, jamais un jour d'annonce, avec un média Relance gratuit) ; réveil « en ligne » ; gros dépensier silencieux depuis 14 jours (texte personnel sans vente, 10 fans au départ) ; merci de fidélité (abonnés depuis 90 jours ou plus, une fois par trimestre, photo Relance gratuite).
 - [ ] Aucun Mass DM payant. Plafond de 3 par semaine et par fan, tous types confondus, 36 h d'écart au moins ; priorité annonce, gros dépensier, réveil, fidélité ; lassitude : 3 sans réponse d'affilée = pause de 14 jours, levée quand le fan écrit.
 - [ ] Exclusions : doute d'âge, mode soin et sortie de soin, ventes gelées, fan parti au milieu d'un sexto, « ne plus écrire », au milieu d'un script, rythme lent.

@@ -16,7 +16,7 @@ Chaque dimanche, le code prépare la semaine : au moins trois publications du fe
 - [ ] Clé d'idempotence par publication ; avant de recréer une publication dont la réponse s'est perdue, relire les publications programmées. Échec = ambre avec sa raison, jamais de republication à l'aveugle.
 - [ ] Modifier une publication programmée = la supprimer puis la recréer (Reveal n'a pas montré d'édition).
 
-## Lot b : le plan et les gardes (propriétaire du module `content-drops`, fil Médias, ou le fil désigné par le coordinateur)
+## Lot b : le plan et les gardes (fil « Publier posts et stories automatiquement » ; « OK sur <sha> » du fil Médias sur ce qui touche `content-drops`)
 - [ ] Plan pur, construit le dimanche à 18 h : feed ≥ 3 par semaine, au plus 1 par jour, réglable de 3 à 7, jours étalés ; une story par jour (au plus 2, 4 h d'écart). Heures par défaut 20 h (feed) et 12 h 30 (stories), dans le fuseau de la créatrice ; rien pendant un live (ADR 0126).
 - [ ] Une séance = une publication. Les stories viennent seulement des dépôts `reveal_story` ; stock vide = aucune story et alerte ambre.
 - [ ] Visibilité : feed `isPublic false` toujours ; stories publiques ; publication publique seulement à la main par le propriétaire.
