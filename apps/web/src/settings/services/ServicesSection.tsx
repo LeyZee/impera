@@ -223,7 +223,7 @@ export function ServicesSection({
 
       <div className="nv-plate sv-next" aria-live="polite">
         <div className="sv-next__head">
-          <span className="sv-dot sv-dot--big" data-dot={nextDot} />
+          <span className="sv-dot" data-dot={nextDot} />
           <div className="sv-next__text">
             <p className="sv-lead">{leadOf(next, services)}</p>
             <p className="sv-muted">{next.detail}</p>

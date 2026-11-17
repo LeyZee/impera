@@ -17,8 +17,8 @@ import { PageHeader } from '@/shell/layout';
 
 /**
  * The Dashboard of the owner and of an active manager, before any creator is chosen (ADR 0078): « Toute l'agence »
- * checked in front of the creators' chips, what waits on the agency, then the agency's figures. A creator's chip opens
- * her Dashboard, her figures first and her agent under them.
+ * checked in front of the creators' chips, the agency's figures, then what waits on the agency. A creator's chip opens
+ * her Dashboard, her agent first and her figures under it.
  */
 export function AgencyPage({
   period,
@@ -50,12 +50,8 @@ export function AgencyPage({
       <header className="db-top nv-enter">
         <CreatorPicker onChoose={onCreator} agency={{ selected: true, onChoose: () => undefined }} />
       </header>
-      <BackupBanner enabled={forOwner} />
-      <PaperworkBanner enabled={forOwner} />
-      <ReportsBanner enabled={reviewsReports} />
-      {view.status === 'live' ? (
-        <AgencyStrip agency={view.data.agency} onAgencyView opensSettings={forOwner} />
-      ) : null}
+      {/* The figures first, then what the agency runs: the export, the invoices, the reports, the day's AI budget
+          (recette visuelle 16/11, PIL-04). */}
       <AgencyInsightsPanel
         period={period}
         onPeriod={onPeriod}
@@ -64,6 +60,10 @@ export function AgencyPage({
         canOpenSettings={forOwner}
         tip={tip}
       />
+      <BackupBanner enabled={forOwner} />
+      <PaperworkBanner enabled={forOwner} />
+      <ReportsBanner enabled={reviewsReports} />
+      {view.status === 'live' ? <AgencyStrip agency={view.data.agency} opensSettings={forOwner} /> : null}
       {tip.element}
     </div>
   );

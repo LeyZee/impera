@@ -63,6 +63,7 @@ import {
   PayRulesPage,
   SalesFeedPage,
   SecurityPage,
+  SettingsHome,
   SettingsLayout,
   TelegramPage,
 } from './screens/settings/SettingsLayout';
@@ -632,12 +633,16 @@ const payGoals = createRoute({
 const payPeriods = createRoute({
   getParentRoute: () => pay,
   path: '/releves',
+  // The quinzaine the other tabs showed, kept for the way back to them (GES-02).
+  validateSearch: parsePaySearch,
   component: function PayPeriods() {
+    const { quinzaine } = payPeriods.useSearch();
     const navigate = payPeriods.useNavigate();
     const { user } = rootRoute.useRouteContext();
     return (
       <PeriodsPage
         user={user}
+        period={quinzaine ?? null}
         onOpen={(period) => void navigate({ to: '/paie/quinzaine', search: { quinzaine: period } })}
       />
     );
@@ -674,9 +679,11 @@ const payExports = createRoute({
       throw redirect({ to: '/paie/quinzaine', replace: true, state: { notice: NOT_YOURS } });
     }
   },
+  validateSearch: parsePaySearch,
   component: function PayExports() {
+    const { quinzaine } = payExports.useSearch();
     const { user } = rootRoute.useRouteContext();
-    return <ExportsPage user={user} />;
+    return <ExportsPage user={user} period={quinzaine ?? null} />;
   },
 });
 
@@ -872,11 +879,9 @@ const settings = createRoute({
 const settingsIndex = createRoute({
   getParentRoute: () => settings,
   path: '/',
-  // Réglages is the owner's alone (the root sends anyone else home): it opens on Modèles IA.
-  beforeLoad: () => {
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/reglages/modeles-ia', replace: true });
-  },
+  // Réglages is the owner's alone (the root sends anyone else home). On a phone it is the list of its sections; on a
+  // computer, where the list stands beside a section, it opens on the first (GES-04).
+  component: SettingsHome,
 });
 const aiModels = createRoute({
   getParentRoute: () => settings,

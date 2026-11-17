@@ -987,15 +987,6 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
     ['/paie/objectifs', 'Paie', 'Objectifs', 'wide', owner],
     ['/paie/factures', 'Paie', 'Factures', 'wide', owner],
     ['/paie/exports', 'Paie', 'Exports', 'wide', owner],
-    ['/reglages/modeles-ia', 'Réglages', 'Modèles IA', 'narrow', owner],
-    ['/reglages/ventes', 'Réglages', 'Ventes', 'narrow', owner],
-    ['/reglages/consommation-ia', 'Réglages', 'Consommation IA', 'narrow', owner],
-    ['/reglages/alertes', 'Réglages', 'Alertes', 'narrow', owner],
-    ['/reglages/telegram', 'Réglages', 'Telegram', 'narrow', owner],
-    ['/reglages/regles-de-paie', 'Réglages', 'Règles de paie', 'narrow', owner],
-    ['/reglages/facturation', 'Réglages', 'Facturation', 'narrow', owner],
-    ['/reglages/sauvegardes', 'Réglages', 'Sauvegardes', 'narrow', owner],
-    ['/reglages/securite', 'Réglages', 'Sécurité', 'narrow', owner],
     ['/moi/profil', 'Moi', 'Profil', 'narrow', manager],
     ['/moi/dossier', 'Moi', 'Dossier', 'narrow', manager],
     ['/moi/factures', 'Moi', 'Factures', 'narrow', manager],
@@ -1034,6 +1025,43 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
           .getAttribute('aria-current'),
       ).toBe('page');
       expect(head.closest('.nv-page')?.getAttribute('data-width')).toBe(width);
+    },
+  );
+
+  // Recette visuelle 16/11 (GES-04): Réglages is a list beside its section, not tabs; the header keeps the template.
+  it.each([
+    ['/reglages/modeles-ia', 'Modèles IA'],
+    ['/reglages/ventes', 'Ventes'],
+    ['/reglages/consommation-ia', 'Consommation IA'],
+    ['/reglages/alertes', 'Alertes'],
+    ['/reglages/telegram', 'Telegram'],
+    ['/reglages/regles-de-paie', 'Règles de paie'],
+    ['/reglages/facturation', 'Facturation'],
+    ['/reglages/sauvegardes', 'Sauvegardes'],
+    ['/reglages/securite', 'Sécurité'],
+  ] as const)(
+    'titles %s by its section under « Réglages » (« %s »), its list beside it, wide',
+    async (path, name) => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+      );
+      renderApp(owner, path);
+      const title = await screen.findByRole('heading', { level: 1, name });
+      const head = title.closest<HTMLElement>('.nv-page__head');
+      if (head === null) throw new Error('no header');
+      expect(head.querySelector('.nv-page__title > .nv-eyebrow > .rgl-eyebrow')?.textContent).toBe(
+        'Réglages',
+      );
+      expect(head.querySelector('.nv-page__tabs')).toBeNull();
+      const list = await screen.findByRole('navigation', { name: 'Réglages' });
+      expect(list.closest('.rgl-body')?.parentElement).toBe(head.parentElement);
+      expect(
+        within(list)
+          .getByRole('link', { name: new RegExp(`^${name}`, 'u') })
+          .getAttribute('aria-current'),
+      ).toBe('page');
+      expect(head.closest('.nv-page')?.getAttribute('data-width')).toBe('wide');
     },
   );
 });

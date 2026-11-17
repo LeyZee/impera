@@ -32,9 +32,12 @@ import { Failure } from '@/shell/states';
  */
 export function PeriodsPage({
   user,
+  period = null,
   onOpen,
 }: {
   user: Me;
+  /** The quinzaine the other tabs showed, kept for them (GES-02): this screen lists them all. */
+  period?: PayPeriod | null;
   onOpen: (period: PayPeriod) => void;
 }): JSX.Element {
   const periods = usePayPeriods();
@@ -57,7 +60,7 @@ export function PeriodsPage({
         eyebrow="Paie"
         title="Historique"
         lead="Chaque quinzaine, ce qui a été validé et versé."
-        tabs={<PayNav user={user} />}
+        tabs={<PayNav user={user} period={period} />}
       />
       <div className="py-board">
         <Panel className="nv-enter">

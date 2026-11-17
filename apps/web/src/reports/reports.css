@@ -1170,8 +1170,9 @@
   align-items: center;
   gap: 2px var(--nv-space-3);
 }
-/* « Ventes vérifiées » is the widest chip: where it shows, every chip of the card takes its width (ADR 0084). */
-.rp-account:has(.rp-account__checked) {
+/* « Ventes vérifiées » is the widest chip (ADR 0084): every card of Règles de paie gives its chips that width, so that the
+   rules of the team's cards and of the accounts' start on one line (recette visuelle 16/11, GES-12). */
+.rp-rules {
   --rp-chip-column: 128px;
 }
 .rp-account__now .rp-account__since,

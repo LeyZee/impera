@@ -141,3 +141,31 @@ describe('the page’s header (COH-01)', () => {
     expect(rule(phone, '.nv-page__actions')).toMatch(/grid-row: 3;/u);
   });
 });
+
+describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
+  const settings = strip(readFileSync(new URL('../screens/settings/settings.css', import.meta.url), 'utf8'));
+  const phone = settings.slice(settings.indexOf('@media (max-width: 820px) {'));
+
+  it('stands the list on the page’s left, the section on its right, groups apart by the group gap', () => {
+    const body = rule(settings, '.rgl-body');
+    expect(body).toMatch(/grid-template-columns: 220px minmax\(0, 1fr\);/u);
+    expect(body).toMatch(/gap: var\(--nv-group-gap\);/u);
+  });
+
+  it('gives every line 44 px to the finger, the open one a neutral light', () => {
+    expect(rule(settings, '.rgl-list__item')).toMatch(/min-height: 44px;/u);
+    expect(rule(settings, ".rgl-list__item[aria-current='page']")).toMatch(
+      /background-color: var\(--nv-select-strong\);/u,
+    );
+    expect(settings).not.toMatch(/--nv-neon/u);
+  });
+
+  it('is the screen of Réglages on a phone: the list alone, or a section alone with the way back', () => {
+    expect(rule(phone, '.rgl-body')).toMatch(/grid-template-columns: minmax\(0, 1fr\);/u);
+    expect(
+      rule(phone, '.rgl-body[data-open] > .rgl-list,\n  .rgl-body:not([data-open]) > .rgl-section'),
+    ).toMatch(/display: none;/u);
+    expect(rule(phone, '.rgl-list__chevron')).toMatch(/display: block;/u);
+    expect(rule(phone, '.nv-eyebrow > .rgl-back')).toMatch(/display: inline-flex;/u);
+  });
+});
