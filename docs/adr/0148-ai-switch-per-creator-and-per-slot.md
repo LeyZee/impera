@@ -33,7 +33,12 @@ Charles veut un interrupteur visible là où on gère la créatrice, et régler 
 - **Couleurs** (design system) : l'IA en violet `--nv-agent`, comme dans le calendrier (ADR 0048), jamais en rouge, réservé aux urgences et au bouton principal ; les chatteurs en doré `--nv-data-2` ; « personne ne répond » en ambre `--nv-warning`, en pointillés, car c'est un avertissement ; le live de la créatrice en rose (jeton `--nv-creator` à ajouter, la couleur de la part des créatrices au Dashboard). Une légende en pastilles au-dessus de la frise.
 - Les heures de l'IA ne dépendent pas des shifts des chatteurs. La ligne « Équipe », en dessous, dit en clair qui est en shift (« Kévin 14 h – 19 h ») et où **personne ne répond** (pointillés ambre), **pour repère seulement**. Un geste « Mettre l'IA là où personne ne répond » remplit ces trous d'un coup ; ensuite, les plages vivent seules.
 - Les lives prévus de la créatrice (ADR 0126) sont dessinés sur la frise : l'IA s'y tait d'elle-même, sans réglage.
-- « Toujours » reste le choix par défaut ; les plages sont gardées quand on y passe.
+- **Une plage peut passer minuit** (22 h – 4 h) : elle finit « le lendemain », sans être coupée en deux jours ; la suite se dessine au début du jour suivant.
+- **Quand ses fans écrivent** : le fond de la ligne IA s'éclaire selon le nombre moyen de messages de fans par heure, jour par jour, sur les 4 dernières semaines (lu dans les messages déjà en base, sans nouvelle table). Masquable.
+- **Ce que la frise dit en chiffres** : heures de l'IA seule, heures où elle aide un chatteur, messages de fans par semaine tombés quand personne ne répond (le chiffre à faire baisser), et coût IA estimé par semaine à ce rythme, d'après la consommation réelle de la créatrice, à côté du plafond du jour.
+- L'interrupteur dit aussi qui répond quand l'IA ne répond pas (« Kévin répond jusqu'à 19 h · l'IA reprend cette nuit à 0 h ») et combien de fans attendent sa reprise.
+- Sous la frise : qui a changé les heures en dernier, et quand (le changement est journalisé avec l'avant et l'après).
+- « 24 h / 24 » est un bouton, pas un réglage à part : enfoncé, l'IA répond à toute heure ; relâché, ses plages reviennent telles qu'elles étaient.
 - Stockage de la semaine type : `creators.agent_hours`, tel quel.
 
 ### 3. Une date qui change : l'exception
@@ -68,4 +73,6 @@ Mise en œuvre, en lots : (a) contrats et base, pause avec fin et exceptions (Bi
 - **Un second bouton « IA » à côté du mode** : deux réglages qui peuvent se contredire.
 - **L'IA réglée sur les créneaux du planning** (première proposition du 17/11) : refusée par Charles, l'IA n'a pas de shift type.
 - **Des heures saisies champ par champ** (écran actuel, et l'outil concurrent montré par Charles) : lent, et on ne voit pas la semaine.
+- **Un compteur « coupée par un live »** : rare, il ne pilote rien ; remplacé par les messages de fans sans réponse.
+- **Plus tard, dans une autre décision** : un mode par plage (Automatique la nuit, Copilote le jour) une fois l'Automatique ouvert ; une vue agence des heures IA de toutes les créatrices ; une alerte quand un trou de plus de 2 h tombe sur des heures où ses fans écrivent beaucoup.
 - **Plages datées et exceptions datées séparées** : une seule forme (les plages du jour daté) dit la même chose avec moins de règles.
