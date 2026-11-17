@@ -2,6 +2,7 @@ import { PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  AGENCY_SHARE_CHANGE_MIN_NET_MINOR,
   agencyShareChanges,
   observedShares,
   shareBps,
@@ -98,6 +99,30 @@ describe('a change of share from one fortnight to the next (ADR 0054 § 5)', () 
     );
     expect(agencyShareChanges([], [row({ agencyMinor: 5_000 })])).toEqual([]);
     expect(agencyShareChanges([row()], [row({ netMinor: -100, agencyMinor: -35 })])).toEqual([]);
+  });
+
+  it('compares nothing with a fortnight of a few cents, whose share is rounding (PAY-04)', () => {
+    // 0,03 € of net and 0,01 € for the agency: 33,33 %, then 37,5 % on 0,08 €. No alert.
+    expect(
+      agencyShareChanges([row({ netMinor: 3, agencyMinor: 1 })], [row({ netMinor: 8, agencyMinor: 3 })]),
+    ).toEqual([]);
+    expect(agencyShareChanges([row()], [row({ netMinor: 1_999, agencyMinor: 1_000 })])).toEqual([]);
+    expect(agencyShareChanges([row({ netMinor: 1_999, agencyMinor: 100 })], [row()])).toEqual([]);
+    // From the floor on, the move counts.
+    expect(
+      agencyShareChanges(
+        [row({ netMinor: AGENCY_SHARE_CHANGE_MIN_NET_MINOR, agencyMinor: 700 })],
+        [row({ netMinor: AGENCY_SHARE_CHANGE_MIN_NET_MINOR, agencyMinor: 800 })],
+      ),
+    ).toEqual([
+      {
+        platform: 'reveal',
+        platformAccountId: ACCOUNT,
+        currency: 'EUR',
+        previousAgencyBps: 3_500,
+        agencyBps: 4_000,
+      },
+    ]);
   });
 
   it('keeps each currency apart', () => {

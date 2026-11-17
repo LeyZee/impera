@@ -127,6 +127,8 @@ const WireMessageCoreSchema = z.strictObject({
   type: z.string(),
   /** Set on a message deleted on Reveal (2026-11-16), absent otherwise: such a message is never read by us. */
   deletedAt: iso.optional(),
+  /** Set on a fan's answer to one of her stories (2026-11-16), absent otherwise; the story itself is `storyReply`. */
+  replyToStoryId: id.optional(),
   /** A GIF sent instead of a text (2026-11-15). */
   gif: z
     .strictObject({

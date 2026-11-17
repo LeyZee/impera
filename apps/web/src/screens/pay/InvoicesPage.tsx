@@ -109,8 +109,8 @@ export function InvoicesPage({
       <PageHeader
         eyebrow="Paie"
         title="Factures"
-        lead="Les factures et avoirs émis au nom de chaque membre : les contestations à trancher, les échéances, puis chaque quinzaine."
-        actions={<PayNav user={user} />}
+        lead="Les factures et avoirs émis au nom de chaque membre : contestations, échéances, quinzaines."
+        tabs={<PayNav user={user} />}
       />
       <div className="py-board">
         {timeZone === null ? null : (
@@ -207,7 +207,7 @@ export function InvoicesPage({
               what="la liste des documents"
               hint="Ses factures s’émettent à la validation de ses relevés, une fois son dossier complet."
               first={`${chosenName ?? 'Ce membre'} n’a aucun document sur les dix dernières années : ses factures s’émettent à la validation de ses relevés, une fois son dossier complet.`}
-              older="Le serveur ne répond pas : les documents plus anciens n’ont pas pu être lus."
+              older="Les documents plus anciens n’ont pas pu être lus : réessaie dans un instant."
               row={(item) => row(item, timeZone)}
             />
           )}

@@ -27,7 +27,7 @@ import { CreatorFace } from '@/creators/CreatorFace';
 import { useCreators } from '@/creators/api';
 import { initialOf } from '@/lib/utils';
 import { NightBanner } from '@/settings/telegram/NightBanner';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /** Why the control cannot change the mode under an operator's global switch: the hero says it too (DASH-08). */
 const GLOBAL_NOTE =
@@ -142,9 +142,8 @@ function Offline({
         </header>
       )}
       {/* The same face as on Aujourd'hui (DASH-22): the sentence, what it holds back, « Réessayer ». */}
-      <ServerSilent
+      <Failure
         headline
-        text="Les chiffres reviennent dès qu’il répond. Rien ici n’est à jour en attendant."
         onRetry={() => {
           // The list of creators may be what failed: both are read again.
           void client.refetchQueries({ queryKey: ['creators'] });

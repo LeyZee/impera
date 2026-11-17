@@ -752,7 +752,7 @@ describe('DashboardPage when the server does not answer', () => {
     let up = false;
     serveDashboard(() => (up ? { status: 200, body: apiDashboard() } : { status: 500 }));
     renderDashboard();
-    expect(await screen.findByText('ne répond pas')).toBeDefined();
+    expect(await screen.findByText('Le serveur ne répond pas')).toBeDefined();
     expect(headline()).toBe('Le serveur ne répond pas');
     expect(screen.getByText('Léa')).toBeDefined();
     expect(screen.queryByText('Exemple')).toBeNull();

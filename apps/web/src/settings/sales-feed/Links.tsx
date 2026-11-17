@@ -79,7 +79,7 @@ export function ModelLinks({
   return (
     <section className="nv-plate sf-links" aria-labelledby={`sf-models-${platform}`}>
       <header className="sf-links__head">
-        <h3 id={`sf-models-${platform}`} className="sf-links__title">
+        <h3 id={`sf-models-${platform}`} className="nv-h3 sf-links__title">
           Modèles {name}
         </h3>
         <p className="sv-muted">
@@ -154,7 +154,7 @@ export function TeamLink({ platform }: { platform: Platform }): JSX.Element | nu
   return (
     <section className="nv-plate sf-links" aria-labelledby={`sf-team-${platform}`}>
       <header className="sf-links__head">
-        <h3 id={`sf-team-${platform}`} className="sf-links__title">
+        <h3 id={`sf-team-${platform}`} className="nv-h3 sf-links__title">
           Équipe {name}
         </h3>
         <p className="sv-muted">

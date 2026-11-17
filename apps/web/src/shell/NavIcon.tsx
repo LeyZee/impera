@@ -7,6 +7,7 @@ import type { JSX } from 'react';
 export type NavIconName =
   | 'dashboard'
   | 'creators'
+  | 'fans'
   | 'train'
   | 'tracking'
   | 'settings'
@@ -24,7 +25,8 @@ export type NavIconName =
   | 'phone'
   | 'puzzle'
   | 'sign-out'
-  | 'compass';
+  | 'compass'
+  | 'clapper';
 
 const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   dashboard: (
@@ -45,6 +47,16 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
         <circle cx="9" cy="8" r="3.4" />
         <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4s6.5 2.4 6.5 5.4v.6" />
       </g>
+    </>
+  ),
+  fans: (
+    <>
+      <circle cx="9" cy="8" r="3.4" />
+      <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4 1.6 0 3 .4 4.1 1" />
+      <path
+        className="nav-heart"
+        d="M18 20.5s-4-2.4-4-5.1c0-1.3 1-2.2 2.1-2.2.8 0 1.5.4 1.9 1.1.4-.7 1.1-1.1 1.9-1.1 1.1 0 2.1.9 2.1 2.2 0 2.7-4 5.1-4 5.1z"
+      />
     </>
   ),
   train: (
@@ -171,6 +183,14 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <circle cx="12" cy="12" r="9.5" />
       <path d="M16.2 7.8 14.1 14.1 7.8 16.2 9.9 9.9z" />
+    </>
+  ),
+  // A shoot (« Fiche de tournage »), drawn after Lucide's clapperboard, in place of the 🎬 that was its icon (CRE-11).
+  clapper: (
+    <>
+      <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" />
+      <path d="m6.2 5.3 3.1 3.9M12.4 3.4l3.1 4" />
+      <path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
     </>
   ),
   more: (

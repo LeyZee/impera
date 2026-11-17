@@ -68,6 +68,8 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/aujourdhui': 'today',
   '/agenda': 'planning',
   '/suivi': 'tracking',
+  // Fans is no role's shortcut today (ADR 0124).
+  '/fans': 'creators',
   '/entrainer': 'tracking',
   '/planning': 'planning',
   '/commissions': 'pay',

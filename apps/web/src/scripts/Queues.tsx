@@ -18,6 +18,7 @@ import { useDragSort } from './useDragSort';
 import { useFlip } from './useFlip';
 
 import { initialOf } from '@/lib/utils';
+import { Failure } from '@/shell/states';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
 
@@ -187,19 +188,7 @@ function Queue({
   const full = ids.length >= SCRIPT_QUEUE_MAX;
 
   if (stored.isError) {
-    return (
-      <div className="nv-plate ps-panel st-queue">
-        <p className="ps-title">Sa file ne se charge pas</p>
-        <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft ps-self-start"
-          onClick={() => void stored.refetch()}
-        >
-          Réessayer
-        </button>
-      </div>
-    );
+    return <Failure onRetry={() => void stored.refetch()} />;
   }
   if (stored.data === undefined) {
     return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall st-queue" aria-busy="true" />;
@@ -210,7 +199,7 @@ function Queue({
       <header className="st-queue__head">
         <div>
           <p className="nv-eyebrow">File de {creator.displayName}</p>
-          <h2 className="st-queue__title">Ce qu’on lui demandera, dans l’ordre</h2>
+          <h2 className="nv-h2 st-queue__title">Ce qu’on lui demandera, dans l’ordre</h2>
         </div>
         <span className="st-queue__state" aria-live="polite">
           {saving ? (

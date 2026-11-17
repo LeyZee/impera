@@ -6,7 +6,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
-  padding: 14px 16px 14px 14px;
+  padding: 14px var(--nv-plate-pad);
 }
 .tg-night[data-state='off'] {
   --_c: var(--nv-ink-muted);

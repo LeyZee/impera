@@ -62,8 +62,8 @@ export function ExportsPage({ user }: { user: Me }): JSX.Element {
       <PageHeader
         eyebrow="Paie"
         title="Exports"
-        lead="Les trois fichiers du comptable, tels que le serveur les fait : le journal des prestataires, le récapitulatif DAS2 et l’archive des PDF."
-        actions={<PayNav user={user} />}
+        lead="Pour le comptable : journal des prestataires, récapitulatif DAS2 et archive des PDF."
+        tabs={<PayNav user={user} />}
       />
       <div className="py-board">
         {today === null && down !== null ? (

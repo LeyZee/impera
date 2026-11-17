@@ -13,7 +13,9 @@ export function scriptsInputOf(scripts: ScenarioScripts, now: Date): ScriptsInpu
     scriptRef: script.ref,
     moment: script.moment,
     description: script.description,
-    steps: script.steps.map((step) => ({
+    steps: script.steps.map((step, index) => ({
+      // A scenario names no platform step: its rank stands for it.
+      stepRef: `${script.ref}:${String(index)}`,
       kind: step.kind,
       priceMinor: step.price_euros === undefined ? null : Math.round(step.price_euros * 100),
       ...(step.instruction !== undefined && { instruction: step.instruction }),

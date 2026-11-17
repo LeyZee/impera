@@ -19,7 +19,7 @@ import { NotificationsPage } from './pwa/NotificationsPage';
 import { RevealHelpPage } from './pwa/RevealHelpPage';
 import { CreatorRewardRevealGate } from './rewards/CreatorRewardRevealGate';
 import { playsTheGame } from './rewards/api';
-import { parseCalendarSearch } from './scheduling/calendar';
+import { myPlanningSearch, teamPlanningSearch } from './scheduling/calendar';
 import { myAwayOf } from './scheduling/model';
 import { AgendaPage } from './screens/agenda/AgendaPage';
 import { parseAgendaSearch, viewOf, vueOf } from './screens/agenda/search';
@@ -35,6 +35,7 @@ import {
   parseDashboardSearch,
   periodOf,
 } from './screens/dashboard/logic';
+import { FansPage } from './screens/fans/FansPage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
@@ -70,7 +71,7 @@ import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
 import { ReportsPage } from './screens/team/ReportsPage';
 import { RevealPage } from './screens/team/RevealPage';
-import { parsePlanningSearch, parseReportsSearch, parseTeamSearch } from './screens/team/model';
+import { parseReportsSearch, parseTeamSearch } from './screens/team/model';
 import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
 import { ChatterTrackingPage } from './screens/tracking/ChatterTrackingPage';
@@ -85,8 +86,9 @@ import { StructuresPage } from './scripts/StructuresPage';
 import { AccountSecurityPage } from './security/AccountSecurityPage';
 import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegram/search';
 import { AppShell } from './shell/AppShell';
+import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
-import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
+import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf, securityPathOf } from './shell/nav';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -96,6 +98,9 @@ export interface RouterContext {
 
 /** What the shell says when the route guard sends someone to the first tab of their rail (NAV-21). */
 export const NOT_YOURS = 'Cette page n’est pas dans ton espace.';
+
+/** What the shell says when an address of Entraîner has no screen yet and leads to the Playground (PIL-17). */
+export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur le Playground.';
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   // A section outside the account's rail sends it to its first tab (ADR 0024); the server's 403 stays the barrier.
@@ -197,8 +202,9 @@ const creators = createRoute({
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
     if (first !== undefined && !sheets.includes(sheetOf(search))) {
-      // A word brought by an earlier guard (Structures sends here) goes on with this second step.
-      const notice = location.state.notice;
+      // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
+      // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
+      const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
@@ -218,6 +224,8 @@ const creators = createRoute({
         tab={tab}
         creatorId={creatrice ?? null}
         onCreator={(id) => void navigate({ search: creatorsSearch(tab, id) })}
+        folderId={search.dossier ?? null}
+        onFolder={(id) => void navigate({ search: creatorsSearch(tab, creatrice ?? null, id) })}
       />
     );
   },
@@ -237,6 +245,19 @@ const scriptStructures = createRoute({
   },
   component: StructuresPage,
 });
+// Every fan of a creator (ADR 0124), the owner's and an active manager's: anyone else is sent back home.
+const fansList = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/fans',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner' && context.user.teamScope !== 'agency') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: FansPage,
+});
+
 const tracking = createRoute({
   getParentRoute: () => rootRoute,
   path: '/suivi',
@@ -411,10 +432,7 @@ const contentScript = createRoute({
 const myPlanning = createRoute({
   getParentRoute: () => rootRoute,
   path: '/planning',
-  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => {
-    const { semaine } = parsePlanningSearch(search);
-    return { ...(semaine === undefined ? {} : { semaine }), ...parseCalendarSearch(search) };
-  },
+  validateSearch: (search: Record<string, unknown>): MyPlanningSearch => myPlanningSearch(search),
   component: function MyPlanning() {
     const { user } = rootRoute.useRouteContext();
     const search = myPlanning.useSearch();
@@ -442,10 +460,7 @@ const teamIndex = createRoute({
 const teamPlanning = createRoute({
   getParentRoute: () => team,
   path: '/planning',
-  validateSearch: (search: Record<string, unknown>) => ({
-    ...parsePlanningSearch(search),
-    ...parseCalendarSearch(search),
-  }),
+  validateSearch: teamPlanningSearch,
   component: function TeamPlanning() {
     const { semaine, membre, affichage, mois } = teamPlanning.useSearch();
     const navigate = teamPlanning.useNavigate();
@@ -792,10 +807,19 @@ const mePreferences = createRoute({
   },
 });
 
-// Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
+// Outside the rail (SEC-04): an operator's own sessions and backup codes, from the account's menu. Whoever has them in
+// a section reads them there, and this address leads to it with its query (recette visuelle 16/11, CHA-16, CRE-07,
+// GES-11): one page, not two.
 const accountSecurity = createRoute({
   getParentRoute: () => rootRoute,
   path: ACCOUNT_SECURITY,
+  beforeLoad: ({ context }) => {
+    const own = securityPathOf(context.user);
+    if (own !== ACCOUNT_SECURITY) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: own, search: true, hash: true, replace: true });
+    }
+  },
   component: AccountSecurityPage,
 });
 
@@ -820,14 +844,15 @@ const channelPost = createRoute({
 });
 /*
  * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
- * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
+ * to an « à venir » page under its header (recette 05/11, PRO-25), and say so on arrival (recette visuelle 16/11,
+ * PIL-17). Each comes back with its screen.
  */
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
   beforeLoad: () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true });
+    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
   },
 });
 const tests = createRoute({
@@ -835,7 +860,7 @@ const tests = createRoute({
   path: '/tests',
   beforeLoad: () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true });
+    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
   },
 });
 
@@ -1052,6 +1077,7 @@ const routeTree = rootRoute.addChildren([
   train.addChildren([trainIndex, playground, channelPost, corrections, tests]),
   tracking,
   trackingAlerts,
+  fansList,
   today,
   agenda,
   sales,
@@ -1096,6 +1122,8 @@ const buildRouter = (context: RouterContext, history?: RouterHistory) =>
     defaultPreload: 'intent',
     // An unknown address keeps the rail and says so in French, in place of the router's « Not Found ».
     defaultNotFoundComponent: NotFoundPage,
+    // A screen that throws says so in French, the rail kept, never the router's « Something went wrong! » (CHT-06).
+    defaultErrorComponent: ErrorPage,
     ...(history === undefined ? {} : { history }),
   });
 

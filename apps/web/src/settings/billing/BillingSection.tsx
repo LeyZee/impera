@@ -16,6 +16,7 @@ import { Card, Fact } from './parts';
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
 import '@/screens/team/team.css';
+import { Failure } from '@/shell/states';
 import './billing.css';
 
 interface Opened {
@@ -46,21 +47,11 @@ export function BillingSection(): JSX.Element {
   if (query.isError) {
     return (
       <section className="rp-rules bf">
-        <div className="nv-plate rp-rules__cover nv-enter">
-          <p className="rp-notice__title">Le serveur ne répond pas</p>
-          <p className="rp-notice__text">
-            Les réglages de facturation n’ont pas pu être lus. Réessaie dans un instant.
-          </p>
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft tm-self-start"
-            onClick={() => {
-              void query.refetch();
-            }}
-          >
-            Réessayer
-          </button>
-        </div>
+        <Failure
+          onRetry={() => {
+            void query.refetch();
+          }}
+        />
       </section>
     );
   }

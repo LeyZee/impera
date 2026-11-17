@@ -490,6 +490,91 @@ describe('LlmGateway', () => {
     expect(result.ok && result.value.output.replyBrief).toBe(BRIEF.replyBrief);
   });
 
+  it('reads a brief whose optional fields come back null or blank, as the fallback writes them', async () => {
+    const mistral = scripted([
+      {
+        text: JSON.stringify({
+          ...BRIEF,
+          objection: null,
+          callback: '',
+          selfDisclosure: '  ',
+          scriptPick: null,
+          scriptReply: null,
+          alertsSeen: null,
+          desireSignals: null,
+          toneHints: null,
+          risks: null,
+        }),
+      },
+    ]);
+    const { gateway, log } = setup({ xai: scripted([{ status: 400 }]), mistral });
+
+    const result = await gateway.brain(INPUT);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const brief = result.value.output;
+    expect(result.value.meta.provider).toBe('mistral');
+    for (const key of [
+      'objection',
+      'callback',
+      'selfDisclosure',
+      'scriptPick',
+      'scriptReply',
+      'alertsSeen',
+      'desireSignals',
+    ]) {
+      expect(brief).not.toHaveProperty(key);
+    }
+    expect(brief.toneHints).toEqual([]);
+    expect(brief.risks).toEqual([]);
+    expect(BriefSchema.safeParse(brief).success).toBe(true);
+    expect(log.since(new Date(0)).at(-1)?.outcome).toBe('ok');
+  });
+
+  it('still refuses a brief whose value is wrong, and logs where, never what', async () => {
+    const wrong = JSON.stringify({ ...BRIEF, intent: 'Salut toi' });
+    const { gateway, log } = setup({
+      xai: scripted([{ text: wrong }]),
+      mistral: scripted([{ text: wrong }]),
+    });
+
+    const result = await gateway.brain(INPUT);
+
+    expect(result.ok).toBe(false);
+    const failed = log.since(new Date(0)).filter((r) => r.outcome === 'invalid_output');
+    expect(failed.length).toBeGreaterThan(0);
+    for (const record of failed) expect(record.errorCode).toBe('intent:invalid_value');
+    expect(JSON.stringify(log.since(new Date(0)))).not.toContain('Salut');
+  });
+
+  it('tells a reply that is not JSON from one that is cut', async () => {
+    const { gateway, log } = setup({
+      xai: scripted([{ text: 'pas du json' }]),
+      mistral: scripted([{ text: '{"intent":' }]),
+    });
+
+    await gateway.brain(INPUT);
+
+    const codes = log
+      .since(new Date(0))
+      .filter((r) => r.outcome === 'invalid_output')
+      .map((r) => r.errorCode);
+    expect(codes.length).toBeGreaterThan(0);
+    for (const code of codes) expect(code).toBe('json');
+  });
+
+  it('shows the model a brief schema where the optional fields may be null', async () => {
+    const xai = scripted([{ text: JSON.stringify(BRIEF) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.brain(INPUT);
+
+    const format = JSON.stringify(xai.doGenerateCalls[0]?.responseFormat);
+    expect(format).toContain('"objection"');
+    expect(format).toContain('null');
+  });
+
   it('gives the brain her alerts as criteria in typed blocks, and reads the ids it saw (P4-01)', async () => {
     const xai = scripted([{ text: JSON.stringify({ ...BRIEF, alertsSeen: ['a2'] }) }]);
     const { gateway } = setup({ xai });
@@ -580,8 +665,60 @@ describe('failures and connection tests', () => {
     const xai = scripted([{ text: 'ok' }]);
     const { gateway } = setup({ xai });
 
-    expect(await gateway.testConnection('xai')).toMatchObject({ isOk: true, model: 'grok-4.7' });
+    expect(await gateway.testConnection('xai')).toMatchObject({
+      isOk: true,
+      model: 'grok-4.7',
+      modelLabel: 'Grok 4.7',
+    });
     expect(await gateway.testConnection('venice')).toMatchObject({ isOk: false, outcome: 'unknown_model' });
+  });
+
+  it('journals the « Essai réel » under probe, out of the agent health, and says when the account is used up', async () => {
+    const xai = scripted([{ text: 'ok' }]);
+    const { gateway, log } = setup({ xai });
+
+    await gateway.testConnection('xai');
+
+    expect(log.since(new Date(0))).toMatchObject([
+      { purpose: 'probe', provider: 'xai', model: 'grok-4.7', outcome: 'ok', isFallback: false },
+    ]);
+    expect(gateway.health().roles.find((r) => r.role === 'voice')?.lastSuccessAt).toBeUndefined();
+  });
+
+  it('reports a key the « Essai réel » sees refused, like a refusal in production (ADR 0091 § 7)', async () => {
+    // On purpose, not a side effect: the key is truly refused, the agent must stop using it too.
+    const refusals: KeyRefusal[] = [];
+    const { gateway } = setup({ xai: scripted([{ status: 401 }]) }, ALL_KEYS, (refusal) =>
+      refusals.push(refusal),
+    );
+    expect(await gateway.testConnection('xai')).toMatchObject({ isOk: false, outcome: 'auth' });
+    expect(refusals).toEqual([{ provider: 'xai', status: 401 }]);
+  });
+
+  it('tells an account with nothing left from a refused key, and never calls past the cap', async () => {
+    const mistral = scripted([{ status: 402, body: '{"message":"no credits"}' }]);
+    const { gateway } = setup({ mistral });
+    expect(await gateway.testConnection('mistral')).toMatchObject({
+      isOk: false,
+      model: 'mistral-large-4',
+      outcome: 'quota_exhausted',
+    });
+
+    const xai = scripted([{ text: 'ok' }]);
+    const capped = setup({ xai }, ALL_KEYS, undefined, { dailyCapEur: () => 0.000_001 });
+    capped.log.append({
+      at: new Date('2026-10-17T11:00:00Z'),
+      role: 'voice',
+      provider: 'xai',
+      model: 'grok-4.7',
+      promptHash: 'h',
+      outcome: 'ok',
+      latencyMs: 1,
+      isFallback: false,
+      costUsd: 1,
+    });
+    expect(await capped.gateway.testConnection('xai')).toMatchObject({ outcome: 'budget_reached' });
+    expect(xai.doGenerateCalls).toHaveLength(0);
   });
 });
 

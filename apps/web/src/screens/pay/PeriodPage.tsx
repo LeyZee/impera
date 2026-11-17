@@ -35,7 +35,6 @@ import {
   LockIcon,
   PayoutHoldLine,
   PeriodArrows,
-  PeriodHeading,
   Swatch,
   Unreachable,
 } from './parts';
@@ -326,12 +325,14 @@ function PeriodView({
   const head = (
     <PageHeader
       eyebrow="Paie"
-      title={period === null ? 'Quinzaine' : <PeriodHeading period={period} />}
+      title="Quinzaine"
       lead={leadOf(data, blocked, owner)}
+      tabs={<PayNav user={user} />}
       actions={
         <>
-          {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav user={user} />
+          {period === null ? null : (
+            <PeriodArrows period={period} current={current} onPeriod={onPeriod} named />
+          )}
           {reread !== undefined ? (
             <button
               type="button"
@@ -714,7 +715,7 @@ function Summary({
   /** « +12 % par rapport à la quinzaine du 16 au 30 septembre »: a change, and what it is against, in French (EQP-13). */
   const against = (now: number): ReactNode =>
     previous === undefined ? null : previousNet === null ? (
-      'pas de quinzaine avant pour comparer'
+      'Première quinzaine : rien à comparer'
     ) : (
       <>
         <Delta bps={changeBps(now, previousNet)} title={`${amountText(previousNet, 'EUR')} de net`} /> par

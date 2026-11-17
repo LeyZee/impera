@@ -34,6 +34,7 @@ import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 import '@/creators/agenda/agency-agenda.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Demandes (recette MED-09, ADR 0055 § 4), the owner's and an active manager's: what the agency asks of
@@ -62,19 +63,7 @@ export function RequestsSection({
   const list = (): JSX.Element => {
     if (content.data === undefined) {
       if (content.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="aa-empty__title">Ses demandes ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void content.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+        return <Failure title="Ses demandes ne se chargent pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const groups = requestGroups(content.data, structures.data ?? [], today);
@@ -91,7 +80,7 @@ export function RequestsSection({
     return (
       <>
         <section className="rq-group" aria-label="En cours">
-          <h3 className="rq-group__title">
+          <h3 className="nv-h3 rq-group__title">
             En cours <span className="rq-count nv-num">{groups.current.length}</span>
           </h3>
           {groups.current.length === 0 ? (
@@ -116,7 +105,7 @@ export function RequestsSection({
         </section>
         {groups.closed.length === 0 ? null : (
           <section className="rq-group" aria-label="Refusées ou annulées">
-            <h3 className="rq-group__title">
+            <h3 className="nv-h3 rq-group__title">
               Refusées ou annulées <span className="rq-count nv-num">{groups.closed.length}</span>
             </h3>
             <ul className="rq-list">

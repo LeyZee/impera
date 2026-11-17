@@ -5,6 +5,7 @@ import type {
   PlaygroundMedia,
   Verdict,
 } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { Composer, Conversation, LessonCard, type LocalMode } from './playground/Conversation';
@@ -42,7 +43,8 @@ function fanName(notes: readonly string[]): string {
 }
 
 const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
-  llm_unavailable: 'Grok ne répond pas : ajoute ou vérifie sa clé dans Réglages, Modèles IA.',
+  llm_unavailable: 'Grok ne répond pas : ajoute ou vérifie sa clé dans Réglages › Modèles IA.',
+  unreachable: 'Le serveur ne répond pas. Réessaie dans un instant.',
   not_deployed: 'Le playground n’est pas encore en ligne sur ce serveur.',
   still_writing: 'L’agent rédige encore la réponse précédente.',
   forbidden: 'Le Playground est réservé au propriétaire pour l’instant.',
@@ -51,6 +53,26 @@ const ERRORS: Readonly<Record<PlaygroundErrorCode, string>> = {
 
 /** How often the screen asks for the brain's reading while the voice writes. */
 const READING_POLL_MS = 1500;
+
+/** Under the first screen's title, only what to do: the title already says what went wrong (avis Design 16/11). */
+const LOADING_ACTIONS: Readonly<Record<PlaygroundErrorCode, string>> = {
+  llm_unavailable: 'Ajoute ou vérifie sa clé dans Réglages › Modèles IA.',
+  unreachable: 'Réessaie dans un instant.',
+  not_deployed: 'Il arrive avec la prochaine mise à jour du serveur.',
+  still_writing: 'Attends la fin de la réponse précédente.',
+  forbidden: ERRORS.forbidden,
+  failed: 'Réessaie dans un instant.',
+};
+
+/** The first screen's title: the AI provider is named only when the server said it refused (V-ETA-06). */
+const LOADING_TITLES: Readonly<Record<PlaygroundErrorCode, string>> = {
+  llm_unavailable: 'Grok ne répond pas',
+  unreachable: 'Le serveur ne répond pas',
+  not_deployed: 'Le playground n’est pas en ligne',
+  still_writing: 'L’agent rédige encore',
+  forbidden: '',
+  failed: 'Le serveur ne répond pas',
+};
 
 /**
  * Entraîner > Playground (spec moteur-ia/playground-entrainement.md): the same path as production with no
@@ -248,11 +270,23 @@ export function PlaygroundPage(): JSX.Element {
       <div className="pg-loading nv-plate" aria-busy={pg.isLoading}>
         {pg.isLoading ? null : (
           <div className="pg-loading__in nv-enter">
-            {refused ? null : <p className="pg-loading__t">Le serveur ne répond pas</p>}
-            <p>{ERRORS[pg.error ?? 'failed']}</p>
+            {refused ? null : (
+              <p
+                className={`pg-loading__t ${pg.error === 'unreachable' || pg.error === 'llm_unavailable' ? 'is-warn' : ''}`}
+              >
+                {LOADING_TITLES[pg.error ?? 'failed']}
+              </p>
+            )}
+            <p>{LOADING_ACTIONS[pg.error ?? 'failed']}</p>
             {/* Refused, a retry or the demo would only hide the reason: nothing to try. */}
             {refused ? null : (
               <>
+                {/* The provider refuses: a retry alone settles nothing, the key is where it is fixed. */}
+                {pg.error === 'llm_unavailable' ? (
+                  <Link className="nv-btn nv-btn--soft" to="/reglages/modeles-ia">
+                    Ouvrir Modèles IA
+                  </Link>
+                ) : null}
                 <button type="button" className="nv-btn nv-btn--soft" onClick={pg.retry}>
                   Réessayer
                 </button>
@@ -359,7 +393,7 @@ export function PlaygroundPage(): JSX.Element {
           reading={reading}
           sent={sent}
           error={pg.error === undefined ? undefined : ERRORS[pg.error]}
-          errorTone={pg.error === 'llm_unavailable' ? 'warn' : 'bad'}
+          errorTone={pg.error === 'llm_unavailable' || pg.error === 'unreachable' ? 'warn' : 'bad'}
           lesson={lesson?.verdict}
           comparison={comparison}
           onValidate={() => void rate({ kind: 'validated' })}

@@ -20,7 +20,7 @@ import {
 import { sql, type schema } from '@impera/db';
 import { z } from 'zod';
 
-import type { Conversation, Draft, DraftFact, StoredEvent } from '../../domain/ports';
+import type { Conversation, Draft, DraftFact, DraftScriptStep, StoredEvent } from '../../domain/ports';
 
 /** Rows read back from Postgres are validated like any other boundary (CLAUDE.md rule 6). */
 
@@ -78,6 +78,32 @@ function readFacts(brief: unknown): DraftFact[] {
   return parsed.data.factsProposed.map((fact) => ({ ...fact, observedAt: new Date(fact.observedAt) }));
 }
 
+/**
+ * `drafts.policy_trace`: what the code decided with the draft. Today the step of her script (ADR 0098); a trace written
+ * before it, or one that does not read, carries no step: nothing is sent that the code cannot read back.
+ */
+const StoredPolicyTraceSchema = z.object({
+  scriptStep: z
+    .strictObject({
+      scriptRef: z.string().min(1),
+      stepIndex: z.int().min(0),
+      stepRef: z.string().min(1),
+      priceMinor: z.int().min(0),
+      hasMedia: z.boolean(),
+      idempotencyKey: z.string().min(1),
+    })
+    .optional(),
+});
+
+export function toStoredPolicyTrace(scriptStep: DraftScriptStep): z.infer<typeof StoredPolicyTraceSchema> {
+  return StoredPolicyTraceSchema.parse({ scriptStep });
+}
+
+function readScriptStep(trace: unknown): DraftScriptStep | null {
+  const parsed = StoredPolicyTraceSchema.safeParse(trace);
+  return parsed.success ? (parsed.data.scriptStep ?? null) : null;
+}
+
 export function toDraft(row: typeof schema.drafts.$inferSelect): Draft {
   return {
     id: DraftIdSchema.parse(row.id),
@@ -87,6 +113,7 @@ export function toDraft(row: typeof schema.drafts.$inferSelect): Draft {
     finalBubbles: row.finalBubbles,
     createdAt: row.createdAt,
     facts: readFacts(row.brief),
+    scriptStep: readScriptStep(row.policyTrace),
   };
 }
 

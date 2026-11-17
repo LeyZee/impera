@@ -1,10 +1,11 @@
 import type { InvoiceList, InvoiceListItem } from '@impera/contracts';
 import type { InfiniteData, UseInfiniteQueryResult } from '@tanstack/react-query';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { Empty, Loading, Unreachable } from './parts';
 
 import { gapText, yearSlices } from '@/invoices/model';
+import { Failure } from '@/shell/states';
 
 /**
  * One's documents read a year at a time (Commissions › Factures, a member in Paie › Factures): the documents, the
@@ -18,6 +19,7 @@ export function InvoiceYears({
   hint,
   first,
   older,
+  none,
   row,
 }: {
   years: UseInfiniteQueryResult<InfiniteData<InvoiceList, number>>;
@@ -28,8 +30,13 @@ export function InvoiceYears({
   hint: string;
   /** Said when ten years hold no document. */
   first: string;
-  /** Said when a later year could not be read. */
+  /** Said when a later year could not be read: what is missing, and what to do. */
   older: string;
+  /**
+   * Said instead when the latest year, the only one read, holds no document: a sentence for the reader, not how
+   * « Plus anciennes » reads (CHA-18). Once he reads further, the years without a document are said by their days.
+   */
+  none?: { readonly whisper: string; readonly text: string; readonly action?: ReactNode };
   row: (item: InvoiceListItem) => JSX.Element;
 }): JSX.Element {
   if (years.isError && years.data === undefined)
@@ -49,7 +56,9 @@ export function InvoiceYears({
 
   return (
     <div className="rp-sec">
-      {only?.kind === 'gap' ? (
+      {only?.kind === 'gap' && none !== undefined && years.data.pages.length === 1 ? (
+        <Empty whisper={none.whisper} text={none.text} action={none.action} />
+      ) : only?.kind === 'gap' ? (
         <Empty
           whisper={gapText(only.range)}
           text={
@@ -89,9 +98,14 @@ export function InvoiceYears({
         </button>
       ) : null}
       {years.isError ? (
-        <p className="tm-warn" role="alert">
+        <Failure
+          inline
+          onRetry={() => {
+            void years.fetchNextPage();
+          }}
+        >
           {older}
-        </p>
+        </Failure>
       ) : null}
     </div>
   );
