@@ -21,7 +21,11 @@ export function previewLinkOf(item: VaultItem): string | null {
   return null;
 }
 
-/** The bounds of one small picture: the file hosts of ADR 0113 § 2, no second list; the size of ADR 0138 § 2. */
+/**
+ * The bounds of one small picture: the file hosts of ADR 0113 § 2, no second list; the size of ADR 0138 § 2. A video's
+ * poster is a vault file on the videos host, so the files' origin header (ADR 0113 § 2, amendment of 16/11) is taken
+ * as it is: the same host, the same fixed value, no second constant.
+ */
 export function previewBounds(files: DownloadBounds): DownloadBounds {
   return {
     hosts: files.hosts,
@@ -30,6 +34,7 @@ export function previewBounds(files: DownloadBounds): DownloadBounds {
     maxSegments: 0,
     maxKeys: 0,
     ...(files.allowHttp === true ? { allowHttp: true } : {}),
+    ...(files.referer === undefined ? {} : { referer: files.referer }),
   };
 }
 
@@ -40,7 +45,7 @@ function hostOf(url: string): string {
 
 /**
  * One read of a small picture (ADR 0138 §§ 1 and 2), by the vault files' own reader (ADR 0113 § 2): its hosts, its
- * transport, no header of ours, no redirect followed, at most `VAULT_PREVIEW_MAX_BYTES`, an image by its first bytes.
+ * transport, no header of ours but the videos host's origin header, no redirect followed, at most `VAULT_PREVIEW_MAX_BYTES`, an image by its first bytes.
  * `expired`: the platform refused the link (401, 403, 404, 410), which a fresh listing may cure once.
  */
 export async function readPreviewFile(
