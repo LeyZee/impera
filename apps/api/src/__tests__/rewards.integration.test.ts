@@ -587,8 +587,8 @@ describe('Jeu du chatteur : défi du shift, niveaux, fiche du membre (ADR 0104 �
 
 /**
  * The validated reports feed the game (ADR 0118, CHF-01). Nora works on an account whose pay reads the reports: her
- * validated report gives her a net, a first sale and a rank; refused afterwards, it takes them back, in silence, and
- * validated again it gives them anew. Léa reads nothing of it. Everything is invented (ADR 0010).
+ * validated report gives her a net, a first sale and a rank; corrected down to nothing afterwards, it takes them back,
+ * in silence, and corrected up again it gives them anew. Léa reads nothing of it. Everything is invented (ADR 0010).
  */
 describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qui ne tient plus est repris (ADR 0118)', () => {
   let team: PayrollTeam;
@@ -612,17 +612,48 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
       .from(schema.rewardGains)
       .where(eq(schema.rewardGains.userId, nora.userId))
       .orderBy(schema.rewardGains.id);
-  /** The review of Nora's report, as the planning leaves it. */
-  const review = (status: 'validated' | 'rejected') =>
+  /**
+   * The owner validates Nora's report, as the planning leaves it: a validated report never changes afterwards (EQ-03,
+   * trigger `shift_reports_kept`), it is corrected.
+   */
+  const validate = () =>
     team.test.admin.db
       .update(schema.shiftReports)
       .set({
-        status,
+        status: 'validated',
+        version: sql`${schema.shiftReports.version} + 1`,
         reviewedBy: team.ownerId,
         reviewedAt: new Date('2025-05-20T09:00:00Z'),
-        reviewNote: status === 'rejected' ? 'Montant à revoir' : null,
+        reviewKind: 'human',
       })
       .where(eq(schema.shiftReports.id, reportId));
+  /** A correction of Nora's report by the agency, validated: the only way a validated total moves. */
+  const correct = async (amountMinor: number): Promise<void> => {
+    const [report] = await team.test.admin.db
+      .select()
+      .from(schema.shiftReports)
+      .where(eq(schema.shiftReports.id, reportId));
+    if (report === undefined) throw new Error('no report');
+    await team.test.admin.db.insert(schema.shiftReports).values({
+      id: newId(ShiftReportIdSchema),
+      creatorId: report.creatorId,
+      platformAccountId: report.platformAccountId,
+      shiftId: report.shiftId,
+      memberId: report.memberId,
+      period: report.period,
+      correctsId: report.id,
+      byAgency: true,
+      amountMinor,
+      currency: report.currency,
+      status: 'validated',
+      submittedBy: team.ownerId,
+      submittedAt: new Date('2025-05-20T10:00:00Z'),
+      reviewedBy: team.ownerId,
+      reviewedAt: new Date('2025-05-20T10:00:00Z'),
+      reviewKind: 'human',
+      createdBy: team.ownerId,
+    });
+  };
 
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'));
@@ -647,8 +678,8 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
   });
 
   it('counts a validated report at its net: a first sale, a rank, the net toward the next one (§ 1)', async () => {
-    await review('validated');
-    // Two runs at once after a take-back: the key among the gains that hold lets one of them write, never both.
+    await validate();
+    // Two runs at once: the key among the gains that hold lets one of them write, never both.
     const runs = await Promise.all([evaluate(), evaluate()]);
     expect(runs[0].gained + runs[1].gained).toBe(2);
     const noras = await caseOf(noraCookie);
@@ -700,12 +731,13 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
     expect(earned(await caseOf(noraCookie))).toEqual(['first_sale', 'level:1']);
   });
 
-  it('takes back, in silence, what a refused report had given: the trophy and the rank (§ 4 and § 5)', async () => {
+  it('takes back, in silence, what a report corrected down to nothing had given: the trophy and the rank (§ 4 and § 5)', async () => {
     const seen = await team.call('POST', '/rewards/my-trophy-case/reveals', noraCookie, {
       kinds: ['first_sale', 'level:1'],
     });
     expect(seen.statusCode, seen.body).toBe(200);
-    await review('rejected');
+    // The whole declared amount is taken off by a validated correction: the shift's validated total is zero.
+    await correct(-10_000);
     expect((await evaluate()).gained).toBe(0);
     const noras = await caseOf(noraCookie);
     expect(earned(noras)).toEqual([]);
@@ -724,7 +756,7 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
 
   it('gives it again, to be revealed again at its new date, when the net comes back (§ 5)', async () => {
     const before = await gainsOfNora();
-    await review('validated');
+    await correct(10_000);
     // Two runs at once after a take-back: the key among the gains that hold lets one of them write, never both.
     const runs = await Promise.all([evaluate(), evaluate()]);
     expect(runs[0].gained + runs[1].gained).toBe(2);
