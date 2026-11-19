@@ -387,6 +387,14 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
 
   it('reads a pause as the other readers do: ended, no longer Arrêt; under way, Arrêt (ADR 0148 § 1)', async () => {
     const minutes = (count: number): Date => new Date(Date.now() + count * 60_000);
+    // The test above leaves the global switch on: lifted first, so only her pause decides.
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'global',
+      active: false,
+      reason: 'essai levé',
+      setBy: 'owner',
+    });
     await test.admin.db.insert(schema.killSwitches).values({
       id: newId(KillSwitchIdSchema),
       scope: 'creator',
