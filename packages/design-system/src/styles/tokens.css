@@ -102,6 +102,9 @@
    */
   --nv-trend-up: #5fd08f;
   --nv-trend-down: var(--nv-warning);
+  /* The same trend as text, in a change's pill: readable at 4.5:1 on the plate. */
+  --nv-trend-up-text: var(--nv-trend-up);
+  --nv-trend-down-text: var(--nv-trend-down);
   /*
    * The kinds of sale (subscriptions, PPV, tips, others): a neutral ramp, light to dark, so the money's rose and blue
    * stay the only hues of the Dashboard's figures. Each step is labelled in the legend and the tip, never colour alone.
@@ -196,7 +199,10 @@
   --nv-money-creator: #b8406f;
   --nv-money-agency: #2a6fc9;
   --nv-trend-up: #2aa866;
-  --nv-trend-down: var(--nv-warning);
+  /* A stroke's amber on the day plate (3:1 on it, dataviz validator); the warning's own is made for text, and drew brown. */
+  --nv-trend-down: #c27400;
+  --nv-trend-up-text: #1b7a49;
+  --nv-trend-down-text: var(--nv-warning);
   --nv-kind-1: #3a2630;
   --nv-kind-2: #665059;
   --nv-kind-3: #8f7c85;

@@ -222,6 +222,7 @@ function RevenueCurve({
                 : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
             ],
         rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
+        trend: tone,
         compact: narrowTip(),
       },
       { marker: x },
@@ -718,6 +719,10 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
           : columns.length <= 31
             ? 5
             : 15;
+  // The last day's label ends at the card's edge; on a phone the one before it, a few columns away, would run into it.
+  const last = columns.length - 1;
+  const labelled = (i: number): boolean =>
+    i % every === 0 && !(narrow && i !== last && last % every === 0 && every > 1 && last - i <= every);
   const used = STACKS.filter((_, s) => columns.some((column) => (column.parts[s] ?? 0) > 0));
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const step =
@@ -799,7 +804,7 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
                 )}
               </span>
               <span className="ins-col__label" aria-hidden="true">
-                {i % every === 0 ? column.label : ''}
+                {labelled(i) ? column.label : ''}
               </span>
             </button>
           ))}

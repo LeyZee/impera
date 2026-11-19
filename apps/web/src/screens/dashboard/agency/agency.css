@@ -114,6 +114,16 @@
   stop-color: var(--_trend);
   stop-opacity: 0;
 }
+/* The changes say the trend in the curve's colours (lot couleurs 17/11): one code for better and worse, green and
+   amber, never the statuses' cyan beside the agency's blue nor the danger's red. */
+.ins-body .nv-delta.nv-delta--better {
+  color: var(--nv-trend-up-text);
+  background: color-mix(in srgb, var(--nv-trend-up) 16%, transparent);
+}
+.ins-body .nv-delta.nv-delta--worse {
+  color: var(--nv-trend-down-text);
+  background: color-mix(in srgb, var(--nv-trend-down) 16%, transparent);
+}
 /* A tile's small curve (lot couleurs 17/11): at its foot, 1.5px, no axis nor point, a 12 % fill at most, drawn in
    with the tiles' progress. The net takes the trend's colour, a part its money's. */
 .ins-tile__spark {
@@ -517,6 +527,11 @@
   overflow: visible;
   color: var(--nv-ink-faint);
   text-align: left;
+}
+/* The last day's label ends at its column's right edge: left-aligned, it ran past the card on a phone. */
+.ins-col:last-child .ins-col__label {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* ── Two rings side by side. */

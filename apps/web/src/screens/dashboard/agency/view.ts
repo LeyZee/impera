@@ -239,14 +239,26 @@ const KIND_SLICES: readonly {
 /** What « Autres ventes » holds, for its tip. */
 export const OTHER_KINDS_NOTE = 'Liens de paiement, boudoir, messages payants et le reste.';
 
+/**
+ * Each kind's step of the ramp, by its usual weight (relecture Design 19/11): the PPV, the biggest, the strongest tone,
+ * then the subscriptions, the tips, the Mass DM; « Autres ventes » the neutral fold. Fixed per kind, never by the
+ * period's rank: a filter or another month never repaints a kind (dataviz: colour follows the entity).
+ */
+const KIND_STEP: Readonly<Record<string, number>> = { ppv: 0, subscriptions: 1, tips: 2, mass_dm: 3 };
+
+function kindColour(key: string): string {
+  const step = KIND_STEP[key];
+  return step === undefined ? OTHER : (KINDS[step] ?? OTHER);
+}
+
 /** The kinds' ring: every slice in its fixed colour, empty ones kept out (a slice of nothing says nothing). */
 export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
-  return KIND_SLICES.map((slice, i) => {
+  return KIND_SLICES.map((slice) => {
     const mine = kinds.filter((one) => slice.kinds.includes(one.kind));
     return {
       key: slice.key,
       label: slice.label,
-      colour: KINDS[i] ?? OTHER,
+      colour: kindColour(slice.key),
       cents: mine.reduce((sum, one) => sum + one.revenueMinor, 0),
       previousCents: mine.reduce((sum, one) => sum + one.previousRevenueMinor, 0),
       sales: mine.reduce((sum, one) => sum + one.sales, 0),
@@ -289,10 +301,10 @@ export interface Stack {
 }
 
 /** The stacks of the chart of the period: the kinds, in the ring's order and colours (the agency's as one creator's). */
-export const STACKS: readonly Stack[] = KIND_SLICES.map((slice, i) => ({
+export const STACKS: readonly Stack[] = KIND_SLICES.map((slice) => ({
   key: slice.key,
   label: slice.label,
-  colour: KINDS[i] ?? OTHER,
+  colour: kindColour(slice.key),
 }));
 
 /** A day's (or an hour's) amounts by kind, in the stacks' order. */

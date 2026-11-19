@@ -16,7 +16,8 @@ ADR 0106 (§ 10 à § 14 et l'avenant du 17/11), ADR 0146 § 4 et § 5, ADR 0144
 - [x] Avenant du 17/11 dans l'ADR 0106.
 - [x] Contrat et domaine : `agencyMinor` et `creatorMinor` par jour (un remboursement sur le jour de sa vente, arrondi par jour) ; tests : somme des jours, dollars, MCP sans les parts, manager comme propriétaire.
 - [x] Écran : courbe du chiffre d'affaires selon la tendance, petites courbes sous Net, Part de l'agence, Part des créatrices ; sortes de vente en rampe neutre ; tests.
-- [ ] Captures Nuit/Jour, PC/téléphone, données inventées ; le bleu est celui de Design, pas encore du logo ; la rampe neutre présentée comme un choix ; « ok captures ».
+- [x] Captures Nuit/Jour, PC/téléphone, données inventées, en deux lots (courbe et tuiles ; barres et anneau A neutre / B sarcelle).
+- [ ] Avis Design, puis « ok captures » de Charles (choix A ou B, bleu du logo, trois mini-courbes ou une).
 - [ ] OK de Design et de Bilan sur le dernier commit.
 
 ## Critères d'acceptation

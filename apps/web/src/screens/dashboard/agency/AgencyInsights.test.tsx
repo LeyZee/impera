@@ -514,6 +514,8 @@ describe('the days read and their comparison (ADR 0146)', () => {
     // Every media query matches here, a phone's: the compact tip, amounts and the day compared only.
     expect(bubble.textContent).toMatch(/270\s€ · 30 oct\./u);
     expect(bubble.textContent).not.toContain('Chiffre d’affaires');
+    // The tip's stroke takes the curve's colour (relecture Design 19/11).
+    expect(bubble.classList.contains('db-tip--up')).toBe(true);
     expect(plot.querySelector('.ins-curve__hair')).not.toBeNull();
     // A wide screen: each amount with its label.
     vi.stubGlobal(
