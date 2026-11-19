@@ -1,14 +1,23 @@
-import { AGENCY_TRANSFER_VAT_BPS, type AgencyInsights, type AgencyPeriod } from '@impera/contracts';
-import { chartPoints, linePath, niceTicks, placeSegmentThumb } from '@impera/design-system';
+import { AGENCY_TRANSFER_VAT_BPS, type AgencyInsights } from '@impera/contracts';
+import { chartPoints, linePath, niceTicks } from '@impera/design-system';
 import { Link } from '@tanstack/react-router';
-import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 
 import { CountUp, Section, type FloatingTip } from '../parts';
 
+import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
+import { againstText, comparable, readName, shortDate, spanText, type AgencySelection } from './period';
 import { useNarrow } from './useNarrow';
 import {
-  AGAINST,
   arcs,
   bestSlot,
   busiest,
@@ -30,7 +39,6 @@ import {
   type MoneyPart,
   OTHER,
   OTHER_KINDS_NOTE,
-  PERIOD_OPTIONS,
   ppvRate,
   readAtLabel,
   SELLER_NOTES,
@@ -64,66 +72,11 @@ const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00
 const formatEuros = (cents: number): string => euros(Math.round(cents));
 const formatCount = (n: number): string => Math.round(n).toLocaleString('fr-FR');
 
-/** The four periods, a segment whose thumb slides; a radio group, one stop in the Tab order. */
-export function AgencyPeriodControl({
-  period,
-  onChange,
-}: {
-  period: AgencyPeriod;
-  onChange: (period: AgencyPeriod) => void;
-}): JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLSpanElement>(null);
-  const placed = useRef(false);
-  const index = PERIOD_OPTIONS.findIndex((p) => p.id === period);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (element === null) return;
-    placeSegmentThumb(
-      element,
-      index,
-      PERIOD_OPTIONS.length,
-      placed.current ? (thumbRef.current ?? undefined) : undefined,
-    );
-    placed.current = true;
-  }, [index]);
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const step = STEPS[event.key];
-    if (step === undefined) return;
-    event.preventDefault();
-    const next = PERIOD_OPTIONS[(index + step + PERIOD_OPTIONS.length) % PERIOD_OPTIONS.length];
-    if (next === undefined) return;
-    ref.current?.querySelector<HTMLButtonElement>(`[data-period="${next.id}"]`)?.focus();
-    onChange(next.id);
-  };
-  return (
-    <div
-      className="nv-seg nv-glass nv-glass--thin ins-period"
-      role="radiogroup"
-      aria-label="Période"
-      ref={ref}
-      onKeyDown={onKeyDown}
-    >
-      <span className="nv-seg__thumb nv-glass nv-glass--thin" ref={thumbRef} aria-hidden="true" />
-      {PERIOD_OPTIONS.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          role="radio"
-          className="nv-seg__opt"
-          data-period={p.id}
-          aria-checked={p.id === period}
-          tabIndex={p.id === period ? 0 : -1}
-          onClick={() => {
-            onChange(p.id);
-          }}
-        >
-          {p.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+/**
+ * Whether the register reaches back to the comparison's first day (ADR 0146 § 4): when it does not, no percentage of
+ * money or fans is shown, never a false rise. The subscribers keep their own rule (ADR 0081 § 4).
+ */
+const Comparable = createContext(true);
 
 /**
  * « +18 % » in the colour of better or worse; nothing when there is nothing to compare with, nor when nothing then and
@@ -138,7 +91,8 @@ function Delta({
   previous: number;
   lowerIsBetter?: boolean;
 }): JSX.Element | null {
-  if (current === 0 && previous === 0) return null;
+  const compared = useContext(Comparable);
+  if (!compared || (current === 0 && previous === 0)) return null;
   const change = changeOf(current, previous);
   if (change === null) return null;
   const better = lowerIsBetter ? change < 0 : change > 0;
@@ -146,15 +100,179 @@ function Delta({
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
-/** The revenue of every day, a quiet line under the lead figure. */
-function Spark({ values }: { values: readonly number[] }): JSX.Element | null {
-  if (values.length < 2 || values.every((value) => value === 0)) return null;
-  const frame = { width: 240, height: 48, padTop: 4, padBottom: 4 };
-  const points = chartPoints(values, frame, { min: Math.min(0, ...values) });
+/** Under 640px the curve's tip is the compact one. */
+function narrowTip(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
+}
+
+/** One point of the curve: its label, its revenue, and the compared day's when the register holds it. */
+interface CurvePoint {
+  readonly key: string;
+  readonly title: string;
+  readonly cents: number;
+  readonly compared: { readonly title: string; readonly cents: number } | null;
+}
+
+/**
+ * The points under the lead figure (ADR 0146 § 5): every day from the register's first day when it falls in the period
+ * (the line no longer sinks to the right), each with the day compared, aligned day for day, when the register holds
+ * that day (the compared line stops where the register begins, never falls to zero); one day read hour by hour.
+ */
+export function curvePoints(insights: AgencyInsights): CurvePoint[] {
+  if (insights.from === insights.to) {
+    return insights.hourly.map((hour) => ({
+      key: String(hour.hour),
+      title: hoursLabel(hour.hour),
+      cents: hour.revenueMinor,
+      compared: null,
+    }));
+  }
+  const since = insights.registerSince;
+  const first =
+    since === null || since <= insights.from
+      ? 0
+      : Math.max(
+          0,
+          insights.days.findIndex((one) => one.day >= since),
+        );
+  const today = insights.span.today;
+  return insights.days.slice(first).map((one, i) => {
+    const before = insights.previousDays[i + first];
+    return {
+      key: one.day,
+      title: dayLabel(one.day),
+      cents: one.revenueMinor,
+      compared:
+        before === undefined || (since !== null && before.day < since)
+          ? null
+          : { title: spanText(before.day, before.day, today), cents: before.revenueMinor },
+    };
+  });
+}
+
+/**
+ * The revenue day by day under the lead figure, the comparison as a discreet dashed line behind, aligned day for day.
+ * A hairline and a dot follow the pointer or the finger to the nearest day, and the tip gives the date, then both
+ * amounts with their strokes (dataviz: one tip, every series). The subtitle says the days compared: no legend.
+ */
+function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element | null {
+  const [hover, setHover] = useState<number | null>(null);
+  const points = curvePoints(insights);
+  if (points.length < 2 || points.every((one) => one.cents === 0 && (one.compared?.cents ?? 0) === 0))
+    return null;
+  const frame = { width: 600, height: 96, padTop: 10, padBottom: 6 };
+  const top = Math.max(1, ...points.map((one) => Math.max(one.cents, one.compared?.cents ?? 0)));
+  const line = chartPoints(
+    points.map((one) => one.cents),
+    frame,
+    { min: 0, max: top },
+  );
+  const all = chartPoints(
+    points.map((one) => one.compared?.cents ?? 0),
+    frame,
+    { min: 0, max: top },
+  );
+  // The compared line where the register holds its days only: one run, from its first held day.
+  const behind = all.filter((_, i) => points[i]?.compared !== null);
+  const last = line.at(-1);
+  const lit = hover === null ? undefined : line[hover];
+  const dot = lit ?? last;
+  const area =
+    last === undefined || line[0] === undefined
+      ? ''
+      : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(line[0].x)},${String(frame.height)} Z`;
+  const pick = (event: ReactPointerEvent<HTMLDivElement>): { index: number; x: number } => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
+    const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
+    setHover(index);
+    return { index, x: box.left + ((line[index]?.x ?? 0) / frame.width) * box.width };
+  };
+  const tipAt = ({ index, x }: { index: number; x: number }): ReturnType<FloatingTip['bind']> => {
+    const one = points[index];
+    if (one === undefined) return tip.bind({ title: '' });
+    return tip.bind(
+      {
+        title: one.title,
+        // A phone's tip says only the amounts and the day compared: the labels took half the curve (recette DSH-04).
+        rows: narrowTip()
+          ? [
+              [euros(one.cents), ''],
+              ...(one.compared === null
+                ? []
+                : [[`${euros(one.compared.cents)} · ${one.compared.title}`, ''] as const]),
+            ]
+          : [
+              ['Chiffre d’affaires', euros(one.cents)],
+              ...(one.compared === null
+                ? []
+                : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
+            ],
+        rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
+        compact: narrowTip(),
+      },
+      { marker: x },
+    );
+  };
   return (
-    <svg className="ins-spark" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true">
-      <path className="ins-spark__line" d={linePath(points)} vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div className="ins-curve">
+      <div
+        className="ins-curve__plot"
+        role="img"
+        aria-label={`Chiffre d’affaires ${insights.from === insights.to ? 'heure par heure' : 'jour par jour'}, de ${points[0]?.title ?? ''} à ${points.at(-1)?.title ?? ''}${behind.length > 0 ? ', avec la période comparée' : ''}`}
+      >
+        <svg
+          viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="ins-curve-fill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" className="ins-curve__fill-top" />
+              <stop offset="1" className="ins-curve__fill-bottom" />
+            </linearGradient>
+          </defs>
+          {behind.length > 1 ? (
+            <path className="ins-curve__compared" d={linePath(behind)} vectorEffect="non-scaling-stroke" />
+          ) : null}
+          <path className="ins-curve__area" d={area} fill="url(#ins-curve-fill)" />
+          <path className="ins-curve__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
+        </svg>
+        {lit === undefined ? null : (
+          <span
+            className="ins-curve__hair"
+            style={{ '--_x': `${String((lit.x / frame.width) * 100)}%` }}
+            aria-hidden="true"
+          />
+        )}
+        {dot === undefined ? null : (
+          <span
+            className="ins-curve__dot"
+            style={{
+              '--_x': `${String((dot.x / frame.width) * 100)}%`,
+              '--_y': `${String((dot.y / frame.height) * 100)}%`,
+            }}
+            aria-hidden="true"
+          />
+        )}
+        {/* One layer for the pointer and the finger alike: the nearest day follows it (dataviz: the crosshair finds
+            the X), a tap shows it, a glide moves it. */}
+        <div
+          className="ins-curve__hits"
+          aria-hidden="true"
+          onPointerMove={(event) => {
+            tipAt(pick(event)).onPointerMove(event);
+          }}
+          onPointerDown={(event) => {
+            tipAt(pick(event)).onPointerDown(event);
+          }}
+          onPointerLeave={(event) => {
+            setHover(null);
+            tip.bind({ title: '' }).onPointerLeave(event);
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -294,14 +412,27 @@ function MoneySplit({
   );
 }
 
+/**
+ * The line under the lead figure: the days compared and their amount; the register's first day when it does not reach
+ * back to them (ADR 0146 § 4), never a percentage then.
+ */
+function leadNote(insights: AgencyInsights): string {
+  const { current, previous } = insights.totals;
+  const against = againstText(insights);
+  if (!comparable(insights) && insights.registerSince !== null) {
+    return `${against} : le registre commence le ${shortDate(insights.registerSince)}, rien à comparer`;
+  }
+  if (changeOf(current.revenueMinor, previous.revenueMinor) === null)
+    return `${against} : aucune vente alors`;
+  return `${against} (${euros(previous.revenueMinor)})`;
+}
+
 function Figures({
   insights,
-  period,
   several,
   tip,
 }: {
   insights: AgencyInsights;
-  period: AgencyPeriod;
   several: boolean;
   tip: FloatingTip;
 }): JSX.Element {
@@ -443,15 +574,11 @@ function Figures({
             />
             <span className="nv-figure__note">
               <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
-              <span>
-                {changeOf(current.revenueMinor, previous.revenueMinor) === null
-                  ? 'rien à comparer sur la période d’avant'
-                  : `${AGAINST[period]} (${euros(previous.revenueMinor)})`}
-              </span>
+              <span>{leadNote(insights)}</span>
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
           </div>
-          <Spark values={insights.days.map((day) => day.revenueMinor)} />
+          <RevenueCurve insights={insights} tip={tip} />
         </div>
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
       </div>
@@ -467,7 +594,7 @@ function Figures({
  */
 function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const narrow = useNarrow();
-  const today = insights.period === 'day';
+  const today = insights.from === insights.to;
   const days = today
     ? insights.hourly.map((hour) => ({
         key: String(hour.hour),
@@ -483,7 +610,8 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
         parts: dayStacks(day),
         total: day.revenueMinor,
       }));
-  const weekly = narrow && insights.period === 'quarter';
+  // A long period on a phone reads week by week: ninety columns do not fit a thumb.
+  const weekly = narrow && insights.days.length > 45;
   const columns = weekly ? byWeek(days) : days;
   const [focus, setFocus] = useState(columns.length - 1);
   const current = Math.min(Math.max(0, focus), columns.length - 1);
@@ -1302,7 +1430,7 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
             )}
           </span>
         </div>
-        <ActiveLine key={insights.period} days={subs.days} tip={tip} />
+        <ActiveLine key={`${insights.from}:${insights.to}`} days={subs.days} tip={tip} />
       </div>
       <dl className="ins-tiles ins-subs__tiles">
         {tiles.map((tile) => (
@@ -1334,21 +1462,20 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
   );
 }
 
-/** Sections' reading lines, by period. */
-const DAILY_SUB: Readonly<Record<AgencyPeriod, string>> = {
-  day: 'heure par heure depuis minuit',
-  week: 'jour par jour, les 7 derniers jours',
-  month: 'jour par jour, les 30 derniers jours',
-  quarter: 'les 3 derniers mois, par type de vente',
-};
+/** The chart's reading line (ADR 0146): the unit of its columns and the days it covers. */
+function dailySub(insights: AgencyInsights): string {
+  if (insights.from === insights.to) return `heure par heure, ${zoneLabel(insights.timeZone)}`;
+  const span = spanText(insights.from, insights.to, insights.span.today);
+  return `jour par jour, ${span}, par type de vente`;
+}
 
 /**
  * The insights of the agency (`creatorId` null) or of one creator, from `index` in the page's entrance order. The
- * period control sits on the first section.
+ * days' control sits on the first section.
  */
 export function AgencyInsightsPanel({
-  period,
-  onPeriod,
+  selection,
+  onSelection,
   creatorId,
   creatorName,
   onCreator,
@@ -1356,8 +1483,8 @@ export function AgencyInsightsPanel({
   tip,
   index = 1,
 }: {
-  period: AgencyPeriod;
-  onPeriod: (period: AgencyPeriod) => void;
+  selection: AgencySelection;
+  onSelection: (selection: AgencySelection) => void;
   creatorId: string | null;
   creatorName?: string;
   onCreator?: ((creatorId: string) => void) | undefined;
@@ -1366,8 +1493,8 @@ export function AgencyInsightsPanel({
   tip: FloatingTip;
   index?: number;
 }): JSX.Element | null {
-  const query = useAgencyInsights(period, creatorId);
-  const control = <AgencyPeriodControl period={period} onChange={onPeriod} />;
+  const query = useAgencyInsights(selection, creatorId);
+  const control = <PeriodBar selection={selection} insights={query.data ?? null} onChange={onSelection} />;
   const oneCreator = creatorId !== null;
   const title = oneCreator ? `Les chiffres de ${creatorName ?? 'la créatrice'}` : 'L’agence en chiffres';
 
@@ -1424,8 +1551,7 @@ export function AgencyInsightsPanel({
       </Section>
     );
   }
-  // While another period loads the last one stays, dimmed, and says its own period, never the one asked.
-  const shown = insights.period;
+  // While other days load the last ones stay, dimmed, and say their own days, never the ones asked.
   const several = !oneCreator && insights.creators.length >= 2;
   const kinds = kindSlices(insights.kinds);
   let at = index;
@@ -1434,80 +1560,81 @@ export function AgencyInsightsPanel({
     return at;
   };
   return (
-    <div className="ins-body" aria-busy={query.isPlaceholderData}>
-      <Section
-        title={title}
-        sub={`${AGAINST[shown]}, lus dans le registre des ventes`}
-        index={at}
-        control={control}
-      >
-        <Figures insights={insights} period={shown} several={several} tip={tip} />
-        {insights.dollarsLeftOut ? (
-          <p className="ins-note" role="note">
-            Des ventes en dollars sont laissées de côté : aucun taux de change n’est encore connu (Équipe ›
-            Paie).
-          </p>
-        ) : null}
-        {insights.refundsWithoutSale > 0 ? (
-          <p className="ins-note" role="note">
-            {insights.refundsWithoutSale === 1
-              ? 'Un remboursement de la période porte sur une vente plus ancienne que le registre : il n’est compté dans aucun chiffre.'
-              : `${String(insights.refundsWithoutSale)} remboursements de la période portent sur des ventes plus anciennes que le registre : ils ne sont comptés dans aucun chiffre.`}
-          </p>
-        ) : null}
-      </Section>
-
-      <Section
-        title="Chiffre d’affaires"
-        sub={shown === 'day' ? `${DAILY_SUB.day}, ${zoneLabel(insights.timeZone)}` : DAILY_SUB[shown]}
-        index={next()}
-      >
-        <Daily key={insights.period} insights={insights} tip={tip} />
-      </Section>
-
-      <Section
-        title="Les abonnés"
-        sub="lus chaque heure dans les statistiques de Reveal, jamais de l’argent"
-        index={next()}
-      >
-        <Subscribers insights={insights} tip={tip} />
-      </Section>
-
-      {/* « Qui vend » said the ranking's amounts a second time: one card now, the ranking (recette visuelle 16/11,
-          PIL-02). */}
-      <div className="nv-enter" style={{ '--nv-i': next() }}>
-        <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" tip={tip} />
-      </div>
-
-      <Section
-        title="Qui a vendu"
-        sub="chaque chatteur et l’agent, le plus gros chiffre d’abord ; les ventes sans vendeur en dessous"
-        index={next()}
-      >
-        <Sellers insights={insights} tip={tip} />
-      </Section>
-
-      {several ? (
-        <Section title="Les créatrices" sub="côte à côte ; un clic ouvre la sienne" index={next()}>
-          <Creators insights={insights} onCreator={onCreator} tip={tip} />
+    <Comparable.Provider value={comparable(insights)}>
+      <div className="ins-body" aria-busy={query.isPlaceholderData}>
+        <Section
+          title={title}
+          sub={`${readName(insights)}, ${againstText(insights)}, lus dans le registre des ventes`}
+          index={at}
+          control={control}
+        >
+          <Figures insights={insights} several={several} tip={tip} />
+          {insights.dollarsLeftOut ? (
+            <p className="ins-note" role="note">
+              Des ventes en dollars sont laissées de côté : aucun taux de change n’est encore connu (Équipe ›
+              Paie).
+            </p>
+          ) : null}
+          {insights.refundsWithoutSale > 0 ? (
+            <p className="ins-note" role="note">
+              {insights.refundsWithoutSale === 1
+                ? 'Un remboursement de la période porte sur une vente plus ancienne que le registre : il n’est compté dans aucun chiffre.'
+                : `${String(insights.refundsWithoutSale)} remboursements de la période portent sur des ventes plus anciennes que le registre : ils ne sont comptés dans aucun chiffre.`}
+            </p>
+          ) : null}
         </Section>
-      ) : null}
 
-      <Section
-        title="Quand ça vend"
-        sub={`jour de la semaine et heure de chaque vente, ${zoneLabel(insights.timeZone)}`}
-        index={next()}
-      >
-        <Hours insights={insights} tip={tip} />
-      </Section>
+        <Section title="Chiffre d’affaires" sub={dailySub(insights)} index={next()}>
+          <Daily key={`${insights.from}:${insights.to}`} insights={insights} tip={tip} />
+        </Section>
 
-      <Section
-        title="Les fans qui paient"
-        sub="un fan compte une fois par compte de créatrice, jamais nommé ici"
-        index={next()}
-      >
-        <Fans insights={insights} />
-      </Section>
-    </div>
+        <Section
+          title="Les abonnés"
+          sub="lus chaque heure dans les statistiques de Reveal, jamais de l’argent"
+          index={next()}
+        >
+          {/* The subscribers' comparison follows their own rule (ADR 0081 § 4), not the register's first day. */}
+          <Comparable.Provider value>
+            <Subscribers insights={insights} tip={tip} />
+          </Comparable.Provider>
+        </Section>
+
+        {/* « Qui vend » said the ranking's amounts a second time: one card now, the ranking (recette visuelle 16/11,
+            PIL-02). */}
+        <div className="nv-enter" style={{ '--nv-i': next() }}>
+          <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" tip={tip} />
+        </div>
+
+        <Section
+          title="Qui a vendu"
+          sub="chaque chatteur et l’agent, le plus gros chiffre d’abord ; les ventes sans vendeur en dessous"
+          index={next()}
+        >
+          <Sellers insights={insights} tip={tip} />
+        </Section>
+
+        {several ? (
+          <Section title="Les créatrices" sub="côte à côte ; un clic ouvre la sienne" index={next()}>
+            <Creators insights={insights} onCreator={onCreator} tip={tip} />
+          </Section>
+        ) : null}
+
+        <Section
+          title="Quand ça vend"
+          sub={`jour de la semaine et heure de chaque vente, ${zoneLabel(insights.timeZone)}`}
+          index={next()}
+        >
+          <Hours insights={insights} tip={tip} />
+        </Section>
+
+        <Section
+          title="Les fans qui paient"
+          sub="un fan compte une fois par compte de créatrice, jamais nommé ici"
+          index={next()}
+        >
+          <Fans insights={insights} />
+        </Section>
+      </div>
+    </Comparable.Provider>
   );
 }

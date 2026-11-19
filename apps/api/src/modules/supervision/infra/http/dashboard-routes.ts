@@ -1,5 +1,6 @@
 import {
   AgencyInsightsQuerySchema,
+  agencySpanQueryOf,
   AgencyInsightsSchema,
   CreatorIdSchema,
   CreatorSetupListSchema,
@@ -159,7 +160,7 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
         schema: { querystring: AgencyInsightsQuerySchema, response: { 200: AgencyInsightsSchema } },
       },
       async (request) => {
-        const { period, creatorId } = request.query;
+        const { creatorId } = request.query;
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
         const answer = await readAgencyInsights(
@@ -169,9 +170,12 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
             role: user.role,
             creatorIds: user.creatorIds.map((id) => CreatorIdSchema.parse(id)),
           },
-          period,
+          agencySpanQueryOf(request.query),
           creatorId,
         );
+        if (answer.kind === 'comparison_not_before') {
+          throw new DomainError('comparison_invalid', 'La comparaison doit finir avant la période lue');
+        }
         if (answer.kind === 'creator_out_of_scope') {
           throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
         }

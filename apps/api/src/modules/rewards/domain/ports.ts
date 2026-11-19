@@ -2,7 +2,7 @@ import type { Currency, TeamMemberId } from '@impera/contracts';
 
 import type { ChallengeShift, TimedNet } from './challenge';
 import type { CreatorFacts, CreatorGainKind, StoredCreatorGain } from './creator-game';
-import type { Gain, GamePay, GameShift } from './gains';
+import type { Gain, GamePay, GameShift, HeldGain } from './gains';
 import type { Streak } from './streak';
 import type { StoredGain } from './trophy-case';
 
@@ -19,6 +19,8 @@ interface PlayerFacts {
   readonly shifts: readonly GameShift[];
   /** The owner's thresholds for the levels, the first rank first; empty when none is set. */
   readonly thresholdsMinor: readonly number[];
+  /** The gains that hold today, as the job last wrote them. */
+  readonly held: readonly HeldGain[];
 }
 
 /** What a chatter's own read adds to their stored gains: their net, their shifts begun, the thresholds. */
@@ -35,9 +37,18 @@ export interface RewardsStore {
   /** The chatters who have not left, on the admin connection. */
   players(): Promise<Player[]>;
   facts(player: Player, now: Date): Promise<PlayerFacts>;
-  /** Writes the gains not written yet (each once, under its key) and the streak as counted; answers how many are new. */
-  record(player: Player, gains: readonly Gain[], streak: Streak, now: Date): Promise<number>;
-  /** The account's own gains and streak, read as itself. */
+  /**
+   * Writes the gains not held yet (each once, under its key), dates those `takenBack` (ADR 0118 § 5: the row stays, a
+   * gain earned again is a new one) and keeps the streak as counted; answers how many are new.
+   */
+  record(
+    player: Player,
+    gains: readonly Gain[],
+    takenBack: readonly HeldGain[],
+    streak: Streak,
+    now: Date,
+  ): Promise<number>;
+  /** The account's own gains that hold and its streak, read as itself. */
   own(userId: string): Promise<{ readonly gains: StoredGain[]; readonly streak: Streak }>;
   /** A chatter's own net, shifts and the thresholds, read as themself; `null` for an account that does not play. */
   ownFacts(userId: string, now: Date): Promise<OwnFacts | null>;

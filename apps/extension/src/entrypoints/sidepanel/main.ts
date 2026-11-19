@@ -17,7 +17,8 @@ import { newestOf } from '../../lib/copilot/card';
 import { openConversationOf } from '../../lib/copilot/open-conversation';
 import { standingOf, withheldOf, type Standing } from '../../lib/copilot/standing';
 import { VerdictSentSchema, type FromPanel } from '../../lib/copilot/verdict';
-import { storedOrigin } from '../../lib/crm-origin-store';
+import { changedOrigin } from '../../lib/crm-address';
+import { ADDRESS_KEY, storedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { kindOf } from '../../lib/who';
 
@@ -374,6 +375,15 @@ async function start(): Promise<void> {
   });
   browser.tabs.onUpdated.addListener((_id, change, tab) => {
     if (tab.active && tab.windowId === windowId && change.url !== undefined) void refresh();
+  });
+  // The popup saves another address: the panel follows it at once, from a clean slate (EXT-24).
+  browser.storage.onChanged.addListener((changes, area) => {
+    const next = changedOrigin(changes, area, ADDRESS_KEY);
+    if (next === null || next === origin) return;
+    origin = next;
+    conversationId = null;
+    opensCreators = null;
+    void refresh();
   });
   document.addEventListener('visibilitychange', schedule);
   schedule();

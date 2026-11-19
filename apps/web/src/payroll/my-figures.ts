@@ -37,6 +37,8 @@ export interface DayBar {
   readonly netMinor: number;
   readonly sales: number;
   readonly refunds: number;
+  /** Shifts counted that day from their validated report: a total, no sale to count (ADR 0118 § 10). */
+  readonly reports: number;
   readonly today: boolean;
   readonly ahead: boolean;
 }
@@ -56,6 +58,7 @@ export function fortnightBars(
       netMinor: one === undefined ? 0 : netIn(one.nets, currency),
       sales: one?.sales ?? 0,
       refunds: one?.refunds ?? 0,
+      reports: one?.reports ?? 0,
       today: day === figures.today,
       ahead: day > figures.today,
     });

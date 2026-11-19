@@ -1,4 +1,3 @@
-import type { AgencyPeriod } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, type JSX, type ReactNode } from 'react';
@@ -15,6 +14,7 @@ import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
+import type { AgencySelection } from './agency/period';
 import { agentRuns, litParts } from './logic';
 import type { Fan, Period, Todo, Tone } from './model';
 import { Section, TONE_COLOR, useFloatingTip } from './parts';
@@ -256,8 +256,8 @@ export function DashboardPage({
 
 /** The agency's figures on a creator's Dashboard (ADR 0078): their period, and the way back to the whole agency. */
 export interface AgencyView {
-  readonly period: AgencyPeriod;
-  readonly onPeriod: (period: AgencyPeriod) => void;
+  readonly selection: AgencySelection;
+  readonly onSelection: (selection: AgencySelection) => void;
   readonly onAgency: () => void;
   readonly canOpenSettings: boolean;
 }
@@ -389,8 +389,8 @@ function Loaded({
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
       {agency === undefined ? null : (
         <AgencyInsightsPanel
-          period={agency.period}
-          onPeriod={agency.onPeriod}
+          selection={agency.selection}
+          onSelection={agency.onSelection}
           creatorId={creatorId}
           creatorName={data.creator.name}
           canOpenSettings={agency.canOpenSettings}

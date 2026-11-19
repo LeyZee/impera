@@ -90,6 +90,7 @@ export function Select<V extends string>({
   ariaLabel,
   autofocus = false,
   listWidth = 'field',
+  search: withSearch = 'auto',
 }: {
   /** For the form's `<label htmlFor>`: the field is named by its label. */
   id?: string;
@@ -116,6 +117,11 @@ export function Select<V extends string>({
    * la personne » in a filter): never narrower than the field, never past the screen's edge.
    */
   listWidth?: 'field' | 'options';
+  /**
+   * `auto`: a field to find a choice above ten of them. `never`: a short list read at a glance (a dozen periods) opens
+   * straight on its choices; the letters typed still move to one.
+   */
+  search?: 'auto' | 'never';
 }): JSX.Element {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -131,7 +137,7 @@ export function Select<V extends string>({
   const list = useRef<HTMLUListElement>(null);
   const typed = useRef({ text: '', at: 0 });
 
-  const searchable = options.length > SEARCH_FROM;
+  const searchable = withSearch === 'auto' && options.length > SEARCH_FROM;
   const shown = searchable ? matchSelect(options, text) : [...options];
   const current = options.find((one) => one.value === value);
 

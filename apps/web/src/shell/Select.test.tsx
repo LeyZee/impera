@@ -147,6 +147,15 @@ describe('Select', () => {
     expect(onChange).toHaveBeenCalledWith('genève');
   });
 
+  it('opens a long list straight on its choices when told never to search (a dozen periods)', () => {
+    render(
+      <Select id="b" ariaLabel="Mois" value="paris" options={CITIES} onChange={vi.fn()} search="never" />,
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Mois' }));
+    expect(screen.queryByRole('combobox', { name: 'Chercher' })).toBeNull();
+    expect(screen.getByRole('listbox')).toBeDefined();
+  });
+
   it('shows a value not in its options as itself, and the placeholder when there is none', () => {
     const { rerender } = render(<Select id="a" value="xof" options={LOOSE} onChange={vi.fn()} />);
     expect(screen.getByRole('combobox').textContent).toContain('xof');
