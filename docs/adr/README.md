@@ -133,6 +133,7 @@ Date : AAAA-MM-JJ
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
 | 0113 | Les fichiers du coffre : lus le temps de la description, jamais gardés | accepted (précise 0018, 0030 § 3 et § 4, 0099 § 4, § 5 et § 7) |
 | 0117 | L'agent écrit le prénom du membre et le canevas de la note client | accepted (précise 0018 § 1 et 0085 § 11) |
+| 0118 | Les rapports validés nourrissent le jeu du chatteur, et un gain que le net corrigé ne justifie plus est repris | accepted (précise 0104 § 12 à § 16 et 0108 ; amende 0104 § 15 et § 16) |
 | 0120 | Lire avant de publier : les statistiques du compte Instagram et les clics des liens de redirection, le retour sur un Reel, l'entonnoir d'acquisition | accepted (précise 0057, 0060, 0080, 0082, 0042 ; amende 0057 § 2 et 0060 § 2) |
 | 0121 | « Mes liens » chez la créatrice, et le pilotage du trafic côté agence : paliers réglables, entonnoir par endroit, récap du jour | accepted (précise 0120, 0080 § 4, 0042) |
 | 0122 | Les commentaires Instagram : une réponse courte dans sa voix, seule après un entraînement validé, et les commentaires hostiles masqués | accepted (précise 0057 §§ 1 et 6, 0120, 0102, 0021) |
@@ -152,4 +153,5 @@ Date : AAAA-MM-JJ
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
 | 0145 | Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed à nous, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) |
+| 0146 | Le Dashboard de l'agence se lit par jour, semaine, mois ou période choisie, et se compare à la période qu'on choisit | accepted (précise 0078 § 3 et § 5) |
 | 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |

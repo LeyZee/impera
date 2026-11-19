@@ -28,8 +28,8 @@ const figures = (over: Partial<Record<keyof MyFigures, unknown>> = {}): MyFigure
     today: '2026-11-05',
     timeZone: 'Europe/Paris',
     days: [
-      { day: '2026-11-02', sales: 2, refunds: 0, nets: [{ currency: 'EUR', netMinor: 6_000 }] },
-      { day: '2026-11-04', sales: 1, refunds: 1, nets: [{ currency: 'EUR', netMinor: -500 }] },
+      { day: '2026-11-02', sales: 2, refunds: 0, reports: 0, nets: [{ currency: 'EUR', netMinor: 6_000 }] },
+      { day: '2026-11-04', sales: 1, refunds: 1, reports: 0, nets: [{ currency: 'EUR', netMinor: -500 }] },
     ],
     nets: [{ currency: 'EUR', netMinor: 5_500 }],
     previous: {
@@ -157,6 +157,7 @@ describe('Mes chiffres, côté écran (ADR 0104 § A)', () => {
       netMinor,
       sales: 1,
       refunds: 0,
+      reports: 0,
       today,
       ahead: false,
     });

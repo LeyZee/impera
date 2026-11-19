@@ -8,7 +8,7 @@ import type {
 } from '@impera/contracts';
 
 import { shiftChallenge, shownShift } from '../domain/challenge';
-import { gainsOf } from '../domain/gains';
+import { gainsOf, takenBackOf } from '../domain/gains';
 import { LEVEL_NAMES, levelSteps } from '../domain/levels';
 import type { RewardsStore } from '../domain/ports';
 import { gainKeyOf, trophyCaseOf } from '../domain/trophy-case';
@@ -19,8 +19,9 @@ export interface RewardsDeps {
 }
 
 /**
- * The job (`rewards.evaluate`): what each chatter earned, from the facts as they stand. Replayable: a gain already
- * written stays as it is, with the date it was first noted. It sends nothing to anyone (ADR 0104 § 18).
+ * The job (`rewards.evaluate`): what each chatter earned, from the facts as they stand. Replayable: a gain that holds
+ * stays as it is, with the date it was noted. One a corrected net no longer justifies is taken back, in silence (ADR
+ * 0118 § 5). It sends nothing to anyone (ADR 0104 § 18).
  */
 export async function evaluateRewards(deps: RewardsDeps): Promise<{ players: number; gained: number }> {
   const players = await deps.store.players();
@@ -29,7 +30,12 @@ export async function evaluateRewards(deps: RewardsDeps): Promise<{ players: num
     const now = deps.now();
     const facts = await deps.store.facts(player, now);
     const { gains, streak } = gainsOf({ ...facts, now, levelSteps: levelSteps(facts.thresholdsMinor) });
-    gained += await deps.store.record(player, gains, streak, now);
+    const takenBack = takenBackOf({
+      held: facts.held,
+      earned: gains,
+      cumulatedNetMinor: facts.pay.cumulatedNetMinor,
+    });
+    gained += await deps.store.record(player, gains, takenBack, streak, now);
   }
   return { players: players.length, gained };
 }
@@ -99,7 +105,7 @@ export async function levelSettings(deps: RewardsDeps, userId: string): Promise<
   return settingsOf(await deps.store.thresholds(userId));
 }
 
-/** The owner sets the cumulated net that opens each rank (§ 16). A rank already reached is never taken back. */
+/** The owner sets the cumulated net that opens each rank (§ 16). Moving them takes no rank back (ADR 0118 § 7). */
 export async function saveLevelThresholds(
   deps: RewardsDeps,
   userId: string,

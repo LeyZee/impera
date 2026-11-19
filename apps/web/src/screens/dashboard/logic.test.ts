@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  agencyPeriodOf,
+  agencySelectionOf,
   agencySearch,
   agentPeriodOf,
   agentRuns,
@@ -277,24 +277,57 @@ describe('the Dashboard’s address (recette 05/11, PRO-28)', () => {
   });
 });
 
-describe('the agency’s period in the address (ADR 0078)', () => {
-  it('reads 7 days by default, then today, 30 days and 3 months, and writes them back', () => {
-    expect(agencyPeriodOf(parseDashboardSearch({}))).toBe('week');
-    expect(agencyPeriodOf(parseDashboardSearch({ periode: 'jour' }))).toBe('day');
-    expect(agencyPeriodOf(parseDashboardSearch({ periode: '30j' }))).toBe('month');
-    expect(agencyPeriodOf(parseDashboardSearch({ periode: '90j' }))).toBe('quarter');
-    expect(agencyPeriodOf(parseDashboardSearch({ periode: '1an' }))).toBe('week');
-    expect(agencySearch('week')).toEqual({});
-    expect(agencySearch('quarter', '00000000-0000-4000-8000-000000000001')).toEqual({
-      periode: '90j',
-      creatrice: '00000000-0000-4000-8000-000000000001',
+describe('the agency’s days in the address (ADR 0146)', () => {
+  const her = '00000000-0000-4000-8000-000000000001';
+  it('opens on the month running, and reads a day, a week, a month or days chosen with their comparison', () => {
+    expect(agencySelectionOf(parseDashboardSearch({}))).toEqual({ unit: 'month' });
+    expect(agencySelectionOf(parseDashboardSearch({ vue: 'jour', date: '2026-11-14' }))).toEqual({
+      unit: 'day',
+      at: '2026-11-14',
     });
-    expect(agencySearch('day')).toEqual({ periode: 'jour' });
+    expect(agencySelectionOf(parseDashboardSearch({ vue: 'mois', vs: '2025-11-01' }))).toEqual({
+      unit: 'month',
+      compareAt: '2025-11-01',
+    });
+    expect(
+      agencySelectionOf(parseDashboardSearch({ vue: 'perso', du: '2026-10-01', au: '2026-10-19' })),
+    ).toEqual({ unit: 'custom', from: '2026-10-01', to: '2026-10-19' });
+    // Days chosen without both ends, or the wrong way round, and words that are no day: the month.
+    expect(agencySelectionOf(parseDashboardSearch({ vue: 'perso', du: '2026-10-01' }))).toEqual({
+      unit: 'month',
+    });
+    expect(
+      agencySelectionOf(parseDashboardSearch({ vue: 'perso', du: '2026-10-19', au: '2026-10-01' })),
+    ).toEqual({ unit: 'month' });
+    expect(agencySelectionOf(parseDashboardSearch({ vue: 'semaine', date: 'demain' }))).toEqual({
+      unit: 'week',
+    });
   });
 
-  it('gives the agent’s blocks three months as 30 days', () => {
-    expect(agentPeriodOf('quarter')).toBe('month');
-    expect(agentPeriodOf('week')).toBe('week');
-    expect(agentPeriodOf('day')).toBe('day');
+  it('opens an older link on its nearest unit', () => {
+    expect(agencySelectionOf(parseDashboardSearch({ periode: 'jour' }))).toEqual({ unit: 'day' });
+    expect(agencySelectionOf(parseDashboardSearch({ periode: '7j' }))).toEqual({ unit: 'week' });
+    expect(agencySelectionOf(parseDashboardSearch({ periode: '90j' }))).toEqual({ unit: 'month' });
+  });
+
+  it('writes the selection back, the month running as no word at all', () => {
+    expect(agencySearch({ unit: 'month' })).toEqual({});
+    expect(agencySearch({ unit: 'week', at: '2026-11-09', compareAt: '2026-10-26' }, her)).toEqual({
+      vue: 'semaine',
+      date: '2026-11-09',
+      vs: '2026-10-26',
+      creatrice: her,
+    });
+    expect(agencySearch({ unit: 'custom', from: '2026-10-01', to: '2026-10-19' })).toEqual({
+      vue: 'perso',
+      du: '2026-10-01',
+      au: '2026-10-19',
+    });
+  });
+
+  it('gives the agent’s blocks a month or days chosen as 30 days', () => {
+    expect(agentPeriodOf({ unit: 'custom', from: '2026-10-01', to: '2026-10-19' })).toBe('month');
+    expect(agentPeriodOf({ unit: 'week' })).toBe('week');
+    expect(agentPeriodOf({ unit: 'day' })).toBe('day');
   });
 });
