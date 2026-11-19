@@ -39,6 +39,7 @@ import { FansPage } from './screens/fans/FansPage';
 import { HerProfilePage } from './screens/me/HerProfilePage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
+import { MyLinksPage } from './screens/me/MyLinksPage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MyProfilePage } from './screens/me/MyProfilePage';
@@ -746,6 +747,18 @@ const mePersona = createRoute({
   },
   component: MyPersonaPage,
 });
+// Moi › Mes liens (INS-03, ADR 0121 § 1): hers alone; anyone else is sent to his profile.
+const meLinks = createRoute({
+  getParentRoute: () => me,
+  path: '/liens',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'creator') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: MyLinksPage,
+});
 const meProfile = createRoute({
   getParentRoute: () => me,
   path: '/profil',
@@ -1110,6 +1123,7 @@ const routeTree = rootRoute.addChildren([
     meFile,
     meInvoices,
     meCalendar,
+    meLinks,
     meSecurity,
     mePreferences,
   ]),
