@@ -84,7 +84,6 @@
   --ca-cols: minmax(0, 1fr) repeat(3, 132px);
   display: grid;
   gap: 0;
-  padding-bottom: 6px;
 }
 .ca-card__head {
   display: grid;
@@ -141,7 +140,10 @@
   min-height: 68px;
   padding: 12px 0;
   border-top: 1px solid var(--nv-hairline);
-  transition: background var(--nv-dur-fast) var(--nv-ease-out);
+}
+/* The same air under the last line as above the title: the card's own padding, no rule under it. */
+.ca-line:last-child {
+  padding-bottom: 0;
 }
 .ca-line__text {
   display: grid;
@@ -181,9 +183,16 @@
   border-radius: 50%;
   background: currentColor;
 }
+/* A locked line: a calm band exactly as wide as the three columns and as tall as a segment, the lock inside. */
 .ca-line__always {
   grid-column: 2 / -1;
-  justify-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 5%, transparent);
   font-size: var(--nv-text-footnote);
   font-weight: 600;
   color: var(--nv-ink-muted);
@@ -214,10 +223,14 @@
   display: inline-grid;
   place-items: center;
   padding: 0;
+  color: var(--nv-ink-muted);
+}
+.ca-seg__opt[aria-checked='true'] {
+  color: var(--nv-ink);
 }
 .ca-seg__opt > svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   vertical-align: 0;
 }
@@ -240,7 +253,7 @@
   .ca-seg__opt::after {
     content: attr(data-tip);
     position: absolute;
-    bottom: calc(100% + 8px);
+    top: calc(100% + 8px);
     left: 50%;
     z-index: 5;
     width: max-content;
@@ -257,7 +270,7 @@
     color: var(--nv-ink);
     pointer-events: none;
     opacity: 0;
-    transform: translate(-50%, 4px);
+    transform: translate(-50%, -4px);
     transition:
       opacity var(--nv-dur-fast) var(--nv-ease-out),
       transform var(--nv-dur-base) var(--nv-ease-spring);
@@ -267,9 +280,6 @@
     opacity: 1;
     transform: translate(-50%, 0);
     transition-delay: 250ms;
-  }
-  .ca-line:hover {
-    background: color-mix(in srgb, var(--nv-ink) 2.5%, transparent);
   }
 }
 
@@ -314,20 +324,20 @@
     grid-template-columns: minmax(0, 1fr);
     row-gap: 10px;
   }
+  /* The three roles share one grid: the label column is as wide as the longest label, on one line. */
   .ca-line__roles {
     display: grid;
-    gap: 8px;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 8px 12px;
   }
   .ca-role {
-    display: grid;
-    grid-template-columns: 88px minmax(0, 1fr);
-    justify-items: stretch;
-    align-items: center;
-    gap: 12px;
+    display: contents;
   }
   .ca-role__name {
     display: block;
-    font-size: var(--nv-text-footnote);
+    font-size: var(--nv-text-caption);
+    white-space: nowrap;
     color: var(--nv-ink-muted);
   }
   .ca-seg {
@@ -348,6 +358,5 @@
   }
   .ca-line__always {
     grid-column: auto;
-    justify-self: start;
   }
 }

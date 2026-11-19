@@ -162,10 +162,7 @@ function AlertRow({
   return (
     <li className="ca-line" data-locked={line.locked ? 'true' : undefined}>
       <div className="ca-line__text">
-        <p className="ca-line__title">
-          {line.locked ? <LockIcon /> : null}
-          {text.title}
-        </p>
+        <p className="ca-line__title">{text.title}</p>
         {nobody ? (
           <p className="ca-line__nobody">
             <span className="ca-dot" aria-hidden="true" />
@@ -179,7 +176,10 @@ function AlertRow({
         )}
       </div>
       {line.locked ? (
-        <p className="ca-line__always">Reçoit toujours</p>
+        <p className="ca-line__always">
+          <LockIcon />
+          Reçoit toujours
+        </p>
       ) : (
         <div className="ca-line__roles">
           {CREATOR_ALERT_ROLES.map((role) => (
@@ -274,7 +274,7 @@ function ModeIcon({ mode }: { mode: CreatorAlertMode }): JSX.Element {
   return (
     <svg {...SVG} className={`ca-icon ca-icon--${mode}`}>
       {mode === 'off' ? (
-        <path d="M7 12h10" />
+        <path d="M6 12h12" strokeWidth={2.2} />
       ) : (
         <>
           <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
