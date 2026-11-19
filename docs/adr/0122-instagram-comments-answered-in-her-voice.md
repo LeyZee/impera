@@ -1,6 +1,6 @@
 # 0122. Les commentaires Instagram : une réponse courte dans sa voix, seule après un entraînement validé, et les commentaires hostiles masqués
 
-Statut : proposed (demandes de Charles du 17/11/2026, 13 h 49, 13 h 56 et 14 h 00 ; fil « Imaginer le système Instagram » ; contrat accordé avec le fil Playground le 17/11 ; relectures Sécurité et Playground du 19/11 intégrées)
+Statut : proposed (demandes de Charles du 17/11/2026, 13 h 49, 13 h 56 et 14 h 00 ; fil « Imaginer le système Instagram » ; contrat accordé avec le fil Playground le 17/11 ; relectures Sécurité, Playground et Agent du 19/11 intégrées)
 Date : 2026-11-19
 Précise : l'ADR 0057 (§ 1 : API officielles seulement ; § 6 : la garde Instagram des légendes), l'ADR 0120 (le compte branché en deux temps, « les réponses aux commentaires : une ADR à venir »), l'ADR 0102 (la banque d'exemples née du Playground), l'ADR 0021 (rester en personnage), l'ADR 0010 (aucune donnée réelle dans le dépôt).
 
@@ -36,11 +36,14 @@ Vérifié le 17/11 dans la documentation de Meta :
   - `handoff` : à un humain.
 - **Le modèle ne supprime jamais.** La suppression n'est pas une issue de son schéma.
 - Un commentaire dont l'auteur est le compte de la créatrice est ignoré par le code : ses propres réponses ne relancent rien.
-- Le prompt `voice/instagram-comment` est versionné dans `packages/llm` avec son schéma ; il lit la persona active et la banque d'exemples « commentaire » de la créatrice (§ 4).
+- Le prompt `voice/instagram-comment` est versionné dans `packages/llm` avec son schéma ; il lit la banque d'exemples « commentaire » de la créatrice (§ 4) et, de sa persona active, **les seuls panneaux publics** (sa voix, son ton, ce qu'elle montre en public). Jamais l'intime, les zones du corps ni les pratiques : un test échoue si un de ces panneaux entre dans ce prompt.
+- **Une réponse est publique et tous publics** : Instagram est ouvert dès 13 ans et n'importe qui la lit. Elle est chaleureuse, jamais séductrice. Un commentaire sexuel donne `skip` ou `hide`, jamais une réponse.
+- L'auteur d'un commentaire n'est **jamais rapproché d'un fan** d'une plateforme : ni par le code, ni par le modèle.
 
 ### 3. Les gardes, dans le code
 
-- Une réponse passe la garde Instagram des légendes (ADR 0057 § 6 : aucune plateforme adulte, aucun lien, aucun prix, aucun « lien en bio »), plus `ai_disclosure`, `meeting_promise`, `love_declaration`, `contact_info` et `discount`, et ne contient rien d'explicite. Une réponse refusée est réécrite une fois, puis l'issue devient `skip`.
+- Une réponse passe la garde Instagram des légendes (ADR 0057 § 6 : aucune plateforme adulte, aucun lien, aucun prix, aucun « lien en bio »), plus `ai_disclosure`, `meeting_promise`, `love_declaration`, `contact_info` et `discount`, plus une garde nommée `public_explicit`, qui refuse tout mot explicite ou de séduction, et une garde `repeated_reply`, qui refuse une réponse identique ou presque à l'une de ses réponses récentes sous la même publication ou le même jour. Une réponse refusée est réécrite une fois, puis l'issue devient `skip`.
+- Les évals rejouent la voix courte du chatting sur des commentaires inventés : une réponse de commentaire doit sonner comme elle, en plus court et sans séduction.
 - **Aucune réponse, et passage à un humain**, quand le code ou le modèle relève : un doute sur l'âge de l'auteur, une détresse, une question de rendez-vous ou de tarif, une langue que la persona ne parle pas. La règle sur l'âge et celle sur la détresse priment sur tout le reste, comme dans le chatting ; aucune n'est affaiblie ici.
 - Le doute sur l'âge est relevé **par le code aussi, sans le modèle**, avec les détecteurs du chatting. Un auteur en doute ouvert ne reçoit plus aucune réponse, sous aucune publication, tant qu'un humain n'a pas tranché.
 - **Masquer est le geste par défaut contre un commentaire hostile** (insulte, dénigrement, harcèlement, contenu contraire aux règles de Meta), parce qu'il est réversible. Le CRM montre chaque commentaire masqué avec un geste « Réafficher ».
