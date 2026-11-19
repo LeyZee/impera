@@ -19,7 +19,7 @@ export interface RoutedEventRow {
 }
 
 /** An account a notification goes to, in its own time zone (its quiet hours, its day). */
-export interface Recipient {
+interface Recipient {
   readonly userId: string;
   readonly timeZone: string;
 }
@@ -54,7 +54,7 @@ export interface RouterDeps {
  * How far back each run reads. Each minute re-reads the last half hour: a run that failed, or a worker restarted, loses
  * nothing within it, and an event read twice rings once (the notification's key is the event).
  */
-export const ROUTE_WINDOW_MS = 30 * 60_000;
+const ROUTE_WINDOW_MS = 30 * 60_000;
 
 /**
  * `alerts.route` (ADR 0150 lot 2): each alert of the window, to the roles her tab chooses. `deliver` rings, `muted`
