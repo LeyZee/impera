@@ -27,9 +27,9 @@ describe('revealSessionShape', () => {
       'base64url',
     );
     const bearer = `eyJhbGciOiJIUzI1NiJ9.${payload}.invented-signature`;
-    expect(revealSessionShape(JSON.stringify({ ...session, bearer }))?.expiresAt).toEqual(
-      new Date(1_794_870_000_000),
-    );
+    expect(revealSessionShape(JSON.stringify({ ...session, bearer }))).toMatchObject({
+      expiresAt: new Date(1_794_870_000_000),
+    });
   });
 
   it('refuses a token that names another member than the session says (ADR 0147 § 4)', () => {
@@ -38,7 +38,9 @@ describe('revealSessionShape', () => {
     expect(revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-bot-test') }))).toMatchObject(
       { memberInToken: true },
     );
-    expect(revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-owner-test') }))).toBeNull();
+    expect(revealSessionShape(JSON.stringify({ ...session, bearer: claims('user-owner-test') }))).toBe(
+      'member_mismatch',
+    );
   });
 
   it.each([

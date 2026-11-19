@@ -5,7 +5,9 @@ import {
   SessionAutoSyncUnprocessable,
   SessionMemberConflict,
   SessionOwnerConflict,
+  SessionMemberMismatch,
   SessionShapeUnprocessable,
+  SessionTokenExpired,
   SessionVaultMissing,
 } from '../domain/errors';
 import type { AccountStore, Clock, JobLogger, SessionShapes, SessionVault } from '../domain/ports';
@@ -84,18 +86,20 @@ export function createConnectorSessions(deps: {
     const { creatorId } = account;
     const shape = deps.shapes[account.platform];
     const read = shape === undefined ? null : shape(session);
+    if (read === 'member_mismatch') throw new SessionMemberMismatch();
     if (shape === undefined || read === null) throw new SessionShapeUnprocessable();
     // A token already past its expiry is no session: nothing stored, the breaker left as it is.
     const now = deps.clock.now();
     if ((read.expiresAt ?? null) !== null && (read.expiresAt?.getTime() ?? 0) <= now.getTime())
-      throw new SessionShapeUnprocessable();
+      throw new SessionTokenExpired();
     // The extension alone sends only a session whose member the token itself names (ADR 0147 § 4).
     if (trigger === 'open' && read.memberInToken !== true)
       throw new SessionAutoSyncUnprocessable('auto_member_unread');
     // A session of another creator would make this account speak for her: refused, whatever the state.
     const previous = await deps.accounts.sessionOf(creatorId, platformAccountId);
     const before = previous === null ? null : openOrNull(vault(), platformAccountId, previous);
-    const stored = before === null ? null : shape(before);
+    const storedRead = before === null ? null : shape(before);
+    const stored = storedRead === 'member_mismatch' ? null : storedRead;
     // The extension alone never sets who the AI's account is (ADR 0147 § 1, § 4): a click did, once, before.
     if (trigger === 'open' && stored?.member === undefined) throw new SessionAutoSyncUnprocessable();
     if (stored !== null && stored.owner !== read.owner) throw new SessionOwnerConflict();

@@ -57,13 +57,13 @@ export function revealTokenExpiry(bearer: string): Date | null {
 
 /**
  * `null` for anything that is not a Reveal session of this shape: the route refuses it before storing. A token that
- * names another member than the session says is not one either (ADR 0147 § 4): the member pinned is the token's.
+ * names another member than the session says is `'member_mismatch'` (ADR 0147 § 4): the member pinned is the token's.
  */
 export const revealSessionShape: SessionShape = (raw) => {
   const session = parseRevealSession(raw);
   if (session === null) return null;
   const { userId } = claimsOf(session.bearer);
-  if (userId !== undefined && userId !== session.userId) return null;
+  if (userId !== undefined && userId !== session.userId) return 'member_mismatch';
   return {
     owner: session.modelId,
     member: session.userId,
