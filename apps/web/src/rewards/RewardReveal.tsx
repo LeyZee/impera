@@ -167,8 +167,11 @@ export function RewardReveal({
                 </li>
               ))}
               {more === 0 ? null : (
-                <li className="rw-reveal__alsomore nv-num" style={{ '--nv-i': also.length }}>
-                  +{more}
+                <li className="rw-reveal__alsoitem" style={{ '--nv-i': also.length }}>
+                  <span className="rw-reveal__alsoobject nv-num" data-more="true">
+                    +{more}
+                  </span>
+                  <span className="rw-reveal__alsoname">{more === 1 ? 'autre' : 'autres'}</span>
                 </li>
               )}
             </ul>

@@ -97,8 +97,9 @@ describe('RewardRevealGate (ADR 0104 § 12)', () => {
       'Palier atteint',
       'Record de quinzaine',
       'Record du jour',
+      'autres',
     ]);
-    expect(dialog.querySelector('.rw-reveal__alsomore')?.textContent).toBe('+2');
+    expect(dialog.querySelector('[data-more]')?.textContent).toBe('+2');
     expect(dialog.textContent).toContain(
       'Aussi gagné : Palier atteint, Record de quinzaine, Record du jour et 2 autres.',
     );

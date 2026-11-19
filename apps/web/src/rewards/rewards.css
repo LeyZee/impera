@@ -294,24 +294,26 @@
   animation: rw-fade 300ms ease-out 1500ms both;
 }
 .rw-reveal__alsolist {
+  box-sizing: border-box;
+  width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 0 var(--nv-space-4);
   list-style: none;
-  display: flex;
-  align-items: flex-start;
+  /* Every gain has a column of the same width, « +N » too: the objects stand at equal distances and the row is
+     centred whatever the names are. A name is cut only when it is wider than its column. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 116px);
   justify-content: center;
   gap: var(--nv-space-3);
 }
-.rw-reveal__alsoitem,
-.rw-reveal__alsomore {
-  animation: rw-fade 300ms ease-out calc(1560ms + var(--nv-i, 0) * 60ms) both;
-}
 .rw-reveal__alsoitem {
-  width: 84px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  animation: rw-fade 300ms ease-out calc(1560ms + var(--nv-i, 0) * 60ms) both;
 }
 .rw-reveal__alsoobject {
   display: grid;
@@ -319,20 +321,20 @@
   width: 44px;
   height: 44px;
 }
+.rw-reveal__alsoobject[data-more='true'] {
+  box-sizing: border-box;
+  border: 1px solid rgb(246 238 241 / 0.28);
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(246 238 241 / 0.78);
+}
 .rw-reveal__alsoname {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: rgb(246 238 241 / 0.78);
-}
-.rw-reveal__alsomore {
-  height: 44px;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  font-weight: 600;
   color: rgb(246 238 241 / 0.78);
 }
 .rw-reveal__close {
