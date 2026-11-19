@@ -135,12 +135,16 @@ describe('ExtensionPage', () => {
     vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', window.location.origin);
     await renderAs(CHROME);
     expect(screen.queryByRole('link', { name: 'Relier l’extension à ce CRM' })).toBeNull();
-    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+    // The last step says what to do, and no longer « alors » after a step that is gone (avis Design du 19/11).
+    expect(screen.getAllByText('Clique sur l’icône Impera : elle affiche ton nom.')).toHaveLength(2);
+    expect(screen.queryByText(/l’extension affiche alors ton nom/u)).toBeNull();
   });
 
   it('keeps the link step when the extension was built for another address', async () => {
     vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', 'https://autre.exemple.fr');
     await renderAs(CHROME);
     expect(screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' })).toHaveLength(2);
+    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+    expect(screen.queryByText('Clique sur l’icône Impera : elle affiche ton nom.')).toBeNull();
   });
 });

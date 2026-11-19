@@ -511,7 +511,7 @@ function changeCrmScreen(screen: Extract<Screen, { kind: 'change-crm' }>, action
     { class: 'pp-hero pp-offer' },
     h(
       'p',
-      { class: 'pp-hero__text nv-enter', style: '--nv-i: 1' },
+      { class: 'pp-hero__text pp-offer__from nv-enter', style: '--nv-i: 1' },
       `Cette extension est prévue pour ${screen.from}.`,
     ),
     h(

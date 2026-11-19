@@ -57,9 +57,19 @@ describe('ExtensionLinkPage', () => {
     expect(await screen.findByText(/« Relier l’extension au CRM de cet ordinateur \? »/u)).toBeDefined();
   });
 
-  it('names the browser it is opened in', async () => {
+  // Avis Design du 19/11: « la barre de Chrome » was wrong in Edge; the browser is not named, in either.
+  it('says the same in Edge as in Chrome, naming no browser', async () => {
     await renderAt('https://crm.exemple.fr/extension/lier', EDGE);
-    expect(await screen.findByText('Épinglée : elle est dans la barre d’Edge.')).toBeDefined();
+    expect(await screen.findByText('Épinglée : elle est dans la barre du navigateur.')).toBeDefined();
+    expect(screen.queryByText(/Edge|Chrome/u)).toBeNull();
+  });
+
+  it('puts each caption above its sketch', async () => {
+    await renderAt('https://crm.exemple.fr/extension/lier');
+    await screen.findByRole('heading', { name: 'Relier l’extension à ce CRM' });
+    const figures = [...document.querySelectorAll('figure')];
+    expect(figures).toHaveLength(2);
+    for (const figure of figures) expect(figure.firstElementChild?.tagName).toBe('FIGCAPTION');
   });
 
   it('says what an already linked extension does, and goes back to the guide it came from', async () => {

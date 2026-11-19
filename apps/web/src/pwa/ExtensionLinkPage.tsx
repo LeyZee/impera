@@ -3,8 +3,6 @@ import type { JSX } from 'react';
 
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
-import { browserOf } from './extension';
-
 /**
  * /extension/lier (ADR 0067, amendement du 19/11): the page the extension recognises by the tab's own address. It only
  * says where to click; the extension reads nothing it shows, and it cannot learn the link is made (no channel between
@@ -16,7 +14,8 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
   return (
     <svg
       className="nv-ext-link__sketch"
-      viewBox={hidden ? '0 0 240 112' : '0 0 240 52'}
+      // Cropped to the bar's outer edge (stroke included): the sketch starts exactly where its caption does.
+      viewBox={hidden ? '3.5 7.5 233 97.5' : '3.5 7.5 233 37'}
       role="img"
       aria-label={
         hidden
@@ -54,8 +53,6 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
 }
 
 export function ExtensionLinkPage(): JSX.Element {
-  const browser = browserOf(navigator.userAgent);
-  const named = browser === 'edge' ? 'd’Edge' : browser === 'chrome' ? 'de Chrome' : 'de ton navigateur';
   // The popup's own words: a host in full, or this computer (ADR 0067, amendement du 19/11 § 3).
   const host = window.location.hostname;
   const crm = host === 'localhost' || host === '127.0.0.1' ? 'au CRM de cet ordinateur' : `à ${host}`;
@@ -74,13 +71,14 @@ export function ExtensionLinkPage(): JSX.Element {
       <div className="nv-help-install nv-ext-link">
         <Panel>
           <PanelSection className="nv-ext-link__cases">
+            {/* Each caption above its sketch, as a small title, on one line on both sides (avis Design du 19/11). */}
             <figure className="nv-ext-link__case">
+              <figcaption>Épinglée : elle est dans la barre du navigateur.</figcaption>
               <BarSketch hidden={false} />
-              <figcaption>Épinglée : elle est dans la barre {named}.</figcaption>
             </figure>
             <figure className="nv-ext-link__case">
-              <BarSketch hidden />
               <figcaption>Pas épinglée : la pièce de puzzle, puis Impera.</figcaption>
+              <BarSketch hidden />
             </figure>
           </PanelSection>
           <PanelSection>

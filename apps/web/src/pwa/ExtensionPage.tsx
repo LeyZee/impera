@@ -34,7 +34,9 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
   },
 };
 
+/** After the link step, its outcome; with no link step (a hosted build), what to do (avis Design du 19/11). */
 const LAST_STEP = 'Connecté au CRM, l’extension affiche alors ton nom.';
+const LAST_STEP_LINKED = 'Clique sur l’icône Impera : elle affiche ton nom.';
 
 /**
  * The zip carries no CRM address (ADR 0067 § 4): the popup links itself from this CRM's own page, nothing to type
@@ -116,6 +118,7 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
   const browser = browserOf(navigator.userAgent);
   const zip = useZipServed();
   const offers = watches ? [...OFFERS, WATCH] : OFFERS;
+  const linked = extensionKnowsThisCrm();
   const order: readonly Exclude<Browser, 'other'>[] =
     browser === 'edge' ? ['edge', 'chrome'] : ['chrome', 'edge'];
   return (
@@ -188,8 +191,8 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                     <li key={step}>{step}</li>
                   ))}
                   {/* A hosted build is linked from the install: no step that would lead nowhere (ADR 0067). */}
-                  {extensionKnowsThisCrm() ? null : <LinkStep />}
-                  <li>{LAST_STEP}</li>
+                  {linked ? null : <LinkStep />}
+                  <li>{linked ? LAST_STEP_LINKED : LAST_STEP}</li>
                 </ol>
               </PanelSection>
             </Panel>
