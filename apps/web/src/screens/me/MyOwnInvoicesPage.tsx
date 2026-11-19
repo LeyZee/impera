@@ -16,15 +16,16 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 export function MyOwnInvoicesPage({ user }: { user: Me }): JSX.Element {
   const members = useMembers();
   const me = members.data?.find((member) => member.userId === user.id) ?? null;
-  if (me !== null) return <MyInvoicesPage eyebrow="Moi" actions={<MeNav manager />} memberId={me.id} />;
+  if (me !== null)
+    return <MyInvoicesPage eyebrow="Moi" tabs={<MeNav manager />} width="narrow" memberId={me.id} />;
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Factures"
-        lead="Les factures que l’agence émet en ton nom, et les avoirs qui les corrigent. Tu acceptes ou contestes chacune avant la fin de son délai."
-        actions={<MeNav manager />}
+        lead="Factures et avoirs émis en ton nom : accepte ou conteste chacun avant son délai."
+        tabs={<MeNav manager />}
       />
       <div className="py-board">
         <Panel className="nv-enter">

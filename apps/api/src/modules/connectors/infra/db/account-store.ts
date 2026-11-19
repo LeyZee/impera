@@ -185,6 +185,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
             creatorName: schema.creators.displayName,
             sessionState: schema.platformAccounts.sessionState,
             sessionUpdatedAt: schema.platformAccounts.sessionUpdatedAt,
+            modelId: schema.platformAccounts.sessionOwner,
           })
           .from(schema.platformAccounts)
           .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
@@ -199,6 +200,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           creatorName: row.creatorName,
           sessionState: SessionStateSchema.parse(row.sessionState),
           sessionUpdatedAt: row.sessionUpdatedAt,
+          modelId: row.modelId,
         }));
       }),
 
@@ -277,12 +279,12 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
               sessionCiphertext: session.ciphertext,
               sessionOwner: session.owner,
               ...(renewed ? { sessionUpdatedAt: meta.at } : {}),
-              sessionState: 'valid',
+              sessionState: session.state,
               consecutiveErrors: 0,
               pausedUntil: null,
             })
             .where(byId(id));
-          if (row.sessionState !== 'valid') {
+          if (row.sessionState !== session.state) {
             await insertEvent(
               tx,
               creatorId,
@@ -291,7 +293,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
                 payload: {
                   platformAccountId: id,
                   from: SessionStateSchema.parse(row.sessionState),
-                  to: 'valid',
+                  to: session.state,
                 },
               },
               meta,
@@ -304,7 +306,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
             action: 'connector.session_stored',
             entity: 'platform_account',
             entityId: id,
-            details: { correlationId: meta.correlationId },
+            details: { correlationId: meta.correlationId, trigger: meta.trigger },
             createdAt: meta.at,
           });
           // A valid session replaced by a different one (ADR 0046 § 8): the agent may now speak through another
@@ -352,7 +354,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           action: 'connector.session_refused',
           entity: 'platform_account',
           entityId: id,
-          details: { correlationId: meta.correlationId, reason },
+          details: { correlationId: meta.correlationId, reason, trigger: meta.trigger },
           createdAt: meta.at,
         });
       }),

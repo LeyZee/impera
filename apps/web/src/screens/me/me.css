@@ -3,14 +3,17 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 720px;
 }
 .me-prefs__body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--nv-space-3);
-  padding: 0 var(--nv-space-6) var(--nv-space-6);
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+/* The choice of theme starts on the panel's text, not 14 px inside it (CHA-13): its menu inset is for the rail. */
+.me-prefs .nv-appearance {
+  padding: 0;
 }
 .me-prefs__body > :first-child:not(p, a, button) {
   align-self: stretch;
@@ -19,6 +22,9 @@
   margin: 0;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
+}
+.me-prefs__mail {
+  overflow-wrap: anywhere;
 }
 .me-prefs__go svg {
   width: 16px;
@@ -39,7 +45,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 640px;
+}
+/* The facts start where the panel's title does, on a phone as on a computer. */
+.me-profile .tm-facts > div {
+  padding-inline: 24px;
 }
 /* « Flou des médias » (SC-04 lot c4): its row on the panel's inset, its icon under the panel's text. */
 .me-prefs .nv-more__blur {
@@ -50,4 +59,66 @@
 /* The hint takes the width of the choice above it, not a narrow column beside nothing (GES-18). */
 .me-prefs .nv-appearance__hint {
   max-width: none;
+}
+
+/* Moi › Profil, the creator's (recette visuelle 16/11, CRE-03): her facts on the panel's inset, then her other
+   screens, one line each, 44 px or more to the finger. */
+.me-her__facts {
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+.me-her__links {
+  margin: 0;
+  padding: 0 var(--nv-space-2) var(--nv-space-2);
+  list-style: none;
+}
+.me-her__links > li + li {
+  border-top: 1px solid var(--nv-hairline);
+}
+.me-her__link {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: 52px;
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  color: var(--nv-ink);
+  text-decoration: none;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.me-her__link:hover {
+  background-color: var(--nv-plate-hover);
+}
+.me-her__link:active {
+  transform: scale(0.985);
+  transition-duration: var(--nv-dur-instant);
+}
+.me-her__link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.me-her__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.me-her__text b {
+  font-weight: 600;
+}
+.me-her__text span {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.me-her__chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-inline-end: var(--nv-space-1);
+  border-right: 1.75px solid var(--nv-ink-faint);
+  border-bottom: 1.75px solid var(--nv-ink-faint);
+  transform: rotate(-45deg);
 }

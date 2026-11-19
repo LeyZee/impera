@@ -109,7 +109,10 @@ function renderDashboard(
   return client;
 }
 
-const headline = (): string => document.querySelector('h1')?.textContent ?? '';
+/** The first sentence under the screen's title « Dashboard » (COH-07): the agent's state, a failure, a page alone. */
+const headline = (): string =>
+  [...document.querySelectorAll('h1, h2')].find((heading) => heading.closest('.nv-page__head') === null)
+    ?.textContent ?? '';
 describe('DashboardPage on the server’s data', () => {
   it('waits for the server without showing any figure', async () => {
     serveDashboard({ status: 200, body: apiDashboard() });
@@ -752,7 +755,7 @@ describe('DashboardPage when the server does not answer', () => {
     let up = false;
     serveDashboard(() => (up ? { status: 200, body: apiDashboard() } : { status: 500 }));
     renderDashboard();
-    expect(await screen.findByText('ne répond pas')).toBeDefined();
+    expect(await screen.findByText('Le serveur ne répond pas')).toBeDefined();
     expect(headline()).toBe('Le serveur ne répond pas');
     expect(screen.getByText('Léa')).toBeDefined();
     expect(screen.queryByText('Exemple')).toBeNull();
@@ -960,14 +963,23 @@ describe('DashboardPage, the fold of the agent', () => {
     );
   });
 
-  it('says the AI budget once, for the whole agency, apart from her agent’s health (recette 05/11, reco 18)', async () => {
+  it('shows an operator no AI budget of the agency, which he can set nothing of (recette visuelle 16/11, PIL-27)', async () => {
     serveDashboard({ status: 200, body: apiDashboard() });
-    renderDashboard(true);
+    renderDashboard();
     await screen.findByText('Kévin');
     const tiles = [...document.querySelectorAll('.nv-tile')].map((tile) => tile.textContent);
     expect(tiles.some((text) => text.includes('Budget IA'))).toBe(false);
-    const agency = screen.getByRole('complementary', { name: 'Pour toute l’agence' });
-    expect(agency.textContent).toContain('Budget IA du jour, toutes créatrices');
+    expect(screen.queryByText(/Budget IA du jour/u)).toBeNull();
+    expect(screen.queryByText('Pour toute l’agence')).toBeNull();
+  });
+
+  it('is titled « Dashboard », as every screen, with the agent’s state under the title (COH-07)', async () => {
+    serveDashboard({ status: 200, body: apiDashboard() });
+    renderDashboard();
+    await screen.findByText('Kévin');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Dashboard');
+    expect(document.querySelectorAll('h1')).toHaveLength(1);
+    expect(headline()).not.toBe('');
   });
 });
 

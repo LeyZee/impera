@@ -7,6 +7,7 @@ import {
 } from '@impera/contracts';
 
 import type { BlockedReason } from './ports';
+import type { StepCut } from './rules';
 import type { ConversationCommand } from './state-machine';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
@@ -173,5 +174,32 @@ export class CareCloseForbidden extends DomainError {
 export class ConversationForbidden extends DomainError {
   constructor() {
     super('conversation_forbidden', 'Cette conversation ne t’a pas été confiée');
+  }
+}
+
+const STEP_CUT_WORDS: Readonly<Record<StepCut, string>> = {
+  care: 'il traverse un moment difficile',
+  do_not_contact: 'il ne doit plus recevoir de message',
+  sales_frozen: 'ses ventes sont gelées',
+  age_disputed: 'son âge est en doute',
+  limits_unreadable: 'ses limites sont illisibles',
+};
+
+/** Why a draft stopped before its paid step, in the words of its `draft_expired` event. */
+export function stepCutExpiryReason(cut: StepCut): string {
+  return `Étape payante retenue à l’envoi : ${STEP_CUT_WORDS[cut]}`;
+}
+
+/**
+ * A draft that carries a paid step of her script, approved while his limits keep it (relecture Sécurité de #812):
+ * nothing is approved, the draft stays as it was. A human answers him without the step.
+ */
+export class ScriptStepCut extends DomainError {
+  constructor(cut: StepCut) {
+    super(
+      'script_step_cut_unprocessable',
+      `Ce message porte une étape payante qui ne peut plus partir : ${STEP_CUT_WORDS[cut]}`,
+      { details: { cut } },
+    );
   }
 }

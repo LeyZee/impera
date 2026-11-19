@@ -122,6 +122,7 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
         sendMedia: () => Promise.reject(new Error('not used')),
+        sendStep: () => Promise.reject(new Error('not used')),
         verifySent: () => Promise.resolve({ status: 'not_found' }),
       },
       requireRole: () => () => Promise.resolve(),
@@ -368,6 +369,59 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     });
   });
 
+  it('says once per episode that no script is left for him, again after a script started (ADR 0150 § 9)', async () => {
+    const id = await fanWrites('c-exhausted', 'Tu me montres ?');
+    const exhausted = {
+      kind: 'held',
+      reason: 'no_reply',
+      detail: [],
+      costUsd: 0,
+      scriptsExhausted: true,
+    } as const;
+    composer.next = exhausted;
+    await respond(id);
+    await fanWrites('c-exhausted', 'Allez');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Patience 😏'],
+      softViolations: [],
+      costUsd: 0,
+      scriptsExhausted: true,
+    };
+    await respond(id);
+    const said = async () =>
+      (await events(id)).filter((event) => event.type === 'scripts_exhausted').map((event) => event.payload);
+    expect(await said()).toEqual([{ conversationId: id }]);
+
+    // A script started for him closes the episode: the next time none is left, the team hears it again.
+    const at = new Date('2026-11-12T21:00:00Z');
+    await fanWrites('c-exhausted', 'Vas-y');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Regarde 😏'],
+      softViolations: [],
+      costUsd: 0,
+      scriptRun: {
+        opened: {
+          run: {
+            scriptRef: 'script-new',
+            status: 'open',
+            steps: [{ stepIndex: 0, kind: 'free', priceMinor: null, sentAt: at, at, outcome: 'sent' }],
+            ignoredMessages: 0,
+            startedAt: at,
+            endedAt: null,
+          },
+          events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }],
+        },
+      },
+    };
+    await respond(id);
+    await fanWrites('c-exhausted', 'Encore');
+    composer.next = exhausted;
+    await respond(id);
+    expect(await said()).toHaveLength(2);
+  });
+
   it('keeps his script run with the draft, journals each step and the offer, and gives it back (ADR 0098)', async () => {
     const id = await fanWrites('c-script', 'Tu me montres ?');
     const at = new Date('2026-11-12T21:00:00Z');
@@ -391,9 +445,32 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
           events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }],
         },
         offer: { amountMinor: 1_500, currency: 'EUR' },
+        step: {
+          scriptRef: 'script-demo',
+          stepIndex: 0,
+          stepRef: 'step-demo-0',
+          priceMinor: 1_500,
+          hasMedia: true,
+          idempotencyKey: 'step:c-script:0',
+        },
       },
     };
     await respond(id);
+    // The step leaves with the draft, after its bubbles: the send job reads it back from the draft.
+    const [draft] = await test.admin.db
+      .select({ policyTrace: schema.drafts.policyTrace })
+      .from(schema.drafts)
+      .where(eq(schema.drafts.conversationId, id));
+    expect(draft?.policyTrace).toEqual({
+      scriptStep: {
+        scriptRef: 'script-demo',
+        stepIndex: 0,
+        stepRef: 'step-demo-0',
+        priceMinor: 1_500,
+        hasMedia: true,
+        idempotencyKey: 'step:c-script:0',
+      },
+    });
     const written = (await events(id)).slice(-4);
     expect(written.map((event) => event.type)).toEqual([
       'script_started',

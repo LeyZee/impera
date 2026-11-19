@@ -211,6 +211,8 @@ type AgentComposeResult = (
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
   readonly customOrderOpened?: true;
+  /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
+  readonly scriptsExhausted?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /**
@@ -221,6 +223,15 @@ type AgentComposeResult = (
     readonly moved?: ScriptRunChange;
     readonly opened?: ScriptRunChange;
     readonly offer?: { readonly amountMinor: number; readonly currency: 'EUR' };
+    /** The step decided, paid or not: the platform sends it after the bubbles, at this price (0 when offered). */
+    readonly step?: {
+      readonly scriptRef: string;
+      readonly stepIndex: number;
+      readonly stepRef: string;
+      readonly priceMinor: number;
+      readonly hasMedia: boolean;
+      readonly idempotencyKey: string;
+    };
   };
 };
 
@@ -312,10 +323,12 @@ export interface DraftComposerDeps {
  */
 export interface ScriptSource {
   catalogue(creatorId: string, platformAccountId: string): Promise<readonly PlatformScriptView[]>;
+  /** His history on the platform, read for the fan (`fanId`, ours) in this conversation of the account. */
   history(
     creatorId: string,
     platformAccountId: string,
     platformConversationId: string,
+    fanId: string,
   ): Promise<ScriptHistoryView>;
 }
 
@@ -332,10 +345,15 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
   if (deps.scripts === undefined || platformAccountId === undefined || platformConversationId === undefined)
     return closed;
   try {
-    const [catalogue, history] = await Promise.all([
-      deps.scripts.catalogue(input.creatorId, platformAccountId),
-      deps.scripts.history(input.creatorId, platformAccountId, platformConversationId),
-    ]);
+    // Her catalogue first: without a script she may offer, his history is not asked of the platform.
+    const catalogue = await deps.scripts.catalogue(input.creatorId, platformAccountId);
+    if (catalogue.length === 0) return closed;
+    const history = await deps.scripts.history(
+      input.creatorId,
+      platformAccountId,
+      platformConversationId,
+      input.fanId,
+    );
     return { ...closed, catalogue, history };
   } catch {
     return closed;
@@ -359,15 +377,17 @@ function withScripts(
     turn.priceMismatch !== null && settings.systemOn.has('script_price')
       ? [...(result.alerts ?? []), SCRIPT_PRICE]
       : result.alerts;
-  const base = alerts === undefined ? result : { ...result, alerts };
+  const alerted = alerts === undefined ? result : { ...result, alerts };
+  const base =
+    turn.decision.kind === 'none' && turn.decision.reason === 'scripts_exhausted'
+      ? { ...alerted, scriptsExhausted: true as const }
+      : alerted;
   if (result.kind !== 'draft') {
     return turn.followed === null ? base : { ...base, scriptRun: { moved: turn.followed } };
   }
   const { decision } = turn;
-  const price =
-    (decision.kind === 'start' || decision.kind === 'send_step') && decision.step.priceMinor !== null
-      ? decision.step.priceMinor
-      : null;
+  const decided = decision.kind === 'start' || decision.kind === 'send_step' ? decision.step : null;
+  const price = decided?.priceMinor ?? null;
   // Reveal sells in euros: the catalogue's minor units are cents.
   const offer: NonNullable<AgentComposeResult['scriptRun']>['offer'] =
     price === null ? undefined : { amountMinor: price, currency: 'EUR' };
@@ -375,6 +395,16 @@ function withScripts(
     ...(turn.moved !== null && { moved: turn.moved }),
     ...(turn.opened !== null && { opened: turn.opened }),
     ...(offer !== undefined && { offer }),
+    ...(decided !== null && {
+      step: {
+        scriptRef: decided.scriptRef,
+        stepIndex: decided.stepIndex,
+        stepRef: decided.stepRef,
+        priceMinor: decided.priceMinor ?? 0,
+        hasMedia: (turn.script?.steps[decided.stepIndex]?.mediaRefs.length ?? 0) > 0,
+        idempotencyKey: decided.idempotencyKey,
+      },
+    }),
   };
   return Object.keys(scriptRun).length === 0 ? base : { ...base, scriptRun };
 }

@@ -17,9 +17,9 @@ export function ProfileSection({
 }): JSX.Element {
   return (
     <section className="nv-plate ps-panel cr-profile nv-enter" aria-label="Profil">
-      <h2 className="ps-title">Son nom</h2>
+      <h2 className="nv-h2 ps-title">Son nom</h2>
       <NameEditor creatorId={creatorId} displayName={creatorName} />
-      <h2 className="ps-title cr-profile__next">L’archiver</h2>
+      <h2 className="nv-h2 ps-title cr-profile__next">L’archiver</h2>
       <ArchivePanel creatorId={creatorId} creatorName={creatorName} />
     </section>
   );

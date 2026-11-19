@@ -85,8 +85,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     const chosen: string[] = [];
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={(id) => chosen.push(id)}
         forOwner
         reviewsReports={false}
@@ -94,6 +94,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       />
     ));
     const agency = await screen.findByRole('radio', { name: /Toute l’agence/u });
+    // A title, as on every screen (recette visuelle 16/11, PIL-04).
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
     expect(agency.getAttribute('aria-checked')).toBe('true');
     expect(agency.tabIndex).toBe(0);
     expect(await screen.findByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();
@@ -107,8 +109,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     serve();
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={() => undefined}
         forOwner
         reviewsReports={false}
@@ -127,8 +129,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     serve([]);
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={() => undefined}
         forOwner
         reviewsReports={false}
@@ -139,6 +141,45 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(screen.queryByRole('heading', { name: /L’agence en chiffres/u })).toBeNull();
   });
 
+  it('puts the figures before what the agency runs, the AI budget last (PIL-04)', async () => {
+    serve();
+    show(() => (
+      <AgencyPage
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
+        onCreator={() => undefined}
+        forOwner
+        reviewsReports={false}
+        canAddCreator
+      />
+    ));
+    const budget = await screen.findByRole('complementary', { name: 'Budget IA du jour, toutes créatrices' });
+    const figures = await screen.findByRole('heading', { name: /L’agence en chiffres/u });
+    expect(figures.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('puts her agent first on a creator’s Dashboard, her figures under it, nothing of the agency’s (PIL-01, PIL-04)', async () => {
+    serve();
+    show(() => (
+      <DashboardPage
+        period="week"
+        onPeriod={() => undefined}
+        forOwner
+        agency={{
+          selection: { unit: 'week' },
+          onSelection: () => undefined,
+          onAgency: () => undefined,
+          canOpenSettings: true,
+        }}
+      />
+    ));
+    const figures = await screen.findByRole('heading', { name: /Les chiffres de/u });
+    const hero = document.querySelector('.db-hero');
+    if (hero === null) throw new Error('hero');
+    expect(hero.compareDocumentPosition(figures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(/Budget IA du jour/u)).toBeNull();
+  });
+
   it('puts her figures first on a creator’s Dashboard, one period control, no second sales panel', async () => {
     serve();
     show(() => (
@@ -147,8 +188,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
         onPeriod={() => undefined}
         forOwner
         agency={{
-          period: 'week',
-          onPeriod: () => undefined,
+          selection: { unit: 'week' },
+          onSelection: () => undefined,
           onAgency: () => undefined,
           canOpenSettings: true,
         }}

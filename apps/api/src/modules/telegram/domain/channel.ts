@@ -102,29 +102,8 @@ function slotRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
   return null;
 }
 
-/** One address however it is typed: the host in lower case (`URL` does it), no trailing slash. */
-function sameAddress(url: string): string {
-  return new URL(url).href.replace(/\/+$/u, '');
-}
-
+/** Her links are set in « Liens » (INS-03): only the channel's own choice among them is checked here. */
 function linkRefusal(config: TelegramChannelConfig): ChannelRefusal | null {
-  const names = new Set<string>();
-  const urls = new Set<string>();
-  for (const link of config.links) {
-    const name = link.name.toLocaleLowerCase('fr');
-    if (names.has(name)) {
-      return { kind: 'link_name_taken', message: `Deux liens s’appellent « ${link.name} » : renomme l’un.` };
-    }
-    const address = sameAddress(link.url);
-    if (urls.has(address)) {
-      return {
-        kind: 'link_url_taken',
-        message: `L’adresse du lien « ${link.name} » est déjà dans la liste.`,
-      };
-    }
-    names.add(name);
-    urls.add(address);
-  }
   if (config.channelLinkId !== null && !config.links.some((link) => link.id === config.channelLinkId)) {
     return {
       kind: 'channel_link_unknown',
@@ -204,7 +183,19 @@ export function channelWarnings(
   if (config.chatId === null) warnings.push('no_channel');
   else if (chat?.membership !== 'member') warnings.push('channel_gone');
   else if (!chat.canPost) warnings.push('bot_cannot_post');
-  if (config.channelLinkId === null) warnings.push('no_link');
+  // No link chosen, or one switched off or gone since: the main post would leave without its link.
+  if (config.channelLinkId === null || !config.links.some((link) => link.id === config.channelLinkId))
+    warnings.push('no_link');
   if (!config.slots.some((slot) => slot.enabled)) warnings.push('no_slot');
   return warnings;
+}
+
+/** Whether two lists hold the same links, whatever their order: what a save may carry of her links (INS-03). */
+export function sameLinks(a: TelegramChannelConfig['links'], b: TelegramChannelConfig['links']): boolean {
+  if (a.length !== b.length) return false;
+  const byId = new Map(a.map((link) => [link.id, link]));
+  return b.every((link) => {
+    const other = byId.get(link.id);
+    return other?.name === link.name && other.url === link.url && other.destination === link.destination;
+  });
 }

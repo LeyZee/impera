@@ -305,11 +305,11 @@ describe('TrackingPage', () => {
             },
     });
     renderPage();
-    const warning = await screen.findByText(/« À traiter » n’a pas pu être lu/u);
-    expect(warning.classList.contains('tr-warn')).toBe(true);
+    const warning = await screen.findByText(/Une urgence peut manquer ici/u);
+    expect(warning.closest('[role="alert"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByRole('list', { name: 'À traiter' })).toBeDefined();
-    expect(screen.queryByText(/« À traiter » n’a pas pu être lu/u)).toBeNull();
+    expect(screen.queryByText(/Une urgence peut manquer ici/u)).toBeNull();
   });
 
   it('never tells a chatter there is nothing for him while « À traiter » could not be read (relecture #538)', async () => {
@@ -319,7 +319,7 @@ describe('TrackingPage', () => {
       todos: { status: 500 },
     });
     renderPage('/suivi', true, false, true, 'Rien à suivre');
-    expect(await screen.findByText(/« À traiter » n’a pas pu être lu/u)).toBeDefined();
+    expect(await screen.findByText(/Une urgence peut manquer ici/u)).toBeDefined();
     expect(screen.queryByText('Rien à suivre')).toBeNull();
   });
 
@@ -1569,6 +1569,26 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     renderPage('/suivi', true, false, true);
     const yours = await screen.findByRole('list', { name: 'À toi' });
     expect(yours.textContent).toContain('Tu as la main');
+  });
+
+  it('says a state all the lines of « À toi » share once, in its title, never on each line (PIL-10)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: {
+          items: [
+            conversation('1', { state: 'human', heldBy: 'other' }),
+            conversation('2', { state: 'human', heldBy: 'other' }),
+          ],
+          nextCursor: null,
+        },
+      },
+    });
+    renderPage('/suivi');
+    const yours = await screen.findByRole('list', { name: 'À toi' });
+    expect(yours.textContent).not.toContain('Un humain répond');
+    const title = yours.closest('section')?.querySelector('.tr-group__title');
+    expect(title?.textContent).toBe('À toi2un humain répond');
   });
 
   it('shows a chatter another person’s hand without a way to give it back (EQ-13)', async () => {

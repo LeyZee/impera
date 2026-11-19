@@ -65,6 +65,8 @@ const GAP = 4;
  * so nothing of it shows between the field and the list (recette #566).
  */
 const OUTSET = 4;
+/** The room kept between a list as wide as its options and the screen's right edge. */
+const EDGE = 12;
 
 /**
  * The design system's list (consigne de Charles, 05/11: no control of the system, a `<select>` least of all): a field
@@ -87,6 +89,8 @@ export function Select<V extends string>({
   describedBy,
   ariaLabel,
   autofocus = false,
+  listWidth = 'field',
+  search: withSearch = 'auto',
 }: {
   /** For the form's `<label htmlFor>`: the field is named by its label. */
   id?: string;
@@ -108,6 +112,16 @@ export function Select<V extends string>({
   ariaLabel?: string;
   /** The field a dialog focuses first (`data-autofocus`, read by `Dialog`). */
   autofocus?: boolean;
+  /**
+   * How wide the list opens: as its field, or as its longest option when a compact field holds long ones (« Doute sur
+   * la personne » in a filter): never narrower than the field, never past the screen's edge.
+   */
+  listWidth?: 'field' | 'options';
+  /**
+   * `auto`: a field to find a choice above ten of them. `never`: a short list read at a glance (a dozen periods) opens
+   * straight on its choices; the letters typed still move to one.
+   */
+  search?: 'auto' | 'never';
 }): JSX.Element {
   const listId = useId();
   const [open, setOpen] = useState(false);
@@ -123,7 +137,7 @@ export function Select<V extends string>({
   const list = useRef<HTMLUListElement>(null);
   const typed = useRef({ text: '', at: 0 });
 
-  const searchable = options.length > SEARCH_FROM;
+  const searchable = withSearch === 'auto' && options.length > SEARCH_FROM;
   const shown = searchable ? matchSelect(options, text) : [...options];
   const current = options.find((one) => one.value === value);
 
@@ -168,12 +182,20 @@ export function Select<V extends string>({
       const box = field.getBoundingClientRect();
       const below = window.innerHeight - box.bottom;
       const above = below < POP_ROOM && box.top > below;
+      const left = box.left - OUTSET;
+      const fieldWidth = box.width + 2 * OUTSET;
       setPlace({
         host,
         above,
         style: {
-          left: box.left - OUTSET,
-          width: box.width + 2 * OUTSET,
+          left,
+          ...(listWidth === 'options'
+            ? {
+                width: 'max-content',
+                minWidth: fieldWidth,
+                maxWidth: Math.max(fieldWidth, window.innerWidth - left - EDGE),
+              }
+            : { width: fieldWidth }),
           ...(above ? { bottom: window.innerHeight - box.top + GAP } : { top: box.bottom + GAP }),
         },
       });
@@ -185,7 +207,7 @@ export function Select<V extends string>({
       window.removeEventListener('scroll', follow, true);
       window.removeEventListener('resize', follow);
     };
-  }, [open]);
+  }, [open, listWidth]);
   // The search field takes the focus when the list opens; the active option stays in view.
   const placed = place !== null;
   useEffect(() => {

@@ -1,4 +1,4 @@
-import type { BonusTier, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
+import type { BonusTier, CommissionStatement, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
@@ -6,7 +6,7 @@ import { useCurrentPeriod } from './data';
 import './my-figures.css';
 
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
-import { roundAmountText, tierProgress } from '@/payroll/model';
+import { besidesLine, roundAmountText, tierProgress } from '@/payroll/model';
 import {
   barHeight,
   barLabelled,
@@ -34,7 +34,7 @@ import {
 import { amountText, periodLine } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
-import { dayNumber, longDay } from '@/scheduling/time';
+import { cityOf, dayNumber, longDay } from '@/scheduling/time';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
 import { Panel } from '@/shell/layout';
 
@@ -60,6 +60,23 @@ function Named({ kind, children }: { kind: 'sales' | 'tier' | 'record'; children
 const counted = (count: number, one: string, many: string): string =>
   `${String(count)}\u00a0${count > 1 ? many : one}`;
 
+/**
+ * Where a net comes from (ADR 0118 § 10): the sales read, and the shifts counted from their validated report. A report
+ * gives a total, never its sales: it is named for what it is, never added to the sales' count.
+ */
+function sourceRows(sales: number, reports: number): (readonly [string, string])[] {
+  return [
+    ...(sales > 0 || reports === 0 ? [['Ventes', String(sales)] as const] : []),
+    ...(reports === 0 ? [] : [['Rapports validés', String(reports)] as const]),
+  ];
+}
+
+const sourceText = (sales: number, reports: number): string =>
+  [
+    ...(sales > 0 || reports === 0 ? [counted(sales, 'vente', 'ventes')] : []),
+    ...(reports === 0 ? [] : [counted(reports, 'rapport validé', 'rapports validés')]),
+  ].join(' · ');
+
 /** What a day's bar says under the pointer. */
 function dayTip(bar: DayBar, currency: Currency): Parameters<FloatingTip['bind']>[0] {
   const day = longDay(bar.day);
@@ -67,9 +84,10 @@ function dayTip(bar: DayBar, currency: Currency): Parameters<FloatingTip['bind']
     title: `${day.charAt(0).toUpperCase()}${day.slice(1)}`,
     rows: [
       ['Net', amountText(bar.netMinor, currency)],
-      ['Ventes', String(bar.sales)],
+      ...sourceRows(bar.sales, bar.reports),
       ...(bar.refunds === 0 ? [] : [['Remboursements', String(bar.refunds)] as const]),
     ],
+    ...(bar.reports === 0 ? {} : { aside: 'Un rapport validé compte au jour de son shift, pour son total.' }),
   };
 }
 
@@ -101,7 +119,7 @@ function DayBars({
           data-ahead={bar.ahead}
           data-best={bar.netMinor === max && max > 0}
           style={{ '--_h': barHeight(bar.netMinor, max), '--nv-i': index }}
-          {...(bar.ahead ? {} : tip.bind(dayTip(bar, currency), { above: true }))}
+          {...(bar.ahead ? {} : tip.bind(dayTip(bar, currency), { beside: true }))}
           tabIndex={bar.ahead ? undefined : 0}
         >
           <span className="mf-bar__col">
@@ -230,6 +248,12 @@ const hasFortnight = (figures: MyFigures, period: PayrollPeriod | undefined): bo
  * Aujourd'hui › « Ma quinzaine » (ADR 0104 § 2, § 3, § 4): one compact card under the shift, what the member has
  * earned so far, the fortnight day by day and the way to the next tier. Nothing shows before their first line.
  */
+/** « 0,00 € de net · prime +30,00 € · malus −5,00 € »: what « Ma quinzaine » adds up to, net first. */
+const partsOf = (statement: CommissionStatement): string => {
+  const others = besidesLine(statement);
+  return `${amountText(statement.netMinor, 'EUR')} de net${others === null ? '' : ` · ${others}`}`;
+};
+
 export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX.Element | null {
   const figures = useMyFigures().data;
   const current = useCurrentPeriod();
@@ -242,12 +266,13 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
   const tiers = manager ? [] : tiersOf(period);
   const net = netIn(figures.nets, currency);
   const sales = figures.days.reduce((sum, day) => sum + day.sales, 0);
+  const reports = figures.days.reduce((sum, day) => sum + day.reports, 0);
   return (
     <Panel
       className="nv-enter mf mf-card"
       eyebrow={<Named kind="sales">Ma quinzaine</Named>}
       actions={
-        <Link to="/commissions" className="mf-more">
+        <Link to="/commissions" className="mf-more nv-hit">
           Mes chiffres
           <Chevron className="mf-more__chev" />
         </Link>
@@ -264,7 +289,7 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
                 'Net vendu',
                 amountText(statement?.netMinor ?? net, statement === undefined ? currency : 'EUR'),
               ],
-              ...(figures.days.length === 0 ? [] : [['Ventes', String(sales)] as const]),
+              ...(figures.days.length === 0 ? [] : sourceRows(sales, reports)),
               ...(statement === undefined
                 ? []
                 : [['Gagné', amountText(statement.totalMinor, 'EUR')] as const]),
@@ -292,6 +317,9 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
                 format={(value) => amountText(Math.round(value), 'EUR')}
               />
               <p className="mf-figure__label">gagné à ce jour, avant validation</p>
+              {/* Where the amount comes from, as « Mes relevés » says it: 25 € earned without a sale is never a riddle
+                  (Design, recette CHT-02). */}
+              <p className="mf-figure__parts nv-num">{partsOf(statement)}</p>
             </>
           )}
           <Change change={fortnightChange(figures, currency)} />
@@ -303,8 +331,8 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
       </div>
       <div className="mf-card__bars">
         {figures.days.length === 0 ? (
-          // A statement paid on reports has no day to draw: one line, never fifteen flat bars.
-          <p className="mf-note">Le jour par jour arrive avec les ventes relevées.</p>
+          // Nothing read and no report validated yet: one line, never fifteen flat bars.
+          <p className="mf-note">Le jour par jour arrive avec tes rapports validés et tes ventes relevées.</p>
         ) : (
           <DayBars bars={fortnightBars(figures, currency)} currency={currency} tip={tip} tall={false} />
         )}
@@ -403,7 +431,7 @@ function Hours({
           <i />
           <span>plus</span>
         </div>
-        <p className="mf-note">Heures de ton fuseau ({figures.timeZone.replace(/_/gu, ' ')}).</p>
+        <p className="mf-note">Heures de ton fuseau ({cityOf(figures.timeZone)}).</p>
       </div>
     </Panel>
   );
@@ -499,6 +527,7 @@ export function MyDaysCard(): JSX.Element | null {
   const net = netIn(figures.nets, currency);
   const sales = figures.days.reduce((sum, day) => sum + day.sales, 0);
   const refunds = figures.days.reduce((sum, day) => sum + day.refunds, 0);
+  const reports = figures.days.reduce((sum, day) => sum + day.reports, 0);
   const before = figures.previous === null ? null : netIn(figures.previous.toDateNets, currency);
   return (
     <Panel
@@ -512,7 +541,7 @@ export function MyDaysCard(): JSX.Element | null {
             title: 'Ta quinzaine à ce jour',
             rows: [
               ['Net vendu', amountText(net, currency)],
-              ['Ventes', String(sales)],
+              ...sourceRows(sales, reports),
               ...(refunds === 0 ? [] : [['Remboursements', String(refunds)] as const]),
               ...(before === null
                 ? []
@@ -520,7 +549,7 @@ export function MyDaysCard(): JSX.Element | null {
             ],
           })}
         >
-          {amountText(net, currency)} de net · {counted(sales, 'vente', 'ventes')}
+          {amountText(net, currency)} de net · {sourceText(sales, reports)}
         </span>
       }
     >

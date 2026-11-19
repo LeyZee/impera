@@ -25,6 +25,8 @@ let answer: { status: number; body: unknown };
 let pdfAnswer: { status: number; type: string; body: string };
 /** How many times the PDF route was read. */
 let pdfReads = 0;
+/** The team's answer to the reader: his own row, or nothing read (`null`). */
+let team: unknown = null;
 const writes: { path: string; body: unknown }[] = [];
 const reads: string[] = [];
 
@@ -81,6 +83,8 @@ function serve(): void {
           );
         case '/v1/scheduling/settings':
           return json(SCHEDULING_SETTINGS);
+        case '/v1/team/members':
+          return team === null ? json(null, 404) : json(team);
         default:
           return json({ items: [], nextCursor: null });
       }
@@ -96,8 +100,9 @@ function renderPage(): void {
     component: MyInvoicesPage,
   });
   const index = createRoute({ getParentRoute: () => root, path: '/commissions', component: () => null });
+  const file = createRoute({ getParentRoute: () => root, path: '/moi/dossier', component: () => null });
   const router = createRouter({
-    routeTree: root.addChildren([page, index]),
+    routeTree: root.addChildren([page, index, file]),
     history: createMemoryHistory({ initialEntries: ['/commissions/factures'] }),
   });
   render(
@@ -146,6 +151,7 @@ beforeEach(() => {
   answer = { status: 200, body: acceptanceView(PENDING, 'accepted') };
   pdfAnswer = { status: 200, type: 'application/pdf', body: '%PDF-1.7' };
   pdfReads = 0;
+  team = null;
   writes.length = 0;
   reads.length = 0;
   serve();
@@ -346,19 +352,34 @@ describe('Commissions › Factures', () => {
     expect(screen.getByText('Aucun document entre le 29 octobre 2016 et le 2 novembre 2022.')).toBeTruthy();
   });
 
+  it('offers no older year than the one he joined in (CHA-18)', async () => {
+    // Théo joined on 1 September 2026: the year read, from 5 November 2025, already holds his arrival.
+    team = { members: [THEO] };
+    years = new Map();
+    renderPage();
+    expect(await screen.findByText('Pas encore de facture.')).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Plus anciennes' })).toBeNull();
+    });
+    expect(screen.queryByText(/dix/u)).toBeNull();
+  });
+
   it('says a year without a document by its days, never « none at all », and a server that does not answer', async () => {
     years = new Map();
     renderPage();
+    // A sentence for him, not a notice on how the list reads (CHA-18); the way back further stays.
+    expect(await screen.findByText('Pas encore de facture.')).toBeTruthy();
     expect(
-      await screen.findByText('Aucun document entre le 5 novembre 2025 et le 5 novembre 2026.'),
+      screen.getByText('Elle arrive avec ton premier relevé validé, une fois ton dossier rempli.'),
     ).toBeTruthy();
-    // How a first invoice comes, beside the way back further.
-    expect(
-      screen.getByText(
-        'Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet. « Plus anciennes » remonte d’une année à la fois, jusqu’à dix ans.',
-      ),
-    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ouvrir mon dossier' }).getAttribute('href')).toBe(
+      '/moi/dossier',
+    );
+    expect(screen.queryByText(/remonte d’une année à la fois/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Plus anciennes' })).toBeTruthy();
+    // Read further, a year without a document is said by its days.
+    fireEvent.click(screen.getByRole('button', { name: 'Plus anciennes' }));
+    expect(await screen.findByText(/^Aucun document entre le /u)).toBeTruthy();
     cleanup();
     listStatus = 500;
     renderPage();

@@ -8,6 +8,7 @@ import {
   disconnectProvider,
   listProviderStatuses,
   createRefusalReporter,
+  probeProvider,
   reverifyProvider,
   updateProviderSettings,
   type ConnectionsDeps,
@@ -25,6 +26,7 @@ const works: VerificationOutcome = {
   settings: {},
   voices: [],
   charactersLeft: null,
+  quota: null,
   isLowCredit: false,
 };
 
@@ -422,5 +424,88 @@ describe('key cache', () => {
       ['mistral', null],
       ['elevenlabs', null],
     ]);
+  });
+});
+
+describe('« Essai réel » (ADR 0091 § 7)', () => {
+  function probing(outcome: 'answers' | 'no_credit' | 'key_refused') {
+    const { deps, store } = setup({ current: works });
+    const tried: string[] = [];
+    const withProbe: ConnectionsDeps = {
+      ...deps,
+      probes: [
+        {
+          provider: 'xai',
+          probe: (key) => {
+            tried.push(key);
+            return Promise.resolve({ outcome, latencyMs: 420, model: 'Grok 4.7' });
+          },
+        },
+      ],
+      activity: {
+        last24h: () =>
+          Promise.resolve(
+            new Map([
+              [
+                'xai' as const,
+                {
+                  calls: 12,
+                  troubled: 1,
+                  asFallback: 0,
+                  lastSuccessAt: '2026-10-17T18:55:00.000Z',
+                  lastTrouble: null,
+                },
+              ],
+            ]),
+          ),
+      },
+    };
+    return { deps: withProbe, store, tried };
+  }
+
+  it('calls the service once with the saved key and keeps what it found', async () => {
+    const { deps, store, tried } = probing('answers');
+    await connectProvider(deps, 'xai', OLD_KEY);
+    const status = await probeProvider(deps, 'xai');
+    expect(tried).toEqual([OLD_KEY]);
+    expect(status).toMatchObject({
+      state: 'connected',
+      probe: { outcome: 'answers', latencyMs: 420, model: 'Grok 4.7' },
+      activity: { calls: 12 },
+    });
+    expect((await store.find('xai'))?.probe?.outcome).toBe('answers');
+  });
+
+  it('says an account with nothing left without turning the key red, and a refused key red at once', async () => {
+    const empty = probing('no_credit');
+    await connectProvider(empty.deps, 'xai', OLD_KEY);
+    expect(await probeProvider(empty.deps, 'xai')).toMatchObject({
+      state: 'connected',
+      probe: { outcome: 'no_credit' },
+    });
+    const refused = probing('key_refused');
+    await connectProvider(refused.deps, 'xai', OLD_KEY);
+    expect(await probeProvider(refused.deps, 'xai')).toMatchObject({ state: 'needs_reconnect' });
+  });
+
+  it('runs one essai at a time, refuses a service not connected, and forgets it on replacement', async () => {
+    const { deps, tried } = probing('answers');
+    await expect(probeProvider(deps, 'xai')).rejects.toThrow(/Aucune clé/);
+    await connectProvider(deps, 'xai', OLD_KEY);
+    await Promise.all([probeProvider(deps, 'xai'), probeProvider(deps, 'xai')]);
+    expect(tried).toHaveLength(1);
+    const replaced = await connectProvider(deps, 'xai', NEW_KEY);
+    expect(replaced.ok && replaced.value.probe).toBeNull();
+  });
+
+  it('lists every service the journal sees, with an empty day when it made no call', async () => {
+    const { deps } = probing('answers');
+    const statuses = await listProviderStatuses(deps);
+    expect(statuses.find((s) => s.provider === 'xai')?.activity).toBeNull();
+    await connectProvider(deps, 'xai', OLD_KEY);
+    const after = await listProviderStatuses(deps);
+    expect(after.find((s) => s.provider === 'xai')?.activity).toMatchObject({ calls: 12 });
+    expect(after.find((s) => s.provider === 'mistral')?.activity).toBeNull();
+    expect(after.find((s) => s.provider === 'elevenlabs')?.activity).toBeNull();
   });
 });

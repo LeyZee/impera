@@ -1,4 +1,5 @@
 import {
+  BlurhashSchema,
   VAULT_DESCRIPTION_MAX,
   VAULT_FOLDER_NAME_MAX,
   type ConversationSnapshot,
@@ -201,6 +202,14 @@ function stepOf(source: StepSource, index: number, platformIndex: number): Platf
     // Absent = free (spec § 6).
     priceMinor: source.script.price ?? 0,
     currency: REVEAL_CURRENCY,
+    // « Tarif réduit » (2026-11-15): both or neither, but one alone is a discount all the same (never sold at).
+    discount:
+      source.script.discountedPrice === undefined && source.script.discountDurationMinutes === undefined
+        ? null
+        : {
+            priceMinor: source.script.discountedPrice ?? null,
+            minutes: source.script.discountDurationMinutes ?? null,
+          },
   };
 }
 
@@ -297,5 +306,7 @@ export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null, posit
         ? null
         : cut(media.description, VAULT_DESCRIPTION_MAX),
     suggestedPriceMinor: min === null || max === null || min < 0 || max < 0 ? null : { min, max },
+    // A preview that does not read as a blurhash is dropped, never the media.
+    blurhash: BlurhashSchema.safeParse(media.blurhash).data ?? null,
   };
 }

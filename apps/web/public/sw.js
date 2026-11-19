@@ -44,7 +44,7 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'apply-update') self.skipWaiting();
 });
 
-// Web Push (CR-01 lot b). The server sends `{ title, body, url, tag }` and never a fan's name nor a message
+// Web Push (CR-01 lot b). The server sends `{ title, body, url, tag, silent }` and never a fan's name nor a message
 // (ADR 0020): what rings on a locked screen is read by anyone near the phone.
 self.addEventListener('push', (event) => {
   const message = readPush(event.data);
@@ -52,6 +52,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(message.title, {
       body: message.body,
       tag: message.tag,
+      silent: message.silent,
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',
       lang: 'fr',
@@ -74,6 +75,7 @@ function readPush(data) {
     body: text('body', 180),
     tag: text('tag', 64),
     url: safePath(value.url),
+    silent: value.silent === true,
   };
 }
 

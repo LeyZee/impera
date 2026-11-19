@@ -119,6 +119,7 @@ async function serve(creators: readonly (typeof ANNA)[] | null): Promise<void> {
             last30Days: { from: '2026-10-05', to: '2026-11-03', shares: [] },
             fortnights: [],
           },
+          alerts: [],
         });
       }
       return json({}, 404);
@@ -146,6 +147,9 @@ const picked = (name: string): Promise<void> =>
     expect(screen.getByRole('link', { name: '← Créatrices' })).toBeDefined();
     const views = screen.getByRole('navigation', { name: 'Fiche de la créatrice' });
     expect(within(views).getByRole('link', { name: 'Persona' }).getAttribute('aria-current')).toBe('page');
+    // Her sheets on the header's row of tabs, never among its buttons (recette visuelle 16/11, T1).
+    expect(views.closest('.nv-page__tabs')).not.toBeNull();
+    expect(views.closest('.nv-page__actions')).toBeNull();
   });
 
 /** The card of a creator in the list. */
@@ -256,8 +260,8 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'acces', creatrice: ANNA.id });
     });
-    // Her account: the list answers 404 here, so the sheet says it does not load, never a form to fill.
-    expect(await screen.findByText('Son accès ne se charge pas')).toBeDefined();
+    // Her account: the list answers 404 here, so the sheet says the server is silent, never a form to fill.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
 
     cleanup();
     await serve([ANNA]);
@@ -265,6 +269,18 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(other.state.location.search).toEqual({ creatrice: ANNA.id });
     });
+    // A sheet asked by name and refused says why, as any page that is not his (recette visuelle 16/11, PIL-26).
+    expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+
+    // No sheet asked: his first one, without a word.
+    cleanup();
+    await serve([ANNA]);
+    const plain = renderAt(operator, `/creatrices?creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(plain.state.location.search).toEqual({ creatrice: ANNA.id });
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Anna' });
+    expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
   });
 
   it('gives the owner her Profil, where her name is changed, and keeps it from anyone else (ADR 0071)', async () => {
@@ -380,8 +396,8 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'agenda', creatrice: ANNA.id });
     });
-    // The suggestions answer 404 here: the sheet says they do not load, and still offers to propose.
-    expect(await screen.findByText('Ses propositions ne se chargent pas')).toBeDefined();
+    // The suggestions answer 404 here: the sheet says the server is silent, and still offers to propose.
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Proposer une tâche' })).toBeDefined();
   });
 
@@ -397,7 +413,7 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts', 'Contenu']);
+    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts', 'Contenu', 'Liens']);
     router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
     expect(await screen.findByText('Ses idées du jour')).toBeDefined();
     for (const onglet of ['pourcentage', 'acces', 'heures']) {
@@ -438,33 +454,40 @@ describe('Créatrices, what a member without the list reads', () => {
   it('says the list does not load, with a way to try again', async () => {
     await serve(null);
     renderAt(owner, '/creatrices');
-    expect(await screen.findByText('La liste des créatrices ne se charge pas')).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });
 });
 
 describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
-  it('opens her persona in Moi, never Créatrices, and keeps a member’s Moi screens from her', async () => {
+  it('opens her Moi on her profile, her persona one tab away, never in Créatrices, and keeps a member’s Moi screens from her', async () => {
     await serve([ANNA]);
     const router = renderAt(anna, '/moi');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
-    expect(router.state.location.pathname).toBe('/moi/persona');
+    // A short profile first (recette visuelle 16/11, CRE-03): who she is in Impera, and where the rest is.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeDefined();
+    expect(router.state.location.pathname).toBe('/moi/profil');
+    expect(await screen.findByText('Dans Impera')).toBeDefined();
     const moi = screen.getByRole('navigation', { name: 'Moi' });
     expect(
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    cleanup();
+
+    await serve([ANNA]);
+    renderAt(anna, '/moi/persona');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
     // She reads her sheet; the agency changes it (recette CREA-01).
     await screen.findByText(/Ta fiche/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 
-    for (const path of ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/factures']) {
+    for (const path of ['/moi/dossier', '/moi/calendrier', '/moi/factures']) {
       await serve([ANNA]);
       const again = renderAt(anna, path);
       await waitFor(() => {
-        expect(again.state.location.pathname).toBe('/moi/persona');
+        expect(again.state.location.pathname).toBe('/moi/profil');
       });
       cleanup();
     }

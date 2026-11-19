@@ -303,7 +303,7 @@ export function TrophyCaseView({
         return (
           <section key={shelf.family} className="tc-shelf" aria-labelledby={`${id}-${shelf.family}`}>
             <header className="tc-shelf__head" style={{ '--tc-i': index++ }}>
-              <h3 id={`${id}-${shelf.family}`}>
+              <h3 className="nv-h2" id={`${id}-${shelf.family}`}>
                 {shelfTitles?.[shelf.family] ?? SHELF_TITLES[shelf.family]}
               </h3>
               <span className="tc-shelf__count">

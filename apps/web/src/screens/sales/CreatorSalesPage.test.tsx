@@ -136,6 +136,11 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
     expect(screen.getByText('vince.r')).toBeDefined();
     expect(screen.queryByRole('button', { name: /vince\.r/u })).toBeNull();
     expect(screen.getByText(/pas encore de conversation/u)).toBeDefined();
+    // A fan who unlocked nothing has no amount, not a dash (recette visuelle 16/11, CRE-02).
+    expect(document.querySelectorAll('.vt-row__amount')).toHaveLength(1);
+    expect(screen.queryByText('—')).toBeNull();
+    // No figure of hers is said yet: never a price before shares shown as what she earned.
+    expect(document.body.textContent).not.toMatch(/gagné|ta part/u);
     // Before a fan is chosen, the reading side says so on a plate of its own (recette CRE-04).
     expect(screen.getByText('Choisis un fan pour lire sa conversation.').closest('.nv-plate')).not.toBeNull();
     fireEvent.click(open);
@@ -178,8 +183,8 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
   it('says her fans do not load, with a way to try again', async () => {
     serve({ '/v1/creator-space/fans': { status: 500, body: null } });
     show(null);
-    expect(await screen.findByText(/Tes fans n’ont pas pu être lus/u)).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getAllByRole('button', { name: 'Réessayer' })).toHaveLength(1);
   });
 
   it('says once that the server does not answer when her fans and their figures both fail (CRE-31)', async () => {
@@ -188,9 +193,9 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
       '/v1/creator-space/fan-insights': { status: 500, body: null },
     });
     show(null);
-    expect(await screen.findByText(/Tes fans et leurs chiffres n’ont pas pu être lus/u)).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     await waitFor(() => {
-      expect(screen.queryByText(/Les chiffres de tes fans n’ont pas pu être lus/u)).toBeNull();
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
     });
     const retry = screen.getAllByRole('button', { name: 'Réessayer' });
     expect(retry).toHaveLength(1);

@@ -6,11 +6,13 @@ import { Medal } from './Medal';
 import { TROPHY_NAMES, TrophyBadge, type TrophyKind } from './TrophyBadge';
 import { tierMedals } from './metals';
 
+import { roundAmountText } from '@/payroll/model';
 import { amountText } from '@/reports/model';
 
 /*
  * What a reveal says and shows for each thing a chatter earns (ADR 0104 § 12, § 15 and § 16). A tier's bonus is the one its
- * statement's tiers give, never worked out here (§ 17); no trophy shows an amount.
+ * statement's tiers give, never worked out here (§ 17); no trophy shows an amount. A rank says the cumulated net it
+ * was earned at when the server gives it: the chatter's own figure, the one « Mon rang » already counted toward.
  */
 
 export interface RevealWords {
@@ -63,7 +65,7 @@ const OBJECT_SIZE = 220;
  * without its label nor its bonus, which this screen has not read.
  */
 export function revealWordsOf(
-  item: Pick<TrophyCaseItem, 'kind'>,
+  item: Pick<TrophyCaseItem, 'kind' | 'basis'>,
   current: PayPeriod | null,
   tiers: readonly BonusTier[],
 ): RevealWords | null {
@@ -85,9 +87,11 @@ export function revealWordsOf(
       kicker: 'Nouveau rang',
       title: name,
       text:
-        rank === 1
-          ? 'Ton premier rang. Il monte avec ton net cumulé et ne redescend jamais.'
-          : 'Ton net cumulé a passé le seuil. Un rang gagné ne se perd pas.',
+        item.basis === undefined
+          ? rank === 1
+            ? 'Ton premier rang. Il suit ton net cumulé.'
+            : 'Ton net cumulé a passé le seuil.'
+          : `Ton net depuis ton arrivée vient de passer ${roundAmountText(item.basis.minor, item.basis.currency)}.`,
       tone: 'neon',
       forge: rank,
     };

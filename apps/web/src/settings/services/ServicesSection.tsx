@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
 import { ConnectSheet } from './ConnectSheet';
 import { PasswordPrompt, SignInAgain } from './PasswordPrompt';
+import { ServiceHealth } from './ServiceHealth';
 import {
   disconnect,
   fetchOverview,
   isForbidden,
   isSessionExpired,
+  probeNow,
   ReauthRequired,
   showError,
   verifyNow,
@@ -15,7 +17,9 @@ import {
 } from './api';
 import { GUIDES, isDashboardProvider, type DashboardProvider } from './guide';
 import { checkedAgo, dotOf, dotOfNext, leadOf, shortStateOf, verifyNotice } from './view';
+
 import './services.css';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /** The list refreshes on its own: a key revoked while the page is open turns red without a reload. */
 const REFRESH_MS = 30_000;
@@ -32,7 +36,15 @@ type Notice = ShownError & { tone: 'error' | 'warning' };
  * Réglages › Modèles IA › Services (fiche P3-03, ADR 0016): what to do now, then one line per service. Connecting
  * happens in a sheet; nothing on this page ever shows a key.
  */
-export function ServicesSection(): JSX.Element {
+export function ServicesSection({
+  onDown,
+  onRetry,
+}: {
+  /** Whether the server is silent on this page: the page's other cards then keep quiet (ETA-05). */
+  onDown?: (down: boolean) => void;
+  /** Also run by « Réessayer », for the page's other reads. */
+  onRetry?: () => void;
+} = {}): JSX.Element {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [sheet, setSheet] = useState<Sheet>(null);
   const [menu, setMenu] = useState<DashboardProvider | null>(null);
@@ -40,6 +52,8 @@ export function ServicesSection(): JSX.Element {
   /** A removal waiting for the password (ADR 0016). */
   const [reauthFor, setReauthFor] = useState<DashboardProvider | null>(null);
   const [verifying, setVerifying] = useState<DashboardProvider | null>(null);
+  /** The services whose « Essai réel » is running: each its own, side by side. */
+  const [probing, setProbing] = useState<ReadonlySet<DashboardProvider>>(new Set());
   const [now, setNow] = useState(() => new Date());
   const [notice, setNotice] = useState<Notice | null>(null);
   /** Only the latest refresh may land: an older answer arriving late would show a stale state. */
@@ -117,6 +131,29 @@ export function ServicesSection(): JSX.Element {
     );
   };
 
+  /** « Essai réel » (ADR 0091 § 7): the answer replaces the line at once, then the list refreshes. */
+  const probe = (provider: DashboardProvider): void => {
+    setNotice(null);
+    setProbing((current) => new Set(current).add(provider));
+    probeNow(provider)
+      .then(
+        () => refresh(),
+        (error: unknown) => {
+          setNotice({
+            ...showError(error, `L’essai réel de ${GUIDES[provider].name} n’a pas pu partir.`),
+            tone: 'error',
+          });
+        },
+      )
+      .finally(() => {
+        setProbing((current) => {
+          const next = new Set(current);
+          next.delete(provider);
+          return next;
+        });
+      });
+  };
+
   const open = (provider: DashboardProvider, isReplace: boolean): void => {
     setMenu(null);
     setConfirming(null);
@@ -132,36 +169,40 @@ export function ServicesSection(): JSX.Element {
     [refresh],
   );
 
-  if (load.kind !== 'ready') {
+  const down = load.kind === 'failed' && !load.isForbidden && !load.error.isSessionExpired;
+  useEffect(() => {
+    onDown?.(down);
+  }, [down, onDown]);
+
+  if (load.kind === 'loading') {
     return (
-      <section className="sv-page" aria-busy={load.kind === 'loading'}>
-        {load.kind === 'failed' ? (
+      <section className="sv-page">
+        <Skeleton label="Chargement des modèles IA…">
+          <SkeletonCard lines={1} />
+          <SkeletonCard lines={4} />
+        </Skeleton>
+      </section>
+    );
+  }
+  if (load.kind === 'failed') {
+    return (
+      <section className="sv-page">
+        {load.isForbidden || load.error.isSessionExpired ? (
           <div className="nv-plate sv-next">
             <p className="sv-lead">
-              {load.isForbidden
-                ? 'Seul le propriétaire règle les modèles IA'
-                : load.error.isSessionExpired
-                  ? 'Ta session a expiré'
-                  : 'Le serveur ne répond pas'}
+              {load.isForbidden ? 'Seul le propriétaire règle les modèles IA' : 'Ta session a expiré'}
             </p>
-            <p className="sv-muted">
-              {load.isForbidden || load.error.isSessionExpired
-                ? load.error.message
-                : 'L’état des clés n’a pas pu être lu. Réessaie dans un instant.'}
-            </p>
-            {load.isForbidden ? null : load.error.isSessionExpired ? (
-              <SignInAgain />
-            ) : (
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft sv-self-start"
-                onClick={() => void refresh()}
-              >
-                Réessayer
-              </button>
-            )}
+            <p className="sv-muted">{load.error.message}</p>
+            {load.isForbidden ? null : <SignInAgain />}
           </div>
-        ) : null}
+        ) : (
+          <Failure
+            onRetry={() => {
+              void refresh();
+              onRetry?.();
+            }}
+          />
+        )}
       </section>
     );
   }
@@ -182,7 +223,7 @@ export function ServicesSection(): JSX.Element {
 
       <div className="nv-plate sv-next" aria-live="polite">
         <div className="sv-next__head">
-          <span className="sv-dot sv-dot--big" data-dot={nextDot} />
+          <span className="sv-dot" data-dot={nextDot} />
           <div className="sv-next__text">
             <p className="sv-lead">{leadOf(next, services)}</p>
             <p className="sv-muted">{next.detail}</p>
@@ -251,6 +292,22 @@ export function ServicesSection(): JSX.Element {
               <p className="sv-row__line" data-state={status.state}>
                 {line}
               </p>
+              {status.state === 'not_connected' && !isFromEnvironment ? null : (
+                <ServiceHealth
+                  provider={provider}
+                  status={status}
+                  now={now}
+                  isProbing={probing.has(provider)}
+                  // A key read from the environment is the developer's, and an unreadable one cannot be sent.
+                  onProbe={
+                    isSaved && !status.isUnreadable
+                      ? () => {
+                          probe(provider);
+                        }
+                      : null
+                  }
+                />
+              )}
               {menu === provider ? (
                 <RowMenu
                   provider={provider}

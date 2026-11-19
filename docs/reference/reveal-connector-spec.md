@@ -36,7 +36,7 @@ La session envoyée à `POST /v1/connector/sessions` (champ `session`, opaque po
 
 Le compte plateforme et la session ne font jamais apparaître le jeton ailleurs que chiffré en base (AES-256-GCM, P0-06). La route refuse une session dont `modelId` ne correspond pas au compte déjà relié : ni à la session déjà gardée, ni, dès la première « Sync », au modèle que le relevé des ventes relie à ce compte (Réglages › Relevé des ventes).
 
-**Santé (`health`)** : `GET /models/:modelId`. 200 → `valid` ; 401 ou 403 → `expired` ; `exp` du JWT lisible : `warning` 2 h avant (le jeton ne vit que 24 h, V1).
+**Santé (`health`)** : `GET /models/:modelId`. 200 → `valid` ; 401 ou 403 → `expired` ; `exp` du JWT lisible : `warning` 2 h avant (le jeton ne vit que 24 h, V1). À la synchronisation (`POST /v1/connector/sessions`), la même lecture de `exp` : enregistrée en `warning` à moins de 2 h, et la réponse donne `expiresAt` et `reconnectFirst` (moins de 20 h : le jeton n'est pas celui d'une connexion fraîche, se reconnecter à Reveal puis resynchroniser).
 
 ## 3. Le client HTTP
 

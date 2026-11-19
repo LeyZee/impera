@@ -223,6 +223,8 @@ export const pdfRefusalText = (refusal: InvoiceRefusal): string =>
  */
 export function invoiceRefusalText(refusal: InvoiceRefusal): string {
   if (refusal.kind === 'failed') return 'Le serveur ne répond pas : rien n’a été enregistré. Réessaie.';
+  // Each dialog asks for them first (EQ-15); said in words only where nothing asks.
+  if (refusal.kind === 'reauth') return 'Confirme ton mot de passe et ton code : rien n’a été enregistré.';
   switch (refusal.code) {
     case 'invoice_not_found':
       return 'Ce document n’existe plus, ou il n’est pas à toi.';

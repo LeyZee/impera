@@ -32,6 +32,7 @@ import {
 
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
+import { useFollowDeviceZone } from '@/pwa/device-zone';
 import { useOnline } from '@/pwa/online';
 import { HoldProvider } from '@/reports/Hold';
 import { ReopenProvider } from '@/reports/reopen';
@@ -61,6 +62,8 @@ export interface Account {
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   const rail = useMemo(() => railOf(user), [user]);
+  // A member's record takes the zone of the phone at each opening (recette CHT-01): his screens speak his hour.
+  useFollowDeviceZone(user);
   const account = useMemo(
     () => ({
       name: user.name,
@@ -322,8 +325,12 @@ export function RailNav({
       </Link>
       <span className="nv-rail__lens" ref={lensRef} aria-hidden="true" />
       {rail.items.map((item, index) => {
-        // The first tab of a family opens it: with a heading, or a gap when the family has that tab alone.
-        const opens = item.family === rail.items[index - 1]?.family ? null : item.family;
+        // The first tab of a family opens it: with a heading, or a gap when the family has that tab alone. A rail with no
+        // heading at all (the operator's) is one list: no gap, its tabs 42 px apart as in a family (PIL-15).
+        const opens =
+          item.family === rail.items[index - 1]?.family || (index > 0 && rail.headed.size === 0)
+            ? null
+            : item.family;
         return (
           <Fragment key={item.to}>
             {opens !== null ? (
@@ -425,7 +432,7 @@ export function MoreSheet({
         aria-labelledby="nv-more-title"
         onKeyDown={keepTabInside}
       >
-        <h2 className="nv-more__title" id="nv-more-title">
+        <h2 className="nv-eyebrow nv-more__title" id="nv-more-title">
           Plus
         </h2>
         {items.map((item, index) => (

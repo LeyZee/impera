@@ -156,6 +156,13 @@ export async function verifyNow(provider: AiProvider): Promise<ProviderStatus> {
   );
 }
 
+/** « Essai réel » (ADR 0091 § 7): one tiny real call, paid, on the owner's click. */
+export async function probeNow(provider: AiProvider): Promise<ProviderStatus> {
+  return parsed(await call(`/${provider}/probe`, { method: 'POST' }), (body) =>
+    ProviderStatusSchema.parse(body),
+  );
+}
+
 export async function saveSettings(
   provider: AiProvider,
   settings: ProviderSettings,

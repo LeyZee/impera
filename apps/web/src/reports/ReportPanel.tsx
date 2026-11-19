@@ -1,5 +1,6 @@
 import {
   newId,
+  SHIFT_REPORT_MAX_MINOR,
   ShiftReportIdSchema,
   type ShiftReport,
   type ShiftReportContext,
@@ -15,11 +16,14 @@ import {
   useRefreshReports,
   useReportContext,
   useReportEstimate,
+  useReportsOf,
   type ReportOutcome,
 } from './api';
+import { dropDraft, keepDraft, keptDraft } from './draft';
 import {
   amountInput,
   amountText,
+  amountTooLarge,
   CURRENCY_SIGNS,
   CURRENCY_WORDS,
   currencyTyped,
@@ -29,12 +33,15 @@ import {
   MEMBER_STATUS,
   parseAmount,
   periodLine,
+  previousPeriod,
   READ_AGAIN,
   REPORT_ERRORS,
   reportOf,
   signedAmountText,
   STATUS_TONES,
   uncheckedText,
+  unusualAmount,
+  usualReport,
   validatedTotal,
   WITHOUT_PAY_EFFECT,
   withoutPayEffect,
@@ -45,6 +52,7 @@ import { accountLine, platformName, swapShiftLine } from '@/scheduling/model';
 import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 const COMMENT_MAX = 1000;
 
@@ -101,18 +109,12 @@ export function ReportPanel({
     >
       {context.isError ? (
         <div className="tm-dialog__body">
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : ce shift n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void context.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure
+            inline
+            onRetry={() => {
+              void context.refetch();
+            }}
+          />
         </div>
       ) : data === undefined ? (
         <div className="tm-dialog__body">
@@ -486,16 +488,27 @@ function Form({
   const refresh = useRefreshReports();
   const correcting = corrected !== null;
   const currency = data.rules?.currency ?? 'EUR';
-  const [reportId] = useState<ShiftReportId>(() => draft?.id ?? newId(ShiftReportIdSchema));
-  const [amount, setAmount] = useState(
-    () => draft?.amount ?? (report === null ? '' : amountInput(report.amount.amountMinor)),
+  const shiftId = data.shift.id;
+  // What the server holds, and a draft this device kept of it when the panel is not reopened from the island (CHT-29).
+  const base = {
+    amount: report === null ? '' : amountInput(report.amount.amountMinor),
+    comment: report?.comment ?? '',
+    incidentOn: (report?.incident ?? null) !== null,
+    incident: report?.incident ?? '',
+    explanation: report?.explanation ?? '',
+  };
+  const basisId = report?.id ?? null;
+  const basisVersion = report?.version ?? null;
+  const [start] = useState(
+    () => draft ?? keptDraft(shiftId, correcting, { reportId: basisId, version: basisVersion }),
   );
-  const [comment, setComment] = useState(() => draft?.comment ?? report?.comment ?? '');
-  const [incidentOn, setIncidentOn] = useState(
-    () => draft?.incidentOn ?? (report?.incident ?? null) !== null,
-  );
-  const [incident, setIncident] = useState(() => draft?.incident ?? report?.incident ?? '');
-  const [explanation, setExplanation] = useState(() => draft?.explanation ?? report?.explanation ?? '');
+  const fromDevice = draft === null && start !== null;
+  const [reportId] = useState<ShiftReportId>(() => start?.id ?? newId(ShiftReportIdSchema));
+  const [amount, setAmount] = useState(() => start?.amount ?? base.amount);
+  const [comment, setComment] = useState(() => start?.comment ?? base.comment);
+  const [incidentOn, setIncidentOn] = useState(() => start?.incidentOn ?? base.incidentOn);
+  const [incident, setIncident] = useState(() => start?.incident ?? base.incident);
+  const [explanation, setExplanation] = useState(() => start?.explanation ?? base.explanation);
   const now = useNow(15_000);
   const platform = platformName(data.account.platform);
   // A report the platform reads otherwise (ADR 0073 § 5): its member explains the gap, or corrects the amount.
@@ -503,7 +516,13 @@ function Form({
     report !== null &&
     !correcting &&
     ((report.check?.state === 'complete' && report.check.verdict === 'gap') || report.explanation !== null);
-  const [touched, setTouched] = useState(draft !== null);
+  const [touched, setTouched] = useState(start !== null);
+  /** An unusual amount the member was asked to look at again: the next send takes it as it is (CHT-29). */
+  const [asked, setAsked] = useState<number | null>(null);
+  // The member's usual report, over this period and the one before: an amount far above it is confirmed first.
+  const history = useReportsOf([previousPeriod(data.period), data.period]);
+  const usual =
+    history.list === null ? null : usualReport(history.list.reports, data.shift.memberId, currency);
   /** How many sends found something to fix: each takes the reader to the first field to fix. */
   const [tries, setTries] = useState(0);
 
@@ -523,9 +542,11 @@ function Form({
     typed !== null && typed !== currency
       ? `Ce compte se déclare ${CURRENCY_WORDS[currency]} : tape le montant seul, sans devise.`
       : minor === null
-        ? correcting
-          ? 'Un montant à ajouter ou retirer, comme 20 ou −15,50.'
-          : 'Un montant comme 120 ou 85,50, 0 si le shift n’a rien vendu.'
+        ? amountTooLarge(amount, correcting)
+          ? `Au plus ${amountText(SHIFT_REPORT_MAX_MINOR, currency)} par ${correcting ? 'correction' : 'rapport'} : vérifie le montant.`
+          : correcting
+            ? 'Un montant à ajouter ou retirer, comme 20 ou −15,50.'
+            : 'Un montant comme 120 ou 85,50, 0 si le shift n’a rien vendu.'
         : correcting && minor === 0
           ? 'Une correction ajoute ou retire : 0 ne change rien.'
           : correcting && total + minor < 0
@@ -542,6 +563,49 @@ function Form({
     (comment.trim() === '' ? null : comment.trim()) === report.comment &&
     (incidentOn ? incident.trim() : null) === report.incident &&
     (!explaining || (explanation.trim() === '' ? null : explanation.trim()) === report.explanation);
+
+  const changed =
+    amount !== base.amount ||
+    comment !== base.comment ||
+    incidentOn !== base.incidentOn ||
+    incident !== base.incident ||
+    (explaining && explanation !== base.explanation);
+  const unusual =
+    minor !== null && minor !== report?.amount.amountMinor && unusualAmount(minor, usual) ? minor : null;
+
+  // Kept on this device as it is typed, so that a reload loses nothing; back to what the server holds, forgotten.
+  useEffect(() => {
+    if (!changed) {
+      dropDraft(shiftId, correcting);
+      return;
+    }
+    keepDraft(
+      shiftId,
+      {
+        id: reportId,
+        correcting,
+        amount,
+        comment,
+        incidentOn,
+        incident,
+        ...(explaining && { explanation }),
+      },
+      { reportId: basisId, version: basisVersion },
+    );
+  }, [
+    changed,
+    shiftId,
+    correcting,
+    reportId,
+    amount,
+    comment,
+    incidentOn,
+    incident,
+    explaining,
+    explanation,
+    basisId,
+    basisVersion,
+  ]);
 
   const draftNow = (): ReportDraft => ({
     id: reportId,
@@ -561,7 +625,13 @@ function Form({
     }
     // A report still waiting, left as it was: nothing to send.
     if (report?.status === 'submitted' && unchanged) {
+      dropDraft(shiftId, correcting);
       onClose();
+      return;
+    }
+    // An amount far above the member's usual report: said once, the next send takes it (CHT-29).
+    if (unusual !== null && asked !== unusual) {
+      setAsked(unusual);
       return;
     }
     const mine = draftNow();
@@ -605,6 +675,7 @@ function Form({
       async (): Promise<HoldResult> => {
         const outcome = await send();
         if (outcome.kind === 'ok') {
+          dropDraft(shiftId, correcting);
           await refresh();
           return { ok: true, title: verb, text: `${text} · en attente de validation` };
         }
@@ -638,6 +709,7 @@ function Form({
         submit();
       }}
     >
+      {fromDevice ? <p className="tm-hint">Repris du brouillon gardé sur cet appareil.</p> : null}
       {report?.status === 'rejected' && report.reviewNote !== null ? (
         <div className="rp-notice nv-enter" data-tone="warn">
           <p className="rp-notice__title">Renvoyé par l’agence</p>
@@ -789,20 +861,45 @@ function Form({
         </div>
       )}
 
+      {unusual !== null && asked === unusual ? (
+        <div className="rp-notice nv-enter" data-tone="warn" role="status">
+          <p className="rp-notice__title">
+            <span className="nv-num">
+              {correcting ? signedAmountText(unusual, currency) : amountText(unusual, currency)}
+            </span>{' '}
+            : vérifie le montant
+          </p>
+          <p className="rp-notice__text">
+            {usual === null ? (
+              'C’est beaucoup pour un shift.'
+            ) : (
+              <>
+                Plus de cinq fois {memberName === null ? 'ton' : 'le'} rapport habituel
+                {memberName === null ? '' : ` de ${memberName}`} (
+                <span className="nv-num">{amountText(usual, currency)}</span>).
+              </>
+            )}{' '}
+            S’il est juste, appuie encore pour l’envoyer.
+          </p>
+        </div>
+      ) : null}
+
       <div className="tm-dialog__foot">
         <button type="button" className="nv-btn nv-btn--plain" onClick={onClose}>
           Fermer
         </button>
         <button type="submit" className="nv-btn nv-btn--neon" aria-disabled={touched && !ready}>
-          {correcting
-            ? 'Envoyer la correction'
-            : report === null
-              ? 'Envoyer mon rapport'
-              : report.status === 'rejected'
-                ? unchanged
-                  ? 'Renvoyer tel quel'
-                  : 'Renvoyer'
-                : 'Enregistrer'}
+          {unusual !== null && asked === unusual
+            ? 'Oui, l’envoyer'
+            : correcting
+              ? 'Envoyer la correction'
+              : report === null
+                ? 'Envoyer mon rapport'
+                : report.status === 'rejected'
+                  ? unchanged
+                    ? 'Renvoyer tel quel'
+                    : 'Renvoyer'
+                  : 'Enregistrer'}
         </button>
       </div>
     </form>

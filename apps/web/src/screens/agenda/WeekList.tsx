@@ -53,7 +53,7 @@ export function WeekList({
       {routines.length === 0 ? null : (
         <section className="ag-sec">
           <div className="ag-sec__head">
-            <h2>{routines.length === 1 ? 'Routine proposée' : 'Routines proposées'}</h2>
+            <h2 className="nv-h2">{routines.length === 1 ? 'Routine proposée' : 'Routines proposées'}</h2>
             <span className="ag-count nv-num">{routines.length}</span>
           </div>
           {cards(routines)}

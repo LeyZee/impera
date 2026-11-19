@@ -22,6 +22,7 @@ import type {
   ComposeResult,
   Conversation,
   DraftComposer,
+  DraftScriptStep,
   DraftVoice,
   EventMeta,
   FanDirectory,
@@ -348,8 +349,8 @@ async function recordScriptRuns(
   stored: StoredScriptRun | null,
   change: ScriptRunChange | undefined,
   meta: EventMeta,
-): Promise<Conversation> {
-  if (change === undefined) return conversation;
+): Promise<{ readonly conversation: Conversation; readonly step?: DraftScriptStep }> {
+  if (change === undefined) return { conversation };
   let current = conversation;
   const journal = async (id: StoredScriptRun['id'], events: readonly ScriptRunJournalEvent[]) => {
     for (const event of events) current = await appendEvent(tx, current, scriptEventOf(event, id), meta);
@@ -377,7 +378,10 @@ async function recordScriptRuns(
       meta,
     );
   }
-  return current;
+  // The step goes with the draft only once its run was written, like the offer.
+  return written && change.step !== undefined
+    ? { conversation: current, step: change.step }
+    : { conversation: current };
 }
 
 /**
@@ -512,8 +516,18 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // No script left for him where one would open (ADR 0150 § 9): said once, until a script starts again for him.
+      if (result.scriptsExhausted === true && !(await tx.events.scriptsExhaustedSaid(conversation.id))) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'scripts_exhausted', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       // His script runs as his message and Reveal left them (ADR 0098); the step decided only with a draft.
-      conversation = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
+      const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
+      conversation = scripted.conversation;
       if (result.kind === 'draft') {
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {
@@ -542,6 +556,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.voice !== undefined && { voice: result.voice }),
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
+          ...(scripted.step !== undefined && { scriptStep: scripted.step }),
         });
         await appendEvent(
           tx,

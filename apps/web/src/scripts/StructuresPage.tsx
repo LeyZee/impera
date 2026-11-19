@@ -7,7 +7,7 @@ import {
   type ScriptStarter,
   type ScriptStructure,
 } from '@impera/contracts';
-import { useBlocker } from '@tanstack/react-router';
+import { Link, useBlocker } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { Queues } from './Queues';
@@ -21,6 +21,7 @@ import { useCreators } from '@/creators/api';
 import { Segment } from '@/creators/persona/fields';
 import '@/creators/persona/persona.css';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
 
@@ -82,17 +83,7 @@ export function StructuresPage(): JSX.Element {
     if (structures.isError) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">Les structures ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void structures.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={() => void structures.refetch()} />
         </section>
       );
     }
@@ -203,7 +194,12 @@ export function StructuresPage(): JSX.Element {
   return (
     <Page>
       <PageHeader
-        eyebrow="Créatrices"
+        // The way back to the list, as on a creator's sheet: the same eyebrow on every screen of Créatrices (COH-01).
+        eyebrow={
+          <Link to="/creatrices" className="nv-btn nv-btn--plain nv-btn--sm">
+            ← Créatrices
+          </Link>
+        }
         title="Structures de script"
         lead="Les étapes que tes créatrices tournent, leurs cartons et leur couleur. Une structure se tourne carton par carton."
         actions={

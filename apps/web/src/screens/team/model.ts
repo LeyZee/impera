@@ -14,8 +14,8 @@ import {
 
 import { countryName } from '@/lib/country';
 import { memberOf } from '@/lib/utils';
-import { platformName } from '@/scheduling/model';
-import { mondayOf, withFirstOfMonth } from '@/scheduling/time';
+import { platformName, type Unheld } from '@/scheduling/model';
+import { clockAt, mondayOf, readerZone, withFirstOfMonth } from '@/scheduling/time';
 
 /**
  * Équipe › Membres, without React (EQ-01): who shows in which tab, how a status, a rate, a country and an invitation
@@ -31,6 +31,13 @@ export const STATUS_LABELS: Readonly<Record<TeamMemberStatus, string>> = {
   suspended: 'Suspendu',
   left: 'Parti',
 };
+
+/**
+ * What a shift nobody holds says on the planning (recette EQP-03, EQU-01): its member's status, « Suspendu », or « Sans
+ * accès » when its creator is no longer on his list.
+ */
+export const unheldLabel = (unheld: Unheld): string =>
+  unheld.kind === 'away' ? STATUS_LABELS[unheld.status] : 'Sans accès';
 
 /** A member away, in a sentence: « Théo est suspendu ». */
 export const AWAY_WORDS: Readonly<Record<Exclude<TeamMemberStatus, 'active'>, string>> = {
@@ -104,23 +111,6 @@ export function listMembers(members: readonly TeamMember[], tab: TeamRole, query
     gone: shown.filter((member) => member.status === 'left'),
     counts,
   };
-}
-
-/** The sentence under the title: how many are at work, away, and still to sign in. */
-export function teamSummary(members: readonly TeamMember[], now: Date): string | null {
-  const here = members.filter((member) => member.status !== 'left');
-  if (here.length === 0) return null;
-  const active = here.filter((member) => member.status === 'active').length;
-  const away = here.filter((member) => STATUS_TONES[member.status] === 'away').length;
-  // A dead link is no invitation waiting: it is counted apart, since it asks for a new link (EQ-06).
-  const expired = here.filter((member) => invitationState(member, now).kind === 'expired').length;
-  const pending = here.filter((member) => member.invitationPending).length - expired;
-  const parts = [`${String(active)} actif${active > 1 ? 's' : ''}`];
-  if (away > 0) parts.push(`${String(away)} absent${away > 1 ? 's' : ''}`);
-  if (pending > 0) parts.push(`${String(pending)} invitation${pending > 1 ? 's' : ''} en attente`);
-  if (expired > 0)
-    parts.push(`${String(expired)} lien${expired > 1 ? 's' : ''} expiré${expired > 1 ? 's' : ''}`);
-  return parts.join(' · ');
 }
 
 const PERCENT = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 2 });
@@ -282,6 +272,9 @@ const NOTE_DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'shor
 /** « 27 oct. », « 1er nov. »: the day an internal note was written, in the reader's zone. */
 export const noteDay = (iso: string): string => withFirstOfMonth(NOTE_DAY.formatToParts(new Date(iso)));
 
+/** « 16 nov. à 17 h 02 »: when a phone moved a member's zone, in the reader's hour (recette CHT-01). */
+export const zoneChangeAt = (iso: string): string => `${noteDay(iso)} à ${clockAt(iso, readerZone())}`;
+
 /** The rate set to start after `day`, the nearest one: `member.commission` stays the one in force until then. */
 export const rateAhead = (rates: readonly CommissionRate[], day: string): CommissionRate | null =>
   rates
@@ -308,10 +301,14 @@ export interface TeamSearch {
   readonly membre?: string | undefined;
 }
 
-/** Anything else in the address is ignored: a broken link opens the list, never an error. */
+/**
+ * Anything else in the address is ignored: a broken link opens the list, never an error. Each key is said, `undefined`
+ * when thrown away: a page's search is laid over the raw address, so a key left out would keep what the link said
+ * (recette CHT-06).
+ */
 export function parseTeamSearch(search: Record<string, unknown>): TeamSearch {
   const { onglet } = search;
-  return { ...(onglet === 'managers' ? { onglet } : {}), ...memberOf(search) };
+  return { onglet: onglet === 'managers' ? onglet : undefined, membre: memberOf(search).membre };
 }
 
 /**
@@ -323,14 +320,20 @@ export interface PlanningSearch {
   readonly membre?: string | undefined;
 }
 
-/** A real day, said as its week's Monday; anything else opens this week. */
+/**
+ * A real day, said as its week's Monday; anything else opens this week. Each key is said, `undefined` when thrown away
+ * (see `parseTeamSearch`): `?semaine=abc` no longer reaches the page and breaks it (recette CHT-06).
+ */
 export function parsePlanningSearch(search: Record<string, unknown>): PlanningSearch {
-  const { semaine } = search;
-  const member = memberOf(search);
-  if (typeof semaine !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(semaine)) return member;
+  return { semaine: weekOfAddress(search['semaine']), membre: memberOf(search).membre };
+}
+
+/** `?semaine=`: a real calendar day, said as its week's Monday, or nothing. */
+function weekOfAddress(semaine: unknown): string | undefined {
+  if (typeof semaine !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(semaine)) return undefined;
   const day = new Date(`${semaine}T12:00:00Z`);
-  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== semaine) return member;
-  return { semaine: mondayOf(semaine), ...member };
+  if (Number.isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== semaine) return undefined;
+  return mondayOf(semaine);
 }
 
 /** `/equipe/rapports?quinzaine=2026-10-16&membre=<id>`: the period shown and the member's fold open (EQ-11, EQ-13). */
@@ -341,7 +344,7 @@ export interface ReportsSearch {
 
 export function parseReportsSearch(search: Record<string, unknown>): ReportsSearch {
   const period = PayPeriodSchema.safeParse(search['quinzaine']);
-  return { ...(period.success ? { quinzaine: period.data } : {}), ...memberOf(search) };
+  return { quinzaine: period.success ? period.data : undefined, membre: memberOf(search).membre };
 }
 
 /**

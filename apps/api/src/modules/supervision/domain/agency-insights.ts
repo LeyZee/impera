@@ -7,6 +7,8 @@ import {
   type AgencyInsights,
   type AgencyPeriod,
   type AgencySaleKind,
+  type AgencySpan,
+  type AgencySpanQuery,
   type AgencySubscriberFigures,
   type AgencySubscribers,
   type CreatorId,
@@ -40,6 +42,80 @@ export function agencyRange(
     new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
   const from = shift(to, -(length - 1));
   return { from, to, previousFrom: shift(from, -length), previousTo: shift(from, -1) };
+}
+
+/** The days a read covers and how they were chosen (ADR 0146): the period, its comparison, and the span said back. */
+export interface AgencyRange {
+  readonly from: string;
+  readonly to: string;
+  readonly previousFrom: string;
+  readonly previousTo: string;
+}
+
+const dayNumber = (day: string): number => Date.parse(`${day}T00:00:00Z`) / DAY_MS;
+const dayCount = (from: string, to: string): number => dayNumber(to) - dayNumber(from) + 1;
+const minDay = (a: string, b: string): string => (a < b ? a : b);
+
+/** The natural bounds of the day, week (Monday to Sunday) or calendar month holding `day`. */
+export function periodAround(unit: 'day' | 'week' | 'month', day: string): { from: string; to: string } {
+  if (unit === 'day') return { from: day, to: day };
+  if (unit === 'week') {
+    const isoDay = ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+    const from = shiftDay(day, 1 - isoDay);
+    return { from, to: shiftDay(from, 6) };
+  }
+  const from = `${day.slice(0, 7)}-01`;
+  const [year, month] = [Number(day.slice(0, 4)), Number(day.slice(5, 7))];
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { from, to: `${day.slice(0, 7)}-${String(last).padStart(2, '0')}` };
+}
+
+/**
+ * The days asked (ADR 0146 § 1 to § 3, § 6), in `timeZone`: a period running past today is read up to today and its
+ * comparison cut at as many days; the comparison always ends before the period. Null when the comparison asked does
+ * not (a refusal, never a guess). The older `period` keeps its rolling days (ADR 0078 § 3).
+ */
+export function agencySpan(
+  query: AgencySpanQuery,
+  now: Date,
+  timeZone: string,
+): { range: AgencyRange; span: AgencySpan } | null {
+  const today = calendarDayAt(now, timeZone);
+  if (query.kind === 'rolling') {
+    const range = agencyRange(query.period, now, timeZone);
+    return { range, span: { unit: 'rolling', partial: false, end: range.to, compare: 'previous', today } };
+  }
+  let natural: { from: string; to: string };
+  let compare: { from: string; to: string };
+  if (query.kind === 'custom') {
+    natural = { from: minDay(query.from, today), to: query.to };
+    const length = dayCount(natural.from, natural.to);
+    const first = query.compareAt ?? shiftDay(natural.from, -length);
+    compare = { from: first, to: shiftDay(first, length - 1) };
+  } else {
+    natural = periodAround(query.unit, minDay(query.at ?? today, today));
+    compare =
+      query.compareAt === undefined
+        ? periodAround(query.unit, shiftDay(natural.from, -1))
+        : periodAround(query.unit, query.compareAt);
+  }
+  if (compare.to >= natural.from) return null;
+  const partial = natural.to > today;
+  const to = partial ? today : natural.to;
+  // A period cut at today is compared on as many days (§ 2), never past the comparison's own end.
+  const previousTo = partial
+    ? minDay(compare.to, shiftDay(compare.from, dayCount(natural.from, to) - 1))
+    : compare.to;
+  return {
+    range: { from: natural.from, to, previousFrom: compare.from, previousTo },
+    span: {
+      unit: query.kind === 'custom' ? 'custom' : query.unit,
+      partial,
+      end: natural.to,
+      compare: query.compareAt === undefined ? 'previous' : 'chosen',
+      today,
+    },
+  };
 }
 
 /** The days from `from` to `to`, both included. */
@@ -114,6 +190,8 @@ export interface AgencyCreatorRead {
   readonly fans: readonly FanSum[];
   /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
   readonly refundsWithoutSale: number;
+  /** The day of her register's oldest line, in the platform's zone; null without one (ADR 0146 § 4). */
+  readonly registerSince: string | null;
   /** Her accounts' days in the statistics' snapshot, from the day before the previous period to today. */
   readonly stats: readonly StatsDay[];
 }
@@ -231,15 +309,20 @@ const hasAny = (figures: AgencyFigures): boolean =>
 
 /** The insights of `creators` over `range`, in euro cents; `names` maps a member id to his display name. */
 export function agencyInsights(input: {
-  readonly period: AgencyPeriod;
-  readonly range: { from: string; to: string; previousFrom: string; previousTo: string };
+  /** The older form's period, null for a calendar's (ADR 0146 § 6). */
+  readonly period: AgencyPeriod | null;
+  readonly span: AgencySpan;
+  readonly range: AgencyRange;
   readonly creators: readonly AgencyCreatorRead[];
   readonly names: ReadonlyMap<string, string>;
   readonly rate: UsdRate | null;
   /** The platform's zone, the days' and hours'. */
   readonly timeZone: string;
 }): AgencyInsights {
-  const { period, range, creators, names, rate, timeZone } = input;
+  const { period, span, range, creators, names, rate, timeZone } = input;
+  // One day read: its hours fill the chart (ADR 0078 § 4).
+  const oneDay = range.from === range.to;
+  const previousByDay = new Map<string, Pot>();
   const total: Pair = { current: pot(), previous: pot() };
   const byDay = new Map<string, { all: Pot; creator: Map<CreatorId, Pot>; kind: Map<AgencySaleKind, Pot> }>();
   const byKind = new Map<AgencySaleKind, Pair>();
@@ -262,7 +345,12 @@ export function agencyInsights(input: {
       const seller = bySeller.get(key) ?? { seller: row.seller, current: pot(), previous: pot() };
       bySeller.set(key, seller);
       add(seller[side], row);
-      if (!current) continue;
+      if (!current) {
+        const before = previousByDay.get(row.day) ?? pot();
+        previousByDay.set(row.day, before);
+        add(before, row);
+        continue;
+      }
       const day = byDay.get(row.day) ?? {
         all: pot(),
         creator: new Map<CreatorId, Pot>(),
@@ -295,7 +383,7 @@ export function agencyInsights(input: {
       cell[slot] += sum.grossMinor;
       if (sum.currency === 'USD' && sum.grossMinor !== 0) dollarsSeen = true;
       const hour = hourly[sum.hour];
-      if (period !== 'day' || hour === undefined) continue;
+      if (!oneDay || hour === undefined) continue;
       hour.all[slot] += sum.grossMinor;
       const ofCreator = hour.creator.get(creator.creatorId) ?? [0, 0];
       ofCreator[slot] += sum.grossMinor;
@@ -357,9 +445,15 @@ export function agencyInsights(input: {
         (creatorNames.get(a.creatorId) ?? '').localeCompare(creatorNames.get(b.creatorId) ?? '', 'fr'),
     );
 
+  const firstDays = creators
+    .map((creator) => creator.registerSince)
+    .filter((day): day is string => day !== null)
+    .sort();
   return {
     period,
+    span,
     ...range,
+    registerSince: firstDays[0] ?? null,
     creators: creators.map((creator) => ({ creatorId: creator.creatorId, name: creator.name })),
     totals: { current: figuresOf(total.current, rate), previous: figuresOf(total.previous, rate) },
     days: daysBetween(range.from, range.to).map((day) => {
@@ -382,6 +476,10 @@ export function agencyInsights(input: {
           .filter((one) => one.revenueMinor !== 0),
       };
     }),
+    previousDays: daysBetween(range.previousFrom, range.previousTo).map((day) => ({
+      day,
+      revenueMinor: figuresOf(previousByDay.get(day) ?? pot(), rate).revenueMinor,
+    })),
     kinds: AgencySaleKindSchema.options.flatMap((kind) => {
       const pair = byKind.get(kind);
       if (pair === undefined) return [];
@@ -414,22 +512,21 @@ export function agencyInsights(input: {
       ),
     byCreator: creatorFigures,
     hours: hours.map((row) => row.map(([eur, usd]) => eur + toEur(usd, rate))),
-    hourly:
-      period === 'day'
-        ? hourly.map((hour, i) => ({
-            hour: i,
-            revenueMinor: hour.all[0] + toEur(hour.all[1], rate),
-            byCreator: [...hour.creator]
-              .map(([creatorId, [eur, usd]]) => ({ creatorId, revenueMinor: eur + toEur(usd, rate) }))
-              .filter((one) => one.revenueMinor !== 0),
-            byKind: AgencySaleKindSchema.options
-              .map((kind) => {
-                const [eur, usd] = hour.kind.get(kind) ?? [0, 0];
-                return { kind, revenueMinor: eur + toEur(usd, rate) };
-              })
-              .filter((one) => one.revenueMinor !== 0),
-          }))
-        : [],
+    hourly: oneDay
+      ? hourly.map((hour, i) => ({
+          hour: i,
+          revenueMinor: hour.all[0] + toEur(hour.all[1], rate),
+          byCreator: [...hour.creator]
+            .map(([creatorId, [eur, usd]]) => ({ creatorId, revenueMinor: eur + toEur(usd, rate) }))
+            .filter((one) => one.revenueMinor !== 0),
+          byKind: AgencySaleKindSchema.options
+            .map((kind) => {
+              const [eur, usd] = hour.kind.get(kind) ?? [0, 0];
+              return { kind, revenueMinor: eur + toEur(usd, rate) };
+            })
+            .filter((one) => one.revenueMinor !== 0),
+        }))
+      : [],
     fans: {
       paying: spent.length,
       previousPaying,
