@@ -1351,11 +1351,15 @@ export const MY_FIGURES_MIN_SALES = 30;
 
 const MyNetSchema = z.object({ currency: CurrencySchema, netMinor: z.number().int() });
 
-/** A day of the member's own lines: how many sales and refunds, and their net per currency. */
+/**
+ * A day of the member's own lines: how many sales and refunds were read, how many shifts count from their validated
+ * report instead (ADR 0118 § 10: a report gives a total, never its sales), and the net of all of it per currency.
+ */
 export const MyFiguresDaySchema = z.object({
   day: CalendarDaySchema,
   sales: z.number().int().min(0),
   refunds: z.number().int().min(0),
+  reports: z.number().int().min(0),
   nets: z.array(MyNetSchema),
 });
 export type MyFiguresDay = z.infer<typeof MyFiguresDaySchema>;
@@ -1371,11 +1375,11 @@ export type MyFiguresCell = z.infer<typeof MyFiguresCellSchema>;
 
 /**
  * `GET /v1/payroll/my-figures` (any member) → 200: the member's own figures (ADR 0104 § A), read from their own
- * statements only, never from the register: never another member's sale, a team's mean, the agency's share nor a fan.
+ * statements and their own validated reports (ADR 0118 § 10) only, never from the register: never another member's sale, a team's mean, the agency's share nor a fan.
  * - `days`, the period under way day by day in the agency's zone, and `nets` their sum; `previous`, the period before
  *   with `toDateNets` stopped at the same day of the fortnight (`null` without a statement for it);
- * - `hours`, the sales of the last `MY_FIGURES_WEEKS` weeks by weekday and hour in the member's zone, `enough` from
- *   `MY_FIGURES_MIN_SALES` sales on;
+ * - `hours`, the sales read in the last `MY_FIGURES_WEEKS` weeks by weekday and hour in the member's zone, `enough`
+ *   from `MY_FIGURES_MIN_SALES` sales on (a report has no hour of sale: it is not there);
  * - `records`, the best day and the best fortnight in the currency that brought the most.
  * Everything empty for the owner outside the team.
  */
