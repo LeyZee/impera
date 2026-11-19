@@ -13,6 +13,8 @@ import {
   agencyInsights,
   agencyTransferVat,
   agencyRange,
+  agencySpan,
+  periodAround,
   subscribersOf,
   type AgencyCreatorRead,
   type StatsDay,
@@ -26,6 +28,13 @@ const THEO = newId(TeamMemberIdSchema);
 const NAMES = new Map([[THEO, 'Théo']]);
 const theo: SaleSeller = { kind: 'member', memberId: THEO };
 const RANGE = { from: '2026-11-04', to: '2026-11-06', previousFrom: '2026-11-01', previousTo: '2026-11-03' };
+const SPAN = {
+  unit: 'rolling',
+  partial: false,
+  end: RANGE.to,
+  compare: 'previous',
+  today: RANGE.to,
+} as const;
 
 function row(patch: Partial<SalesTotalsRow> = {}): SalesTotalsRow {
   return {
@@ -59,6 +68,7 @@ function creator(
     hours: [],
     fans: [],
     refundsWithoutSale: 0,
+    registerSince: null,
     stats: [],
     ...more,
   };
@@ -69,8 +79,104 @@ const insights = (
   rate: { day: string; rateMicros: number } | null = null,
 ) =>
   AgencyInsightsSchema.parse(
-    agencyInsights({ period: 'week', range: RANGE, creators, names: NAMES, rate, timeZone: 'Europe/Paris' }),
+    agencyInsights({
+      period: 'week',
+      span: SPAN,
+      range: RANGE,
+      creators,
+      names: NAMES,
+      rate,
+      timeZone: 'Europe/Paris',
+    }),
   );
+
+describe('agencySpan (ADR 0146)', () => {
+  // The 16th of November, 23h45 in Paris.
+  const now = new Date('2026-11-16T22:45:00Z');
+  const zone = 'Europe/Paris';
+
+  it('finds the day, the week from Monday and the calendar month around a day', () => {
+    expect(periodAround('day', '2026-11-16')).toEqual({ from: '2026-11-16', to: '2026-11-16' });
+    expect(periodAround('week', '2026-11-16')).toEqual({ from: '2026-11-16', to: '2026-11-22' });
+    expect(periodAround('week', '2026-11-15')).toEqual({ from: '2026-11-09', to: '2026-11-15' });
+    expect(periodAround('month', '2026-02-10')).toEqual({ from: '2026-02-01', to: '2026-02-28' });
+    expect(periodAround('month', '2028-02-10')).toEqual({ from: '2028-02-01', to: '2028-02-29' });
+  });
+
+  it('reads the month running up to today and compares it on as many days of the month before', () => {
+    expect(agencySpan({ kind: 'calendar', unit: 'month' }, now, zone)).toEqual({
+      range: { from: '2026-11-01', to: '2026-11-16', previousFrom: '2026-10-01', previousTo: '2026-10-16' },
+      span: { unit: 'month', partial: true, end: '2026-11-30', compare: 'previous', today: '2026-11-16' },
+    });
+  });
+
+  it('compares a whole month with the whole month before, whatever their lengths', () => {
+    expect(agencySpan({ kind: 'calendar', unit: 'month', at: '2026-03-04' }, now, zone)?.range).toEqual({
+      from: '2026-03-01',
+      to: '2026-03-31',
+      previousFrom: '2026-02-01',
+      previousTo: '2026-02-28',
+    });
+  });
+
+  it('compares with the month chosen, cut at as many days, never past its own end', () => {
+    expect(agencySpan({ kind: 'calendar', unit: 'month', compareAt: '2025-11-20' }, now, zone)).toMatchObject(
+      {
+        range: { previousFrom: '2025-11-01', previousTo: '2025-11-16' },
+        span: { compare: 'chosen' },
+      },
+    );
+    // The 31st of March read whole, compared with February: its 28 days.
+    expect(
+      agencySpan(
+        { kind: 'calendar', unit: 'month', at: '2027-03-31', compareAt: '2027-02-01' },
+        new Date('2027-03-31T12:00:00Z'),
+        zone,
+      )?.range,
+    ).toMatchObject({ previousFrom: '2027-02-01', previousTo: '2027-02-28' });
+  });
+
+  it('never reads a day to come and refuses a comparison that does not end before', () => {
+    expect(agencySpan({ kind: 'calendar', unit: 'day', at: '2026-12-01' }, now, zone)?.range).toEqual({
+      from: '2026-11-16',
+      to: '2026-11-16',
+      previousFrom: '2026-11-15',
+      previousTo: '2026-11-15',
+    });
+    expect(agencySpan({ kind: 'calendar', unit: 'week', compareAt: '2026-11-17' }, now, zone)).toBeNull();
+    expect(agencySpan({ kind: 'calendar', unit: 'month', compareAt: '2026-11-02' }, now, zone)).toBeNull();
+  });
+
+  it('cuts the week running at today, compared on as many days of the week before', () => {
+    expect(agencySpan({ kind: 'calendar', unit: 'week', at: '2026-11-12' }, now, zone)?.range).toEqual({
+      from: '2026-11-09',
+      to: '2026-11-15',
+      previousFrom: '2026-11-02',
+      previousTo: '2026-11-08',
+    });
+    expect(
+      agencySpan({ kind: 'calendar', unit: 'week' }, new Date('2026-11-18T10:00:00Z'), zone)?.range,
+    ).toEqual({ from: '2026-11-16', to: '2026-11-18', previousFrom: '2026-11-09', previousTo: '2026-11-11' });
+  });
+
+  it('puts the days chosen against as many days just before, or from the first day chosen', () => {
+    expect(agencySpan({ kind: 'custom', from: '2026-10-10', to: '2026-10-19' }, now, zone)).toEqual({
+      range: { from: '2026-10-10', to: '2026-10-19', previousFrom: '2026-09-30', previousTo: '2026-10-09' },
+      span: { unit: 'custom', partial: false, end: '2026-10-19', compare: 'previous', today: '2026-11-16' },
+    });
+    expect(
+      agencySpan({ kind: 'custom', from: '2026-10-10', to: '2026-10-19', compareAt: '2026-08-01' }, now, zone)
+        ?.range,
+    ).toMatchObject({ previousFrom: '2026-08-01', previousTo: '2026-08-10' });
+  });
+
+  it('keeps the rolling days of the older form', () => {
+    expect(agencySpan({ kind: 'rolling', period: 'quarter' }, now, zone)).toMatchObject({
+      range: { from: '2026-08-19', to: '2026-11-16' },
+      span: { unit: 'rolling', partial: false, compare: 'previous' },
+    });
+  });
+});
 
 describe('agencyRange', () => {
   it('counts today in, and puts the period of the same length just before', () => {
@@ -132,6 +238,22 @@ describe('agencyInsights', () => {
       ['2026-11-05', 1200],
       ['2026-11-06', 1000],
     ]);
+  });
+
+  it('gives every day of the comparison its revenue, and the registers’ first day (ADR 0146 § 4, § 5)', () => {
+    const result = insights([
+      creator(LINA, 'Lina', [row({ day: '2026-11-02', grossInclVatMinor: 700 }), row()], {
+        registerSince: '2026-10-20',
+      }),
+      creator(MAYA, 'Maya', [], { registerSince: '2026-10-05' }),
+    ]);
+    expect(result.previousDays).toEqual([
+      { day: '2026-11-01', revenueMinor: 0 },
+      { day: '2026-11-02', revenueMinor: 700 },
+      { day: '2026-11-03', revenueMinor: 0 },
+    ]);
+    expect(result.registerSince).toBe('2026-10-05');
+    expect(insights([creator(LINA, 'Lina', [])]).registerSince).toBeNull();
   });
 
   it("estimates the VAT added to the agency's transfers on its part alone, never on a part at zero (ADR 0106)", () => {
@@ -217,7 +339,8 @@ describe('agencyInsights', () => {
     const result = AgencyInsightsSchema.parse(
       agencyInsights({
         period: 'day',
-        range: RANGE,
+        span: { ...SPAN, end: '2026-11-05', today: '2026-11-05' },
+        range: { from: '2026-11-05', to: '2026-11-05', previousFrom: '2026-11-04', previousTo: '2026-11-04' },
         creators: [
           creator(LINA, 'Lina', [], {
             hours: [

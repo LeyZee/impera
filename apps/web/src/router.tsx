@@ -6,7 +6,7 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { useEffect, type JSX } from 'react';
 
 import { followCreator } from './agent/followed';
 import { CreatorsPage } from './creators/CreatorsPage';
@@ -28,7 +28,7 @@ import { ScriptPage } from './screens/content/ScriptPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { AgencyPage } from './screens/dashboard/agency/AgencyPage';
 import {
-  agencyPeriodOf,
+  agencySelectionOf,
   agencySearch,
   agentPeriodOf,
   dashboardSearch,
@@ -36,8 +36,10 @@ import {
   periodOf,
 } from './screens/dashboard/logic';
 import { FansPage } from './screens/fans/FansPage';
+import { HerProfilePage } from './screens/me/HerProfilePage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
+import { MyLinksPage } from './screens/me/MyLinksPage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MyProfilePage } from './screens/me/MyProfilePage';
@@ -142,14 +144,14 @@ const dashboard = createRoute({
     const rail = railOf(user);
     // The agency's figures are the owner's and an active manager's (ADR 0078 § 1): the Dashboard opens on them.
     if (user.role === 'owner' || user.teamScope === 'agency') {
-      const period = agencyPeriodOf(search);
+      const selection = agencySelectionOf(search);
       const openCreator = (id: string): void =>
-        void navigate({ search: agencySearch(period, id), replace: true });
+        void navigate({ search: agencySearch(selection, id), replace: true });
       if (search.creatrice === undefined) {
         return (
           <AgencyPage
-            period={period}
-            onPeriod={(next) => void navigate({ search: agencySearch(next), replace: true })}
+            selection={selection}
+            onSelection={(next) => void navigate({ search: agencySearch(next), replace: true })}
             onCreator={openCreator}
             forOwner={user.role === 'owner'}
             reviewsReports={canOpen(rail, '/equipe')}
@@ -159,7 +161,7 @@ const dashboard = createRoute({
       }
       return (
         <DashboardPage
-          period={agentPeriodOf(period)}
+          period={agentPeriodOf(selection)}
           onPeriod={() => undefined}
           onCreator={openCreator}
           forOwner={user.role === 'owner'}
@@ -168,10 +170,10 @@ const dashboard = createRoute({
           canAddCreator={canOpen(rail, '/creatrices')}
           asked={search.creatrice}
           agency={{
-            period,
-            onPeriod: (next) =>
+            selection,
+            onSelection: (next) =>
               void navigate({ search: agencySearch(next, search.creatrice), replace: true }),
-            onAgency: () => void navigate({ search: agencySearch(period), replace: true }),
+            onAgency: () => void navigate({ search: agencySearch(selection), replace: true }),
             canOpenSettings: user.role === 'owner',
           }}
         />
@@ -396,13 +398,21 @@ const sales = createRoute({
 const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
+  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01).
+  validateSearch: (search: Record<string, unknown>): { readonly demande?: string } => {
+    const { demande } = search;
+    return typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {};
+  },
   component: function Content() {
     const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
+    const { demande } = content.useSearch();
     return (
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+          asked={demande ?? null}
+          onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
       </>
@@ -709,20 +719,21 @@ const me = createRoute({ getParentRoute: () => rootRoute, path: '/moi' });
 const meIndex = createRoute({
   getParentRoute: () => me,
   path: '/',
-  beforeLoad: ({ context }) => {
-    // A team member's Moi opens on his profile; the file, a task of once in a while, is the next tab (CHAT-30).
+  beforeLoad: () => {
+    // Everyone's Moi opens on a short profile: a team member's file, a task of once in a while, is the next tab
+    // (CHAT-30); a creator's persona, the longest page of the app, too (recette visuelle 16/11, CRE-03).
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/profil', replace: true });
+    throw redirect({ to: '/moi/profil', replace: true });
   },
 });
 /**
- * A creator's Moi holds her persona and her security (ADR 0042 § 8): a team member's screens (his file, his invoices,
- * his calendar of shifts) send her to her persona, as her persona sends anyone else to his profile.
+ * A creator's Moi holds her profile, her persona and her security (ADR 0042 § 8, CRE-03): a team member's screens (his
+ * file, his invoices, his calendar of shifts) send her to her profile, as her persona sends anyone else to his.
  */
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/moi/persona', replace: true, state: { notice: NOT_YOURS } });
+    throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
   }
 };
 const mePersona = createRoute({
@@ -736,13 +747,25 @@ const mePersona = createRoute({
   },
   component: MyPersonaPage,
 });
+// Moi › Mes liens (INS-03, ADR 0121 § 1): hers alone; anyone else is sent to his profile.
+const meLinks = createRoute({
+  getParentRoute: () => me,
+  path: '/liens',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'creator') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: MyLinksPage,
+});
 const meProfile = createRoute({
   getParentRoute: () => me,
   path: '/profil',
-  beforeLoad: creatorAway,
-  component: function MyProfile() {
+  // Its return type is written: inferred from a choice on the context, it made the route tree's types circular.
+  component: function MyProfile(): JSX.Element {
     const { user } = rootRoute.useRouteContext();
-    return <MyProfilePage user={user} />;
+    return user.role === 'creator' ? <HerProfilePage user={user} /> : <MyProfilePage user={user} />;
   },
 });
 // Moi › Trophées (ADR 0108): the chatter's trophy case, or the creator's; anyone else is sent to his profile.
@@ -1044,8 +1067,8 @@ const extensionHelp = createRoute({
   },
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
-    // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
-    return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
+    // The trend watch is the owner's alone (ADR 0024, amendement du 16/11): the team is shown the copilot instead.
+    return <ExtensionPage watches={user.role === 'owner'} />;
   },
 });
 /** /aide/reveal (P2-01): reconnect Reveal with the extension's « Sync », the owner's alone like the button itself. */
@@ -1100,6 +1123,7 @@ const routeTree = rootRoute.addChildren([
     meFile,
     meInvoices,
     meCalendar,
+    meLinks,
     meSecurity,
     mePreferences,
   ]),

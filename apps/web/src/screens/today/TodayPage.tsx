@@ -170,12 +170,6 @@ function Day({
       <RewardRevealGate user={user} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
-      <Link to="/planning" className="sc-more">
-        Tout mon planning
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="m6 3.5 4.5 4.5-4.5 4.5" />
-        </svg>
-      </Link>
     </div>
   );
 }
@@ -232,7 +226,7 @@ function Hero({
   const urgent = urgencies(queue.data?.items ?? []);
   const toStart = new Date(shift.startsAt).getTime() - now.getTime();
   return (
-    <Panel className={`sc-hero sc-hero--${state.kind} nv-enter`}>
+    <Panel className={`sc-hero sc-hero--${state.kind}${state.kind === 'later' ? ' sc-linked' : ''} nv-enter`}>
       <div className="sc-hero__top">
         <span className={`nv-status sc-state sc-state--${state.kind}`}>
           <span
@@ -279,7 +273,12 @@ function Hero({
           <span className="nv-gauge__fill" />
         </div>
       ) : null}
-      <p className="sc-hero__note">{noteOf(state, zone)}</p>
+      {state.kind === 'later' ? (
+        // A shift ahead opens Planning from the whole card: no « Tout mon planning » under the cards (CHA-23).
+        <ToPlanning />
+      ) : (
+        <p className="sc-hero__note">{noteOf(state, zone)}</p>
+      )}
       {urgent === 0 || state.kind === 'later' ? null : (
         <p className="td-urgent">
           <span className="nv-dot nv-tone--bad" aria-hidden="true" />
@@ -326,11 +325,17 @@ function Hero({
   );
 }
 
+/** The whole card leads to Planning: a link stretched over it, read as « Voir mon planning » (CHA-23). */
+function ToPlanning(): JSX.Element {
+  return <Link to="/planning" className="sc-card-link" aria-label="Voir mon planning" />;
+}
+
 /**
  * What Impera brings him around his shift, in one line: the account line already says the platform. Until EQ-13 opens a
- * shift's conversations in Suivi, only the passations handed to him arrive there: no window is promised (CHAT-02).
+ * shift's conversations in Suivi, only the passations handed to him arrive there: no window is promised (CHAT-02). A
+ * shift ahead says nothing of them: the card leads to Planning instead (CHA-23).
  */
-function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): string {
+function noteOf(state: Exclude<DayState, { kind: 'none' | 'later' }>, zone: string): string {
   const { shift } = state;
   switch (state.kind) {
     case 'on':
@@ -339,8 +344,6 @@ function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): strin
       return 'Ton shift est fini. Les passations qu’on t’a confiées restent dans Suivi.';
     case 'soon':
       return `Ton shift commence à ${clockAt(shift.startsAt, zone)}. Les passations qu’on te confie arrivent dans Suivi.`;
-    case 'later':
-      return 'Les passations qu’on te confie arriveront dans Suivi.';
   }
 }
 
@@ -357,7 +360,8 @@ function NextCard({
 }): JSX.Element {
   const soon = soonOf(new Date(shift.startsAt).getTime() - now.getTime());
   return (
-    <Panel className="sc-next nv-enter">
+    <Panel className="sc-next sc-linked nv-enter">
+      <ToPlanning />
       <p className="nv-eyebrow">Ensuite</p>
       <div className="sc-next__row">
         <div className="sc-next__main">

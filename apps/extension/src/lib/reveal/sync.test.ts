@@ -2,7 +2,16 @@ import { PlatformAccountIdSchema } from '@impera/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RevealSession } from './capture';
-import { captureSession, syncReveal, type RequestTap, type SeenRequest, type SyncDeps } from './sync';
+import {
+  captureSession,
+  readReveal,
+  sendHeld,
+  sessionHold,
+  type ReadDeps,
+  type RequestTap,
+  type SeenRequest,
+  type SendDeps,
+} from './sync';
 
 // Invented values (ADR 0010).
 const BEARER = 'invented-bearer-0123456789abcdef';
@@ -65,7 +74,7 @@ describe('captureSession', () => {
   });
 });
 
-describe('syncReveal', () => {
+describe('the session read, held, then sent', () => {
   const SESSION: RevealSession = {
     v: 1,
     bearer: BEARER,
@@ -74,38 +83,99 @@ describe('syncReveal', () => {
     userAgent: FRAME.userAgent,
     capturedAt: NOW.toISOString(),
   };
+  const OTHER = PlatformAccountIdSchema.parse('1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d');
 
-  function deps(overrides: Partial<SyncDeps> = {}): SyncDeps {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function reading(overrides: Partial<ReadDeps> = {}): ReadDeps {
     return {
       readLink: () => Promise.resolve('x'.repeat(43)),
-      markRevoked: vi.fn(() => Promise.resolve()),
-      origin: () => Promise.resolve('http://localhost:5173'),
       capture: () => Promise.resolve(SESSION),
-      send: vi.fn(() => Promise.resolve('synced' as const)),
+      lastModel: () => Promise.resolve(null),
       ...overrides,
     };
   }
 
-  it('sends the captured session for the chosen account', async () => {
-    const run = deps();
-    expect(await syncReveal(run, ACCOUNT)).toEqual({ state: 'synced' });
+  function sending(overrides: Partial<SendDeps> = {}): SendDeps {
+    return {
+      readLink: () => Promise.resolve('x'.repeat(43)),
+      markRevoked: vi.fn(() => Promise.resolve()),
+      origin: () => Promise.resolve('http://localhost:5173'),
+      send: vi.fn(() => Promise.resolve('synced' as const)),
+      remember: vi.fn(() => Promise.resolve()),
+      ...overrides,
+    };
+  }
+
+  it('tells the popup the model alone, and sends only on confirmation', async () => {
+    const hold = sessionHold();
+    const read = await readReveal(reading(), hold, ACCOUNT);
+    expect(read).toEqual({ state: 'held', modelId: 'model-a1', seen: 'unknown' });
+    expect(JSON.stringify(read)).not.toContain(BEARER);
+    const run = sending();
+    expect(await sendHeld(run, hold, ACCOUNT)).toEqual({ state: 'synced' });
     expect(run.send).toHaveBeenCalledWith('http://localhost:5173', 'x'.repeat(43), ACCOUNT, SESSION);
+    expect(run.remember).toHaveBeenCalledWith(ACCOUNT, 'model-a1');
+    // Taken once: a second « Envoyer » finds nothing.
+    expect(await sendHeld(run, hold, ACCOUNT)).toEqual({ state: 'expired' });
   });
 
-  it('captures nothing without a link, and sends nothing without a session', async () => {
-    const capture = vi.fn(() => Promise.resolve(SESSION));
-    expect(await syncReveal(deps({ readLink: () => Promise.resolve(null), capture }), ACCOUNT)).toEqual({
-      state: 'unlinked',
-    });
-    expect(capture).not.toHaveBeenCalled();
-    const run = deps({ capture: () => Promise.resolve(null) });
-    expect(await syncReveal(run, ACCOUNT)).toEqual({ state: 'no-session' });
+  it('compares the model with the one of this account’s last sync', async () => {
+    const same = await readReveal(
+      reading({ lastModel: () => Promise.resolve('model-a1') }),
+      sessionHold(),
+      ACCOUNT,
+    );
+    expect(same).toMatchObject({ seen: 'same' });
+    const other = await readReveal(
+      reading({ lastModel: () => Promise.resolve('model-z9') }),
+      sessionHold(),
+      ACCOUNT,
+    );
+    expect(other).toMatchObject({ seen: 'other' });
+  });
+
+  it('forgets the session after a minute, on cancel, and for another account', async () => {
+    const hold = sessionHold();
+    await readReveal(reading(), hold, ACCOUNT);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await sendHeld(sending(), hold, ACCOUNT)).toEqual({ state: 'expired' });
+    await readReveal(reading(), hold, ACCOUNT);
+    hold.drop();
+    expect(await sendHeld(sending(), hold, ACCOUNT)).toEqual({ state: 'expired' });
+    await readReveal(reading(), hold, ACCOUNT);
+    const run = sending();
+    expect(await sendHeld(run, hold, OTHER)).toEqual({ state: 'expired' });
+    expect(await sendHeld(run, hold, ACCOUNT)).toEqual({ state: 'expired' });
     expect(run.send).not.toHaveBeenCalled();
   });
 
-  it('drops a link the CRM removed', async () => {
-    const run = deps({ send: () => Promise.resolve('revoked' as const) });
-    expect(await syncReveal(run, ACCOUNT)).toEqual({ state: 'revoked' });
+  it('reads nothing without a link, and holds nothing without a session', async () => {
+    const capture = vi.fn(() => Promise.resolve(SESSION));
+    const hold = sessionHold();
+    expect(
+      await readReveal(reading({ readLink: () => Promise.resolve(null), capture }), hold, ACCOUNT),
+    ).toEqual({
+      state: 'unlinked',
+    });
+    expect(capture).not.toHaveBeenCalled();
+    expect(await readReveal(reading({ capture: () => Promise.resolve(null) }), hold, ACCOUNT)).toEqual({
+      state: 'no-session',
+    });
+    expect(await sendHeld(sending(), hold, ACCOUNT)).toEqual({ state: 'expired' });
+  });
+
+  it('drops a link the CRM removed, and remembers no model it refused', async () => {
+    const hold = sessionHold();
+    await readReveal(reading(), hold, ACCOUNT);
+    const run = sending({ send: () => Promise.resolve('revoked' as const) });
+    expect(await sendHeld(run, hold, ACCOUNT)).toEqual({ state: 'revoked' });
     expect(run.markRevoked).toHaveBeenCalledTimes(1);
+    expect(run.remember).not.toHaveBeenCalled();
   });
 });

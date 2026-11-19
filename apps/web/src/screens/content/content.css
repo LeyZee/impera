@@ -149,10 +149,25 @@
   color: var(--nv-warning);
   font-weight: 650;
 }
+.ct-due--today {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
 .ct-card__foot {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: var(--nv-space-2);
+}
+/* « Je ne peux pas »: a quiet way out beside the answer, never a second button that weighs the same (CRE-13). */
+.ct-card__cant {
+  color: var(--nv-ink-muted);
+}
+/* On a phone her thumb answers a request: the buttons of a card are 44 px tall, seen as well as touched (CRE-13). */
+@media (max-width: 720px) {
+  .ct-card__foot .nv-btn {
+    height: 44px;
+  }
 }
 
 /* What a send under way asks of her, said once on its card; out of the flow while there is nothing to say. */

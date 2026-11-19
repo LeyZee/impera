@@ -67,22 +67,6 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     expect(nextSlot(round)?.minute).toBe(60);
   });
 
-  it('says where a link leads in words, never by an address', () => {
-    const link = {
-      id: linkId,
-      name: 'TikTok',
-      url: 'https://redirect.example.test/t',
-      destination: 'tiktok.com/@nora',
-    };
-    expect(
-      issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, links: [link] }).has(`link:${linkId}:destination`),
-    ).toBe(true);
-    const fine = { ...link, destination: 'mon live TikTok ce soir 21 h' };
-    expect(
-      issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, links: [fine] }).has(`link:${linkId}:destination`),
-    ).toBe(false);
-  });
-
   it('refuses a bare domain in the words of the link', () => {
     expect(
       issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, linkLabel: 'Tout est sur bit.ly/messa' }).get('label'),
@@ -103,13 +87,12 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     expect(issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, slots }).get('slots')).toBeDefined();
   });
 
-  it('marks a link without a name or with an address that is not https', () => {
+  it('says nothing of her links: they are set in « Liens » (INS-03)', () => {
     const issues = issuesOf({
       ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
-      links: [{ id: linkId, name: ' ', url: 'http://example.test', destination: '' }],
+      links: [{ id: linkId, name: 'Telegram', url: 'https://redirect.example.test/t', destination: '' }],
     });
-    expect(issues.has(`link:${linkId}:name`)).toBe(true);
-    expect(issues.has(`link:${linkId}:url`)).toBe(true);
+    expect([...issues.keys()].some((key) => key.startsWith('link:'))).toBe(false);
   });
 
   it('marks an empty example, and saves the others trimmed', () => {

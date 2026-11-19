@@ -144,7 +144,8 @@ function FanRow({
           {fan.conversationId === null ? `${seen} · pas encore de conversation` : seen}
         </span>
       </span>
-      <span className="vt-row__amount nv-num">{unlocked ?? '—'}</span>
+      {/* Nothing unlocked, nothing written: a dash on every line was noise (recette visuelle 16/11, CRE-02). */}
+      {unlocked === null ? null : <span className="vt-row__amount nv-num">{unlocked}</span>}
     </>
   );
   const { conversationId } = fan;

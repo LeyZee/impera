@@ -186,8 +186,9 @@ describe('Notifications, when it rings', () => {
     deviceIs('unsupported');
     renderPage();
     const start = await screen.findByLabelText('Début des heures calmes');
-    expect(start).toHaveProperty('value', '22:00');
-    expect(screen.getByLabelText('Fin des heures calmes')).toHaveProperty('value', '08:00');
+    // Written as the line under them writes them, « 22 h », not « 22:00 » (CHA-26).
+    expect(start).toHaveProperty('value', '22\u00a0h');
+    expect(screen.getByLabelText('Fin des heures calmes')).toHaveProperty('value', '8\u00a0h');
     expect(save()).toHaveProperty('disabled', true);
 
     fireEvent.change(start, { target: { value: '23:30' } });
