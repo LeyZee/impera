@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { NO_PARTS, readRequest, sessionOf, type SessionParts } from './capture';
+import { memberOfBearer, NO_PARTS, readRequest, sessionOf, type SessionParts } from './capture';
 
 // Invented values: never a real token, member or model (ADR 0010).
 const BEARER = 'invented-bearer-0123456789abcdef';
 const AUTH = [{ name: 'Authorization', value: `Bearer ${BEARER}` }];
+
+/** An invented JWT whose claims are `claims`; its signature is never checked here. */
+function jwt(claims: Record<string, unknown>): string {
+  const part = (value: unknown): string =>
+    btoa(JSON.stringify(value)).replace(/\+/gu, '-').replace(/\//gu, '_').replace(/=+$/u, '');
+  return `${part({ alg: 'HS256', typ: 'JWT' })}.${part(claims)}.invented-signature`;
+}
 
 function seen(...requests: readonly [string, typeof AUTH | undefined][]): SessionParts {
   return requests.reduce<SessionParts>((parts, [url, headers]) => readRequest(parts, url, headers), NO_PARTS);
@@ -62,5 +69,40 @@ describe('the Reveal session read from the tab’s requests', () => {
       userAgent: 'Mozilla/5.0 test',
       capturedAt: '2026-11-11T15:00:00.000Z',
     });
+  });
+
+  it('ignores /users/me/…, which names no one', () => {
+    expect(seen(['https://api.reveal.me/users/me/context', AUTH]).userId).toBeNull();
+    expect(seen(['https://api.reveal.me/users/Me/context', AUTH]).userId).toBeNull();
+  });
+
+  it('takes the member from the bearer’s claims, whatever route came first (19/11)', () => {
+    const token = jwt({ userId: 'member-b2', exp: 1_900_000_000 });
+    const auth = [{ name: 'Authorization', value: `Bearer ${token}` }];
+    const parts = seen(
+      ['https://api.reveal.me/users/me/context', auth],
+      ['https://api.reveal.me/users/member-x9/profile', auth],
+      ['https://api.reveal.me/models/model-a1', auth],
+    );
+    const session = sessionOf(parts, 'UA', new Date('2026-11-19T17:00:00.000Z'));
+    expect(session?.userId).toBe('member-b2');
+  });
+
+  it('composes the session from the bearer and the model alone when the claims name the member', () => {
+    const token = jwt({ userId: 'member-b2' });
+    const parts = seen([
+      'https://api.reveal.me/models/model-a1',
+      [{ name: 'Authorization', value: `Bearer ${token}` }],
+    ]);
+    expect(sessionOf(parts, 'UA', new Date('2026-11-19T17:00:00.000Z'))?.userId).toBe('member-b2');
+  });
+
+  it('falls back on a route’s member when the bearer names none', () => {
+    expect(memberOfBearer(BEARER)).toBeNull();
+    expect(memberOfBearer(jwt({ exp: 1 }))).toBeNull();
+    expect(memberOfBearer(jwt({ userId: 'a b' }))).toBeNull();
+    expect(memberOfBearer('a.%%%.c')).toBeNull();
+    const parts = seen(['https://api.reveal.me/users/member-b2/notifications?modelId=model-a1', AUTH]);
+    expect(sessionOf(parts, 'UA', new Date('2026-11-19T17:00:00.000Z'))?.userId).toBe('member-b2');
   });
 });
