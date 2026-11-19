@@ -380,8 +380,10 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     serve(200, AGENCY_WEEK);
     show();
     const label = await screen.findByText('Chiffre d’affaires', { selector: '.nv-figure__label' });
-    const lead = label.closest('.ins-lead');
+    // On the figure, not the whole card: the curve under it keeps its own reading of a day.
+    const lead = label.closest('.nv-figure');
     if (!(lead instanceof HTMLElement)) throw new Error('lead');
+    expect(lead.closest('.ins-lead')?.hasAttribute('tabindex')).toBe(false);
     expect(lead.tabIndex).toBe(0);
     fireEvent.pointerDown(lead, { pointerType: 'touch' });
     const tipText = (): string => document.querySelector('.nv-tip.is-on')?.textContent ?? '';

@@ -547,25 +547,25 @@ function Figures({
   return (
     <div className="ins-figures-stack">
       <div className="ins-figures">
-        {/* A money tile, so its tip too (ADR 0106 § 12, PAY-16): to the cent, against the period before. */}
-        <div
-          className="nv-plate ins-lead nv-enter"
-          style={{ '--nv-i': 1 }}
-          tabIndex={0}
-          {...tip.bind(
-            moneyTip({
-              title: 'Chiffre d’affaires',
-              cents: current.revenueMinor,
-              previousCents: previous.revenueMinor,
-              // The whole itself: no share of it to say.
-              revenueMinor: 0,
-              netMinor: null,
-              text: 'Ce que les fans ont payé, TVA comprise, avant la commission de la plateforme.',
-            }),
-            { around: true },
-          )}
-        >
-          <div className="nv-figure">
+        <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
+          {/* A money tile, so its tip too (ADR 0106 § 12, PAY-16): to the cent, against the period before. On the
+              figure alone, never the whole card: the curve under it reads its own days. */}
+          <div
+            className="nv-figure"
+            tabIndex={0}
+            {...tip.bind(
+              moneyTip({
+                title: 'Chiffre d’affaires',
+                cents: current.revenueMinor,
+                previousCents: previous.revenueMinor,
+                // The whole itself: no share of it to say.
+                revenueMinor: 0,
+                netMinor: null,
+                text: 'Ce que les fans ont payé, TVA comprise, avant la commission de la plateforme.',
+              }),
+              { around: true },
+            )}
+          >
             <span className="nv-figure__label">Chiffre d’affaires</span>
             <CountUp
               className="nv-figure__value ins-lead__value"
