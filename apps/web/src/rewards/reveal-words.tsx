@@ -82,10 +82,7 @@ export function revealWordsOf(
       object: <LevelInsignia rank={rank} size={OBJECT_SIZE} glow />,
       kicker: 'Nouveau rang',
       title: name,
-      text:
-        rank === 1
-          ? 'Ton premier rang. Il monte avec ton net cumulé et ne redescend jamais.'
-          : 'Ton net cumulé a passé le seuil. Un rang gagné ne se perd pas.',
+      text: rank === 1 ? 'Ton premier rang. Il suit ton net cumulé.' : 'Ton net cumulé a passé le seuil.',
       tone: 'neon',
     };
   }

@@ -1,4 +1,3 @@
-import type { AgencyPeriod } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { AgencyStrip } from '../AgencyStrip';
@@ -12,6 +11,7 @@ import { useDashboard } from '../useDashboard';
 import '../dashboard.css';
 
 import { AgencyInsightsPanel } from './AgencyInsights';
+import type { AgencySelection } from './period';
 
 import { PageHeader } from '@/shell/layout';
 
@@ -21,15 +21,15 @@ import { PageHeader } from '@/shell/layout';
  * her Dashboard, her agent first and her figures under it.
  */
 export function AgencyPage({
-  period,
-  onPeriod,
+  selection,
+  onSelection,
   onCreator,
   forOwner,
   reviewsReports,
   canAddCreator,
 }: {
-  period: AgencyPeriod;
-  onPeriod: (period: AgencyPeriod) => void;
+  selection: AgencySelection;
+  onSelection: (selection: AgencySelection) => void;
   onCreator: (creatorId: string) => void;
   /** The owner also reads the daily export and the invoices' paperwork, and links the registers. */
   forOwner: boolean;
@@ -53,8 +53,8 @@ export function AgencyPage({
       {/* The figures first, then what the agency runs: the export, the invoices, the reports, the day's AI budget
           (recette visuelle 16/11, PIL-04). */}
       <AgencyInsightsPanel
-        period={period}
-        onPeriod={onPeriod}
+        selection={selection}
+        onSelection={onSelection}
         creatorId={null}
         onCreator={onCreator}
         canOpenSettings={forOwner}
