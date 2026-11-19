@@ -25,6 +25,11 @@ interface Recipient {
   readonly timeZone: string;
 }
 
+/** A manager is told of a creator's alert only when she is one of his (`user.creator_ids`, relecture Bilan). */
+interface Manager extends Recipient {
+  readonly creatorIds: readonly string[];
+}
+
 /** What the router reads, as the service role (ADR 0150 § 18). */
 export interface RouterReads {
   /**
@@ -40,8 +45,8 @@ export interface RouterReads {
   creators(): Promise<readonly { readonly id: CreatorId; readonly name: string }[]>;
   /** The owners' accounts, in the agency's time zone. */
   owners(): Promise<readonly Recipient[]>;
-  /** The active managers' accounts (the agency's scope), each in his own time zone. */
-  managers(): Promise<readonly Recipient[]>;
+  /** The active managers' accounts, each in his own time zone, with the creators his account is given. */
+  managers(): Promise<readonly Manager[]>;
   /** The accounts of these team members, active ones only, each in his own time zone. */
   members(memberIds: readonly string[]): Promise<readonly Recipient[]>;
 }
@@ -124,7 +129,11 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
 
     const byRole = async (role: CreatorAlertRole): Promise<readonly Recipient[]> => {
       if (role === 'owner') return owners;
-      if (role === 'manager') return managers;
+      // A creator's alert to her managers only; the agency's (budget, no creator) to every active manager.
+      if (role === 'manager') {
+        const creatorId = event.creatorId;
+        return creatorId === null ? managers : managers.filter((m) => m.creatorIds.includes(creatorId));
+      }
       // An alert of no creator has no shift: the chatters are never told of the agency's budget by this road.
       if (event.creatorId === null) return [];
       const onShift = await deps.onShift(event.creatorId, now).catch(failed('on_shift'));

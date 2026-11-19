@@ -5,6 +5,7 @@ import { creatorAlertLines } from '../../domain/creator-alerts';
 import { routeAlerts, type RoutedEventRow, type RouterReads } from '../route';
 
 const NORA = CreatorIdSchema.parse('01900000-0000-7000-8000-000000000010');
+const IRIS = '01900000-0000-7000-8000-000000000012';
 const CONVERSATION = '01900000-0000-7000-8000-000000000020';
 const NOW = new Date('2026-11-19T15:00:00Z');
 
@@ -30,7 +31,12 @@ function harness(options: {
     creators: () => Promise.resolve([{ id: NORA, name: 'Nora' }]),
     owners: () => Promise.resolve([{ userId: 'owner', timeZone: 'Europe/Paris' }]),
     managers: () =>
-      fails('managers') ? down() : Promise.resolve([{ userId: 'manager', timeZone: 'Europe/Paris' }]),
+      fails('managers')
+        ? down()
+        : Promise.resolve([
+            { userId: 'manager', timeZone: 'Europe/Paris', creatorIds: [NORA] },
+            { userId: 'manager-of-iris', timeZone: 'Europe/Paris', creatorIds: [IRIS] },
+          ]),
     members: (ids) =>
       fails('members')
         ? down()
@@ -170,6 +176,13 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     expect(h.asked.map((r) => [r.userId, r.message.title])).toEqual([
       ['owner', 'Budget IA'],
       ['manager', 'Budget IA'],
+      ['manager-of-iris', 'Budget IA'],
     ]);
+  });
+
+  it('tells a creator’s alert to her managers only, never to the manager of another (relecture Bilan)', async () => {
+    const h = harness({ events: [safety] });
+    await h.run();
+    expect(h.asked.map((r) => r.userId)).toEqual(['owner', 'manager']);
   });
 });

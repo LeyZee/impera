@@ -141,11 +141,16 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
       const table = schema.teamMembers;
       const rows = await admin((tx) =>
         tx
-          .select({ userId: table.userId, timeZone: table.timeZone })
+          .select({ userId: table.userId, timeZone: table.timeZone, creatorIds: schema.user.creatorIds })
           .from(table)
+          .innerJoin(schema.user, eq(schema.user.id, table.userId))
           .where(and(eq(table.teamRole, 'manager'), eq(table.status, 'active'))),
       );
-      return rows.map((row) => ({ userId: row.userId, timeZone: row.timeZone }));
+      return rows.map((row) => ({
+        userId: row.userId,
+        timeZone: row.timeZone,
+        creatorIds: row.creatorIds,
+      }));
     },
 
     async members(memberIds) {
