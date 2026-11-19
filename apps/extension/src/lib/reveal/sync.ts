@@ -3,7 +3,14 @@ import type { PlatformAccountId } from '@impera/contracts';
 import type { RevealRead, RevealSynced } from '../watch/protocol';
 
 import type { Synced } from './api';
-import { NO_PARTS, readRequest, sessionOf, type RequestHeader, type RevealSession } from './capture';
+import {
+  NO_PARTS,
+  readRequest,
+  sessionOf,
+  type Captured,
+  type RequestHeader,
+  type RevealSession,
+} from './capture';
 
 /**
  * The owner's « Sync » (P2-01), run by the service worker: listen to the open Reveal tab's requests to `api.reveal.me`
@@ -28,34 +35,52 @@ export interface RequestTap {
 /** Reveal asks every few seconds; a tab that asked nothing is reloaded once, then the « Sync » gives up. */
 const NUDGE_AFTER_MS = 4_000;
 const GIVE_UP_AFTER_MS = 30_000;
+/** Once a session can be made and the account's model is not seen yet, how long the tab may still name it. */
+const SETTLE_MS = 2_500;
 
+/**
+ * Listens to the tab until the account's model shows (`expected`), then reads at once. Without it, or while the tab
+ * names others, it listens a little longer, so that a tab reading several creators is seen as such (19/11, 409).
+ */
 export function captureSession(
   tap: RequestTap,
   tabId: number,
+  expected: string | null,
   frame: { readonly userAgent: string; readonly now: () => Date },
-  timing: { readonly nudgeMs: number; readonly waitMs: number } = {
+  timing: { readonly nudgeMs: number; readonly waitMs: number; readonly settleMs: number } = {
     nudgeMs: NUDGE_AFTER_MS,
     waitMs: GIVE_UP_AFTER_MS,
+    settleMs: SETTLE_MS,
   },
-): Promise<RevealSession | null> {
+): Promise<Captured | null> {
   return new Promise((resolve) => {
     let parts = NO_PARTS;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const now = (): Captured | null => sessionOf(parts, expected, frame.userAgent, frame.now());
     const listener = (request: SeenRequest): void => {
       parts = readRequest(parts, request.url, request.requestHeaders);
-      const session = sessionOf(parts, frame.userAgent, frame.now());
-      if (session !== null) finish(session);
+      const captured = now();
+      if (captured === null) return;
+      if (expected !== null && captured.state === 'session' && captured.session.modelId === expected) {
+        finish(captured);
+        return;
+      }
+      settle ??= setTimeout(() => {
+        finish(now());
+      }, timing.settleMs);
     };
     const nudge = setTimeout(() => {
       tap.reload(tabId);
     }, timing.nudgeMs);
     const giveUp = setTimeout(() => {
-      finish(null);
+      finish(now());
     }, timing.waitMs);
-    function finish(session: RevealSession | null): void {
+    function finish(captured: Captured | null): void {
       clearTimeout(nudge);
       clearTimeout(giveUp);
+      clearTimeout(settle);
       tap.stop(listener);
-      resolve(session);
+      resolve(captured);
     }
     tap.listen(tabId, listener);
   });
@@ -100,9 +125,10 @@ export function sessionHold(ttlMs: number = HOLD_MS): SessionHold {
 
 export interface ReadDeps {
   readonly readLink: () => Promise<string | null>;
-  readonly capture: () => Promise<RevealSession | null>;
-  /** The model of this account's last sync, null before the first one. */
-  readonly lastModel: (accountId: PlatformAccountId) => Promise<string | null>;
+  /** Reads the tab, waiting for `expected` when it is known. */
+  readonly capture: (expected: string | null) => Promise<Captured | null>;
+  /** The account's model: the CRM's `modelId`, else the model of this account's last sync; null before the first. */
+  readonly expectedModel: (accountId: PlatformAccountId) => Promise<string | null>;
 }
 
 /** Reads the tab's session and holds it; the popup is told the model's id alone, to check it before sending. */
@@ -113,14 +139,16 @@ export async function readReveal(
 ): Promise<RevealRead> {
   hold.drop();
   if ((await deps.readLink()) === null) return { state: 'unlinked' };
-  const session = await deps.capture();
-  if (session === null) return { state: 'no-session' };
+  const expected = await deps.expectedModel(accountId);
+  const captured = await deps.capture(expected);
+  if (captured === null) return { state: 'no-session' };
+  if (captured.state === 'several') return { state: 'several' };
+  const { session } = captured;
   hold.keep(accountId, session);
-  const last = await deps.lastModel(accountId);
   return {
     state: 'held',
     modelId: session.modelId,
-    seen: last === null ? 'unknown' : last === session.modelId ? 'same' : 'other',
+    seen: expected === null ? 'unknown' : expected === session.modelId ? 'same' : 'other',
   };
 }
 
@@ -149,7 +177,8 @@ export async function sendHeld(
   const token = await deps.readLink();
   if (token === null) return { state: 'unlinked' };
   const synced = await deps.send(await deps.origin(), token, accountId, session);
-  if (synced === 'revoked') await deps.markRevoked();
-  if (synced === 'synced') await deps.remember(accountId, session.modelId);
-  return { state: synced };
+  if (synced.state === 'revoked') await deps.markRevoked();
+  if (synced.state !== 'synced') return { state: synced.state };
+  await deps.remember(accountId, session.modelId);
+  return { state: 'synced', ...synced.stored };
 }
