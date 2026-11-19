@@ -12,7 +12,11 @@ import {
  * `public_explicit` and `repeated_reply`.
  */
 
-/** The chatting guards a public reply passes too (§ 3). The wiring hands their findings over; this module names them. */
+/**
+ * The chatting guards the ADR names for a public reply (§ 3): the tested minimum, not a whitelist. The wiring hands
+ * over every blocking code the chatting guards raise on the text, and each one refuses the reply, so a guard added to
+ * the chatting later holds here too.
+ */
 export const CHAT_GUARDS_ON_A_REPLY = [
   'ai_disclosure',
   'meeting_promise',
@@ -30,12 +34,13 @@ export interface ReplyViolation {
 export interface ReplyGuardContext {
   /** Her replies under the same post or of the same day, the most recent ones. */
   readonly recentReplies: readonly string[];
-  /** The codes the chatting guards raise on this text; only those of `CHAT_GUARDS_ON_A_REPLY` are kept. */
+  /** The blocking codes the chatting guards raise on this text: each one refuses the reply. */
   readonly chatGuardCodes: readonly GuardCode[];
 }
 
 const EMOJI = /\p{Extended_Pictographic}/gu;
-const HASHTAG_OR_MENTION = /(?:^|\s)[#@][\p{L}\p{N}_.]+/u;
+// Anywhere in the text, full-width forms folded: a public mention notifies a third party.
+const HASHTAG_OR_MENTION = /[#@][\p{L}\p{N}_]/u;
 
 // Words of seduction or sex, on the folded text: a public reply is warm, never seductive.
 const SEDUCTION = [
@@ -99,14 +104,13 @@ export function checkReply(text: string, context: ReplyGuardContext): ReplyViola
   if (reply === '' || reply.length > COMMENT_REPLY_MAX)
     violations.push({ code: 'comment_format', detail: 'length' });
   if ((reply.match(EMOJI) ?? []).length > 1) violations.push({ code: 'comment_format', detail: 'emojis' });
-  if (HASHTAG_OR_MENTION.test(reply))
+  if (HASHTAG_OR_MENTION.test(reply.normalize('NFKC')))
     violations.push({ code: 'comment_format', detail: 'hashtag_or_mention' });
   for (const fault of instagramFaults(reply)) violations.push({ code: 'instagram_text', detail: fault });
   const explicit = nudityIn(reply) ?? seductionIn(reply);
   if (explicit !== null) violations.push({ code: 'public_explicit', detail: explicit });
   if (context.recentReplies.some((earlier) => nearlySame(earlier, reply)))
     violations.push({ code: 'repeated_reply', detail: 'recent_reply' });
-  const kept: readonly GuardCode[] = CHAT_GUARDS_ON_A_REPLY;
-  for (const code of context.chatGuardCodes) if (kept.includes(code)) violations.push({ code, detail: code });
+  for (const code of new Set(context.chatGuardCodes)) violations.push({ code, detail: code });
   return violations;
 }

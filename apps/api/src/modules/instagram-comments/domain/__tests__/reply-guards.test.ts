@@ -38,12 +38,31 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Contente que la lumière te plaise', context)).not.toContain('repeated_reply');
   });
 
-  it('keeps the chatting guards that apply in public, and only those', () => {
+  it('refuses a mention or a hashtag anywhere in the text, full-width forms too', () => {
+    expect(codes('merci!@quelquun')).toContain('comment_format');
+    expect(codes('(@quelquun) merci')).toContain('comment_format');
+    expect(codes('merci ＠quelquun')).toContain('comment_format');
+    expect(codes('merci＃dimanche')).toContain('comment_format');
+  });
+
+  it('refuses on every blocking code the chatting guards raise, not on a whitelist', () => {
     const context: ReplyGuardContext = {
       recentReplies: [],
-      chatGuardCodes: ['ai_disclosure', 'pet_name', 'discount'],
+      chatGuardCodes: [
+        'ai_disclosure',
+        'asks_for_nudes',
+        'off_platform_payment',
+        'assistant_output',
+        'discount',
+      ],
     };
-    expect(codes('Merci à toi', context)).toEqual(['ai_disclosure', 'discount']);
+    expect(codes('Merci à toi', context)).toEqual([
+      'ai_disclosure',
+      'asks_for_nudes',
+      'off_platform_payment',
+      'assistant_output',
+      'discount',
+    ]);
   });
 
   it('names the five chatting guards of a public reply, staying in character first', () => {

@@ -40,8 +40,15 @@ describe('before the model (ADR 0122 § 2 and § 3)', () => {
     });
   });
 
-  it('mutes an author whose age doubt is open, whatever he writes', () => {
+  it('mutes an author whose age doubt is open, whatever else he writes', () => {
     expect(beforeModel({ ...facts, authorAgeDoubtOpen: true }, bounds)).toEqual({ step: 'mute' });
+  });
+
+  it('hands the distress of an author whose age doubt is open to a human: silence and a relay', () => {
+    expect(beforeModel({ ...facts, authorAgeDoubtOpen: true, distressDetected: true }, bounds)).toEqual({
+      step: 'handoff',
+      handoff: 'distress',
+    });
   });
 
   it('hands a distress to a human, even with a bound reached', () => {

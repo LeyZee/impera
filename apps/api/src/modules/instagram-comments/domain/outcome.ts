@@ -29,7 +29,7 @@ export interface ReplyBounds {
 export type BeforeModel =
   /** Her own comment: nothing happens, her replies start nothing. */
   | { readonly step: 'ignore' }
-  /** The author's age is in doubt and unsettled: no reply anywhere, and no new call to the model. */
+  /** The author's age is in doubt and unsettled: no reply anywhere, and no call to the model. A handoff never replies either. */
   | { readonly step: 'mute' }
   | { readonly step: 'handoff'; readonly handoff: CommentHandoffReason }
   /** A bound is reached: no reply, the comment may still be hidden. */
@@ -39,8 +39,9 @@ export type BeforeModel =
 export function beforeModel(facts: CommentFacts, bounds: ReplyBounds): BeforeModel {
   if (facts.fromOwnAccount) return { step: 'ignore' };
   if (facts.ageDoubtDetected) return { step: 'handoff', handoff: 'age_doubt' };
-  if (facts.authorAgeDoubtOpen) return { step: 'mute' };
+  // Distress before the open doubt: a handoff answers nothing either, and a muted author in distress still reaches a human.
   if (facts.distressDetected) return { step: 'handoff', handoff: 'distress' };
+  if (facts.authorAgeDoubtOpen) return { step: 'mute' };
   if (facts.repliesToAuthorToday >= bounds.perAuthorPerDay || facts.repliesInThread >= bounds.perThread)
     return { step: 'no_reply' };
   return { step: 'ask_model' };
