@@ -185,6 +185,13 @@ describe('identifyPlatformScript', () => {
     expect(
       await identifyPlatformScript(harness(target(notImported), identified).deps, request(notImported)),
     ).toBe('waiting');
+    // No media at all: nothing of hers chosen, the brain is never paid of itself for its texts.
+    const textOnly = script({
+      steps: script().steps.map((step) => ({ ...step, media: [], previewMedia: [] })),
+    });
+    const quiet = harness(target(textOnly), identified);
+    expect(await identifyPlatformScript(quiet.deps, request(textOnly))).toBe('waiting');
+    expect(quiet.asked).toEqual([]);
     const branched = script({ steps: script().steps.map((step) => ({ ...step, platformIndex: 0 })) });
     const run = harness(target(branched), identified);
     expect(await identifyPlatformScript(run.deps, request(branched))).toBe('branched');
