@@ -38,6 +38,8 @@ export interface AlertRouterDeps {
   /** The `notifications` module's `notify`. */
   readonly notify: (request: NotificationRequest, at: Date) => Promise<NotificationOutcome>;
   readonly onLinesUnread?: (creatorId: CreatorId, error: unknown) => void;
+  /** A role unread or an account not notified: logged, the others are told all the same (relecture Sécurité). */
+  readonly onFailure?: (step: string, error: unknown) => void;
 }
 
 /** `alerts.route` (ADR 0150 lot 2): built by the composition root once `notifications` and `scheduling` exist. */
@@ -50,6 +52,7 @@ export function createAlertRouter(deps: AlertRouterDeps): (now: Date) => Promise
         onShift: deps.onShift,
         notify: deps.notify,
         ...(deps.onLinesUnread !== undefined && { onLinesUnread: deps.onLinesUnread }),
+        ...(deps.onFailure !== undefined && { onFailure: deps.onFailure }),
       },
       now,
     );

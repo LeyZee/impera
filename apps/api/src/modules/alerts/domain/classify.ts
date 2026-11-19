@@ -16,13 +16,14 @@ export interface ClassifiedAlert {
 }
 
 /** The human relays for safety (ADR 0150 § 6): locked on « reçoit » for every role. */
-const SAFETY_CAUSES: ReadonlySet<HandoffCause> = new Set([
+export const SAFETY_HANDOFF_CAUSES = [
   'minor',
   'non_consent',
   'distress',
   'meeting',
   'manipulation',
-]);
+] as const satisfies readonly HandoffCause[];
+const SAFETY_CAUSES: ReadonlySet<HandoffCause> = new Set(SAFETY_HANDOFF_CAUSES);
 
 function handoffAlert(cause: HandoffCause): CreatorAlertCode | null {
   if (SAFETY_CAUSES.has(cause)) return 'safety_handoff';

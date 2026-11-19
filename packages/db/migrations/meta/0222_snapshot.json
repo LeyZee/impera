@@ -1,5 +1,5 @@
 {
-  "id": "9e197823-33b9-4caf-af77-b13f47dc1433",
+  "id": "3c082979-dfbe-4144-98bb-b40594faa898",
   "prevId": "96c731c9-2d88-460e-b6a0-5928de0b7765",
   "version": "7",
   "dialect": "postgresql",
@@ -9227,7 +9227,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert')"
         }
       },
       "isRLSEnabled": false

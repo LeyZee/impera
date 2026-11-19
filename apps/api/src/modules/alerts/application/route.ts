@@ -1,9 +1,10 @@
-import type {
-  CreatorAlertLine,
-  CreatorAlertRole,
-  CreatorId,
-  NotificationOutcome,
-  NotificationRequest,
+import {
+  isCreatorAlertLocked,
+  type CreatorAlertLine,
+  type CreatorAlertRole,
+  type CreatorId,
+  type NotificationOutcome,
+  type NotificationRequest,
 } from '@impera/contracts';
 
 import { classifyEvent } from '../domain/classify';
@@ -26,7 +27,12 @@ interface Recipient {
 
 /** What the router reads, as the service role (ADR 0150 § 18). */
 export interface RouterReads {
-  /** The routed events written after `since`, oldest first. */
+  /**
+   * The human relays for safety written after `since`, by a read of their own: never crowded out of the window by a
+   * burst of other events (relecture Sécurité).
+   */
+  safetyEvents(since: Date): Promise<readonly RoutedEventRow[]>;
+  /** Every routed event written after `since`, oldest first, read page by page to the window's newest. */
   events(since: Date): Promise<readonly RoutedEventRow[]>;
   /** Her stored choices, through `creatorAlertLines`: a locked alert reads « reçoit » whatever a row says. */
   lines(creatorId: CreatorId): Promise<readonly CreatorAlertLine[]>;
@@ -48,6 +54,11 @@ export interface RouterDeps {
   readonly notify: (request: NotificationRequest, at: Date) => Promise<NotificationOutcome>;
   /** A failure to read her choices: logged by the caller; the defaults of the code apply. */
   readonly onLinesUnread?: (creatorId: CreatorId, error: unknown) => void;
+  /**
+   * A failure to read who a role is, or to notify one account: logged by the caller; the other roles and accounts are
+   * told all the same, and the next run tries again (the notification's key is the event).
+   */
+  readonly onFailure?: (step: string, error: unknown) => void;
 }
 
 /**
@@ -61,8 +72,22 @@ const ROUTE_WINDOW_MS = 30 * 60_000;
  * comes without sound, `off` reaches nobody (the history keeps it anyway). Returns the notifications asked.
  */
 export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> {
-  const events = await deps.reads.events(new Date(now.getTime() - ROUTE_WINDOW_MS));
+  const since = new Date(now.getTime() - ROUTE_WINDOW_MS);
+  // The safety relays first, by their own read: whatever else the window holds, they are routed (relecture Sécurité).
+  const safety = await deps.reads.safetyEvents(since);
+  let others: readonly RoutedEventRow[] = [];
+  try {
+    others = await deps.reads.events(since);
+  } catch (error) {
+    deps.onFailure?.('events', error);
+  }
+  const first = new Set(safety.map((event) => event.id));
+  const events = [...safety, ...others.filter((event) => !first.has(event.id))];
   if (events.length === 0) return 0;
+  const failed = (step: string) => (error: unknown) => {
+    deps.onFailure?.(step, error);
+    return [];
+  };
   const creators = await deps.reads.creators();
   const nameOf = new Map(creators.map((creator) => [creator.id, creator.name]));
   const linesCache = new Map<CreatorId, readonly CreatorAlertLine[]>();
@@ -80,7 +105,11 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
     linesCache.set(creatorId, lines);
     return lines;
   };
-  const [owners, managers] = await Promise.all([deps.reads.owners(), deps.reads.managers()]);
+  // Each role read on its own: the owner is told even when the managers or the shift cannot be read.
+  const [owners, managers] = await Promise.all([
+    deps.reads.owners().catch(failed('owners')),
+    deps.reads.managers().catch(failed('managers')),
+  ]);
 
   let asked = 0;
   for (const event of events) {
@@ -98,8 +127,10 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
       if (role === 'manager') return managers;
       // An alert of no creator has no shift: the chatters are never told of the agency's budget by this road.
       if (event.creatorId === null) return [];
-      const onShift = await deps.onShift(event.creatorId, now);
-      return onShift.length === 0 ? [] : deps.reads.members(onShift.map((shift) => shift.memberId));
+      const onShift = await deps.onShift(event.creatorId, now).catch(failed('on_shift'));
+      return onShift.length === 0
+        ? []
+        : deps.reads.members(onShift.map((shift) => shift.memberId)).catch(failed('members'));
     };
 
     // One notification per account: the loudest of its roles (an owner on shift is not told twice).
@@ -112,18 +143,24 @@ export async function routeAlerts(deps: RouterDeps, now: Date): Promise<number> 
       }
     }
     const creatorName = event.creatorId === null ? null : (nameOf.get(event.creatorId) ?? null);
+    // A safety relay rings through the quiet hours and outside the daily cap (ADR 0150 § 6: « partent toujours »).
+    const reason = isCreatorAlertLocked(alert.code) ? 'safety_alert' : 'creator_alert';
     for (const { recipient, silent } of loudest.values()) {
-      await deps.notify(
-        {
-          userId: recipient.userId,
-          reason: 'creator_alert',
-          objectKey: event.id,
-          timeZone: recipient.timeZone,
-          message: alertMessage(alert.code, creatorName, alert.conversationId, silent),
-        },
-        now,
-      );
-      asked += 1;
+      try {
+        await deps.notify(
+          {
+            userId: recipient.userId,
+            reason,
+            objectKey: event.id,
+            timeZone: recipient.timeZone,
+            message: alertMessage(alert.code, creatorName, alert.conversationId, silent),
+          },
+          now,
+        );
+        asked += 1;
+      } catch (error) {
+        deps.onFailure?.('notify', error);
+      }
     }
   }
   return asked;

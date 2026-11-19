@@ -551,6 +551,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
           onLinesUnread: (creatorId, error) => {
             context.logger.error({ err: error, creatorId }, 'alerts: her choices unread, the defaults apply');
           },
+          onFailure: (step, error) => {
+            context.logger.error({ err: error, step }, 'alerts: a step failed, the others went on');
+          },
         });
         context.logger.info({ asked: await route(new Date()) }, 'alerts: routed');
       },

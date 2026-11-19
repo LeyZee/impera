@@ -12,32 +12,50 @@ function harness(options: {
   readonly events: readonly RoutedEventRow[];
   readonly lines?: () => Promise<readonly CreatorAlertLine[]>;
   readonly onShift?: readonly string[];
+  readonly failing?: readonly ('events' | 'managers' | 'on_shift' | 'members')[];
 }) {
+  const fails = (step: 'events' | 'managers' | 'on_shift' | 'members') =>
+    options.failing?.includes(step) === true;
+  const down = () => Promise.reject(new Error('down'));
   const asked: NotificationRequest[] = [];
   const reads: RouterReads = {
-    events: () => Promise.resolve(options.events),
+    safetyEvents: () =>
+      Promise.resolve(
+        options.events.filter(
+          (event) => event.type === 'handoff_requested' && JSON.stringify(event.payload).includes('"minor"'),
+        ),
+      ),
+    events: () => (fails('events') ? down() : Promise.resolve(options.events)),
     lines: options.lines ?? (() => Promise.resolve(creatorAlertLines([]))),
     creators: () => Promise.resolve([{ id: NORA, name: 'Nora' }]),
     owners: () => Promise.resolve([{ userId: 'owner', timeZone: 'Europe/Paris' }]),
-    managers: () => Promise.resolve([{ userId: 'manager', timeZone: 'Europe/Paris' }]),
+    managers: () =>
+      fails('managers') ? down() : Promise.resolve([{ userId: 'manager', timeZone: 'Europe/Paris' }]),
     members: (ids) =>
-      Promise.resolve(ids.map((id) => ({ userId: `user-of-${id}`, timeZone: 'Africa/Porto-Novo' }))),
+      fails('members')
+        ? down()
+        : Promise.resolve(ids.map((id) => ({ userId: `user-of-${id}`, timeZone: 'Africa/Porto-Novo' }))),
   };
   const unread: unknown[] = [];
+  const failures: string[] = [];
   const run = () =>
     routeAlerts(
       {
         reads,
-        onShift: () => Promise.resolve((options.onShift ?? []).map((memberId) => ({ memberId }))),
+        onShift: () =>
+          fails('on_shift')
+            ? down()
+            : Promise.resolve((options.onShift ?? []).map((memberId) => ({ memberId }))),
         notify: (request) => {
           asked.push(request);
           return Promise.resolve('rang');
         },
         onLinesUnread: (_creatorId, error) => unread.push(error),
+        onFailure: (step) => failures.push(step),
       },
       NOW,
     );
-  return { asked, unread, run };
+  return { asked, unread, failures, run };
 }
 
 const safety: RoutedEventRow = {
@@ -52,11 +70,40 @@ describe('alerts.route (ADR 0150 lot 2)', () => {
     const h = harness({ events: [safety], onShift: ['member-1'] });
     expect(await h.run()).toBe(3);
     expect(h.asked.map((r) => [r.userId, r.reason, r.objectKey, r.timeZone, r.message.silent])).toEqual([
-      ['owner', 'creator_alert', 'event-1', 'Europe/Paris', undefined],
-      ['manager', 'creator_alert', 'event-1', 'Europe/Paris', undefined],
-      ['user-of-member-1', 'creator_alert', 'event-1', 'Africa/Porto-Novo', undefined],
+      ['owner', 'safety_alert', 'event-1', 'Europe/Paris', undefined],
+      ['manager', 'safety_alert', 'event-1', 'Europe/Paris', undefined],
+      ['user-of-member-1', 'safety_alert', 'event-1', 'Africa/Porto-Novo', undefined],
     ]);
     expect(h.asked[0]?.message.url).toBe(`/suivi?conversation=${CONVERSATION}`);
+  });
+
+  it('rings any other alert under the ordinary reason, its quiet hours and its cap', async () => {
+    const sale: RoutedEventRow = { id: 'event-5', creatorId: NORA, type: 'sale_detected', payload: {} };
+    const h = harness({ events: [sale] });
+    await h.run();
+    expect(new Set(h.asked.map((r) => r.reason))).toEqual(new Set(['creator_alert']));
+  });
+
+  it('routes the safety relays read apart even when the other events cannot be read (relecture Sécurité)', async () => {
+    const h = harness({ events: [safety], failing: ['events'] });
+    await h.run();
+    expect(h.asked.map((r) => r.userId)).toEqual(['owner', 'manager']);
+    expect(h.failures).toEqual(['events']);
+  });
+
+  it('tells the owner and the manager when the shift, its members or the managers cannot be read', async () => {
+    const onShift = harness({ events: [safety], onShift: ['member-1'], failing: ['on_shift'] });
+    await onShift.run();
+    expect(onShift.asked.map((r) => r.userId)).toEqual(['owner', 'manager']);
+    expect(onShift.failures).toEqual(['on_shift']);
+
+    const members = harness({ events: [safety], onShift: ['member-1'], failing: ['members'] });
+    await members.run();
+    expect(members.asked.map((r) => r.userId)).toEqual(['owner', 'manager']);
+
+    const managers = harness({ events: [safety], onShift: ['member-1'], failing: ['managers'] });
+    await managers.run();
+    expect(managers.asked.map((r) => r.userId)).toEqual(['owner', 'user-of-member-1']);
   });
 
   it('delivers a safety relay even when a row says otherwise (forced past the base’s check)', async () => {

@@ -7,21 +7,43 @@ import {
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { RoutedEventRow, RouterReads } from '../../application/route';
-import { ROUTED_EVENT_TYPES } from '../../domain/classify';
+import { ROUTED_EVENT_TYPES, SAFETY_HANDOFF_CAUSES } from '../../domain/classify';
 import { creatorAlertLines } from '../../domain/creator-alerts';
 
-/** Read once per run in the worst case: a burst of events past it waits for the next minute. */
-const EVENTS_LIMIT = 500;
+/** One page of the window. */
+const EVENTS_PAGE = 500;
+/** Pages read per run at most: past it, a burst waits for the next minute (the safety relays are read apart). */
+const EVENTS_PAGES = 20;
 
 /**
  * The router's reads (ADR 0150 § 18), as the service role, across creators: the outbox, her choices (read through
  * `creatorAlertLines`, so that a locked alert is « reçoit » whatever a row says), and who the accounts are. Read only:
  * the service role has SELECT on `creator_alert_routes` and nothing more.
  */
+interface RoutedRow {
+  readonly id: string;
+  readonly creatorId: string | null;
+  readonly type: string;
+  readonly payload: unknown;
+}
+
+/** A row of a page, and where the next page starts. */
+interface Row extends RoutedRow {
+  readonly createdAt: Date;
+}
+type Cursor = Pick<Row, 'createdAt' | 'id'>;
+
+function toRouted(row: RoutedRow): RoutedEventRow[] {
+  const { id, type, payload } = row;
+  if (row.creatorId === null) return [{ id, type, payload, creatorId: null }];
+  const creatorId = CreatorIdSchema.safeParse(row.creatorId);
+  return creatorId.success ? [{ id, type, payload, creatorId: creatorId.data }] : [];
+}
+
 export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promise<string>): RouterReads {
   const admin = <T>(fn: (tx: Transaction) => Promise<T>): Promise<T> => withAdmin(adminDb, fn);
   return {
-    async events(since) {
+    async safetyEvents(since) {
       const table = schema.domainEvents;
       const rows = await admin((tx) =>
         tx
@@ -30,17 +52,51 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
           .where(
             and(
               sql`${table.createdAt} > ${since.toISOString()}::timestamptz`,
-              inArray(table.type, [...ROUTED_EVENT_TYPES]),
+              eq(table.type, 'handoff_requested'),
+              inArray(sql<string>`${table.payload} ->> 'cause'`, [...SAFETY_HANDOFF_CAUSES]),
             ),
           )
-          .orderBy(table.createdAt, table.id)
-          .limit(EVENTS_LIMIT),
+          .orderBy(table.createdAt, table.id),
       );
-      return rows.flatMap((row): RoutedEventRow[] => {
-        if (row.creatorId === null) return [{ ...row, creatorId: null }];
-        const creatorId = CreatorIdSchema.safeParse(row.creatorId);
-        return creatorId.success ? [{ ...row, creatorId: creatorId.data }] : [];
-      });
+      return rows.flatMap(toRouted);
+    },
+
+    async events(since) {
+      const table = schema.domainEvents;
+      const page = (cursor: Cursor | null): Promise<Row[]> =>
+        admin((tx) =>
+          tx
+            .select({
+              id: table.id,
+              creatorId: table.creatorId,
+              type: table.type,
+              payload: table.payload,
+              createdAt: table.createdAt,
+            })
+            .from(table)
+            .where(
+              and(
+                sql`${table.createdAt} > ${since.toISOString()}::timestamptz`,
+                inArray(table.type, [...ROUTED_EVENT_TYPES]),
+                cursor === null
+                  ? undefined
+                  : sql`(${table.createdAt}, ${table.id}) > (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id})`,
+              ),
+            )
+            .orderBy(table.createdAt, table.id)
+            .limit(EVENTS_PAGE),
+        );
+      const read: RoutedEventRow[] = [];
+      let cursor: Cursor | null = null;
+      // Page by page to the window's newest: a burst never keeps the newest events out of the run.
+      for (let count = 0; count < EVENTS_PAGES; count += 1) {
+        const rows: Row[] = await page(cursor);
+        for (const row of rows) read.push(...toRouted(row));
+        const last = rows.at(-1);
+        if (last === undefined || rows.length < EVENTS_PAGE) break;
+        cursor = { createdAt: last.createdAt, id: last.id };
+      }
+      return read;
     },
 
     async lines(creatorId) {

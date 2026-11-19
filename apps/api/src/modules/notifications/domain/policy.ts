@@ -4,8 +4,8 @@ import type { NotificationReason } from '@impera/contracts';
  * When a push notification may ring (ADR 0042 § 7, CR-01), pure. The rules live here, never in a setting nor in a
  * prompt:
  * - heures calmes, chosen by each account (22 h – 8 h by default): nothing rings; what was held waits for a single
- *   recap at their end. The start of one's own shift and the first reminder of its report (ADR 0077) are the only
- *   exceptions (glossary, « Heures calmes »), and neither counts in the cap;
+ *   recap at their end. The start of one's own shift, the first reminder of its report (ADR 0077) and a creator's
+ *   safety relay (ADR 0150 § 6) are the only exceptions (glossary, « Heures calmes »), and none counts in the cap;
  * - a sale rings, one notification per sale, grouped only in a burst (more than 3 within 2 minutes);
  * - everything else (reminders, routine, streak, team) shares a daily cap, in the account's own day; past it, the
  *   notification stays in the app and does not ring.
@@ -111,7 +111,12 @@ export type NotificationDecision =
  * What rings even in the quiet hours, outside the daily cap: one's own shift that starts, and the first reminder of the
  * report of one's own shift that just ended (ADR 0077 § 3). One set, read by both rules, so that they never part.
  */
-const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set(['own_shift_start', 'own_shift_end']);
+const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set([
+  'own_shift_start',
+  'own_shift_end',
+  // A human relay for safety of a creator (ADR 0150 § 6): « partent toujours », night and cap alike.
+  'safety_alert',
+]);
 
 export function isCapped(kind: NotificationReason): boolean {
   return kind !== 'sale' && !PASSES_QUIET_HOURS.has(kind);
