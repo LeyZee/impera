@@ -199,17 +199,11 @@ function RevenueCurve({
     const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
     const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
     setHover(index);
-    // The highest stroke, both lines, over a third of the curve around the day: the tip sits over it, never on it.
-    const reach = Math.max(1, Math.round(points.length / 6));
-    const near = [...line, ...all.filter((_, i) => points[i]?.compared !== null)].filter(
-      (one) =>
-        Math.abs(one.x - (line[index]?.x ?? 0)) <= (reach / Math.max(1, points.length - 1)) * frame.width,
-    );
-    const highest = Math.min(frame.height, ...near.map((one) => one.y));
     return {
       index,
       x: box.left + ((line[index]?.x ?? 0) / frame.width) * box.width,
-      top: box.top + (highest / frame.height) * box.height,
+      // The plot's top: the tip lives in the band reserved over it.
+      top: event.currentTarget.parentElement?.getBoundingClientRect().top ?? box.top,
     };
   };
   const tipAt = ({

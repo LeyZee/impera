@@ -49,9 +49,17 @@
   gap: 8px;
   min-width: 0;
 }
+/* Over the plot, a band as tall as the tip plus 8px (relecture Design 19/11): the tip lives there, over the point,
+   so it never covers the figures above nor a stroke, whatever the day. A phone's tip is the compact one. */
 .ins-curve__plot {
   position: relative;
-  height: 96px;
+  height: 68px;
+  margin-top: 90px;
+}
+@media (max-width: 640px) {
+  .ins-curve__plot {
+    margin-top: 82px;
+  }
 }
 .ins-curve__plot svg {
   display: block;

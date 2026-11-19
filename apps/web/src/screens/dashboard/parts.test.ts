@@ -57,7 +57,10 @@ describe('markerPlacement', () => {
     expect(place.top).toBeGreaterThanOrEqual(plot.top);
   });
 
-  it('sits over the highest stroke near the marker, centred on it, slid only to stay in the chart', () => {
+  it('sits in the band over the plot, centred on the marker, slid only to stay in the chart', () => {
+    // The curve's highest point touches the plot's top (300): the tip still ends 8px above it.
+    const highest = markerPlacement(plot, 200, tip, phone, plot.top);
+    expect(highest.top + tip.height).toBe(plot.top - 8);
     expect(markerPlacement(plot, 200, tip, phone, 330)).toEqual({ left: 110, top: 330 - 8 - 80 });
     // Near the right edge: slid left to end at the chart's right, still over the strokes.
     expect(markerPlacement(plot, 360, tip, phone, 330)).toEqual({ left: 370 - 180, top: 242 });

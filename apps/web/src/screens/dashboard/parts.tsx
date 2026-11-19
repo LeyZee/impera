@@ -77,9 +77,9 @@ export interface TipOptions {
    */
   readonly marker?: number;
   /**
-   * With `marker`, the viewport y of the highest stroke near it: the tip sits over that, centred on the marker, in the
-   * band between the figures and the curve, never on a line (relecture Design 19/11); it slides left or right only to
-   * stay inside the chart's box.
+   * With `marker`, the viewport y of the plot's top: the tip sits over it, centred on the marker, in the band the chart
+   * reserves above its plot, so it touches neither the figures nor a stroke (relecture Design 19/11); it slides left or
+   * right only to stay inside the chart's box.
    */
   readonly markerTop?: number;
 }
@@ -205,7 +205,7 @@ export function markerPlacement(
   strokeTop?: number,
 ): { left: number; top: number } {
   if (strokeTop !== undefined) {
-    // Over the strokes, centred on the marker, slid only to stay inside the chart's box and the window.
+    // Over the plot, centred on the marker, slid only to stay inside the chart's box and the window.
     const inside = Math.min(Math.max(box.left, x - tip.width / 2), box.right - tip.width);
     const left = Math.min(Math.max(TIP_MARGIN, inside), view.width - tip.width - TIP_MARGIN);
     return { left, top: Math.max(TIP_MARGIN, strokeTop - TIP_GAP - tip.height) };
