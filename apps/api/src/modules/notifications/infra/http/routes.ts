@@ -1,4 +1,5 @@
 import {
+  NotificationKindsSchema,
   NotificationPreferencesSchema,
   PushPublicKeySchema,
   PushSubscriptionInputSchema,
@@ -79,6 +80,26 @@ export function createNotificationRoutes(
       },
       async (request) => {
         await ready().preferences.put(signedIn(request.user), request.body);
+        return request.body;
+      },
+    );
+
+    // Her sorts (ADR 0150 § 16 ter): the creator's own choices, for herself only (RLS own_rows).
+    const creatorOnly = requireRole('creator');
+    app.get(
+      '/notifications/kinds',
+      { preValidation: creatorOnly, schema: { response: { 200: NotificationKindsSchema } } },
+      (request) => ready().preferences.kinds(signedIn(request.user)),
+    );
+
+    app.put(
+      '/notifications/kinds',
+      {
+        preValidation: creatorOnly,
+        schema: { body: NotificationKindsSchema, response: { 200: NotificationKindsSchema } },
+      },
+      async (request) => {
+        await ready().preferences.putKinds(signedIn(request.user), request.body);
         return request.body;
       },
     );

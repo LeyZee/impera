@@ -1,11 +1,13 @@
 import { sql, type SQL } from 'drizzle-orm';
 import {
+  boolean,
   check,
   customType,
   index,
   integer,
   pgPolicy,
   pgTable,
+  primaryKey,
   smallint,
   text,
   unique,
@@ -87,6 +89,34 @@ export const notificationPreferences = pgTable(
       sql`${t.quietStartMinute} between 0 and 1439 and ${t.quietEndMinute} between 0 and 1439`,
     ),
     check('notification_preferences_cap_check', sql`${t.dailyCap} between 1 and 30`),
+    pgPolicy('own_rows', {
+      for: 'all',
+      using: sql`${t.userId} = ${currentUser}`,
+      withCheck: sql`${t.userId} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
+ * The sorts of notification a creator turned on or off herself (ADR 0150 § 16 ter); no row means on. Each account
+ * reads and writes only its own: the agency never sees these choices.
+ */
+export const notificationKindPreferences = pgTable(
+  'notification_kind_preferences',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    enabled: boolean('enabled').notNull(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.kind] }),
+    check(
+      'notification_kind_preferences_kind_check',
+      sql`${t.kind} in ('agency_request', 'week_to_validate', 'earnings', 'lives')`,
+    ),
     pgPolicy('own_rows', {
       for: 'all',
       using: sql`${t.userId} = ${currentUser}`,

@@ -33,6 +33,7 @@ export async function remind(
           objectKey: `task:${payload.taskId}:${payload.startsAt}`,
           timeZone: found.timeZone,
           message,
+          kind: 'agency_request',
         },
         at,
       ),

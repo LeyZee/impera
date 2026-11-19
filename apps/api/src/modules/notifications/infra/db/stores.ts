@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { NotificationPreferencesSchema, type NotificationPreferences } from '@impera/contracts';
+import {
+  DEFAULT_NOTIFICATION_KINDS,
+  NOTIFICATION_KINDS,
+  NotificationKindSchema,
+  NotificationPreferencesSchema,
+  type NotificationKinds,
+  type NotificationPreferences,
+} from '@impera/contracts';
 import {
   and,
   decryptSecret,
@@ -133,6 +140,7 @@ export function createSubscriptionStore(db: Database, adminDb: Database): Subscr
 }
 
 const preferences = schema.notificationPreferences;
+const kindPreferences = schema.notificationKindPreferences;
 
 export function createPreferencesStore(db: Database): PreferencesStore {
   return {
@@ -158,6 +166,29 @@ export function createPreferencesStore(db: Database): PreferencesStore {
           .insert(preferences)
           .values({ userId, ...set })
           .onConflictDoUpdate({ target: preferences.userId, set }),
+      );
+    },
+    async kinds(userId) {
+      const rows = await withMember(db, userId, (tx) =>
+        tx
+          .select({ kind: kindPreferences.kind, enabled: kindPreferences.enabled })
+          .from(kindPreferences)
+          .where(eq(kindPreferences.userId, userId)),
+      );
+      const kinds: NotificationKinds = { ...DEFAULT_NOTIFICATION_KINDS };
+      for (const row of rows) kinds[NotificationKindSchema.parse(row.kind)] = row.enabled;
+      return kinds;
+    },
+    async putKinds(userId, value: NotificationKinds) {
+      const rows = NOTIFICATION_KINDS.map((kind) => ({ userId, kind, enabled: value[kind] }));
+      await withMember(db, userId, (tx) =>
+        tx
+          .insert(kindPreferences)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [kindPreferences.userId, kindPreferences.kind],
+            set: { enabled: sql`excluded.enabled`, updatedAt: sql`now()` },
+          }),
       );
     },
   };

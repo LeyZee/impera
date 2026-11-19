@@ -59,6 +59,13 @@ describe('decideNotification', () => {
     expect(decideNotification(base)).toEqual({ action: 'ring' });
   });
 
+  it('keeps a sort she turned off silent, day or night, a sale too (ADR 0150 § 16 ter)', () => {
+    expect(decideNotification({ ...base, turnedOff: true })).toEqual({ action: 'silent' });
+    expect(decideNotification({ ...base, kind: 'sale', turnedOff: true })).toEqual({ action: 'silent' });
+    const night = new Date('2026-11-10T23:00:00Z');
+    expect(decideNotification({ ...base, at: night, turnedOff: true })).toEqual({ action: 'silent' });
+  });
+
   it('holds everything for the recap in the quiet hours, sales too', () => {
     const night = new Date('2026-11-10T23:00:00Z');
     const until = new Date('2026-11-11T07:00:00Z');
