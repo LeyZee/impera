@@ -329,12 +329,12 @@ const invoiceDuePayload = z.object({
   payoutBlock: PayoutBlockSchema.nullable(),
 });
 
-/** Payload schema of every event type. Adding a type here is a contract change (ADR 0007). */
 /** What an `offer_proposed` is (ADR 0150 § 12), a closed list. */
 export const OFFER_PROPOSED_KINDS = ['practice_offer', 'custom_order', 'service_request'] as const;
 /** The uses of « Ses comptes » (ADR 0143 § 7), a closed list. */
 export const OFFER_PROPOSED_USAGES = ['lives', 'practice', 'personal', 'other'] as const;
 
+/** Payload schema of every event type. Adding a type here is a contract change (ADR 0007). */
 export const EVENT_PAYLOADS = {
   message_received: messagePayload,
   message_sent: messagePayload,
