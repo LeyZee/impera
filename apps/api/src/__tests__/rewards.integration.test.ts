@@ -2,6 +2,7 @@ import {
   AccountPayRulesIdSchema,
   ApiErrorSchema,
   LevelSettingsSchema,
+  MyFiguresSchema,
   MyShiftChallengeSchema,
   newId,
   payPeriodAt,
@@ -23,6 +24,7 @@ import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
 // Everything below is invented (ADR 0010). A period of 2025: it has ended.
 const P1 = PayPeriodSchema.parse('2025-05-01');
+const P2 = PayPeriodSchema.parse('2025-05-16');
 const HOUR = 3_600_000;
 
 /**
@@ -797,5 +799,51 @@ describe('Jeu du chatteur : les rapports validés nourrissent le jeu, un gain qu
     await evaluate();
     expect(await team.statementOf(nora, P1)).toEqual(before);
     expect(await team.jobsFor(P1)).toEqual([]);
+  });
+
+  it('gives « Mes chiffres » the same lines: her own validated reports, never a colleague’s (§ 10)', async () => {
+    const figuresOf = async (cookie: string) => {
+      const response = await team.call('GET', '/payroll/my-figures', cookie);
+      expect(response.statusCode, response.body).toBe(200);
+      return MyFiguresSchema.parse(response.json());
+    };
+    const noras = await figuresOf(noraCookie);
+    // 100,00 declared, corrected down then up again: 80,00 of net, the game's own.
+    expect(noras.records.bestPeriod).toEqual({ period: P1, currency: 'EUR', netMinor: 8_000 });
+    expect(noras.records.bestDay).toMatchObject({ currency: 'EUR', netMinor: 8_000 });
+    // A report has no hour of sale.
+    expect(noras.hours.cells).toEqual([]);
+    for (const cookie of [leaCookie, team.owner]) {
+      expect((await figuresOf(cookie)).records).toEqual({ bestDay: null, bestPeriod: null });
+    }
+  });
+
+  it('leaves a report aside on an account whose pay reads the sales, from the period it does (§ 3)', async () => {
+    // Béa's account declares until mid-May, then its pay reads the sales: a report there says nothing any more.
+    await team.test.admin.db.insert(schema.accountPayRules).values({
+      id: newId(AccountPayRulesIdSchema),
+      creatorId: team.bea,
+      platformAccountId: team.beas,
+      fromPeriod: P2,
+      currency: 'EUR',
+      vatBps: 0,
+      platformFeeBps: 2_000,
+      earningsSource: 'detected',
+      createdBy: team.ownerId,
+    });
+    await team.report(lea, P1, 3_000, { account: team.beas });
+    await team.report(lea, P2, 40_000, { account: team.beas });
+    const own = await team.app.modules.scheduling.game.ownValidatedShifts(UserIdSchema.parse(lea.userId));
+    expect(own.map((shift) => [shift.platformAccountId, shift.period, shift.grossMinor])).toEqual([
+      [team.beas, P1, 3_000],
+    ]);
+    await evaluate();
+    // 30,00 declared, 20 % to the platform: her first sale, and nothing of the 400,00.
+    expect(earned(await caseOf(leaCookie))).toContain('first_sale');
+    const [rank] = await team.test.admin.db
+      .select({ basisMinor: schema.rewardGains.basisMinor })
+      .from(schema.rewardGains)
+      .where(and(eq(schema.rewardGains.userId, lea.userId), eq(schema.rewardGains.kind, 'level')));
+    expect(rank).toBeUndefined();
   });
 });

@@ -1030,3 +1030,12 @@
     padding-top: clamp(var(--nv-space-6), 12vh, 112px);
   }
 }
+
+/* A member's pills under his name, not at the row's right where they cut the line of his creators (recette visuelle
+   16/11, GES-21). */
+.tm-row__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
+}

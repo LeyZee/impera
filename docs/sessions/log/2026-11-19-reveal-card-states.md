@@ -1,0 +1,7 @@
+# 2026-11-19 — Carte « Session Reveal » du popup : un état par compte, la cause et le geste — done
+Fait : demande de Charles du 19/11 (« trop de messages », statut de synchro clair, vraie cause d'une erreur). Une ligne par compte : un point et un mot (Connectée, Expire bientôt, Coupée en rouge, Jamais branchée), l'heure de fin quand on la connaît et un trait fin du temps qui reste. Le geste à faire n'apparaît qu'une fois, sous la liste. Un échec donne sa cause et son geste sous le compte concerné. Synchro en deux étapes, coche et trait animés une seule fois (rien en mouvement réduit). Infobulle commune `.nv-tip` au survol et au focus. « Resynchroniser » reste en mot discret. Le CRM injoignable est nommé par son adresse, et la pastille du haut le dit aussi (« CRM injoignable », sinon « CRM relié »). L'envoi lit maintenant la réponse 200 du serveur (`expiresAt`, `reconnectFirst`, `kept`). À « Délier », les modèles des synchros passées sont effacés (avis de Sécurité sur #841). Captures validées par Charles : recette/2026-11-19/extension/carte-reveal-etats et carte-reveal-synchro-erreurs.
+Pas fait : le trait au repos attend `sessionExpiresAt` dans la liste des comptes (PR de Bilan après #866) ; les deux codes de refus de #866 ont leur phrase à brancher après sa fusion ; le logo de Reveal sur la carte attend le choix de Charles.
+Décisions : aucune ADR touchée.
+Découvertes : aucune.
+Candidats à suppression : /mnt/project-files/recette/2026-11-19/extension/carte-reveal/ (premier jet en 1x, remplacé).
+Vérifié : tests de l'extension, pnpm check.
