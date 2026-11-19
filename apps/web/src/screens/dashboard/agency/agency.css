@@ -183,9 +183,45 @@
   gap: var(--nv-card-gap);
   margin: 0;
 }
-.ins-figures > .ins-tiles,
 .ins-tiles--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* The money beside the revenue (relecture Design 19/11), in the sense of the figures: the net alone on the top row,
+   its small curve on its right, then what it splits into and the VAT on the transfers, three equal tiles with no curve.
+   Two rows of one height fill the lead card's exactly. */
+.ins-figures > .ins-tiles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+}
+.ins-figures > .ins-tiles > .ins-tile:first-child {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  column-gap: var(--nv-card-gap);
+  row-gap: 4px;
+}
+.ins-figures > .ins-tiles > .ins-tile:first-child > :not(.ins-tile__spark) {
+  grid-column: 1;
+}
+.ins-figures > .ins-tiles > .ins-tile:first-child > .ins-tile__spark {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: stretch;
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+.ins-figures > .ins-tiles > .ins-tile:first-child .ins-spark {
+  height: auto;
+  min-height: 40px;
+  flex: 1;
+}
+/* A third has no room for a long amount and its change side by side: always under it, the three tiles alike. */
+.ins-figures > .ins-tiles > .ins-tile:not(:first-child) dd:first-of-type {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 /* The lead's note: the day read on the curve lies over the sentence, in its box, which keeps its place while hidden,
    so reading a day moves nothing; the day stays on one line. */
@@ -1104,6 +1140,12 @@
   min-height: 120px;
 }
 
+/* Beside the tiles, the curve keeps the height it had when the parts drew theirs (relecture Design 19/11). */
+@media (min-width: 1101px) {
+  .ins-figures .ins-curve__plot {
+    min-height: 150px;
+  }
+}
 @media (max-width: 1100px) {
   .ins-figures {
     grid-template-columns: minmax(0, 1fr);
@@ -1387,6 +1429,26 @@
   }
   .ins-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* A phone: the net on its own row with its curve under it, the two parts side by side, the VAT on its own row. */
+  .ins-figures > .ins-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+  }
+  .ins-figures > .ins-tiles > .ins-tile:first-child {
+    display: flex;
+  }
+  .ins-figures > .ins-tiles > .ins-tile:first-child > .ins-tile__spark {
+    margin-top: auto;
+    padding-top: 6px;
+  }
+  .ins-figures > .ins-tiles > .ins-tile:first-child .ins-spark {
+    min-height: 0;
+    height: 28px;
+    flex: none;
+  }
+  .ins-figures > .ins-tiles > .ins-tile:last-child {
+    grid-column: 1 / -1;
   }
   .ins-money__legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -570,20 +570,6 @@ function Figures({
       ),
     },
     {
-      label: 'Part de l’agence',
-      value: euros(current.agencyMinor),
-      note: ofNet('agency'),
-      delta: [current.agencyMinor, previous.agencyMinor],
-      part: 'agency',
-      tip: tipOf(
-        'Part de l’agence',
-        current.agencyMinor,
-        previous.agencyMinor,
-        'agency',
-        'Ce que la plateforme verse à l’agence, son propre chiffre.',
-      ),
-    },
-    {
       label: creatorLabel,
       value: euros(current.creatorMinor),
       note: ofNet('creator'),
@@ -597,6 +583,20 @@ function Figures({
         several
           ? 'Ce que la plateforme leur verse, son propre chiffre.'
           : 'Ce que la plateforme lui verse, son propre chiffre.',
+      ),
+    },
+    {
+      label: 'Part de l’agence',
+      value: euros(current.agencyMinor),
+      note: ofNet('agency'),
+      delta: [current.agencyMinor, previous.agencyMinor],
+      part: 'agency',
+      tip: tipOf(
+        'Part de l’agence',
+        current.agencyMinor,
+        previous.agencyMinor,
+        'agency',
+        'Ce que la plateforme verse à l’agence, son propre chiffre.',
       ),
     },
     {
