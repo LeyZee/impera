@@ -1,4 +1,4 @@
-# 0148. Les idées apprennent ses goûts et ce qui marche : un profil de goûts tenu par le code, un dosage entre valeur sûre, variation et nouveauté, une mesure rapportée à son audience
+# 0151. Les idées apprennent ses goûts et ce qui marche : un profil de goûts tenu par le code, un dosage entre valeur sûre, variation et nouveauté, une mesure rapportée à son audience
 
 Statut : proposed (demande de Charles du 17/11/2026, 13 h 54 ; les cinq points acceptés à 13 h 56, « Oui, à fond. Vas-y sur tout ça, je valide » ; fil « Imaginer le système Instagram »)
 Date : 2026-11-19
