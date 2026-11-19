@@ -237,20 +237,23 @@ export function VaultPage({
     const share = (value: number): number => (chosenFigures.listed === 0 ? 0 : value / chosenFigures.listed);
     return (
       <>
-        {/* One line of figures under the title, a thin gauge under it: imported of those listed, described of those. */}
-        <div className="vp-sum" data-chosen={chosen === null ? undefined : ''}>
-          <p className="vp-sum__line nv-num">{summaryLine(chosenFigures)}</p>
-          <span className="vp-sum__meter" aria-hidden="true">
-            <span className="vp-sum__in" style={{ '--vp-share': share(chosenFigures.imported) }} />
-            <span className="vp-sum__described" style={{ '--vp-share': share(chosenFigures.described) }} />
-          </span>
-        </div>
+        {/* Nothing imported yet: one sentence says it, no figures and no empty gauge. Then one line of figures, and a
+            gauge of what is imported across the card's width; described is said by the line alone. */}
         {chosenFigures.imported === 0 && isOwner && choices.data !== undefined ? (
           <p className="vx-note vp-first">
             Rien n’est encore importé : coche un dossier entier, ou ouvre-le et sélectionne ses médias. Seuls
             les médias importés servent aux scripts et à l’IA.
           </p>
-        ) : null}
+        ) : (
+          <div className="vp-sum" data-chosen={chosen === null ? undefined : ''}>
+            <p className="vp-sum__line nv-num">{summaryLine(chosenFigures)}</p>
+            {chosenFigures.imported === 0 ? null : (
+              <span className="vp-sum__meter" aria-hidden="true">
+                <span className="vp-sum__in" style={{ '--vp-share': share(chosenFigures.imported) }} />
+              </span>
+            )}
+          </div>
+        )}
         <div className="vp-body" data-chosen={chosen === null ? undefined : ''}>
           <nav className="vp-rail" aria-label="Ses dossiers">
             <p className="nv-eyebrow vp-rail__head">
@@ -404,6 +407,9 @@ function FolderRow({
             ) : null}
           </span>
           <span className="vp-folder__line nv-num">{importLine(count)}</span>
+          {folder.folderRef !== null && folder.moment === null ? (
+            <span className="vp-folder__warn">Ni ☀️ ni 🌙 : à renommer dans Reveal</span>
+          ) : null}
         </span>
         <span className="vp-folder__chev" aria-hidden="true">
           <ChevronIcon />
@@ -578,11 +584,8 @@ function FolderPane({
           </h3>
           {/* What it holds; how much of it is imported is said once, on the rail, and by the grid's groups. */}
           <p className="ps-muted vp-pane__line nv-num">{folderLine(folder.media)}</p>
-          {unmarked ? (
-            <p className="vp-pane__warn">
-              Ni ☀️ ni 🌙 dans son nom : renomme-le dans Reveal pour le classer.
-            </p>
-          ) : null}
+          {/* The rail says it on the folder's row; on the phone the rail is gone once a folder is open. */}
+          {unmarked ? <p className="vp-pane__warn">Ni ☀️ ni 🌙 : à renommer dans Reveal</p> : null}
         </div>
         <div className="vp-pane__actions">
           {isOwner && order.length > 0 ? (
@@ -664,7 +667,7 @@ function FolderPane({
           {groups.map((group, g) => {
             const first = groups.slice(0, g).reduce((sum, each) => sum + each.media.length, 0);
             return (
-              <li key={group.key} className="vp-group">
+              <li key={group.key} className="vp-group" data-group={group.key}>
                 <h4 className="vp-group__title nv-eyebrow" id={`vp-group-${group.key}`}>
                   {GROUP_NAMES[group.key]}{' '}
                   <span className="vp-group__count nv-num">{group.media.length}</span>

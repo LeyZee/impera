@@ -177,15 +177,17 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     show(true);
     const card = await screen.findByRole('region', { name: 'Coffre Reveal de Lina' });
     expect(await within(card).findByText('Synchronisé il y a 1 h')).toBeDefined();
-    // One line of figures under the title, never a plate per figure.
-    expect(await within(card).findByText('Aucun média importé sur 6')).toBeDefined();
-    expect(card.querySelectorAll('.nv-tile')).toHaveLength(0);
-    expect(within(card).getByText(/Rien n’est encore importé/u)).toBeDefined();
+    // Nothing imported: one sentence says it, no line of figures, no empty gauge, never a plate per figure.
+    expect(await within(card).findByText(/Rien n’est encore importé/u)).toBeDefined();
+    expect(within(card).queryByText('Aucun média importé sur 6')).toBeNull();
+    expect(card.querySelectorAll('.vp-sum__meter, .nv-tile')).toHaveLength(0);
     const rail = within(card).getByRole('navigation', { name: 'Ses dossiers' });
     const names = [...rail.querySelectorAll('.vp-folder__label')].map((name) => name.textContent);
     // The root, first in Reveal's list, is an ordinary folder at the bottom: never « Tout ».
     expect(names).toEqual(['Matin ☀️', 'Soirée 🌙', 'En vrac', 'Racine du coffre']);
     expect(within(rail).getByText('Aucun importé sur 3')).toBeDefined();
+    // A folder named with neither ☀️ nor 🌙 says why on its row, readable without opening it.
+    expect(within(rail).getAllByText('Ni ☀️ ni 🌙 : à renommer dans Reveal')).toHaveLength(1);
     // Nothing ticked at first, the root included.
     const ticks = within(rail).getAllByRole('checkbox');
     expect(ticks).toHaveLength(4);
