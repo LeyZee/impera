@@ -432,10 +432,13 @@ function welcomeScreen(actions: Actions): HTMLElement {
     'section',
     { class: 'pp-hero' },
     h('p', { class: 'pp-whisper nv-enter', style: '--nv-i: 1' }, 'Bienvenue.'),
+    // Three short steps, numbered, rather than one long sentence (avis Design du 19/11).
     h(
-      'p',
-      { class: 'pp-hero__text nv-enter', style: '--nv-i: 2' },
-      'Pour relier l’extension, ouvre ton CRM : menu de ton compte, Extension, « Relier l’extension à ce CRM ». Puis clique à nouveau sur l’icône Impera.',
+      'ol',
+      { class: 'pp-steps nv-enter', style: '--nv-i: 2' },
+      h('li', {}, 'Ouvre ton CRM.'),
+      h('li', {}, 'Menu de ton compte, puis Extension.'),
+      h('li', {}, 'Clique « Relier l’extension à ce CRM », puis de nouveau sur l’icône Impera.'),
     ),
     h('div', { class: 'pp-actions nv-enter', style: '--nv-i: 3' }, type),
   );

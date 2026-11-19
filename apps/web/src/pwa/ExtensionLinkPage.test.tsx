@@ -43,9 +43,7 @@ describe('ExtensionLinkPage', () => {
     await renderAt('https://crm.exemple.fr/extension/lier');
     expect(await screen.findByRole('heading', { name: 'Relier l’extension à ce CRM' })).toBeDefined();
     expect(screen.getByText('Clique sur l’icône Impera en haut à droite de ton navigateur.')).toBeDefined();
-    expect(
-      screen.getByText('Tu ne la vois pas ? Clique sur la pièce de puzzle, puis sur Impera.'),
-    ).toBeDefined();
+    expect(screen.getByText('Pas épinglée : la pièce de puzzle, puis Impera.')).toBeDefined();
     expect(screen.getAllByRole('img')).toHaveLength(2);
   });
 
@@ -61,14 +59,12 @@ describe('ExtensionLinkPage', () => {
 
   it('names the browser it is opened in', async () => {
     await renderAt('https://crm.exemple.fr/extension/lier', EDGE);
-    expect(await screen.findByText('L’icône est dans la barre d’Edge : clique-la.')).toBeDefined();
+    expect(await screen.findByText('Épinglée : elle est dans la barre d’Edge.')).toBeDefined();
   });
 
-  it('says what an already linked extension does, and keeps its way back to the guide', async () => {
+  it('says what an already linked extension does, and goes back to the guide it came from', async () => {
     await renderAt('https://crm.exemple.fr/extension/lier');
     expect(await screen.findByText(/Ton extension est peut-être déjà reliée/u)).toBeDefined();
-    expect(screen.getByRole('link', { name: 'Retour au guide' }).getAttribute('href')).toBe(
-      '/aide/extension',
-    );
+    expect(screen.getByRole('link', { name: '← Extension' }).getAttribute('href')).toBe('/aide/extension');
   });
 });

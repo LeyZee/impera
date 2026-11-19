@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
-import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
 import { browserOf } from './extension';
@@ -17,7 +16,7 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
   return (
     <svg
       className="nv-ext-link__sketch"
-      viewBox="0 0 240 112"
+      viewBox={hidden ? '0 0 240 112' : '0 0 240 52'}
       role="img"
       aria-label={
         hidden
@@ -37,7 +36,7 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
         <g>
           <rect className="nv-ext-link__menu" x="108" y="50" width="120" height="54" rx="10" />
           <rect className="nv-ext-link__row" x="116" y="58" width="104" height="18" rx="6" />
-          <rect className="nv-ext-link__mark" x="122" y="61" width="12" height="12" rx="3" />
+          <image href="/impera-mark.svg" x="121" y="60" width="14" height="14" />
           <text className="nv-ext-link__label" x="146" y="71">
             Impera
           </text>
@@ -46,7 +45,7 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
         </g>
       ) : (
         <g>
-          <rect className="nv-ext-link__mark" x="200" y="18" width="16" height="16" rx="4" />
+          <image href="/impera-mark.svg" x="199" y="17" width="18" height="18" />
           <circle className="nv-ext-link__ring" cx="208" cy="26" r="13" />
         </g>
       )}
@@ -63,7 +62,12 @@ export function ExtensionLinkPage(): JSX.Element {
   return (
     <Page width="narrow">
       <PageHeader
-        eyebrow={<OffRailBack />}
+        eyebrow={
+          // Reached from the guide: the way back is the guide (avis Design du 19/11), not the rail's.
+          <Link to="/aide/extension" className="nv-btn nv-btn--plain nv-btn--sm nv-offrail-back">
+            ← Extension
+          </Link>
+        }
         title="Relier l’extension à ce CRM"
         lead="Clique sur l’icône Impera en haut à droite de ton navigateur."
       />
@@ -72,11 +76,11 @@ export function ExtensionLinkPage(): JSX.Element {
           <PanelSection className="nv-ext-link__cases">
             <figure className="nv-ext-link__case">
               <BarSketch hidden={false} />
-              <figcaption>L’icône est dans la barre {named} : clique-la.</figcaption>
+              <figcaption>Épinglée : elle est dans la barre {named}.</figcaption>
             </figure>
             <figure className="nv-ext-link__case">
               <BarSketch hidden />
-              <figcaption>Tu ne la vois pas ? Clique sur la pièce de puzzle, puis sur Impera.</figcaption>
+              <figcaption>Pas épinglée : la pièce de puzzle, puis Impera.</figcaption>
             </figure>
           </PanelSection>
           <PanelSection>
@@ -89,9 +93,6 @@ export function ExtensionLinkPage(): JSX.Element {
         <p className="nv-help-install__note">
           Rien ne se passe ? Ton extension est peut-être déjà reliée : regarde la pastille en haut du popup.
         </p>
-        <Link to="/aide/extension" className="nv-ext-link__back">
-          Retour au guide
-        </Link>
       </div>
     </Page>
   );

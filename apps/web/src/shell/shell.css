@@ -1895,6 +1895,7 @@ label.nv-notif__row {
 .nv-ext-link__cases {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
   gap: var(--nv-space-4);
 }
 .nv-ext-link__case {
@@ -1942,9 +1943,6 @@ label.nv-notif__row {
 .nv-ext-link__row {
   fill: var(--nv-glass-fill-strong);
 }
-.nv-ext-link__mark {
-  fill: var(--nv-neon);
-}
 .nv-ext-link__label {
   fill: var(--nv-ink);
   font-size: 11px;
@@ -1955,17 +1953,4 @@ label.nv-notif__row {
   stroke: var(--nv-neon-ink);
   stroke-width: 1.6;
   stroke-dasharray: 3 3;
-}
-.nv-ext-link__back {
-  justify-self: start;
-  color: var(--nv-ink);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--nv-hairline);
-  text-underline-offset: 3px;
-}
-.nv-ext-link__back:hover,
-.nv-ext-link__back:focus-visible {
-  text-decoration-color: currentColor;
 }

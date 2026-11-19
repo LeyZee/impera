@@ -334,7 +334,11 @@ describe('popup', () => {
   it('sends a first opening to the CRM’s page, and types only on demand', () => {
     const { root, actions } = draw({ kind: 'welcome' });
     expect(root.querySelector('.pp-whisper')?.textContent).toBe('Bienvenue.');
-    expect(root.textContent).toContain('« Relier l’extension à ce CRM »');
+    expect([...root.querySelectorAll('.pp-steps li')].map((step) => step.textContent)).toEqual([
+      'Ouvre ton CRM.',
+      'Menu de ton compte, puis Extension.',
+      'Clique « Relier l’extension à ce CRM », puis de nouveau sur l’icône Impera.',
+    ]);
     expect(root.querySelector('.pp-pill')).toBeNull();
     expect(root.querySelector('.pp-address')).toBeNull();
     expect(root.querySelector('input')).toBeNull();

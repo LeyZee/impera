@@ -2,7 +2,7 @@
 
 Statut : accepted (Charles, 03/11/2026, 17 h 49, « ok 0067 » ; § 2 précisé : « ok phrases 0067 », 17 h 50 ; captures : « ok captures guide », 17 h 50 ; demande de Charles du 03/11/2026, 17 h 40 : « un guide dans le CRM […] pour installer l'extension […] pour l'équipe, les chatters, etc., et les managers. Et puis leur expliquer à quoi ça sert »)
 Date : 2026-11-03
-Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 accepté (Charles, 19/11/2026, 19 h 50, « Valider » sur la carte du fil Extension, après les OK de Design et de Sécurité sur d2394025) : l'extension se relie au CRM depuis le CRM. Second amendement du 19/11/2026 proposé : la version hébergée connaît l'adresse du CRM.
+Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 accepté (Charles, 19/11/2026, 19 h 50, « Valider » sur la carte du fil Extension, après les OK de Design et de Sécurité sur d2394025) : l'extension se relie au CRM depuis le CRM. Second amendement du 19/11/2026 accepté (Charles, 19/11/2026, 20 h 44, « Valider » sur la carte du fil Extension, après le OK de Sécurité sur aa6d0561) : la version hébergée connaît l'adresse du CRM.
 
 ## Contexte
 
@@ -46,7 +46,7 @@ Conséquences : un chatteur n'a plus rien à taper. Il se connecte au CRM, ouvre
 
 Risque résiduel, accepté : un faux site en `https://` qu'un chatteur ouvrirait avant de relier son extension. Aucun contrôle de l'extension ne le distingue, puisque son fichier ne contient aucune adresse (§ 4). Les défenses sont l'hôte affiché en entier, le premier lien seulement, et le code de liaison ci-dessus.
 
-## Second amendement du 19/11/2026 : la version hébergée connaît l'adresse du CRM (proposé)
+## Second amendement du 19/11/2026 : la version hébergée connaît l'adresse du CRM (accepté)
 
 Demande de Charles du 19/11 : « une fois que ça soit hébergé, ça demande plus l'adresse ». Il a choisi « Les deux » (fil Extension, 19/11, 20 h 39) : l'adresse intégrée pour la version hébergée, et « Relier l'extension à ce CRM » pour son PC et pour un changement d'adresse.
 
