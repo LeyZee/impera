@@ -638,10 +638,106 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ───────────── Reveal's mark (demande de Charles du 19/11): its eyes on a raspberry tile ───────────── */
+
+/* A brand raspberry, apart from the urgency red (--nv-danger): it leans to pink, so the red dot of « Coupée » below
+   it still reads as the alarm. */
+.pp-reveal {
+  --pp-reveal-top: #f0466f;
+  --pp-reveal-bottom: #a8123f;
+  --pp-reveal-white: #fff7f9;
+  --pp-reveal-pupil: #1c0a12;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 3px 8px rgb(168 18 63 / 0.35));
+}
+[data-theme='light'] .pp-reveal {
+  filter: drop-shadow(0 2px 5px rgb(168 18 63 / 0.22));
+}
+.pp-reveal__top {
+  stop-color: var(--pp-reveal-top);
+}
+.pp-reveal__bottom {
+  stop-color: var(--pp-reveal-bottom);
+}
+.pp-reveal__shine-top {
+  stop-color: #fff;
+  stop-opacity: 0.32;
+}
+.pp-reveal__shine-mid {
+  stop-color: #fff;
+  stop-opacity: 0.05;
+}
+.pp-reveal__shine-end {
+  stop-color: #fff;
+  stop-opacity: 0;
+}
+.pp-reveal__rim {
+  stroke: rgb(255 255 255 / 0.22);
+  stroke-width: 1;
+}
+.pp-reveal__white {
+  fill: var(--pp-reveal-white);
+}
+.pp-reveal__pupil {
+  fill: var(--pp-reveal-pupil);
+}
+.pp-reveal__glint {
+  fill: #fff;
+}
+.pp-reveal__pupils {
+  transform-box: view-box;
+}
+/* While a session is on its way, the eyes read the tab, from one side to the other. */
+.pp-reveal.is-reading .pp-reveal__pupils {
+  animation: pp-reveal-read 1.6s var(--nv-ease-out, ease-in-out) infinite;
+}
+@keyframes pp-reveal-read {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  40%,
+  60% {
+    transform: translateX(-4.6px);
+  }
+}
+/* Its tile is the mark itself: no glass behind it. */
+.pp-card__icon--mark {
+  background: none;
+  box-shadow: none;
+}
+
+/* The ink variant, for Charles to choose (avis Design du 19/11): the same eyes on the neutral tile. */
+.pp-reveal--ink {
+  filter: none;
+}
+.pp-reveal--ink .pp-reveal__tile {
+  fill: var(--nv-glass-fill-strong);
+}
+.pp-reveal--ink .pp-reveal__shine {
+  display: none;
+}
+.pp-reveal--ink .pp-reveal__rim {
+  stroke: var(--nv-hairline);
+}
+/* By day, the white of the eyes would melt into the light tile: an ink line draws them. */
+[data-theme='light'] .pp-reveal--ink .pp-reveal__white {
+  stroke: var(--nv-ink);
+  stroke-width: 1.4;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pp-mark,
-  .pp-skeleton {
+  .pp-skeleton,
+  .pp-sync__dot.is-live,
+  .pp-sync__gauge.is-fresh .nv-gauge__fill,
+  .pp-reveal.is-reading .pp-reveal__pupils {
     animation: none;
+  }
+  .pp-sync__check path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
   .pp-tile,
   .pp-tile__icon,
@@ -733,9 +829,20 @@ body {
   cursor: progress;
 }
 
-/* ───────────── The owner's Reveal session (P2-01): its own card, beside the copilot's ───────────── */
+/* ───────────── The owner's Reveal session (P2-01): its own card, beside the copilot's ─────────────
+   One account per block, read top to bottom: who and the action; the state in a word with its dot and the hour it
+   holds until; a thin line of the time left; the gesture or the cause of a failure (demande de Charles du 19/11). */
 
 .pp-sync__account {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pp-sync__account + .pp-sync__account {
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -760,13 +867,146 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pp-sync__who .pp-hint {
-  flex-basis: 100%;
-}
-.pp-sync__account .pp-btn {
+.pp-sync__top .pp-btn,
+.pp-sync__again {
   flex: none;
 }
-/* The advice and the notices hold to the accounts they speak of. */
-.pp-sync__account + .pp-hint {
-  margin-top: -4px;
+.pp-sync__again {
+  align-self: center;
+}
+.pp-sync__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  border-radius: var(--nv-radius-sm);
+}
+.pp-tipped {
+  cursor: default;
+}
+.pp-tipped:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 3px;
+}
+.pp-sync__dot {
+  --_c: var(--nv-ink-faint);
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--_c);
+}
+.pp-sync__dot--ok {
+  --_c: var(--nv-success);
+}
+.pp-sync__dot--amber {
+  --_c: var(--nv-warning);
+}
+.pp-sync__dot--red {
+  --_c: var(--nv-danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nv-danger) 22%, transparent);
+}
+/* On its way: the dot breathes, nothing else moves. */
+.pp-sync__dot.is-live {
+  --_c: var(--nv-ink-muted);
+  animation: pp-sync-breathe var(--nv-dur-breathe) var(--nv-ease-out) infinite;
+}
+@keyframes pp-sync-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+.pp-sync__word {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.pp-sync__word--amber {
+  color: var(--nv-warning);
+}
+.pp-sync__word--red {
+  color: var(--nv-danger);
+}
+.pp-sync__until,
+.pp-sync__step {
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* A session just stored: the tick draws itself once. */
+.pp-sync__check {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--nv-surface-raised);
+  background: var(--nv-success);
+}
+.pp-sync__check svg {
+  stroke-width: 3;
+}
+.pp-sync__check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: pp-sync-tick var(--nv-dur-slow) var(--nv-ease-out) var(--nv-dur-fast) forwards;
+}
+@keyframes pp-sync-tick {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* The time left: one thin line, never a full red bar (avis Design du 19/11). */
+.nv-gauge.pp-sync__gauge {
+  height: 2px;
+}
+.pp-sync__gauge--ok {
+  --_g: var(--nv-success);
+}
+.pp-sync__gauge--amber {
+  --_g: var(--nv-warning);
+}
+/* Fills from nothing once, when a session was just stored: the only motion at rest. */
+.pp-sync__gauge.is-fresh .nv-gauge__fill {
+  animation: pp-sync-fill var(--nv-dur-data) var(--nv-ease-spring) var(--nv-dur-base) both;
+}
+@keyframes pp-sync-fill {
+  from {
+    width: 0;
+  }
+}
+.pp-sync__advice,
+.pp-sync__fail {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+/* An account's failure sits below the same hairline as the advice under the list (avis Design du 19/11). */
+.pp-sync__account .pp-sync__fail {
+  margin-top: 2px;
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__gauge + .pp-sync__fail {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.pp-sync__advice--all {
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__retry {
+  display: flex;
+  justify-content: flex-end;
+}
+.pp-sync__cause {
+  font-weight: 600;
+  color: var(--nv-warning);
 }

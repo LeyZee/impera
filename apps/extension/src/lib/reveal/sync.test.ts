@@ -106,7 +106,12 @@ describe('the session read, held, then sent', () => {
       readLink: () => Promise.resolve('x'.repeat(43)),
       markRevoked: vi.fn(() => Promise.resolve()),
       origin: () => Promise.resolve('http://localhost:5173'),
-      send: vi.fn(() => Promise.resolve('synced' as const)),
+      send: vi.fn(() =>
+        Promise.resolve({
+          state: 'synced' as const,
+          stored: { expiresAt: '2026-11-12T09:05:00.000Z', reconnectFirst: false, kept: false },
+        }),
+      ),
       remember: vi.fn(() => Promise.resolve()),
       ...overrides,
     };
@@ -118,7 +123,12 @@ describe('the session read, held, then sent', () => {
     expect(read).toEqual({ state: 'held', modelId: 'model-a1', seen: 'unknown' });
     expect(JSON.stringify(read)).not.toContain(BEARER);
     const run = sending();
-    expect(await sendHeld(run, hold, ACCOUNT)).toEqual({ state: 'synced' });
+    expect(await sendHeld(run, hold, ACCOUNT)).toEqual({
+      state: 'synced',
+      expiresAt: '2026-11-12T09:05:00.000Z',
+      reconnectFirst: false,
+      kept: false,
+    });
     expect(run.send).toHaveBeenCalledWith('http://localhost:5173', 'x'.repeat(43), ACCOUNT, SESSION);
     expect(run.remember).toHaveBeenCalledWith(ACCOUNT, 'model-a1');
     // Taken once: a second « Envoyer » finds nothing.
@@ -173,7 +183,7 @@ describe('the session read, held, then sent', () => {
   it('drops a link the CRM removed, and remembers no model it refused', async () => {
     const hold = sessionHold();
     await readReveal(reading(), hold, ACCOUNT);
-    const run = sending({ send: () => Promise.resolve('revoked' as const) });
+    const run = sending({ send: () => Promise.resolve({ state: 'revoked' as const }) });
     expect(await sendHeld(run, hold, ACCOUNT)).toEqual({ state: 'revoked' });
     expect(run.markRevoked).toHaveBeenCalledTimes(1);
     expect(run.remember).not.toHaveBeenCalled();

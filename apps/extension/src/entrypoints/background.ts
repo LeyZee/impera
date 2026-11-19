@@ -354,6 +354,8 @@ export default defineBackground(() => {
               creatorName,
               sessionState,
               sessionUpdatedAt,
+              // The CRM does not list the end of a session yet: the card says it after a « Sync » only.
+              sessionExpiresAt: null,
             }),
           ),
         };
@@ -456,6 +458,8 @@ export default defineBackground(() => {
       }
       case 'popup/unlink':
         await forgetLink();
+        // The models of past syncs go with the link that made them (avis de Sécurité sur #841).
+        await browser.storage.local.remove(MODELS_KEY);
         return { ok: true };
       case 'popup/reveal-accounts':
         return revealAccounts();

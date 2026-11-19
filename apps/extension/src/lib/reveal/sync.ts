@@ -149,7 +149,8 @@ export async function sendHeld(
   const token = await deps.readLink();
   if (token === null) return { state: 'unlinked' };
   const synced = await deps.send(await deps.origin(), token, accountId, session);
-  if (synced === 'revoked') await deps.markRevoked();
-  if (synced === 'synced') await deps.remember(accountId, session.modelId);
-  return { state: synced };
+  if (synced.state === 'revoked') await deps.markRevoked();
+  if (synced.state !== 'synced') return { state: synced.state };
+  await deps.remember(accountId, session.modelId);
+  return { state: 'synced', ...synced.stored };
 }

@@ -1,9 +1,12 @@
 import type { PlatformAccountId } from '@impera/contracts';
 
 import { h } from '../../lib/dom';
-import type { RevealAccounts, RevealSeen } from '../../lib/watch/protocol';
+import { icon } from '../../lib/icons';
+import { revealMark } from '../../lib/reveal-mark';
+import type { RevealAccounts, RevealSeen, RevealSynced } from '../../lib/watch/protocol';
 
 import { button, card, pill, text } from './card';
+import { withTip } from './tip';
 import { hourOf, linkForm, notice, type WatchActions, type WatchNotice } from './watch-view';
 
 /**
@@ -32,13 +35,29 @@ export interface Confirm {
   readonly seen: RevealSeen;
 }
 
+/** Why a « Sync » did not store a session: each one has its cause and the gesture that mends it. */
+export type SyncFailure = Exclude<RevealSynced['state'], 'synced'> | 'no-session';
+
+/** What the last gesture left under its account: the session stored, or why not. */
+export type SyncOutcome =
+  | {
+      readonly kind: 'synced';
+      readonly accountId: PlatformAccountId;
+      readonly expiresAt: string | null;
+      readonly reconnectFirst: boolean;
+      readonly kept: boolean;
+    }
+  | { readonly kind: 'failed'; readonly accountId: PlatformAccountId; readonly failure: SyncFailure };
+
 export interface SyncView {
   readonly accounts: RevealAccounts;
-  readonly notice: WatchNotice | null;
+  readonly outcome: SyncOutcome | null;
   /** The account whose session is on its way, and how far (EXT-19, V-EXT-16); null while nothing is. */
   readonly pending: { readonly accountId: PlatformAccountId; readonly phase: 'reading' | 'sending' } | null;
   readonly confirm: Confirm | null;
   readonly now: Date;
+  /** The CRM's address as this extension is set, named when it does not answer (avis Design du 19/11). */
+  readonly crm: string;
 }
 
 export interface SyncActions {
@@ -104,53 +123,240 @@ export function copilotCard(
 
 /* ---- The owner's Reveal session ---- */
 
-function stateLine(account: Account): HTMLElement {
-  switch (account.sessionState) {
-    case 'none':
-      return h('p', { class: 'pp-hint pp-hint--amber' }, 'Jamais synchronisée.');
+/**
+ * One line per account, read in this order (demande de Charles du 19/11, avis Design): who, the state in a word with its
+ * dot, the hour it holds until, then the one gesture to make, or the cause of the last failure and its gesture. Red is
+ * for a session cut alone; nothing is said twice and no advice stays once all is well.
+ */
+
+type Tone = 'ok' | 'amber' | 'red' | 'neutral';
+
+const STATES: Readonly<Record<Account['sessionState'], { readonly tone: Tone; readonly word: string }>> = {
+  valid: { tone: 'ok', word: 'Connectée' },
+  warning: { tone: 'amber', word: 'Expire bientôt' },
+  expired: { tone: 'red', word: 'Coupée' },
+  none: { tone: 'neutral', word: 'Jamais branchée' },
+};
+
+/** A Reveal token lasts a day from the login (reveal-api-observed.md): the gauge's full length. */
+const TOKEN_LIFE_MS = 24 * 3_600_000;
+
+const RECONNECT = 'Reconnecte-toi à Reveal, puis resynchronise.';
+/** A token stored with less than a day ahead: why a new login, then the gesture (avis Design du 19/11). */
+const SHORT_TOKEN = 'Pour 24 h pleines : reconnecte-toi à Reveal, puis resynchronise.';
+
+/** The cause, then the gesture (demande de Charles du 19/11: « la vraie cause et le geste à faire »). */
+export function failureOf(
+  failure: SyncFailure,
+  crm: string,
+): { readonly cause: string; readonly gesture: string } {
+  switch (failure) {
+    case 'no-session':
+      return {
+        cause: 'Aucune session lue dans cet onglet.',
+        gesture: 'Ouvre la messagerie Reveal ici, puis resynchronise.',
+      };
     case 'expired':
-      return h('p', { class: 'pp-hint pp-hint--amber' }, 'Session expirée.');
-    case 'warning':
-      return h('p', { class: 'pp-hint pp-hint--amber' }, 'Session bientôt expirée.');
-    case 'valid':
-      return h(
-        'p',
-        { class: 'pp-hint' },
-        account.sessionUpdatedAt === null
-          ? 'Session valide.'
-          : `Session valide, envoyée ${whenOf(new Date(account.sessionUpdatedAt))}.`,
-      );
+      return {
+        cause: 'La session lue a été oubliée au bout d’une minute.',
+        gesture: 'Resynchronise, puis envoie-la sans attendre.',
+      };
+    case 'unlinked':
+      return {
+        cause: 'L’extension n’est pas reliée.',
+        gesture: 'Relie-la avec le code de la page Sécurité.',
+      };
+    case 'revoked':
+      return {
+        cause: 'Cette liaison a été retirée dans le CRM.',
+        gesture: 'Colle un nouveau code dans le copilote.',
+      };
+    case 'not-owner':
+      return {
+        cause: 'Seul le propriétaire envoie une session.',
+        gesture: 'Relie l’extension avec le code du propriétaire.',
+      };
+    case 'other-model':
+      return {
+        cause: 'Cet onglet montre une autre créatrice que ce compte.',
+        gesture: 'Ouvre la bonne dans Reveal, puis resynchronise.',
+      };
+    case 'other-member':
+      return {
+        cause: 'Cet onglet est connecté avec un autre membre que le « bot » de ce compte.',
+        gesture: 'Connecte-toi à Reveal avec le « bot », puis resynchronise.',
+      };
+    case 'refused':
+      return {
+        cause: 'Le CRM a refusé cette session.',
+        gesture: 'Recharge l’onglet Reveal, puis resynchronise.',
+      };
+    case 'unreachable':
+      return { cause: `Le CRM ne répond pas à ${crm}.`, gesture: 'Vérifie qu’il tourne, puis réessaie.' };
   }
 }
 
-function who(account: Account, line: HTMLElement | null): HTMLElement {
+const DAY_MS = 86_400_000;
+
+/** « 19/11 à 14 h 37 »: a tip's day, without the year (avis Design du 19/11). */
+function shortWhenOf(at: Date): string {
+  return `${at.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${hourOf(at)}`;
+}
+
+/** « 9 h 05 » today, « demain 9 h 05 », else the CRM's full day. */
+export function untilOf(at: Date, now: Date): string {
+  const days = Math.round(
+    (new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime() -
+      new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+      DAY_MS,
+  );
+  if (days === 0) return hourOf(at);
+  if (days === 1) return `demain ${hourOf(at)}`;
+  return whenOf(at);
+}
+
+function dot(tone: Tone, live: boolean): HTMLElement {
+  return h('span', {
+    class: `pp-sync__dot pp-sync__dot--${tone}${live ? ' is-live' : ''}`,
+    'aria-hidden': 'true',
+  });
+}
+
+/** The time left of the token as one thin line, only while it holds and its end is known (avis Design du 19/11). */
+function gauge(tone: Tone, expiresAt: Date | null, now: Date, fresh: boolean): HTMLElement | null {
+  if (expiresAt === null || tone === 'red' || tone === 'neutral') return null;
+  const left = Math.max(0, Math.min(1, (expiresAt.getTime() - now.getTime()) / TOKEN_LIFE_MS));
   return h(
     'div',
-    { class: 'pp-sync__who' },
-    h('span', { class: 'pp-sync__name' }, account.creatorName),
-    h('span', { class: 'pp-sync__handle' }, `@${account.handle}`),
-    line,
+    {
+      class: `nv-gauge pp-sync__gauge pp-sync__gauge--${tone}${fresh ? ' is-fresh' : ''}`,
+      role: 'presentation',
+      style: `--nv-gauge-value: ${String(Math.round(left * 100))}%`,
+    },
+    h('span', { class: 'nv-gauge__fill' }),
   );
 }
 
+interface RowState {
+  readonly tone: Tone;
+  readonly word: string;
+  readonly until: Date | null;
+  readonly synced: Extract<SyncOutcome, { kind: 'synced' }> | null;
+  readonly failure: SyncFailure | null;
+  readonly phase: 'reading' | 'sending' | null;
+}
+
+function rowStateOf(account: Account, view: SyncView): RowState {
+  const outcome = view.outcome?.accountId === account.id ? view.outcome : null;
+  const synced = outcome?.kind === 'synced' ? outcome : null;
+  const at = synced?.expiresAt ?? account.sessionExpiresAt;
+  const until = at === null ? null : new Date(at);
+  const { tone, word } = STATES[account.sessionState];
+  return {
+    tone,
+    word,
+    until: until !== null && until > view.now ? until : null,
+    synced,
+    failure: outcome?.kind === 'failed' ? outcome.failure : null,
+    phase: view.pending?.accountId === account.id ? view.pending.phase : null,
+  };
+}
+
+/** The state in a word, its dot, and the hour it holds until; its tip gives the days behind it, never more. */
+function statusLine(account: Account, row: RowState, now: Date): HTMLElement {
+  if (row.phase !== null) {
+    return h(
+      'p',
+      { class: 'pp-sync__state', role: 'status' },
+      dot('neutral', true),
+      h('span', { class: 'pp-sync__word' }, row.phase === 'reading' ? 'Lecture de l’onglet' : 'Envoi au CRM'),
+      h('span', { class: 'pp-sync__step' }, row.phase === 'reading' ? '1/2' : '2/2'),
+    );
+  }
+  const line = h(
+    'p',
+    { class: 'pp-sync__state', role: row.synced === null ? undefined : 'status' },
+    row.synced === null
+      ? dot(row.tone, false)
+      : h('span', { class: 'pp-sync__check', 'aria-hidden': 'true' }, icon('check', 12)),
+    h('span', { class: `pp-sync__word pp-sync__word--${row.tone}` }, row.word),
+    row.until === null || row.tone === 'red'
+      ? null
+      : h('span', { class: 'pp-sync__until' }, `jusqu’à ${untilOf(row.until, now)}`),
+  );
+  if (account.sessionUpdatedAt === null) return line;
+  return withTip(line, {
+    title: `${account.creatorName} sur Reveal`,
+    rows: [
+      { label: 'Synchronisée', value: shortWhenOf(new Date(account.sessionUpdatedAt)) },
+      ...(row.until === null ? [] : [{ label: 'Fin du jeton', value: shortWhenOf(row.until) }]),
+    ],
+  });
+}
+
+/** Under one account: the last failure's cause and gesture, or what a session just stored still asks; else nothing. */
+function adviceLine(row: RowState, crm: string): HTMLElement | null {
+  if (row.phase !== null) return null;
+  if (row.failure !== null) {
+    const { cause, gesture } = failureOf(row.failure, crm);
+    return h(
+      'p',
+      { class: 'pp-sync__fail', role: 'status' },
+      h('span', { class: 'pp-sync__cause' }, cause),
+      ' ',
+      gesture,
+    );
+  }
+  if (row.synced?.kept === true)
+    return h(
+      'p',
+      { class: 'pp-sync__advice' },
+      'La session en place tient plus longtemps : elle est gardée.',
+    );
+  if (row.synced?.reconnectFirst === true) return h('p', { class: 'pp-sync__advice' }, SHORT_TOKEN);
+  return null;
+}
+
+/** « Resynchroniser », a word at the end of a line at rest: always there, never calling (avis Design du 19/11). */
+function again(onClick: () => void, busy: boolean): HTMLButtonElement {
+  const element = h(
+    'button',
+    { type: 'button', class: 'pp-link pp-sync__again', disabled: busy },
+    h('span', {}, 'Resynchroniser'),
+  );
+  element.addEventListener('click', onClick);
+  return element;
+}
+
 function accountRow(account: Account, neon: boolean, view: SyncView, actions: SyncActions): HTMLElement {
-  const mine = view.pending?.accountId === account.id ? view.pending : null;
+  const row = rowStateOf(account, view);
+  const sync = (): void => {
+    actions.sync(account.id);
+  };
+  const busy = view.pending !== null;
+  const pending = row.phase === null ? null : row.phase === 'reading' ? 'Lecture…' : 'Envoi…';
+  // At rest the action steps back to a word at the end of the line; it stays, never hidden (avis Design du 19/11).
+  const action =
+    row.tone === 'ok' && pending === null
+      ? again(sync, busy)
+      : button('Synchroniser', sync, neon ? 'neon' : 'soft', { busy, pending, small: true });
   return h(
     'div',
-    { class: 'pp-sync__account' },
-    who(account, stateLine(account)),
-    button(
-      'Synchroniser',
-      () => {
-        actions.sync(account.id);
-      },
-      neon ? 'neon' : 'soft',
-      {
-        busy: view.pending !== null,
-        pending: mine === null ? null : mine.phase === 'reading' ? 'Lecture…' : 'Envoi…',
-        small: true,
-      },
+    { class: 'pp-sync__account', 'data-tone': row.tone },
+    h(
+      'div',
+      { class: 'pp-sync__top' },
+      h(
+        'div',
+        { class: 'pp-sync__who' },
+        h('span', { class: 'pp-sync__name' }, account.creatorName),
+        h('span', { class: 'pp-sync__handle' }, `@${account.handle}`),
+      ),
+      action,
     ),
+    statusLine(account, row, view.now),
+    row.phase === null ? gauge(row.tone, row.until, view.now, row.synced !== null) : null,
+    adviceLine(row, view.crm),
   );
 }
 
@@ -176,7 +382,12 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
             : `Première synchro de ce compte : vérifie que cet onglet montre bien ${named(account)} avant d’envoyer.`,
         );
   return [
-    who(account, null),
+    h(
+      'div',
+      { class: 'pp-sync__who' },
+      h('span', { class: 'pp-sync__name' }, account.creatorName),
+      h('span', { class: 'pp-sync__handle' }, `@${account.handle}`),
+    ),
     sentence,
     h(
       'p',
@@ -198,9 +409,16 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
 function syncBody(view: SyncView, actions: SyncActions): readonly (HTMLElement | null)[] {
   const { state, accounts } = view.accounts;
   if (state === 'unreachable') {
+    const { cause, gesture } = failureOf('unreachable', view.crm);
     return [
-      h('p', { class: 'pp-hint pp-hint--amber' }, 'Le CRM ne répond pas : réessaie dans un instant.'),
-      button('Réessayer', actions.retry, 'plain'),
+      h(
+        'p',
+        { class: 'pp-sync__fail', role: 'status' },
+        h('span', { class: 'pp-sync__cause' }, cause),
+        ' ',
+        gesture,
+      ),
+      h('div', { class: 'pp-sync__retry' }, button('Réessayer', actions.retry, 'soft', { small: true })),
     ];
   }
   if (accounts.length === 0)
@@ -211,23 +429,16 @@ function syncBody(view: SyncView, actions: SyncActions): readonly (HTMLElement |
   if (confirm !== null && confirmed !== undefined) return confirmRows(confirmed, confirm, actions);
   // One neon per screen (V-EXT-05): the first account whose session is missing or ending.
   const first = accounts.find((account) => account.sessionState !== 'valid');
+  // The gesture a late session asks for, said once under the list, whatever the number of accounts (avis Design).
+  const late = accounts.some(
+    (account) =>
+      (account.sessionState === 'expired' || account.sessionState === 'warning') &&
+      view.pending?.accountId !== account.id &&
+      !(view.outcome?.kind === 'failed' && view.outcome.accountId === account.id),
+  );
   return [
     ...accounts.map((account) => accountRow(account, account === first, view, actions)),
-    view.pending?.phase === 'reading'
-      ? h(
-          'p',
-          { class: 'pp-hint', role: 'status' },
-          'Lecture de la session : l’onglet Reveal peut se recharger une fois.',
-        )
-      : notice(view.notice),
-    // Once every session is up to date, the advice steps back (V-EXT-01).
-    first === undefined
-      ? null
-      : h(
-          'p',
-          { class: 'pp-hint' },
-          'Garde la messagerie Reveal ouverte : la session est lue, envoyée au CRM, puis oubliée.',
-        ),
+    late ? h('p', { class: 'pp-sync__advice pp-sync__advice--all' }, RECONNECT) : null,
   ];
 }
 
@@ -240,19 +451,12 @@ export function syncWanted(view: SyncView | null): boolean {
 
 /**
  * Its own card, beside the copilot's (V-EXT-09): only the owner sends a session. Not drawn without a link, whose
- * « Relier » is the copilot's, nor for a link that is not the owner's.
+ * « Relier » is the copilot's, nor for a link that is not the owner's. Its state lives on each account's line: the head
+ * says nothing twice.
  */
 export function syncCard(view: SyncView, actions: SyncActions, index: number): HTMLElement | null {
-  const { state, accounts } = view.accounts;
+  const { state } = view.accounts;
   if (state === 'none' || state === 'revoked' || state === 'not-owner') return null;
-  const status =
-    state !== 'ok' || accounts.length === 0
-      ? null
-      : syncWanted(view)
-        ? pill('awaiting-approval', 'À synchroniser')
-        : pill('sent', 'À jour');
-  return card(
-    { id: 'sync', icon: 'rotate', title: 'Session Reveal', aside: status, index },
-    syncBody(view, actions),
-  );
+  const mark = revealMark(view.pending !== null);
+  return card({ id: 'sync', icon: mark, title: 'Session Reveal', index }, syncBody(view, actions));
 }
