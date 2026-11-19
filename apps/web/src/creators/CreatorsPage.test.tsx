@@ -413,7 +413,7 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts', 'Contenu']);
+    ).toEqual(['Agenda', 'Idées du jour', 'Demandes', 'Scripts', 'Contenu', 'Liens']);
     router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
     expect(await screen.findByText('Ses idées du jour')).toBeDefined();
     for (const onglet of ['pourcentage', 'acces', 'heures']) {
@@ -470,7 +470,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
     // She reads her sheet; the agency changes it (recette CREA-01).
     await screen.findByText(/Ta fiche/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
