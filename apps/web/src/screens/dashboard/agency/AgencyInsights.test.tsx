@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
 
-import { AgencyInsightsPanel } from './AgencyInsights';
+import { AgencyInsightsPanel, sparkValues } from './AgencyInsights';
 import { AGENCY_WEEK, LINA } from './fixture';
 
 const reads: string[] = [];
@@ -529,6 +529,53 @@ describe('the days read and their comparison (ADR 0146)', () => {
       expect(screen.getByRole('tooltip').textContent).toContain('Comparé, 30 oct.');
     });
     expect(screen.getByRole('tooltip').textContent).toContain('Chiffre d’affaires');
+  });
+
+  it('colours the curve by the trend: green above the period compared, amber below, never red (lot couleurs)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
+    cleanup();
+    const lower = {
+      ...AGENCY_WEEK.totals,
+      current: {
+        ...AGENCY_WEEK.totals.current,
+        revenueMinor: AGENCY_WEEK.totals.previous.revenueMinor - 1_000,
+      },
+    };
+    serve(200, { ...AGENCY_WEEK, totals: lower });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--down')).toBe(true);
+    // Nothing to compare with: green, as the « n % » says nothing worse.
+    cleanup();
+    serve(200, { ...AGENCY_WEEK, totals: lower, registerSince: '2026-11-02' });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
+  });
+
+  it('draws a small curve under the net and each part, in the trend’s and the money’s colours, hidden from readers', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const sparks = [...document.querySelectorAll('.ins-spark')];
+    expect(sparks.map((one) => one.getAttribute('class'))).toEqual([
+      'ins-spark ins-spark--up',
+      'ins-spark ins-spark--agency',
+      'ins-spark ins-spark--creator',
+    ]);
+    for (const one of sparks) expect(one.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws no small curve for one day read hour by hour', () => {
+    expect(sparkValues({ ...AGENCY_WEEK, to: AGENCY_WEEK.from }, (day) => day.agencyMinor)).toBeNull();
+    expect(sparkValues(AGENCY_WEEK, (day) => day.agencyMinor)).toHaveLength(7);
+    // From the register's first day, as the lead curve.
+    expect(
+      sparkValues({ ...AGENCY_WEEK, registerSince: '2026-11-02' }, (day) => day.agencyMinor),
+    ).toHaveLength(5);
   });
 
   it('shows no percentage when the register starts after the days compared, and says so (§ 4)', async () => {

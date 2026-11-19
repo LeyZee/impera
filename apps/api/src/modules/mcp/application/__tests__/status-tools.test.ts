@@ -129,6 +129,8 @@ const insights: AgencyInsights = AgencyInsightsSchema.parse({
     {
       day: '2026-11-16',
       revenueMinor: 3_000,
+      agencyMinor: 700_007,
+      creatorMinor: 700_008,
       byCreator: [{ creatorId: ines, revenueMinor: 3_000 }],
       byKind: [{ kind: 'ppv', revenueMinor: 3_000 }],
     },
@@ -223,7 +225,8 @@ describe('stats_get (ADR 0026 § 5, ADR 0078, decision A of 14/11)', () => {
     ])
       expect(text).not.toContain(`"${key}"`);
     expect(text).not.toContain('Chatteur Inventé');
-    for (const amount of [...SHARES, ...SELLER, 910_005]) expect(numbersIn(out)).not.toContain(amount);
+    for (const amount of [...SHARES, 700_007, 700_008, ...SELLER, 910_005])
+      expect(numbersIn(out)).not.toContain(amount);
   });
 
   it('reads every creator for the owner', async () => {

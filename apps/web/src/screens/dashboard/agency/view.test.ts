@@ -21,7 +21,7 @@ import {
   moneyShares,
   moneyTip,
   OTHER,
-  SERIES,
+  KINDS,
   sellerRanking,
   sharesOf,
   shortEuros,
@@ -49,9 +49,9 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
   it('folds the rare kinds in « Autres ventes », each kind in its fixed colour', () => {
     const slices = kindSlices(AGENCY_WEEK.kinds);
     expect(slices.map((slice) => [slice.label, slice.cents, slice.colour])).toEqual([
-      ['Abonnements', 42_000, SERIES[0]],
-      ['PPV en privé', 112_600, SERIES[1]],
-      ['Tips', 28_000, SERIES[3]],
+      ['Abonnements', 42_000, KINDS[0]],
+      ['PPV en privé', 112_600, KINDS[1]],
+      ['Tips', 28_000, KINDS[3]],
       ['Autres ventes', 2_000, OTHER],
     ]);
   });
@@ -71,7 +71,7 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     const day = AGENCY_WEEK.days[0];
     if (day === undefined) throw new Error('fixture');
     expect(dayStacks(day)).toEqual([6_000, 10_000, 0, 4_000, 0]);
-    expect(STACKS.map((stack) => stack.colour)).toEqual([...SERIES, OTHER]);
+    expect(STACKS.map((stack) => stack.colour)).toEqual([...KINDS, OTHER]);
   });
 
   it('reads three months a week a column on a phone, the last week shorter', () => {

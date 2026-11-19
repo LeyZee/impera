@@ -8,11 +8,18 @@ import { clockOf } from '@/scheduling/time';
  */
 
 /**
- * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the four categorical
- * series (validated Nuit and Jour, never violet, gold, red or cyan, the agent's, the sale's and the statuses'), then
- * « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
+ * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the neutral ramp
+ * (`--nv-kind-1..4`, light to dark, so the money's rose and blue stay the only hues of the figures, avenant du 17/11 à
+ * l'ADR 0106 § 10), then « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
  * creators' bars and the hours' ramp take the data ink alone.
  */
+export const KINDS = [
+  'var(--nv-kind-1)',
+  'var(--nv-kind-2)',
+  'var(--nv-kind-3)',
+  'var(--nv-kind-4)',
+] as const;
+/** The four categorical series, for what is not money (the AI's providers and uses, Consommation IA). */
 export const SERIES = [
   'var(--nv-series-1)',
   'var(--nv-series-2)',
@@ -239,7 +246,7 @@ export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
     return {
       key: slice.key,
       label: slice.label,
-      colour: SERIES[i] ?? OTHER,
+      colour: KINDS[i] ?? OTHER,
       cents: mine.reduce((sum, one) => sum + one.revenueMinor, 0),
       previousCents: mine.reduce((sum, one) => sum + one.previousRevenueMinor, 0),
       sales: mine.reduce((sum, one) => sum + one.sales, 0),
@@ -285,7 +292,7 @@ export interface Stack {
 export const STACKS: readonly Stack[] = KIND_SLICES.map((slice, i) => ({
   key: slice.key,
   label: slice.label,
-  colour: SERIES[i] ?? OTHER,
+  colour: KINDS[i] ?? OTHER,
 }));
 
 /** A day's (or an hour's) amounts by kind, in the stacks' order. */

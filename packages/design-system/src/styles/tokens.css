@@ -89,13 +89,27 @@
   --nv-series-4: #9c9630;
   --nv-series-other: rgba(246, 238, 241, 0.32);
   /*
-   * Where the money goes (ADR 0106 § 10): the creator's part rose, the agency's gold, the same on every block of the
-   * Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second hatched). Validated
-   * at 3:1 at least on the plate, Nuit and Jour, and 13 ΔE at least from --nv-series-4's olive, 8 at least for
-   * colour-blind readers (dataviz validator): they never sit in the same chart, and the legend labels every block.
+   * Where the money goes (ADR 0106 § 10, avenant du 17/11): the creator's part rose, the agency's blue, the same on
+   * every block of the Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second
+   * hatched). Validated at 3:1 at least on the plate, Nuit and Jour, and apart for colour-blind readers (dataviz
+   * validator); the legend labels every block. The kinds' bars take the neutral ramp below, never these two.
    */
   --nv-money-creator: #d06c98;
-  --nv-money-agency: #9c6420;
+  --nv-money-agency: #3d8ce6;
+  /*
+   * A curve's trend against the period compared (ADR 0146): green above it, or with nothing to compare; the warning's
+   * amber below it, never the danger's red (a lower month is no emergency). Always beside the « +n % » that says it.
+   */
+  --nv-trend-up: #5fd08f;
+  --nv-trend-down: var(--nv-warning);
+  /*
+   * The kinds of sale (subscriptions, PPV, tips, others): a neutral ramp, light to dark, so the money's rose and blue
+   * stay the only hues of the Dashboard's figures. Each step is labelled in the legend and the tip, never colour alone.
+   */
+  --nv-kind-1: #f1e4e8;
+  --nv-kind-2: #b9a9b0;
+  --nv-kind-3: #85767d;
+  --nv-kind-4: #5c4f55;
 
   /* Shadows */
   --nv-shadow-glass:
@@ -180,7 +194,13 @@
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
   --nv-money-creator: #b8406f;
-  --nv-money-agency: #bd853c;
+  --nv-money-agency: #2a6fc9;
+  --nv-trend-up: #2aa866;
+  --nv-trend-down: var(--nv-warning);
+  --nv-kind-1: #3a2630;
+  --nv-kind-2: #665059;
+  --nv-kind-3: #8f7c85;
+  --nv-kind-4: #b8a9b0;
 
   --nv-shadow-glass:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(80, 10, 30, 0.07),

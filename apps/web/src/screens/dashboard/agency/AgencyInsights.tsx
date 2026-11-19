@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import {
   createContext,
   useContext,
+  useId,
   useRef,
   useState,
   type JSX,
@@ -116,6 +117,16 @@ interface CurvePoint {
  * (the line no longer sinks to the right), each with the day compared, aligned day for day, when the register holds
  * that day (the compared line stops where the register begins, never falls to zero); one day read hour by hour.
  */
+/** The first day the curves draw (ADR 0146 § 5): the register's first day when it falls in the period, else the first. */
+function firstDrawn(insights: AgencyInsights): number {
+  const since = insights.registerSince;
+  if (since === null || since <= insights.from) return 0;
+  return Math.max(
+    0,
+    insights.days.findIndex((one) => one.day >= since),
+  );
+}
+
 export function curvePoints(insights: AgencyInsights): CurvePoint[] {
   if (insights.from === insights.to) {
     return insights.hourly.map((hour) => ({
@@ -126,13 +137,7 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
     }));
   }
   const since = insights.registerSince;
-  const first =
-    since === null || since <= insights.from
-      ? 0
-      : Math.max(
-          0,
-          insights.days.findIndex((one) => one.day >= since),
-        );
+  const first = firstDrawn(insights);
   const today = insights.span.today;
   return insights.days.slice(first).map((one, i) => {
     const before = insights.previousDays[i + first];
@@ -153,8 +158,18 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
  * A hairline and a dot follow the pointer or the finger to the nearest day, and the tip gives the date, then both
  * amounts with their strokes (dataviz: one tip, every series). The subtitle says the days compared: no legend.
  */
-function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element | null {
+function RevenueCurve({
+  insights,
+  tip,
+  tone,
+}: {
+  insights: AgencyInsights;
+  tip: FloatingTip;
+  /** Above the period compared or nothing to compare with, or below it: the same word as the « n % » beside. */
+  tone: Trend;
+}): JSX.Element | null {
   const [hover, setHover] = useState<number | null>(null);
+  const fill = useId();
   const points = curvePoints(insights);
   if (points.length < 2 || points.every((one) => one.cents === 0 && (one.compared?.cents ?? 0) === 0))
     return null;
@@ -213,7 +228,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
     );
   };
   return (
-    <div className="ins-curve">
+    <div className={`ins-curve ins-curve--${tone}`}>
       <div
         className="ins-curve__plot"
         role="img"
@@ -225,7 +240,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
           aria-hidden="true"
         >
           <defs>
-            <linearGradient id="ins-curve-fill" x1="0" x2="0" y1="0" y2="1">
+            <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0" className="ins-curve__fill-top" />
               <stop offset="1" className="ins-curve__fill-bottom" />
             </linearGradient>
@@ -233,7 +248,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
           {behind.length > 1 ? (
             <path className="ins-curve__compared" d={linePath(behind)} vectorEffect="non-scaling-stroke" />
           ) : null}
-          <path className="ins-curve__area" d={area} fill="url(#ins-curve-fill)" />
+          <path className="ins-curve__area" d={area} fill={`url(#${fill})`} />
           <path className="ins-curve__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
         </svg>
         {lit === undefined ? null : (
@@ -274,6 +289,69 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
   );
 }
 
+/** A curve's colour against the period compared: green above it (or nothing to compare with), amber below. */
+type Trend = 'up' | 'down';
+
+function trendOf(current: number, previous: number, compared: boolean): Trend {
+  const change = compared ? changeOf(current, previous) : null;
+  return change !== null && change < 0 ? 'down' : 'up';
+}
+
+/**
+ * A tile's small curve: the same days as the lead curve, from the register's first day, nothing for one day read hour
+ * by hour (its parts are not kept by the hour) nor for fewer than two days. Values only; the tile says the figure.
+ */
+export function sparkValues(
+  insights: AgencyInsights,
+  pick: (day: AgencyInsights['days'][number]) => number,
+): number[] | null {
+  if (insights.from === insights.to) return null;
+  const values = insights.days.slice(firstDrawn(insights)).map(pick);
+  return values.length < 2 || values.every((one) => one === 0) ? null : values;
+}
+
+/**
+ * The small curve at a tile's foot (lot couleurs, 17/11): 1.5px, no axis, no point, a fill of 12 % at most, in the
+ * tile's colour (the trend's for the net, the money's for a part). Decorative: the tile's figure and its « n % » say it,
+ * so it is hidden from assistive technologies.
+ */
+function Spark({
+  values,
+  tone,
+}: {
+  values: readonly number[];
+  tone: Trend | 'agency' | 'creator';
+}): JSX.Element {
+  const fill = useId();
+  const frame = { width: 200, height: 32, padTop: 3, padBottom: 2 };
+  const low = Math.min(0, ...values);
+  const high = Math.max(1, ...values);
+  const line = chartPoints(values, frame, { min: low, max: high });
+  const first = line[0];
+  const last = line.at(-1);
+  const area =
+    first === undefined || last === undefined
+      ? ''
+      : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(first.x)},${String(frame.height)} Z`;
+  return (
+    <svg
+      className={`ins-spark ins-spark--${tone}`}
+      viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" className="ins-spark__fill-top" />
+          <stop offset="1" className="ins-spark__fill-bottom" />
+        </linearGradient>
+      </defs>
+      <path className="ins-spark__area" d={area} fill={`url(#${fill})`} />
+      <path className="ins-spark__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 interface Tile {
   readonly label: string;
   readonly value: string;
@@ -284,6 +362,8 @@ interface Tile {
   readonly part?: MoneyPart['key'];
   /** A money tile explains itself on hover, focus or a tap (ADR 0106 § 12). */
   readonly tip?: ReturnType<typeof moneyTip>;
+  /** Its small curve, day by day, and its colour. */
+  readonly spark?: { readonly values: readonly number[]; readonly tone: Trend | 'agency' | 'creator' };
 }
 
 function Tiles({
@@ -326,6 +406,11 @@ function Tiles({
             )}
           </dd>
           {tile.note === '' ? null : <dd className="ins-tile__note">{tile.note}</dd>}
+          {tile.spark === undefined ? null : (
+            <dd className="ins-tile__spark">
+              <Spark values={tile.spark.values} tone={tile.spark.tone} />
+            </dd>
+          )}
         </div>
       ))}
     </dl>
@@ -443,6 +528,14 @@ function Figures({
   const ofNet = (key: 'creator' | 'agency'): string =>
     current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
+  const compared = comparable(insights);
+  const sparkOf = (
+    pick: (day: AgencyInsights['days'][number]) => number,
+    tone: Trend | 'agency' | 'creator',
+  ): Pick<Tile, 'spark'> => {
+    const values = sparkValues(insights, pick);
+    return values === null ? {} : { spark: { values, tone } };
+  };
   const tipOf = (
     title: string,
     cents: number,
@@ -465,6 +558,11 @@ function Figures({
       value: euros(current.netMinor),
       note: `après ${euros(fansVat)} de TVA des fans et ${euros(commission)} de commission de la plateforme`,
       delta: [current.netMinor, previous.netMinor],
+      // The net is the two parts (ADR 0106 § 4): its curve is their sum, in the trend's colour as the lead's.
+      ...sparkOf(
+        (day) => day.agencyMinor + day.creatorMinor,
+        trendOf(current.netMinor, previous.netMinor, compared),
+      ),
       tip: tipOf(
         'Net',
         current.netMinor,
@@ -479,6 +577,7 @@ function Figures({
       note: ofNet('agency'),
       delta: [current.agencyMinor, previous.agencyMinor],
       part: 'agency',
+      ...sparkOf((day) => day.agencyMinor, 'agency'),
       tip: tipOf(
         'Part de l’agence',
         current.agencyMinor,
@@ -493,6 +592,7 @@ function Figures({
       note: ofNet('creator'),
       delta: [current.creatorMinor, previous.creatorMinor],
       part: 'creator',
+      ...sparkOf((day) => day.creatorMinor, 'creator'),
       tip: tipOf(
         creatorLabel,
         current.creatorMinor,
@@ -559,7 +659,11 @@ function Figures({
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
           </div>
-          <RevenueCurve insights={insights} tip={tip} />
+          <RevenueCurve
+            insights={insights}
+            tip={tip}
+            tone={trendOf(current.revenueMinor, previous.revenueMinor, compared)}
+          />
         </div>
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
       </div>
