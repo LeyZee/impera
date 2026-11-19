@@ -1,9 +1,11 @@
 import {
   CurrencySchema,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   TeamMemberIdSchema,
   type Currency,
   type PayPeriod,
+  type PlatformAccountId,
   type TeamMemberId,
   type UserId,
 } from '@impera/contracts';
@@ -60,10 +62,11 @@ export async function shiftsForGameUnscoped(
 
 /**
  * A shift whose reports the agency validated, as the game counts it (ADR 0118 § 1 and § 2): when it was held, the
- * period and the currency it was declared in, the total validated (the report and its corrections), and what pay takes
+ * account, the period and the currency it was declared in, the total validated (the report and its corrections), and what pay takes
  * off a gross on that account for that period. Never a comment, an incident nor who reviewed it.
  */
 export interface ValidatedShiftForGame {
+  readonly platformAccountId: PlatformAccountId;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly period: PayPeriod;
@@ -74,6 +77,7 @@ export interface ValidatedShiftForGame {
 }
 
 const ValidatedRowSchema = z.object({
+  platform_account_id: PlatformAccountIdSchema,
   starts_at: instant,
   ends_at: instant,
   period: PayPeriodSchema,
@@ -92,7 +96,7 @@ const ValidatedRowSchema = z.object({
  */
 async function validatedShiftsOf(tx: Transaction, memberId: TeamMemberId): Promise<ValidatedShiftForGame[]> {
   const result = await tx.execute(sql`
-    select s.starts_at, s.ends_at, r.period::text as period, r.currency, sum(r.amount_minor) as gross_minor,
+    select r.platform_account_id, s.starts_at, s.ends_at, r.period::text as period, r.currency, sum(r.amount_minor) as gross_minor,
       rules.vat_bps, rules.platform_fee_bps
     from shift_reports r
     join shifts s on s.id = r.shift_id
@@ -102,11 +106,12 @@ async function validatedShiftsOf(tx: Transaction, memberId: TeamMemberId): Promi
       order by a.from_period desc limit 1
     ) rules on true
     where r.member_id = ${memberId} and r.status = 'validated' and rules.earnings_source = 'declared'
-    group by s.id, s.starts_at, s.ends_at, r.period, r.currency, rules.vat_bps, rules.platform_fee_bps
+    group by s.id, r.platform_account_id, s.starts_at, s.ends_at, r.period, r.currency, rules.vat_bps, rules.platform_fee_bps
     order by s.starts_at, s.id`);
   return result.rows.map((raw) => {
     const row = ValidatedRowSchema.parse(raw);
     return {
+      platformAccountId: row.platform_account_id,
       startsAt: row.starts_at,
       endsAt: row.ends_at,
       period: row.period,

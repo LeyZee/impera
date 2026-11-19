@@ -1,4 +1,4 @@
-import { PayPeriodSchema } from '@impera/contracts';
+import { PayPeriodSchema, PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { payGameFacts, reportLines, type ValidatedShift } from '../game-facts';
@@ -7,6 +7,8 @@ import type { FigureLine } from '../my-figures';
 const ZONE = 'Europe/Paris';
 const MAY = PayPeriodSchema.parse('2025-05-01');
 const JUNE = PayPeriodSchema.parse('2025-06-01');
+const ACCOUNT = PlatformAccountIdSchema.parse('00000000-0000-4000-8000-0000000000a1');
+const OTHER_ACCOUNT = PlatformAccountIdSchema.parse('00000000-0000-4000-8000-0000000000a2');
 
 const line = (
   period: FigureLine['period'],
@@ -14,7 +16,15 @@ const line = (
   at: string | null,
   currency: FigureLine['currency'] = 'EUR',
   event: FigureLine['event'] = 'sale',
-): FigureLine => ({ period, event, currency, netMinor, occurredAt: at === null ? null : new Date(at) });
+  platformAccountId: FigureLine['platformAccountId'] = ACCOUNT,
+): FigureLine => ({
+  period,
+  platformAccountId,
+  event,
+  currency,
+  netMinor,
+  occurredAt: at === null ? null : new Date(at),
+});
 
 describe('payGameFacts (ADR 0104 § 12, § 14 to § 16)', () => {
   it('reads nothing from a member with no line', () => {
@@ -60,6 +70,7 @@ describe('the validated reports in the game (ADR 0118 § 1 to § 4)', () => {
     grossMinor: number,
     over: Partial<ValidatedShift> = {},
   ): ValidatedShift => ({
+    platformAccountId: ACCOUNT,
     startsAt: new Date(startsAt),
     endsAt: new Date(new Date(startsAt).getTime() + 4 * 3_600_000),
     period: JUNE,
@@ -75,6 +86,7 @@ describe('the validated reports in the game (ADR 0118 § 1 to § 4)', () => {
     expect(reportLines([shift('2025-06-03T18:00:00Z', 12_000)], [])).toEqual([
       {
         period: JUNE,
+        platformAccountId: ACCOUNT,
         event: 'sale',
         currency: 'EUR',
         netMinor: 8_000,
@@ -91,6 +103,21 @@ describe('the validated reports in the game (ADR 0118 § 1 to § 4)', () => {
       reportLines([shift('2025-06-03T18:00:00Z', 12_000)], [line(JUNE, 1, '2025-06-03T22:00:00Z')]),
     ).toHaveLength(1);
     expect(reportLines([shift('2025-06-03T18:00:00Z', 12_000)], [line(JUNE, 1, null)])).toHaveLength(1);
+  });
+
+  it('keeps the report of a shift when the sale read in its hours is another account’s', () => {
+    const elsewhere = [line(JUNE, 3_000, '2025-06-03T19:30:00Z', 'EUR', 'sale', OTHER_ACCOUNT)];
+    expect(reportLines([shift('2025-06-03T18:00:00Z', 12_000)], elsewhere)).toHaveLength(1);
+    // Two shifts in the same hours, one on each account: only the one whose account has the sale is left to it.
+    expect(
+      reportLines(
+        [
+          shift('2025-06-03T18:00:00Z', 12_000),
+          shift('2025-06-03T18:00:00Z', 6_000, { platformAccountId: OTHER_ACCOUNT }),
+        ],
+        elsewhere,
+      ).map((one) => one.platformAccountId),
+    ).toEqual([ACCOUNT]);
   });
 
   it('brings no line for a total of zero or less', () => {
