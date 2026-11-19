@@ -27,9 +27,12 @@ interface RoutedRow {
   readonly payload: unknown;
 }
 
-/** A row of a page, and where the next page starts. */
+/**
+ * A row of a page, and where the next page starts. The instant is kept as Postgres writes it: a `Date` would cut its
+ * microseconds, and a page cut at a millisecond would read itself again and again.
+ */
 interface Row extends RoutedRow {
-  readonly createdAt: Date;
+  readonly createdAt: string;
 }
 type Cursor = Pick<Row, 'createdAt' | 'id'>;
 
@@ -71,7 +74,7 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
               creatorId: table.creatorId,
               type: table.type,
               payload: table.payload,
-              createdAt: table.createdAt,
+              createdAt: sql<string>`${table.createdAt}::text`,
             })
             .from(table)
             .where(
@@ -80,7 +83,7 @@ export function createRouterReads(adminDb: Database, agencyTimeZone: () => Promi
                 inArray(table.type, [...ROUTED_EVENT_TYPES]),
                 cursor === null
                   ? undefined
-                  : sql`(${table.createdAt}, ${table.id}) > (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id})`,
+                  : sql`(${table.createdAt}, ${table.id}) > (${cursor.createdAt}::timestamptz, ${cursor.id})`,
               ),
             )
             .orderBy(table.createdAt, table.id)
