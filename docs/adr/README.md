@@ -130,7 +130,7 @@ Date : AAAA-MM-JJ
 | 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
-| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
+| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) ; amendement du 19/11 (créer un script à l’écran, le recopier dans Reveal) proposed, précise 0149 |
 | 0113 | Les fichiers du coffre : lus le temps de la description, jamais gardés | accepted (précise 0018, 0030 § 3 et § 4, 0099 § 4, § 5 et § 7) |
 | 0117 | L'agent écrit le prénom du membre et le canevas de la note client | accepted (précise 0018 § 1 et 0085 § 11) |
 | 0118 | Les rapports validés nourrissent le jeu du chatteur, et un gain que le net corrigé ne justifie plus est repris | accepted (précise 0104 § 12 à § 16 et 0108 ; amende 0104 § 15 et § 16) |
