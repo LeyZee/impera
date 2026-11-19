@@ -6,8 +6,10 @@ import type { RevealAccounts } from '../../lib/watch/protocol';
 
 import {
   copilotCard,
+  failureOf,
   syncCard,
   syncWanted,
+  untilOf,
   whenOf,
   type CopilotActions,
   type CopilotView,
@@ -29,36 +31,44 @@ function sync(
   overrides: Partial<SyncView> = {},
 ): { card: HTMLElement | null; actions: SyncActions } {
   const actions: SyncActions = { sync: vi.fn(), send: vi.fn(), cancel: vi.fn(), retry: vi.fn() };
-  const view: SyncView = { accounts, notice: null, pending: null, confirm: null, now: NOW, ...overrides };
+  const view: SyncView = {
+    accounts,
+    outcome: null,
+    pending: null,
+    confirm: null,
+    now: NOW,
+    crm: '127.0.0.1:5173',
+    ...overrides,
+  };
   return { card: syncCard(view, actions, 4), actions };
 }
 
-const THREE: RevealAccounts = {
-  state: 'ok',
-  accounts: [
-    {
-      id: ACCOUNT_A,
-      handle: 'atelier.lune',
-      creatorName: 'Lune',
-      sessionState: 'valid',
-      sessionUpdatedAt: new Date(2026, 10, 15, 21, 39).toISOString(),
-    },
-    {
-      id: ACCOUNT_B,
-      handle: 'soleil.noir',
-      creatorName: 'Soleil',
-      sessionState: 'expired',
-      sessionUpdatedAt: null,
-    },
-    {
-      id: ACCOUNT_C,
-      handle: 'brume.douce',
-      creatorName: 'Brume',
-      sessionState: 'warning',
-      sessionUpdatedAt: null,
-    },
-  ],
+type Account = RevealAccounts['accounts'][number];
+const LUNE: Account = {
+  id: ACCOUNT_A,
+  handle: 'atelier.lune',
+  creatorName: 'Lune',
+  sessionState: 'valid',
+  sessionUpdatedAt: new Date(2026, 10, 15, 21, 39).toISOString(),
+  sessionExpiresAt: null,
 };
+const SOLEIL: Account = {
+  id: ACCOUNT_B,
+  handle: 'soleil.noir',
+  creatorName: 'Soleil',
+  sessionState: 'expired',
+  sessionUpdatedAt: null,
+  sessionExpiresAt: null,
+};
+const BRUME: Account = {
+  id: ACCOUNT_C,
+  handle: 'brume.douce',
+  creatorName: 'Brume',
+  sessionState: 'warning',
+  sessionUpdatedAt: null,
+  sessionExpiresAt: new Date(2026, 10, 15, 23, 30).toISOString(),
+};
+const THREE: RevealAccounts = { state: 'ok', accounts: [LUNE, SOLEIL, BRUME] };
 
 function copilot(
   overrides: Partial<CopilotView> = {},
@@ -134,19 +144,63 @@ describe('the copilot card on a Reveal tab', () => {
   });
 });
 
+const row = (card: HTMLElement | null, name: string): HTMLElement | null =>
+  [...(card?.querySelectorAll<HTMLElement>('.pp-sync__account') ?? [])].find((one) =>
+    one.textContent.includes(name),
+  ) ?? null;
+
 describe('the Reveal session card', () => {
-  it('lists each Reveal account with its session and a button that reads that one', () => {
-    const { card, actions } = sync(THREE);
-    const text = card?.textContent ?? '';
+  // Demande de Charles du 19/11: a clear state, no pile of messages.
+  it('gives each account one state in a word, the cut one in red, and nothing in the head', () => {
+    const { card } = sync(THREE);
     expect(card?.querySelector('.pp-card__title')?.textContent).toBe('Session Reveal');
-    expect(text).toContain('À synchroniser');
-    // EXT-26: the day as the CRM writes it.
-    expect(text).toContain('Session valide, envoyée le 15/11/2026 à 21 h 39.');
-    expect(text).toContain('Session expirée');
-    const buttons = [...(card?.querySelectorAll('button') ?? [])];
-    expect(buttons).toHaveLength(3);
-    buttons[1]?.click();
+    expect(card?.querySelector('.pp-card__head .pp-pill')).toBeNull();
+    expect(row(card, 'Lune')?.querySelector('.pp-sync__word')?.textContent).toBe('Connectée');
+    expect(row(card, 'Soleil')?.querySelector('.pp-sync__word')?.textContent).toBe('Coupée');
+    expect(row(card, 'Soleil')?.querySelector('.pp-sync__word--red')).not.toBeNull();
+    expect(row(card, 'Brume')?.querySelector('.pp-sync__word')?.textContent).toBe('Expire bientôt');
+    expect(card?.textContent).not.toContain('Garde la messagerie Reveal ouverte');
+  });
+
+  it('says « Jamais branchée » neutral, the neon alone calling', () => {
+    const never = sync({
+      state: 'ok',
+      accounts: [{ ...SOLEIL, sessionState: 'none' }],
+    }).card;
+    expect(never?.querySelector('.pp-sync__word--neutral')?.textContent).toBe('Jamais branchée');
+    expect(never?.querySelector('.pp-sync__advice')).toBeNull();
+    expect(never?.querySelector('.nv-btn--neon')?.textContent).toBe('Synchroniser');
+  });
+
+  it('tells the gesture a late session asks for, under it', () => {
+    const { card } = sync(THREE);
+    expect(row(card, 'Soleil')?.querySelector('.pp-sync__advice')?.textContent).toBe(
+      'Reconnecte-toi à Reveal, puis resynchronise.',
+    );
+    expect(row(card, 'Lune')?.querySelector('.pp-sync__advice')).toBeNull();
+  });
+
+  it('says the hour a session holds until, and a thin gauge of what is left, empty once cut', () => {
+    const { card } = sync(THREE);
+    expect(row(card, 'Brume')?.querySelector('.pp-sync__until')?.textContent).toBe('tient jusqu’à 23 h 30');
+    expect(row(card, 'Brume')?.querySelector<HTMLElement>('.pp-sync__gauge')?.getAttribute('style')).toBe(
+      '--nv-gauge-value: 6%',
+    );
+    expect(row(card, 'Soleil')?.querySelector<HTMLElement>('.pp-sync__gauge')?.getAttribute('style')).toBe(
+      '--nv-gauge-value: 0%',
+    );
+    // No end known: no gauge rather than a made-up one.
+    expect(row(card, 'Lune')?.querySelector('.pp-sync__gauge')).toBeNull();
+  });
+
+  it('reads the button of each account, the late ones as a button and the fine one as a word', () => {
+    const { card, actions } = sync(THREE);
+    expect(names(card)).toEqual(['Resynchroniser', 'Synchroniser', 'Synchroniser']);
+    expect(row(card, 'Lune')?.querySelector('.pp-sync__again')).not.toBeNull();
+    row(card, 'Soleil')?.querySelector('button')?.click();
     expect(actions.sync).toHaveBeenCalledWith(ACCOUNT_B);
+    row(card, 'Lune')?.querySelector('button')?.click();
+    expect(actions.sync).toHaveBeenCalledWith(ACCOUNT_A);
   });
 
   // V-EXT-05: two late accounts gave two neons.
@@ -157,11 +211,23 @@ describe('the Reveal session card', () => {
     expect(neon[0]?.closest('.pp-sync__account')?.textContent).toContain('Soleil');
   });
 
-  it('keeps the advice while a session is late, and drops it once all are up to date (V-EXT-01)', () => {
-    expect(sync(THREE).card?.textContent).toContain('Garde la messagerie Reveal ouverte');
-    const fine = sync({ state: 'ok', accounts: THREE.accounts.slice(0, 1) }).card;
-    expect(fine?.textContent).not.toContain('Garde la messagerie Reveal ouverte');
-    expect(fine?.textContent).toContain('À jour');
+  it('keeps « Resynchroniser » once every session is fine, with no neon', () => {
+    const fine = sync({ state: 'ok', accounts: [LUNE] }).card;
+    expect(names(fine)).toEqual(['Resynchroniser']);
+    expect(fine?.querySelector('.nv-btn--neon')).toBeNull();
+  });
+
+  it('gives the day of the last sync in a tip that opens on focus too', () => {
+    const { card } = sync(THREE);
+    const state = row(card, 'Lune')?.querySelector<HTMLElement>('.pp-sync__state');
+    expect(state?.getAttribute('tabindex')).toBe('0');
+    state?.dispatchEvent(new FocusEvent('focus'));
+    const tip = document.querySelector('.nv-tip');
+    expect(tip?.getAttribute('role')).toBe('tooltip');
+    expect(tip?.textContent).toContain('15/11/2026 à 21 h 39');
+    expect(state?.getAttribute('aria-describedby')).toBe(tip?.id);
+    state?.dispatchEvent(new FocusEvent('blur'));
+    expect(document.querySelector('.nv-tip')).toBeNull();
   });
 
   it('is not drawn without the owner’s link: its « Relier » is the copilot’s', () => {
@@ -171,20 +237,82 @@ describe('the Reveal session card', () => {
   });
 
   // EXT-19 and V-EXT-16: up to 30 s without a word, every button pale.
-  it('says which account is read, and that the tab may reload', () => {
+  it('says which account is on its way and at which of the two steps', () => {
     const { card } = sync(THREE, { pending: { accountId: ACCOUNT_B, phase: 'reading' } });
-    expect(names(card)).toEqual(['Synchroniser', 'Lecture…', 'Synchroniser']);
+    expect(names(card)).toEqual(['Resynchroniser', 'Lecture…', 'Synchroniser']);
     expect([...(card?.querySelectorAll('button') ?? [])].every((one) => one.disabled)).toBe(true);
-    expect(card?.querySelector('.pp-card__body [role="status"]')?.textContent).toContain(
-      'l’onglet Reveal peut se recharger',
+    expect(row(card, 'Soleil')?.querySelector('[role="status"]')?.textContent).toBe('Lecture de l’onglet1/2');
+    const sending = sync(THREE, { pending: { accountId: ACCOUNT_B, phase: 'sending' } }).card;
+    expect(row(sending, 'Soleil')?.querySelector('.pp-sync__state')?.textContent).toBe('Envoi au CRM2/2');
+  });
+
+  it('ticks a session just stored and says until when, with the gesture when Reveal comes first', () => {
+    const { card } = sync(
+      { state: 'ok', accounts: [LUNE] },
+      {
+        outcome: {
+          kind: 'synced',
+          accountId: ACCOUNT_A,
+          expiresAt: new Date(2026, 10, 16, 9, 5).toISOString(),
+          reconnectFirst: true,
+          kept: false,
+        },
+      },
     );
-    expect(sync(THREE, { pending: { accountId: ACCOUNT_B, phase: 'sending' } }).card?.textContent).toContain(
-      'Envoi…',
+    expect(card?.querySelector('.pp-sync__check')).not.toBeNull();
+    expect(card?.querySelector('.pp-sync__until')?.textContent).toBe('tient jusqu’à demain 9 h 05');
+    expect(card?.querySelector('.pp-sync__gauge.is-fresh')).not.toBeNull();
+    expect(card?.querySelector('.pp-sync__advice')?.textContent).toBe(
+      'Reconnecte-toi à Reveal, puis resynchronise.',
     );
+  });
+
+  it('puts a failure’s cause and gesture under its own account', () => {
+    const { card } = sync(THREE, {
+      outcome: { kind: 'failed', accountId: ACCOUNT_C, failure: 'other-member' },
+    });
+    const fail = row(card, 'Brume')?.querySelector('.pp-sync__fail');
+    expect(fail?.getAttribute('role')).toBe('status');
+    expect(fail?.querySelector('.pp-sync__cause')?.textContent).toContain('un autre membre');
+    expect(fail?.textContent).toContain('Connecte-toi à Reveal avec le');
+    // The cause takes the place of the advice: one sentence per account.
+    expect(row(card, 'Brume')?.querySelector('.pp-sync__advice')).toBeNull();
+    expect(card?.querySelectorAll('.pp-sync__fail')).toHaveLength(1);
+  });
+
+  it('names the CRM address that does not answer', () => {
+    const { card, actions } = sync({ state: 'unreachable', accounts: [] });
+    expect(card?.textContent).toContain('Le CRM ne répond pas à 127.0.0.1:5173.');
+    card?.querySelector('button')?.click();
+    expect(actions.retry).toHaveBeenCalledOnce();
   });
 
   it('writes the day and the hour', () => {
     expect(whenOf(new Date(2026, 10, 9, 8, 30))).toBe('le 09/11/2026 à 8 h 30');
+    expect(untilOf(new Date(2026, 10, 15, 23, 0), NOW)).toBe('23 h 00');
+    expect(untilOf(new Date(2026, 10, 17, 8, 0), NOW)).toBe('le 17/11/2026 à 8 h 00');
+  });
+});
+
+describe('failureOf', () => {
+  it('gives every failure a cause and a gesture, never the old catch-all', () => {
+    const failures = [
+      'no-session',
+      'expired',
+      'unlinked',
+      'revoked',
+      'not-owner',
+      'other-model',
+      'other-member',
+      'refused',
+      'unreachable',
+    ] as const;
+    for (const failure of failures) {
+      const { cause, gesture } = failureOf(failure, 'crm.test');
+      expect(cause.endsWith('.')).toBe(true);
+      expect(gesture.endsWith('.')).toBe(true);
+    }
+    expect(failureOf('refused', 'crm.test').gesture).not.toContain('bien connecté');
   });
 });
 
@@ -225,14 +353,15 @@ describe('syncWanted', () => {
   it('asks for the one neon when a session is missing or ending, never on a card at rest', () => {
     const view = (accounts: RevealAccounts): SyncView => ({
       accounts,
-      notice: null,
+      outcome: null,
       pending: null,
       confirm: null,
       now: NOW,
+      crm: 'crm.test',
     });
     expect(syncWanted(view(THREE))).toBe(true);
     expect(syncWanted(view({ state: 'none', accounts: [] }))).toBe(false);
-    expect(syncWanted(view({ state: 'ok', accounts: THREE.accounts.slice(0, 1) }))).toBe(false);
+    expect(syncWanted(view({ state: 'ok', accounts: [LUNE] }))).toBe(false);
     expect(syncWanted(view({ state: 'unreachable', accounts: [] }))).toBe(false);
     expect(syncWanted(null)).toBe(false);
   });

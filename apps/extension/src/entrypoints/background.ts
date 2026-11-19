@@ -354,6 +354,8 @@ export default defineBackground(() => {
               creatorName,
               sessionState,
               sessionUpdatedAt,
+              // The CRM does not list the end of a session yet: the card says it after a « Sync » only.
+              sessionExpiresAt: null,
             }),
           ),
         };
