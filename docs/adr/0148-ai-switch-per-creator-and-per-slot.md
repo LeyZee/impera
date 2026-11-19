@@ -35,11 +35,20 @@ Charles veut un interrupteur visible là où on gère la créatrice, et régler 
 - Les lives prévus de la créatrice (ADR 0126) sont dessinés sur la frise : l'IA s'y tait d'elle-même, sans réglage.
 - **Une plage peut passer minuit** (22 h – 4 h) : elle finit « le lendemain », sans être coupée en deux jours ; la suite se dessine au début du jour suivant.
 - **Quand ses fans écrivent** : le fond de la ligne IA s'éclaire selon le nombre moyen de messages de fans par heure, jour par jour, sur les 4 dernières semaines (lu dans les messages déjà en base, sans nouvelle table). Masquable.
-- **Ce que la frise dit en chiffres** : heures de l'IA seule, heures où elle aide un chatteur, messages de fans par semaine tombés quand personne ne répond (le chiffre à faire baisser), et coût IA estimé par semaine à ce rythme, d'après la consommation réelle de la créatrice, à côté du plafond du jour.
+- **Ordre de l'écran** (du plus utile au détail) : l'état de l'IA en tête de fiche ; puis les chiffres, en premier les messages de fans par semaine tombés quand personne ne répond (le chiffre à faire baisser), puis heures de l'IA seule, heures où elle aide un chatteur, coût IA estimé par semaine d'après la consommation réelle de la créatrice, à côté du plafond du jour ; puis la suggestion de trou (ci-dessous) ; puis les réglages, la légende et la frise.
+- **Le trou qui coûte le plus** : quand un trou d'au moins 2 h sans IA ni chatteur reçoit, sur la semaine, au moins 8 messages de fans (moyenne des 4 dernières semaines), une ligne ambre le nomme au-dessus de la frise (« Personne ne répond samedi, de 19 h à 23 h · ≈ 44 messages par semaine · coût si l'IA le couvre ≈ … ») avec « Mettre l'IA sur ce trou » et « Laisser comme ça ». Un seul trou à la fois, le plus chargé ; c'est une suggestion dans la page, pas une notification.
+- **Pas de mode par plage** : la frise ne choisit pas entre Automatique et Copilote, c'est déduit. Pendant le shift d'un chatteur, l'IA lui prépare ses brouillons ; seule, elle répond si l'Automatique est ouvert pour la créatrice, sinon elle prépare et ses réponses attendent le prochain shift. Tant que l'Automatique n'est pas ouvert, l'écran le dit en une ligne et le chiffre « L'IA seule » dit « elle prépare, un chatteur envoie ».
 - L'interrupteur dit aussi qui répond quand l'IA ne répond pas (« Kévin répond jusqu'à 19 h · l'IA reprend cette nuit à 0 h ») et combien de fans attendent sa reprise.
 - Sous la frise : qui a changé les heures en dernier, et quand (le changement est journalisé avec l'avant et l'après).
 - « 24 h / 24 » est un bouton, pas un réglage à part : enfoncé, l'IA répond à toute heure ; relâché, ses plages reviennent telles qu'elles étaient.
 - Stockage de la semaine type : `creators.agent_hours`, tel quel.
+
+### 2 bis. La vue agence
+
+- Dans Équipe › Planning, une page « L'IA de toutes les créatrices » : une ligne par créatrice, avec sa journée en mini-frise (l'IA en violet, les shifts en traits dorés, les trous en ambre), son état (« l'IA aide Kévin », « personne ne répond »), son interrupteur, ses messages de fans sans réponse et son coût IA du jour. Un sélecteur de jour, aujourd'hui par défaut.
+- Les créatrices où des fans restent sans réponse passent en haut.
+- En tête : messages sans réponse de toute l'agence, coût IA du jour de toute l'agence face au plafond de 20 € (prévenu au-dessus de 14 €), nombre de créatrices avec l'IA allumée.
+- On y regarde et on coupe ; les heures se règlent dans la fiche (clic sur le nom). Mêmes droits que l'interrupteur de la fiche ; les chatteurs n'y voient pas les coûts.
 
 ### 3. Une date qui change : l'exception
 
@@ -66,7 +75,7 @@ Négatives, à surveiller :
 - La pause ajoute une heure de fin à l'arrêt de la créatrice : toute lecture de l'arrêt (Dashboard, agent, relances, calendrier) doit ignorer une pause échue.
 - Sur téléphone, la frise de 24 h est trop étroite pour être touchée : chaque jour s'y lit en liste de plages, avec la même fenêtre de réglage.
 
-Mise en œuvre, en lots : (a) contrats et base, pause avec fin et exceptions (Bilan) ; (b) lecture des exceptions par l'agent et les relances (Agent) ; (c) interrupteur, pause et frise (Design) ; (d) les plages et exceptions de l'IA visibles dans le planning (Équipe, avec l'ADR 0126). Captures Nuit/Jour, PC/téléphone, sur données inventées, avis Design avant Charles ; Sécurité relit droits et gardes.
+Mise en œuvre, en lots : (a) contrats et base, pause avec fin et exceptions (Bilan) ; (b) lecture des exceptions par l'agent et les relances (Agent) ; (c) interrupteur, pause et frise (Design) ; (d) les plages et exceptions de l'IA visibles dans le planning, et la vue agence (Équipe, avec l'ADR 0126). Captures Nuit/Jour, PC/téléphone, sur données inventées, avis Design avant Charles ; Sécurité relit droits et gardes.
 
 ## Alternatives rejetées
 
@@ -74,5 +83,6 @@ Mise en œuvre, en lots : (a) contrats et base, pause avec fin et exceptions (Bi
 - **L'IA réglée sur les créneaux du planning** (première proposition du 17/11) : refusée par Charles, l'IA n'a pas de shift type.
 - **Des heures saisies champ par champ** (écran actuel, et l'outil concurrent montré par Charles) : lent, et on ne voit pas la semaine.
 - **Un compteur « coupée par un live »** : rare, il ne pilote rien ; remplacé par les messages de fans sans réponse.
-- **Plus tard, dans une autre décision** : un mode par plage (Automatique la nuit, Copilote le jour) une fois l'Automatique ouvert ; une vue agence des heures IA de toutes les créatrices ; une alerte quand un trou de plus de 2 h tombe sur des heures où ses fans écrivent beaucoup.
+- **Un mode par plage réglé à la main** (Automatique la nuit, Copilote le jour) : il se déduit déjà de qui est là ; un réglage de plus pourrait contredire le verrou de l'Automatique.
+- **Une notification pour chaque trou** : du bruit ; la suggestion dans la page suffit. Si Charles la veut aussi en alerte, elle entre dans le catalogue des alertes par créatrice, pas ici.
 - **Plages datées et exceptions datées séparées** : une seule forme (les plages du jour daté) dit la même chose avec moins de règles.
