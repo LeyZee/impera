@@ -2,7 +2,7 @@
 
 Statut : accepted (Charles, 03/11/2026, 17 h 49, « ok 0067 » ; § 2 précisé : « ok phrases 0067 », 17 h 50 ; captures : « ok captures guide », 17 h 50 ; demande de Charles du 03/11/2026, 17 h 40 : « un guide dans le CRM […] pour installer l'extension […] pour l'équipe, les chatters, etc., et les managers. Et puis leur expliquer à quoi ça sert »)
 Date : 2026-11-03
-Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien.
+Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 proposé : l'extension se relie au CRM depuis le CRM.
 
 ## Contexte
 
@@ -25,6 +25,23 @@ Deux voies existent :
 - Tant qu'on passe par le `.zip`, chaque mise à jour de l'extension demande à chaque membre de retélécharger et de recharger. Le popup affiche sa version en pied de page, pour qu'on voie qui est en retard.
 - L'image du CRM grossit d'environ 1 Mo (le `.zip`, avec ses polices).
 - Bilan relit la ligne du `Dockerfile` du CRM (ops).
+
+## Amendement du 19/11/2026 : l'extension se relie au CRM depuis le CRM (proposé)
+
+Demande de Charles du 19/11 : l'écran « Où s'ouvre ton CRM ? » à la première ouverture n'est « pas très intuitif ». Il veut faciliter au maximum la tâche des chatteurs, sans rien perdre en sûreté. Il a choisi « Lier depuis le CRM » (fil Bilan, 19/11).
+
+Le § 4 tient toujours : le fichier reste le même pour tout le monde, sans adresse de CRM. Ce qui change, c'est la façon dont on règle l'adresse.
+
+1. **Le geste part du CRM.** La page du guide (`/aide/extension`) porte un bouton « Lier l'extension ». Il mène à une page dédiée, `/extension/lier`, qui dit en une phrase : « Clique sur l'icône Impera en haut à droite de ton navigateur. » Rien n'est à taper.
+2. **L'extension lit l'adresse dans l'onglet, pas dans la page.** À l'ouverture du popup, le navigateur donne l'adresse réelle de l'onglet actif (droit `activeTab`). Si son chemin est exactement `/extension/lier`, le popup propose « Relier l'extension à crm.exemple.fr ? », avec « Relier » et « Pas maintenant ». Le nom du site s'affiche en entier. Rien de ce que la page affiche, ni de ce que contient son adresse après le chemin, n'est lu.
+3. **Seulement une origine sûre** : `https://` sur le port par défaut, ou `localhost` et `127.0.0.1` pour le développement. Toute autre origine n'est jamais proposée.
+4. **Seulement à la première ouverture**, tant qu'aucune adresse n'a été enregistrée. Une fois l'extension reliée, une autre page `/extension/lier` ne propose rien : changer d'adresse passe par le bouton d'adresse du pied du popup. Ainsi, un site qui imiterait la page ne peut pas détourner une extension déjà reliée.
+5. **« Relier » fait ce que faisait l'enregistrement d'une adresse** (ADR 0066 § 4) : le navigateur demande le droit sur ce site seul, dans le même clic, puis le popup vérifie que l'adresse répond comme un CRM (`/v1/me`). Sinon, il dit « Cette adresse ne répond pas comme un CRM Impera » et n'enregistre rien.
+6. **La saisie reste possible**, derrière un petit lien « Saisir l'adresse » de l'écran d'accueil, pour le propriétaire et le développement. Un build de développement garde son raccourci vers `localhost:5173`.
+
+Côté serveur : rien, la page `/extension/lier` est un écran du CRM, ouvert à tous les rôles qui ont le guide.
+
+Conséquences : un chatteur n'a plus rien à taper. Il se connecte au CRM, ouvre « Extension » dans le menu de son compte, clique « Lier l'extension », puis l'icône de l'extension, puis « Relier ». Le code de liaison (« Relier » du copilote, ADR 0066 § 7) ne change pas dans cet amendement.
 
 ## Alternatives écartées
 
