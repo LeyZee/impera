@@ -1,5 +1,5 @@
 # INS-04 Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués
-Statut : todo (tout se fait contre `FakeInstagram` ; l'essai réel attend le compte professionnel, l'application Meta et le mot écrit de Charles)
+Statut : in progress (lot a fait ; tout se fait contre `FakeInstagram` ; l'essai réel attend le compte professionnel, l'application Meta et le mot écrit de Charles)
 Phase : Instagram (ADR 0122)
 Dépend de : ADR 0122 acceptée ; INS-01 (faux, contrats, branchement) ; le contrat des notes accordé avec le fil Playground
 Branche : task/ins-04-instagram-comments
@@ -13,10 +13,10 @@ ADR 0122 en entier, ADR 0057 § 1 et § 6, ADR 0120 § 1, ADR 0102, ADR 0021, AD
 
 ## À faire
 Lot a, contrats, domaine et faux (aucune route, aucune table) :
-- [ ] Contrats Zod : commentaire reçu (identifiant, auteur opaque, texte borné, média, parent), bloc d'entrée du prompt sans nom ni pseudo, `comment_outcome` et sa raison, raisons des notes.
-- [ ] Domaine pur : gardes d'une réponse (garde des légendes, `public_explicit`, `repeated_reply`, celles du chatting réutilisées par leur `index.ts`), réécriture une fois puis `skip`, bornes par auteur, par jour et par fil, relais forcé (âge, détresse, rendez-vous, tarif, langue), commentaire de son propre compte ignoré.
-- [ ] `FakeInstagram` gagne les commentaires : lire, répondre, masquer, réafficher, supprimer, refus de Meta simulé.
-- [ ] Liste fermée des droits demandés à Meta, et le test qui échoue si un droit de messagerie y entre.
+- [x] Contrats Zod : commentaire reçu (identifiant, auteur opaque, texte borné, média, parent), bloc d'entrée du prompt sans nom ni pseudo, `comment_outcome` et sa raison, raisons des notes.
+- [x] Domaine pur : gardes d'une réponse (garde des légendes, `public_explicit`, `repeated_reply`, celles du chatting réutilisées par leur `index.ts`), réécriture une fois puis `skip`, bornes par auteur, par jour et par fil, relais forcé (âge, détresse, rendez-vous, tarif, langue), commentaire de son propre compte ignoré.
+- [x] `FakeInstagram` gagne les commentaires : lire, répondre, masquer, réafficher, supprimer, refus de Meta simulé.
+- [x] Liste fermée des droits demandés à Meta, et le test qui échoue si un droit de messagerie y entre.
 
 Lot b, serveur (relu par Sécurité avant fusion) :
 - [ ] Webhook : signature vérifiée sur le corps brut avant toute lecture, poignée de main par jeton, taille et débit bornés, réponse immédiate puis job rejouable, rien du corps dans les logs, événement d'un compte non branché jeté. La route entre dans authentication-sweep et origin-sweep comme une exception écrite et testée.
@@ -48,3 +48,5 @@ Lot d, entraînement et écrans (fils Playground et Design) :
 Les messages privés (exclus), commenter ailleurs que sous ses publications, la suppression automatique, la première réponse réelle sur un vrai compte (mot écrit de Charles), la publication (PUB-02).
 
 ## Notes de session
+
+- 19/11 : lot a. Emplacements accordés avec le fil Bilan : module neuf `instagram-comments` (règles et port, un drapeau par capacité), port à part de celui de la publication, `FakeInstagram` dans `connectors/infra/fake` qui lit le port par l'`index.ts` du module, auteur opaque (empreinte salée). Les cinq gardes du chatting qui valent en public sont nommées ici (`CHAT_GUARDS_ON_A_REPLY`) et leurs résultats sont remis par le branchement : il se fait au lot c avec le fil Agent, qui relit aussi la liste des mots de `public_explicit`. `INS-01` n'ayant pas encore son faux, `FakeInstagram` naît ici avec les seuls commentaires ; la lecture des médias s'y ajoutera.
