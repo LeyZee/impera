@@ -88,11 +88,20 @@ describe('the scripts in preparation', () => {
   }
 
   type Who = keyof typeof ids;
+  /** One sign-in per person: the sign-in is rate-limited per account. */
+  const cookies = new Map<Who, string>();
+  async function cookieOf(who: Who): Promise<string> {
+    const known = cookies.get(who);
+    if (known !== undefined) return known;
+    const cookie = await signIn(server, `${who}@example.test`, PASSWORD);
+    cookies.set(who, cookie);
+    return cookie;
+  }
   const call = async (who: Who, method: 'GET' | 'POST' | 'PUT', url: string, payload?: object) =>
     server.inject({
       method,
       url,
-      headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
+      headers: { cookie: await cookieOf(who), origin: DASHBOARD_ORIGIN },
       ...(payload === undefined ? {} : { payload }),
     });
   const base = (creatorId: CreatorId) => `/v1/creators/${creatorId}/prepared-scripts`;
@@ -236,6 +245,22 @@ describe('the scripts in preparation', () => {
       .from(schema.auditLog)
       .where(eq(schema.auditLog.entityId, id));
     expect(audit.map((row) => row.action)).toEqual(['prepared_script.created']);
+  });
+
+  it('refuses an id another creator holds, with a conflict and not a failure', async () => {
+    const id = newId(PreparedScriptIdSchema);
+    expect(
+      (await call('owner', 'POST', base(nora), { id, platformAccountId: noraAccount, content: CONTENT }))
+        .statusCode,
+    ).toBe(201);
+    // Hidden from Inès's side by Nora's RLS: only the key finds it.
+    const taken = await call('owner', 'POST', base(ines), {
+      id,
+      platformAccountId: inesAccount,
+      content: CONTENT,
+    });
+    expect(taken.statusCode).toBe(409);
+    expect(codeOf(taken.body)).toBe('prepared_script_conflict');
   });
 
   it('refuses an account that is not one of hers', async () => {

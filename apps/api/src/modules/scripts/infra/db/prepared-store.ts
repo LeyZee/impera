@@ -38,6 +38,15 @@ const VaultRowSchema = z.object({
   described: z.boolean(),
 });
 
+/** The Postgres code behind a failed query (Drizzle wraps it as `cause`). */
+function pgCodeOf(error: unknown): string | null {
+  for (let current = error; typeof current === 'object' && current !== null;) {
+    if ('code' in current && typeof current.code === 'string') return current.code;
+    current = 'cause' in current ? current.cause : null;
+  }
+  return null;
+}
+
 /** The refs a script names, each once. */
 const refsOf = (content: PreparedScriptContent) => [
   ...new Set(
@@ -150,14 +159,22 @@ export function createDrizzlePreparedScriptStore(db: Database): PreparedScriptSt
             and(eq(platformAccounts.id, input.platformAccountId), eq(platformAccounts.creatorId, creatorId)),
           );
         if (account === undefined) return 'account_invalid';
-        await tx.insert(preparedScripts).values({
-          id: input.id,
-          creatorId,
-          platformAccountId: input.platformAccountId,
-          content: input.content,
-          createdBy: userId,
-          updatedBy: userId,
-        });
+        try {
+          // In a savepoint: an id another creator holds is hidden by her RLS, and found only by the key.
+          await tx.transaction((savepoint) =>
+            savepoint.insert(preparedScripts).values({
+              id: input.id,
+              creatorId,
+              platformAccountId: input.platformAccountId,
+              content: input.content,
+              createdBy: userId,
+              updatedBy: userId,
+            }),
+          );
+        } catch (error) {
+          if (pgCodeOf(error) === '23505') return 'conflict';
+          throw error;
+        }
         await tx.insert(auditLog).values({
           id: newId(AuditEntryIdSchema),
           userId,
