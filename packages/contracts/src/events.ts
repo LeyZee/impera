@@ -255,6 +255,8 @@ export const EVENT_TYPES = [
   'script_step_opened',
   'script_step_refused',
   'script_ended',
+  'scripts_exhausted',
+  'offer_proposed',
   'session_state_changed',
   'budget_threshold_crossed',
   'ai_credits_low',
@@ -328,6 +330,11 @@ const invoiceDuePayload = z.object({
 });
 
 /** Payload schema of every event type. Adding a type here is a contract change (ADR 0007). */
+/** What an `offer_proposed` is (ADR 0150 § 12), a closed list. */
+export const OFFER_PROPOSED_KINDS = ['practice_offer', 'custom_order', 'service_request'] as const;
+/** The uses of « Ses comptes » (ADR 0143 § 7), a closed list. */
+export const OFFER_PROPOSED_USAGES = ['lives', 'practice', 'personal', 'other'] as const;
+
 export const EVENT_PAYLOADS = {
   message_received: messagePayload,
   message_sent: messagePayload,
@@ -439,6 +446,22 @@ export const EVENT_PAYLOADS = {
   script_step_opened: scriptPayload,
   script_step_refused: scriptPayload,
   script_ended: scriptPayload,
+  /**
+   * The agent would open a script for him (the gate of ADR 0103 open, his desire at the threshold, no pause) and none
+   * is playable for him any more (ADR 0150 § 9): once per episode, until a script starts again for him. Nothing else.
+   */
+  scripts_exhausted: z.strictObject({ conversationId: ConversationIdSchema }),
+  /**
+   * Something sold outside the scripts was put forward by the agent (ADR 0150 §§ 12–14): what she offers around her
+   * practice (`practice_offer`, ADR 0143 § 10). `custom_order` and `service_request` are read from their own events.
+   * Never the fan's words, never an account's name, never a price.
+   */
+  offer_proposed: z.strictObject({
+    conversationId: ConversationIdSchema,
+    kind: z.enum(OFFER_PROPOSED_KINDS),
+    /** The use of the account he was pointed to, as « Ses comptes » names it (ADR 0143 § 7). */
+    usage: z.enum(OFFER_PROPOSED_USAGES).optional(),
+  }),
   session_state_changed: z.object({
     platformAccountId: PlatformAccountIdSchema,
     from: SessionStateSchema,
@@ -760,6 +783,8 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('script_step_opened'),
   typedEvent('script_step_refused'),
   typedEvent('script_ended'),
+  typedEvent('scripts_exhausted'),
+  typedEvent('offer_proposed'),
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),
   typedEvent('ai_credits_low'),

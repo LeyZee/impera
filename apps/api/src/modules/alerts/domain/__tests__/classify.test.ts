@@ -57,6 +57,28 @@ describe('which alert of her tab an event is (ADR 0150 § B)', () => {
     ).toBeNull();
   });
 
+  it('tells no script left, and an offer outside the scripts with nothing free in it (§§ 9, 12)', () => {
+    expect(classifyEvent('scripts_exhausted', { conversationId: CONVERSATION })).toEqual({
+      code: 'scripts_exhausted',
+      conversationId: CONVERSATION,
+    });
+    expect(
+      classifyEvent('offer_proposed', {
+        conversationId: CONVERSATION,
+        kind: 'practice_offer',
+        usage: 'practice',
+      }),
+    ).toEqual({ code: 'offer_proposed', conversationId: CONVERSATION });
+    // A strict payload: no free field, no usage outside the closed list.
+    expect(
+      classifyEvent('offer_proposed', { conversationId: CONVERSATION, kind: 'practice_offer', text: 'x' }),
+    ).toBeNull();
+    expect(
+      classifyEvent('offer_proposed', { conversationId: CONVERSATION, kind: 'practice_offer', usage: 'x' }),
+    ).toBeNull();
+    expect(classifyEvent('scripts_exhausted', { conversationId: CONVERSATION, scriptRef: 'x' })).toBeNull();
+  });
+
   it('skips what is none of the tab’s, and a payload that does not read', () => {
     expect(classifyEvent('handoff_requested', { conversationId: CONVERSATION, cause: 'guard' })).toBeNull();
     expect(classifyEvent('handoff_requested', { cause: 'minor' })).toBeNull();

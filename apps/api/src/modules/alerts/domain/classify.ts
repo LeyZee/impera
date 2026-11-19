@@ -41,6 +41,8 @@ export const ROUTED_EVENT_TYPES = [
   'budget_threshold_crossed',
   'ai_credits_low',
   'session_state_changed',
+  'scripts_exhausted',
+  'offer_proposed',
 ] as const;
 
 /** The alert an event is, or null when it is none of the tab's (or its payload does not read). */
@@ -73,6 +75,16 @@ export function classifyEvent(type: string, payload: unknown): ClassifiedAlert |
       return parsed.success && parsed.data.to === 'expired' && parsed.data.from !== 'expired'
         ? { code: 'session_expired', conversationId: null }
         : null;
+    }
+    case 'scripts_exhausted': {
+      const parsed = EVENT_PAYLOADS.scripts_exhausted.safeParse(payload);
+      return parsed.success
+        ? { code: 'scripts_exhausted', conversationId: parsed.data.conversationId }
+        : null;
+    }
+    case 'offer_proposed': {
+      const parsed = EVENT_PAYLOADS.offer_proposed.safeParse(payload);
+      return parsed.success ? { code: 'offer_proposed', conversationId: parsed.data.conversationId } : null;
     }
     default:
       return null;
