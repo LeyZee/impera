@@ -402,9 +402,14 @@
 /* One range: « de », its start, « à », its end, a fixed column for « minuit », the cross. */
 .hr-days__range {
   display: grid;
-  grid-template-columns: auto minmax(0, 120px) auto minmax(0, 120px) 7ch 44px;
+  grid-template-columns: auto 120px auto 120px 7ch 44px;
+  justify-content: start;
   align-items: center;
   gap: var(--nv-space-2);
+}
+.hr-days__range .hr-time {
+  width: 100%;
+  min-width: 0;
 }
 
 .hr-grid {

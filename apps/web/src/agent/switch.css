@@ -118,3 +118,20 @@
   padding-inline-start: var(--nv-space-5);
   color: var(--nv-ink-muted);
 }
+
+/* A phone: her AI's state between her name and the tabs, so it never reads as the tab's content (avis Design, 19/11),
+   its button on the page's right edge. */
+@media (max-width: 820px) {
+  .nv-page__head:has(.ai-switch--header) > .nv-page__actions {
+    grid-row: 2;
+    justify-content: stretch;
+  }
+  .nv-page__head:has(.ai-switch--header) > .nv-page__tabs {
+    grid-row: 3;
+  }
+  .ai-switch--header {
+    flex: 1;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+}
