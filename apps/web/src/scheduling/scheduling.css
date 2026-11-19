@@ -92,8 +92,7 @@
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .sc-arrow svg,
-.sc-add svg,
-.sc-more svg {
+.sc-add svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -120,8 +119,7 @@
 .sc-add:focus-visible,
 .sc-chip:focus-visible,
 .sc-days__one:focus-visible,
-.sc-duty__one:focus-visible,
-.sc-more:focus-visible {
+.sc-duty__one:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
 }
@@ -1123,33 +1121,30 @@ button.sc-duty__one:active {
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
-/* Its text on the cards' edge, its padding outside it (recette ADR 0073). */
-.sc-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-start;
-  min-height: var(--nv-target-min);
-  margin-left: calc(-1 * var(--nv-space-2));
-  padding: 0 var(--nv-space-2);
-  border-radius: var(--nv-radius-full);
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-  text-decoration: none;
+/* A card that leads to Planning as a whole (a shift ahead, « Ensuite »): one link stretched over it, its hover and
+   focus on the card itself (recette visuelle 16/11, CHA-23). */
+.sc-linked {
+  position: relative;
   transition:
-    color var(--nv-dur-fast) var(--nv-ease-out),
-    background-color var(--nv-dur-fast) var(--nv-ease-out);
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
-.sc-more:hover {
-  color: var(--nv-ink);
+.sc-linked:has(.sc-card-link:hover) {
   background: var(--nv-plate-hover);
 }
-.sc-more svg {
-  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+.sc-linked:has(.sc-card-link:active) {
+  transform: scale(0.985);
+  transition-duration: var(--nv-dur-instant);
 }
-.sc-more:hover svg {
-  transform: translateX(3px);
+.sc-card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.sc-card-link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
 }
 @media (max-width: 520px) {
   .sc-next__side {
@@ -1210,6 +1205,15 @@ button.sc-duty__one:active {
 }
 .sc-mine__earlier .nv-disclosure__body {
   padding-top: var(--nv-space-2);
+}
+/* The chevron on the card's right edge, as « Mes congés » and « Mes échanges » under it, with or without a summary
+   (recette visuelle 16/11, CHA-22). */
+.sc-mine__earlier > summary::after {
+  margin-left: auto;
+}
+/* Today stands out from the other days: its shifts on the selection's light (CHA-22). */
+.sc-mine__day[data-today='true'] .sc-mine__shift:not(:hover) {
+  background: var(--nv-select);
 }
 .sc-mine__shift[data-phase='live'] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 40%, transparent);
@@ -1322,8 +1326,7 @@ button.sc-duty__one:active {
   .sc-chip:active,
   .sc-arrow:active,
   .sc-days__one:active,
-  button.sc-duty__one:active,
-  .sc-more:hover svg {
+  button.sc-duty__one:active {
     transform: none;
   }
   .sc-grid,
@@ -1331,8 +1334,8 @@ button.sc-duty__one:active {
   .sc-arrow,
   .sc-add,
   .sc-days__one,
-  .sc-more svg,
-  .sc-mine__shift {
+  .sc-mine__shift,
+  .sc-linked {
     transition: none;
   }
 }

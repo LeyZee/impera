@@ -4,6 +4,7 @@ Statut : accepted (Charles, 07/11/2026 12h26, « ok 0080 », avec ses réponses 
 Date : 2026-11-07
 Précise : l'ADR 0057 (connecteur Telegram, légendes, lien ajouté par le code), l'ADR 0055 § 1 et § 5 (catégorie `telegram_post`, stock et demandes), l'ADR 0020 (groupes de l'agence).
 Remplace : pour le canal Telegram seulement, dans l'ADR 0057 § 3, « acceptation d'un geste par le propriétaire ou un manager » (§ 2 ci-dessous) ; dans l'ADR 0057 § 6, « le code ajoute l'adresse enregistrée dans Réglages » devient le lien de redirection du § 4 ; dans l'ADR 0055 § 1, « Un média ne part que vers la sortie de sa catégorie » pour la vidéo publique Reveal (§ 3 ci-dessous).
+Précisée par : l'ADR 0121 § 1 (acceptée le 16/11/2026) : les liens de redirection ont leur propre table et se règlent dans l'onglet « Liens » de la fiche de la créatrice, avec leur endroit et leur phrase d'usage ; un lien s'éteint au lieu d'être supprimé ; le canal choisit le sien parmi les liens allumés (§ 4.1 et § 6.3 ci-dessous).
 
 ## Contexte
 

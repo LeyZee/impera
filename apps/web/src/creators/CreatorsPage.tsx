@@ -11,6 +11,7 @@ import { useCreators } from './api';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
+import { LinksSection } from './links/LinksSection';
 import { CreatorsList } from './overview/CreatorsList';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
@@ -204,6 +205,16 @@ export function CreatorsPage({
     if (shown === 'telegram' && current !== undefined) {
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
+    if (shown === 'links' && current !== undefined) {
+      return (
+        <LinksSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          canEdit={isOwner}
+        />
+      );
+    }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
@@ -251,6 +262,7 @@ export function CreatorsPage({
     scripts: 'Scripts',
     content: 'Contenu',
     telegram: 'Canal Telegram',
+    links: 'Liens',
     hours: 'Heures d’activité',
     access: 'Accès',
     rate: 'Part de l’agence',
@@ -265,6 +277,7 @@ export function CreatorsPage({
     'scripts',
     'content',
     'telegram',
+    'links',
     'hours',
     'access',
     'rate',

@@ -22,9 +22,8 @@ export function MySecurityPage({ user }: { user: Me }): JSX.Element {
         lead={
           user.role === 'creator'
             ? 'Les appareils où ton compte est ouvert, et tes codes de secours.'
-            : user.teamScope === 'agency'
-              ? 'Les appareils où ton compte est ouvert, tes codes de secours, ton chat Telegram et l’extension de veille.'
-              : 'Les appareils où ton compte est ouvert, tes codes de secours et ton chat Telegram.'
+            : // How one signs in, first: the four cards below then read as its parts (CHA-14).
+              'Tu te connectes avec ton mot de passe et le code de ton application ; une clé d’accès les remplace d’un geste.'
         }
         tabs={
           <MeNav
