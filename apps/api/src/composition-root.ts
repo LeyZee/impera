@@ -84,6 +84,7 @@ import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
+import { wireRedirectLinks } from './wiring/redirect-links';
 import { wireRewards } from './wiring/rewards';
 import { wireScheduling } from './wiring/scheduling';
 import { wireScripts } from './wiring/scripts';
@@ -341,8 +342,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
+  const redirectLinks = wireRedirectLinks(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
+    channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
     channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
   });
   const team = wireTeam(shared, {
@@ -630,6 +633,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
+      ...redirectLinks.routes,
       ...creatorTasks.routes,
       ...contentDrops.routes,
       ...contractors.routes,

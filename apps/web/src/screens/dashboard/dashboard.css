@@ -897,3 +897,24 @@ div.db-fan {
 .db-creators__unread:empty {
   position: absolute;
 }
+
+/* A line chart's tip keys each row with a short stroke of its series: plain for the period, dashed for the one
+   compared (dataviz: line keys, never a box). */
+.db-tip-key {
+  display: inline-block;
+  width: 12px;
+  height: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 1px;
+  background: var(--nv-data-1);
+}
+.db-tip-key[data-key='dashed'] {
+  background: repeating-linear-gradient(90deg, var(--nv-ink-muted) 0 3px, transparent 3px 6px);
+}
+
+/* A phone's curve tip: as narrow as its amounts, so the curve it reads stays in sight. */
+.nv-tip.db-tip--compact {
+  min-width: 0;
+  padding: 8px 10px;
+}

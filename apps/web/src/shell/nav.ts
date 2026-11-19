@@ -213,6 +213,7 @@ const SCREENS = {
   '/moi/trophees': 'Trophées',
   '/moi/dossier': 'Dossier',
   '/moi/persona': 'Persona',
+  '/moi/liens': 'Mes liens',
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',

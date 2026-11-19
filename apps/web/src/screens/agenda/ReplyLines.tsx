@@ -61,7 +61,7 @@ export function ShortReplies({ lines }: { lines: readonly ReplyLine[] }): JSX.El
   );
 }
 
-/** In a column of Semaine, under the row « fans »: one person per line, the platform said when she has several. */
+/** In a column of Semaine, under the row « Qui répond »: one person per line, the platform said when she has several. */
 export function CellReplies({ lines }: { lines: readonly ReplyLine[] }): JSX.Element | null {
   if (lines.length === 0) return null;
   return (
@@ -71,7 +71,10 @@ export function CellReplies({ lines }: { lines: readonly ReplyLine[] }): JSX.Ele
           <li key={`${line.platform}-${reply.key}`}>
             <span className="sr-only">Qui répond à tes fans dans {line.label} : </span>
             {lines.length > 1 ? <span aria-hidden="true">{line.label} · </span> : null}
-            <Who reply={reply} />
+            {/* The hours first, whole, the name after: on a narrow column the end of a shift is what she reads (CRE-04). */}
+            <span className="ag-replies__cell">
+              <span className="nv-num">{reply.when}</span> <span>{reply.name}</span>
+            </span>
           </li>
         )),
       )}

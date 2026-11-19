@@ -65,6 +65,7 @@ Chaque ligne a son enregistrement (`recordings/2026-11-10/<nom>.2026-11-10.json`
 | `GET /models/:id/medias` [`vault.medias`] | `take`, `cursor`, `vaultFolderId`, `mediaType`, `memberId` | médias du coffre + `status[]` relatif au membre (`paid`), `sentForFree`, `description`, `suggestedMinPrice`, `suggestedMaxPrice` ; `totalImage`, `totalVideo` | L10 |
 | `GET /transactions/model/:id` [`transactions.list`] | `take`, `cursor`, `status[]` ∈ `paid`, `refunded`, `refund_asked` | `data[]` : `amount`, `status`, `type`, `memberId`, `agencyMemberId`, répartition (TVA, Reveal 18 %, agence, modèle), `countryCode` | L6 |
 | `GET /users/:id/notifications` [`notifications.list`] | `take`, `since`, `cursor` | `data[]` : `type`, `title`, `content`, `conversationId`, `isRead` | L4 |
+| `GET /users/me/context` | — | le contexte du membre connecté (vu le 19/11) ; `me` n'est pas un identifiant : la capture de session ne s'en sert pas et prend le membre dans les claims du jeton | — |
 
 Un média (`medias[]`) porte `id`, `type` ∈ `photo`, `video`, `audio`, `url`, `smallUrl`, `mediumUrl`, `largeUrl`, `blurhash`, `durationSeconds`, `name`, `isArchived`, `modelId` ; un média du coffre ajoute `isHls`, `thumbnailUrl`, `moderationStatus` ; un fichier envoyé par le fan ajoute `incomingMessageMemberId` (et n'a pas les trois précédents).
 

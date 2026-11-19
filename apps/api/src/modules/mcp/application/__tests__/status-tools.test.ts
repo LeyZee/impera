@@ -110,10 +110,13 @@ const subscriberFigures = {
 };
 const insights: AgencyInsights = AgencyInsightsSchema.parse({
   period: 'week',
+  span: { unit: 'rolling', partial: false, end: '2026-11-16', compare: 'previous', today: '2026-11-16' },
   from: '2026-11-10',
   to: '2026-11-16',
   previousFrom: '2026-11-03',
   previousTo: '2026-11-09',
+  registerSince: '2026-10-01',
+  previousDays: [],
   creators: [
     { creatorId: ines, name: 'Inès Inventée' },
     { creatorId: mara, name: 'Mara Inventée' },

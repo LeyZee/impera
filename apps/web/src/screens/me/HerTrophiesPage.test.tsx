@@ -100,7 +100,7 @@ function renderPage(user: Me): void {
     path: '/moi/trophees',
     component: () => <MyTrophiesPage user={user} />,
   });
-  const others = ['/moi/persona', '/moi/securite', '/moi/preferences'].map((path) =>
+  const others = ['/moi/profil', '/moi/persona', '/moi/securite', '/moi/preferences'].map((path) =>
     createRoute({ getParentRoute: () => root, path, component: () => null }),
   );
   const router = createRouter({

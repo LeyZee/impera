@@ -74,7 +74,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
         const answer = await readAgencyInsights(
           { ...deps, agency, agencyTimeZone },
           reader,
-          period,
+          { kind: 'rolling', period },
           creatorId,
         );
         return answer.kind === 'read' ? answer.insights : null;

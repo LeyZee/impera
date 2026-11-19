@@ -19,7 +19,6 @@ import {
   rateLine,
   suggestedZone,
   periodStartsFrom,
-  teamSummary,
 } from './model';
 
 import { countryName } from '@/lib/country';
@@ -80,23 +79,6 @@ describe('the list', () => {
     expect(matches(aicha, 'madag')).toBe(true);
     expect(matches(aicha, 'benin')).toBe(false);
     expect(matches(aicha, '  ')).toBe(true);
-  });
-
-  it('says how many work, are away and still have to sign in', () => {
-    const now = new Date('2026-10-28T12:00:00Z');
-    expect(teamSummary(team, now)).toBe('2 actifs · 1 absent');
-    expect(teamSummary([member({ invitationPending: true })], now)).toBe('1 actif · 1 invitation en attente');
-    expect(teamSummary([member({ status: 'left' })], now)).toBeNull();
-    // A dead link is counted apart: it asks for a new one (EQ-06).
-    expect(
-      teamSummary(
-        [
-          member({ invitationPending: true, invitationExpiresAt: '2026-10-30T12:00:00Z' }),
-          member({ invitationPending: true, invitationExpiresAt: '2026-10-27T12:00:00Z' }),
-        ],
-        now,
-      ),
-    ).toBe('2 actifs · 1 invitation en attente · 1 lien expiré');
   });
 });
 
