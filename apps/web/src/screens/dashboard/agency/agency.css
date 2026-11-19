@@ -1,6 +1,6 @@
 /*
- * « L'agence en chiffres » (ADR 0078). Content on plates, one palette per axis: the kinds of sale take the neutral
- * ramp --nv-kind-* (the money's rose and blue are the figures' only hues), the curves the trend's, who sold the team's ink, the agent's violet and the data gold, a total and a ramp the data
+ * « L'agence en chiffres » (ADR 0078). Content on plates, one palette per axis: the kinds of sale take the cyan
+ * ramp --nv-kind-* (apart from the money's rose and blue), the curves the trend's, who sold the team's ink, the agent's violet and the data gold, a total and a ramp the data
  * ink alone. Thin marks with rounded ends, a 2px gap between stacked parts, the money in Geist tabular figures. Tokens
  * only. The screen's styles load before components.css: a rule that overrides a design-system class takes two classes.
  */

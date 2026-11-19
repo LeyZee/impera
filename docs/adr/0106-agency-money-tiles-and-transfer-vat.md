@@ -1,6 +1,6 @@
 # 0106. Le Dashboard de l'agence sépare le chiffre d'affaires, le net, la part de la créatrice et celle de l'agence, et estime la TVA des virements
 
-Statut : accepted (« ok 0106 » de Charles le 13/11/2026, 0 h 52, fil « Afficher parts modèle, agence et TVA » ; numéro attribué par le coordinateur). Amendée : § 10 à § 14 (« ok phrases 0106 », 13/11/2026, 1 h 11, même fil), qui remplacent « une encre en quatre pas » du § 5. Avenant du 17/11/2026 au § 10 (part de l'agence en bleu, décision de Charles ; courbes selon la tendance et barres des sortes de vente en rampe neutre).
+Statut : accepted (« ok 0106 » de Charles le 13/11/2026, 0 h 52, fil « Afficher parts modèle, agence et TVA » ; numéro attribué par le coordinateur). Amendée : § 10 à § 14 (« ok phrases 0106 », 13/11/2026, 1 h 11, même fil), qui remplacent « une encre en quatre pas » du § 5. Avenant du 17/11/2026 au § 10 (part de l'agence au bleu du logo, courbes selon la tendance, barres des sortes de vente en cyan : décisions de Charles des 17 et 19/11/2026).
 Date : 2026-11-13
 Précise : l'ADR 0078 (insights de l'agence lus dans le registre des ventes) et l'ADR 0054 § 2 (sur Reveal, la part de la créatrice est le chiffre de Reveal). Ne remplace rien.
 
@@ -44,10 +44,10 @@ Ce que le registre a déjà, vente par vente (connecteur Reveal) : le TTC, le HT
 
 Le 17/11/2026 vers 13 h (heure de Paris), à la recette des périodes du Dashboard (ADR 0146), Charles veut plus de couleur et de courbes, « comme Reveal ». Ses choix : la part des créatrices reste rose (« ça fait féminin »), la part de l'agence passe au bleu, celui du logo d'Impera ; la courbe du chiffre d'affaires quitte le blanc.
 
-1. **La part de l'agence est bleue** partout où le § 10 la place (`--nv-money-agency`, Nuit et Jour, validés par le fil Design au validateur dataviz). Le bleu est celui de la palette des données, pas encore celui du logo : si Charles donne le sien, seul le jeton change.
+1. **La part de l'agence est bleue** partout où le § 10 la place (`--nv-money-agency`, Nuit et Jour, validés par le fil Design au validateur dataviz). Le 19/11/2026, Charles a choisi le bleu exact de son logo : le marine #001A33 en Jour, tel quel, et en Nuit la même teinte (209°) éclaircie par le fil Design pour rester lisible sur la plaque sombre.
 2. **La courbe du chiffre d'affaires prend la couleur de sa tendance** : verte (`--nv-trend-up`) au-dessus de la période comparée ou quand rien n'est comparable (ADR 0146 § 4), ambre (`--nv-trend-down`, la couleur des avertissements) en dessous ; jamais rouge, réservé aux urgences. Elle dit toujours la même chose que le pourcentage écrit à côté.
 3. **Une petite courbe au pied de la tuile Net**, jour par jour depuis le premier jour du registre : 1,5 px, sans axe ni point, cachée aux lecteurs d'écran (le chiffre et son pourcentage la disent), dans la couleur de sa tendance. Aucune pour un jour lu heure par heure. Les deux parts en avaient une aussi à la recette ; Charles a choisi le 19/11/2026 de n'en garder qu'une, sous Net, car les parts redessinaient la même forme. Les deux parts par jour viennent du serveur, aux mêmes droits que leurs totaux, jamais au MCP (ADR 0144).
-4. **Les barres et l'anneau des sortes de vente passent en rampe neutre** (`--nv-kind-1..4`, du clair au foncé), pour que le rose et le bleu de l'argent restent les seules teintes des chiffres. Proposé à Charles comme un choix à la recette du lot.
+4. **Les barres et l'anneau des sortes de vente passent en une rampe cyan** (`--nv-kind-1..4`, une seule teinte du clair au foncé), distincte du rose et du bleu de l'argent et du vert de la tendance. Deux variantes ont été montrées à Charles à la recette du lot (rampe neutre ou cyan) : il a choisi le cyan le 19/11/2026.
 
 ## Conséquences
 

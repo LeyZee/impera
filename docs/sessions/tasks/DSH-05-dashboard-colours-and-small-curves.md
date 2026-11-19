@@ -15,7 +15,7 @@ ADR 0106 (§ 10 à § 14 et l'avenant du 17/11), ADR 0146 § 4 et § 5, ADR 0144
 - [x] Jetons de Design : `--nv-money-agency` bleu, `--nv-trend-up`, `--nv-trend-down`, `--nv-kind-1..4` (Nuit et Jour).
 - [x] Avenant du 17/11 dans l'ADR 0106.
 - [x] Contrat et domaine : `agencyMinor` et `creatorMinor` par jour (un remboursement sur le jour de sa vente, arrondi par jour) ; tests : somme des jours, dollars, MCP sans les parts, manager comme propriétaire.
-- [x] Écran : courbe du chiffre d'affaires selon la tendance, une petite courbe sous Net seulement (Charles, 19/11 : les parts redessinaient la même forme) ; sortes de vente en rampe neutre ; tests.
+- [x] Écran : courbe du chiffre d'affaires selon la tendance, une petite courbe sous Net seulement (Charles, 19/11 : les parts redessinaient la même forme) ; sortes de vente en cyan (choix B de Charles, 19/11), agence au bleu du logo ; tests.
 - [x] Captures Nuit/Jour, PC/téléphone, données inventées, en deux lots (courbe et tuiles ; barres et anneau A neutre / B sarcelle).
 - [ ] Avis Design, puis « ok captures » de Charles (choix A ou B, bleu du logo, trois mini-courbes ou une).
 - [ ] OK de Design et de Bilan sur le dernier commit.

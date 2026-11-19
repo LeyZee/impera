@@ -8,9 +8,9 @@ import { clockOf } from '@/scheduling/time';
  */
 
 /**
- * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the neutral ramp
- * (`--nv-kind-1..4`, light to dark, so the money's rose and blue stay the only hues of the figures, avenant du 17/11 à
- * l'ADR 0106 § 10), then « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
+ * One palette per axis, none shared between blocks (relecture 06/11): the kinds of sale take the cyan ramp
+ * (`--nv-kind-1..4`, light to dark, apart from the money's rose and blue, avenant du 17/11 à l'ADR 0106 § 10, choix B
+ * de Charles le 19/11), then « Autres ventes » the neutral fold; who sold takes the team's ink, the agent's violet and the data gold; a total, the
  * creators' bars and the hours' ramp take the data ink alone.
  */
 export const KINDS = [
