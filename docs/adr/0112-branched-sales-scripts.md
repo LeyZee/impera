@@ -1,6 +1,6 @@
 # 0112. Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit
 
-Statut : accepted (« ok 0112 » de Charles le 16/11/2026, 0 h 37, après ses choix du 16/11 à 0 h 00, 0 h 01, 0 h 02, 0 h 05 et 0 h 07, fil « Concevoir les scripts de vente à branches » ; relu par Agent et Médias). Amendement du 19/11/2026 (§ 20 à 26, créer un script à l'écran et le recopier dans Reveal) : proposed
+Statut : accepted (« ok 0112 » de Charles le 16/11/2026, 0 h 37, après ses choix du 16/11 à 0 h 00, 0 h 01, 0 h 02, 0 h 05 et 0 h 07, fil « Concevoir les scripts de vente à branches » ; relu par Agent et Médias). Amendement du 19/11/2026 (§ 20 à 26, créer un script à l'écran et le recopier dans Reveal) : accepted (Charles, 19/11/2026, 17 h 26 heure de Paris, « Oui, comme la maquette » sur la carte du fil)
 Date : 2026-11-16
 Précise : l'ADR 0098 (déroulé d'un script par fan), l'ADR 0099 (coffre et scripts de Reveal), l'ADR 0100 (rôle `script_writer`), l'ADR 0090 (objections), l'ADR 0103 (porte, ventes fictives au playground). Ne remplace rien : un script sans branche reste celui de l'ADR 0098.
 
@@ -86,7 +86,7 @@ Le 15/11/2026 au soir, Charles veut que l'IA vende par des scripts à branches, 
 
 19. **Mesure** : par script, étape et branche, taux d'ouverture, taux d'achat et revenu.
 
-## Amendement du 19/11/2026 : créer un script à l'écran, le recopier dans Reveal
+## Amendement du 19/11/2026 : créer un script à l'écran, le recopier dans Reveal (accepté)
 
 Le 17/11/2026, Charles constate que l'onglet Scripts de la fiche montre le coffre mais ne permet pas de créer un script. L'ADR 0149 range la liste des scripts et « Nouveau script » dans l'onglet Scripts de la fiche à sept onglets. La maquette de l'éditeur (données inventées), revue trois fois avec lui les 17 et 19/11, est validée le 19/11/2026 à 16 h 59 heure de Paris (« je valide », fil « Concevoir les scripts de vente à branches »). Les écritures de séquence de Reveal ne sont toujours pas capturées : Impera ne crée rien chez Reveal.
 
