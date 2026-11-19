@@ -114,6 +114,8 @@ export const RevealAccountsSchema = z.strictObject({
       creatorName: z.string(),
       sessionState: SessionStateSchema,
       sessionUpdatedAt: z.iso.datetime().nullable(),
+      /** When the stored session ends; null while the CRM does not say it. */
+      sessionExpiresAt: z.iso.datetime().nullable(),
     }),
   ),
 });
@@ -132,27 +134,38 @@ export type RevealSeen = z.infer<typeof RevealSeenSchema>;
 /**
  * What became of the reading of a session. `held`: read, kept by the service worker for one minute at most until the
  * owner sends it or not; the popup learns the model's id alone. `no-session`: the tab made no request to read in time.
+ * `several`: the tab named several creators and none is the account's (19/11, 409).
  */
 export const RevealReadSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('held'), modelId: z.string().min(1).max(64), seen: RevealSeenSchema }),
-  z.strictObject({ state: z.enum(['no-session', 'unlinked']) }),
+  z.strictObject({ state: z.enum(['no-session', 'unlinked', 'several']) }),
 ]);
 export type RevealRead = z.infer<typeof RevealReadSchema>;
 
-/** What became of a « Sync ». `expired`: the session read is no longer held (a minute passed, or it was cancelled). */
-export const RevealSyncedSchema = z.strictObject({
-  state: z.enum([
-    'synced',
-    'expired',
-    'unlinked',
-    'revoked',
-    'not-owner',
-    'other-model',
-    'other-member',
-    'refused',
-    'unreachable',
-  ]),
-});
+/**
+ * What became of a « Sync ». `synced`: stored, with its end and whether a new login to Reveal should come first (ADR 0147
+ * § 5). `expired`: the session read is no longer held (a minute passed, or it was cancelled).
+ */
+export const RevealSyncedSchema = z.discriminatedUnion('state', [
+  z.strictObject({
+    state: z.literal('synced'),
+    expiresAt: z.iso.datetime().nullable(),
+    reconnectFirst: z.boolean(),
+    kept: z.boolean(),
+  }),
+  z.strictObject({
+    state: z.enum([
+      'expired',
+      'unlinked',
+      'revoked',
+      'not-owner',
+      'other-model',
+      'other-member',
+      'refused',
+      'unreachable',
+    ]),
+  }),
+]);
 export type RevealSynced = z.infer<typeof RevealSyncedSchema>;
 
 /** Popup → service worker. The tab is always the one open when the popup opened. */

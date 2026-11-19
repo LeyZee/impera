@@ -117,11 +117,22 @@ function button(
   return element;
 }
 
+/** The session card heard no answer from the CRM: listing the accounts, or sending a session. */
+function crmLost(sync: SyncView | null): boolean {
+  if (sync === null) return false;
+  return (
+    sync.accounts.state === 'unreachable' ||
+    (sync.outcome?.kind === 'failed' && sync.outcome.failure === 'unreachable')
+  );
+}
+
 function pillOf(screen: Screen): HTMLElement | null {
   switch (screen.kind) {
     case 'signed_in': {
       const away = awayOf(screen.me);
-      return away === null ? pill('sent', 'Connecté') : pill('awaiting-approval', awayLabel(away));
+      if (away !== null) return pill('awaiting-approval', awayLabel(away));
+      // The head and the session card never disagree (avis Design du 19/11): a CRM that stops answering says so here too.
+      return crmLost(screen.sync) ? pill('error', 'CRM injoignable') : pill('sent', 'CRM relié');
     }
     case 'signed_out':
       return pill('idle', 'Déconnecté');
