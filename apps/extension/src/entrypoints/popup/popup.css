@@ -897,6 +897,14 @@ body {
   color: var(--nv-ink-faint);
   text-wrap: pretty;
 }
+.pp-sync__advice--all {
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__retry {
+  display: flex;
+  justify-content: flex-end;
+}
 .pp-sync__cause {
   font-weight: 600;
   color: var(--nv-warning);

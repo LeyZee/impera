@@ -177,7 +177,7 @@ describe('popup', () => {
       sync: null,
     });
     expect(root.querySelector('.nv-popup__head .pp-pill')?.textContent).toBe('Suspendu');
-    expect(root.textContent).not.toContain('Connecté');
+    expect(root.textContent).not.toContain('CRM relié');
     expect(root.querySelector('[data-card="away"]')?.textContent).toContain('Ton compte est suspendu');
     expect(root.textContent).toContain('le copilote s’ouvre quand ton responsable te remet actif');
     expect(root.textContent).not.toContain('Ouvrir le copilote');

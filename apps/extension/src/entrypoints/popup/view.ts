@@ -121,7 +121,7 @@ function pillOf(screen: Screen): HTMLElement | null {
   switch (screen.kind) {
     case 'signed_in': {
       const away = awayOf(screen.me);
-      return away === null ? pill('sent', 'Connecté') : pill('awaiting-approval', awayLabel(away));
+      return away === null ? pill('sent', 'CRM relié') : pill('awaiting-approval', awayLabel(away));
     }
     case 'signed_out':
       return pill('idle', 'Déconnecté');

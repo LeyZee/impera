@@ -141,6 +141,8 @@ const STATES: Readonly<Record<Account['sessionState'], { readonly tone: Tone; re
 const TOKEN_LIFE_MS = 24 * 3_600_000;
 
 const RECONNECT = 'Reconnecte-toi à Reveal, puis resynchronise.';
+/** A token stored with less than a day ahead: why a new login, then the gesture (avis Design du 19/11). */
+const SHORT_TOKEN = 'Pour 24 h pleines : reconnecte-toi à Reveal, puis resynchronise.';
 
 /** The cause, then the gesture (demande de Charles du 19/11: « la vraie cause et le geste à faire »). */
 export function failureOf(
@@ -195,6 +197,11 @@ export function failureOf(
 
 const DAY_MS = 86_400_000;
 
+/** « 19/11 à 14 h 37 »: a tip's day, without the year (avis Design du 19/11). */
+function shortWhenOf(at: Date): string {
+  return `${at.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${hourOf(at)}`;
+}
+
 /** « 9 h 05 » today, « demain 9 h 05 », else the CRM's full day. */
 export function untilOf(at: Date, now: Date): string {
   const days = Math.round(
@@ -214,18 +221,16 @@ function dot(tone: Tone, live: boolean): HTMLElement {
   });
 }
 
-/** The time left of the token as one thin line: empty once cut, never a red bar (avis Design du 19/11). */
+/** The time left of the token as one thin line, only while it holds and its end is known (avis Design du 19/11). */
 function gauge(tone: Tone, expiresAt: Date | null, now: Date, fresh: boolean): HTMLElement | null {
-  if (expiresAt === null && tone !== 'red') return null;
-  const left =
-    expiresAt === null ? 0 : Math.max(0, Math.min(1, (expiresAt.getTime() - now.getTime()) / TOKEN_LIFE_MS));
-  const value = tone === 'red' ? 0 : Math.round(left * 100);
+  if (expiresAt === null || tone === 'red' || tone === 'neutral') return null;
+  const left = Math.max(0, Math.min(1, (expiresAt.getTime() - now.getTime()) / TOKEN_LIFE_MS));
   return h(
     'div',
     {
       class: `nv-gauge pp-sync__gauge pp-sync__gauge--${tone}${fresh ? ' is-fresh' : ''}`,
       role: 'presentation',
-      style: `--nv-gauge-value: ${String(value)}%`,
+      style: `--nv-gauge-value: ${String(Math.round(left * 100))}%`,
     },
     h('span', { class: 'nv-gauge__fill' }),
   );
@@ -276,21 +281,19 @@ function statusLine(account: Account, row: RowState, now: Date): HTMLElement {
     h('span', { class: `pp-sync__word pp-sync__word--${row.tone}` }, row.word),
     row.until === null || row.tone === 'red'
       ? null
-      : h('span', { class: 'pp-sync__until' }, `tient jusqu’à ${untilOf(row.until, now)}`),
+      : h('span', { class: 'pp-sync__until' }, `jusqu’à ${untilOf(row.until, now)}`),
   );
   if (account.sessionUpdatedAt === null) return line;
   return withTip(line, {
     title: `${account.creatorName} sur Reveal`,
     rows: [
-      { label: 'Synchronisée', value: whenOf(new Date(account.sessionUpdatedAt)).replace(/^le /u, '') },
-      ...(row.until === null
-        ? []
-        : [{ label: 'Fin du jeton', value: whenOf(row.until).replace(/^le /u, '') }]),
+      { label: 'Synchronisée', value: shortWhenOf(new Date(account.sessionUpdatedAt)) },
+      ...(row.until === null ? [] : [{ label: 'Fin du jeton', value: shortWhenOf(row.until) }]),
     ],
   });
 }
 
-/** Under the state: the last failure's cause and gesture, else the gesture the state asks for, else nothing. */
+/** Under one account: the last failure's cause and gesture, or what a session just stored still asks; else nothing. */
 function adviceLine(row: RowState, crm: string): HTMLElement | null {
   if (row.phase !== null) return null;
   if (row.failure !== null) {
@@ -309,8 +312,7 @@ function adviceLine(row: RowState, crm: string): HTMLElement | null {
       { class: 'pp-sync__advice' },
       'La session en place tient plus longtemps : elle est gardée.',
     );
-  if (row.tone === 'red' || row.tone === 'amber' || row.synced?.reconnectFirst === true)
-    return h('p', { class: 'pp-sync__advice' }, RECONNECT);
+  if (row.synced?.reconnectFirst === true) return h('p', { class: 'pp-sync__advice' }, SHORT_TOKEN);
   return null;
 }
 
@@ -415,7 +417,7 @@ function syncBody(view: SyncView, actions: SyncActions): readonly (HTMLElement |
         ' ',
         gesture,
       ),
-      button('Réessayer', actions.retry, 'plain'),
+      h('div', { class: 'pp-sync__retry' }, button('Réessayer', actions.retry, 'soft', { small: true })),
     ];
   }
   if (accounts.length === 0)
@@ -426,7 +428,17 @@ function syncBody(view: SyncView, actions: SyncActions): readonly (HTMLElement |
   if (confirm !== null && confirmed !== undefined) return confirmRows(confirmed, confirm, actions);
   // One neon per screen (V-EXT-05): the first account whose session is missing or ending.
   const first = accounts.find((account) => account.sessionState !== 'valid');
-  return accounts.map((account) => accountRow(account, account === first, view, actions));
+  // The gesture a late session asks for, said once under the list, whatever the number of accounts (avis Design).
+  const late = accounts.some(
+    (account) =>
+      (account.sessionState === 'expired' || account.sessionState === 'warning') &&
+      view.pending?.accountId !== account.id &&
+      !(view.outcome?.kind === 'failed' && view.outcome.accountId === account.id),
+  );
+  return [
+    ...accounts.map((account) => accountRow(account, account === first, view, actions)),
+    late ? h('p', { class: 'pp-sync__advice pp-sync__advice--all' }, RECONNECT) : null,
+  ];
 }
 
 /** The card's action is the screen's one neon: an account whose session is missing or ending. */
@@ -444,5 +456,5 @@ export function syncWanted(view: SyncView | null): boolean {
 export function syncCard(view: SyncView, actions: SyncActions, index: number): HTMLElement | null {
   const { state } = view.accounts;
   if (state === 'none' || state === 'revoked' || state === 'not-owner') return null;
-  return card({ id: 'sync', icon: 'rotate', title: 'Session Reveal', index }, syncBody(view, actions));
+  return card({ id: 'sync', icon: 'link', title: 'Session Reveal', index }, syncBody(view, actions));
 }

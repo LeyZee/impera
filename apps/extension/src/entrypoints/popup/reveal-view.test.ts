@@ -172,23 +172,23 @@ describe('the Reveal session card', () => {
     expect(never?.querySelector('.nv-btn--neon')?.textContent).toBe('Synchroniser');
   });
 
-  it('tells the gesture a late session asks for, under it', () => {
+  // Avis Design du 19/11: the same sentence under every account was the pile of messages.
+  it('says the gesture late sessions ask for once, under the list', () => {
     const { card } = sync(THREE);
-    expect(row(card, 'Soleil')?.querySelector('.pp-sync__advice')?.textContent).toBe(
+    expect(card?.querySelectorAll('.pp-sync__advice')).toHaveLength(1);
+    expect(card?.querySelector('.pp-sync__advice--all')?.textContent).toBe(
       'Reconnecte-toi à Reveal, puis resynchronise.',
     );
-    expect(row(card, 'Lune')?.querySelector('.pp-sync__advice')).toBeNull();
+    expect(sync({ state: 'ok', accounts: [LUNE] }).card?.querySelector('.pp-sync__advice')).toBeNull();
   });
 
-  it('says the hour a session holds until, and a thin gauge of what is left, empty once cut', () => {
+  it('says the hour a session holds until with a thin gauge, and no line at all once cut', () => {
     const { card } = sync(THREE);
-    expect(row(card, 'Brume')?.querySelector('.pp-sync__until')?.textContent).toBe('tient jusqu’à 23 h 30');
+    expect(row(card, 'Brume')?.querySelector('.pp-sync__until')?.textContent).toBe('jusqu’à 23 h 30');
     expect(row(card, 'Brume')?.querySelector<HTMLElement>('.pp-sync__gauge')?.getAttribute('style')).toBe(
       '--nv-gauge-value: 6%',
     );
-    expect(row(card, 'Soleil')?.querySelector<HTMLElement>('.pp-sync__gauge')?.getAttribute('style')).toBe(
-      '--nv-gauge-value: 0%',
-    );
+    expect(row(card, 'Soleil')?.querySelector('.pp-sync__gauge')).toBeNull();
     // No end known: no gauge rather than a made-up one.
     expect(row(card, 'Lune')?.querySelector('.pp-sync__gauge')).toBeNull();
   });
@@ -224,7 +224,8 @@ describe('the Reveal session card', () => {
     state?.dispatchEvent(new FocusEvent('focus'));
     const tip = document.querySelector('.nv-tip');
     expect(tip?.getAttribute('role')).toBe('tooltip');
-    expect(tip?.textContent).toContain('15/11/2026 à 21 h 39');
+    expect(tip?.textContent).toContain('15/11 à 21 h 39');
+    expect(tip?.textContent).not.toContain('2026');
     expect(state?.getAttribute('aria-describedby')).toBe(tip?.id);
     state?.dispatchEvent(new FocusEvent('blur'));
     expect(document.querySelector('.nv-tip')).toBeNull();
@@ -262,10 +263,10 @@ describe('the Reveal session card', () => {
       },
     );
     expect(card?.querySelector('.pp-sync__check')).not.toBeNull();
-    expect(card?.querySelector('.pp-sync__until')?.textContent).toBe('tient jusqu’à demain 9 h 05');
+    expect(card?.querySelector('.pp-sync__until')?.textContent).toBe('jusqu’à demain 9 h 05');
     expect(card?.querySelector('.pp-sync__gauge.is-fresh')).not.toBeNull();
     expect(card?.querySelector('.pp-sync__advice')?.textContent).toBe(
-      'Reconnecte-toi à Reveal, puis resynchronise.',
+      'Pour 24 h pleines : reconnecte-toi à Reveal, puis resynchronise.',
     );
   });
 
