@@ -40,7 +40,7 @@ const AREAS = [
   {
     file: '../../creators/telegram/telegram-channel.css',
     selector: '.tc-slot .ps-entry__remove',
-    seen: 22,
+    seen: 36,
     what: 'a channel slot’s ×',
   },
   {
