@@ -183,8 +183,13 @@ export function replyOpenAt(
     // A slot belongs to the day it starts: one that starts on a date with an exception does not run past its midnight.
     const slot = slotAt(hours, timeZone, at);
     if (slot !== undefined && slot.day !== localClock(at, timeZone).day) {
-      const { minute } = localClock(at, timeZone);
-      const dayBefore = localDate(new Date(at.getTime() - (minute + 1) * MINUTE_MS), timeZone);
+      // The calendar day before hers, not the instant minute + 1 earlier: the night the clock goes back, 2:30 the
+      // second time is three hours and a half after midnight (relecture Agent de #865).
+      const dayBefore = new Date(
+        Date.parse(`${localDate(at, timeZone)}T00:00:00Z`) - MINUTES_PER_DAY * MINUTE_MS,
+      )
+        .toISOString()
+        .slice(0, 10);
       if (exceptions.some((candidate) => candidate.date === dayBefore)) return false;
     }
   }

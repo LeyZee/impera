@@ -25,3 +25,54 @@ ALTER TABLE "agent_hour_exceptions" FORCE ROW LEVEL SECURITY;--> statement-break
 REVOKE ALL ON "agent_hour_exceptions" FROM nirvana_app;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE, DELETE ON "agent_hour_exceptions" TO nirvana_app;--> statement-breakpoint
 GRANT SELECT ON "agent_hour_exceptions" TO impera_service;
+--> statement-breakpoint
+-- The planning's read of the agent's mode (0069) follows the same rule as every other reader of the kill switches
+-- (ADR 0148 § 1, relecture Bilan de #865): a pause whose end has passed no longer stops her. Same definition as 0069
+-- otherwise; CREATE OR REPLACE keeps the owner and the EXECUTE grant.
+CREATE OR REPLACE FUNCTION public.calendar_agent()
+RETURNS TABLE (
+  creator_id uuid,
+  time_zone text,
+  mode text,
+  reply jsonb
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $$
+DECLARE
+  reader text := public.calendar_reader_scope();
+  global_stop boolean;
+BEGIN
+  IF reader NOT IN ('all', 'team') THEN
+    RETURN;
+  END IF;
+  select k.active and (k.active_until is null or k.active_until > now()) into global_stop
+  from public.kill_switches k
+  where k.scope = 'global'
+  order by k.set_at desc
+  limit 1;
+  RETURN QUERY
+    select c.id,
+           c.timezone,
+           case
+             when coalesce(global_stop, false) then 'stop'
+             when coalesce((
+               select k.active and (k.active_until is null or k.active_until > now())
+               from public.kill_switches k
+               where k.scope = 'creator' and k.scope_id = c.id
+               order by k.set_at desc
+               limit 1
+             ), false) then 'stop'
+             when exists (
+               select 1 from public.conversations v
+               where v.creator_id = c.id and v.mode = 'auto' and v.state not in ('human', 'paused')
+             ) then 'auto'
+             else 'copilot'
+           end,
+           coalesce(c.agent_hours -> 'reply', '{"mode":"always"}'::jsonb)
+    from public.creators c
+    order by c.id;
+END;
+$$;

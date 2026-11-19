@@ -227,3 +227,18 @@ describe('agentHoursNow (ADR 0148 § 1)', () => {
     });
   });
 });
+
+describe('replyOpenAt the night the clock goes back (relecture Agent, #865)', () => {
+  it('a slot started on a date with an exception stops at its midnight, the second 2:30 included', () => {
+    // Saturday 22:00 to 4:00; Saturday 30/10/2027 has an exception with no range.
+    const hours: AgentHours = {
+      ...DEFAULT_AGENT_HOURS,
+      reply: { mode: 'slots', slots: [{ day: 6, startMinute: 1320, endMinute: 240, enabled: true }] },
+    };
+    const exceptions = [{ date: '2027-10-30', ranges: [] }];
+    // 2:30 the second time on Sunday 31/10 in Paris (UTC+1 again): 1:30 UTC.
+    expect(replyOpenAt(hours, PARIS, new Date('2027-10-31T01:30:00Z'), exceptions)).toBe(false);
+    // Without the exception, Saturday's slot runs on to 4:00.
+    expect(replyOpenAt(hours, PARIS, new Date('2027-10-31T01:30:00Z'))).toBe(true);
+  });
+});

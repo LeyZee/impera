@@ -55,7 +55,9 @@ export async function moveReopen(
   at: Date,
   correlationId: string,
 ): Promise<void> {
-  // Her dated exceptions (ADR 0148 § 3) move her opening too: read in her tenant, the table's RLS asks it.
+  // Her dated exceptions (ADR 0148 § 3) move her opening too: read in her tenant, the table's RLS asks it. The
+  // caller's transaction is already open (the hours or the exception written in it), so `withTenant` cannot wrap it;
+  // the setting is local to this transaction (`true`) and names this creator alone, as `withTenant` would.
   await tx.execute(sql`select set_config('app.creator_id', ${creator.id}, true)`);
   const dated = await tx.execute(
     sql`select to_char(date, 'YYYY-MM-DD') as date, ranges from agent_hour_exceptions
