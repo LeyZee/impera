@@ -313,7 +313,12 @@ describe('« Plus » on the phone', () => {
       routeTree: root.addChildren(routes),
       history: createMemoryHistory({ initialEntries: [path] }),
     });
-    render(<RouterProvider router={router} />);
+    // The rail reads its counts (ADR 0134 § 8): a client of its own, as in the app.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
   }
 
   it('lights up when the screen shown is one of its tabs', async () => {
@@ -381,7 +386,12 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
       routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: '/suivi' })]),
       history: createMemoryHistory({ initialEntries: ['/suivi'] }),
     });
-    render(<RouterProvider router={router} />);
+    // The rail reads its counts (ADR 0134 § 8): a client of its own, as in the app.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
   }
 
   it('leaves « Plus » out when every tab fits and Moi › Préférences holds the rest (D-03)', async () => {

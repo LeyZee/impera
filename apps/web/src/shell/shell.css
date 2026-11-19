@@ -132,6 +132,11 @@
     background-color var(--nv-dur-fast),
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
+/* What waits behind a tab (ADR 0134 § 8): the design system's count, at the row's end. */
+.nv-rail__count {
+  flex: none;
+  margin-left: auto;
+}
 .nv-rail__item:hover {
   color: var(--nv-ink);
 }
@@ -1231,6 +1236,13 @@
   .nv-rail__agent::before {
     display: none;
   }
+  /* Icons only: the count sits on the icon's corner. */
+  .nv-rail__item .nv-rail__count {
+    position: absolute;
+    top: 2px;
+    left: calc(50% + 2px);
+    margin: 0;
+  }
   /* Icons only: a family heading becomes a hairline, which says the same without words. */
   .nv-rail__heading {
     height: 13px;
@@ -1360,6 +1372,13 @@
     /* The guide's floor for a label (recette visuelle 16/11, CRE-23). */
     font-size: 11px;
     font-weight: 600;
+  }
+  /* The phone's bar: the count on the icon's corner, as on the icons-only rail. */
+  .nv-rail__item .nv-rail__count {
+    position: absolute;
+    top: 4px;
+    left: calc(50% + 4px);
+    margin: 0;
   }
   .nv-rail__item[aria-current='page'],
   .nv-rail__more[data-current='true'],

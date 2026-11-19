@@ -17,6 +17,7 @@ import { AgentPill } from './AgentPill';
 import { AppearanceChoice } from './AppearanceChoice';
 import { MediaBlurToggle } from './MediaBlurToggle';
 import { NavIcon } from './NavIcon';
+import { RailCount } from './RailCount';
 import { keepTabInside } from './focus';
 import { seesHerMedia } from './media-blur';
 import {
@@ -302,6 +303,7 @@ export function RailNav({
     >
       <NavIcon name={item.icon} />
       <span className="nv-rail__label">{item.label}</span>
+      <RailCount section={item.to} />
     </Link>
   );
 
@@ -448,6 +450,7 @@ export function MoreSheet({
           >
             <NavIcon name={item.icon} />
             {item.label}
+            <RailCount section={item.to} />
           </Link>
         ))}
         {account === undefined ? null : (
