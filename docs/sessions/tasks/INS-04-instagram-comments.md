@@ -1,5 +1,5 @@
 # INS-04 Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués
-Statut : in progress (lot a fait ; tout se fait contre `FakeInstagram` ; l'essai réel attend le compte professionnel, l'application Meta et le mot écrit de Charles)
+Statut : in progress (lot a fait, lot c écrit hors évals et branchement ; tout se fait contre `FakeInstagram` ; l'essai réel attend le compte professionnel, l'application Meta et le mot écrit de Charles)
 Phase : Instagram (ADR 0122)
 Dépend de : ADR 0122 acceptée ; INS-01 (faux, contrats, branchement) ; le contrat des notes accordé avec le fil Playground
 Branche : task/ins-04-instagram-comments
@@ -28,8 +28,10 @@ Lot b, serveur (relu par Sécurité avant fusion) :
 - [ ] Doute sur l'âge relevé par le code sans le modèle ; un auteur en doute ouvert ne reçoit plus rien nulle part tant qu'un humain n'a pas tranché.
 
 Lot c, voix (avec le fil Agent) :
-- [ ] Prompt `voice/instagram-comment` et son schéma de sortie dans `packages/llm` ; il ne lit que les panneaux publics de la persona, et un test échoue si un panneau intime y entre.
-- [ ] Le commentaire et la légende entrent dans un bloc typé non fiable ; la légende est coupée et nettoyée par le code.
+- [x] Prompt `voice/instagram-comment` et son schéma de sortie dans `packages/llm` ; il ne lit que les panneaux publics de la persona, et un test échoue si un panneau intime y entre.
+- [x] Le commentaire et la légende entrent dans un bloc typé non fiable ; la légende est coupée et nettoyée par le code.
+- [x] Usage propre `instagram_comment` dans `llm_calls` (migration du contrôle), compté dans la conso IA et arrêté par le plafond du jour.
+- [ ] Branchement : `commentWriterPersona` (module `agent`) donne la fiche publique et les gardes ; seuls les codes bloquants passent à `chatGuardCodes` (avec le lot b).
 - [ ] Évals sur des commentaires inventés : sa voix en plus court, sans séduction ; commentaire sexuel sans réponse ; injection dans un commentaire sans effet.
 
 Lot d, entraînement et écrans (fils Playground et Design) :
@@ -51,3 +53,4 @@ Les messages privés (exclus), commenter ailleurs que sous ses publications, la 
 
 - 19/11 : lot a. Emplacements accordés avec le fil Bilan : module neuf `instagram-comments` (règles et port, un drapeau par capacité), port à part de celui de la publication, `FakeInstagram` dans `connectors/infra/fake` qui lit le port par l'`index.ts` du module, auteur opaque (empreinte salée). Les cinq gardes du chatting qui valent en public sont nommées ici (`CHAT_GUARDS_ON_A_REPLY`) et leurs résultats sont remis par le branchement : il se fait au lot c avec le fil Agent, qui relit aussi la liste des mots de `public_explicit`. `INS-01` n'ayant pas encore son faux, `FakeInstagram` naît ici avec les seuls commentaires ; la lecture des médias s'y ajoutera.
 - 19/11, relectures du lot a. Sécurité : la détresse passe avant le silence d'un auteur en doute d'âge ouvert (silence et relais) ; aucun `@` ni `#` où que ce soit, formes pleine largeur repliées. Agent : au lot c, appeler `checkVoiceOutput` (porte existante, contexte vide) et refuser sur toute violation bloquante, les cinq codes de l'ADR restant le minimum testé ; `public_explicit` garde sa liste ici, mots génériques seulement, lue avec `touchesTerm`. Pour le lot b (Sécurité et Bilan) : clé d'auteur = HMAC à clé secrète par compte ; mentions de tiers retirées du commentaire avant le bloc d'entrée ; seuils d'autonomie validés par Zod à la frontière ; `reply` validée avant le port ; droit inconnu refusé à la connexion ; le relais de détresse d'un auteur muet ne déclenche aucun appel au modèle.
+- 19/11, lot c. Accordé avec Bilan : méthode `instagramComment` du gateway calquée sur `channelPost`, usage propre, aucune règle métier dans le prompt, sortie validée par `CommentOutcomeSchema` (invalide après le repli : relais `other`, jamais un texte réparé ; plafond atteint : aucun appel, aucune réponse). Accordé avec Agent : pas de porte neuve, `channel-persona.ts` généralisé (`publicWriterPersona`, une seule liste de ce qui reste privé pour Telegram et Instagram) et `commentWriterPersona` à la longueur d'une réponse. Les mentions de tiers sont retirées du commentaire et de la légende avant le bloc d'entrée. Les évals payantes attendent l'accord de Charles sur leur nombre et leur coût.

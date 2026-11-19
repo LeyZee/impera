@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+  CommentOutcomeSchema,
   err,
   FanCardReadSchema,
   MEDIA_VOCABULARY_VERSION,
@@ -27,6 +28,7 @@ import {
 import type {
   ChannelPostInput,
   FanCardReadInput,
+  InstagramCommentInput,
   LlmFailure,
   LlmGateway,
   LlmGatewayDeps,
@@ -66,6 +68,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
   const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
+  const instagramCommentPrompt = prompts.instagramComment ?? loadPrompt('voice', 'instagram-comment');
   const scriptSummaryPrompt = prompts.scriptSummary ?? loadPrompt('brain', 'script-summary');
   const scriptIdentityPrompt = prompts.scriptIdentity ?? loadPrompt('brain', 'script-identity');
   const fanCardPrompt = prompts.fanCard ?? loadPrompt('brain', 'fan-card');
@@ -375,6 +378,27 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       return result.ok ? ok({ ...result.value, output: { kind: 'post', ...result.value.output } }) : result;
     },
 
+    async instagramComment(input) {
+      const system = renderPrompt(instagramCommentPrompt, {
+        creator_name: input.creatorName,
+        persona_sheet: input.personaSheet,
+        examples:
+          input.examples.length === 0
+            ? 'Aucun exemple pour l’instant.'
+            : wrapUntrusted('comment_examples', input.examples.join('\n\n---\n\n')),
+        canary,
+      });
+      const content = instagramCommentRequest(input);
+      return run(
+        'voice',
+        instagramCommentPrompt,
+        system,
+        () => Promise.resolve([{ role: 'user', content }]),
+        CommentOutcomeSchema,
+        { ...input.trace, purpose: 'instagram_comment' },
+      );
+    },
+
     async summarizeScript(input) {
       const system = renderPrompt(scriptSummaryPrompt, { canary });
       const content = scriptSummaryRequest(input);
@@ -524,6 +548,40 @@ function channelPostRequest(input: ChannelPostInput): string {
     );
   }
   if (input.advice !== null) lines.push('', wrapUntrusted('agency_advice', input.advice));
+  return lines.join('\n');
+}
+
+const MEDIA_KIND_WORDS = { reel: 'un Reel', photo: 'une photo', carousel: 'un carrousel' } as const;
+
+/** What this one comment is: the facts written by the code, the two texts in their blocks (CLAUDE.md rule 4). */
+function instagramCommentRequest(input: InstagramCommentInput): string {
+  const { comment } = input;
+  const lines = [
+    `Un commentaire sous ${MEDIA_KIND_WORDS[comment.mediaKind]} qu’elle a publié il y a ${String(comment.postAgeHours)} h.`,
+    comment.repliesToHer
+      ? 'Il répond à une de ses réponses.'
+      : 'Il est posé directement sous la publication.',
+    comment.authorCommentedBefore
+      ? 'Son auteur a déjà commenté ses publications.'
+      : 'C’est le premier commentaire de son auteur.',
+    '',
+    comment.caption.trim() === ''
+      ? 'La publication n’a pas de légende.'
+      : `La légende de la publication :\n${wrapUntrusted('instagram_caption', comment.caption)}`,
+    '',
+    `Le commentaire :\n${wrapUntrusted('instagram_comment', comment.comment)}`,
+  ];
+  if (input.recentReplies.length > 0)
+    lines.push(
+      '',
+      'Ses réponses récentes, à ne pas répéter :',
+      ...input.recentReplies.map((reply) => `- ${reply}`),
+    );
+  if (input.refusedBy !== undefined && input.refusedBy.length > 0)
+    lines.push(
+      '',
+      `Ta première réponse a été refusée (${input.refusedBy.join(', ')}). Écris-en une autre, plus simple, ou choisis une autre issue.`,
+    );
   return lines.join('\n');
 }
 

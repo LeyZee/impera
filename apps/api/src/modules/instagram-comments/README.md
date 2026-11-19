@@ -15,6 +15,12 @@ Un commentaire laissé sous une publication de la créatrice reçoit une issue (
 
 Les contrats sont dans `packages/contracts/src/instagram-comments.ts`, avec la liste fermée des droits demandés à Meta : aucun droit de messagerie, et un droit non demandé est refusé.
 
+## Lot c (écrit) : la voix
+
+- `domain/prompt-input.ts` : le bloc que lit le modèle. Commentaire et légende coupés, mentions de tiers et liens retirés ; sans réponse utilisable du modèle, rien (plafond du jour) ou un relais à un humain (sortie invalide).
+- `packages/llm` : prompt `voice/instagram-comment`, méthode `instagramComment` du gateway, usage `instagram_comment` dans `llm_calls`. Le prompt ne porte aucune règle : les gardes passent après, dans le code.
+- Module `agent` : `commentWriterPersona` rend sa fiche sans l'intime et ses gardes publiques.
+
 ## À venir
 
-Le webhook, la table et les réglages (lot b, relu par Sécurité), le prompt et les évals (lot c, avec le fil Agent), l'onglet du Playground et les écrans (lot d). Rien n'appelle Meta : tout se joue contre `FakeInstagram` jusqu'au mot écrit de Charles.
+Le webhook, la table et les réglages (lot b, relu par Sécurité), le branchement et les évals du lot c, l'onglet du Playground et les écrans (lot d). Rien n'appelle Meta : tout se joue contre `FakeInstagram` jusqu'au mot écrit de Charles.

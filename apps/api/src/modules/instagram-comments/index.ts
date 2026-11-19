@@ -37,3 +37,11 @@ export {
   type AutonomyReadiness,
   type AutonomyThresholds,
 } from './domain/autonomy';
+/** @public What the code prepares for the model and does without it, wired with the jobs at lot b. */
+export {
+  captionForPrompt,
+  commentForPrompt,
+  outcomeWithoutModel,
+  promptInputOf,
+  type CommentPromptFacts,
+} from './domain/prompt-input';

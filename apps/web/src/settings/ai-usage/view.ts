@@ -48,12 +48,17 @@ export const USES: Readonly<
   },
   sense: { label: 'Regarder les médias', note: 'photos, vidéos et vocaux décrits', colour: SERIES[2] },
   trend_watch: { label: 'Veille des tendances', note: 'les idées de contenu', colour: SERIES[3] },
+  instagram_comment: {
+    label: 'Commentaires Instagram',
+    note: 'ses réponses sous ses publications',
+    colour: OTHER,
+  },
   judge: { label: 'Tests de qualité', note: 'les évaluations de l’agent', colour: OTHER },
   probe: { label: 'Essais réels', note: 'tes essais des services', colour: OTHER },
 };
 
 /** The uses in the neutral colour share one slice: two slices of one colour could not be told apart. */
-const FOLDED_USES: readonly AiUsageUse[] = ['judge', 'probe'];
+const FOLDED_USES: readonly AiUsageUse[] = ['judge', 'probe', 'instagram_comment'];
 
 /** « 3,42 € », to the cent; under a cent « 0,004 € », so a cheap call never reads as free. */
 export function eurText(eur: number): string {
