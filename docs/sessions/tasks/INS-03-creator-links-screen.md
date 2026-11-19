@@ -1,5 +1,5 @@
 # INS-03 « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier
-Statut : in review (code et captures faits ; avis Design puis « ok captures » de Charles avant fusion)
+Statut : done (fusionnée le 19/11/2026, #847 ; captures validées par Charles les 16 et 17/11)
 Phase : Instagram (ADR 0121)
 Dépend de : ADR 0121 acceptée ; l'endroit d'un lien (ADR 0120 § 3, migration partagée avec INS-02)
 Branche : task/ins-03-creator-links-screen

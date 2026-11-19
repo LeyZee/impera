@@ -267,7 +267,7 @@ describe('a page inside an open section that is not the account’s', () => {
       [manager, '/creatrices/structures', '/creatrices'],
       [chatter, '/suivi/alertes', '/suivi'],
       [manager, '/moi/persona', '/moi/profil'],
-      [creator, '/moi/profil', '/moi/persona'],
+      [creator, '/moi/dossier', '/moi/profil'],
     ];
     for (const [user, path, landing] of cases) {
       const router = renderApp(user, path);
@@ -684,6 +684,13 @@ describe('the account’s security, from its menu (SEC-04)', () => {
       expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
       cleanup();
     }
+  });
+
+  it('draws his rail as one list, no gap between tabs of families without a heading (PIL-15)', async () => {
+    renderApp(operator, '/');
+    const rail = await screen.findByRole('navigation', { name: 'Navigation' });
+    expect(rail.querySelectorAll('.nv-rail__heading')).toHaveLength(0);
+    expect(rail.querySelectorAll('.nv-rail__gap')).toHaveLength(0);
   });
 
   it('is in « Plus » on the phone', async () => {

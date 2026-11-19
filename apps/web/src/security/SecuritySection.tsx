@@ -41,15 +41,16 @@ const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
  * factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
- * (no geographic base: Charles's choice of 02/11). The owner and the managers also link here the browsers where they
- * watch Instagram (`extensionLinks`, VEI-02): the watch is theirs.
+ * (no geographic base: Charles's choice of 02/11). The team links here the browsers where it uses the extension
+ * (`extensionLinks`, VEI-02, ADR 0109): `copilot` for the copilot's gestures, `watch` when the Instagram watch is theirs
+ * too, `none` for a creator.
  */
 export function SecuritySection({
   ownerId,
-  extensionLinks = false,
+  extensionLinks = 'none',
 }: {
   ownerId?: string;
-  extensionLinks?: boolean;
+  extensionLinks?: 'none' | 'copilot' | 'watch';
 }): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
@@ -57,7 +58,7 @@ export function SecuritySection({
       <PasskeysPanel />
       <BackupCodesPanel />
       {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
-      {extensionLinks ? <ExtensionLinksPanel /> : null}
+      {extensionLinks === 'none' ? null : <ExtensionLinksPanel watches={extensionLinks === 'watch'} />}
     </div>
   );
 }

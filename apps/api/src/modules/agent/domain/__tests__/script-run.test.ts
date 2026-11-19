@@ -304,8 +304,27 @@ describe('nextScriptStep', () => {
     expect(nextScriptStep({ ...base, brainPick: 'script-day' })).toEqual({ kind: 'none', reason: 'no_pick' });
     expect(nextScriptStep({ ...base, history: history(['script-night', [0]]) })).toEqual({
       kind: 'none',
+      reason: 'scripts_exhausted',
+    });
+  });
+
+  it('says no script is left only where one would open, and from a catalogue that has some (ADR 0150 § 9)', () => {
+    const played = history(['script-night', [0]]);
+    expect(nextScriptStep({ ...base, catalogue: [], history: played })).toEqual({
+      kind: 'none',
       reason: 'no_script',
     });
+    expect(nextScriptStep({ ...base, history: played, careMode: true })).toEqual({
+      kind: 'none',
+      reason: 'held',
+    });
+    expect(
+      nextScriptStep({
+        ...base,
+        history: played,
+        startGate: { open: false, missing: ['availability_unconfirmed'] },
+      }),
+    ).toEqual({ kind: 'wait', reason: 'availability_unconfirmed' });
   });
 
   it('sends the teasing through the policy like a paid step: never before the cooldown (Charles, 12/11)', () => {
@@ -447,7 +466,7 @@ describe("Reveal's script history (ADR 0018 § 5)", () => {
     ]).toEqual(['script-night', 'script-both']);
     expect(nextScriptStep({ ...base, history: history(['script-night', [0, 1]]) })).toEqual({
       kind: 'none',
-      reason: 'no_script',
+      reason: 'scripts_exhausted',
     });
   });
 

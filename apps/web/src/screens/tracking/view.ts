@@ -99,6 +99,16 @@ export const STOP_SITUATION: Situation = {
   pill: statusClass('awaiting_approval'),
 };
 
+/**
+ * The state every line of a group says alike, said once by the group's title instead (PIL-10: « Un humain répond » on
+ * thirty lines): the label when two lines or more all say it, null when one differs.
+ */
+export function sharedLabel(labels: readonly string[]): string | null {
+  const [first] = labels;
+  if (first === undefined || labels.length < 2) return null;
+  return labels.every((label) => label === first) ? first : null;
+}
+
 /** The lines split by who acts, each group in the order it came; an empty group is left out. */
 export function groupByHand<T extends { readonly conversation: ConversationSummary }>(
   lines: readonly T[],

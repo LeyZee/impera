@@ -8,7 +8,13 @@ import {
   SetSystemAlertBodySchema,
   SystemAlertCodeSchema,
   SystemAlertSettingSchema,
+  CreatorAlertCodeSchema,
+  CreatorAlertLineSchema,
+  CreatorAlertsViewSchema,
+  CreatorIdSchema,
+  SetCreatorAlertBodySchema,
   type AlertErrorCode,
+  type CreatorAlertErrorCode,
   type UserRole,
 } from '@impera/contracts';
 import type { preValidationAsyncHookHandler } from 'fastify';
@@ -19,6 +25,24 @@ import type { AlertStore } from '../../domain/ports';
 
 const GroupParamsSchema = z.object({ groupId: CustomAlertGroupIdSchema });
 const SystemParamsSchema = z.object({ code: SystemAlertCodeSchema });
+const CreatorParamsSchema = z.object({ creatorId: CreatorIdSchema });
+const CreatorAlertParamsSchema = z.object({ creatorId: CreatorIdSchema, code: CreatorAlertCodeSchema });
+
+class CreatorAlertCreatorNotFound extends DomainError {
+  constructor() {
+    super('creator_alert_creator_not_found' satisfies CreatorAlertErrorCode, 'Créatrice introuvable');
+  }
+}
+
+/** ADR 0150 § 6: the safety relays reach everyone, always. */
+class CreatorAlertLocked extends DomainError {
+  constructor() {
+    super(
+      'creator_alert_locked_unprocessable' satisfies CreatorAlertErrorCode,
+      'Les alertes de sécurité partent toujours à tout le monde : ni sourdine, ni coupure',
+    );
+  }
+}
 
 class CustomAlertNotFound extends DomainError {
   constructor() {
@@ -138,6 +162,43 @@ export function createAlertRoutes(store: AlertStore, requireRole: RequireRole): 
         const written = await store.setSystem(request.params.code, request.body, signedIn(request.user));
         if (written === 'locked') throw new SystemAlertLocked();
         if (written === 'unknown_creator') throw new AlertCreatorInvalid();
+        return written;
+      },
+    );
+
+    // The Alertes tab of her sheet (ADR 0150): the owner's alone, never hers.
+    app.get(
+      '/creators/:creatorId/alerts',
+      {
+        preValidation: requireRole('owner'),
+        schema: { params: CreatorParamsSchema, response: { 200: CreatorAlertsViewSchema } },
+      },
+      async (request) => {
+        const view = await store.creatorAlerts(request.params.creatorId);
+        if (view === 'unknown_creator') throw new CreatorAlertCreatorNotFound();
+        return view;
+      },
+    );
+
+    app.put(
+      '/creators/:creatorId/alerts/:code',
+      {
+        preValidation: requireRole('owner'),
+        schema: {
+          params: CreatorAlertParamsSchema,
+          body: SetCreatorAlertBodySchema,
+          response: { 200: CreatorAlertLineSchema },
+        },
+      },
+      async (request) => {
+        const written = await store.setCreatorAlert(
+          request.params.creatorId,
+          request.params.code,
+          request.body.routes,
+          signedIn(request.user),
+        );
+        if (written === 'locked') throw new CreatorAlertLocked();
+        if (written === 'unknown_creator') throw new CreatorAlertCreatorNotFound();
         return written;
       },
     );
