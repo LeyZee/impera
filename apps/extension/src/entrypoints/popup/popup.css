@@ -1010,3 +1010,22 @@ body {
   font-weight: 600;
   color: var(--nv-warning);
 }
+
+/* ───────────── Relier l'extension depuis le CRM (ADR 0067, amendement du 19/11) ───────────── */
+
+/* The host in full: a long name wraps rather than hides its end. */
+.pp-offer__question {
+  overflow-wrap: anywhere;
+}
+.pp-offer__done {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.pp-offer__done .popup-icon {
+  flex: none;
+  color: var(--nv-success);
+}

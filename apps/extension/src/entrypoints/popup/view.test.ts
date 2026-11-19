@@ -38,6 +38,9 @@ function draw(screen: Screen, at: typeof frame = frame): { root: HTMLElement; ac
     editAddress: vi.fn(),
     openPanel: vi.fn(),
     saveAddress: vi.fn(),
+    linkFromPage: vi.fn(),
+    declineLink: vi.fn(),
+    typeAddress: vi.fn(),
     resetAddress: vi.fn(),
     cancelAddress: vi.fn(),
     watch: {
@@ -316,12 +319,71 @@ describe('popup', () => {
     expect(root.textContent).not.toContain('localhost');
     expect(root.querySelector('.pp-pill')).toBeNull();
     expect(root.querySelector('.pp-address')).toBeNull();
-    expect([...root.querySelectorAll('button')].map((b) => b.textContent.trim())).toEqual(['Enregistrer']);
-    // No way back from the welcome: Échap leaves it to the browser.
+    expect([...root.querySelectorAll('button')].map((b) => b.textContent.trim())).toEqual([
+      'Enregistrer',
+      'Annuler',
+    ]);
+    // Typed from the welcome, it steps back to it (ADR 0067, amendement du 19/11).
     root
       .querySelector('#crm-address')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(actions.cancelAddress).not.toHaveBeenCalled();
+    expect(actions.cancelAddress).toHaveBeenCalledOnce();
+  });
+
+  // ADR 0067, amendement du 19/11: the way to link is in the CRM, typing behind a small link.
+  it('sends a first opening to the CRM’s page, and types only on demand', () => {
+    const { root, actions } = draw({ kind: 'welcome' });
+    expect(root.querySelector('.pp-whisper')?.textContent).toBe('Bienvenue.');
+    expect(root.textContent).toContain('« Relier l’extension à ce CRM »');
+    expect(root.querySelector('.pp-pill')).toBeNull();
+    expect(root.querySelector('.pp-address')).toBeNull();
+    expect(root.querySelector('input')).toBeNull();
+    buttonNamed(root, 'Saisir l’adresse').click();
+    expect(actions.typeAddress).toHaveBeenCalledOnce();
+  });
+
+  it('asks before linking to the CRM of the open tab, its host in full, and warns of the browser’s question', () => {
+    const { root, actions } = draw({
+      kind: 'link-offer',
+      offer: { origin: 'https://crm.exemple.fr', host: 'crm.exemple.fr' },
+      error: null,
+    });
+    expect(root.querySelector('h1')?.textContent).toBe('Relier l’extension à crm.exemple.fr ?');
+    expect(root.textContent).toContain('Ton navigateur va te demander d’autoriser ce site. Accepte.');
+    expect(root.querySelector('.pp-address')).toBeNull();
+    buttonNamed(root, 'Relier').click();
+    expect(actions.linkFromPage).toHaveBeenCalledOnce();
+    buttonNamed(root, 'Pas maintenant').click();
+    expect(actions.declineLink).toHaveBeenCalledOnce();
+  });
+
+  it('names this computer rather than a site, with no browser question to announce', () => {
+    const { root } = draw({
+      kind: 'link-offer',
+      offer: { origin: 'http://localhost:5173', host: null },
+      error: null,
+    });
+    expect(root.querySelector('h1')?.textContent).toBe('Relier l’extension au CRM de cet ordinateur ?');
+    expect(root.textContent).not.toContain('localhost');
+    expect(root.textContent).not.toContain('Ton navigateur va te demander');
+  });
+
+  it('says why a link failed in place of the browser’s question', () => {
+    const { root } = draw({
+      kind: 'link-offer',
+      offer: { origin: 'https://crm.exemple.fr', host: 'crm.exemple.fr' },
+      error: 'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
+    });
+    expect(root.querySelector('.pp-hint--amber')?.textContent).toBe(
+      'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
+    );
+    expect(root.textContent).not.toContain('Ton navigateur va te demander');
+  });
+
+  it('says once that the extension is linked', () => {
+    const { root } = draw({ kind: 'linked', host: 'crm.exemple.fr' });
+    expect(root.textContent).toContain('Extension reliée à crm.exemple.fr');
+    expect(root.querySelector('.nv-status--sent')?.textContent).toContain('CRM relié');
   });
 
   it('offers the way back to localhost in a development build only', () => {

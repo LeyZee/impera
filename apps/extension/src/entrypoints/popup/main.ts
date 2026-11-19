@@ -11,6 +11,8 @@ import {
   permissionPatternOf,
   shortAddress,
 } from '../../lib/crm-address';
+import { linkCrm, type LinkFailure } from '../../lib/crm-link';
+import { GUIDE_PATH, linkOfferOf, type LinkOffer } from '../../lib/crm-link-page';
 import { ADDRESS_KEY, savedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { placeOf } from '../../lib/tab';
@@ -54,6 +56,8 @@ if (root === null) throw new Error('popup: #app is missing');
 let origin = DEFAULT_CRM_ADDRESS;
 /** No address was ever saved: the welcome stays until one is (EXT-07). */
 let welcome = false;
+/** What the open tab offers at a first opening, read once (ADR 0067, amendement du 19/11); « Pas maintenant » drops it. */
+let offer: LinkOffer | null = null;
 let screen: Screen = { kind: 'loading' };
 let previous: Screen = screen;
 
@@ -269,7 +273,7 @@ function cancelSession(): void {
 
 async function refresh(): Promise<void> {
   if (welcome) {
-    show({ kind: 'address', draft: '', error: null, first: true });
+    show(offer === null ? { kind: 'welcome' } : { kind: 'link-offer', offer, error: null });
     return;
   }
   show({ kind: 'loading' });
@@ -333,7 +337,56 @@ async function openCrm(path: string): Promise<void> {
   window.close();
 }
 
-/** Saves an address the person typed; a deployed CRM asks the browser for that site alone, in the same click. */
+const LINK_FAILURES: Readonly<Record<'page' | 'typed', Readonly<Record<LinkFailure, string>>>> = {
+  page: {
+    denied: 'Ton navigateur n’a pas autorisé ce site. Clique sur Relier et accepte sa question.',
+    signed_out: 'Connecte-toi au CRM dans cet onglet, puis clique sur Relier.',
+    not_crm: 'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
+  },
+  typed: {
+    denied: 'Ton navigateur n’a pas autorisé ce site. Enregistre à nouveau et accepte sa question.',
+    signed_out: 'Connecte-toi d’abord au CRM à cette adresse, puis enregistre-la.',
+    not_crm: 'Cette adresse ne répond pas comme un CRM Impera.',
+  },
+};
+
+/** How long « Extension reliée » stays before the popup's home. */
+const LINKED_MS = 1400;
+
+/** From the CRM's page or typed: the same checks (ADR 0067, amendement du 19/11). Called inside the click. */
+function linkTo(next: string, from: 'page' | 'typed'): void {
+  const linked = linkCrm(next, {
+    contains: (pattern) => browser.permissions.contains(pattern),
+    request: (pattern) => browser.permissions.request(pattern),
+    remove: (pattern) => browser.permissions.remove(pattern),
+    readSession: (at) => readCrmSession(at),
+    saved: savedOrigin,
+    save: (at) => browser.storage.local.set({ [ADDRESS_KEY]: at }),
+    forget: () => ask({ type: 'popup/unlink' }),
+  });
+  show({ kind: 'loading' });
+  void linked.then((result) => {
+    if (result.state === 'failed') {
+      const error = LINK_FAILURES[from][result.failure];
+      if (from === 'page' && offer !== null) show({ kind: 'link-offer', offer, error });
+      else show({ kind: 'address', draft: shortAddress(next), error, first: welcome });
+      return;
+    }
+    origin = next;
+    welcome = false;
+    offer = null;
+    show({ kind: 'linked', host: isGrantedAtInstall(next) ? null : new URL(next).hostname });
+    setTimeout(() => {
+      // From the CRM's page, the tab goes back to its guide: the page cannot learn it from the extension (§ 6).
+      if (from === 'page' && tabId !== undefined) {
+        void browser.tabs.update(tabId, { url: `${next}${GUIDE_PATH}` }).catch(() => undefined);
+      }
+      void refresh();
+    }, LINKED_MS);
+  });
+}
+
+/** Saves an address the person typed: the same checks as the CRM's page. */
 function saveAddress(value: string): void {
   const next = crmOriginOf(value);
   if (next === null) {
@@ -345,18 +398,15 @@ function saveAddress(value: string): void {
     });
     return;
   }
-  origin = next;
+  linkTo(next, 'typed');
+}
+
+/** Back to the developer's address, offered in a development build only: this computer, saved as before. */
+function resetAddress(): void {
+  origin = DEFAULT_CRM_ADDRESS;
   welcome = false;
-  // Stored first, without waiting: the permission request must stay inside the click (user gesture).
-  void browser.storage.local.set({ [ADDRESS_KEY]: next });
-  if (isGrantedAtInstall(next)) {
-    void refresh();
-    return;
-  }
-  void browser.permissions
-    .request({ origins: [permissionPatternOf(next)] })
-    .catch(() => false)
-    .then(() => refresh());
+  offer = null;
+  void browser.storage.local.set({ [ADDRESS_KEY]: DEFAULT_CRM_ADDRESS }).then(() => refresh());
   show({ kind: 'loading' });
 }
 
@@ -405,9 +455,17 @@ const actions: Actions = {
     show({ kind: 'address', draft: origin.replace(/^https?:\/\//u, ''), error: null, first: false });
   },
   saveAddress,
-  resetAddress: () => {
-    saveAddress(DEFAULT_CRM_ADDRESS);
+  linkFromPage: () => {
+    if (offer !== null) linkTo(offer.origin, 'page');
   },
+  declineLink: () => {
+    offer = null;
+    show({ kind: 'welcome' });
+  },
+  typeAddress: () => {
+    show({ kind: 'address', draft: '', error: null, first: true });
+  },
+  resetAddress,
   cancelAddress: () => {
     show(previous);
   },
@@ -493,8 +551,11 @@ setInterval(() => {
 // The popup's port to the service worker: closing the popup closes it, and a session read and not sent is forgotten.
 browser.runtime.connect({ name: 'popup' });
 
-void savedOrigin().then((saved) => {
+void Promise.all([savedOrigin(), activeTab()]).then(([saved, tab]) => {
   welcome = saved === null;
   origin = saved ?? DEFAULT_CRM_ADDRESS;
+  tabId = tab.id;
+  // Only the tab's own address, and only while nothing is saved: a linked extension ignores the page (§ 4).
+  offer = welcome ? linkOfferOf(tab.url) : null;
   return refresh();
 });

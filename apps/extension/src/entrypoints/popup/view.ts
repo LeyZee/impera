@@ -1,6 +1,7 @@
 import type { Me } from '@impera/contracts';
 
 import { shortAddress } from '../../lib/crm-address';
+import type { LinkOffer } from '../../lib/crm-link-page';
 import { h } from '../../lib/dom';
 import { icon, type IconName } from '../../lib/icons';
 import type { Place } from '../../lib/tab';
@@ -53,7 +54,13 @@ export type Screen =
       /** The Reveal session on a Reveal tab, for the owner alone (P2-01); null elsewhere. */
       readonly sync: SyncView | null;
     }
-  /** `first`: no address was ever saved, the welcome (EXT-07). */
+  /** No address was ever saved, and the open tab offers none: the way to the CRM's page (ADR 0067, amendement). */
+  | { readonly kind: 'welcome' }
+  /** The open tab is the CRM's page « Relier l'extension à ce CRM »: the question, then the browser's. */
+  | { readonly kind: 'link-offer'; readonly offer: LinkOffer; readonly error: string | null }
+  /** The address is saved: said once, before the popup's home. */
+  | { readonly kind: 'linked'; readonly host: string | null }
+  /** `first`: no address was ever saved, typed from the welcome (EXT-07). */
   | {
       readonly kind: 'address';
       readonly draft: string;
@@ -70,6 +77,12 @@ export interface Actions {
   /** The copilot side panel (ADR 0086), from a Reveal tab. */
   readonly openPanel: () => void;
   readonly saveAddress: (value: string) => void;
+  /** « Relier » on the CRM's page: the address of the open tab. */
+  readonly linkFromPage: () => void;
+  /** « Pas maintenant »: nothing is kept. */
+  readonly declineLink: () => void;
+  /** « Saisir l'adresse », from the welcome. */
+  readonly typeAddress: () => void;
   /** Back to the developer's address: offered in a development build only (EXT-07). */
   readonly resetAddress: () => void;
   readonly cancelAddress: () => void;
@@ -151,7 +164,11 @@ function pillOf(screen: Screen): HTMLElement | null {
       // The pill's place, so the head does not jump when the screen arrives (V-EXT-25).
       return h('span', { class: 'pp-skeleton pp-skeleton--pill', 'aria-hidden': 'true' });
     case 'address':
+    case 'welcome':
+    case 'link-offer':
       return null;
+    case 'linked':
+      return pill('sent', 'CRM relié');
   }
 }
 
@@ -385,7 +402,7 @@ function addressForm(
       'div',
       { class: 'pp-actions' },
       h('button', { type: 'submit', class: 'nv-btn nv-btn--neon pp-btn pp-wide' }, 'Enregistrer'),
-      screen.first ? null : button('Annuler', actions.cancelAddress, { variant: 'plain', wide: true }),
+      button('Annuler', actions.cancelAddress, { variant: 'plain', wide: true }),
       back,
     ),
   );
@@ -395,11 +412,76 @@ function addressForm(
   });
   // Échap steps back, as it closes a modal in the CRM: the popup itself stays open. The welcome has no way back.
   form.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || screen.first) return;
+    if (event.key !== 'Escape') return;
     event.preventDefault();
     actions.cancelAddress();
   });
   return form;
+}
+
+/** Where the CRM is named: its full host, or this computer (avis Sécurité du 19/11). */
+function crmOf(host: string | null): string {
+  return host === null ? 'au CRM de cet ordinateur' : `à ${host}`;
+}
+
+/** No address yet: the way is in the CRM, typing stays behind a small link (ADR 0067, amendement du 19/11 § 7). */
+function welcomeScreen(actions: Actions): HTMLElement {
+  const type = h('button', { type: 'button', class: 'pp-link', 'data-action': 'type' }, 'Saisir l’adresse');
+  type.addEventListener('click', actions.typeAddress);
+  return h(
+    'section',
+    { class: 'pp-hero' },
+    h('p', { class: 'pp-whisper nv-enter', style: '--nv-i: 1' }, 'Bienvenue.'),
+    h(
+      'p',
+      { class: 'pp-hero__text nv-enter', style: '--nv-i: 2' },
+      'Pour relier l’extension, ouvre ton CRM : menu de ton compte, Extension, « Relier l’extension à ce CRM ». Puis clique à nouveau sur l’icône Impera.',
+    ),
+    h('div', { class: 'pp-actions nv-enter', style: '--nv-i: 3' }, type),
+  );
+}
+
+/** The question the CRM's page brings: the host in full, then the browser's own question, announced. */
+function linkOfferScreen(screen: Extract<Screen, { kind: 'link-offer' }>, actions: Actions): HTMLElement {
+  const local = screen.offer.host === null;
+  return h(
+    'section',
+    { class: 'pp-hero pp-offer' },
+    h('p', { class: 'pp-whisper nv-enter', style: '--nv-i: 1' }, 'Bienvenue.'),
+    h(
+      'h1',
+      { class: 'pp-form__title pp-offer__question nv-enter', style: '--nv-i: 2' },
+      `Relier l’extension ${crmOf(screen.offer.host)} ?`,
+    ),
+    screen.error !== null
+      ? h('p', { class: 'pp-hint pp-hint--amber nv-enter', role: 'status', style: '--nv-i: 3' }, screen.error)
+      : local
+        ? null
+        : h(
+            'p',
+            { class: 'pp-hint nv-enter', style: '--nv-i: 3' },
+            'Ton navigateur va te demander d’autoriser ce site. Accepte.',
+          ),
+    h(
+      'div',
+      { class: 'pp-actions nv-enter', style: '--nv-i: 4' },
+      button('Relier', actions.linkFromPage, { variant: 'neon', wide: true }),
+      button('Pas maintenant', actions.declineLink, { variant: 'plain', wide: true }),
+    ),
+  );
+}
+
+function linkedScreen(screen: Extract<Screen, { kind: 'linked' }>): HTMLElement {
+  return h(
+    'section',
+    { class: 'pp-hero', role: 'status' },
+    h(
+      'p',
+      { class: 'pp-hero__text pp-offer__done nv-enter', style: '--nv-i: 1' },
+      icon('check', 16),
+      h('span', {}, `Extension reliée ${crmOf(screen.host)}`),
+    ),
+  );
 }
 
 function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElement[] {
@@ -483,6 +565,12 @@ function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElem
       ];
     case 'address':
       return [addressForm(screen, frame, actions)];
+    case 'welcome':
+      return [welcomeScreen(actions)];
+    case 'link-offer':
+      return [linkOfferScreen(screen, actions)];
+    case 'linked':
+      return [linkedScreen(screen)];
   }
 }
 
@@ -518,7 +606,13 @@ export function render(root: HTMLElement, screen: Screen, frame: Frame, actions:
     h(
       'footer',
       { class: 'pp-foot' },
-      screen.kind === 'address' ? h('span', {}) : address,
+      // No address to show nor change before one is saved.
+      screen.kind === 'address' ||
+        screen.kind === 'welcome' ||
+        screen.kind === 'link-offer' ||
+        screen.kind === 'linked'
+        ? h('span', {})
+        : address,
       h('span', { class: 'pp-version' }, `v${frame.version}`),
     ),
   );
