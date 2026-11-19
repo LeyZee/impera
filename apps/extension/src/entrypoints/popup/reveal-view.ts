@@ -352,7 +352,7 @@ function accountRow(account: Account, neon: boolean, view: SyncView, actions: Sy
       action,
     ),
     statusLine(account, row, view.now),
-    gauge(row.tone, row.until, view.now, row.synced !== null),
+    row.phase === null ? gauge(row.tone, row.until, view.now, row.synced !== null) : null,
     adviceLine(row, view.crm),
   );
 }

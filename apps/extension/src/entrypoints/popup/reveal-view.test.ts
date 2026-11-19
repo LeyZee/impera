@@ -241,6 +241,8 @@ describe('the Reveal session card', () => {
     const { card } = sync(THREE, { pending: { accountId: ACCOUNT_B, phase: 'reading' } });
     expect(names(card)).toEqual(['Resynchroniser', 'Lecture…', 'Synchroniser']);
     expect([...(card?.querySelectorAll('button') ?? [])].every((one) => one.disabled)).toBe(true);
+    // The line of the time left steps aside while the session is on its way.
+    expect(row(card, 'Soleil')?.querySelector('.pp-sync__gauge')).toBeNull();
     expect(row(card, 'Soleil')?.querySelector('[role="status"]')?.textContent).toBe('Lecture de l’onglet1/2');
     const sending = sync(THREE, { pending: { accountId: ACCOUNT_B, phase: 'sending' } }).card;
     expect(row(sending, 'Soleil')?.querySelector('.pp-sync__state')?.textContent).toBe('Envoi au CRM2/2');
