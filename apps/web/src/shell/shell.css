@@ -344,21 +344,6 @@
   color: var(--nv-neon-ink);
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--nv-neon) 55%, transparent));
 }
-.nav-tiny {
-  opacity: 0;
-  transform-origin: 5px 4px;
-}
-.nav-needle {
-  transform-origin: 12px 14px;
-  transform: rotate(-45deg);
-  transition: transform var(--nv-dur-morph) var(--nv-ease-spring);
-}
-[aria-current='page'] .nav-needle {
-  transform: rotate(0);
-}
-[aria-current='page'] .nav-tiny {
-  opacity: 1;
-}
 /* Dashboard: the bars grow back. */
 .is-playing .nav-b1,
 .is-playing .nav-b2,
@@ -377,31 +362,10 @@
     transform: scaleY(0.2);
   }
 }
-/* Créatrices: the two of them lean towards each other. */
-.is-playing .nav-h1 {
-  transform-origin: 9px 20px;
-  animation: nv-nav-lean var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-.is-playing .nav-h2 {
-  transform-origin: 17px 20px;
-  animation: nv-nav-lean var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) reverse both;
-}
-@keyframes nv-nav-lean {
-  50% {
-    transform: rotate(8deg);
-  }
-}
-/* Entraîner: the big star turns, the small ones twinkle after it. */
-.is-playing .nav-big {
-  transform-origin: 12px 10px;
+/* Créatrices: her star turns in. */
+.is-playing .nav-star {
+  transform-origin: 18px 16px;
   animation: nv-nav-spin var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-.is-playing .nav-small {
-  transform-origin: 19px 18px;
-  animation: nv-nav-twinkle var(--nv-dur-morph) calc(2 * var(--nv-stagger)) var(--nv-ease-spring) both;
-}
-.is-playing .nav-tiny {
-  animation: nv-nav-twinkle var(--nv-dur-morph) calc(4 * var(--nv-stagger)) var(--nv-ease-spring) both;
 }
 @keyframes nv-nav-spin {
   0% {
@@ -409,6 +373,21 @@
   }
   70% {
     transform: rotate(12deg) scale(1.12);
+  }
+}
+/* Entraîner: the ring closes on the bull's-eye, which lands. */
+.is-playing .nav-ring {
+  transform-origin: 12px 12px;
+  animation: nv-nav-close var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+.is-playing .nav-bull {
+  transform-origin: 12px 12px;
+  animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-close {
+  0% {
+    transform: scale(1.6);
+    opacity: 0;
   }
 }
 @keyframes nv-nav-twinkle {
@@ -424,22 +403,19 @@
     opacity: 1;
   }
 }
-/* Suivi: the needle sweeps the dial and settles. */
-.is-playing .nav-needle {
-  animation: nv-nav-sweep var(--nv-dur-morph) var(--nv-ease-spring) both;
+/* Suivi: his bubble pops, hers answers. */
+.is-playing .nav-c1 {
+  transform-origin: 5.5px 15.8px;
+  animation: nv-nav-pop var(--nv-dur-morph) var(--nv-ease-spring) both;
 }
-@keyframes nv-nav-sweep {
+.is-playing .nav-c2 {
+  transform-origin: 18.5px 20.6px;
+  animation: nv-nav-pop var(--nv-dur-morph) calc(2 * var(--nv-stagger)) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-pop {
   0% {
-    transform: rotate(-135deg);
-  }
-  45% {
-    transform: rotate(45deg);
-  }
-  70% {
-    transform: rotate(-12deg);
-  }
-  100% {
-    transform: rotate(0);
+    opacity: 0;
+    transform: scale(0.5);
   }
 }
 /* Réglages: the gear turns one notch. */
@@ -476,7 +452,20 @@
 .is-playing .nav-up {
   animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
 }
-/* Équipe: the three hop, one after the other. */
+/* Équipe: the headset is put on, its mic swings in. */
+.is-playing .nav-set {
+  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+.is-playing .nav-mic {
+  transform-origin: 19px 19.5px;
+  animation: nv-nav-swing var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-swing {
+  0% {
+    transform: rotate(-50deg);
+  }
+}
+/* Several people: the three hop, one after the other. */
 .is-playing :is(.nav-t1, .nav-t2, .nav-t3) {
   animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
 }
@@ -499,16 +488,6 @@
 @keyframes nv-nav-flip {
   40% {
     transform: scaleX(0.1);
-  }
-}
-/* Fans: the heart beats once. */
-.is-playing .nav-heart {
-  transform-origin: 18px 17px;
-  animation: nv-nav-beat var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-@keyframes nv-nav-beat {
-  35% {
-    transform: scale(1.18);
   }
 }
 /* Moi: a nod. */
@@ -1441,8 +1420,7 @@
     animation: none !important;
   }
   .nv-rail__lens,
-  .nv-subnav__thumb,
-  .nav-needle {
+  .nv-subnav__thumb {
     transition: none;
   }
 }

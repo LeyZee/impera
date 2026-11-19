@@ -78,7 +78,7 @@ import { parseReportsSearch, parseTeamSearch } from './screens/team/model';
 import { CreatorTodayPage } from './screens/today/CreatorTodayPage';
 import { TodayPage } from './screens/today/TodayPage';
 import { ChatterTrackingPage } from './screens/tracking/ChatterTrackingPage';
-import { SuiviNav } from './screens/tracking/SuiviNav';
+import { readsFans, SuiviNav } from './screens/tracking/SuiviNav';
 import { TrackingPage } from './screens/tracking/TrackingPage';
 import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
@@ -248,17 +248,29 @@ const scriptStructures = createRoute({
   },
   component: StructuresPage,
 });
-// Every fan of a creator (ADR 0124), the owner's and an active manager's: anyone else is sent back home.
+// Suivi › Fans: every fan of a creator (ADR 0124), the owner's and an active manager's, a sub-tab of Suivi (ADR 0134
+// § 5). Anyone else is sent back to his own Suivi.
 const fansList = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/fans',
+  path: '/suivi/fans',
   beforeLoad: ({ context }) => {
-    if (context.user.role !== 'owner' && context.user.teamScope !== 'agency') {
+    if (!readsFans(context.user)) {
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/', replace: true, state: { notice: NOT_YOURS } });
+      throw redirect({ to: '/suivi', replace: true, state: { notice: NOT_YOURS } });
     }
   },
-  component: FansPage,
+  component: function Fans() {
+    return <FansPage nav={<SuiviNav fans />} />;
+  },
+});
+// The address Fans had as a section of its own: shared links and bookmarks keep working (ADR 0134 § 10).
+const fansOld = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/fans',
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+    throw redirect({ to: '/suivi/fans', replace: true });
+  },
 });
 
 const tracking = createRoute({
@@ -282,7 +294,7 @@ const tracking = createRoute({
     return rail.kind === 'chatter' ? (
       <ChatterTrackingPage {...props} away={myAwayOf(user)} />
     ) : (
-      <TrackingPage {...props} nav={<SuiviNav />} />
+      <TrackingPage {...props} nav={<SuiviNav fans={readsFans(user)} />} />
     );
   },
 });
@@ -310,7 +322,7 @@ const trackingAlerts = createRoute({
         onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
         canDecide={user.role !== 'creator'}
         isOwner={user.role === 'owner'}
-        nav={<SuiviNav />}
+        nav={<SuiviNav fans={readsFans(user)} />}
       />
     );
   },
@@ -1106,6 +1118,7 @@ const routeTree = rootRoute.addChildren([
   tracking,
   trackingAlerts,
   fansList,
+  fansOld,
   today,
   agenda,
   sales,

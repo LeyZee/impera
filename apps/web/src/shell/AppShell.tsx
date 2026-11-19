@@ -327,15 +327,16 @@ export function RailNav({
       {rail.items.map((item, index) => {
         // The first tab of a family opens it: with a heading, or a gap when the family has that tab alone. A rail with no
         // heading at all (the operator's) is one list: no gap, its tabs 42 px apart as in a family (PIL-15).
+        // A tab of no family after a family closes it with the same gap (the manager's Moi after Agence, ADR 0149 § 2).
         const opens =
-          item.family === rail.items[index - 1]?.family || (index > 0 && rail.headed.size === 0)
-            ? null
-            : item.family;
+          index > 0 && item.family !== rail.items[index - 1]?.family && rail.headed.size > 0
+            ? { family: item.family }
+            : null;
         return (
           <Fragment key={item.to}>
             {opens !== null ? (
-              rail.headed.has(opens) ? (
-                <span className="nv-rail__heading">{FAMILY_LABELS[opens]}</span>
+              opens.family !== null && rail.headed.has(opens.family) ? (
+                <span className="nv-rail__heading">{FAMILY_LABELS[opens.family]}</span>
               ) : (
                 <span className="nv-rail__gap" aria-hidden="true" />
               )

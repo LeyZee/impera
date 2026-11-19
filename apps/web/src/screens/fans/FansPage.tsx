@@ -6,7 +6,7 @@ import {
   type FanListSort,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useDeferredValue, useEffect, useId, useState, type JSX } from 'react';
+import { useDeferredValue, useEffect, useId, useState, type JSX, type ReactNode } from 'react';
 
 import { FANS_ERRORS, fansErrorKind, useFans } from './api';
 import './fans.css';
@@ -36,7 +36,7 @@ const SORTS: readonly FanListSort[] = ['last_message', 'paid', 'last_payment'];
  * His pseudonym, who holds him, his states and what he paid; a line opens his conversation in Suivi. Read only: nothing
  * here writes, and no button acts.
  */
-export function FansPage(): JSX.Element {
+export function FansPage({ nav }: { nav?: ReactNode }): JSX.Element {
   const creatorsQuery = useCreators();
   const creators = creatorsQuery.data ?? [];
   const [chosen, setChosen] = useState<string | null>(null);
@@ -47,8 +47,9 @@ export function FansPage(): JSX.Element {
   return (
     <Page className="fa-page">
       <PageHeader
-        eyebrow="Chatting"
+        eyebrow="Suivi"
         title="Fans"
+        tabs={nav}
         lead={`Chaque fan que le CRM connaît pour ${creator?.displayName ?? 'elle'}, qui le tient et ce qu’il a payé. Une ligne ouvre sa conversation dans Suivi.`}
         actions={
           creators.length > 1 && creatorId !== null ? (

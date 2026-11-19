@@ -7,7 +7,6 @@ import type { JSX } from 'react';
 export type NavIconName =
   | 'dashboard'
   | 'creators'
-  | 'fans'
   | 'train'
   | 'tracking'
   | 'settings'
@@ -15,6 +14,7 @@ export type NavIconName =
   | 'planning'
   | 'content'
   | 'team'
+  | 'people'
   | 'pay'
   | 'me'
   | 'bell'
@@ -37,40 +37,33 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
       <path className="nav-b3" d="M18 17v-8" />
     </>
   ),
+  // Créatrices: one silhouette marked with a star (ADR 0134 § 9).
   creators: (
     <>
-      <g className="nav-h2">
-        <circle cx="17" cy="8" r="2.6" />
-        <path d="M17.5 13.6c2.3.4 4 2.2 4 4.9v1" />
-      </g>
-      <g className="nav-h1">
-        <circle cx="9" cy="8" r="3.4" />
-        <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4s6.5 2.4 6.5 5.4v.6" />
-      </g>
-    </>
-  ),
-  fans: (
-    <>
       <circle cx="9" cy="8" r="3.4" />
-      <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4 1.6 0 3 .4 4.1 1" />
-      <path
-        className="nav-heart"
-        d="M18 20.5s-4-2.4-4-5.1c0-1.3 1-2.2 2.1-2.2.8 0 1.5.4 1.9 1.1.4-.7 1.1-1.1 1.9-1.1 1.1 0 2.1.9 2.1 2.2 0 2.7-4 5.1-4 5.1z"
-      />
+      <path d="M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4 1.3 0 2.5.3 3.5.7" />
+      <path className="nav-star" d="m18 11.6 1.3 3.1 3.1 1.3-3.1 1.3-1.3 3.1-1.3-3.1-3.1-1.3 3.1-1.3z" />
     </>
   ),
+  // Entraîner: a target, its bull's-eye hit.
   train: (
     <>
-      <path className="nav-big" d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
-      <path className="nav-small" d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" />
-      <path className="nav-tiny" d="M5 2.5v3M3.5 4h3" />
+      <circle cx="12" cy="12" r="9.5" />
+      <circle className="nav-ring" cx="12" cy="12" r="5.2" />
+      <circle className="nav-bull" cx="12" cy="12" r="1.4" fill="currentColor" />
     </>
   ),
+  // Suivi: two conversation bubbles, hers behind his.
   tracking: (
     <>
-      <path d="M3.3 19a10 10 0 1 1 17.4 0" />
-      <path className="nav-needle" d="m12 14 4-4" />
-      <circle cx="12" cy="14" r="1" fill="currentColor" />
+      <path
+        className="nav-c2"
+        d="M17 8.5h2a2.5 2.5 0 0 1 2.5 2.5v4.5A2.5 2.5 0 0 1 19 18h-.5v2.6L15.6 18h-3.1a2.5 2.5 0 0 1-2.3-1.5"
+      />
+      <path
+        className="nav-c1"
+        d="M5 3.5h7A2.5 2.5 0 0 1 14.5 6v4.5A2.5 2.5 0 0 1 12 13H8.5l-3 2.8V13H5a2.5 2.5 0 0 1-2.5-2.5V6A2.5 2.5 0 0 1 5 3.5z"
+      />
     </>
   ),
   settings: (
@@ -104,7 +97,17 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
       <path className="nav-up" d="M19.5 21v-7M17 16.4l2.5-2.5 2.5 2.5" />
     </>
   ),
+  // Équipe: a headset, the chatters' tool.
   team: (
+    <g className="nav-set">
+      <path d="M4.5 14v-2.5a7.5 7.5 0 0 1 15 0V14" />
+      <rect x="3" y="13" width="4.2" height="6.5" rx="1.9" />
+      <rect x="16.8" y="13" width="4.2" height="6.5" rx="1.9" />
+      <path className="nav-mic" d="M19 19.5v.2a2.3 2.3 0 0 1-2.3 2.3H13.5" />
+    </g>
+  ),
+  // Several people: who is on a task or a shift.
+  people: (
     <>
       <g className="nav-t1">
         <circle cx="5" cy="9.5" r="2.2" />
