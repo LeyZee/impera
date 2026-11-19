@@ -2,6 +2,7 @@ import type { PlatformAccountId } from '@impera/contracts';
 
 import { h } from '../../lib/dom';
 import { icon } from '../../lib/icons';
+import { revealMark } from '../../lib/reveal-mark';
 import type { RevealAccounts, RevealSeen, RevealSynced } from '../../lib/watch/protocol';
 
 import { button, card, pill, text } from './card';
@@ -456,5 +457,6 @@ export function syncWanted(view: SyncView | null): boolean {
 export function syncCard(view: SyncView, actions: SyncActions, index: number): HTMLElement | null {
   const { state } = view.accounts;
   if (state === 'none' || state === 'revoked' || state === 'not-owner') return null;
-  return card({ id: 'sync', icon: 'link', title: 'Session Reveal', index }, syncBody(view, actions));
+  const mark = revealMark(view.pending !== null);
+  return card({ id: 'sync', icon: mark, title: 'Session Reveal', index }, syncBody(view, actions));
 }
