@@ -134,7 +134,7 @@ export interface AccountStore {
 }
 
 /** A captured session as its platform's reader sees it. */
-export interface SessionRead {
+interface SessionRead {
   readonly owner: string;
   readonly member?: string;
   /** The session's own expiry, when it carries one we can read (Reveal: the JWT's `exp`). */
