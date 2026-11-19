@@ -21,3 +21,13 @@ export class VaultAccountNotFound extends DomainError {
     super('vault_account_not_found', 'Compte de plateforme introuvable pour cette créatrice');
   }
 }
+
+/** A confirmed run of descriptions dearer than what is left of the day's AI ceiling: refused, nothing asked (422). */
+export class VaultDescribeOverCap extends DomainError {
+  constructor() {
+    super(
+      'vault_describe_over_cap_unprocessable',
+      'Plus cher que ce qui reste du plafond IA du jour : réduis la sélection ou attends demain',
+    );
+  }
+}

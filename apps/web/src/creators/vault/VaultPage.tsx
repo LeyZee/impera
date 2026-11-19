@@ -801,7 +801,6 @@ function FolderPane({
                     <button
                       type="button"
                       className={`nv-btn ${toImport.length === 0 ? 'nv-btn--soft' : 'nv-btn--plain'} nv-btn--sm vp-bar__remove`}
-                      title="Retirer d’Impera : rien n’est supprimé dans Reveal"
                       disabled={pending}
                       onClick={() => {
                         tickAll(toRemove, false);
@@ -812,6 +811,9 @@ function FolderPane({
                   )}
                 </span>
               </div>
+            ) : null}
+            {selecting && toRemove.length > 0 ? (
+              <p className="vp-bar__note">Retirer d’Impera ne supprime rien dans Reveal.</p>
             ) : null}
             {selected.size > DESCRIBE_AT_ONCE ? (
               <p className="vp-bar__note">

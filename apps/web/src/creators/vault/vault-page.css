@@ -6,6 +6,15 @@
 .vp {
   --vp-rail: 280px;
   --vp-ease: var(--nv-ease-out);
+  /* Over a picture, alike in Nuit and Jour: a dark veil, white marks on it, and their small drop shadow. */
+  --vp-scrim: rgba(0, 0, 0, 0.38);
+  --vp-scrim-light: rgba(0, 0, 0, 0.32);
+  --vp-on-media: #fff;
+  --vp-on-media-ink: #000;
+  --vp-on-media-edge: rgba(255, 255, 255, 0.85);
+  --vp-on-media-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  /* By day, the close shadow that sets the bar off the grid (Jour only). */
+  --vp-bar-near: 0 10px 26px -10px rgba(80, 10, 30, 0.26);
 }
 .vp-skeleton {
   min-height: 320px;
@@ -399,7 +408,7 @@
   border-radius: 999px;
   background: var(--nv-ink);
   color: var(--nv-void);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--vp-on-media-shadow);
   animation: vp-pop var(--nv-dur-base) var(--nv-ease-spring-bouncy) both;
 }
 .vp-in--said {
@@ -428,8 +437,8 @@
   display: grid;
   place-items: center;
   border-radius: 7px;
-  background: rgba(0, 0, 0, 0.32);
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+  background: var(--vp-scrim-light);
+  box-shadow: inset 0 0 0 1.5px var(--vp-on-media-edge);
   backdrop-filter: blur(6px);
   transition:
     background-color var(--nv-dur-fast) var(--vp-ease),
@@ -447,16 +456,18 @@
 }
 .vp-item[data-selected] .vp-tick {
   background: var(--nv-ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--vp-on-media-shadow);
 }
 .vp-item[data-selected] .vp-tick::after {
   transform: rotate(-45deg) scale(1);
 }
-.vp-grid[data-selecting] .vx-tile:hover {
-  transform: translateY(-2px);
-}
-.vp-grid[data-selecting] .vx-tile:hover .vx-preview {
-  transform: none;
+@media (hover: hover) {
+  .vp-grid[data-selecting] .vx-tile:hover {
+    transform: translateY(-2px);
+  }
+  .vp-grid[data-selecting] .vx-tile:hover .vx-preview {
+    transform: none;
+  }
 }
 .vp-item[data-selected] .vx-tile {
   transform: scale(0.94);
@@ -483,8 +494,8 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.38);
-  color: #fff;
+  background: var(--vp-scrim);
+  color: var(--vp-on-media);
   backdrop-filter: blur(6px);
   cursor: pointer;
   animation: vp-pop var(--nv-dur-base) var(--nv-ease-spring) both;
@@ -498,8 +509,8 @@
   inset: -8px;
 }
 .vp-peek[aria-pressed='true'] {
-  background: #fff;
-  color: #000;
+  background: var(--vp-on-media);
+  color: var(--vp-on-media-ink);
 }
 @media (hover: hover) {
   .vp-peek:hover {
@@ -575,7 +586,7 @@
   box-shadow:
     inset 0 0 0 1px var(--nv-glass-edge),
     var(--nv-shadow-float),
-    0 10px 26px -10px rgba(80, 10, 30, 0.26);
+    var(--vp-bar-near);
 }
 @keyframes vp-rise {
   from {

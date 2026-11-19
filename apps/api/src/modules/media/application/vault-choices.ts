@@ -8,7 +8,7 @@ import {
   type VaultDescribeAsk,
 } from '@impera/contracts';
 
-import { VaultAccountNotFound, VaultChoiceForbidden } from '../domain/errors';
+import { VaultAccountNotFound, VaultChoiceForbidden, VaultDescribeOverCap } from '../domain/errors';
 import {
   capLeftCents,
   confirms,
@@ -125,7 +125,7 @@ export async function askVaultDescriptions(
   ask: VaultDescribeAsk,
   correlationId: string,
 ): Promise<VaultDescribeAnswer> {
-  const outcome = await deps.store.ask<VaultDescribeAnswer>(
+  const outcome = await deps.store.ask<VaultDescribeAnswer | 'over_cap'>(
     creatorId,
     userId,
     {
@@ -136,8 +136,12 @@ export async function askVaultDescriptions(
     },
     (known) => {
       const estimate = estimateVaultDescriptions(ask.platformMediaIds, known);
-      if (confirms(ask.confirm, estimate))
+      const capLeft = capLeftCents(deps.budget());
+      if (confirms(ask.confirm, estimate)) {
+        // Never a run dearer than what is left of the day: refused at the confirmation, nothing asked.
+        if (estimate.costCents > capLeft) return { insert: [], answer: 'over_cap' };
         return { insert: estimate.toAsk, answer: { status: 'asked', count: estimate.count } };
+      }
       return {
         insert: [],
         answer: {
@@ -150,13 +154,14 @@ export async function askVaultDescriptions(
           notImported: estimate.notImported,
           notDescribable: estimate.notDescribable,
           costCents: estimate.costCents,
-          capLeftCents: capLeftCents(deps.budget()),
+          capLeftCents: capLeft,
         },
       };
     },
   );
   if (outcome === 'forbidden') throw new VaultChoiceForbidden('choose');
   if (outcome === 'unknown_account') throw new VaultAccountNotFound();
+  if (outcome === 'over_cap') throw new VaultDescribeOverCap();
   if ('replayed' in outcome) return { status: 'asked', count: outcome.replayed };
   return outcome;
 }
