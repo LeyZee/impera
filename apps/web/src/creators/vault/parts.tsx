@@ -221,28 +221,6 @@ export function Preview({ hash }: { hash: string | null }): JSX.Element {
   );
 }
 
-export function KindIcon({ kind }: { kind: VaultMediaView['kind'] }): JSX.Element {
-  if (kind === 'video')
-    return (
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M5.5 3.8v8.4a.6.6 0 0 0 .9.5l6.6-4.2a.6.6 0 0 0 0-1L6.4 3.3a.6.6 0 0 0-.9.5Z" />
-      </svg>
-    );
-  if (kind === 'audio')
-    return (
-      <svg viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M3 6.5v3M5.5 4v8M8 2.5v11M10.5 5v6M13 7v2" />
-      </svg>
-    );
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="2.5" y="3" width="11" height="10" rx="2" />
-      <path d="m3.5 11.5 3-3.2 2.2 2.2 1.6-1.5 2.2 2.5" />
-      <circle cx="10.5" cy="6" r="1.1" />
-    </svg>
-  );
-}
-
 export function EyeIcon({ open }: { open: boolean }): JSX.Element {
   return (
     <svg className="vx-eye" viewBox="0 0 16 16" aria-hidden="true">

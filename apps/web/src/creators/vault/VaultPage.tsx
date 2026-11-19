@@ -19,6 +19,7 @@ import {
 import {
   DESCRIBE_AT_ONCE,
   FILTER_NAMES,
+  GROUP_NAMES,
   VAULT_FILTERS,
   allToggled,
   centsLine,
@@ -32,11 +33,13 @@ import {
   filteredMedia,
   folderCount,
   importLine,
+  mediaGroups,
   progressLine,
   railFolders,
   rangeSelected,
   selectable,
   selectedLine,
+  summaryLine,
   toggled,
   type ChoiceIndex,
   type FolderCount,
@@ -64,7 +67,6 @@ import {
   EyeIcon,
   FolderIcon,
   GoneIcon,
-  KindIcon,
   MediaSheet,
   Preview,
   SelectIcon,
@@ -78,7 +80,7 @@ import './vault-page.css';
 
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
-import { setMediaBlur, useMediaBlur } from '@/shell/media-blur';
+import { useMediaBlur } from '@/shell/media-blur';
 import { Failure } from '@/shell/states';
 
 /** How often the choices are read again while descriptions asked from this page run; never past `PROGRESS_PATIENCE_MS`. */
@@ -232,35 +234,16 @@ export function VaultPage({
       );
     const figures = vaultFigures(vault.data);
     const chosenFigures = choiceFigures(vault.data, index);
+    const share = (value: number): number => (chosenFigures.listed === 0 ? 0 : value / chosenFigures.listed);
     return (
       <>
-        <div className="nv-tiles vx-tiles vp-figures">
-          <Figure
-            label="Importés"
-            value={chosenFigures.imported}
-            of={chosenFigures.listed}
-            empty="Coffre vide"
-            tone="ink"
-          />
-          <Figure
-            label="Décrits"
-            icon={<SparkIcon />}
-            value={chosenFigures.described}
-            of={chosenFigures.imported}
-            empty="Rien à décrire encore"
-            tone="agent"
-          />
-          <div className={`nv-tile vp-figure${figures.unmarked > 0 ? ' nv-tone--warn' : ''}`}>
-            <span className="nv-tile__label">
-              {figures.unmarked > 0 ? <span className="nv-dot nv-tone--warn" aria-hidden="true" /> : null}À
-              classer
-            </span>
-            <span className="nv-tile__value nv-num">{figures.unmarked}</span>
-            {/* Said by its dot, only while a folder needs it: a name with neither ☀️ nor 🌙 says no moment. */}
-            {figures.unmarked > 0 ? (
-              <span className="vp-figure__said">Sans ☀️ ni 🌙 : renomme dans Reveal.</span>
-            ) : null}
-          </div>
+        {/* One line of figures under the title, a thin gauge under it: imported of those listed, described of those. */}
+        <div className="vp-sum" data-chosen={chosen === null ? undefined : ''}>
+          <p className="vp-sum__line nv-num">{summaryLine(chosenFigures)}</p>
+          <span className="vp-sum__meter" aria-hidden="true">
+            <span className="vp-sum__in" style={{ '--vp-share': share(chosenFigures.imported) }} />
+            <span className="vp-sum__described" style={{ '--vp-share': share(chosenFigures.described) }} />
+          </span>
         </div>
         {chosenFigures.imported === 0 && isOwner && choices.data !== undefined ? (
           <p className="vx-note vp-first">
@@ -354,48 +337,6 @@ export function VaultPage({
   );
 }
 
-/** A figure of the head with its share drawn under it: imported of those listed, described of those imported. */
-function Figure({
-  label,
-  icon,
-  value,
-  of,
-  empty,
-  tone,
-}: {
-  label: string;
-  icon?: JSX.Element;
-  value: number;
-  of: number;
-  /** What it says while there is nothing to count. */
-  empty: string;
-  tone: 'ink' | 'agent';
-}): JSX.Element {
-  const share = of === 0 ? 0 : value / of;
-  return (
-    <div className={`nv-tile vp-figure vp-figure--${tone}`}>
-      <span className="nv-tile__label">
-        {icon}
-        {label}
-      </span>
-      {of === 0 ? (
-        // Nothing to count yet: said in words, never « 0 / 0 » over an empty gauge.
-        <span className="vp-figure__said">{empty}</span>
-      ) : (
-        <>
-          <span className="nv-tile__value nv-num">
-            {value}
-            <span className="vp-figure__of"> / {of}</span>
-          </span>
-          <span className="vp-meter" aria-hidden="true">
-            <span className="vp-meter__fill" style={{ '--vp-share': share }} />
-          </span>
-        </>
-      )}
-    </div>
-  );
-}
-
 /**
  * One folder of the rail: its import tick for the owner (a dash when some of its media only are imported), then the
  * button that opens it, with its first preview, its name as Reveal gives it and how much of it is imported.
@@ -456,10 +397,11 @@ function FolderRow({
         </span>
         <span className="vp-folder__text">
           <span className="vp-folder__name">
+            <span className="vp-folder__label">{name}</span>
+            {/* Where the others carry their ☀️ or 🌙: a folder Reveal names with neither, to rename. */}
             {folder.folderRef !== null && folder.moment === null ? (
               <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
             ) : null}
-            <span className="vp-folder__label">{name}</span>
           </span>
           <span className="vp-folder__line nv-num">{importLine(count)}</span>
         </span>
@@ -523,12 +465,12 @@ function FolderPane({
   const name = folderName(folder);
   const title = useRef<HTMLHeadingElement>(null);
 
-  const shown = filteredMedia(folder, index, filters);
+  const unmarked = folder.folderRef !== null && folder.moment === null;
+  const groups = mediaGroups(folder, index, filteredMedia(folder, index, filters));
+  const shown = groups.flatMap((group) => group.media);
   const order = shown.filter(selectable).map((each) => each.platformMediaId);
   const every = order.length > 0 && order.every((id) => selected.has(id));
   const estimate = describeEstimate(folder, index, selected);
-  const pictured = folder.media.some((each) => each.kind !== 'audio' && !each.removed);
-  const count = folderCount(index, folder);
   const at = picked === null ? -1 : shown.findIndex((each) => each.platformMediaId === picked);
   const media = at < 0 ? undefined : shown[at];
   const bar = (selecting && selected.size > 0) || progress !== null;
@@ -631,35 +573,18 @@ function FolderPane({
         </button>
         <div className="vp-pane__title">
           <h3 className="nv-h3 vp-pane__name" ref={title} tabIndex={-1}>
-            {folder.folderRef !== null && folder.moment === null ? (
-              <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
-            ) : null}
             <span>{name}</span>
+            {unmarked ? <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" /> : null}
           </h3>
-          <p className="ps-muted vp-pane__line nv-num">
-            {folderLine(folder.media)}
-            {count.listed > 0 ? (
-              <>
-                <span className="vp-pane__sep"> · </span>
-                <span className="vp-pane__import">{importLine(count)}</span>
-              </>
-            ) : null}
-          </p>
+          {/* What it holds; how much of it is imported is said once, on the rail, and by the grid's groups. */}
+          <p className="ps-muted vp-pane__line nv-num">{folderLine(folder.media)}</p>
+          {unmarked ? (
+            <p className="vp-pane__warn">
+              Ni ☀️ ni 🌙 dans son nom : renomme-le dans Reveal pour le classer.
+            </p>
+          ) : null}
         </div>
         <div className="vp-pane__actions">
-          {pictured && !selecting ? (
-            <button
-              type="button"
-              className={`nv-btn nv-btn--soft nv-btn--sm vx-open__sharp${blurred ? '' : ' vx-open__sharp--on'}`}
-              aria-pressed={!blurred}
-              onClick={() => {
-                setMediaBlur(!blurred);
-              }}
-            >
-              <EyeIcon open={!blurred} />
-              {blurred ? 'Voir net' : 'Flouter'}
-            </button>
-          ) : null}
           {isOwner && order.length > 0 ? (
             <button
               type="button"
@@ -735,27 +660,44 @@ function FolderPane({
           </button>
         </div>
       ) : (
-        <ul className="vp-grid" aria-label={`Médias de ${name}`} data-selecting={selecting ? '' : undefined}>
-          {shown.map((each, rank) => (
-            <li key={each.platformMediaId} className="vp-cell">
-              <MediaTile
-                creatorId={creatorId}
-                media={each}
-                rank={rank + 1}
-                choice={choiceOf(index, folder, each)}
-                sharp={!blurred}
-                selecting={selecting}
-                selected={selected.has(each.platformMediaId)}
-                peeked={peeked.has(each.platformMediaId)}
-                onPress={(event) => {
-                  press(each, event);
-                }}
-                onPeek={() => {
-                  setPeeked((current) => toggled(current, each.platformMediaId));
-                }}
-              />
-            </li>
-          ))}
+        <ul className="vp-groups" aria-label={`Médias de ${name}`}>
+          {groups.map((group, g) => {
+            const first = groups.slice(0, g).reduce((sum, each) => sum + each.media.length, 0);
+            return (
+              <li key={group.key} className="vp-group">
+                <h4 className="vp-group__title nv-eyebrow" id={`vp-group-${group.key}`}>
+                  {GROUP_NAMES[group.key]}{' '}
+                  <span className="vp-group__count nv-num">{group.media.length}</span>
+                </h4>
+                <ul
+                  className="vp-grid"
+                  aria-labelledby={`vp-group-${group.key}`}
+                  data-selecting={selecting ? '' : undefined}
+                >
+                  {group.media.map((each, at) => (
+                    <li key={each.platformMediaId} className="vp-cell">
+                      <MediaTile
+                        creatorId={creatorId}
+                        media={each}
+                        rank={first + at + 1}
+                        choice={choiceOf(index, folder, each)}
+                        sharp={!blurred}
+                        selecting={selecting}
+                        selected={selected.has(each.platformMediaId)}
+                        peeked={peeked.has(each.platformMediaId)}
+                        onPress={(event) => {
+                          press(each, event);
+                        }}
+                        onPeek={() => {
+                          setPeeked((current) => toggled(current, each.platformMediaId));
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
         </ul>
       )}
       {bar ? (
@@ -951,23 +893,11 @@ function MediaTile({
             </>
           )}
         </span>
-        {/* A photo says nothing in its corner: only a video carries its sign, beside its length. */}
-        {selecting && pickable ? (
-          <span className="vp-tick" aria-hidden="true" />
-        ) : media.kind === 'video' ? (
-          <span className="vx-tile__kind" aria-hidden="true">
-            <KindIcon kind={media.kind} />
-          </span>
-        ) : null}
+        {/* Its corner is the selection's alone: a video says itself by its length. */}
+        {selecting && pickable ? <span className="vp-tick" aria-hidden="true" /> : null}
         {media.kind !== 'image' && media.durationSeconds !== null ? (
           <span className="vx-tile__time nv-num" aria-hidden="true">
             {durationLine(media.durationSeconds)}
-          </span>
-        ) : null}
-        {/* Imported: one sign, a written pill, in the grid and while selecting alike. */}
-        {choice.imported ? (
-          <span className="vp-in vp-in--said" aria-hidden="true">
-            Importé
           </span>
         ) : null}
         {media.removed ? (
@@ -988,13 +918,11 @@ function MediaTile({
           <EyeIcon open={peeked} />
         </button>
       ) : null}
-      {/* Not imported and never asked: the tile says it by having no « Importé », the caption stays silent. */}
-      {!choice.imported && choice.description === 'none' ? null : (
-        <p className={`vp-caption vp-caption--${said.tone}`}>
-          {said.tone === 'described' ? <SparkIcon /> : null}
-          <span>{said.text}</span>
-        </p>
-      )}
+      {/* One left edge for every caption, its room kept even when silent: not imported and never asked, its group
+          says it. Full ink for a description, grey for a state, amber when the AI cannot read it. */}
+      <p className={`vp-caption vp-caption--${said.tone}`}>
+        {!choice.imported && choice.description === 'none' ? null : <span>{said.text}</span>}
+      </p>
     </div>
   );
 }

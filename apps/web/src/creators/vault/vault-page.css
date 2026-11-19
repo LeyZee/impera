@@ -15,6 +15,8 @@
   --vp-on-media-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   /* By day, the close shadow that sets the bar off the grid (Jour only). */
   --vp-bar-near: 0 10px 26px -10px rgba(80, 10, 30, 0.26);
+  /* A mask's opaque stop: what it lets through whole. */
+  --vp-mask-solid: #000;
 }
 .vp-skeleton {
   min-height: 320px;
@@ -23,35 +25,45 @@
   margin-top: -4px;
 }
 
-/* ───────────── The figures of the head: a share drawn under each ───────────── */
+/* ───────────── The head's figures: one line, a thin gauge under it ───────────── */
 
-.vp-figure {
-  position: relative;
-  overflow: hidden;
+.vp-sum {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
 }
-.vp-figure .nv-tile__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.vp-figure--agent .nv-tile__label .vp-icon {
-  color: var(--nv-agent);
-}
-.vp-figure__said {
-  display: block;
-  margin-top: 6px;
+.vp-sum__line {
+  margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.nv-tone--warn .vp-figure__said {
-  color: var(--nv-ink-muted);
+/* Imported over the whole vault, and described inside it in the agent's colour: one gauge for both. */
+.vp-sum__meter {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--nv-fill-track);
+  overflow: hidden;
 }
-.vp-figure__of {
-  font-size: 0.55em;
-  font-weight: 600;
-  color: var(--nv-ink-faint);
+.vp-sum__in,
+.vp-sum__described {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--vp-share, 0));
+  transition: transform var(--nv-dur-progress) var(--vp-ease);
 }
+.vp-sum__in {
+  background: color-mix(in srgb, var(--nv-ink) 55%, transparent);
+}
+.vp-sum__described {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--nv-agent) 70%, transparent), var(--nv-agent));
+}
+
 .vp-meter {
   display: block;
   height: 4px;
@@ -70,7 +82,6 @@
   transform: scaleX(var(--vp-share, 0));
   transition: transform var(--nv-dur-progress) var(--vp-ease);
 }
-.vp-figure--agent .vp-meter__fill,
 .vp-meter--agent .vp-meter__fill {
   background: linear-gradient(90deg, color-mix(in srgb, var(--nv-agent) 70%, transparent), var(--nv-agent));
 }
@@ -126,6 +137,10 @@
   .vp-folder:hover:not([data-open]) {
     background: var(--nv-plate-hover);
   }
+}
+/* An empty tick keeps a drawn edge on every row, the open one's grey included, by day as by night. */
+.vp-folder .nv-check:not(:checked):not(:indeterminate):not(:hover) {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--nv-ink) 24%, transparent);
 }
 /* The folder open: its background, never a coloured bar on its edge. */
 .vp-folder[data-open] {
@@ -288,6 +303,12 @@
 .vp-pane__line {
   margin: 2px 0 0;
 }
+.vp-pane__warn {
+  margin: 4px 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-warning);
+}
 .vp-pane__actions {
   display: flex;
   gap: var(--nv-space-2);
@@ -345,7 +366,27 @@
   stroke-linejoin: round;
 }
 
-/* ───────────── The grid ───────────── */
+/* ───────────── The grid, in groups said once by their title ───────────── */
+
+.vp-groups {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-6);
+}
+.vp-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.vp-group__title {
+  margin: 0;
+}
+.vp-group__count {
+  color: var(--nv-ink-faint);
+}
 
 .vp-grid {
   margin: 0;
@@ -385,40 +426,6 @@
   position: absolute;
   inset: 0;
   transition: opacity var(--nv-dur-base) var(--vp-ease);
-}
-/* Not imported: faded, never by colour alone (its caption says it, its tick is missing). */
-.vp-item--out .vp-face {
-  opacity: 0.6;
-}
-@media (hover: hover) {
-  .vp-item--out .vx-tile:hover .vp-face {
-    opacity: 0.85;
-  }
-}
-
-/* Imported: a small written ink pill in the corner. */
-.vp-in {
-  position: absolute;
-  z-index: 1;
-  left: 7px;
-  bottom: 7px;
-  width: 20px;
-  height: 20px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--nv-ink);
-  color: var(--nv-void);
-  box-shadow: var(--vp-on-media-shadow);
-  animation: vp-pop var(--nv-dur-base) var(--nv-ease-spring-bouncy) both;
-}
-.vp-in--said {
-  width: auto;
-  height: var(--nv-pill-count);
-  padding: 0 8px;
-  font-size: var(--nv-text-caption);
-  line-height: 1;
-  font-weight: 650;
 }
 @keyframes vp-pop {
   from {
@@ -523,11 +530,9 @@
   outline-offset: 2px;
 }
 
-/* Under a tile, where its description stands: two lines at most, the AI's colour once described. */
+/* Under a tile, where its description stands: two lines at most, their room kept, one left edge for all. */
 .vp-caption {
   display: flex;
-  gap: 5px;
-  align-items: flex-start;
   min-height: calc(2 * var(--nv-text-caption-leading));
   margin: 0;
   font-size: var(--nv-text-caption);
@@ -541,14 +546,8 @@
   overflow: hidden;
   overflow-wrap: anywhere;
 }
-.vp-caption .vp-icon {
-  width: 12px;
-  height: 12px;
-  margin-top: 2px;
-  color: var(--nv-agent);
-}
 .vp-caption--described {
-  color: var(--nv-ink-muted);
+  color: var(--nv-ink);
 }
 .vp-caption--warn {
   color: var(--nv-warning);
@@ -782,12 +781,21 @@
   .vp-filters__chips > .nv-chip {
     flex: none;
   }
-  /* What it holds on a line, how much is imported on the next: never a word left alone on its own line. */
-  .vp-pane__sep {
-    display: none;
+  /* A chip cut at the edge fades out, so the row reads as one to scroll, never as a chip broken off. */
+  .vp-filters__chips {
+    --_fade: linear-gradient(
+      90deg,
+      transparent,
+      var(--vp-mask-solid) var(--nv-plate-pad),
+      var(--vp-mask-solid) calc(100% - 40px),
+      transparent
+    );
+    -webkit-mask-image: var(--_fade);
+    mask-image: var(--_fade);
   }
-  .vp-pane__import {
-    display: block;
+  /* A folder open on a phone: its media come first, the vault's figures stay on the list of folders. */
+  .vp-sum[data-chosen] {
+    display: none;
   }
   .vp-body {
     grid-template-columns: minmax(0, 1fr);
@@ -887,15 +895,6 @@
     grid-template-columns: 1fr;
   }
 }
-/* A narrow column: the two counts side by side, « À classer » under them on the whole width, its sentence on one line. */
-@media (max-width: 560px) {
-  .nv-tiles.vx-tiles.vp-figures {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .vp-figures > :nth-child(3) {
-    grid-column: 1 / -1;
-  }
-}
 @media (min-width: 480px) and (max-width: 820px) {
   .vp-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -908,11 +907,12 @@
   .vp-cell,
   .vp-hint,
   .vp-bar.nv-plate,
-  .vp-in,
   .vp-peek {
     animation: none;
   }
-  .vp-meter__fill {
+  .vp-meter__fill,
+  .vp-sum__in,
+  .vp-sum__described {
     transition: none;
   }
   .vp-folder:hover .vp-folder__cover,

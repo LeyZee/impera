@@ -8,7 +8,7 @@ import {
   type VaultView,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { VaultPage } from './VaultPage';
@@ -177,15 +177,9 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     show(true);
     const card = await screen.findByRole('region', { name: 'Coffre Reveal de Lina' });
     expect(await within(card).findByText('Synchronisé il y a 1 h')).toBeDefined();
-    const tiles = () => [...card.querySelectorAll('.nv-tile')].map((tile) => tile.textContent);
-    await waitFor(() => {
-      expect(tiles()).toEqual([
-        'Importés0 / 6',
-        'DécritsRien à décrire encore',
-        'À classer1Sans ☀️ ni 🌙 : renomme dans Reveal.',
-      ]);
-    });
-    expect(within(card).getByText(/renomme dans Reveal/u)).toBeDefined();
+    // One line of figures under the title, never a plate per figure.
+    expect(await within(card).findByText('Aucun média importé sur 6')).toBeDefined();
+    expect(card.querySelectorAll('.nv-tile')).toHaveLength(0);
     expect(within(card).getByText(/Rien n’est encore importé/u)).toBeDefined();
     const rail = within(card).getByRole('navigation', { name: 'Ses dossiers' });
     const names = [...rail.querySelectorAll('.vp-folder__label')].map((name) => name.textContent);
@@ -304,7 +298,10 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
       expect(tick).toHaveProperty('indeterminate', true);
     });
     expect(tick.getAttribute('aria-checked')).toBe('mixed');
-    expect(screen.getAllByText(/1 sur 3 importé$/u)).toHaveLength(2);
+    // Said once, on the rail; the grid says it by its groups.
+    expect(screen.getAllByText(/1 sur 3 importé$/u)).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Importés 1' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Dans Reveal seulement 2' })).toBeDefined();
     fireEvent.click(tick);
     await waitFor(() => {
       expect(tick).toHaveProperty('checked', true);
@@ -313,7 +310,8 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
       { platformAccountId: ACCOUNT, folders: [{ folderRef: 'f1', imported: true }], media: [] },
     ]);
     expect(tick).toHaveProperty('indeterminate', false);
-    expect(screen.getAllByText(/Les 3 importés$/u)).toHaveLength(2);
+    expect(screen.getAllByText(/Les 3 importés$/u)).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: /Dans Reveal seulement/u })).toBeNull();
     expect(screen.getByRole('button', { name: '1. Photo, importé' })).toBeDefined();
   });
 
@@ -510,14 +508,8 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     });
     show(true);
     expect(await screen.findByRole('heading', { name: 'Matin ☀️' })).toBeDefined();
-    // The folder's line, its import count in a span of its own (on its own line on a phone).
-    expect(
-      await screen.findByText(
-        (_, element) =>
-          element?.classList.contains('vp-pane__line') === true &&
-          element.textContent === '1 vidéo · 1 retiré de Reveal · Importé',
-      ),
-    ).toBeDefined();
+    // What the folder holds; how much is imported is said on the rail and by the grid's groups.
+    expect(await screen.findByText('1 vidéo · 1 retiré de Reveal')).toBeDefined();
     const tile = await screen.findByRole('button', { name: '1. Vidéo · 1:15, importé, décrit' });
     expect(tile.querySelector('img')).toBeNull();
     fireEvent.click(tile);
@@ -571,7 +563,7 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     expect(await screen.findByRole('list', { name: 'Médias de Matin ☀️' })).toBeDefined();
   });
 
-  it('shows the sharp pictures on « Voir net », on the pointer, in the sheet, and falls back to the blur (ADR 0138)', async () => {
+  it('shows the sharp pictures by the rail’s « Flou des médias », on the pointer, in the sheet, and falls back to the blur (ADR 0138)', async () => {
     const photo = media('image', false, { platformMediaId: 'photo_1' });
     const video = media('video', false, { platformMediaId: 'video_1' });
     const gone = media('image', true, { platformMediaId: 'gone_1' });
@@ -585,10 +577,11 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     expect(sharp()).toEqual([`/v1/creators/${CREATOR}/vault/media/photo_1/preview`]);
     fireEvent.pointerLeave(tile);
     expect(sharp()).toEqual([]);
-    const toggle = screen.getByRole('button', { name: 'Voir net' });
-    fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-    expect(document.documentElement.dataset['mediaBlur']).toBe('off');
+    // A folder has no « Voir net » of its own: the rail's « Flou des médias » sets it for every screen.
+    expect(screen.queryByRole('button', { name: 'Voir net' })).toBeNull();
+    act(() => {
+      setMediaBlur(false);
+    });
     expect(sharp()).toEqual([
       `/v1/creators/${CREATOR}/vault/media/photo_1/preview`,
       `/v1/creators/${CREATOR}/vault/media/video_1/preview`,
@@ -602,7 +595,9 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     if (second === undefined) throw new Error('no second picture');
     fireEvent.error(second);
     expect(sharp()).toEqual([`/v1/creators/${CREATOR}/vault/media/photo_1/preview`]);
-    fireEvent.click(screen.getByRole('button', { name: 'Flouter' }));
+    act(() => {
+      setMediaBlur(true);
+    });
     expect(sharp()).toEqual([]);
     fireEvent.click(tile);
     const sheet = screen.getByRole('dialog', { name: 'Photo' });
@@ -620,21 +615,11 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     const sharp = () => grid.querySelectorAll('img.vx-sharp').length;
     fireEvent.pointerEnter(screen.getByRole('button', { name: '1. Photo, non importé' }));
     expect(sharp()).toBe(0);
-    // « Voir net » of the whole folder waits for the end of the selection.
-    expect(screen.queryByRole('button', { name: 'Voir net' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Voir net le média 1' }));
     expect(sharp()).toBe(1);
     // The eye does not tick the media.
     expect(screen.queryByRole('toolbar')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Flouter le média 1' }));
     expect(sharp()).toBe(0);
-  });
-
-  it('offers no « Voir net » in a folder of voice notes only', async () => {
-    const voice = { ...media('image'), kind: 'audio' as const, durationSeconds: 8, blurhash: null };
-    serve([viewOf({ folders: [folder('f1', 'Vocaux ☀️', 'day', [voice])] })]);
-    show(true);
-    expect(await screen.findByRole('button', { name: '1. Vocal · 0:08, non importé' })).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Voir net' })).toBeNull();
   });
 });

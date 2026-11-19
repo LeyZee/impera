@@ -271,3 +271,42 @@ export function progressLine(progress: { readonly done: number; readonly total: 
     return progress.total === 1 ? '1 média décrit' : `${String(progress.total)} médias décrits`;
   return `Descriptions : ${String(progress.done)} sur ${String(progress.total)}`;
 }
+
+/** The grid's groups, said once by their title instead of a mark on every tile. */
+export type MediaGroupKey = 'in' | 'out' | 'gone';
+export const GROUP_NAMES: Record<MediaGroupKey, string> = {
+  in: 'Importés',
+  out: 'Dans Reveal seulement',
+  gone: 'Retirés de Reveal',
+};
+
+/**
+ * The media shown, in groups: imported, then those Reveal lists that are not, then those Reveal no longer lists; each in
+ * the platform's order, an empty group left out. Their order, one after the other, is the order shown.
+ */
+export function mediaGroups(
+  folder: VaultFolderView,
+  index: ChoiceIndex,
+  shown: readonly VaultMediaView[],
+): { readonly key: MediaGroupKey; readonly media: VaultMediaView[] }[] {
+  const keyOf = (media: VaultMediaView): MediaGroupKey =>
+    media.removed ? 'gone' : choiceOf(index, folder, media).imported ? 'in' : 'out';
+  return (['in', 'out', 'gone'] as const)
+    .map((key) => ({ key, media: shown.filter((media) => keyOf(media) === key) }))
+    .filter((group) => group.media.length > 0);
+}
+
+/** « 16 importés sur 40 · 5 décrits sur 16 », « Aucun média importé sur 40 ». */
+export function summaryLine(figures: {
+  readonly listed: number;
+  readonly imported: number;
+  readonly described: number;
+}): string {
+  if (figures.imported === 0) return `Aucun média importé sur ${String(figures.listed)}`;
+  const imported = `${String(figures.imported)} ${figures.imported === 1 ? 'importé' : 'importés'} sur ${String(figures.listed)}`;
+  const described =
+    figures.described === 0
+      ? 'aucun décrit'
+      : `${String(figures.described)} ${figures.described === 1 ? 'décrit' : 'décrits'} sur ${String(figures.imported)}`;
+  return `${imported} · ${described}`;
+}

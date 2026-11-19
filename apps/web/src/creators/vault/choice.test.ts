@@ -18,10 +18,12 @@ import {
   filteredMedia,
   folderCount,
   importLine,
+  mediaGroups,
   progressLine,
   railFolders,
   rangeSelected,
   selectedLine,
+  summaryLine,
   toggled,
 } from './choice';
 
@@ -182,5 +184,25 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
     expect(describeProgress(['a', 'b'], f1, index)).toEqual({ done: 1, total: 2 });
     expect(progressLine({ done: 1, total: 2 })).toBe('Descriptions : 1 sur 2');
     expect(progressLine({ done: 2, total: 2 })).toBe('2 médias décrits');
+  });
+
+  it('groups the grid once, imported first, then Reveal only, then gone, each in the platform’s order', () => {
+    const f1 = folder('f1', [media('a'), media('b'), media('c'), media('gone', 'image', true)]);
+    const index = choiceIndex(choices({ media: [chosen('c', true), chosen('gone', true)] }));
+    const groups = mediaGroups(f1, index, f1.media).map((group) => [
+      group.key,
+      group.media.map((each) => each.platformMediaId),
+    ]);
+    expect(groups).toEqual([
+      ['in', ['c']],
+      ['out', ['a', 'b']],
+      ['gone', ['gone']],
+    ]);
+    expect(mediaGroups(f1, choiceIndex(undefined), [media('a')]).map((group) => group.key)).toEqual(['out']);
+    expect(summaryLine({ listed: 40, imported: 0, described: 0 })).toBe('Aucun média importé sur 40');
+    expect(summaryLine({ listed: 40, imported: 16, described: 5 })).toBe(
+      '16 importés sur 40 · 5 décrits sur 16',
+    );
+    expect(summaryLine({ listed: 40, imported: 1, described: 0 })).toBe('1 importé sur 40 · aucun décrit');
   });
 });
