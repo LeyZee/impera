@@ -3,15 +3,7 @@
  * described only on her request, after its count and its cost were shown. Pure: the store reads, this decides.
  */
 
-import { DESCRIPTION_TRIES, type VaultDescriptionState } from '@impera/contracts';
-
-/**
- * What one description costs, in tenths of a euro cent, rounded up from what the vision spends: a photo about 0.4 c€
- * (5 photos ≈ 0.02 €, essai du 16/11 sur le PC), a video, read whole or as keyframes and a transcript, about three
- * times that. Said before, never billed: the gateway's journal is the spend, and the daily cap still holds (ADR 0091).
- */
-export const PHOTO_COST_TENTHS = 5;
-export const VIDEO_COST_TENTHS = 15;
+import { DESCRIPTION_TRIES, VAULT_DESCRIBE_COST_TENTHS, type VaultDescriptionState } from '@impera/contracts';
 
 /** A vault media named in a request, as its link says it now. */
 export interface DescribeCandidate {
@@ -80,7 +72,8 @@ export function estimateVaultDescriptions(
       else counts.videos += 1;
     }
   }
-  const tenths = counts.photos * PHOTO_COST_TENTHS + counts.videos * VIDEO_COST_TENTHS;
+  const tenths =
+    counts.photos * VAULT_DESCRIBE_COST_TENTHS.image + counts.videos * VAULT_DESCRIBE_COST_TENTHS.video;
   return { ...counts, count: toAsk.length, costCents: Math.ceil(tenths / 10), toAsk };
 }
 

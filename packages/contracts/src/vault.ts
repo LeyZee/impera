@@ -58,6 +58,13 @@ export type VaultSyncAsked = z.infer<typeof VaultSyncAskedSchema>;
 export const VAULT_DESCRIBE_MAX = 500;
 /** The beginning of a description shown under a tile: two lines at most on the screen. */
 export const VAULT_EXCERPT_MAX = 160;
+/**
+ * What one description costs, in tenths of a euro cent, rounded up from what the vision spends: a photo about 0.4 c€
+ * (5 photos ≈ 0.02 €, essai du 16/11 sur le PC), a video, read whole or as keyframes and a transcript, about three
+ * times that. The screen says it on the button and the server in its estimate, the same figures; never billed: the
+ * gateway's journal is the spend, and the daily cap still holds (ADR 0091).
+ */
+export const VAULT_DESCRIBE_COST_TENTHS = { image: 5, video: 15 } as const;
 
 /**
  * Where a media's description stands: `none`, never asked; `asked`, waiting for its run; `described`, it has its

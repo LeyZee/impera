@@ -15,7 +15,7 @@ import {
 } from './model';
 import './scripts.css';
 
-import { VaultCard } from '@/creators/vault/VaultCard';
+import { VaultPage } from '@/creators/vault/VaultPage';
 import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
@@ -103,7 +103,7 @@ export function ScriptsSection({
     <section className="ps-page aa-page sx-page" aria-label={`Scripts de ${creatorName}`}>
       {/* Her Reveal vault first, at the top of the tab: what her scripts are built from, and the owner's sync (Charles,
           16/11). « Ses scripts » follows in one piece, its head and its list together. */}
-      <VaultCard
+      <VaultPage
         creatorId={creatorId}
         creatorName={creatorName}
         isOwner={isOwner}

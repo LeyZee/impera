@@ -25,7 +25,7 @@ export interface VaultChoiceMedia extends DescribeCandidate {
 }
 
 /** What a request decides, in the store's transaction: the media to ask, or none. */
-export interface AskDecision<T> {
+interface AskDecision<T> {
   readonly insert: readonly string[];
   readonly answer: T;
 }

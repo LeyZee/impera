@@ -1,0 +1,889 @@
+/*
+ * « Son coffre Reveal », by choice (ADR 0145 § 5): the folders on the left, the folder open on the right, the bar of
+ * actions floating under the grid. Built on vault.css (tiles, previews, the sharp picture, a voice note's wave).
+ */
+
+.vp {
+  --vp-rail: 280px;
+  --vp-ease: var(--nv-ease-out);
+}
+.vp-skeleton {
+  min-height: 320px;
+}
+.vp-first {
+  margin-top: -4px;
+}
+
+/* ───────────── The figures of the head: a share drawn under each ───────────── */
+
+.vp-figure {
+  position: relative;
+  overflow: hidden;
+}
+.vp-figure .nv-tile__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vp-figure--agent .nv-tile__label .vp-icon {
+  color: var(--nv-agent);
+}
+.vp-figure__said {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.nv-tone--warn .vp-figure__said {
+  color: var(--nv-ink-muted);
+}
+.vp-figure__of {
+  font-size: 0.55em;
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.vp-meter {
+  display: block;
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.vp-meter__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nv-ink);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--vp-share, 0));
+  transition: transform var(--nv-dur-progress) var(--vp-ease);
+}
+.vp-figure--agent .vp-meter__fill,
+.vp-meter--agent .vp-meter__fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--nv-agent) 70%, transparent), var(--nv-agent));
+}
+
+/* ───────────── Two columns: the rail of folders, the folder open ───────────── */
+
+.vp-body {
+  display: grid;
+  grid-template-columns: var(--vp-rail) minmax(0, 1fr);
+  gap: var(--nv-space-5);
+  align-items: start;
+  margin-top: var(--nv-space-2);
+}
+
+.vp-rail {
+  position: sticky;
+  top: var(--nv-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: calc(100dvh - 2 * var(--nv-space-4));
+  min-width: 0;
+}
+.vp-rail__head {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0 10px 0 12px;
+}
+.vp-rail__list {
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.vp-folder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--nv-radius-sm);
+  transition: background-color var(--nv-dur-fast) var(--vp-ease);
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+@media (hover: hover) {
+  .vp-folder:hover:not([data-open]) {
+    background: var(--nv-plate-hover);
+  }
+}
+/* The folder open: its background, never a coloured bar on its edge. */
+.vp-folder[data-open] {
+  background: var(--nv-select);
+}
+.vp-folder__tick {
+  margin-left: 10px;
+}
+.vp-folder__open {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vp-folder__open:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.vp-folder__cover {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--nv-glass-fill-strong);
+  color: var(--nv-ink-faint);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vp-folder__cover .vx-preview {
+  position: absolute;
+  inset: 0;
+}
+.vp-folder__cover .vx-voice {
+  position: absolute;
+  inset: 0;
+}
+.vp-folder__cover > svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .vp-folder:hover .vp-folder__cover {
+    transform: scale(1.06) rotate(-2deg);
+  }
+}
+.vp-folder[data-tick='none'] .vp-folder__cover > * {
+  opacity: 0.6;
+}
+.vp-folder__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.vp-folder__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.vp-folder__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vp-folder__line {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.vp-folder[data-tick='all'] .vp-folder__line {
+  color: var(--nv-ink-muted);
+}
+.vp-folder__chev {
+  flex: none;
+  display: none;
+  color: var(--nv-ink-faint);
+}
+.vp-folder__chev svg,
+.vp-back__chev svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ───────────── The folder open ───────────── */
+
+.vp-pane {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  animation: vp-enter var(--nv-dur-base) var(--vp-ease) both;
+}
+@keyframes vp-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.vp-pane__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  flex-wrap: wrap;
+}
+.vp-pane__title {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.vp-pane__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.vp-pane__name > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vp-pane__name:focus {
+  outline: none;
+}
+.vp-pane__name:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.vp-pane__line {
+  margin: 2px 0 0;
+}
+.vp-pane__actions {
+  display: flex;
+  gap: var(--nv-space-2);
+  flex-wrap: wrap;
+}
+.vp-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.vp-back {
+  display: none;
+}
+
+.vp-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  flex-wrap: wrap;
+}
+.vp-filters__chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.vp-all {
+  margin-left: auto;
+}
+.vp-hint {
+  margin: -4px 0 0;
+  font-size: var(--nv-text-footnote);
+  animation: vp-enter var(--nv-dur-base) var(--vp-ease) both;
+}
+/* No Shift on a phone: the run of a selection is said only where a keyboard is. */
+@media (hover: none) {
+  .vp-hint__mouse {
+    display: none;
+  }
+}
+.vp-empty {
+  align-items: flex-start;
+  padding: var(--nv-space-6) 0;
+}
+
+/* The icons of this screen: drawn strokes at the text's size. */
+.vp-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ───────────── The grid ───────────── */
+
+.vp-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--nv-space-4) var(--nv-space-3);
+}
+.vp-cell {
+  min-width: 0;
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+.vp-cell:nth-child(2) {
+  animation-delay: 20ms;
+}
+.vp-cell:nth-child(3) {
+  animation-delay: 40ms;
+}
+.vp-cell:nth-child(4) {
+  animation-delay: 60ms;
+}
+.vp-cell:nth-child(5) {
+  animation-delay: 80ms;
+}
+.vp-cell:nth-child(n + 6) {
+  animation-delay: 100ms;
+}
+
+.vp-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vp-face {
+  position: absolute;
+  inset: 0;
+  transition: opacity var(--nv-dur-base) var(--vp-ease);
+}
+/* Not imported: faded, never by colour alone (its caption says it, its tick is missing). */
+.vp-item--out .vp-face {
+  opacity: 0.6;
+}
+@media (hover: hover) {
+  .vp-item--out .vx-tile:hover .vp-face {
+    opacity: 0.85;
+  }
+}
+
+/* Imported: a small written ink pill in the corner. */
+.vp-in {
+  position: absolute;
+  z-index: 1;
+  left: 7px;
+  bottom: 7px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--nv-ink);
+  color: var(--nv-void);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  animation: vp-pop var(--nv-dur-base) var(--nv-ease-spring-bouncy) both;
+}
+.vp-in--said {
+  width: auto;
+  height: var(--nv-pill-count);
+  padding: 0 8px;
+  font-size: var(--nv-text-caption);
+  line-height: 1;
+  font-weight: 650;
+}
+@keyframes vp-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+/* While selecting: the tick of each tile, its whole surface the target, the picked ones ringed. */
+.vp-tick {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.32);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  transition:
+    background-color var(--nv-dur-fast) var(--vp-ease),
+    box-shadow var(--nv-dur-fast) var(--vp-ease);
+}
+.vp-tick::after {
+  content: '';
+  width: 10px;
+  height: 5px;
+  margin-top: -3px;
+  border-left: 2px solid var(--nv-void);
+  border-bottom: 2px solid var(--nv-void);
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.vp-item[data-selected] .vp-tick {
+  background: var(--nv-ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.vp-item[data-selected] .vp-tick::after {
+  transform: rotate(-45deg) scale(1);
+}
+.vp-grid[data-selecting] .vx-tile:hover {
+  transform: translateY(-2px);
+}
+.vp-grid[data-selecting] .vx-tile:hover .vx-preview {
+  transform: none;
+}
+.vp-item[data-selected] .vx-tile {
+  transform: scale(0.94);
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-ink);
+}
+.vp-tile[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* « Voir net » of one tile while selecting: a small round eye in its top corner, 44 px to the finger. */
+.vp-peek {
+  appearance: none;
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  animation: vp-pop var(--nv-dur-base) var(--nv-ease-spring) both;
+  transition:
+    background-color var(--nv-dur-fast) var(--vp-ease),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vp-peek::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.vp-peek[aria-pressed='true'] {
+  background: #fff;
+  color: #000;
+}
+@media (hover: hover) {
+  .vp-peek:hover {
+    transform: scale(1.1);
+  }
+}
+.vp-peek:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+
+/* Under a tile, where its description stands: two lines at most, the AI's colour once described. */
+.vp-caption {
+  display: flex;
+  gap: 5px;
+  align-items: flex-start;
+  min-height: calc(2 * var(--nv-text-caption-leading));
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.vp-caption > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.vp-caption .vp-icon {
+  width: 12px;
+  height: 12px;
+  margin-top: 2px;
+  color: var(--nv-agent);
+}
+.vp-caption--described {
+  color: var(--nv-ink-muted);
+}
+.vp-caption--warn {
+  color: var(--nv-warning);
+}
+
+/* ───────────── The bar of actions, floating under the grid ───────────── */
+
+.vp-bar-room {
+  position: sticky;
+  z-index: 5;
+  bottom: var(--nv-space-6);
+  display: flex;
+  justify-content: center;
+  padding-top: var(--nv-space-2);
+  pointer-events: none;
+}
+.vp-bar.nv-plate {
+  --_radius: var(--nv-radius-lg);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  max-width: 100%;
+  padding: 10px 10px 10px var(--nv-plate-pad);
+  /* Near opaque: the captions of the grid it floats over never read through it (Nuit as Jour). */
+  background: color-mix(in srgb, var(--nv-abyss) 96%, transparent);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-glass-edge),
+    var(--nv-shadow-float);
+  -webkit-backdrop-filter: blur(var(--nv-blur-regular)) saturate(180%);
+  backdrop-filter: blur(var(--nv-blur-regular)) saturate(180%);
+  animation: vp-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+/* By day the float's wide shadow barely shows under a bar this short: a closer one sets it off the grid. */
+[data-theme='light'] .vp-bar.nv-plate {
+  box-shadow:
+    inset 0 0 0 1px var(--nv-glass-edge),
+    var(--nv-shadow-float),
+    0 10px 26px -10px rgba(80, 10, 30, 0.26);
+}
+@keyframes vp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+}
+.vp-bar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
+  flex-wrap: wrap;
+}
+.vp-bar__count {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vp-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  flex-wrap: wrap;
+}
+.vp-bar__actions .nv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.vp-describe .vp-icon {
+  color: var(--nv-agent);
+}
+.vp-describe__cost {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--nv-agent-soft);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+.vp-bar__note {
+  margin: 0;
+  padding-right: var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.vp-bar__note--warn {
+  color: var(--nv-warning);
+}
+.vp-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 240px;
+  padding-right: var(--nv-space-2);
+}
+.vp-progress__line {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.vp-progress__line .vp-icon {
+  color: var(--nv-agent);
+}
+.vp-progress .vp-meter {
+  margin-top: 4px;
+}
+
+/* ───────────── « Décrire par IA »: the count and the cost before anything starts ───────────── */
+
+.tm-dialog.vp-dialog {
+  max-width: 480px;
+}
+.vp-dialog__skeleton {
+  min-height: 112px;
+  border-radius: var(--nv-radius-md);
+}
+.vp-dialog__figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--nv-space-3);
+}
+.vp-dialog__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  font-size: var(--nv-text-footnote);
+}
+.vp-dialog__figure--cost {
+  background: var(--nv-agent-soft);
+}
+.vp-dialog__value {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+.vp-dialog__over {
+  color: var(--nv-warning);
+}
+.vp-dialog__left {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.vp-dialog__none {
+  margin: 0;
+}
+.tm-dialog__foot .vp-icon {
+  margin-right: 6px;
+}
+
+/* The sheet's state line: imported or not, its description. */
+.vx-sheet__state {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  flex-wrap: wrap;
+}
+.vp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: var(--nv-pill-info);
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--nv-glass-fill-strong);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+}
+.vp-badge--described {
+  background: var(--nv-agent-soft);
+  color: var(--nv-ink);
+}
+.vp-badge--described .vp-icon {
+  color: var(--nv-agent);
+}
+.vp-badge--in {
+  background: var(--nv-ink);
+  color: var(--nv-void);
+}
+.vp-badge .vp-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.2;
+}
+.vx-sheet__said {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.vx-sheet__said--warn {
+  color: var(--nv-warning);
+}
+.vx-sheet__said--described {
+  color: var(--nv-agent);
+}
+
+/* ───────────── A tablet: a narrower rail ───────────── */
+
+@media (max-width: 1100px) {
+  .vp {
+    --vp-rail: 236px;
+  }
+}
+
+/* ───────────── A phone: the folders a list, a folder open the whole width with its way back ───────────── */
+
+@media (max-width: 820px) {
+  .vp-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .vp-rail {
+    position: static;
+    max-height: none;
+  }
+  .vp-body[data-chosen] .vp-rail,
+  .vp-body:not([data-chosen]) .vp-pane {
+    display: none;
+  }
+  /* The list alone: no folder is open on a phone until one is picked, so none is marked. */
+  .vp-body:not([data-chosen]) .vp-folder[data-open] {
+    background: none;
+  }
+  .vp-folder__chev {
+    display: block;
+  }
+  .vp-folder__open {
+    min-height: 56px;
+  }
+  .vp-back {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 100%;
+    margin: 0 0 -4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--nv-ink-muted);
+    font: inherit;
+    font-size: var(--nv-text-footnote);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .vp-back__chev {
+    display: grid;
+    transform: rotate(180deg);
+  }
+  .vp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--nv-space-3) 10px;
+    /* The last captions clear the bar once it has come to rest under them. */
+    padding-bottom: var(--nv-space-5);
+  }
+  .vp-bar-room {
+    bottom: calc(var(--nv-above-tabbar) + 12px);
+  }
+  /* One surface, opaque, as tall as what it holds: the count and « Retirer » on a line, each action under it. */
+  .vp-bar.nv-plate {
+    width: 100%;
+    padding: 10px;
+    background: var(--nv-abyss);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .vp-bar__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--nv-space-2);
+  }
+  .vp-bar__actions {
+    display: contents;
+  }
+  .vp-bar__count {
+    grid-area: 1 / 1;
+    align-self: center;
+    padding-left: 6px;
+  }
+  .vp-bar__remove {
+    grid-area: 1 / 2;
+    justify-self: end;
+  }
+  /* Each action as wide as the bar: « Décrire n par IA » and its cost never squeezed beside « Importer ». */
+  .vp-bar__import {
+    grid-area: 2 / 1 / 3 / -1;
+  }
+  .vp-describe {
+    grid-column: 1 / -1;
+  }
+  .vp-bar__import,
+  .vp-describe {
+    justify-content: center;
+    min-width: 0;
+  }
+  .vp-progress {
+    min-width: 0;
+    padding: 2px 6px;
+  }
+  .vp-all {
+    margin-left: 0;
+  }
+  .vp-dialog__figures {
+    grid-template-columns: 1fr;
+  }
+}
+/* A narrow column: the two counts side by side, « À classer » under them on the whole width, its sentence on one line. */
+@media (max-width: 560px) {
+  .nv-tiles.vx-tiles.vp-figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .vp-figures > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 480px) and (max-width: 820px) {
+  .vp-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vp-folder,
+  .vp-pane,
+  .vp-cell,
+  .vp-hint,
+  .vp-bar.nv-plate,
+  .vp-in,
+  .vp-peek {
+    animation: none;
+  }
+  .vp-meter__fill {
+    transition: none;
+  }
+  .vp-folder:hover .vp-folder__cover,
+  .vp-item[data-selected] .vx-tile,
+  .vp-grid[data-selecting] .vx-tile:hover {
+    transform: none;
+  }
+}

@@ -721,6 +721,20 @@
 .nv-check:checked::after {
   transform: rotate(-45deg) scale(1);
 }
+/* Some of what it stands for, not all (a folder with some of its media only): a dash, on the ink of a tick. */
+.nv-check:indeterminate {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+.nv-check:indeterminate::after {
+  width: 10px;
+  height: 0;
+  margin-top: 0;
+  border-left: 0;
+  border-bottom: 2px solid var(--nv-void);
+  border-radius: 1px;
+  transform: none;
+}
 .nv-check:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
