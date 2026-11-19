@@ -1,4 +1,4 @@
-import type { CreatorOnDuty } from '@impera/contracts';
+import { DROP_CATEGORY_LABELS, type CreatorOnDuty } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
@@ -22,12 +22,17 @@ import { FreshnessNote } from '@/screens/agenda/FreshnessNote';
 import { useAgenda, useWithPending } from '@/screens/agenda/api';
 import '@/screens/agenda/agenda.css';
 import { planOf } from '@/screens/agenda/model';
+import { useContent } from '@/screens/content/api';
+import { CATEGORY_EMOJIS, dueNow, dueOf, toShoot, type ToShoot } from '@/screens/content/model';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
+import './creator-today.css';
+
 /**
  * Aujourd'hui, the creator's (CR-02, ADR 0042 § 8): the page she opens in the morning (CREA-19). Where her day stands
- * and what to start with, as at the top of her Agenda; what the agency proposes and waits on her; then who answers her
+ * and what to start with, as at the top of her Agenda; what the agency proposes and waits on her; what the agency asked
+ * her to send that is due today or late (recette visuelle 16/11, CRE-01); then who answers her
  * fans, in one line, by their display name alone (ADR 0023: nothing else of the team). Her last sales come once CR-04
  * exists. Agenda stays where she plans; this page only reads. Read in her own time, the browser's.
  */
@@ -52,6 +57,8 @@ export function CreatorTodayPage(): JSX.Element {
             }}
           />
         ) : null}
+        {/* What she owes first: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
+        <ToSend today={today} />
         <HerDay now={now} today={today} quiet={down} />
         <Fans now={now} today={today} />
       </div>
@@ -77,6 +84,8 @@ function HerDay({
   const sunday = addDays(monday, 6);
   const read = useAgenda(monday, sunday);
   const { agenda } = useWithPending(read.data);
+  const content = useContent().data;
+  const owes = content !== undefined && dueNow(toShoot(content.requests, content.drops), today).length > 0;
   if (agenda === undefined)
     // The page says the server is silent, once (ETA-05).
     return read.isError ? null : (
@@ -92,7 +101,7 @@ function HerDay({
     <>
       {/* A copy kept on her phone says so: being updated, or old, and why (CRE-02). */}
       <FreshnessNote read={read} from={monday} to={sunday} quiet={quiet} />
-      <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)}>
+      <Glance plan={plan} agenda={agenda} now={now} nowMinute={minuteOf(now, agenda.timeZone)} owes={owes}>
         <Link to="/agenda" className="nv-btn nv-btn--soft nv-btn--sm sc-day__open">
           Ouvrir l’agenda
         </Link>
@@ -118,6 +127,78 @@ function HerDay({
         </section>
       )}
     </>
+  );
+}
+
+/** What the morning card shows of what is due, at most: the rest is counted, Contenu lists it. */
+const TO_SEND_SHOWN = 2;
+
+/**
+ * « À envoyer » (recette visuelle 16/11, CRE-01): the requests of the agency due today or late, the late first, two
+ * lines at most, and « Déposer », the page's one neon, which opens Contenu's sheet on the first. Nothing at all while
+ * nothing is due, or while Contenu is not read: Contenu says when its server is silent, this page does not twice.
+ */
+function ToSend({ today }: { today: string }): JSX.Element | null {
+  const content = useContent();
+  if (content.data === undefined) return null;
+  const due = dueNow(toShoot(content.data.requests, content.data.drops), today);
+  const [first] = due;
+  if (first === undefined) return null;
+  const rest = due.length - TO_SEND_SHOWN;
+  return (
+    <section className="nv-plate sc-send nv-enter" aria-labelledby="sc-send-title">
+      <h2 id="sc-send-title" className="nv-h2">
+        À envoyer
+      </h2>
+      <ul className="sc-send__list">
+        {due.slice(0, TO_SEND_SHOWN).map((item) => (
+          <SendLine key={item.kind === 'script' ? item.drop.id : item.request.id} item={item} today={today} />
+        ))}
+      </ul>
+      {rest > 0 ? (
+        <p className="sc-send__more">
+          {rest > 1 ? `Et ${String(rest)} autres dans Contenu.` : 'Et une autre dans Contenu.'}
+        </p>
+      ) : null}
+      <SendAction item={first} alone={due.length === 1} />
+    </section>
+  );
+}
+
+function SendLine({ item, today }: { item: ToShoot; today: string }): JSX.Element | null {
+  const { request } = item;
+  if (request === null) return null;
+  const due = dueOf(request.dueOn, today);
+  return (
+    <li className="sc-send__line">
+      <span aria-hidden="true">{CATEGORY_EMOJIS[request.category]}</span>
+      <b>{DROP_CATEGORY_LABELS[request.category]}</b>
+      <span className={due.late ? 'sc-send__due sc-send__due--late' : 'sc-send__due'}>{due.text}</span>
+    </li>
+  );
+}
+
+/**
+ * The first one's way: « Déposer » opens Contenu's sheet on its request; a script is begun or continued card by card
+ * from its own page, so it opens Contenu, or the script she began.
+ */
+function SendAction({ item, alone }: { item: ToShoot; alone: boolean }): JSX.Element {
+  const className = 'nv-btn nv-btn--neon nv-btn--sm sc-send__go';
+  if (item.kind === 'script')
+    return (
+      <Link to="/contenu/script/$dropId" params={{ dropId: item.drop.id }} className={className}>
+        Continuer
+      </Link>
+    );
+  const { request } = item;
+  return request.category === 'script' && request.structureVersionId !== null ? (
+    <Link to="/contenu" className={className}>
+      Ouvrir Contenu
+    </Link>
+  ) : (
+    <Link to="/contenu" search={{ demande: request.id }} className={className}>
+      {alone ? 'Déposer' : 'Déposer la première'}
+    </Link>
   );
 }
 

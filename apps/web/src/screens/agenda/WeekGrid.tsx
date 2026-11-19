@@ -108,12 +108,16 @@ export function WeekGrid({
   const root = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
 
-  // The week opens on her day: an hour before now this week, else an hour before her first task.
+  // The week opens on her day: an hour before now this week, or before today's first task when it came earlier (a
+  // task of 10 h seen at night is never above the grid with nothing to say so, CRE-05); else an hour before her first.
   const firstStart = Math.min(...plans.flatMap((plan) => plan.timed.map((item) => item.start)));
+  const todayFirst = Math.min(
+    ...plans.filter((plan) => plan.day === agenda.today).flatMap((plan) => ownTimedStarts(plan)),
+  );
   const thisWeek = days.includes(agenda.today);
   const opensAt = Math.max(
     hours.first * 60,
-    (thisWeek ? nowMinute : Number.isFinite(firstStart) ? firstStart : 9 * 60) - 60,
+    (thisWeek ? Math.min(nowMinute, todayFirst) : Number.isFinite(firstStart) ? firstStart : 9 * 60) - 60,
   );
   const opened = useRef<string | null>(null);
   useEffect(() => {
@@ -272,31 +276,29 @@ export function WeekGrid({
                 <b className="nv-num" aria-hidden="true">
                   {dayNumber(day)}
                 </b>
-                <Routine plan={plans[index]} />
               </button>
             ))}
           </div>
           <div className="ag-wk__all">
-            <span className="ag-wk__label">tâches</span>
+            <span className="ag-wk__label">Sans heure</span>
             {plans.map((plan) => (
               <div key={plan.day} className="ag-wk__cell">
-                {plan.todo
-                  .filter((item) => item.task.when.kind === 'day')
-                  .map((item) => (
-                    <button
-                      key={item.task.id}
-                      type="button"
-                      className="ag-mini"
-                      data-cat={item.task.category}
-                      data-done={item.done ? 'true' : undefined}
-                      onClick={() => {
-                        actions.onTask(item.task, plan.day);
-                      }}
-                    >
-                      <span aria-hidden="true">{CATEGORY_EMOJI[item.task.category]}</span>
-                      <span className="ag-mini__title">{item.task.title}</span>
-                    </button>
-                  ))}
+                {/* Her tasks of the day and her routine alike, by name, as in Jour and on the phone (CRE-06). */}
+                {plan.todo.map((item) => (
+                  <button
+                    key={item.task.id}
+                    type="button"
+                    className="ag-mini"
+                    data-cat={item.task.category}
+                    data-done={item.done ? 'true' : undefined}
+                    onClick={() => {
+                      actions.onTask(item.task, plan.day);
+                    }}
+                  >
+                    <span aria-hidden="true">{CATEGORY_EMOJI[item.task.category]}</span>
+                    <span className="ag-mini__title">{item.task.title}</span>
+                  </button>
+                ))}
                 {plan.suggestions
                   .filter((suggestion) => suggestion.when?.kind === 'day')
                   .map((suggestion) => (
@@ -320,7 +322,7 @@ export function WeekGrid({
           {shifts.length === 0 ? null : (
             <div className="ag-wk__all ag-wk__fans">
               <span className="ag-wk__label" aria-hidden="true">
-                fans
+                Qui répond
               </span>
               {plans.map((plan) => (
                 <div key={plan.day} className="ag-wk__cell">
@@ -427,17 +429,9 @@ export function WeekGrid({
   );
 }
 
-/** Her routine of a day under its date: done out of due, or nothing when none is due. */
-function Routine({ plan }: { plan: DayPlan | undefined }): JSX.Element | null {
-  const routine = plan?.todo.filter((item) => item.task.when.kind === 'routine') ?? [];
-  if (routine.length === 0) return null;
-  const done = routine.filter((item) => item.done).length;
-  return (
-    <span className="ag-wk__routine nv-num" data-full={done === routine.length ? 'true' : undefined}>
-      {done}/{routine.length} routine
-    </span>
-  );
-}
+/** The starts of her own timed tasks of a day: one carried from the day before is not that day's. */
+const ownTimedStarts = (plan: DayPlan): number[] =>
+  plan.timed.filter((item) => !item.carried).map((item) => item.start);
 
 function Column({
   plan,

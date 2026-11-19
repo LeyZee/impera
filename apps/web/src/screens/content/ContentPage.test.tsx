@@ -92,10 +92,10 @@ afterEach(() => {
 });
 
 describe('Contenu, the creator’s (CR-06 d)', () => {
-  it('hides every empty section but Déposer, whose tiles are Reveal’s, without Script', async () => {
+  it('hides every empty section but « Envoyer autre chose », whose tiles are Reveal’s, without Script', async () => {
     serve({ requests: [], drops: [] });
     show();
-    expect(await screen.findByRole('heading', { level: 2, name: 'Déposer' })).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Envoyer autre chose' })).toBeDefined();
     expect(screen.queryByRole('heading', { name: 'À tourner' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Publié' })).toBeNull();
@@ -118,9 +118,39 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     if (section === null) throw new Error('no section');
     const reasons = [...section.querySelectorAll('.ct-card__why')].map((line) => line.textContent);
     expect(reasons).toEqual(['La séance promise', 'Une vidéo pour dimanche']);
-    const late = within(section).getByText('En retard depuis mardi');
+    // Its date, not only its weekday (recette visuelle 16/11, CRE-13).
+    const late = within(section).getByText('En retard depuis mar. 3 nov.');
     expect(late.className).toContain('ct-due--late');
     expect(within(section).getByText('Pour lundi').className).not.toContain('late');
+    // The late one's « Déposer » is the screen's one neon; the other stays soft.
+    const drops = within(section).getAllByRole('button', { name: 'Déposer' });
+    expect(drops.map((button) => button.className.includes('nv-btn--neon'))).toEqual([true, false]);
+    expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
+  });
+
+  it('says « Pour aujourd’hui » in ink, and lights nothing while nothing is due', async () => {
+    serve({ requests: [requestOf({ dueOn: '2026-11-09', reason: 'Une vidéo pour lundi' })], drops: [] });
+    show();
+    const section = (await screen.findByRole('heading', { name: 'À tourner' })).closest('section');
+    if (section === null) throw new Error('no section');
+    expect(within(section).getByRole('button', { name: 'Déposer' }).className).not.toContain('nv-btn--neon');
+    cleanup();
+    serve({ requests: [requestOf({ dueOn: '2026-11-05', reason: 'Une story pour ce soir' })], drops: [] });
+    show();
+    expect((await screen.findByText('Pour aujourd’hui')).className).toContain('ct-due--today');
+  });
+
+  it('opens the sheet on the request Aujourd’hui sent her to drop, then forgets it (CRE-01)', async () => {
+    const request = requestOf({ dueOn: '2026-11-04', reason: 'La séance promise' });
+    serve({ requests: [request], drops: [] });
+    const onAsked = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ContentPage onOpenScript={openScript} asked={request.id} onAsked={onAsked} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('dialog')).toBeDefined();
+    expect(onAsked).toHaveBeenCalled();
   });
 
   it('begins a script asked with its version card by card, and opens it (SC-02 lot b2)', async () => {
@@ -274,7 +304,7 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(within(section).getByText(/Un fichier choisi n’est pas de ce dépôt/u)).toBeDefined();
     // Still to go up: « En route » comes before « Déposer » (CRE-09).
     const titles = [...document.querySelectorAll('h2')].map((title) => title.textContent);
-    expect(titles.indexOf('En route')).toBeLessThan(titles.indexOf('Déposer'));
+    expect(titles.indexOf('En route')).toBeLessThan(titles.indexOf('Envoyer autre chose'));
   });
 
   it('tells a server that refuses from a cut network, with « Réessayer » (CRE-10)', async () => {

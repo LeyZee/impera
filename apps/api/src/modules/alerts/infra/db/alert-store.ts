@@ -10,6 +10,10 @@ import {
   newId,
   SYSTEM_ALERT_CODES,
   SystemAlertCodeSchema,
+  acceptsRouting,
+  CreatorAlertCodeSchema,
+  CreatorAlertModeSchema,
+  CreatorAlertRoleSchema,
   type CreatorId,
   type CustomAlert,
   type CustomAlertBody,
@@ -19,6 +23,7 @@ import {
 } from '@impera/contracts';
 import { and, enterCreator, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
 
+import { creatorAlertLines, routeRowsOf } from '../../domain/creator-alerts';
 import type { AlertStore } from '../../domain/ports';
 
 type Row = typeof schema.customAlerts.$inferSelect;
@@ -133,7 +138,11 @@ export function createDrizzleAlertStore(db: Database): AlertStore {
       id: newId(AuditEntryIdSchema),
       userId,
       action,
-      entity: action.startsWith('system_alert') ? 'system_alert' : 'custom_alert',
+      entity: action.startsWith('system_alert')
+        ? 'system_alert'
+        : action.startsWith('creator_alert_route')
+          ? 'creator_alert_route'
+          : 'custom_alert',
       entityId,
       details,
     });
@@ -234,6 +243,14 @@ export function createDrizzleAlertStore(db: Database): AlertStore {
     }
     return rows;
   }
+
+  /** Her stored choices of the Alertes tab (ADR 0150), inside her RLS; each row parsed, the table is a boundary. */
+  const routeRows = async (tx: Transaction) =>
+    (await tx.select().from(schema.creatorAlertRoutes)).map((row) => ({
+      alertCode: CreatorAlertCodeSchema.parse(row.alertCode),
+      role: CreatorAlertRoleSchema.parse(row.role),
+      mode: CreatorAlertModeSchema.parse(row.mode),
+    }));
 
   return {
     async view() {
@@ -387,6 +404,50 @@ export function createDrizzleAlertStore(db: Database): AlertStore {
           ).map((row) => SystemAlertCodeSchema.parse(row.code)),
         );
         return new Set(SYSTEM_ALERT_CODES.filter((code) => isLocked(code) || !off.has(code)));
+      });
+    },
+    async creatorAlerts(creatorId) {
+      return db.transaction(async (tx) => {
+        if (!(await creatorIds(tx)).includes(creatorId)) return 'unknown_creator' as const;
+        await enterCreator(tx, creatorId, [creatorId]);
+        return { creatorId, alerts: creatorAlertLines(await routeRows(tx)) };
+      });
+    },
+
+    async setCreatorAlert(creatorId, code, routes, userId) {
+      if (!acceptsRouting(code, routes)) return 'locked';
+      return db.transaction(async (tx) => {
+        if (!(await creatorIds(tx)).includes(creatorId)) return 'unknown_creator' as const;
+        await enterCreator(tx, creatorId, [creatorId]);
+        const before = creatorAlertLines(await routeRows(tx)).find((l) => l.code === code);
+        const unchanged =
+          before !== undefined &&
+          !before.isDefault &&
+          JSON.stringify(before.routes) === JSON.stringify(routes);
+        if (unchanged) return before;
+        for (const row of routeRowsOf(code, routes)) {
+          await tx
+            .insert(schema.creatorAlertRoutes)
+            .values({
+              creatorId,
+              alertCode: row.alertCode,
+              role: row.role,
+              mode: row.mode,
+              updatedBy: userId,
+            })
+            .onConflictDoUpdate({
+              target: [
+                schema.creatorAlertRoutes.creatorId,
+                schema.creatorAlertRoutes.alertCode,
+                schema.creatorAlertRoutes.role,
+              ],
+              set: { mode: row.mode, updatedBy: userId, updatedAt: sql`now()` },
+            });
+        }
+        await audit(tx, 'creator_alert_route.update', creatorId, userId, { code, routes });
+        const line = creatorAlertLines(await routeRows(tx)).find((l) => l.code === code);
+        if (line === undefined) throw new Error('creator alert without a line');
+        return line;
       });
     },
   };

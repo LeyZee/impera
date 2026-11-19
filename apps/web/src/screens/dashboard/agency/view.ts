@@ -60,10 +60,10 @@ export function shareOf(part: number, whole: number): number {
  * largest fractions, the first one on a tie. Only the percentages move, never an amount (recette du 13/11 : 17 + 17 +
  * 42 + 25 = 101 %). Zeros for an empty whole.
  */
-export function sharesOf(parts: readonly number[], whole: number): number[] {
+export function sharesOf(parts: readonly number[], whole: number, points = 100): number[] {
   if (whole <= 0) return parts.map(() => 0);
-  // In whole cents × 100, never in floats: two equal remainders stay equal, the tie goes to the first part.
-  const scaled = parts.map((part) => Math.max(0, part) * 100);
+  // In whole cents × points, never in floats: two equal remainders stay equal, the tie goes to the first part.
+  const scaled = parts.map((part) => Math.max(0, part) * points);
   const shares = scaled.map((one) => Math.floor(one / whole));
   const target = Math.round(scaled.reduce((sum, one) => sum + one, 0) / whole);
   const order = scaled
@@ -76,6 +76,25 @@ export function sharesOf(parts: readonly number[], whole: number): number[] {
     left -= 1;
   }
   return shares;
+}
+
+/** « 37,5 % », « 62 % »: a share with its tenth when it has one, a non-breaking space before the sign. */
+export function percentText(share: number): string {
+  return `${share.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u00a0%`;
+}
+
+/**
+ * How « Les fans qui paient » names its biggest spenders: ten at most, the count they are below ten, one alone in the
+ * singular (PAY-16: « Les 10 fans » said of three).
+ */
+export function topFansWords(paying: number): { readonly lead: string; readonly short: string } {
+  const count = Math.min(10, Math.max(1, paying));
+  return count === 1
+    ? { lead: 'Le fan qui dépense le plus fait', short: 'le plus gros fan' }
+    : {
+        lead: `Les ${String(count)} fans qui dépensent le plus font`,
+        short: `les ${String(count)} plus gros fans`,
+      };
 }
 
 /** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
@@ -113,7 +132,10 @@ function split(figures: MoneyFigures): Record<MoneyPart['key'], number> {
 export interface MoneyShares {
   /** Of the revenue, the four parts adding up to 100. */
   readonly ofRevenue: Readonly<Record<MoneyPart['key'], number>>;
-  /** Of the net, the two parts adding up to 100. */
+  /**
+   * Of the net, the two parts adding up to 100, to the tenth: a percentage agreed with a creator is often a half
+   * (37,5 %), and her sheet says it so; the Dashboard never says « 37 % » for it (PAY-16).
+   */
   readonly ofNet: Readonly<Record<'creator' | 'agency', number>>;
 }
 
@@ -123,10 +145,14 @@ export function moneyShares(figures: MoneyFigures): MoneyShares {
     [parts.fansVat, parts.commission, parts.creator, parts.agency],
     figures.revenueMinor,
   );
-  const [creatorOfNet = 0, agencyOfNet = 0] = sharesOf([parts.creator, parts.agency], figures.netMinor);
+  const [creatorOfNet = 0, agencyOfNet = 0] = sharesOf(
+    [parts.creator, parts.agency],
+    figures.netMinor,
+    1_000,
+  );
   return {
     ofRevenue: { fansVat, commission, creator, agency },
-    ofNet: { creator: creatorOfNet, agency: agencyOfNet },
+    ofNet: { creator: creatorOfNet / 10, agency: agencyOfNet / 10 },
   };
 }
 
@@ -198,7 +224,7 @@ export function moneyTip(input: {
       `${String(input.revenueShare ?? shareOf(input.cents, input.revenueMinor))}\u00a0%`,
     ]);
   if (input.netMinor !== null && input.netMinor > 0)
-    rows.push(['Part du net', `${String(input.netShare ?? shareOf(input.cents, input.netMinor))}\u00a0%`]);
+    rows.push(['Part du net', percentText(input.netShare ?? shareOf(input.cents, input.netMinor))]);
   return { title: input.title, rows, text: input.text };
 }
 
