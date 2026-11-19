@@ -27,6 +27,7 @@ Entraîner un modèle n'a pas de sens ici : quelques dizaines d'accords et de re
 - Quand elle refuse une idée, elle peut dire pourquoi d'un geste : « pas mon style », « trop long à tourner », « déjà fait », « pas maintenant ». La raison est facultative. « Pas maintenant » ne compte pas contre le format.
 - Les gestes récents pèsent plus que les anciens ; la durée est un réglage d'agence.
 - La génération reçoit le profil de goûts comme des faits, à côté du profil de contenu. Le code écarte ensuite toute idée d'un format ou d'un thème qu'elle refuse nettement, sauf la part de nouveauté du § 4.
+- Le profil de goûts ne contient **aucune donnée de fan** et rien de l'intime de sa persona : seulement des formats, des thèmes, des efforts de tournage et ses gestes sur des idées.
 - L'agence voit le profil de goûts et peut remettre un format à zéro. La créatrice ne le voit pas (ADR 0042).
 
 ### 3. Rejouer ce qui a marché
