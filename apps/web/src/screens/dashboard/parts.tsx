@@ -52,8 +52,6 @@ interface TipContent {
   readonly rows?: readonly (readonly [string, string])[];
   /** A line chart's rows: each row's series drawn as a short stroke before its label (dataviz: line keys). */
   readonly rowKeys?: readonly ('solid' | 'dashed')[];
-  /** The solid stroke's trend: its curve's green or amber, the same colour as the line it reads. */
-  readonly trend?: 'up' | 'down';
   /** As narrow as its words: a phone's curve tip, which must not hide the curve it reads. */
   readonly compact?: boolean;
   readonly text?: string;
@@ -76,12 +74,6 @@ export interface TipOptions {
    * side near the edge, so it never covers the figures over the chart (recette DSH-04).
    */
   readonly marker?: number;
-  /**
-   * With `marker`, the viewport y of the plot's top: the tip sits over it, centred on the marker, in the band the chart
-   * reserves above its plot, so it touches neither the figures nor a stroke (relecture Design 19/11); it slides left or
-   * right only to stay inside the chart's box.
-   */
-  readonly markerTop?: number;
 }
 
 export interface FloatingTip {
@@ -121,7 +113,7 @@ interface PlacedTip {
   /** Under the box, or over it when the window has no room under: never on it (ADR 0106 § 13). */
   around?: Beside;
   /** Inside the box, beside the marker at this x. */
-  marker?: { readonly box: Beside; readonly x: number; readonly top?: number };
+  marker?: { readonly box: Beside; readonly x: number };
 }
 
 /**
@@ -131,16 +123,7 @@ interface PlacedTip {
 function placedOn(content: TipContent, box: DOMRect, options: TipOptions | undefined): PlacedTip {
   const sides = { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
   if (options?.marker !== undefined) {
-    return {
-      content,
-      x: options.marker,
-      y: box.top,
-      marker: {
-        box: sides,
-        x: options.marker,
-        ...(options.markerTop === undefined ? {} : { top: options.markerTop }),
-      },
-    };
+    return { content, x: options.marker, y: box.top, marker: { box: sides, x: options.marker } };
   }
   if (options?.around === true) return { content, x: box.left, y: box.bottom, around: sides };
   if (options?.above === true || options?.beside === true) {
@@ -202,14 +185,7 @@ export function markerPlacement(
   x: number,
   tip: { readonly width: number; readonly height: number },
   view: { readonly width: number; readonly height: number },
-  strokeTop?: number,
 ): { left: number; top: number } {
-  if (strokeTop !== undefined) {
-    // Over the plot, centred on the marker, slid only to stay inside the chart's box and the window.
-    const inside = Math.min(Math.max(box.left, x - tip.width / 2), box.right - tip.width);
-    const left = Math.min(Math.max(TIP_MARGIN, inside), view.width - tip.width - TIP_MARGIN);
-    return { left, top: Math.max(TIP_MARGIN, strokeTop - TIP_GAP - tip.height) };
-  }
   const right = x + TIP_GAP;
   const wanted = right + tip.width <= box.right ? right : x - TIP_GAP - tip.width;
   const left = Math.min(Math.max(TIP_MARGIN, wanted), view.width - tip.width - TIP_MARGIN);
@@ -232,7 +208,6 @@ export function useFloatingTip(): FloatingTip {
         tip.marker.x,
         { width: element.offsetWidth, height: element.offsetHeight },
         { width: window.innerWidth, height: window.innerHeight },
-        tip.marker.top,
       );
       element.style.left = `${String(placed.left)}px`;
       element.style.top = `${String(placed.top)}px`;
@@ -343,7 +318,7 @@ export function useFloatingTip(): FloatingTip {
   // On the body: `tipPlacement` works in viewport coordinates, a transformed ancestor would shift it.
   const element = createPortal(
     <div
-      className={`nv-tip nv-glass nv-glass--thick${content?.compact === true ? ' db-tip--compact' : ''}${content?.trend === undefined ? '' : ` db-tip--${content.trend}`}${tip === null ? '' : ' is-on'}`}
+      className={`nv-tip nv-glass nv-glass--thick${content?.compact === true ? ' db-tip--compact' : ''}${tip === null ? '' : ' is-on'}`}
       ref={ref}
       role="tooltip"
     >

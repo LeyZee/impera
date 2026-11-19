@@ -7,12 +7,12 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
 
-import { AgencyInsightsPanel, sparkValues } from './AgencyInsights';
+import { AgencyInsightsPanel, readingOf, sparkValues } from './AgencyInsights';
 import { AGENCY_WEEK, LINA } from './fixture';
 
 const reads: string[] = [];
@@ -499,7 +499,7 @@ describe('the days read and their comparison (ADR 0146)', () => {
     expect(screen.getByText('vs semaine précédente')).toBeTruthy();
   });
 
-  it('draws the curve with its comparison and gives both amounts of a day on hover', async () => {
+  it('draws the curve with its comparison and reads a day in the lead’s note, in place, with no floating tip', async () => {
     serve(200, AGENCY_WEEK);
     show();
     await screen.findByRole('heading', { name: /D’où vient l’argent/u });
@@ -507,30 +507,44 @@ describe('the days read and their comparison (ADR 0146)', () => {
     if (plot === null) throw new Error('curve');
     expect(plot.querySelector('.ins-curve__compared')).not.toBeNull();
     const layer = plot.querySelector('.ins-curve__hits');
-    if (layer === null) throw new Error('layer');
-    // To the far right: the last day.
+    const note = document.querySelector('.ins-lead__note');
+    if (layer === null || note === null) throw new Error('layer');
+    const [rest, read] = Array.from(note.children);
+    expect(rest?.textContent).toMatch(/\(1\s560\s€\)/u);
+    expect(rest?.getAttribute('aria-hidden')).toBe('false');
+    // To the far right: the last day, its revenue and the day compared, on the sentence's line.
     fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
-    const bubble = await screen.findByRole('tooltip');
-    // Every media query matches here, a phone's: the compact tip, amounts and the day compared only.
-    expect(bubble.textContent).toMatch(/270\s€ · 30 oct\./u);
-    expect(bubble.textContent).not.toContain('Chiffre d’affaires');
-    // The tip's stroke takes the curve's colour (relecture Design 19/11).
-    expect(bubble.classList.contains('db-tip--up')).toBe(true);
+    expect(read?.textContent).toMatch(/^ven\. 6 nov\. : 320\s€, contre 270\s€ le 30 oct\.$/u);
+    expect(read?.getAttribute('aria-hidden')).toBe('false');
+    // The sentence keeps its place, hidden: nothing moves.
+    expect(rest?.getAttribute('aria-hidden')).toBe('true');
     expect(plot.querySelector('.ins-curve__hair')).not.toBeNull();
-    // A wide screen: each amount with its label.
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({
-        matches: false,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-      })),
+    expect(document.querySelector('.nv-tip.is-on')).toBeNull();
+    // Off the curve, the sentence comes back.
+    fireEvent.pointerLeave(layer, { pointerType: 'mouse' });
+    expect(read?.textContent).toBe('');
+    expect(rest?.getAttribute('aria-hidden')).toBe('false');
+    expect(plot.querySelector('.ins-curve__hair')).toBeNull();
+    // A finger reads the same way, and the day stays when the finger lifts, until a tap off the curve.
+    fireEvent.pointerDown(layer, { clientX: 10, clientY: 10, pointerType: 'touch' });
+    fireEvent.pointerLeave(layer, { pointerType: 'touch' });
+    expect(read?.textContent).toContain('ven. 6 nov.');
+    fireEvent.pointerDown(document.body, { pointerType: 'touch' });
+    expect(read?.textContent).toBe('');
+  });
+
+  it('reads a day with nothing compared as its revenue alone', () => {
+    expect(readingOf({ key: 'x', title: 'mar. 10 nov.', cents: 15_300, compared: null })).toMatch(
+      /^mar\. 10 nov\. : 153\s€$/u,
     );
-    fireEvent.pointerMove(layer, { clientX: 12, clientY: 10 });
-    await waitFor(() => {
-      expect(screen.getByRole('tooltip').textContent).toContain('Comparé, 30 oct.');
-    });
-    expect(screen.getByRole('tooltip').textContent).toContain('Chiffre d’affaires');
+    expect(
+      readingOf({
+        key: 'x',
+        title: 'mar. 10 nov.',
+        cents: 15_300,
+        compared: { title: '10 oct.', cents: 26_860 },
+      }),
+    ).toMatch(/^mar\. 10 nov\. : 153\s€, contre 268,60\s€ le 10 oct\.$/u);
   });
 
   it('colours the curve by the trend: green above the period compared, amber below, never red (lot couleurs)', async () => {

@@ -45,23 +45,21 @@
 .ins-curve {
   --_trend: var(--nv-trend-up);
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
 }
-/* Over the plot, a band as tall as the tip plus 8px (relecture Design 19/11): the tip lives there, over the point,
-   so it never covers the figures above nor a stroke, whatever the day. A phone's tip is the compact one. */
+/* No tip floats over this curve (relecture Design 19/11): the note under the figure reads the day in place, so the plot
+   takes the card's free height, 96px at least, and the card keeps its size. */
 .ins-curve__plot {
   position: relative;
-  height: 68px;
-  margin-top: 90px;
-}
-@media (max-width: 640px) {
-  .ins-curve__plot {
-    margin-top: 82px;
-  }
+  flex: 1 1 96px;
+  min-height: 96px;
 }
 .ins-curve__plot svg {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -194,6 +192,23 @@
 .ins-figures > .ins-tiles,
 .ins-tiles--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* The lead's note: the day read on the curve lies over the sentence, in its box, which keeps its place while hidden,
+   so reading a day moves nothing; the day stays on one line. */
+.ins-lead__note {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ins-lead__note > span:last-child {
+  position: absolute;
+  inset: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ins-lead__note > [aria-hidden='true'] {
+  visibility: hidden;
 }
 .ins-lead__sub {
   font-size: var(--nv-text-caption);

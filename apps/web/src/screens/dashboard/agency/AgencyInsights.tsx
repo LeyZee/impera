@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import {
   createContext,
   useContext,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -99,11 +100,6 @@ function Delta({
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
-/** Under 640px the curve's tip is the compact one. */
-function narrowTip(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
-}
-
 /** One point of the curve: its label, its revenue, and the compared day's when the register holds it. */
 interface CurvePoint {
   readonly key: string;
@@ -154,22 +150,55 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
 }
 
 /**
+ * What the lead's note says while a day of the curve is read (relecture Design 19/11): the day, its revenue, and the
+ * day compared when the register holds it, « mar. 10 nov. : 153 €, contre 268,60 € le 10 oct. ». No floating tip on
+ * this curve: the note under the figure reads the day in place, the curve keeps all its height.
+ */
+export function readingOf(point: CurvePoint): string {
+  const day = `${point.title} : ${euros(point.cents)}`;
+  return point.compared === null
+    ? day
+    : `${day}, contre ${euros(point.compared.cents)} le ${point.compared.title}`;
+}
+
+/**
  * The revenue day by day under the lead figure, the comparison as a discreet dashed line behind, aligned day for day.
- * A hairline and a dot follow the pointer or the finger to the nearest day, and the tip gives the date, then both
- * amounts with their strokes (dataviz: one tip, every series). The subtitle says the days compared: no legend.
+ * A hairline and a dot follow the pointer or the finger to the nearest day, and the lead's note reads that day in place
+ * (`onRead`), back to its sentence when the pointer leaves. The curve takes the card's free height, 96px at least.
  */
 function RevenueCurve({
   insights,
-  tip,
   tone,
+  onRead,
 }: {
   insights: AgencyInsights;
-  tip: FloatingTip;
   /** Above the period compared or nothing to compare with, or below it: the same word as the « n % » beside. */
   tone: Trend;
+  /** The day read, as the note says it, or null when the pointer or the finger leaves the curve. */
+  onRead: (reading: string | null) => void;
 }): JSX.Element | null {
   const [hover, setHover] = useState<number | null>(null);
   const fill = useId();
+  const layer = useRef<HTMLDivElement>(null);
+  // A finger has no hover: the day a tap reads stays until a tap off the curve or a scroll puts the sentence back.
+  const reading = hover !== null;
+  useEffect(() => {
+    if (!reading) return undefined;
+    const done = (): void => {
+      setHover(null);
+      onRead(null);
+    };
+    const onDown = (event: PointerEvent): void => {
+      if (event.target instanceof Node && layer.current?.contains(event.target) === true) return;
+      done();
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    addEventListener('scroll', done, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      removeEventListener('scroll', done, { capture: true });
+    };
+  }, [reading, onRead]);
   const points = curvePoints(insights);
   if (points.length < 2 || points.every((one) => one.cents === 0 && (one.compared?.cents ?? 0) === 0))
     return null;
@@ -194,52 +223,13 @@ function RevenueCurve({
     last === undefined || line[0] === undefined
       ? ''
       : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(line[0].x)},${String(frame.height)} Z`;
-  const pick = (event: ReactPointerEvent<HTMLDivElement>): { index: number; x: number; top: number } => {
+  const read = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const box = event.currentTarget.getBoundingClientRect();
     const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
     const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
     setHover(index);
-    return {
-      index,
-      x: box.left + ((line[index]?.x ?? 0) / frame.width) * box.width,
-      // The plot's top: the tip lives in the band reserved over it.
-      top: event.currentTarget.parentElement?.getBoundingClientRect().top ?? box.top,
-    };
-  };
-  const tipAt = ({
-    index,
-    x,
-    top,
-  }: {
-    index: number;
-    x: number;
-    top: number;
-  }): ReturnType<FloatingTip['bind']> => {
     const one = points[index];
-    if (one === undefined) return tip.bind({ title: '' });
-    return tip.bind(
-      {
-        title: one.title,
-        // A phone's tip says only the amounts and the day compared: the labels took half the curve (recette DSH-04).
-        rows: narrowTip()
-          ? [
-              [euros(one.cents), ''],
-              ...(one.compared === null
-                ? []
-                : [[`${euros(one.compared.cents)} · ${one.compared.title}`, ''] as const]),
-            ]
-          : [
-              ['Chiffre d’affaires', euros(one.cents)],
-              ...(one.compared === null
-                ? []
-                : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
-            ],
-        rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
-        trend: tone,
-        compact: narrowTip(),
-      },
-      { marker: x, markerTop: top },
-    );
+    onRead(one === undefined ? null : readingOf(one));
   };
   return (
     <div className={`ins-curve ins-curve--${tone}`}>
@@ -287,15 +277,13 @@ function RevenueCurve({
         <div
           className="ins-curve__hits"
           aria-hidden="true"
-          onPointerMove={(event) => {
-            tipAt(pick(event)).onPointerMove(event);
-          }}
-          onPointerDown={(event) => {
-            tipAt(pick(event)).onPointerDown(event);
-          }}
+          onPointerMove={read}
+          onPointerDown={read}
+          ref={layer}
           onPointerLeave={(event) => {
+            if (event.pointerType !== 'mouse') return;
             setHover(null);
-            tip.bind({ title: '' }).onPointerLeave(event);
+            onRead(null);
           }}
         />
       </div>
@@ -543,6 +531,7 @@ function Figures({
     current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
   const compared = comparable(insights);
+  const [reading, setReading] = useState<string | null>(null);
   const sparkOf = (
     pick: (day: AgencyInsights['days'][number]) => number,
     tone: Trend | 'agency' | 'creator',
@@ -669,14 +658,18 @@ function Figures({
             />
             <span className="nv-figure__note">
               <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
-              <span>{leadNote(insights)}</span>
+              {/* The day read on the curve takes the sentence's place; both share one cell, so nothing moves. */}
+              <span className="ins-lead__note">
+                <span aria-hidden={reading !== null}>{leadNote(insights)}</span>
+                <span aria-hidden={reading === null}>{reading ?? ''}</span>
+              </span>
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
           </div>
           <RevenueCurve
             insights={insights}
-            tip={tip}
             tone={trendOf(current.revenueMinor, previous.revenueMinor, compared)}
+            onRead={setReading}
           />
         </div>
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
