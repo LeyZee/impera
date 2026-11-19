@@ -36,7 +36,11 @@ export interface Confirm {
 }
 
 /** Why a « Sync » did not store a session: each one has its cause and the gesture that mends it. */
-export type SyncFailure = Exclude<RevealSynced['state'], 'synced'> | 'no-session';
+/**
+ * `extension`: the extension's own worker did not answer the popup (a worker left over after a reload, retour PC du
+ * 19/11): never said to be the CRM's fault.
+ */
+export type SyncFailure = Exclude<RevealSynced['state'], 'synced'> | 'no-session' | 'extension';
 
 /** What the last gesture left under its account: the session stored, or why not. */
 export type SyncOutcome =
@@ -193,6 +197,12 @@ export function failureOf(
       };
     case 'unreachable':
       return { cause: `Le CRM ne répond pas à ${crm}.`, gesture: 'Vérifie qu’il tourne, puis réessaie.' };
+    case 'extension':
+      return {
+        cause: 'L’extension ne répond plus.',
+        gesture:
+          'Recharge-la (chrome://extensions, flèche ronde d’Impera), puis l’onglet Reveal, et resynchronise.',
+      };
   }
 }
 

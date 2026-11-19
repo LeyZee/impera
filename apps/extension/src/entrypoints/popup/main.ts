@@ -225,7 +225,8 @@ async function readSession(accountId: PlatformAccountId): Promise<void> {
       ? null
       : (RevealReadSchema.safeParse(await ask({ type: 'popup/reveal-read', tabId, accountId })).data ?? null);
   syncPending = null;
-  if (read === null) syncOutcome = { kind: 'failed', accountId, failure: 'unreachable' };
+  // No answer here is the extension's own worker, never the CRM: reading the tab asks nothing of it.
+  if (read === null) syncOutcome = { kind: 'failed', accountId, failure: 'extension' };
   else if (read.state !== 'held') syncOutcome = { kind: 'failed', accountId, failure: read.state };
   else {
     syncConfirm = { accountId, modelId: read.modelId, seen: read.seen };
@@ -247,8 +248,9 @@ async function sendSession(): Promise<void> {
   drawSync();
   const synced = RevealSyncedSchema.safeParse(await ask({ type: 'popup/reveal-send', accountId }));
   syncPending = null;
+  // The worker answers « unreachable » itself when the CRM is silent; no answer at all is the worker's.
   syncOutcome = !synced.success
-    ? { kind: 'failed', accountId, failure: 'unreachable' }
+    ? { kind: 'failed', accountId, failure: 'extension' }
     : synced.data.state === 'synced'
       ? {
           kind: 'synced',

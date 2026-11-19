@@ -309,6 +309,7 @@ describe('failureOf', () => {
       'other-member',
       'refused',
       'unreachable',
+      'extension',
     ] as const;
     for (const failure of failures) {
       const { cause, gesture } = failureOf(failure, 'crm.test');
@@ -316,6 +317,13 @@ describe('failureOf', () => {
       expect(gesture.endsWith('.')).toBe(true);
     }
     expect(failureOf('refused', 'crm.test').gesture).not.toContain('bien connecté');
+  });
+
+  // Retour PC du 19/11: a silent worker after a reload read « Le CRM ne répond pas » while the CRM answered.
+  it('never blames the CRM for the extension’s own silence, and says how to reload it', () => {
+    const { cause, gesture } = failureOf('extension', 'crm.test');
+    expect(cause).not.toContain('CRM');
+    expect(gesture).toContain('chrome://extensions');
   });
 });
 
