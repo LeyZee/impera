@@ -56,4 +56,12 @@ describe('markerPlacement', () => {
     expect(place.left).toBe(300 - 8 - 180);
     expect(place.top).toBeGreaterThanOrEqual(plot.top);
   });
+
+  it('sits over the highest stroke near the marker, centred on it, slid only to stay in the chart', () => {
+    expect(markerPlacement(plot, 200, tip, phone, 330)).toEqual({ left: 110, top: 330 - 8 - 80 });
+    // Near the right edge: slid left to end at the chart's right, still over the strokes.
+    expect(markerPlacement(plot, 360, tip, phone, 330)).toEqual({ left: 370 - 180, top: 242 });
+    // Near the left edge: starts at the chart's left.
+    expect(markerPlacement(plot, 30, tip, phone, 330).left).toBe(20);
+  });
 });

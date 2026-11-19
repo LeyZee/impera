@@ -76,6 +76,12 @@ export interface TipOptions {
    * side near the edge, so it never covers the figures over the chart (recette DSH-04).
    */
   readonly marker?: number;
+  /**
+   * With `marker`, the viewport y of the highest stroke near it: the tip sits over that, centred on the marker, in the
+   * band between the figures and the curve, never on a line (relecture Design 19/11); it slides left or right only to
+   * stay inside the chart's box.
+   */
+  readonly markerTop?: number;
 }
 
 export interface FloatingTip {
@@ -115,7 +121,7 @@ interface PlacedTip {
   /** Under the box, or over it when the window has no room under: never on it (ADR 0106 § 13). */
   around?: Beside;
   /** Inside the box, beside the marker at this x. */
-  marker?: { readonly box: Beside; readonly x: number };
+  marker?: { readonly box: Beside; readonly x: number; readonly top?: number };
 }
 
 /**
@@ -125,7 +131,16 @@ interface PlacedTip {
 function placedOn(content: TipContent, box: DOMRect, options: TipOptions | undefined): PlacedTip {
   const sides = { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
   if (options?.marker !== undefined) {
-    return { content, x: options.marker, y: box.top, marker: { box: sides, x: options.marker } };
+    return {
+      content,
+      x: options.marker,
+      y: box.top,
+      marker: {
+        box: sides,
+        x: options.marker,
+        ...(options.markerTop === undefined ? {} : { top: options.markerTop }),
+      },
+    };
   }
   if (options?.around === true) return { content, x: box.left, y: box.bottom, around: sides };
   if (options?.above === true || options?.beside === true) {
@@ -187,7 +202,14 @@ export function markerPlacement(
   x: number,
   tip: { readonly width: number; readonly height: number },
   view: { readonly width: number; readonly height: number },
+  strokeTop?: number,
 ): { left: number; top: number } {
+  if (strokeTop !== undefined) {
+    // Over the strokes, centred on the marker, slid only to stay inside the chart's box and the window.
+    const inside = Math.min(Math.max(box.left, x - tip.width / 2), box.right - tip.width);
+    const left = Math.min(Math.max(TIP_MARGIN, inside), view.width - tip.width - TIP_MARGIN);
+    return { left, top: Math.max(TIP_MARGIN, strokeTop - TIP_GAP - tip.height) };
+  }
   const right = x + TIP_GAP;
   const wanted = right + tip.width <= box.right ? right : x - TIP_GAP - tip.width;
   const left = Math.min(Math.max(TIP_MARGIN, wanted), view.width - tip.width - TIP_MARGIN);
@@ -210,6 +232,7 @@ export function useFloatingTip(): FloatingTip {
         tip.marker.x,
         { width: element.offsetWidth, height: element.offsetHeight },
         { width: window.innerWidth, height: window.innerHeight },
+        tip.marker.top,
       );
       element.style.left = `${String(placed.left)}px`;
       element.style.top = `${String(placed.top)}px`;
