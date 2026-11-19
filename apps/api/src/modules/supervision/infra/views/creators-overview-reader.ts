@@ -27,7 +27,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
         const stopped = z.array(SwitchSchema).parse(
           (
             await tx.execute(
-              sql`select distinct on (scope) scope, active from kill_switches
+              sql`select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active from kill_switches
                   where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId}::uuid)
                   order by scope, set_at desc`,
             )

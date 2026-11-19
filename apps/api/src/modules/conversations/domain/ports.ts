@@ -306,9 +306,17 @@ interface KillSwitches {
    * creator does not exist (nothing to change).
    */
   lockCreator(): Promise<boolean>;
-  isOn(): Promise<{ readonly global: boolean; readonly creator: boolean }>;
-  /** Stamped by the database clock once the lock is held, so the later change is always the latest row. */
-  setCreator(entry: { active: boolean; reason: string; setBy: string }): Promise<void>;
+  /** `creatorUntil`: her switch is a pause that lifts itself then (ADR 0148 § 1); `null` otherwise. */
+  isOn(): Promise<{
+    readonly global: boolean;
+    readonly creator: boolean;
+    readonly creatorUntil: Date | null;
+  }>;
+  /**
+   * Stamped by the database clock once the lock is held, so the later change is always the latest row. `until` makes
+   * an Arrêt a pause: on until then, off after, without another row.
+   */
+  setCreator(entry: { active: boolean; reason: string; setBy: string; until?: Date }): Promise<void>;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { CreatorIdSchema } from './ids';
 import { MinuteOfDaySchema } from './scheduling';
 
 /**
@@ -281,3 +282,95 @@ export type AgentHoursView = z.infer<typeof AgentHoursViewSchema>;
 /** `PUT /v1/creators/:id/agent-hours`: her hours, or `null` to go back to the defaults. */
 export const SetAgentHoursBodySchema = z.object({ hours: AgentHoursSchema.nullable() });
 export type SetAgentHoursBody = z.infer<typeof SetAgentHoursBodySchema>;
+
+/** A date on her clock, « 2026-11-20 ». */
+export const LocalDateSchema = z.iso.date();
+export type LocalDate = z.infer<typeof LocalDateSchema>;
+
+/** A range inside one day of her clock: from `startMinute` to `endMinute`, 1440 being midnight at its end. */
+export const DayRangeSchema = z
+  .object({ startMinute: MinuteOfDaySchema, endMinute: z.number().int().min(1).max(MINUTES_PER_DAY) })
+  .refine((range) => range.startMinute < range.endMinute, {
+    message: 'Une plage doit finir après son début',
+    path: ['endMinute'],
+  });
+export type DayRange = z.infer<typeof DayRangeSchema>;
+
+export const AGENT_EXCEPTION_RANGES_MAX = 8;
+
+const DayRangesSchema = z
+  .array(DayRangeSchema)
+  .max(AGENT_EXCEPTION_RANGES_MAX)
+  // One issue per pair, on the later range: two ranges of the same day never overlap (the screen joins them).
+  .superRefine((ranges, context) => {
+    ranges.forEach((later, j) => {
+      const earlier = ranges
+        .slice(0, j)
+        .find((other) => other.startMinute < later.endMinute && later.startMinute < other.endMinute);
+      if (earlier === undefined) return;
+      context.addIssue({
+        code: 'custom',
+        message: `Chevauche la plage ${clockWords(earlier.startMinute)}${NBSP}–${NBSP}${earlier.endMinute === MINUTES_PER_DAY ? 'minuit' : clockWords(earlier.endMinute)}`,
+        path: [j, 'startMinute'],
+      });
+    });
+  });
+
+/**
+ * One date out of her week type (ADR 0148 § 3): that day, on her clock, these ranges replace her reply slots, a slot of
+ * the day before that runs past midnight included; no range means no agent that day. Stored in
+ * `agent_hour_exceptions`, one row per creator and date.
+ */
+export const AgentHourExceptionSchema = z.object({ date: LocalDateSchema, ranges: DayRangesSchema });
+export type AgentHourException = z.infer<typeof AgentHourExceptionSchema>;
+
+/** `PUT /v1/creators/:id/agent-hours/exceptions/:date`: the ranges of that date. */
+export const SetAgentHourExceptionBodySchema = z.object({ ranges: DayRangesSchema });
+export type SetAgentHourExceptionBody = z.infer<typeof SetAgentHourExceptionBodySchema>;
+
+export const AgentHourExceptionParamsSchema = z.object({ id: CreatorIdSchema, date: LocalDateSchema });
+
+/** `GET /v1/creators/:id/agent-hours/exceptions`: her exceptions from today on, on her clock, the earliest first. */
+export const AgentHourExceptionsViewSchema = z.object({
+  exceptions: z.array(
+    AgentHourExceptionSchema.extend({
+      /** Who wrote it last, and when: the screen's « modifié par ». */
+      updatedBy: z.string().nullable(),
+      updatedAt: z.iso.datetime(),
+    }),
+  ),
+  /** Her clock (`creators.timezone`): the dates and minutes above are read on it. */
+  timeZone: z.string().min(1),
+  /** Her date today, on her clock: an exception before it no longer changes (ADR 0148 § 3). */
+  today: LocalDateSchema,
+});
+export type AgentHourExceptionsView = z.infer<typeof AgentHourExceptionsViewSchema>;
+
+/** Her date at `at`, on her clock, « 2026-11-20 », by `Intl` only. */
+export function localDate(at: Date, timeZone: string): LocalDate {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+/**
+ * She may answer at `at`, her exceptions read first (ADR 0148 § 3): a date that has one follows its ranges alone;
+ * any other follows her hours (`replyOpenAt`). The switches (Arrêt, pause, global) are read elsewhere, before this.
+ */
+export function replyOpenWithExceptions(
+  hours: AgentHours,
+  exceptions: readonly Pick<AgentHourException, 'date' | 'ranges'>[],
+  timeZone: string,
+  at: Date,
+): boolean {
+  const date = localDate(at, timeZone);
+  const exception = exceptions.find((candidate) => candidate.date === date);
+  if (exception === undefined) return replyOpenAt(hours, timeZone, at);
+  const { minute } = localClock(at, timeZone);
+  return exception.ranges.some((range) => minute >= range.startMinute && minute < range.endMinute);
+}

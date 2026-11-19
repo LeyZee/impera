@@ -49,6 +49,13 @@ export class AgeInDoubtConflict extends DomainError {
   }
 }
 
+/** A pause ends in the future, within a week (ADR 0148 § 1); past that, it is an Arrêt lifted by hand. */
+export class AgentPauseInvalid extends DomainError {
+  constructor() {
+    super('agent_pause_invalid', 'Une pause finit plus tard, dans la semaine au plus');
+  }
+}
+
 /** Automatique stays locked until its server lock opens (ADR 0019); `details.missing` says what it waits for. */
 export class AutomaticLocked extends DomainError {
   constructor(missing: readonly AutomaticMissing[]) {

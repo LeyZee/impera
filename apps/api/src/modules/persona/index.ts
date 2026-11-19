@@ -7,9 +7,11 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { PersonaSampleReplyUnprocessable } from './domain/errors';
 import type { CreatorDirectory } from './domain/ports';
 import type { PersonaVersionStore } from './domain/versions';
+import { createDrizzleAgentHourExceptions } from './infra/db/agent-hour-exceptions';
 import { createDrizzleCreatorDirectory } from './infra/db/creator-directory';
 import { createDrizzlePersonaCorrectionStore } from './infra/db/persona-correction-store';
 import { createDrizzlePersonaVersionStore } from './infra/db/persona-version-store';
+import { createAgentHourExceptionRoutes } from './infra/http/agent-hour-exceptions-routes';
 import { createPersonaRoutes } from './infra/http/persona-routes';
 import {
   createCreatorArchiveRoutes,
@@ -78,6 +80,12 @@ function withSampleReplyCheck(
 export function createPersonaModule(deps: PersonaDeps): PersonaModule {
   const creators = createDrizzleCreatorDirectory(deps.db);
   const creatorRoutes = createCreatorRoutes(creators, deps.requireRole, deps.recentLogin);
+  const agentHourExceptions = createDrizzleAgentHourExceptions(deps.db);
+  const exceptionRoutes = createAgentHourExceptionRoutes(
+    agentHourExceptions,
+    deps.requireRole,
+    deps.recentLogin,
+  );
   const check = deps.sampleReplyFaults === undefined ? undefined : sampleReplyCheck(deps.sampleReplyFaults);
   // Checked again on activation: a version saved before a guard changed is not activated as it is (P5-01).
   const stored = createDrizzlePersonaVersionStore(deps.db, check);
@@ -90,6 +98,7 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
     versions,
     routes: async (app) => {
       await app.register(creatorRoutes);
+      await app.register(exceptionRoutes);
       await app.register(personaRoutes);
     },
     archiveRoutes: (archiving) =>

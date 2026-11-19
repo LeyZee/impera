@@ -30,11 +30,31 @@ export type AgentMode = z.infer<typeof AgentModeSchema>;
  * `details.missing`) while ADR 0019 keeps it locked. The answer is the mode now in force, as `GET /v1/dashboard`
  * gives it: Arrêt when the global switch stays on.
  */
-export const SetAgentModeBodySchema = z.object({ creatorId: CreatorIdSchema, mode: AgentModeSchema });
+export const SetAgentModeBodySchema = z
+  .object({
+    creatorId: CreatorIdSchema,
+    mode: AgentModeSchema,
+    /**
+     * A pause (ADR 0148 § 1): Arrêt that lifts itself at this instant, back to the mode she had. Only with Arrêt;
+     * the server refuses an instant already past or more than a week ahead (`agent_pause_invalid`).
+     */
+    until: z.iso.datetime().optional(),
+  })
+  .refine((body) => body.until === undefined || body.mode === 'stop', {
+    message: 'Une pause est un arrêt avec une fin',
+    path: ['until'],
+  });
+export type SetAgentModeBody = z.infer<typeof SetAgentModeBodySchema>;
+
+/** The longest pause (ADR 0148 § 1): past a week, it is an Arrêt, lifted by hand. */
+export const AGENT_PAUSE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+
 export const AgentModeResultSchema = z.object({
   mode: AgentModeSchema,
   /** The global switch is on: Arrêt for every creator, whatever she asked, until an operator lifts it. */
   globalStop: z.boolean(),
+  /** Her Arrêt is a pause: it lifts itself at this instant. `null` for an Arrêt lifted by hand, or no Arrêt. */
+  pausedUntil: z.iso.datetime().nullable().default(null),
 });
 export type AgentModeResult = z.infer<typeof AgentModeResultSchema>;
 
