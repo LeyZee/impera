@@ -26,8 +26,11 @@ export interface SessionParts {
 
 export const NO_PARTS: SessionParts = { bearer: null, models: [], userId: null };
 
-/** Enough for any owner's tab; a tab naming more is read as several creators anyway. */
-const MAX_MODELS = 8;
+/**
+ * A bound on what a tab can make the worker hold, far above an agency's roster: the account's model is never left out
+ * because others came first (relecture de Bilan sur 750a3ad2).
+ */
+const MAX_MODELS = 64;
 
 export interface RequestHeader {
   readonly name: string;

@@ -145,6 +145,15 @@ describe('the model a session speaks for', () => {
     expect(modelFor(['model-z9', 'model-y8'], null)).toEqual({ state: 'several' });
   });
 
+  it('still sees the account’s model after the tab named many others (relecture de Bilan)', () => {
+    const others = Array.from({ length: 20 }, (_, i): [string, typeof AUTH] => [
+      `https://api.reveal.me/models/model-o${String(i)}`,
+      AUTH,
+    ]);
+    const parts = seen(...others, ['https://api.reveal.me/models/model-a1', AUTH]);
+    expect(modelFor(parts.models, 'model-a1')).toEqual({ state: 'one', modelId: 'model-a1' });
+  });
+
   it('waits while the tab named none', () => {
     expect(modelFor([], 'model-a1')).toBeNull();
   });
