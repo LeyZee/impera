@@ -1640,7 +1640,6 @@
   gap: 12px;
   align-items: start;
 }
-/* The step's number in a small neon ring: the eye follows 1, 2, 3, 4 without reading. */
 .nv-help-ext__address {
   display: grid;
   gap: 10px;
@@ -1652,6 +1651,8 @@
   overflow-wrap: anywhere;
 }
 
+/* The step's number on a soft disc: the eye follows 1, 2, 3, 4 without reading. Never neon: the red is the urgencies'
+   and the neon the page's one action (recette visuelle 16/11, CHA-19). */
 .nv-help-install__steps li::before {
   content: counter(nv-step);
   width: 26px;
@@ -1662,8 +1663,8 @@
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--nv-neon-ink);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--nv-neon-ink) 45%, transparent);
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-soft);
   /* Centred on the first line of the step, not on its top. */
   margin-top: -2px;
 }

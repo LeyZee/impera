@@ -247,6 +247,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
             <TimeField
               value={draft.quietHours.startMinute}
               label="Début des heures calmes"
+              spoken
               onChange={(startMinute) => {
                 setDraft({ ...draft, quietHours: { ...draft.quietHours, startMinute } });
               }}
@@ -258,6 +259,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
               <TimeField
                 value={draft.quietHours.endMinute}
                 label="Fin des heures calmes"
+                spoken
                 onChange={(endMinute) => {
                   setDraft({ ...draft, quietHours: { ...draft.quietHours, endMinute } });
                 }}

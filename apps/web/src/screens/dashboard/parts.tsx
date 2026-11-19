@@ -56,6 +56,8 @@ interface TipContent {
   readonly compact?: boolean;
   readonly text?: string;
   readonly note?: string;
+  /** A quiet line under the figures: how to read them, never a warning. */
+  readonly aside?: string;
 }
 
 /**
@@ -336,6 +338,7 @@ export function useFloatingTip(): FloatingTip {
             </div>
           ))}
           {content.note === undefined ? null : <p className="db-tip-note">{content.note}</p>}
+          {content.aside === undefined ? null : <p className="nv-tip__aside">{content.aside}</p>}
         </>
       )}
     </div>,
