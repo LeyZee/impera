@@ -38,11 +38,11 @@ function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
           <rect className="nv-ext-link__menu" x="108" y="50" width="120" height="54" rx="10" />
           <rect className="nv-ext-link__row" x="116" y="58" width="104" height="18" rx="6" />
           <rect className="nv-ext-link__mark" x="122" y="61" width="12" height="12" rx="3" />
-          <text className="nv-ext-link__label" x="140" y="71">
+          <text className="nv-ext-link__label" x="146" y="71">
             Impera
           </text>
           <rect className="nv-ext-link__text" x="122" y="88" width="64" height="4" rx="2" />
-          <circle className="nv-ext-link__ring" cx="128" cy="67" r="10" />
+          <circle className="nv-ext-link__ring" cx="128" cy="67" r="9.5" />
         </g>
       ) : (
         <g>
@@ -89,7 +89,7 @@ export function ExtensionLinkPage(): JSX.Element {
         <p className="nv-help-install__note">
           Rien ne se passe ? Ton extension est peut-être déjà reliée : regarde la pastille en haut du popup.
         </p>
-        <Link to="/aide/extension" className="nv-btn nv-btn--plain nv-ext-link__back">
+        <Link to="/aide/extension" className="nv-ext-link__back">
           Retour au guide
         </Link>
       </div>

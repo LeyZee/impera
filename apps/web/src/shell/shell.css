@@ -1958,4 +1958,14 @@ label.nv-notif__row {
 }
 .nv-ext-link__back {
   justify-self: start;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--nv-hairline);
+  text-underline-offset: 3px;
+}
+.nv-ext-link__back:hover,
+.nv-ext-link__back:focus-visible {
+  text-decoration-color: currentColor;
 }
