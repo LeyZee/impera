@@ -363,6 +363,16 @@
  * lights at 900 ms (`FORGE_STRIKE` in forge-sound.ts), its fire rising, then the reveal's light and words, a beat
  * later than for a medal. Settled within 2.5 s. Transform and opacity only.
  */
+/* The forge's colours, named once: fixed like the gold of an earned object. */
+.rw-reveal {
+  --rw-forge-heat: #ffd27a;
+  --rw-forge-fire: #ff6a3a;
+  --rw-forge-spark: #fff4cc;
+  --rw-forge-gold: #ffc25a;
+  --rw-forge-trail: rgb(255 110 60 / 0.5);
+  --rw-forge-white: #fff;
+  --rw-forge-glare: rgb(255 200 96 / 0.75);
+}
 .rw-forge__cold,
 .rw-forge__core,
 .rw-forge__ember,
@@ -377,7 +387,7 @@
   position: absolute;
   inset: 22%;
   border-radius: 50%;
-  background: radial-gradient(circle, #ffd27a 0, #ff6a3a 30%, rgb(255 42 77 / 0) 68%);
+  background: radial-gradient(circle, var(--rw-forge-heat) 0, var(--rw-forge-fire) 30%, transparent 68%);
   animation: rw-forge-core 500ms ease-in 380ms both;
 }
 .rw-forge__ember {
@@ -391,13 +401,13 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    #fff4cc 0,
-    #ffc25a 22%,
-    rgb(255 110 60 / 0.5) 45%,
-    rgb(255 80 60 / 0) 100%
+    var(--rw-forge-spark) 0,
+    var(--rw-forge-gold) 22%,
+    var(--rw-forge-trail) 45%,
+    transparent 100%
   );
   transform-origin: calc(var(--_s) / 2) 50%;
-  filter: drop-shadow(0 0 6px #ff8a3a);
+  filter: drop-shadow(0 0 6px var(--rw-forge-fire));
   animation: rw-forge-ember 420ms cubic-bezier(0.55, 0, 1, 0.45) var(--_d) both;
 }
 .rw-forge__flash {
@@ -406,10 +416,10 @@
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    #fff 0,
-    #fff3c2 16%,
-    rgb(255 200 96 / 0.75) 34%,
-    rgb(255 170 60 / 0) 60%
+    var(--rw-forge-white) 0,
+    var(--rw-forge-spark) 16%,
+    var(--rw-forge-glare) 34%,
+    transparent 60%
   );
   mix-blend-mode: screen;
   animation: rw-forge-flash 120ms ease-out 880ms forwards;
