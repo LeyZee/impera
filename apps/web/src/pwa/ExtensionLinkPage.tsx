@@ -1,0 +1,98 @@
+import { Link } from '@tanstack/react-router';
+import type { JSX } from 'react';
+
+import { OffRailBack } from '../shell/OffRailBack';
+import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
+
+import { browserOf } from './extension';
+
+/**
+ * /extension/lier (ADR 0067, amendement du 19/11): the page the extension recognises by the tab's own address. It only
+ * says where to click; the extension reads nothing it shows, and it cannot learn the link is made (no channel between
+ * a page and the extension, which any site could use), so it keeps its way back to the guide.
+ */
+
+/** The browser's bar, drawn with the design system's tokens, never a capture: the icon in sight, or behind the puzzle. */
+function BarSketch({ hidden }: { readonly hidden: boolean }): JSX.Element {
+  return (
+    <svg
+      className="nv-ext-link__sketch"
+      viewBox="0 0 240 112"
+      role="img"
+      aria-label={
+        hidden
+          ? 'La pièce de puzzle, à droite de la barre d’adresse, ouvre la liste des extensions : Impera y est.'
+          : 'L’icône Impera, à droite de la barre d’adresse.'
+      }
+    >
+      <rect className="nv-ext-link__bar" x="4" y="8" width="232" height="36" rx="10" />
+      <rect className="nv-ext-link__field" x="14" y="16" width="140" height="20" rx="10" />
+      <rect className="nv-ext-link__text" x="26" y="24" width="72" height="4" rx="2" />
+      {/* The puzzle piece. */}
+      <path
+        className={hidden ? 'nv-ext-link__puzzle nv-ext-link__target' : 'nv-ext-link__puzzle'}
+        d="M171 20h5a3 3 0 0 1 6 0h5v5a3 3 0 0 1 0 6v5h-5a3 3 0 0 0-6 0h-5v-5a3 3 0 0 0 0-6z"
+      />
+      {hidden ? (
+        <g>
+          <rect className="nv-ext-link__menu" x="108" y="50" width="120" height="54" rx="10" />
+          <rect className="nv-ext-link__row" x="116" y="58" width="104" height="18" rx="6" />
+          <rect className="nv-ext-link__mark" x="122" y="61" width="12" height="12" rx="3" />
+          <text className="nv-ext-link__label" x="140" y="71">
+            Impera
+          </text>
+          <rect className="nv-ext-link__text" x="122" y="88" width="64" height="4" rx="2" />
+          <circle className="nv-ext-link__ring" cx="128" cy="67" r="10" />
+        </g>
+      ) : (
+        <g>
+          <rect className="nv-ext-link__mark" x="200" y="18" width="16" height="16" rx="4" />
+          <circle className="nv-ext-link__ring" cx="208" cy="26" r="13" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+export function ExtensionLinkPage(): JSX.Element {
+  const browser = browserOf(navigator.userAgent);
+  const named = browser === 'edge' ? 'd’Edge' : browser === 'chrome' ? 'de Chrome' : 'de ton navigateur';
+  // The popup's own words: a host in full, or this computer (ADR 0067, amendement du 19/11 § 3).
+  const host = window.location.hostname;
+  const crm = host === 'localhost' || host === '127.0.0.1' ? 'au CRM de cet ordinateur' : `à ${host}`;
+  return (
+    <Page width="narrow">
+      <PageHeader
+        eyebrow={<OffRailBack />}
+        title="Relier l’extension à ce CRM"
+        lead="Clique sur l’icône Impera en haut à droite de ton navigateur."
+      />
+      <div className="nv-help-install nv-ext-link">
+        <Panel>
+          <PanelSection className="nv-ext-link__cases">
+            <figure className="nv-ext-link__case">
+              <BarSketch hidden={false} />
+              <figcaption>L’icône est dans la barre {named} : clique-la.</figcaption>
+            </figure>
+            <figure className="nv-ext-link__case">
+              <BarSketch hidden />
+              <figcaption>Tu ne la vois pas ? Clique sur la pièce de puzzle, puis sur Impera.</figcaption>
+            </figure>
+          </PanelSection>
+          <PanelSection>
+            <p className="nv-ext-link__then">
+              L’extension te demande « Relier l’extension {crm} ? ». Clique « Relier », puis accepte la
+              question du navigateur.
+            </p>
+          </PanelSection>
+        </Panel>
+        <p className="nv-help-install__note">
+          Rien ne se passe ? Ton extension est peut-être déjà reliée : regarde la pastille en haut du popup.
+        </p>
+        <Link to="/aide/extension" className="nv-btn nv-btn--plain nv-ext-link__back">
+          Retour au guide
+        </Link>
+      </div>
+    </Page>
+  );
+}
