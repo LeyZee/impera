@@ -104,6 +104,8 @@ function Delta({
 interface CurvePoint {
   readonly key: string;
   readonly title: string;
+  /** The same moment without its weekday, « 10 nov. », for a phone's line. */
+  readonly brief: string;
   readonly cents: number;
   readonly compared: { readonly title: string; readonly cents: number } | null;
 }
@@ -128,6 +130,7 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
     return insights.hourly.map((hour) => ({
       key: String(hour.hour),
       title: hoursLabel(hour.hour),
+      brief: hoursLabel(hour.hour),
       cents: hour.revenueMinor,
       compared: null,
     }));
@@ -140,6 +143,7 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
     return {
       key: one.day,
       title: dayLabel(one.day),
+      brief: shortDay(one.day),
       cents: one.revenueMinor,
       compared:
         before === undefined || (since !== null && before.day < since)
@@ -154,8 +158,9 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
  * day compared when the register holds it, « mar. 10 nov. : 153 €, contre 268,60 € le 10 oct. ». No floating tip on
  * this curve: the note under the figure reads the day in place, the curve keeps all its height.
  */
-export function readingOf(point: CurvePoint): string {
-  const day = `${point.title} : ${euros(point.cents)}`;
+export function readingOf(point: CurvePoint, brief = false): string {
+  // A phone's line has no room for the weekday: shortened, never cut (relecture Design 19/11).
+  const day = `${brief ? point.brief : point.title} : ${euros(point.cents)}`;
   return point.compared === null
     ? day
     : `${day}, contre ${euros(point.compared.cents)} le ${point.compared.title}`;
@@ -527,6 +532,7 @@ function Figures({
   const compared = comparable(insights);
   // The day read on the curve: the note and its pill say that day while it is read (relecture Design 19/11).
   const [read, setRead] = useState<CurvePoint | null>(null);
+  const narrow = useNarrow();
   const sparkOf = (
     pick: (day: AgencyInsights['days'][number]) => number,
     tone: Trend,
@@ -664,7 +670,10 @@ function Figures({
               </span>
               <span className="ins-lead__note">
                 <span aria-hidden={read !== null}>{leadNote(insights)}</span>
-                <span aria-hidden={read === null}>{read === null ? '' : readingOf(read)}</span>
+                {/* Said to screen readers as it changes, the curve itself being a picture to them. */}
+                <span aria-hidden={read === null} aria-live="polite">
+                  {read === null ? '' : readingOf(read, narrow)}
+                </span>
               </span>
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>

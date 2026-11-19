@@ -512,9 +512,10 @@ describe('the days read and their comparison (ADR 0146)', () => {
     const [rest, read] = Array.from(note.children);
     expect(rest?.textContent).toMatch(/\(1\s560\s€\)/u);
     expect(rest?.getAttribute('aria-hidden')).toBe('false');
-    // To the far right: the last day, its revenue and the day compared, on the sentence's line.
+    // To the far right: the last day, its revenue and the day compared, on the sentence's line (every media query
+    // matches here, a phone's: the day without its weekday, shortened rather than cut).
     fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
-    expect(read?.textContent).toMatch(/^ven\. 6 nov\. : 320\s€, contre 270\s€ le 30 oct\.$/u);
+    expect(read?.textContent).toMatch(/^6 nov\. : 320\s€, contre 270\s€ le 30 oct\.$/u);
     expect(read?.getAttribute('aria-hidden')).toBe('false');
     // The sentence keeps its place, hidden: nothing moves.
     expect(rest?.getAttribute('aria-hidden')).toBe('true');
@@ -528,7 +529,7 @@ describe('the days read and their comparison (ADR 0146)', () => {
     // A finger reads the same way, and the day stays when the finger lifts, until a tap off the curve.
     fireEvent.pointerDown(layer, { clientX: 10, clientY: 10, pointerType: 'touch' });
     fireEvent.pointerLeave(layer, { pointerType: 'touch' });
-    expect(read?.textContent).toContain('ven. 6 nov.');
+    expect(read?.textContent).toContain('6 nov. : 320');
     fireEvent.pointerDown(document.body, { pointerType: 'touch' });
     expect(read?.textContent).toBe('');
   });
@@ -569,17 +570,21 @@ describe('the days read and their comparison (ADR 0146)', () => {
     const [kept, none] = Array.from(document.querySelector('.ins-lead__pill')?.children ?? []);
     expect(none?.textContent).toBe('');
     expect(kept?.getAttribute('aria-hidden')).toBe('true');
-    expect(document.querySelector('.ins-lead__note')?.textContent).toContain('ven. 6 nov. : 320');
+    expect(document.querySelector('.ins-lead__note')?.textContent).toContain('6 nov. : 320');
   });
 
-  it('reads a day with nothing compared as its revenue alone', () => {
-    expect(readingOf({ key: 'x', title: 'mar. 10 nov.', cents: 15_300, compared: null })).toMatch(
-      /^mar\. 10 nov\. : 153\s€$/u,
-    );
+  it('reads a day with nothing compared as its revenue alone, and a phone’s day without its weekday', () => {
+    expect(
+      readingOf({ key: 'x', title: 'mar. 10 nov.', brief: '10 nov.', cents: 15_300, compared: null }, true),
+    ).toMatch(/^10 nov\. : 153\s€$/u);
+    expect(
+      readingOf({ key: 'x', title: 'mar. 10 nov.', brief: '10 nov.', cents: 15_300, compared: null }),
+    ).toMatch(/^mar\. 10 nov\. : 153\s€$/u);
     expect(
       readingOf({
         key: 'x',
         title: 'mar. 10 nov.',
+        brief: '10 nov.',
         cents: 15_300,
         compared: { title: '10 oct.', cents: 26_860 },
       }),

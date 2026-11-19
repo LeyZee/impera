@@ -187,7 +187,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 /* The money beside the revenue (relecture Design 19/11), in the sense of the figures: the net alone on the top row,
-   its small curve on its right, then what it splits into and the VAT on the transfers, three equal tiles with no curve.
+   its small curve low under its sentence, then what it splits into and the VAT on the transfers, three equal tiles with no curve.
    Two rows of one height fill the lead card's exactly. */
 .ins-figures > .ins-tiles {
   grid-template-columns: repeat(3, minmax(0, 1fr));
