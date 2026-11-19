@@ -1,6 +1,6 @@
 # 0122. Les commentaires Instagram : une réponse courte dans sa voix, seule après un entraînement validé, et les commentaires hostiles masqués
 
-Statut : proposed (demandes de Charles du 17/11/2026, 13 h 49, 13 h 56 et 14 h 00 ; fil « Imaginer le système Instagram » ; contrat accordé avec le fil Playground le 17/11 ; relectures Sécurité, Playground et Agent du 19/11 intégrées)
+Statut : accepted (Charles, 19/11/2026, 16 h 58, « ok 0122 » ; supprimer un commentaire reste le geste du propriétaire seul, faute de mot contraire ; demandes de Charles du 17/11/2026, 13 h 49, 13 h 56 et 14 h 00 ; fil « Imaginer le système Instagram » ; contrat accordé avec le fil Playground le 17/11 ; relectures Sécurité, Playground et Agent du 19/11 intégrées)
 Date : 2026-11-19
 Précise : l'ADR 0057 (§ 1 : API officielles seulement ; § 6 : la garde Instagram des légendes), l'ADR 0120 (le compte branché en deux temps, « les réponses aux commentaires : une ADR à venir »), l'ADR 0102 (la banque d'exemples née du Playground), l'ADR 0021 (rester en personnage), l'ADR 0010 (aucune donnée réelle dans le dépôt).
 

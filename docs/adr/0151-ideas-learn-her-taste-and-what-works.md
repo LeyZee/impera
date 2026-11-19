@@ -1,6 +1,6 @@
 # 0151. Les idées apprennent ses goûts et ce qui marche : un profil de goûts tenu par le code, un dosage entre valeur sûre, variation et nouveauté, une mesure rapportée à son audience
 
-Statut : proposed (demande de Charles du 17/11/2026, 13 h 54 ; les cinq points acceptés à 13 h 56, « Oui, à fond. Vas-y sur tout ça, je valide » ; fil « Imaginer le système Instagram »)
+Statut : accepted (Charles, 19/11/2026, 16 h 58, « ok 0151 » ; demande de Charles du 17/11/2026, 13 h 54 ; les cinq points acceptés à 13 h 56, « Oui, à fond. Vas-y sur tout ça, je valide » ; fil « Imaginer le système Instagram »)
 Date : 2026-11-19
 Précise : l'ADR 0060 (§ 3 : le profil de contenu ; § 4 : les idées du jour et leurs filtres ; § 5 : son accord ou son refus ; § 6 : le retour), l'ADR 0120 (§ 2 : les relevés de ses médias), l'ADR 0140 (la semaine de la créatrice), l'ADR 0042 (ce qu'elle voit).
 Amende : l'ADR 0060 § 4, filtre « une idée trop proche d'une idée des 30 derniers jours est retirée » (§ 3 ci-dessous).
