@@ -648,11 +648,6 @@ body {
   --pp-reveal-white: #fff7f9;
   --pp-reveal-pupil: #1c0a12;
   display: block;
-  overflow: visible;
-  filter: drop-shadow(0 3px 8px rgb(168 18 63 / 0.35));
-}
-[data-theme='light'] .pp-reveal {
-  filter: drop-shadow(0 2px 5px rgb(168 18 63 / 0.22));
 }
 .pp-reveal__top {
   stop-color: var(--pp-reveal-top);
@@ -702,16 +697,13 @@ body {
     transform: translateX(-4.6px);
   }
 }
-/* Its tile is the mark itself: no glass behind it. */
+/* Its tile is the mark itself, flat: no glass behind it and no glow, so it never reads as a second neon (avis Design). */
 .pp-card__icon--mark {
   background: none;
   box-shadow: none;
 }
 
 /* The ink variant, for Charles to choose (avis Design du 19/11): the same eyes on the neutral tile. */
-.pp-reveal--ink {
-  filter: none;
-}
 .pp-reveal--ink .pp-reveal__tile {
   fill: var(--nv-glass-fill-strong);
 }
