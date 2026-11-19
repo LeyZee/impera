@@ -154,9 +154,41 @@ function slotAt(hours: AgentHours, timeZone: string, at: Date): AgentSlot | unde
     });
 }
 
-/** She may answer at `at`: always, or inside one of her active slots, on her clock. */
-export function replyOpenAt(hours: AgentHours, timeZone: string, at: Date): boolean {
+/** Her week type alone: always, or inside one of her active slots, on her clock. */
+function weekOpenAt(hours: AgentHours, timeZone: string, at: Date): boolean {
   return hours.reply.mode === 'always' || slotAt(hours, timeZone, at) !== undefined;
+}
+
+/** Her dated exceptions as the agent reads them (ADR 0148 § 3): a date of her clock and its ranges. */
+export type DatedRanges = readonly { readonly date: string; readonly ranges: readonly DayRange[] }[];
+
+/**
+ * She may answer at `at`, on her clock: a date with an exception (ADR 0148 § 3) follows its ranges alone, a slot of
+ * the day before that runs past midnight included; any other date follows her week, always or in her active slots,
+ * but for a slot started on a date with an exception, which stops at that date's midnight. The switches (Arrêt, pause, global) are read elsewhere, before this.
+ */
+export function replyOpenAt(
+  hours: AgentHours,
+  timeZone: string,
+  at: Date,
+  exceptions: DatedRanges = [],
+): boolean {
+  if (exceptions.length > 0) {
+    const date = localDate(at, timeZone);
+    const exception = exceptions.find((candidate) => candidate.date === date);
+    if (exception !== undefined) {
+      const { minute } = localClock(at, timeZone);
+      return exception.ranges.some((range) => minute >= range.startMinute && minute < range.endMinute);
+    }
+    // A slot belongs to the day it starts: one that starts on a date with an exception does not run past its midnight.
+    const slot = slotAt(hours, timeZone, at);
+    if (slot !== undefined && slot.day !== localClock(at, timeZone).day) {
+      const { minute } = localClock(at, timeZone);
+      const dayBefore = localDate(new Date(at.getTime() - (minute + 1) * MINUTE_MS), timeZone);
+      if (exceptions.some((candidate) => candidate.date === dayBefore)) return false;
+    }
+  }
+  return weekOpenAt(hours, timeZone, at);
 }
 
 /** Her quiet hours hold at `at`: no follow-up then. */
@@ -193,26 +225,42 @@ function nextWallMinute(after: Date, timeZone: string, minute: number): Date {
 }
 
 /**
- * When she may answer next: `after` itself when a slot is open, otherwise the opening of the next active slot, on
- * her clock. Never null: a setting in slots always has one active.
+ * When she may answer next: `after` itself when she is open, otherwise the next opening, on her clock. Without
+ * exceptions, the opening of her next active slot; never null: a setting in slots always has one active. With
+ * exceptions, an opening is a slot's start, a range's start or a midnight (a date entering or leaving its exception):
+ * the earliest of those, over the next eight days, at which she is open; `after` when none is (a week closed by hand).
  */
-export function nextReplyOpening(hours: AgentHours, timeZone: string, after: Date): Date {
-  if (replyOpenAt(hours, timeZone, after)) return after;
-  if (hours.reply.mode === 'always') return after;
-  const starts = [
-    ...new Set(hours.reply.slots.filter((slot) => slot.enabled).map((slot) => slot.startMinute)),
-  ];
+export function nextReplyOpening(
+  hours: AgentHours,
+  timeZone: string,
+  after: Date,
+  exceptions: DatedRanges = [],
+): Date {
+  if (replyOpenAt(hours, timeZone, after, exceptions)) return after;
+  if (exceptions.length === 0 && hours.reply.mode === 'always') return after;
+  const starts = openingMinutes(hours, exceptions);
   let best: Date | undefined;
-  // Each start minute, on each of the next eight days: the earliest one that opens a slot.
+  // Each start minute, on each of the next eight days: the earliest one that opens.
   for (const start of starts) {
     let from = after;
     for (let i = 0; i < 8; i += 1) {
       const at = nextWallMinute(from, timeZone, start);
-      if (replyOpenAt(hours, timeZone, at) && (best === undefined || at < best)) best = at;
+      if (best !== undefined && at >= best) break;
+      if (replyOpenAt(hours, timeZone, at, exceptions)) best = at;
       from = new Date(at.getTime() + MINUTE_MS);
     }
   }
   return best ?? after;
+}
+
+/** The minutes of her clock where she can open: her slots' starts, and with exceptions their ranges' and midnight. */
+function openingMinutes(hours: AgentHours, exceptions: DatedRanges): number[] {
+  const slots = hours.reply.mode === 'slots' ? hours.reply.slots.filter((slot) => slot.enabled) : [];
+  const minutes = slots.map((slot) => slot.startMinute);
+  if (exceptions.length > 0) {
+    minutes.push(0, ...exceptions.flatMap((exception) => exception.ranges.map((range) => range.startMinute)));
+  }
+  return [...new Set(minutes)];
 }
 
 /** The last instant at or before `before` whose minute on her clock is `minute` (the day before, when not yet today). */
@@ -228,10 +276,39 @@ function previousWallMinute(before: Date, timeZone: string, minute: number): Dat
 
 /**
  * When the open stretch she is in at `at` began: slots that follow one another read as one stretch. `null` when
- * closed; the epoch when she is always open. The « Sans réponse » net counts from there, not from his message.
+ * closed; the epoch when she is always open. The « Sans réponse » net counts from there, not from his message. With
+ * exceptions: the latest opening minute (`openingMinutes`) at or before `at`, over the last eight days, where she is
+ * open and was not a minute before; the epoch when none (always open, around a date she keeps open).
  */
-export function replyOpenedAt(hours: AgentHours, timeZone: string, at: Date): Date | null {
-  if (!replyOpenAt(hours, timeZone, at)) return null;
+export function replyOpenedAt(
+  hours: AgentHours,
+  timeZone: string,
+  at: Date,
+  exceptions: DatedRanges = [],
+): Date | null {
+  if (!replyOpenAt(hours, timeZone, at, exceptions)) return null;
+  if (exceptions.length === 0) return weekOpenedAt(hours, timeZone, at);
+  let latest: Date | null = null;
+  for (const start of openingMinutes(hours, exceptions)) {
+    let before = at;
+    for (let i = 0; i < 8; i += 1) {
+      const candidate = previousWallMinute(before, timeZone, start);
+      if (latest !== null && candidate <= latest) break;
+      const opens =
+        replyOpenAt(hours, timeZone, candidate, exceptions) &&
+        !replyOpenAt(hours, timeZone, new Date(candidate.getTime() - MINUTE_MS), exceptions);
+      if (opens) {
+        latest = candidate;
+        break;
+      }
+      before = new Date(candidate.getTime() - MINUTE_MS);
+    }
+  }
+  return latest ?? new Date(0);
+}
+
+/** `replyOpenedAt` on her week alone. */
+function weekOpenedAt(hours: AgentHours, timeZone: string, at: Date): Date | null {
   if (hours.reply.mode === 'always') return new Date(0);
   let opened = at;
   // A slot lasts less than a day, so its start is the last time her clock showed it; then the slot just before.
@@ -240,7 +317,7 @@ export function replyOpenedAt(hours: AgentHours, timeZone: string, at: Date): Da
     if (slot === undefined) return opened;
     opened = previousWallMinute(opened, timeZone, slot.startMinute);
     const before = new Date(opened.getTime() - MINUTE_MS);
-    if (!replyOpenAt(hours, timeZone, before)) return opened;
+    if (!weekOpenAt(hours, timeZone, before)) return opened;
     opened = before;
   }
   return opened;
@@ -250,14 +327,23 @@ export function replyOpenedAt(hours: AgentHours, timeZone: string, at: Date): Da
  * When a follow-up may go out next: the first minute both in an open slot and out of her quiet hours. `null` when no
  * minute of the week is both (slots from 23:00 to 1:00 with quiet hours from 23:00 to 9:00): no follow-up then.
  */
-export function nextFollowUpAllowed(hours: AgentHours, timeZone: string, after: Date): Date | null {
+export function nextFollowUpAllowed(
+  hours: AgentHours,
+  timeZone: string,
+  after: Date,
+  exceptions: DatedRanges = [],
+): Date | null {
   let at = after;
   // Each step moves to an opening or past the quiet hours, about two a day; bounded in time too: past a week and a
   // day of her clock, no minute will ever allow one.
   const horizon = after.getTime() + 8 * MINUTES_PER_DAY * MINUTE_MS;
   for (let i = 0; i < 4 * AGENT_SLOTS_MAX + 8 && at.getTime() <= horizon; i += 1) {
-    if (!replyOpenAt(hours, timeZone, at)) at = nextReplyOpening(hours, timeZone, at);
-    else if (followUpQuietAt(hours, timeZone, at))
+    if (!replyOpenAt(hours, timeZone, at, exceptions)) {
+      const opening = nextReplyOpening(hours, timeZone, at, exceptions);
+      // Closed with no opening ahead (a week of dates closed by hand): no follow-up.
+      if (opening.getTime() === at.getTime()) return null;
+      at = opening;
+    } else if (followUpQuietAt(hours, timeZone, at))
       at = nextWallMinute(at, timeZone, hours.followUpQuiet.endMinute);
     else return at;
   }
@@ -356,21 +442,4 @@ export function localDate(at: Date, timeZone: string): LocalDate {
   }).formatToParts(at);
   const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
-}
-
-/**
- * She may answer at `at`, her exceptions read first (ADR 0148 § 3): a date that has one follows its ranges alone;
- * any other follows her hours (`replyOpenAt`). The switches (Arrêt, pause, global) are read elsewhere, before this.
- */
-export function replyOpenWithExceptions(
-  hours: AgentHours,
-  exceptions: readonly Pick<AgentHourException, 'date' | 'ranges'>[],
-  timeZone: string,
-  at: Date,
-): boolean {
-  const date = localDate(at, timeZone);
-  const exception = exceptions.find((candidate) => candidate.date === date);
-  if (exception === undefined) return replyOpenAt(hours, timeZone, at);
-  const { minute } = localClock(at, timeZone);
-  return exception.ranges.some((range) => minute >= range.startMinute && minute < range.endMinute);
 }

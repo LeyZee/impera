@@ -453,6 +453,13 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         );
         return rows.rows[0]?.found === true;
       },
+      async archived() {
+        const [creator] = await tx
+          .select({ archivedAt: schema.creators.archivedAt })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        return creator !== undefined && creator.archivedAt !== null;
+      },
       async isOn() {
         const rows = await tx.execute(sql`
           select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active,

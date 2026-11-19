@@ -5,7 +5,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { PersonaSampleReplyUnprocessable } from './domain/errors';
-import type { CreatorDirectory } from './domain/ports';
+import type { AgentHourExceptions, CreatorDirectory } from './domain/ports';
 import type { PersonaVersionStore } from './domain/versions';
 import { createDrizzleAgentHourExceptions } from './infra/db/agent-hour-exceptions';
 import { createDrizzleCreatorDirectory } from './infra/db/creator-directory';
@@ -29,6 +29,8 @@ export interface PersonaModule {
    * the port the agent writes with (her active version, read at each draft), wired by the composition root.
    */
   readonly versions: PersonaVersionStore;
+  /** Her dated exceptions (ADR 0148 § 3): read by the agent through the composition root, written by their routes. */
+  readonly agentHourExceptions: AgentHourExceptions;
   /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions and her corrections. */
   readonly routes: FastifyPluginAsyncZod;
   /**
@@ -96,6 +98,7 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
     name: 'persona',
     creators,
     versions,
+    agentHourExceptions,
     routes: async (app) => {
       await app.register(creatorRoutes);
       await app.register(exceptionRoutes);

@@ -1,4 +1,5 @@
 import {
+  AgentHoursSchema,
   AuditEntryIdSchema,
   DayRangeSchema,
   localDate,
@@ -11,6 +12,8 @@ import { z } from 'zod';
 
 import { AgentHourExceptionPast } from '../../domain/errors';
 import type { AgentHourExceptions } from '../../domain/ports';
+
+import { moveReopen } from './creator-directory';
 
 type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 
@@ -30,6 +33,21 @@ export function createDrizzleAgentHourExceptions(
       .from(schema.creators)
       .where(eq(schema.creators.id, creatorId));
     return row?.timezone ?? null;
+  };
+
+  /** The fans her hours put off wait for her opening under the dates as they are now (ADR 0148 § 3). */
+  const reopenAfter = async (tx: Transaction, creatorId: CreatorId, timeZone: string, change: string) => {
+    const [row] = await tx
+      .select({ agentHours: schema.creators.agentHours })
+      .from(schema.creators)
+      .where(eq(schema.creators.id, creatorId));
+    const stored = AgentHoursSchema.safeParse(row?.agentHours);
+    await moveReopen(
+      tx,
+      { id: creatorId, hours: stored.success ? stored.data : null, timezone: timeZone },
+      now(),
+      change,
+    );
   };
 
   const read = async (
@@ -124,6 +142,7 @@ export function createDrizzleAgentHourExceptions(
             set: { ranges: stored, updatedBy: userId, updatedAt: at },
           });
         await audit(tx, creatorId, userId, { date, ranges: stored });
+        await reopenAfter(tx, creatorId, timeZone, `agent_hour_exception:${creatorId}:${date}`);
         return read(tx, creatorId, timeZone, today);
       }),
 
@@ -139,7 +158,10 @@ export function createDrizzleAgentHourExceptions(
             ),
           )
           .returning({ id: schema.agentHourExceptions.id });
-        if (removed.length > 0) await audit(tx, creatorId, userId, { date, ranges: null });
+        if (removed.length > 0) {
+          await audit(tx, creatorId, userId, { date, ranges: null });
+          await reopenAfter(tx, creatorId, timeZone, `agent_hour_exception:${creatorId}:${date}`);
+        }
         return read(tx, creatorId, timeZone, today);
       }),
   };

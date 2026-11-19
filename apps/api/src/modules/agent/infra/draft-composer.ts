@@ -1,5 +1,6 @@
 import type {
   AgentHours,
+  DatedRanges,
   AlertTrigger,
   FanFlags,
   HandoffCause,
@@ -104,6 +105,8 @@ export interface AgentComposeInput {
    * worker's call; here they set her night and when a follow-up may go out.
    */
   readonly hours?: AgentHours;
+  /** Her dated exceptions (ADR 0148 § 3): when a follow-up may go out, a date that has one follows its ranges. */
+  readonly exceptions?: DatedRanges;
   /** How many times she already waited for his last message (P3-11): from 1, she does not wait again. */
   readonly waited?: number;
   /** A follow-up on his silence (P3-10), not an answer to a message of his. */
@@ -657,6 +660,7 @@ async function followUp(
     now: input.now,
     timeZone,
     ...(input.hours !== undefined && { hours: input.hours }),
+    ...(input.exceptions !== undefined && { exceptions: input.exceptions }),
   });
   if (decision.kind === 'skip') return NOT_FOLLOWED_UP(decision.reason);
   if (decision.kind === 'later') return { ...NOT_FOLLOWED_UP(decision.reason), retryAt: decision.at };

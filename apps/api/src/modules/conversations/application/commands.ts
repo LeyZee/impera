@@ -29,6 +29,7 @@ import {
 import { safetySigns } from '../../agent';
 import {
   AgeInDoubtConflict,
+  AgentPauseConflict,
   AgentPauseInvalid,
   AutomaticLocked,
   CreatorNotFound,
@@ -601,7 +602,15 @@ export function createConversationCommands({
         if (input.mode === 'auto') await requireAutomaticOpen(tx, voice);
         const meta = humanMeta(input);
         const switches = await tx.switches.isOn();
-        // A pause turned into an Arrêt (or the other way, or a new end) is a new row too: its end changes.
+        if (until !== null) {
+          // A pause never brings a stop's end closer (Sécurité, #865): resuming has its own checks.
+          if (await tx.switches.archived()) throw new AgentPauseConflict('archived');
+          if (switches.creator && switches.creatorUntil === null) throw new AgentPauseConflict('stopped');
+          if (switches.creatorUntil !== null && until < switches.creatorUntil) {
+            throw new AgentPauseConflict('sooner');
+          }
+        }
+        // A pause turned into an Arrêt, or pushed back, is a new row too: its end changes.
         const endChanges = stop && switches.creator && switches.creatorUntil?.getTime() !== until?.getTime();
         if (switches.creator !== stop || endChanges) {
           const reason = stop

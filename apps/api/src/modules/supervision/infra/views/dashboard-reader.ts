@@ -1,10 +1,12 @@
 import {
   AgentHoursSchema,
   ConnectorConfigSchema,
+  DayRangeSchema,
   DEFAULT_AGENT_HOURS,
   HandoffCauseSchema,
   LIVE_WINDOW,
   type AgentHours,
+  type DatedRanges,
   type DecidedDraft,
 } from '@impera/contracts';
 import { sql, withTenant, type Database, type Transaction } from '@impera/db';
@@ -171,7 +173,7 @@ async function facts(
   tx: Transaction,
   creatorId: string,
   window: DashboardWindow,
-  her: { readonly hours: AgentHours; readonly timeZone: string },
+  her: { readonly hours: AgentHours; readonly timeZone: string; readonly exceptions: DatedRanges },
   usdRate: UsdRate | null,
 ) {
   const now = window.now.toISOString();
@@ -498,7 +500,20 @@ export function createDashboardReader(db: Database): DashboardReader {
         const window = windowFor(creator.timezone);
         // Her hours as the worker reads them: none stored, or unreadable, are the defaults (always open).
         const stored = AgentHoursSchema.safeParse(creator.agent_hours);
-        const her = { hours: stored.success ? stored.data : DEFAULT_AGENT_HOURS, timeZone: creator.timezone };
+        // Her dated exceptions (ADR 0148 § 3) from her today on: a date that has one follows its ranges alone.
+        const dated = await rows(
+          tx,
+          z.object({ date: z.string(), ranges: z.array(DayRangeSchema) }),
+          sql`select to_char(date, 'YYYY-MM-DD') as date, ranges from agent_hour_exceptions
+              where creator_id = ${creatorId}::uuid
+                and date >= (now() at time zone ${creator.timezone})::date - 8
+              order by date`,
+        );
+        const her = {
+          hours: stored.success ? stored.data : DEFAULT_AGENT_HOURS,
+          timeZone: creator.timezone,
+          exceptions: dated,
+        };
         return {
           facts: {
             creator: { name: creator.display_name, timezone: creator.timezone },

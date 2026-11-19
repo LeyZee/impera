@@ -379,14 +379,72 @@ describe('PUT /v1/agent/mode', () => {
       expect(new Date(job?.at ?? 0).toISOString()).toBe(until);
     });
 
-    it('turns into an Arrêt lifted by hand with a new row, and a new end with another', async () => {
+    it('is pushed back freely, never brought closer, and never lifts an Arrêt (Sécurité, #865)', async () => {
+      const current = (await lastSwitch())?.activeUntil?.getTime() ?? 0;
+      const later = new Date(current + 30 * 60_000).toISOString();
       const before = (await creatorSwitches()).length;
-      const stop = await setMode('stop');
-      expect(stop.json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: null });
+      expect((await pause(later)).json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: later });
+      expect(await creatorSwitches()).toHaveLength(before + 1);
+
+      const sooner = await pause(inMinutes(5));
+      expect(sooner.statusCode).toBe(409);
+      expect(ApiErrorSchema.parse(sooner.json()).error).toMatchObject({
+        code: 'agent_pause_conflict',
+        details: { reason: 'sooner' },
+      });
+
+      // A pause becomes an Arrêt lifted by hand; the Arrêt never becomes a pause.
+      expect((await setMode('stop')).json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: null });
       expect(await lastSwitch()).toEqual({ active: true, activeUntil: null });
-      const until = inMinutes(30);
-      expect((await pause(until)).json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: until });
+      const onStop = await pause(inMinutes(60));
+      expect(onStop.statusCode).toBe(409);
+      expect(ApiErrorSchema.parse(onStop.json()).error.details).toEqual({ reason: 'stopped' });
       expect(await creatorSwitches()).toHaveLength(before + 2);
+
+      // The reopening the pause planned finds her stopped: it answers nobody.
+      const drafts = async () =>
+        (
+          await test.admin.db
+            .select()
+            .from(schema.drafts)
+            .where(eq(schema.drafts.conversationId, conversationId))
+        ).length;
+      const draftsBefore = await drafts();
+      const noLog = {
+        info: () => undefined,
+        warn: () => undefined,
+        error: () => undefined,
+        debug: () => undefined,
+      };
+      await app.modules.conversations.jobs.reopen({ creatorId, correlationId: 'test-pause-end' }, noLog);
+      await app.modules.conversations.jobs.respond(
+        { creatorId, conversationId, correlationId: 'test-pause-end' },
+        noLog,
+      );
+      expect(await drafts()).toBe(draftsBefore);
+      expect(await dashboardMode()).toBe('stop');
+
+      // Resumed, she can be paused again.
+      await setMode('copilot');
+      expect((await pause(inMinutes(30))).statusCode).toBe(200);
+    });
+
+    it('refuses a pause for an archived creator: her Arrêt is the code’s', async () => {
+      const archived = newId(CreatorIdSchema);
+      await test.admin.db.insert(schema.creators).values({
+        id: archived,
+        nameKey: archived,
+        displayName: 'Archivée',
+        timezone: 'Europe/Paris',
+        archivedAt: new Date(),
+      });
+      const response = await send('PUT', '/v1/agent/mode', {
+        creatorId: archived,
+        mode: 'stop',
+        until: inMinutes(60),
+      });
+      expect(response.statusCode).toBe(409);
+      expect(ApiErrorSchema.parse(response.json()).error.details).toEqual({ reason: 'archived' });
     });
 
     it('reads as off once its end is past, everywhere the switch is read, without a new row', async () => {

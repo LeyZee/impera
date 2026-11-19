@@ -1,5 +1,5 @@
-import { AgentHourExceptionsViewSchema, ApiErrorSchema, localDate } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { AgentHourExceptionsViewSchema, ApiErrorSchema, localDate, reopenJobKey } from '@impera/contracts';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -85,6 +85,11 @@ describe('her dated exceptions (ADR 0148 § 3, /v1/creators/:id/agent-hours/exce
     // The same date again replaces it; no range at all means no agent that day.
     expect((await put(lea.id, tomorrow, [])).statusCode).toBe(200);
     expect((await list(lea.id)).exceptions).toMatchObject([{ date: tomorrow, ranges: [] }]);
+    // Her opening is computed again with the date (ADR 0148 § 3): the fans put off wait for it.
+    const reopen = await test.admin.db.execute(
+      sql`select 1 from graphile_worker._private_jobs where key = ${reopenJobKey(lea.id)}`,
+    );
+    expect(reopen.rows).toHaveLength(1);
     expect((await remove(lea.id, tomorrow)).statusCode).toBe(200);
     expect((await list(lea.id)).exceptions).toEqual([]);
     const audit = await test.admin.db
