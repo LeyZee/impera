@@ -63,6 +63,7 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   provider_credentials: ['insert', 'update', 'delete'],
   push_server_keys: ['insert'],
   push_subscriptions: ['insert', 'update'],
+  redirect_links: ['insert', 'update'],
   reward_gains: ['insert'],
   reward_streaks: ['insert', 'update'],
   sales_feed_chatter_reviews: ['insert', 'update'],
