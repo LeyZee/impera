@@ -86,7 +86,8 @@ describe('one card (T4: COH-03, COH-11, PIL-12, PIL-30, ETA-20, CHA-13)', () => 
 
   /**
    * Plates whose content is a list of rows, each row carrying the card's inset itself: the plate keeps a thin inset of
-   * its own (4 to 8 px) for the rows' tint. A toolbar (the Playground's rating bar) is not a card either.
+   * its own (4 to 8 px) for the rows' tint. A toolbar (the Playground's rating bar, the vault's bar of actions on a
+   * selection) is not a card either.
    */
   const LIST_PLATES: ReadonlySet<string> = new Set([
     'ins-creators',
@@ -99,6 +100,7 @@ describe('one card (T4: COH-03, COH-11, PIL-12, PIL-30, ETA-20, CHA-13)', () => 
     'tm-panel',
     'tr-panel',
     'pg-bar',
+    'vp-bar',
   ]);
 
   /** The rules that style a card class itself (states and modifiers included), in every sheet. */
