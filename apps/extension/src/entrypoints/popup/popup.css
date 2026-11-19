@@ -897,6 +897,17 @@ body {
   color: var(--nv-ink-faint);
   text-wrap: pretty;
 }
+/* An account's failure sits below the same hairline as the advice under the list (avis Design du 19/11). */
+.pp-sync__account .pp-sync__fail {
+  margin-top: 2px;
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__gauge + .pp-sync__fail {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 .pp-sync__advice--all {
   padding-top: var(--nv-space-2);
   border-top: 1px solid var(--nv-hairline);

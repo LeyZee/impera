@@ -3,6 +3,7 @@ import type { Me } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import html from './index.html?raw';
+import type { SyncView } from './reveal-view';
 import { accountPathOf, greetingAt, render, type Actions, type Screen } from './view';
 
 const ME: Me = {
@@ -129,6 +130,28 @@ describe('popup', () => {
         sync: null,
       }).root.querySelector('.pp-card'),
     ).toBeNull();
+  });
+
+  // Avis Design du 19/11: « CRM relié » above a card that says the CRM does not answer.
+  it('says « CRM injoignable » in the head when the session card heard no answer', () => {
+    const head = (accounts: SyncView['accounts']): string =>
+      draw({
+        kind: 'signed_in',
+        me: ME,
+        place: 'reveal',
+        copilot: LINKED,
+        watch: null,
+        sync: {
+          accounts,
+          outcome: null,
+          pending: null,
+          confirm: null,
+          now: new Date(2026, 10, 19, 18, 0),
+          crm: 'localhost:5173',
+        },
+      }).root.querySelector('.pp-pill')?.textContent ?? '';
+    expect(head({ state: 'ok', accounts: [] })).toBe('CRM relié');
+    expect(head({ state: 'unreachable', accounts: [] })).toBe('CRM injoignable');
   });
 
   // EXT-11 and EXT-12: on Reveal, the copilot is the one neon, and the popup holds under 600 px.
