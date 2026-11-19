@@ -443,6 +443,29 @@
   }
 }
 
+/* ───────────── Jauge du jeu ───────────── */
+
+/* The fill slides in under the track's own round ends: transform only, once, from the value last shown
+   (`GameGauge`). Its round tip keeps its shape all the way, which a scale would crush. */
+.rw-gauge {
+  overflow: hidden;
+}
+.rw-gauge .nv-gauge__fill {
+  width: 100%;
+  transform: translateX(calc(var(--rw-gauge-at, 0%) - 100%));
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.rw-gauge[data-moving='true'] .nv-gauge__fill {
+  transition:
+    transform var(--nv-dur-progress) var(--nv-ease-out),
+    background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-gauge[data-moving='true'] .nv-gauge__fill {
+    transition: none;
+  }
+}
+
 /* ───────────── Défi du shift (ADR 0104 § 14) ───────────── */
 
 /* The way to the target is a progress: its blue, as the way to a tier. */
