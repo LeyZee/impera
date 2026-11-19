@@ -120,7 +120,7 @@ function CreatorCard({
           zone={creator.timezone}
           state={card}
           read={read}
-          compact
+          variant="card"
           readOnly={!switches}
         />
       )}

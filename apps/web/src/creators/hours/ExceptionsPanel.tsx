@@ -14,11 +14,12 @@ import { exceptionsQueryKey, removeException, saveException, useAgentHourExcepti
 import {
   dateWords,
   dayWords,
-  daysAhead,
   endOf,
   fromToWords,
+  gridDays,
   openedBeyondWeek,
   sortedRanges,
+  spanWords,
 } from './exceptions-model';
 
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
@@ -122,205 +123,300 @@ function Days({
     editing === null || !checked.success ? [] : openedBeyondWeek(hours, view.timeZone, editing.date, ranges);
 
   return (
-    <section className="nv-plate ps-panel hr-days" aria-labelledby="hr-days">
-      <p className="nv-eyebrow" id="hr-days">
-        Jours modifiés
-      </p>
-      <p className="ps-hint">
-        Un jour peut sortir de la semaine type : ce jour-là, ses plages remplacent celles de la semaine. La
-        pause et l’arrêt l’emportent toujours.
-      </p>
-      {ahead.length === 0 ? (
-        <p className="ps-muted">Aucun jour modifié : l’IA suit sa semaine type.</p>
-      ) : (
-        <ul className="hr-days__list">
-          {ahead.map((exception) => (
-            <li key={exception.date} className="hr-days__item">
-              <span className="hr-days__date">{dateWords(exception.date, view.today)}</span>
-              <span className={exception.ranges.length === 0 ? 'hr-days__off' : 'hr-days__ranges'}>
-                {dayWords(exception.ranges)}
-              </span>
-              <span className="hr-days__actions">
+    <section className="nv-plate ps-panel" aria-labelledby="hr-days">
+      <div className="ps-block hr-days">
+        <p className="nv-eyebrow" id="hr-days">
+          Jours modifiés
+        </p>
+        <p className="ps-hint">
+          Un jour peut sortir de la semaine type : ce jour-là, ses plages remplacent celles de la semaine. La
+          pause et l’arrêt l’emportent toujours.
+        </p>
+        {ahead.length === 0 ? (
+          <p className="ps-muted">Aucun jour modifié : l’IA suit sa semaine type.</p>
+        ) : (
+          <ul className="hr-days__list">
+            {ahead.map((exception) => {
+              const day = dateWords(exception.date, view.today);
+              return (
+                <li key={exception.date} className="hr-days__item">
+                  {/* The whole line opens the day; « Rétablir » stays its own button (avis Design, 19/11). */}
+                  <button
+                    type="button"
+                    className="hr-days__row"
+                    aria-label={`Modifier ${day}`}
+                    aria-pressed={editing?.date === exception.date}
+                    disabled={busy}
+                    onClick={() => {
+                      open(exception.date);
+                    }}
+                  >
+                    <span className="hr-days__date">{day}</span>
+                    <span className={exception.ranges.length === 0 ? 'hr-days__off' : 'hr-days__ranges'}>
+                      {dayWords(exception.ranges)}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="nv-iconbtn hr-days__icon"
+                    aria-label={`Rétablir ${day}`}
+                    title="Rétablir la semaine type"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(
+                        () => removeException(creatorId, exception.date),
+                        `${day} suit de nouveau sa semaine type.`,
+                      )
+                    }
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 12a8 8 0 1 0 2.3-5.6M4 4v4h4" />
+                    </svg>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {editing === null ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm hr-days__ghost"
+            onClick={() => {
+              open(view.today);
+            }}
+          >
+            Modifier un jour
+          </button>
+        ) : (
+          <div className="hr-days__editor">
+            <DayGrid
+              today={view.today}
+              picked={editing.date}
+              kept={kept}
+              onPick={(date) => {
+                open(date);
+              }}
+            />
+            <Segment
+              label="Ce jour-là"
+              options={[
+                { value: 'ranges', label: 'Ses plages' },
+                { value: 'off', label: 'Pas d’IA' },
+              ]}
+              value={editing.off ? 'off' : 'ranges'}
+              onChange={(value) => {
+                setEditing({ ...editing, off: value === 'off' });
+              }}
+            />
+            {editing.off ? null : (
+              <div className="hr-days__ranges-edit">
+                {editing.ranges.map((range, index) => (
+                  <div key={index} className="hr-days__range">
+                    <span className="ps-hint">de</span>
+                    <TimeField
+                      className="hr-time"
+                      value={range.startMinute}
+                      label={`Plage ${String(index + 1)} : début`}
+                      onChange={(startMinute) => {
+                        setEditing({
+                          ...editing,
+                          ranges: editing.ranges.with(index, { ...range, startMinute }),
+                        });
+                      }}
+                      onUnreadable={times.onUnreadable}
+                    />
+                    <span className="ps-hint">à</span>
+                    <TimeField
+                      className="hr-time"
+                      value={range.endMinute % 1440}
+                      label={`Plage ${String(index + 1)} : fin`}
+                      onChange={(minute) => {
+                        setEditing({
+                          ...editing,
+                          ranges: editing.ranges.with(index, { ...range, endMinute: endOf(minute) }),
+                        });
+                      }}
+                      onUnreadable={times.onUnreadable}
+                    />
+                    <span className="ps-hint hr-days__midnight">
+                      {range.endMinute === 1440 ? 'minuit' : ''}
+                    </span>
+                    {editing.ranges.length > 1 ? (
+                      <button
+                        type="button"
+                        className="nv-iconbtn hr-days__icon"
+                        aria-label={`Supprimer la plage ${String(index + 1)}`}
+                        onClick={() => {
+                          setEditing({ ...editing, ranges: editing.ranges.filter((_, at) => at !== index) });
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="m7 7 10 10M17 7 7 17" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <span className="hr-days__icon-gap" aria-hidden="true" />
+                    )}
+                  </div>
+                ))}
                 <button
                   type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
-                  disabled={busy}
+                  className="nv-btn nv-btn--plain nv-btn--sm hr-days__ghost"
                   onClick={() => {
-                    open(exception.date);
+                    setEditing({
+                      ...editing,
+                      ranges: [...editing.ranges, { startMinute: 0, endMinute: 240 }],
+                    });
                   }}
                 >
-                  Modifier
+                  Ajouter une plage
                 </button>
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(
-                      () => removeException(creatorId, exception.date),
-                      `${dateWords(exception.date, view.today)} suit de nouveau sa semaine type.`,
-                    )
-                  }
-                >
-                  Rétablir
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {editing === null ? (
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm ps-self-start"
-          onClick={() => {
-            open(view.today);
-          }}
-        >
-          Modifier un jour
-        </button>
-      ) : (
-        <div className="hr-days__editor">
-          <div className="hr-days__dates" role="group" aria-label="Quel jour">
-            {daysAhead(view.today).map((date) => (
+              </div>
+            )}
+            {issue === null ? null : <p className="ps-error">{issue}</p>}
+            {beyond.length === 0 ? null : (
+              <p className="hr-days__beyond" role="note">
+                Ce jour-là, l’IA répondra aussi {fromToWords(beyond)}, hors de sa semaine type.
+              </p>
+            )}
+            <div className="hr-days__foot">
               <button
-                key={date}
                 type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                aria-pressed={date === editing.date}
-                data-kept={kept.has(date) || undefined}
+                className="nv-btn nv-btn--plain nv-btn--sm hr-days__ghost"
+                disabled={busy}
                 onClick={() => {
-                  open(date);
+                  setEditing(null);
                 }}
               >
-                {dateWords(date, view.today)}
+                Annuler
               </button>
-            ))}
-          </div>
-          <Segment
-            label="Ce jour-là"
-            options={[
-              { value: 'ranges', label: 'Ses plages' },
-              { value: 'off', label: 'Pas d’IA' },
-            ]}
-            value={editing.off ? 'off' : 'ranges'}
-            onChange={(value) => {
-              setEditing({ ...editing, off: value === 'off' });
-            }}
-          />
-          {editing.off ? null : (
-            <div className="hr-days__ranges-edit">
-              {editing.ranges.map((range, index) => (
-                <div key={index} className="hr-slot__hours">
-                  <span className="ps-hint">de</span>
-                  <TimeField
-                    className="hr-time"
-                    value={range.startMinute}
-                    label={`Plage ${String(index + 1)} : début`}
-                    onChange={(startMinute) => {
-                      setEditing({
-                        ...editing,
-                        ranges: editing.ranges.with(index, { ...range, startMinute }),
-                      });
-                    }}
-                    onUnreadable={times.onUnreadable}
-                  />
-                  <span className="ps-hint">à</span>
-                  <TimeField
-                    className="hr-time"
-                    value={range.endMinute % 1440}
-                    label={`Plage ${String(index + 1)} : fin`}
-                    onChange={(minute) => {
-                      setEditing({
-                        ...editing,
-                        ranges: editing.ranges.with(index, { ...range, endMinute: endOf(minute) }),
-                      });
-                    }}
-                    onUnreadable={times.onUnreadable}
-                  />
-                  {range.endMinute === 1440 ? <span className="ps-hint">minuit</span> : null}
-                  {editing.ranges.length > 1 ? (
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--plain nv-btn--sm"
-                      aria-label={`Supprimer la plage ${String(index + 1)}`}
-                      onClick={() => {
-                        setEditing({ ...editing, ranges: editing.ranges.filter((_, at) => at !== index) });
-                      }}
-                    >
-                      ×
-                    </button>
-                  ) : null}
-                </div>
-              ))}
               <button
                 type="button"
-                className="nv-btn nv-btn--plain nv-btn--sm ps-self-start"
-                onClick={() => {
-                  setEditing({ ...editing, ranges: [...editing.ranges, { startMinute: 0, endMinute: 240 }] });
-                }}
+                className="nv-btn nv-btn--neon nv-btn--sm"
+                disabled={busy || issue !== null || times.unreadable}
+                onClick={() =>
+                  void run(
+                    () => saveException(creatorId, editing.date, ranges),
+                    `${dateWords(editing.date, view.today)} : ${dayWords(ranges)}.`,
+                  )
+                }
               >
-                Ajouter une plage
+                Enregistrer ce jour
               </button>
             </div>
-          )}
-          {issue === null ? null : <p className="ps-error">{issue}</p>}
-          {beyond.length === 0 ? null : (
-            <p className="hr-days__beyond" role="note">
-              Ce jour-là, l’IA répondra aussi {fromToWords(beyond)}, hors de sa semaine type.
-            </p>
-          )}
-          <div className="hr-days__foot">
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
-              disabled={busy}
-              onClick={() => {
-                setEditing(null);
-              }}
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--neon nv-btn--sm"
-              disabled={busy || issue !== null || times.unreadable}
-              onClick={() =>
-                void run(
-                  () => saveException(creatorId, editing.date, ranges),
-                  `${dateWords(editing.date, view.today)} : ${dayWords(ranges)}.`,
-                )
-              }
-            >
-              Enregistrer ce jour
-            </button>
           </div>
-        </div>
-      )}
-      {reauth === null ? null : (
-        <PasswordPrompt
-          lead="Pour changer un jour, confirme ton mot de passe et ton code."
-          onConfirmed={() => {
-            const again = reauth;
-            setReauth(null);
-            again();
-          }}
-          onCancel={() => {
-            setReauth(null);
-          }}
-        />
-      )}
-      {problem === null ? null : (
-        <p className="ps-error" role="alert">
-          {problem}
-        </p>
-      )}
-      {notice === null ? null : (
-        <p className="ps-hint" role="status">
-          {notice}
-        </p>
-      )}
+        )}
+        {reauth === null ? null : (
+          <PasswordPrompt
+            lead="Pour changer un jour, confirme ton mot de passe et ton code."
+            onConfirmed={() => {
+              const again = reauth;
+              setReauth(null);
+              again();
+            }}
+            onCancel={() => {
+              setReauth(null);
+            }}
+          />
+        )}
+        {problem === null ? null : (
+          <p className="ps-error" role="alert">
+            {problem}
+          </p>
+        )}
+        {notice === null ? null : (
+          <p className="ps-hint" role="status">
+            {notice}
+          </p>
+        )}
+      </div>
     </section>
+  );
+}
+
+const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as const;
+const WEEKDAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] as const;
+/** How far ahead the grid goes, in its pages of two weeks. */
+const PAGES = 4;
+
+/**
+ * The days to pick from (avis Design, 19/11): two weeks a page, seven columns under L M M J V S D, the day's number in
+ * its cell. A past day cannot be picked; one with a change of its own carries a violet dot; today is said quietly.
+ */
+function DayGrid({
+  today,
+  picked,
+  kept,
+  onPick,
+}: {
+  today: string;
+  picked: string;
+  kept: ReadonlyMap<string, unknown>;
+  onPick: (date: string) => void;
+}): JSX.Element {
+  const [page, setPage] = useState(0);
+  const days = gridDays(today, page);
+  const first = days[0] ?? today;
+  const last = days.at(-1) ?? today;
+  return (
+    <div className="hr-grid">
+      <div className="hr-grid__head">
+        <span className="hr-grid__span">{spanWords(first, last)}</span>
+        <span className="hr-grid__nav">
+          <button
+            type="button"
+            className="nv-iconbtn hr-days__icon"
+            aria-label="Deux semaines plus tôt"
+            disabled={page === 0}
+            onClick={() => {
+              setPage(page - 1);
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m14 6-6 6 6 6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="nv-iconbtn hr-days__icon"
+            aria-label="Deux semaines plus tard"
+            disabled={page === PAGES - 1}
+            onClick={() => {
+              setPage(page + 1);
+            }}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m10 6 6 6-6 6" />
+            </svg>
+          </button>
+        </span>
+      </div>
+      <div className="hr-grid__days" role="group" aria-label="Quel jour">
+        {WEEKDAYS.map((letter, index) => (
+          <span key={index} className="hr-grid__weekday" aria-hidden="true">
+            {letter}
+          </span>
+        ))}
+        {days.map((date, index) => (
+          <button
+            key={date}
+            type="button"
+            className="hr-grid__day"
+            aria-label={`${WEEKDAY_NAMES[index % 7] ?? ''} ${String(Number(date.slice(8, 10)))}${date === today ? ', aujourd’hui' : ''}${kept.has(date) ? ', modifié' : ''}`}
+            aria-pressed={date === picked}
+            data-today={date === today || undefined}
+            data-kept={kept.has(date) || undefined}
+            disabled={date < today}
+            onClick={() => {
+              onPick(date);
+            }}
+          >
+            {Number(date.slice(8, 10))}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

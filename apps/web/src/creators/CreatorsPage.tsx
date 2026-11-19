@@ -333,6 +333,9 @@ export function CreatorsPage({
             </Link>
           }
           title={current.displayName}
+          // Her AI's switch (ADR 0148 § 1) next to her name, on every tab of her sheet: the same setting as the
+          // Dashboard's control (avis Design, 19/11: in the header, not as a card of the tab).
+          actions={showForm ? undefined : <CreatorAgentSwitch creator={current} user={user} />}
           tabs={
             switchShown ? (
               <SubNav
@@ -353,8 +356,6 @@ export function CreatorsPage({
       {/* One child of the page: the sheet follows the switch, never pushed to the foot of the screen (CREA-03). */}
       <div className="ps-sheet">
         {leaving ? <LeaveConfirm onLeave={leave} onStay={stay} /> : null}
-        {/* Her AI's switch (ADR 0148 § 1), on every tab of her sheet: the same setting as the Dashboard's control. */}
-        {current !== undefined && !showForm ? <CreatorAgentSwitch creator={current} user={user} /> : null}
         {/* Her « Mise en route » (pilotage plan W1) above whichever sheet is open, until all is done. */}
         {isOwner && current !== undefined && !showForm ? (
           <CreatorSetupBlock key={`${current.id}:${shown}`} creatorId={current.id} />
@@ -385,6 +386,7 @@ function CreatorAgentSwitch({
       zone={creator.timezone}
       state={card}
       read={overview.dataUpdatedAt}
+      variant="header"
       readOnly={!canSwitch(user)}
     />
   );

@@ -1,6 +1,6 @@
 import { replyOpenAt, type AgentHours, type DayRange } from '@impera/contracts';
 
-import { addDays, clockOf, zonedInstant } from '@/scheduling/time';
+import { addDays, clockOf, weekdayOf, zonedInstant } from '@/scheduling/time';
 
 /*
  * Her dated days (ADR 0148 § 3), in words: pure, so that the panel only lays them out. A day's ranges replace her
@@ -39,9 +39,20 @@ export function dateWords(date: string, today: string): string {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-/** The days the panel offers to change: today and the next ones, two weeks in all. */
-export const daysAhead = (today: string, count = 14): readonly string[] =>
-  Array.from({ length: count }, (_, index) => addDays(today, index));
+/** A page of the day grid: two weeks from the Monday of her today's week, `page` pages of two weeks later. */
+export const gridDays = (today: string, page: number): readonly string[] => {
+  const monday = addDays(today, 1 - weekdayOf(today) + page * 14);
+  return Array.from({ length: 14 }, (_, index) => addDays(monday, index));
+};
+
+const MONTH = new Intl.DateTimeFormat('fr-FR', { month: 'long', timeZone: 'UTC' });
+
+/** « novembre », « novembre – décembre »: the months a page of the grid spans. */
+export function spanWords(first: string, last: string): string {
+  const from = MONTH.format(new Date(`${first}T12:00:00Z`));
+  const to = MONTH.format(new Date(`${last}T12:00:00Z`));
+  return from === to ? from : `${from} – ${to}`;
+}
 
 /**
  * What the day's ranges open that her week keeps closed, by quarters of an hour: the agent will answer then too, the

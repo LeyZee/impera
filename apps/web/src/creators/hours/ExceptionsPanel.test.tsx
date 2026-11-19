@@ -86,7 +86,7 @@ describe('Jours modifiés (ADR 0148 § 3)', () => {
     expect(flat(tomorrow.textContent)).toContain('20 h – minuit');
     expect(screen.getByText('Pas d’IA ce jour-là')).toBeDefined();
     expect(screen.queryByText(/18 nov/u)).toBeNull();
-    fireEvent.click(within(tomorrow).getByRole('button', { name: 'Rétablir' }));
+    fireEvent.click(within(tomorrow).getByRole('button', { name: 'Rétablir Demain' }));
     await waitFor(() => {
       expect(calls.at(-1)).toEqual({ method: 'DELETE', url: `${BASE}/2026-11-21`, body: null });
     });
@@ -97,10 +97,16 @@ describe('Jours modifiés (ADR 0148 § 3)', () => {
     const calls = serve(view([]), view([{ date: '2026-11-20', ranges: [] }]));
     show();
     fireEvent.click(await screen.findByRole('button', { name: 'Modifier un jour' }));
+    // Two weeks from her Monday, under L M M J V S D: a past day cannot be picked, today is said.
+    expect(screen.getByRole('button', { name: 'lundi 16' }).hasAttribute('disabled')).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'vendredi 20, aujourd’hui' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'lundi 23' }));
     fireEvent.click(screen.getByRole('radio', { name: 'Pas d’IA' }));
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer ce jour' }));
     await waitFor(() => {
-      expect(calls.at(-1)).toEqual({ method: 'PUT', url: `${BASE}/2026-11-20`, body: { ranges: [] } });
+      expect(calls.at(-1)).toEqual({ method: 'PUT', url: `${BASE}/2026-11-23`, body: { ranges: [] } });
     });
   });
 

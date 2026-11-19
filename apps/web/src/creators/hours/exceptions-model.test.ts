@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   dateWords,
   dayWords,
-  daysAhead,
+  gridDays,
   endOf,
   fromToWords,
   openedBeyondWeek,
   rangeWords,
+  spanWords,
 } from './exceptions-model';
 
 // Everything below is invented (ADR 0010).
@@ -49,7 +50,12 @@ describe('her dated days in words (ADR 0148 § 3)', () => {
     expect(dateWords('2026-11-20', '2026-11-20')).toBe('Aujourd’hui');
     expect(dateWords('2026-11-21', '2026-11-20')).toBe('Demain');
     expect(dateWords('2026-11-24', '2026-11-20')).toBe('mardi 24 nov.');
-    expect(daysAhead('2026-11-30', 3)).toEqual(['2026-11-30', '2026-12-01', '2026-12-02']);
+    // Friday 20/11: the grid starts on Monday 16/11, two weeks a page.
+    expect(gridDays('2026-11-20', 0)[0]).toBe('2026-11-16');
+    expect(gridDays('2026-11-20', 0).at(-1)).toBe('2026-11-29');
+    expect(gridDays('2026-11-20', 1)[0]).toBe('2026-11-30');
+    expect(spanWords('2026-11-16', '2026-11-29')).toBe('novembre');
+    expect(spanWords('2026-11-30', '2026-12-13')).toBe('novembre – décembre');
   });
 
   it('a 0 h end is midnight', () => {

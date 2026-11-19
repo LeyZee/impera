@@ -9,9 +9,10 @@ import { Dialog } from '@/shell/Dialog';
 
 /**
  * Her AI's switch (ADR 0148 § 1): the state in words, and the gestures that change it, the same setting as the
- * Dashboard's control, never a second one. « Pause » (1 h, until 9:00 tomorrow on her clock, or until someone lifts
- * it), « Couper » after a confirmation that says what stops and what stays, « Rallumer » back to the mode she had.
- * The global switch is said, never lifted from here. `compact` is the line of her card in the list of Créatrices.
+ * Dashboard's control, never a second one. « Pause » (1 h, or until 9:00 tomorrow on her clock; out of her hours,
+ * only what ends after she opens again), « Couper » after a confirmation that says what stops and what stays,
+ * « Rallumer » back to the mode she had. The global switch is said, never lifted from here. `card` is the line of her
+ * card in the list of Créatrices, `header` sits in her sheet's header, next to her name (avis Design, 19/11).
  */
 export function AgentSwitch({
   creatorId,
@@ -19,7 +20,7 @@ export function AgentSwitch({
   zone,
   state: input,
   read,
-  compact = false,
+  variant,
   readOnly = false,
 }: {
   creatorId: string;
@@ -29,7 +30,7 @@ export function AgentSwitch({
   state: AgentStateInput;
   /** When the server last answered the page: a refusal stays said until the next answer. */
   read: number;
-  compact?: boolean;
+  variant: 'card' | 'header';
   /** The reader may say the state but not change it (a chatter, a scope of one's own): no gesture shown. */
   readOnly?: boolean;
 }): JSX.Element {
@@ -39,10 +40,11 @@ export function AgentSwitch({
   const state = agentStateOf(input, zone, now);
   const running = state.kind === 'on' || state.kind === 'out';
   const stopped = state.kind === 'paused' || state.kind === 'off';
+  const choices = pauseChoices(zone, now, state.kind === 'out' ? (input.hoursNow?.changesAt ?? null) : null);
 
   return (
     <div
-      className={`ai-switch${compact ? ' ai-switch--compact' : ' nv-plate'}`}
+      className={`ai-switch ai-switch--${variant}`}
       data-state={state.kind}
       aria-busy={writer.pending || undefined}
     >
@@ -50,23 +52,27 @@ export function AgentSwitch({
         <span className={`nv-dot ai-switch__dot ai-switch__dot--${state.kind}`} aria-hidden="true" />
         <span className="ai-switch__words">
           <strong className="ai-switch__label">{state.label}</strong>
-          {state.detail === null ? null : <span className="ai-switch__detail">{state.detail}</span>}
+          {state.detail === null && variant === 'header' ? null : (
+            <span className="ai-switch__detail">{state.detail ?? ''}</span>
+          )}
         </span>
       </p>
       {state.kind === 'global' || readOnly ? null : (
         <div className="ai-switch__actions">
           {running ? (
             <>
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                disabled={writer.pending}
-                onClick={() => {
-                  setAsking('pause');
-                }}
-              >
-                Pause
-              </button>
+              {choices.length === 0 ? null : (
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--soft nv-btn--sm"
+                  disabled={writer.pending}
+                  onClick={() => {
+                    setAsking('pause');
+                  }}
+                >
+                  Pause
+                </button>
+              )}
               <button
                 type="button"
                 className="nv-btn nv-btn--plain nv-btn--sm"
@@ -101,14 +107,13 @@ export function AgentSwitch({
       {asking === 'pause' ? (
         <PauseDialog
           creatorName={creatorName}
-          choices={pauseChoices(zone, now)}
+          choices={choices}
           onCancel={() => {
             setAsking(null);
           }}
           onPick={(choice) => {
             setAsking(null);
-            if (choice.until === null) writer.setMode('stop');
-            else writer.setMode('stop', choice.until);
+            writer.setMode('stop', choice.until);
           }}
         />
       ) : null}
@@ -147,11 +152,11 @@ function PauseDialog({
   onPick: (choice: PauseChoice) => void;
 }): JSX.Element {
   return (
-    <Dialog
-      title="Mettre l’IA en pause"
-      lead={`Plus aucun message ne part au nom de ${creatorName} pendant la pause. À la fin, l’IA reprend seule dans le mode d’avant et répond aux fans qui ont écrit entre-temps.`}
-      onClose={onCancel}
-    >
+    <Dialog title="Mettre l’IA en pause" onClose={onCancel}>
+      <p className="ai-dialog__lead">
+        Plus aucun message ne part au nom de {creatorName} pendant la pause. À la fin, l’IA reprend seule dans
+        le mode d’avant et répond aux fans qui ont écrit entre-temps.
+      </p>
       <div className="ai-pause">
         {choices.map((choice) => (
           <button
@@ -162,12 +167,7 @@ function PauseDialog({
               onPick(choice);
             }}
           >
-            <span className="ai-pause__label">{choice.label}</span>
-            {choice.until === null ? (
-              <span className="ai-pause__note">
-                Comme « Couper » : elle reste coupée jusqu’à « Rallumer ».
-              </span>
-            ) : null}
+            {choice.label}
           </button>
         ))}
       </div>
@@ -185,11 +185,10 @@ function CutDialog({
   onConfirm: () => void;
 }): JSX.Element {
   return (
-    <Dialog
-      title="Couper l’IA ?"
-      lead={`Plus aucun message ne part au nom de ${creatorName}, ni proposé ni envoyé.`}
-      onClose={onCancel}
-    >
+    <Dialog title="Couper l’IA ?" onClose={onCancel}>
+      <p className="ai-dialog__lead">
+        Plus aucun message ne part au nom de {creatorName}, ni proposé ni envoyé.
+      </p>
       <ul className="ai-cut">
         <li>Les conversations restent lues et notées.</li>
         <li>Les chatteurs reprennent dans Reveal comme avant.</li>

@@ -92,25 +92,28 @@ export function agentStateOf(input: AgentStateInput, zone: string, now: Date): A
   };
 }
 
-/** A pause the switch offers (ADR 0148 § 1): its words, and its end; `null` is the Arrêt lifted by hand. */
+/** A pause the switch offers (ADR 0148 § 1): its words, and its end. An Arrêt without an end is « Couper ». */
 export interface PauseChoice {
-  readonly key: 'hour' | 'morning' | 'manual';
+  readonly key: 'hour' | 'morning';
   readonly label: string;
-  readonly until: Date | null;
+  readonly until: Date;
 }
 
-/** 1 h, until 9:00 tomorrow on her clock, or until someone lifts it. Never longer than the server takes. */
-export function pauseChoices(zone: string, now: Date): readonly PauseChoice[] {
+/**
+ * 1 h, or until 9:00 tomorrow on her clock, never longer than the server takes. Out of her hours, only a pause that
+ * ends after she opens again does something (avis Design, 19/11): `opensAt` leaves out the others; none may be left.
+ */
+export function pauseChoices(zone: string, now: Date, opensAt: string | null = null): readonly PauseChoice[] {
   const hour = new Date(Math.ceil((now.getTime() + 60 * 60_000) / 60_000) * 60_000);
   const morning = zonedInstant(addDays(dayOf(now, zone), 1), 9 * 60, zone);
   const choices: PauseChoice[] = [
     { key: 'hour', label: `1\u00a0h, ${untilWords(hour.toISOString(), zone, now)}`, until: hour },
   ];
   if (morning.getTime() > hour.getTime() && morning.getTime() - now.getTime() < AGENT_PAUSE_MAX_MS) {
-    choices.push({ key: 'morning', label: 'Jusqu’à demain 9 h', until: morning });
+    choices.push({ key: 'morning', label: 'Jusqu’à demain 9\u00a0h', until: morning });
   }
-  choices.push({ key: 'manual', label: 'Jusqu’à ce qu’on la rallume', until: null });
-  return choices;
+  const opens = opensAt === null ? null : Date.parse(opensAt);
+  return opens === null ? choices : choices.filter((choice) => choice.until.getTime() > opens);
 }
 
 /**

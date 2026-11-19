@@ -72,18 +72,23 @@ describe('agentStateOf (ADR 0148 § 1)', () => {
 });
 
 describe('pauseChoices (ADR 0148 § 1)', () => {
-  it('offers 1 h, tomorrow 9:00 on her clock, and until someone lifts it', () => {
+  it('offers 1 h and tomorrow 9:00 on her clock; Arrêt without an end is « Couper »', () => {
     const choices = pauseChoices(PARIS, NOW);
-    expect(choices.map((choice) => choice.key)).toEqual(['hour', 'morning', 'manual']);
-    expect(choices[0]?.until?.toISOString()).toBe('2026-11-19T16:30:00.000Z');
-    expect(choices[0]?.label).toBe('1 h, jusqu’à 17 h 30');
-    expect(choices[1]?.until?.toISOString()).toBe('2026-11-20T08:00:00.000Z');
-    expect(choices[2]?.until).toBeNull();
+    expect(choices.map((choice) => choice.key)).toEqual(['hour', 'morning']);
+    expect(choices[0]?.until.toISOString()).toBe('2026-11-19T16:30:00.000Z');
+    expect(choices[0]?.label).toBe('1\u00a0h, jusqu’à 17\u00a0h\u00a030');
+    expect(choices[1]?.until.toISOString()).toBe('2026-11-20T08:00:00.000Z');
   });
 
   it('in her small hours, 9:00 tomorrow is still the next morning on her clock', () => {
     // 0:30 on Friday 20/11 in Paris: « demain 9 h » is Saturday 9:00.
     const choices = pauseChoices(PARIS, new Date('2026-11-19T23:30:00Z'));
-    expect(choices[1]?.until?.toISOString()).toBe('2026-11-21T08:00:00.000Z');
+    expect(choices[1]?.until.toISOString()).toBe('2026-11-21T08:00:00.000Z');
+  });
+
+  it('out of her hours, only what ends after she opens again (avis Design, 19/11)', () => {
+    // She opens at 21:00 tonight: 1 h does nothing, tomorrow 9:00 does.
+    expect(pauseChoices(PARIS, NOW, '2026-11-19T20:00:00Z').map((choice) => choice.key)).toEqual(['morning']);
+    expect(pauseChoices(PARIS, NOW, '2026-11-20T10:00:00Z')).toEqual([]);
   });
 });
