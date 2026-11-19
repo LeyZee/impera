@@ -687,8 +687,23 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(late)).toContain('Délai passé sans explication : à toi de décider.');
     expect(late?.querySelector('input')?.disabled).toBe(false);
 
+    // A report with a gap is never swept by « Tout valider »: it is ticked by hand, once read.
+    expect(screen.queryByRole('button', { name: /^Tout valider/u })).toBeNull();
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));
     expect(screen.getByRole('button', { name: 'Valider (2)' })).toBeTruthy();
+  });
+
+  it('counts in « Tout valider » the reports without a gap only', async () => {
+    open = [
+      report(1, 0),
+      report(2, 1, {
+        check: gapOf(-3_000, 15_000, '2026-10-28T22:00:00.000Z'),
+        explanation: 'Un remboursement arrivé après le shift.',
+      }),
+      report(3, 2),
+    ];
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Tout valider (2)' })).toBeTruthy();
   });
 
   it('says once when no sale of the platform is read yet: every report waits for a hand (recette EQP-05)', async () => {

@@ -148,6 +148,9 @@ export function ReportsPage({
   // What the reader may validate now: his to review, not held, its gap no longer waiting for its member.
   const reviewable = waiting.filter((one) => one.canReview && !held.has(one.id) && !gapWaits(one, now));
   const chosen = reviewable.filter((one) => selected.has(one.id));
+  // « Tout valider » never takes a report whose check found a gap: those are read and ticked one by one (relecture
+  // Équipe of #858).
+  const plain = reviewable.filter((one) => !hasGap(one));
   // Reveal's team opens to the owner and an active manager (ADR 0076): « Relier » leads there only for them.
   const canLink = useTeamImportCounts('reveal').data !== undefined;
 
@@ -227,7 +230,7 @@ export function ReportsPage({
         tabs={<TeamNav />}
         // The screen's action in sight before anything is ticked; once some are, « Valider (N) » at the foot of the
         // list takes over, the one neon of the page (recette visuelle 16/11, GES-25; EQ-26).
-        {...(chosen.length > 0 || reviewable.length === 0
+        {...(chosen.length > 0 || plain.length === 0
           ? {}
           : {
               actions: (
@@ -235,10 +238,10 @@ export function ReportsPage({
                   type="button"
                   className="nv-btn nv-btn--neon"
                   onClick={() => {
-                    validate(reviewable, new Set());
+                    validate(plain, new Set());
                   }}
                 >
-                  Tout valider ({reviewable.length})
+                  Tout valider ({plain.length})
                 </button>
               ),
             })}
