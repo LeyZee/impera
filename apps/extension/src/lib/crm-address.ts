@@ -44,3 +44,18 @@ export function permissionPatternOf(origin: string): string {
 export function shortAddress(origin: string): string {
   return origin.replace(/^https?:\/\//u, '');
 }
+
+/**
+ * The address a change of `chrome.storage` brings, for a page that stays open while the popup saves another one (the
+ * copilot panel, recette du 16/11, EXT-24): the new origin, the default one when it was removed, or null when the
+ * change is not about the address.
+ */
+export function changedOrigin(
+  changes: Readonly<Record<string, { readonly newValue?: unknown }>>,
+  area: string,
+  key: string,
+): string | null {
+  if (area !== 'local' || !(key in changes)) return null;
+  const value = changes[key]?.newValue;
+  return typeof value === 'string' ? (crmOriginOf(value) ?? DEFAULT_CRM_ADDRESS) : DEFAULT_CRM_ADDRESS;
+}
