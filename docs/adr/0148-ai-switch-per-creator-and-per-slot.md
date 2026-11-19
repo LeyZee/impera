@@ -1,6 +1,6 @@
 # 0148. L'IA d'une créatrice : un interrupteur qui dit l'état en clair, une pause rapide, et ses heures à elle dessinées sur une frise
 
-Statut : proposed (demande de Charles, 17/11/2026, 14 h 20 heure de Paris : « il faut un bouton global […] pour activer l'IA sur la modèle ou pas » et « activer l'IA sur certains shifts ou pas » ; forme choisie le même jour à 14 h 23 : « Chaque semaine + exceptions » ; précisée à 14 h 34 : « les shifts des chatteurs et les shifts des IA, c'est deux choses différentes […] l'IA n'a pas besoin d'avoir des shifts comme des chatteurs »)
+Statut : accepted (acceptée par Charles le 19/11/2026 à 16 h 58, heure de Paris : « ok 0148 » ; demande de Charles, 17/11/2026, 14 h 20 heure de Paris : « il faut un bouton global […] pour activer l'IA sur la modèle ou pas » et « activer l'IA sur certains shifts ou pas » ; forme choisie le même jour à 14 h 23 : « Chaque semaine + exceptions » ; précisée à 14 h 34 : « les shifts des chatteurs et les shifts des IA, c'est deux choses différentes […] l'IA n'a pas besoin d'avoir des shifts comme des chatteurs »)
 Date : 2026-11-17
 Précise : P3-14 (heures d'activité), l'ADR 0126 § 13 et § 17 (heures récurrentes et exceptions datées de l'agent, ordre de priorité), l'ADR 0019 (verrou de l'Automatique), l'ADR 0024 (un chatteur ne change jamais le mode), l'ADR 0149 (onglet IA de la fiche). Ne remplace rien.
 
