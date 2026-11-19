@@ -253,6 +253,9 @@ export function assembleDashboard(input: {
     period: input.period,
     mode: modeOf(facts),
     globalStop: facts.switches.global,
+    pausedUntil: facts.switches.creator ? (facts.pausedUntil?.toISOString() ?? null) : null,
+    hoursNow: facts.hoursNow,
+    resumesAs: facts.autoConversations > 0 ? 'auto' : 'copilot',
     automatic: { open: gate.open, missing: [...gate.missing] },
     liveRate: {
       rate: asPercent(reading.rate),

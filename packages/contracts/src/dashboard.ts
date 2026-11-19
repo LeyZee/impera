@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { AgentHoursNowSchema } from './agent-hours';
 import { AutomaticGateSchema } from './automatic';
 import { PlatformSchema } from './enums';
 import { HandoffCauseSchema } from './events';
@@ -45,6 +46,10 @@ export const SetAgentModeBodySchema = z
     path: ['until'],
   });
 export type SetAgentModeBody = z.infer<typeof SetAgentModeBodySchema>;
+
+/** The mode « Rallumer » gives back (ADR 0148 § 1): never Arrêt. */
+export const ResumeModeSchema = z.enum(['auto', 'copilot']);
+export type ResumeMode = z.infer<typeof ResumeModeSchema>;
 
 /** The longest pause (ADR 0148 § 1): past a week, it is an Arrêt, lifted by hand. */
 export const AGENT_PAUSE_MAX_MS = 7 * 24 * 60 * 60 * 1000;
@@ -201,6 +206,12 @@ export const DashboardSchema = z.object({
   mode: AgentModeSchema,
   /** The global switch is on: Arrêt for every creator, whatever she sets, as `PUT /v1/agent/mode` answers it. */
   globalStop: z.boolean(),
+  /** Her Arrêt is a pause (ADR 0148 § 1): it lifts itself at this instant. `null` otherwise. */
+  pausedUntil: at.nullable().default(null),
+  /** Her hours now, as the switch says them (ADR 0148 § 1); `null` from a server that does not say it yet. */
+  hoursNow: AgentHoursNowSchema.nullable().default(null),
+  /** The mode lifting her Arrêt gives back, the one she had (ADR 0148 § 1 « Rallumer »). */
+  resumesAs: ResumeModeSchema.default('copilot'),
   /** Automatique opens only when nothing is missing. */
   automatic: AutomaticGateSchema,
   /** Taux en réel: drafts approved without an edit among the last 200 decided, for the active voice version. */

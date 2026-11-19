@@ -443,3 +443,51 @@ export function localDate(at: Date, timeZone: string): LocalDate {
   const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
+
+/** The minutes of her clock where she can close: her slots' ends, and with exceptions their ranges' and midnight. */
+function closingMinutes(hours: AgentHours, exceptions: DatedRanges): number[] {
+  const slots = hours.reply.mode === 'slots' ? hours.reply.slots.filter((slot) => slot.enabled) : [];
+  const minutes = slots.map((slot) => slot.endMinute);
+  if (exceptions.length > 0) {
+    minutes.push(
+      0,
+      // A range that ends at midnight ends at the next day's 0:00.
+      ...exceptions.flatMap((exception) =>
+        exception.ranges.map((range) => range.endMinute % MINUTES_PER_DAY),
+      ),
+    );
+  }
+  return [...new Set(minutes)];
+}
+
+/**
+ * Her hours at `at` as the switch says them (ADR 0148 § 1): open or not, and when that changes, the closing when
+ * open, the next opening when closed. `changesAt` is `null` when nothing changes in the next eight days (always open,
+ * or a week closed by hand). The switches (Arrêt, pause, global) are read elsewhere: this is her hours alone.
+ */
+export const AgentHoursNowSchema = z.object({ open: z.boolean(), changesAt: z.iso.datetime().nullable() });
+export type AgentHoursNow = z.infer<typeof AgentHoursNowSchema>;
+
+export function agentHoursNow(
+  hours: AgentHours,
+  timeZone: string,
+  at: Date,
+  exceptions: DatedRanges = [],
+): AgentHoursNow {
+  if (!replyOpenAt(hours, timeZone, at, exceptions)) {
+    const opening = nextReplyOpening(hours, timeZone, at, exceptions);
+    return { open: false, changesAt: opening.getTime() === at.getTime() ? null : opening.toISOString() };
+  }
+  if (exceptions.length === 0 && hours.reply.mode === 'always') return { open: true, changesAt: null };
+  let best: Date | undefined;
+  for (const end of closingMinutes(hours, exceptions)) {
+    let from = new Date(at.getTime() + MINUTE_MS);
+    for (let i = 0; i < 8; i += 1) {
+      const candidate = nextWallMinute(from, timeZone, end);
+      if (best !== undefined && candidate >= best) break;
+      if (!replyOpenAt(hours, timeZone, candidate, exceptions)) best = candidate;
+      from = new Date(candidate.getTime() + MINUTE_MS);
+    }
+  }
+  return { open: true, changesAt: best === undefined ? null : best.toISOString() };
+}

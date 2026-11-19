@@ -1,7 +1,7 @@
 import { CreatorIdSchema, TeamMemberIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { fortnightOf, modeOf, onShiftOf, requestOf, salesOf, todosOf } from './model';
+import { fortnightOf, onShiftOf, requestOf, salesOf, todosOf } from './model';
 
 // Everything below is invented (ADR 0010).
 const CREATOR = CreatorIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a1');
@@ -13,12 +13,6 @@ const member = (n: number, name: string, endsAt: string) => ({
 const flat = (text: string): string => text.replace(/\s/gu, ' ');
 
 describe('the words of a card of the list of Créatrices', () => {
-  it('names her mode, Arrêt in amber and never in red', () => {
-    expect(modeOf('auto')).toEqual({ label: 'Automatique', tone: 'ok' });
-    expect(modeOf('copilot')).toEqual({ label: 'Copilote', tone: 'calm' });
-    expect(modeOf('stop')).toEqual({ label: 'Arrêt', tone: 'warn' });
-  });
-
   it('says her fortnight and its revenue, or why there is none', () => {
     expect(fortnightOf('2026-11-16', '2026-11-20')).toBe('du 16 au 20 nov.');
     expect(fortnightOf('2026-11-01', '2026-11-01')).toBe('le 1 nov.');

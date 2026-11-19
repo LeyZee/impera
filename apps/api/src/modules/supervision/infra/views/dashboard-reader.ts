@@ -1,8 +1,6 @@
 import {
-  AgentHoursSchema,
+  agentHoursNow,
   ConnectorConfigSchema,
-  DayRangeSchema,
-  DEFAULT_AGENT_HOURS,
   HandoffCauseSchema,
   LIVE_WINDOW,
   type AgentHours,
@@ -16,6 +14,8 @@ import { unansweredSince } from '../../domain/dashboard';
 import type { DashboardFacts, DashboardReader, DashboardWindow } from '../../domain/dashboard-ports';
 import { rankFans, usdToEurMinor, type UsdRate } from '../../domain/fan-ranking';
 import { FRAGILE_PROPOSAL, fragileProposal, fragileWhy } from '../../domain/fragile';
+
+import { herHours } from './her-hours';
 
 /**
  * The Dashboard's SQL views (docs/architecture/modules.md: read only, aggregates, the documented exception to
@@ -182,8 +182,9 @@ async function facts(
 
   const stopped = await rows(
     tx,
-    z.object({ scope: z.string(), active: z.boolean() }),
-    sql`select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active from kill_switches
+    z.object({ scope: z.string(), active: z.boolean(), active_until: timestamp.nullable() }),
+    sql`select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active,
+               active_until from kill_switches
         where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId}::uuid)
         order by scope, set_at desc`,
   );
@@ -401,6 +402,8 @@ async function facts(
       global: stopped.some((s) => s.scope === 'global' && s.active),
       creator: stopped.some((s) => s.scope === 'creator' && s.active),
     },
+    pausedUntil: stopped.find((s) => s.scope === 'creator' && s.active)?.active_until ?? null,
+    hoursNow: agentHoursNow(her.hours, her.timeZone, window.now, her.exceptions),
     autoConversations: counts.auto,
     decidedThreeWeeksAgo: await decided(tx, creatorId, window, new Date(window.now.getTime() - 21 * DAY_MS)),
     reveal: {
@@ -498,22 +501,7 @@ export function createDashboardReader(db: Database): DashboardReader {
         );
         if (creator === undefined) return undefined;
         const window = windowFor(creator.timezone);
-        // Her hours as the worker reads them: none stored, or unreadable, are the defaults (always open).
-        const stored = AgentHoursSchema.safeParse(creator.agent_hours);
-        // Her dated exceptions (ADR 0148 § 3) from her today on: a date that has one follows its ranges alone.
-        const dated = await rows(
-          tx,
-          z.object({ date: z.string(), ranges: z.array(DayRangeSchema) }),
-          sql`select to_char(date, 'YYYY-MM-DD') as date, ranges from agent_hour_exceptions
-              where creator_id = ${creatorId}::uuid
-                and date >= (now() at time zone ${creator.timezone})::date - 8
-              order by date`,
-        );
-        const her = {
-          hours: stored.success ? stored.data : DEFAULT_AGENT_HOURS,
-          timeZone: creator.timezone,
-          exceptions: dated,
-        };
+        const her = await herHours(tx, creatorId, creator.timezone, creator.agent_hours);
         return {
           facts: {
             creator: { name: creator.display_name, timezone: creator.timezone },

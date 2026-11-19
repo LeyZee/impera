@@ -28,6 +28,8 @@ const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_00
 const FACTS: DashboardFacts = {
   creator: { name: 'Lina', timezone: 'Europe/Paris' },
   switches: { global: false, creator: false },
+  pausedUntil: null,
+  hoursNow: { open: true, changesAt: null },
   autoConversations: 0,
   decidedThreeWeeksAgo: [],
   reveal: {
@@ -196,6 +198,16 @@ describe('dashboard', () => {
   it('says Arrêt over everything, and Automatique when a conversation runs on its own', () => {
     const hers = assemble({ switches: { global: false, creator: true }, autoConversations: 3 });
     expect(hers).toMatchObject({ mode: 'stop', globalStop: false });
+    expect(hers.pausedUntil).toBeNull();
+    const paused = assemble({
+      switches: { global: false, creator: true },
+      pausedUntil: new Date('2026-10-17T23:00:00.000Z'),
+      hoursNow: { open: false, changesAt: '2026-10-18T07:00:00.000Z' },
+    });
+    expect(paused).toMatchObject({
+      pausedUntil: '2026-10-17T23:00:00.000Z',
+      hoursNow: { open: false, changesAt: '2026-10-18T07:00:00.000Z' },
+    });
     const everyone = assemble({ switches: { global: true, creator: false } });
     expect(everyone).toMatchObject({ mode: 'stop', globalStop: true });
     expect(assemble({ autoConversations: 1 }).mode).toBe('auto');

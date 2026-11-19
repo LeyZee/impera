@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  agentHoursNow,
   AgentHourExceptionSchema,
   DEFAULT_AGENT_HOURS,
   localDate,
@@ -183,5 +184,46 @@ describe('openings with her exceptions (ADR 0148 § 3, IA-01 lot b)', () => {
       ranges: [],
     }));
     expect(nextFollowUpAllowed(NIGHTS, PARIS, at('2026-11-20T10:00:00Z'), week)).toBeNull();
+  });
+});
+
+describe('agentHoursNow (ADR 0148 § 1)', () => {
+  it('always open: open, nothing changes', () => {
+    expect(agentHoursNow(DEFAULT_AGENT_HOURS, PARIS, new Date('2026-11-20T12:00:00Z'))).toEqual({
+      open: true,
+      changesAt: null,
+    });
+  });
+
+  it('open in a slot past midnight: closes at 1:00 her time', () => {
+    // Friday 20/11, 23:00 in Paris (UTC+1).
+    expect(agentHoursNow(NIGHTS, PARIS, new Date('2026-11-20T22:00:00Z'))).toEqual({
+      open: true,
+      changesAt: '2026-11-21T00:00:00.000Z',
+    });
+  });
+
+  it('closed: opens at 9:00 her time', () => {
+    expect(agentHoursNow(NIGHTS, PARIS, new Date('2026-11-21T03:00:00Z'))).toEqual({
+      open: false,
+      changesAt: '2026-11-21T08:00:00.000Z',
+    });
+  });
+
+  it('an exception ending at midnight closes her at the next 0:00 even inside a week slot', () => {
+    const exceptions = [{ date: '2026-11-20', ranges: [{ startMinute: 1200, endMinute: 1440 }] }];
+    // The next day has no exception: its own 9:00 slot opens; the night before is cut at midnight.
+    expect(agentHoursNow(NIGHTS, PARIS, new Date('2026-11-20T20:00:00Z'), exceptions)).toEqual({
+      open: true,
+      changesAt: '2026-11-20T23:00:00.000Z',
+    });
+  });
+
+  it('a date closed by hand: opens the day after', () => {
+    const exceptions = [{ date: '2026-11-21', ranges: [] }];
+    expect(agentHoursNow(NIGHTS, PARIS, new Date('2026-11-21T10:00:00Z'), exceptions)).toEqual({
+      open: false,
+      changesAt: '2026-11-22T08:00:00.000Z',
+    });
   });
 });

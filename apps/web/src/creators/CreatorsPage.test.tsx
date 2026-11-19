@@ -193,7 +193,10 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(within(anna).getByText('1 846,50 €')).toBeDefined();
     });
-    expect(within(anna).getByText('Copilote')).toBeDefined();
+    // Her AI's switch on her card (ADR 0148 § 1): the state in words, and the owner's gestures.
+    expect(within(anna).getByText('IA active · Copilote')).toBeDefined();
+    expect(within(anna).getByRole('button', { name: 'Pause' })).toBeDefined();
+    expect(within(anna).getByRole('button', { name: 'Couper' })).toBeDefined();
     expect(within(anna).getByText('du 16 au 20 nov.')).toBeDefined();
     expect(within(anna).getByText(/^Théo jusqu’à/u)).toBeDefined();
     expect(within(anna).getByText('🎬 Feed · Vidéo short')).toBeDefined();
@@ -238,8 +241,11 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     const router = renderAt(operator, '/creatrices');
     const anna = await cardOf('Anna');
     await waitFor(() => {
-      expect(within(anna).getByText('Automatique')).toBeDefined();
+      expect(within(anna).getByText('IA active · Automatique')).toBeDefined();
     });
+    // A scope of one's own reads the state and never changes it (ADR 0148 § 1).
+    expect(within(anna).queryByRole('button', { name: 'Pause' })).toBeNull();
+    expect(within(anna).queryByRole('button', { name: 'Couper' })).toBeNull();
     expect(within(anna).queryByText('Chiffre d’affaires')).toBeNull();
     expect(within(anna).queryByText('En poste')).toBeNull();
     expect(within(anna).queryByText('Contenu attendu')).toBeNull();

@@ -22,6 +22,20 @@ class ModeNotChanged extends Error {}
 
 const OFFLINE = 'Le mode n’a pas changé : le serveur ne répond pas. Réessaie dans un instant.';
 const FORBIDDEN = 'Le mode n’a pas changé : tu n’as pas la main sur cette créatrice.';
+/** Why the server kept a pause off (ADR 0148 § 1, `details.reason`): a pause never lifts nor shortens a stop. */
+function pauseRefusal(reason: unknown): string {
+  switch (reason) {
+    case 'stopped':
+      return 'La pause n’a pas été posée : l’IA est déjà coupée sans fin. Rallume-la d’abord.';
+    case 'archived':
+      return 'La pause n’a pas été posée : cette créatrice est archivée.';
+    case 'sooner':
+      return 'La pause n’a pas été posée : une pause plus longue est déjà en cours.';
+    default:
+      return 'La pause n’a pas été posée. Réessaie dans un instant.';
+  }
+}
+
 /** Copilote asked, Arrêt kept: an operator's global switch holds every creator. */
 const GLOBAL_STOP = 'L’agent reste arrêté : un arrêt général est posé pour toutes les créatrices.';
 
@@ -29,18 +43,27 @@ const GLOBAL_STOP = 'L’agent reste arrêté : un arrêt général est posé po
  * `PUT /v1/agent/mode`. Throws `ReauthRequired` when Automatique asks the password and the code again (reco 9: not
  * given in the last 10 minutes), `ModeNotChanged` with a French sentence on any other refusal.
  */
-async function putAgentMode(creatorId: string, mode: AgentMode): Promise<AgentModeResult> {
+async function putAgentMode(
+  creatorId: string,
+  mode: AgentMode,
+  until: Date | null,
+): Promise<AgentModeResult> {
   const response = await fetch('/v1/agent/mode', {
     method: 'PUT',
     credentials: 'include',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ creatorId, mode }),
+    body: JSON.stringify(
+      until === null ? { creatorId, mode } : { creatorId, mode, until: until.toISOString() },
+    ),
   }).catch(() => null);
   if (response === null) throw new ModeNotChanged(OFFLINE);
   if (response.ok) return AgentModeResultSchema.parse(await response.json());
   if (response.status === 409) {
     // Automatique still locked (ADR 0019): what is missing, with the server's figures, or else its own sentence.
     const body = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+    if (body.success && body.data.error.code === 'agent_pause_conflict') {
+      throw new ModeNotChanged(pauseRefusal(body.data.error.details['reason']));
+    }
     if (body.success) {
       const missing = MissingSchema.safeParse(body.data.error.details['missing']);
       const rows = missing.success ? missingRows({ open: false, missing: missing.data }) : [];
@@ -50,6 +73,12 @@ async function putAgentMode(creatorId: string, mode: AgentMode): Promise<AgentMo
           : `Automatique reste fermé : ${rows.map(([label, value]) => `${label.toLowerCase()} ${value}`).join(', ')}.`,
       );
     }
+  }
+  if (response.status === 400) {
+    // The pause's end passed meanwhile, or lies more than a week ahead (`agent_pause_invalid`).
+    throw new ModeNotChanged(
+      'La pause n’a pas été posée : son heure de fin est passée ou à plus d’une semaine.',
+    );
   }
   if (response.status === 403) {
     const body = ApiErrorSchema.safeParse(await response.json().catch(() => null));
@@ -65,13 +94,18 @@ async function settle(client: QueryClient, creatorId: string, result: AgentModeR
   // A read sent before the change would land after it and put the old mode back (an Arrêt lost): dropped first.
   await client.cancelQueries({ queryKey: key });
   client.setQueriesData<ApiDashboard>({ queryKey: key }, (before) =>
-    before === undefined ? before : { ...before, mode: result.mode, globalStop: result.globalStop },
+    before === undefined
+      ? before
+      : { ...before, mode: result.mode, globalStop: result.globalStop, pausedUntil: result.pausedUntil },
   );
   await client.invalidateQueries({ queryKey: key });
+  // Her card in the list of Créatrices says the same switch (ADR 0148 § 1).
+  await client.invalidateQueries({ queryKey: ['dashboard', 'creators'] });
 }
 
 export interface ModeWriter {
-  readonly setMode: (mode: AgentMode) => void;
+  /** Arrêt with `until` is a pause (ADR 0148 § 1): it lifts itself then, back to the mode she had. */
+  readonly setMode: (mode: AgentMode, until?: Date) => void;
   readonly pending: boolean;
   /**
    * What the screen must say after a change: a refusal, or Arrêt kept by the global switch. Gone once the page has
@@ -97,11 +131,11 @@ export function useAgentModeWriter(creatorId: string | null, read: number): Mode
   const [said, setSaid] = useState<{ readonly text: string; readonly on: number } | null>(null);
   const [asking, setAsking] = useState(false);
   const mutation = useMutation({
-    mutationFn: async ({ mode }: { mode: AgentMode; on: number }) => {
+    mutationFn: async ({ mode, until }: { mode: AgentMode; until: Date | null; on: number }) => {
       // The sample has no creator: nothing to write.
       if (creatorId === null) throw new ModeNotChanged(OFFLINE);
       setSaid(null);
-      return putAgentMode(creatorId, mode);
+      return putAgentMode(creatorId, mode, until);
     },
     onSuccess: async (result, { mode, on }) => {
       if (result.globalStop && mode !== 'stop') setSaid({ text: GLOBAL_STOP, on });
@@ -117,16 +151,16 @@ export function useAgentModeWriter(creatorId: string | null, read: number): Mode
   });
   const { mutate } = mutation;
   const setMode = useCallback(
-    (mode: AgentMode) => {
+    (mode: AgentMode, until?: Date) => {
       // Any other choice made meanwhile (an Arrêt) wins over the Automatique that waited for the password.
       setAsking(false);
-      mutate({ mode, on: read });
+      mutate({ mode, until: until ?? null, on: read });
     },
     [mutate, read],
   );
   const confirmed = useCallback(() => {
     setAsking(false);
-    mutate({ mode: 'auto', on: read });
+    mutate({ mode: 'auto', until: null, on: read });
   }, [mutate, read]);
   const cancelled = useCallback(() => {
     setAsking(false);

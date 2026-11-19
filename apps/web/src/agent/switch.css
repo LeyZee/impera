@@ -1,0 +1,108 @@
+/*
+ * Her AI's switch (ADR 0148 § 1): the state in words, then the gestures. On her sheet it is a plate of its own under
+ * the header; on her card in the list, one line above the figures. The AI is violet (`--nv-agent`, as in the
+ * calendar), a pause or a stop amber: a state someone chose, never an alarm. No coloured bar on any side.
+ */
+.ai-switch {
+  position: relative;
+  /* Above the card's stretched link: its buttons stay their own. */
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-4);
+  min-width: 0;
+}
+.ai-switch:not(.ai-switch--compact) {
+  padding: var(--nv-space-3) var(--nv-space-4);
+}
+
+.ai-switch__state {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  margin: 0;
+}
+
+.ai-switch__dot--on {
+  --_c: var(--nv-agent);
+}
+.ai-switch__dot--out {
+  --_c: var(--nv-ink-faint);
+}
+.ai-switch__dot--paused,
+.ai-switch__dot--off,
+.ai-switch__dot--global {
+  --_c: var(--nv-warning);
+}
+
+.ai-switch__words {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--nv-space-2);
+  min-width: 0;
+}
+
+.ai-switch__label {
+  font-weight: 600;
+}
+.ai-switch[data-state='paused'] .ai-switch__label,
+.ai-switch[data-state='off'] .ai-switch__label,
+.ai-switch[data-state='global'] .ai-switch__label {
+  color: var(--nv-warning);
+}
+
+.ai-switch__detail {
+  color: var(--nv-ink-muted);
+}
+
+.ai-switch__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+
+.ai-switch__notice {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--nv-warning);
+}
+
+.ai-switch--compact .ai-switch__state {
+  flex-basis: 100%;
+}
+.ai-switch--compact .ai-switch__words {
+  font-size: var(--nv-text-footnote);
+}
+
+/* The pause's choices: one large button each, the end written in her clock. */
+.ai-pause {
+  display: grid;
+  gap: var(--nv-space-2);
+}
+.ai-pause__choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  height: auto;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  text-align: start;
+}
+.ai-pause__label {
+  font-weight: 600;
+}
+.ai-pause__note {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 400;
+}
+
+.ai-cut {
+  margin: 0;
+  padding-inline-start: var(--nv-space-5);
+  color: var(--nv-ink-muted);
+}
