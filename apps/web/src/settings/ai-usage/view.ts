@@ -229,10 +229,14 @@ export function useSlices(usage: AiUsage): Slice[] {
     });
   } else if (folded.length > 1) {
     const calls = folded.reduce((total, use) => total + use.calls, 0);
+    // A real spend never hides under a name of tests: with her Instagram comments in, the slice names what it holds.
+    const onlyTests = folded.every((use) => use.use === 'judge' || use.use === 'probe');
     slices.push({
-      key: 'tests',
-      label: 'Tests et essais',
-      note: `évaluations de l’agent et essais des services · ${callsText(calls)}`,
+      key: onlyTests ? 'tests' : 'others',
+      label: onlyTests ? 'Tests et essais' : 'Autres usages',
+      note: onlyTests
+        ? `évaluations de l’agent et essais des services · ${callsText(calls)}`
+        : `${folded.map((use) => USES[use.use].label).join(', ')} · ${callsText(calls)}`,
       colour: OTHER,
       eur: folded.reduce((total, use) => total + use.eur, 0),
     });

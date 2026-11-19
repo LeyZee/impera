@@ -36,7 +36,9 @@ export type UntrustedKind =
   | 'instagram_comment'
   | 'instagram_caption'
   /** Her validated replies to comments (ADR 0122 § 4): the examples of the Playground's bank. */
-  | 'comment_examples';
+  | 'comment_examples'
+  /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
+  | 'recent_replies';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

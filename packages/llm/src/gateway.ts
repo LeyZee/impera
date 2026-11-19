@@ -575,7 +575,10 @@ function instagramCommentRequest(input: InstagramCommentInput): string {
     lines.push(
       '',
       'Ses réponses récentes, à ne pas répéter :',
-      ...input.recentReplies.map((reply) => `- ${reply}`),
+      wrapUntrusted(
+        'recent_replies',
+        input.recentReplies.map((reply) => `- ${reply.replace(/\s+/gu, ' ').trim()}`).join('\n'),
+      ),
     );
   if (input.refusedBy !== undefined && input.refusedBy.length > 0)
     lines.push(
