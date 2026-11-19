@@ -16,11 +16,17 @@ const days = [
 ];
 
 export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
-  period: 'week',
+  period: null,
+  span: { unit: 'week', partial: false, end: '2026-11-06', compare: 'previous', today: '2026-11-06' },
   from: '2026-10-31',
   to: '2026-11-06',
   previousFrom: '2026-10-24',
   previousTo: '2026-10-30',
+  registerSince: '2026-09-01',
+  previousDays: days.map((day, i) => ({
+    day: new Date(Date.parse(`${day}T00:00:00Z`) - 7 * 86_400_000).toISOString().slice(0, 10),
+    revenueMinor: 18_000 + i * 1_500,
+  })),
   creators: [
     { creatorId: LINA, name: 'Lina Test' },
     { creatorId: MAYA, name: 'Maya Démo' },

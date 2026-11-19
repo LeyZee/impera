@@ -21,12 +21,77 @@ export const AGENCY_PERIOD_DAYS: Readonly<Record<AgencyPeriod, number>> = {
   quarter: 90,
 };
 
-export const AgencyInsightsQuerySchema = z.object({
-  period: AgencyPeriodSchema.default('week'),
-  /** One creator alone; absent, every creator the account reads with the team's scope. */
-  creatorId: CreatorIdSchema.optional(),
-});
+/**
+ * The calendar's ways of choosing the days (ADR 0146 § 1): a day, a week from Monday to Sunday, a calendar month, or
+ * the days chosen. `rolling` is the older `period`'s answer (ADR 0078 § 3), kept for the MCP and shared links.
+ */
+export const AgencyUnitSchema = z.enum(['day', 'week', 'month', 'custom']);
+export type AgencyUnit = z.infer<typeof AgencyUnitSchema>;
+
+/** The longest span the screen reads, days both included (ADR 0146 § 1). */
+export const AGENCY_CUSTOM_MAX_DAYS = 366;
+
+const isoDay = z.iso.date();
+
+/** The days asked, in one form or the other (ADR 0146 § 6); the server fixes them in the platform's zone. */
+export type AgencySpanQuery =
+  | { readonly kind: 'rolling'; readonly period: AgencyPeriod }
+  | {
+      readonly kind: 'calendar';
+      readonly unit: Exclude<AgencyUnit, 'custom'>;
+      /** A day of the period wanted; absent, today. */
+      readonly at?: string | undefined;
+      /** A day of the period to compare with; absent, the period just before. */
+      readonly compareAt?: string | undefined;
+    }
+  | {
+      readonly kind: 'custom';
+      readonly from: string;
+      readonly to: string;
+      /** The first day of the span to compare with, as long; absent, the span just before. */
+      readonly compareAt?: string | undefined;
+    };
+
+const dayCount = (from: string, to: string): number =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+
+export const AgencyInsightsQuerySchema = z
+  .object({
+    /** The older form: days counted back from today (ADR 0078 § 3). */
+    period: AgencyPeriodSchema.optional(),
+    /** The calendar's form (ADR 0146 § 6). */
+    unit: AgencyUnitSchema.optional(),
+    at: isoDay.optional(),
+    from: isoDay.optional(),
+    to: isoDay.optional(),
+    compareAt: isoDay.optional(),
+    /** One creator alone; absent, every creator the account reads with the team's scope. */
+    creatorId: CreatorIdSchema.optional(),
+  })
+  .superRefine((query, ctx) => {
+    if (query.period !== undefined && query.unit !== undefined) {
+      ctx.addIssue({ code: 'custom', message: 'period ou unit, pas les deux', path: ['unit'] });
+    }
+    if (query.unit === 'custom') {
+      if (query.from === undefined || query.to === undefined) {
+        ctx.addIssue({ code: 'custom', message: 'from et to sont requis', path: ['from'] });
+      } else if (query.from > query.to) {
+        ctx.addIssue({ code: 'custom', message: 'from après to', path: ['from'] });
+      } else if (dayCount(query.from, query.to) > AGENCY_CUSTOM_MAX_DAYS) {
+        ctx.addIssue({ code: 'custom', message: 'au plus 366 jours', path: ['to'] });
+      }
+    }
+  });
 export type AgencyInsightsQuery = z.infer<typeof AgencyInsightsQuerySchema>;
+
+/** The query's days in one form (ADR 0146 § 6): neither form given is the older default, seven days. */
+export function agencySpanQueryOf(query: AgencyInsightsQuery): AgencySpanQuery {
+  if (query.unit === undefined) return { kind: 'rolling', period: query.period ?? 'week' };
+  if (query.unit === 'custom') {
+    return { kind: 'custom', from: query.from ?? '', to: query.to ?? '', compareAt: query.compareAt };
+  }
+  return { kind: 'calendar', unit: query.unit, at: query.at, compareAt: query.compareAt };
+}
 
 /**
  * What was sold, the way the screen groups it: a subscription and its renewals are one group (ADR 0078 § 4). The order
@@ -111,12 +176,33 @@ export const AgencySubscribersSchema = z.strictObject({
 });
 export type AgencySubscribers = z.infer<typeof AgencySubscribersSchema>;
 
+/** How the days were chosen (ADR 0146): the screen says them with it. */
+export const AgencySpanSchema = z.strictObject({
+  unit: z.enum(['day', 'week', 'month', 'custom', 'rolling']),
+  /** The week or month asked runs past today: read up to today, the comparison cut at as many days (§ 2). */
+  partial: z.boolean(),
+  /** The period's own last day before the cut (the 30th of a month read up to the 16th). */
+  end: day,
+  /** The comparison is the period just before, or one chosen (§ 3). */
+  compare: z.enum(['previous', 'chosen']),
+  /** Today, in the platform's zone: the screen never reads a day after it. */
+  today: day,
+});
+export type AgencySpan = z.infer<typeof AgencySpanSchema>;
+
 export const AgencyInsightsSchema = z.strictObject({
-  period: AgencyPeriodSchema,
+  /** The older form's period; null for a calendar's (ADR 0146 § 6). */
+  period: AgencyPeriodSchema.nullable(),
+  span: AgencySpanSchema,
   from: day,
   to: day,
   previousFrom: day,
   previousTo: day,
+  /**
+   * The first day of the registers counted, their oldest line, in the platform's zone; null without a line. A
+   * comparison that starts before it is not compared (ADR 0146 § 4).
+   */
+  registerSince: day.nullable(),
   /** The creators counted, in the agency's order: those with an account linked to a register, within the scope. */
   creators: z.array(z.strictObject({ creatorId: CreatorIdSchema, name: z.string().min(1) })),
   totals: z.strictObject({ current: AgencyFiguresSchema, previous: AgencyFiguresSchema }),
@@ -129,6 +215,8 @@ export const AgencyInsightsSchema = z.strictObject({
       byKind: z.array(z.strictObject({ kind: AgencySaleKindSchema, revenueMinor: cents })),
     }),
   ),
+  /** Every day of the comparison, in order, its revenue: the curve's discreet line (ADR 0146 § 5). */
+  previousDays: z.array(z.strictObject({ day, revenueMinor: cents })),
   /** By kind of sale, in the fixed order; a kind with nothing in either period is left out. */
   kinds: z.array(
     z.strictObject({
