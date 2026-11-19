@@ -11,6 +11,9 @@ import type {
   PlatformScriptId,
   PlatformScriptMoment,
   PlatformStepDiscount,
+  PreparedScriptContent,
+  PreparedScriptId,
+  PreparedScriptState,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
   ScriptIdentityContent,
@@ -25,6 +28,7 @@ import type {
 
 import type { BranchSetting } from './branches';
 import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
+import type { PreparedVaultMedia } from './prepared-scripts';
 
 /** A structure of a queue, with the version a request would take: the latest. */
 export interface QueuedStructure {
@@ -405,4 +409,53 @@ export interface ScriptBranchStore {
     branches: readonly BranchInput[],
     userId: string,
   ): Promise<SetBranchesOutcome>;
+}
+
+/** A script in preparation as the base keeps it (`prepared_scripts`, ADR 0112 §§ 20-23). */
+export interface StoredPreparedScript {
+  readonly id: PreparedScriptId;
+  readonly creatorId: CreatorId;
+  readonly platformAccountId: PlatformAccountId;
+  readonly state: PreparedScriptState;
+  readonly revision: number;
+  readonly content: PreparedScriptContent;
+  readonly matchedPlatformScriptId: PlatformScriptId | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  /** Where each media it names stands in her vault, read in the same transaction; a ref absent is not in it. */
+  readonly vault: ReadonlyMap<string, PreparedVaultMedia>;
+}
+
+export type CreatePreparedOutcome = 'created' | 'replayed' | 'conflict' | 'account_invalid' | 'not_found';
+type UpdatePreparedOutcome = 'updated' | 'stale' | 'closed' | 'not_found';
+
+/**
+ * Her scripts in preparation, in the person's transaction, under her RLS and the team's scope: the owner and the
+ * active managers of her list. Anyone else reads `null` / `not_found`, for a creator or a script that exists and one
+ * that does not.
+ */
+export interface PreparedScriptStore {
+  list(creatorId: CreatorId, userId: string): Promise<readonly StoredPreparedScript[] | null>;
+  one(creatorId: CreatorId, id: PreparedScriptId, userId: string): Promise<StoredPreparedScript | null>;
+  /** Under the client's id: the same content again replays, another is a conflict. */
+  create(
+    creatorId: CreatorId,
+    input: {
+      readonly id: PreparedScriptId;
+      readonly platformAccountId: PlatformAccountId;
+      readonly content: PreparedScriptContent;
+    },
+    userId: string,
+  ): Promise<CreatePreparedOutcome>;
+  /** Writes on `basedOnRevision` only, raising it by one; the content stays when `content` is `null`. */
+  update(
+    creatorId: CreatorId,
+    id: PreparedScriptId,
+    change: {
+      readonly basedOnRevision: number;
+      readonly content: PreparedScriptContent | null;
+      readonly state: Exclude<PreparedScriptState, 'matched'>;
+    },
+    userId: string,
+  ): Promise<UpdatePreparedOutcome>;
 }

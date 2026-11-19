@@ -62,6 +62,7 @@ export * from './result';
 export * from './sales-feed';
 export * from './sales-feed-team';
 export * from './scripts';
+export * from './prepared-scripts';
 export * from './script-runs';
 export * from './script-starters';
 export * from './scheduling';
