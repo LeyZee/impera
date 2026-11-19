@@ -1,6 +1,6 @@
 # 0122. Les commentaires Instagram : une réponse courte dans sa voix, seule après un entraînement validé, et les commentaires hostiles masqués
 
-Statut : proposed (demandes de Charles du 17/11/2026, 13 h 49, 13 h 56 et 14 h 00 ; fil « Imaginer le système Instagram » ; contrat accordé avec le fil Playground le 17/11)
+Statut : proposed (demandes de Charles du 17/11/2026, 13 h 49, 13 h 56 et 14 h 00 ; fil « Imaginer le système Instagram » ; contrat accordé avec le fil Playground le 17/11 ; relectures Sécurité et Playground du 19/11 intégrées)
 Date : 2026-11-19
 Précise : l'ADR 0057 (§ 1 : API officielles seulement ; § 6 : la garde Instagram des légendes), l'ADR 0120 (le compte branché en deux temps, « les réponses aux commentaires : une ADR à venir »), l'ADR 0102 (la banque d'exemples née du Playground), l'ADR 0021 (rester en personnage), l'ADR 0010 (aucune donnée réelle dans le dépôt).
 
@@ -21,7 +21,9 @@ Vérifié le 17/11 dans la documentation de Meta :
 
 - Impera ne traite que les commentaires laissés **sous les publications du compte professionnel de la créatrice**, par l'API officielle (ADR 0057 § 1). Il ne commente jamais ailleurs, n'aime rien, ne suit personne.
 - **Aucun message privé.** Un commentaire ne déclenche jamais de message privé, et le droit de messagerie n'est jamais demandé à Meta.
-- Le droit de gérer les commentaires est un **troisième accord** de la créatrice, après lire et publier (ADR 0120 § 1). Sans lui, rien de cette ADR ne tourne.
+- Le droit de gérer les commentaires est un **troisième accord** de la créatrice, après lire et publier (ADR 0120 § 1). Sans lui, rien de cette ADR ne tourne ; le retirer éteint tout, y compris les jobs en attente.
+- Les droits demandés à Meta sont une **liste fermée dans le code**, et un test échoue si un droit de messagerie y entre.
+- **La première réponse réelle** sur un vrai compte attend le mot écrit de Charles. Avant, tout se joue contre `FakeInstagram`.
 
 ### 2. L'entrée et la sortie
 
@@ -33,31 +35,43 @@ Vérifié le 17/11 dans la documentation de Meta :
   - `hide` : commentaire hostile, à masquer ;
   - `handoff` : à un humain.
 - **Le modèle ne supprime jamais.** La suppression n'est pas une issue de son schéma.
+- Un commentaire dont l'auteur est le compte de la créatrice est ignoré par le code : ses propres réponses ne relancent rien.
 - Le prompt `voice/instagram-comment` est versionné dans `packages/llm` avec son schéma ; il lit la persona active et la banque d'exemples « commentaire » de la créatrice (§ 4).
 
 ### 3. Les gardes, dans le code
 
 - Une réponse passe la garde Instagram des légendes (ADR 0057 § 6 : aucune plateforme adulte, aucun lien, aucun prix, aucun « lien en bio »), plus `ai_disclosure`, `meeting_promise`, `love_declaration`, `contact_info` et `discount`, et ne contient rien d'explicite. Une réponse refusée est réécrite une fois, puis l'issue devient `skip`.
 - **Aucune réponse, et passage à un humain**, quand le code ou le modèle relève : un doute sur l'âge de l'auteur, une détresse, une question de rendez-vous ou de tarif, une langue que la persona ne parle pas. La règle sur l'âge et celle sur la détresse priment sur tout le reste, comme dans le chatting ; aucune n'est affaiblie ici.
+- Le doute sur l'âge est relevé **par le code aussi, sans le modèle**, avec les détecteurs du chatting. Un auteur en doute ouvert ne reçoit plus aucune réponse, sous aucune publication, tant qu'un humain n'a pas tranché.
 - **Masquer est le geste par défaut contre un commentaire hostile** (insulte, dénigrement, harcèlement, contenu contraire aux règles de Meta), parce qu'il est réversible. Le CRM montre chaque commentaire masqué avec un geste « Réafficher ».
-- **La suppression automatique** est réservée à une liste courte de cas évidents, tenue par le code et testée (un lien de spam, une insulte caractérisée). Tout autre commentaire n'est supprimé que par un geste du propriétaire ou d'un manager actif. Chaque masquage et chaque suppression entre au journal d'audit, sans le texte du commentaire.
-- Chaque action vers Meta part avec sa clé d'idempotence ; un commentaire reçoit au plus une réponse.
+- Masquer est une action réelle sur son compte : elle a **son propre interrupteur** par créatrice, éteint par défaut, que le propriétaire seul allume après une connexion récente. Éteint, un commentaire hostile est seulement signalé dans le CRM.
+- **Supprimer** est irréversible : c'est un geste du **propriétaire seul**. Le premier lot ne livre **aucune suppression automatique**. Si elle vient plus tard, ce sera une liste courte de cas évidents tenue par le code et testée (un lien de spam, une insulte caractérisée), appliquée avant tout appel au modèle, en masquant d'abord et en supprimant après un délai pendant lequel un humain peut annuler.
+- Chaque masquage et chaque suppression entre au journal d'audit avec l'identifiant du commentaire et le nom de la règle, sans le texte.
+- Chaque action vers Meta part avec sa clé d'idempotence. Un commentaire reçoit au plus une réponse ; le code borne aussi les réponses par auteur et par jour, et par fil de commentaires.
+- Les relais à un humain sont bornés par publication et par heure ; au-delà, un seul relais groupé. Un relais pour l'âge ou la détresse n'est jamais écarté par cette borne.
 
 ### 4. L'entraînement au Playground
 
 - Entraîner gagne un onglet « Commentaires ». Le propriétaire écrit un commentaire fictif sous une publication fictive, voit l'issue (réponse, ignoré, masqué, supprimé par la règle, passé à un humain) et la note : **validée**, **corrigée** ou **refusée**, avec une raison (« pas sa voix », « trop long », « trop vendeur », « trop froid », « répond à côté », « ne fallait pas répondre », « il fallait répondre », « il fallait masquer », « ne fallait pas masquer », ou un texte libre).
 - Les corrections forment une banque d'exemples « commentaire », séparée de celle du chatting, par créatrice et par version de persona, lue par la production comme l'ADR 0102.
+- Chaque note garde le bloc d'entrée du commentaire, sans nom ni pseudo, pour être rejouée en éval comme une note de chatting.
 - Rien n'est envoyé à Instagram depuis le Playground.
 
 ### 5. Le passage en autonome
 
 - Tant qu'elle n'est pas autonome, l'IA **prépare** : chaque réponse attend dans le CRM qu'un humain l'envoie, la corrige ou la refuse.
-- Le passage en autonome est un réglage **par créatrice**, que **le propriétaire seul** allume, après une connexion récente. Le code ne le propose que si l'entraînement est suffisant : un nombre minimal de notes sur la persona active, dont les dernières validées telles quelles (30 et 10 par défaut, réglage du propriétaire). Seule « validée » compte comme réussite ; une issue `skip`, `hide` ou `handoff` jugée bonne compte comme validée ; « corrigée » est un raté.
+- Le passage en autonome est un réglage **par créatrice**, que **le propriétaire seul** allume, après une connexion récente. Le code ne le propose que si l'entraînement est suffisant : un nombre minimal de notes sur la persona active, dont les dernières validées telles quelles (30 et 10 par défaut, réglage du propriétaire, entre un minimum et un maximum que le code fixe et que le réglage ne franchit pas ; de même pour la limite par jour). Seule « validée » compte comme réussite ; une issue `skip`, `hide` ou `handoff` jugée bonne compte comme validée ; « corrigée » est un raté.
 - Une nouvelle version de persona redemande une courte série de validations avant de rester autonome.
 - En autonome, la réponse part après un délai court et irrégulier, jamais dans les heures calmes de la créatrice, et dans une limite par jour réglée par le propriétaire.
-- Le propriétaire éteint l'autonomie d'un geste ; deux refus de Meta de suite l'éteignent d'eux-mêmes et le disent en ambre.
+- Le propriétaire éteint l'autonomie d'un geste, pour une créatrice ou **pour toute l'agence** ; deux refus de Meta de suite l'éteignent d'eux-mêmes et le disent en ambre.
 
-### 6. Ce que la créatrice voit
+### 6. L'arrivée des commentaires et ce qui est gardé
+
+- Les commentaires arrivent par le webhook de Meta, une entrée publique : la signature de Meta est vérifiée sur le corps brut avant toute lecture, la poignée de main se fait par jeton, la taille et le débit sont bornés, la route répond aussitôt et un job rejouable fait le reste, sans doublon pour un même commentaire. Rien du corps n'entre dans les logs. Le secret de l'application est scellé comme les jetons (ADR 0016). Un événement pour un compte qui n'est pas branché est jeté.
+- Les auteurs des commentaires sont des tiers. Les commentaires vivent dans une table sous RLS forcée, fermée à la créatrice hors de ce que le § 7 lui montre, gardés peu de temps puis purgés (durée réglée par l'agence, bornée par le code). L'auteur y est un identifiant opaque, qui suffit à « a déjà commenté » ; son pseudo n'est lu que pour l'afficher à un humain dans le CRM.
+- Aucun commentaire réel, aucun pseudo, dans le MCP, une éval, une fixture ou le dépôt (ADR 0010). Une demande d'effacement transmise par Meta est honorée.
+
+### 7. Ce que la créatrice voit
 
 - Elle ne voit jamais l'IA (ADR 0042). Son espace lui montre les commentaires passés à un humain qui la concernent, si l'agence le veut ; le reste est l'affaire de l'agence.
 
@@ -78,4 +92,5 @@ Négatives, à surveiller :
 - **Valider chaque réponse pour toujours** : Charles l'écarte, le gain disparaît.
 - **Autonome dès le premier jour** : une réponse publique dans une voix non réglée.
 - **Laisser le modèle supprimer** : un geste irréversible ne se confie pas à un jugement de modèle.
+- **Supprimer automatiquement dès le premier lot** : masquer suffit à faire disparaître un commentaire hostile, et se rattrape.
 - **Répondre en message privé à un commentaire** : les messages privés sont exclus par Charles.
