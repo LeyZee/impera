@@ -271,6 +271,70 @@
   font-weight: 500;
   animation: rw-rise 450ms ease-out 1100ms both;
 }
+/* « Aussi gagné »: what else was earned since the last visit, small and by name, on the axis of the sentence. No
+   ground, no card, no colour but the objects' own; each fades in after the ceremony, 60 ms apart, and nothing
+   more (with « réduire les animations » they are there at once, as the rest of the reveal). */
+.rw-reveal__also {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.rw-reveal__alsosaid {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.rw-reveal__alsohead {
+  color: rgb(246 238 241 / 0.55);
+  animation: rw-fade 300ms ease-out 1500ms both;
+}
+.rw-reveal__alsolist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--nv-space-3);
+}
+.rw-reveal__alsoitem,
+.rw-reveal__alsomore {
+  animation: rw-fade 300ms ease-out calc(1560ms + var(--nv-i, 0) * 60ms) both;
+}
+.rw-reveal__alsoitem {
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.rw-reveal__alsoobject {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+.rw-reveal__alsoname {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgb(246 238 241 / 0.78);
+}
+.rw-reveal__alsomore {
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(246 238 241 / 0.78);
+}
 .rw-reveal__close {
   margin-top: 26px;
   padding: 11px 26px;
