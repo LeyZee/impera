@@ -301,6 +301,7 @@ describe('failureOf', () => {
   it('gives every failure a cause and a gesture, never the old catch-all', () => {
     const failures = [
       'no-session',
+      'several',
       'expired',
       'unlinked',
       'revoked',

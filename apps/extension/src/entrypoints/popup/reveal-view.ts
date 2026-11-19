@@ -40,7 +40,7 @@ export interface Confirm {
  * `extension`: the extension's own worker did not answer the popup (a worker left over after a reload, retour PC du
  * 19/11): never said to be the CRM's fault.
  */
-export type SyncFailure = Exclude<RevealSynced['state'], 'synced'> | 'no-session' | 'extension';
+export type SyncFailure = Exclude<RevealSynced['state'], 'synced'> | 'no-session' | 'several' | 'extension';
 
 /** What the last gesture left under its account: the session stored, or why not. */
 export type SyncOutcome =
@@ -179,6 +179,11 @@ export function failureOf(
       return {
         cause: 'Seul le propriétaire envoie une session.',
         gesture: 'Relie l’extension avec le code du propriétaire.',
+      };
+    case 'several':
+      return {
+        cause: 'Cet onglet montre plusieurs créatrices, et aucune n’est celle de ce compte.',
+        gesture: 'Ouvre dans Reveal la messagerie de la créatrice de ce compte, puis resynchronise.',
       };
     case 'other-model':
       return {

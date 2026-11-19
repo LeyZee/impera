@@ -134,10 +134,11 @@ export type RevealSeen = z.infer<typeof RevealSeenSchema>;
 /**
  * What became of the reading of a session. `held`: read, kept by the service worker for one minute at most until the
  * owner sends it or not; the popup learns the model's id alone. `no-session`: the tab made no request to read in time.
+ * `several`: the tab named several creators and none is the account's (19/11, 409).
  */
 export const RevealReadSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('held'), modelId: z.string().min(1).max(64), seen: RevealSeenSchema }),
-  z.strictObject({ state: z.enum(['no-session', 'unlinked']) }),
+  z.strictObject({ state: z.enum(['no-session', 'unlinked', 'several']) }),
 ]);
 export type RevealRead = z.infer<typeof RevealReadSchema>;
 
