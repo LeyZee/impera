@@ -638,47 +638,38 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ───────────── Reveal's mark (demande de Charles du 19/11): its eyes on a raspberry tile ───────────── */
+/* ───────────── Reveal's mark (demande de Charles du 19/11): its eyes, in ink, on the glass tile ───────────── */
 
-/* A brand raspberry, apart from the urgency red (--nv-danger): it leans to pink, so the red dot of « Coupée » below
-   it still reads as the alarm. */
+/* The neutral tile Charles chose (19/11): the red stays the button's and the urgencies'. */
 .pp-reveal {
-  --pp-reveal-top: #f0466f;
-  --pp-reveal-bottom: #a8123f;
-  --pp-reveal-white: #fff7f9;
-  --pp-reveal-pupil: #1c0a12;
+  --pp-reveal-white: var(--nv-ink);
+  --pp-reveal-pupil: var(--nv-surface-raised);
   display: block;
 }
-.pp-reveal__top {
-  stop-color: var(--pp-reveal-top);
+[data-theme='light'] .pp-reveal {
+  --pp-reveal-white: var(--nv-surface-raised);
+  --pp-reveal-pupil: var(--nv-ink);
 }
-.pp-reveal__bottom {
-  stop-color: var(--pp-reveal-bottom);
-}
-.pp-reveal__shine-top {
-  stop-color: #fff;
-  stop-opacity: 0.32;
-}
-.pp-reveal__shine-mid {
-  stop-color: #fff;
-  stop-opacity: 0.05;
-}
-.pp-reveal__shine-end {
-  stop-color: #fff;
-  stop-opacity: 0;
+.pp-reveal__tile {
+  fill: var(--nv-glass-fill-strong);
 }
 .pp-reveal__rim {
-  stroke: rgb(255 255 255 / 0.22);
+  stroke: var(--nv-hairline);
   stroke-width: 1;
 }
 .pp-reveal__white {
   fill: var(--pp-reveal-white);
 }
+/* By day, the white of the eyes would melt into the light tile: an ink line draws them. */
+[data-theme='light'] .pp-reveal__white {
+  stroke: var(--nv-ink);
+  stroke-width: 1.4;
+}
 .pp-reveal__pupil {
   fill: var(--pp-reveal-pupil);
 }
 .pp-reveal__glint {
-  fill: #fff;
+  fill: var(--pp-reveal-white);
 }
 .pp-reveal__pupils {
   transform-box: view-box;
@@ -697,26 +688,10 @@ body {
     transform: translateX(-4.6px);
   }
 }
-/* Its tile is the mark itself, flat: no glass behind it and no glow, so it never reads as a second neon (avis Design). */
+/* Its tile is the mark itself, flat: no glass behind it and no glow. */
 .pp-card__icon--mark {
   background: none;
   box-shadow: none;
-}
-
-/* The ink variant, for Charles to choose (avis Design du 19/11): the same eyes on the neutral tile. */
-.pp-reveal--ink .pp-reveal__tile {
-  fill: var(--nv-glass-fill-strong);
-}
-.pp-reveal--ink .pp-reveal__shine {
-  display: none;
-}
-.pp-reveal--ink .pp-reveal__rim {
-  stroke: var(--nv-hairline);
-}
-/* By day, the white of the eyes would melt into the light tile: an ink line draws them. */
-[data-theme='light'] .pp-reveal--ink .pp-reveal__white {
-  stroke: var(--nv-ink);
-  stroke-width: 1.4;
 }
 
 @media (prefers-reduced-motion: reduce) {
