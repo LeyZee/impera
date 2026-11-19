@@ -2,7 +2,7 @@
 
 Statut : accepted (Charles, 03/11/2026, 17 h 49, « ok 0067 » ; § 2 précisé : « ok phrases 0067 », 17 h 50 ; captures : « ok captures guide », 17 h 50 ; demande de Charles du 03/11/2026, 17 h 40 : « un guide dans le CRM […] pour installer l'extension […] pour l'équipe, les chatters, etc., et les managers. Et puis leur expliquer à quoi ça sert »)
 Date : 2026-11-03
-Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 proposé : l'extension se relie au CRM depuis le CRM.
+Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 accepté (Charles, 19/11/2026, 19 h 50, « Valider » sur la carte du fil Extension, après les OK de Design et de Sécurité sur d2394025) : l'extension se relie au CRM depuis le CRM.
 
 ## Contexte
 
@@ -26,7 +26,7 @@ Deux voies existent :
 - L'image du CRM grossit d'environ 1 Mo (le `.zip`, avec ses polices).
 - Bilan relit la ligne du `Dockerfile` du CRM (ops).
 
-## Amendement du 19/11/2026 : l'extension se relie au CRM depuis le CRM (proposé)
+## Amendement du 19/11/2026 : l'extension se relie au CRM depuis le CRM (accepté)
 
 Demande de Charles du 19/11 : l'écran « Où s'ouvre ton CRM ? » à la première ouverture n'est « pas très intuitif ». Il veut faciliter au maximum la tâche des chatteurs, sans rien perdre en sûreté. Il a choisi « Lier depuis le CRM » (fil Bilan, 19/11).
 
