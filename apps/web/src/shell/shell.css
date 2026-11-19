@@ -1239,9 +1239,12 @@
   /* Icons only: the count sits on the icon's corner. */
   .nv-rail__item .nv-rail__count {
     position: absolute;
-    top: 2px;
-    left: calc(50% + 2px);
+    top: 1px;
+    left: calc(50% + 6px);
     margin: 0;
+    /* Over the icon's corner: an opaque ground, so the drawing never shows through the figure. */
+    background: color-mix(in srgb, var(--nv-ink) 16%, var(--nv-surface-raised));
+    box-shadow: 0 0 0 2px var(--nv-surface-raised);
   }
   /* Icons only: a family heading becomes a hairline, which says the same without words. */
   .nv-rail__heading {
@@ -1376,9 +1379,12 @@
   /* The phone's bar: the count on the icon's corner, as on the icons-only rail. */
   .nv-rail__item .nv-rail__count {
     position: absolute;
-    top: 4px;
-    left: calc(50% + 4px);
+    top: 2px;
+    left: calc(50% + 6px);
     margin: 0;
+    /* Over the icon's corner: an opaque ground, so the drawing never shows through the figure. */
+    background: color-mix(in srgb, var(--nv-ink) 16%, var(--nv-surface-raised));
+    box-shadow: 0 0 0 2px var(--nv-surface-raised);
   }
   .nv-rail__item[aria-current='page'],
   .nv-rail__more[data-current='true'],
