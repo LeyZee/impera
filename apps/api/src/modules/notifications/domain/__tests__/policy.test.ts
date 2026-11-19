@@ -93,12 +93,12 @@ describe('decideNotification', () => {
     const own = { startMinute: 13 * 60, endMinute: 17 * 60 };
     expect(decideNotification({ ...base, kind: 'safety_alert', quiet: own })).toEqual({ action: 'ring' });
     expect(isCapped('safety_alert')).toBe(false);
-    // Any other alert of her tab waits for the recap at night and goes silent past the cap.
+    // Any other alert of her tab waits for the recap at night, and rings all day past the cap (Charles, 19/11).
     expect(decideNotification({ ...base, kind: 'creator_alert', at: night }).action).toBe('hold');
     expect(
       decideNotification({ ...base, kind: 'creator_alert', cappedRungToday: DEFAULT_DAILY_CAP }),
-    ).toEqual({ action: 'silent' });
-    expect(isCapped('creator_alert')).toBe(true);
+    ).toEqual({ action: 'ring' });
+    expect(isCapped('creator_alert')).toBe(false);
   });
 
   it('holds the second reminder, a plain reminder, for the recap, and counts it in the cap', () => {

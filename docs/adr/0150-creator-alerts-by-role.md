@@ -57,7 +57,7 @@ Ce qui manque :
 | Système | Budget IA : seuil d'alerte, plafond atteint, crédits bas | `budget_threshold_crossed`, `ai_credits_low` | Reçoit / Reçoit / Rien |
 | Système | Session Reveal expirée | `session_state_changed` vers `expired` | Reçoit / Reçoit / Sourdine |
 
-6. **Verrouillé** : les relais humains de sécurité (mineur possible, non-consentement, détresse, rencontre, manipulation) partent toujours au propriétaire et au chatteur en shift. On ne peut ni les mettre en sourdine, ni les couper. Ces règles priment sur tout réglage (ADR 0088, règle d'âge). « Toujours » vaut aussi la nuit : ces relais sonnent pendant les heures calmes de chacun et hors du plafond du jour, qu'ils ne consomment pas (raison `safety_alert`, relecture Sécurité du 19/11). Les autres alertes suivent les heures calmes et le plafond du jour, partagé avec rappels, routine et équipe.
+6. **Verrouillé** : les relais humains de sécurité (mineur possible, non-consentement, détresse, rencontre, manipulation) partent toujours au propriétaire et au chatteur en shift. On ne peut ni les mettre en sourdine, ni les couper. Ces règles priment sur tout réglage (ADR 0088, règle d'âge). « Toujours » vaut aussi la nuit : ces relais sonnent pendant les heures calmes de chacun et hors du plafond du jour, qu'ils ne consomment pas (raison `safety_alert`, relecture Sécurité du 19/11). Les autres alertes sonnent toute la journée hors du plafond du jour, et la nuit attendent le récapitulatif de la fin des heures calmes (décision de Charles, 19/11).
 7. **Budget IA** : le budget est celui de l'agence, pas de la créatrice. Le seuil d'alerte et le plafond se règlent dans Réglages › Consommation IA ; l'onglet de chaque créatrice montre la ligne et son routage, et rappelle que l'IA s'arrête pour toutes quand le plafond est atteint. Un seuil franchi prévient une seule fois par jour et par rôle, pas une fois par créatrice.
 8. **Sans ligne en base, le défaut du tableau s'applique.** Les défauts vivent dans le code (`domain/`), testés, jamais dans un prompt.
 
@@ -123,3 +123,4 @@ Négatives :
 ## Décisions de Charles
 
 1. 17/11/2026, 13 h 35 (carte de choix) : « offre proposée » = tout ce qui se vend hors des scripts, venant de l'IA ou du fan (§§ 12–13).
+2. 19/11/2026, 17 h 26 (carte de choix) : les alertes de l'équipe autres que les relais de sécurité sonnent toute la journée hors du plafond de notifications du jour, et la nuit attendent le récapitulatif du matin (§ 6).

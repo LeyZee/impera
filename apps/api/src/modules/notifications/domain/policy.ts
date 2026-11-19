@@ -7,6 +7,7 @@ import type { NotificationReason } from '@impera/contracts';
  *   recap at their end. The start of one's own shift, the first reminder of its report (ADR 0077) and a creator's
  *   safety relay (ADR 0150 § 6) are the only exceptions (glossary, « Heures calmes »), and none counts in the cap;
  * - a sale rings, one notification per sale, grouped only in a burst (more than 3 within 2 minutes);
+ * - an alert of a creator's tab (ADR 0150) is never capped, and waits for the recap in the quiet hours;
  * - everything else (reminders, routine, streak, team) shares a daily cap, in the account's own day; past it, the
  *   notification stays in the app and does not ring.
  */
@@ -118,8 +119,11 @@ const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set([
   'safety_alert',
 ]);
 
+/** The alerts of a creator's tab ring all day outside the cap, and wait for the recap at night (Charles, 19/11). */
+const OUTSIDE_THE_CAP: ReadonlySet<NotificationReason> = new Set(['sale', 'creator_alert']);
+
 export function isCapped(kind: NotificationReason): boolean {
-  return kind !== 'sale' && !PASSES_QUIET_HOURS.has(kind);
+  return !OUTSIDE_THE_CAP.has(kind) && !PASSES_QUIET_HOURS.has(kind);
 }
 
 /** The decision for one notification, from facts the caller has read (counts, settings, time). */

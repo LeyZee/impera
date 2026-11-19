@@ -127,7 +127,7 @@ export const NOTIFICATION_REASONS = [
   'streak',
   'team',
   'agency_share',
-  /** An alert of a creator's tab, to a role it reaches (ADR 0150): under the rules of every other. */
+  /** An alert of a creator's tab, to a role it reaches (ADR 0150): outside the daily cap, held in the quiet hours. */
   'creator_alert',
   /**
    * A human relay for safety of her tab (ADR 0150 § 6, locked on « reçoit »): it rings even in the quiet hours and
