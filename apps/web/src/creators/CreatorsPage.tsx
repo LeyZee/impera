@@ -7,6 +7,7 @@ import { ArchivedCreators } from './ArchivedCreators';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
+import { AlertsTab } from './alerts/AlertsTab';
 import { useCreators } from './api';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
@@ -206,6 +207,9 @@ export function CreatorsPage({
     if (shown === 'telegram' && current !== undefined) {
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
+    if (shown === 'alerts' && current !== undefined) {
+      return <AlertsTab key={current.id} creatorId={current.id} creatorName={current.displayName} />;
+    }
     if (shown === 'links' && current !== undefined) {
       return (
         <LinksSection
@@ -263,6 +267,7 @@ export function CreatorsPage({
     scripts: 'Scripts',
     content: 'Contenu',
     telegram: 'Canal Telegram',
+    alerts: 'Alertes',
     links: 'Liens',
     hours: 'Heures d’activité',
     access: 'Accès',
@@ -278,6 +283,7 @@ export function CreatorsPage({
     'scripts',
     'content',
     'telegram',
+    'alerts',
     'links',
     'hours',
     'access',
