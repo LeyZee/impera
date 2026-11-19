@@ -638,7 +638,12 @@ function FolderPane({
           </h3>
           <p className="ps-muted vp-pane__line nv-num">
             {folderLine(folder.media)}
-            {count.listed > 0 ? ` · ${importLine(count)}` : ''}
+            {count.listed > 0 ? (
+              <>
+                <span className="vp-pane__sep"> · </span>
+                <span className="vp-pane__import">{importLine(count)}</span>
+              </>
+            ) : null}
           </p>
         </div>
         <div className="vp-pane__actions">
@@ -946,13 +951,14 @@ function MediaTile({
             </>
           )}
         </span>
+        {/* A photo says nothing in its corner: only a video carries its sign, beside its length. */}
         {selecting && pickable ? (
           <span className="vp-tick" aria-hidden="true" />
-        ) : (
+        ) : media.kind === 'video' ? (
           <span className="vx-tile__kind" aria-hidden="true">
             <KindIcon kind={media.kind} />
           </span>
-        )}
+        ) : null}
         {media.kind !== 'image' && media.durationSeconds !== null ? (
           <span className="vx-tile__time nv-num" aria-hidden="true">
             {durationLine(media.durationSeconds)}
@@ -982,10 +988,13 @@ function MediaTile({
           <EyeIcon open={peeked} />
         </button>
       ) : null}
-      <p className={`vp-caption vp-caption--${said.tone}`}>
-        {said.tone === 'described' ? <SparkIcon /> : null}
-        <span>{said.text}</span>
-      </p>
+      {/* Not imported and never asked: the tile says it by having no « Importé », the caption stays silent. */}
+      {!choice.imported && choice.description === 'none' ? null : (
+        <p className={`vp-caption vp-caption--${said.tone}`}>
+          {said.tone === 'described' ? <SparkIcon /> : null}
+          <span>{said.text}</span>
+        </p>
+      )}
     </div>
   );
 }

@@ -361,14 +361,14 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   padding: 12px 0 0;
   border-top: 1px solid var(--nv-hairline);
 }
 .vx-sheet__fact {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 .vx-sheet__fact dd {
   margin: 0;

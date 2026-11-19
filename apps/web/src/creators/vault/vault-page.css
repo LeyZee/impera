@@ -98,7 +98,8 @@
   display: flex;
   justify-content: space-between;
   margin: 0;
-  padding: 0 10px 0 12px;
+  /* On the column of the folders' ticks, its count on their right edge. */
+  padding: 0 8px 0 2px;
 }
 .vp-rail__list {
   margin: 0;
@@ -766,6 +767,28 @@
 /* ───────────── A phone: the folders a list, a folder open the whole width with its way back ───────────── */
 
 @media (max-width: 820px) {
+  /* The filters on one line, scrolled sideways, never a second row of chips before the grid. */
+  .vp-filters__chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: calc(-1 * var(--nv-plate-pad));
+    padding-inline: var(--nv-plate-pad);
+    scroll-padding-inline: var(--nv-plate-pad);
+  }
+  .vp-filters__chips::-webkit-scrollbar {
+    display: none;
+  }
+  .vp-filters__chips > .nv-chip {
+    flex: none;
+  }
+  /* What it holds on a line, how much is imported on the next: never a word left alone on its own line. */
+  .vp-pane__sep {
+    display: none;
+  }
+  .vp-pane__import {
+    display: block;
+  }
   .vp-body {
     grid-template-columns: minmax(0, 1fr);
   }

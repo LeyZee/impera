@@ -510,7 +510,14 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     });
     show(true);
     expect(await screen.findByRole('heading', { name: 'Matin ☀️' })).toBeDefined();
-    expect(await screen.findByText('1 vidéo · 1 retiré de Reveal · Importé')).toBeDefined();
+    // The folder's line, its import count in a span of its own (on its own line on a phone).
+    expect(
+      await screen.findByText(
+        (_, element) =>
+          element?.classList.contains('vp-pane__line') === true &&
+          element.textContent === '1 vidéo · 1 retiré de Reveal · Importé',
+      ),
+    ).toBeDefined();
     const tile = await screen.findByRole('button', { name: '1. Vidéo · 1:15, importé, décrit' });
     expect(tile.querySelector('img')).toBeNull();
     fireEvent.click(tile);
