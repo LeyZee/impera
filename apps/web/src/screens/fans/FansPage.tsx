@@ -27,6 +27,7 @@ import {
 import { useCreators } from '@/creators/api';
 import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 const PERIODS: readonly AgencyPeriod[] = ['week', 'month', 'quarter'];
 const SORTS: readonly FanListSort[] = ['last_message', 'paid', 'last_payment'];
@@ -71,24 +72,15 @@ export function FansPage({ nav }: { nav?: ReactNode }): JSX.Element {
         }
       />
       {creatorsQuery.isError ? (
-        <Panel className="fa-panel">
-          <div className="fa-empty" role="alert">
-            <p>{FANS_ERRORS.unavailable}</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void creatorsQuery.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
-        </Panel>
+        <Failure
+          onRetry={() => {
+            void creatorsQuery.refetch();
+          }}
+        />
       ) : creatorsQuery.isPending ? (
-        <Panel className="fa-panel">
-          <Skeleton />
-        </Panel>
+        <Skeleton>
+          <SkeletonCard lines={5} />
+        </Skeleton>
       ) : creatorId === null ? (
         <Panel className="fa-panel">
           <p className="fa-empty">
@@ -176,22 +168,25 @@ function FanList({ creatorId }: { creatorId: string }): JSX.Element {
       </div>
 
       {fans.isError && items.length === 0 ? (
-        <div className="fa-empty" role="alert">
-          <p>{FANS_ERRORS[fansErrorKind(fans.error)]}</p>
-          {fansErrorKind(fans.error) === 'unavailable' ? (
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void fans.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          ) : null}
-        </div>
+        fansErrorKind(fans.error) === 'unavailable' ? (
+          // The server is silent: the app's one way to say it (ETA-04), inside the list's card.
+          <Failure
+            inline
+            onRetry={() => {
+              void fans.refetch();
+            }}
+          />
+        ) : (
+          <p className="fa-empty" role="alert">
+            {FANS_ERRORS[fansErrorKind(fans.error)]}
+          </p>
+        )
       ) : fans.isPending ? (
-        <Skeleton />
+        <Skeleton className="fa-skeleton">
+          {[0, 1, 2].map((row) => (
+            <i key={row} className="nv-skeleton__bar fa-skeleton__row" />
+          ))}
+        </Skeleton>
       ) : items.length === 0 ? (
         <p className="fa-empty">{q.trim() === '' ? EMPTY_LINES[filter] : 'Aucun fan ne porte ce pseudo.'}</p>
       ) : (
@@ -300,16 +295,6 @@ function Paid({ paid, base }: { paid: FanListItem['paidEver']; base: string }): 
         </span>
       ))}
     </span>
-  );
-}
-
-function Skeleton(): JSX.Element {
-  return (
-    <div className="fa-skeleton" aria-busy="true" aria-label="Lecture des fans">
-      <i />
-      <i />
-      <i />
-    </div>
   );
 }
 
