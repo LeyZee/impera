@@ -107,8 +107,8 @@ describe('the levels (ADR 0104 § 16)', () => {
   it('reaches no rank without thresholds nor under the first, then every rank up to the net', () => {
     expect(ranksReached(1_000_000, [])).toEqual([]);
     expect(ranksReached(99_999, steps)).toEqual([]);
-    expect(ranksReached(100_000, steps)).toEqual([1]);
-    expect(ranksReached(900_000, steps)).toEqual([1, 2]);
+    expect(ranksReached(100_000, steps).map((step) => step.rank)).toEqual([1]);
+    expect(ranksReached(900_000, steps)).toEqual(steps);
   });
 
   it('names a rank by its number and finds the one ahead', () => {
