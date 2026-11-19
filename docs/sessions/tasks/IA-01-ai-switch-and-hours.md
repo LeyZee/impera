@@ -13,7 +13,7 @@ L'IA d'une créatrice s'allume, se coupe et se met en pause là où on la gère,
 ## À faire, en lots
 - [x] (a) Contrats et base (périmètre Bilan) : `until` sur `PUT /v1/agent/mode` (pause = Arrêt avec fin, une semaine au plus) et `pausedUntil` dans la réponse ; colonne `kill_switches.active_until`, lue partout comme « allumé tant que la fin n'est pas passée » ; une reprise `conversation.reopen` à la fin de la pause, sous sa propre clé ; table `agent_hour_exceptions` (FORCE RLS, fermée à la créatrice, `GRANT SELECT` au rôle de service) et routes `GET`, `PUT`, `DELETE /v1/creators/:id/agent-hours/exceptions[/:date]` (propriétaire, connexion récente pour changer, date passée refusée) ; les fonctions d'heures des contrats prennent les exceptions.
 - [x] (b) Agent : `respond`, les relances, le filet « Sans réponse » et le Dashboard lisent les exceptions (`replyOpenAt`, `nextReplyOpening`, `replyOpenedAt` et `nextFollowUpAllowed` prennent les exceptions) ; une plage commencée un jour d'exception s'arrête à son minuit ; une exception écrite ou retirée déplace la reprise.
-- [ ] (c) Écrans (Design) : interrupteur et pause en tête de fiche et dans la liste Créatrices ; frise de l'onglet IA en section autonome (branchée dans l'onglet IA par le lot 2 de la navigation) ; jeton rose commun avec le fil Dashboard (`--nv-money-creator`).
+- [ ] (c) Écrans (Design) : [x] interrupteur et pause en tête de fiche et dans la liste Créatrices (`agent/AgentSwitch.tsx`, état lu dans `GET /v1/dashboard` et `/v1/dashboard/creators` : `pausedUntil`, `hoursNow`, `resumesAs`) ; [x] « Jours modifiés » dans Heures d'activité (`creators/hours/ExceptionsPanel.tsx`, dit ce qu'un jour ouvre hors de la semaine type) ; [ ] frise de l'onglet IA en section autonome (branchée dans l'onglet IA par le lot 2 de la navigation) ; jeton rose commun avec le fil Dashboard (`--nv-money-creator`).
 - [ ] (d) Planning (Équipe) : l'IA et ses exceptions dans le planning ; vue « L'IA de toutes les créatrices ».
 
 ## Critères d'acceptation
@@ -27,3 +27,4 @@ Un mode par plage réglé à la main, une notification pour chaque trou (ADR 014
 
 ## Notes de session
 - 19/11 : lot (a) écrit. Relecture Sécurité : une pause ne lève jamais un Arrêt (Arrêt sans fin, pause plus courte, créatrice archivée : refusés, `agent_pause_conflict`). Lot (b) écrit dans la même PR. Pas de Docker dans le conteneur de la session : les tests d'intégration tournent dans la CI.
+- 19/11 : lot (c), première partie : l'interrupteur (Pause 1 h / demain 9 h / sans fin, Couper confirmé, Rallumer dans le mode d'avant) et « Jours modifiés ». Reste la frise, la ligne Équipe, les chiffres et la vue agence (lot d).
