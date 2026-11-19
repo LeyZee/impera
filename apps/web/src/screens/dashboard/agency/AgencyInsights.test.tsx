@@ -533,6 +533,45 @@ describe('the days read and their comparison (ADR 0146)', () => {
     expect(read?.textContent).toBe('');
   });
 
+  it('gives the pill the day’s change while a day is read, the period’s again after, none for a day with nothing compared', async () => {
+    // The last day falls below its day compared (320 € against 400 €) while the week rises (+18 %).
+    const previousDays = AGENCY_WEEK.previousDays.map((one, i) =>
+      i === 6 ? { ...one, revenueMinor: 40_000 } : one,
+    );
+    serve(200, { ...AGENCY_WEEK, previousDays });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const layer = document.querySelector('.ins-curve__hits');
+    const pill = document.querySelector('.ins-lead__pill');
+    if (layer === null || pill === null) throw new Error('pill');
+    const [period, day] = Array.from(pill.children);
+    expect(period?.textContent).toMatch(/^\+18\s%$/u);
+    expect(period?.querySelector('.nv-delta--better')).not.toBeNull();
+    expect(period?.getAttribute('aria-hidden')).toBe('false');
+    // The last day read: its own change, amber, the period's kept in place, hidden.
+    fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
+    expect(day?.textContent).toMatch(/^−20\s%$/u);
+    expect(day?.querySelector('.nv-delta--worse')).not.toBeNull();
+    expect(day?.getAttribute('aria-hidden')).toBe('false');
+    expect(period?.getAttribute('aria-hidden')).toBe('true');
+    // Off the curve: the period's change again.
+    fireEvent.pointerLeave(layer, { pointerType: 'mouse' });
+    expect(day?.textContent).toBe('');
+    expect(period?.getAttribute('aria-hidden')).toBe('false');
+    cleanup();
+    // A day with nothing compared: no pill, its place kept (the period's, hidden).
+    serve(200, { ...AGENCY_WEEK, previousDays: AGENCY_WEEK.previousDays.slice(0, 6) });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const again = document.querySelector('.ins-curve__hits');
+    if (again === null) throw new Error('layer');
+    fireEvent.pointerMove(again, { clientX: 10, clientY: 10 });
+    const [kept, none] = Array.from(document.querySelector('.ins-lead__pill')?.children ?? []);
+    expect(none?.textContent).toBe('');
+    expect(kept?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('.ins-lead__note')?.textContent).toContain('ven. 6 nov. : 320');
+  });
+
   it('reads a day with nothing compared as its revenue alone', () => {
     expect(readingOf({ key: 'x', title: 'mar. 10 nov.', cents: 15_300, compared: null })).toMatch(
       /^mar\. 10 nov\. : 153\s€$/u,

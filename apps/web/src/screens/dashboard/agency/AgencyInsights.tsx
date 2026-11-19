@@ -175,7 +175,7 @@ function RevenueCurve({
   /** Above the period compared or nothing to compare with, or below it: the same word as the « n % » beside. */
   tone: Trend;
   /** The day read, as the note says it, or null when the pointer or the finger leaves the curve. */
-  onRead: (reading: string | null) => void;
+  onRead: (point: CurvePoint | null) => void;
 }): JSX.Element | null {
   const [hover, setHover] = useState<number | null>(null);
   const fill = useId();
@@ -229,7 +229,7 @@ function RevenueCurve({
     const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
     setHover(index);
     const one = points[index];
-    onRead(one === undefined ? null : readingOf(one));
+    onRead(one ?? null);
   };
   return (
     <div className={`ins-curve ins-curve--${tone}`}>
@@ -531,7 +531,8 @@ function Figures({
     current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
   const compared = comparable(insights);
-  const [reading, setReading] = useState<string | null>(null);
+  // The day read on the curve: the note and its pill say that day while it is read (relecture Design 19/11).
+  const [read, setRead] = useState<CurvePoint | null>(null);
   const sparkOf = (
     pick: (day: AgencyInsights['days'][number]) => number,
     tone: Trend | 'agency' | 'creator',
@@ -657,11 +658,21 @@ function Figures({
               format={formatEuros}
             />
             <span className="nv-figure__note">
-              <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
-              {/* The day read on the curve takes the sentence's place; both share one cell, so nothing moves. */}
+              {/* The day read on the curve takes the period's place, its pill and its sentence each over theirs, kept in
+                  place hidden, so nothing moves; a day with nothing compared has no pill, its place kept. */}
+              <span className="ins-lead__pill">
+                <span aria-hidden={read !== null}>
+                  <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
+                </span>
+                <span aria-hidden={read === null}>
+                  {read?.compared == null ? null : (
+                    <Delta current={read.cents} previous={read.compared.cents} />
+                  )}
+                </span>
+              </span>
               <span className="ins-lead__note">
-                <span aria-hidden={reading !== null}>{leadNote(insights)}</span>
-                <span aria-hidden={reading === null}>{reading ?? ''}</span>
+                <span aria-hidden={read !== null}>{leadNote(insights)}</span>
+                <span aria-hidden={read === null}>{read === null ? '' : readingOf(read)}</span>
               </span>
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
@@ -669,7 +680,7 @@ function Figures({
           <RevenueCurve
             insights={insights}
             tone={trendOf(current.revenueMinor, previous.revenueMinor, compared)}
-            onRead={setReading}
+            onRead={setRead}
           />
         </div>
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />

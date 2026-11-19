@@ -207,6 +207,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ins-lead__pill {
+  position: relative;
+  display: inline-flex;
+}
+.ins-lead__pill:has(> span:first-child:empty) {
+  display: none;
+}
+.ins-lead__pill > span:last-child {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: inline-flex;
+  white-space: nowrap;
+}
+.ins-lead__pill > [aria-hidden='true'],
 .ins-lead__note > [aria-hidden='true'] {
   visibility: hidden;
 }
