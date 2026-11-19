@@ -275,6 +275,10 @@
    ground, no card, no colour but the objects' own; each fades in after the ceremony, 60 ms apart, and nothing
    more (with « réduire les animations » they are there at once, as the rest of the reveal). */
 .rw-reveal__also {
+  /* The reveal is dark in both themes: its inks are its own, the ones of its sentence. */
+  --rw-also-ink: rgb(246 238 241 / 0.78);
+  --rw-also-faint: rgb(246 238 241 / 0.55);
+  --rw-also-line: rgb(246 238 241 / 0.28);
   margin-top: 22px;
   display: flex;
   flex-direction: column;
@@ -290,7 +294,7 @@
   white-space: nowrap;
 }
 .rw-reveal__alsohead {
-  color: rgb(246 238 241 / 0.55);
+  color: var(--rw-also-faint);
   animation: rw-fade 300ms ease-out 1500ms both;
 }
 .rw-reveal__alsolist {
@@ -323,11 +327,11 @@
 }
 .rw-reveal__alsoobject[data-more='true'] {
   box-sizing: border-box;
-  border: 1px solid rgb(246 238 241 / 0.28);
+  border: 1px solid var(--rw-also-line);
   border-radius: 50%;
   font-size: 14px;
   font-weight: 600;
-  color: rgb(246 238 241 / 0.78);
+  color: var(--rw-also-ink);
 }
 .rw-reveal__alsoname {
   max-width: 100%;
@@ -335,7 +339,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: rgb(246 238 241 / 0.78);
+  color: var(--rw-also-ink);
 }
 .rw-reveal__close {
   margin-top: 26px;
