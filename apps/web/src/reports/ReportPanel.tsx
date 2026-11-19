@@ -52,6 +52,7 @@ import { accountLine, platformName, swapShiftLine } from '@/scheduling/model';
 import { clockAt, dayMonth, dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 const COMMENT_MAX = 1000;
 
@@ -108,18 +109,12 @@ export function ReportPanel({
     >
       {context.isError ? (
         <div className="tm-dialog__body">
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : ce shift n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void context.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure
+            inline
+            onRetry={() => {
+              void context.refetch();
+            }}
+          />
         </div>
       ) : data === undefined ? (
         <div className="tm-dialog__body">

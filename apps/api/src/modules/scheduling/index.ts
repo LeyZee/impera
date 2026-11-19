@@ -250,7 +250,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
   const colleagues = createDrizzleColleagueReads(deps.adminDb);
   const planning = createDrizzlePlanningStore(deps.db, deps.adminDb);
   const calendarReads = createDrizzleCalendarReads(deps.db);
-  const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf);
+  const shareCheck = createDrizzleAgencyShareCheck(deps.adminDb, deps.salesTotalsOf, deps.notify);
   const reportStore = createDrizzleShiftReportStore(
     deps.db,
     deps.adminDb,

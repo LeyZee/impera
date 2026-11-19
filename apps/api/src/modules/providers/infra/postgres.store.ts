@@ -7,6 +7,7 @@ import {
   ProviderConnectionStateSchema,
   ProviderErrorKindSchema,
   ProviderFactSchema,
+  ProviderProbeOutcomeSchema,
   ProviderSettingsSchema,
   ProviderVoiceSchema,
   type AiProvider,
@@ -51,7 +52,22 @@ const RowSchema = z.object({
   settings: ProviderSettingsSchema,
   voices: z.array(ProviderVoiceSchema),
   lastErrorKind: ProviderErrorKindSchema.nullable(),
+  planTier: z.enum(['free', 'paid']).nullable(),
+  probeOutcome: ProviderProbeOutcomeSchema.nullable(),
 });
+
+/** The columns a check or an « Essai réel » writes (ADR 0091 § 7), from the credential. */
+function quotaAndProbe(credential: StoredCredential) {
+  return {
+    charactersLimit: credential.quota?.limit ?? null,
+    charactersResetAt: credential.quota?.resetsAt ?? null,
+    planTier: credential.quota?.plan ?? null,
+    probedAt: credential.probe?.at ?? null,
+    probeOutcome: credential.probe?.outcome ?? null,
+    probeLatencyMs: credential.probe?.latencyMs ?? null,
+    probeModel: credential.probe?.model ?? null,
+  };
+}
 
 export interface PostgresStoreDeps {
   /** The admin connection: `provider_credentials` is revoked from the application role (ADR 0016). */
@@ -94,6 +110,19 @@ export function createPostgresCredentialStore(deps: PostgresStoreDeps): Credenti
       state: key === null ? 'needs_reconnect' : parsed.state,
       verifiedAt: row.verifiedAt,
       charactersLeft: row.charactersLeft,
+      quota:
+        row.charactersLimit === null
+          ? null
+          : { limit: row.charactersLimit, resetsAt: row.charactersResetAt, plan: parsed.planTier },
+      probe:
+        row.probedAt === null || parsed.probeOutcome === null
+          ? null
+          : {
+              at: row.probedAt,
+              outcome: parsed.probeOutcome,
+              latencyMs: row.probeLatencyMs,
+              model: row.probeModel,
+            },
       lastErrorKind: key === null ? 'unauthorized' : parsed.lastErrorKind,
       revision: row.updatedAt.getTime(),
     };
@@ -123,6 +152,7 @@ export function createPostgresCredentialStore(deps: PostgresStoreDeps): Credenti
         settings: credential.settings,
         voices: credential.voices,
         charactersLeft: credential.charactersLeft,
+        ...quotaAndProbe(credential),
         lastErrorKind: credential.lastErrorKind,
         verifiedAt: credential.verifiedAt,
         updatedAt: new Date(),
@@ -157,6 +187,7 @@ export function createPostgresCredentialStore(deps: PostgresStoreDeps): Credenti
             settings: credential.settings,
             voices: credential.voices,
             charactersLeft: credential.charactersLeft,
+            ...quotaAndProbe(credential),
             lastErrorKind: credential.lastErrorKind,
             verifiedAt: credential.verifiedAt,
             // Strictly later than the version read, even within the same millisecond.

@@ -69,8 +69,7 @@ export function LevelsPanel(): JSX.Element | null {
   return (
     <Panel
       className="nv-enter rw-levels"
-      eyebrow="Rangs des chatteurs"
-      title={thresholdsMinor.length === 0 ? 'Aucun seuil réglé' : 'Net cumulé qui ouvre chaque rang'}
+      title="Rangs des chatteurs"
       actions={
         <button
           type="button"
@@ -84,20 +83,23 @@ export function LevelsPanel(): JSX.Element | null {
       }
     >
       <div className="rp-sec">
-        <ul className="rw-levels__list">
-          {ranks.map((rank, index) => {
-            const threshold = thresholdsMinor[index];
-            return (
-              <li key={rank.rank} className="rw-levels__rank" data-open={threshold !== undefined}>
-                <LevelInsignia rank={rank.rank} earned={threshold !== undefined} size={44} />
-                <p className="rw-levels__name">{rank.name}</p>
-                <p className="rw-levels__at nv-num">
-                  {threshold === undefined ? 'Pas de seuil' : `à ${amountText(threshold, 'EUR')}`}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
+        {/* No threshold set: one sentence, not eight tiles that each say « Pas de seuil » (GES-18). */}
+        {thresholdsMinor.length === 0 ? null : (
+          <ul className="rw-levels__list">
+            {ranks.map((rank, index) => {
+              const threshold = thresholdsMinor[index];
+              return (
+                <li key={rank.rank} className="rw-levels__rank" data-open={threshold !== undefined}>
+                  <LevelInsignia rank={rank.rank} earned={threshold !== undefined} size={44} />
+                  <p className="rw-levels__name">{rank.name}</p>
+                  <p className="rw-levels__at nv-num">
+                    {threshold === undefined ? 'Pas de seuil' : `à ${amountText(threshold, 'EUR')}`}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         <p className="py-quiet">
           {thresholdsMinor.length === 0
             ? 'Sans seuil, aucun nouveau rang ne s’ouvre ; un rang déjà gagné reste.'

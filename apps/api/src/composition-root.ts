@@ -83,6 +83,7 @@ import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
+import { wireRedirectLinks } from './wiring/redirect-links';
 import { wireRewards } from './wiring/rewards';
 import { wireScheduling } from './wiring/scheduling';
 import { wireScripts } from './wiring/scripts';
@@ -315,7 +316,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });
-  const providers = await wireProviders(shared);
+  // « Essai réel » (ADR 0091 § 7) reaches the gateway built below, on these keys, only when the owner clicks.
+  const providers = await wireProviders(shared, (provider) => llm.gateway.testConnection(provider));
   const alerts = wireAlerts(shared);
   const media = await wireMedia(shared);
   const llmCalls = createDrizzleLlmCallStore(adminDb.db);
@@ -339,8 +341,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
+  const redirectLinks = wireRedirectLinks(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
+    channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
     channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
   });
   const team = wireTeam(shared, {
@@ -448,7 +452,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const backups = wireBackups(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
-  const aiUsage = wireAiUsage(shared, llm);
+  // ElevenLabs bills characters, not money: its month comes from its own check (ADR 0091 § 7).
+  const aiUsage = wireAiUsage(shared, llm, () => providers.module.voiceQuota());
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
@@ -601,6 +606,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
+      ...redirectLinks.routes,
       ...creatorTasks.routes,
       ...contentDrops.routes,
       ...contractors.routes,

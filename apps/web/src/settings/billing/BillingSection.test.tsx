@@ -114,7 +114,17 @@ describe('Réglages › Facturation', () => {
   it('asks for the settings first while none is saved, then walks the six steps and saves them whole', async () => {
     view = { settings: null, logo: null };
     renderSection();
-    expect(await screen.findByText('Aucune facture ne part')).toBeDefined();
+    expect(
+      await screen.findByText('Aucune facture ne part tant que ces réglages ne sont pas enregistrés'),
+    ).toBeDefined();
+    // What an invoice asks for is seen before it is asked, empty (recette visuelle 16/11, GES-26).
+    expect(screen.getAllByRole('heading', { level: 2 }).map((title) => title.textContent)).toEqual([
+      'L’agence',
+      'Désignation de la prestation',
+      'Paiement',
+      'Logo',
+    ]);
+    expect(screen.getAllByRole('button', { name: /^Remplir/u })).toHaveLength(5);
     fireEvent.click(screen.getByRole('button', { name: 'Remplir les réglages' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Réglages de facturation' });
@@ -191,7 +201,9 @@ describe('Réglages › Facturation', () => {
     });
     // The page shows what the server answered.
     expect(screen.getByRole('heading', { name: 'L’agence' })).toBeDefined();
-    expect(screen.queryByText('Aucune facture ne part')).toBeNull();
+    expect(
+      screen.queryByText('Aucune facture ne part tant que ces réglages ne sont pas enregistrés'),
+    ).toBeNull();
   });
 
   it('shows what each invoice prints, the foot as the PDF writes it', async () => {

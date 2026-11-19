@@ -44,8 +44,8 @@ import { lookAgainAtHerCase } from '@/rewards/api';
 import { dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 import './content.css';
 
@@ -100,7 +100,7 @@ export function ContentPage({
   const onTheWay =
     moving.length === 0 ? null : (
       <section className="ct-section" aria-labelledby="ct-moving">
-        <h2 id="ct-moving" className="ct-section__title">
+        <h2 id="ct-moving" className="nv-h2 ct-section__title">
           En route
         </h2>
         <ul className="ct-list">
@@ -119,15 +119,16 @@ export function ContentPage({
     );
 
   return (
-    <Page className="ct-page">
+    <Page className="ct-page" width="narrow">
       <PageHeader title="Contenu" lead="Ce qu’on te demande, et ce que tu envoies." />
       {content.isError ? (
-        <ServerSilent
-          text="Ton contenu n’a pas pu être lu. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void content.refetch();
           }}
-        />
+        >
+          Rien ici n’est à jour en attendant.
+        </Failure>
       ) : content.data === undefined ? (
         <div className="ct-skeleton" aria-hidden="true">
           <i />
@@ -138,7 +139,7 @@ export function ContentPage({
         <div className="ct-sections nv-enter">
           {asked.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-asked">
-              <h2 id="ct-asked" className="ct-section__title">
+              <h2 id="ct-asked" className="nv-h2 ct-section__title">
                 À tourner
               </h2>
               <ul className="ct-list">
@@ -175,12 +176,12 @@ export function ContentPage({
           {routeFirst(moving) ? onTheWay : null}
 
           <section className="ct-section" aria-labelledby="ct-drop">
-            <h2 id="ct-drop" className="ct-section__title">
+            <h2 id="ct-drop" className="nv-h2 ct-section__title">
               Déposer
             </h2>
             {DROP_OUTPUTS.map((output) => (
               <div key={output.name} className="ct-output">
-                {DROP_OUTPUTS.length > 1 ? <h3 className="ct-output__name">{output.name}</h3> : null}
+                {DROP_OUTPUTS.length > 1 ? <h3 className="nv-h3 ct-output__name">{output.name}</h3> : null}
                 <div className="ct-tiles">
                   {output.categories.map((category) => (
                     <button
@@ -207,7 +208,7 @@ export function ContentPage({
 
           {out.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-out">
-              <h2 id="ct-out" className="ct-section__title">
+              <h2 id="ct-out" className="nv-h2 ct-section__title">
                 Publié
               </h2>
               <ul className="ct-list ct-list--quiet">

@@ -6,6 +6,7 @@ import { freshnessOf, readAtWords } from './freshness';
 import { rangeKey, snapshotAtOf } from './offline';
 
 import { useOnline } from '@/pwa/online';
+import { Failure } from '@/shell/states';
 
 /**
  * What her screen says of the agenda it shows when that is not the server's fresh answer (CRE-02): « Mise à jour… » under
@@ -17,12 +18,15 @@ export function FreshnessNote({
   from,
   to,
   waiting = null,
+  quiet = false,
 }: {
   read: UseQueryResult<CreatorAgenda>;
   from: string;
   to: string;
   /** Her ticks not sent yet, where the screen sends them (Agenda); `null` where it does not say (Aujourd'hui). */
   waiting?: number | null;
+  /** The page already says the server is silent (ETA-05): the note does not say it again. */
+  quiet?: boolean;
 }): JSX.Element | null {
   const online = useOnline();
   const range = rangeKey(from, to);
@@ -63,20 +67,15 @@ export function FreshnessNote({
         </span>
       </p>
     );
+  if (quiet) return null;
   return (
-    <p className="ag-offline" role="status">
-      <span>Le serveur ne répond pas : {copy}</span>
-      <button
-        type="button"
-        className="nv-btn nv-btn--soft nv-btn--sm"
-        disabled={read.isFetching}
-        aria-busy={read.isFetching}
-        onClick={() => {
-          void read.refetch();
-        }}
-      >
-        Réessayer
-      </button>
-    </p>
+    <Failure
+      inline
+      onRetry={() => {
+        void read.refetch();
+      }}
+    >
+      {`${copy.charAt(0).toUpperCase()}${copy.slice(1)}`}
+    </Failure>
   );
 }

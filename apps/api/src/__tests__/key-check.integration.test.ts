@@ -55,6 +55,8 @@ describe('ops:check-keys', () => {
       state: 'connected',
       verifiedAt: new Date('2026-10-27T10:00:00Z'),
       charactersLeft: null,
+      quota: null,
+      probe: null,
       lastErrorKind: null,
       revision: 0,
     });

@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { Reader } from './Reader';
+import { suiviEyebrow } from './SuiviNav';
 import { fetchConversations, fetchSendingStop, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
@@ -41,6 +42,8 @@ import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 const REFRESH_MS = 30_000;
 
@@ -176,15 +179,18 @@ export function TrackingPage({
         todos.find((t) => t.conversationId === selected)?.creatorId ??
         null);
 
+  const oneName = creators.length === 1 ? creators[0]?.displayName : undefined;
   return (
     <Page className={selected === null ? 'tr-page' : 'tr-page tr-is-reading'}>
       <PageHeader
-        eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
-        title="Suivi"
+        // With its tabs, the section above and the open tab as the title (recette visuelle 16/11, T2); a chatter's Suivi
+        // is one screen, named by the section itself.
+        eyebrow={nav === undefined ? oneName : suiviEyebrow(oneName)}
+        title={nav === undefined ? 'Suivi' : screenLabel('/suivi')}
         // Only what the mode means: the panels say the rest themselves (D-03).
         // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
         lead={mode === null || offShift !== undefined ? undefined : MODE_MEANINGS[mode]}
-        actions={nav}
+        tabs={nav}
       />
       {offShift?.(lines.length > 0)}
       {stoppedNames.length === 0 ? null : (
@@ -206,14 +212,7 @@ export function TrackingPage({
         </Panel>
       ) : null}
       {creatorsQuery.isError || (failed.length > 0 && lines.length === 0) ? (
-        <Notice
-          title="Le serveur ne répond pas"
-          text="La liste n’a pas pu être lue. Réessaie dans un instant."
-        >
-          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={retry}>
-            Réessayer
-          </button>
-        </Notice>
+        <Failure onRetry={retry} />
       ) : isLoading && lines.length === 0 ? (
         <Panel className="tr-panel">
           <div className="tr-skeleton" aria-hidden="true">
@@ -252,12 +251,9 @@ export function TrackingPage({
             {/* An unread queue is never silent: an urgency may be missing from it. */}
             {queue.isError ? (
               <Panel className="tr-panel" eyebrow="À traiter">
-                <p className="tr-queue-error tr-warn">
-                  « À traiter » n’a pas pu être lu : une urgence peut manquer ici.
-                </p>
-                <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={retry}>
-                  Réessayer
-                </button>
+                <Failure inline className="tr-queue-error" onRetry={retry}>
+                  Une urgence peut manquer ici : réessaie dans un instant.
+                </Failure>
               </Panel>
             ) : null}
             {todos.length === 0 ? null : (
@@ -341,7 +337,7 @@ export function TrackingPage({
                   <div role="group" aria-label="Conversations" className="tr-groups">
                     {groupByHand(shown, selfScope).map((group) => (
                       <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
-                        <h3 className="tr-group__title">
+                        <h3 className="nv-eyebrow tr-group__title">
                           {HAND_TITLES[group.hand]}
                           {group.hand === 'yours' ? (
                             <span className="tr-group__count">{group.lines.length}</span>
@@ -383,13 +379,13 @@ export function TrackingPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <p className="tr-reader__empty">
-                Choisis une conversation à gauche : elle s’ouvre ici, avec son brouillon s’il y en a un.
-              </p>
+              <Empty title="Choisis une conversation à gauche.">
+                Elle s’ouvre ici, avec son brouillon s’il y en a un.
+              </Empty>
             </section>
           ) : open === null ? (
             <section className="nv-plate tr-reader" aria-label="Conversation">
-              <p className="tr-reader__empty">Cette conversation n’est pas dans la liste.</p>
+              <Empty title="Cette conversation n’est pas dans la liste." />
             </section>
           ) : (
             <Reader
@@ -689,13 +685,9 @@ function Notice({
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tr-notice">
-        <h2>{title}</h2>
-        <p>{text}</p>
-        {children}
-      </div>
-    </Panel>
+    <Empty plate title={title} action={children}>
+      {text}
+    </Empty>
   );
 }
 

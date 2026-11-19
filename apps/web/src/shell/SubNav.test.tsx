@@ -81,7 +81,7 @@ describe('SubNav', () => {
     act(() => {
       setItems([{ to: '/paie/quinzaine', label: 'Quinzaine', count: 4 }, releves]);
     });
-    expect(screen.getByText('4').className).toBe('nv-subnav__count');
+    expect(screen.getByText('4').className).toBe('nv-count nv-subnav__count');
     expect(placeTabBarLens.mock.calls.length).toBeGreaterThan(before);
   });
 

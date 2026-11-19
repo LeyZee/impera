@@ -136,7 +136,7 @@ function ChannelPostWriter({
     <div className="cp-page">
       <div className="nv-plate ps-panel">
         <section className="ps-block" aria-labelledby="cp-ask">
-          <h3 className="ps-block__title" id="cp-ask">
+          <h3 className="nv-h3 ps-block__title" id="cp-ask">
             Ce qu’elle publie
           </h3>
           <div className="tc-setting tc-setting--select cp-setting">
@@ -197,7 +197,7 @@ function ChannelPostWriter({
 
       <div className="nv-plate ps-panel">
         <section ref={preview} className="ps-block" aria-labelledby="cp-preview">
-          <h3 className="ps-block__title" id="cp-preview">
+          <h3 className="nv-h3 ps-block__title" id="cp-preview">
             Aperçu
           </h3>
           {failure === null ? null : (

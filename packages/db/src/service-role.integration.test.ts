@@ -63,6 +63,7 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   provider_credentials: ['insert', 'update', 'delete'],
   push_server_keys: ['insert'],
   push_subscriptions: ['insert', 'update'],
+  redirect_links: ['insert', 'update'],
   // Plus one column the job dates when it takes a gain back (taken_back_at, ADR 0118): a column right, not a table's.
   reward_gains: ['insert'],
   reward_streaks: ['insert', 'update'],

@@ -16,7 +16,6 @@ import { OnLeave, PendingLeaves, TeamSwaps, type InTheWay } from './TeamExchange
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
 import { unheldLabel } from './model';
-import { Unread } from './parts';
 import './team.css';
 
 import { ReportPanel } from '@/reports/ReportPanel';
@@ -75,6 +74,8 @@ import {
 import { useNow } from '@/scheduling/useNow';
 import { Answers } from '@/screens/planning/Exchanges';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 type Open =
   | { readonly kind: 'add'; readonly start: ShiftStart }
@@ -246,23 +247,19 @@ export function PlanningPage({
   return (
     <Page>
       <PageHeader
-        title="Équipe"
+        eyebrow="Équipe"
+        title={screenLabel('/equipe/planning')}
         lead={
           agency === null
             ? 'Qui chatte sur quel compte, et quand.'
             : `Qui chatte sur quel compte, et quand. À l’heure ${zone === agency ? `de l’agence (${cityOf(agency)})` : `de ${cityOf(zone)}`}.`
         }
-        actions={
-          <>
-            <TeamNav />
-            {/* No button above a page that could not be read: it would only be greyed out (EQ-22). */}
-            {data === undefined ? null : add}
-          </>
-        }
+        tabs={<TeamNav />}
+        // No button above a page that could not be read: it would only be greyed out (EQ-22).
+        {...(data === undefined ? {} : { actions: add })}
       />
       {shown.isError && data === undefined ? (
-        <Unread
-          text="Le serveur ne répond pas : le planning n’a pas pu être lu."
+        <Failure
           onRetry={() => {
             void shown.refetch();
           }}
@@ -696,11 +693,11 @@ function OnDutyStrip({
   const known = new Set<string>(planning.shifts.map((shift) => shift.id));
   return (
     <section className="sc-duty" aria-labelledby="sc-duty-title">
-      <h2 id="sc-duty-title" className="sc-duty__title">
+      <p id="sc-duty-title" className="sc-duty__title">
         {/* Fixed: the shift under way on the grid is the page's one moving sign (CR-12, Charles 02/11 17h56). */}
         <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok'}`} />
         En poste maintenant
-      </h2>
+      </p>
       {list.length === 0 ? (
         <p className="sc-duty__none">Personne pour l’instant.</p>
       ) : (
@@ -765,7 +762,7 @@ function Conflicts({
   const known = new Set<string>(planning.shifts.map((shift) => shift.id));
   return (
     <section className="nv-plate sc-conflicts nv-swap" role="status" aria-labelledby="sc-conflicts-title">
-      <h2 id="sc-conflicts-title" className="sc-conflicts__title">
+      <h2 id="sc-conflicts-title" className="nv-h2 sc-conflicts__title">
         {conflictTitle(lines)}
       </h2>
       <ul className="sc-conflicts__list">
@@ -847,15 +844,10 @@ function Grid({
 }): JSX.Element {
   if (planning.accounts.length === 0) {
     return (
-      <Panel className="nv-coming">
-        <div className="nv-coming__in sc-notice">
-          <h2>Aucun compte à planifier</h2>
-          <p>
-            Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
-            d’abord.
-          </p>
-        </div>
-      </Panel>
+      <Empty plate title="Aucun compte à planifier">
+        Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
+        d’abord.
+      </Empty>
     );
   }
   const week = planning.shifts.filter((shift) =>

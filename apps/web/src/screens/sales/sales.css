@@ -1,29 +1,22 @@
 /* Ventes, the creator's (CR-02 c3): her fans, and a conversation read only. */
 
+/* Three parts under one another, each its own height: the page's body row would stretch the first and leave a hole
+   above the list while both load (ETA-14). */
+.nv-page.vt-page {
+  grid-template-rows: auto;
+  align-content: start;
+}
+
 .vt-cols {
   display: grid;
   gap: var(--nv-space-4);
   align-items: start;
 }
-.vt-note,
-.vt-empty,
-.vt-hint {
+.vt-note {
   margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-faint);
-}
-/* The reading side before a fan is chosen: a plate of its own, not a line afloat on the page (recette CRE-04). */
-.vt-hint {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--nv-space-2);
-  padding: var(--nv-space-8) var(--nv-space-4);
-  text-align: center;
-}
-.vt-hint > p {
-  margin: 0;
 }
 .vt-rows {
   display: flex;
@@ -81,36 +74,13 @@
 .vt-older {
   align-self: center;
 }
-.vt-skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
-}
-.vt-skeleton i {
-  height: 48px;
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
-  animation: vt-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
-}
-.vt-skeleton i:nth-child(2) {
-  animation-delay: calc(var(--nv-stagger) * 2);
-}
-.vt-skeleton i:nth-child(3) {
-  animation-delay: calc(var(--nv-stagger) * 4);
-}
-@keyframes vt-breathe {
-  to {
-    opacity: 0.4;
-  }
-}
-
 /* The reader. */
 .vt-reader {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
   min-width: 0;
-  padding: var(--nv-space-4);
+  padding: var(--nv-plate-pad);
 }
 .vt-reader__top {
   display: flex;
@@ -133,7 +103,6 @@
 .vt-reader__who h2 {
   margin: 0;
   overflow: hidden;
-  font-size: var(--nv-text-headline);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -141,11 +110,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-}
-.vt-warn {
-  margin: 0;
-  color: var(--nv-warning);
-  font-weight: 600;
 }
 .vt-day {
   display: flex;

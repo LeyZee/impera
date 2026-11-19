@@ -178,8 +178,8 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
   it('says her fans do not load, with a way to try again', async () => {
     serve({ '/v1/creator-space/fans': { status: 500, body: null } });
     show(null);
-    expect(await screen.findByText(/Tes fans n’ont pas pu être lus/u)).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    expect(screen.getAllByRole('button', { name: 'Réessayer' })).toHaveLength(1);
   });
 
   it('says once that the server does not answer when her fans and their figures both fail (CRE-31)', async () => {
@@ -188,9 +188,9 @@ describe('Ventes, the creator’s (CR-02 c3)', () => {
       '/v1/creator-space/fan-insights': { status: 500, body: null },
     });
     show(null);
-    expect(await screen.findByText(/Tes fans et leurs chiffres n’ont pas pu être lus/u)).toBeDefined();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     await waitFor(() => {
-      expect(screen.queryByText(/Les chiffres de tes fans n’ont pas pu être lus/u)).toBeNull();
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
     });
     const retry = screen.getAllByRole('button', { name: 'Réessayer' });
     expect(retry).toHaveLength(1);

@@ -21,7 +21,7 @@ export function ErrorPage(): JSX.Element {
           <span className="nv-notfound__icon" aria-hidden="true">
             <NavIcon name="compass" />
           </span>
-          <h2>Cette page n’a pas pu s’afficher</h2>
+          <h2 className="nv-h2">Cette page n’a pas pu s’afficher</h2>
           <p className="nv-notfound__text">
             Le lien est peut-être abîmé. Recharge la page, ou repars de {sectionLabel(home)}.
           </p>

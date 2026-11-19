@@ -14,6 +14,7 @@ import { chatterCase } from '@/rewards/chatter-case';
 import { tiersOf } from '@/screens/pay/MyFigures';
 import { useCurrentPeriod } from '@/screens/pay/data';
 import { Page, PageHeader } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 /** Without tiers set by the agency, the medal shelf still stands and says why it is empty (CHT-17). */
 const NO_TIERS = {
@@ -60,8 +61,13 @@ function ChatterTrophiesPage({ user }: { user: Me }): JSX.Element {
   const shift = read?.streaks.find((streak) => streak.kind === 'shift');
   const shown = read === undefined ? null : chatterCase(read, current, net, currency, tiersOf(period));
   return (
-    <Page>
-      <PageHeader eyebrow="Moi" title="Mes trophées" actions={<MeNav trophies />} />
+    <Page width="narrow">
+      <PageHeader
+        eyebrow="Moi"
+        title={screenLabel('/moi/trophees')}
+        lead="Ce que tu as gagné, et ce qui vient ensuite."
+        tabs={<MeNav trophies />}
+      />
       {shown === null ? (
         caseRead.isError ? (
           <TrophyCaseDown onRetry={() => void caseRead.refetch()} />

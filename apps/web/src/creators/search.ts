@@ -15,6 +15,7 @@ export interface CreatorsSearch {
     | 'scripts'
     | 'contenu'
     | 'telegram'
+    | 'liens'
     | 'profil';
   readonly creatrice?: CreatorId;
   /**
@@ -36,6 +37,7 @@ export type CreatorSheet =
   | 'scripts'
   | 'content'
   | 'telegram'
+  | 'links'
   | 'profile';
 
 const SLUGS = {
@@ -48,6 +50,7 @@ const SLUGS = {
   scripts: 'scripts',
   content: 'contenu',
   telegram: 'telegram',
+  links: 'liens',
   profile: 'profil',
 } as const;
 const SHEETS = {
@@ -60,6 +63,7 @@ const SHEETS = {
   scripts: 'scripts',
   contenu: 'content',
   telegram: 'telegram',
+  liens: 'links',
   profil: 'profile',
 } as const;
 
@@ -74,17 +78,20 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
   'scripts',
   'content',
   'telegram',
+  'links',
   'profile',
 ];
 
 /**
  * The sheets a member opens: all of them for the owner; her agenda alone for an active manager (CR-05 lot c, Charles,
  * 05/11 17h22: « Ouvrir aux managers », the other sheets stay the owner's) and her ideas of the day (VEI-02, ADR 0060
- * § 5: the owner's and the managers') and what the agency asks of her (MED-09, the same) and her sent scripts (SC-03 c2b, the same) and her other drops (recette créatrice 1, the same); the persona alone for anyone else. The first one is where Créatrices opens.
+ * § 5: the owner's and the managers') and what the agency asks of her (MED-09, the same) and her sent scripts (SC-03 c2b, the same) and her other drops (recette créatrice 1, the same) and her redirect links (INS-03, ADR 0121 § 1: the agency sets them); the persona alone for anyone else. The first one is where Créatrices opens.
  */
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
-  return user.teamScope === 'agency' ? ['agenda', 'ideas', 'requests', 'scripts', 'content'] : ['persona'];
+  return user.teamScope === 'agency'
+    ? ['agenda', 'ideas', 'requests', 'scripts', 'content', 'links']
+    : ['persona'];
 }
 
 /** Longest folder id read in the address: longer, none. */
@@ -108,6 +115,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     tab === SLUGS.scripts ||
     tab === SLUGS.content ||
     tab === SLUGS.telegram ||
+    tab === SLUGS.links ||
     tab === SLUGS.profile
       ? { onglet: tab }
       : {}),

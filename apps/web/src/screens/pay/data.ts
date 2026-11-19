@@ -8,6 +8,7 @@ import {
   type ShiftReport,
   type TeamMember,
 } from '@impera/contracts';
+import { useState } from 'react';
 
 import { useExchangeRates, usePayPeriod, usePayPeriodReads, usePayPeriods } from '@/payroll/api';
 import {
@@ -62,6 +63,19 @@ export function usePeriodToOpen(owner: boolean): PayPeriod | null {
   if (index.isError) return current;
   const first = index.data?.pages[0];
   return first === undefined ? null : periodToOpen(first.items, current, owner);
+}
+
+/**
+ * The period a screen of Paie shows (recette visuelle 16/11, GES-02): the one chosen, which the tabs carry from one to
+ * the next in the address (`PayNav`); without a choice, the one Quinzaine opens on, the same on every tab. Once shown
+ * it stays: validating or paying the last statement changes which one would open, and the screen never jumps to it
+ * under an open dialog or before the result is said.
+ */
+export function useShownPeriod(chosen: PayPeriod | null, owner: boolean): PayPeriod | null {
+  const toOpen = usePeriodToOpen(owner);
+  const [first, setFirst] = useState<PayPeriod | null>(null);
+  if (first === null && toOpen !== null) setFirst(toOpen);
+  return chosen ?? first ?? toOpen;
 }
 
 /** What stops a period from being validated, seen before anyone tries: reports to review, the dollar's rate. */

@@ -474,7 +474,7 @@ describe('Équipe › Membres', () => {
     serve({ members: { status: 503 } });
     renderPage();
     expect(
-      await screen.findByText('Le serveur ne répond pas : l’équipe n’a pas pu être lue.', undefined, {
+      await screen.findByText('Le serveur ne répond pas', undefined, {
         timeout: 4000,
       }),
     ).toBeDefined();

@@ -11,6 +11,7 @@ import { useCreators } from './api';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
+import { LinksSection } from './links/LinksSection';
 import { CreatorsList } from './overview/CreatorsList';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
@@ -22,6 +23,7 @@ import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
 
@@ -86,17 +88,7 @@ export function CreatorsPage({
     if (query.isError) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">La liste des créatrices ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={() => void query.refetch()} />
         </section>
       );
     }
@@ -104,10 +96,12 @@ export function CreatorsPage({
       // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
       if (creatorId === null)
         return (
-          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
-            <li className="nv-plate cl-card cl-card--skeleton" />
-            <li className="nv-plate cl-card cl-card--skeleton" />
-          </ul>
+          <Skeleton label="Chargement des créatrices…">
+            <div className="cl-grid">
+              <SkeletonCard lines={2} height={136} />
+              <SkeletonCard lines={2} height={136} />
+            </div>
+          </Skeleton>
         );
       return (
         <section className="ps-page" aria-busy="true">
@@ -212,6 +206,16 @@ export function CreatorsPage({
     if (shown === 'telegram' && current !== undefined) {
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
     }
+    if (shown === 'links' && current !== undefined) {
+      return (
+        <LinksSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          canEdit={isOwner}
+        />
+      );
+    }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
@@ -259,6 +263,7 @@ export function CreatorsPage({
     scripts: 'Scripts',
     content: 'Contenu',
     telegram: 'Canal Telegram',
+    links: 'Liens',
     hours: 'Heures d’activité',
     access: 'Accès',
     rate: 'Part de l’agence',
@@ -273,6 +278,7 @@ export function CreatorsPage({
     'scripts',
     'content',
     'telegram',
+    'links',
     'hours',
     'access',
     'rate',
@@ -280,9 +286,9 @@ export function CreatorsPage({
   ];
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche et tous ses réglages.'
     : sheets.includes('agenda')
-      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes, ses scripts et son contenu.'
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour sa fiche.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
 
   return (
@@ -323,7 +329,7 @@ export function CreatorsPage({
             </Link>
           }
           title={current.displayName}
-          actions={
+          tabs={
             switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"
