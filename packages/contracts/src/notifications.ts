@@ -94,6 +94,8 @@ export const PushMessageSchema = z.object({
   url: AppPathSchema,
   /** A newer message with the same tag replaces the older one on the screen (a grouped burst of sales). */
   tag: z.string().max(64).optional(),
+  /** Shown without sound nor vibration: an alert « en sourdine » (ADR 0150 § 1). */
+  silent: z.boolean().optional(),
 });
 export type PushMessage = z.infer<typeof PushMessageSchema>;
 
@@ -124,6 +126,8 @@ export const NOTIFICATION_REASONS = [
   'streak',
   'team',
   'agency_share',
+  /** An alert of a creator's tab, to a role it reaches (ADR 0150): under the rules of every other. */
+  'creator_alert',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;

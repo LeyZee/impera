@@ -72,6 +72,12 @@ const CRON_JOBS: readonly CronJob[] = [
   // whether it is morning somewhere; the purge drops the deliveries past their retention.
   // The minute's scan is a safety net: one try, the next minute is its retry (the trigger's own scan keeps the
   // contract's 25).
+  // The alerts of each creator's tab (ADR 0150 lot 2): each minute re-reads the last half hour, an event rings once.
+  {
+    task: 'alerts.route',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.route'] },
+  },
   {
     task: 'telegram.scan',
     match: '* * * * *',

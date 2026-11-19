@@ -19,7 +19,7 @@ Ce qui existe déjà (relevé du 17/11) :
 
 - **Réglages › Alertes** (propriétaire seul, P4-01) : ses alertes personnalisées (une phrase, des mots-clés, « met en pause ») et quatre alertes système allumées par créatrice : un mot de sa fiche (`keyword`, toujours actif), un service demandé (`service_request`), un doute sur la personne (`identity_doubt`), le prix d'une étape de script changé (`script_price`).
 - **Réglages › Telegram** (ADR 0020) : quel groupe reçoit quel sujet (urgent, important, info, ventes, mots-clés, validations, ses alertes), par créatrice ou pour toutes.
-- **Suivi › Historique des alertes** et la cloche du CRM (table `notifications`).
+- **Suivi › Historique des alertes** (la table `notifications` de supervision existe, mais aucun écran ne la lit : pas de cloche dans le CRM).
 - **Notifications push** (ADR 0042 § 7) : par compte, avec heures calmes et plafond quotidien.
 - **Événements** : `sale_detected`, `budget_threshold_crossed` (seuil d'alerte puis plafond, sans créatrice), `ai_credits_low`, `handoff_requested` (dont `custom_order`, `minor`, `distress`…), `alert_triggered`.
 
@@ -35,8 +35,8 @@ Ce qui manque :
 ### A. L'onglet Alertes de la fiche
 
 1. **Une ligne par alerte de cette créatrice**, rangées en quatre familles : **Sécurité**, **Ventes**, **Conversation**, **Système**. Pour chaque ligne : son nom, une phrase qui dit quand elle part, et trois rôles (Propriétaire, Manager, Chatteur en shift), chacun sur **Reçoit**, **Sourdine** ou **Rien**.
-   - **Reçoit** : la cloche du CRM et une notification sur son téléphone, sous ses heures calmes et son plafond (ADR 0042 § 7).
-   - **Sourdine** : la cloche du CRM, sans notification.
+   - **Reçoit** : une notification sur son téléphone, qui sonne, sous ses heures calmes et son plafond (ADR 0042 § 7).
+   - **Sourdine** : la même notification, sans son ni vibration (précisé au lot 2 : le CRM n'a pas de cloche ; la notification muette en tient lieu).
    - **Rien** : rien pour ce rôle. L'historique des alertes garde toujours la ligne, quel que soit le réglage.
 2. **« Chatteur en shift »** veut dire le ou les chatteurs dont le shift couvre cette créatrice au moment de l'alerte, lus dans le planning. Hors shift, un chatteur ne reçoit rien de cette créatrice.
 3. **Qui voit l'onglet** : le propriétaire seul (ADR 0149). Le manager, le chatteur et la créatrice ne le voient pas ; ils reçoivent ce qui leur est routé. Le serveur refuse le rôle `creator` sur ces routes ; la table est fermée à la créatrice par la RLS.
@@ -89,7 +89,7 @@ Ce qui manque :
 
 16. **Table `creator_alert_routes`** (`creator_id`, `alert_code`, `role` parmi `owner`, `manager`, `chatter_on_shift`, `mode` parmi `deliver`, `muted`, `off`, `updated_by`, `updated_at`), unique sur (`creator_id`, `alert_code`, `role`). RLS forcée par `creator_id`, fermée à la créatrice, `GRANT SELECT TO impera_service`. Une alerte verrouillée refuse toute ligne autre que `deliver` (contrainte en base et en code).
 17. **Routes** (contrat `packages/contracts/src/creator-alerts.ts`) : `GET /v1/creators/:id/alerts` (propriétaire seul) et `PUT /v1/creators/:id/alerts/:code` (propriétaire seul, idempotent : le même corps rejoue ce qui est stocké). Chaque écriture ajoute une ligne `creator_alert_route.update` dans `audit_log`. Tests : authentication-sweep, origin-sweep, isolation entre créatrices.
-18. **Le routeur** lit l'outbox `domain_events`, classe chaque événement en alerte (table du domaine), puis appelle `notify` du module `notifications` pour chaque compte du rôle. Une raison nouvelle `creator_alert` entre dans `NOTIFICATION_REASONS`. La clé d'unicité est l'événement et le compte : un job rejoué ne sonne jamais deux fois.
+18. **Le routeur** (`alerts.route`, chaque minute) relit la dernière demi-heure de l'outbox `domain_events`, classe chaque événement en alerte (table du domaine), lit ses choix par la même règle que l'onglet (le verrou tient aussi à la lecture ; une lecture en échec donne les défauts, jamais « personne »), puis appelle `notify` du module `notifications` pour chaque compte des rôles atteints, une seule fois par compte (le plus fort de ses rôles). Une raison nouvelle `creator_alert` entre dans `NOTIFICATION_REASONS`. La clé d'unicité est l'événement et le compte : relire la fenêtre ne sonne jamais deux fois.
 
 ### G. Qui code quoi
 

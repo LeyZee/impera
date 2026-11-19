@@ -419,6 +419,12 @@ export function createDrizzleAlertStore(db: Database): AlertStore {
       return db.transaction(async (tx) => {
         if (!(await creatorIds(tx)).includes(creatorId)) return 'unknown_creator' as const;
         await enterCreator(tx, creatorId, [creatorId]);
+        const before = creatorAlertLines(await routeRows(tx)).find((l) => l.code === code);
+        const unchanged =
+          before !== undefined &&
+          !before.isDefault &&
+          JSON.stringify(before.routes) === JSON.stringify(routes);
+        if (unchanged) return before;
         for (const row of routeRowsOf(code, routes)) {
           await tx
             .insert(schema.creatorAlertRoutes)

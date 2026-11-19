@@ -1,4 +1,9 @@
-import { CreatorAlertLineSchema, CreatorAlertsViewSchema, CREATOR_ALERT_DEFAULTS } from '@impera/contracts';
+import {
+  CreatorAlertLineSchema,
+  CreatorAlertsViewSchema,
+  CREATOR_ALERT_DEFAULTS,
+  TeamMemberSchema,
+} from '@impera/contracts';
 import { eq, schema, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -10,11 +15,13 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { parisDay } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: 'staple battery horse' };
 const CREATOR = { email: 'creator@example.test', name: 'Creator', password: 'battery staple correct' };
+const MANAGER_PASSWORD = 'horse correct staple battery';
 
 const ErrorBodySchema = z.object({ error: z.object({ code: z.string() }) });
 
@@ -24,8 +31,9 @@ describe('the Alertes tab of her sheet (ADR 0150, /v1/creators/:creatorId/alerts
   let server: Server;
   let nora: string;
   let iris: string;
-  const headers: Record<'owner' | 'operator' | 'creator', Record<string, string>> = {
+  const headers: Record<'owner' | 'manager' | 'operator' | 'creator', Record<string, string>> = {
     owner: {},
+    manager: {},
     operator: {},
     creator: {},
   };
@@ -62,6 +70,38 @@ describe('the Alertes tab of her sheet (ADR 0150, /v1/creators/:creatorId/alerts
       cookie: await signIn(server, CREATOR.email, CREATOR.password),
       origin: DASHBOARD_ORIGIN,
     };
+    // An active manager of the agency: the role most tempted by this tab, refused all the same (relecture Sécurité).
+    const invited = await server.inject({
+      method: 'POST',
+      url: '/v1/team/members',
+      headers: headers.owner,
+      payload: {
+        email: 'manager@example.test',
+        displayName: 'Manager',
+        firstName: 'Manon',
+        lastName: 'Inventée',
+        teamRole: 'manager',
+        creatorIds: [nora, iris],
+        country: 'FR',
+        timeZone: 'Europe/Paris',
+        joinedOn: parisDay(-30),
+        commission: { rateBps: 1000 },
+        teamShareBps: 500,
+      },
+    });
+    expect(invited.statusCode, invited.body).toBe(201);
+    const member = TeamMemberSchema.parse(invited.json());
+    const context = await app.auth.$context;
+    await context.internalAdapter.linkAccount({
+      userId: member.userId,
+      providerId: 'credential',
+      accountId: member.userId,
+      password: await context.password.hash(MANAGER_PASSWORD),
+    });
+    headers.manager = {
+      cookie: await signIn(server, 'manager@example.test', MANAGER_PASSWORD),
+      origin: DASHBOARD_ORIGIN,
+    };
   });
 
   afterAll(async () => {
@@ -81,11 +121,11 @@ describe('the Alertes tab of her sheet (ADR 0150, /v1/creators/:creatorId/alerts
     });
   const quiet = { owner: 'deliver', manager: 'off', chatter_on_shift: 'muted' };
 
-  it('is the owner’s alone: never the operator’s, never hers', async () => {
-    expect((await view('operator', nora)).statusCode).toBe(403);
-    expect((await view('creator', nora)).statusCode).toBe(403);
-    expect((await put('operator', nora, 'sale', quiet)).statusCode).toBe(403);
-    expect((await put('creator', nora, 'sale', quiet)).statusCode).toBe(403);
+  it('is the owner’s alone: never a manager’s, an operator’s, nor hers', async () => {
+    for (const who of ['manager', 'operator', 'creator'] as const) {
+      expect((await view(who, nora)).statusCode).toBe(403);
+      expect((await put(who, nora, 'sale', quiet)).statusCode).toBe(403);
+    }
   });
 
   it('shows the defaults of the code, then the owner’s choice, for her alone', async () => {
@@ -119,7 +159,8 @@ describe('the Alertes tab of her sheet (ADR 0150, /v1/creators/:creatorId/alerts
       .select({ action: schema.auditLog.action })
       .from(schema.auditLog)
       .where(eq(schema.auditLog.entity, 'creator_alert_route'));
-    expect(audits.length).toBe(2);
+    // The same choice sent twice writes one audit line.
+    expect(audits.length).toBe(1);
   });
 
   it('never mutes nor switches off a safety relay, and the base refuses it too', async () => {

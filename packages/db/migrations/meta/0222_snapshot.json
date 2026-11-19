@@ -1,5 +1,5 @@
 {
-  "id": "124861d0-8bdf-46d0-b727-c13a604e7194",
+  "id": "b5e0e7d2-178b-47f5-b65b-a8ed216790b2",
   "prevId": "96c731c9-2d88-460e-b6a0-5928de0b7765",
   "version": "7",
   "dialect": "postgresql",
@@ -123,7 +123,7 @@
           "name": "updated_by",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "updated_at": {
           "name": "updated_at",
@@ -150,7 +150,7 @@
           "tableTo": "user",
           "columnsFrom": ["updated_by"],
           "columnsTo": ["id"],
-          "onDelete": "no action",
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -9227,7 +9227,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert')"
         }
       },
       "isRLSEnabled": false

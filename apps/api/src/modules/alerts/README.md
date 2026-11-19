@@ -21,6 +21,8 @@ Les codes d'erreur sont dans `ALERT_ERROR_CODES`, le sujet Telegram de chaque al
 
 **Pour l'agent.** `store.activeFor(creatorId)` rend ses alertes personnalisées allumées et non archivées ; `store.systemOn(creatorId)` rend ses alertes système actives. Les mots-clés se lisent en code, la phrase par le cerveau, qui rend des identifiants (fiche P4-01). Un déclenchement s'écrit `alert_triggered` quand l'alerte prévient seulement, ou `handoff_requested` avec son `trigger` quand elle met en pause, jamais les deux. Aucun des deux ne porte le texte du fan (ADR 0020).
 
+**Routeur** (`alerts.route`, ADR 0150 lot 2, chaque minute) : `application/route.ts` relit la dernière demi-heure de `domain_events` par le rôle de service (`infra/db/router-reads.ts`), classe chaque événement (`domain/classify.ts`), lit les choix de la créatrice par `creatorAlertLines` et le verrou (`domain/route.ts`), puis appelle `notify` (raison `creator_alert`, clé = l'événement) pour le propriétaire, les managers actifs et les chatteurs en shift sur elle (`scheduling.onShift`). Sourdine = notification sans son (`silent`). Une créatrice archivée ne prévient personne ; une alerte de l'agence (budget IA) prend le mode le plus fort de ses créatrices, jamais les chatteurs. Le message dit son nom et l'alerte, ouvre la conversation, jamais rien du fan. Lu, jamais écrit : `domain_events`, `creators`, `user`, `team_members`, `creator_alert_routes`.
+
 ## Structure
 
 - `domain/` : le port `AlertStore`. Zéro I/O.

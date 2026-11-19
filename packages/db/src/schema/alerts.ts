@@ -146,9 +146,8 @@ export const creatorAlertRoutes = pgTable(
     alertCode: enumText('alert_code').notNull(),
     role: enumText('role').notNull(),
     mode: enumText('mode').notNull(),
-    updatedBy: text('updated_by')
-      .notNull()
-      .references(() => user.id),
+    /** Kept when the account is removed: the choice stays, its author is forgotten (as the neighbouring tables). */
+    updatedBy: text('updated_by').references(() => user.id, { onDelete: 'set null' }),
     updatedAt: updatedAt(),
   },
   (t) => [
