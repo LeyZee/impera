@@ -460,27 +460,34 @@ describe('Créatrices, what a member without the list reads', () => {
 });
 
 describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
-  it('opens her persona in Moi, never Créatrices, and keeps a member’s Moi screens from her', async () => {
+  it('opens her Moi on her profile, her persona one tab away, never in Créatrices, and keeps a member’s Moi screens from her', async () => {
     await serve([ANNA]);
     const router = renderAt(anna, '/moi');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
-    expect(router.state.location.pathname).toBe('/moi/persona');
+    // A short profile first (recette visuelle 16/11, CRE-03): who she is in Impera, and where the rest is.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeDefined();
+    expect(router.state.location.pathname).toBe('/moi/profil');
+    expect(await screen.findByText('Dans Impera')).toBeDefined();
     const moi = screen.getByRole('navigation', { name: 'Moi' });
     expect(
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    cleanup();
+
+    await serve([ANNA]);
+    renderAt(anna, '/moi/persona');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
     // She reads her sheet; the agency changes it (recette CREA-01).
     await screen.findByText(/Ta fiche/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 
-    for (const path of ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/factures']) {
+    for (const path of ['/moi/dossier', '/moi/calendrier', '/moi/factures']) {
       await serve([ANNA]);
       const again = renderAt(anna, path);
       await waitFor(() => {
-        expect(again.state.location.pathname).toBe('/moi/persona');
+        expect(again.state.location.pathname).toBe('/moi/profil');
       });
       cleanup();
     }

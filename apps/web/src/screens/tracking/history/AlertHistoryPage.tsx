@@ -122,7 +122,7 @@ export function AlertHistoryPage({
           text="Ses alertes arrivent ici dès qu’une créatrice t’est confiée."
         />
       ) : (
-        <div className="tr-layout">
+        <div className="tr-layout hi-layout">
           <div className="tr-side">
             <History
               creators={creators}
@@ -280,13 +280,59 @@ function History({
   };
 
   return (
-    <Panel
-      className="tr-panel hi-panel"
-      actions={
-        anyUnseen ? (
+    <Panel className="tr-panel hi-panel">
+      {/* The list's header: its filters on one row, « Tout marquer comme vu » at its end, on the list's own edges
+          (recette visuelle 16/11). */}
+      <div className="hi-head">
+        <div className="hi-filters" role="group" aria-label="Filtres">
           <button
             type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
+            className="nv-chip"
+            aria-pressed={unseen}
+            onClick={() => {
+              onUnseen(!unseen);
+            }}
+          >
+            Non vues
+          </button>
+          <label className="sr-only" htmlFor={`${id}-alert`}>
+            Alerte
+          </label>
+          <Select<string>
+            id={`${id}-alert`}
+            className="hi-select"
+            listWidth="options"
+            value={alert ?? ''}
+            options={[{ value: '', label: 'Toutes les alertes' }, ...choices]}
+            onChange={(value) => {
+              onAlert(choiceOf(value));
+            }}
+          />
+          {several ? (
+            <>
+              <label className="sr-only" htmlFor={`${id}-creator`}>
+                Créatrice
+              </label>
+              <Select<string>
+                id={`${id}-creator`}
+                className="hi-select"
+                listWidth="options"
+                value={creator ?? ''}
+                options={[
+                  { value: '', label: 'Toutes les créatrices' },
+                  ...creators.map((one) => ({ value: one.id, label: one.displayName })),
+                ]}
+                onChange={(value) => {
+                  onCreator(creators.find((one) => one.id === value)?.id ?? null);
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+        {anyUnseen ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm hi-head__all"
             // While another filter is read, the lines shown are the old one's: their newest is no `untilId` for it.
             disabled={markingAll || stale}
             aria-busy={markingAll}
@@ -296,50 +342,6 @@ function History({
           >
             {markingAll ? 'Marquage…' : 'Tout marquer comme vu'}
           </button>
-        ) : undefined
-      }
-    >
-      <div className="hi-filters" role="group" aria-label="Filtres">
-        <button
-          type="button"
-          className="nv-chip"
-          aria-pressed={unseen}
-          onClick={() => {
-            onUnseen(!unseen);
-          }}
-        >
-          Non vues
-        </button>
-        <label className="sr-only" htmlFor={`${id}-alert`}>
-          Alerte
-        </label>
-        <Select<string>
-          id={`${id}-alert`}
-          className="hi-select"
-          value={alert ?? ''}
-          options={[{ value: '', label: 'Toutes les alertes' }, ...choices]}
-          onChange={(value) => {
-            onAlert(choiceOf(value));
-          }}
-        />
-        {several ? (
-          <>
-            <label className="sr-only" htmlFor={`${id}-creator`}>
-              Créatrice
-            </label>
-            <Select<string>
-              id={`${id}-creator`}
-              className="hi-select"
-              value={creator ?? ''}
-              options={[
-                { value: '', label: 'Toutes les créatrices' },
-                ...creators.map((one) => ({ value: one.id, label: one.displayName })),
-              ]}
-              onChange={(value) => {
-                onCreator(creators.find((one) => one.id === value)?.id ?? null);
-              }}
-            />
-          </>
         ) : null}
       </div>
 

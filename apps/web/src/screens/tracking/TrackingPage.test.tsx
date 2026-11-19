@@ -1571,6 +1571,26 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     expect(yours.textContent).toContain('Tu as la main');
   });
 
+  it('says a state all the lines of « À toi » share once, in its title, never on each line (PIL-10)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: {
+          items: [
+            conversation('1', { state: 'human', heldBy: 'other' }),
+            conversation('2', { state: 'human', heldBy: 'other' }),
+          ],
+          nextCursor: null,
+        },
+      },
+    });
+    renderPage('/suivi');
+    const yours = await screen.findByRole('list', { name: 'À toi' });
+    expect(yours.textContent).not.toContain('Un humain répond');
+    const title = yours.closest('section')?.querySelector('.tr-group__title');
+    expect(title?.textContent).toBe('À toi2un humain répond');
+  });
+
   it('shows a chatter another person’s hand without a way to give it back (EQ-13)', async () => {
     serve({
       ...ONE,

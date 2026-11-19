@@ -613,15 +613,20 @@
     flex-direction: row;
     align-items: center;
   }
-  /* A creator's long name gives way before the pseudo: cut with « … », her whole name in its title. */
+  /* A creator's name that does not fit beside the pseudo goes under it, whole: never cut three ways for one name
+     (« Lina Te… », « Maya … », PIL-10). Only a name wider than the whole list is cut, at its end. */
+  .tr-groups .tr-row__name {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
   .tr-groups .tr-row__pseudo {
     flex: 0 0 auto;
     max-width: 100%;
   }
   .tr-groups .tr-row__creator {
     display: block;
-    flex: 0 1 auto;
-    min-width: 3em;
+    flex: 0 0 auto;
+    max-width: 100%;
     line-height: 22px;
     overflow: hidden;
     text-overflow: ellipsis;

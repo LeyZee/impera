@@ -11,6 +11,7 @@ import {
   mergeConversations,
   orderLines,
   parseTrackingSearch,
+  sharedLabel,
   sharedMode,
   situationOf,
   statusClass,
@@ -182,6 +183,15 @@ describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
       ['yours', ['Fan 2', 'Fan 3']],
       ['quiet', ['Fan 1']],
     ]);
+  });
+});
+
+describe('sharedLabel (PIL-10)', () => {
+  it('names the state every line says, from two lines up', () => {
+    expect(sharedLabel(['Un humain répond', 'Un humain répond'])).toBe('Un humain répond');
+    expect(sharedLabel(['Un humain répond', 'À valider'])).toBeNull();
+    expect(sharedLabel(['Un humain répond'])).toBeNull();
+    expect(sharedLabel([])).toBeNull();
   });
 });
 

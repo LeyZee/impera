@@ -211,6 +211,8 @@ type AgentComposeResult = (
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
   readonly customOrderOpened?: true;
+  /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
+  readonly scriptsExhausted?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /**
@@ -375,7 +377,11 @@ function withScripts(
     turn.priceMismatch !== null && settings.systemOn.has('script_price')
       ? [...(result.alerts ?? []), SCRIPT_PRICE]
       : result.alerts;
-  const base = alerts === undefined ? result : { ...result, alerts };
+  const alerted = alerts === undefined ? result : { ...result, alerts };
+  const base =
+    turn.decision.kind === 'none' && turn.decision.reason === 'scripts_exhausted'
+      ? { ...alerted, scriptsExhausted: true as const }
+      : alerted;
   if (result.kind !== 'draft') {
     return turn.followed === null ? base : { ...base, scriptRun: { moved: turn.followed } };
   }
