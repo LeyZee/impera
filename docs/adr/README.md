@@ -152,3 +152,4 @@ Date : AAAA-MM-JJ
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
 | 0145 | Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed à nous, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) |
+| 0146 | Le Dashboard de l'agence se lit par jour, semaine, mois ou période choisie, et se compare à la période qu'on choisit | accepted (précise 0078 § 3 et § 5) |

@@ -1,4 +1,4 @@
-import type { AgencyInsights, AgencyPeriod, AgencySaleKind, DashboardSalesSeller } from '@impera/contracts';
+import type { AgencyInsights, AgencySaleKind, DashboardSalesSeller } from '@impera/contracts';
 
 import { clockOf } from '@/scheduling/time';
 
@@ -20,21 +20,6 @@ export const SERIES = [
   'var(--nv-series-4)',
 ] as const;
 export const OTHER = 'var(--nv-series-other)';
-
-export const PERIOD_OPTIONS: readonly { readonly id: AgencyPeriod; readonly label: string }[] = [
-  { id: 'day', label: 'Aujourd’hui' },
-  { id: 'week', label: '7 jours' },
-  { id: 'month', label: '30 jours' },
-  { id: 'quarter', label: '3 mois' },
-];
-
-/** « par rapport à … »: the period the deltas compare to. */
-export const AGAINST: Readonly<Record<AgencyPeriod, string>> = {
-  day: 'par rapport à hier',
-  week: 'par rapport aux 7 jours d’avant',
-  month: 'par rapport aux 30 jours d’avant',
-  quarter: 'par rapport aux 3 mois d’avant',
-};
 
 /** « 1 846 € », « 10,50 € » from cents: the cents only when there are some (ADR 0011: exact money). */
 export function euros(cents: number): string {
