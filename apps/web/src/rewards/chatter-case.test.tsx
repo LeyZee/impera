@@ -53,4 +53,15 @@ describe('chatterCase', () => {
   it('marks as seen the server’s own kinds, the unseen fortnights of a medal', () => {
     expect(shown.toStoredKinds(['tier:50000', 'streak_5'])).toEqual(['tier:2026-11-01:50000', 'streak_5']);
   });
+
+  it('says the PPV trophy is counted on the sales read, never on a report (ADR 0118)', () => {
+    const ppv = shown.entry({
+      kind: 'ten_ppv_shift',
+      family: 'trophy',
+      earnedAt: null,
+      progress: null,
+      revealedAt: null,
+    });
+    expect(ppv?.how).toContain('comptés sur les ventes lues, pas sur les rapports');
+  });
 });

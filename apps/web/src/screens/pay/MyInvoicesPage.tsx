@@ -1,4 +1,5 @@
 import type { InvoiceListItem, TeamMemberId } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import { useState, type JSX, type ReactNode } from 'react';
 
 import { CommissionsNav } from './CommissionsNav';
@@ -13,7 +14,8 @@ import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
 import '@/screens/team/team.css';
-import { Page, PageHeader, Panel } from '@/shell/layout';
+import { useMembers } from '@/screens/team/api';
+import { Page, PageHeader, Panel, type PageWidth } from '@/shell/layout';
 
 /** What the reader opened on a document: his answer, or its detail. */
 type Opened =
@@ -27,12 +29,16 @@ type Opened =
  */
 export function MyInvoicesPage({
   eyebrow = 'Commissions',
-  actions = <CommissionsNav />,
+  tabs = <CommissionsNav />,
+  width = 'wide',
   memberId,
 }: {
   /** Commissions for a chatter; Moi for a manager, whose commissions are there (ADR 0024). */
   eyebrow?: string;
-  actions?: ReactNode;
+  /** The section's tabs, in the header's row of tabs. */
+  tabs?: ReactNode;
+  /** The section's column: Commissions' wide one, or Moi's narrow one (COH-02). */
+  width?: PageWidth;
   /**
    * A manager's own member: an active manager reads every document of the agency, so his own list asks for his alone.
    * A chatter reads only his, without it.
@@ -43,15 +49,23 @@ export function MyInvoicesPage({
   const down = useAgencySettingsDown();
   const timeZone = useSchedulingSettings().data?.timeZone ?? null;
   const years = useInvoiceYears(memberId === undefined ? {} : { memberId }, today);
+  // The day he joined: no year before it to look in (CHA-18). A member reads his own row alone; a manager is named.
+  const members = useMembers().data;
+  const mine =
+    memberId === undefined
+      ? members?.length === 1
+        ? members[0]
+        : undefined
+      : members?.find((member) => member.id === memberId);
   const [opened, setOpened] = useState<Opened | null>(null);
 
   return (
-    <Page>
+    <Page width={width}>
       <PageHeader
         eyebrow={eyebrow}
         title="Factures"
-        lead="Les factures que l’agence émet en ton nom, et les avoirs qui les corrigent. Tu acceptes ou contestes chacune avant la fin de son délai."
-        actions={actions}
+        lead="Factures et avoirs émis en ton nom : accepte ou conteste chacun avant son délai."
+        tabs={tabs}
       />
       <div className="py-board">
         <Panel className="nv-enter">
@@ -66,7 +80,17 @@ export function MyInvoicesPage({
               what="la liste de tes factures"
               hint="Ta première facture s’émet quand ton premier relevé est validé, une fois ton dossier complet."
               first="Aucune facture sur les dix dernières années : la première s’émet quand ton premier relevé est validé, une fois ton dossier complet."
-              older="Le serveur ne répond pas : les factures plus anciennes n’ont pas pu être lues."
+              older="Les factures plus anciennes n’ont pas pu être lues : réessaie dans un instant."
+              since={mine?.joinedOn ?? null}
+              none={{
+                whisper: 'Pas encore de facture.',
+                text: 'Elle arrive avec ton premier relevé validé, une fois ton dossier rempli.',
+                action: (
+                  <Link to="/moi/dossier" className="nv-btn nv-btn--soft">
+                    Ouvrir mon dossier
+                  </Link>
+                ),
+              }}
               row={(item) => (
                 <InvoiceRow
                   item={item}

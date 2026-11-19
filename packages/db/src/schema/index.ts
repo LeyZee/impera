@@ -19,6 +19,7 @@ export * from './rewards';
 export * from './playground';
 export * from './sales-feed';
 export * from './scheduling';
+export * from './redirect-links';
 export * from './scripts';
 export * from './supervision';
 export * from './system';

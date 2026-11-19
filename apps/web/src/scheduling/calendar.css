@@ -167,7 +167,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-3) var(--nv-space-5);
+  padding: var(--nv-space-3) var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
 }
 .cal-legend__members {
@@ -379,9 +379,6 @@
 }
 .cal-detail__title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 650;
 }
 .cal-detail__title::first-letter {
   text-transform: uppercase;
@@ -416,6 +413,11 @@
 }
 .cal-detail__range {
   color: var(--nv-ink-muted);
+}
+/* « suspendu », « sans accès »: the week's amber signal, on those words alone (Design, 16/11). */
+.cal-detail__unheld {
+  color: var(--nv-warning);
+  font-weight: 650;
 }
 .cal-mine {
   margin: 0;
@@ -469,13 +471,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-space-4) var(--nv-plate-pad);
 }
 .cal-agency__title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 650;
 }
 .cal-agency__empty {
   margin: 0;
@@ -635,5 +634,5 @@
 }
 
 .cal-month__top {
-  padding: var(--nv-space-3) var(--nv-space-5) 0;
+  padding: var(--nv-space-3) var(--nv-plate-pad) 0;
 }

@@ -11,6 +11,7 @@ import {
   VAT_NUMBER_PATTERN,
   addressLines,
   legalFormWords,
+  legalNameReadsRight,
   rcsWords,
   type BillingRegime,
   type ContractAcceptance,
@@ -224,8 +225,22 @@ export interface FileToDo {
   readonly key: string;
   readonly title: string;
   readonly text: string;
-  readonly go: 'text' | 'document';
+  readonly go: 'text' | 'document' | 'profile';
 }
+
+/**
+ * An empty file, said first and whatever the regime (none may be assigned yet): no invoice leaves in one's name
+ * without it, as Moi › Dossier says (recette visuelle 16/11, CHA-09). `null` once the file is filled.
+ */
+export const profileToDo = (file: Pick<ContractorFile, 'profile'>): FileToDo | null =>
+  file.profile === null
+    ? {
+        key: 'profile',
+        title: 'Remplis ton dossier',
+        text: 'Sans lui, pas de facture à ton nom.',
+        go: 'profile',
+      }
+    : null;
 
 /**
  * Everything one's own file waits on, in the file's order: the newest version of each text not accepted yet, then each
@@ -390,6 +405,11 @@ export function profileProblems(
       : 'Ton nom et ton prénom, tels que sur ta pièce d’identité.',
   );
   check(
+    'legalName',
+    legalNameReadsRight(draft.legalName),
+    'Sans emoji ni pictogramme : ce nom s’imprime sur tes factures.',
+  );
+  check(
     'address',
     filled(draft.address, POSTAL_ADDRESS_MAX),
     'Ton adresse complète, sur une ou plusieurs lignes.',
@@ -398,6 +418,11 @@ export function profileProblems(
     'taxId',
     draft.taxId.trim().length <= TAX_ID_MAX && (!taxIdRequired || draft.taxId.trim() !== ''),
     'Ton identifiant fiscal, celui que les impôts de ton pays t’ont donné.',
+  );
+  check(
+    'businessId',
+    digits(draft.businessId) !== '',
+    'Indique ton SIREN (9 chiffres) ou ton SIRET (14 chiffres).',
   );
   check(
     'businessId',
@@ -473,6 +498,14 @@ const PREFIX = new RegExp(INVOICE_PREFIX_PATTERN, 'u');
 export function prefixOf(text: string): string | null {
   const prefix = text.trim().toUpperCase();
   return PREFIX.test(prefix) ? prefix : null;
+}
+
+/**
+ * The first number a prefix opens this year, as an invoice prints it (« INES-2026-0001 »): the hint beside the field
+ * follows what is typed, and shows the example's (NORA) while the field holds no prefix yet.
+ */
+export function firstNumberOf(prefix: string | null, now: Date = new Date()): string {
+  return `${prefix ?? 'NORA'}-${String(now.getFullYear())}-0001`;
 }
 
 /**

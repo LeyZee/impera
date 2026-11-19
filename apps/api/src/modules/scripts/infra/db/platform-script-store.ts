@@ -10,6 +10,7 @@ import {
   ScriptIdentityAuthorSchema,
   ScriptIdentityContentSchema,
   ScriptIdentityIdSchema,
+  type CreatorId,
   type PlatformScript,
 } from '@impera/contracts';
 import {
@@ -62,6 +63,8 @@ async function writeSteps(
       text: step.text,
       priceMinor: step.priceMinor,
       currency: step.currency,
+      discountPriceMinor: step.discount?.priceMinor ?? null,
+      discountMinutes: step.discount?.minutes ?? null,
     })),
   );
   const media = script.steps.flatMap((step) => [
@@ -137,6 +140,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
             moment: script.moment,
             fingerprint: platformScriptFingerprint(script),
             syncedAt: now,
+            versionAt: now,
           });
           await writeSteps(tx, id, account.creatorId, script);
         }
@@ -151,6 +155,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
               active: true,
               deactivatedAt: null,
               syncedAt: now,
+              versionAt: now,
             })
             .where(and(eq(scripts.id, id), eq(scripts.platformAccountId, account.id)));
           // Its media go with its steps (on delete cascade).
@@ -285,6 +290,10 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
         text: step.text,
         priceMinor: step.priceMinor,
         currency: CurrencySchema.parse(step.currency),
+        discount:
+          step.discountPriceMinor === null && step.discountMinutes === null
+            ? null
+            : { priceMinor: step.discountPriceMinor, minutes: step.discountMinutes },
         media: mediaOf(step, 'sold'),
         previewMedia: mediaOf(step, 'preview'),
       })),
@@ -313,30 +322,74 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
  * The agency's reads of her native scripts: under her RLS and the team's scopes (the owner, an active manager of her
  * list, `onCreatorList`, as her vault is read); her own account is closed by the base. Anyone else gets the same `null`
  * for a creator who exists and one who does not, never her existence. Her vault links are read in the same
- * transaction, never by the service role. `oneForJob` alone is the service role's, for a job.
+ * transaction, never by the service role. `oneForJob` and `ofAccountForJob` alone are the service role's, for a job.
  */
+/**
+ * `run` as a person of the agency reads her native scripts: in his transaction, under her RLS and his scope. The owner
+ * reads every creator of hers; an active manager only those of his list, as her vault (fiche vault-sync). `creators` is
+ * out of RLS: a creator who does not exist answers like one he may not read (`null`).
+ */
+function asTeam<T>(
+  db: Database,
+  creatorId: CreatorId,
+  userId: string,
+  run: (tx: Transaction) => Promise<T>,
+): Promise<T | null> {
+  return withTenantMember(db, creatorId, userId, async (tx, scope) => {
+    if (scope !== 'owner' && scope !== 'agency') return null;
+    if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId))) return null;
+    const readable = await tx
+      .select({ id: schema.creators.id })
+      .from(schema.creators)
+      .where(eq(schema.creators.id, creatorId));
+    if (readable.length === 0) return null;
+    return run(tx);
+  });
+}
+
+const DiscountedRowSchema = z.object({
+  id: PlatformScriptIdSchema,
+  name: z.string(),
+  steps: z.number().int().positive(),
+  since: z.date(),
+});
+
 export function createDrizzlePlatformScriptReadStore(
   db: Database,
   adminDb: Database,
 ): PlatformScriptReadStore {
   return {
     ofCreator: (creatorId, userId) =>
-      withTenantMember(db, creatorId, userId, async (tx, scope) => {
-        if (scope !== 'owner' && scope !== 'agency') return null;
-        // The owner reads every creator of hers; an active manager only those of his list, as her vault (fiche
-        // vault-sync). `creators` is out of RLS: a creator who does not exist answers like one he may not read.
-        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId))) return null;
-        const readable = await tx
-          .select({ id: schema.creators.id })
-          .from(schema.creators)
-          .where(eq(schema.creators.id, creatorId));
-        if (readable.length === 0) return null;
+      asTeam(db, creatorId, userId, async (tx) => {
         const rows = await tx
           .select()
           .from(scripts)
           .where(eq(scripts.creatorId, creatorId))
           .orderBy(scripts.platformAccountId, scripts.name, scripts.id);
         return storedOf(tx, rows);
+      }),
+
+    discountedOf: (creatorId, userId) =>
+      asTeam(db, creatorId, userId, async (tx) => {
+        const rows = await tx
+          .select({
+            id: scripts.id,
+            name: scripts.name,
+            since: scripts.versionAt,
+            steps: sql<number>`count(*)::int`,
+          })
+          .from(scripts)
+          .innerJoin(steps, eq(steps.platformScriptId, scripts.id))
+          .where(
+            and(
+              eq(scripts.creatorId, creatorId),
+              eq(scripts.active, true),
+              sql`(${steps.discountPriceMinor} is not null or ${steps.discountMinutes} is not null)`,
+            ),
+          )
+          .groupBy(scripts.id)
+          .orderBy(scripts.versionAt, scripts.id);
+        return rows.map((row) => DiscountedRowSchema.parse(row));
       }),
 
     oneForJob: (creatorId, scriptId) =>
@@ -347,6 +400,16 @@ export function createDrizzlePlatformScriptReadStore(
           .where(and(eq(scripts.id, scriptId), eq(scripts.creatorId, creatorId)));
         const [stored] = await storedOf(tx, rows);
         return stored ?? null;
+      }),
+
+    ofAccountForJob: (creatorId, platformAccountId) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select()
+          .from(scripts)
+          .where(and(eq(scripts.creatorId, creatorId), eq(scripts.platformAccountId, platformAccountId)))
+          .orderBy(scripts.name, scripts.id);
+        return storedOf(tx, rows);
       }),
   };
 }

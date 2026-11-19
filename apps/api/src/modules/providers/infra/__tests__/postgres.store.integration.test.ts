@@ -23,6 +23,8 @@ const elevenlabs: NewCredential = {
   state: 'connected',
   verifiedAt: new Date('2026-10-17T19:00:00Z'),
   charactersLeft: 100_000,
+  quota: null,
+  probe: null,
   lastErrorKind: null,
   revision: 0,
 };
@@ -53,6 +55,22 @@ describe('Postgres credential store (ADR 0016)', () => {
     const [row] = await withAdmin(test.admin.db, (tx) => tx.select().from(schema.providerCredentials));
     expect(row?.keyCiphertext.includes(FAKE_KEY)).toBe(false);
     expect(row?.keyVersion).toBe('v1');
+
+    // ElevenLabs' month and the last « Essai réel » (ADR 0091 § 7) round-trip.
+    const current = await store.find('elevenlabs');
+    if (current === null) throw new Error('saved line missing');
+    const probed = {
+      ...current,
+      quota: { limit: 10_000, resetsAt: new Date('2026-12-01T00:00:00Z'), plan: 'free' as const },
+      probe: {
+        at: new Date('2026-11-16T13:40:00Z'),
+        outcome: 'no_credit' as const,
+        latencyMs: 310,
+        model: 'Flash v2.5',
+      },
+    };
+    expect(await store.update(probed)).toBe(true);
+    expect(await store.find('elevenlabs')).toMatchObject({ quota: probed.quota, probe: probed.probe });
 
     await store.remove('elevenlabs');
     expect(await store.find('elevenlabs')).toBeNull();

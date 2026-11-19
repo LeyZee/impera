@@ -26,6 +26,7 @@ const verified: VerifiedKey = {
   settings: {},
   voices: [],
   charactersLeft: null,
+  quota: null,
   isLowCredit: false,
 };
 

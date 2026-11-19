@@ -83,6 +83,7 @@ import { wirePayroll } from './wiring/payroll';
 import { wirePersona } from './wiring/persona';
 import { wirePlayground } from './wiring/playground';
 import { wireProviders } from './wiring/providers';
+import { wireRedirectLinks } from './wiring/redirect-links';
 import { wireRewards } from './wiring/rewards';
 import { wireScheduling } from './wiring/scheduling';
 import { wireScripts } from './wiring/scripts';
@@ -315,7 +316,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });
-  const providers = await wireProviders(shared);
+  // « Essai réel » (ADR 0091 § 7) reaches the gateway built below, on these keys, only when the owner clicks.
+  const providers = await wireProviders(shared, (provider) => llm.gateway.testConnection(provider));
   const alerts = wireAlerts(shared);
   const media = await wireMedia(shared);
   const llmCalls = createDrizzleLlmCallStore(adminDb.db);
@@ -339,8 +341,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
+  const redirectLinks = wireRedirectLinks(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
+    channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
     channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
   });
   const team = wireTeam(shared, {
@@ -424,6 +428,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     fans: fans.module,
     alerts: alerts.module,
     scheduling: scheduling.module,
+    scripts: scripts.module,
+    connectors: connectors.module,
     ...(options.composer !== undefined && { composer: options.composer }),
   });
   const conversations = wireConversations(shared, {
@@ -446,7 +452,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const backups = wireBackups(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
-  const aiUsage = wireAiUsage(shared, llm);
+  // ElevenLabs bills characters, not money: its month comes from its own check (ADR 0091 § 7).
+  const aiUsage = wireAiUsage(shared, llm, () => providers.module.voiceQuota());
   const trends = wireTrends(shared, {
     gateway: options.trendVision ?? llm.gateway,
     persona: persona.module,
@@ -583,17 +590,23 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         conversations: conversations.module,
       }),
       ...alerts.routes,
-      fans.routes(agent.kycSlotsOf, {
-        holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
-        traceOpening: (creatorId, fanId, trace) =>
-          conversations.module.traceFanOpening(creatorId, fanId, trace),
-        messageTexts: (creatorId, fanId, messageIds) =>
-          conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
-      }),
+      fans.routes(
+        agent.kycSlotsOf,
+        {
+          holds: (creatorId, fanId, userId) => conversations.module.isFanHeldBy(creatorId, fanId, userId),
+          traceOpening: (creatorId, fanId, trace) =>
+            conversations.module.traceFanOpening(creatorId, fanId, trace),
+          messageTexts: (creatorId, fanId, messageIds) =>
+            conversations.module.fanMessageTexts(creatorId, fanId, messageIds),
+        },
+        // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
+        async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+      ),
       ...team.routes,
       ...scheduling.routes,
       ...scripts.routes,
       ...trends.routes,
+      ...redirectLinks.routes,
       ...creatorTasks.routes,
       ...contentDrops.routes,
       ...contractors.routes,

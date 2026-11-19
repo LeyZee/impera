@@ -106,6 +106,13 @@
 [data-theme='light'] .rw-level__glow {
   opacity: 0.1;
 }
+/* The reveal's stage stays dark in both themes: its fire keeps the night's glow. */
+[data-theme='light'] .rw-reveal .rw-level__ember {
+  opacity: 0.6;
+}
+[data-theme='light'] .rw-reveal .rw-level__glow {
+  opacity: 0.34;
+}
 .rw-mid {
   fill: none;
   stroke: var(--rw-mid);
@@ -442,7 +449,7 @@
 .rw-challenge__body {
   display: grid;
   gap: 6px;
-  padding: 0 24px 24px;
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
 }
 .rw-challenge__title {
   margin: 0;
@@ -487,7 +494,7 @@
   display: flex;
   align-items: center;
   gap: var(--nv-space-4);
-  padding: 0 24px 24px;
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
 }
 .rw-rank__body > svg {
   flex: none;
@@ -573,48 +580,99 @@
 
 /* ───────────── Jeu, sur la fiche d'un membre (ADR 0104 § 20) ───────────── */
 
-.rw-member__facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--nv-space-3);
-  margin: var(--nv-space-3) 0;
-}
-.rw-member__facts dt {
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.rw-member__facts dd {
-  margin: 2px 0 0;
-  font-weight: 600;
-  color: var(--nv-ink);
-}
+/* The member's game on their file: the rank first and large, two figures side by side, the trophies last. */
 .rw-member__rank {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--nv-space-3);
+  margin: var(--nv-space-3) 0;
 }
-.rw-member__trophies {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nv-space-2) var(--nv-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--nv-text-callout);
-  color: var(--nv-ink);
-}
-.rw-member__trophies li {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
+.rw-member__eyebrow,
+.rw-member__facts dt,
 .rw-member__label {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+.rw-member__name {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-size: var(--nv-text-title-1);
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-member__name[data-none='true'] {
+  font-family: inherit;
+  font-size: var(--nv-text-body);
+  font-weight: 400;
+  line-height: inherit;
+  color: var(--nv-ink-muted);
+}
+.rw-member__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+  margin: 0 0 var(--nv-space-4);
+}
+.rw-member__facts > div {
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+.rw-member__facts dd {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+.rw-member__figure {
+  font-size: var(--nv-text-title-2);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-member__figure[data-zero='true'] {
+  font-weight: 400;
+  color: var(--nv-ink-muted);
+}
+.rw-member__unit {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-member__best {
+  display: block;
+}
+.rw-member__label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--nv-space-2);
+}
+.rw-member__trophies {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--nv-space-3) var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink);
+}
+.rw-member__trophies li {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .rw-member__trophies {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .rw-member__none {
   margin: 0;
+}
+.rw-member__foot {
+  margin: var(--nv-space-4) 0 0;
 }
 
 /* A creator's streak medal (ADR 0107 § 1): her days engraved in Arabic numerals, heavier than a trophy's digits. */

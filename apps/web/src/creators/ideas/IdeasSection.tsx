@@ -35,6 +35,7 @@ import { ReelBrief } from '@/screens/agenda/ReelBrief';
 import { CATEGORY_EMOJIS } from '@/screens/content/model';
 import { Select } from '@/shell/Select';
 import '@/creators/agenda/agency-agenda.css';
+import { Failure } from '@/shell/states';
 
 /**
  * The morning job that writes her ideas (VEI-03) is not coded yet: the empty day says so, never a promise of 7 a.m.
@@ -66,20 +67,7 @@ export function IdeasSection({
 
   const list = (): JSX.Element => {
     if (query.data === undefined) {
-      if (query.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="ps-title">Ses idées ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+      if (query.isError) return <Failure onRetry={() => void query.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const items = query.data.items;
@@ -395,7 +383,7 @@ function IdeaCard({
         </form>
       ) : (
         <>
-          <h3 className="iv-title" id={`${id}-title`}>
+          <h3 className="nv-h3 iv-title" id={`${id}-title`}>
             {idea.title}
           </h3>
           <section className="iv-shoot" aria-label="À tourner">

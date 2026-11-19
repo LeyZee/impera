@@ -20,6 +20,7 @@ import '@/creators/persona/persona.css';
 import './my-persona.css';
 import { MeNav } from '@/screens/me/MeNav';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 const languageLabel = (value: string): string =>
   PERSONA_OPTIONS.languages.find((option) => option.value === value)?.label ?? value;
@@ -71,7 +72,7 @@ function Panel({
   });
   return (
     <section className="nv-plate mp-block" aria-label={title}>
-      <h2 className="mp-block__title">{title}</h2>
+      <h2 className="nv-h2 mp-block__title">{title}</h2>
       {written.length === 0 ? (
         <p className="ps-muted">Rien d’écrit pour l’instant.</p>
       ) : (
@@ -106,15 +107,7 @@ function Sheet({ sheet, correcting }: { sheet: PersonaSheet; correcting: Correct
 }
 
 function Failed({ retry }: { retry: () => void }): JSX.Element {
-  return (
-    <div className="nv-plate mp-block">
-      <p className="mp-block__title">Ta fiche ne se charge pas</p>
-      <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-      <button type="button" className="nv-btn nv-btn--soft ps-self-start" onClick={retry}>
-        Réessayer
-      </button>
-    </div>
-  );
+  return <Failure onRetry={retry} />;
 }
 
 const Loading = (): JSX.Element => (
@@ -156,14 +149,12 @@ export function MyPersonaPage(): JSX.Element {
   const own = creators.data?.[0];
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Persona"
-        lead={
-          'Ta fiche, panneau par panneau\u00a0: qui tu es, ta vie, tes goûts, ta façon de parler, tes relations, l’intime et tes zones interdites. Quelque chose ne te ressemble pas\u00a0? Propose une correction sous le panneau concerné, l’agence met ta fiche à jour.'
-        }
-        actions={<MeNav creator />}
+        lead={'Ta fiche, panneau par panneau. Une erreur\u00a0? Propose une correction sous le panneau.'}
+        tabs={<MeNav creator />}
       />
       <div className="ps-sheet">
         <section className="ps-page">

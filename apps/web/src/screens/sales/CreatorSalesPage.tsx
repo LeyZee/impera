@@ -10,8 +10,8 @@ import './sales.css';
 import { initialOf } from '@/lib/utils';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
  * Ventes, the creator's (CR-02 c3, ADR 0042 § 8): her fans, what each unlocked and when he was last seen; a fan
@@ -28,9 +28,11 @@ export function CreatorSalesPage({
   onSelect: (conversationId: string | null) => void;
 }): JSX.Element {
   const fans = useCreatorFans();
-  // The same read as the panel's (one cache): when both fail, the page says it once (recette CRE-31).
+  // The same read as the panel's (one cache). Either read failing is the server silent: the page says it once, on
+  // top, and the panel and the list say nothing of their own (recette CRE-31, ETA-05).
   const insights = useCreatorFanInsights();
-  const silent = fans.isError && fans.data === undefined && insights.isError && insights.data === undefined;
+  const silent =
+    (fans.isError && fans.data === undefined) || (insights.isError && insights.data === undefined);
   const now = useNow();
   const zone = readerZone();
   const list = fans.data?.pages.flatMap((page) => page.items) ?? [];
@@ -43,8 +45,7 @@ export function CreatorSalesPage({
         lead="Tes fans et ce qu’ils ont débloqué. Leur conversation s’ouvre ici, en lecture seule."
       />
       {silent ? (
-        <ServerSilent
-          text="Tes fans et leurs chiffres n’ont pas pu être lus. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void fans.refetch();
             void insights.refetch();
@@ -55,30 +56,17 @@ export function CreatorSalesPage({
       {silent ? null : (
         <div className="vt-cols">
           <div className="vt-list">
-            {fans.isError && fans.data === undefined ? (
-              <ServerSilent
-                text="Tes fans n’ont pas pu être lus. Rien ici n’est à jour en attendant."
-                onRetry={() => {
-                  void fans.refetch();
-                }}
-              />
-            ) : fans.data === undefined ? (
-              <Panel>
-                <PanelSection>
-                  <div className="vt-skeleton" aria-busy="true" aria-label="Chargement de tes fans">
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                </PanelSection>
-              </Panel>
+            {fans.data === undefined ? (
+              <Skeleton label="Chargement de tes fans…">
+                <SkeletonCard lines={5} />
+              </Skeleton>
             ) : (
               <Panel className="nv-enter" title="Tes fans">
                 <PanelSection>
                   {list.length === 0 ? (
-                    <p className="vt-empty">
-                      Aucun fan pour l’instant : ils arrivent ici dès leur premier message.
-                    </p>
+                    <Empty title="Aucun fan pour l’instant.">
+                      Ils arrivent ici dès leur premier message.
+                    </Empty>
                   ) : (
                     <>
                       <p className="vt-note">
@@ -114,9 +102,7 @@ export function CreatorSalesPage({
           </div>
           <div className="vt-side">
             {selected === null ? (
-              <div className="nv-plate vt-hint">
-                <p>Choisis un fan pour lire sa conversation.</p>
-              </div>
+              <Empty plate title="Choisis un fan pour lire sa conversation." />
             ) : (
               <CreatorReader
                 key={selected}

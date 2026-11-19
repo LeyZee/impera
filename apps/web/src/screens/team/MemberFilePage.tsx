@@ -25,7 +25,7 @@ export function MemberFilePage({ user, memberId }: { user: Me; memberId: string 
         eyebrow="Équipe"
         title={member === null ? 'Dossier' : `Dossier de ${member.displayName}`}
         lead="Ce que ses factures impriment, et ce qui les laisse partir : son identité vérifiée, son régime, son mandat, ses pièces."
-        actions={<TeamNav inMember />}
+        tabs={<TeamNav inMember />}
       />
       <div className="py-board">
         <Link

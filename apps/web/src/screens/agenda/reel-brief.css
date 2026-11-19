@@ -15,11 +15,11 @@
 .ag-reel__chip {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
+  min-height: var(--nv-pill-info);
   padding: 0 10px;
   border-radius: var(--nv-radius-full);
   background: color-mix(in srgb, var(--nv-ink) 7%, transparent);
-  font-size: var(--nv-text-footnote);
+  font-size: var(--nv-text-caption);
   font-weight: 600;
   color: var(--nv-ink);
 }

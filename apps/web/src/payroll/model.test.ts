@@ -41,6 +41,7 @@ import {
   flowOf,
   gaugePercent,
   goalSpanBps,
+  growthWords,
   heroPeriodOf,
   lateWords,
   mainLine,
@@ -1470,6 +1471,14 @@ describe('Commissions, as the member reads them', () => {
       /^Calculé à 10 h 07 sur tes rapports validés et tes ventes lues\./u,
     );
     expect(notes([])[0]).toMatch(/sur tes rapports validés\./u);
+  });
+
+  it('says a commission grows sale after sale on the sales read, report after report on reports (CHT-14)', () => {
+    const onNet = line({ base: 'platform_net' });
+    expect(growthWords([onNet])).toBe('vente après vente');
+    expect(growthWords([line()])).toBe('rapport après rapport');
+    expect(growthWords([line(), onNet])).toBe('vente après vente et rapport après rapport');
+    expect(growthWords([])).toBeNull();
   });
 
   it('says the payout delay the owner announced, never one of its own (PAIE-32)', () => {

@@ -1,5 +1,5 @@
 import type { Me } from '@impera/contracts';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
@@ -13,6 +13,7 @@ import { linkPageOf } from './auth/api';
 import { forgetChosenPassword } from './auth/chosen-password';
 import { readSession, SessionServerError, signOut } from './auth/session';
 import { watchSessionEnd } from './auth/session-end';
+import { createQueryClient } from './lib/query-client';
 import { forgetDevice } from './pwa/device';
 import { keepSession, keptSession } from './pwa/keptSession';
 import { listenForNotificationOpens } from './pwa/notificationOpen';
@@ -233,7 +234,7 @@ export function App(): JSX.Element {
 /** The dashboard itself: one router per signed-in user, so a new session starts on a clean state. */
 function SignedIn({ user, onSignOut }: RouterContext): JSX.Element {
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(createQueryClient);
   // A touched notification opens its page here, without a reload (public/sw.js).
   useEffect(
     () =>

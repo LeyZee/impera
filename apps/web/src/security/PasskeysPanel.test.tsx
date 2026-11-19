@@ -267,8 +267,9 @@ describe('Clés d’accès in Sécurité (ADR 0053 § 5)', () => {
     expect(
       await screen.findByText('Noé : 2 clés d’accès retirées. Ses sessions restent ouvertes.'),
     ).toBeTruthy();
+    // No key left: nothing said, the exception alone is (recette visuelle 16/11, GES-11).
     await waitFor(() => {
-      expect(team?.textContent).toContain('Aucune clé d’accès');
+      expect(team?.textContent).not.toContain('clé');
     });
   });
 });

@@ -141,7 +141,7 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
   const order: readonly Exclude<Browser, 'other'>[] =
     browser === 'edge' ? ['edge', 'chrome'] : ['chrome', 'edge'];
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow={<OffRailBack />}
         title="Installer l’extension"

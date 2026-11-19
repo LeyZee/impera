@@ -15,17 +15,18 @@ import { Page, Panel, PanelSection, PageHeader } from '@/shell/layout';
  */
 export function MySecurityPage({ user }: { user: Me }): JSX.Element {
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Sécurité"
         lead={
           user.role === 'creator'
             ? 'Les appareils où ton compte est ouvert, et tes codes de secours.'
-            : // The Telegram chat shows only when the agency's bot exists: the lead does not promise it (Design).
-              'Les appareils où ton compte est ouvert, tes codes de secours et l’extension.'
+            : // How one signs in, first: the cards below then read as its parts (CHA-14); then the extension, linked
+              // here by the whole team (recette 16/11, EXT-02).
+              'Tu te connectes avec ton mot de passe et le code de ton application ; une clé d’accès les remplace d’un geste. Ton extension se relie ici.'
         }
-        actions={
+        tabs={
           <MeNav
             manager={user.teamScope === 'agency'}
             creator={user.role === 'creator'}
