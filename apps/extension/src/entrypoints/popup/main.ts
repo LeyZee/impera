@@ -368,6 +368,7 @@ function linkTo(next: string, from: 'page' | 'typed'): void {
     saved: activeOrigin,
     save: saveOrigin,
     forget: () => ask({ type: 'popup/unlink' }),
+    builtIn: BUILT_IN_CRM,
   });
   show({ kind: 'loading' });
   void linked.then((result) => {

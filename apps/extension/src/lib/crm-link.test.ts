@@ -28,6 +28,7 @@ function deps(over: Partial<LinkDeps> = {}): LinkDeps {
     saved: vi.fn(() => Promise.resolve(null)),
     save: vi.fn(() => Promise.resolve()),
     forget: vi.fn(() => Promise.resolve()),
+    builtIn: null,
     ...over,
   };
 }
@@ -94,5 +95,39 @@ describe('linkCrm', () => {
     const same = deps({ saved: vi.fn(() => Promise.resolve('https://crm.exemple.fr')) });
     await linkCrm('https://crm.exemple.fr', same);
     expect(same.forget).not.toHaveBeenCalled();
+  });
+
+  it('gives back the site it leaves, unless the manifest grants it', async () => {
+    const typed = deps({ saved: vi.fn(() => Promise.resolve('https://ancien.exemple.fr')) });
+    await linkCrm('https://autre.exemple.fr', typed);
+    expect(typed.remove).toHaveBeenCalledWith({ origins: ['https://ancien.exemple.fr/*'] });
+    expect(typed.remove).not.toHaveBeenCalledWith({ origins: ['https://autre.exemple.fr/*'] });
+
+    const back = deps({
+      saved: vi.fn(() => Promise.resolve('https://autre.exemple.fr')),
+      builtIn: 'https://crm.exemple.fr',
+    });
+    await linkCrm('https://crm.exemple.fr', back);
+    expect(back.remove).toHaveBeenCalledWith({ origins: ['https://autre.exemple.fr/*'] });
+
+    const fromBuiltIn = deps({
+      saved: vi.fn(() => Promise.resolve('https://crm.exemple.fr')),
+      builtIn: 'https://crm.exemple.fr',
+    });
+    await linkCrm('https://autre.exemple.fr', fromBuiltIn);
+    expect(fromBuiltIn.remove).not.toHaveBeenCalled();
+
+    const fromLocal = deps({ saved: vi.fn(() => Promise.resolve('http://localhost:5173')) });
+    await linkCrm('https://autre.exemple.fr', fromLocal);
+    expect(fromLocal.remove).not.toHaveBeenCalled();
+  });
+
+  it('keeps the old site when the new one fails', async () => {
+    const d = deps({
+      saved: vi.fn(() => Promise.resolve('https://ancien.exemple.fr')),
+      readSession: vi.fn(() => Promise.resolve<CrmSession>({ kind: 'signed_out' })),
+    });
+    await linkCrm('https://autre.exemple.fr', d);
+    expect(d.remove).not.toHaveBeenCalledWith({ origins: ['https://ancien.exemple.fr/*'] });
   });
 });

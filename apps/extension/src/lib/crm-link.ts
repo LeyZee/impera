@@ -4,7 +4,8 @@ import type { CrmSession } from './session';
 /**
  * Linking the extension to a CRM (ADR 0067, amendement du 19/11 § 5): the browser is asked for that site alone, then
  * the CRM must answer `/v1/me` with an open session. Only then is the address saved; else nothing is, and the site is
- * given back if it was not already allowed. A new address forgets what the old one held (avis Sécurité du 19/11).
+ * given back if it was not already allowed. A new address forgets what the old one held, and gives back the old site
+ * (avis Sécurité du 19/11).
  * The session check does not tell a CRM from a site that imitates one: it only keeps the extension off a CRM where the
  * person is not signed in. What protects is elsewhere: the host shown in full, the first link only, the link code.
  */
@@ -28,6 +29,8 @@ export interface LinkDeps {
   readonly save: (origin: string) => Promise<void>;
   /** Forgets the link code and what the syncs left, tied to the old address. */
   readonly forget: () => Promise<unknown>;
+  /** The address a hosted build was made for: its leave comes with the manifest and is never given back. */
+  readonly builtIn: string | null;
 }
 
 /** Call it synchronously from the click: it asks the browser before its first `await`. */
@@ -46,7 +49,13 @@ export function linkCrm(next: string, deps: LinkDeps): Promise<Linked> {
       return { state: 'failed', failure: signedOut ? 'signed_out' : 'not_crm' };
     }
     const saved = await deps.saved();
-    if (saved !== null && saved !== next) await deps.forget();
+    if (saved !== null && saved !== next) {
+      await deps.forget();
+      // The site left behind is given back too, unless the manifest grants it (avis Sécurité du 19/11 sur #870).
+      if (!isGrantedAtInstall(saved) && saved !== deps.builtIn) {
+        await deps.remove({ origins: [permissionPatternOf(saved)] }).catch(() => false);
+      }
+    }
     await deps.save(next);
     return { state: 'linked' };
   })();
