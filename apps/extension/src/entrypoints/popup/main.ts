@@ -13,7 +13,7 @@ import {
 } from '../../lib/crm-address';
 import { linkCrm, type LinkFailure } from '../../lib/crm-link';
 import { GUIDE_PATH, linkOfferOf, type LinkOffer } from '../../lib/crm-link-page';
-import { ADDRESS_KEY, savedOrigin } from '../../lib/crm-origin-store';
+import { activeOrigin, ADDRESS_KEY, BUILT_IN_CRM, saveOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { placeOf } from '../../lib/tab';
 import {
@@ -58,6 +58,8 @@ let origin = DEFAULT_CRM_ADDRESS;
 let welcome = false;
 /** What the open tab offers at a first opening, read once (ADR 0067, amendement du 19/11); « Pas maintenant » drops it. */
 let offer: LinkOffer | null = null;
+/** The address « Relier à B » would link to, while the question of a hosted build is open (ADR 0067, § 5). */
+let leaving: string | null = null;
 let screen: Screen = { kind: 'loading' };
 let previous: Screen = screen;
 
@@ -73,6 +75,7 @@ function show(next: Screen): void {
       version: browser.runtime.getManifest().version,
       hour: new Date().getHours(),
       dev: import.meta.env.DEV,
+      builtIn: BUILT_IN_CRM,
     },
     actions,
   );
@@ -360,8 +363,8 @@ function linkTo(next: string, from: 'page' | 'typed'): void {
     request: (pattern) => browser.permissions.request(pattern),
     remove: (pattern) => browser.permissions.remove(pattern),
     readSession: (at) => readCrmSession(at),
-    saved: savedOrigin,
-    save: (at) => browser.storage.local.set({ [ADDRESS_KEY]: at }),
+    saved: activeOrigin,
+    save: saveOrigin,
     forget: () => ask({ type: 'popup/unlink' }),
   });
   show({ kind: 'loading' });
@@ -398,7 +401,33 @@ function saveAddress(value: string): void {
     });
     return;
   }
+  // Leaving the CRM a hosted build was made for is asked first, with both addresses (ADR 0067, second amendement, § 5).
+  if (BUILT_IN_CRM !== null && next !== BUILT_IN_CRM && next !== origin) {
+    leaving = next;
+    show({ kind: 'change-crm', from: shortAddress(BUILT_IN_CRM), to: shortAddress(next) });
+    return;
+  }
   linkTo(next, 'typed');
+}
+
+/**
+ * « Revenir à l'adresse d'origine »: the link with the other CRM is forgotten and the browser's leave on its site given
+ * back, then the built-in address is in force again (§ 5).
+ */
+function revertCrm(): void {
+  if (BUILT_IN_CRM === null) return;
+  const builtIn = BUILT_IN_CRM;
+  const left = origin;
+  show({ kind: 'loading' });
+  void (async () => {
+    await ask({ type: 'popup/unlink' });
+    if (!isGrantedAtInstall(left)) {
+      await browser.permissions.remove({ origins: [permissionPatternOf(left)] }).catch(() => false);
+    }
+    await saveOrigin(builtIn).catch(() => undefined);
+    origin = builtIn;
+    await refresh();
+  })();
 }
 
 /** Back to the developer's address, offered in a development build only: this computer, saved as before. */
@@ -469,6 +498,16 @@ const actions: Actions = {
   cancelAddress: () => {
     show(previous);
   },
+  keepCrm: () => {
+    leaving = null;
+    void refresh();
+  },
+  changeCrm: () => {
+    // Inside the click: the browser's question about the other site must come from it.
+    if (leaving !== null) linkTo(leaving, 'typed');
+    leaving = null;
+  },
+  revertCrm,
   watch: {
     link: (code) => {
       watchDraft = code;
@@ -551,9 +590,10 @@ setInterval(() => {
 // The popup's port to the service worker: closing the popup closes it, and a session read and not sent is forgotten.
 browser.runtime.connect({ name: 'popup' });
 
-void Promise.all([savedOrigin(), activeTab()]).then(([saved, tab]) => {
-  welcome = saved === null;
-  origin = saved ?? DEFAULT_CRM_ADDRESS;
+void Promise.all([activeOrigin(), activeTab()]).then(([active, tab]) => {
+  // A hosted build is in force from the install: no welcome, no page to link from (ADR 0067, second amendement).
+  welcome = active === null;
+  origin = active ?? DEFAULT_CRM_ADDRESS;
   tabId = tab.id;
   // Only the tab's own address, and only while nothing is saved: a linked extension ignores the page (§ 4).
   offer = welcome ? linkOfferOf(tab.url) : null;

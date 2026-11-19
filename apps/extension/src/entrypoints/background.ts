@@ -9,7 +9,7 @@ import { browser, type Browser } from 'wxt/browser';
 import { z } from 'zod';
 
 import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
-import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
+import { storedOrigin } from '../lib/crm-origin-store';
 import { fetchSyncableAccounts, sendSession } from '../lib/reveal/api';
 import { REVEAL_API_PATTERN } from '../lib/reveal/capture';
 import {
@@ -68,7 +68,6 @@ const MODELS_KEY = 'revealModels';
 const ModelsSchema = z.record(z.string(), z.string());
 /** The popup's port: when it closes, a session it held is forgotten. */
 const POPUP_PORT = 'popup';
-const ADDRESS_KEY = 'crmOrigin';
 const FLUSH_ALARM = 'watch-flush';
 const MENU_PARENT = 'watch-mark';
 const MENU_PREFIX = 'watch-mark:';
@@ -100,11 +99,8 @@ export default defineBackground(() => {
   }
   const readState = (): Promise<WatchState> => withState((state) => [state, state]);
 
-  async function crmOrigin(): Promise<string> {
-    const stored: Record<string, unknown> = await browser.storage.local.get(ADDRESS_KEY).catch(() => ({}));
-    const value = stored[ADDRESS_KEY];
-    return typeof value === 'string' ? (crmOriginOf(value) ?? DEFAULT_CRM_ADDRESS) : DEFAULT_CRM_ADDRESS;
-  }
+  // The popup's address, or the built-in one of a hosted build (ADR 0067, second amendement), or this computer's.
+  const crmOrigin = storedOrigin;
 
   /* ---- The reader in a tab ---- */
 

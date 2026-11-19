@@ -657,6 +657,21 @@ body {
   opacity: 1;
   transform: none;
 }
+.pp-foot__where {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px var(--nv-space-2);
+  min-width: 0;
+}
+/* Another CRM than the built-in one (ADR 0067, second amendement): a warning, so amber, and the way back beside it. */
+.pp-address--changed,
+.pp-address--changed:hover {
+  color: var(--nv-warning);
+}
+.pp-revert {
+  font-size: var(--nv-text-caption);
+}
 .pp-version {
   font-variant-numeric: tabular-nums;
 }

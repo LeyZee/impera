@@ -43,6 +43,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('browserOf', () => {
@@ -127,5 +128,19 @@ describe('ExtensionPage', () => {
     expect(links[0]?.getAttribute('href')).toBe('/extension/lier');
     expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
     expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+  });
+
+  // ADR 0067, second amendement: the extension this CRM built knows its address, so there is nothing to link.
+  it('drops the link step when the served extension was built for this CRM', async () => {
+    vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', window.location.origin);
+    await renderAs(CHROME);
+    expect(screen.queryByRole('link', { name: 'Relier l’extension à ce CRM' })).toBeNull();
+    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+  });
+
+  it('keeps the link step when the extension was built for another address', async () => {
+    vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', 'https://autre.exemple.fr');
+    await renderAs(CHROME);
+    expect(screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' })).toHaveLength(2);
   });
 });

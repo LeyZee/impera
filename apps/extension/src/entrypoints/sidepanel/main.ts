@@ -17,8 +17,8 @@ import { newestOf } from '../../lib/copilot/card';
 import { openConversationOf } from '../../lib/copilot/open-conversation';
 import { standingOf, withheldOf, type Standing } from '../../lib/copilot/standing';
 import { VerdictSentSchema, type FromPanel } from '../../lib/copilot/verdict';
-import { changedOrigin } from '../../lib/crm-address';
-import { ADDRESS_KEY, storedOrigin } from '../../lib/crm-origin-store';
+import { changedOrigin, DEFAULT_CRM_ADDRESS } from '../../lib/crm-address';
+import { ADDRESS_KEY, BUILT_IN_CRM, storedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { kindOf } from '../../lib/who';
 
@@ -378,7 +378,7 @@ async function start(): Promise<void> {
   });
   // The popup saves another address: the panel follows it at once, from a clean slate (EXT-24).
   browser.storage.onChanged.addListener((changes, area) => {
-    const next = changedOrigin(changes, area, ADDRESS_KEY);
+    const next = changedOrigin(changes, area, ADDRESS_KEY, BUILT_IN_CRM ?? DEFAULT_CRM_ADDRESS);
     if (next === null || next === origin) return;
     origin = next;
     conversationId = null;

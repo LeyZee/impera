@@ -4,7 +4,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
-import { browserOf, EXTENSION_ZIP, type Browser } from './extension';
+import { browserOf, EXTENSION_ZIP, extensionKnowsThisCrm, type Browser } from './extension';
 
 interface Steps {
   readonly title: string;
@@ -187,7 +187,8 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                   {STEPS[key].steps.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
-                  <LinkStep />
+                  {/* A hosted build is linked from the install: no step that would lead nowhere (ADR 0067). */}
+                  {extensionKnowsThisCrm() ? null : <LinkStep />}
                   <li>{LAST_STEP}</li>
                 </ol>
               </PanelSection>
