@@ -2,7 +2,7 @@
 
 Statut : accepted (Charles, 03/11/2026, 17 h 49, « ok 0067 » ; § 2 précisé : « ok phrases 0067 », 17 h 50 ; captures : « ok captures guide », 17 h 50 ; demande de Charles du 03/11/2026, 17 h 40 : « un guide dans le CRM […] pour installer l'extension […] pour l'équipe, les chatters, etc., et les managers. Et puis leur expliquer à quoi ça sert »)
 Date : 2026-11-03
-Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 accepté (Charles, 19/11/2026, 19 h 50, « Valider » sur la carte du fil Extension, après les OK de Design et de Sécurité sur d2394025) : l'extension se relie au CRM depuis le CRM.
+Précise : l'ADR 0066 (popup) et l'ADR 0027 (déploiement). Ne remplace rien. Amendement du 19/11/2026 accepté (Charles, 19/11/2026, 19 h 50, « Valider » sur la carte du fil Extension, après les OK de Design et de Sécurité sur d2394025) : l'extension se relie au CRM depuis le CRM. Second amendement du 19/11/2026 proposé : la version hébergée connaît l'adresse du CRM.
 
 ## Contexte
 
@@ -45,6 +45,22 @@ Côté serveur : rien, la page `/extension/lier` est un écran du CRM, ouvert à
 Conséquences : un chatteur n'a plus rien à taper. Il se connecte au CRM, ouvre « Extension » dans le menu de son compte, clique « Relier l'extension à ce CRM », puis l'icône de l'extension, puis « Relier », puis accepte la question du navigateur : cinq gestes. Le code de liaison (« Relier l'extension » de Moi › Sécurité, ADR 0066 § 7) ne change pas dans cet amendement, et c'est lui qui porte la sûreté : tant qu'il n'a pas réussi, l'extension n'envoie à l'adresse reliée ni session Reveal, ni capture, ni relevé, ni verdict. Relier une adresse ne donne donc rien de tout cela à un site par lui-même.
 
 Risque résiduel, accepté : un faux site en `https://` qu'un chatteur ouvrirait avant de relier son extension. Aucun contrôle de l'extension ne le distingue, puisque son fichier ne contient aucune adresse (§ 4). Les défenses sont l'hôte affiché en entier, le premier lien seulement, et le code de liaison ci-dessus.
+
+## Second amendement du 19/11/2026 : la version hébergée connaît l'adresse du CRM (proposé)
+
+Demande de Charles du 19/11 : « une fois que ça soit hébergé, ça demande plus l'adresse ». Il a choisi « Les deux » (fil Extension, 19/11, 20 h 39) : l'adresse intégrée pour la version hébergée, et « Relier l'extension à ce CRM » pour son PC et pour un changement d'adresse.
+
+Le § 4 change sur un point : le fichier peut porter **une** donnée, l'adresse publique du CRM qui le sert. Il ne porte toujours ni jeton, ni nom, ni rien d'autre, et reste le même pour toute l'équipe de ce CRM.
+
+1. **L'adresse vient du build.** L'image du CRM fabrique l'extension (§ 1) avec l'adresse officielle du CRM dans une variable de build. Le build la vérifie et échoue sinon : `https://` seulement, un nom de domaine en ASCII, le port par défaut, sans chemin ni identifiants. Une adresse en `http://`, une IP ou `localhost` ne passent pas : un build de développement n'en porte pas.
+2. **Le droit sur ce site est donné à l'installation.** L'adresse entre dans les `host_permissions` du manifeste, pour ce site seul. Le navigateur n'a donc aucune question à poser, et le chatteur aucun geste à faire.
+3. **Pas d'écran d'accueil.** Avec une adresse intégrée, le popup s'ouvre directement sur le CRM, comme si elle avait été enregistrée. Une page `/extension/lier` ne propose rien (premier amendement, § 4).
+4. **L'ordre des adresses** : une adresse enregistrée dans le popup (par « Relier » ou par le bouton d'adresse du pied) passe avant l'adresse intégrée, qui passe avant l'écran d'accueil. Ainsi, si le CRM change d'adresse, le propriétaire relie l'extension à la nouvelle sans attendre une nouvelle version, avec les mêmes contrôles (premier amendement, §§ 3 à 5).
+5. **Sans adresse intégrée** (le PC de Charles, le développement), rien ne change : écran d'accueil, puis « Relier l'extension à ce CRM » ou la saisie.
+
+Côté serveur : rien. Bilan relit la ligne du `Dockerfile` qui passe l'adresse au build (ops).
+
+Conséquences : un chatteur installe l'extension téléchargée depuis le CRM, s'y connecte, et n'a plus rien à faire. Un changement d'adresse du CRM demande une nouvelle image, donc une nouvelle version de l'extension ; en attendant, le bouton du pied sert de secours. Le code de liaison (ADR 0066 § 7) ne change pas et porte toujours la sûreté des envois.
 
 ## Alternatives écartées
 
