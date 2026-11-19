@@ -22,7 +22,8 @@ type Child = HTMLElement | null;
 
 export interface CardHead {
   readonly id: string;
-  readonly icon: IconName;
+  /** A glyph of the set, or a drawn mark that fills the tile (Reveal's eyes). */
+  readonly icon: IconName | SVGSVGElement;
   readonly title: string;
   /** A pill or a button, on the right of the title. */
   readonly aside?: HTMLElement | null;
@@ -43,7 +44,9 @@ export function card(head: CardHead, ...body: readonly (Child | readonly Child[]
     h(
       'header',
       { class: 'pp-card__head' },
-      h('span', { class: 'pp-card__icon', 'aria-hidden': 'true' }, icon(head.icon, 18)),
+      typeof head.icon === 'string'
+        ? h('span', { class: 'pp-card__icon', 'aria-hidden': 'true' }, icon(head.icon, 18))
+        : h('span', { class: 'pp-card__icon pp-card__icon--mark', 'aria-hidden': 'true' }, head.icon),
       h('h2', { class: 'pp-card__title', id: `${head.id}-title` }, head.title),
       head.aside ?? null,
     ),

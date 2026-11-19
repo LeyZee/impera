@@ -28,8 +28,7 @@ const LABELS: Readonly<Record<Kind, string>> = {
 
 /**
  * Who takes part in the Instagram watch from the extension: the owner alone (ADR 0024, amendement du 16/11, point 2).
- * A creator watches from her PWA; a manager or a chatter keeps the copilot and never sees the watch, and the server
- * refuses them a watch link anyway.
+ * A creator watches from her PWA; a manager or a chatter keeps the copilot and is never shown the watch.
  */
 export const watchesInstagram = (kind: Kind): boolean => kind === 'owner';
 

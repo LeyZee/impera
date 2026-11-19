@@ -9,6 +9,7 @@ import {
   DEFAULT_CRM_ADDRESS,
   isGrantedAtInstall,
   permissionPatternOf,
+  shortAddress,
 } from '../../lib/crm-address';
 import { ADDRESS_KEY, savedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
@@ -24,12 +25,11 @@ import {
   WatchStatusSchema,
   type FromPopup,
   type MarkableCreators,
-  type RevealSynced,
 } from '../../lib/watch/protocol';
 import { INSTAGRAM_PATTERN } from '../../lib/watch/watch-script';
 import { awayOf, kindOf, watchesInstagram } from '../../lib/who';
 
-import type { Confirm, CopilotView, LinkState, SyncView } from './reveal-view';
+import type { Confirm, CopilotView, LinkState, SyncOutcome, SyncView } from './reveal-view';
 import { accountPathOf, render, type Actions, type Screen } from './view';
 import type { WatchNotice, WatchView } from './watch-view';
 
@@ -165,7 +165,7 @@ async function copilotViewFor(): Promise<CopilotView> {
 
 /* ---- The owner's « Sync » of the Reveal session (P2-01): the service worker reads, holds, sends, forgets it. ---- */
 
-let syncNotice: WatchNotice | null = null;
+let syncOutcome: SyncOutcome | null = null;
 let syncPending: SyncView['pending'] = null;
 let syncConfirm: Confirm | null = null;
 /** The service worker forgets a session read after a minute: the confirmation goes with it. */
@@ -176,10 +176,11 @@ async function syncViewFor(): Promise<SyncView> {
   const parsed = RevealAccountsSchema.safeParse(await ask({ type: 'popup/reveal-accounts' }));
   return {
     accounts: parsed.success ? parsed.data : { state: 'unreachable', accounts: [] },
-    notice: syncNotice,
+    outcome: syncOutcome,
     pending: syncPending,
     confirm: syncConfirm,
     now: new Date(),
+    crm: shortAddress(origin),
   };
 }
 
@@ -196,7 +197,16 @@ async function redrawReveal(): Promise<void> {
 function drawSync(): void {
   const now = currentScreen();
   if (now.kind === 'signed_in' && now.sync !== null)
-    show({ ...now, sync: { ...now.sync, notice: syncNotice, pending: syncPending, confirm: syncConfirm } });
+    show({
+      ...now,
+      sync: {
+        ...now.sync,
+        outcome: syncOutcome,
+        pending: syncPending,
+        confirm: syncConfirm,
+        now: new Date(),
+      },
+    });
 }
 
 function endConfirm(): void {
@@ -204,23 +214,10 @@ function endConfirm(): void {
   syncConfirm = null;
 }
 
-const SYNC_NOTICES: Readonly<Record<Exclude<RevealSynced['state'], 'synced'> | 'no-session', string>> = {
-  'no-session': 'Aucune session lue : ouvre la messagerie de Reveal dans cet onglet, puis réessaie.',
-  expired: 'La session lue a été oubliée au bout d’une minute : synchronise à nouveau.',
-  unlinked: 'Relie d’abord l’extension avec le code de Sécurité.',
-  revoked: 'Cette liaison a été retirée dans le CRM : colle un nouveau code.',
-  'not-owner': 'Seul le propriétaire synchronise une session.',
-  'other-model': 'Cet onglet montre une autre créatrice que ce compte : ouvre la bonne dans Reveal.',
-  'other-member':
-    'Cet onglet est connecté avec un autre membre Reveal que le membre «\u00a0bot\u00a0» de ce compte : connecte-toi avec le membre «\u00a0bot\u00a0».',
-  refused: 'Le CRM a refusé cette session : vérifie que l’onglet est bien connecté à Reveal.',
-  unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
-};
-
 /** Reads the session of the open tab for this account; the service worker holds it until the owner says. */
 async function readSession(accountId: PlatformAccountId): Promise<void> {
   endConfirm();
-  syncNotice = null;
+  syncOutcome = null;
   syncPending = { accountId, phase: 'reading' };
   drawSync();
   const read =
@@ -228,13 +225,14 @@ async function readSession(accountId: PlatformAccountId): Promise<void> {
       ? null
       : (RevealReadSchema.safeParse(await ask({ type: 'popup/reveal-read', tabId, accountId })).data ?? null);
   syncPending = null;
-  if (read === null) syncNotice = { tone: 'amber', text: SYNC_NOTICES.unreachable };
-  else if (read.state !== 'held') syncNotice = { tone: 'amber', text: SYNC_NOTICES[read.state] };
+  // No answer here is the extension's own worker, never the CRM: reading the tab asks nothing of it.
+  if (read === null) syncOutcome = { kind: 'failed', accountId, failure: 'extension' };
+  else if (read.state !== 'held') syncOutcome = { kind: 'failed', accountId, failure: read.state };
   else {
     syncConfirm = { accountId, modelId: read.modelId, seen: read.seen };
     confirmTimer = setTimeout(() => {
       endConfirm();
-      syncNotice = { tone: 'amber', text: SYNC_NOTICES.expired };
+      syncOutcome = { kind: 'failed', accountId, failure: 'expired' };
       drawSync();
     }, CONFIRM_MS);
   }
@@ -244,18 +242,24 @@ async function readSession(accountId: PlatformAccountId): Promise<void> {
 async function sendSession(): Promise<void> {
   const confirm = syncConfirm;
   if (confirm === null) return;
+  const { accountId } = confirm;
   endConfirm();
-  syncPending = { accountId: confirm.accountId, phase: 'sending' };
+  syncPending = { accountId, phase: 'sending' };
   drawSync();
-  const synced = RevealSyncedSchema.safeParse(
-    await ask({ type: 'popup/reveal-send', accountId: confirm.accountId }),
-  );
+  const synced = RevealSyncedSchema.safeParse(await ask({ type: 'popup/reveal-send', accountId }));
   syncPending = null;
-  syncNotice = !synced.success
-    ? { tone: 'amber', text: SYNC_NOTICES.unreachable }
+  // The worker answers « unreachable » itself when the CRM is silent; no answer at all is the worker's.
+  syncOutcome = !synced.success
+    ? { kind: 'failed', accountId, failure: 'extension' }
     : synced.data.state === 'synced'
-      ? { tone: 'quiet', text: 'Session envoyée au CRM.' }
-      : { tone: 'amber', text: SYNC_NOTICES[synced.data.state] };
+      ? {
+          kind: 'synced',
+          accountId,
+          expiresAt: synced.data.expiresAt,
+          reconnectFirst: synced.data.reconnectFirst,
+          kept: synced.data.kept,
+        }
+      : { kind: 'failed', accountId, failure: synced.data.state };
   await redrawReveal();
 }
 
