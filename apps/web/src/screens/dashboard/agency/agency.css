@@ -148,12 +148,6 @@
 .ins-spark--down {
   --_c: var(--nv-trend-down);
 }
-.ins-spark--agency {
-  --_c: var(--nv-money-agency);
-}
-.ins-spark--creator {
-  --_c: var(--nv-money-creator);
-}
 .ins-spark__line {
   fill: none;
   stroke: var(--_c);

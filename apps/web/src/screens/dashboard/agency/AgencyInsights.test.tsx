@@ -611,16 +611,12 @@ describe('the days read and their comparison (ADR 0146)', () => {
     expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
   });
 
-  it('draws a small curve under the net and each part, in the trend’s and the money’s colours, hidden from readers', async () => {
+  it('draws one small curve, under the net, in the trend’s colour, hidden from readers (Charles 19/11)', async () => {
     serve(200, AGENCY_WEEK);
     show();
     await screen.findByRole('heading', { name: /D’où vient l’argent/u });
     const sparks = [...document.querySelectorAll('.ins-spark')];
-    expect(sparks.map((one) => one.getAttribute('class'))).toEqual([
-      'ins-spark ins-spark--up',
-      'ins-spark ins-spark--agency',
-      'ins-spark ins-spark--creator',
-    ]);
+    expect(sparks.map((one) => one.getAttribute('class'))).toEqual(['ins-spark ins-spark--up']);
     for (const one of sparks) expect(one.getAttribute('aria-hidden')).toBe('true');
   });
 

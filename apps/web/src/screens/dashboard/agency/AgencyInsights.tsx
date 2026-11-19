@@ -313,17 +313,11 @@ export function sparkValues(
 }
 
 /**
- * The small curve at a tile's foot (lot couleurs, 17/11): 1.5px, no axis, no point, a fill of 12 % at most, in the
- * tile's colour (the trend's for the net, the money's for a part). Decorative: the tile's figure and its « n % » say it,
+ * The small curve at the net's foot (lot couleurs, 17/11; under the net only, Charles 19/11: the parts drew the same
+ * shape again): 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour. Decorative: the tile's figure and its « n % » say it,
  * so it is hidden from assistive technologies.
  */
-function Spark({
-  values,
-  tone,
-}: {
-  values: readonly number[];
-  tone: Trend | 'agency' | 'creator';
-}): JSX.Element {
+function Spark({ values, tone }: { values: readonly number[]; tone: Trend }): JSX.Element {
   const fill = useId();
   const frame = { width: 200, height: 32, padTop: 3, padBottom: 2 };
   const low = Math.min(0, ...values);
@@ -365,7 +359,7 @@ interface Tile {
   /** A money tile explains itself on hover, focus or a tap (ADR 0106 § 12). */
   readonly tip?: ReturnType<typeof moneyTip>;
   /** Its small curve, day by day, and its colour. */
-  readonly spark?: { readonly values: readonly number[]; readonly tone: Trend | 'agency' | 'creator' };
+  readonly spark?: { readonly values: readonly number[]; readonly tone: Trend };
 }
 
 function Tiles({
@@ -535,7 +529,7 @@ function Figures({
   const [read, setRead] = useState<CurvePoint | null>(null);
   const sparkOf = (
     pick: (day: AgencyInsights['days'][number]) => number,
-    tone: Trend | 'agency' | 'creator',
+    tone: Trend,
   ): Pick<Tile, 'spark'> => {
     const values = sparkValues(insights, pick);
     return values === null ? {} : { spark: { values, tone } };
@@ -581,7 +575,6 @@ function Figures({
       note: ofNet('agency'),
       delta: [current.agencyMinor, previous.agencyMinor],
       part: 'agency',
-      ...sparkOf((day) => day.agencyMinor, 'agency'),
       tip: tipOf(
         'Part de l’agence',
         current.agencyMinor,
@@ -596,7 +589,6 @@ function Figures({
       note: ofNet('creator'),
       delta: [current.creatorMinor, previous.creatorMinor],
       part: 'creator',
-      ...sparkOf((day) => day.creatorMinor, 'creator'),
       tip: tipOf(
         creatorLabel,
         current.creatorMinor,
