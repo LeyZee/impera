@@ -395,6 +395,13 @@ export function RailNav({
         >
           <NavIcon name="more" />
           <span className="nv-rail__label">Plus</span>
+          {/* What waits under « Plus » (Paie's statements): a dot on its corner, the words for a screen reader. The
+              figures themselves are in the sheet (ADR 0134 § 8). */}
+          <span className="nv-rail__under">
+            {more.map((item) => (
+              <RailCount key={item.to} section={item.to} />
+            ))}
+          </span>
         </button>
       )}
       {children}

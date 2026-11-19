@@ -791,6 +791,8 @@ const meIndex = createRoute({
  * A creator's Moi holds her profile, her persona and her security (ADR 0042 § 8, CRE-03): a team member's screens (his
  * file, his invoices, his calendar of shifts) send her to her profile, as her persona sends anyone else to his.
  */
+/** Said once to who opens the old address of Moi › Calendrier: where the link went. */
+const CALENDAR_MOVED = 'Ton lien de calendrier est ici maintenant : « Dans mon téléphone ».';
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
@@ -873,7 +875,14 @@ const meInvoices = createRoute({
 const meCalendar = createRoute({
   getParentRoute: () => me,
   path: '/calendrier',
-  beforeLoad: creatorAway,
+  // A chatter's link now lives on Planning, « Dans mon téléphone » (ADR 0134, lot 1): the old address opens it there.
+  beforeLoad: (options) => {
+    creatorAway(options);
+    if (canOpen(railOf(options.context.user), '/planning')) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/planning', replace: true, state: { notice: CALENDAR_MOVED } });
+    }
+  },
   component: function MyCalendarLink() {
     const { user } = rootRoute.useRouteContext();
     return <MyCalendarLinkPage user={user} />;

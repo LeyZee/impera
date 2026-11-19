@@ -1969,3 +1969,25 @@ label.nv-notif__row {
     max-width: 260px;
   }
 }
+
+/* « Plus » on the phone: a dot on its corner while a tab it holds has something waiting; the figure is in the sheet. */
+/* Out of the button's flow: the icon and its word stay where they are on every other tab. */
+.nv-rail__under {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nv-rail__under .nv-count {
+  display: none;
+}
+.nv-rail__under:has(.nv-count)::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 8px);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink-muted);
+  box-shadow: 0 0 0 2px var(--nv-surface-raised);
+}
