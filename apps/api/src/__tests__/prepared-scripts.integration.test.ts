@@ -345,6 +345,43 @@ describe('the scripts in preparation', () => {
     expect(codeOf(back.body)).toBe('prepared_script_closed_conflict');
   });
 
+  it('gives a job each native script with the script of ours it copies, or none (ADR 0161 § 5)', async () => {
+    const native = async (name: string) => {
+      const id = newId(z.uuid());
+      await test.admin.db.insert(schema.platformScripts).values({
+        id,
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        platformScriptRef: `sequence_${id}`,
+        name,
+        fingerprint: `empreinte-${id}`,
+        syncedAt: new Date(),
+        versionAt: new Date(),
+      });
+      return id;
+    };
+    const ours = newId(PreparedScriptIdSchema);
+    await call('owner', 'POST', base(nora), { id: ours, platformAccountId: noraAccount, content: CONTENT });
+    const copy = await native('Soirée inventée');
+    // A native script of an earlier tool, never prepared here: it carries none.
+    const foreign = await native('Ancien script inventé');
+    await test.admin.db
+      .update(schema.preparedScripts)
+      .set({ state: 'matched', matchedPlatformScriptId: copy, matchedAt: new Date() })
+      .where(eq(schema.preparedScripts.id, ours));
+    const scripts = await app.modules.scripts.forJobs.accountScripts(nora, noraAccount);
+    expect(scripts.find((each) => each.id === copy)?.ours).toEqual({
+      preparedScriptId: ours,
+      description: 'Un soir de pluie inventé.',
+      moment: 'night',
+      steps: [
+        { branches: [{ priceMinor: 0, currency: 'EUR' }] },
+        { branches: [{ priceMinor: 1500, currency: 'EUR' }] },
+      ],
+    });
+    expect(scripts.find((each) => each.id === foreign)?.ours).toBeNull();
+  });
+
   it('is read by the owner and the managers of her list only; anyone else is refused', async () => {
     const listed = await call('manager', 'GET', base(nora));
     expect(listed.statusCode).toBe(200);
