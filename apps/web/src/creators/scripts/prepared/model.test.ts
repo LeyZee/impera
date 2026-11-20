@@ -5,6 +5,7 @@ import {
   conditionLabel,
   differenceText,
   gapText,
+  momentLabel,
   parsePrice,
   priceLabel,
   scriptPaths,
@@ -25,6 +26,14 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
     expect(priceLabel(0)).toBe('Offert');
     expect(priceLabel(1200)).toBe('12 €');
     expect(priceLabel(1250)).toBe('12,50 €');
+  });
+
+  it('says when a script is played, the day, the night or both', () => {
+    expect([momentLabel('day'), momentLabel('night'), momentLabel('both')]).toEqual([
+      'Jour',
+      'Nuit',
+      'Jour et nuit',
+    ]);
   });
 
   it('names each path after the branches it takes that are not defaults, defaults first', () => {

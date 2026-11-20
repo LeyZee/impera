@@ -1365,6 +1365,11 @@ body {
 .se-moment__opt[aria-checked='true'] svg {
   color: var(--nv-sale);
 }
+/* Jour et nuit : le soleil et la lune côte à côte, serrés. */
+.se-moment__both {
+  display: inline-flex;
+  gap: 1px;
+}
 
 /* Barre du script : titre + Construire | Performances */
 .se-edbar {
