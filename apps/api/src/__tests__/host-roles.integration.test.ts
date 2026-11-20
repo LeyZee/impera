@@ -56,6 +56,29 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     expect(opened.rows[0]?.count).toBe(0);
   });
 
+  it('gives each function of ours exactly the callers it serves, so a wider grant turns this red', async () => {
+    const callers = await root.query<{ name: string; roles: string[] }>(
+      `select p.proname as name,
+              array(select r from unnest(array['nirvana_app', 'impera_service', 'anon']) r
+                     where has_function_privilege(r, p.oid, 'EXECUTE') order by r) as roles
+         from pg_proc p
+        where p.pronamespace = 'public'::regnamespace
+          and not exists (select 1 from pg_depend d
+                           where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
+        order by p.proname`,
+    );
+    // A new function goes here with the roles its migration grants it to.
+    expect(Object.fromEntries(callers.rows.map((row) => [row.name, row.roles]))).toEqual({
+      calendar_agent: ['nirvana_app'],
+      calendar_reader_scope: [],
+      calendar_shifts: ['nirvana_app'],
+      enqueue_job: ['impera_service', 'nirvana_app'],
+      follow_own_time_zone: ['nirvana_app'],
+      // A trigger's function: PUBLIC could call it before 0231, so our two roles still can.
+      reward_gains_taken_back_stays: ['impera_service', 'nirvana_app'],
+    });
+  });
+
   it('names an object not created by the owner role', async () => {
     await root.query('create table public.made_by_hand (id int)');
     try {
