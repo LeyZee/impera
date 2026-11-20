@@ -7,20 +7,22 @@ ALTER TABLE "shifts" ADD COLUMN "checked_in_at" timestamp with time zone;--> sta
 -- `check_in_own_shift` and nothing else; the owner and a manager never date a check-in for a member.
 --
 -- A check-in belongs to the member and the hours it was made for. A shift that changes member (a swap, a move by the
--- owner) or start loses it: the database clears it, whatever wrote the change, so no path can forget it.
+-- owner) or start loses it, and a shift is always written without one (the table grant of INSERT covers the column):
+-- the database clears it, whatever wrote the row, so no path can plan a shift already taken.
 CREATE FUNCTION public.shifts_clear_check_in()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
 AS $$
 BEGIN
-  IF NEW."member_id" IS DISTINCT FROM OLD."member_id" OR NEW."starts_at" IS DISTINCT FROM OLD."starts_at" THEN
+  IF TG_OP = 'INSERT' OR NEW."member_id" IS DISTINCT FROM OLD."member_id"
+    OR NEW."starts_at" IS DISTINCT FROM OLD."starts_at" THEN
     NEW."checked_in_at" := NULL;
   END IF;
   RETURN NEW;
 END;
 $$;--> statement-breakpoint
-CREATE TRIGGER "shifts_clear_check_in" BEFORE UPDATE OF "member_id", "starts_at" ON public."shifts"
+CREATE TRIGGER "shifts_clear_check_in" BEFORE INSERT OR UPDATE OF "member_id", "starts_at" ON public."shifts"
   FOR EACH ROW EXECUTE FUNCTION public.shifts_clear_check_in();--> statement-breakpoint
 REVOKE ALL ON FUNCTION public.shifts_clear_check_in() FROM PUBLIC;--> statement-breakpoint
 -- SECURITY DEFINER, run as the owner of the tables (the migration role, BYPASSRLS, ADR 0005), like the zone's (0217)

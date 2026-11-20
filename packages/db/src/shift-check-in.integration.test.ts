@@ -276,6 +276,29 @@ describe('a member takes his own shift, in its window (0231)', () => {
       ).toMatch(/permission denied/);
     }
     expect((await shiftOf(shift)).checkedInAt).toBeNull();
+    // Nor by planning a shift already taken: the insert grant covers the column, the database clears it.
+    const { memberId } = await hire();
+    const planned = newId(ShiftIdSchema);
+    const accountId = newId(PlatformAccountIdSchema);
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .insert(s.platformAccounts)
+        .values({ id: accountId, creatorId: nora.creatorId, platform: 'reveal', handle: 'handle-taken' }),
+    );
+    await withTenantMember(test.app.db, nora.creatorId, owner, (tx) =>
+      tx.insert(s.shifts).values({
+        id: planned,
+        creatorId: nora.creatorId,
+        platformAccountId: accountId,
+        memberId,
+        startsAt: inMinutes(5),
+        endsAt: inMinutes(65),
+        checkedInAt: new Date(),
+        createdBy: owner,
+        updatedBy: owner,
+      }),
+    );
+    expect((await shiftOf(planned)).checkedInAt).toBeNull();
   });
 
   it('is a door of the application role alone: neither PUBLIC nor the service role may call it', async () => {
