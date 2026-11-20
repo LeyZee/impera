@@ -287,6 +287,8 @@ export interface StoredPlatformScript {
   readonly branches: readonly BranchSetting[];
   /** Every identity written for it, whatever the version (SC-04 lot c8); the domain picks the current one. */
   readonly identities: readonly StoredScriptIdentity[];
+  /** Ours when an import recognised it as the copy of a script prepared in Impera (ADR 0161); `null` otherwise. */
+  readonly ours: OurCopy | null;
 }
 
 /** An identity of a native script as the base keeps it (`script_identities`). */
@@ -510,4 +512,18 @@ export interface PreparedScriptStore {
     },
     userId: string,
   ): Promise<UpdatePreparedOutcome>;
+}
+
+/**
+ * The script of ours a native script is the recognised copy of (ADR 0161 § 5): what the agent offers it on. Its
+ * description and moment are ours, written by a person in the editor; its steps in order, each branch with the price we
+ * set, are what the agent checks the copy still matches before offering it.
+ */
+export interface OurCopy {
+  readonly preparedScriptId: PreparedScriptId;
+  readonly description: string;
+  readonly moment: PlatformScriptMoment;
+  readonly steps: readonly {
+    readonly branches: readonly { readonly priceMinor: number; readonly currency: Currency }[];
+  }[];
 }
