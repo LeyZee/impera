@@ -241,6 +241,8 @@ interface FollowUpTurn {
 interface AftercareTurn {
   /** What he paid for: a step of her script, or a tip. */
   readonly saleType: AfterSaleType;
+  /** His run is still open: he bought a step in the middle of the script, the moment goes on. */
+  readonly scriptGoesOn: boolean;
 }
 
 /** What his desire score is counted from (`desireScore`). */
@@ -375,6 +377,20 @@ const AFTERCARE_WHAT: Readonly<Record<AfterSaleType, string>> = {
  * tenderness, without overdoing it, nothing to buy, no sulking.
  */
 function aftercareBrief(aftercare: AftercareTurn): Brief {
+  // In the middle of a script she stays in the moment and checks he is still with her: the tender aftercare is for its
+  // end (Charles, 20/11).
+  if (aftercare.scriptGoesOn) {
+    return {
+      intent: 'other',
+      sentiment: 'aroused',
+      factsProposed: [],
+      kycMissing: [],
+      risks: [],
+      action: 'reply',
+      replyBrief: `${AFTERCARE_WHAT.ppv} Elle lui demande, complice et chaude, si ça lui a plu et comment il se sent, en restant dans la tension du moment, sans rien proposer de payant, sans parler de prix ni d’argent.`,
+      toneHints: ['court, une seule bulle', 'dans la séduction, jamais commerciale'],
+    };
+  }
   return {
     intent: 'other',
     sentiment: 'positive',

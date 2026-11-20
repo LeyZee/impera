@@ -746,7 +746,13 @@ async function quietTurn(
             spirit: her.deps.followUpSpirit ?? null,
           },
         }
-      : { aftercare: { saleType: turn.saleType } }),
+      : {
+          aftercare: {
+            saleType: turn.saleType,
+            // A step bought while his run is open: the script goes on, so does the moment (Charles, 20/11).
+            scriptGoesOn: turn.saleType === 'ppv' && input.scriptRun?.status === 'open',
+          },
+        }),
   });
   const { costUsd } = composed;
   if (composed.droppedNotes !== undefined) {

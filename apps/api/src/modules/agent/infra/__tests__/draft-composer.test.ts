@@ -1876,6 +1876,30 @@ describe('createDraftComposer, her word after a sale of his (ADR 0156 § 2)', ()
     expect(brief?.replyBrief).not.toMatch(/€|\d/u);
   });
 
+  it('stays in the moment when he bought a step in the middle of her script; tender at its end (Charles, 20/11)', async () => {
+    const at = new Date('2026-10-17T11:35:00Z');
+    const open = {
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [
+        { stepIndex: 0, kind: 'paid' as const, outcome: 'sent' as const, priceMinor: 1_500, sentAt: at, at },
+      ],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    };
+    const briefOf = async (scriptRun: NonNullable<AgentComposeInput['scriptRun']>) => {
+      const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
+      await draftComposer.compose({ ...AFTERCARE, scriptRun });
+      return seen.voiceInputs?.[0]?.brief;
+    };
+    const going = await briefOf(open);
+    expect(going?.replyBrief).toContain('si ça lui a plu');
+    expect(going?.replyBrief).toContain('sans rien proposer de payant');
+    const ended = await briefOf({ ...open, status: 'bought_out', endedAt: at });
+    expect(ended?.replyBrief).toContain('petit mot tendre');
+  });
+
   it('thanks him for a tip in its own words', async () => {
     const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
     await draftComposer.compose({

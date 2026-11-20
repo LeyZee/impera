@@ -64,6 +64,8 @@ async function skipReason(
  * platform id: a fan nobody knows (a purchase the CRM reads before his messages are synced) wakes nothing and is
  * logged, never retried. Same three steps as `follow_up`: read under the lock, compose outside it, re-lock and write
  * unless something changed. It becomes a draft a human approves, never a send; a replay finds its draft written.
+ * It runs outside the `conv:<id>` queue on purpose: the row lock and the idle re-check under it are enough, and a
+ * word after a sale must not wait behind his answers (relecture Bilan de #903).
  */
 export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: AfterSaleDeps) {
   return async (payload: JobPayload<'conversation.after_sale'>, logger: JobLogger): Promise<void> => {
@@ -101,6 +103,7 @@ export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: A
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId),
+        scriptRun: await tx.scriptRuns.latest(conversation.id),
       };
     });
     if (read === null) return;
@@ -120,6 +123,8 @@ export function createAfterSaleJob({ uow, clock, fans, composer, replyHours }: A
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       aftercare: { saleType: payload.saleType, occurredAt: paidAt },
+      // His run still open: the step he bought is not the end of it, her word stays in the moment (Charles, 20/11).
+      scriptRun: read.scriptRun?.run ?? null,
       ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
     };
 
