@@ -1,4 +1,4 @@
 # 2026-11-20 — OPS-19, avenant : la production sur le projet Supabase des essais — review
 Fait : avenant à l'ADR 0152 (§ 9) sur la décision écrite de Charles (pas d'organisation Supabase à part, le projet des essais vidé à la mise en ligne), avec les garde-fous relus par Sécurité : plus aucun outil sur le compte avant la première donnée réelle et plus jamais de connecteur sur cette organisation, base repartie de zéro (`DROP OWNED` puis rôles recréés, sur son mot), clés et secret JWT régénérés, API de données et Realtime coupés, restes hors base supprimés, journal d'audit lu, réseau limité au serveur en IPv4 et IPv6, essais ultérieurs dans un projet temporaire d'une autre organisation. `deploy.md` § 1.1 (étapes renumérotées, renvois suivis), `operations.md`, `restore.md`, fiche OPS-19.
 Reste : lot c avec Charles ; OPS-20 (Postgres 17).
-Découvertes : aucune.
+Découvertes : ce choix retire aussi le connecteur Supabase à tous les fils du projet, dès l'étape 0 ; OPS-20 doit finir ses essais sur Supabase avant. À constater pendant l'essai : `DROP OWNED BY` nos rôles par `postgres` non superutilisateur (sinon `GRANT` des rôles à `postgres` d'abord).
