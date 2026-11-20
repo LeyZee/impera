@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { draftWhen } from './AddDialog';
 import {
@@ -27,15 +27,18 @@ const draft: TaskDraft = {
 };
 
 describe('« Ajouter » (CR-05)', () => {
-  it('previews no day her agenda does not reach: what to choose instead (CREA-14)', () => {
+  // A body's day is checked against the clock (a year back at most, CREA-14): frozen on the draft's day, never today's.
+  beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
-    try {
-      expect(draftWhen({ ...draft, kind: 'day', day: '2099-01-01' }, ZONE)).toBe('Choisis le jour');
-      expect(draftWhen({ ...draft, kind: 'day' }, ZONE)).toMatch(/4 novembre/u);
-    } finally {
-      vi.useRealTimers();
-    }
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('previews no day her agenda does not reach: what to choose instead (CREA-14)', () => {
+    expect(draftWhen({ ...draft, kind: 'day', day: '2099-01-01' }, ZONE)).toBe('Choisis le jour');
+    expect(draftWhen({ ...draft, kind: 'day' }, ZONE)).toMatch(/4 novembre/u);
   });
 
   it('reads an end at or before the start as the next day, in her zone', () => {

@@ -1,5 +1,5 @@
 import { SuggestionIdSchema, type AgencySuggestion } from '@impera/contracts';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { followedOf, groupsOf, proposalSlotOf, suggestionBodyOf, summaryOf } from './model';
 
@@ -102,6 +102,15 @@ describe('the week at a glance', () => {
 });
 
 describe('the body sent', () => {
+  // The body's day is checked against the clock (a year back at most, CREA-14): frozen that week, never today's date.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-04T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('reads the hours in her zone and leaves an empty purpose out', () => {
     expect(
       suggestionBodyOf(

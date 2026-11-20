@@ -1,0 +1,7 @@
+# 2026-11-20 — Tests à l'horloge figée — done
+Fait : les tests qui envoyaient un jour fixe de novembre 2026 à travers `PlannedWhenSchema` (un an en arrière au plus, CREA-14, lu sur `Date.now()`) figent leur horloge (`vi.useFakeTimers({ toFake: ['Date'] })` + `vi.setSystemTime`) : `reel-brief.test.ts` (contracts), `suggest.test.ts` (creator-tasks), `model.test.ts` (agenda de la créatrice côté agence) et `draft.test.ts` (« Ajouter ») ; ils seraient passés au rouge entre le 05/11/2027 et le 11/11/2027. L'intégration `trend-ideas` (fiche reel écrite à la main) date sa suggestion de dans deux semaines à Paris (`parisDay`) au lieu du 02/12/2026 : l'horloge du serveur ne se fige pas, son 422 serait devenu 400 le 03/12/2027.
+Pas fait : l'intégration n'a pas tourné ici (pas de Docker) ; sa revue est statique.
+Décisions : on fige l'horloge des tests unitaires plutôt que de rendre leurs dates relatives ; en intégration, les dates restent relatives à aujourd'hui, comme le correctif du 19/11 (`sales-feed-check`).
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : toutes les suites unitaires (api, web, extension, contracts, llm, db, design-system) rejouées avec l'horloge décalée au 15/06/2027, 31/12/2027 23 h 30 UTC, 29/02/2028 23 h 30 UTC et 15/06/2029 : seuls les quatre fichiers corrigés tombaient, ils passent à chaque date ; prettier, eslint et check-repo sur les fichiers changés.
