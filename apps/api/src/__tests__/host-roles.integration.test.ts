@@ -14,6 +14,8 @@ const LOCK_DOWN = new URL('../../../../packages/db/supabase/lock-down.sql', impo
 const PREDEFINED = ['anon', 'authenticated', 'service_role'];
 /** Like Supabase's `supabase_read_only_user`: a member of `pg_read_all_data`, which no right of ours can close. */
 const HOST_READER = 'host_reads_everything';
+/** A role that may write every table is no accepted risk: none of Supabase's non-superusers is one. */
+const HOST_WRITER = 'host_writes_everything';
 
 const silent = { warn: () => undefined, info: () => undefined };
 
@@ -116,6 +118,19 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     }
   });
 
+  it('refuses a role of the host that may write every table, even one that reads everything too', async () => {
+    await root.query(
+      `do $$ begin create role ${HOST_WRITER} nologin in role pg_read_all_data, pg_write_all_data; exception when duplicate_object then null; end $$`,
+    );
+    try {
+      const access = await readForeignAccess(test.service.db);
+      expect(access.hostReaders).not.toContain(HOST_WRITER);
+      expect(access.problems).toContainEqual(expect.stringContaining(`${HOST_WRITER} on public`));
+    } finally {
+      await root.query(`drop role ${HOST_WRITER}`);
+    }
+  });
+
   it('refuses to start in production until the lock-down is played, then lets our roles work as before', async () => {
     const warnings: string[] = [];
     const infos: string[] = [];
@@ -142,7 +157,6 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     const after = await readForeignAccess(test.service.db);
     expect(after.problems).toEqual([]);
     expect(after.hostReaders).toContain(HOST_READER);
-    expect(after.hostWriters).not.toContain(HOST_READER);
     await expect(assertNoForeignAccess(test.service.db, true, silent)).resolves.toBeUndefined();
     for (const role of PREDEFINED) {
       const reach = await root.query<{ public: boolean; queue: boolean }>(
