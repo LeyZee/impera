@@ -36,8 +36,9 @@ export function MeNav({
       : [
           '/moi/profil',
           ...(trophies ? (['/moi/trophees'] as const) : []),
+          // No « Calendrier » for a chatter: his link is on Planning, « Dans mon téléphone », where his shifts are
+          // (ADR 0134, lot 1). A manager has no Planning of his own in his menu and keeps the tab.
           '/moi/dossier',
-          '/moi/calendrier',
           '/moi/securite',
           '/moi/preferences',
         ];

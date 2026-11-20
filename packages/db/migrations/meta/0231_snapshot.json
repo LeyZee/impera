@@ -1,5 +1,5 @@
 {
-  "id": "7a63e9a7-4ae8-447e-9348-80e152435e5f",
+  "id": "a05ee7c6-f8e6-4703-87e0-7ec2ca6ab459",
   "prevId": "aad13aa1-029e-4ad9-a201-9538d71ba21d",
   "version": "7",
   "dialect": "postgresql",
@@ -7715,6 +7715,12 @@
         "error_code": {
           "name": "error_code",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "voice_example_ids": {
+          "name": "voice_example_ids",
+          "type": "uuid[]",
           "primaryKey": false,
           "notNull": false
         },
@@ -17918,12 +17924,6 @@
         },
         "stopped_at": {
           "name": "stopped_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "checked_in_at": {
-          "name": "checked_in_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

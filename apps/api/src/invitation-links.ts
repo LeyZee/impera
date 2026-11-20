@@ -45,6 +45,7 @@ import { z } from 'zod';
 import { authHeaders, meOf, type Auth, type RequireRole } from './auth';
 import type { Config } from './config';
 import type { ShiftCreators } from './modules/scheduling';
+import { isOwnerAccount } from './owners';
 import type { PasswordBreachCheck } from './password-breaches';
 import { publishSecurityAlert, roleOf } from './security-alerts';
 
@@ -274,6 +275,8 @@ async function createLinkUnscoped(
       .for('update');
     if (member === undefined) throw new MemberNotFound();
     if (member.status === 'left') throw new MemberLeft();
+    // A link chooses a new password and resets the code: on an owner's account it would be a takeover (ADR 0096 § 2).
+    if (await isOwnerAccount(tx, member.userId)) throw new OwnerProtected();
     if (!input.byOwner) await assertChatterToInvite(tx, member);
     const replaced = await tx
       .update(schema.invitationLinks)
@@ -316,6 +319,16 @@ async function createLinkUnscoped(
     });
     return { token, expiresAt: created.expiresAt };
   });
+}
+
+/** An owner's password and code are his own: « Mot de passe oublié », or the server's command (ADR 0096 § 2). */
+class OwnerProtected extends DomainError {
+  constructor() {
+    super(
+      'owner_protected_conflict',
+      'Ce membre est propriétaire : il change son mot de passe lui-même, par « Mot de passe oublié »',
+    );
+  }
 }
 
 class CreatorNotFound extends DomainError {

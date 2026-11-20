@@ -25,6 +25,8 @@ export interface CalibrationRecord extends RatedAnswer {
   readonly fanMessage: string;
   readonly bubbles: readonly string[];
   readonly destination?: Destination;
+  /** A correction filed as a voice example that a hard guard stopped (ADR 0102 § 4): never one of her examples. */
+  readonly exampleBlocked?: true;
   readonly moment: RatedMoment;
 }
 
@@ -40,23 +42,49 @@ export interface ExamplesOf {
   readonly guardSettings: GuardSettings;
 }
 
+/** One of her examples: a correction the owner filed as one, by its rating's id. */
+export interface VoiceExample {
+  readonly id: string;
+  readonly text: string;
+}
+
+/** How many of her examples the voice reads (ADR 0102 § 2). */
+export const VOICE_EXAMPLES_MAX = 12;
+
+/**
+ * The examples the voice receives, from her bank newest first (ADR 0102 § 2, § 4): only those her hard guards let
+ * through, at most twelve. Production and the playground both choose through it, so what the playground shows is what
+ * a fan receives.
+ */
+export function pickVoiceExamples(
+  bank: readonly VoiceExample[],
+  guardSettings: GuardSettings,
+  max = VOICE_EXAMPLES_MAX,
+): VoiceExample[] {
+  return bank.filter((e) => !isBlocked(checkVoiceOutput([e.text], guardSettings))).slice(0, max);
+}
+
 /**
  * Her corrected answers, newest first, given back to the voice as her examples (ADR 0102 § 1, § 4; recette AGE-07):
  * only hers, only for the version that answered, and only those her hard guards let through. A correction of the
  * invented persona, or of another version, is never one.
  */
-export function voiceExamples(records: readonly CalibrationRecord[], of: ExamplesOf, max = 12): string[] {
-  return records
+export function voiceExamples(
+  records: readonly CalibrationRecord[],
+  of: ExamplesOf,
+  max = Number.POSITIVE_INFINITY,
+): VoiceExample[] {
+  const bank = records
     .filter(
       (r) =>
         r.destination === 'voice_example' &&
+        r.exampleBlocked !== true &&
         r.creatorId === of.creatorId &&
         r.personaVersionId === of.personaVersionId,
     )
-    .flatMap((r) => (r.verdict.kind === 'corrected' ? [r.verdict.text] : []))
-    .filter((text) => !isBlocked(checkVoiceOutput([text], of.guardSettings)))
-    .reverse()
-    .slice(0, max);
+    .flatMap((r) => (r.verdict.kind === 'corrected' ? [{ id: r.id, text: r.verdict.text }] : []))
+    .reverse();
+  return pickVoiceExamples(bank, of.guardSettings, max);
 }
 
 /** Every correction and rejection is a moment to replay after a change of prompt or model. */

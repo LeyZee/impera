@@ -77,7 +77,7 @@ export interface StoredShift {
 }
 
 /**
- * What `check_in_own_shift` answers (migration 0231): the instant of the check-in, new or the first one again, or why
+ * What `check_in_own_shift` answers (migration 0235): the instant of the check-in, new or the first one again, or why
  * there is none. `not_found` covers a shift of someone else's, a cancelled one, and a reader who is not `active`.
  */
 type CheckInOutcome =

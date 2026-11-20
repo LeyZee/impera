@@ -398,6 +398,18 @@ describe('the chatter’s Planning', () => {
     expect(screen.getByText('2 shifts · 12 h')).toBeTruthy();
   });
 
+  it('puts his shifts in his phone from here, « Dans mon téléphone », not from a tab of Moi (ADR 0134, lot 1)', async () => {
+    serve();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Dans mon téléphone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mes shifts dans mon téléphone' });
+    expect(within(dialog).getByText('iPhone, Mac, Google Agenda')).toBeTruthy();
+    // The team's calendar is not his own link's place.
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('radio', { name: 'L’équipe' }));
+    expect(screen.queryByRole('button', { name: 'Dans mon téléphone' })).toBeNull();
+  });
+
   it('keeps a colleague’s shift offered to him out of his shifts and their total (CHAT-05)', async () => {
     serve({ offered: true, swaps: [swap({})] });
     renderPage();

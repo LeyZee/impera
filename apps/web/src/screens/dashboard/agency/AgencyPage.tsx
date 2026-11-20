@@ -2,7 +2,6 @@ import type { JSX } from 'react';
 
 import { AgencyStrip } from '../AgencyStrip';
 import { BackupBanner } from '../BackupBanner';
-import { CreatorPicker } from '../CreatorPicker';
 import { NoCreator } from '../DashboardPage';
 import { PaperworkBanner } from '../PaperworkBanner';
 import { ReportsBanner } from '../ReportsBanner';
@@ -16,8 +15,8 @@ import type { AgencySelection } from './period';
 import { PageHeader } from '@/shell/layout';
 
 /**
- * The Dashboard of the owner and of an active manager, before any creator is chosen (ADR 0078): « Toute l'agence »
- * checked in front of the creators' chips, the agency's figures, then what waits on the agency. A creator's chip opens
+ * The Dashboard of the owner and of an active manager while the menu's selector is on « Toutes » (ADR 0078, ADR 0134
+ * § 3): the agency's figures, then what waits on the agency. A creator chosen in the selector, or her line here, opens
  * her Dashboard, her agent first and her figures under it.
  */
 export function AgencyPage({
@@ -47,9 +46,6 @@ export function AgencyPage({
     <div className="db">
       {/* The screen's title, as on every other one (recette visuelle 16/11, PIL-04): the rest of the Dashboard as it was. */}
       <PageHeader title="Dashboard" />
-      <header className="db-top nv-enter">
-        <CreatorPicker onChoose={onCreator} agency={{ selected: true, onChoose: () => undefined }} />
-      </header>
       {/* The figures first, then what the agency runs: the export, the invoices, the reports, the day's AI budget
           (recette visuelle 16/11, PIL-04). */}
       <AgencyInsightsPanel

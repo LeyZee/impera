@@ -451,6 +451,9 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
   let pending: Answer | null = null;
   let answered = 0;
   let costEur = 0;
+  // The demo's trial script (ADR 0103 § 15-17): with the fans who buy, a step goes after her answer.
+  let run: DemoRun | null = null;
+  let fictiveSpentCents = 0;
 
   const setup = (): PresetSetup =>
     SETUPS[presetId] ?? SETUPS['nouveau'] ?? { notes: [], ageHours: 0, spentCents: 0, answers: [] };
@@ -487,7 +490,78 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
       sessionCostEur: costEur,
       voice: { reachable: true },
       pending,
+      scripts: {
+        source: 'trial',
+        unavailable: null,
+        run: run === null ? null : runView(run),
+        fictiveSpentCents,
+        salesFrozen: false,
+      },
     };
+  };
+
+  /** After her answer, the next step of the trial script, if the last one lets it go: never past a paid step undecided. */
+  const nextStep = (): void => {
+    if (presetId !== 'chaud' && presetId !== 'acheteur') return;
+    const current = run ?? { status: 'open' as const, outcomes: [] };
+    if (current.status !== 'open') return;
+    const last = current.outcomes.length - 1;
+    const lastStep = DEMO_SCRIPT.steps[last];
+    if (lastStep?.kind === 'paid' && current.outcomes[last] !== 'bought') return;
+    const index = current.outcomes.length;
+    const step = DEMO_SCRIPT.steps[index];
+    if (step === undefined) return;
+    const sent: DemoRun = { ...current, outcomes: [...current.outcomes, 'sent'] };
+    run = sent;
+    // As the platform sends a step: its words, the teaser open, the bundle locked while paid.
+    const bundle = [
+      ...(step.teaser ?? []).map((media) => ({ media, teaser: true })),
+      ...step.media.map((media) => ({ media, teaser: false })),
+    ];
+    history.push({
+      from: 'creator',
+      text: step.text,
+      media: bundle.map(({ media, teaser }) => ({
+        description: describe({ kind: media.kind, factualDescription: media.sheet }),
+        isLocked: step.kind === 'paid' && !teaser,
+        scriptStep: stepView(sent, index),
+        scriptMedia: { ref: media.ref, teaser },
+      })),
+    });
+  };
+
+  /** He answers the paid step waiting: the media opens and its price counts, or the script stops there. */
+  const answerStep = (answer: 'buy' | 'refuse'): void => {
+    if (run?.status !== 'open') return;
+    const index = run.outcomes.length - 1;
+    const step = DEMO_SCRIPT.steps[index];
+    if (step?.kind !== 'paid' || run.outcomes[index] !== 'sent') return;
+    const outcomes = [
+      ...run.outcomes.slice(0, -1),
+      answer === 'buy' ? ('bought' as const) : ('refused' as const),
+    ];
+    const done =
+      answer === 'refuse' ? 'refused' : index === DEMO_SCRIPT.steps.length - 1 ? 'bought_out' : 'open';
+    run = { status: done, outcomes };
+    if (answer === 'buy') {
+      fictiveSpentCents += step.priceCents ?? 0;
+      spentCents += step.priceCents ?? 0;
+    }
+    const current = run;
+    history = history.map((turn) => ({
+      ...turn,
+      ...(turn.media !== undefined && {
+        media: turn.media.map((m) => {
+          if (m.scriptStep === undefined) return m;
+          const view = stepView(current, m.scriptStep.stepIndex);
+          return {
+            ...m,
+            scriptStep: view,
+            isLocked: view.state === 'waiting' && m.scriptMedia?.teaser !== true,
+          };
+        }),
+      }),
+    }));
   };
 
   const reply = (answer: Answer): void => {
@@ -530,6 +604,8 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
   };
 
   const choose = (id: string): void => {
+    run = null;
+    fictiveSpentCents = 0;
     presetId = id;
     const s = setup();
     startedAt = new Date(now.getTime() - s.ageHours * HOUR);
@@ -577,6 +653,7 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
           desire,
         });
         reply({ ...answerFor(media), desire });
+        nextStep();
         return snapshot();
       }, 900),
     rate: (verdict: Verdict) => later(() => (rated(verdict), snapshot())),
@@ -620,6 +697,8 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
         const turn = history[at];
         if (turn === undefined) return snapshot();
         history = history.slice(0, at + 1);
+        // The demo's script goes back with the conversation only as far as its media remain.
+        if (!history.some((t) => t.media?.some((m) => m.scriptStep !== undefined))) run = null;
         answered = Math.max(0, fanMessageNumber - 1);
         const previous = setup().answers[answered];
         const media: PlaygroundMedia[] = (turn.media ?? []).map(({ description }) => ({
@@ -646,6 +725,7 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
     advance: (hours) => later(() => ((now = new Date(now.getTime() + hours * HOUR)), snapshot())),
     setNotes: (next) => later(() => ((notes = [...next]), snapshot())),
     setSpent: (cents) => later(() => ((spentCents = cents), snapshot())),
+    answerScriptStep: (answer) => later(() => (answerStep(answer), snapshot())),
     sendCreatorMedia: ({ isLocked, ...media }) =>
       later(
         () => (
@@ -653,5 +733,136 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
           snapshot()
         ),
       ),
+    // The demo plays the invented persona: no creator, so no bank (ADR 0102 § 1).
+    bank: () => later(() => ({ examples: [] })),
+    withdrawExample: () => later(() => ({ examples: [] })),
+  };
+}
+
+/** The demo's trial script: invented from end to end, as the server's (playground/infra/trial-scripts.ts). */
+interface DemoMedia {
+  readonly ref: string;
+  readonly kind: 'image' | 'video';
+  readonly sheet: string;
+}
+interface DemoStep {
+  readonly kind: 'free' | 'paid';
+  readonly priceCents: number | null;
+  readonly text: string;
+  readonly teaser?: readonly DemoMedia[];
+  readonly media: readonly DemoMedia[];
+}
+const DEMO_SCRIPT: {
+  readonly scriptRef: string;
+  readonly name: string;
+  readonly description: string;
+  readonly steps: readonly DemoStep[];
+} = {
+  scriptRef: 'essai-nuit',
+  name: 'Essai · Nuit',
+  description: 'Fin de soirée, elle est rentrée et ne dort pas encore : un moment à deux, tard.',
+  steps: [
+    {
+      kind: 'free',
+      priceCents: null,
+      text: 'Enfin rentrée 😌',
+      media: [
+        {
+          ref: 'essai-media-8',
+          kind: 'image',
+          sheet: 'Photo d’elle sur le canapé, lumière tamisée, plaid sur les jambes.',
+        },
+      ],
+    },
+    {
+      kind: 'paid',
+      priceCents: 1200,
+      text: 'Juste entre nous',
+      teaser: [
+        {
+          ref: 'essai-media-9',
+          kind: 'image',
+          sheet: 'Photo d’elle de profil près de la lampe, en tenue de nuit.',
+        },
+      ],
+      media: [
+        {
+          ref: 'essai-media-10',
+          kind: 'image',
+          sheet: 'Photo d’elle en tenue de nuit, cadrage serré, ambiance tamisée.',
+        },
+        {
+          ref: 'essai-media-11',
+          kind: 'image',
+          sheet: 'Photo d’elle allongée, le téléphone à la main, sourire en coin.',
+        },
+      ],
+    },
+    {
+      kind: 'paid',
+      priceCents: 2000,
+      text: 'Pour finir la soirée',
+      media: [
+        {
+          ref: 'essai-media-12',
+          kind: 'video',
+          sheet: 'Vidéo d’elle qui lui souhaite bonne nuit, voix basse, lumière d’une lampe.',
+        },
+        { ref: 'essai-media-13', kind: 'video', sheet: 'Courte vidéo d’elle qui éteint la lampe en riant.' },
+        {
+          ref: 'essai-media-14',
+          kind: 'image',
+          sheet: 'Photo d’elle sous la couette, seul son regard dépasse.',
+        },
+        {
+          ref: 'essai-media-15',
+          kind: 'image',
+          sheet: 'Photo de la lampe de chevet allumée, la pièce dans la pénombre.',
+        },
+      ],
+    },
+  ],
+};
+
+interface DemoRun {
+  readonly status: 'open' | 'bought_out' | 'refused';
+  readonly outcomes: readonly ('sent' | 'bought' | 'refused')[];
+}
+
+type ScriptStepView = NonNullable<NonNullable<Turn['media']>[number]['scriptStep']>;
+
+function stepView(run: DemoRun, stepIndex: number): ScriptStepView {
+  const step = DEMO_SCRIPT.steps[stepIndex];
+  const outcome = run.outcomes[stepIndex];
+  return {
+    source: 'trial',
+    scriptRef: DEMO_SCRIPT.scriptRef,
+    stepIndex,
+    kind: step?.kind ?? 'free',
+    priceCents: step?.priceCents ?? null,
+    state:
+      step?.kind !== 'paid'
+        ? 'offered'
+        : outcome === 'bought' || outcome === 'refused'
+          ? outcome
+          : run.status === 'open'
+            ? 'waiting'
+            : 'closed',
+  };
+}
+
+function runView(run: DemoRun): NonNullable<PlaygroundState['scripts']['run']> {
+  return {
+    scriptRef: DEMO_SCRIPT.scriptRef,
+    name: DEMO_SCRIPT.name,
+    source: 'trial',
+    description: DEMO_SCRIPT.description,
+    moment: 'night',
+    status: run.status,
+    steps: DEMO_SCRIPT.steps.map((step, index) => ({
+      kind: step.kind,
+      priceCents: step.priceCents,
+      outcome: run.outcomes[index] ?? null,
+    })),
   };
 }

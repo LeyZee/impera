@@ -1,6 +1,6 @@
 {
-  "id": "ad2bb508-f91c-47fa-9779-27dfca78374c",
-  "prevId": "7a63e9a7-4ae8-447e-9348-80e152435e5f",
+  "id": "bca79bac-f324-496e-b456-91ad59b743d4",
+  "prevId": "a05ee7c6-f8e6-4703-87e0-7ec2ca6ab459",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -7715,6 +7715,12 @@
         "error_code": {
           "name": "error_code",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "voice_example_ids": {
+          "name": "voice_example_ids",
+          "type": "uuid[]",
           "primaryKey": false,
           "notNull": false
         },
@@ -17922,12 +17928,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "checked_in_at": {
-          "name": "checked_in_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -20487,239 +20487,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.announcement_reads": {
-      "name": "announcement_reads",
-      "schema": "",
-      "columns": {
-        "announcement_id": {
-          "name": "announcement_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "member_id": {
-          "name": "member_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "announcement_reads_member_idx": {
-          "name": "announcement_reads_member_idx",
-          "columns": [
-            {
-              "expression": "member_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "announcement_reads_announcement_id_announcements_id_fk": {
-          "name": "announcement_reads_announcement_id_announcements_id_fk",
-          "tableFrom": "announcement_reads",
-          "tableTo": "announcements",
-          "columnsFrom": ["announcement_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "announcement_reads_member_id_team_members_id_fk": {
-          "name": "announcement_reads_member_id_team_members_id_fk",
-          "tableFrom": "announcement_reads",
-          "tableTo": "team_members",
-          "columnsFrom": ["member_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "announcement_reads_announcement_id_member_id_pk": {
-          "name": "announcement_reads_announcement_id_member_id_pk",
-          "columns": ["announcement_id", "member_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "member_read": {
-          "name": "member_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
-        },
-        "member_insert": {
-          "name": "member_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"announcement_reads\".\"read_at\" = now() and exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '') and m.status <> 'left') and exists (select 1 from announcements a where a.id = \"announcement_reads\".\"announcement_id\" and a.withdrawn_at is null)"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.announcements": {
-      "name": "announcements",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "author_user_id": {
-          "name": "author_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "withdrawn_at": {
-          "name": "withdrawn_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "withdrawn_by": {
-          "name": "withdrawn_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "announcements_created_idx": {
-          "name": "announcements_created_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "announcements_creator_id_creators_id_fk": {
-          "name": "announcements_creator_id_creators_id_fk",
-          "tableFrom": "announcements",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "announcements_author_user_id_user_id_fk": {
-          "name": "announcements_author_user_id_user_id_fk",
-          "tableFrom": "announcements",
-          "tableTo": "user",
-          "columnsFrom": ["author_user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "announcements_withdrawn_by_user_id_fk": {
-          "name": "announcements_withdrawn_by_user_id_fk",
-          "tableFrom": "announcements",
-          "tableTo": "user",
-          "columnsFrom": ["withdrawn_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or (nullif(current_setting('app.team_scope', true), '') = 'self' and \"announcements\".\"withdrawn_at\" is null and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids))))"
-        },
-        "team_insert": {
-          "name": "team_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"withdrawn_at\" is null and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids)))))"
-        },
-        "team_withdraw": {
-          "name": "team_withdraw",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"announcements\".\"withdrawn_at\" is null",
-          "withCheck": "\"announcements\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '') and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and \"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), '')))"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "announcements_body_check": {
-          "name": "announcements_body_check",
-          "value": "char_length(\"announcements\".\"body\") between 1 and 1000"
-        },
-        "announcements_withdrawn_check": {
-          "name": "announcements_withdrawn_check",
-          "value": "(\"announcements\".\"withdrawn_at\" is null) = (\"announcements\".\"withdrawn_by\" is null)"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.commission_presets": {
