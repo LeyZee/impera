@@ -5,7 +5,6 @@ import { useId, useState, type JSX } from 'react';
 import { confirmOut, dropArchiveHref } from './api';
 import { OUT_LABELS, OUT_PLACES, herDrops, holdsLine, summaryLine, type HerDropRow } from './model';
 
-import { DescribeSwitch } from '@/creators/scripts/DescribeSwitch';
 import { ScriptReview } from '@/creators/scripts/ScriptReview';
 import { contentKey, useCreatorContent } from '@/creators/scripts/api';
 import { dayLabel } from '@/creators/scripts/model';
@@ -17,19 +16,16 @@ import { Failure } from '@/shell/states';
 /**
  * Créatrices › Contenu (recette créatrice 1 et 6), the owner's and an active manager's: every drop of hers but a
  * script, her media, their descriptions to read, its archive and « Publié » once the team put it out by hand (ADR 0044):
- * her originals of it go 30 days later. The switch of the descriptions stands here, at the head of what it describes.
+ * her originals of it go 30 days later. Each of her media is described on arrival: no switch (ADR 0145 § 5, 17/11).
  */
 export function DropsSection({
   creatorId,
   creatorName,
   timezone,
-  isOwner = false,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
-  /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9). */
-  isOwner?: boolean;
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
   const [confirming, setConfirming] = useState<HerDropRow | null>(null);
@@ -88,7 +84,6 @@ export function DropsSection({
           </div>
         </div>
       </div>
-      {isOwner ? <DescribeSwitch creatorId={creatorId} creatorName={creatorName} /> : null}
       {list()}
       {confirming === null ? null : (
         <ConfirmOut

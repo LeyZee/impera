@@ -89,13 +89,32 @@
   --nv-series-4: #9c9630;
   --nv-series-other: rgba(246, 238, 241, 0.32);
   /*
-   * Where the money goes (ADR 0106 § 10): the creator's part rose, the agency's gold, the same on every block of the
-   * Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second hatched). Validated
-   * at 3:1 at least on the plate, Nuit and Jour, and 13 ΔE at least from --nv-series-4's olive, 8 at least for
-   * colour-blind readers (dataviz validator): they never sit in the same chart, and the legend labels every block.
+   * Where the money goes (ADR 0106 § 10, avenant du 17/11): the creator's part rose, the agency's blue, the same on
+   * every block of the Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second
+   * hatched). Validated at 3:1 at least on the plate, Nuit and Jour, and apart for colour-blind readers (dataviz
+   * validator); the legend labels every block. The kinds' bars take the cyan ramp below, never these two.
    */
   --nv-money-creator: #d06c98;
-  --nv-money-agency: #9c6420;
+  /* The blue of the Impera logo (Charles, 19/11), its hue (209°) made lighter for the night plate (fil Design). */
+  --nv-money-agency: #3e99ef;
+  /*
+   * A curve's trend against the period compared (ADR 0146): green above it, or with nothing to compare; the warning's
+   * amber below it, never the danger's red (a lower month is no emergency). Always beside the « +n % » that says it.
+   */
+  --nv-trend-up: #5fd08f;
+  --nv-trend-down: var(--nv-warning);
+  /* The same trend as text, in a change's pill: readable at 4.5:1 on the plate. */
+  --nv-trend-up-text: var(--nv-trend-up);
+  --nv-trend-down-text: var(--nv-trend-down);
+  /*
+   * The kinds of sale (subscriptions, PPV, tips, others): one cyan, light to dark (Charles's choice B, 19/11), apart
+   * from the money's rose and blue and the trend's green by its hue and its steps (dataviz validator, ordinal, Nuit and
+   * Jour). Each step is labelled in the legend and the tip, never colour alone.
+   */
+  --nv-kind-1: #b3eef2;
+  --nv-kind-2: #5fd3dd;
+  --nv-kind-3: #21a7b4;
+  --nv-kind-4: #137582;
 
   /* Shadows */
   --nv-shadow-glass:
@@ -180,7 +199,17 @@
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
   --nv-money-creator: #b8406f;
-  --nv-money-agency: #bd853c;
+  /* The Impera logo's navy itself, Charles's value (19/11), unretouched. */
+  --nv-money-agency: #001a33;
+  --nv-trend-up: #2aa866;
+  /* A stroke's amber on the day plate (3:1 on it, dataviz validator); the warning's own is made for text, and drew brown. */
+  --nv-trend-down: #c27400;
+  --nv-trend-up-text: #1b7a49;
+  --nv-trend-down-text: var(--nv-warning);
+  --nv-kind-1: #0a3e45;
+  --nv-kind-2: #146a75;
+  --nv-kind-3: #2ea6b3;
+  --nv-kind-4: #4fbfcb;
 
   --nv-shadow-glass:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(80, 10, 30, 0.07),

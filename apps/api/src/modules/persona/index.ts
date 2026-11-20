@@ -5,11 +5,13 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { PersonaSampleReplyUnprocessable } from './domain/errors';
-import type { CreatorDirectory } from './domain/ports';
+import type { AgentHourExceptions, CreatorDirectory } from './domain/ports';
 import type { PersonaVersionStore } from './domain/versions';
+import { createDrizzleAgentHourExceptions } from './infra/db/agent-hour-exceptions';
 import { createDrizzleCreatorDirectory } from './infra/db/creator-directory';
 import { createDrizzlePersonaCorrectionStore } from './infra/db/persona-correction-store';
 import { createDrizzlePersonaVersionStore } from './infra/db/persona-version-store';
+import { createAgentHourExceptionRoutes } from './infra/http/agent-hour-exceptions-routes';
 import { createPersonaRoutes } from './infra/http/persona-routes';
 import {
   createCreatorArchiveRoutes,
@@ -27,6 +29,8 @@ export interface PersonaModule {
    * the port the agent writes with (her active version, read at each draft), wired by the composition root.
    */
   readonly versions: PersonaVersionStore;
+  /** Her dated exceptions (ADR 0148 § 3): read by the agent through the composition root, written by their routes. */
+  readonly agentHourExceptions: AgentHourExceptions;
   /** Mounted under `/v1` by the server: `/creators` and her `/agent-hours`, and each creator's `/persona` with its versions and her corrections. */
   readonly routes: FastifyPluginAsyncZod;
   /**
@@ -78,6 +82,12 @@ function withSampleReplyCheck(
 export function createPersonaModule(deps: PersonaDeps): PersonaModule {
   const creators = createDrizzleCreatorDirectory(deps.db);
   const creatorRoutes = createCreatorRoutes(creators, deps.requireRole, deps.recentLogin);
+  const agentHourExceptions = createDrizzleAgentHourExceptions(deps.db);
+  const exceptionRoutes = createAgentHourExceptionRoutes(
+    agentHourExceptions,
+    deps.requireRole,
+    deps.recentLogin,
+  );
   const check = deps.sampleReplyFaults === undefined ? undefined : sampleReplyCheck(deps.sampleReplyFaults);
   // Checked again on activation: a version saved before a guard changed is not activated as it is (P5-01).
   const stored = createDrizzlePersonaVersionStore(deps.db, check);
@@ -88,8 +98,10 @@ export function createPersonaModule(deps: PersonaDeps): PersonaModule {
     name: 'persona',
     creators,
     versions,
+    agentHourExceptions,
     routes: async (app) => {
       await app.register(creatorRoutes);
+      await app.register(exceptionRoutes);
       await app.register(personaRoutes);
     },
     archiveRoutes: (archiving) =>

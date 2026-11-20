@@ -11,7 +11,7 @@ L'agence écrit un script à branches dans Impera, voit ce qui lui manque, le re
 ADR 0112 (§§ 13, 14, 20-26), ADR 0145 (coffre), ADR 0149 (fiche créatrice), module `scripts` (README), fiche SCB-01.
 
 ## À faire
-- [x] Lot 1 serveur : table `prepared_scripts` (migration 0225, RLS forcée, fermée au compte de la créatrice), manques et refus comptés à chaque lecture, avertissements de prix, états `editing` → `ready_to_copy` → `matched`, routes `…/prepared-scripts` (création idempotente, enregistrement sur révision, prêt à copier sans manque), journal d'audit.
+- [x] Lot 1 serveur : table `prepared_scripts` (migration 0229, RLS forcée, fermée au compte de la créatrice), manques et refus comptés à chaque lecture, avertissements de prix, états `editing` → `ready_to_copy` → `matched`, routes `…/prepared-scripts` (création idempotente, enregistrement sur révision, prêt à copier sans manque), journal d'audit.
 - [ ] Lot 2 : reconnaissance à l'import (correspondance exacte nom, étapes, branches par rang, médias, prix), transfert des réglages, `scriptRef` reçu, script fermé.
 - [ ] Lot 3 : écran (onglet Scripts, vues « À copier dans Reveal » et « Structures », éditeur), après l'ADR 0149 sur `main`.
 - [ ] Lot 4 : vue Performances (lecture serveur puis écran).

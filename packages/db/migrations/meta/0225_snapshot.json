@@ -1,5 +1,5 @@
 {
-  "id": "a53f7a16-041b-4726-babe-379b1ab8424a",
+  "id": "d24d459b-f3d2-47fe-8811-92dcc1b42003",
   "prevId": "db6cd8b3-143c-448b-98bf-4a82e19db80e",
   "version": "7",
   "dialect": "postgresql",
@@ -8770,6 +8770,361 @@
         "media_sends_price_minor_check": {
           "name": "media_sends_price_minor_check",
           "value": "\"media_sends\".\"price_minor\" is null or \"media_sends\".\"price_minor\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.vault_describe_requests": {
+      "name": "vault_describe_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_media_id": {
+          "name": "platform_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_key": {
+          "name": "asked_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_by": {
+          "name": "asked_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_at": {
+          "name": "asked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vault_describe_requests_key_idx": {
+          "name": "vault_describe_requests_key_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "asked_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vault_describe_requests_creator_id_creators_id_fk": {
+          "name": "vault_describe_requests_creator_id_creators_id_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_describe_requests_asked_by_user_id_fk": {
+          "name": "vault_describe_requests_asked_by_user_id_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "user",
+          "columnsFrom": ["asked_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_describe_requests_ref_fk": {
+          "name": "vault_describe_requests_ref_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "media_platform_refs",
+          "columnsFrom": ["platform_account_id", "platform_media_id"],
+          "columnsTo": ["platform_account_id", "platform_media_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_describe_requests_account_fk": {
+          "name": "vault_describe_requests_account_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vault_describe_requests_media_unique": {
+          "name": "vault_describe_requests_media_unique",
+          "nullsNotDistinct": false,
+          "columns": ["platform_account_id", "platform_media_id"]
+        }
+      },
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"vault_describe_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_ask": {
+          "name": "owner_ask",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"vault_describe_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"vault_describe_requests\".\"asked_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vault_import_choices": {
+      "name": "vault_import_choices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folder_ref": {
+          "name": "folder_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_media_id": {
+          "name": "platform_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imported": {
+          "name": "imported",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chosen_by": {
+          "name": "chosen_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chosen_at": {
+          "name": "chosen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vault_import_choices_folder_unique": {
+          "name": "vault_import_choices_folder_unique",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"folder_ref\", '')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"vault_import_choices\".\"scope\" = 'folder'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vault_import_choices_media_unique": {
+          "name": "vault_import_choices_media_unique",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_media_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"vault_import_choices\".\"scope\" = 'media'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vault_import_choices_creator_idx": {
+          "name": "vault_import_choices_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vault_import_choices_creator_id_creators_id_fk": {
+          "name": "vault_import_choices_creator_id_creators_id_fk",
+          "tableFrom": "vault_import_choices",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_import_choices_chosen_by_user_id_fk": {
+          "name": "vault_import_choices_chosen_by_user_id_fk",
+          "tableFrom": "vault_import_choices",
+          "tableTo": "user",
+          "columnsFrom": ["chosen_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_import_choices_account_fk": {
+          "name": "vault_import_choices_account_fk",
+          "tableFrom": "vault_import_choices",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_write": {
+          "name": "owner_write",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"vault_import_choices\".\"chosen_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_change": {
+          "name": "owner_change",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"vault_import_choices\".\"chosen_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_clear": {
+          "name": "owner_clear",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "vault_import_choices_scope_check": {
+          "name": "vault_import_choices_scope_check",
+          "value": "\"vault_import_choices\".\"scope\" in ('folder', 'media')"
+        },
+        "vault_import_choices_target_check": {
+          "name": "vault_import_choices_target_check",
+          "value": "(\"vault_import_choices\".\"scope\" = 'folder' and \"vault_import_choices\".\"platform_media_id\" is null) or (\"vault_import_choices\".\"scope\" = 'media' and \"vault_import_choices\".\"platform_media_id\" is not null and \"vault_import_choices\".\"folder_ref\" is null)"
+        },
+        "vault_import_choices_text_check": {
+          "name": "vault_import_choices_text_check",
+          "value": "char_length(\"vault_import_choices\".\"folder_ref\") <= 200 and char_length(\"vault_import_choices\".\"platform_media_id\") <= 200"
         }
       },
       "isRLSEnabled": false
@@ -18415,210 +18770,6 @@
         "platform_scripts_text_check": {
           "name": "platform_scripts_text_check",
           "value": "char_length(\"platform_scripts\".\"name\") <= 200 and char_length(\"platform_scripts\".\"platform_script_ref\") <= 200"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.prepared_scripts": {
-      "name": "prepared_scripts",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_account_id": {
-          "name": "platform_account_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'editing'"
-        },
-        "revision": {
-          "name": "revision",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "content": {
-          "name": "content",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "matched_platform_script_id": {
-          "name": "matched_platform_script_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "matched_at": {
-          "name": "matched_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "prepared_scripts_creator_idx": {
-          "name": "prepared_scripts_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "updated_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "prepared_scripts_creator_id_creators_id_fk": {
-          "name": "prepared_scripts_creator_id_creators_id_fk",
-          "tableFrom": "prepared_scripts",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "prepared_scripts_created_by_user_id_fk": {
-          "name": "prepared_scripts_created_by_user_id_fk",
-          "tableFrom": "prepared_scripts",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "prepared_scripts_updated_by_user_id_fk": {
-          "name": "prepared_scripts_updated_by_user_id_fk",
-          "tableFrom": "prepared_scripts",
-          "tableTo": "user",
-          "columnsFrom": ["updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "prepared_scripts_account_creator_fk": {
-          "name": "prepared_scripts_account_creator_fk",
-          "tableFrom": "prepared_scripts",
-          "tableTo": "platform_accounts",
-          "columnsFrom": ["platform_account_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "prepared_scripts_matched_creator_fk": {
-          "name": "prepared_scripts_matched_creator_fk",
-          "tableFrom": "prepared_scripts",
-          "tableTo": "platform_scripts",
-          "columnsFrom": ["matched_platform_script_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
-        },
-        "team_write": {
-          "name": "team_write",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"prepared_scripts\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"prepared_scripts\".\"updated_by\" = nullif(current_setting('app.user_id', true), '') and \"prepared_scripts\".\"state\" = 'editing'"
-        },
-        "team_update": {
-          "name": "team_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"prepared_scripts\".\"state\" <> 'matched'",
-          "withCheck": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"prepared_scripts\".\"updated_by\" = nullif(current_setting('app.user_id', true), '') and \"prepared_scripts\".\"state\" <> 'matched'"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "prepared_scripts_state_check": {
-          "name": "prepared_scripts_state_check",
-          "value": "\"prepared_scripts\".\"state\" in ('editing', 'ready_to_copy', 'matched')"
-        },
-        "prepared_scripts_revision_check": {
-          "name": "prepared_scripts_revision_check",
-          "value": "\"prepared_scripts\".\"revision\" >= 1"
-        },
-        "prepared_scripts_matched_check": {
-          "name": "prepared_scripts_matched_check",
-          "value": "(\"prepared_scripts\".\"state\" = 'matched') = (\"prepared_scripts\".\"matched_platform_script_id\" is not null and \"prepared_scripts\".\"matched_at\" is not null)"
-        },
-        "prepared_scripts_content_check": {
-          "name": "prepared_scripts_content_check",
-          "value": "jsonb_typeof(\"prepared_scripts\".\"content\") = 'object' and jsonb_typeof(\"prepared_scripts\".\"content\"->'steps') = 'array'"
         }
       },
       "isRLSEnabled": false

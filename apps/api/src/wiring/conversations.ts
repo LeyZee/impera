@@ -62,7 +62,10 @@ export function wireConversations(
         const view = await persona.creators.agentHours(creatorId);
         if (view?.invalidStored === true)
           logger.warn({ creatorId }, 'agent hours: stored setting unreadable, defaults used');
-        return view === null ? null : { hours: view.hours, timeZone: view.timeZone };
+        if (view === null) return null;
+        // Her dated exceptions (ADR 0148 § 3), from her today on: a date that has one follows its ranges alone.
+        const dated = await persona.agentHourExceptions.list(creatorId);
+        return { hours: view.hours, timeZone: view.timeZone, exceptions: dated?.exceptions ?? [] };
       },
     },
     alertNames: { ofCreator: (creatorId) => alerts.store.names(creatorId) },

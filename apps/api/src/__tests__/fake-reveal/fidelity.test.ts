@@ -49,6 +49,7 @@ const SAMPLES: Record<EndpointName, { method: Method; url: string; body?: object
   'conversations.ppvHistory': { method: 'GET', url: '/conversations/conv_02/ppv-history?take=10&kind=paid' },
   'conversations.stats': { method: 'GET', url: '/conversations/conv_02/stats' },
   'models.get': { method: 'GET', url: '/models/model_test' },
+  'models.sayHello': { method: 'GET', url: '/models/model_test/say-hello' },
   'scripts.list': { method: 'GET', url: '/scripts/model/model_test?take=20&withConversations=false' },
   'scriptSequences.list': { method: 'GET', url: '/script-sequences/model/model_test' },
   'vault.folders': { method: 'GET', url: '/models/model_test/vault-folders' },

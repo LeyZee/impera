@@ -186,13 +186,15 @@ const LinkRowSchema = z.object({
   platform_media_id: z.string(),
   media_asset_id: z.uuid().nullable(),
   description_id: z.uuid().nullable(),
+  imported: z.boolean(),
 });
 
 /**
  * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
  * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
  * not in the vault. `description_id`: the latest description of its media a human validated (ADR 0083), with its
- * `detailed` text, as the script sheet reads it (SC-04 lot c4). Keyed by account and platform id.
+ * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5). Keyed by
+ * account and platform id.
  */
 async function vaultLinksOf(
   tx: Transaction,
@@ -213,7 +215,8 @@ async function vaultLinksOf(
       (select md.id from ${schema.mediaDescriptions} md
         where md.media_asset_id = l.media_asset_id and md.validated_at is not null and md.content ? 'detailed'
         order by md.validated_at desc, md.created_at desc, md.id desc
-        limit 1) as description_id
+        limit 1) as description_id,
+      ${schema.vaultImported({ account: sql`l.platform_account_id`, media: sql`l.platform_media_id`, folder: sql`l.folder_ref` })} as imported
     from ${schema.mediaPlatformRefs} l
     where l.platform_account_id in (${accounts})
       and l.platform_media_id in (${refs})
@@ -224,7 +227,7 @@ async function vaultLinksOf(
       .parse(result.rows)
       .map((row) => [
         `${row.platform_account_id}:${row.platform_media_id}`,
-        { mediaAssetId: row.media_asset_id, descriptionId: row.description_id },
+        { mediaAssetId: row.media_asset_id, descriptionId: row.description_id, imported: row.imported },
       ]),
   );
 }

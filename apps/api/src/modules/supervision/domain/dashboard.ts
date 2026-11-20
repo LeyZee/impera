@@ -9,6 +9,7 @@ import {
   liveRate,
   replyOpenedAt,
   type AgentHours,
+  type DatedRanges,
   type AgentMode,
   type AutomaticGate,
   type LiveRateReading,
@@ -79,9 +80,9 @@ const UNANSWERED_AFTER_MINUTES = 30;
 export function unansweredSince(
   lastInboundAt: Date,
   now: Date,
-  her: { readonly hours: AgentHours; readonly timeZone: string },
+  her: { readonly hours: AgentHours; readonly timeZone: string; readonly exceptions?: DatedRanges },
 ): Date | null {
-  const opened = replyOpenedAt(her.hours, her.timeZone, now);
+  const opened = replyOpenedAt(her.hours, her.timeZone, now, her.exceptions);
   if (opened === null) return null;
   const counted = opened > lastInboundAt ? opened : lastInboundAt;
   return now.getTime() - counted.getTime() >= UNANSWERED_AFTER_MINUTES * MINUTE_MS ? lastInboundAt : null;
@@ -252,6 +253,9 @@ export function assembleDashboard(input: {
     period: input.period,
     mode: modeOf(facts),
     globalStop: facts.switches.global,
+    pausedUntil: facts.switches.creator ? (facts.pausedUntil?.toISOString() ?? null) : null,
+    hoursNow: facts.hoursNow,
+    resumesAs: facts.autoConversations > 0 ? 'auto' : 'copilot',
     automatic: { open: gate.open, missing: [...gate.missing] },
     liveRate: {
       rate: asPercent(reading.rate),

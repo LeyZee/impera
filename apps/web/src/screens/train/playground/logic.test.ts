@@ -29,7 +29,9 @@ import {
 
 describe('lesson words', () => {
   it('names no one in the help of « Règle »', () => {
-    expect(DESTINATION_HINTS.rule).toBe('Part au propriétaire pour validation, puis devient du code.');
+    expect(DESTINATION_HINTS.rule).toBe(
+      'Gardée pour être relue. Elle ne change rien toute seule pour l’instant.',
+    );
   });
 
   it('lists a manipulation attempt once when the trap already says it', () => {

@@ -27,6 +27,12 @@ describe('revealWordsOf (ADR 0104 § 12, § 15, § 17)', () => {
     expect(revealWordsOf({ kind: 'first_sale' }, P, TIERS)?.kicker).toBe('Trophée gagné');
   });
 
+  it('forges a rank, and nothing else', () => {
+    expect(revealWordsOf({ kind: 'level:3' }, P, TIERS)).toMatchObject({ kicker: 'Nouveau rang', forge: 3 });
+    expect(revealWordsOf({ kind: 'first_sale' }, P, TIERS)?.forge).toBeUndefined();
+    expect(revealWordsOf({ kind: 'tier:2026-11-01:200000' }, P, TIERS)?.forge).toBeUndefined();
+  });
+
   it('names a tier of the fortnight under way, with the bonus its statement gives', () => {
     const words = revealWordsOf({ kind: 'tier:2026-11-01:200000' }, P, TIERS);
     expect(words).toMatchObject({ kicker: 'Palier atteint', title: 'Palier Or', tone: 'gold' });

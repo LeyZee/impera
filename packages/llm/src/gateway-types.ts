@@ -1,4 +1,6 @@
 import type {
+  CommentOutcome,
+  CommentPromptInput,
   DropMediaDescription,
   FanCardRead,
   FanFlags,
@@ -46,6 +48,11 @@ export interface ConversationTurn {
    * shown in brackets before his block, never inside it.
    */
   readonly timeNote?: string;
+  /**
+   * What an automation of the platform wrote, or what his message answers (ADR 0110), written by code: on his turn,
+   * shown in brackets before his block; on hers, read into « le moment » by the agent, never shown in her turn.
+   */
+  readonly originNote?: string;
 }
 
 export interface VideoFrame {
@@ -237,6 +244,25 @@ export interface ChannelPostInput {
   readonly trace?: CallTrace;
 }
 
+/**
+ * A comment under one of her Instagram posts (ADR 0122 § 2), for the outcome she gives it. `comment` is the block the
+ * code prepared (`CommentPromptInput`): no name nor handle has a field to enter by. The persona sheet holds her public
+ * panels only.
+ */
+export interface InstagramCommentInput {
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  /** Her validated replies of the bank « commentaire »; empty: none. */
+  readonly examples: readonly string[];
+  /** Her most recent replies, so that she does not write the same one twice; empty: none. */
+  readonly recentReplies: readonly string[];
+  readonly comment: CommentPromptInput;
+  /** What the guards refused in a first reply: this call is the one rewrite (§ 3). Rule names only, never a text. */
+  readonly refusedBy?: readonly string[];
+  /** Always a comment call: its purpose is set by the gateway. */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
+}
+
 /** A media of a step, as its description tells it; a voice note is not described by the vision AI. */
 export interface ScriptSummaryMedia {
   readonly kind: 'image' | 'video' | 'audio';
@@ -367,6 +393,11 @@ export interface LlmGateway {
   ): Promise<Result<LlmSuccess<TrendCaptureDescription>, LlmFailure>>;
   /** A post or a poll of her Telegram channel (ADR 0080 § 5, role `voice`). */
   channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
+  /**
+   * What she does of a comment under one of her Instagram posts (ADR 0122 § 2, role `voice`), journaled under the
+   * purpose `instagram_comment` and stopped by the daily cap. The guards run after, in the code.
+   */
+  instagramComment(input: InstagramCommentInput): Promise<Result<LlmSuccess<CommentOutcome>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
   /** A native script's identity (SC-04 lot c8, prompt `brain/script-identity`), under the daily cap. */
@@ -416,6 +447,7 @@ export interface LlmGatewayDeps {
     readonly trendCaptures?: PromptTemplate;
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
+    readonly instagramComment?: PromptTemplate;
     readonly scriptSummary?: PromptTemplate;
     readonly scriptIdentity?: PromptTemplate;
     readonly fanCard?: PromptTemplate;
