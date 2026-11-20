@@ -100,7 +100,7 @@ export interface ComposerPersona {
  * The examples this fan's turn may carry (ADR 0102 § 2, § 4): an explicit one only once his adult age is confirmed and
  * he did not ask for nothing explicit, as for her own words (P3-09); then the twelve most recent.
  */
-export function examplesForTurn(examples: readonly VoiceExample[], explicitAllowed: boolean): VoiceExample[] {
+function examplesForTurn(examples: readonly VoiceExample[], explicitAllowed: boolean): VoiceExample[] {
   return examples
     .filter((e) => explicitAllowed || checkExplicit([e.text]).length === 0)
     .slice(0, VOICE_EXAMPLES_MAX);

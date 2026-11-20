@@ -48,7 +48,6 @@ export {
   createDbVoiceBankStore,
   createDbVoiceExampleBank,
   importRatings,
-  type RatingImport,
 } from './infra/db/rating-store';
 export type { DesireMarkRecord } from './application/desire-marks';
 
