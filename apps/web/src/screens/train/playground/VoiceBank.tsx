@@ -30,7 +30,16 @@ export function exampleStatus(example: Pick<VoiceBankExample, 'state' | 'isRead'
   return example.isRead ? 'Lu par sa voix' : 'En réserve';
 }
 
-export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element | null {
+export function VoiceBankFold({
+  state,
+  pg,
+  mayWithdraw = true,
+}: {
+  state: PlaygroundState;
+  pg: Playground;
+  /** The owner alone withdraws an example (ADR 0092 § 8); a manager reads her bank. */
+  mayWithdraw?: boolean;
+}): JSX.Element | null {
   const played = state.persona.played ?? null;
   const queryClient = useQueryClient();
   const [asked, setAsked] = useState<string | null>(null);
@@ -128,17 +137,19 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
                 ) : (
                   <span className="pg-bank__foot">
                     <span className="pg-bank__status">{exampleStatus(example)}</span>
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--soft nv-btn--sm"
-                      disabled={asked !== null}
-                      onClick={() => {
-                        setWithdrawnAt(null);
-                        setAsked(example.id);
-                      }}
-                    >
-                      Retirer
-                    </button>
+                    {mayWithdraw ? (
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--soft nv-btn--sm"
+                        disabled={asked !== null}
+                        onClick={() => {
+                          setWithdrawnAt(null);
+                          setAsked(example.id);
+                        }}
+                      >
+                        Retirer
+                      </button>
+                    ) : null}
                   </span>
                 )}
               </li>

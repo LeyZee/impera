@@ -138,8 +138,11 @@ describe('her scripts in the playground (ADR 0103 § 15)', () => {
         return Promise.resolve(asked.length === 1 ? [ready] : null);
       },
     });
-    expect((await source(creatorId, 'user-1')).kind).toBe('ready');
+    expect((await source(creatorId, { userId: 'user-1', role: 'owner' })).kind).toBe('ready');
     expect(asked).toEqual([[creatorId, { userId: 'user-1', role: 'owner' }]]);
-    expect(await source(creatorId, 'user-1')).toEqual({ kind: 'none', reason: 'unreadable' });
+    expect(await source(creatorId, { userId: 'user-1', role: 'owner' })).toEqual({
+      kind: 'none',
+      reason: 'unreadable',
+    });
   });
 });

@@ -1,6 +1,8 @@
 import { Outlet, useRouterState } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
+import { useTrainsAsOwner } from './playground/trainer';
+
 import { Page, PageHeader, SubNav, type SubNavItem } from '@/shell/layout';
 
 /**
@@ -13,8 +15,12 @@ const TRAIN_TABS: readonly SubNavItem[] = [
   { to: '/entrainer/canal', label: 'Post du canal' },
 ];
 
+/** A manager trains the chat alone: her channel's posts are the owner's (ADR 0092 § 8). */
+const MANAGER_TABS: readonly SubNavItem[] = TRAIN_TABS.slice(0, 1);
+
 export function TrainLayout(): JSX.Element {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const tabs = useTrainsAsOwner() ? TRAIN_TABS : MANAGER_TABS;
   const canal = pathname.startsWith('/entrainer/canal');
   // The Playground scrolls its thread inside and keeps the composer in view: its page fills the stage.
   return (
@@ -29,7 +35,7 @@ export function TrainLayout(): JSX.Element {
             : 'Parle à la persona comme un fan, avant qu’un vrai fan ne la lise : rien n’est envoyé.'
         }
         // One screen is no choice: no tab bar until there is a second one.
-        {...(TRAIN_TABS.length > 1 && { tabs: <SubNav label="Entraîner" items={TRAIN_TABS} /> })}
+        {...(tabs.length > 1 && { tabs: <SubNav label="Entraîner" items={tabs} /> })}
       />
       <Outlet />
     </Page>

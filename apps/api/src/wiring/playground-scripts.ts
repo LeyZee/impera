@@ -47,9 +47,12 @@ export function playgroundCatalogueOf(scripts: readonly HerScript[]): HerCatalog
 export function createPlaygroundScripts(
   scripts: Pick<ScriptsModule['reads'], 'platformScripts'>,
 ): HerScriptsSource {
-  return async (creatorId, userId) => {
-    // The playground's routes are the owner's alone (`requireRole('owner')`).
-    const read = await scripts.platformScripts(CreatorIdSchema.parse(creatorId), { userId, role: 'owner' });
+  return async (creatorId, trainer) => {
+    // Read with the trainer's own rights: the owner, or an active manager for the creators of his list (ADR 0092 § 8).
+    const read = await scripts.platformScripts(CreatorIdSchema.parse(creatorId), {
+      userId: trainer.userId,
+      role: trainer.role,
+    });
     return read === null ? { kind: 'none', reason: 'unreadable' } : playgroundCatalogueOf(read);
   };
 }
