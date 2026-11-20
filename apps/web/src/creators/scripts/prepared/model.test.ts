@@ -50,6 +50,34 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
     expect(paths.shown).toHaveLength(8);
   });
 
+  it('never counts a path through a branch kept for those who took another branch before', () => {
+    const [first, second] = CONTENT.steps;
+    if (first === undefined || second === undefined) throw new Error('fixture');
+    const special = second.branches[1];
+    if (special === undefined) throw new Error('fixture');
+    const followers = {
+      ...CONTENT,
+      steps: [
+        first,
+        second,
+        {
+          key: crypto.randomUUID(),
+          rhythm: 2,
+          branches: [
+            branchOf(20, { condition: { kind: 'none' }, priceMinor: 2000 }),
+            branchOf(21, {
+              condition: { kind: 'structured', rule: { kind: 'previous_branch', stepRef: special.key } },
+              priceMinor: 4000,
+            }),
+          ],
+        },
+      ],
+    };
+    const paths = scriptPaths(followers);
+    expect(paths.count).toBe(3);
+    expect(paths.shown.map((path) => path.totalMinor)).toEqual([3200, 3500, 5500]);
+  });
+
   it('says each gap where it is, and a limit as she wrote it', () => {
     const second = CONTENT.steps[1]?.branches[1]?.key ?? null;
     expect(gapText(CONTENT, { code: 'name_missing', step: null, branch: null, term: null })).toBe(

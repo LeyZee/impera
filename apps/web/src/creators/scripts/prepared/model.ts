@@ -198,15 +198,39 @@ export interface ScriptPath {
 /** Paths shown at most: past that, the rail says how many more there are. */
 export const PATHS_SHOWN = 8;
 
+const followed = (branch: PreparedBranch): string | null =>
+  branch.condition?.kind === 'structured' && branch.condition.rule.kind === 'previous_branch'
+    ? branch.condition.rule.stepRef
+    : null;
+
 /**
- * Every path, the default branches first; named after the last branch taken that is not a default one. Counted
- * without building more than `PATHS_SHOWN` of them (four branches on ten steps would be a million).
+ * The paths a fan can take: one branch at each step, never a branch kept for those who took another branch before.
+ * Counted step by step on the branches some later branch follows (four branches on ten steps would be a million to
+ * walk), and only the first `PATHS_SHOWN` built, the default branches first, each named after the last branch taken
+ * that is not a default one.
  */
 export function scriptPaths(content: PreparedScriptContent): {
   readonly shown: readonly ScriptPath[];
   readonly count: number;
 } {
-  const count = content.steps.reduce((all, step) => all * step.branches.length, 1);
+  const watched = new Set(
+    content.steps.flatMap((step) => step.branches.map(followed)).filter((key) => key !== null),
+  );
+  let ways = new Map<string, number>([['', 1]]);
+  for (const step of content.steps) {
+    const next = new Map<string, number>();
+    for (const [state, n] of ways) {
+      const taken = new Set(state === '' ? [] : state.split(' '));
+      for (const branch of step.branches) {
+        const after = followed(branch);
+        if (after !== null && !taken.has(after)) continue;
+        const key = watched.has(branch.key) ? [...taken, branch.key].sort().join(' ') : state;
+        next.set(key, (next.get(key) ?? 0) + n);
+      }
+    }
+    ways = next;
+  }
+  const count = [...ways.values()].reduce((sum, n) => sum + n, 0);
   const shown: ScriptPath[] = [];
   const walk = (step: number, taken: readonly PreparedBranch[]): void => {
     if (shown.length >= PATHS_SHOWN) return;
@@ -223,7 +247,11 @@ export function scriptPaths(content: PreparedScriptContent): {
     const ordered = [...one.branches].sort(
       (a, b) => Number(b.condition?.kind === 'none') - Number(a.condition?.kind === 'none'),
     );
-    for (const branch of ordered) walk(step + 1, [...taken, branch]);
+    for (const branch of ordered) {
+      const after = followed(branch);
+      if (after !== null && !taken.some((was) => was.key === after)) continue;
+      walk(step + 1, [...taken, branch]);
+    }
   };
   walk(0, []);
   return { shown, count };

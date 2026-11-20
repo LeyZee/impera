@@ -411,7 +411,7 @@ function BranchCard({
         </Field>
       )}
       <div className="se-foot">
-        <label className="se-kv" htmlFor={`${id}-price`}>
+        <label className="se-kv se-kv--price" htmlFor={`${id}-price`}>
           <span>Prix TTC</span>
           <input
             id={`${id}-price`}
