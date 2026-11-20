@@ -71,7 +71,10 @@ export function TrackingPage({
   selfScope = false,
   nothingListed,
   nav,
+  only = null,
 }: {
+  /** The creator the menu's selector is set on, or null for all of them (« Toutes », and every account without it). */
+  only?: string | null;
   /** The conversation open in the reader (`/suivi?conversation=<id>`), or null for the list alone. */
   selected: string | null;
   /** The creator the link names for it (`&creatrice=<id>`), read first when she is one of this account's. */
@@ -100,7 +103,10 @@ export function TrackingPage({
   nav?: ReactNode;
 }): JSX.Element {
   const creatorsQuery = useCreators();
-  const creators = creatorsQuery.data ?? [];
+  const listed = creatorsQuery.data ?? [];
+  // The menu's selector set on one creator (ADR 0134 § 3): Suivi reads her alone, as an account that has only her.
+  const narrowed = only !== null && listed.some((creator) => creator.id === only);
+  const creators = narrowed ? listed.filter((creator) => creator.id === only) : listed;
   const queries = useQueries({
     queries: creators.map((creator) => ({
       queryKey: ['conversations', creator.id],
@@ -156,7 +162,7 @@ export function TrackingPage({
     if (queue.isError) void queue.refetch();
   };
   // Each line of the queue carries its creator: its conversation opens with her id.
-  const todos = queue.data?.items ?? [];
+  const todos = (queue.data?.items ?? []).filter((todo) => !narrowed || todo.creatorId === only);
   // « Nothing for you » only once the queue answered: a queue in error or on its way may hide an urgency (relecture #538).
   const isQueueEmpty = queue.isSuccess && todos.length === 0;
   // The gravest first (the server's order): three lines keep the search and the list above the fold; the one open stays.

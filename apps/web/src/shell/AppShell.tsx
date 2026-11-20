@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom';
 
 import { AgentPill } from './AgentPill';
 import { AppearanceChoice } from './AppearanceChoice';
+import { CreatorScope, scopesCreators } from './CreatorScope';
 import { MediaBlurToggle } from './MediaBlurToggle';
 import { NavIcon } from './NavIcon';
 import { RailCount } from './RailCount';
@@ -31,6 +32,7 @@ import {
   type Rail,
 } from './nav';
 
+import { useCreatorScope } from '@/agent/scope';
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
 import { useFollowDeviceZone } from '@/pwa/device-zone';
@@ -151,10 +153,16 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             <i />
             <i />
           </div>
-          <RailNav rail={rail} current={lit} onSignOut={onSignOut} account={account}>
+          <RailNav
+            rail={rail}
+            current={lit}
+            onSignOut={onSignOut}
+            account={account}
+            head={scopesCreators(user) ? <CreatorScope place="rail" /> : undefined}
+          >
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
-          <Stage key={current ?? 'none'} pathname={pathname} stage={main} />
+          <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
           <div className="nv-offline-region" role="status">
@@ -192,7 +200,16 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
  * The stage of one section, made anew when the section changes. Once a sub-tab of the same section is chosen, the
  * page's header no longer plays its entrance: the title stays where it is and the sub-tabs' glass slides (NAV-08).
  */
-function Stage({ pathname, stage }: { pathname: string; stage: RefObject<HTMLElement | null> }): JSX.Element {
+function Stage({
+  pathname,
+  stage,
+  scoped,
+}: {
+  pathname: string;
+  stage: RefObject<HTMLElement | null>;
+  /** The account chooses a creator: on a phone the selector heads the page, the menu having no room for it. */
+  scoped: boolean;
+}): JSX.Element {
   const [first] = useState(pathname);
   const [within, setWithin] = useState(false);
   if (!within && pathname !== first) setWithin(true);
@@ -201,6 +218,7 @@ function Stage({ pathname, stage }: { pathname: string; stage: RefObject<HTMLEle
       {/* On a phone the install card heads the page, in its flow: it never covers what the page shows (recette 11/11,
           SOC-14). A computer keeps it in its corner. */}
       <InstallNudge />
+      {scoped ? <CreatorScope place="page" /> : null}
       <Outlet />
     </main>
   );
@@ -215,9 +233,12 @@ export function RailNav({
   current,
   onSignOut,
   account,
+  head,
   children,
 }: {
   rail: Rail;
+  /** Under the mark, before the tabs: the creator selector of the accounts that choose one (ADR 0134 § 3). */
+  head?: JSX.Element | undefined;
   /** The section on screen, or null outside every section (an unknown address): no tab is lit. */
   current: string | null;
   /**
@@ -283,15 +304,20 @@ export function RailNav({
       lens.style.removeProperty('transition');
     });
     observer.observe(nav);
+    const headEl = nav.querySelector('.nv-rail__head');
+    if (headEl !== null) observer.observe(headEl);
     return () => {
       observer.disconnect();
     };
   }, [current]);
 
+  const { chosen: scoped } = useCreatorScope();
   const link = (item: NavItem): JSX.Element => (
     <Link
       key={item.to}
       to={item.to}
+      // Créatrices opens on the creator the selector is set on: there the address is the choice (ADR 0134 § 3).
+      {...(item.to === '/creatrices' && scoped !== null ? { search: { creatrice: scoped } } : {})}
       data-section={item.to}
       data-phone={rail.more.has(item.to) ? 'more' : 'bar'}
       className="nv-rail__item"
@@ -325,6 +351,8 @@ export function RailNav({
         <img className="nv-rail__mark" src="/impera-mark.svg" alt="" width={30} height={30} />
         <span className="nv-rail__name">Impera</span>
       </Link>
+      {/* Always there, even empty: the lens is placed again when the selector comes in or goes (its creators read). */}
+      <div className="nv-rail__head">{head}</div>
       <span className="nv-rail__lens" ref={lensRef} aria-hidden="true" />
       {rail.items.map((item, index) => {
         // The first tab of a family opens it: with a heading, or a gap when the family has that tab alone. A rail with no
@@ -367,6 +395,13 @@ export function RailNav({
         >
           <NavIcon name="more" />
           <span className="nv-rail__label">Plus</span>
+          {/* What waits under « Plus » (Paie's statements): a dot on its corner, the words for a screen reader. The
+              figures themselves are in the sheet (ADR 0134 § 8). */}
+          <span className="nv-rail__under">
+            {more.map((item) => (
+              <RailCount key={item.to} section={item.to} />
+            ))}
+          </span>
         </button>
       )}
       {children}

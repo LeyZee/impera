@@ -432,6 +432,18 @@
   align-items: center;
   gap: var(--nv-space-3) var(--nv-space-6);
 }
+/* « Dans mon téléphone »: at the bar's end, apart from the choices of what the calendar shows. */
+.cal-bar__end {
+  margin-left: auto;
+}
+.cal-bar__mark {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
 .cal-bar > .tm-choices + .tm-choices {
   padding-left: var(--nv-space-6);
   border-left: 1px solid var(--nv-hairline);

@@ -1,0 +1,7 @@
+# 2026-11-16 : les notes du Playground en base (AGE-06)
+
+- **Fiche** : ADR 0103 § 2, AGE-06, premier des cinq points « que chaque remarque serve vraiment » (fil Playground).
+- **Fait** : l'API garde les notes du Playground dans `calibration_ratings` (source `playground`), par créatrice et par version de persona, sous `withTenant`, avec la base et ses sauvegardes. Une correction rangée en Exemple de voix y entre `active` ; un exemple `withdrawn` est relu sans sa destination, donc hors de sa banque. Au démarrage, `ratings.jsonl` est importé : chaque note garde un id dérivé du sien (le même à chaque fois, l'import est rejouable), celles de la persona inventée ne sont pas gardées (§ 7), puis le fichier est renommé `ratings.jsonl.imported-<horodatage>`, jamais supprimé ; s'il reste une note refusée par la table, il n'est pas renommé. Le schéma de lecture devient `CalibrationRecordSchema`, exporté par `agent`. Aucune migration : la table existe (0185).
+- **Tests** : unitaires (ids dérivés, comptes de l'import, fichier intact) ; intégration (import rejoué sans doublon, lecture par créatrice dans l'ordre, exemple retiré, note refusée comptée).
+- **Reste** : b) la production lit les mêmes exemples (ADR 0102) ; c) écran Leçons ; d) Tests en scénarios d'évaluation ; e) compteur.
+- **Découvertes** : le Playground du terminal (`apps/api/src/scripts/playground.ts`) écrit toujours dans le fichier ; ses notes n'entrent en base qu'au prochain démarrage de l'API, et sa commande `/tests` ne voit plus les notes déjà importées.

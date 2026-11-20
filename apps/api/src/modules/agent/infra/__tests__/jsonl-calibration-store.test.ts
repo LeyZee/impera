@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
-import { replayableTests, voiceExamples, type CalibrationRecord } from '../calibration-record';
+import {
+  pickVoiceExamples,
+  replayableTests,
+  voiceExamples,
+  type CalibrationRecord,
+} from '../calibration-record';
 import { createJsonlCalibrationStore } from '../jsonl-calibration-store';
 
 const dirs: string[] = [];
@@ -55,7 +60,7 @@ describe('JSONL calibration store', () => {
     const records = await store.list();
     expect(records.map((r) => r.id)).toEqual(['a', 'b', 'c']);
     expect(records[0]?.moment.situation.now).toEqual(new Date('2026-10-17T21:30:00Z'));
-    expect(voiceExamples(records, HERS)).toEqual(['Coucou toi ✨']);
+    expect(voiceExamples(records, HERS).map((e) => e.text)).toEqual(['Coucou toi ✨']);
     expect(replayableTests(records).map((r) => r.id)).toEqual(['b', 'c']);
   });
 
@@ -71,8 +76,23 @@ describe('JSONL calibration store', () => {
       corrected('d', 'Je suis une IA'),
       corrected('e', 'Et toi alors 😏'),
     ];
-    expect(voiceExamples(records, HERS)).toEqual(['Et toi alors 😏', 'Coucou toi ✨']);
+    expect(voiceExamples(records, HERS).map((e) => e.text)).toEqual(['Et toi alors 😏', 'Coucou toi ✨']);
     const invented = [record('f', { kind: 'corrected', text: 'Sur la persona inventée' }, false)];
     expect(voiceExamples(invented, HERS)).toEqual([]);
+  });
+});
+
+describe('pickVoiceExamples (ADR 0102 § 2, § 4)', () => {
+  it('keeps her bank’s order, leaves out what her hard guards stop, and gives twelve at most', () => {
+    const bank = [
+      { id: 'n', text: 'Hey toi, le plus récent' },
+      { id: 'ia', text: 'Je suis une IA' },
+      ...Array.from({ length: 14 }, (_, i) => ({ id: `e${String(i)}`, text: `Coucou ${String(i)}` })),
+    ];
+    const picked = pickVoiceExamples(bank, DEFAULT_GUARD_SETTINGS);
+    expect(picked).toHaveLength(12);
+    expect(picked[0]?.id).toBe('n');
+    expect(picked.map((e) => e.id)).not.toContain('ia');
+    expect(pickVoiceExamples(bank, DEFAULT_GUARD_SETTINGS, 2).map((e) => e.id)).toEqual(['n', 'e0']);
   });
 });

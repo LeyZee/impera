@@ -130,10 +130,7 @@ function Offline({
       {creatorName === null ? null : (
         <header className="db-top nv-enter">
           {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
-          <CreatorPicker
-            onChoose={onCreator}
-            agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
-          />
+          {agency === undefined ? <CreatorPicker onChoose={onCreator} /> : null}
           <div className="db-top__who">
             <span className="db-top__av" aria-hidden="true">
               {initialOf(creatorName)}
@@ -222,11 +219,6 @@ export function DashboardPage({
       <div className="db" aria-busy="true">
         <PageHeader title="Dashboard" />
         {/* The chips keep their place while her Dashboard loads: nothing jumps when it comes (ADM-21). */}
-        {agency === undefined ? null : (
-          <header className="db-top">
-            <CreatorPicker onChoose={onCreator} agency={{ selected: false, onChoose: agency.onAgency }} />
-          </header>
-        )}
         <div className="db-loading nv-plate" aria-label="Chargement du Dashboard" role="status" />
       </div>
     );
@@ -285,7 +277,7 @@ function Loaded({
   const sales = data.sales?.[period] ?? null;
   // With several creators the chips above name her: the header does not say her name a second time (DASH-03).
   const creators = useCreators().data;
-  const several = (creators?.length ?? 0) >= 2;
+  const several = agency === undefined && (creators?.length ?? 0) >= 2;
   // Her photo copied at her import (CRM-07 b2), read in the list: the Dashboard's answer does not carry it.
   const hasPhoto = creators?.find((one) => one.id === creatorId)?.hasAvatar === true;
 
@@ -333,10 +325,8 @@ function Loaded({
       <PageHeader title="Dashboard" />
       <header className="db-top nv-enter">
         {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
-        <CreatorPicker
-          onChoose={onCreator}
-          agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
-        />
+        {/* The owner and an active manager choose her in the menu's selector instead (ADR 0134 § 3). */}
+        {agency === undefined ? <CreatorPicker onChoose={onCreator} /> : null}
         <div className="db-top__who">
           {several ? null : (
             <CreatorFace

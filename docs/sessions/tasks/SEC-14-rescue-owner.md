@@ -22,7 +22,7 @@ Appliquer l'ADR 0096 : le propriétaire fait d'un membre de l'équipe un second 
 - [x] Alertes de sécurité (Telegram) et lignes du journal pour chaque geste.
 - [x] Aucun autre geste ne ferme la porte à un propriétaire : statut de sa fiche de membre, lien de mot de passe, retrait de ses clés d'accès par l'autre.
 - [x] Écran : le panneau « Propriétaires » de Réglages › Sécurité.
-- [ ] Captures validées par Charles (Nuit, Jour, bureau, téléphone).
+- [x] Captures validées par Charles (Nuit, Jour, bureau, téléphone).
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
