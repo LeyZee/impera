@@ -1,8 +1,8 @@
 # 0145. Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed, le code lit le rôle et jamais le nom
 
-Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
+Statut : accepted (Charles, 16/11/2026, 17 h 36, « ok 0145 » ; avenant du § 5 accepté le 17/11/2026, 14 h 17, « oki parfait » ; amendée par Charles le même jour à 17 h 41 après la capture : réserves Mass DM et Feed à nous ; demande de Charles, 16/11/2026, 17 h 28 : « tu crées un nouveau dossier et tu mets les médias dans ce nouveau dossier […] comme ça, ça se mélange pas avec le reste », « il faudrait créer un dossier Mass DM et un dossier post-feed »)
 Date : 2026-11-16
-Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR.
+Amende : l'ADR 0099 § 2 (« le CRM ne crée aucun dossier du coffre »), pour les seuls dossiers de cette ADR. Avenant du 17/11 : amende aussi l'ADR 0113 § 5 (la description du coffre ne part plus seule, par lots, mais sur une sélection confirmée) et l'ADR 0083 § 9 (plus d'interrupteur des descriptions : un dépôt est décrit à son arrivée).
 Précise : l'ADR 0056 (§ 5 la nomenclature, § 7 vers Reveal dans l'ordre), l'ADR 0113 § 5 (ce qui est décrit), l'ADR 0018 (garde d'écriture), l'ADR 0136 (feed) et l'ADR 0137 (Mass DM).
 
 ## Contexte
@@ -51,9 +51,16 @@ La garde vit dans le domaine. Elle est testée en unitaire et contre `FakeReveal
 
 À la synchronisation, un dossier inconnu arrive `unclassified`. Charles lui donne son rôle une fois, dans l'écran du coffre. Le CRM peut lui proposer un rôle d'après le nom (« SCRIPT … » → `script`), mais ce n'est qu'une proposition : il la confirme. Un dossier sans rôle confirmé reste `unclassified`.
 
-### 5. Ce qui est décrit
+### 5. Ce qui entre dans le CRM, et ce qui est décrit
 
-Par défaut, la description par la vision (ADR 0113 § 5, amendée le 16/11) ne prend que les médias des dossiers, jamais ceux de la racine (Charles, 16/11, 17 h 28 : « prends seulement ce qu'il y a dans les dossiers »). Sur chaque dossier, un interrupteur « Décrire » permet de l'en retirer. Une option « Tous les médias » ajoute ceux de la racine, s'il le décide. Avant de lancer, l'écran annonce le nombre de médias et le coût estimé.
+*Avenant du 17/11/2026, accepté par Charles (« oki parfait », 14 h 17 ; demande de Charles, 17/11, 14 h 13 heure de Paris, après avoir ouvert l'écran du coffre : « il ne faut pas que ça importe tout », « je dois pouvoir sélectionner soit les fichiers séparés, soit les dossiers entiers », « des petites coches », « le bouton faire la description par IA avec le coût »). Il remplace la règle précédente de ce paragraphe (les dossiers décrits par défaut, un interrupteur « Décrire » par dossier, une option « Tous les médias »).*
+
+- **La synchronisation lit tout, le CRM ne garde que ce qui est choisi.** La synchronisation reste la lecture gratuite de la liste du coffre, sans fichier (ADR 0099). Chaque dossier porte une coche « Importer », et chaque média la sienne. Un média est importé si son dossier est coché et que lui-même n'est pas décoché, ou s'il est coché à part.
+- **Rien n'est importé sans un geste.** La racine du coffre et tout dossier qui apparaît dans Reveal arrivent non cochés. Seul un dossier de script créé par le CRM (§ 3) arrive coché, puisqu'il naît d'un dépôt accepté.
+- **Un média non importé reste visible dans l'écran du coffre**, en retrait, pour qu'on puisse le cocher. L'agent, le copilote, les scripts et les Mass DM ne le voient pas : il n'existe pas pour eux.
+- **La description par la vision ne part qu'à la demande** (ADR 0113 § 5, ADR 0083). Dans un dossier ouvert, on coche un, plusieurs ou tous les médias importés. Une barre annonce le nombre et le coût estimé (« Décrire 12 médias · ≈ 0,06 € »). Rien ne part avant la confirmation. Un média déjà décrit n'est pas compté deux fois. Aucun job ne décrit plus le coffre de lui-même, et aucun interrupteur global ne fait décrire en continu (Charles, 17/11, 14 h 20 : « c'est moi qui dois choisir qu'est-ce que je veux décrire pour maîtriser les coûts ») : la passe horaire est retirée, et l'interrupteur « Descriptions par l'IA » de la fiche disparaît. Un dépôt de la créatrice par le CRM reste décrit d'office : le dépôt vaut choix (Charles, 17/11, 14 h 21, sur la question posée). Le plafond de dépense de l'IA (ADR 0091) s'applique comme ailleurs.
+- **Qui choisit.** Le propriétaire coche et lance. Un manager actif voit ce qui est importé et décrit, sans cocher ni lancer.
+- Les coches de l'écran sont des contrôles du design system, jamais des cases natives.
 
 ### 6. Ce que la capture a montré, et l'idempotence
 
@@ -63,6 +70,7 @@ La capture ciblée a été faite le 16/11 sur le PC de Charles et lue sur place 
 
 - Une table ou une colonne garde le rôle des dossiers du coffre (`vault_folder_role`, terme ajouté au glossaire). La migration est additive : tout dossier existant arrive `unclassified`.
 - L'écran du coffre montre le rôle de chaque dossier et permet de le changer. Le propriétaire est seul à décider ; le manager voit.
+- Une table garde la sélection d'import du coffre (dossier entier ou média seul), additive, sous RLS forcée ; tout ce qui existe arrive non importé, et le job qui décrivait seul les médias en attente cesse de partir. La lecture des médias par l'agent et le copilote filtre sur la sélection.
 - L'agent et le copilote lisent le rôle avec le média. La garde du § 2 s'ajoute à celles de l'envoi.
 - Sans la capture, ou si Reveal ne permet pas ces écritures, l'ADR 0056 § 7 s'applique : export ZIP et fiche à recopier, avec le nom de dossier à créer à la main.
 

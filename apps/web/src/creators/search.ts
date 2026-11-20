@@ -15,6 +15,7 @@ export interface CreatorsSearch {
     | 'scripts'
     | 'contenu'
     | 'telegram'
+    | 'alertes'
     | 'liens'
     | 'profil';
   readonly creatrice?: CreatorId;
@@ -37,6 +38,7 @@ export type CreatorSheet =
   | 'scripts'
   | 'content'
   | 'telegram'
+  | 'alerts'
   | 'links'
   | 'profile';
 
@@ -50,6 +52,7 @@ const SLUGS = {
   scripts: 'scripts',
   content: 'contenu',
   telegram: 'telegram',
+  alerts: 'alertes',
   links: 'liens',
   profile: 'profil',
 } as const;
@@ -63,6 +66,7 @@ const SHEETS = {
   scripts: 'scripts',
   contenu: 'content',
   telegram: 'telegram',
+  alertes: 'alerts',
   liens: 'links',
   profil: 'profile',
 } as const;
@@ -78,6 +82,7 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
   'scripts',
   'content',
   'telegram',
+  'alerts',
   'links',
   'profile',
 ];
@@ -115,6 +120,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     tab === SLUGS.scripts ||
     tab === SLUGS.content ||
     tab === SLUGS.telegram ||
+    tab === SLUGS.alerts ||
     tab === SLUGS.links ||
     tab === SLUGS.profile
       ? { onglet: tab }

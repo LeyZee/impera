@@ -55,7 +55,6 @@ const SUMMARY: ScriptDropSummary = {
 
 const TARGET: ScriptToSummarize = {
   creatorId: 'creator',
-  describes: true,
   versionId: 'version',
   moment: 'night',
   files: [
@@ -222,14 +221,12 @@ describe('content-drops › content_drops.summarize_script (ADR 0083 § 6)', () 
     expect(undescribed.asked).toEqual([]);
   });
 
-  it('does nothing while her switch is off, for a set already told, or a drop gone', async () => {
-    const off = fakes({ target: { ...TARGET, describes: false } });
-    expect(await summarizeScript(off.deps, 'drop', NOW, 'corr')).toBe('off');
+  it('does nothing for a set already told, or a drop gone', async () => {
     const already = fakes({ summarized: true });
     expect(await summarizeScript(already.deps, 'drop', NOW, 'corr')).toBe('already');
     const gone = fakes({ target: null });
     expect(await summarizeScript(gone.deps, 'drop', NOW, 'corr')).toBe('gone');
-    expect([...off.asked, ...already.asked, ...gone.asked]).toEqual([]);
+    expect([...already.asked, ...gone.asked]).toEqual([]);
   });
 
   it('asks again an hour later when the day’s budget is spent', async () => {

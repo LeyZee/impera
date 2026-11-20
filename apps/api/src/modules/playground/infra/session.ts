@@ -129,6 +129,8 @@ export interface PlaygroundSession {
   /** Her next follow-up on his silence, as `conversation.follow_up` would ask for it at the simulated time (P3-10). */
   followUp(): Promise<PlaygroundFollowUp>;
   setFanNotes(notes: readonly string[]): void;
+  /** His age as already confirmed before the conversation (a simulated fan she knows), or unknown again. */
+  confirmAge(at: Date | null): void;
   reset(): void;
   readonly history: readonly ConversationTurn[];
   readonly fanNotes: readonly string[];
@@ -299,6 +301,10 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
 
     setFanNotes(notes) {
       fanNotes.splice(0, fanNotes.length, ...notes);
+    },
+
+    confirmAge(at) {
+      ageConfirmedAt = at;
     },
 
     sendCreatorMedia(description, isLocked) {

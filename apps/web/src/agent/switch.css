@@ -1,0 +1,137 @@
+/*
+ * Her AI's switch (ADR 0148 § 1): the state in words, then the gestures. In her sheet's header, next to her name,
+ * without a card (avis Design, 19/11); on her card in the list, one block above the figures, the same two lines on
+ * every card (state, then detail) so that the cards' rows line up. The AI is violet (`--nv-agent`, as in the
+ * calendar), a pause or a stop amber: a state someone chose, never an alarm. No coloured bar on any side.
+ */
+.ai-switch {
+  position: relative;
+  /* Above the card's stretched link: its buttons stay their own. */
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-3) var(--nv-space-4);
+  min-width: 0;
+}
+
+.ai-switch__state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  margin: 0;
+}
+
+.ai-switch .nv-dot.ai-switch__dot {
+  flex: none;
+  /* On the first line's middle, whatever the second says. */
+  margin-top: calc((1lh - 8px) / 2);
+}
+.ai-switch .nv-dot.ai-switch__dot--on {
+  --_c: var(--nv-agent);
+}
+.ai-switch .nv-dot.ai-switch__dot--out {
+  --_c: var(--nv-ink-faint);
+}
+.ai-switch .nv-dot.ai-switch__dot--paused,
+.ai-switch .nv-dot.ai-switch__dot--off,
+.ai-switch .nv-dot.ai-switch__dot--global {
+  --_c: var(--nv-warning);
+}
+
+.ai-switch__words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ai-switch__label {
+  font-weight: 600;
+}
+.ai-switch[data-state='paused'] .ai-switch__label,
+.ai-switch[data-state='off'] .ai-switch__label,
+.ai-switch[data-state='global'] .ai-switch__label {
+  color: var(--nv-warning);
+}
+
+.ai-switch__detail {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+
+.ai-switch__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+
+.ai-switch__notice {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+
+/* On a card: the state over the full width, two lines always (the second kept even when empty), the gestures under. */
+.ai-switch--card {
+  flex-direction: column;
+  align-items: stretch;
+}
+.ai-switch--card .ai-switch__words {
+  min-height: 2lh;
+}
+.ai-switch--card .ai-switch__detail:empty::before {
+  content: '\00a0';
+}
+
+/* In the header: on the right of her name on a wide screen, under it on a phone (the header's own rule). */
+.ai-switch--header {
+  justify-content: flex-end;
+}
+.ai-switch--header .ai-switch__state {
+  text-align: start;
+}
+
+/* The dialogs' sentence over the whole width under the title. */
+.ai-dialog__lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+
+/* The pause's choices: one large button each, the end written in her clock. */
+.ai-pause {
+  display: grid;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-4);
+}
+.ai-pause .ai-pause__choice {
+  height: auto;
+  min-height: 48px;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  white-space: normal;
+}
+
+.ai-cut {
+  margin: var(--nv-space-3) 0 0;
+  padding-inline-start: var(--nv-space-5);
+  color: var(--nv-ink-muted);
+}
+
+/* A phone: her AI's state between her name and the tabs, so it never reads as the tab's content (avis Design, 19/11),
+   its button on the page's right edge. */
+@media (max-width: 820px) {
+  .nv-page__head:has(.ai-switch--header) > .nv-page__actions {
+    grid-row: 2;
+    justify-content: stretch;
+  }
+  .nv-page__head:has(.ai-switch--header) > .nv-page__tabs {
+    grid-row: 3;
+  }
+  .ai-switch--header {
+    flex: 1;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+  }
+}

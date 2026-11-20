@@ -56,6 +56,8 @@ export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
   days: days.map((day, i) => ({
     day,
     revenueMinor: 20_000 + i * 2_000,
+    agencyMinor: 6_400 + i * 640,
+    creatorMinor: 9_600 + i * 960,
     byCreator: [
       { creatorId: LINA, revenueMinor: 12_000 + i * 1_500 },
       { creatorId: MAYA, revenueMinor: 8_000 + i * 500 },

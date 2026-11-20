@@ -1,5 +1,4 @@
 import {
-  CreatorSettingsSchema,
   DropMediaKindSchema,
   JOB_MAX_ATTEMPTS,
   newId,
@@ -45,12 +44,10 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
         const [drop] = await tx
           .select({
             creatorId: contentDrops.creatorId,
-            settings: schema.creators.settings,
             versionId: contentRequests.structureVersionId,
             moment: contentRequests.moment,
           })
           .from(contentDrops)
-          .innerJoin(schema.creators, eq(schema.creators.id, contentDrops.creatorId))
           .innerJoin(contentRequests, eq(contentRequests.id, contentDrops.requestId))
           .where(and(eq(contentDrops.id, dropId), sent))
           .limit(1);
@@ -75,7 +72,6 @@ export function createDrizzleScriptSummaryStore(adminDb: Database): ScriptSummar
           .orderBy(contentDropFiles.position);
         return {
           creatorId: drop.creatorId,
-          describes: CreatorSettingsSchema.parse(drop.settings).describeDrops,
           versionId: drop.versionId,
           moment: ShotMomentSchema.nullable().parse(drop.moment),
           files: files.map((file) => ({

@@ -65,34 +65,33 @@ describe('layoutRail, once every screen exists', () => {
     expect(order('owner')).toEqual([
       '/',
       '/suivi',
-      '/fans',
       '/entrainer',
+      '/creatrices',
       '/equipe',
       '/paie',
-      '/creatrices',
       '/reglages',
     ]);
-    expect(order('manager')).toEqual(['/', '/suivi', '/fans', '/equipe', '/paie', '/creatrices', '/moi']);
+    expect(order('manager')).toEqual(['/', '/suivi', '/creatrices', '/equipe', '/paie', '/moi']);
     expect(order('chatter')).toEqual(['/aujourdhui', '/suivi', '/planning', '/commissions', '/moi']);
   });
 
   it('titles both families of the owner, and puts on « Plus » what his phone has no room for', () => {
     const layout = layoutRail('owner', all);
     expect([...layout.headed]).toEqual(['chatting', 'agency']);
-    expect([...layout.more]).toEqual(['/fans', '/entrainer', '/creatrices', '/reglages']);
+    expect([...layout.more]).toEqual(['/entrainer', '/paie', '/reglages']);
   });
 
   it('keeps five tabs on the bar, without « Plus », for the chatter', () => {
     expect(layoutRail('chatter', all).more.size).toBe(0);
   });
 
-  it('puts Fans, Créatrices and Moi on the manager’s « Plus », his bar keeping its four (CR-05 lot c, ADR 0124)', () => {
-    expect([...layoutRail('manager', all).more]).toEqual(['/fans', '/creatrices', '/moi']);
+  it('puts Paie and Moi on the manager’s « Plus », his bar keeping Créatrices and Équipe (ADR 0149 § 2)', () => {
+    expect([...layoutRail('manager', all).more]).toEqual(['/paie', '/moi']);
   });
 
   it('fills the bar from the phone order, then the rail order, when only Équipe is new', () => {
-    const layout = layoutRail('owner', (section) => section !== '/paie' && section !== '/moi');
-    expect([...layout.more]).toEqual(['/entrainer', '/creatrices', '/reglages']);
+    const layout = layoutRail('owner', (section) => section !== '/creatrices' && section !== '/moi');
+    expect([...layout.more]).toEqual(['/paie', '/reglages']);
     expect([...layout.headed]).toEqual(['chatting', 'agency']);
   });
 });
@@ -102,11 +101,10 @@ describe('railOf, with the screens of today', () => {
     expect(labels(owner)).toEqual([
       'Dashboard',
       'Suivi',
-      'Fans',
       'Entraîner',
+      'Créatrices',
       'Équipe',
       'Paie',
-      'Créatrices',
       'Réglages',
     ]);
     // An operator without a team row keeps today's rail: no Équipe.
@@ -115,7 +113,7 @@ describe('railOf, with the screens of today', () => {
     expect(labels(operator)).toEqual(['Dashboard', 'Suivi', 'Créatrices']);
     // Moi, the fifth tab of the chatter, on the phone's bar too (EQ-06 lot 8b): no « Plus ». The manager's sixth,
     // Créatrices for her agenda alone (CR-05 lot c), sends it and Moi to « Plus » on the phone.
-    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Fans', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
+    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
     expect(railOf(chatter).more.size).toBe(0);
     // The chatter's bar ends there: Moi › Préférences holds what « Plus » held (D-03). The manager, whose sixth tab
@@ -133,7 +131,7 @@ describe('railOf, with the screens of today', () => {
     const rail = railOf(owner);
     expect([...rail.headed]).toEqual(['chatting', 'agency']);
     // The bar keeps Dashboard, Suivi, Équipe and Paie (ADR 0024): Fans and Entraîner go under « Plus » with the rest.
-    expect([...rail.more]).toEqual(['/fans', '/entrainer', '/creatrices', '/reglages']);
+    expect([...rail.more]).toEqual(['/entrainer', '/paie', '/reglages']);
   });
 
   it('titles nothing for an operator, whose Suivi and Créatrices are alone, and needs no « Plus »', () => {
