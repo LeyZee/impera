@@ -191,6 +191,8 @@ const CREATOR_DECISIONS: Readonly<
   blind_tests: 'closed',
   notifications: 'closed',
   kill_switches: 'closed',
+  // Her dated exceptions (ADR 0148 § 3): the agency's setting, like her hours.
+  agent_hour_exceptions: 'closed',
   custom_alerts: 'closed',
   alert_seen: 'closed',
   system_alert_settings: 'closed',

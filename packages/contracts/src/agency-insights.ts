@@ -206,11 +206,18 @@ export const AgencyInsightsSchema = z.strictObject({
   /** The creators counted, in the agency's order: those with an account linked to a register, within the scope. */
   creators: z.array(z.strictObject({ creatorId: CreatorIdSchema, name: z.string().min(1) })),
   totals: z.strictObject({ current: AgencyFiguresSchema, previous: AgencyFiguresSchema }),
-  /** Every day of the period, in order, its revenue by creator and by kind (only those not zero). */
+  /**
+   * Every day of the period, in order, its revenue by creator and by kind (only those not zero), and its two parts of
+   * the net (the tiles' small curves): read by whoever reads the totals' parts, never by the MCP (ADR 0144). A refund
+   * stays on its sale's day; each day is rounded on its own, as its revenue, so the days add up to the period's parts
+   * to the cent in euros and within a cent per day with dollars.
+   */
   days: z.array(
     z.strictObject({
       day,
       revenueMinor: cents,
+      agencyMinor: cents,
+      creatorMinor: cents,
       byCreator: z.array(z.strictObject({ creatorId: CreatorIdSchema, revenueMinor: cents })),
       byKind: z.array(z.strictObject({ kind: AgencySaleKindSchema, revenueMinor: cents })),
     }),

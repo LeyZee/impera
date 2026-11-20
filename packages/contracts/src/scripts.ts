@@ -760,6 +760,8 @@ export const PLATFORM_SCRIPT_WARNING_CODES = [
 ] as const;
 export const PLATFORM_SCRIPT_GAPS = [
   'media_absent',
+  /** A media of a step in the vault but not imported into the CRM (ADR 0145 § 5): the agent does not see it. */
+  'media_not_imported',
   'media_not_described',
   'identity_not_validated',
   /** A branch of a step whose condition the agency has not set (ADR 0112 § 13): Reveal keeps its own unread. */
@@ -819,6 +821,8 @@ const PlatformStepMediaViewSchema = z.object({
   kind: MediaSlotKindSchema,
   /** `false`: absent from the vault, its step is incomplete. */
   inVault: z.boolean(),
+  /** In the vault and chosen for the CRM (ADR 0145 § 5): `false`, the script cannot be offered. */
+  imported: z.boolean(),
   mediaAssetId: z.uuid().nullable(),
   described: z.boolean(),
 });

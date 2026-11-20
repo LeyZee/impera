@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { CreatorIdSchema } from './ids';
 import { MinuteOfDaySchema } from './scheduling';
 
 /**
@@ -153,9 +154,46 @@ function slotAt(hours: AgentHours, timeZone: string, at: Date): AgentSlot | unde
     });
 }
 
-/** She may answer at `at`: always, or inside one of her active slots, on her clock. */
-export function replyOpenAt(hours: AgentHours, timeZone: string, at: Date): boolean {
+/** Her week type alone: always, or inside one of her active slots, on her clock. */
+function weekOpenAt(hours: AgentHours, timeZone: string, at: Date): boolean {
   return hours.reply.mode === 'always' || slotAt(hours, timeZone, at) !== undefined;
+}
+
+/** Her dated exceptions as the agent reads them (ADR 0148 § 3): a date of her clock and its ranges. */
+export type DatedRanges = readonly { readonly date: string; readonly ranges: readonly DayRange[] }[];
+
+/**
+ * She may answer at `at`, on her clock: a date with an exception (ADR 0148 § 3) follows its ranges alone, a slot of
+ * the day before that runs past midnight included; any other date follows her week, always or in her active slots,
+ * but for a slot started on a date with an exception, which stops at that date's midnight. The switches (Arrêt, pause, global) are read elsewhere, before this.
+ */
+export function replyOpenAt(
+  hours: AgentHours,
+  timeZone: string,
+  at: Date,
+  exceptions: DatedRanges = [],
+): boolean {
+  if (exceptions.length > 0) {
+    const date = localDate(at, timeZone);
+    const exception = exceptions.find((candidate) => candidate.date === date);
+    if (exception !== undefined) {
+      const { minute } = localClock(at, timeZone);
+      return exception.ranges.some((range) => minute >= range.startMinute && minute < range.endMinute);
+    }
+    // A slot belongs to the day it starts: one that starts on a date with an exception does not run past its midnight.
+    const slot = slotAt(hours, timeZone, at);
+    if (slot !== undefined && slot.day !== localClock(at, timeZone).day) {
+      // The calendar day before hers, not the instant minute + 1 earlier: the night the clock goes back, 2:30 the
+      // second time is three hours and a half after midnight (relecture Agent de #865).
+      const dayBefore = new Date(
+        Date.parse(`${localDate(at, timeZone)}T00:00:00Z`) - MINUTES_PER_DAY * MINUTE_MS,
+      )
+        .toISOString()
+        .slice(0, 10);
+      if (exceptions.some((candidate) => candidate.date === dayBefore)) return false;
+    }
+  }
+  return weekOpenAt(hours, timeZone, at);
 }
 
 /** Her quiet hours hold at `at`: no follow-up then. */
@@ -192,26 +230,42 @@ function nextWallMinute(after: Date, timeZone: string, minute: number): Date {
 }
 
 /**
- * When she may answer next: `after` itself when a slot is open, otherwise the opening of the next active slot, on
- * her clock. Never null: a setting in slots always has one active.
+ * When she may answer next: `after` itself when she is open, otherwise the next opening, on her clock. Without
+ * exceptions, the opening of her next active slot; never null: a setting in slots always has one active. With
+ * exceptions, an opening is a slot's start, a range's start or a midnight (a date entering or leaving its exception):
+ * the earliest of those, over the next eight days, at which she is open; `after` when none is (a week closed by hand).
  */
-export function nextReplyOpening(hours: AgentHours, timeZone: string, after: Date): Date {
-  if (replyOpenAt(hours, timeZone, after)) return after;
-  if (hours.reply.mode === 'always') return after;
-  const starts = [
-    ...new Set(hours.reply.slots.filter((slot) => slot.enabled).map((slot) => slot.startMinute)),
-  ];
+export function nextReplyOpening(
+  hours: AgentHours,
+  timeZone: string,
+  after: Date,
+  exceptions: DatedRanges = [],
+): Date {
+  if (replyOpenAt(hours, timeZone, after, exceptions)) return after;
+  if (exceptions.length === 0 && hours.reply.mode === 'always') return after;
+  const starts = openingMinutes(hours, exceptions);
   let best: Date | undefined;
-  // Each start minute, on each of the next eight days: the earliest one that opens a slot.
+  // Each start minute, on each of the next eight days: the earliest one that opens.
   for (const start of starts) {
     let from = after;
     for (let i = 0; i < 8; i += 1) {
       const at = nextWallMinute(from, timeZone, start);
-      if (replyOpenAt(hours, timeZone, at) && (best === undefined || at < best)) best = at;
+      if (best !== undefined && at >= best) break;
+      if (replyOpenAt(hours, timeZone, at, exceptions)) best = at;
       from = new Date(at.getTime() + MINUTE_MS);
     }
   }
   return best ?? after;
+}
+
+/** The minutes of her clock where she can open: her slots' starts, and with exceptions their ranges' and midnight. */
+function openingMinutes(hours: AgentHours, exceptions: DatedRanges): number[] {
+  const slots = hours.reply.mode === 'slots' ? hours.reply.slots.filter((slot) => slot.enabled) : [];
+  const minutes = slots.map((slot) => slot.startMinute);
+  if (exceptions.length > 0) {
+    minutes.push(0, ...exceptions.flatMap((exception) => exception.ranges.map((range) => range.startMinute)));
+  }
+  return [...new Set(minutes)];
 }
 
 /** The last instant at or before `before` whose minute on her clock is `minute` (the day before, when not yet today). */
@@ -227,10 +281,39 @@ function previousWallMinute(before: Date, timeZone: string, minute: number): Dat
 
 /**
  * When the open stretch she is in at `at` began: slots that follow one another read as one stretch. `null` when
- * closed; the epoch when she is always open. The « Sans réponse » net counts from there, not from his message.
+ * closed; the epoch when she is always open. The « Sans réponse » net counts from there, not from his message. With
+ * exceptions: the latest opening minute (`openingMinutes`) at or before `at`, over the last eight days, where she is
+ * open and was not a minute before; the epoch when none (always open, around a date she keeps open).
  */
-export function replyOpenedAt(hours: AgentHours, timeZone: string, at: Date): Date | null {
-  if (!replyOpenAt(hours, timeZone, at)) return null;
+export function replyOpenedAt(
+  hours: AgentHours,
+  timeZone: string,
+  at: Date,
+  exceptions: DatedRanges = [],
+): Date | null {
+  if (!replyOpenAt(hours, timeZone, at, exceptions)) return null;
+  if (exceptions.length === 0) return weekOpenedAt(hours, timeZone, at);
+  let latest: Date | null = null;
+  for (const start of openingMinutes(hours, exceptions)) {
+    let before = at;
+    for (let i = 0; i < 8; i += 1) {
+      const candidate = previousWallMinute(before, timeZone, start);
+      if (latest !== null && candidate <= latest) break;
+      const opens =
+        replyOpenAt(hours, timeZone, candidate, exceptions) &&
+        !replyOpenAt(hours, timeZone, new Date(candidate.getTime() - MINUTE_MS), exceptions);
+      if (opens) {
+        latest = candidate;
+        break;
+      }
+      before = new Date(candidate.getTime() - MINUTE_MS);
+    }
+  }
+  return latest ?? new Date(0);
+}
+
+/** `replyOpenedAt` on her week alone. */
+function weekOpenedAt(hours: AgentHours, timeZone: string, at: Date): Date | null {
   if (hours.reply.mode === 'always') return new Date(0);
   let opened = at;
   // A slot lasts less than a day, so its start is the last time her clock showed it; then the slot just before.
@@ -239,7 +322,7 @@ export function replyOpenedAt(hours: AgentHours, timeZone: string, at: Date): Da
     if (slot === undefined) return opened;
     opened = previousWallMinute(opened, timeZone, slot.startMinute);
     const before = new Date(opened.getTime() - MINUTE_MS);
-    if (!replyOpenAt(hours, timeZone, before)) return opened;
+    if (!weekOpenAt(hours, timeZone, before)) return opened;
     opened = before;
   }
   return opened;
@@ -249,14 +332,23 @@ export function replyOpenedAt(hours: AgentHours, timeZone: string, at: Date): Da
  * When a follow-up may go out next: the first minute both in an open slot and out of her quiet hours. `null` when no
  * minute of the week is both (slots from 23:00 to 1:00 with quiet hours from 23:00 to 9:00): no follow-up then.
  */
-export function nextFollowUpAllowed(hours: AgentHours, timeZone: string, after: Date): Date | null {
+export function nextFollowUpAllowed(
+  hours: AgentHours,
+  timeZone: string,
+  after: Date,
+  exceptions: DatedRanges = [],
+): Date | null {
   let at = after;
   // Each step moves to an opening or past the quiet hours, about two a day; bounded in time too: past a week and a
   // day of her clock, no minute will ever allow one.
   const horizon = after.getTime() + 8 * MINUTES_PER_DAY * MINUTE_MS;
   for (let i = 0; i < 4 * AGENT_SLOTS_MAX + 8 && at.getTime() <= horizon; i += 1) {
-    if (!replyOpenAt(hours, timeZone, at)) at = nextReplyOpening(hours, timeZone, at);
-    else if (followUpQuietAt(hours, timeZone, at))
+    if (!replyOpenAt(hours, timeZone, at, exceptions)) {
+      const opening = nextReplyOpening(hours, timeZone, at, exceptions);
+      // Closed with no opening ahead (a week of dates closed by hand): no follow-up.
+      if (opening.getTime() === at.getTime()) return null;
+      at = opening;
+    } else if (followUpQuietAt(hours, timeZone, at))
       at = nextWallMinute(at, timeZone, hours.followUpQuiet.endMinute);
     else return at;
   }
@@ -281,3 +373,126 @@ export type AgentHoursView = z.infer<typeof AgentHoursViewSchema>;
 /** `PUT /v1/creators/:id/agent-hours`: her hours, or `null` to go back to the defaults. */
 export const SetAgentHoursBodySchema = z.object({ hours: AgentHoursSchema.nullable() });
 export type SetAgentHoursBody = z.infer<typeof SetAgentHoursBodySchema>;
+
+/** A date on her clock, « 2026-11-20 ». */
+export const LocalDateSchema = z.iso.date();
+export type LocalDate = z.infer<typeof LocalDateSchema>;
+
+/** A range inside one day of her clock: from `startMinute` to `endMinute`, 1440 being midnight at its end. */
+export const DayRangeSchema = z
+  .object({ startMinute: MinuteOfDaySchema, endMinute: z.number().int().min(1).max(MINUTES_PER_DAY) })
+  .refine((range) => range.startMinute < range.endMinute, {
+    message: 'Une plage doit finir après son début',
+    path: ['endMinute'],
+  });
+export type DayRange = z.infer<typeof DayRangeSchema>;
+
+export const AGENT_EXCEPTION_RANGES_MAX = 8;
+
+const DayRangesSchema = z
+  .array(DayRangeSchema)
+  .max(AGENT_EXCEPTION_RANGES_MAX)
+  // One issue per pair, on the later range: two ranges of the same day never overlap (the screen joins them).
+  .superRefine((ranges, context) => {
+    ranges.forEach((later, j) => {
+      const earlier = ranges
+        .slice(0, j)
+        .find((other) => other.startMinute < later.endMinute && later.startMinute < other.endMinute);
+      if (earlier === undefined) return;
+      context.addIssue({
+        code: 'custom',
+        message: `Chevauche la plage ${clockWords(earlier.startMinute)}${NBSP}–${NBSP}${earlier.endMinute === MINUTES_PER_DAY ? 'minuit' : clockWords(earlier.endMinute)}`,
+        path: [j, 'startMinute'],
+      });
+    });
+  });
+
+/**
+ * One date out of her week type (ADR 0148 § 3): that day, on her clock, these ranges replace her reply slots, a slot of
+ * the day before that runs past midnight included; no range means no agent that day. Stored in
+ * `agent_hour_exceptions`, one row per creator and date.
+ */
+export const AgentHourExceptionSchema = z.object({ date: LocalDateSchema, ranges: DayRangesSchema });
+export type AgentHourException = z.infer<typeof AgentHourExceptionSchema>;
+
+/** `PUT /v1/creators/:id/agent-hours/exceptions/:date`: the ranges of that date. */
+export const SetAgentHourExceptionBodySchema = z.object({ ranges: DayRangesSchema });
+export type SetAgentHourExceptionBody = z.infer<typeof SetAgentHourExceptionBodySchema>;
+
+export const AgentHourExceptionParamsSchema = z.object({ id: CreatorIdSchema, date: LocalDateSchema });
+
+/** `GET /v1/creators/:id/agent-hours/exceptions`: her exceptions from today on, on her clock, the earliest first. */
+export const AgentHourExceptionsViewSchema = z.object({
+  exceptions: z.array(
+    AgentHourExceptionSchema.extend({
+      /** Who wrote it last, and when: the screen's « modifié par ». */
+      updatedBy: z.string().nullable(),
+      updatedAt: z.iso.datetime(),
+    }),
+  ),
+  /** Her clock (`creators.timezone`): the dates and minutes above are read on it. */
+  timeZone: z.string().min(1),
+  /** Her date today, on her clock: an exception before it no longer changes (ADR 0148 § 3). */
+  today: LocalDateSchema,
+});
+export type AgentHourExceptionsView = z.infer<typeof AgentHourExceptionsViewSchema>;
+
+/** Her date at `at`, on her clock, « 2026-11-20 », by `Intl` only. */
+export function localDate(at: Date, timeZone: string): LocalDate {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(at);
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+/** The minutes of her clock where she can close: her slots' ends, and with exceptions their ranges' and midnight. */
+function closingMinutes(hours: AgentHours, exceptions: DatedRanges): number[] {
+  const slots = hours.reply.mode === 'slots' ? hours.reply.slots.filter((slot) => slot.enabled) : [];
+  const minutes = slots.map((slot) => slot.endMinute);
+  if (exceptions.length > 0) {
+    minutes.push(
+      0,
+      // A range that ends at midnight ends at the next day's 0:00.
+      ...exceptions.flatMap((exception) =>
+        exception.ranges.map((range) => range.endMinute % MINUTES_PER_DAY),
+      ),
+    );
+  }
+  return [...new Set(minutes)];
+}
+
+/**
+ * Her hours at `at` as the switch says them (ADR 0148 § 1): open or not, and when that changes, the closing when
+ * open, the next opening when closed. `changesAt` is `null` when nothing changes in the next eight days (always open,
+ * or a week closed by hand). The switches (Arrêt, pause, global) are read elsewhere: this is her hours alone.
+ */
+export const AgentHoursNowSchema = z.object({ open: z.boolean(), changesAt: z.iso.datetime().nullable() });
+export type AgentHoursNow = z.infer<typeof AgentHoursNowSchema>;
+
+export function agentHoursNow(
+  hours: AgentHours,
+  timeZone: string,
+  at: Date,
+  exceptions: DatedRanges = [],
+): AgentHoursNow {
+  if (!replyOpenAt(hours, timeZone, at, exceptions)) {
+    const opening = nextReplyOpening(hours, timeZone, at, exceptions);
+    return { open: false, changesAt: opening.getTime() === at.getTime() ? null : opening.toISOString() };
+  }
+  if (exceptions.length === 0 && hours.reply.mode === 'always') return { open: true, changesAt: null };
+  let best: Date | undefined;
+  for (const end of closingMinutes(hours, exceptions)) {
+    let from = new Date(at.getTime() + MINUTE_MS);
+    for (let i = 0; i < 8; i += 1) {
+      const candidate = nextWallMinute(from, timeZone, end);
+      if (best !== undefined && candidate >= best) break;
+      if (!replyOpenAt(hours, timeZone, candidate, exceptions)) best = candidate;
+      from = new Date(candidate.getTime() + MINUTE_MS);
+    }
+  }
+  return { open: true, changesAt: best === undefined ? null : best.toISOString() };
+}

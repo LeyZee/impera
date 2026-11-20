@@ -1,7 +1,7 @@
 /*
- * « Son coffre Reveal » (ADR 0099), prefixed `vx-`. One card: when it was read, three figures, her folders as tiles in
- * Reveal's order, their names as Reveal gives them; a folder opened shows its media, each a blurred preview. Amber only for what asks her team to
- * act (a folder without ☀️ or 🌙, its dot the same as its figure's); never a coloured edge.
+ * « Son coffre Reveal » (ADR 0099), prefixed `vx-`: the card, its head and figures, a media's tile, its previews (the
+ * platform's blur, the sharp small picture), a voice note's wave and a media's sheet. The page's layout by choice
+ * (rail, grid, selection, bar) is vault-page.css. Amber only for what asks her team to act; never a coloured edge.
  */
 .vx-card {
   display: flex;
@@ -89,200 +89,6 @@
   color: var(--nv-warning);
 }
 
-/* ───────────── Her folders: tiles with a cover of blurred previews ───────────── */
-
-.vx-grid {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
-  gap: var(--nv-space-3);
-}
-.vx-grid__cell {
-  display: flex;
-  min-width: 0;
-  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
-  animation-delay: min(calc(var(--vx-at, 0) * var(--nv-stagger)), 400ms);
-}
-.vx-grid__cell:nth-child(2) {
-  --vx-at: 1;
-}
-.vx-grid__cell:nth-child(3) {
-  --vx-at: 2;
-}
-.vx-grid__cell:nth-child(4) {
-  --vx-at: 3;
-}
-.vx-grid__cell:nth-child(5) {
-  --vx-at: 4;
-}
-.vx-grid__cell:nth-child(6) {
-  --vx-at: 5;
-}
-.vx-grid__cell:nth-child(n + 7) {
-  --vx-at: 6;
-}
-
-.vx-folder {
-  appearance: none;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px 8px 12px;
-  border: 0;
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    box-shadow var(--nv-dur-base) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.vx-folder:hover {
-  background: var(--nv-plate-hover);
-  box-shadow: var(--nv-shadow-lift);
-  transform: translateY(-3px);
-}
-.vx-folder:active {
-  transform: scale(0.98);
-  transition-duration: var(--nv-dur-instant);
-}
-.vx-folder:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-}
-
-/* One, two, three or four previews: one fills, two side by side, three and four in a square. */
-.vx-cover {
-  position: relative;
-  display: grid;
-  gap: 3px;
-  aspect-ratio: 4 / 3;
-  border-radius: calc(var(--nv-radius-lg) - 8px);
-  overflow: hidden;
-  background: var(--nv-select);
-  isolation: isolate;
-}
-.vx-cover--2 {
-  grid-template-columns: 1fr 1fr;
-}
-.vx-cover--3,
-.vx-cover--4 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-}
-.vx-cover--3 > :first-child {
-  grid-row: span 2;
-}
-.vx-cover .vx-preview {
-  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.vx-folder:hover .vx-cover .vx-preview {
-  transform: scale(1.08);
-}
-.vx-cover__empty {
-  display: grid;
-  place-items: center;
-  color: var(--nv-ink-faint);
-}
-.vx-cover__empty svg {
-  width: 30px;
-  height: 30px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-}
-/* « Ouvrir »: a small round chevron that slides in under the pointer. */
-.vx-cover__open {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  z-index: 1;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
-  color: var(--nv-ink);
-  backdrop-filter: blur(8px);
-  opacity: 0;
-  transform: translateX(-6px) scale(0.8);
-  transition:
-    opacity var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-.vx-folder:hover .vx-cover__open,
-.vx-folder:focus-visible .vx-cover__open {
-  opacity: 1;
-  transform: none;
-}
-.vx-cover__open svg,
-.vx-crumbs__chev svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.vx-folder__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 0 6px;
-}
-.vx-folder__name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-weight: 600;
-}
-.vx-folder__label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vx-folder__line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-}
-/* « 1 retiré »: a quiet chip on the cover, so the tile keeps the height of its neighbours. */
-.vx-cover__gone {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--nv-surface-raised) 80%, transparent);
-  color: var(--nv-ink-muted);
-  backdrop-filter: blur(8px);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-weight: 600;
-}
-
 /* ───────────── A preview: the platform's blurhash, stretched and smoothed ───────────── */
 
 .vx-preview {
@@ -301,116 +107,6 @@
       transparent 60%
     ),
     var(--nv-select);
-}
-
-/* ───────────── A folder opened ───────────── */
-
-.vx-open {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-3);
-  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
-}
-.vx-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-}
-.vx-crumbs__back {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-  min-height: 32px;
-  padding: 4px 10px 4px 6px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--nv-glass-fill);
-  color: var(--nv-ink);
-  font: inherit;
-  font-weight: 560;
-}
-.vx-crumbs__chev {
-  display: inline-grid;
-  transform: rotate(180deg);
-  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-.vx-crumbs__back:hover .vx-crumbs__chev {
-  transform: rotate(180deg) translateX(3px);
-}
-.vx-crumbs__sep {
-  color: var(--nv-ink-faint);
-}
-.vx-crumbs__here {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin: 0;
-}
-.vx-crumbs__name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vx-crumbs__here:focus {
-  outline: none;
-}
-.vx-crumbs__here:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 4px;
-  border-radius: 6px;
-}
-/* « Coffre / Soirée » on the left, « Voir net » on the right of the same line. */
-.vx-open__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-3);
-  min-width: 0;
-}
-.vx-open__head .vx-crumbs {
-  flex: 1 1 auto;
-}
-.vx-open__line {
-  margin: -6px 0 0;
-}
-
-/* The grid of its media: its columns never change, the sheet of a media opens over the page. */
-.vx-media {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-  gap: 8px;
-}
-.vx-media__cell {
-  min-width: 0;
-  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
-}
-.vx-media__cell:nth-child(2) {
-  animation-delay: 25ms;
-}
-.vx-media__cell:nth-child(3) {
-  animation-delay: 50ms;
-}
-.vx-media__cell:nth-child(4) {
-  animation-delay: 75ms;
-}
-.vx-media__cell:nth-child(5) {
-  animation-delay: 100ms;
-}
-.vx-media__cell:nth-child(6) {
-  animation-delay: 125ms;
-}
-.vx-media__cell:nth-child(n + 7) {
-  animation-delay: 150ms;
 }
 
 .vx-tile {
@@ -488,8 +184,6 @@
 .vx-tile--audio::after {
   display: none;
 }
-.vx-tile--removed .vx-tile__kind,
-.vx-tile--audio .vx-tile__kind,
 .vx-tile--audio .vx-tile__time {
   background: var(--nv-glass-fill);
   color: var(--nv-ink-muted);
@@ -514,8 +208,7 @@
     var(--nv-select);
   color: var(--nv-neon);
 }
-.vx-cover .vx-voice {
-  position: relative;
+.vp-folder__cover .vx-voice {
   padding: 18% 12%;
 }
 .vx-voice__wave {
@@ -530,39 +223,13 @@
   transform-origin: center;
 }
 .vx-tile--audio:hover .vx-voice__wave rect,
-.vx-folder:hover .vx-voice__wave rect {
+.vp-folder:hover .vx-voice__wave rect {
   animation: vx-breathe 900ms var(--nv-ease-out) infinite alternate;
 }
 @keyframes vx-breathe {
   to {
     transform: scaleY(0.55);
   }
-}
-.vx-tile__kind {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  z-index: 1;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.38);
-  backdrop-filter: blur(6px);
-}
-.vx-tile__kind svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.vx-tile--video .vx-tile__kind svg {
-  fill: currentColor;
-  stroke: none;
 }
 .vx-tile__time {
   position: absolute;
@@ -666,14 +333,14 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   padding: 12px 0 0;
   border-top: 1px solid var(--nv-hairline);
 }
 .vx-sheet__fact {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 .vx-sheet__fact dd {
   margin: 0;
@@ -684,14 +351,6 @@
 @media (max-width: 560px) {
   .vx-tiles .nv-tile {
     padding: 10px 12px;
-  }
-  .vx-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .vx-media {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
   }
 }
 
@@ -711,23 +370,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vx-grid__cell,
-  .vx-media__cell,
-  .vx-open,
   .vx-sheet__preview,
   .vx-phase:not(:empty) {
     animation: none;
   }
-  .vx-folder,
-  .vx-folder:hover,
   .vx-tile,
   .vx-tile:hover,
-  .vx-folder:hover .vx-cover .vx-preview,
   .vx-tile:hover .vx-preview {
     transform: none;
   }
   .vx-tile--audio:hover .vx-voice__wave rect,
-  .vx-folder:hover .vx-voice__wave rect {
+  .vp-folder:hover .vx-voice__wave rect {
     animation: none;
   }
 }

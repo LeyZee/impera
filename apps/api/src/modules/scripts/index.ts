@@ -44,9 +44,11 @@ import {
   createDrizzlePlatformScriptImportStore,
   createDrizzlePlatformScriptReadStore,
 } from './infra/db/platform-script-store';
+import { createDrizzlePreparedScriptStore } from './infra/db/prepared-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
 import { createFrozenVersionReader, createRequestFreezer } from './infra/db/version-reader';
 import { createPlatformScriptRoutes } from './infra/http/platform-script-routes';
+import { createPreparedScriptRoutes } from './infra/http/prepared-routes';
 import { createScriptRoutes, type RequireRole } from './infra/http/routes';
 import { createGatewayScriptIdentifier } from './infra/script-identifier';
 
@@ -130,6 +132,8 @@ export interface ScriptsModule {
    * correction of a script's identity (SC-04 lot c8).
    */
   readonly platformScriptRoutes: FastifyPluginAsyncZod;
+  /** Her scripts in preparation (ADR 0112 §§ 20-22): written in Impera, copied into Reveal by hand. */
+  readonly preparedScriptRoutes: FastifyPluginAsyncZod;
   /**
    * Queues the import of one account's native scripts, on the account's queue after its vault sync: what the owner's
    * « Synchroniser » asks too (`connectors.onVaultSyncAsked`, wired by the composition root). No cron.
@@ -242,6 +246,11 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
       platformReads.store,
       createDrizzleScriptIdentityReviewStore(deps.db),
       createDrizzleScriptBranchStore(deps.db),
+      deps.requireRole,
+    ),
+    preparedScriptRoutes: createPreparedScriptRoutes(
+      createDrizzlePreparedScriptStore(deps.db),
+      deps.limitsOf,
       deps.requireRole,
     ),
     jobs: {

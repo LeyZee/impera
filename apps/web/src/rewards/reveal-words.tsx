@@ -22,6 +22,8 @@ export interface RevealWords {
   readonly text: string;
   readonly chip?: string;
   readonly tone: 'gold' | 'neon';
+  /** A rank's insignia is forged, not turned over (`RewardReveal`). */
+  readonly forge?: number;
 }
 
 const TROPHY_TEXTS: Readonly<Record<TrophyKind, string>> = {
@@ -104,6 +106,7 @@ export function revealWordsOf(
             : 'Ton net cumulé a passé le seuil.'
           : `Ton net depuis ton arrivée vient de passer ${roundAmountText(item.basis.minor, item.basis.currency)}.`,
       tone: 'neon',
+      forge: rank,
     };
   }
   const tier = tierOfKind(item.kind);
