@@ -36,6 +36,18 @@ describe('her moves after his refusal (ADR 0156 § 3)', () => {
     }
   });
 
+  it('never whines at a fan who already paid a step of this script: she only asks why (Charles, 20/11)', () => {
+    const at = new Date('2026-11-20T19:40:00Z');
+    const paid: ScriptRun = {
+      ...REFUSED,
+      steps: [
+        { stepIndex: 0, kind: 'paid', outcome: 'bought', priceMinor: 1_500, sentAt: at, at },
+        { stepIndex: 1, kind: 'paid', outcome: 'refused', priceMinor: 2_000, sentAt: at, at: ENDED },
+      ],
+    };
+    expect([0, 1, 2].map((n) => moment(n, { run: paid }))).toEqual(['ask_why', null, null]);
+  });
+
   it('holds nothing past the session of the refusal, nor without a refused run', () => {
     expect(moment(1, { now: new Date(ENDED.getTime() + REFUSAL_SESSION_MS + 1) })).toBeNull();
     expect(moment(0, { run: { ...REFUSED, status: 'stalled' } })).toBeNull();
