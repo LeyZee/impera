@@ -13,9 +13,18 @@ Il demande aussi : une grille interne de prix que l'IA lit (cam à la minute…)
 
 ## Décision
 
+### 0. Ce qui se commande
+
+Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pour lui, parfois des demandes très précises ou crues ; une photo (son prénom écrit sur elle…) ; sa réaction filmée à une photo intime qu'il envoie, ou une note donnée à cette photo ; un appel ; une visio, juste pour parler ou sexuelle.
+
+- **Une liste fermée de types**, lue par le cerveau : `custom_video`, `custom_photo`, `reaction_video`, `rating`, `call`, `video_call_talk`, `video_call_sexual`.
+- **Un niveau**, lu par le cerveau dans une liste fermée : `soft`, `explicit`, `exclusive` (une demande plus crue ou plus exclusive coûte plus cher à tourner). Le cerveau ne lit que le type et le niveau, jamais un prix.
+- **Ce qu'elle ne fait jamais** (`never_do` de sa fiche) est décliné par le code avant toute demande à la créatrice (règle actuelle de `customOrderDecision`).
+- **Une photo intime envoyée par le fan** pour une réaction ou une note passe par les règles actuelles : doute d'âge ouvert, rien ne s'ouvre.
+
 ### A. La commande sur mesure
 
-1. **Les états, dans le code** (`agent/domain/custom-order.ts`) : `asked` → `creator_yes` (avec prix) ou `creator_no` → `deposit_paid` → `delivered`, et `expired` / `cancelled`. Chaque passage est un événement de conversation, idempotent.
+1. **Les états, dans le code** (`agent/domain/custom-order.ts`) : `asked` → `creator_yes` (avec prix) ou `creator_no` → `deposit_paid` → `delivered`, et `expired` / `cancelled`. Un appel ou une visio suit le § D (paiement entier d'avance). Chaque passage est un événement de conversation, idempotent.
 2. **`asked`.** L'IA répond avec la réponse d'attente actuelle, sous la garde `no_commitment`. La demande part à la créatrice : un résumé en une phrase de ce qu'il veut voir, écrit par le code à partir du brief, jamais son pseudo ni son texte brut. Tant que l'espace de la créatrice n'est pas en ligne, elle part au propriétaire, qui saisit la réponse.
 3. **`creator_yes`.** Seul un humain (la créatrice, ou le propriétaire pour elle) saisit le oui et le prix. Le modèle ne fixe jamais un prix. L'IA annonce le prix exact et demande un pourboire de la moitié pour prendre la commande. La garde `no_commitment` est levée pour ce prix-là seulement ; « jamais de négociation » s'applique.
 4. **Le pourboire n'est demandé qu'ici.** Une garde de voix bloque toute demande de pourboire hors d'une commande à l'état `creator_yes`. Un remerciement pour un pourboire spontané reste permis.
@@ -35,21 +44,24 @@ Il demande aussi : une grille interne de prix que l'IA lit (cam à la minute…)
 ### C. La grille interne
 
 14. Rangée dans les réglages de l'agent de la version de persona (`agent.custom_price_grid`), comme la banque de répliques : propriétaire seul en lecture et écriture, jamais dans le dépôt, jamais entière dans un prompt (seule la ligne utile entre, dans un bloc typé).
-15. Elle donne un prix de départ par type (vidéo sur mesure, cam à la minute, vocal pour lui). La créatrice garde le dernier mot sur chaque demande (§ A.3).
+15. Elle donne un prix par type et par niveau (§ 0) : un prix fixe pour une vidéo, une photo, une réaction ou une note ; un prix à la minute et une durée minimale pour un appel ou une visio. Le propriétaire la saisit lui-même.
+15 bis. **Le code calcule le prix proposé** à partir du type, du niveau et, pour un appel ou une visio, de la durée demandée. Ce prix est présenté à la créatrice avec la demande ; elle l'accepte ou le change (§ A.3). L'IA n'annonce au fan que le prix accepté par la créatrice.
 
-### D. La cam
+### D. Appels et visios
 
-16. L'IA peut annoncer le prix de la grille, jamais une heure. Un humain cale le créneau avec la créatrice. Tant que la façon dont Reveal permet une cam n'est pas relevée, une cam hors de Reveal reste bloquée par les gardes « paiement hors plateforme » et « rencontre ».
+16. **Payés en entier d'avance**, sur Reveal, par pourboire : la durée achetée fois le prix à la minute. Pas d'acompte de moitié ici : le paiement vient d'abord (Charles, 20/11).
+17. **L'appel ou la visio se passe sur Instagram, et c'est la créatrice qui le passe elle-même.** Aucune automatisation Instagram (ADR 0057). L'IA vend et prévient, rien de plus : elle n'écrit jamais un nom de compte, un lien ni une heure (les gardes « coordonnées » et « paiement hors plateforme » restent actives sur sa voix). Une fois le paiement reçu, la commande passe à un humain (créatrice ou propriétaire), qui donne le moyen de contact et cale l'heure.
+18. Le temps non utilisé n'est pas rendu par l'IA ; un dépassement se paie avant, jamais après. Un litige va à un humain.
 
 ### E. Les cadeaux aux meilleurs clients
 
-17. Nouveau rôle de dossier `gift`, rempli d'avance par la créatrice. Le code seul décide de l'envoi : fan au-dessus du seuil de dépense saisi par le propriétaire (secret, en base) ; au plus un cadeau tous les 14 jours ; jamais le même deux fois au même fan ; jamais juste après un refus ; aucune offre payante dans les 24 h qui suivent.
-18. Un cadeau envoyé porte la marque « offert » (ADR 0145 § 2) : il n'entre plus jamais dans une étape payante.
+19. Nouveau rôle de dossier `gift`, rempli d'avance par la créatrice. Le code seul décide de l'envoi : fan au-dessus du seuil de dépense saisi par le propriétaire (secret, en base) ; au plus un cadeau tous les 14 jours ; jamais le même deux fois au même fan ; jamais juste après un refus ; aucune offre payante dans les 24 h qui suivent.
+20. Un cadeau envoyé porte la marque « offert » (ADR 0145 § 2) : il n'entre plus jamais dans une étape payante.
 
 ### F. Le relais de preuve
 
-19. Quand le cerveau lit une demande de preuve non sexuelle d'un fan qui doute (`identity_doubt` avec demande de preuve), l'IA reste elle-même et ne promet rien (garde « média annoncé mais pas envoyé »). La demande part à la créatrice et au propriétaire. Au plus un relais par fan tous les 7 jours ; au-delà, un humain décide.
-20. La preuve revient par un humain, ou par le dossier `custom` rattaché au fan.
+21. Quand le cerveau lit une demande de preuve non sexuelle d'un fan qui doute (`identity_doubt` avec demande de preuve), l'IA reste elle-même et ne promet rien (garde « média annoncé mais pas envoyé »). La demande part à la créatrice et au propriétaire. Au plus un relais par fan tous les 7 jours ; au-delà, un humain décide.
+22. La preuve revient par un humain, ou par le dossier `custom` rattaché au fan.
 
 ## Mise en œuvre
 
@@ -68,7 +80,7 @@ Jusque-là, l'ADR 0090 s'applique telle quelle : aucune commande ne se perd, ell
 - L'IA vend du sur-mesure, mais seulement au prix dit par un humain, après un oui de la créatrice. Le code la retient à chaque étape.
 - Migration additive : états et événements de commande, rôles `custom` et `gift`, rattachement d'un média à un fan. RLS forcée, `GRANT SELECT TO impera_service`.
 - Glossaire : « Acompte », « Dossier Perso », « Cadeau », « Relais de preuve ».
-- Évals : demande avec oui, avec non, sans réponse ; pourboire juste, trop bas, spontané ; demande de pourboire hors commande ; vidéo perso proposée à un autre fan (refusée) ; cadeau trop tôt ; preuve demandée deux fois.
+- Évals : demande avec oui, avec non, sans réponse ; pourboire juste, trop bas, spontané ; demande de pourboire hors commande ; vidéo perso proposée à un autre fan (refusée) ; type et niveau lus pour chaque type ; appel payé puis passé à un humain, sans nom de compte ni heure dans sa réponse ; cadeau trop tôt ; preuve demandée deux fois.
 - Dépend de : l'agent voit les achats et les pourboires (correction en cours au fil Agent) ; la garde d'écriture ouverte pour le compte.
 
 ## Alternatives rejetées
