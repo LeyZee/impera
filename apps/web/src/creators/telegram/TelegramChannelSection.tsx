@@ -403,12 +403,10 @@ function ChannelForm({
           </h3>
           <p className="ps-lead">
             Le lien du canal finit chaque post, et le texte parle de l’endroit où il mène. Ses liens se
-            règlent dans l’onglet « Liens » de sa fiche ; ici, tu choisis celui du canal.
+            règlent dans Trafic ; ici, tu choisis celui du canal.
           </p>
           {draft.links.length === 0 ? (
-            <p className="ps-hint">
-              Aucun lien allumé pour l’instant : ajoute-en un dans l’onglet « Liens ».
-            </p>
+            <p className="ps-hint">Aucun lien allumé pour l’instant : ajoute-en un dans Trafic.</p>
           ) : (
             <ul className="tc-links" aria-label="Liens de redirection">
               {draft.links.map((link) => (

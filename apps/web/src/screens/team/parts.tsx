@@ -11,7 +11,7 @@ import { Empty } from '@/shell/states';
 /** The pieces the list, the sheet and the add panel share. */
 
 /**
- * The member's initials, two letters as Équipe › Reveal writes them (« Chatteur Un » → « CU »), on his planning colour
+ * The member's initials, two letters as Équipe › Comptes Reveal writes them (« Chatteur Un » → « CU »), on his planning colour
  * once he has one: one letter made every « Chatteur … » the same « C » (recette visuelle 16/11, GES-21).
  */
 export function Avatar({ member, large = false }: { member: TeamMember; large?: boolean }): JSX.Element {

@@ -10,7 +10,7 @@ import type {
 import { longDay, noteDay } from './model';
 
 /**
- * Équipe › Reveal, without React (ADR 0076): where each account of the platform's team shows, what its list offers,
+ * Équipe › Comptes Reveal, without React (ADR 0076): where each account of the platform's team shows, what its list offers,
  * and how a proposal, a model and a gap read. The server proposes and decides; this only says it.
  */
 

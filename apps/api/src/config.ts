@@ -93,6 +93,12 @@ const configSchema = z
     IMPERA_SANDBOX: flag,
     /** The fake world of `pnpm sandbox:world`; `http://127.0.0.1:4010` when absent. */
     IMPERA_SANDBOX_URL: optionalValue,
+    /**
+     * Where the redirect service of the link connector answers (ADR 0120 § 3, amendment of 20/11/2026):
+     * `https://<domain>`, nothing after. Set by the deployment alone, never by a setting of the CRM. Absent, the link
+     * connector is off; present and invalid, the process refuses to start.
+     */
+    LINK_SERVICE_ORIGIN: optionalValue,
     /** AI service keys pasted in the dashboard are sealed with these (ADR 0016), `v2:<base64>,v1:<base64>`. */
     CREDENTIALS_ENCRYPTION_KEYS: z.string().min(1).optional(),
     /**
@@ -223,6 +229,16 @@ const configSchema = z
       path: ['SESSION_ENCRYPTION_KEYS'],
     },
   )
+  .refine(
+    (config) =>
+      config.LINK_SERVICE_ORIGIN === undefined || linkServiceOriginOf(config.LINK_SERVICE_ORIGIN) !== null,
+    {
+      // The value is never echoed: the name of the host says which service the agency uses.
+      message:
+        'LINK_SERVICE_ORIGIN must be https://<domain>: no port, path, credentials, IP address nor localhost',
+      path: ['LINK_SERVICE_ORIGIN'],
+    },
+  )
   .refine((config) => config.SENTRY_DSN === undefined || sentryDsnOf(config.SENTRY_DSN) !== null, {
     message: 'SENTRY_DSN must be an https Sentry DSN, https://<key>@<host>/<project>',
     path: ['SENTRY_DSN'],
@@ -308,6 +324,28 @@ function endpointOf(value: string | undefined): URL | null {
   const url = new URL(value);
   const plain = url.search === '' && url.hash === '' && url.username === '' && url.password === '';
   return plain && (url.protocol === 'https:' || url.protocol === 'http:') ? url : null;
+}
+
+/** A public domain name in ASCII: dotted labels of letters, digits and hyphens, a top level of letters. */
+const DOMAIN_NAME = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u;
+/** Names that never leave the machine or its network, whatever a resolver answers. */
+const LOCAL_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.home.arpa'];
+
+/**
+ * The origin of the redirect service (ADR 0120 § 3, amendment of 20/11/2026): exactly `https://<domain>`, the domain
+ * a public name in ASCII; `null` otherwise. No port, path, query, fragment nor credentials; no IP address, no local
+ * name, no internationalised label (a look-alike of another host). The link adapter calls this origin and no other.
+ */
+export function linkServiceOriginOf(value: string): string | null {
+  if (!URL.canParse(value)) return null;
+  const url = new URL(value);
+  const host = url.hostname;
+  const plain = value === `https://${host}` && url.port === '' && url.username === '' && url.password === '';
+  const named =
+    DOMAIN_NAME.test(host) &&
+    !host.split('.').some((label) => label.startsWith('xn--')) &&
+    !LOCAL_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  return plain && named ? url.origin : null;
 }
 
 /**

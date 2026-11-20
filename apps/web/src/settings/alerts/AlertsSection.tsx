@@ -239,7 +239,7 @@ export function AlertsSection(): JSX.Element {
   );
 }
 
-/** The routing of Réglages › Telegram, as far as this page needs it: who has no group for which topic. */
+/** The routing of Réglages › Bots Telegram, as far as this page needs it: who has no group for which topic. */
 function useTelegramRouting(): { data: TelegramRouting | undefined } {
   return useQuery({
     queryKey: ['telegram', 'routing'],
@@ -275,7 +275,7 @@ function TelegramNote({ line }: { line: TelegramLine | null }): JSX.Element | nu
   );
 }
 
-/** Opens Réglages › Telegram on the tab that routes this topic. */
+/** Opens Réglages › Bots Telegram on the tab that routes this topic. */
 function ChooseGroup({ topic }: { topic: TelegramTopic }): JSX.Element {
   return (
     <Link to="/reglages/telegram" search={searchOfTab(TAB_OF_TOPIC[topic])} className="al-link">
