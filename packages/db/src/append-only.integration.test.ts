@@ -19,7 +19,7 @@ async function failure(promise: Promise<unknown>): Promise<string> {
  * that adds one names it here, with the change its trigger permits.
  */
 const UPDATED_BY_THE_APP: readonly string[] = [
-  // The purge of `moment` (0005_calibration_ratings): every other change is refused by the trigger.
+  // The purge of `moment` (0005) and an example withdrawn from her bank (ADR 0102 § 5): the trigger refuses the rest.
   'calibration_ratings',
 ];
 

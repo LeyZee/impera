@@ -180,6 +180,8 @@ function stubClient(): PlaygroundClient {
     setNotes: unused,
     setSpent: unused,
     sendCreatorMedia: unused,
+    bank: unused,
+    withdrawExample: unused,
   };
 }
 

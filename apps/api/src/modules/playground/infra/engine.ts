@@ -17,6 +17,7 @@ import type { LlmGateway } from '@impera/llm';
 import {
   bubbleDelays,
   desireSignalPoints,
+  checkVoiceOutput,
   guardSettingsOf,
   isNight,
   isTimeZone,
@@ -30,6 +31,7 @@ import {
   type CalibrationRecord,
   type CalibrationStore,
   type PersonaForModels,
+  type VoiceExample,
 } from '../../agent/index';
 import type { DesireMarkStore } from '../application/desire-marks';
 import {
@@ -85,6 +87,11 @@ export interface EngineDeps {
    * `creatorId` says. Absent: the invented persona.
    */
   readonly played?: NonNullable<PlaygroundState['persona']['played']>;
+  /**
+   * Her bank of the version played, as her drafts read it (ADR 0102 § 2), already chosen by `pickVoiceExamples`.
+   * Absent: chosen from the ratings kept here, as the terminal playground does.
+   */
+  readonly voiceExamples?: readonly VoiceExample[];
   readonly timeZone?: string;
   readonly now?: () => Date;
   /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
@@ -103,6 +110,7 @@ export function ratingRecord(input: {
   readonly destination: Destination | undefined;
   readonly exchange: { readonly fanMessage: string; readonly bubbles: readonly string[] };
   readonly moment: CalibrationRecord['moment'];
+  readonly exampleBlocked?: true;
 }): CalibrationRecord {
   return {
     id: input.id,
@@ -113,6 +121,7 @@ export function ratingRecord(input: {
     version: input.version,
     verdict: input.verdict,
     ...(input.destination !== undefined && { destination: input.destination }),
+    ...(input.exampleBlocked === true && { exampleBlocked: true }),
     fanMessage: input.exchange.fanMessage,
     bubbles: input.exchange.bubbles,
     moment: input.moment,
@@ -215,11 +224,12 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     voiceExamples:
       deps.played === undefined
         ? []
-        : voiceExamples(deps.records, {
+        : (deps.voiceExamples ??
+          voiceExamples(deps.records, {
             creatorId: deps.played.creatorId,
             personaVersionId: deps.played.versionId,
             guardSettings: guardSettingsOf(deps.persona),
-          }),
+          })),
     offerLimits: deps.persona.offerLimits,
     sexualizationLimits: deps.persona.sexualizationLimits,
     followUps: deps.persona.followUps,
@@ -371,6 +381,13 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         if (verdict.kind === 'validated' && exchange.turn.isBlocked && !decided) throw new BlockedAnswer();
         const destination =
           verdict.kind === 'validated' ? undefined : (override ?? suggestDestination(verdict));
+        // A correction that trips a hard guard stays a correction, out of her bank, and the screen says why (§ 4).
+        const blockedBy =
+          verdict.kind === 'corrected' && destination === 'voice_example'
+            ? checkVoiceOutput([verdict.text], guardSettingsOf(deps.persona)).filter(
+                (v) => v.severity === 'blocking',
+              )
+            : [];
         ratings += 1;
         const record = ratingRecord({
           id: `${deps.sessionId}-${String(ratings)}`,
@@ -387,12 +404,24 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
           destination,
           exchange: { fanMessage: exchange.fanMessage, bubbles: exchange.turn.bubbles },
           moment: exchange.moment,
+          ...(blockedBy.length > 0 && { exampleBlocked: true }),
         });
         await deps.store.append(record);
         deps.records.push(record);
         isRated = true;
         if (verdict.kind === 'corrected') session.replaceLastAnswer(verdict.text);
-        return { rate: rate(), destination: destination ?? null };
+        return {
+          rate: rate(),
+          destination: destination ?? null,
+          ...(blockedBy.length > 0 && {
+            exampleBlockedBy: blockedBy.map((v) => ({
+              code: v.code,
+              label: guardLabel(v.code),
+              severity: v.severity,
+              ...(v.match !== undefined && { match: v.match }),
+            })),
+          }),
+        };
       }),
 
     branch: (fanMessageNumber) =>

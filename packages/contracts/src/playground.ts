@@ -150,6 +150,7 @@ export const GuardViolationSchema = z.object({
   severity: z.enum(['blocking', 'soft']),
   match: z.string().exactOptional(),
 });
+export type PlaygroundGuardViolation = z.infer<typeof GuardViolationSchema>;
 
 /**
  * A media as the trainer types it: what it shows, in a few words. The server completes the description
@@ -280,6 +281,11 @@ export type PlaygroundComparison = z.infer<typeof PlaygroundComparisonSchema>;
 export const PlaygroundRatingResultSchema = z.object({
   rate: PlaygroundRateSchema,
   destination: DestinationSchema.nullable(),
+  /**
+   * A correction filed as a voice example that trips a blocking guard (ADR 0102 § 4): kept as a correction, out of
+   * her bank, and the screen says which guard. Absent otherwise.
+   */
+  exampleBlockedBy: z.array(GuardViolationSchema).exactOptional(),
 });
 export type PlaygroundRatingResult = z.infer<typeof PlaygroundRatingResultSchema>;
 
@@ -382,6 +388,41 @@ export const DesireMarksSchema = z.object({
 export type DesireMarks = z.infer<typeof DesireMarksSchema>;
 export const DesireMarksQuerySchema = z.strictObject({ creatorId: CreatorIdSchema });
 
+/** `GET /v1/playground/bank` (ADR 0102 § 5): her bank for one version of her persona. */
+export const VoiceBankQuerySchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  versionId: PersonaVersionIdSchema,
+});
+
+/** One correction of her bank, newest first, as Entraîner shows it (ADR 0102 § 5). */
+export const VoiceBankExampleSchema = z.object({
+  id: z.uuid(),
+  text: z.string(),
+  /** His message that brought it, in the playground. */
+  fanMessage: z.string(),
+  ratedAt: IsoDateSchema,
+  /** `blocked`: a hard guard stops it; it never leaves. Withdrawn ones are not listed. */
+  state: z.enum(['active', 'blocked']),
+  /** Among the twelve her voice reads now, here and with her real fans. */
+  isRead: z.boolean(),
+  /** Why a guard stops it, in French, written by the server. Empty when it is active. */
+  blockedBy: z.array(GuardViolationSchema),
+});
+export type VoiceBankExample = z.infer<typeof VoiceBankExampleSchema>;
+
+export const VoiceBankSchema = z.object({ examples: z.array(VoiceBankExampleSchema) });
+export type VoiceBank = z.infer<typeof VoiceBankSchema>;
+
+/**
+ * `POST /v1/playground/bank/withdraw` (ADR 0102 § 5): out of her bank everywhere, kept for history; answers her bank of
+ * that version as it is now. Not in her bank: 404 `voice_example_not_found`.
+ */
+export const VoiceBankWithdrawBodySchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  versionId: PersonaVersionIdSchema,
+  id: z.uuid(),
+});
+
 /** Codes of the playground routes (suffix rules of errors.ts; 503 is set by the route itself). */
 export const PLAYGROUND_ERROR_CODES = [
   'llm_unavailable',
@@ -395,5 +436,6 @@ export const PLAYGROUND_ERROR_CODES = [
   'time_zone_invalid',
   'playground_persona_not_found',
   'desire_mark_invented_persona_conflict',
+  'voice_example_not_found',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

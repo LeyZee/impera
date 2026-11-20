@@ -17,7 +17,8 @@ const TurnSchema = z.object({
     .exactOptional(),
 });
 
-const RecordSchema = z.object({
+/** A rating as kept, wherever it is kept: the JSON lines of before and the table read it back the same way. */
+export const CalibrationRecordSchema = z.object({
   id: z.string().min(1),
   creatorId: z.string().min(1).exactOptional(),
   personaVersionId: z.string().min(1).exactOptional(),
@@ -26,6 +27,7 @@ const RecordSchema = z.object({
   version: z.object({ voicePrompt: z.string(), voiceModel: z.string() }),
   verdict: VerdictSchema,
   destination: DestinationSchema.exactOptional(),
+  exampleBlocked: z.literal(true).exactOptional(),
   fanMessage: z.string(),
   bubbles: z.array(z.string()),
   moment: z.object({
@@ -49,7 +51,7 @@ export function createJsonlCalibrationStore(path: string): CalibrationStore {
   return {
     async append(record) {
       await mkdir(dirname(path), { recursive: true });
-      await appendFile(path, `${JSON.stringify(RecordSchema.parse(record))}\n`);
+      await appendFile(path, `${JSON.stringify(CalibrationRecordSchema.parse(record))}\n`);
     },
     async list() {
       let source: string;
@@ -62,7 +64,7 @@ export function createJsonlCalibrationStore(path: string): CalibrationStore {
       for (const line of source.split('\n')) {
         if (line.trim() === '') continue;
         try {
-          const parsed = RecordSchema.safeParse(JSON.parse(line));
+          const parsed = CalibrationRecordSchema.safeParse(JSON.parse(line));
           if (parsed.success) records.push(parsed.data);
         } catch {
           // Not JSON: a line cut by a crash. The others still count.
