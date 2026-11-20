@@ -16,7 +16,7 @@ Deux mécanismes (ADR 0152 § 2) : la **sauvegarde du jour de Supabase** (retour
 L'export (ADR 0028, service `backup`) est un tar chiffré par `age` : le dump `pg_dump --format=custom` (schéma et données de tous les schémas, sans les données de `session`, `verification` et `rate_limit_counters`) et un `manifest.json` (comptes de lignes au moment du dump, version de `pg_dump`). Il se restaure dans une base **vide**, sans rejouer les migrations.
 
 1. Kill switch global si l'ancienne base répond encore.
-2. Créer une base vierge : un nouveau projet Supabase, `deploy.md` § 1.1 étapes 1 à 5 (les trois rôles et `btree_gist`). À vérifier au premier essai sur Supabase : `pg_restore` dans un projet neuf, qui contient déjà les schémas de Supabase, ne doit toucher qu'aux nôtres. Puis, après la restauration, `lock-down.sql` (`deploy.md` § 1.4, étape 2).
+2. Créer une base vierge : un nouveau projet Supabase, `deploy.md` § 1.1 étapes 3 à 6 (services coupés, réseau, les trois rôles et `btree_gist`), dans une organisation sans aucun connecteur. À vérifier au premier essai sur Supabase : `pg_restore` dans un projet neuf, qui contient déjà les schémas de Supabase, ne doit toucher qu'aux nôtres. Puis, après la restauration, `lock-down.sql` (`deploy.md` § 1.4, étape 2).
 3. Sur le PC où se trouve la clé privée, récupérer le dernier export du bucket (clé d'accès en lecture seule), puis :
    `sh ops/db-export/restore-check.sh impera-<date>.tar.age impera-backup.key "<DATABASE_ADMIN_URL de la nouvelle base>"`.
    Le script déchiffre, restaure (`pg_restore --no-owner --single-transaction`), **vide la file `graphile_worker`** (aucun job d'avant le sinistre ne repart) et compare les comptes de lignes au manifeste.
