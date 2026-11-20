@@ -1,4 +1,4 @@
-/* Annonces (EQ-12): in Aujourd'hui and in Équipe › Annonces. One card, its items as plates. Tokens only. */
+/* Annonces (EQ-12): in Aujourd'hui and in Équipe › Annonces. One card, its items as rows under a hairline. Tokens only. */
 
 .an-card > .nv-panel__head + * {
   margin-top: 0;
@@ -12,32 +12,31 @@
 .an-list {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-2);
   list-style: none;
 }
 .an-item {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-3) var(--nv-space-4);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-plate);
-  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    opacity var(--nv-dur-fast) var(--nv-ease-out);
+  padding: var(--nv-space-4) 0;
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
 }
-.an-item:hover {
-  background: var(--nv-plate-hover);
+.an-item:first-child {
+  padding-top: 0;
+}
+.an-item:last-child {
+  padding-bottom: 0;
+}
+.an-item + .an-item {
+  border-top: 1px solid var(--nv-hairline);
 }
 .an-item.is-read {
   opacity: 0.72;
 }
 .an-item__meta {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--nv-space-2);
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
@@ -61,6 +60,22 @@
   gap: var(--nv-space-2);
 }
 /* The way to the readers and « Retirer » are plain buttons: their padding pulled back, their text on the body's line. */
+.an-reads svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.an-reads[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.an-compose .nv-eyebrow {
+  margin: 0;
+}
 .an-item .an-reads {
   margin-inline-start: calc(-1 * var(--nv-space-4));
 }

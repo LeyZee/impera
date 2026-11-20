@@ -8,7 +8,7 @@ import '@/screens/team/announcements.css';
 import { Panel } from '@/shell/layout';
 
 /**
- * Annonces in Aujourd'hui (EQ-12, ADR 0024): what the owner or a manager wrote to him and he has not said « Lu » to,
+ * Annonces in Aujourd'hui (EQ-12, ADR 0024): what the owner or a manager wrote to him and he has not said « J’ai lu » to,
  * the newest first. Nothing at all once all are read: the card never stands empty. One said « Lu » stays, ticked,
  * until he leaves the page, so the gesture is seen to land.
  */
@@ -95,7 +95,7 @@ function Item({
               void say();
             }}
           >
-            Lu
+            J’ai lu
           </button>
         )}
         {problem === null ? null : (

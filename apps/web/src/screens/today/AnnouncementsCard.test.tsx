@@ -62,9 +62,9 @@ describe('Annonces in Aujourd’hui (EQ-12)', () => {
     if (item === null) throw new Error('no item');
     expect(within(item).getByText(/À l’équipe de Nora/u)).toBeDefined();
     expect(screen.queryByText('Déjà lue')).toBeNull();
-    fireEvent.click(within(item).getByRole('button', { name: 'Lu' }));
+    fireEvent.click(within(item).getByRole('button', { name: 'J’ai lu' }));
     expect(await within(item).findByRole('status')).toBeDefined();
-    expect(within(item).queryByRole('button', { name: 'Lu' })).toBeNull();
+    expect(within(item).queryByRole('button', { name: 'J’ai lu' })).toBeNull();
     expect(fetcher).toHaveBeenCalledWith(
       `/v1/team/announcements/${A}/read`,
       expect.objectContaining({ method: 'POST' }),
@@ -84,7 +84,7 @@ describe('Annonces in Aujourd’hui (EQ-12)', () => {
       },
     });
     show();
-    fireEvent.click(await screen.findByRole('button', { name: 'Lu' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'J’ai lu' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Cette annonce a été retirée.');
     cleanup();
     serve([announcement(A, { readAt: '2026-11-03T09:30:00.000Z' }), announcement(B, { mine: true })], {

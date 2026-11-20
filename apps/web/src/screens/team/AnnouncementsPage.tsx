@@ -102,7 +102,10 @@ function Composer(): JSX.Element {
           void send();
         }}
       >
-        <div className="an-chips" role="radiogroup" aria-label="À qui">
+        <p className="nv-eyebrow" aria-hidden="true">
+          Pour
+        </p>
+        <div className="an-chips" role="radiogroup" aria-label="Pour">
           {audiences.map((audience) => (
             <button
               key={audience.id ?? 'team'}
@@ -124,7 +127,7 @@ function Composer(): JSX.Element {
           value={draft}
           rows={3}
           maxLength={ANNOUNCEMENT_BODY_MAX}
-          placeholder="Ce que l’équipe doit savoir"
+          placeholder="Ton message à l’équipe"
           aria-label="Annonce"
           aria-describedby={hint}
           onChange={(event) => {
@@ -208,6 +211,9 @@ function Sent({
             }}
           >
             {readsLine(announcement.reads)}
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m4.5 6 3.5 3.5L11.5 6" />
+            </svg>
           </button>
         )}
         {announcement.mine || owner ? (
