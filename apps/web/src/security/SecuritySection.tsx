@@ -2,6 +2,7 @@ import type { AccountSecurity, OpenSession, Passkey } from '@impera/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { ExtensionLinksPanel } from './ExtensionLinksPanel';
+import { OwnersPanel } from './OwnersPanel';
 import {
   closeAccountSessions,
   closeOtherSessions,
@@ -39,8 +40,8 @@ const MUTED = 'text-sm text-[var(--nv-ink-muted)]';
 const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 
 /**
- * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
- * factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
+ * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, the owners themselves
+ * (ADR 0096) and each account's second factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
  * (no geographic base: Charles's choice of 02/11). The team links here the browsers where it uses the extension
  * (`extensionLinks`, VEI-02, ADR 0109): `copilot` for the copilot's gestures, `watch` when the Instagram watch is theirs
  * too, `none` for a creator.
@@ -57,6 +58,7 @@ export function SecuritySection({
       <SessionsPanel />
       <PasskeysPanel />
       <BackupCodesPanel />
+      {ownerId === undefined ? null : <OwnersPanel />}
       {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
       {extensionLinks === 'none' ? null : <ExtensionLinksPanel watches={extensionLinks === 'watch'} />}
     </div>

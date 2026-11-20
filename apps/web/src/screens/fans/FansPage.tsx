@@ -37,11 +37,18 @@ const SORTS: readonly FanListSort[] = ['last_message', 'paid', 'last_payment'];
  * His pseudonym, who holds him, his states and what he paid; a line opens his conversation in Suivi. Read only: nothing
  * here writes, and no button acts.
  */
-export function FansPage({ nav }: { nav?: ReactNode }): JSX.Element {
+export function FansPage({
+  nav,
+  scoped = null,
+}: {
+  nav?: ReactNode;
+  /** The creator the menu's selector is set on (ADR 0134 § 3), or null on « Toutes »: the list then asks which one. */
+  scoped?: string | null;
+}): JSX.Element {
   const creatorsQuery = useCreators();
   const creators = creatorsQuery.data ?? [];
   const [chosen, setChosen] = useState<string | null>(null);
-  const creatorId = chosen ?? creators[0]?.id ?? null;
+  const creatorId = scoped ?? chosen ?? creators[0]?.id ?? null;
   const creator = creators.find((one) => one.id === creatorId);
   const id = useId();
 
@@ -53,7 +60,7 @@ export function FansPage({ nav }: { nav?: ReactNode }): JSX.Element {
         tabs={nav}
         lead={`Chaque fan que le CRM connaît pour ${creator?.displayName ?? 'elle'}, qui le tient et ce qu’il a payé. Une ligne ouvre sa conversation dans Suivi.`}
         actions={
-          creators.length > 1 && creatorId !== null ? (
+          creators.length > 1 && creatorId !== null && scoped === null ? (
             <>
               <label className="sr-only" htmlFor={`${id}-creator`}>
                 Créatrice

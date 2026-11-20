@@ -75,6 +75,7 @@ function dtoOf(view: PreparedScriptView): PreparedScriptDto {
     gaps: [...view.gaps],
     warnings: [...view.warnings],
     matchedPlatformScriptId: view.matchedPlatformScriptId,
+    copyDifferences: view.copyDifferences === null ? null : [...view.copyDifferences],
     createdAt: view.createdAt.toISOString(),
     updatedAt: view.updatedAt.toISOString(),
   };

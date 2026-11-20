@@ -132,6 +132,24 @@ export const PreparedScriptWarningSchema = z.object({
 });
 export type PreparedScriptWarning = z.infer<typeof PreparedScriptWarningSchema>;
 
+/**
+ * What differs between a script « prêt à copier » and the native script of the same name that differs least (ADR 0112
+ * § 23): what the screen says while the next import cannot recognise it.
+ */
+export const CopyDifferenceSchema = z.discriminatedUnion('code', [
+  z.object({ code: z.literal('name_not_found') }),
+  z.object({ code: z.literal('steps_count'), expected: z.number().int(), found: z.number().int() }),
+  z.object({
+    code: z.literal('branches_count'),
+    step: z.number().int().min(0),
+    expected: z.number().int(),
+    found: z.number().int(),
+  }),
+  /** No branch of that rank sells these media at this price. */
+  z.object({ code: z.literal('branch_not_found'), step: z.number().int().min(0), branch: PreparedKeySchema }),
+]);
+export type CopyDifference = z.infer<typeof CopyDifferenceSchema>;
+
 /** `GET /v1/creators/:creatorId/prepared-scripts[/:scriptId]`: owner and active managers of her list. */
 export const PreparedScriptViewSchema = z.object({
   id: PreparedScriptIdSchema,
@@ -145,6 +163,8 @@ export const PreparedScriptViewSchema = z.object({
   warnings: z.array(PreparedScriptWarningSchema),
   /** The native script it became; `null` until an import recognises it. */
   matchedPlatformScriptId: PlatformScriptIdSchema.nullable(),
+  /** « Prêt à copier » only: what differs from Reveal for now (`name_not_found` until it is copied); `null` otherwise. */
+  copyDifferences: z.array(CopyDifferenceSchema).nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

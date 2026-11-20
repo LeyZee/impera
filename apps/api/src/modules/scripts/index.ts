@@ -45,6 +45,7 @@ import {
   createDrizzlePlatformScriptReadStore,
 } from './infra/db/platform-script-store';
 import { createDrizzlePreparedScriptStore } from './infra/db/prepared-store';
+import { createDrizzlePreparedRecognitionStore } from './infra/db/recognition-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
 import { createFrozenVersionReader, createRequestFreezer } from './infra/db/version-reader';
 import { createPlatformScriptRoutes } from './infra/http/platform-script-routes';
@@ -148,6 +149,7 @@ export interface ScriptsModule {
     /**
      * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2): one account's native scripts mirrored from the
      * platform, asked with each vault sync (`askImport`). Counts only; a failed read throws, for the job's retry.
+     * `onRecognitionFailed` hears a recognition that failed after the import was written, for the log.
      */
     importPlatformScripts(
       request: {
@@ -156,6 +158,7 @@ export interface ScriptsModule {
         readonly correlationId: string;
       },
       now: Date,
+      onRecognitionFailed?: (error: unknown) => void,
     ): Promise<ImportPlatformScriptsRun>;
     /**
      * `scripts.identify_platform_script` (SC-04 lot c8): one native script's identity written by the brain, once each
@@ -264,13 +267,15 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
           },
           now,
         ),
-      importPlatformScripts: (request, now) =>
+      importPlatformScripts: (request, now, onRecognitionFailed) =>
         importPlatformScripts(
           {
             store: platformImports,
             source: platform.source,
+            recognition: createDrizzlePreparedRecognitionStore(deps.adminDb),
             askIdentities: (creatorId, scriptIds, correlationId) =>
               identities.enqueue(creatorId, scriptIds, correlationId),
+            ...(onRecognitionFailed === undefined ? {} : { onRecognitionFailed }),
           },
           request,
           now,

@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import type { Me, PlaygroundAnswer, PlaygroundState } from '@impera/contracts';
+import {
+  MEDIA_VOCABULARY_VERSION,
+  type Me,
+  type PlaygroundAnswer,
+  type PlaygroundState,
+} from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -48,6 +53,7 @@ const BASE: PlaygroundState = {
   voice: { reachable: true },
   persona: { name: 'Elena', played: null },
   pending: null,
+  scripts: { source: 'trial', unavailable: null, run: null, fictiveSpentCents: 0, salesFrozen: false },
 };
 
 const ANSWER: PlaygroundAnswer = {
@@ -273,6 +279,78 @@ describe('Playground', () => {
     expect(screen.getByLabelText<HTMLTextAreaElement>('Message du fan').disabled).toBe(true);
   });
 
+  it('offers « Payer (fictif) » and « Refuser » on the paid step of a trial script waiting (ADR 0103 § 16)', async () => {
+    type Media = NonNullable<PlaygroundState['history'][number]['media']>[number];
+    const media = (kind: 'free' | 'paid', isLocked: boolean, state: 'offered' | 'waiting'): Media => ({
+      description: {
+        vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+        kind: 'image',
+        factualDescription: 'Photo d’elle sur le canapé, lumière tamisée.',
+        durationS: null,
+        segments: [],
+        intensity: 'not_visible',
+        anatomyVisible: [],
+        castMode: 'not_visible',
+        mood: [],
+        setting: null,
+        audio: null,
+        textVisible: null,
+        quality: 'acceptable',
+        confidenceLow: true,
+        notVisible: false,
+        flags: [],
+      },
+      isLocked,
+      scriptStep: {
+        source: 'trial',
+        scriptRef: 'essai-nuit',
+        stepIndex: kind === 'free' ? 0 : 1,
+        kind,
+        priceCents: kind === 'free' ? null : 1200,
+        state,
+      },
+    });
+    const state: PlaygroundState = {
+      ...BASE,
+      history: [
+        { index: 0, from: 'fan', text: 'Montre-moi' },
+        { index: 1, from: 'creator', text: '', media: [media('free', false, 'offered')] },
+        { index: 2, from: 'creator', text: '', media: [media('paid', true, 'waiting')] },
+      ],
+      scripts: {
+        source: 'trial',
+        unavailable: null,
+        run: {
+          scriptRef: 'essai-nuit',
+          name: 'Essai · Nuit',
+          source: 'trial',
+          description: 'Fin de soirée.',
+          moment: 'night',
+          status: 'open',
+          steps: [
+            { kind: 'free', priceCents: null, outcome: 'sent' },
+            { kind: 'paid', priceCents: 1200, outcome: 'sent' },
+          ],
+        },
+        fictiveSpentCents: 0,
+        salesFrozen: false,
+      },
+    };
+    answer = (method, path) =>
+      method === 'GET' && path === '/v1/playground'
+        ? json(200, state)
+        : method === 'POST' && path === '/v1/playground/script/buy'
+          ? json(200, state)
+          : undefined;
+    open();
+    expect(await screen.findByLabelText('Script d’essai')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: /^Payer 12/ }));
+    await waitFor(() => {
+      expect(calls).toContain('POST /v1/playground/script/buy');
+    });
+    expect(screen.getByRole('button', { name: 'Refuser' })).toBeTruthy();
+  });
+
   it('says a blocked answer once, with its reason', async () => {
     answer = serve({
       ...BASE,
@@ -317,9 +395,7 @@ describe('Playground', () => {
     expect(screen.queryByText('Proposée, à noter')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     expect(
-      await screen.findByText(
-        'Rangée en Exemple de voix : elle sert au Playground, pas encore aux vrais fans.',
-      ),
+      await screen.findByText('Rangée en Exemple de voix : sa voix s’en sert, ici et avec ses vrais fans.'),
     ).toBeTruthy();
   });
 });
