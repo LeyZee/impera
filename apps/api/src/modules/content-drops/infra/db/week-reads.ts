@@ -17,10 +17,12 @@ interface OpenScriptRequest {
   readonly dueOn: string;
 }
 
-/** What her week is computed on (ADR 0140 § 4): her stock by category, and her scripts asked due by `dueBy`. */
+/** What her week is computed on (ADR 0140 § 4): her stock by category, her scripts asked due by `dueBy`, her last script. */
 export interface WeekStockFacts {
   readonly stock: Readonly<Partial<Record<DropCategory, number>>>;
   readonly scripts: readonly OpenScriptRequest[];
+  /** When her last script drop reached the agency; `null` when none ever did. */
+  readonly lastScriptAt: Date | null;
 }
 
 /**
@@ -66,7 +68,18 @@ export async function weekStockUnscoped(
       ),
     )
     .orderBy(contentRequests.dueOn, contentRequests.createdAt);
-  return { stock, scripts: open };
+  const [last] = await tx
+    .select({ at: sql<string | null>`max(${contentDrops.createdAt})` })
+    .from(contentDrops)
+    .where(
+      and(
+        eq(contentDrops.creatorId, creatorId),
+        eq(contentDrops.category, 'script'),
+        inArray(contentDrops.state, [...ARRIVED]),
+      ),
+    );
+  const lastScriptAt = last?.at === null || last?.at === undefined ? null : new Date(last.at);
+  return { stock, scripts: open, lastScriptAt };
 }
 
 /**

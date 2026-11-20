@@ -22,8 +22,8 @@ import { Failure } from '@/shell/states';
 
 const NEED_LABELS: Readonly<Record<WeekNeed, string>> = {
   script: 'Script',
-  feed_shoot: 'Séance feed',
-  feed_video: 'Vidéo feed',
+  feed_shoot: 'Séance boudoir',
+  feed_video: 'Vidéo du jour',
   mass_dm: 'Relance',
   idea: 'Idée',
   reveal_story: 'Stories',
@@ -228,7 +228,8 @@ function Plan({
       </header>
       <p className="wp-facts nv-num">
         <span>
-          Stock : {plan.stock.feed} publications feed, {plan.stock.stories} stories
+          Stock : {plan.stock.sessions} séances, {plan.stock.videos} vidéos du jour, {plan.stock.stories}{' '}
+          stories
         </span>
         <span>Livraison avant {longDay(dayOf(plan.dueAt, timezone))}, 23 h</span>
       </p>

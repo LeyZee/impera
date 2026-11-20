@@ -19,7 +19,11 @@ function deps(unreadable: ReadonlySet<string>): PlanWeeksDeps {
       facts: (creatorId) =>
         unreadable.has(creatorId)
           ? Promise.reject(new Error('stock unreadable'))
-          : Promise.resolve({ stock: { feed: 0, stories: 0 }, scripts: [] }),
+          : Promise.resolve({
+              stock: { sessions: 0, videos: 0, stories: 0 },
+              scripts: [],
+              lastScriptAt: null,
+            }),
       shootDaysOf: () => Promise.resolve([]),
       dispoMinutes: () => Promise.resolve(new Map<number, number>()),
     },

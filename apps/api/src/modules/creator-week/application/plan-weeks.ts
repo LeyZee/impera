@@ -1,6 +1,6 @@
 import { WeekPlanSchema, type WeekPlan } from '@impera/contracts';
 
-import { addDays } from '../../scheduling/pure';
+import { addDays, calendarDayIn } from '../../scheduling/pure';
 import {
   WEEK_DEFAULTS,
   chooseShootDays,
@@ -33,18 +33,22 @@ async function computeWeek(
   week: string,
 ): Promise<WeekPlan> {
   const settings = deps.settings ?? WEEK_DEFAULTS;
-  const [facts, previous, dispo] = await Promise.all([
+  const [read, previous, dispo] = await Promise.all([
     deps.facts.facts(creatorId, addDays(week, 6)),
     deps.facts.shootDaysOf(creatorId, addDays(week, -7)),
     deps.facts.dispoMinutes(creatorId),
   ]);
+  const facts = {
+    ...read,
+    lastScriptOn: read.lastScriptAt === null ? null : calendarDayIn(read.lastScriptAt, timeZone),
+  };
   const days = chooseShootDays(week, previous, dispo, settings.shootDays);
-  const packed = packWeek(weekNeeds(facts, settings), days, settings.capacityMinutes);
+  const packed = packWeek(weekNeeds(facts, week, settings), days, settings.capacityMinutes);
   return WeekPlanSchema.parse({
     shootDays: packed.shootDays,
     deferred: packed.deferred,
     dueAt: deliveryDue(week, timeZone, settings).toISOString(),
-    stock: facts.stock,
+    stock: read.stock,
     capacityMinutes: settings.capacityMinutes,
   });
 }

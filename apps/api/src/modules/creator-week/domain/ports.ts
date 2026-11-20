@@ -38,8 +38,11 @@ export interface WeekDraftStore {
  * What the week is computed on, from the drops and the agenda, never their tables: on the admin connection for the
  * job, which reads every creator; `arrivals` alone runs in her request, so in her own account.
  */
+/** Her figures as read: her last script as an instant, made her day by the week's job in her zone. */
+export type WeekFactsRead = Omit<WeekFacts, 'lastScriptOn'> & { readonly lastScriptAt: Date | null };
+
 export interface WeekFactsReader {
-  facts(creatorId: string, dueBy: string): Promise<WeekFacts>;
+  facts(creatorId: string, dueBy: string): Promise<WeekFactsRead>;
   /** The days of her shooting days of the week starting `week`, as she kept them. */
   shootDaysOf(creatorId: string, week: string): Promise<readonly string[]>;
   dispoMinutes(creatorId: string): Promise<ReadonlyMap<number, number>>;

@@ -130,7 +130,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     cookies.nora = noraAccount.cookie;
     cookies.ines = (await account('ines@example.test', { role: 'creator', creatorIds: [ines] })).cookie;
 
-    // A script asked of her, due in the week, and the stock: one feed publication, two stories, one already out.
+    // A script asked of her, due in the week, and the stock: one boudoir session, two stories, one already out.
     const structureId = randomUUID();
     await test.admin.db.insert(schema.scriptStructures).values({ id: structureId, createdBy: ownerId });
     const [version] = await test.admin.db
@@ -216,15 +216,19 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     expect(computed.state).toBe('draft');
     // No dispo, no week before: Wednesday and Saturday.
     expect(computed.plan.shootDays.map((day) => day.day)).toEqual([addDays(week, 2), addDays(week, 5)]);
-    expect(computed.plan.stock).toEqual({ feed: 1, stories: 2 });
+    expect(computed.plan.stock).toEqual({ sessions: 1, videos: 0, stories: 2 });
     const lines = computed.plan.shootDays.flatMap((day) => day.items);
     expect(lines.map((line) => [line.need, line.count])).toEqual(
       expect.arrayContaining([
         ['script', 1],
         ['feed_shoot', 1],
-        ['feed_video', 1],
       ]),
     );
+    // Two boudoir sessions of the three (one in stock), seven videos of the day.
+    expect(lines.filter((line) => line.need === 'feed_shoot')).toHaveLength(2);
+    expect(
+      lines.filter((line) => line.need === 'feed_video').reduce((sum, line) => sum + line.count, 0),
+    ).toBe(7);
     expect(lines.find((line) => line.need === 'script')).toMatchObject({
       label: 'Script « La bougie »',
       requestId,
@@ -417,8 +421,14 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     });
     expect(after?.lines.find((line) => line.need === 'feed_shoot')).toEqual({
       need: 'feed_shoot',
-      asked: 1,
+      asked: 2,
       received: 1,
+    });
+    // Each boudoir session brings back the photo or video of its Mass DM.
+    expect(after?.lines.find((line) => line.need === 'mass_dm')).toEqual({
+      need: 'mass_dm',
+      asked: 2,
+      received: 0,
     });
     expect(after?.lines.find((line) => line.need === 'reveal_story')?.received).toBe(0);
     expect(after?.delivered).toBe(false);

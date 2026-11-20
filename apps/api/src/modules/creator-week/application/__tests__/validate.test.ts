@@ -26,7 +26,7 @@ const computed = WeekPlanSchema.parse({
   ],
   deferred: [],
   dueAt: '2026-11-29T22:00:00.000Z',
-  stock: { feed: 0, stories: 0 },
+  stock: { sessions: 0, videos: 0, stories: 0 },
   capacityMinutes: 240,
 });
 

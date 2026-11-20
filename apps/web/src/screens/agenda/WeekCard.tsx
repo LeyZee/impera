@@ -4,25 +4,16 @@ import {
   type HerDelivery,
   type HerShootDay,
   type ShootItem,
+  type WeekNeed,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState, type JSX } from 'react';
+import { useState, type CSSProperties, type JSX } from 'react';
 
 import { NOT_SENT, type Outcome } from './api';
 import { acceptWeek, readWeekAgain, tickShootItem, useCreatorWeek } from './week-api';
-import {
-  dayWhen,
-  droppedOf,
-  dueIn,
-  dueShort,
-  hasWeek,
-  leftToDrop,
-  NEED_WORDS,
-  progressOf,
-  shootDaysWords,
-  shotOf,
-} from './week-model';
+import { DEFAULT_COLORS, SWATCHES, SWATCH_WORDS, useWeekColors, type Swatch } from './week-colors';
+import { dayWhen, dueIn, dueShort, hasWeek, leftToDrop, NEED_WORDS, nextDay, progressOf } from './week-model';
 import './week-card.css';
 
 import { longDay } from '@/scheduling/time';
@@ -38,10 +29,10 @@ function failureOf(outcome: Exclude<Outcome<null>, { kind: 'ok' }>): string {
 }
 
 /**
- * Her week of shooting (ADR 0140), above her agenda, read in a few seconds: three steps (shoot on her days, drop
- * everything, before Sunday night), then each « Jour de tournage » with what there is to shoot, to tick line by line,
- * and what is left to drop, which fills itself with her drops. She accepts it in one gesture; she never reads how it
- * was computed, nor the minutes the agency counts. Nothing shows until the agency sent her week.
+ * Her week of shooting (ADR 0140), above her agenda, read in a few seconds (Charles, 20/11): one thing leads, her next
+ * shooting day with what to bring back, each kind of thing in its own colour, which she can change; her other days
+ * fold under it; what is left to drop closes it, with its deadline. She accepts it in one gesture; she never reads how
+ * it was computed, nor the minutes the agency counts. Nothing shows until the agency sent her week.
  */
 export function WeekCard({
   monday,
@@ -54,8 +45,10 @@ export function WeekCard({
 }): JSX.Element | null {
   const client = useQueryClient();
   const read = useCreatorWeek(monday);
+  const palette = useWeekColors();
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [painting, setPainting] = useState(false);
   const week = read.data;
   if (week === undefined || !hasWeek(week)) return null;
 
@@ -68,54 +61,66 @@ export function WeekCard({
       setBusy(null);
     });
   };
+  const onTick = (item: ShootItem): void => {
+    run(item.id, tickShootItem(item.id, !item.done));
+  };
 
   const days = week.shootDays.filter((day) => day.state !== 'declined');
-  const shot = shotOf(days);
-  const dropped = week.delivery === null ? null : droppedOf(week.delivery.lines);
+  const lead = nextDay(days, today);
+  const others = days.filter((day) => day !== lead);
+  const kinds = [
+    ...new Set<WeekNeed>([
+      ...days.flatMap((day) => day.items.map((item) => item.need)),
+      ...(week.delivery?.lines.map((line) => line.need) ?? []),
+    ]),
+  ];
+  // Her colours reach every line through one variable a kind.
+  const style: CSSProperties = {};
+  for (const need of kinds) style[`--wk-${need}`] = `var(--wk-sw-${palette.colors[need]})`;
   return (
-    <article className="wk-card nv-plate" data-cat="shoot" aria-labelledby="wk-title">
+    <article className="wk-card nv-plate" data-cat="shoot" aria-labelledby="wk-title" style={style}>
       <header className="wk-head">
         <WeekMark />
         <div className="wk-heading">
-          <span className="wk-tag">De l’agence</span>
           <b id="wk-title" className="wk-title">
             Ta semaine de tournage
           </b>
+          {week.delivery === null ? null : (
+            <span
+              className="wk-due nv-num"
+              data-late={dueIn(week.delivery.dueAt, zone, today) === 'passé' || undefined}
+            >
+              Tout déposer avant {dueShort(week.delivery.dueAt, zone)}
+              <span className="wk-due__in"> · {dueIn(week.delivery.dueAt, zone, today)}</span>
+            </span>
+          )}
         </div>
+        <button
+          type="button"
+          className="nv-btn nv-btn--plain nv-btn--sm wk-paint"
+          aria-label="Couleurs"
+          aria-expanded={painting}
+          aria-controls="wk-palette"
+          onClick={() => {
+            setPainting(!painting);
+          }}
+        >
+          <span className="wk-paint__dots" aria-hidden="true">
+            {kinds.slice(0, 3).map((need) => (
+              <i key={need} data-need={need} />
+            ))}
+          </span>
+          <span className="wk-paint__word">Couleurs</span>
+        </button>
       </header>
-      <ol className="wk-steps" aria-label="Ta semaine en trois étapes">
-        <Step
-          n={1}
-          icon="shoot"
-          verb="Tourne"
-          what={days.length === 0 ? 'rien cette semaine' : shootDaysWords(days)}
-          done={shot.total > 0 && shot.done === shot.total}
-        />
-        {dropped === null ? null : (
-          <Step
-            n={2}
-            icon="drop"
-            verb="Dépose"
-            what={`${String(dropped.done)} sur ${String(dropped.total)}`}
-            done={week.delivery?.delivered ?? false}
-          />
-        )}
-        {week.delivery === null ? null : (
-          <Step
-            n={3}
-            icon="clock"
-            verb="Avant"
-            what={dueShort(week.delivery.dueAt, zone)}
-            hint={dueIn(week.delivery.dueAt, zone, today)}
-            done={week.delivery.delivered}
-          />
-        )}
-      </ol>
+      {painting ? (
+        <Palette kinds={kinds} colors={palette.colors} onPaint={palette.paint} onReset={palette.reset} />
+      ) : null}
       {week.toAccept ? (
         <div className="wk-ask">
           <p className="wk-ask__text">
             L’agence a préparé ta semaine. Si elle te va, accepte-la : tes jours de tournage arrivent dans ton
-            agenda et tu pourras cocher au fur et à mesure.
+            agenda et tu coches au fur et à mesure.
           </p>
           <button
             type="button"
@@ -135,31 +140,76 @@ export function WeekCard({
           {failed}
         </p>
       )}
-      <div className="wk-days">
-        {days.map((day) => (
-          <ShootDay
-            key={day.suggestionId}
-            day={day}
-            today={today}
-            busy={busy}
-            onTick={(item) => {
-              run(item.id, tickShootItem(item.id, !item.done));
-            }}
-          />
-        ))}
-      </div>
-      {week.delivery === null ? null : <Delivery delivery={week.delivery} zone={zone} today={today} />}
+      {lead === null ? null : <ShootDay day={lead} today={today} busy={busy} onTick={onTick} lead />}
+      {others.length === 0 ? null : (
+        <div className="wk-days">
+          {others.map((day) => (
+            <ShootDay key={day.suggestionId} day={day} today={today} busy={busy} onTick={onTick} />
+          ))}
+        </div>
+      )}
+      {week.delivery === null ? null : <Delivery delivery={week.delivery} />}
     </article>
   );
 }
 
-type IconName = 'shoot' | 'drop' | 'clock' | ShootItem['need'];
+/** Her colours, a row a kind: seven swatches, ours marked, one tap to change. Kept on this device. */
+function Palette({
+  kinds,
+  colors,
+  onPaint,
+  onReset,
+}: {
+  kinds: readonly WeekNeed[];
+  colors: Readonly<Record<WeekNeed, Swatch>>;
+  onPaint: (need: WeekNeed, swatch: Swatch) => void;
+  onReset: () => void;
+}): JSX.Element {
+  return (
+    <div id="wk-palette" className="wk-palette">
+      <p className="wk-palette__lead">Choisis la couleur de chaque type de contenu.</p>
+      <ul className="wk-palette__rows">
+        {kinds.map((need) => (
+          <li key={need} className="wk-palette__row">
+            <span className="wk-kind" data-need={need} aria-hidden="true">
+              <Icon name={need} />
+            </span>
+            <span className="wk-palette__word" id={`wk-pal-${need}`}>
+              {NEED_WORDS[need]}
+            </span>
+            <span className="wk-swatches" role="radiogroup" aria-labelledby={`wk-pal-${need}`}>
+              {SWATCHES.map((swatch) => (
+                <button
+                  key={swatch}
+                  type="button"
+                  role="radio"
+                  className="wk-swatch"
+                  data-swatch={swatch}
+                  aria-checked={colors[need] === swatch}
+                  aria-label={SWATCH_WORDS[swatch]}
+                  onClick={() => {
+                    onPaint(need, swatch);
+                  }}
+                />
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {kinds.every((need) => colors[need] === DEFAULT_COLORS[need]) ? null : (
+        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm wk-palette__reset" onClick={onReset}>
+          Remettre nos couleurs
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** The small drawn marks of her week: one per kind of thing she shoots, never a stock icon. */
-function Icon({ name }: { name: IconName }): JSX.Element {
+function Icon({ name }: { name: WeekNeed | 'drop' }): JSX.Element {
   return (
     <svg className="wk-icon" viewBox="0 0 24 24" aria-hidden="true">
-      {name === 'shoot' || name === 'feed_shoot' ? (
+      {name === 'feed_shoot' ? (
         <>
           <path
             className="wk-icon__fill"
@@ -196,49 +246,13 @@ function Icon({ name }: { name: IconName }): JSX.Element {
           <rect className="wk-icon__fill" x="3.5" y="6" width="17" height="12" rx="2.5" />
           <path d="m4.5 7.5 7.5 5.5 7.5-5.5" />
         </>
-      ) : name === 'drop' ? (
+      ) : (
         <>
           <path className="wk-icon__fill" d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
           <path d="M12 15V4.5M7.5 9 12 4.5 16.5 9" />
         </>
-      ) : (
-        <>
-          <circle className="wk-icon__fill" cx="12" cy="12.5" r="8" />
-          <path d="M12 8.5v4l2.8 1.8" />
-        </>
       )}
     </svg>
-  );
-}
-
-/** One of the three steps of her week: what to do, and its word for this week. */
-function Step({
-  n,
-  icon,
-  verb,
-  what,
-  hint,
-  done,
-}: {
-  n: number;
-  icon: IconName;
-  verb: string;
-  what: string;
-  hint?: string;
-  done: boolean;
-}): JSX.Element {
-  return (
-    <li className="wk-step" data-done={done || undefined} data-late={hint === 'passé' || undefined}>
-      <span className="wk-step__mark">
-        <Icon name={icon} />
-        <span className="wk-step__n nv-num" aria-hidden="true">
-          {done ? '✓' : n}
-        </span>
-      </span>
-      <span className="wk-step__verb">{verb}</span>
-      <span className="wk-step__what nv-num">{what}</span>
-      {hint === undefined ? null : <span className="wk-step__hint">{hint}</span>}
-    </li>
   );
 }
 
@@ -255,117 +269,152 @@ function WeekMark(): JSX.Element {
   );
 }
 
+/**
+ * One of her shooting days. The lead one is open and large, « Prochain tournage »; the others fold to one line (their
+ * date, when, how many), opened by a tap.
+ */
 function ShootDay({
   day,
   today,
   busy,
   onTick,
+  lead = false,
 }: {
   day: HerShootDay;
   today: string;
   busy: string | null;
   onTick: (item: ShootItem) => void;
+  lead?: boolean;
 }): JSX.Element {
   const { done, total } = progressOf(day);
   const open = day.state === 'accepted' && day.taskId !== null;
-  const when = dayWhen(day.day, today);
-  return (
-    <section
-      className="wk-day"
-      aria-label={`Jour de tournage, ${longDay(day.day)}`}
-      data-today={day.day === today || undefined}
-      data-full={(total > 0 && done === total) || undefined}
-    >
-      <div className="wk-day__head">
+  const head = (
+    <>
+      <span className="wk-day__titles">
+        {lead ? (
+          <span className="wk-day__lead">{day.day === today ? 'Tournage du jour' : 'Prochain tournage'}</span>
+        ) : null}
         <b className="wk-day__date">{longDay(day.day)}</b>
-        <span className="wk-day__when">{when}</span>
-        <span className="wk-day__count nv-num" aria-label={`${String(done)} sur ${String(total)} tournés`}>
-          {done} / {total}
-        </span>
-      </div>
+      </span>
+      <span className="wk-day__when">{dayWhen(day.day, today)}</span>
+      <span className="wk-day__count nv-num" aria-label={`${String(done)} sur ${String(total)} tournés`}>
+        {done} / {total}
+      </span>
+    </>
+  );
+  const lines = (
+    <>
       <span className="wk-bar" aria-hidden="true">
         <i style={{ width: `${total === 0 ? '0' : ((done / total) * 100).toFixed(1)}%` }} />
       </span>
       <ul className="wk-lines">
         {day.items.map((item) => (
-          <li key={item.id} className="wk-line" data-done={item.done ? 'true' : undefined}>
-            {open ? (
-              <button
-                type="button"
-                className="ag-check"
-                data-cat="shoot"
-                aria-pressed={item.done}
-                aria-busy={busy === item.id}
-                disabled={busy !== null}
-                aria-label={item.done ? `Décocher ${item.label}` : `Cocher ${item.label}`}
-                onClick={() => {
-                  onTick(item);
-                }}
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="m3.5 8.5 3 3 6-7" />
-                </svg>
-              </button>
-            ) : (
-              <span className="wk-line__kind" aria-hidden="true">
-                <Icon name={item.need} />
-              </span>
-            )}
-            {item.sheet === null ? (
-              <div className="wk-line__body">
-                <span className="wk-line__label">{item.label}</span>
-              </div>
-            ) : (
-              // The whole line opens its shooting sheet; its first words show before, the tick stays its own target.
-              <details className="wk-line__body wk-line__sheet">
-                <summary className="wk-line__summary">
-                  <span className="wk-line__words">
-                    <span className="wk-line__label">{item.label}</span>
-                    <span className="wk-line__peek">{item.sheet}</span>
-                  </span>
-                  <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="m6 3 5 5-5 5" />
-                  </svg>
-                </summary>
-                <p className="wk-line__text">{item.sheet}</p>
-              </details>
-            )}
-          </li>
+          <Line key={item.id} item={item} open={open} busy={busy} onTick={onTick} />
         ))}
       </ul>
-    </section>
+    </>
+  );
+  const shared = {
+    'aria-label': `Jour de tournage, ${longDay(day.day)}`,
+    'data-today': day.day === today || undefined,
+    'data-full': (total > 0 && done === total) || undefined,
+  };
+  if (lead)
+    return (
+      <section className="wk-day wk-day--lead" {...shared}>
+        <div className="wk-day__head">{head}</div>
+        {lines}
+      </section>
+    );
+  return (
+    <details className="wk-day wk-day--later" {...shared}>
+      <summary className="wk-day__head wk-day__fold">
+        {head}
+        <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m6 3 5 5-5 5" />
+        </svg>
+      </summary>
+      {lines}
+    </details>
   );
 }
 
-function Delivery({
-  delivery,
-  zone,
-  today,
+/** One line: its kind in its colour, its words and the start of its sheet, and her tick at the end, once accepted. */
+function Line({
+  item,
+  open,
+  busy,
+  onTick,
 }: {
-  delivery: HerDelivery;
-  zone: string;
-  today: string;
+  item: ShootItem;
+  open: boolean;
+  busy: string | null;
+  onTick: (item: ShootItem) => void;
 }): JSX.Element {
+  return (
+    <li className="wk-line" data-need={item.need} data-done={item.done ? 'true' : undefined}>
+      <span className="wk-kind" aria-hidden="true">
+        <Icon name={item.need} />
+      </span>
+      {item.sheet === null ? (
+        <div className="wk-line__body">
+          <span className="wk-line__label">{item.label}</span>
+        </div>
+      ) : (
+        // The line opens its shooting sheet; its first words show before, the tick stays its own target.
+        <details className="wk-line__body wk-line__sheet">
+          <summary className="wk-line__summary">
+            <span className="wk-line__words">
+              <span className="wk-line__label">{item.label}</span>
+              <span className="wk-line__peek">{item.sheet.split('\n')[0]}</span>
+            </span>
+            <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="m6 3 5 5-5 5" />
+            </svg>
+          </summary>
+          <p className="wk-line__text">{item.sheet}</p>
+        </details>
+      )}
+      {open ? (
+        <button
+          type="button"
+          className="wk-tick"
+          aria-pressed={item.done}
+          aria-busy={busy === item.id}
+          disabled={busy !== null}
+          aria-label={item.done ? `Décocher ${item.label}` : `Cocher ${item.label}`}
+          onClick={() => {
+            onTick(item);
+          }}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="m3.5 8.5 3 3 6-7" />
+          </svg>
+        </button>
+      ) : null}
+    </li>
+  );
+}
+
+function Delivery({ delivery }: { delivery: HerDelivery }): JSX.Element {
   const left = leftToDrop(delivery.lines);
-  const due = dueIn(delivery.dueAt, zone, today);
   return (
     <section className="wk-delivery" aria-label="À déposer" data-delivered={delivery.delivered || undefined}>
       <div className="wk-day__head">
         <b className="wk-day__date">À déposer</b>
-        {delivery.delivered ? (
-          <span className="wk-done">Tout est arrivé, merci</span>
-        ) : (
-          <span className="wk-day__when nv-num" data-late={due === 'passé' || undefined}>
-            avant {dueShort(delivery.dueAt, zone)}
-          </span>
-        )}
+        {delivery.delivered ? <span className="wk-done">Tout est arrivé, merci</span> : null}
       </div>
       <ul className="wk-tally">
         {delivery.lines.map((line) => {
           const got = Math.min(line.received, line.asked);
           return (
-            <li key={line.need} className="wk-tally__line" data-full={got >= line.asked || undefined}>
-              <span className="wk-line__kind" aria-hidden="true">
+            <li
+              key={line.need}
+              className="wk-tally__line"
+              data-need={line.need}
+              data-full={got >= line.asked || undefined}
+            >
+              <span className="wk-kind" aria-hidden="true">
                 <Icon name={line.need} />
               </span>
               <span className="wk-tally__word">{NEED_WORDS[line.need]}</span>

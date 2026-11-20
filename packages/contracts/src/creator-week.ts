@@ -61,9 +61,10 @@ export const WeekPlanDaySchema = z.strictObject({
 });
 export type WeekPlanDay = z.infer<typeof WeekPlanDaySchema>;
 
-/** The stock the week was computed on, for the owner: publications of the feed and stories not yet out. */
+/** The stock the week was computed on, for the owner: boudoir sessions, public-feed videos and stories not yet out. */
 export const WeekStockSchema = z.strictObject({
-  feed: z.number().int().min(0),
+  sessions: z.number().int().min(0),
+  videos: z.number().int().min(0),
   stories: z.number().int().min(0),
 });
 export type WeekStock = z.infer<typeof WeekStockSchema>;

@@ -11,10 +11,16 @@ export interface WeekSettings {
   readonly shootDays: number;
   /** What one shooting day holds (§ 5). */
   readonly capacityMinutes: number;
-  /** Publications of the feed a week (ADR 0136: at least 3). */
-  readonly feedPerWeek: number;
+  /** Boudoir sessions a week (Charles, 20/11: 3 is the ideal). Each feeds the feed, the Mass DM and the gifts. */
+  readonly sessionsPerWeek: number;
+  /** Short videos for Reveal's public video feed a week (Charles, 20/11: one a day). */
+  readonly videosPerWeek: number;
   /** Stories a week (ADR 0136: one a day). */
   readonly storiesPerWeek: number;
+  /** A script is asked when none arrived for this many days and none is asked already (Charles, 20/11: two weeks). */
+  readonly scriptEveryDays: number;
+  /** Photos kept from each session for the gifts to the whales, never published, never nude (Charles, 20/11). */
+  readonly giftsPerSession: number;
   /** The estimated shooting time of one of each need (§ 5). */
   readonly minutes: Readonly<Record<WeekNeed, number>>;
   /** The delivery's weekday (7 Sunday) and minute of her day (23 h) (§ 9). */
@@ -22,13 +28,20 @@ export interface WeekSettings {
   readonly dueMinute: number;
 }
 
-/** Chosen by common sense on 20/11 and told to Charles: two days of 4 h; a script 1 h 30, a session 45 min. */
+/**
+ * Charles's rhythm (20/11): 3 boudoir sessions, a video a day for the public feed, a story a day, a script every two
+ * weeks. Chosen by common sense and told to him: two days of 4 h; a script 1 h 30, a session 1 h, a video or a story
+ * 5 min; 2 gift photos a session.
+ */
 export const WEEK_DEFAULTS: WeekSettings = {
   shootDays: 2,
   capacityMinutes: 240,
-  feedPerWeek: 3,
+  sessionsPerWeek: 3,
+  videosPerWeek: 7,
   storiesPerWeek: 7,
-  minutes: { script: 90, feed_shoot: 45, feed_video: 30, mass_dm: 15, idea: 45, reveal_story: 10 },
+  scriptEveryDays: 14,
+  giftsPerSession: 2,
+  minutes: { script: 90, feed_shoot: 60, feed_video: 5, mass_dm: 0, idea: 45, reveal_story: 5 },
   dueWeekday: 7,
   dueMinute: 23 * 60,
 };
@@ -36,40 +49,63 @@ export const WEEK_DEFAULTS: WeekSettings = {
 /** Her shooting days when she never had any and opens no dispo: Wednesday and Saturday, then the others. */
 const FALLBACK_WEEKDAYS = [3, 6, 2, 4, 5, 1, 7] as const;
 
-/** What a full week keeps first (§ 5): what blocks a sale, then the feed, the Relance, the ideas, the stories. */
+/** What a full week keeps first (§ 5): what blocks a sale, then the sessions, the daily videos, the ideas, the stories. */
 const RANK: Readonly<Record<WeekNeed, number>> = {
   script: 0,
   feed_shoot: 1,
-  feed_video: 1,
-  mass_dm: 2,
-  idea: 3,
-  reveal_story: 4,
+  feed_video: 2,
+  mass_dm: 3,
+  idea: 4,
+  reveal_story: 5,
 };
 
 /** What the week is computed on, read by the code from her real figures, never by a model (§ 4, § 14). */
 export interface WeekFacts {
-  /** Her feed publications and stories received and not out yet. */
-  readonly stock: { readonly feed: number; readonly stories: number };
+  /** Her sessions, public-feed videos and stories received and not out yet. */
+  readonly stock: { readonly sessions: number; readonly videos: number; readonly stories: number };
   /** Her scripts asked and not answered, due by the end of the week, oldest due first. */
   readonly scripts: readonly { readonly requestId: ContentRequestId; readonly name: string | null }[];
+  /** The day her last script arrived, in her zone; `null` when none ever did. */
+  readonly lastScriptOn: string | null;
 }
 
 /** Her sheets, written by the code (§ 14: without the AI, the week leaves all the same). */
-const SHEETS: Readonly<Record<Exclude<WeekNeed, 'mass_dm' | 'idea'>, string>> = {
+const SHEETS = {
   script: 'Les photos et vidéos du script, étape par étape, comme la demande les décrit.',
-  feed_shoot: 'Quelques photos d’une même tenue, pour une publication du feed.',
-  feed_video: 'Une vidéo courte, quelques secondes, pour une publication du feed.',
-  reveal_story: 'Des moments simples de ta journée, pour une story par jour.',
-};
+  next_script: 'Un nouveau script à tourner : l’agence t’envoie ses étapes avant ton jour de tournage.',
+  feed_video:
+    'Courtes et sexy, une par jour, pour le feed vidéo public de Reveal : c’est ce qui fait venir de nouveaux fans. Jamais sur Instagram, c’est trop chaud pour lui.',
+  reveal_story: 'Des moments simples de ta journée, pour une story Reveal par jour.',
+} as const;
 
-const storiesLabel = (count: number): string => (count === 1 ? '1 story' : `${String(count)} stories`);
+/** A boudoir session's sheet: everything it feeds, so that she brings back each piece in one sitting. */
+const sessionSheet = (gifts: number): string =>
+  [
+    'Une tenue, une lumière, et tu ramènes :',
+    '• les photos et deux ou trois vidéos de quelques secondes pour le post du feed ;',
+    '• une photo ou une vidéo pour annoncer la séance en Mass DM ;',
+    gifts === 1
+      ? '• 1 jolie photo sexy rien que pour les cadeaux, jamais publiée, jamais nue.'
+      : `• ${String(gifts)} jolies photos sexy rien que pour les cadeaux, jamais publiées, jamais nues.`,
+  ].join('\n');
+
+/** « 7 stories », « 1 vidéo du jour »: the label of a line cut by count. */
+function countLabel(need: WeekNeed, count: number): string {
+  if (need === 'feed_video') return count === 1 ? '1 vidéo du jour' : `${String(count)} vidéos du jour`;
+  return count === 1 ? '1 story' : `${String(count)} stories`;
+}
 
 /**
- * What there is to shoot for the week (§ 4), in the order a full week keeps them (§ 5): each script asked, the feed
- * publications the stock lacks (a session, then a short video, in turn), and the stories as one line. The media of
- * Relance and the ideas join when the Mass DM plan and the ideas do: none is ever made up here.
+ * What there is to shoot for the week (§ 4), in the order a full week keeps them (§ 5): each script asked, or the next
+ * script when none arrived for `scriptEveryDays`; the boudoir sessions the stock lacks; the videos of the public feed as
+ * one line; the stories as one line. A session feeds its Mass DM and the gifts too, said on its sheet. The ideas join
+ * when they do: none is ever made up here.
  */
-export function weekNeeds(facts: WeekFacts, settings: WeekSettings = WEEK_DEFAULTS): WeekPlanItem[] {
+export function weekNeeds(
+  facts: WeekFacts,
+  week: string,
+  settings: WeekSettings = WEEK_DEFAULTS,
+): WeekPlanItem[] {
   const items: WeekPlanItem[] = facts.scripts.map((script) => ({
     need: 'script',
     label: script.name === null ? 'Ton prochain script' : `Script « ${script.name} »`.slice(0, 120),
@@ -78,28 +114,42 @@ export function weekNeeds(facts: WeekFacts, settings: WeekSettings = WEEK_DEFAUL
     count: 1,
     requestId: script.requestId,
   }));
-  const feed = Math.max(0, settings.feedPerWeek - facts.stock.feed);
-  for (let index = 0; index < feed; index += 1) {
-    const need = index % 2 === 0 ? 'feed_shoot' : 'feed_video';
+  const scriptDue =
+    facts.lastScriptOn === null || facts.lastScriptOn <= addDays(week, -settings.scriptEveryDays);
+  if (items.length === 0 && scriptDue)
     items.push({
-      need,
-      label: need === 'feed_shoot' ? 'Une séance pour le feed' : 'Une vidéo courte pour le feed',
-      sheet: SHEETS[need],
-      minutes: settings.minutes[need],
+      need: 'script',
+      label: 'Ton prochain script',
+      sheet: SHEETS.next_script,
+      minutes: settings.minutes.script,
       count: 1,
       requestId: null,
     });
-  }
-  const stories = Math.min(50, Math.max(0, settings.storiesPerWeek - facts.stock.stories));
-  if (stories > 0)
+  const sessions = Math.max(0, settings.sessionsPerWeek - facts.stock.sessions);
+  for (let index = 0; index < sessions; index += 1)
     items.push({
-      need: 'reveal_story',
-      label: storiesLabel(stories),
-      sheet: SHEETS.reveal_story,
-      minutes: settings.minutes.reveal_story * stories,
-      count: stories,
+      need: 'feed_shoot',
+      label: 'Une séance boudoir',
+      sheet: sessionSheet(settings.giftsPerSession),
+      minutes: settings.minutes.feed_shoot,
+      count: 1,
       requestId: null,
     });
+  for (const [need, wanted, stock] of [
+    ['feed_video', settings.videosPerWeek, facts.stock.videos],
+    ['reveal_story', settings.storiesPerWeek, facts.stock.stories],
+  ] as const) {
+    const count = Math.min(50, Math.max(0, wanted - stock));
+    if (count > 0)
+      items.push({
+        need,
+        label: countLabel(need, count),
+        sheet: SHEETS[need],
+        minutes: settings.minutes[need] * count,
+        count,
+        requestId: null,
+      });
+  }
   // Stable: the order within a rank is the order above (the oldest script first).
   return items
     .map((item, index) => ({ item, index }))
@@ -108,8 +158,23 @@ export function weekNeeds(facts: WeekFacts, settings: WeekSettings = WEEK_DEFAUL
 }
 
 /**
+ * What her delivery asks beside her lines (§ 25): each boudoir session brings back the photo or video of its Mass DM.
+ */
+export function deliveryAsks(lines: readonly Pick<WeekPlanItem, 'need' | 'count'>[]): Map<WeekNeed, number> {
+  const asked = new Map<WeekNeed, number>();
+  const add = (need: WeekNeed, count: number): void => {
+    asked.set(need, (asked.get(need) ?? 0) + count);
+  };
+  for (const line of lines) {
+    add(line.need, line.count);
+    if (line.need === 'feed_shoot') add('mass_dm', line.count);
+  }
+  return asked;
+}
+
+/**
  * Her lines laid on her shooting days (§ 5): each, in order, on the day with the most room left (the earliest when two
- * tie), so that her days weigh alike. Stories are cut across days when a day cannot hold them all. What fits nowhere
+ * tie), so that her days weigh alike. Stories and daily videos are cut across days when a day cannot hold them all. What fits nowhere
  * moves to the week after: never a week heavier than her days.
  */
 export function packWeek(
@@ -140,7 +205,7 @@ export function packWeek(
         left = null;
         continue;
       }
-      const part = splitStories(left, fits, each);
+      const part = splitByCount(left, fits, each);
       placed[at]?.push(part.now);
       room[at] = free - part.now.minutes;
       left = part.later;
@@ -149,15 +214,15 @@ export function packWeek(
   return { shootDays: days.map((day, index) => ({ day, items: placed[index] ?? [] })), deferred };
 }
 
-function splitStories(
+function splitByCount(
   item: WeekPlanItem,
   count: number,
   each: number,
 ): { readonly now: WeekPlanItem; readonly later: WeekPlanItem } {
   const rest = item.count - count;
   return {
-    now: { ...item, count, minutes: Math.round(each * count), label: storiesLabel(count) },
-    later: { ...item, count: rest, minutes: Math.round(each * rest), label: storiesLabel(rest) },
+    now: { ...item, count, minutes: Math.round(each * count), label: countLabel(item.need, count) },
+    later: { ...item, count: rest, minutes: Math.round(each * rest), label: countLabel(item.need, rest) },
   };
 }
 

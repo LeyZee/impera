@@ -38,9 +38,11 @@ export function wireCreatorWeek(
         const read = await weekStockUnscoped(tx, creatorId, dueBy);
         return {
           stock: {
-            feed: (read.stock.feed_shoot ?? 0) + (read.stock.feed_video ?? 0),
+            sessions: read.stock.feed_shoot ?? 0,
+            videos: read.stock.feed_video ?? 0,
             stories: read.stock.reveal_story ?? 0,
           },
+          lastScriptAt: read.lastScriptAt,
           scripts: read.scripts.map((script) => ({
             requestId: ContentRequestIdSchema.parse(script.requestId),
             name: script.name,

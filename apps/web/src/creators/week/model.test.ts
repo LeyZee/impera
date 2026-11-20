@@ -29,7 +29,7 @@ const plan = WeekPlanSchema.parse({
   ],
   deferred: [item('Séance C', 45)],
   dueAt: '2026-11-29T22:00:00.000Z',
-  stock: { feed: 1, stories: 2 },
+  stock: { sessions: 1, videos: 0, stories: 2 },
   capacityMinutes: 60,
 });
 

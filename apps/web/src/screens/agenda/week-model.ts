@@ -5,12 +5,19 @@ import { addDays, clockAt, daysFrom, dayOf, longDay, shortDay } from '@/scheduli
 /** What each line of her delivery is, in her words (plural: « 1 sur 3 »). */
 export const NEED_WORDS: Readonly<Record<WeekNeed, string>> = {
   script: 'Scripts',
-  feed_shoot: 'Séances pour le feed',
-  feed_video: 'Vidéos pour le feed',
-  mass_dm: 'Relance',
+  feed_shoot: 'Séances boudoir',
+  feed_video: 'Vidéos du jour',
+  mass_dm: 'Pour les Mass DM',
   idea: 'Idées',
   reveal_story: 'Stories',
 };
+
+/** The day her eyes go to first: today's or the next shooting day not done; else the last one. */
+export function nextDay(days: readonly HerShootDay[], today: string): HerShootDay | null {
+  const ahead = days.filter((day) => day.day >= today);
+  const open = days.find((day) => day.items.some((item) => !item.done));
+  return ahead.find((day) => day.items.some((item) => !item.done)) ?? ahead[0] ?? open ?? days.at(-1) ?? null;
+}
 
 /** Whether her week has anything to show: the agency sent it. */
 export const hasWeek = (week: CreatorWeek): boolean => week.shootDays.length > 0 || week.delivery !== null;

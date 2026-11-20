@@ -81,6 +81,20 @@ afterEach(() => {
 });
 
 describe('her week of shooting', () => {
+  it('lets her pick the colour of a kind, kept on this device', async () => {
+    serve(week(false));
+    localStorage.clear();
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Couleurs/ }));
+    const row = screen.getByRole('radiogroup', { name: 'Séances boudoir' });
+    expect(row.querySelector('[aria-checked="true"]')?.getAttribute('aria-label')).toBe('Rose');
+    fireEvent.click(screen.getAllByRole('radio', { name: 'Vert' })[0] ?? row);
+    expect(JSON.parse(localStorage.getItem('impera.week-colors') ?? '{}')).toMatchObject({
+      feed_shoot: 'vert',
+    });
+    expect(screen.getByRole('button', { name: 'Remettre nos couleurs' })).toBeTruthy();
+  });
+
   it('shows nothing before the agency sent it', async () => {
     serve({ week: MONDAY, toAccept: false, shootDays: [], delivery: null });
     const { container } = show();
@@ -95,10 +109,8 @@ describe('her week of shooting', () => {
     show();
     const accept = await screen.findByRole('button', { name: 'Accepter ma semaine' });
     expect(screen.queryByRole('button', { name: /Cocher/ })).toBeNull();
-    const steps = screen.getByRole('list', { name: 'Ta semaine en trois étapes' });
-    expect(steps.textContent).toContain('Tournemer. 25');
-    expect(steps.textContent).toContain('Dépose8 sur 9');
-    expect(steps.textContent).toMatch(/Avantdim\. 29, 23.h/);
+    expect(screen.getByText(/Tout déposer avant dim\. 29, 23.h/)).toBeTruthy();
+    expect(screen.getByText('Prochain tournage')).toBeTruthy();
     expect(screen.getByText('Demain')).toBeTruthy();
     fireEvent.click(accept);
     await waitFor(() => {

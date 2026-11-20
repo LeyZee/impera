@@ -8,7 +8,7 @@ import {
 
 import type { HerWeekFrame, WeekAgendaStore } from '../../creator-tasks';
 import { addDays, wallClockToInstant } from '../../scheduling/pure';
-import { deliveryDue } from '../domain/plan';
+import { deliveryAsks, deliveryDue } from '../domain/plan';
 import type { AcceptSuggestion, WeekFactsReader } from '../domain/ports';
 
 export interface HerWeekDeps {
@@ -37,20 +37,28 @@ function deliveryLines(
     readonly answered: ReadonlySet<string>;
   },
 ): DeliveryLine[] {
-  const asked = new Map<WeekNeed, number>();
-  const answeredScripts = new Set<string>();
-  for (const frame of frames) {
-    if (frame.role !== 'shoot_day' || frame.state === 'declined') continue;
-    for (const line of frame.lines) {
-      asked.set(line.need, (asked.get(line.need) ?? 0) + line.count);
-      if (line.requestId !== null && arrived.answered.has(line.requestId))
-        answeredScripts.add(line.requestId);
-    }
-  }
-  return [...asked.entries()].map(([need, count]) => {
+  const lines = frames
+    .filter((frame) => frame.role === 'shoot_day' && frame.state !== 'declined')
+    .flatMap((frame) => frame.lines);
+  const answeredScripts = new Set(
+    lines.flatMap((line) =>
+      line.requestId !== null && arrived.answered.has(line.requestId) ? [line.requestId] : [],
+    ),
+  );
+  // The next script, asked without a request: answered by any script drop of the week beyond those of the requests.
+  const freeScripts = lines.filter((line) => line.need === 'script' && line.requestId === null).length;
+  const freeArrived = Math.min(
+    freeScripts,
+    Math.max(0, (arrived.byCategory.script ?? 0) - answeredScripts.size),
+  );
+  return [...deliveryAsks(lines).entries()].map(([need, count]) => {
     const category = CATEGORY[need];
     const received =
-      need === 'script' ? answeredScripts.size : category === null ? 0 : (arrived.byCategory[category] ?? 0);
+      need === 'script'
+        ? answeredScripts.size + freeArrived
+        : category === null
+          ? 0
+          : (arrived.byCategory[category] ?? 0);
     return { need, asked: count, received: Math.min(received, count) };
   });
 }
