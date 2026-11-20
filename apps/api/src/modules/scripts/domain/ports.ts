@@ -3,6 +3,7 @@ import type {
   CreateScriptStructureBody,
   CreatorId,
   Currency,
+  DescriptionReviewReason,
   MediaSlotKind,
   SaveScriptStructureBody,
   PersonaLimits,
@@ -223,6 +224,20 @@ interface VaultLink {
   readonly descriptionId: string | null;
   /** Chosen for the CRM, by its own tick or its folder's (ADR 0145 § 5): `false`, the agent does not see it. */
   readonly imported: boolean;
+  /**
+   * The description its media is told with (ADR 0030 § 3): the latest validated, else the latest written, by the vision
+   * or by hand, for the agency to validate; never the platform's own text. `null` while it has none.
+   */
+  readonly shown: ShownDescription | null;
+}
+
+/** A description of a vault media as the agency reviews it. */
+export interface ShownDescription {
+  readonly id: string;
+  readonly detailed: string;
+  /** Why it waits for a person (ADR 0083 § 3 to 5): validated alone, never with others. */
+  readonly reviewReasons: readonly DescriptionReviewReason[];
+  readonly validated: boolean;
 }
 
 /** A media of a step, by the platform's id of the vault media. */
@@ -384,6 +399,11 @@ export type IdentityReview =
   | { readonly kind: 'validate'; readonly identityId: ScriptIdentityId }
   | { readonly kind: 'correct'; readonly content: ScriptIdentityContent };
 
+/** The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4). */
+export type DescriptionReview =
+  | { readonly kind: 'validate'; readonly descriptionIds: readonly string[] }
+  | { readonly kind: 'correct'; readonly descriptionId: string; readonly detailed: string };
+
 /**
  * The agency's validation and correction of an identity (SC-04 lot c8, ADR 0030 § 3), in the person's transaction,
  * under her RLS and his scope, audited. `currentHash` reads the version of the script as the same transaction sees
@@ -397,6 +417,18 @@ export interface ScriptIdentityReviewStore {
     userId: string,
     currentHash: (script: StoredPlatformScript) => string,
   ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'>;
+  /**
+   * The descriptions of its media validated as shown, or one rewritten by hand and validated (ADR 0099 § 4), in the
+   * same way: a description that is not the one a media of this script is shown with now is `stale`, one that waits
+   * for a person named with others `alone`. Each write asks the script's identity again (`scripts.identify_platform_script`).
+   */
+  describe(
+    creatorId: CreatorId,
+    scriptId: string,
+    review: DescriptionReview,
+    userId: string,
+    correlationId: string,
+  ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'>;
 }
 
 /** One branch of a step, as the agency sets it: by its `stepRef`, in the order given. */
