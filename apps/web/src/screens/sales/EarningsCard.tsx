@@ -148,6 +148,7 @@ export function EarningsCard(): JSX.Element {
         {read.totals.map((total) => (
           <Path key={total.currency} total={total} several={read.totals.length > 1} />
         ))}
+        <h3 className="nv-eyebrow vt-earn__label">Tes ventes</h3>
         <Lines earnings={read} />
       </PanelSection>
     </Panel>

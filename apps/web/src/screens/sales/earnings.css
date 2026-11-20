@@ -54,11 +54,15 @@
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
+/* « Tes ventes »: the design system's eyebrow, a breath above it after the path. */
+.vt-earn .vt-earn__label {
+  margin: var(--nv-space-6) 0 0;
+}
 .vt-earn__lines {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: var(--nv-space-4) calc(var(--nv-space-2) * -1) 0;
+  margin: var(--nv-space-2) calc(var(--nv-space-2) * -1) 0;
   padding: 0;
   list-style: none;
 }
@@ -133,8 +137,8 @@
   color: var(--nv-ink);
 }
 
-/* ── Où va l'argent (ADR 0157 § 1): the Dashboard's colours of the money (ADR 0106 § 10), the VAT and Reveal in the
-   neutral fold, Reveal hatched to stand apart without its colour; 2px between blocks, 4px corners. */
+/* ── Où va l'argent (ADR 0157 § 1): the Dashboard's colours of the money (ADR 0106 § 10), the VAT and Reveal two flat
+   greys of the neutral fold (no hatching: it would say « estimated »), each labelled; 2px between blocks, 4px corners. */
 .vt-path {
   display: flex;
   flex-direction: column;
@@ -142,10 +146,12 @@
   margin-top: var(--nv-space-4);
 }
 .vt-path [data-part='vat'],
-.vt-path [data-part='platform'],
-.vt-earn__detail [data-part='vat'],
-.vt-earn__detail [data-part='platform'] {
+.vt-earn__detail [data-part='vat'] {
   --_c: var(--nv-series-other);
+}
+.vt-path [data-part='platform'],
+.vt-earn__detail [data-part='platform'] {
+  --_c: color-mix(in oklab, var(--nv-series-other) 50%, transparent);
 }
 .vt-path [data-part='agency'],
 .vt-earn__detail [data-part='agency'] {
@@ -173,11 +179,6 @@
   background: var(--_c);
   transform-origin: left center;
   animation: vt-path-grow var(--nv-dur-data) var(--nv-ease-out) both;
-}
-.vt-path__seg[data-part='platform'],
-.vt-path__row[data-part='platform'] .vt-path__key,
-.vt-earn__detail [data-part='platform'] .vt-path__key {
-  background: repeating-linear-gradient(135deg, var(--_c) 0 3px, transparent 3px 6px);
 }
 @keyframes vt-path-grow {
   from {
