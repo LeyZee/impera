@@ -668,12 +668,6 @@
   align-items: center;
   gap: var(--nv-space-2);
 }
-.db-todo__title {
-  margin: 0;
-  font-size: var(--nv-text-headline);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
 .db-todo__count {
   min-width: var(--nv-space-6);
   padding: 0 var(--nv-space-2);

@@ -46,7 +46,7 @@ export function TodoCard({
   return (
     <section className="nv-plate db-todo nv-enter" aria-labelledby="db-todo-title">
       <header className="db-todo__head">
-        <h2 id="db-todo-title" className="db-todo__title">
+        <h2 id="db-todo-title" className="nv-h3">
           À faire
         </h2>
         <span className="db-todo__count nv-num" aria-label={`${String(items.length)} à traiter`}>
