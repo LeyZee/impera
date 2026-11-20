@@ -13,6 +13,7 @@ export interface CreatorsSearch {
     | 'idees'
     | 'demandes'
     | 'scripts'
+    | 'sur-mesure'
     | 'contenu'
     | 'telegram'
     | 'alertes'
@@ -36,6 +37,7 @@ export type CreatorSheet =
   | 'ideas'
   | 'requests'
   | 'scripts'
+  | 'custom'
   | 'content'
   | 'telegram'
   | 'alerts'
@@ -50,6 +52,7 @@ const SLUGS = {
   ideas: 'idees',
   requests: 'demandes',
   scripts: 'scripts',
+  custom: 'sur-mesure',
   content: 'contenu',
   telegram: 'telegram',
   alerts: 'alertes',
@@ -64,6 +67,7 @@ const SHEETS = {
   idees: 'ideas',
   demandes: 'requests',
   scripts: 'scripts',
+  'sur-mesure': 'custom',
   contenu: 'content',
   telegram: 'telegram',
   alertes: 'alerts',
@@ -80,6 +84,7 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
   'ideas',
   'requests',
   'scripts',
+  'custom',
   'content',
   'telegram',
   'alerts',
@@ -118,6 +123,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
     tab === SLUGS.ideas ||
     tab === SLUGS.requests ||
     tab === SLUGS.scripts ||
+    tab === SLUGS.custom ||
     tab === SLUGS.content ||
     tab === SLUGS.telegram ||
     tab === SLUGS.alerts ||
