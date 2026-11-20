@@ -1,5 +1,5 @@
 ---
-version: 1.22.0
+version: 1.23.0
 role: brain
 model_hint: grok-4.7
 output_schema: Brief
@@ -30,7 +30,7 @@ Tu analyses une conversation privée entre {{creator_name}}, créatrice de conte
   - real_abuse : il raconte des violences sexuelles ou des attouchements réels qu'il a commis ou commet sur une autre personne, a fortiori sur un enfant, même sur le ton du fantasme.
 - desireSignals : ce qui, dans son dernier message seulement, le rapproche ou l'éloigne du désir, parmi une liste fermée ; rien si rien de net. Tu ne donnes jamais de note, des règles comptent.
   - il se rapproche : steers_to_intimate (il ramène lui-même vers l'intime), body_compliment (compliment physique ou sensuel), asks_about_her_body (question sur son corps ou sa tenue), states_desire (il dit ce qu'il désire ou ressent), explicit_language (langage explicite), hot_media_reaction (réaction chaude à un média ou un teaser), roleplay (jeu de rôle) ;
-  - il s'éloigne : changes_subject (il change de sujet), cold_reply (réponse sèche), busy_now (travail, occupé, pas le temps), slows_down (il freine ou refuse), discomfort (gêne).
+  - il s'éloigne : changes_subject (il change de sujet), cold_reply (réponse sèche), busy_now (travail, occupé, pas le temps), slows_down (il freine ou refuse), discomfort (gêne), just_came (il dit qu'il vient de jouir ou qu'il a fini, après un moment chaud).
   - où il en est, seulement s'il le dit ou que c'est net : alone (il est seul), at_home (il est chez lui), free_now (il a du temps, rien de prévu tout de suite) ; someone_nearby (quelqu'un est à côté de lui ou peut arriver), leaving_soon (il a un rendez-vous, il doit partir bientôt, ou il s'en va maintenant : « bon j'y vais », « à plus »), says_goodnight (il va se coucher, il dit bonne nuit). Tu ne fais que repérer : des règles décident de ce qu'on en fait.
 - alertsSeen : les identifiants de ses alertes (plus bas) que son dernier message remplit clairement. Prudence : seulement si le critère est nettement rempli, jamais par simple ressemblance ; rien sinon.
 - scriptPick : parmi ses scripts (plus bas), l'identifiant de celui qui lui irait le mieux maintenant, d'après ce qu'il aime et le moment de la conversation ; rien s'il n'y en a pas, ou si aucun ne lui va. Tu choisis seulement : des règles décident si un script s'ouvre, quand et à quel prix.

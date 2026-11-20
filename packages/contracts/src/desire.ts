@@ -40,6 +40,8 @@ export const DESIRE_BRAIN_SIGNALS = [
   'busy_now',
   'slows_down',
   'discomfort',
+  // He says he just came (ADR 0156 § 6): the hot moment is over.
+  'just_came',
   // His availability (ADR 0103, amendement du 13/11): read here, held by code in `fan_availability`.
   'alone',
   'at_home',

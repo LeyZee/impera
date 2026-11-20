@@ -38,6 +38,8 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   busy_now: -30,
   slows_down: -20,
   discomfort: -30,
+  // He just came (ADR 0156 § 6): the hot moment falls at once, nothing more to sell tonight on this heat.
+  just_came: -50,
   // His availability (ADR 0103, amendement du 13/11): a fan alone and free warms a little; someone beside him or an
   // appointment cools him as much as being busy. The gate before a script reads the state code holds, not these.
   alone: 6,

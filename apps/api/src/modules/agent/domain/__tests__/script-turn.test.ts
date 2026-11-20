@@ -169,6 +169,33 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(back.decision).toEqual({ kind: 'end', status: 'stalled' });
   });
 
+  it('pauses right after he came: no step goes, and his message neither answers nor refuses hers (ADR 0156 § 6)', () => {
+    const waiting = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      heCame: true,
+      mayAct: false,
+    });
+    expect(waiting.decision.kind).toBe('wait');
+    expect(waiting.moved).toBeNull();
+    // Even a message the brain reads as a no is no refusal right after he came.
+    const no = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      heCame: true,
+      mayAct: false,
+      reply: 'refused',
+    });
+    expect(no.decision.kind).toBe('wait');
+    expect(no.moved).toBeNull();
+    // The next step would have gone: held.
+    const next = scriptTurn({ ...input, latest: teased, history: history([0]), heCame: true, mayAct: false });
+    expect(next.decision).toEqual({ kind: 'none', reason: 'held' });
+    expect(next.moved).toBeNull();
+  });
+
   it('pauses while he is not free: his messages neither refuse nor ignore the step (ADR 0103 § 12)', () => {
     const first = scriptTurn({ ...input, latest: offered, history: history([0, 1]), availability: 'no' });
     expect(first.decision.kind).toBe('wait');

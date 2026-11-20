@@ -265,7 +265,7 @@ export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks
  * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
  * of a script decided (she offers only what a script sends, ADR 0098).
  */
-type OfferRefusal = OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step';
+type OfferRefusal = OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step' | 'he_came';
 
 /** Why her first answer was refused, as the voice reads it once more (M1): the fault, never the words she wrote. */
 const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
@@ -377,6 +377,13 @@ function farewellOf(signals: readonly string[] | undefined): keyof typeof FAREWE
   // « Je suis au boulot » while he keeps writing is no goodbye: `busy_now` only spaces her follow-up.
   return read.includes('leaving_soon') ? 'away' : null;
 }
+
+/**
+ * He just came (ADR 0156 § 6): she shares the moment with him, tender and proud, and the evening's sale stops there.
+ * His run pauses; no step, no offer, no question that would start the game again.
+ */
+const HE_CAME_HINT =
+  'il vient de jouir : elle savoure ce moment avec lui, tendre, fière et complice, en une ou deux bulles ; rien à vendre, aucune nouvelle demande, pas de question pour relancer le jeu';
 
 /** He asks how to pay for her step waiting (ADR 0156 § 4): she helps him plainly, the price in the voice's block. */
 const PAYMENT_HELP_HINT =
@@ -779,6 +786,7 @@ export async function composeTurn(
     availability === undefined || threshold === undefined
       ? undefined
       : scriptStartGate(availability, heat, threshold);
+  const heCame = brief?.desireSignals?.includes('just_came') === true;
   // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
   const scripts =
     input.scripts === undefined || input.offer === undefined
@@ -805,8 +813,10 @@ export async function composeTurn(
           ...(availability !== undefined && { availability: availability.state }),
           reply: brief?.scriptReply ?? null,
           countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
+          heCame,
           mayAct:
             !care &&
+            !heCame &&
             brief !== undefined &&
             trap.replyBrief === undefined &&
             customOrder === undefined &&
@@ -819,11 +829,13 @@ export async function composeTurn(
   const offerRefused =
     cursored.action !== 'offer' || scriptStep !== undefined
       ? undefined
-      : input.scripts !== undefined && input.offer !== undefined
-        ? 'no_script_step'
-        : scriptStart !== undefined && !scriptStart.open
-          ? (scriptStart.missing[0] ?? 'availability_unconfirmed')
-          : offerRefusal(cursored, input.offer, heat);
+      : heCame
+        ? 'he_came'
+        : input.scripts !== undefined && input.offer !== undefined
+          ? 'no_script_step'
+          : scriptStart !== undefined && !scriptStart.open
+            ? (scriptStart.missing[0] ?? 'availability_unconfirmed')
+            : offerRefusal(cursored, input.offer, heat);
   const decidedBrief: Brief =
     scriptStep === undefined
       ? cursored
@@ -935,21 +947,30 @@ export async function composeTurn(
   const farewell =
     scriptStep === undefined && waitingStep === undefined ? farewellOf(brief?.desireSignals) : null;
   const voiceBrief: Brief =
-    farewell !== null
-      ? { ...answered, toneHints: [...answered.toneHints, FAREWELL_HINTS[farewell]] }
-      : asking
-        ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
-        : {
-            ...answered,
-            toneHints: [
-              ...answered.toneHints,
-              ...paced,
-              ...(reminds ? [UNOPENED_STEP_HINT] : []),
-              ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
-              ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
-              ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
-            ],
-          };
+    heCame && !care
+      ? {
+          ...answered,
+          toneHints: [
+            ...answered.toneHints,
+            HE_CAME_HINT,
+            ...(farewell === null ? [] : [FAREWELL_HINTS[farewell]]),
+          ],
+        }
+      : farewell !== null
+        ? { ...answered, toneHints: [...answered.toneHints, FAREWELL_HINTS[farewell]] }
+        : asking
+          ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
+          : {
+              ...answered,
+              toneHints: [
+                ...answered.toneHints,
+                ...paced,
+                ...(reminds ? [UNOPENED_STEP_HINT] : []),
+                ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
+                ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
+                ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
+              ],
+            };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}

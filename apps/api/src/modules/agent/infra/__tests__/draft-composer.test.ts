@@ -2269,6 +2269,28 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(bare.kind === 'held' ? bare.detail : []).toContain('media_not_sent');
   });
 
+  it('opens nothing right after he came: she shares the moment, no step, no offer (ADR 0156 § 6)', async () => {
+    const came: Brief = { ...HOT, desireSignals: ['just_came'] };
+    const { draftComposer, seen } = composer(
+      { brief: came, voice: { bubbles: ['Mmh… t’as été parfait 🫠'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(free(INPUT));
+
+    const voice = seen.voiceInputs?.[0];
+    expect(voice?.scriptStep).toBeUndefined();
+    expect(voice?.brief.action).toBe('reply');
+    expect(
+      voice?.brief.toneHints.some(
+        (hint) => hint.includes('vient de jouir') && hint.includes('rien à vendre'),
+      ),
+    ).toBe(true);
+    expect(result).toMatchObject({ kind: 'draft', bubbles: ['Mmh… t’as été parfait 🫠'] });
+    expect(result.kind === 'draft' ? result.scriptRun : 'held').toBeUndefined();
+  });
+
   it('says goodbye in one bubble when he says goodnight or leaves, never when he is only at work (ADR 0158 § A)', async () => {
     const goodbye = async (signals: Brief['desireSignals']) => {
       const { draftComposer, seen } = composer({ brief: { ...BRIEF, desireSignals: signals } });

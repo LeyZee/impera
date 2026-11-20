@@ -60,6 +60,7 @@ const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   not_sexualizing: 'Il ne sexualise pas encore lui-même',
   availability_unconfirmed: 'Il n’a pas dit être seul et libre',
   no_script_step: 'Aucune étape de script à envoyer',
+  he_came: 'Il vient de jouir : plus rien à vendre ce soir',
 };
 
 /** What the cursor decided on going sexual (agent/domain/sexualization.ts `SexualizationDecision`). */
