@@ -16,6 +16,7 @@ import { PhoneDialog } from './PhoneDialog';
 import { SuggestionDialog, UndatedSuggestions } from './SuggestionCard';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
+import { WeekCard } from './WeekCard';
 import { WeekGrid } from './WeekGrid';
 import { WeekList } from './WeekList';
 import { moveTask, tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
@@ -260,19 +261,23 @@ export function AgendaPage({
           </Skeleton>
         )
       ) : (
-        <Views
-          agenda={agenda}
-          view={seen}
-          wide={wide}
-          day={shown}
-          monday={monday}
-          onDay={onDay}
-          onView={onView}
-          onTick={tick}
-          onMove={move}
-          onOpen={setOpen}
-          shifts={shifts}
-        />
+        <>
+          {/* Her week of shooting, once the agency sent it: above the views, on every one of them (ADR 0140). */}
+          <WeekCard monday={monday} zone={agenda.timeZone} />
+          <Views
+            agenda={agenda}
+            view={seen}
+            wide={wide}
+            day={shown}
+            monday={monday}
+            onDay={onDay}
+            onView={onView}
+            onTick={tick}
+            onMove={move}
+            onOpen={setOpen}
+            shifts={shifts}
+          />
+        </>
       )}
       {agenda === undefined ? null : (
         <p className="ag-foot">

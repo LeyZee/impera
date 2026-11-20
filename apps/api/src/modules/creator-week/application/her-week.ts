@@ -73,7 +73,7 @@ export async function herWeek(
   const arrived =
     delivery === null
       ? { byCategory: {}, answered: new Set<string>() }
-      : await deps.facts.arrivals(read.creatorId, { from, to }, requestIds);
+      : await deps.facts.arrivals(userId, { from, to }, requestIds);
   const lines = deliveryLines(read.frames, arrived);
   return CreatorWeekSchema.parse({
     week,

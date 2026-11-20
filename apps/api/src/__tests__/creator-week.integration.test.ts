@@ -311,6 +311,26 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       ['shoot_day', addDays(week, 2)],
       ['shoot_day', addDays(week, 4)],
     ]);
+    // A line of her shooting day is the owner's alone to write: a manager under her own account is refused.
+    const shootDay = frames.find((frame) => frame.weekRole === 'shoot_day');
+    if (shootDay === undefined) throw new Error('a shooting day expected');
+    await expect(
+      withTenantMember(app.db.db, nora, managerUserId, (tx) =>
+        tx.insert(schema.creatorShootItems).values({
+          id: randomUUID(),
+          creatorId: nora,
+          suggestionId: shootDay.id,
+          position: 19,
+          need: 'feed_shoot',
+          label: 'Ligne glissée par un manager',
+          sheet: null,
+          count: 1,
+          requestId: null,
+          createdBy: managerUserId,
+        }),
+      ),
+      // 42501: the row breaks her team_insert policy.
+    ).rejects.toMatchObject({ cause: { code: '42501' } });
   });
 
   it('reaches her as her week to accept, and no one else’s', async () => {

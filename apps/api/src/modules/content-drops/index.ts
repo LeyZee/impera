@@ -133,7 +133,7 @@ export type { DropStorage, IdeaContentRequest, ScriptVersions } from './domain/p
 /** @public Her drops and requests as the creator's game counts them (ADR 0107), for the composition root. */
 export { dropsForGameUnscoped, type DropsForGame } from './infra/db/game-reads';
 /** @public Her stock, her open scripts and what of her delivery arrived (ADR 0140 § 4 and § 25), for the week's job and reads. */
-export { weekArrivalsUnscoped, weekStockUnscoped, type WeekStockFacts } from './infra/db/week-reads';
+export { weekArrivals, weekStockUnscoped, type WeekStockFacts } from './infra/db/week-reads';
 
 export interface ContentDropsDeps {
   /** Application role: her own account's RLS, or the team's. */

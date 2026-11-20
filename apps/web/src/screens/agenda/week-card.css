@@ -1,0 +1,229 @@
+/* ── Ta semaine de tournage (ADR 0140) ─────────────────────────────────────────────────────────────────────────── */
+/* One card above her agenda; the shoot's pink (`--ag-c` from `data-cat='shoot'`) carries it, no bar on its side. */
+.wk-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  margin-bottom: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 28%, var(--nv-hairline));
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--ag-c) 14%, transparent), transparent 60%),
+    var(--nv-plate);
+  animation: wk-in var(--nv-dur-slow) var(--nv-ease-out) both;
+}
+@keyframes wk-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.wk-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.wk-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--ag-c) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 34%, transparent);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.wk-card:hover .wk-mark {
+  transform: rotate(-6deg) scale(1.05);
+}
+.wk-mark svg {
+  width: 24px;
+  height: 24px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.wk-mark__board {
+  fill: color-mix(in srgb, var(--ag-c) 55%, transparent);
+  stroke: var(--ag-c);
+  stroke-width: 1.4;
+}
+.wk-mark__clap {
+  fill: var(--ag-c);
+  stroke: var(--ag-c);
+  stroke-width: 1.4;
+  transform-origin: 4px 9px;
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.wk-card:hover .wk-mark__clap {
+  transform: rotate(-8deg);
+}
+.wk-mark__stripes {
+  fill: none;
+  stroke: var(--nv-plate);
+  stroke-width: 1.6;
+}
+.wk-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wk-tag {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.wk-title {
+  font-family: var(--nv-font-display);
+  font-weight: 650;
+  font-size: var(--nv-text-headline);
+  line-height: 1.2;
+}
+.wk-due {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.wk-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--ag-c) 9%, transparent);
+}
+.wk-ask__text {
+  margin: 0;
+  flex: 1 1 220px;
+  font-size: var(--nv-text-footnote);
+}
+.wk-failed {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-warning);
+}
+.wk-days {
+  display: grid;
+  gap: var(--nv-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.wk-day,
+.wk-delivery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.wk-day__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.wk-day__date {
+  font-size: var(--nv-text-callout);
+}
+.wk-day__date::first-letter {
+  text-transform: uppercase;
+}
+.wk-day__count {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.wk-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.wk-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ag-c) 70%, transparent), var(--ag-c));
+  transition: width var(--nv-dur-data) var(--nv-ease-out);
+}
+.wk-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.wk-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+}
+.wk-line .ag-check {
+  margin-top: 1px;
+}
+.wk-line__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 3px;
+}
+.wk-line__label {
+  font-size: var(--nv-text-body);
+  transition: color var(--nv-dur-base) var(--nv-ease-out);
+}
+.wk-line[data-done] .wk-line__label {
+  color: var(--nv-ink-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--ag-c) 60%, transparent);
+}
+.wk-delivery {
+  background: color-mix(in srgb, var(--ag-c) 5%, transparent);
+}
+.wk-delivery[data-delivered] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 40%, transparent);
+  background: color-mix(in srgb, var(--nv-success) 8%, transparent);
+}
+.wk-done {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-success);
+}
+.wk-tally {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.wk-tally__line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--nv-text-footnote);
+  background: var(--nv-fill-track);
+}
+.wk-tally__line[data-full] {
+  background: color-mix(in srgb, var(--nv-success) 16%, transparent);
+  color: var(--nv-success);
+}
+.wk-drop {
+  align-self: flex-start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wk-card {
+    animation: none;
+  }
+  .wk-mark,
+  .wk-mark__clap,
+  .wk-bar i {
+    transition: none;
+  }
+}

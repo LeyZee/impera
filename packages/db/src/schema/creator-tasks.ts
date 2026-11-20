@@ -45,6 +45,9 @@ const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is 
 const readsTeam: SQL = sql`${notCreatorAccount} and ${currentScope} in ('owner', 'agency')`;
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
 const ofHerTeam = (creatorId: PgColumn): SQL => sql`${readsTeam} and ${creatorId} = ${currentCreator}`;
+/** Her week of shooting is the owner's alone to write (ADR 0140 § 3): a manager reads it. */
+const ofHerOwner = (creatorId: PgColumn): SQL =>
+  sql`${notCreatorAccount} and ${currentScope} = 'owner' and ${creatorId} = ${currentCreator}`;
 
 /** The shape each kind takes: a start and an end, a day, or weekdays (1 Monday … 7 Sunday, each once). */
 const whenShape = (t: {
@@ -320,7 +323,9 @@ export const creatorSuggestions = pgTable(
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('team_insert', {
       for: 'insert',
-      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}`,
+      // A frame of her week (`week_role`) is the owner's alone; any other suggestion, the owner's or a manager's.
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}
+        and (${t.weekRole} is null or ${currentScope} = 'owner')`,
     }),
   ],
 );
@@ -390,7 +395,7 @@ export const creatorShootItems = pgTable(
     // Written by the owner with the shooting day he validates, still to decide.
     pgPolicy('team_insert', {
       for: 'insert',
-      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.doneAt} is null
+      withCheck: sql`${ofHerOwner(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.doneAt} is null
         and exists (
           select 1 from creator_suggestions s
            where s.id = ${t.suggestionId} and s.creator_id = ${t.creatorId} and s.week_role = 'shoot_day'

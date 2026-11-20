@@ -71,9 +71,9 @@ export async function weekStockUnscoped(
 
 /**
  * What of her delivery arrived (ADR 0140 § 25): her drops by category that reached the agency between two instants,
- * and which of `requestIds` a drop answers, whenever it came. On the admin connection, bounded to her.
+ * and which of `requestIds` a drop answers, whenever it came. Read in her own account, in her request (her RLS).
  */
-export async function weekArrivalsUnscoped(
+export async function weekArrivals(
   tx: Transaction,
   creatorId: string,
   window: { readonly from: Date; readonly to: Date },

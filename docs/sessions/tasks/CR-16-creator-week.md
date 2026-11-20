@@ -1,6 +1,6 @@
 # CR-16 La semaine de la créatrice : deux jours de tournage, une livraison le dimanche, un agenda que le code remplit
 
-Statut : in_progress (lot 1 en PR ; ADR 0140, acceptée par Charles le 16/11/2026 ; lancée par Charles le 20/11/2026, « ça peut être cool de le faire »)
+Statut : in_progress (lots 1 et 2 en PR #921, captures de recette à faire ; ADR 0140, acceptée par Charles le 16/11/2026 ; lancée par Charles le 20/11/2026, « ça peut être cool de le faire »)
 Phase : espaces (ADR 0140, ADR 0042 § 3 à § 5)
 Dépend de : CR-05 (agenda), CR-06 (dépôts et demandes), SC-02 (scripts demandés par la cadence)
 Branche : claude/project-thread-b1a26e
@@ -24,8 +24,11 @@ Elle se concentre sur la création : sa semaine arrive préparée, en trois ou q
 - [x] Chez elle : lire sa semaine, « Accepter ma semaine », cocher une ligne (la tâche du jour suit), sa livraison comptée par ses dépôts.
 
 ### Lot 2 (écrans, captures avant fusion)
-- [ ] Chez elle, dans l'Agenda existant : sa semaine (jours de tournage et leurs lignes à cocher, « Livrer ma semaine » avec « Déposer »), « Accepter ma semaine ».
-- [ ] Chez le propriétaire, dans Créatrices › Agenda : relire, déplacer un jour ou une ligne, retirer, valider ; ce qui passe à la semaine d'après.
+- [x] Chez elle, dans l'Agenda existant : sa semaine (jours de tournage et leurs lignes à cocher, « Livrer ma semaine » avec « Déposer »), « Accepter ma semaine ».
+- [x] Chez le propriétaire, dans Créatrices › Agenda : relire, déplacer un jour ou une ligne, retirer, valider ; ce qui passe à la semaine d'après.
+
+- [ ] Captures de recette (Nuit/Jour, PC/téléphone, données inventées) et avis Design avant fusion.
+- [ ] À notre tour de fusion : ramener main, plafond du rôle de service (`modules/creator-week` et `wiring`) relevé avec sa raison ici, renuméroter la migration.
 
 ### Lot 3
 - [ ] Réglages par créatrice (nombre de jours, capacité, durées, échéance) ; le rappel du matin d'un jour de tournage ; la veille et le jour de l'échéance ; le propriétaire prévenu le dimanche soir qu'une semaine attend ; la livraison en retard en ambre côté agence.
@@ -41,3 +44,5 @@ Elle se concentre sur la création : sa semaine arrive préparée, en trois ou q
 Les lives (rien d'automatique, § 15) ; tout envoi réel.
 
 ## Notes de session
+
+- 20/11, relecture Sécurité sur d85d2dd : ses arrivées se lisent dans son compte (`withCreatorAccount`), plus avec le rôle de service ; les lignes d'un jour de tournage et les cadres de sa semaine ne s'écrivent que par le propriétaire (politiques et `suggestWeek`) ; la validation enregistre la semaine d'abord, puis écrit son agenda : rejouée, elle complète ; un autre plan est refusé.

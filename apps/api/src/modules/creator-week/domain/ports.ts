@@ -34,15 +34,21 @@ export interface WeekDraftStore {
   ): Promise<AgencyCreatorWeek>;
 }
 
-/** What the week is computed on (admin), from the drops and the agenda, never their tables. */
+/**
+ * What the week is computed on, from the drops and the agenda, never their tables: on the admin connection for the
+ * job, which reads every creator; `arrivals` alone runs in her request, so in her own account.
+ */
 export interface WeekFactsReader {
   facts(creatorId: string, dueBy: string): Promise<WeekFacts>;
   /** The days of her shooting days of the week starting `week`, as she kept them. */
   shootDaysOf(creatorId: string, week: string): Promise<readonly string[]>;
   dispoMinutes(creatorId: string): Promise<ReadonlyMap<number, number>>;
-  /** What of her delivery arrived between two instants, and which script requests a drop answers. */
+  /**
+   * What of her delivery arrived between two instants, and which script requests a drop answers: read in her own
+   * account (`userId`, her RLS), never with the service role, since it serves her request.
+   */
   arrivals(
-    creatorId: string,
+    userId: string,
     window: { readonly from: Date; readonly to: Date },
     requestIds: readonly string[],
   ): Promise<{

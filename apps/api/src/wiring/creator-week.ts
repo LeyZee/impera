@@ -1,8 +1,8 @@
 import { ContentRequestIdSchema, JOB_PAYLOADS } from '@impera/contracts';
-import { withAdmin } from '@impera/db';
+import { withAdmin, withCreatorAccount } from '@impera/db';
 
 import { defineTask } from '../jobs';
-import { weekArrivalsUnscoped, weekStockUnscoped } from '../modules/content-drops';
+import { weekArrivals, weekStockUnscoped } from '../modules/content-drops';
 import {
   dispoMinutesByWeekdayUnscoped,
   shootDaysOfWeekUnscoped,
@@ -24,7 +24,8 @@ export interface WiredCreatorWeek {
 
 /**
  * Her week (ADR 0140): computed from her drops' stock and scripts asked (`content-drops`), her shooting days and dispos
- * (`creator-tasks`), read here on the admin connection bounded to her; written in her agenda through its own door.
+ * (`creator-tasks`), read by the job on the admin connection bounded to her; what arrived of her delivery is read in
+ * her own account, in her request. Written in her agenda through its own door.
  */
 export function wireCreatorWeek(
   shared: Shared,
@@ -49,8 +50,11 @@ export function wireCreatorWeek(
     shootDaysOf: (creatorId, week) =>
       withAdmin(adminDb, (tx) => shootDaysOfWeekUnscoped(tx, creatorId, week)),
     dispoMinutes: (creatorId) => withAdmin(adminDb, (tx) => dispoMinutesByWeekdayUnscoped(tx, creatorId)),
-    arrivals: (creatorId, window, requestIds) =>
-      withAdmin(adminDb, (tx) => weekArrivalsUnscoped(tx, creatorId, window, requestIds)),
+    // Her request: her own account and her RLS, never the service role (Sécurité, 20/11).
+    arrivals: (userId, window, requestIds) =>
+      withCreatorAccount(shared.db, userId, (tx, creatorId) =>
+        weekArrivals(tx, creatorId, window, requestIds),
+      ),
   };
   const module = createCreatorWeekModule({
     db: shared.db,

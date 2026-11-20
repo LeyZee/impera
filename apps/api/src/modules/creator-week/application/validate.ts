@@ -41,8 +41,9 @@ const sameShape = (a: WeekPlan, b: WeekPlan): boolean =>
 
 /**
  * The owner validates her week as he corrected it (ADR 0140 § 13): its days and lines; its deadline, its stock and
- * the capacity stay the computed ones. The frames enter her agenda first (replayable), then the week is marked: a
- * failure between the two is mended by the same validation again. Replayed with the same plan, it answers the week.
+ * the capacity stay the computed ones. The week is marked first, with the plan he sent, then its frames enter her
+ * agenda (replayable): a failure between the two is mended by the same validation again, which writes what is
+ * missing; another plan is refused, so her agenda always holds the plan the week recorded (Sécurité, 20/11).
  */
 export async function validateWeek(
   deps: ValidateDeps,
@@ -59,8 +60,9 @@ export async function validateWeek(
     deferred: corrected.deferred,
   };
   if (current.state === 'validated') {
-    if (sameShape(current.plan, plan)) return current;
-    throw new CreatorWeekValidated();
+    if (!sameShape(current.plan, plan)) throw new CreatorWeekValidated();
+    await deps.agenda.suggestWeek(creatorId, userId, framesOf(creatorId, week, current.plan));
+    return current;
   }
   if (
     !daysInWeek(
@@ -69,6 +71,9 @@ export async function validateWeek(
     )
   )
     throw new CreatorWeekPlanInvalid();
-  await deps.agenda.suggestWeek(creatorId, userId, framesOf(creatorId, week, plan));
-  return deps.drafts.markValidated(creatorId, userId, week, plan, now);
+  const validated = await deps.drafts.markValidated(creatorId, userId, week, plan, now);
+  // Validated meanwhile by another gesture: her agenda gets the plan recorded, and this one is refused.
+  await deps.agenda.suggestWeek(creatorId, userId, framesOf(creatorId, week, validated.plan));
+  if (!sameShape(validated.plan, plan)) throw new CreatorWeekValidated();
+  return validated;
 }

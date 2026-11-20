@@ -95,7 +95,7 @@ export function createDrizzleWeekAgendaStore(db: Database): WeekAgendaStore {
   return {
     suggestWeek: (creatorId, userId, frames) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
-        if (scope !== 'owner' && scope !== 'agency') throw new SuggestionForbidden();
+        if (scope !== 'owner') throw new SuggestionForbidden();
         await zoneOf(tx, creatorId);
         const common = {
           creatorId,
