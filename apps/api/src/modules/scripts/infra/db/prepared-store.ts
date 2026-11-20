@@ -28,6 +28,8 @@ import { z } from 'zod';
 import type { PreparedScriptStore, StoredPreparedScript } from '../../domain/ports';
 import type { PreparedVaultMedia } from '../../domain/prepared-scripts';
 
+import { nativesOf } from './natives';
+
 const { auditLog, mediaDescriptions, mediaPlatformRefs, platformAccounts, preparedScripts } = schema;
 
 type Row = typeof preparedScripts.$inferSelect;
@@ -100,6 +102,11 @@ async function storedOf(tx: Transaction, row: Row): Promise<StoredPreparedScript
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     vault: await vaultOf(tx, row.platformAccountId, refsOf(content)),
+    // What it is compared with while it waits to be copied: the native scripts of its name (ADR 0112 § 23).
+    natives:
+      row.state === 'ready_to_copy'
+        ? await nativesOf(tx, row.platformAccountId, { name: content.name })
+        : null,
   };
 }
 

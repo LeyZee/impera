@@ -227,7 +227,12 @@ describe('the scripts in preparation', () => {
     const created = await call('manager', 'POST', base(nora), body);
     expect(created.statusCode).toBe(201);
     const view = PreparedScriptViewSchema.parse(created.json());
-    expect(view).toMatchObject({ state: 'editing', revision: 1, matchedPlatformScriptId: null });
+    expect(view).toMatchObject({
+      state: 'editing',
+      revision: 1,
+      matchedPlatformScriptId: null,
+      copyDifferences: null,
+    });
     // Both media listed by her vault, neither described yet.
     expect(view.gaps.map((gap) => [gap.code, gap.step])).toEqual([
       ['media_not_described', 0],
@@ -292,6 +297,8 @@ describe('the scripts in preparation', () => {
       state: 'ready_to_copy',
       revision: 2,
       gaps: [],
+      // Not copied into Reveal yet: no native script of its name.
+      copyDifferences: [{ code: 'name_not_found' }],
     });
     // A save on an old revision is refused; on the current one it goes back to editing.
     const stale = await call('manager', 'PUT', `${base(nora)}/${id}`, {
