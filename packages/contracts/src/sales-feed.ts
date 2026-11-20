@@ -789,33 +789,58 @@ export const EARNINGS_MAX_DAYS_BACK = 400;
 export const EARNINGS_MAX_LINES = 300;
 
 /**
- * Her part over a period, per currency (`modelRevenue` on Reveal, ADR 0054), refunds taken off their sale's day: the
- * only money she reads (Charles: « elle voit sa part seulement »). Never the price the fan paid, the platform's share,
- * the agency's, nor who sold.
+ * A share in basis points (10 000 = 100 %), computed by the server on sums (ADR 0157 § 6): `null` when the base is
+ * zero or less, never a value guessed.
+ */
+const BasisPointsSchema = z.number().int().nullable();
+
+/**
+ * The whole path of her sales over a period, per currency (ADR 0157 § 1), each amount as Reveal records it, refunds
+ * taken off their sale's day: what her fans paid VAT included, without VAT, the net after Reveal, the agency's part and
+ * hers (`modelRevenue`, ADR 0054). Her part over the net and over what her fans paid are observed shares, never the
+ * agreed percentage. Never who sold, nor anything of the team.
  */
 export const CreatorEarningsTotalSchema = z.strictObject({
   currency: CurrencySchema,
-  creatorMinor: z.number().int(),
   sales: z.number().int().min(0),
   refunds: z.number().int().min(0),
+  grossInclVatMinor: z.number().int(),
+  grossExclVatMinor: z.number().int(),
+  netMinor: z.number().int(),
+  agencyMinor: z.number().int(),
+  creatorMinor: z.number().int(),
+  /** Her part over the net. */
+  shareOfNetBp: BasisPointsSchema,
+  /** Her part over what her fans paid, VAT included. */
+  shareOfPaidBp: BasisPointsSchema,
 });
 export type CreatorEarningsTotal = z.infer<typeof CreatorEarningsTotalSchema>;
 
-/** One sale or refund of the period: when, what, her part of it, and the fan's name when his card is hers. */
+/**
+ * One sale or refund of the period: when, what, its own path (never signed: `event` says a refund), her part over its
+ * net, the day of the sale a refund belongs to, and the fan's name when his card is hers. Reveal splits a sale by the
+ * model's split, not by who sold: its share names no seller (ADR 0157 § 6).
+ */
 export const CreatorEarningsLineSchema = z.strictObject({
   occurredAt: z.iso.datetime(),
+  saleDay: z.iso.date(),
   event: SaleEventSchema,
   saleType: SaleTypeSchema,
   currency: CurrencySchema,
+  grossInclVatMinor: z.number().int().min(0),
+  grossExclVatMinor: z.number().int().min(0),
+  netMinor: z.number().int().min(0),
+  agencyMinor: z.number().int().min(0),
   creatorMinor: z.number().int().min(0),
+  shareOfNetBp: BasisPointsSchema,
   fanName: z.string().min(1).nullable(),
 });
 export type CreatorEarningsLine = z.infer<typeof CreatorEarningsLineSchema>;
 
 /**
  * Her Ventes over one period (CR-04): `from` and `to` both included, `estimated` while the period is not over (a
- * sale may still come, a refund still be taken), `latest` when it is the current one. Strict: no seller, no gross, no
- * agency share can pass.
+ * sale may still come, a refund still be taken), `latest` when it is the current one. Strict: no seller, no source
+ * (agent or human), no shift, no member can pass (ADR 0157 § 5).
  */
 export const CreatorEarningsSchema = z.strictObject({
   period: EarningsPeriodSchema,

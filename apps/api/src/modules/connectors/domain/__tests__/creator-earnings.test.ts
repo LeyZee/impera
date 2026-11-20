@@ -6,7 +6,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { creatorEarnings, periodRange, readableDay } from '../creator-earnings';
+import { creatorEarnings, periodRange, readableDay, shareBp } from '../creator-earnings';
 
 const fan = FanIdSchema.parse('0199f2a0-0000-7000-8000-000000000051');
 const stranger = FanIdSchema.parse('0199f2a0-0000-7000-8000-000000000052');
@@ -33,6 +33,7 @@ const line = (
   ...patch,
 });
 
+/** Invented amounts: a row whose path ends in `creatorMinor`, the agency taking a third of the net. */
 const row = (currency: 'EUR' | 'USD', creatorMinor: number, sales: number, refunds = 0) => ({
   day: '2026-11-03',
   platform: 'reveal' as const,
@@ -41,10 +42,10 @@ const row = (currency: 'EUR' | 'USD', creatorMinor: number, sales: number, refun
   saleType: 'ppv' as const,
   sales,
   refunds,
-  grossInclVatMinor: 0,
-  grossExclVatMinor: 0,
-  netMinor: 0,
-  agencyMinor: 0,
+  grossInclVatMinor: creatorMinor * 2,
+  grossExclVatMinor: Math.round((creatorMinor * 2) / 1.2),
+  netMinor: (creatorMinor * 3) / 2,
+  agencyMinor: creatorMinor / 2,
   creatorMinor,
 });
 
@@ -64,7 +65,7 @@ describe('her Ventes (CR-04)', () => {
     expect(readableDay('2025-10-15', '2026-11-20', 400)).toBe(false);
   });
 
-  it('gives her part alone, per currency, refunds off, the newest line first with her fan by name', () => {
+  it('gives the whole path of her sales, per currency, refunds off, the newest line first with her fan by name', () => {
     const sales: CreatorSales = {
       from: '2026-11-01',
       to: '2026-11-15',
@@ -83,8 +84,30 @@ describe('her Ventes (CR-04)', () => {
     });
     expect(CreatorEarningsSchema.parse(read)).toEqual(read);
     expect(read.totals).toEqual([
-      { currency: 'EUR', creatorMinor: 1400, sales: 3, refunds: 1 },
-      { currency: 'USD', creatorMinor: 300, sales: 1, refunds: 0 },
+      {
+        currency: 'EUR',
+        sales: 3,
+        refunds: 1,
+        grossInclVatMinor: 2800,
+        grossExclVatMinor: 1500 + 833,
+        netMinor: 2100,
+        agencyMinor: 700,
+        creatorMinor: 1400,
+        shareOfNetBp: 6667,
+        shareOfPaidBp: 5000,
+      },
+      {
+        currency: 'USD',
+        sales: 1,
+        refunds: 0,
+        grossInclVatMinor: 600,
+        grossExclVatMinor: 500,
+        netMinor: 450,
+        agencyMinor: 150,
+        creatorMinor: 300,
+        shareOfNetBp: 6667,
+        shareOfPaidBp: 5000,
+      },
     ]);
     expect(read.lines.map((one) => [one.occurredAt, one.event, one.fanName])).toEqual([
       ['2026-11-04T08:00:00.000Z', 'sale', null],
@@ -93,7 +116,66 @@ describe('her Ventes (CR-04)', () => {
     ]);
     // Closed and gone by: no longer estimated, not the latest.
     expect([read.estimated, read.latest, read.refundsWithoutSale]).toEqual([false, false, 1]);
-    expect(JSON.stringify(read)).not.toMatch(/gross|agency|net/u);
+    expect(read.lines[2]).toMatchObject({ saleDay: '2026-11-03', netMinor: 1333, agencyMinor: 400 });
+    expect(read.lines[2]?.shareOfNetBp).toBe(shareBp(900, 1333));
+  });
+
+  it('sends the keys of the path and nothing else: no seller, source, shift nor member (ADR 0157 § 6)', () => {
+    const read = creatorEarnings(
+      {
+        from: '2026-11-03',
+        to: '2026-11-03',
+        rows: [row('EUR', 900, 1)],
+        lines: [line('2026-11-03T10:00:00.000Z', 900)],
+        refundsWithoutSale: 0,
+      },
+      { period: 'day', today: '2026-11-20', names: new Map() },
+    );
+    expect(Object.keys(read).sort()).toEqual([
+      'estimated',
+      'from',
+      'latest',
+      'lines',
+      'linesOmitted',
+      'period',
+      'refundsWithoutSale',
+      'to',
+      'totals',
+    ]);
+    expect(Object.keys(read.totals[0] ?? {}).sort()).toEqual([
+      'agencyMinor',
+      'creatorMinor',
+      'currency',
+      'grossExclVatMinor',
+      'grossInclVatMinor',
+      'netMinor',
+      'refunds',
+      'sales',
+      'shareOfNetBp',
+      'shareOfPaidBp',
+    ]);
+    expect(Object.keys(read.lines[0] ?? {}).sort()).toEqual([
+      'agencyMinor',
+      'creatorMinor',
+      'currency',
+      'event',
+      'fanName',
+      'grossExclVatMinor',
+      'grossInclVatMinor',
+      'netMinor',
+      'occurredAt',
+      'saleDay',
+      'saleType',
+      'shareOfNetBp',
+    ]);
+  });
+
+  it('computes a share on sums only, a dash when the base is nil', () => {
+    expect(shareBp(900, 1350)).toBe(6667);
+    expect(shareBp(0, 1350)).toBe(0);
+    expect(shareBp(500, 0)).toBeNull();
+    // A period whose refunds outweigh its sales has no share to tell.
+    expect(shareBp(-200, -300)).toBeNull();
   });
 
   it('says a period under way estimated, and keeps the newest lines beyond the cap', () => {

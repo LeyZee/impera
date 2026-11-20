@@ -11,8 +11,8 @@ import { EARNINGS_MAX_LINES } from '@impera/contracts';
 import type { TotalsRange } from './sales-totals';
 
 /**
- * Her Ventes (CR-04): the period that holds a day, and her part over it out of her sales (`creatorSales`, the totals'
- * rule). Only her part leaves: never the gross, the platform's share, the agency's, nor who sold. Pure.
+ * Her Ventes (CR-04, ADR 0157): the period that holds a day, and the whole path of her sales over it (`creatorSales`, the
+ * totals' rule): what her fans paid, VAT, Reveal, the agency, her. Never who sold. Pure.
  */
 
 /** `YYYY-MM-DD` moved by `count` days, on the calendar alone. */
@@ -49,8 +49,13 @@ export function readableDay(day: string, today: string, maxBack: number): boolea
   return day <= today && day >= addDays(today, -maxBack);
 }
 
+/** `part` over `base` in basis points, rounded half up; `null` when `base` is zero or less (ADR 0157 § 6). */
+export function shareBp(part: number, base: number): number | null {
+  return base > 0 ? Math.round((part * 10_000) / base) : null;
+}
+
 /**
- * Her part over `range` out of her sales: a total per currency (refunds taken off, as the rows already are), the lines
+ * The path over `range` out of her sales: a total per currency (refunds taken off, as the rows already are), the lines
  * the newest first with the fan's name when his card is hers, `EARNINGS_MAX_LINES` at most.
  */
 export function creatorEarnings(
@@ -61,24 +66,39 @@ export function creatorEarnings(
     readonly names: ReadonlyMap<FanId, string>;
   },
 ): CreatorEarnings {
-  const totals = new Map<string, CreatorEarningsTotal>();
+  const sums = new Map<string, Omit<CreatorEarningsTotal, 'shareOfNetBp' | 'shareOfPaidBp'>>();
   for (const row of sales.rows) {
-    const before = totals.get(row.currency);
-    totals.set(row.currency, {
+    const before = sums.get(row.currency);
+    sums.set(row.currency, {
       currency: row.currency,
-      creatorMinor: (before?.creatorMinor ?? 0) + row.creatorMinor,
       sales: (before?.sales ?? 0) + row.sales,
       refunds: (before?.refunds ?? 0) + row.refunds,
+      grossInclVatMinor: (before?.grossInclVatMinor ?? 0) + row.grossInclVatMinor,
+      grossExclVatMinor: (before?.grossExclVatMinor ?? 0) + row.grossExclVatMinor,
+      netMinor: (before?.netMinor ?? 0) + row.netMinor,
+      agencyMinor: (before?.agencyMinor ?? 0) + row.agencyMinor,
+      creatorMinor: (before?.creatorMinor ?? 0) + row.creatorMinor,
     });
   }
+  const totals: CreatorEarningsTotal[] = [...sums.values()].map((sum) => ({
+    ...sum,
+    shareOfNetBp: shareBp(sum.creatorMinor, sum.netMinor),
+    shareOfPaidBp: shareBp(sum.creatorMinor, sum.grossInclVatMinor),
+  }));
   const lines: CreatorEarningsLine[] = [...sales.lines]
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .map((line) => ({
       occurredAt: line.occurredAt,
+      saleDay: line.saleDay,
       event: line.event,
       saleType: line.saleType,
       currency: line.currency,
+      grossInclVatMinor: line.grossInclVatMinor,
+      grossExclVatMinor: line.grossExclVatMinor,
+      netMinor: line.netMinor,
+      agencyMinor: line.agencyMinor,
       creatorMinor: line.creatorMinor,
+      shareOfNetBp: shareBp(line.creatorMinor, line.netMinor),
       fanName: line.fanId === null ? null : (input.names.get(line.fanId) ?? null),
     }));
   return {
@@ -87,7 +107,7 @@ export function creatorEarnings(
     to: sales.to,
     estimated: sales.to >= input.today,
     latest: sales.from <= input.today && input.today <= sales.to,
-    totals: [...totals.values()].sort((a, b) => a.currency.localeCompare(b.currency)),
+    totals: totals.sort((a, b) => a.currency.localeCompare(b.currency)),
     lines: lines.slice(0, EARNINGS_MAX_LINES),
     linesOmitted: Math.max(0, lines.length - EARNINGS_MAX_LINES),
     refundsWithoutSale: sales.refundsWithoutSale,
