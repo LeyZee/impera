@@ -182,5 +182,6 @@ describe('Sa banque (ADR 0102 § 5)', () => {
     mount(STATE, { examples: [READ, STOPPED] }, undefined, false);
     expect(await screen.findByText('Hey toi, tu fais quoi ?')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Retirer' })).toBeNull();
+    expect(screen.getByText(/^Les corrections rangées en Exemple de voix par le propriétaire,/)).toBeTruthy();
   });
 });

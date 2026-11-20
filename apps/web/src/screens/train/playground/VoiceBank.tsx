@@ -84,7 +84,9 @@ export function VoiceBankFold({
       </summary>
       <div className="nv-disclosure__body">
         <p className="pg-hint">
-          Tes corrections rangées en Exemple de voix, toutes versions confondues. Les douze plus récentes que
+          {/* A manager files nothing in her bank: he reads the owner's (ADR 0092, avenant du 20/11). */}
+          {mayWithdraw ? 'Tes corrections' : 'Les corrections'} rangées en Exemple de voix
+          {mayWithdraw ? '' : ' par le propriétaire'}, toutes versions confondues. Les douze plus récentes que
           ses gardes laissent passer sont lues par sa voix, ici et avec ses vrais fans.
         </p>
         {withdrawnAt === state.rate.rated ? (
