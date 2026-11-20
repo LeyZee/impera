@@ -59,7 +59,7 @@
   background: var(--nv-plate-hover);
 }
 .vt-earn__lines.is-dated .vt-earn__line {
-  grid-template-columns: 11.5em minmax(0, 1fr) auto;
+  grid-template-columns: 9em minmax(0, 1fr) auto;
 }
 .vt-earn__when {
   font-variant-numeric: tabular-nums;
