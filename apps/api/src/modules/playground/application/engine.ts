@@ -28,6 +28,12 @@ export interface PlaygroundEngine {
   advance(hours: number): PlaygroundState;
   setNotes(notes: readonly string[]): PlaygroundState;
   sendCreatorMedia(media: PlaygroundMedia, isLocked: boolean): PlaygroundState;
+  /** « Payer (fictif) » on the paid step of a trial script waiting for him (ADR 0103 § 16); nothing reaches Reveal. */
+  buyScriptStep(): PlaygroundState;
+  /** « Refuser » the paid step waiting: an explicit refusal, the script stops there. */
+  refuseScriptStep(): PlaygroundState;
+  /** Reads her catalogue now, as his next message would: the screen says at once whether she has a script to sell. */
+  readScripts(): Promise<void>;
   /** The owner marks his desire score after his n-th message (ADR 0103 § 6); kept for a creator's version only. */
   markDesire(
     fanMessageNumber: number,
@@ -81,6 +87,20 @@ export class BlockedAnswer extends PlaygroundError {
   }
 }
 
+/** « Payer (fictif) » or « Refuser » with no paid step waiting for him (already decided, or the script ended). */
+export class ScriptStepNotWaiting extends PlaygroundError {
+  constructor() {
+    super('script_step_not_waiting_conflict', 'Aucune étape payante n’attend de réponse.');
+  }
+}
+
+/** « Payer (fictif) » once a possible minor or his distress froze his sales: production would never sell then. */
+export class ScriptSalesFrozen extends PlaygroundError {
+  constructor() {
+    super('script_sales_frozen_conflict', 'Ventes gelées pour ce fan : aucun achat, même fictif.');
+  }
+}
+
 export class PresetNotFound extends PlaygroundError {
   constructor() {
     super('preset_not_found', 'Ce fan préréglé n’existe pas.');
@@ -119,5 +139,12 @@ export class DesireMarkInventedPersona extends PlaygroundError {
       'desire_mark_invented_persona_conflict',
       'La persona fictive n’est pas gardée : choisis une version d’une créatrice pour noter le désir.',
     );
+  }
+}
+
+/** No example of hers in her bank under this id: withdrawn already, another creator's, or never filed (ADR 0102 § 5). */
+export class VoiceExampleNotFound extends PlaygroundError {
+  constructor() {
+    super('voice_example_not_found', 'Cet exemple n’est plus dans sa banque.');
   }
 }

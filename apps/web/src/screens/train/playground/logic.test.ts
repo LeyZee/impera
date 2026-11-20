@@ -170,6 +170,7 @@ describe('stepOf', () => {
     sessionCostEur: 0,
     voice: { reachable: true },
     pending,
+    scripts: { source: 'trial', unavailable: null, run: null, fictiveSpentCents: 0, salesFrozen: false },
   });
 
   it('proposes the one thing to do next', () => {

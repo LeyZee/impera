@@ -47,7 +47,7 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     await test.close();
   });
 
-  it('keeps every function of ours out of reach of PUBLIC, and callable by our roles (migration 0231)', async () => {
+  it('keeps every function of ours out of reach of PUBLIC, and callable by our roles (migration 0234)', async () => {
     const rights = await root.query<{ anon: boolean; app: boolean; service: boolean }>(
       `select has_function_privilege('anon', $1, 'EXECUTE') as anon,
               has_function_privilege('nirvana_app', $1, 'EXECUTE') as app,
@@ -101,7 +101,7 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
       calendar_shifts: ['nirvana_app'],
       enqueue_job: ['impera_service', 'nirvana_app'],
       follow_own_time_zone: ['nirvana_app'],
-      // Open to PUBLIC before 0231: our two roles keep them, nobody else.
+      // Open to PUBLIC before 0234: our two roles keep them, nobody else.
       member_documents_open: ['impera_service', 'nirvana_app'],
       next_pay_period: ['impera_service', 'nirvana_app'],
       pay_period_closed: ['impera_service', 'nirvana_app'],

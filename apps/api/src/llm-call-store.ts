@@ -74,6 +74,7 @@ export function createDrizzleLlmCallStore(adminDb: Database): LlmCallStore {
         hedge: record.hedge ?? null,
         // Paths and kinds only (`invalidOutputCode`): `errorMessage` may quote the answer and is never stored.
         errorCode: record.errorCode ?? null,
+        voiceExampleIds: record.voiceExampleIds === undefined ? null : [...record.voiceExampleIds],
         createdAt: record.at,
       });
     },

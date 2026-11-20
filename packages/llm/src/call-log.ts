@@ -55,6 +55,8 @@ export interface LlmCallRecord {
   readonly purpose?: LlmPurpose;
   /** Absent: the request was not hedged. */
   readonly hedge?: HedgeRole;
+  /** A voice call only: the ids of her examples it received (ADR 0102 § 6). */
+  readonly voiceExampleIds?: readonly string[];
 }
 
 /** Journal of calls; the llm_calls table implements it once the database exists (P0-03). */

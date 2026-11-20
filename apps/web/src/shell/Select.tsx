@@ -22,6 +22,8 @@ export interface SelectOption<V extends string> {
   /** The heading it is listed under; options of one group follow each other. */
   readonly group?: string;
   readonly disabled?: boolean;
+  /** Drawn before the label, in the list and in the field (a face): decoration, never read aloud. */
+  readonly lead?: ReactNode;
 }
 
 /** Lower case without accents, for « éq » to find « Équipe ». */
@@ -288,6 +290,11 @@ export function Select<V extends string>({
           pick(option);
         }}
       >
+        {option.lead === undefined ? null : (
+          <span className="nv-select__lead" aria-hidden="true">
+            {option.lead}
+          </span>
+        )}
         <span className="nv-select__label">
           {option.label}
           {/* A space for the name read aloud: « Lune, relié à @lune », never « Lunerelié ». */}
@@ -339,6 +346,11 @@ export function Select<V extends string>({
         }}
         onKeyDown={onKeyDown}
       >
+        {current?.lead === undefined ? null : (
+          <span className="nv-select__lead" aria-hidden="true">
+            {current.lead}
+          </span>
+        )}
         <span
           className={cn(
             'nv-select__value',

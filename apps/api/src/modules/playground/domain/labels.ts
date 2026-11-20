@@ -60,6 +60,17 @@ const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   not_sexualizing: 'Il ne sexualise pas encore lui-même',
   availability_unconfirmed: 'Il n’a pas dit être seul et libre',
   no_script_step: 'Aucune étape de script à envoyer',
+  // Why her scripts sent no step (agent/domain/script-run.ts `ScriptStepDecision`), shown in place of `no_script_step`.
+  held: 'Autre chose répond à ce message : aucune étape ne part',
+  no_history: 'Historique de ses achats illisible : rien ne se vend',
+  no_script: 'Ce script n’est plus au catalogue',
+  scripts_exhausted: 'Plus aucun script pour ce moment de la journée',
+  no_pick: 'Elle n’a choisi aucun script',
+  cold_session: 'Session pas assez chaude pour continuer le script',
+  price_mismatch: 'Le prix du catalogue a changé : l’étape ne part pas',
+  step_waiting: 'Une étape payante attend sa réponse',
+  after_refusal: 'Il vient de refuser une étape : le script s’arrête',
+  script_ended: 'Le script est terminé',
 };
 
 /** What the cursor decided on going sexual (agent/domain/sexualization.ts `SexualizationDecision`). */
@@ -73,6 +84,18 @@ const CURSOR_LABELS: Readonly<Record<string, string>> = {
 
 export function offerRefusalLabel(code: string): string {
   return OFFER_REFUSAL_LABELS[code] ?? code;
+}
+
+/** Why none of her scripts can be played in the playground (ADR 0103 § 15), as production would sell none either. */
+const CATALOGUE_LABELS: Readonly<Record<string, string>> = {
+  no_script: 'Aucun de ses scripts Reveal n’est importé',
+  none_ready: 'Aucun de ses scripts n’est prêt',
+  several_accounts: 'Ses scripts sont sur plusieurs comptes Reveal',
+  unreadable: 'Ses scripts ne se lisent pas',
+};
+
+export function catalogueLabel(code: string): string {
+  return CATALOGUE_LABELS[code] ?? code;
 }
 
 /**
