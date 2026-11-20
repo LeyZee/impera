@@ -57,6 +57,8 @@ const WHY: Readonly<Record<WaitingConversation['kind'], string>> = {
     'Elle n’a pas de persona active : l’agent n’écrit rien. Le propriétaire ou un manager en active une dans Créatrices › Persona.',
   custom_order:
     'Il demande quelque chose fait pour lui : un humain prend la commande, l’agent ne promet rien.',
+  sale_trouble:
+    'Une vente coince encore : il n’arrive pas à ouvrir son achat, ou il se plaint à nouveau de ce qu’il a acheté. Un humain doit lui répondre.',
   awaiting_approval: 'Un brouillon attend d’être validé depuis plus de 10 minutes.',
   send_failed: 'Un message n’a pas pu partir. L’agent ne réessaie plus, un humain doit le renvoyer.',
   unanswered: 'Son dernier message attend depuis plus de 30 minutes, sans brouillon ni réponse en cours.',
@@ -210,6 +212,7 @@ function guardsToday(handoffs: DashboardFacts['handoffsToday']): Record<HandoffC
     identity_doubt: 0,
     persona_inactive: 0,
     custom_order: 0,
+    sale_trouble: 0,
   };
   for (const { cause, count } of handoffs) counts[cause] += count;
   return counts;

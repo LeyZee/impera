@@ -9,6 +9,7 @@ import {
   replyOpenAt,
   reopenJobKey,
   type AlertTrigger,
+  type ConversationId,
   type EventBody,
   type HandoffCause,
   type JobPayload,
@@ -382,6 +383,23 @@ async function recordScriptRuns(
 }
 
 /**
+ * His runs before the latest that went cold, and her teases about the latest when it went cold too (Charles 20/11):
+ * read only when his latest run went cold, the one case she may tease him. `null`: nothing to read.
+ */
+async function scriptAbandonOf(
+  tx: Transaction,
+  conversationId: ConversationId,
+  latest: StoredScriptRun | null,
+): Promise<NonNullable<ComposeInput['scriptAbandon']> | null> {
+  if (latest?.run.status !== 'stalled') return null;
+  const stalled = await tx.scriptRuns.stalled(conversationId);
+  return {
+    earlier: stalled.filter((stored) => stored.id !== latest.id).map((stored) => stored.run),
+    teased: await tx.events.abandonTeases(conversationId, latest.id),
+  };
+}
+
+/**
  * `conversation.respond`, after the debounce (message-flow.md §1). Three steps, so that no lock is held while the
  * engine thinks (seconds): read the gates and the context; compose outside any transaction; re-lock and write,
  * unless the fan wrote again meanwhile (the next debounce answers) or a gate closed. Never sends anything: the
@@ -408,12 +426,14 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         logger.info({ until: until.toISOString() }, 'respond: out of her hours, deferred');
         return null;
       }
+      const scriptRun = await tx.scriptRuns.latest(conversation.id);
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId),
         sales: await tx.events.salesState(conversation.id),
-        scriptRun: await tx.scriptRuns.latest(conversation.id),
+        scriptRun,
+        scriptAbandon: await scriptAbandonOf(tx, conversation.id, scriptRun),
         lastInbound: lastInboundKey(conversation),
       };
     });
@@ -446,7 +466,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
       scriptRun: read.scriptRun?.run ?? null,
+      ...(read.scriptAbandon !== null && { scriptAbandon: read.scriptAbandon }),
       fanAvailability: read.conversation.fanAvailability,
+      saleTrouble: read.sales.saleTrouble,
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -526,6 +548,24 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
       conversation = scripted.conversation;
       if (result.kind === 'draft') {
+        // She answered a sale gone wrong: the same trouble again soon after goes to a human (ADR 0156 § 4 and § 7).
+        if (result.saleTrouble !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'sale_trouble', payload: { conversationId: conversation.id, kind: result.saleTrouble } },
+            meta,
+          );
+        }
+        // She teased him about the run he left: counted, so that she never says it more than due (Charles 20/11).
+        if (result.abandonTeased === true && read.scriptRun !== null) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'script_abandon_teased', payload: { scriptRunId: read.scriptRun.id } },
+            meta,
+          );
+        }
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {
           conversation = await appendEvent(

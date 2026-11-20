@@ -104,6 +104,7 @@ const INTENTS: Readonly<Record<BriefIntent, string>> = {
   media_reaction: 'Il réagit à un média',
   asks_for_media: 'Il demande un média',
   price_objection: 'Il discute le prix',
+  payment_help: 'Il demande comment payer',
   asks_if_bot: 'Il demande si elle est un bot',
   asks_to_meet: 'Il veut la rencontrer',
   asks_personal_contact: 'Il veut ses coordonnées',

@@ -445,6 +445,19 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .limit(1);
         return last?.type === 'scripts_exhausted';
       },
+      async abandonTeases(conversationId, scriptRunId) {
+        const rows = await tx
+          .select({ seq: schema.conversationEvents.seq })
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              eq(schema.conversationEvents.type, 'script_abandon_teased'),
+              sql`${schema.conversationEvents.payload} ->> 'scriptRunId' = ${scriptRunId}`,
+            ),
+          );
+        return rows.length;
+      },
       async salesState(conversationId) {
         const rows = await tx
           .select()
@@ -456,18 +469,28 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
                 'custom_order_opened',
                 'objection_reply_used',
                 'takeover_started',
+                'sale_trouble',
               ]),
             ),
           )
           .orderBy(schema.conversationEvents.seq);
         let customOrderOpen = false;
         const usedObjectionReplies: string[] = [];
-        for (const { body } of rows.map(toStoredEvent)) {
+        let paymentHelpAt: Date | null = null;
+        let complaintAt: Date | null = null;
+        for (const { body, at } of rows.map(toStoredEvent)) {
           if (body.type === 'custom_order_opened') customOrderOpen = true;
-          if (body.type === 'takeover_started') customOrderOpen = false;
           if (body.type === 'objection_reply_used') usedObjectionReplies.push(body.payload.replyId);
+          // A human took the conversation: what was open is theirs, and a trouble after them is a new one.
+          if (body.type === 'takeover_started') {
+            customOrderOpen = false;
+            paymentHelpAt = null;
+            complaintAt = null;
+          }
+          if (body.type === 'sale_trouble' && body.payload.kind === 'payment_help') paymentHelpAt = at;
+          if (body.type === 'sale_trouble' && body.payload.kind === 'purchase_complaint') complaintAt = at;
         }
-        return { customOrderOpen, usedObjectionReplies };
+        return { customOrderOpen, usedObjectionReplies, saleTrouble: { paymentHelpAt, complaintAt } };
       },
       async list(conversationId) {
         const rows = await tx

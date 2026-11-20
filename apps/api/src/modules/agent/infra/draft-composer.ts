@@ -33,6 +33,7 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
+import { herDayEndsSoon } from '../domain/day-end';
 import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
@@ -49,6 +50,7 @@ import type { PickedObjectionReply } from '../domain/objections';
 import { originNote } from '../domain/origin';
 import type { OfferLimits } from '../domain/policy';
 import { safetySigns } from '../domain/safety-net';
+import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../domain/sale-trouble';
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
@@ -154,6 +156,11 @@ export interface AgentComposeInput {
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRun | null;
+  /**
+   * His runs before `scriptRun` that went cold, and how many times she teased him about `scriptRun` when he left it
+   * (Charles 20/11). Absent: none, never.
+   */
+  readonly scriptAbandon?: { readonly earlier: readonly ScriptRun[]; readonly teased: number };
   /** His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
@@ -161,6 +168,8 @@ export interface AgentComposeInput {
    * whatever he writes, until a manager or the owner closes it. `helpGiven`: the help bubble already went out in it.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+  /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7), as the journal keeps it. */
+  readonly saleTrouble?: SaleTroubleSeen;
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -247,6 +256,10 @@ type AgentComposeResult = (
   readonly customOrderOpened?: true;
   /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
   readonly scriptsExhausted?: true;
+  /** She answered a sale gone wrong in this draft (`sale_trouble`, ADR 0156 § 4 and § 7): a human gets the next one. */
+  readonly saleTrouble?: SaleTroubleKind;
+  /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
+  readonly abandonTeased?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /**
@@ -375,6 +388,10 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
     history: null,
     latest: input.scriptRun ?? null,
     countsHisMessage: (input.waited ?? 0) === 0,
+    ...(input.scriptAbandon !== undefined && {
+      earlier: input.scriptAbandon.earlier,
+      teased: input.scriptAbandon.teased,
+    }),
   };
   if (deps.scripts === undefined || platformAccountId === undefined || platformConversationId === undefined)
     return closed;
@@ -539,6 +556,10 @@ function adultOnCard(
 }
 
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
+
+/** A step of hers he bought, as his latest run records it (Reveal's history, ADR 0156 § 2). */
+const paidStepOf = (run: ScriptRun | null | undefined): boolean =>
+  run?.steps.some((step) => step.outcome === 'bought') === true;
 
 /**
  * The AI could not answer him with care (a refusal, a failure, no budget, a guard): never silence, a human writes to
@@ -821,6 +842,9 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
   return {
     ...result,
     ...(opened && { customOrderOpened: true }),
+    ...(composed.saleTrouble?.kind === 'answer' &&
+      result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
+    ...(composed.abandonTeased !== undefined && result.kind === 'draft' && { abandonTeased: true }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
   };
@@ -924,6 +948,9 @@ async function settle(
       costUsd,
     };
   // A custom order with a chatter on shift (ADR 0090 § A): they take it, the voice did not write.
+  // The same sale trouble again soon after her answer (ADR 0156 § 4 and § 7): a human answers, she did not write.
+  if (composed.saleTrouble?.kind === 'handoff')
+    return { ...HANDOFF, cause: 'sale_trouble', detail: [composed.saleTrouble.trouble], costUsd };
   if (composed.customOrder?.kind === 'handoff')
     return { ...HANDOFF, cause: 'custom_order', detail: ['custom_order'], costUsd };
   // He stated an adult age himself, or his card gives one: confirmed (Charles, 27/10 and 16/11), never once his age
@@ -1059,6 +1086,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const offer = await offerInput(withHer, input, stop.flags);
       const scripts = await scriptsInput(deps, input);
       const waited = (input.waited ?? 0) >= 1;
+      const timeZone = await deps.timeZoneOf(input.creatorId);
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
         fanText: ownText,
@@ -1076,13 +1104,15 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         situation: {
           now: input.now,
-          timeZone: await deps.timeZoneOf(input.creatorId),
+          timeZone,
           relationshipStartedAt: input.fan.firstMessageAt ?? input.now,
           spentCents: input.fan.spentMinor,
           ...(input.hours !== undefined && { night: input.hours.night }),
         },
         trace: { creatorId: input.creatorId, conversationId: input.conversationId, draftId: input.draftId },
         ...(waited && { waited }),
+        ...(input.hours !== undefined &&
+          herDayEndsSoon(input.hours, timeZone, input.now, input.exceptions) && { herDayEnds: true }),
         desire: {
           ...(input.desire !== undefined && { previous: input.desire }),
           measured: measureDesire(
@@ -1120,6 +1150,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
+        saleTrouble: {
+          seen: input.saleTrouble ?? NO_SALE_TROUBLE,
+          // He bought from her: Reveal's spending, or a step of hers recorded paid.
+          hasBought: input.fan.spentMinor > 0 || paidStepOf(input.scriptRun),
+        },
       });
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);

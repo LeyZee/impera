@@ -71,6 +71,8 @@ const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   step_waiting: 'Une étape payante attend sa réponse',
   after_refusal: 'Il vient de refuser une étape : le script s’arrête',
   script_ended: 'Le script est terminé',
+  he_came: 'Il vient de jouir : rien à vendre juste après',
+  abandon_tease: 'Il est parti en plein script : elle le taquine d’abord',
 };
 
 /** What the cursor decided on going sexual (agent/domain/sexualization.ts `SexualizationDecision`). */

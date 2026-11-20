@@ -88,7 +88,7 @@ Persona par blocs (P5-01) : la fiche donnée aux modèles porte chaque bloc remp
 Brief {
   // BRIEF_INTENTS, packages/contracts/src/brief.ts: the one list, read by the model's schema and by the screens.
   intent: 'small_talk'|'kyc_answer'|'flirt'|'sexting'|'media_reaction'|'asks_for_media'|'price_objection'|
-          'asks_if_bot'|'asks_to_meet'|'asks_personal_contact'|'asks_for_service'|'distress'|'complaint'|
+          'payment_help'|'asks_if_bot'|'asks_to_meet'|'asks_personal_contact'|'asks_for_service'|'distress'|'complaint'|
           'off_topic_request'|'other';
   sentiment: 'positive'|'neutral'|'negative'|'aroused'|'frustrated';
   factsProposed: { category, key, value, kind: 'declared'|'inferred', confidence }[];

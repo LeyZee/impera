@@ -1366,7 +1366,7 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
         before: 59,
         score: 93,
         signals: ['states_desire', 'intent:sexting', 'sentiment:aroused'],
-        weightsVersion: 'desire-3',
+        weightsVersion: 'desire-4',
       },
     });
     expect(written(seen)?.action).toBe('offer');
@@ -2461,6 +2461,170 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(bare.kind === 'held' ? bare.detail : []).toContain('media_not_sent');
   });
 
+  it('says goodbye for the day in her last minutes, and starts no step that would be cut off (ADR 0158 § A 7)', async () => {
+    // Saturday 17/10, 12:00 in Paris: her slot ends at 12:10.
+    const closing: AgentComposeInput = {
+      ...free(INPUT),
+      hours: {
+        reply: {
+          mode: 'slots',
+          slots: [{ day: 6, startMinute: 10 * 60, endMinute: 12 * 60 + 10, enabled: true }],
+        },
+        followUpQuiet: { startMinute: 23 * 60, endMinute: 9 * 60 },
+        night: { startMinute: 22 * 60, endMinute: 7 * 60 },
+      },
+    };
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(closing);
+
+    const voice = seen.voiceInputs?.[0];
+    expect(voice?.scriptStep).toBeUndefined();
+    expect(voice?.maxBubbles).toBe(1);
+    expect(voice?.brief.toneHints.some((hint) => hint.includes('sa journée à elle se termine'))).toBe(true);
+    expect(result.kind === 'draft' ? result.scriptRun : 'held').toBeUndefined();
+  });
+
+  it('teases him when he comes back hot after leaving a script, once, then vexed after a second time (Charles 20/11)', async () => {
+    const twoPacks: ScriptSource = {
+      catalogue: async () => {
+        const [pack] = await PACK_SOURCE.catalogue('creator-1', 'account-1');
+        return pack === undefined
+          ? []
+          : [pack, { ...pack, scriptRef: 'script-deux', description: 'Deuxième pack' }];
+      },
+      // He was sent the first one and left it: only the second may open.
+      history: (...args) => sent.history(...args),
+    };
+    // Yesterday: past her cooldown between two scripts.
+    const yesterday = new Date(INPUT.now.getTime() - 24 * 3_600_000);
+    const left = {
+      ...waiting,
+      status: 'stalled' as const,
+      steps: waiting.steps.map((step) => ({ ...step, sentAt: yesterday, at: yesterday })),
+      startedAt: yesterday,
+      endedAt: yesterday,
+    };
+    const hot = {
+      brief: { ...HOT, scriptPick: 's1' },
+      voice: { bubbles: ['Tu m’as laissée en plan toi 😏'] },
+    };
+    const turn = async (scriptAbandon: NonNullable<AgentComposeInput['scriptAbandon']>) => {
+      const { draftComposer, seen } = composer(hot, undefined, limitsOf(ADULT).limits, deps(twoPacks));
+      const result = await draftComposer.compose({ ...free(INPUT), scriptRun: left, scriptAbandon });
+      return { result, voice: seen.voiceInputs?.[0] };
+    };
+
+    const first = await turn({ earlier: [], teased: 0 });
+    expect(first.voice?.scriptStep).toBeUndefined();
+    expect(first.voice?.brief.toneHints.some((hint) => hint.includes('le taquine une fois'))).toBe(true);
+    expect(first.result).toMatchObject({ kind: 'draft', abandonTeased: true });
+    expect(first.result.kind === 'draft' ? first.result.scriptRun?.opened : 'held').toBeUndefined();
+
+    // Said once: the game may start again.
+    const after = await turn({ earlier: [], teased: 1 });
+    expect(after.result).toMatchObject({ kind: 'draft', scriptRun: { step: { scriptRef: 'script-deux' } } });
+    expect(after.result.kind === 'draft' ? after.result.abandonTeased : 'held').toBeUndefined();
+
+    // He left one before: vexed, three times, and no script before.
+    const again = await turn({ earlier: [left], teased: 2 });
+    expect(again.voice?.scriptStep).toBeUndefined();
+    expect(again.voice?.brief.toneHints.some((hint) => hint.includes('franchement vexée'))).toBe(true);
+    expect(again.result).toMatchObject({ kind: 'draft', abandonTeased: true });
+    const done = await turn({ earlier: [left], teased: 3 });
+    expect(done.result).toMatchObject({ kind: 'draft', scriptRun: { step: { scriptRef: 'script-deux' } } });
+  });
+
+  it('never teases a fragile fan about the script he left (Charles 20/11)', async () => {
+    const left = {
+      ...waiting,
+      status: 'stalled' as const,
+      endedAt: new Date(INPUT.now.getTime() - 3_600_000),
+    };
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf({ ...ADULT, fragile: true }).limits,
+      deps(sent),
+    );
+    const result = await draftComposer.compose({
+      ...free(INPUT),
+      scriptRun: left,
+      scriptAbandon: { earlier: [left], teased: 0 },
+    });
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('vexée'))).toBe(false);
+    expect(result.kind === 'draft' ? result.abandonTeased : undefined).toBeUndefined();
+  });
+
+  it('brings his score back to a client’s rest once he bought the last step, even unsaid (ADR 0156 § 6)', async () => {
+    const boughtIt: ScriptSource = {
+      ...PACK_SOURCE,
+      history: () =>
+        Promise.resolve({
+          scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0], boughtStepIndexes: [0] }],
+        }),
+    };
+    const { draftComposer } = composer(
+      { brief: { ...HOT, action: 'reply' } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(boughtIt),
+    );
+    const result = await draftComposer.compose({
+      ...free(INPUT),
+      scriptRun: waiting,
+      desire: { score: 90, at: new Date(INPUT.now.getTime() - 30 * 60_000) },
+    });
+    expect(result).toMatchObject({ desire: { score: 20 } });
+    expect(result.kind === 'draft' ? result.desire?.signals.at(-1) : null).toBe('rest_client');
+  });
+
+  it('opens nothing right after he came: she shares the moment, no step, no offer (ADR 0156 § 6)', async () => {
+    const came: Brief = { ...HOT, desireSignals: ['just_came'] };
+    const { draftComposer, seen } = composer(
+      { brief: came, voice: { bubbles: ['Mmh… t’as été parfait 🫠'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(free(INPUT));
+
+    const voice = seen.voiceInputs?.[0];
+    expect(voice?.scriptStep).toBeUndefined();
+    expect(voice?.brief.action).toBe('reply');
+    expect(
+      voice?.brief.toneHints.some(
+        (hint) => hint.includes('vient de jouir') && hint.includes('rien à vendre'),
+      ),
+    ).toBe(true);
+    expect(result).toMatchObject({ kind: 'draft', bubbles: ['Mmh… t’as été parfait 🫠'] });
+    expect(result.kind === 'draft' ? result.scriptRun : 'held').toBeUndefined();
+  });
+
+  it('says goodbye in one bubble when he says goodnight or leaves, never when he is only at work (ADR 0158 § A)', async () => {
+    const goodbye = async (signals: Brief['desireSignals']) => {
+      const { draftComposer, seen } = composer({ brief: { ...BRIEF, desireSignals: signals } });
+      await draftComposer.compose(INPUT);
+      const voice = seen.voiceInputs?.[0];
+      return { max: voice?.maxBubbles, hints: voice?.brief.toneHints ?? [] };
+    };
+    const night = await goodbye(['says_goodnight']);
+    expect(night.max).toBe(1);
+    expect(night.hints.some((hint) => hint.includes('bonne nuit') && hint.includes('sans question'))).toBe(
+      true,
+    );
+    const leaving = await goodbye(['leaving_soon']);
+    expect(leaving.max).toBe(1);
+    expect(leaving.hints.some((hint) => hint.includes('le laisse filer'))).toBe(true);
+    // « Je suis au boulot » while he keeps writing: she chats on.
+    const busy = await goodbye(['busy_now']);
+    expect(busy.hints.some((hint) => hint.includes('une seule bulle'))).toBe(false);
+  });
+
   it('sends no step in the care mode, hot, free and at her threshold: the care brief only (ADR 0088 § 2)', async () => {
     const { draftComposer, seen } = composer(
       { brief: HOT, voice: { bubbles: ['Je suis là pour toi 🤍'] } },
@@ -2548,6 +2712,10 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       { type: 'script_step_refused', stepIndex: 0 },
       { type: 'script_ended' },
     ]);
+    // Her first answer after his no asks what did not please him (ADR 0156 § 3).
+    expect(
+      seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('ce qui ne lui a pas plu')),
+    ).toBe(true);
 
     const handoff = composer(
       { brief: { ...refused, action: 'handoff' } },
@@ -2558,6 +2726,143 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     const held = await handoff.draftComposer.compose({ ...INPUT, scriptRun: waiting });
     expect(held.kind).toBe('held');
     expect(held.scriptRun?.moved?.run.status).toBe('refused');
+  });
+
+  it('insists once after his no, then sulks once, then lets go; never with a fragile fan (ADR 0156 § 3)', async () => {
+    const refused: Brief = { ...BRIEF, scriptReply: 'refused' };
+    const first = await composer(
+      { brief: refused },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    ).draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    const run = first.scriptRun?.moved?.run;
+    if (run === undefined) throw new Error('no refused run');
+    const answers = (count: number): AgentComposeInput => ({
+      ...INPUT,
+      now: new Date(INPUT.now.getTime() + (count + 1) * 120_000),
+      scriptRun: run,
+      history: [
+        ...INPUT.history,
+        ...Array.from({ length: count }, (_, i) => [
+          {
+            direction: 'outbound' as const,
+            text: 'Ah bon ?',
+            at: new Date(INPUT.now.getTime() + (i * 2 + 1) * 60_000),
+          },
+          {
+            direction: 'inbound' as const,
+            text: 'Bof',
+            at: new Date(INPUT.now.getTime() + (i * 2 + 2) * 60_000),
+          },
+        ]).flat(),
+      ],
+    });
+    const hintsAfter = async (count: number, flags: FanFlags) => {
+      const { draftComposer, seen } = composer(
+        { brief: BRIEF },
+        undefined,
+        limitsOf(flags).limits,
+        deps(sent),
+      );
+      await draftComposer.compose(answers(count));
+      return seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    };
+    expect((await hintsAfter(1, ADULT)).some((hint) => hint.includes('insiste un tout petit peu'))).toBe(
+      true,
+    );
+    expect((await hintsAfter(2, ADULT)).some((hint) => hint.includes('boude un peu'))).toBe(true);
+    const after = await hintsAfter(3, ADULT);
+    expect(after.some((hint) => hint.includes('insiste') || hint.includes('boude'))).toBe(false);
+    const fragile = await hintsAfter(1, { ...ADULT, fragile: true });
+    expect(fragile.some((hint) => hint.includes('insiste'))).toBe(false);
+  });
+
+  it('pauses the step he left unopened when he comes back cold, and teases him once (ADR 0156 § 1)', async () => {
+    // His « salut » the next day: his desire fell under her threshold, the session cooled.
+    const cold = { ...deps(sent), offerLimits: { cooldownHours: 10, minDesire: 100 } };
+    const { draftComposer, seen } = composer({ brief: BRIEF }, undefined, limitsOf(ADULT).limits, cold);
+    const result = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(result.scriptRun?.moved?.run.status).toBe('stalled');
+    expect(result.scriptRun?.moved?.events).toEqual([{ type: 'script_ended' }]);
+    const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('n’a pas ouvert'))).toBe(true);
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+  });
+
+  it('helps him open her step waiting: its exact price passes, any other is held (ADR 0156 § 4)', async () => {
+    const asks: Brief = { ...BRIEF, intent: 'payment_help', scriptReply: 'answers_step' };
+    const helped = (bubbles: string[], flags: FanFlags = ADULT) => {
+      const { draftComposer, seen } = composer(
+        { brief: asks, voice: { bubbles } },
+        undefined,
+        limitsOf(flags).limits,
+        deps(sent),
+      );
+      return { result: draftComposer.compose({ ...INPUT, scriptRun: waiting }), seen };
+    };
+    const exact = helped(['C’est 15 € mon cœur, touche la photo floutée 😘']);
+    expect(await exact.result).toMatchObject({ kind: 'draft' });
+    expect(exact.seen.voiceInputs?.[0]?.waitingStep).toEqual({
+      price: { amountMinor: 1_500, currency: 'EUR' },
+      mediaSheet: null,
+    });
+    expect(
+      exact.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('ne sait pas comment')),
+    ).toBe(true);
+    // Another sum is never hers to say, not even beside the right one.
+    const other = await helped(['C’est 15 €, ou 10 € pour toi 😘']).result;
+    expect(other.kind === 'held' ? other.detail : []).toContain('price_outside_offer');
+    // A fan nobody may sell to gets no help to buy, and no price.
+    const fragile = helped(['C’est 15 € mon cœur'], { ...ADULT, fragile: true });
+    const held = await fragile.result;
+    expect(fragile.seen.voiceInputs?.[0]?.waitingStep).toBeUndefined();
+    expect(held.kind === 'held' ? held.detail : []).toContain('price_outside_offer');
+  });
+
+  it('hands him to a human when he is still stuck to pay soon after her help, never helps twice (ADR 0156 § 4)', async () => {
+    const asks: Brief = { ...BRIEF, intent: 'payment_help', scriptReply: 'answers_step' };
+    const { draftComposer, seen } = composer(
+      { brief: asks, voice: { bubbles: ['C’est 15 € mon cœur'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    );
+    const first = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(first).toMatchObject({ kind: 'draft', saleTrouble: 'payment_help' });
+    const again = await draftComposer.compose({
+      ...INPUT,
+      scriptRun: waiting,
+      saleTrouble: { paymentHelpAt: new Date(INPUT.now.getTime() - 20 * 60_000), complaintAt: null },
+    });
+    expect(again).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'sale_trouble',
+      detail: ['payment_help'],
+    });
+    // The voice wrote nothing the second time.
+    expect(seen.voiceInputs).toHaveLength(1);
+  });
+
+  it('answers his complaint about a purchase herself once, a human the second time (ADR 0156 § 7, 0158 § 48)', async () => {
+    const complains: Brief = { ...BRIEF, intent: 'complaint' };
+    const { draftComposer, seen } = composer({ brief: complains }, undefined, limitsOf(ADULT).limits);
+    const bought = { ...INPUT, fan: { ...INPUT.fan, spentMinor: 1_500 } };
+    const first = await draftComposer.compose(bought);
+    expect(first).toMatchObject({ kind: 'draft', saleTrouble: 'purchase_complaint' });
+    const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('ce qui ne lui a pas plu') && hint.includes('Reveal'))).toBe(
+      true,
+    );
+    const again = await draftComposer.compose({
+      ...bought,
+      saleTrouble: { paymentHelpAt: null, complaintAt: new Date(INPUT.now.getTime() - 3_600_000) },
+    });
+    expect(again).toMatchObject({ kind: 'held', cause: 'sale_trouble', detail: ['purchase_complaint'] });
+    // A complaint with nothing bought is no purchase complaint.
+    const nothing = await draftComposer.compose(INPUT);
+    expect(nothing.kind === 'draft' ? nothing.saleTrouble : 'held').toBeUndefined();
   });
 
   it('tells the team when the step waiting no longer has the price she said', async () => {

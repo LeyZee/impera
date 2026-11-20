@@ -1233,6 +1233,13 @@
       "when": 1795188224839,
       "tag": "0234_our_functions_for_our_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 176,
+      "version": "7",
+      "when": 1795200825959,
+      "tag": "0235_sale_trouble_and_abandon_events",
+      "breakpoints": true
     }
   ]
 }
