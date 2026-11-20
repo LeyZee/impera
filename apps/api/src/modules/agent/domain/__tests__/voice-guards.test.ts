@@ -11,6 +11,7 @@ import {
   type GuardCode,
   type GuardContext,
 } from '../guards';
+import { checkWelcome } from '../sexualization';
 
 const codes = (bubbles: string[], context: GuardContext = {}): GuardCode[] =>
   checkVoiceOutput(bubbles, DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
@@ -175,6 +176,7 @@ describe('voice guards (P3-13)', () => {
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
+      ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),
     ]);
     const known: readonly string[] = GUARD_CODES;
     expect([...emitted].filter((code) => !known.includes(code))).toEqual([]);

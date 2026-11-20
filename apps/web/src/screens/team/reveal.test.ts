@@ -246,7 +246,7 @@ describe('what a row says', () => {
 
   it('names its models, a model not imported by its handle', () => {
     expect(modelsLine(row({ models }), 'Reveal')).toBe(
-      'Modèles sur Reveal : Lune, soleil (modèle Reveal non importée)',
+      'Modèles sur Reveal : Lune, @soleil (modèle Reveal non importé)',
     );
     expect(modelsLine(row(), 'Reveal')).toBeNull();
   });

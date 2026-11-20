@@ -245,6 +245,41 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect((await agency('owner', 'period=quarter')).days).toHaveLength(90);
   });
 
+  it('reads the calendar’s days and the comparison chosen, and refuses one that does not end before (ADR 0146)', async () => {
+    const today = calendarDayAt(new Date(), 'Europe/Paris');
+    const shift = (days: number): string =>
+      new Date(Date.parse(`${today}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+    // The sale of ten days ago alone, compared with five days long before the register.
+    const custom = await agency(
+      'owner',
+      `unit=custom&from=${shift(-12)}&to=${shift(-8)}&compareAt=${shift(-60)}`,
+    );
+    expect(custom).toMatchObject({
+      period: null,
+      span: { unit: 'custom', partial: false, compare: 'chosen', today },
+      from: shift(-12),
+      to: shift(-8),
+      previousFrom: shift(-60),
+      previousTo: shift(-56),
+    });
+    expect(custom.totals.current.revenueMinor).toBe(2400);
+    // Today's sales fall between the two: in neither, not even as fans of the period before.
+    expect(custom.totals.previous.revenueMinor).toBe(0);
+    expect(custom.fans).toMatchObject({ paying: 1, previousPaying: 0 });
+    expect(custom.previousDays).toHaveLength(5);
+    // The register's oldest line is the sale of ten days ago (§ 4).
+    expect(custom.registerSince).toBe(shift(-10));
+
+    const month = await agency('owner', 'unit=month');
+    expect(month.span).toMatchObject({ unit: 'month', compare: 'previous', today });
+    expect(month.from).toBe(`${today.slice(0, 7)}-01`);
+    expect(month.to).toBe(today);
+
+    expect((await get('owner', `unit=week&compareAt=${today}`)).statusCode).toBe(400);
+    expect((await get('owner', `unit=custom&from=${shift(-2)}`)).statusCode).toBe(400);
+    expect((await get('owner', 'unit=day&period=day')).statusCode).toBe(400);
+  });
+
   it('reads one creator alone when asked, and an unlinked one as nothing to count', async () => {
     expect((await agency('owner', `period=day&creatorId=${creatorId}`)).creators).toHaveLength(1);
     const unlinked = await agency('owner', `period=day&creatorId=${unlinkedCreatorId}`);

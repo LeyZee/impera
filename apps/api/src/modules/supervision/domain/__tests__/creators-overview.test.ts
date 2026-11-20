@@ -22,6 +22,8 @@ const facts = (patch: Partial<CreatorOverviewFacts> = {}): CreatorOverviewFacts 
   timezone: 'Europe/Paris',
   scope: 'owner',
   switches: { global: false, creator: false },
+  pausedUntil: null,
+  hoursNow: { open: true, changesAt: null },
   autoConversations: 0,
   requests: [],
   names: new Map([
@@ -138,6 +140,38 @@ describe('the cards of the list of Créatrices', () => {
       rate: null,
       onShift: [{ memberId: THEO, endsAt: new Date('2026-11-21T01:00:00Z') }],
     });
-    expect(card).toEqual({ creatorId: CREATOR, mode: 'stop', sales: null, onShift: null, requests: null });
+    expect(card).toEqual({
+      creatorId: CREATOR,
+      mode: 'stop',
+      pausedUntil: null,
+      globalStop: false,
+      hoursNow: { open: true, changesAt: null },
+      resumesAs: 'copilot',
+      sales: null,
+      onShift: null,
+      requests: null,
+    });
+  });
+
+  it('names her pause while her own Arrêt holds, never once it is lifted (ADR 0148 § 1)', () => {
+    const until = new Date('2026-11-20T23:00:00Z');
+    const paused = creatorOverview({
+      creatorId: CREATOR,
+      facts: facts({ switches: { global: false, creator: true }, pausedUntil: until }),
+      now: NOW,
+      sales: undefined,
+      rate: null,
+      onShift: [],
+    });
+    expect(paused).toMatchObject({ mode: 'stop', pausedUntil: until.toISOString(), globalStop: false });
+    const lifted = creatorOverview({
+      creatorId: CREATOR,
+      facts: facts({ pausedUntil: until }),
+      now: NOW,
+      sales: undefined,
+      rate: null,
+      onShift: [],
+    });
+    expect(lifted.pausedUntil).toBeNull();
   });
 });

@@ -135,7 +135,11 @@ describe('PUT /v1/agent/mode', () => {
   it('Arrêt sets her kill switch at once, with its event and its audit line', async () => {
     const response = await setMode('stop');
     expect(response.statusCode).toBe(200);
-    expect(AgentModeResultSchema.parse(response.json())).toEqual({ mode: 'stop', globalStop: false });
+    expect(AgentModeResultSchema.parse(response.json())).toEqual({
+      mode: 'stop',
+      globalStop: false,
+      pausedUntil: null,
+    });
     expect(await dashboardMode()).toBe('stop');
 
     const switches = await creatorSwitches();
@@ -159,7 +163,7 @@ describe('PUT /v1/agent/mode', () => {
     expect(audit).toMatchObject({ entity: 'kill_switch', entityId: creatorId });
 
     // A second Arrêt changes nothing: one row per change, not per click.
-    expect((await setMode('stop')).json()).toEqual({ mode: 'stop', globalStop: false });
+    expect((await setMode('stop')).json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: null });
     expect(await creatorSwitches()).toHaveLength(1);
   });
 
@@ -171,7 +175,7 @@ describe('PUT /v1/agent/mode', () => {
       .where(eq(schema.conversations.id, conversationId));
 
     const response = await setMode('copilot');
-    expect(response.json()).toEqual({ mode: 'copilot', globalStop: false });
+    expect(response.json()).toEqual({ mode: 'copilot', globalStop: false, pausedUntil: null });
     expect(await dashboardMode()).toBe('copilot');
     expect((await creatorSwitches()).map((s) => s.active)).toEqual([true, false]);
     const [conversation] = await test.admin.db
@@ -266,7 +270,7 @@ describe('PUT /v1/agent/mode', () => {
 
   it('answers Arrêt to Copilote while the global switch stays on', async () => {
     await setKillSwitch(test.admin.db, { active: true, scope: 'global', scopeId: null, reason: 'test' });
-    expect((await setMode('copilot')).json()).toEqual({ mode: 'stop', globalStop: true });
+    expect((await setMode('copilot')).json()).toEqual({ mode: 'stop', globalStop: true, pausedUntil: null });
     // The Dashboard, reloaded, says the same and why.
     expect(await dashboard()).toMatchObject({ mode: 'stop', globalStop: true });
     await test.admin.db.execute(
@@ -323,5 +327,142 @@ describe('PUT /v1/agent/mode', () => {
     }
     expect((await setMode('stop')).statusCode).toBe(200);
     expect((await setMode('copilot')).statusCode).toBe(200);
+  });
+  describe('a pause: Arrêt with an end (ADR 0148 § 1)', () => {
+    const pause = (until: string) => send('PUT', '/v1/agent/mode', { creatorId, mode: 'stop', until });
+    const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+    const lastSwitch = async () => {
+      const [row] = await test.admin.db
+        .select({ active: schema.killSwitches.active, activeUntil: schema.killSwitches.activeUntil })
+        .from(schema.killSwitches)
+        .where(and(eq(schema.killSwitches.scope, 'creator'), eq(schema.killSwitches.scopeId, creatorId)))
+        .orderBy(sql`${schema.killSwitches.setAt} desc`)
+        .limit(1);
+      return row;
+    };
+
+    it('refuses an end with another mode, one already past, or one more than a week ahead', async () => {
+      await setMode('copilot');
+      const before = (await creatorSwitches()).length;
+      const withCopilot = await send('PUT', '/v1/agent/mode', {
+        creatorId,
+        mode: 'copilot',
+        until: inMinutes(60),
+      });
+      expect(withCopilot.statusCode).toBe(400);
+      for (const until of [inMinutes(-1), inMinutes(8 * 24 * 60)]) {
+        const response = await pause(until);
+        expect(response.statusCode).toBe(400);
+        expect(ApiErrorSchema.parse(response.json()).error.code).toBe('agent_pause_invalid');
+      }
+      expect(await creatorSwitches()).toHaveLength(before);
+    });
+
+    it('stops her until its end, and plans the reopening that answers the fans who wrote meanwhile', async () => {
+      const until = inMinutes(60);
+      const response = await pause(until);
+      expect(response.statusCode).toBe(200);
+      expect(AgentModeResultSchema.parse(response.json())).toEqual({
+        mode: 'stop',
+        globalStop: false,
+        pausedUntil: until,
+      });
+      expect(await dashboardMode()).toBe('stop');
+      expect((await lastSwitch())?.activeUntil?.toISOString()).toBe(until);
+      const [job] = (
+        await test.admin.db.execute<{ task: string; at: string }>(sql`
+          select t.identifier as task, j.run_at::text as at from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+          where j.key = ${`conversation.reopen:pause:${creatorId}`}`)
+      ).rows;
+      expect(job?.task).toBe('conversation.reopen');
+      expect(new Date(job?.at ?? 0).toISOString()).toBe(until);
+    });
+
+    it('is pushed back freely, never brought closer, and never lifts an Arrêt (Sécurité, #865)', async () => {
+      const current = (await lastSwitch())?.activeUntil?.getTime() ?? 0;
+      const later = new Date(current + 30 * 60_000).toISOString();
+      const before = (await creatorSwitches()).length;
+      expect((await pause(later)).json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: later });
+      expect(await creatorSwitches()).toHaveLength(before + 1);
+
+      const sooner = await pause(inMinutes(5));
+      expect(sooner.statusCode).toBe(409);
+      expect(ApiErrorSchema.parse(sooner.json()).error).toMatchObject({
+        code: 'agent_pause_conflict',
+        details: { reason: 'sooner' },
+      });
+
+      // A pause becomes an Arrêt lifted by hand; the Arrêt never becomes a pause.
+      expect((await setMode('stop')).json()).toEqual({ mode: 'stop', globalStop: false, pausedUntil: null });
+      expect(await lastSwitch()).toEqual({ active: true, activeUntil: null });
+      const onStop = await pause(inMinutes(60));
+      expect(onStop.statusCode).toBe(409);
+      expect(ApiErrorSchema.parse(onStop.json()).error.details).toEqual({ reason: 'stopped' });
+      expect(await creatorSwitches()).toHaveLength(before + 2);
+
+      // The reopening the pause planned finds her stopped: it answers nobody.
+      const drafts = async () =>
+        (
+          await test.admin.db
+            .select()
+            .from(schema.drafts)
+            .where(eq(schema.drafts.conversationId, conversationId))
+        ).length;
+      const draftsBefore = await drafts();
+      const noLog = {
+        info: () => undefined,
+        warn: () => undefined,
+        error: () => undefined,
+        debug: () => undefined,
+      };
+      await app.modules.conversations.jobs.reopen({ creatorId, correlationId: 'test-pause-end' }, noLog);
+      await app.modules.conversations.jobs.respond(
+        { creatorId, conversationId, correlationId: 'test-pause-end' },
+        noLog,
+      );
+      expect(await drafts()).toBe(draftsBefore);
+      expect(await dashboardMode()).toBe('stop');
+
+      // Resumed, she can be paused again.
+      await setMode('copilot');
+      expect((await pause(inMinutes(30))).statusCode).toBe(200);
+    });
+
+    it('refuses a pause for an archived creator: her Arrêt is the code’s', async () => {
+      const archived = newId(CreatorIdSchema);
+      await test.admin.db.insert(schema.creators).values({
+        id: archived,
+        nameKey: archived,
+        displayName: 'Archivée',
+        timezone: 'Europe/Paris',
+        archivedAt: new Date(),
+      });
+      const response = await send('PUT', '/v1/agent/mode', {
+        creatorId: archived,
+        mode: 'stop',
+        until: inMinutes(60),
+      });
+      expect(response.statusCode).toBe(409);
+      expect(ApiErrorSchema.parse(response.json()).error.details).toEqual({ reason: 'archived' });
+    });
+
+    it('reads as off once its end is past, everywhere the switch is read, without a new row', async () => {
+      await test.admin.db
+        .update(schema.killSwitches)
+        .set({ activeUntil: new Date(Date.now() - 1000) })
+        .where(and(eq(schema.killSwitches.scope, 'creator'), eq(schema.killSwitches.scopeId, creatorId)));
+      expect(await dashboardMode()).toBe('copilot');
+      const stopped = await send('GET', `/v1/conversations/stop?creatorId=${creatorId}`);
+      expect(SendingStopSchema.parse(stopped.json()).stopped).toBe(false);
+      // Copilote now writes nothing: her switch is already off.
+      const before = (await creatorSwitches()).length;
+      expect((await setMode('copilot')).json()).toEqual({
+        mode: 'copilot',
+        globalStop: false,
+        pausedUntil: null,
+      });
+      expect(await creatorSwitches()).toHaveLength(before);
+    });
   });
 });

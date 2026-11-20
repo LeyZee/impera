@@ -64,11 +64,13 @@ export function AgentHero({
           <p className="nv-eyebrow">
             {MODE_LABEL[mode]} · {agent.eyebrow}
           </p>
-          <h1>
+          {/* Under the screen's title « Dashboard »: the agent's state is a heading of the page, not its title
+              (recette visuelle 16/11, COH-07), in the section titles' class. */}
+          <h2 className="nv-h2">
             {litParts(hero.headline).map((part) =>
               part.lit ? <em key={part.text}>{part.text}</em> : part.text,
             )}
-          </h1>
+          </h2>
           {hero.lead === '' ? null : <p className="db-hero__lead">{hero.lead}</p>}
         </div>
         {hero.action !== undefined && hero.actionTo !== undefined && !stopped ? (

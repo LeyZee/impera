@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useState, type JSX } from 'react';
 
-import { inputOf, minuteOfInput } from './time';
+import { clockOf, inputOf, minuteOfInput } from './time';
 
 /**
  * An hour on 24 hours, typed as text (« 09:00 », « 21h30 », « 22 », « 930 » from the phone's number pad, which has
@@ -15,6 +15,7 @@ export function TimeField({
   label,
   className,
   disabled = false,
+  spoken = false,
   onChange,
   onUnreadable,
 }: {
@@ -23,12 +24,18 @@ export function TimeField({
   label: string;
   className?: string;
   disabled?: boolean;
+  /**
+   * Out of the field, the hour as the app writes it elsewhere (« 22 h », « 8 h 30 »), `HH:MM` again while it is typed
+   * in (recette visuelle 16/11, CHA-26: Notifications said « 22:00 » over « Calme de 22 h à 8 h »).
+   */
+  spoken?: boolean;
   onChange: (minute: number) => void;
   /** From `useUnreadableTimes` (stable): told when the field holds what is not an hour, and when it no longer does. */
   onUnreadable: (field: string, unreadable: boolean) => void;
 }): JSX.Element {
   const field = useId();
   const [draft, setDraft] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const unreadable = draft !== null && minuteOfInput(draft) === null;
   // Set from outside (a slot reset, the defaults back) while it was unreadable: the field shows the form's hour again.
   const [seen, setSeen] = useState(value);
@@ -55,7 +62,7 @@ export function TimeField({
       maxLength={6}
       placeholder="HH:MM"
       className={`nv-field__control nv-glass nv-num${className === undefined ? '' : ` ${className}`}`}
-      value={draft ?? inputOf(value)}
+      value={draft ?? (spoken && !focused ? clockOf(value) : inputOf(value))}
       aria-label={label}
       disabled={disabled}
       aria-invalid={unreadable ? true : undefined}
@@ -65,8 +72,12 @@ export function TimeField({
         const minute = minuteOfInput(event.target.value);
         if (minute !== null) onChange(minute);
       }}
+      onFocus={() => {
+        setFocused(true);
+      }}
       onBlur={() => {
-        // A full hour is written back as HH:MM; anything else stays as typed, for it to be corrected.
+        setFocused(false);
+        // A full hour is written back as HH:MM (« 22 h » when spoken); anything else stays as typed, to be corrected.
         if (!unreadable) setDraft(null);
       }}
     />

@@ -113,23 +113,6 @@ export function listMembers(members: readonly TeamMember[], tab: TeamRole, query
   };
 }
 
-/** The sentence under the title: how many are at work, away, and still to sign in. */
-export function teamSummary(members: readonly TeamMember[], now: Date): string | null {
-  const here = members.filter((member) => member.status !== 'left');
-  if (here.length === 0) return null;
-  const active = here.filter((member) => member.status === 'active').length;
-  const away = here.filter((member) => STATUS_TONES[member.status] === 'away').length;
-  // A dead link is no invitation waiting: it is counted apart, since it asks for a new link (EQ-06).
-  const expired = here.filter((member) => invitationState(member, now).kind === 'expired').length;
-  const pending = here.filter((member) => member.invitationPending).length - expired;
-  const parts = [`${String(active)} actif${active > 1 ? 's' : ''}`];
-  if (away > 0) parts.push(`${String(away)} absent${away > 1 ? 's' : ''}`);
-  if (pending > 0) parts.push(`${String(pending)} invitation${pending > 1 ? 's' : ''} en attente`);
-  if (expired > 0)
-    parts.push(`${String(expired)} lien${expired > 1 ? 's' : ''} expiré${expired > 1 ? 's' : ''}`);
-  return parts.join(' · ');
-}
-
 const PERCENT = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 2 });
 
 /** A rate in basis points as people read it: 1250 → « 12,5 % ». */

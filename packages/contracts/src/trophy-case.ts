@@ -27,6 +27,15 @@ export const TrophyCaseProgressSchema = z.object({
 });
 export type TrophyCaseProgress = z.infer<typeof TrophyCaseProgressSchema>;
 
+/**
+ * The cumulated net a rank was earned at: the threshold of the day it was noted, in the currency its owner's net is
+ * counted in.
+ */
+export const TrophyCaseBasisSchema = z.object({
+  minor: z.number().int().nonnegative(),
+  currency: CurrencySchema,
+});
+
 export const TrophyCaseItemSchema = z.object({
   /** The object, from the closed list of the module that gives it. */
   kind: z.string().min(1).max(64),
@@ -37,6 +46,11 @@ export const TrophyCaseItemSchema = z.object({
   progress: TrophyCaseProgressSchema.nullable(),
   /** When its reveal was played; `null` on an earned object means the reveal is still owed. */
   revealedAt: z.iso.datetime().nullable(),
+  /**
+   * On a rank, what it was earned at, for its reveal to say. Left out of every other object, of a rank noted before
+   * thresholds were kept (ADR 0118 § 7), and of a read of someone else's case: an amount is its owner's alone.
+   */
+  basis: TrophyCaseBasisSchema.optional(),
 });
 export type TrophyCaseItem = z.infer<typeof TrophyCaseItemSchema>;
 

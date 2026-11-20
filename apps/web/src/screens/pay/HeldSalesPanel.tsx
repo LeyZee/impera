@@ -108,7 +108,7 @@ export function HeldSalesPanel({
     teams[unnamed.indexOf(platform)]?.data;
   if (reads && read === undefined && held.isError)
     return (
-      <Panel className="nv-enter py-held" eyebrow="Ventes en attente">
+      <Panel className="nv-enter py-held" title="Ventes en attente">
         <Unreachable
           what="la liste des ventes en attente"
           onRetry={() => {
@@ -122,7 +122,7 @@ export function HeldSalesPanel({
   return (
     <Panel
       className="nv-enter py-held"
-      eyebrow="Ventes en attente"
+      title="Ventes en attente"
       actions={<span className="py-held__count nv-num">{heldCountText(sales)}</span>}
     >
       <div className="rp-sec">

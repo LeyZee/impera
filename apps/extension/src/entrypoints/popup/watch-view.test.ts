@@ -47,7 +47,7 @@ function draw(
     draft: '',
     ...overrides,
   };
-  return { card: watchCard(view, actions), actions };
+  return { card: watchCard(view, actions, 3), actions };
 }
 
 const buttonNamed = (root: HTMLElement, name: string): HTMLButtonElement => {
@@ -60,14 +60,15 @@ describe('the watch card', () => {
   it('asks for the code first, and hands it over as typed', () => {
     const { card, actions } = draw({ ...READY, link: 'none' });
     expect(card.querySelector('.nv-status')?.textContent).toBe('À relier');
-    const input = card.querySelector<HTMLInputElement>('#watch-link');
+    const input = card.querySelector<HTMLInputElement>('#extension-link');
     if (input === null) throw new Error('no field');
-    expect(card.querySelector('label[for="watch-link"]')?.textContent).toBe('Code de liaison');
+    expect(card.querySelector('label[for="extension-link"]')?.textContent).toBe('Code de liaison');
     input.value = 'un-code-collé';
     card.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
     expect(actions.link).toHaveBeenCalledWith('un-code-collé');
     buttonNamed(card, 'Ouvrir Sécurité').click();
     expect(actions.openSecurity).toHaveBeenCalledOnce();
+    expect(card.textContent).toContain('tes relevés arrivent alors à ton nom');
   });
 
   it('says in amber that a link was removed in the CRM', () => {
@@ -92,7 +93,8 @@ describe('the watch card', () => {
 
   it('shows the watch running, and marks the post on screen for a creator', () => {
     const { card, actions } = draw(WATCHING);
-    expect(card.querySelector('.nv-status')?.textContent).toBe('Relève');
+    // V-EXT-30: who acts is clear.
+    expect(card.querySelector('.nv-status')?.textContent).toBe('En cours');
     expect(card.querySelector('.pp-watch__time')?.textContent).toBe(
       'Depuis 12\u00a0min · s’arrête à 14\u00a0h\u00a045',
     );
@@ -111,12 +113,20 @@ describe('the watch card', () => {
       watch: WATCHING.watch === null ? null : { ...WATCHING.watch, amber: true },
     });
     expect(card.querySelector('.nv-status')?.textContent).toBe('À regarder');
-    expect(card.querySelector('.pp-hint--amber')?.textContent).toContain('Rien n’est rechargé');
+    // V-EXT-30: one amber line, not two paragraphs.
+    const amber = [...card.querySelectorAll('.pp-hint--amber')];
+    expect(amber.map((line) => line.textContent)).toEqual([
+      'Instagram a changé sa page : plus rien n’est lu.',
+    ]);
     expect(card.querySelector('.nv-status--error')).toBeNull();
   });
 
-  it('says the vision’s cap of the day in amber', () => {
-    const { card } = draw({ ...WATCHING, vision: 'budget' });
+  it('says the vision’s cap of the day in amber, at the marking only', () => {
+    expect(draw({ ...WATCHING, vision: 'budget' }).card.textContent).not.toContain('jusqu’à minuit');
+    const { card } = draw(
+      { ...WATCHING, vision: 'budget' },
+      { notice: { tone: 'quiet', text: 'Marqué pour Créatrice B.' } },
+    );
     expect(card.querySelector('.pp-hint--amber')?.textContent).toContain('jusqu’à minuit');
   });
 

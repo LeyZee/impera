@@ -16,8 +16,8 @@ import {
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
 import { clockOf } from '@/scheduling/time';
 import { OffRailBack } from '@/shell/OffRailBack';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /**
  * /notifications (CR-01): for every role, from the account's menu. This device: on or off, and a test. The account:
@@ -54,7 +54,7 @@ const FAILURE_WORDS: Readonly<Record<Exclude<TurnOnOutcome, 'on'>, string>> = {
   unsupported: STATE_WORDS.unsupported,
 };
 
-function ThisDevice(): JSX.Element {
+function ThisDevice({ quiet = false }: { quiet?: boolean }): JSX.Element {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -155,7 +155,8 @@ function ThisDevice(): JSX.Element {
             {note}
           </p>
         )}
-        {state === 'off' && serverKey.isError ? (
+        {/* The page says the server is silent once, under this card: this line keeps quiet then (ETA-05). */}
+        {state === 'off' && serverKey.isError && !quiet ? (
           <p className="nv-notif__note" role="status">
             Impera ne répond pas pour l’instant : rouvre cette page dans un instant pour activer.
           </p>
@@ -246,6 +247,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
             <TimeField
               value={draft.quietHours.startMinute}
               label="Début des heures calmes"
+              spoken
               onChange={(startMinute) => {
                 setDraft({ ...draft, quietHours: { ...draft.quietHours, startMinute } });
               }}
@@ -257,6 +259,7 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
               <TimeField
                 value={draft.quietHours.endMinute}
                 label="Fin des heures calmes"
+                spoken
                 onChange={(endMinute) => {
                   setDraft({ ...draft, quietHours: { ...draft.quietHours, endMinute } });
                 }}
@@ -339,29 +342,26 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
 export function NotificationsPage({ creator = false }: { creator?: boolean }): JSX.Element {
   const preferences = useQuery(preferencesQuery);
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow={<OffRailBack />}
         title="Notifications"
         lead="Ce qui sonne sur tes appareils, et quand ça se tait."
       />
       <div className="nv-notif">
-        <ThisDevice />
+        <ThisDevice quiet={preferences.isError && preferences.data === undefined} />
         {preferences.data === undefined ? (
           preferences.isError ? (
-            // Said as every screen that reads first says it, amber with « Réessayer » (recette 11/11, GES-15).
-            <ServerSilent
-              text="Tes réglages n’ont pas pu être lus."
+            // Said as every screen that reads first says it (ETA-21): amber, what to do, « Réessayer ».
+            <Failure
               onRetry={() => {
                 void preferences.refetch();
               }}
             />
           ) : (
-            <Panel title="Quand ça sonne">
-              <PanelSection>
-                <p className="nv-notif__hint">Lecture…</p>
-              </PanelSection>
-            </Panel>
+            <Skeleton label="Chargement de tes réglages…">
+              <SkeletonCard lines={4} />
+            </Skeleton>
           )
         ) : (
           <QuietHours key={JSON.stringify(preferences.data)} saved={preferences.data} creator={creator} />

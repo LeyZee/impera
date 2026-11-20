@@ -12,6 +12,7 @@ import { SaveBar, useOnScreen } from '../SaveBar';
 import { ZoneEditor } from '../ZoneEditor';
 import { Segment } from '../persona/fields';
 
+import { ExceptionsPanel } from './ExceptionsPanel';
 import { HOURS_ERRORS, hoursErrorKind, hoursQueryKey, saveAgentHours, useAgentHours } from './api';
 import {
   barsOf,
@@ -223,7 +224,7 @@ function HoursForm({
         <div className="ps-head__top">
           <div className="ps-head__who">
             {/* The switch above says « Heures d'activité »: the card is titled by whose clock it reads (CREA-24). */}
-            <h2 className="ps-title">{clockHeader(creatorName, stored.timeZone)}</h2>
+            <h2 className="nv-h2 ps-title">{clockHeader(creatorName, stored.timeZone)}</h2>
           </div>
           <div className="ps-head__actions">
             {changed && !saving && !sameHours(draft, stored.hours) ? (
@@ -390,6 +391,8 @@ function HoursForm({
           />
         </section>
       </div>
+      {/* Her dated days (ADR 0148 § 3), read against her week as stored, not the draft. */}
+      <ExceptionsPanel creatorId={creatorId} hours={stored.hours} />
       <SaveBar
         show={dirty && !headOnScreen}
         warn={blocked}

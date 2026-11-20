@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { declaredAdultAge, sexualizationDecision, type SexualizationContext } from '../sexualization';
+import {
+  checkWelcome,
+  declaredAdultAge,
+  sexualizationDecision,
+  type SexualizationContext,
+} from '../sexualization';
 
 const base: SexualizationContext = {
   relationshipHours: 48,
@@ -168,5 +173,27 @@ describe('declaredAdultAge', () => {
     expect(declaredAdultAge(fact('25'), 'J’ai vingt-cinq ans')).toBe(25);
     expect(declaredAdultAge(fact('vingt et un ans'), 'vingt et un ans et toi')).toBe(21);
     expect(declaredAdultAge(fact('quatre-vingts'), 'quatre vingts ans')).toBe(80);
+  });
+});
+
+describe('checkWelcome (Charles, 20/11)', () => {
+  it('refuses a brake on a fan who only compliments her', () => {
+    for (const bubble of [
+      'Coucou toi ! Tu y vas un peu fort, non 😏',
+      'Doucement toi 😅',
+      'Tu t’emballes un peu là',
+      'Oh là, pas si vite',
+      'On se calme 😂',
+    ]) {
+      expect(
+        checkWelcome([bubble]).map((violation) => violation.code),
+        bubble,
+      ).toEqual(['unwarranted_brake']);
+    }
+  });
+
+  it('lets a welcome through: she takes the compliment and thanks him', () => {
+    expect(checkWelcome(['Je sais 😏', 'Merci, c’est trop mignon de ta part'])).toEqual([]);
+    expect(checkWelcome(['Ahah ça me fait plaisir, tu fais quoi de beau ce soir ?'])).toEqual([]);
   });
 });

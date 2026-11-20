@@ -181,7 +181,7 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  height: 18px;
+  height: var(--nv-pill-info);
   padding: 0 7px;
   border-radius: var(--nv-radius-full);
   outline: 1px dashed var(--nv-ink-faint);
@@ -247,7 +247,7 @@
 .tm-skeleton i {
   height: 56px;
   border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: tm-breathe calc(var(--nv-dur-slow) * 4) var(--nv-ease-out) infinite alternate;
 }
 .tm-skeleton i:nth-child(2) {
@@ -255,16 +255,6 @@
 }
 .tm-skeleton i:nth-child(3) {
   animation-delay: var(--nv-dur-slow);
-}
-.tm-notice p {
-  margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-}
-.tm-notice .nv-btn {
-  align-self: center;
-  margin-top: var(--nv-space-2);
 }
 
 /* ───────────── The member's sheet ───────────── */
@@ -274,7 +264,7 @@
   flex-direction: column;
   gap: var(--nv-space-4);
   min-width: 0;
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .tm-sheet .tm-back {
   align-self: flex-start;
@@ -309,10 +299,6 @@
 }
 .tm-sheet__who h2 {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
   text-wrap: balance;
 }
 .tm-sheet__who p {
@@ -331,7 +317,7 @@
 .tm-new {
   display: inline-flex;
   align-items: center;
-  height: 18px;
+  height: var(--nv-pill-info);
   padding: 0 7px;
   border-radius: var(--nv-radius-full);
   background: var(--nv-select-strong);
@@ -456,9 +442,6 @@
 }
 .tm-block h3 {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  font-weight: 650;
-  letter-spacing: -0.01em;
 }
 .tm-hint {
   margin: 0;
@@ -846,7 +829,7 @@
 /* What could not be read: one amber line and « Réessayer », on Planning, Membres and Rapports alike (EQ-22). */
 .tm-unread {
   align-self: start;
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 
 /* Where the member is and what hour it is there, under the name (EQ-08). */
@@ -984,12 +967,25 @@
 .rv-fold > .sf-import__list > .sf-imp:first-child {
   border-top: 1px solid var(--nv-hairline);
 }
+/* One grid for the two cards (recette visuelle 16/11, GES-10): the box, the face, who, the menu, then a column of
+   buttons of a fixed width, kept empty where a row has fewer or none, so that every menu stands in one column. */
+.sf-imp.rv-row,
 .sf-imp.rv-linked {
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 260px);
+  grid-template-columns: 22px 40px minmax(0, 1fr) minmax(0, 260px) 168px;
 }
 @media (max-width: 639px) {
+  .sf-imp.rv-row {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
   .sf-imp.rv-linked {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+  /* No box on a phone's linked row: the face starts the line. */
+  .rv-linked > .rv-tick-space {
+    display: none;
+  }
+  .sf-imp.rv-linked.rv-own > .sf-imp__who {
+    grid-column: 2 / -1;
   }
   .rv-end {
     grid-column: 4;
@@ -1021,9 +1017,6 @@
 .sf-imp.rv-own > .sf-imp__who {
   grid-column: 3 / -1;
 }
-.sf-imp.rv-linked.rv-own > .sf-imp__who {
-  grid-column: 2 / -1;
-}
 /* A removal on the platform, under the account's name: amber, a state to act on (ADR 0076 § 5). */
 .sf-imp__meta.rv-warn {
   color: var(--nv-warning);
@@ -1036,4 +1029,13 @@
     align-items: flex-start;
     padding-top: clamp(var(--nv-space-6), 12vh, 112px);
   }
+}
+
+/* A member's pills under his name, not at the row's right where they cut the line of his creators (recette visuelle
+   16/11, GES-21). */
+.tm-row__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
 }

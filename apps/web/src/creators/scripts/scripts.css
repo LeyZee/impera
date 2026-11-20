@@ -16,8 +16,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: 20px 22px;
-  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-plate-pad);
 }
 
 .sx-card__top {
@@ -64,10 +63,6 @@
 }
 .sx-title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  letter-spacing: var(--nv-text-headline-tracking);
-  font-weight: 650;
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -114,9 +109,6 @@
 }
 
 @media (max-width: 520px) {
-  .sx-card {
-    padding: 16px;
-  }
   .sx-actions > .nv-btn {
     flex: 1 1 auto;
   }
@@ -341,10 +333,6 @@
   max-height: 70vh;
   object-fit: contain;
 }
-.sx-viewer__empty {
-  padding: var(--nv-space-6);
-  text-align: center;
-}
 /* Over the middle of the picture, whatever the button's own margins. */
 .sx-viewer__frame > .sx-viewer__reveal {
   position: absolute;
@@ -475,26 +463,6 @@
   min-height: 0;
 }
 
-/* Her switch: one card, one line of help, the owner's alone (ADR 0083 § 9). */
-.sx-switch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-4);
-  padding: 16px 22px;
-  border-radius: var(--nv-radius-xl);
-}
-.sx-switch__text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.sx-switch__title {
-  margin: 0;
-  font-weight: 650;
-}
-
 @media (max-width: 520px) {
   .sx-synth__step {
     grid-template-columns: auto 1fr;
@@ -503,9 +471,6 @@
     grid-column: 2;
     justify-self: start;
     margin: 0;
-  }
-  .sx-switch {
-    padding: 16px;
   }
   /* In the review, a lone « Corriger » stays a small button at the end of its row, never a full-width bar. */
   .sx-review .sx-actions > .nv-btn {

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,6 +19,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 let out = '';
 let manifest: Record<string, unknown> = {};
 let reader = '';
+let assets: readonly string[] = [];
 
 beforeAll(async () => {
   out = mkdtempSync(join(tmpdir(), 'impera-extension-'));
@@ -28,6 +29,7 @@ beforeAll(async () => {
     .record(z.string(), z.unknown())
     .parse(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')));
   reader = readFileSync(join(dir, 'watch.js'), 'utf8');
+  assets = readdirSync(join(dir, 'assets'));
 }, 120_000);
 
 afterAll(() => {
@@ -51,6 +53,13 @@ function silent(): Logger {
 const mentionsInstagram = (value: unknown): boolean => JSON.stringify(value ?? null).includes('instagram');
 
 describe('the built manifest', () => {
+  // Recette du 16/11, EXT-25: eight Playfair files for the one word « Impera ».
+  it('carries Playfair Display in its latin subset alone, for the name', () => {
+    const playfair = assets.filter((file) => file.startsWith('playfair-display-'));
+    expect(playfair).toHaveLength(2);
+    expect(playfair.every((file) => file.startsWith('playfair-display-latin-600-italic-'))).toBe(true);
+  });
+
   it('asks Instagram only when « Veille » starts, never at the install', () => {
     expect(manifest['optional_host_permissions']).toContain('https://www.instagram.com/*');
     expect(mentionsInstagram(manifest['host_permissions'])).toBe(false);

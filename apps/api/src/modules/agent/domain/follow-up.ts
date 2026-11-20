@@ -4,6 +4,7 @@ import {
   followUpQuietAt,
   replyOpenAt,
   type AgentHours,
+  type DatedRanges,
   type FanFlags,
 } from '@impera/contracts';
 
@@ -19,6 +20,8 @@ export interface FollowUpMoment {
   readonly timeZone: string;
   /** Her hours (P3-14); absent, the defaults: always open, quiet from 23:00 to 9:00. */
   readonly hours?: AgentHours;
+  /** Her dated exceptions (ADR 0148 § 3): a date closed by one gets no follow-up either. */
+  readonly exceptions?: DatedRanges;
 }
 
 export type FollowUpDecision =
@@ -54,10 +57,10 @@ export function followUpDecision(context: FollowUpMoment): FollowUpDecision {
   if (flags.ageDisputed !== undefined) return { kind: 'skip', reason: 'follow_up_age_disputed' };
   if (context.step < 0 || context.step >= context.steps)
     return { kind: 'skip', reason: 'follow_up_plan_over' };
-  const { now, timeZone, hours = DEFAULT_AGENT_HOURS } = context;
-  const open = replyOpenAt(hours, timeZone, now);
+  const { now, timeZone, hours = DEFAULT_AGENT_HOURS, exceptions = [] } = context;
+  const open = replyOpenAt(hours, timeZone, now, exceptions);
   if (open && !followUpQuietAt(hours, timeZone, now)) return { kind: 'write' };
-  const at = nextFollowUpAllowed(hours, timeZone, now);
+  const at = nextFollowUpAllowed(hours, timeZone, now, exceptions);
   // Her slots all fall in her quiet hours: no minute ever allows a follow-up, none is written.
   if (at === null) return { kind: 'skip', reason: 'follow_up_no_allowed_hour' };
   return { kind: 'later', reason: open ? 'follow_up_quiet_hours' : 'follow_up_outside_hours', at };

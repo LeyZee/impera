@@ -1,5 +1,6 @@
 import type {
   AgentHours,
+  DatedRanges,
   AlertTrigger,
   FanFlags,
   HandoffCause,
@@ -104,6 +105,8 @@ export interface AgentComposeInput {
    * worker's call; here they set her night and when a follow-up may go out.
    */
   readonly hours?: AgentHours;
+  /** Her dated exceptions (ADR 0148 § 3): when a follow-up may go out, a date that has one follows its ranges. */
+  readonly exceptions?: DatedRanges;
   /** How many times she already waited for his last message (P3-11): from 1, she does not wait again. */
   readonly waited?: number;
   /** A follow-up on his silence (P3-10), not an answer to a message of his. */
@@ -211,6 +214,8 @@ type AgentComposeResult = (
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
   readonly customOrderOpened?: true;
+  /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
+  readonly scriptsExhausted?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /**
@@ -375,7 +380,11 @@ function withScripts(
     turn.priceMismatch !== null && settings.systemOn.has('script_price')
       ? [...(result.alerts ?? []), SCRIPT_PRICE]
       : result.alerts;
-  const base = alerts === undefined ? result : { ...result, alerts };
+  const alerted = alerts === undefined ? result : { ...result, alerts };
+  const base =
+    turn.decision.kind === 'none' && turn.decision.reason === 'scripts_exhausted'
+      ? { ...alerted, scriptsExhausted: true as const }
+      : alerted;
   if (result.kind !== 'draft') {
     return turn.followed === null ? base : { ...base, scriptRun: { moved: turn.followed } };
   }
@@ -657,6 +666,7 @@ async function followUp(
     now: input.now,
     timeZone,
     ...(input.hours !== undefined && { hours: input.hours }),
+    ...(input.exceptions !== undefined && { exceptions: input.exceptions }),
   });
   if (decision.kind === 'skip') return NOT_FOLLOWED_UP(decision.reason);
   if (decision.kind === 'later') return { ...NOT_FOLLOWED_UP(decision.reason), retryAt: decision.at };

@@ -6,7 +6,7 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { useEffect, type JSX } from 'react';
 
 import { followCreator } from './agent/followed';
 import { CreatorsPage } from './creators/CreatorsPage';
@@ -28,7 +28,7 @@ import { ScriptPage } from './screens/content/ScriptPage';
 import { DashboardPage } from './screens/dashboard/DashboardPage';
 import { AgencyPage } from './screens/dashboard/agency/AgencyPage';
 import {
-  agencyPeriodOf,
+  agencySelectionOf,
   agencySearch,
   agentPeriodOf,
   dashboardSearch,
@@ -36,8 +36,10 @@ import {
   periodOf,
 } from './screens/dashboard/logic';
 import { FansPage } from './screens/fans/FansPage';
+import { HerProfilePage } from './screens/me/HerProfilePage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
+import { MyLinksPage } from './screens/me/MyLinksPage';
 import { MyOwnInvoicesPage } from './screens/me/MyOwnInvoicesPage';
 import { MyPreferencesPage } from './screens/me/MyPreferencesPage';
 import { MyProfilePage } from './screens/me/MyProfilePage';
@@ -63,6 +65,7 @@ import {
   PayRulesPage,
   SalesFeedPage,
   SecurityPage,
+  SettingsHome,
   SettingsLayout,
   TelegramPage,
 } from './screens/settings/SettingsLayout';
@@ -88,7 +91,7 @@ import { parseTelegramSearch, searchOfTab, tabOfSearch } from './settings/telegr
 import { AppShell } from './shell/AppShell';
 import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
-import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf } from './shell/nav';
+import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf, securityPathOf } from './shell/nav';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -98,6 +101,9 @@ export interface RouterContext {
 
 /** What the shell says when the route guard sends someone to the first tab of their rail (NAV-21). */
 export const NOT_YOURS = 'Cette page n’est pas dans ton espace.';
+
+/** What the shell says when an address of Entraîner has no screen yet and leads to the Playground (PIL-17). */
+export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur le Playground.';
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   // A section outside the account's rail sends it to its first tab (ADR 0024); the server's 403 stays the barrier.
@@ -138,14 +144,14 @@ const dashboard = createRoute({
     const rail = railOf(user);
     // The agency's figures are the owner's and an active manager's (ADR 0078 § 1): the Dashboard opens on them.
     if (user.role === 'owner' || user.teamScope === 'agency') {
-      const period = agencyPeriodOf(search);
+      const selection = agencySelectionOf(search);
       const openCreator = (id: string): void =>
-        void navigate({ search: agencySearch(period, id), replace: true });
+        void navigate({ search: agencySearch(selection, id), replace: true });
       if (search.creatrice === undefined) {
         return (
           <AgencyPage
-            period={period}
-            onPeriod={(next) => void navigate({ search: agencySearch(next), replace: true })}
+            selection={selection}
+            onSelection={(next) => void navigate({ search: agencySearch(next), replace: true })}
             onCreator={openCreator}
             forOwner={user.role === 'owner'}
             reviewsReports={canOpen(rail, '/equipe')}
@@ -155,7 +161,7 @@ const dashboard = createRoute({
       }
       return (
         <DashboardPage
-          period={agentPeriodOf(period)}
+          period={agentPeriodOf(selection)}
           onPeriod={() => undefined}
           onCreator={openCreator}
           forOwner={user.role === 'owner'}
@@ -164,10 +170,10 @@ const dashboard = createRoute({
           canAddCreator={canOpen(rail, '/creatrices')}
           asked={search.creatrice}
           agency={{
-            period,
-            onPeriod: (next) =>
+            selection,
+            onSelection: (next) =>
               void navigate({ search: agencySearch(next, search.creatrice), replace: true }),
-            onAgency: () => void navigate({ search: agencySearch(period), replace: true }),
+            onAgency: () => void navigate({ search: agencySearch(selection), replace: true }),
             canOpenSettings: user.role === 'owner',
           }}
         />
@@ -199,8 +205,9 @@ const creators = createRoute({
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
     if (first !== undefined && !sheets.includes(sheetOf(search))) {
-      // A word brought by an earlier guard (Structures sends here) goes on with this second step.
-      const notice = location.state.notice;
+      // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
+      // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
+      const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({
         to: '/creatrices',
@@ -391,13 +398,21 @@ const sales = createRoute({
 const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
+  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01).
+  validateSearch: (search: Record<string, unknown>): { readonly demande?: string } => {
+    const { demande } = search;
+    return typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {};
+  },
   component: function Content() {
     const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
+    const { demande } = content.useSearch();
     return (
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+          asked={demande ?? null}
+          onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
       </>
@@ -628,12 +643,16 @@ const payGoals = createRoute({
 const payPeriods = createRoute({
   getParentRoute: () => pay,
   path: '/releves',
+  // The quinzaine the other tabs showed, kept for the way back to them (GES-02).
+  validateSearch: parsePaySearch,
   component: function PayPeriods() {
+    const { quinzaine } = payPeriods.useSearch();
     const navigate = payPeriods.useNavigate();
     const { user } = rootRoute.useRouteContext();
     return (
       <PeriodsPage
         user={user}
+        period={quinzaine ?? null}
         onOpen={(period) => void navigate({ to: '/paie/quinzaine', search: { quinzaine: period } })}
       />
     );
@@ -670,9 +689,11 @@ const payExports = createRoute({
       throw redirect({ to: '/paie/quinzaine', replace: true, state: { notice: NOT_YOURS } });
     }
   },
+  validateSearch: parsePaySearch,
   component: function PayExports() {
+    const { quinzaine } = payExports.useSearch();
     const { user } = rootRoute.useRouteContext();
-    return <ExportsPage user={user} />;
+    return <ExportsPage user={user} period={quinzaine ?? null} />;
   },
 });
 
@@ -698,20 +719,21 @@ const me = createRoute({ getParentRoute: () => rootRoute, path: '/moi' });
 const meIndex = createRoute({
   getParentRoute: () => me,
   path: '/',
-  beforeLoad: ({ context }) => {
-    // A team member's Moi opens on his profile; the file, a task of once in a while, is the next tab (CHAT-30).
+  beforeLoad: () => {
+    // Everyone's Moi opens on a short profile: a team member's file, a task of once in a while, is the next tab
+    // (CHAT-30); a creator's persona, the longest page of the app, too (recette visuelle 16/11, CRE-03).
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/profil', replace: true });
+    throw redirect({ to: '/moi/profil', replace: true });
   },
 });
 /**
- * A creator's Moi holds her persona and her security (ADR 0042 § 8): a team member's screens (his file, his invoices,
- * his calendar of shifts) send her to her persona, as her persona sends anyone else to his profile.
+ * A creator's Moi holds her profile, her persona and her security (ADR 0042 § 8, CRE-03): a team member's screens (his
+ * file, his invoices, his calendar of shifts) send her to her profile, as her persona sends anyone else to his.
  */
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/moi/persona', replace: true, state: { notice: NOT_YOURS } });
+    throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
   }
 };
 const mePersona = createRoute({
@@ -725,13 +747,25 @@ const mePersona = createRoute({
   },
   component: MyPersonaPage,
 });
+// Moi › Mes liens (INS-03, ADR 0121 § 1): hers alone; anyone else is sent to his profile.
+const meLinks = createRoute({
+  getParentRoute: () => me,
+  path: '/liens',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'creator') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: MyLinksPage,
+});
 const meProfile = createRoute({
   getParentRoute: () => me,
   path: '/profil',
-  beforeLoad: creatorAway,
-  component: function MyProfile() {
+  // Its return type is written: inferred from a choice on the context, it made the route tree's types circular.
+  component: function MyProfile(): JSX.Element {
     const { user } = rootRoute.useRouteContext();
-    return <MyProfilePage user={user} />;
+    return user.role === 'creator' ? <HerProfilePage user={user} /> : <MyProfilePage user={user} />;
   },
 });
 // Moi › Trophées (ADR 0108): the chatter's trophy case, or the creator's; anyone else is sent to his profile.
@@ -803,10 +837,19 @@ const mePreferences = createRoute({
   },
 });
 
-// Outside the rail (SEC-04): an operator's or a creator's own sessions and backup codes, from the account's menu.
+// Outside the rail (SEC-04): an operator's own sessions and backup codes, from the account's menu. Whoever has them in
+// a section reads them there, and this address leads to it with its query (recette visuelle 16/11, CHA-16, CRE-07,
+// GES-11): one page, not two.
 const accountSecurity = createRoute({
   getParentRoute: () => rootRoute,
   path: ACCOUNT_SECURITY,
+  beforeLoad: ({ context }) => {
+    const own = securityPathOf(context.user);
+    if (own !== ACCOUNT_SECURITY) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: own, search: true, hash: true, replace: true });
+    }
+  },
   component: AccountSecurityPage,
 });
 
@@ -831,14 +874,15 @@ const channelPost = createRoute({
 });
 /*
  * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
- * to an « à venir » page under its header (recette 05/11, PRO-25). Each comes back with its screen.
+ * to an « à venir » page under its header (recette 05/11, PRO-25), and say so on arrival (recette visuelle 16/11,
+ * PIL-17). Each comes back with its screen.
  */
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
   beforeLoad: () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true });
+    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
   },
 });
 const tests = createRoute({
@@ -846,7 +890,7 @@ const tests = createRoute({
   path: '/tests',
   beforeLoad: () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true });
+    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
   },
 });
 
@@ -858,11 +902,9 @@ const settings = createRoute({
 const settingsIndex = createRoute({
   getParentRoute: () => settings,
   path: '/',
-  // Réglages is the owner's alone (the root sends anyone else home): it opens on Modèles IA.
-  beforeLoad: () => {
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/reglages/modeles-ia', replace: true });
-  },
+  // Réglages is the owner's alone (the root sends anyone else home). On a phone it is the list of its sections; on a
+  // computer, where the list stands beside a section, it opens on the first (GES-04).
+  component: SettingsHome,
 });
 const aiModels = createRoute({
   getParentRoute: () => settings,
@@ -1025,8 +1067,8 @@ const extensionHelp = createRoute({
   },
   component: function ExtensionHelp() {
     const { user } = rootRoute.useRouteContext();
-    // The trend watch is the owner's and the managers' (ADR 0060): a chatter is shown what serves his shift instead.
-    return <ExtensionPage watches={user.role === 'owner' || user.teamScope === 'agency'} />;
+    // The trend watch is the owner's alone (ADR 0024, amendement du 16/11): the team is shown the copilot instead.
+    return <ExtensionPage watches={user.role === 'owner'} />;
   },
 });
 /** /aide/reveal (P2-01): reconnect Reveal with the extension's « Sync », the owner's alone like the button itself. */
@@ -1081,6 +1123,7 @@ const routeTree = rootRoute.addChildren([
     meFile,
     meInvoices,
     meCalendar,
+    meLinks,
     meSecurity,
     mePreferences,
   ]),

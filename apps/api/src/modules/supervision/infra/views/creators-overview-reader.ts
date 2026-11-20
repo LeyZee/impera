@@ -1,11 +1,20 @@
-import { DropCategorySchema } from '@impera/contracts';
+import { agentHoursNow, DropCategorySchema } from '@impera/contracts';
 import { sql, withTenantMember, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { CreatorOverviewView } from '../../domain/dashboard-ports';
 
-const CreatorSchema = z.object({ timezone: z.string().min(1) });
-const SwitchSchema = z.object({ scope: z.string(), active: z.boolean() });
+import { herHours } from './her-hours';
+
+const CreatorSchema = z.object({ timezone: z.string().min(1), agent_hours: z.unknown() });
+const SwitchSchema = z.object({
+  scope: z.string(),
+  active: z.boolean(),
+  active_until: z
+    .union([z.date(), z.string()])
+    .transform((value) => new Date(value))
+    .nullable(),
+});
 const CountSchema = z.object({ auto: z.coerce.number().int().nonnegative() });
 const RequestSchema = z.object({ category: DropCategorySchema, due_on: z.string() });
 const NameSchema = z.object({ id: z.string(), display_name: z.string() });
@@ -20,14 +29,15 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
     read: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         const creator = await tx.execute(
-          sql`select timezone from creators where id = ${creatorId}::uuid and archived_at is null`,
+          sql`select timezone, agent_hours from creators where id = ${creatorId}::uuid and archived_at is null`,
         );
         const [her] = z.array(CreatorSchema).parse(creator.rows);
         if (her === undefined) return undefined;
         const stopped = z.array(SwitchSchema).parse(
           (
             await tx.execute(
-              sql`select distinct on (scope) scope, active from kill_switches
+              sql`select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active,
+                         active_until from kill_switches
                   where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId}::uuid)
                   order by scope, set_at desc`,
             )
@@ -45,11 +55,17 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
           global: stopped.some((s) => s.scope === 'global' && s.active),
           creator: stopped.some((s) => s.scope === 'creator' && s.active),
         };
+        // Her pause and her hours now, as her switch says them (ADR 0148 § 1).
+        const pausedUntil = stopped.find((s) => s.scope === 'creator' && s.active)?.active_until ?? null;
+        const hours = await herHours(tx, creatorId, her.timezone, her.agent_hours);
+        const hoursNow = agentHoursNow(hours.hours, hours.timeZone, new Date(), hours.exceptions);
         if (scope === 'self') {
           return {
             timezone: her.timezone,
             scope,
             switches,
+            pausedUntil,
+            hoursNow,
             autoConversations: counts?.auto ?? 0,
             requests: [],
             names: new Map(),
@@ -74,6 +90,8 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
           timezone: her.timezone,
           scope,
           switches,
+          pausedUntil,
+          hoursNow,
           autoConversations: counts?.auto ?? 0,
           requests: requests.map((row) => ({ category: row.category, dueOn: row.due_on })),
           names: new Map(members.map((row) => [row.id, row.display_name] as const)),

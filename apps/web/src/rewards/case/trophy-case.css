@@ -67,11 +67,10 @@
   position: relative;
 }
 .tc-kicker {
-  font-size: 13px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--tc-gold);
+  color: var(--nv-ink-faint);
 }
 .tc-hero__name {
   margin: 6px 0 10px;
@@ -152,13 +151,10 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--nv-space-3);
-  margin: 0 4px 14px;
+  margin: 0 0 14px;
 }
 .tc-shelf__head h3 {
   margin: 0;
-  font-size: 21px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
 }
 .tc-shelf__count {
   color: var(--nv-ink-faint);
@@ -186,7 +182,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 30px 8px;
-  padding: 28px 20px 12px;
+  padding: 28px var(--nv-plate-pad) 12px;
   border-radius: 26px;
   background: linear-gradient(180deg, var(--nv-plate), transparent 70%);
   box-shadow:
@@ -474,9 +470,6 @@
     justify-content: center;
     gap: 8px;
   }
-  .tc-shelf__head h3 {
-    font-size: 19px;
-  }
   .tc-case {
     justify-content: flex-start;
     gap: 22px 0;
@@ -494,11 +487,17 @@
   .tc-cell__name {
     margin-top: -4px;
     font-size: 13px;
-    /* Two lines kept for every name, so the meters of a row stand level. */
+    /* Two lines kept for every name, so the meters of a row stand level. A name breaks between its words only, two
+       lines at most, then « … » (recette visuelle 16/11): never in the middle of a word under its medal. */
     min-height: calc(2 * 1.25em);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
   }
   .tc-wide {
     display: none;

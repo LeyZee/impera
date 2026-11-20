@@ -147,6 +147,15 @@ describe('Select', () => {
     expect(onChange).toHaveBeenCalledWith('genève');
   });
 
+  it('opens a long list straight on its choices when told never to search (a dozen periods)', () => {
+    render(
+      <Select id="b" ariaLabel="Mois" value="paris" options={CITIES} onChange={vi.fn()} search="never" />,
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Mois' }));
+    expect(screen.queryByRole('combobox', { name: 'Chercher' })).toBeNull();
+    expect(screen.getByRole('listbox')).toBeDefined();
+  });
+
   it('shows a value not in its options as itself, and the placeholder when there is none', () => {
     const { rerender } = render(<Select id="a" value="xof" options={LOOSE} onChange={vi.fn()} />);
     expect(screen.getByRole('combobox').textContent).toContain('xof');
@@ -169,5 +178,29 @@ describe('Select', () => {
     fireEvent.click(field);
     fireEvent.keyDown(field, { key: 'ArrowDown' });
     expect(screen.queryByRole('listbox')).toBeNull();
+  });
+});
+
+describe('Select › the width of its list', () => {
+  const LONG: SelectOption<string>[] = [
+    { value: '', label: 'Toutes les alertes' },
+    { value: 'doubt', label: 'Doute sur la personne' },
+  ];
+
+  it('opens as wide as its field by default', () => {
+    render(<Select ariaLabel="Alerte" value="" options={LONG} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Alerte' }));
+    const pop = screen.getByRole('listbox').parentElement;
+    expect(pop?.style.width).toBe('8px');
+    expect(pop?.style.minWidth).toBe('');
+  });
+
+  it('opens as wide as its longest option when asked, never narrower than its field (recette visuelle 16/11)', () => {
+    render(<Select ariaLabel="Alerte" value="" options={LONG} onChange={vi.fn()} listWidth="options" />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Alerte' }));
+    const pop = screen.getByRole('listbox').parentElement;
+    expect(pop?.style.width).toBe('max-content');
+    expect(pop?.style.minWidth).toBe('8px');
+    expect(pop?.style.maxWidth).not.toBe('');
   });
 });

@@ -215,6 +215,12 @@ async function seedCreator(admin: Database, label: string) {
       fingerprint: 'a'.repeat(64),
       attemptStartedAt: at,
     });
+    await tx
+      .insert(s.user)
+      .values({ id: `owner-${label}`, name: 'Owner', email: `owner-${label}@example.test` });
+    await tx
+      .insert(s.creatorAlertRoutes)
+      .values({ creatorId, alertCode: 'sale', role: 'manager', mode: 'muted', updatedBy: `owner-${label}` });
     await tx.insert(s.killSwitches).values({
       id: newId(MessageIdSchema),
       scope: 'creator',
@@ -223,6 +229,12 @@ async function seedCreator(admin: Database, label: string) {
       active: false,
       reason: 'test',
       setBy: 'u',
+    });
+    await tx.insert(s.agentHourExceptions).values({
+      id: newId(MessageIdSchema),
+      creatorId,
+      date: '2099-01-01',
+      ranges: [{ startMinute: 0, endMinute: 240 }],
     });
   });
   return { creatorId, accountId, conversationId };
@@ -248,7 +260,9 @@ const TENANT_TABLES = {
   calibration_ratings: s.calibrationRatings,
   blind_tests: s.blindTests,
   notifications: s.notifications,
+  creator_alert_routes: s.creatorAlertRoutes,
   kill_switches: s.killSwitches,
+  agent_hour_exceptions: s.agentHourExceptions,
 };
 
 describe('database (RLS, constraints, migrations)', () => {

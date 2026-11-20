@@ -160,7 +160,10 @@ export interface MonthLine {
   readonly proposed: boolean;
 }
 
-/** What a month cell lists, hours first then the tasks of the day; her routine stays in Jour. */
+/**
+ * What a month cell lists, hours first then the tasks of the day and her routine, by name as everywhere else (recette
+ * visuelle 16/11, CRE-06).
+ */
 export function monthLinesOf(agenda: CreatorAgenda, day: string): MonthLine[] {
   const plan = planOf(agenda, day);
   const zone = agenda.timeZone;
@@ -180,16 +183,14 @@ export function monthLinesOf(agenda: CreatorAgenda, day: string): MonthLine[] {
     done: false,
     proposed: true,
   }));
-  const ofDay: MonthLine[] = plan.todo
-    .filter((item) => item.task.when.kind === 'day')
-    .map((item) => ({
-      key: item.task.id,
-      title: item.task.title,
-      category: item.task.category,
-      start: null,
-      done: item.done,
-      proposed: false,
-    }));
+  const ofDay: MonthLine[] = plan.todo.map((item) => ({
+    key: item.task.id,
+    title: item.task.title,
+    category: item.task.category,
+    start: null,
+    done: item.done,
+    proposed: false,
+  }));
   return [...timed, ...proposed].sort((a, b) => (a.start ?? -1) - (b.start ?? -1)).concat(ofDay);
 }
 

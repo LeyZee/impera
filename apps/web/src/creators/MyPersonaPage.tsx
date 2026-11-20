@@ -11,6 +11,7 @@ import {
 import type { JSX } from 'react';
 
 import { useCreators, useMyPersona } from './api';
+import { herLabel, rubricsOf } from './my-persona';
 import { ProposeCorrection } from './persona/ProposeCorrection';
 import { useCorrections } from './persona/corrections';
 import { panelTitle, type Answer } from './persona/model';
@@ -20,6 +21,7 @@ import '@/creators/persona/persona.css';
 import './my-persona.css';
 import { MeNav } from '@/screens/me/MeNav';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 const languageLabel = (value: string): string =>
   PERSONA_OPTIONS.languages.find((option) => option.value === value)?.label ?? value;
@@ -48,48 +50,80 @@ function answerOf(question: SheetQuestion, value: Answer | undefined): string | 
   return question.kind === 'date' ? (ageLine(value)?.replace(' aujourd’hui', '') ?? null) : value;
 }
 
+/** An answer as she reads it: cut on its rubrics in capitals when it has some, each under its own title (CRE-03). */
+function Value({ value }: { value: string }): JSX.Element {
+  const rubrics = rubricsOf(value);
+  if (rubrics === null) return <>{value}</>;
+  return (
+    <dl className="mp-rubrics">
+      {rubrics.map((rubric, index) => (
+        <div key={`${String(index)}-${rubric.title ?? ''}`} className="mp-rubrics__one">
+          {rubric.title === null ? null : <dt>{rubric.title}</dt>}
+          <dd>{rubric.text}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** « 4 réponses », what a folded panel holds without opening it. */
+const answersLine = (count: number): string =>
+  count === 0 ? 'Rien d’écrit pour l’instant.' : count === 1 ? '1 réponse' : `${String(count)} réponses`;
+
 /**
  * A panel of her sheet, Desirali's title over the lines written, as a list of terms (label, then value), so that a
- * half-filled sheet never reads « rien d'écrit » ten times over (Extension's review of #531). A panel with nothing
- * says it once. « Proposer une correction » at its foot.
+ * half-filled sheet never reads « rien d'écrit » ten times over (Extension's review of #531). Folded, with what it holds
+ * on its line, the first panel open (recette visuelle 16/11, CRE-03): her sheet reads as sections, not a wall of
+ * text. « Proposer une correction » at its foot, inside the fold.
  */
 function Panel({
   section,
   sheet,
   correcting,
+  open,
 }: {
   section: SheetSection;
   sheet: PersonaSheet;
   correcting: Correcting;
+  open: boolean;
 }): JSX.Element {
   const title = panelTitle(section.key);
   const answers: Readonly<Record<string, Answer>> = sheet[section.key];
   const written = section.questions.flatMap((question) => {
     if (question.kind === 'timezone') return [];
     const value = answerOf(question, answers[question.key]);
-    return value === null ? [] : [{ label: question.kind === 'date' ? 'Âge' : question.label, value }];
+    return value === null
+      ? []
+      : [{ label: question.kind === 'date' ? 'Âge' : herLabel(question.key, question.label), value }];
   });
   return (
-    <section className="nv-plate mp-block" aria-label={title}>
-      <h2 className="mp-block__title">{title}</h2>
-      {written.length === 0 ? (
-        <p className="ps-muted">Rien d’écrit pour l’instant.</p>
-      ) : (
-        <dl className="mp-fields">
-          {written.map((row) => (
-            <div key={row.label} className="mp-fields__row">
-              <dt>{row.label}</dt>
-              <dd>{row.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-      <ProposeCorrection
-        creatorId={correcting.creatorId}
-        section={section.key}
-        title={title}
-        corrections={correcting.corrections}
-      />
+    <section className="nv-plate mp-block mp-block--fold" aria-label={title}>
+      <details className="nv-disclosure mp-fold" open={open}>
+        <summary className="mp-fold__head">
+          <h2 className="nv-h2 mp-block__title">{title}</h2>
+          <span className="nv-disclosure__sum">{answersLine(written.length)}</span>
+        </summary>
+        <div className="mp-fold__body">
+          {written.length === 0 ? null : (
+            <dl className="mp-fields">
+              {written.map((row) => (
+                <div key={row.label} className="mp-fields__row">
+                  <dt>{row.label}</dt>
+                  <dd>
+                    <Value value={row.value} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <ProposeCorrection
+            creatorId={correcting.creatorId}
+            section={section.key}
+            title={title}
+            corrections={correcting.corrections}
+          />
+        </div>
+      </details>
     </section>
   );
 }
@@ -98,23 +132,15 @@ function Panel({
 function Sheet({ sheet, correcting }: { sheet: PersonaSheet; correcting: Correcting }): JSX.Element {
   return (
     <>
-      {PERSONA_SHEET.map((section) => (
-        <Panel key={section.key} section={section} sheet={sheet} correcting={correcting} />
+      {PERSONA_SHEET.map((section, index) => (
+        <Panel key={section.key} section={section} sheet={sheet} correcting={correcting} open={index === 0} />
       ))}
     </>
   );
 }
 
 function Failed({ retry }: { retry: () => void }): JSX.Element {
-  return (
-    <div className="nv-plate mp-block">
-      <p className="mp-block__title">Ta fiche ne se charge pas</p>
-      <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-      <button type="button" className="nv-btn nv-btn--soft ps-self-start" onClick={retry}>
-        Réessayer
-      </button>
-    </div>
-  );
+  return <Failure onRetry={retry} />;
 }
 
 const Loading = (): JSX.Element => (
@@ -156,14 +182,14 @@ export function MyPersonaPage(): JSX.Element {
   const own = creators.data?.[0];
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Persona"
         lead={
-          'Ta fiche, panneau par panneau\u00a0: qui tu es, ta vie, tes goûts, ta façon de parler, tes relations, l’intime et tes zones interdites. Quelque chose ne te ressemble pas\u00a0? Propose une correction sous le panneau concerné, l’agence met ta fiche à jour.'
+          'Ta fiche, panneau par panneau : ouvre-en un pour le lire. Une erreur\u00a0? Propose une correction dedans.'
         }
-        actions={<MeNav creator />}
+        tabs={<MeNav creator />}
       />
       <div className="ps-sheet">
         <section className="ps-page">

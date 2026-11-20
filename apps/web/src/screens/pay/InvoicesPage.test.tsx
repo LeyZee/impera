@@ -225,7 +225,11 @@ describe('Paie › Factures', () => {
       `/paie/quinzaine?quinzaine=${OCT1}&membre=${THEO.id}`,
     );
 
-    const documents = await waitFor(() => panelOf('16 – 31 octobre 2026'));
+    // The period between the header's arrows, Paie's one period bar (GES-02); the card names what it lists.
+    await waitFor(() => {
+      expect(screen.getByRole('group', { name: 'Quinzaine' }).textContent).toContain('16 – 31 octobre 2026');
+    });
+    const documents = panelOf('Documents de la quinzaine');
     await waitFor(() => rowIn(documents, THEO_CREDIT.number));
     expect(reads).toContain(`?period=${OCT2}`);
     const credit = rowIn(documents, THEO_CREDIT.number);
@@ -370,7 +374,7 @@ describe('Paie › Factures', () => {
     const contests = await waitFor(() => panelOf('Contestations à trancher'));
     expect(within(contests).getByText('Le propriétaire les tranche.')).toBeTruthy();
     expect(within(contests).queryByRole('button', { name: 'Trancher' })).toBeNull();
-    const documents = await waitFor(() => panelOf('16 – 31 octobre 2026'));
+    const documents = await waitFor(() => panelOf('Documents de la quinzaine'));
     const own = await waitFor(() => rowIn(documents, irisPending.number));
     expect(within(own).getByRole('button', { name: 'J’accepte' })).toBeTruthy();
     expect(

@@ -43,6 +43,7 @@ import { dayMonthText } from '@/payroll/model';
 import { amountText, parseAmount } from '@/reports/model';
 import { MONEY_LEAD } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 /**
  * A document of the invoices' lists (EQ-06 lot 8) and what is done from it: the contractor's answer, the owner's end of
@@ -719,18 +720,9 @@ export function DetailDialog({
           <dd>{amountText(item.inclVatMinor, 'EUR')}</dd>
         </dl>
         {view.isError ? (
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : l’historique n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void view.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure inline onRetry={() => void view.refetch()}>
+            L’historique n’a pas pu être lu : réessaie dans un instant.
+          </Failure>
         ) : view.data === undefined ? (
           <p className="tm-hint">Lecture de l’historique…</p>
         ) : (

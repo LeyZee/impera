@@ -1,6 +1,10 @@
 import type {
   AlertsView,
   CreateCustomAlertBody,
+  CreatorAlertCode,
+  CreatorAlertLine,
+  CreatorAlertRouting,
+  CreatorAlertsView,
   CreatorId,
   CustomAlert,
   CustomAlertBody,
@@ -64,4 +68,16 @@ export interface AlertStore {
   ): Promise<ReadonlyMap<CustomAlertId, { readonly groupId: CustomAlertGroupId; readonly name: string }>>;
   /** The system's alerts that are on for her. */
   systemOn(creatorId: CreatorId): Promise<ReadonlySet<SystemAlertCode>>;
+  /** The Alertes tab of her sheet (ADR 0150): every alert, by role, stored or default. `unknown_creator` if archived. */
+  creatorAlerts(creatorId: CreatorId): Promise<CreatorAlertsView | 'unknown_creator'>;
+  /**
+   * Sets who an alert of hers reaches, the three roles whole, audited with the owner. The same choice again changes
+   * nothing. `locked` for a locked alert set to anything but `deliver`.
+   */
+  setCreatorAlert(
+    creatorId: CreatorId,
+    code: CreatorAlertCode,
+    routes: CreatorAlertRouting,
+    userId: string,
+  ): Promise<CreatorAlertLine | 'unknown_creator' | 'locked'>;
 }

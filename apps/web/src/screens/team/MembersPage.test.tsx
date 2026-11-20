@@ -234,7 +234,9 @@ describe('Équipe › Membres', () => {
   it('lists the chatters at work first, folds those who left, and counts each tab', async () => {
     serve();
     renderPage();
-    await screen.findByText('2 actifs · 1 absent');
+    await screen.findByRole('list', { name: 'Chatteurs' });
+    // A sentence under the title, as on the other tabs: who is active is counted in the capsule (GES-21).
+    expect(screen.getByText('Qui travaille pour l’agence, à quel taux, sur quels comptes.')).toBeDefined();
     expect(names('Chatteurs')).toEqual(['Théo', 'Basile']);
     expect(within(screen.getByRole('radio', { name: /Chatteurs/u })).getByText('2')).toBeDefined();
     expect(within(screen.getByRole('radio', { name: /Managers/u })).getByText('1')).toBeDefined();
@@ -474,7 +476,7 @@ describe('Équipe › Membres', () => {
     serve({ members: { status: 503 } });
     renderPage();
     expect(
-      await screen.findByText('Le serveur ne répond pas : l’équipe n’a pas pu être lue.', undefined, {
+      await screen.findByText('Le serveur ne répond pas', undefined, {
         timeout: 4000,
       }),
     ).toBeDefined();
@@ -1020,12 +1022,59 @@ describe('a link from the sheet', () => {
       within(list)
         .getAllByRole('button')
         .find((row) => row.querySelector('.nv-convo__name')?.textContent === name)
-        ?.querySelector('.nv-convo__side')?.textContent ?? 'none';
+        ?.querySelector('.tm-row__pills')?.textContent ?? '';
     expect(side('Théo')).toBe('');
     expect(side('Basile')).toBe('En congé');
     expect(side('Mialy')).toBe('Invité');
     expect(side('Koffi')).toBe('Lien expiré');
-    expect(screen.getByText('3 actifs · 1 absent · 1 invitation en attente · 1 lien expiré')).toBeDefined();
+  });
+
+  it('says a status under the name and the country in words, without a flag (GES-21)', async () => {
+    serve();
+    renderPage();
+    const list = await screen.findByRole('list', { name: 'Chatteurs' });
+    const basile = within(list)
+      .getAllByRole('button')
+      .find((row) => row.querySelector('.nv-convo__name')?.textContent === 'Basile');
+    const main = basile?.querySelector('.nv-convo__main');
+    // Name, then his pill, then the line of his country, rate and creators, which keeps the row's width.
+    expect([...(main?.children ?? [])].map((one) => one.className)).toEqual([
+      'nv-convo__name tm-name',
+      'tm-row__pills',
+      'nv-convo__preview',
+    ]);
+    expect(basile?.querySelector('.nv-convo__side')).toBeNull();
+    expect(list.textContent).not.toMatch(/\p{Regional_Indicator}/u);
+    expect(main?.querySelector('.nv-convo__preview')?.textContent).toMatch(/^Bénin · /u);
+  });
+
+  it('opens the first member on a wide screen, and leaves the hint once his sheet is closed (GES-21)', async () => {
+    serve();
+    const router = renderPage();
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    // The address stays the list's: nothing was chosen.
+    expect(router.state.location.search).toEqual({});
+    expect(
+      within(screen.getByRole('list', { name: 'Chatteurs' }))
+        .getAllByRole('button')
+        .find((row) => row.getAttribute('aria-current') === 'true')?.textContent,
+    ).toContain('Théo');
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Fermer la fiche' }));
+    await screen.findByText('Aucune fiche ouverte');
+    expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
+  });
+
+  it('keeps the hint on a narrower screen: nothing opens by itself (GES-21)', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: !query.includes('1280px'),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    serve();
+    renderPage();
+    await screen.findByRole('list', { name: 'Chatteurs' });
+    expect(screen.getByText('Aucune fiche ouverte')).toBeDefined();
+    expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
   });
 
   it('says the member’s city and hour under the name, never an IANA zone (EQ-07, EQ-08)', async () => {
@@ -1088,7 +1137,7 @@ describe('a member removed from a platform (ADR 0076 § 5)', () => {
       within(list)
         .getAllByRole('button')
         .find((row) => row.querySelector('.nv-convo__name')?.textContent === name)
-        ?.querySelector('.nv-convo__side')?.textContent ?? 'none';
+        ?.querySelector('.tm-row__pills')?.textContent ?? '';
     await waitFor(() => {
       expect(side('Théo')).toBe('Retiré de Reveal');
     });

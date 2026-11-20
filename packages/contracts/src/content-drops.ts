@@ -687,13 +687,6 @@ export type ScriptSummaryAuthor = z.infer<typeof ScriptSummaryAuthorSchema>;
 export const ScriptSummaryReviewReasonSchema = z.enum(SCRIPT_SUMMARY_REVIEW_REASONS);
 export type ScriptSummaryReviewReason = z.infer<typeof ScriptSummaryReviewReasonSchema>;
 
-/**
- * `GET`/`PUT /v1/creators/:creatorId/drop-descriptions`: her switch (ADR 0083 § 9), the owner's. Turned on, what she
- * dropped while it was off is described and her sent scripts told.
- */
-export const DropDescriptionsSwitchSchema = z.strictObject({ on: z.boolean() });
-export type DropDescriptionsSwitch = z.infer<typeof DropDescriptionsSwitchSchema>;
-
 /* ----------------------------------------------------------------------------------------------------------------
  * ADR 0030 § 3 (amended 08/11/2026) and ADR 0083 § 7: the agency validates a drop's descriptions and a script's
  * synthesis, row by row, as the account that validates. A correction is a new row, validated as it is written.

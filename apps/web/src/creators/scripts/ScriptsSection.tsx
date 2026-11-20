@@ -15,10 +15,11 @@ import {
 } from './model';
 import './scripts.css';
 
-import { VaultCard } from '@/creators/vault/VaultCard';
+import { VaultPage } from '@/creators/vault/VaultPage';
 import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Scripts (SC-03 c2b, ADR 0056 § 7), the owner's and an active manager's: each script she sent, its
@@ -50,19 +51,7 @@ export function ScriptsSection({
   const list = (): JSX.Element => {
     if (content.data === undefined) {
       if (content.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="aa-empty__title">Ses scripts ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void content.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+        return <Failure title="Ses scripts ne se chargent pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const rows = sentScripts(content.data, structures.data ?? []);
@@ -114,7 +103,7 @@ export function ScriptsSection({
     <section className="ps-page aa-page sx-page" aria-label={`Scripts de ${creatorName}`}>
       {/* Her Reveal vault first, at the top of the tab: what her scripts are built from, and the owner's sync (Charles,
           16/11). « Ses scripts » follows in one piece, its head and its list together. */}
-      <VaultCard
+      <VaultPage
         creatorId={creatorId}
         creatorName={creatorName}
         isOwner={isOwner}
@@ -128,8 +117,6 @@ export function ScriptsSection({
             <p className="ps-muted">
               Les scripts envoyés par {creatorName}, le plus récent d’abord. Télécharge l’archive, recopie-la
               dans Reveal en suivant la fiche, puis confirme la copie.
-              {/* Her switch holds for every drop: it stands in Contenu (recette créatrice 6). */}
-              {isOwner ? ' Les descriptions par l’IA s’allument dans l’onglet Contenu.' : null}
             </p>
           </div>
         </div>
@@ -197,7 +184,7 @@ function ScriptCard({
         </span>
       </div>
       <div className="sx-card__body">
-        <h3 id={`${id}-title`} className="sx-title">
+        <h3 id={`${id}-title`} className="nv-h3 sx-title">
           {row.name ?? 'Structure retirée de la bibliothèque'}
         </h3>
         <p className="sx-meta nv-num">

@@ -40,6 +40,8 @@ export const GUARD_CODES = [
   'no_commitment',
   // ADR 0088 § 3: a care answer (a fan in distress) that sells, meets or goes sexual.
   'care_breach',
+  // Charles 20/11: she slows down a fan who only compliments her (« tu y vas un peu fort »).
+  'unwarranted_brake',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;
