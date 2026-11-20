@@ -2368,6 +2368,18 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(held.scriptRun?.moved?.run.status).toBe('refused');
   });
 
+  it('pauses the step he left unopened when he comes back cold, and teases him once (ADR 0156 § 1)', async () => {
+    // His « salut » the next day: his desire fell under her threshold, the session cooled.
+    const cold = { ...deps(sent), offerLimits: { cooldownHours: 10, minDesire: 100 } };
+    const { draftComposer, seen } = composer({ brief: BRIEF }, undefined, limitsOf(ADULT).limits, cold);
+    const result = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(result.scriptRun?.moved?.run.status).toBe('stalled');
+    expect(result.scriptRun?.moved?.events).toEqual([{ type: 'script_ended' }]);
+    const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('n’a pas ouvert'))).toBe(true);
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+  });
+
   it('tells the team when the step waiting no longer has the price she said', async () => {
     const repriced: ScriptSource = {
       ...sent,

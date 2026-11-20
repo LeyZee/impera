@@ -399,7 +399,12 @@ export type ScriptStepDecision =
   /** No script may start yet, or an open one pauses (ADR 0103 § 11-12): the first condition missing. */
   | { readonly kind: 'wait'; readonly reason: ScriptStartBlock }
   | { readonly kind: 'after_refusal'; readonly step: StepRecord }
-  | { readonly kind: 'end'; readonly status: Exclude<ScriptRunStatus, 'open' | 'refused'> };
+  | {
+      readonly kind: 'end';
+      readonly status: Exclude<ScriptRunStatus, 'open' | 'refused'>;
+      /** The paid step he left unopened when the run paused (ADR 0156 § 1): she reminds him of it once. */
+      readonly unopened?: StepRecord;
+    };
 
 const later = (a: Date | null, b: Date | null): Date | null => {
   if (a === null) return b;
@@ -442,6 +447,9 @@ export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
   if (status === 'open') return nextInOpenRun(input, run, script);
   if (run.endedAt?.getTime() === input.now.getTime()) {
     const last = current(run);
+    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message.
+    if (status === 'stalled' && last?.kind === 'paid' && last.outcome === 'sent')
+      return { kind: 'end', status, unopened: last };
     if (status !== 'refused') return { kind: 'end', status };
     if (last !== undefined) return { kind: 'after_refusal', step: last };
   }

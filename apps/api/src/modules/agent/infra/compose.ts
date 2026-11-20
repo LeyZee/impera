@@ -336,6 +336,9 @@ function askedHisAge(history: readonly ConversationTurn[]): boolean {
 const ASK_AVAILABILITY_HINT =
   'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
 const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
+/** He came back without opening the paid step she sent: she teases him about it once (ADR 0156 § 1). */
+const UNOPENED_STEP_HINT =
+  'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
 /** What the voice writes for a follow-up: decided by code, never by the brain (CLAUDE.md rule 3). */
 function followUpBrief(followUp: FollowUpTurn): Brief {
@@ -783,9 +786,21 @@ export async function composeTurn(
           ),
         )
       : [];
+  // He comes back after the session cooled, her paid step unopened: one light reminder, never a sale (ADR 0156 § 1).
+  const reminds =
+    !care &&
+    scripts?.decision.kind === 'end' &&
+    scripts.decision.unopened !== undefined &&
+    customOrder === undefined &&
+    objectionReply === undefined &&
+    trap.replyBrief === undefined &&
+    sexualization?.kind !== 'steer_back';
   const voiceBrief: Brief = asking
     ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
-    : { ...answered, toneHints: [...answered.toneHints, ...paced] };
+    : {
+        ...answered,
+        toneHints: [...answered.toneHints, ...paced, ...(reminds ? [UNOPENED_STEP_HINT] : [])],
+      };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}

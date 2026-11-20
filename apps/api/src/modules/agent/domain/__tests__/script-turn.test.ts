@@ -130,6 +130,45 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(second.moved?.run.status).toBe('refused');
   });
 
+  it('pauses an unopened step when he comes back cold, never a refusal, and reminds him once (ADR 0156 § 1)', () => {
+    // He fell asleep without opening it and writes « salut » the next day: the session cooled.
+    const back = scriptTurn({ ...input, latest: offered, history: history([0, 1]), hotSession: false });
+    expect(back.decision).toMatchObject({ kind: 'end', status: 'stalled', unopened: { stepIndex: 1 } });
+    expect(back.moved?.run.status).toBe('stalled');
+    expect(back.moved?.run.steps.at(-1)?.outcome).toBe('sent');
+    expect(back.moved?.events).toEqual([{ type: 'script_ended' }]);
+
+    // His next message: the reminder was once, nothing is left to remind.
+    const later = scriptTurn({
+      ...input,
+      now: new Date(NOW.getTime() + 60_000),
+      latest: back.moved?.run ?? null,
+      history: history([0, 1]),
+      hotSession: false,
+    });
+    expect(later.decision).not.toMatchObject({ kind: 'end' });
+
+    // A clear no stays one, even cold.
+    const no = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      hotSession: false,
+      reply: 'refused',
+    });
+    expect(no.decision.kind).toBe('after_refusal');
+  });
+
+  it('pauses an opened, unbought step without a reminder when he comes back cold (ADR 0156 § 1)', () => {
+    const opened = played([
+      { type: 'step_sent', stepIndex: 0, at: BEFORE },
+      { type: 'step_sent', stepIndex: 1, at: BEFORE },
+      { type: 'step_opened', stepIndex: 1, at: BEFORE },
+    ]);
+    const back = scriptTurn({ ...input, latest: opened, history: history([0, 1]), hotSession: false });
+    expect(back.decision).toEqual({ kind: 'end', status: 'stalled' });
+  });
+
   it('pauses while he is not free: his messages neither refuse nor ignore the step (ADR 0103 § 12)', () => {
     const first = scriptTurn({ ...input, latest: offered, history: history([0, 1]), availability: 'no' });
     expect(first.decision.kind).toBe('wait');
