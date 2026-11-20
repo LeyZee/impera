@@ -1,6 +1,6 @@
 # 0160. Durée des sessions selon le rôle : le propriétaire tient 48 heures sans activité, les autres 12 heures
 
-Statut : proposed
+Statut : accepted (« ok sessions » de Charles, 20/11/2026)
 Date : 2026-11-20
 Amende : l'ADR 0046 § 6 (« 12 heures sans activité » pour tous). La durée absolue de 7 jours ne change pas.
 
