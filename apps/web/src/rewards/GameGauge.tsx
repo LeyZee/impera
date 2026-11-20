@@ -46,6 +46,10 @@ function keepShown(userId: string, name: string, shown: Shown): void {
   }
 }
 
+/** « Réduire les animations »: the gauge is put at today's value from the first picture, never a frame late. */
+const still = (): boolean =>
+  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /** Where the gauge starts: the last value shown when it was lower and for the same target, else `null`. */
 export function gaugeStart(last: Shown | null, scope: string, percent: number): number | null {
   if (last?.scope !== scope) return null;
@@ -72,7 +76,7 @@ export function GameGauge({
   className?: string;
 }): JSX.Element {
   // Read once, on arrival: the movement plays once a visit.
-  const [from] = useState(() => gaugeStart(lastShown(userId, name), scope, percent));
+  const [from] = useState(() => (still() ? null : gaugeStart(lastShown(userId, name), scope, percent)));
   const [state, setState] = useState<'before' | 'moving' | 'still'>(from === null ? 'still' : 'before');
 
   useEffect(() => {
