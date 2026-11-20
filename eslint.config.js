@@ -45,6 +45,8 @@ const MODULE_DEPENDENCIES = {
   trends: ['agent', 'content-drops', 'creator-tasks'],
   // INS-03, ADR 0121 § 1: her redirect links, out of the Telegram channel's setting; a leaf, read through its index.
   'redirect-links': [],
+  // ADR 0159: custom orders, first lot her grid of custom prices; a leaf.
+  'custom-orders': [],
   // INS-04, ADR 0122: the comments under her Instagram posts. Lot a: pure rules and its port; imports no module.
   'instagram-comments': [],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).

@@ -29,8 +29,15 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 ### A. La commande sur mesure
 
 1. **Les états, dans le code** (`agent/domain/custom-order.ts`) : `asked` → `creator_yes` (avec prix) ou `creator_no` → `deposit_paid` → `delivered`, et `expired` / `cancelled`. Un appel ou une visio suit le § D (paiement entier d'avance). Chaque passage est un événement de conversation, idempotent.
-2. **`asked`.** L'IA répond avec la réponse d'attente actuelle, sous la garde `no_commitment`. La demande part à la créatrice : un résumé en une phrase de ce qu'il veut voir, écrit par le code à partir du brief, jamais son pseudo ni son texte brut. Tant que l'espace de la créatrice n'est pas en ligne, elle part au propriétaire, qui saisit la réponse.
-3. **`creator_yes`.** Seul un humain (la créatrice, ou le propriétaire pour elle) saisit le oui et le prix. Le modèle ne fixe jamais un prix. L'IA annonce le prix exact et demande un pourboire de la moitié pour prendre la commande. La garde `no_commitment` est levée pour ce prix-là seulement, et la garde `price_outside_offer` laisse passer ce seul montant (`GuardContext.allowedPriceMinor`) ; « jamais de négociation » s'applique.
+2. **`asked` : comprendre la demande en entier avant de la transmettre** (Charles, 20/11, 15 h 52 : « il faut que la modèle sache exactement quoi faire, la durée, la prestation et le prix »). L'IA ne dit ni oui ni non et ne donne aucun prix ; elle répond sous la garde `no_commitment`. Elle recueille les détails par deux ou trois questions joueuses dans la conversation, une à la fois, jamais en questionnaire. Le code tient la liste des informations obligatoires selon le format, le cerveau remplit les cases, le code dit ce qui manque :
+   - toujours : ce qu'il veut voir, décrit précisément ; pour quand il le voudrait ; le prénom ou le mot à dire ou à écrire, s'il y en a un ;
+   - photo : la pose, la tenue, le texte écrit, le nombre de photos ;
+   - vidéo : la durée, le déroulé, la tenue, ce qu'elle dit ;
+   - réaction filmée ou note : la photo qu'il envoie (déjà reçue), le ton voulu ;
+   - appel ou visio : la durée, parlée ou sexuelle, les moments où il est libre.
+   Une demande hors de ses limites (« Elle le fait ? » sur non, `never_do`) est déclinée sans rien demander de plus : c'est la réponse que la créatrice a donnée d'avance.
+2 bis. **La fiche envoyée à la créatrice, seulement quand elle est complète** : avec quel fan (son prénom connu et le lien vers la conversation, dans le CRM et son espace, jamais dans le texte d'une notification), ce qu'il veut en détail, la durée, pour quand, le format et les suppléments lus, et le prix calculé par la grille, à accepter ou changer. Sans les informations après trois questions, la fiche part au propriétaire, qui décide. Pendant l'attente, l'IA garde le fan chaud et continue la conversation, sans rien promettre (Charles, 20/11, 15 h 53, « tu peux appliquer tout ça »). Tant que l'espace de la créatrice n'est pas en ligne, la fiche part au propriétaire, qui saisit sa réponse.
+3. **`creator_yes`.** Rien n'est annoncé au fan avant ce oui, même quand la grille donne un prix. Seul un humain (la créatrice, ou le propriétaire pour elle) saisit le oui et le prix. Le modèle ne fixe jamais un prix. L'IA annonce le prix exact et demande un pourboire de la moitié pour prendre la commande. La garde `no_commitment` est levée pour ce prix-là seulement, et la garde `price_outside_offer` laisse passer ce seul montant (`GuardContext.allowedPriceMinor`) ; « jamais de négociation » s'applique.
 4. **Le pourboire n'est demandé qu'ici.** Une garde de voix bloque toute demande de pourboire hors d'une commande à l'état `creator_yes`. Un remerciement pour un pourboire spontané reste permis.
 5. **`deposit_paid`.** Le code reconnaît un pourboire de ce fan, d'au moins la moitié du prix, arrivé après l'annonce. Un montant plus bas ou ambigu passe à un humain.
 6. **`delivered`.** La créatrice dépose la vidéo dans un dossier de rôle `custom` (§ B). L'IA l'envoie comme média payant au prix restant, derrière la garde d'écriture.
@@ -47,7 +54,7 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 
 ### C. La grille interne
 
-14. Rangée dans les réglages de l'agent de la version de persona (`agent.custom_price_grid`), comme la banque de répliques : propriétaire seul en lecture et écriture, jamais dans le dépôt, jamais entière dans un prompt (seule la ligne utile entre, dans un bloc typé).
+14. Rangée dans sa propre table, une version par enregistrement (`custom_price_grids`), pour être modifiable à tout moment sans activer une nouvelle persona : propriétaire seul en lecture et écriture, fermée au manager, au chatteur et à la créatrice, jamais dans le dépôt, jamais entière dans un prompt (seul le prix calculé en sort). Chaque enregistrement garde sa date ; une demande déjà acceptée garde son prix. Elle se règle dans la vue « Sur mesure » de l'onglet Scripts de sa fiche.
 15. Elle donne un prix par type et par niveau (§ 0) : un prix fixe pour une vidéo, une photo, une réaction ou une note ; un prix à la minute et une durée minimale pour un appel ou une visio. Le propriétaire la saisit lui-même.
 15 bis. **Le code calcule le prix proposé** à partir du type, du niveau et, pour un appel ou une visio, de la durée demandée. Ce prix est présenté à la créatrice avec la demande ; elle l'accepte ou le change (§ A.3). L'IA n'annonce au fan que le prix accepté par la créatrice.
 
@@ -83,7 +90,8 @@ Jusque-là, l'ADR 0090 s'applique telle quelle : aucune commande ne se perd, ell
 
 - L'IA vend du sur-mesure, mais seulement au prix dit par un humain, après un oui de la créatrice. Le code la retient à chaque étape.
 - Migration additive : états et événements de commande, rôles `custom` et `gift`, rattachement d'un média à un fan. RLS forcée, `GRANT SELECT TO impera_service`.
-- Glossaire : « Acompte », « Dossier Perso », « Cadeau », « Relais de preuve ».
+- Grille (lot fait le 20/11) : table versionnée `custom_price_grids` (migration 0233, lecture propriétaire seul, écriture par le rôle de service), module `custom-orders` (`GET`/`PUT /v1/creators/:creatorId/custom-prices`), calcul pur `quoteCustomOrder` dans les contrats, écran « Sur mesure » avec calculateur.
+- Glossaire : « Acompte », « Dossier Perso », « Cadeau », « Relais de preuve », « Grille sur mesure », « Supplément ».
 - Évals : demande avec oui, avec non, sans réponse ; pourboire juste, trop bas, spontané ; demande de pourboire hors commande ; vidéo perso proposée à un autre fan (refusée) ; type et niveau lus pour chaque type ; appel payé puis passé à un humain, sans nom de compte ni heure dans sa réponse ; cadeau trop tôt ; preuve demandée deux fois.
 - Dépend de : l'agent voit les achats et les pourboires (une vente ou un pourboire rattaché au fan réveille déjà la conversation ; la mise à jour d'un média déjà lu devenu payé est en cours au fil Agent) ; la garde d'écriture ouverte pour le compte.
 

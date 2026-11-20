@@ -1,0 +1,320 @@
+/*
+ * Créatrices › Sur mesure (ADR 0159 § C). The head, panel, hints, chips and errors are the persona's (`ps-*`); the
+ * rows of the grid and the calculator live here, prefixed `smp-`. One card per subject (Formats, Suppléments,
+ * Calculateur). Colours are tokens only: a price is data, not an alarm; the one neon of the screen is « Enregistrer »,
+ * and the price of the calculator is the one large figure.
+ */
+.smp-title {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  font-weight: 400;
+}
+
+.smp-saved {
+  font-size: var(--nv-text-footnote);
+}
+
+.smp-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+
+.smp-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+}
+.smp-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.smp-card__title {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+
+/* A line of the grid. On a PC, fixed columns under one header per card, the field labels read by screen readers
+   only; on a phone, each line stacks and its labels show. */
+.smp-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.smp-row {
+  display: grid;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  padding: var(--nv-space-2) 0;
+  border-top: 1px solid var(--nv-glass-edge);
+}
+.smp-row:first-child {
+  border-top: none;
+}
+.smp-colhead {
+  display: grid;
+  gap: var(--nv-space-3);
+  padding-bottom: var(--nv-space-1);
+  font-size: var(--nv-text-caption);
+  letter-spacing: var(--nv-text-caption-tracking);
+  color: var(--nv-ink-muted);
+}
+.smp-colhead--formats,
+.smp-rows--formats > .smp-row {
+  grid-template-columns: minmax(0, 1fr) 8rem 7rem 7rem 8.5rem;
+}
+.smp-rows--formats .smp-row__never {
+  grid-column: span 3;
+}
+.smp-colhead--supplements,
+.smp-rows--supplements > .smp-row {
+  grid-template-columns: minmax(0, 1fr) 7rem 8.5rem 4.5rem;
+}
+.smp-rows--supplements .smp-row__never {
+  margin: 0;
+}
+.smp-row[data-off='true'] .smp-row__label {
+  color: var(--nv-ink-muted);
+}
+.smp-row__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.smp-row__label {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.smp-row__nameinput {
+  width: 100%;
+}
+.smp-row__never {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+}
+.smp-row__remove {
+  justify-self: end;
+}
+.smp-empty {
+  margin: 0;
+}
+/* The second header stands over the second column, on a wide screen only. */
+.smp-colheads > .smp-colhead + .smp-colhead {
+  display: none;
+}
+
+/* Suppléments in two columns on a wide screen: one header over each. */
+@media (min-width: 1320px) {
+  .smp-rows--supplements {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--nv-space-6);
+  }
+  .smp-rows--supplements > .smp-row:nth-child(2) {
+    border-top: none;
+  }
+  .smp-colheads {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--nv-space-6);
+  }
+  .smp-colheads > .smp-colhead + .smp-colhead {
+    display: grid;
+  }
+}
+
+/* A number with its unit inside the field, at its end, as the € of a statement. */
+.smp-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.smp-unit__label {
+  font-size: var(--nv-text-caption);
+  letter-spacing: var(--nv-text-caption-tracking);
+  color: var(--nv-ink-muted);
+}
+/* Under a column header, the label is the header's: kept for screen readers, not shown twice. */
+@media (min-width: 721px) {
+  .smp-rows .smp-unit__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+.smp-unit__box {
+  position: relative;
+}
+.smp-unit .smp-unit__input.nv-field__control {
+  width: 100%;
+  padding-right: 56px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.smp-unit__sign {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  pointer-events: none;
+}
+.smp-unit__error {
+  margin: 0;
+}
+
+.smp-offered {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.smp-offered__text {
+  min-width: 76px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+.smp-add {
+  gap: 6px;
+}
+
+/* The calculator: what is asked on the left, the price on the right, one large figure. */
+.smp-calc {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--nv-space-5);
+  align-items: start;
+}
+.smp-calc__inputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.smp-calc__inputs .nv-eyebrow:not(:first-child) {
+  margin-top: var(--nv-space-2);
+}
+.smp-calc__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-5);
+  border-radius: var(--nv-radius-lg);
+}
+.smp-calc__total {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-size: var(--nv-text-metric);
+  line-height: var(--nv-text-metric-leading);
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.smp-calc__result[data-kind='declined'] .smp-calc__total,
+.smp-calc__result[data-kind='off_grid'] .smp-calc__total {
+  color: var(--nv-ink-faint);
+}
+.smp-calc__result[data-kind='declined'] .ps-muted {
+  color: var(--nv-warning);
+}
+.smp-calc__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--nv-space-2) 0 0;
+  padding: var(--nv-space-3) 0 0;
+  list-style: none;
+  border-top: 1px solid var(--nv-glass-edge);
+}
+.smp-calc__line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.smp-calc__amount {
+  color: var(--nv-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .smp-colhead {
+    display: none;
+  }
+  .smp-rows--formats > .smp-row,
+  .smp-rows--supplements > .smp-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    padding: var(--nv-space-3) 0;
+  }
+  .smp-row__name {
+    flex: 1 1 100%;
+  }
+  .smp-rows--formats .smp-row__name {
+    flex: 1 1 calc(100% - 9rem - var(--nv-space-3));
+    align-self: flex-start;
+  }
+  .smp-rows--formats .smp-offered {
+    order: -1;
+    align-self: flex-start;
+  }
+  .smp-rows--formats .smp-row__name {
+    order: -2;
+  }
+  .smp-rows--formats .smp-unit,
+  .smp-rows--formats .smp-row__never {
+    flex: 0 0 calc(50% - var(--nv-space-3) / 2);
+  }
+  .smp-rows--formats .smp-row__never {
+    flex-basis: 100%;
+  }
+  .smp-cell--none {
+    display: none;
+  }
+  .smp-rows--supplements .smp-unit {
+    flex: 0 0 7rem;
+  }
+  /* « Retirer » on the line of the name, the switch with the percent. */
+  .smp-rows--supplements .smp-row__name {
+    flex: 1 1 calc(100% - 6rem - var(--nv-space-3));
+    order: -2;
+  }
+  .smp-rows--supplements .smp-row__remove {
+    order: -1;
+  }
+  .smp-calc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .smp-head__actions {
+    justify-content: stretch;
+  }
+  .smp-head__actions .nv-btn {
+    flex: 1;
+  }
+  /* The page ends above the tab bar, the price of the calculator never under it. */
+  .smp-page {
+    padding-bottom: calc(var(--nv-space-6) + var(--nv-tabbar-room, 110px));
+  }
+}
+
+/* The duration of the calculator: a short number, never a full-width field. */
+.smp-calc__inputs .smp-unit {
+  width: 9rem;
+}

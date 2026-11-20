@@ -75,6 +75,7 @@ import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
+import { wireCustomOrders } from './wiring/custom-orders';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
@@ -343,6 +344,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const persona = wirePersona(shared);
   const redirectLinks = wireRedirectLinks(shared);
+  const customOrders = wireCustomOrders(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
     channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
@@ -635,6 +637,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scripts.routes,
       ...trends.routes,
       ...redirectLinks.routes,
+      ...customOrders.routes,
       ...creatorTasks.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,

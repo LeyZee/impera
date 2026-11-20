@@ -52,6 +52,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   media_descriptions: ['insert'],
   passkey: ['update', 'delete'],
   password_reset_links: ['insert', 'update'],
+  // Her grid of custom prices (ADR 0159 § C): a save adds a version, never changes one.
+  custom_price_grids: ['insert'],
   pay_period_blocks: ['insert', 'update', 'delete'],
   pay_periods: ['insert'],
   platform_chatter_daily_stats: ['insert', 'update'],

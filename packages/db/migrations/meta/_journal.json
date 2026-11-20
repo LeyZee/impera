@@ -1219,6 +1219,13 @@
       "when": 1795178280374,
       "tag": "0232_withdraw_example",
       "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1795186458700,
+      "tag": "0233_custom_price_grids",
+      "breakpoints": true
     }
   ]
 }
