@@ -20,6 +20,7 @@ import {
   moneyParts,
   moneyShares,
   moneyTip,
+  percentText,
   OTHER,
   KINDS,
   sellerRanking,
@@ -27,6 +28,7 @@ import {
   shortEuros,
   slotLabel,
   STACKS,
+  topFansWords,
   zoneLabel,
 } from './view';
 
@@ -220,6 +222,19 @@ describe('sharesOf', () => {
   });
 });
 
+describe('percentText and topFansWords (PAY-16)', () => {
+  it('says a share with its tenth only when it has one', () => {
+    expect(percentText(37.5)).toBe('37,5\u00a0%');
+    expect(percentText(62)).toBe('62\u00a0%');
+  });
+
+  it('names ten biggest fans at most, as many as there are below ten', () => {
+    expect(topFansWords(42).lead).toBe('Les 10 fans qui dépensent le plus font');
+    expect(topFansWords(3).lead).toBe('Les 3 fans qui dépensent le plus font');
+    expect(topFansWords(1)).toEqual({ lead: 'Le fan qui dépense le plus fait', short: 'le plus gros fan' });
+  });
+});
+
 describe('moneyShares', () => {
   it('splits the revenue and the net to 100 % each, the amounts untouched', () => {
     const figures = {
@@ -232,6 +247,10 @@ describe('moneyShares', () => {
     const shares = moneyShares(figures);
     expect(shares.ofRevenue).toEqual({ fansVat: 17, commission: 17, creator: 41, agency: 25 });
     expect(shares.ofNet.creator + shares.ofNet.agency).toBe(100);
+    // To the tenth of a point: 37,5 % of the net is never said « 37 % » (PAY-16).
+    expect(
+      moneyShares({ ...figures, netMinor: 8_000, agencyMinor: 3_000, creatorMinor: 5_000 }).ofNet,
+    ).toEqual({ creator: 62.5, agency: 37.5 });
     expect(figures.agencyMinor).toBe(2_490);
   });
 });

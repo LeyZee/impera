@@ -1,4 +1,4 @@
-import type { CreatorId } from '@impera/contracts';
+import type { CreatorId, CreatorSummary } from '@impera/contracts';
 import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
@@ -13,6 +13,7 @@ import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { LinksSection } from './links/LinksSection';
 import { CreatorsList } from './overview/CreatorsList';
+import { useCreatorsOverview } from './overview/api';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
@@ -21,6 +22,8 @@ import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
+import { AgentSwitch } from '@/agent/AgentSwitch';
+import { canSwitch } from '@/agent/state';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
@@ -147,7 +150,8 @@ export function CreatorsPage({
         </section>
       );
     }
-    if (listing) return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} />;
+    if (listing)
+      return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} switches={canSwitch(user)} />;
     if (shown === 'agenda' && current !== undefined) {
       return (
         <AgendaSection
@@ -199,7 +203,6 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           timezone={current.timezone}
-          isOwner={isOwner}
         />
       );
     }
@@ -329,6 +332,9 @@ export function CreatorsPage({
             </Link>
           }
           title={current.displayName}
+          // Her AI's switch (ADR 0148 § 1) next to her name, on every tab of her sheet: the same setting as the
+          // Dashboard's control (avis Design, 19/11: in the header, not as a card of the tab).
+          actions={showForm ? undefined : <CreatorAgentSwitch creator={current} user={user} />}
           tabs={
             switchShown ? (
               <SubNav
@@ -358,5 +364,29 @@ export function CreatorsPage({
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
+  );
+}
+
+/** Her switch on her sheet, from her card of the list (`GET /v1/dashboard/creators`): nothing until it is read. */
+function CreatorAgentSwitch({
+  creator,
+  user,
+}: {
+  creator: CreatorSummary;
+  user: { readonly role: string; readonly teamScope: string | null };
+}): JSX.Element | null {
+  const overview = useCreatorsOverview();
+  const card = overview.data?.find((one) => one.creatorId === creator.id);
+  if (card === undefined) return null;
+  return (
+    <AgentSwitch
+      creatorId={creator.id}
+      creatorName={creator.displayName}
+      zone={creator.timezone}
+      state={card}
+      read={overview.dataUpdatedAt}
+      variant="header"
+      readOnly={!canSwitch(user)}
+    />
   );
 }

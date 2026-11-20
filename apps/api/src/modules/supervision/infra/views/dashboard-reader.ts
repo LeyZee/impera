@@ -1,10 +1,10 @@
 import {
-  AgentHoursSchema,
+  agentHoursNow,
   ConnectorConfigSchema,
-  DEFAULT_AGENT_HOURS,
   HandoffCauseSchema,
   LIVE_WINDOW,
   type AgentHours,
+  type DatedRanges,
   type DecidedDraft,
 } from '@impera/contracts';
 import { sql, withTenant, type Database, type Transaction } from '@impera/db';
@@ -14,6 +14,8 @@ import { unansweredSince } from '../../domain/dashboard';
 import type { DashboardFacts, DashboardReader, DashboardWindow } from '../../domain/dashboard-ports';
 import { rankFans, usdToEurMinor, type UsdRate } from '../../domain/fan-ranking';
 import { FRAGILE_PROPOSAL, fragileProposal, fragileWhy } from '../../domain/fragile';
+
+import { herHours } from './her-hours';
 
 /**
  * The Dashboard's SQL views (docs/architecture/modules.md: read only, aggregates, the documented exception to
@@ -171,7 +173,7 @@ async function facts(
   tx: Transaction,
   creatorId: string,
   window: DashboardWindow,
-  her: { readonly hours: AgentHours; readonly timeZone: string },
+  her: { readonly hours: AgentHours; readonly timeZone: string; readonly exceptions: DatedRanges },
   usdRate: UsdRate | null,
 ) {
   const now = window.now.toISOString();
@@ -180,8 +182,9 @@ async function facts(
 
   const stopped = await rows(
     tx,
-    z.object({ scope: z.string(), active: z.boolean() }),
-    sql`select distinct on (scope) scope, active from kill_switches
+    z.object({ scope: z.string(), active: z.boolean(), active_until: timestamp.nullable() }),
+    sql`select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active,
+               active_until from kill_switches
         where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId}::uuid)
         order by scope, set_at desc`,
   );
@@ -399,6 +402,8 @@ async function facts(
       global: stopped.some((s) => s.scope === 'global' && s.active),
       creator: stopped.some((s) => s.scope === 'creator' && s.active),
     },
+    pausedUntil: stopped.find((s) => s.scope === 'creator' && s.active)?.active_until ?? null,
+    hoursNow: agentHoursNow(her.hours, her.timeZone, window.now, her.exceptions),
     autoConversations: counts.auto,
     decidedThreeWeeksAgo: await decided(tx, creatorId, window, new Date(window.now.getTime() - 21 * DAY_MS)),
     reveal: {
@@ -496,9 +501,7 @@ export function createDashboardReader(db: Database): DashboardReader {
         );
         if (creator === undefined) return undefined;
         const window = windowFor(creator.timezone);
-        // Her hours as the worker reads them: none stored, or unreadable, are the defaults (always open).
-        const stored = AgentHoursSchema.safeParse(creator.agent_hours);
-        const her = { hours: stored.success ? stored.data : DEFAULT_AGENT_HOURS, timeZone: creator.timezone };
+        const her = await herHours(tx, creatorId, creator.timezone, creator.agent_hours);
         return {
           facts: {
             creator: { name: creator.display_name, timezone: creator.timezone },

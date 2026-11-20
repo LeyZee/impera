@@ -49,6 +49,31 @@ export class AgeInDoubtConflict extends DomainError {
   }
 }
 
+/** A pause ends in the future, within a week (ADR 0148 § 1); past that, it is an Arrêt lifted by hand. */
+export class AgentPauseInvalid extends DomainError {
+  constructor() {
+    super('agent_pause_invalid', 'Une pause finit plus tard, dans la semaine au plus');
+  }
+}
+
+/**
+ * A pause never lifts an Arrêt sooner (Sécurité, relecture de #865): an Arrêt without an end, an archived creator, or a
+ * pause asked to end before the one in force refuses; she is resumed first, behind the resume's own checks.
+ */
+export class AgentPauseConflict extends DomainError {
+  constructor(reason: 'stopped' | 'archived' | 'sooner') {
+    super(
+      'agent_pause_conflict',
+      reason === 'archived'
+        ? 'Une créatrice archivée reste arrêtée : pas de pause'
+        : reason === 'stopped'
+          ? 'L’IA est déjà arrêtée sans fin : reprends-la d’abord, puis mets-la en pause'
+          : 'Une pause ne finit pas plus tôt que celle en cours : reprends l’IA d’abord',
+      { details: { reason } },
+    );
+  }
+}
+
 /** Automatique stays locked until its server lock opens (ADR 0019); `details.missing` says what it waits for. */
 export class AutomaticLocked extends DomainError {
   constructor(missing: readonly AutomaticMissing[]) {

@@ -12,6 +12,7 @@ import { SaveBar, useOnScreen } from '../SaveBar';
 import { ZoneEditor } from '../ZoneEditor';
 import { Segment } from '../persona/fields';
 
+import { ExceptionsPanel } from './ExceptionsPanel';
 import { HOURS_ERRORS, hoursErrorKind, hoursQueryKey, saveAgentHours, useAgentHours } from './api';
 import {
   barsOf,
@@ -390,6 +391,8 @@ function HoursForm({
           />
         </section>
       </div>
+      {/* Her dated days (ADR 0148 § 3), read against her week as stored, not the draft. */}
+      <ExceptionsPanel creatorId={creatorId} hours={stored.hours} />
       <SaveBar
         show={dirty && !headOnScreen}
         warn={blocked}

@@ -1378,7 +1378,8 @@
     height: 54px;
     padding: 0;
     border-radius: var(--nv-radius-full);
-    font-size: 10px;
+    /* The guide's floor for a label (recette visuelle 16/11, CRE-23). */
+    font-size: 11px;
     font-weight: 600;
   }
   .nv-rail__item[aria-current='page'],

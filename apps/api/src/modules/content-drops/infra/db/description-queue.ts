@@ -1,9 +1,4 @@
-import {
-  CreatorSettingsSchema,
-  DropCategorySchema,
-  DropMediaKindSchema,
-  JOB_MAX_ATTEMPTS,
-} from '@impera/contracts';
+import { DropCategorySchema, DropMediaKindSchema, JOB_MAX_ATTEMPTS } from '@impera/contracts';
 import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
 
 import type { DescriptionQueue } from '../../domain/ports';
@@ -44,13 +39,11 @@ export function createDrizzleDescriptionQueue(adminDb: Database): DescriptionQue
             bytes: mediaAssets.bytes,
             storageKey: mediaAssets.storageKey,
             erasedAt: mediaAssets.erasedAt,
-            settings: schema.creators.settings,
             category: contentDrops.category,
             slotKey: contentDropFiles.slotKey,
             versionId: contentRequests.structureVersionId,
           })
           .from(mediaAssets)
-          .innerJoin(schema.creators, eq(schema.creators.id, mediaAssets.creatorId))
           .innerJoin(contentDropFiles, eq(contentDropFiles.mediaAssetId, mediaAssets.id))
           .innerJoin(contentDrops, eq(contentDrops.id, contentDropFiles.dropId))
           .leftJoin(contentRequests, eq(contentRequests.id, contentDrops.requestId))
@@ -72,7 +65,6 @@ export function createDrizzleDescriptionQueue(adminDb: Database): DescriptionQue
           bytes: row.bytes,
           storageKey: row.storageKey,
           erased: row.erasedAt !== null,
-          describes: CreatorSettingsSchema.parse(row.settings).describeDrops,
           category: DropCategorySchema.parse(row.category),
           script:
             row.slotKey === null || row.versionId === null

@@ -193,7 +193,10 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     await waitFor(() => {
       expect(within(anna).getByText('1 846,50 €')).toBeDefined();
     });
-    expect(within(anna).getByText('Copilote')).toBeDefined();
+    // Her AI's switch on her card (ADR 0148 § 1): the state in words, and the owner's gestures.
+    expect(within(anna).getByText('IA active · Copilote')).toBeDefined();
+    expect(within(anna).getByRole('button', { name: 'Pause' })).toBeDefined();
+    expect(within(anna).getByRole('button', { name: 'Couper' })).toBeDefined();
     expect(within(anna).getByText('du 16 au 20 nov.')).toBeDefined();
     expect(within(anna).getByText(/^Théo jusqu’à/u)).toBeDefined();
     expect(within(anna).getByText('🎬 Feed · Vidéo short')).toBeDefined();
@@ -238,8 +241,11 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     const router = renderAt(operator, '/creatrices');
     const anna = await cardOf('Anna');
     await waitFor(() => {
-      expect(within(anna).getByText('Automatique')).toBeDefined();
+      expect(within(anna).getByText('IA active · Automatique')).toBeDefined();
     });
+    // A scope of one's own reads the state and never changes it (ADR 0148 § 1).
+    expect(within(anna).queryByRole('button', { name: 'Pause' })).toBeNull();
+    expect(within(anna).queryByRole('button', { name: 'Couper' })).toBeNull();
     expect(within(anna).queryByText('Chiffre d’affaires')).toBeNull();
     expect(within(anna).queryByText('En poste')).toBeNull();
     expect(within(anna).queryByText('Contenu attendu')).toBeNull();
@@ -460,27 +466,34 @@ describe('Créatrices, what a member without the list reads', () => {
 });
 
 describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
-  it('opens her persona in Moi, never Créatrices, and keeps a member’s Moi screens from her', async () => {
+  it('opens her Moi on her profile, her persona one tab away, never in Créatrices, and keeps a member’s Moi screens from her', async () => {
     await serve([ANNA]);
     const router = renderAt(anna, '/moi');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
-    expect(router.state.location.pathname).toBe('/moi/persona');
+    // A short profile first (recette visuelle 16/11, CRE-03): who she is in Impera, and where the rest is.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeDefined();
+    expect(router.state.location.pathname).toBe('/moi/profil');
+    expect(await screen.findByText('Dans Impera')).toBeDefined();
     const moi = screen.getByRole('navigation', { name: 'Moi' });
     expect(
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    cleanup();
+
+    await serve([ANNA]);
+    renderAt(anna, '/moi/persona');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
     // She reads her sheet; the agency changes it (recette CREA-01).
     await screen.findByText(/Ta fiche/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 
-    for (const path of ['/moi/profil', '/moi/dossier', '/moi/calendrier', '/moi/factures']) {
+    for (const path of ['/moi/dossier', '/moi/calendrier', '/moi/factures']) {
       await serve([ANNA]);
       const again = renderAt(anna, path);
       await waitFor(() => {
-        expect(again.state.location.pathname).toBe('/moi/persona');
+        expect(again.state.location.pathname).toBe('/moi/profil');
       });
       cleanup();
     }

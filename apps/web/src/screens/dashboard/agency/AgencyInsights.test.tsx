@@ -227,8 +227,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
       if (box === null) throw new Error(label);
       return box;
     };
-    expect(tile('Part de l’agence').textContent).toContain('40 % du net');
-    expect(tile('Part des créatrices').textContent).toContain('60 % du net');
+    expect(tile('Part de l’agence').textContent).toContain('40\u00a0% du net');
+    expect(tile('Part des créatrices').textContent).toContain('60\u00a0% du net');
     const vat = tile('TVA en plus sur les virements').textContent;
     expect(vat).toContain('118,14');
     expect(vat).toContain('estimation');
@@ -374,6 +374,32 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     await vi.waitFor(() => {
       expect(tipText()).not.toContain('Période d’avant');
     });
+  });
+
+  it('gives the revenue tile its tip too, to the cent against the period before (ADR 0106 § 12, PAY-16)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const label = await screen.findByText('Chiffre d’affaires', { selector: '.nv-figure__label' });
+    // On the figure, not the whole card: the curve under it keeps its own reading of a day.
+    const lead = label.closest('.nv-figure');
+    if (!(lead instanceof HTMLElement)) throw new Error('lead');
+    expect(lead.closest('.ins-lead')?.hasAttribute('tabindex')).toBe(false);
+    expect(lead.tabIndex).toBe(0);
+    fireEvent.pointerDown(lead, { pointerType: 'touch' });
+    const tipText = (): string => document.querySelector('.nv-tip.is-on')?.textContent ?? '';
+    await vi.waitFor(() => {
+      expect(tipText()).toContain('Période d’avant');
+    });
+    expect(tipText()).toContain('Montant');
+    expect(tipText()).not.toContain('Part du chiffre d’affaires');
+  });
+
+  it('names as many biggest fans as there are, never « 10 » for three (PAY-16)', async () => {
+    serve(200, { ...AGENCY_WEEK, fans: { ...AGENCY_WEEK.fans, paying: 3, topTenShare: 100 } });
+    show();
+    expect(await screen.findByText(/Les 3 fans qui dépensent le plus font/u)).toBeTruthy();
+    expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
+    expect(screen.getByRole('img', { name: '100 % fait par les 3 plus gros fans' })).toBeTruthy();
   });
 
   it('shows nothing to an account whose scope is its own', async () => {

@@ -98,5 +98,7 @@ export const CREATOR_ERROR_CODES = [
   'creator_planned_conflict',
   'creator_not_found',
   'creator_avatar_not_found',
+  /** A date of hers already past: its exception no longer changes (ADR 0148 § 3). */
+  'agent_hour_exception_conflict',
 ] as const;
 export type CreatorErrorCode = (typeof CREATOR_ERROR_CODES)[number];
