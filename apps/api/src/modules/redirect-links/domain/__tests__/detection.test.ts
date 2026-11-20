@@ -67,6 +67,12 @@ describe('the proposals of « Détecter ses liens »', () => {
     expect(proposals[1]?.name).toHaveLength(60);
   });
 
+  it('removes control characters and invisible direction marks from a name of the service', () => {
+    const [proposal] = linkProposals([found('r1', 'Lien\u202E du\u0000 jour\u200B\n', 'a')], []);
+    expect(proposal?.name).toBe('Lien du jour');
+    expect(linkProposals([found('r1', '\u202E\u200F', 'a')], [])[0]?.name).toBe('Lien 1');
+  });
+
   it('proposes nothing when the service lists nothing', () => {
     expect(linkProposals([], [kept])).toEqual([]);
   });

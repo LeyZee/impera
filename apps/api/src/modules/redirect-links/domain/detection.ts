@@ -35,9 +35,14 @@ export function placementHint(name: string): LinkPlacement | null {
   return HINTS.find(([pattern]) => pattern.test(words))?.[1] ?? null;
 }
 
-/** The name proposed for a detected link: the service's, trimmed and cut; a name left empty becomes « Lien n ». */
+/**
+ * The name proposed for a detected link: the service's, trimmed and cut; a name left empty becomes « Lien n ». The
+ * name comes from a third party and ends on a screen: control characters and invisible marks (direction overrides
+ * among them) are removed first.
+ */
 function proposedName(name: string, rank: number): string {
   const kept = name
+    .replace(/[\p{Cc}\p{Cf}]+/gu, ' ')
     .trim()
     .replace(/\s+/gu, ' ')
     .slice(0, NAME_MAX)
