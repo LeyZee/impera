@@ -14,6 +14,7 @@ import type {
   PlatformStepDiscount,
   PreparedScriptContent,
   PreparedScriptId,
+  PreparedScriptMoment,
   PreparedScriptState,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
@@ -522,7 +523,7 @@ export interface PreparedScriptStore {
 export interface OurCopy {
   readonly preparedScriptId: PreparedScriptId;
   readonly description: string;
-  readonly moment: PlatformScriptMoment;
+  readonly moment: PreparedScriptMoment;
   readonly steps: readonly {
     readonly branches: readonly { readonly priceMinor: number; readonly currency: Currency }[];
   }[];

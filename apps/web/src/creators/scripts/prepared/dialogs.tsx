@@ -4,7 +4,7 @@ import {
   type BranchCondition,
   type CreatorId,
   type PlatformAccountId,
-  type PlatformScriptMoment,
+  type PreparedScriptMoment,
   type PreparedScriptContent,
   type PreparedScriptView,
 } from '@impera/contracts';
@@ -40,7 +40,7 @@ export function NewScriptDialog({
   const id = useId();
   const [name, setName] = useState('');
   const [idea, setIdea] = useState('');
-  const [moment, setMoment] = useState<PlatformScriptMoment>('night');
+  const [moment, setMoment] = useState<PreparedScriptMoment>('night');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Under one id for the whole panel: a send replayed after a cut answers the same script.

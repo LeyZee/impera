@@ -59,6 +59,7 @@ export function reportLines(shifts: readonly ValidatedShift[], lines: readonly F
             currency: shift.currency,
             netMinor,
             occurredAt: shift.startsAt,
+            saleType: null,
           },
         ];
   });

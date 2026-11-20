@@ -94,10 +94,11 @@ function script(ref: string, steps: readonly HerStep[], over: Partial<HerScript>
 const oursOf = (
   steps: readonly HerStep[],
   description = 'Une soirée complice inventée, de la douceur au plus chaud.',
+  moment: 'day' | 'night' | 'both' = 'night',
 ) => ({
   preparedScriptId: PreparedScriptIdSchema.parse(newId(PreparedScriptIdSchema)),
   description,
-  moment: 'night' as const,
+  moment,
   steps: steps.map((each) => ({ branches: [{ priceMinor: each.priceMinor, currency: 'EUR' as const }] })),
 });
 
@@ -133,6 +134,13 @@ describe('her native scripts as the agent decides on them (ADR 0098)', () => {
       proposable: false,
     });
     expect(agentScriptViewOf(unvalidated)?.scriptRef).toBe('seq-1c');
+  });
+
+  it('gives no moment to a script of ours played day and night, so it is offered at either (ADR 0112 § 27)', () => {
+    const both = script('seq-both', linearSteps, { ours: oursOf(linearSteps, undefined, 'both') });
+    expect(agentScriptViewOf(both)?.moment).toBeNull();
+    const day = script('seq-day', linearSteps, { ours: oursOf(linearSteps, undefined, 'day') });
+    expect(agentScriptViewOf(day)?.moment).toBe('day');
   });
 
   it('never offers a native script that is not the recognised copy of ours, even with a validated identity (ADR 0161 § 4)', () => {
