@@ -11,11 +11,12 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/alerts': 1,
   'modules/audit': 3,
   'modules/backups': 1,
-  'modules/connectors': 36,
+  'modules/connectors': 35,
   'modules/content-drops': 29,
   'modules/contractors': 6,
   'modules/conversations': 1,
   'modules/creator-tasks': 1,
+  'modules/creator-week': 2,
   'modules/fans': 1,
   'modules/invoicing': 12,
   'modules/mcp': 1,
@@ -33,11 +34,12 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/trends': 8,
   root: 52,
   scripts: 1,
-  wiring: 4,
+  wiring: 7,
 };
 
 /**
- * The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. Raised once
- * since: 268 with the audit journal (EQ-18), which reads `audit_log`, out of RLS by design, for the owner alone (+3).
+ * The whole on 20/11/2026, when the ceiling reached main (264): the sum of the units never goes above it again. Raised
+ * since: 269 by her week (CR-16, +5), then 272 with the audit journal (EQ-18), which reads `audit_log`, out of RLS by
+ * design, for the owner alone (+3).
  */
-export const SERVICE_ROLE_TOTAL_AT_START = 268;
+export const SERVICE_ROLE_TOTAL_AT_START = 272;

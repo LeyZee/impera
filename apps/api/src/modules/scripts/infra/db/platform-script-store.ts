@@ -8,6 +8,8 @@ import {
   PlatformAccountIdSchema,
   PlatformScriptIdSchema,
   PlatformScriptMomentSchema,
+  PreparedScriptContentSchema,
+  PreparedScriptIdSchema,
   ScriptIdentityAuthorSchema,
   ScriptIdentityContentSchema,
   ScriptIdentityIdSchema,
@@ -34,6 +36,7 @@ import {
   type PlatformScriptsPlan,
 } from '../../domain/platform-scripts';
 import type {
+  OurCopy,
   PlatformScriptImportStore,
   PlatformScriptReadStore,
   StoredPlatformScript,
@@ -286,6 +289,41 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
     .from(branches)
     .where(inArray(branches.platformScriptId, ids))
     .orderBy(branches.platformScriptId, branches.branchOrder, branches.platformStepRef);
+  // The scripts of ours they are the recognised copies of (ADR 0161 § 5), in the same transaction.
+  const oursRows = await tx
+    .select({
+      id: schema.preparedScripts.id,
+      content: schema.preparedScripts.content,
+      nativeId: schema.preparedScripts.matchedPlatformScriptId,
+    })
+    .from(schema.preparedScripts)
+    .where(
+      and(
+        inArray(schema.preparedScripts.matchedPlatformScriptId, ids),
+        eq(schema.preparedScripts.state, 'matched'),
+      ),
+    )
+    // Nothing keeps two of ours from naming the same native script: the last recognised wins, always the same one.
+    .orderBy(schema.preparedScripts.matchedAt, schema.preparedScripts.id);
+  const ours = new Map(
+    oursRows.map((row): [string | null, OurCopy] => {
+      const content = PreparedScriptContentSchema.parse(row.content);
+      return [
+        row.nativeId,
+        {
+          preparedScriptId: PreparedScriptIdSchema.parse(row.id),
+          description: content.description,
+          moment: content.moment,
+          steps: content.steps.map((step) => ({
+            branches: step.branches.map((branch) => ({
+              priceMinor: branch.priceMinor,
+              currency: branch.currency,
+            })),
+          })),
+        },
+      ];
+    }),
+  );
   const accountOf = new Map(rows.map((row) => [row.id, row.platformAccountId]));
   const mediaOf = (step: StepRow, role: 'sold' | 'preview'): StoredStepMedia[] =>
     mediaRows
@@ -344,6 +382,7 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
         validatedAt: identity.validatedAt,
         createdAt: identity.createdAt,
       })),
+    ours: ours.get(row.id) ?? null,
   }));
 }
 

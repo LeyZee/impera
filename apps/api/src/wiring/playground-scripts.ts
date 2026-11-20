@@ -17,8 +17,9 @@ const shownOf = (media: HerStepMedia): ShownMedia => ({
 
 /**
  * Her scripts for the playground (ADR 0103 § 15): the ones production would offer, through the agent's own filter
- * (`agentScriptViewOf`: proposable, identity validated, no step with branches), each with what its steps send on the
- * platform. Read as the trainer reads them (the owner, under her RLS), never as the service role: nothing is written.
+ * (`agentScriptViewOf`: the recognised copy of ours, unchanged, no step with branches), each with what its steps
+ * send on the platform. Read as the trainer reads them (the owner, under her RLS), never as the service role:
+ * nothing is written.
  * A fan's catalogue is the scripts of one account; with scripts ready on several, the playground plays none.
  */
 export function playgroundCatalogueOf(scripts: readonly HerScript[]): HerCatalogue {
@@ -47,9 +48,12 @@ export function playgroundCatalogueOf(scripts: readonly HerScript[]): HerCatalog
 export function createPlaygroundScripts(
   scripts: Pick<ScriptsModule['reads'], 'platformScripts'>,
 ): HerScriptsSource {
-  return async (creatorId, userId) => {
-    // The playground's routes are the owner's alone (`requireRole('owner')`).
-    const read = await scripts.platformScripts(CreatorIdSchema.parse(creatorId), { userId, role: 'owner' });
+  return async (creatorId, trainer) => {
+    // Read with the trainer's own rights: the owner, or an active manager for the creators of his list (ADR 0092 § 8).
+    const read = await scripts.platformScripts(CreatorIdSchema.parse(creatorId), {
+      userId: trainer.userId,
+      role: trainer.role,
+    });
     return read === null ? { kind: 'none', reason: 'unreadable' } : playgroundCatalogueOf(read);
   };
 }

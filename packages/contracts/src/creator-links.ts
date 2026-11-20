@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LINK_PLACEMENTS, LinkPlacementSchema, type LinkPlacement } from './link-stats';
+import { LINK_PLACEMENTS, LinkPlacementSchema, LinkRefSchema, type LinkPlacement } from './link-stats';
 import {
   RedirectLinkIdSchema,
   RedirectLinkSchema,
@@ -99,3 +99,31 @@ export type AgencyRedirectLink = z.infer<typeof AgencyRedirectLinkSchema>;
 
 export const AgencyRedirectLinksResponseSchema = z.object({ links: z.array(AgencyRedirectLinkSchema) });
 export type AgencyRedirectLinksResponse = z.infer<typeof AgencyRedirectLinksResponseSchema>;
+
+/** The longest name the redirect service is read with: a longer one is cut by the adapter, never refused. */
+export const DETECTED_LINK_NAME_MAX = 200;
+
+/**
+ * A link as the redirect service lists it (ADR 0120 § 3): how the service names it, the name the agency gave it
+ * there, its address. Strict: nothing of a visitor, nor any figure, crosses with it.
+ */
+export const DetectedLinkSchema = z.strictObject({
+  ref: LinkRefSchema,
+  name: z.string().max(DETECTED_LINK_NAME_MAX),
+  url: RedirectUrlSchema,
+});
+export type DetectedLink = z.infer<typeof DetectedLinkSchema>;
+
+/**
+ * What « Détecter ses liens » proposes for one link found at the service: a name and a place prefilled by the code,
+ * to be corrected and confirmed by a person. `knownAs` is the link of hers that already has this address, null for
+ * a link we do not keep yet. A proposal writes nothing: only a person's click associates a link.
+ */
+export const LinkProposalSchema = z.strictObject({
+  ref: LinkRefSchema,
+  name: z.string().min(1).max(60),
+  url: RedirectUrlSchema,
+  placement: LinkPlacementSchema.nullable(),
+  knownAs: RedirectLinkIdSchema.nullable(),
+});
+export type LinkProposal = z.infer<typeof LinkProposalSchema>;

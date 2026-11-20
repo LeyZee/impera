@@ -6,6 +6,7 @@ import {
   CHANNEL_POLL_QUESTION_MAX,
   DESIRE_BRAIN_SIGNALS,
   DropMediaDescriptionSchema,
+  OutfitSchema,
   MediaDescriptionSchema,
   ObjectionKindSchema,
   TrendCaptureDescriptionSchema,
@@ -138,6 +139,9 @@ export const DropSenseOutputSchema = DropMediaDescriptionSchema.omit({
   vocabularyVersion: true,
   kind: true,
   durationS: true,
+}).extend({
+  // Always asked of the model (vocabulary 1.1.0): only a description written before may lack it.
+  outfit: OutfitSchema.nullable(),
 });
 
 /** What the judge scores a reply on (`evals/rubrics`, `evals/thresholds.json`). */

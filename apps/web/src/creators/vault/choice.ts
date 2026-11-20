@@ -93,15 +93,6 @@ export function folderCount(index: ChoiceIndex, folder: VaultFolderView): Folder
   return { tick, listed: listed.length, imported, described };
 }
 
-/** « 3 sur 12 importés », « Aucun importé sur 12 », « Les 12 importés », « Vide ». */
-export function importLine(count: Pick<FolderCount, 'listed' | 'imported'>): string {
-  if (count.listed === 0) return 'Vide';
-  if (count.imported === 0) return `Aucun importé sur ${String(count.listed)}`;
-  if (count.imported === count.listed)
-    return count.listed === 1 ? 'Importé' : `Les ${String(count.listed)} importés`;
-  return `${String(count.imported)} sur ${String(count.listed)} ${count.imported === 1 ? 'importé' : 'importés'}`;
-}
-
 /** The figures at the head of the vault: media still listed, imported, and described among those imported. */
 export function choiceFigures(
   view: VaultView,
@@ -119,17 +110,19 @@ export function choiceFigures(
     );
 }
 
-/** The filters above the grid, four at most: they add up (« Photos » and « Non décrits »: the photos not described). */
-export const VAULT_FILTERS = ['photos', 'videos', 'undescribed', 'unimported'] as const;
+/** The filters above the grid, three: they add up (« Photos » and « Non décrits »: the photos not described). */
+export const VAULT_FILTERS = ['photos', 'videos', 'undescribed'] as const;
 export type VaultFilter = (typeof VAULT_FILTERS)[number];
 export const FILTER_NAMES: Record<VaultFilter, string> = {
   photos: 'Photos',
   videos: 'Vidéos',
   undescribed: 'Non décrits',
-  unimported: 'Non importés',
 };
 
-/** The media a folder shows under the filters on, in the platform's order. Photos and Vidéos together: both kinds. */
+/**
+ * The media a folder shows under the filters on, in the platform's order: those in Impera only (avenant du 20/11, what
+ * is not imported is chosen in « Choisir dans Reveal »). Photos and Vidéos together: both kinds.
+ */
 export function filteredMedia(
   folder: VaultFolderView,
   index: ChoiceIndex,
@@ -140,12 +133,43 @@ export function filteredMedia(
     ...(filters.has('videos') ? (['video'] as const) : []),
   ]);
   return folder.media.filter((media) => {
-    if (kinds.size > 0 && !kinds.has(media.kind)) return false;
     const choice = choiceOf(index, folder, media);
+    if (!choice.imported) return false;
+    if (kinds.size > 0 && !kinds.has(media.kind)) return false;
     if (filters.has('undescribed') && choice.description === 'described') return false;
-    if (filters.has('unimported') && choice.imported) return false;
     return true;
   });
+}
+
+/**
+ * The folders the vault's screen lists: those with something in Impera, or ticked whole while empty (what Reveal adds
+ * to it enters on its own). The others wait in « Choisir dans Reveal ».
+ */
+export function importedFolders(folders: readonly VaultFolderView[], index: ChoiceIndex): VaultFolderView[] {
+  return folders.filter((folder) => {
+    if (folderCount(index, folder).tick !== 'none') return true;
+    return folder.media.some((media) => choiceOf(index, folder, media).imported);
+  });
+}
+
+/** A folder's line on the rail: « 12 médias · 3 décrits », « 1 média · aucun décrit », « Vide ». */
+export function folderInLine(count: Pick<FolderCount, 'imported' | 'described'>): string {
+  if (count.imported === 0) return 'Vide';
+  const media = `${String(count.imported)} ${count.imported === 1 ? 'média' : 'médias'}`;
+  const described =
+    count.described === 0
+      ? 'aucun décrit'
+      : `${String(count.described)} ${count.described === 1 ? 'décrit' : 'décrits'}`;
+  return `${media} · ${described}`;
+}
+
+/** « 8 autres médias de ce dossier sont restés dans Reveal »; `null` when the whole folder is in Impera. */
+export function restLine(count: Pick<FolderCount, 'listed' | 'imported'>): string | null {
+  const rest = count.listed - count.imported;
+  if (rest <= 0) return null;
+  return rest === 1
+    ? '1 autre média de ce dossier est resté dans Reveal'
+    : `${String(rest)} autres médias de ce dossier sont restés dans Reveal`;
 }
 
 /** A media can be picked while the platform still lists it: one it removed is kept, never imported again. */
@@ -273,40 +297,30 @@ export function progressLine(progress: { readonly done: number; readonly total: 
 }
 
 /** The grid's groups, said once by their title instead of a mark on every tile. */
-export type MediaGroupKey = 'in' | 'out' | 'gone';
+export type MediaGroupKey = 'in' | 'gone';
 export const GROUP_NAMES: Record<MediaGroupKey, string> = {
-  in: 'Importés',
-  out: 'Dans Reveal seulement',
+  in: 'Dans Impera',
   gone: 'Retirés de Reveal',
 };
 
 /**
- * The media shown, in groups: imported, then those Reveal lists that are not, then those Reveal no longer lists; each in
- * the platform's order, an empty group left out. Their order, one after the other, is the order shown.
+ * The media shown, in groups: those Reveal still lists, then those it no longer lists (kept with their descriptions);
+ * each in the platform's order, an empty group left out. Their order, one after the other, is the order shown.
  */
 export function mediaGroups(
-  folder: VaultFolderView,
-  index: ChoiceIndex,
   shown: readonly VaultMediaView[],
 ): { readonly key: MediaGroupKey; readonly media: VaultMediaView[] }[] {
-  const keyOf = (media: VaultMediaView): MediaGroupKey =>
-    media.removed ? 'gone' : choiceOf(index, folder, media).imported ? 'in' : 'out';
-  return (['in', 'out', 'gone'] as const)
-    .map((key) => ({ key, media: shown.filter((media) => keyOf(media) === key) }))
+  return (['in', 'gone'] as const)
+    .map((key) => ({ key, media: shown.filter((media) => (media.removed ? 'gone' : 'in') === key) }))
     .filter((group) => group.media.length > 0);
 }
 
-/** « 16 importés sur 40 · 5 décrits sur 16 », « Aucun média importé sur 40 ». */
-export function summaryLine(figures: {
-  readonly listed: number;
-  readonly imported: number;
-  readonly described: number;
-}): string {
-  if (figures.imported === 0) return `Aucun média importé sur ${String(figures.listed)}`;
-  const imported = `${String(figures.imported)} ${figures.imported === 1 ? 'importé' : 'importés'} sur ${String(figures.listed)}`;
+/** « 128 médias dans Impera · 40 décrits », « 1 média dans Impera · aucun décrit ». */
+export function summaryLine(figures: { readonly imported: number; readonly described: number }): string {
+  const media = `${figures.imported.toLocaleString('fr-FR')} ${figures.imported <= 1 ? 'média' : 'médias'} dans Impera`;
   const described =
     figures.described === 0
       ? 'aucun décrit'
-      : `${String(figures.described)} ${figures.described === 1 ? 'décrit' : 'décrits'} sur ${String(figures.imported)}`;
-  return `${imported} · ${described}`;
+      : `${figures.described.toLocaleString('fr-FR')} ${figures.described === 1 ? 'décrit' : 'décrits'}`;
+  return `${media} · ${described}`;
 }

@@ -30,7 +30,16 @@ export function exampleStatus(example: Pick<VoiceBankExample, 'state' | 'isRead'
   return example.isRead ? 'Lu par sa voix' : 'En réserve';
 }
 
-export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element | null {
+export function VoiceBankFold({
+  state,
+  pg,
+  mayWithdraw = true,
+}: {
+  state: PlaygroundState;
+  pg: Playground;
+  /** The owner alone withdraws an example (ADR 0092 § 8); a manager reads her bank. */
+  mayWithdraw?: boolean;
+}): JSX.Element | null {
   const played = state.persona.played ?? null;
   const queryClient = useQueryClient();
   const [asked, setAsked] = useState<string | null>(null);
@@ -75,7 +84,9 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
       </summary>
       <div className="nv-disclosure__body">
         <p className="pg-hint">
-          Tes corrections rangées en Exemple de voix, toutes versions confondues. Les douze plus récentes que
+          {/* A manager files nothing in her bank: he reads the owner's (ADR 0092, avenant du 20/11). */}
+          {mayWithdraw ? 'Tes corrections' : 'Les corrections'} rangées en Exemple de voix
+          {mayWithdraw ? '' : ' par le propriétaire'}, toutes versions confondues. Les douze plus récentes que
           ses gardes laissent passer sont lues par sa voix, ici et avec ses vrais fans.
         </p>
         {withdrawnAt === state.rate.rated ? (
@@ -128,17 +139,19 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
                 ) : (
                   <span className="pg-bank__foot">
                     <span className="pg-bank__status">{exampleStatus(example)}</span>
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--soft nv-btn--sm"
-                      disabled={asked !== null}
-                      onClick={() => {
-                        setWithdrawnAt(null);
-                        setAsked(example.id);
-                      }}
-                    >
-                      Retirer
-                    </button>
+                    {mayWithdraw ? (
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--soft nv-btn--sm"
+                        disabled={asked !== null}
+                        onClick={() => {
+                          setWithdrawnAt(null);
+                          setAsked(example.id);
+                        }}
+                      >
+                        Retirer
+                      </button>
+                    ) : null}
                   </span>
                 )}
               </li>

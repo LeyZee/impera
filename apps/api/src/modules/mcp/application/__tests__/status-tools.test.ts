@@ -151,6 +151,17 @@ const insights: AgencyInsights = AgencyInsightsSchema.parse({
   ),
   hourly: [],
   fans: { paying: 9, previousPaying: 7, newPaying: 2, topTenShare: 85, averagePerPayingMinor: 5_555 },
+  // A refund and the chatter of its sale (ADR 0092 § 4): the screen's alone, never the MCP's (ADR 0144).
+  refundList: [
+    {
+      refundedAt: '2026-11-16T09:00:00.000Z',
+      creatorId: ines,
+      kind: 'ppv',
+      amountMinor: 777_001,
+      seller: { kind: 'member', memberId: newId(TeamMemberIdSchema), name: 'Chatteur Remboursé' },
+      delayDays: 3,
+    },
+  ],
   refundsWithoutSale: 0,
   timeZone: 'Europe/Paris',
   dollarsLeftOut: false,
@@ -222,10 +233,13 @@ describe('stats_get (ADR 0026 § 5, ADR 0078, decision A of 14/11)', () => {
       'sellers',
       'seller',
       'memberId',
+      'refundList',
+      'delayDays',
     ])
       expect(text).not.toContain(`"${key}"`);
     expect(text).not.toContain('Chatteur Inventé');
-    for (const amount of [...SHARES, 700_007, 700_008, ...SELLER, 910_005])
+    expect(text).not.toContain('Chatteur Remboursé');
+    for (const amount of [...SHARES, 700_007, 700_008, ...SELLER, 910_005, 777_001])
       expect(numbersIn(out)).not.toContain(amount);
   });
 

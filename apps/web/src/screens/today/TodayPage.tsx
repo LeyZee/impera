@@ -17,6 +17,7 @@ import { ReportPanel } from '@/reports/ReportPanel';
 import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { MyProgressCard } from '@/rewards/MyProgressCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { ShiftChallengeCard } from '@/rewards/ShiftChallengeCard';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
@@ -166,6 +167,8 @@ function Day({
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
       {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
+      {/* Where he stands in the game, and the way to Moi › Trophées (ADR 0134, lot 1). */}
+      <MyProgressCard user={user} />
       {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
       <RewardRevealGate user={user} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />

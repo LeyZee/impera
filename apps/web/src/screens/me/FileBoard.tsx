@@ -25,6 +25,7 @@ import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
 import { Empty, Loading, Unreachable } from '@/screens/pay/parts';
+import { FolderArt } from '@/shell/art/EmptyArt';
 import '@/screens/team/team.css';
 import { Panel } from '@/shell/layout';
 
@@ -194,6 +195,7 @@ function ProfileMissing({
   return (
     <div className="rp-sec">
       <Empty
+        art={<FolderArt />}
         whisper={self ? 'Ton dossier est vide.' : `${name} n’a pas encore rempli son dossier.`}
         text={
           self
