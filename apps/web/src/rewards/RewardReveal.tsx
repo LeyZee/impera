@@ -44,6 +44,20 @@ const SPARKS = Array.from({ length: 28 }, (_, index) => {
   };
 });
 
+export interface RevealAlso {
+  readonly key: string;
+  readonly object: ReactNode;
+  readonly name: string;
+}
+
+/** « Aussi gagné : Record du jour, Première vente et 2 autres. », for a screen reader, after the reveal's own words. */
+export function alsoSentence(names: readonly string[], more: number): string {
+  const tail = more === 0 ? [] : [more === 1 ? '1 autre' : `${String(more)} autres`];
+  const all = [...names, ...tail];
+  const last = all.at(-1) ?? '';
+  return `Aussi gagné : ${all.length < 2 ? last : `${all.slice(0, -1).join(', ')} et ${last}`}.`;
+}
+
 export function RewardReveal({
   object,
   kicker,
@@ -51,6 +65,8 @@ export function RewardReveal({
   text,
   chip,
   tone = 'gold',
+  also = [],
+  more = 0,
   forge,
   sound,
   onClose,
@@ -65,6 +81,10 @@ export function RewardReveal({
   chip?: string;
   /** The light behind the object: gold for a medal, neon for a badge. */
   tone?: 'gold' | 'neon';
+  /** What else was earned since the last visit, small and by name, with no ceremony of its own: three at most. */
+  also?: readonly RevealAlso[];
+  /** How many more were earned beyond `also`: « +2 ». */
+  more?: number;
   /**
    * A rank, when the object is that rank's insignia: it is forged instead of turned over. The cold medallion first,
    * embers gather into it, it lights, then the usual light and sparks.
@@ -119,7 +139,7 @@ export function RewardReveal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={`${id}t`}
-      aria-describedby={`${id}d`}
+      aria-describedby={also.length === 0 ? `${id}d` : `${id}d ${id}a`}
       onClick={onClose}
     >
       <div className="rw-reveal__card">
@@ -176,6 +196,40 @@ export function RewardReveal({
           {text}
         </p>
         {chip === undefined ? null : <p className="rw-reveal__chip nv-num">{chip}</p>}
+        {also.length === 0 ? null : (
+          <div className="rw-reveal__also">
+            <p className="rw-reveal__alsosaid" id={`${id}a`}>
+              {alsoSentence(
+                also.map((one) => one.name),
+                more,
+              )}
+            </p>
+            <p className="nv-eyebrow rw-reveal__alsohead" aria-hidden="true">
+              Aussi gagné
+            </p>
+            <ul className="rw-reveal__alsolist" aria-hidden="true">
+              {also.map((one, index) => (
+                <li
+                  key={one.key}
+                  className="rw-reveal__alsoitem"
+                  title={one.name}
+                  style={{ '--nv-i': index }}
+                >
+                  <span className="rw-reveal__alsoobject">{one.object}</span>
+                  <span className="rw-reveal__alsoname">{one.name}</span>
+                </li>
+              ))}
+              {more === 0 ? null : (
+                <li className="rw-reveal__alsoitem" style={{ '--nv-i': also.length }}>
+                  <span className="rw-reveal__alsoobject nv-num" data-more="true">
+                    +{more}
+                  </span>
+                  <span className="rw-reveal__alsoname">{more === 1 ? 'autre' : 'autres'}</span>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
         <button ref={button} type="button" className="rw-reveal__close" onClick={onClose}>
           Continuer
         </button>

@@ -116,6 +116,6 @@ export function wireScripts(
         },
       ),
     },
-    routes: [module.routes, module.platformScriptRoutes],
+    routes: [module.routes, module.platformScriptRoutes, module.preparedScriptRoutes],
   };
 }

@@ -117,6 +117,7 @@ Branche : task/<id>-<slug>
 | SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
 | SCB-01 | Import et envoi des branches d'un script | scripts | in_progress | SC-04 |
+| SCB-04 | Éditeur des scripts à branches | scripts | in_progress | SCB-01 |
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | PUB-03 | Légende Instagram : la fenêtre visible avant « … plus », vérifiée pour le modèle, montrée à tous | publication | blocked (PUB-02) | PUB-02, ADR 0082 |

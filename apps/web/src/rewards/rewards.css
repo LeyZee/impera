@@ -128,6 +128,8 @@
  */
 .rw-reveal {
   --rw-tone: #f0c46a;
+  /* The one ink of the night stage; what is quieter on it is mixed from it. */
+  --rw-ink: #f6eef1;
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -135,7 +137,7 @@
   place-items: center;
   padding: var(--nv-space-5);
   overflow: hidden;
-  color: #f6eef1;
+  color: var(--rw-ink);
   /* The same night stage in Day: nothing of the screen behind reads through, and the glow fades to the edges. */
   background:
     radial-gradient(
@@ -270,6 +272,76 @@
   font-size: 14px;
   font-weight: 500;
   animation: rw-rise 450ms ease-out 1100ms both;
+}
+/* « Aussi gagné »: what else was earned since the last visit, small and by name, on the axis of the sentence. No
+   ground, no card, no colour but the objects' own; each fades in after the ceremony, 60 ms apart, and nothing
+   more (with « réduire les animations » they are there at once, as the rest of the reveal). */
+.rw-reveal__also {
+  /* The reveal is dark in both themes: its inks are its own, mixed from the stage's one. */
+  --rw-also-ink: color-mix(in srgb, var(--rw-ink) 78%, transparent);
+  --rw-also-faint: color-mix(in srgb, var(--rw-ink) 55%, transparent);
+  --rw-also-line: color-mix(in srgb, var(--rw-ink) 28%, transparent);
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.rw-reveal__alsosaid {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.rw-reveal__alsohead {
+  color: var(--rw-also-faint);
+  animation: rw-fade 300ms ease-out 1500ms both;
+}
+.rw-reveal__alsolist {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0 var(--nv-space-4);
+  list-style: none;
+  /* Every gain has a column of the same width, « +N » too: the objects stand at equal distances and the row is
+     centred whatever the names are. A name is cut only when it is wider than its column. */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 116px);
+  justify-content: center;
+  gap: var(--nv-space-3);
+}
+.rw-reveal__alsoitem {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  animation: rw-fade 300ms ease-out calc(1560ms + var(--nv-i, 0) * 60ms) both;
+}
+.rw-reveal__alsoobject {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+.rw-reveal__alsoobject[data-more='true'] {
+  box-sizing: border-box;
+  border: 1px solid var(--rw-also-line);
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rw-also-ink);
+}
+.rw-reveal__alsoname {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--rw-also-ink);
 }
 .rw-reveal__close {
   margin-top: 26px;
@@ -627,6 +699,29 @@
 @media (prefers-reduced-motion: reduce) {
   .rw-owed {
     animation: none !important;
+  }
+}
+
+/* ───────────── Jauge du jeu ───────────── */
+
+/* The fill slides in under the track's own round ends: transform only, once, from the value last shown
+   (`GameGauge`). Its round tip keeps its shape all the way, which a scale would crush. */
+.rw-gauge {
+  overflow: hidden;
+}
+.rw-gauge .nv-gauge__fill {
+  width: 100%;
+  transform: translateX(calc(var(--rw-gauge-at, 0%) - 100%));
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.rw-gauge[data-moving='true'] .nv-gauge__fill {
+  transition:
+    transform var(--nv-dur-progress) var(--nv-ease-out),
+    background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-gauge[data-moving='true'] .nv-gauge__fill {
+    transition: none;
   }
 }
 
