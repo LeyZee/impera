@@ -1,7 +1,7 @@
 import type { DesireBand } from '@impera/contracts';
 import type { Brief } from '@impera/llm';
 
-import type { Scenario } from './scenario';
+import type { CUSTOM_ORDER_EVENTS, Scenario } from './scenario';
 
 /** What the agent did with a scenario, on the same path as a real fan. */
 export interface Outcome {
@@ -21,6 +21,8 @@ export interface Outcome {
   readonly desireBand: DesireBand;
   /** What code did with a custom order (ADR 0090 § A). */
   readonly customOrder: 'none' | 'handoff' | 'reply';
+  /** What the turn on his kept order said (ADR 0159 § A.2); absent, `none`. */
+  readonly customOrderEvent?: (typeof CUSTOM_ORDER_EVENTS)[number];
   /** The id of the reply of her objection bank the voice was given, or null (ADR 0090 § B). */
   readonly objectionReply: string | null;
   /** What code decided with her scripts (ADR 0098), and the step when one goes; absent without scripts. */
@@ -91,6 +93,10 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   }
   if (decision?.custom_order !== undefined && decision.custom_order !== outcome.customOrder) {
     failures.push(`sur-mesure : ${outcome.customOrder}, attendu ${decision.custom_order}`);
+  }
+  const event = outcome.customOrderEvent ?? 'none';
+  if (decision?.custom_order_event !== undefined && decision.custom_order_event !== event) {
+    failures.push(`demande sur mesure : ${event}, attendu ${decision.custom_order_event}`);
   }
   if (decision?.objection_reply !== undefined && decision.objection_reply !== outcome.objectionReply) {
     failures.push(

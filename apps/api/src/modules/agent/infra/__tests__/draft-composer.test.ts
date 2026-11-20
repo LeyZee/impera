@@ -1,9 +1,12 @@
 import {
   CustomAlertIdSchema,
+  CustomSupplementIdSchema,
   DEFAULT_AGENT_HOURS,
+  emptyCustomPriceGrid,
   err,
   ok,
   type FanAvailabilityRecord,
+  type CustomPriceGrid,
   type FanFlags,
   type MediaDescription,
 } from '@impera/contracts';
@@ -2088,6 +2091,142 @@ describe('createDraftComposer, the care mode (ADR 0088)', () => {
     expect(
       await minor.draftComposer.compose({ ...INPUT, care: { since: new Date(), helpGiven: false } }),
     ).toMatchObject({ kind: 'held', reason: 'handoff', detail: ['minor_suspected'] });
+  });
+});
+
+describe('createDraftComposer, his custom order kept box by box (ADR 0159 § A.2)', () => {
+  const SUPPLEMENT = CustomSupplementIdSchema.parse('sup_0a1b2c3d');
+  const OTHER = CustomSupplementIdSchema.parse('sup_99999999');
+  const priced: CustomPriceGrid = {
+    formats: emptyCustomPriceGrid().formats.map((line) =>
+      line.format === 'video'
+        ? { ...line, priceMinor: 4000 }
+        : line.format === 'call'
+          ? { ...line, offered: false }
+          : line,
+    ),
+    supplements: [{ id: SUPPLEMENT, label: 'Supplément de test', offered: true, percent: 20 }],
+  };
+  const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
+  const asking = (
+    reading: NonNullable<Brief['customOrder']>,
+    options: { readonly chatter?: boolean; readonly flags?: FanFlags; readonly voice?: VoiceOutput } = {},
+  ) => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [], brainInputs: [] };
+    const brief: Brief = {
+      ...BRIEF,
+      intent: 'asks_for_service',
+      replyBrief: 'Lui dire oui.',
+      customOrder: reading,
+    };
+    const draftComposer = createDraftComposer({
+      gateway: gateway(
+        {
+          brief,
+          voice: options.voice ?? { bubbles: ['mmh ça me tente bien 🙈'] },
+        },
+        seen,
+      ),
+      persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits: limitsOf(options.flags ?? adult).limits,
+      gridOf: () => Promise.resolve(priced),
+      ...(options.chatter !== undefined && {
+        chatterOnShift: () => Promise.resolve(options.chatter === true),
+      }),
+    });
+    return { draftComposer, seen };
+  };
+  const kept: AgentComposeInput = { ...INPUT, openCustomOrder: null };
+
+  it('shows the brain her supplements by id, and asks him the next missing box', async () => {
+    const { draftComposer, seen } = asking({
+      format: 'video',
+      supplements: [SUPPLEMENT, OTHER],
+      minutes: null,
+      details: { what: 'une vidéo en tenue de sport' },
+    });
+    const result = await draftComposer.compose(kept);
+    expect(seen.brainInputs?.[0]?.customOrder).toEqual({
+      open: false,
+      supplements: [{ id: SUPPLEMENT, name: 'Supplément de test' }],
+    });
+    expect(result).toMatchObject({
+      kind: 'draft',
+      customOrderTurn: {
+        kind: 'reply',
+        event: { type: 'custom_order_gathering', asked: 'duration' },
+        order: { state: 'gathering', format: 'video', supplements: [SUPPLEMENT], questionsAsked: 1 },
+      },
+    });
+    expect(result).not.toHaveProperty('customOrderOpened');
+  });
+
+  it('sends her the card once every box is filled, priced by her grid, and opens the order', async () => {
+    const { draftComposer, seen } = asking({
+      format: 'video',
+      supplements: [SUPPLEMENT],
+      minutes: null,
+      details: { what: 'une vidéo en tenue de sport', duration: '3 minutes', when: 'ce week-end' },
+    });
+    const result = await draftComposer.compose(kept);
+    expect(result).toMatchObject({
+      kind: 'draft',
+      customOrderOpened: true,
+      customOrderTurn: {
+        kind: 'reply',
+        order: { state: 'awaiting_creator' },
+        event: {
+          type: 'custom_order_card_ready',
+          card: { to: 'creator', quote: { kind: 'price', totalMinor: 4800 } },
+        },
+      },
+    });
+    // The price is the card's, for her: never in what the voice is told.
+    expect(JSON.stringify(seen.voiceInputs)).not.toContain('48');
+  });
+
+  it('declines what her grid says she never does, without asking her', async () => {
+    const { draftComposer, seen } = asking({ format: 'call', supplements: [], minutes: 10, details: {} });
+    const result = await draftComposer.compose(kept);
+    expect(result).toMatchObject({
+      kind: 'draft',
+      customOrderTurn: { kind: 'reply', order: null, event: { type: 'custom_order_declined', by: 'grid' } },
+    });
+    expect(result).not.toHaveProperty('customOrderOpened');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('n’entre pas dans cette demande');
+  });
+
+  it('opens nothing while his age is not confirmed: she will see', async () => {
+    const { draftComposer, seen } = asking(
+      { format: 'video', supplements: [], minutes: null, details: { what: 'une vidéo' } },
+      { flags: {} },
+    );
+    const result = await draftComposer.compose(kept);
+    expect(result).not.toHaveProperty('customOrderOpened');
+    expect(JSON.stringify(result)).not.toContain('custom_order_gathering');
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('va y réfléchir');
+  });
+
+  it('holds an answer that asks him for a tip', async () => {
+    const { draftComposer } = asking(
+      { format: 'video', supplements: [], minutes: null, details: { what: 'une vidéo' } },
+      { voice: { bubbles: ['envoie moi un petit pourboire et on voit 😏'] } },
+    );
+    expect(await draftComposer.compose(kept)).toMatchObject({
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['no_commitment'],
+    });
+  });
+
+  it('without a kept order, reads nothing into boxes and answers as before', async () => {
+    const { draftComposer, seen } = asking({ format: 'video', supplements: [], minutes: null, details: {} });
+    const result = await draftComposer.compose(INPUT);
+    expect(seen.brainInputs?.[0]?.customOrder).toBeUndefined();
+    expect(result).not.toHaveProperty('customOrderTurn');
+    expect(result).toMatchObject({ kind: 'draft', customOrderOpened: true });
   });
 });
 

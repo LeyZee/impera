@@ -22,6 +22,7 @@ import {
   describeBrief,
   judgeSituationBlock,
   notesBlock,
+  customOrderBlock,
   scriptsBlock,
   toMessages,
 } from './conversation-messages';
@@ -207,6 +208,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         persona_sheet: input.personaSheet,
         alerts: alertsBlock(input.alerts ?? []),
         scripts: scriptsBlock(input.scripts ?? [], input.scriptStepWaiting === true),
+        custom_order: customOrderBlock(input.customOrder),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
         canary,

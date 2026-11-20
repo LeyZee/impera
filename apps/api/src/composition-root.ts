@@ -473,6 +473,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     scripts: scripts.module,
     connectors: connectors.module,
+    customOrders: customOrders.module,
     ...(options.composer !== undefined && { composer: options.composer }),
   });
   const conversations = wireConversations(shared, {

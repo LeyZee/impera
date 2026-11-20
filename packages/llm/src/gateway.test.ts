@@ -607,6 +607,52 @@ describe('LlmGateway', () => {
     expect(format).toContain('null');
   });
 
+  it('reads his custom request into closed boxes, dropping what is unknown, a price never kept (ADR 0159)', async () => {
+    const xai = scripted([
+      {
+        text: JSON.stringify({
+          ...BRIEF,
+          intent: 'asks_for_service',
+          customOrder: {
+            format: 'video',
+            supplements: ['sup_0000000a', 'not-an-id'],
+            minutes: 5,
+            details: { what: 'une danse inventée', price: '50', when: null },
+            priceMinor: 5000,
+          },
+        }),
+      },
+    ]);
+    const { gateway } = setup({ xai });
+
+    const result = await gateway.brain({
+      ...INPUT,
+      customOrder: { open: true, supplements: [{ id: 'sup_0000000a', name: 'Supplément inventé' }] },
+    });
+
+    expect(result.ok && result.value.output.customOrder).toEqual({
+      format: 'video',
+      supplements: ['sup_0000000a'],
+      minutes: 5,
+      details: { what: 'une danse inventée' },
+    });
+    const system = JSON.stringify(xai.doGenerateCalls[0]?.prompt[0]);
+    expect(system).toContain('<custom_supplement>');
+    expect(system).toContain('Une demande sur mesure de lui est en cours');
+  });
+
+  it('reads no custom request when the model writes none, and tells the brain none is open', async () => {
+    const xai = scripted([{ text: JSON.stringify({ ...BRIEF, customOrder: null }) }]);
+    const { gateway } = setup({ xai });
+
+    const result = await gateway.brain(INPUT);
+
+    expect(result.ok && result.value.output).not.toHaveProperty('customOrder');
+    const system = JSON.stringify(xai.doGenerateCalls[0]?.prompt[0]);
+    expect(system).toContain('Aucune demande sur mesure de lui en cours');
+    expect(system).toContain('Aucun supplément');
+  });
+
   it('gives the brain her alerts as criteria in typed blocks, and reads the ids it saw (P4-01)', async () => {
     const xai = scripted([{ text: JSON.stringify({ ...BRIEF, alertsSeen: ['a2'] }) }]);
     const { gateway } = setup({ xai });

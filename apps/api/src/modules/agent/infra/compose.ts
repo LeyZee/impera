@@ -1,9 +1,12 @@
 import {
   desireNow,
   normalise,
+  supplementsIn,
+  type CustomPriceGrid,
   type FanFlags,
   type MediaDescription,
   type ObjectionReplies,
+  type OpenCustomOrder,
 } from '@impera/contracts';
 import type {
   BrainAlert,
@@ -18,6 +21,7 @@ import type {
 } from '@impera/llm';
 import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
+import { customOrderTurn, type CustomOrderTurn } from '../../custom-orders';
 import {
   asksAvailability,
   availabilityChanged,
@@ -30,7 +34,12 @@ import {
 } from '../domain/availability';
 import { bubbleBudget, fitBubbles } from '../domain/bubbles';
 import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
-import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
+import {
+  checkNoCommitment,
+  customOrderDecision,
+  customOrderStop,
+  type CustomOrderDecision,
+} from '../domain/custom-order';
 import {
   desireMoved,
   desireScore,
@@ -178,6 +187,13 @@ export interface ComposeTurnInput {
     readonly chatterOnShift: boolean;
     readonly orderOpen: boolean;
     readonly flags: FanFlags | undefined;
+    /**
+     * His order as the custom-orders module keeps it (ADR 0159 § A.2): given, the turn follows it box by box and the
+     * brain reads his request; `null`, none open. Absent, no order is kept and she answers as before (ADR 0090 § A).
+     */
+    readonly order?: OpenCustomOrder | null;
+    /** Her grid in force: its supplements for the brain, its price for her card. `null`: never filled in. */
+    readonly grid?: CustomPriceGrid | null;
   };
   /** Her replies to a price objection (ADR 0090 § B), and those he already received: never twice. */
   readonly objections?: {
@@ -424,6 +440,8 @@ export interface ComposedTurn {
   readonly offerRefused?: OfferRefusal;
   /** He asked for a custom order (ADR 0090 § A): a chatter takes it, or she answered committing to nothing. */
   readonly customOrder?: Exclude<CustomOrderDecision, { kind: 'none' }>;
+  /** The custom-orders turn, when his order is kept (ADR 0159): what the caller records for it, in the same turn. */
+  readonly customOrderTurn?: Exclude<CustomOrderTurn, { kind: 'none' }>;
   /** The reply of her bank the voice was given for his price objection (ADR 0090 § B). */
   readonly objectionReply?: PickedObjectionReply;
   /** Her scripts at this message (ADR 0098): the run moved or opened, the step decided, a price that changed. */
@@ -575,6 +593,16 @@ function desireOf(brief: Brief, input: ComposeTurnInput): DesireReading | undefi
 }
 
 /** Brain, then voice, then guards. Writes nothing and sends nothing: the caller decides what the answer becomes. */
+/**
+ * The custom-orders turn as the rest of the turn reads it: a chatter takes it, or she answers from its brief and her
+ * card going out opens the order in « À traiter » (`custom_order_opened`, until its own line comes).
+ */
+function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
+  if (turn === undefined || turn.kind === 'none') return { kind: 'none' };
+  if (turn.kind === 'handoff') return { kind: 'handoff' };
+  return { kind: 'reply', brief: turn.brief, opens: turn.event?.type === 'custom_order_card_ready' };
+}
+
 export async function composeTurn(
   gateway: LlmGateway,
   persona: ComposerPersona,
@@ -622,12 +650,23 @@ export async function composeTurn(
   }));
   const latestRun = input.scripts?.latest ?? null;
   const stepWaiting = latestRun?.status === 'open' && paidWaiting(latestRun) !== undefined;
+  // His order kept by the custom-orders module (ADR 0159): the brain reads his request into its boxes.
+  const kept =
+    input.customOrder?.order === undefined
+      ? undefined
+      : { order: input.customOrder.order, grid: input.customOrder.grid ?? null };
   const brain = await gateway.brain({
     ...base,
     fanNotes: [notes.kept, brainOnly.kept].filter((block) => block !== '').join('\n'),
     ...(input.alerts !== undefined && input.alerts.length > 0 && { alerts: input.alerts }),
     ...(brainScripts.length > 0 && { scripts: brainScripts }),
     ...(stepWaiting && { scriptStepWaiting: true }),
+    ...(kept !== undefined && {
+      customOrder: {
+        open: kept.order !== null,
+        supplements: (kept.grid?.supplements ?? []).map((line) => ({ id: line.id, name: line.label })),
+      },
+    }),
   });
   // She asks only what the card lets her ask (ADR 0085 § 2): whatever the brain names, `desires` is never asked.
   const brief = brain.ok ? askableOnly(brain.value.output) : undefined;
@@ -685,19 +724,46 @@ export async function composeTurn(
   const care = typeof input.care === 'function' ? input.care(brief) : input.care === true;
   // A custom order is never sold by her (ADR 0090 § A): a chatter takes it, or she commits to nothing. A trap's
   // answer comes first, and in the care mode nothing is sold at all (ADR 0088 § 2).
-  const order =
-    brief === undefined || trap.replyBrief !== undefined || care
+  const orderContext =
+    brief === undefined
       ? undefined
-      : customOrderDecision({
-          asksForService: brief.intent === 'asks_for_service',
-          chatterOnShift: input.customOrder?.chatterOnShift === true,
-          orderOpen: input.customOrder?.orderOpen === true,
+      : {
           risks: brief.risks,
           flags: input.customOrder?.flags,
           ageConfirmed: ageConfirmed || input.customOrder?.flags?.ageConfirmedAt !== undefined,
           neverDoes: (persona.guardSettings.neverDo ?? []).some((term) => touchesTerm(input.fanText, term)),
+        };
+  const held = brief === undefined || orderContext === undefined || trap.replyBrief !== undefined || care;
+  // Kept, his order goes box by box until her card (ADR 0159 § A.2); otherwise she commits to nothing (ADR 0090 § A).
+  const turn =
+    held || kept === undefined
+      ? undefined
+      : customOrderTurn({
+          asksForService: brief.intent === 'asks_for_service',
+          reading:
+            brief.customOrder === undefined
+              ? null
+              : supplementsIn(
+                  brief.customOrder,
+                  (kept.grid?.supplements ?? []).map((line) => line.id),
+                ),
+          order: kept.order,
+          stop: customOrderStop(orderContext),
+          chatterOnShift: input.customOrder?.chatterOnShift === true,
+          grid: kept.grid,
+        });
+  const order: CustomOrderDecision | undefined = held
+    ? undefined
+    : kept !== undefined
+      ? decisionOf(turn)
+      : customOrderDecision({
+          ...orderContext,
+          asksForService: brief.intent === 'asks_for_service',
+          chatterOnShift: input.customOrder?.chatterOnShift === true,
+          orderOpen: input.customOrder?.orderOpen === true,
         });
   const customOrder = order?.kind === 'none' ? undefined : order;
+  const customOrderKept = turn === undefined || turn.kind === 'none' ? undefined : turn;
   // His price objection: a reply of her bank he never received, said in her words (ADR 0090 § B).
   const objectionReply =
     !care &&
@@ -830,6 +896,7 @@ export async function composeTurn(
   if (input.skipVoice?.(brief) === true || customOrder?.kind === 'handoff') {
     return {
       ...(customOrder !== undefined && { customOrder }),
+      ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
       ...(scripts !== undefined && { scripts }),
       ...availabilityOut(availability),
       ...(trap.isTrap && { trap }),
@@ -896,6 +963,7 @@ export async function composeTurn(
   const bubbles = asSent(written, persona.splitMessages);
   return {
     ...(customOrder !== undefined && { customOrder }),
+    ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
     ...(objectionReply !== undefined && { objectionReply }),
     ...(scripts !== undefined && { scripts }),
     // She asked only if the voice wrote: a question never written is asked again.

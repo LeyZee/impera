@@ -1,0 +1,96 @@
+# Demande sur mesure gardée case par case (ADR 0159 § A.2) : il dit ce qu'il veut voir mais pas la durée ; le code demande la case suivante, elle la pose en jouant, sans oui, sans prix, sans délai. Fan, grille et messages fictifs (ADR 0010).
+description: Il demande une vidéo et dit ce qu'il veut voir ; elle lui demande en jouant combien de temps il l'imagine.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 72
+  age_confirmed: true
+history:
+  - from: fan
+    text: Ta photo d'hier m'a rendu fou
+  - from: creator
+    text: Ah ouais ? Raconte 😏
+custom_order_kept:
+  open: null
+  grid:
+    formats:
+      - {
+          format: photo,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: video,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: reaction_video,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: rating,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: call,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: video_call_talk,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+      - {
+          format: video_call_sexual,
+          offered: true,
+          priceMinor: null,
+          minMinutes: null,
+          includedMinutes: null,
+          extraMinutePercent: null,
+        }
+    supplements:
+      - { id: sup_0a1b2c3d, label: Tenue au choix (fictif), offered: true, percent: null }
+inbound: Tu me ferais une vidéo rien que pour moi, en tenue de sport ?
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: reply
+    custom_order_event: custom_order_gathering
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_match_any:
+      - \?
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(demain|ce soir|cette semaine|d'ici|dans \d+)\b
+      - \d+ ?(€|euros?|balles)
+      - \b(pourboire|tip)\b
+      - \b(oui je (te )?la fais|c'est d'accord|marché conclu)\b

@@ -2,6 +2,7 @@ import type { ModelMessage } from 'ai';
 
 import type {
   BrainAlert,
+  BrainCustomOrder,
   BrainScript,
   ConversationTurn,
   JudgeSituation,
@@ -158,6 +159,23 @@ export function scriptsBlock(scripts: readonly BrainScript[], stepWaiting: boole
     .map((script) => `${script.id} :\n${wrapUntrusted('script_description', script.description)}`)
     .join('\n');
   return `${listed}\n${waiting}`;
+}
+
+/**
+ * His custom request for the brain (ADR 0159 § A.2): whether one is open, and her supplements, each id beside the
+ * name the owner wrote, in a typed block. None listed, the brain names none.
+ */
+export function customOrderBlock(order: BrainCustomOrder | undefined): string {
+  const open =
+    order?.open === true
+      ? 'Une demande sur mesure de lui est en cours : rends `customOrder` s’il en parle, même sans la redemander.'
+      : 'Aucune demande sur mesure de lui en cours : rends `customOrder` seulement s’il en demande une.';
+  const supplements = order?.supplements ?? [];
+  if (supplements.length === 0) return `${open}\nAucun supplément : rends \`supplements\` vide.`;
+  const listed = supplements
+    .map((each) => `${each.id} :\n${wrapUntrusted('custom_supplement', each.name)}`)
+    .join('\n');
+  return `${open}\n${listed}`;
 }
 
 /**

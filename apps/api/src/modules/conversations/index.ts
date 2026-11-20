@@ -32,7 +32,7 @@ import { createDrizzleAwayHolds } from './infra/db/away-holds';
 import { createDrizzleCopilotReader } from './infra/db/copilot-reader';
 import { createDrizzleCreatorSpaceReader } from './infra/db/creator-reader';
 import { createDrizzleConversationReader } from './infra/db/reader';
-import { createDrizzleUnitOfWork } from './infra/db/unit-of-work';
+import { createDrizzleUnitOfWork, type CustomOrderStorePort } from './infra/db/unit-of-work';
 import { createAlertHistoryRoutes } from './infra/http/alert-history-routes';
 import { createCopilotRoutes, type CopilotRouteDeps } from './infra/http/copilot-routes';
 import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
@@ -132,6 +132,11 @@ export interface ConversationsDeps {
    * in, and the read of a conversation none of them holds yet. Without them, `/v1/copilot` is not mounted.
    */
   readonly copilot?: Pick<CopilotRouteDeps, 'linkUser' | 'allCreatorIds' | 'askRead'>;
+  /**
+   * His custom order kept by the `custom-orders` module (ADR 0159 § A.2), in the turn's transactions; without it, the
+   * agent answers a custom request as before (ADR 0090 § A).
+   */
+  readonly customOrders?: CustomOrderStorePort;
   readonly clock?: Clock;
 }
 
@@ -142,7 +147,9 @@ const noMediaDescriptions: MediaDescriptions = { of: () => Promise.resolve(new M
 const systemClock: Clock = { now: () => new Date() };
 
 export function createConversationsModule(deps: ConversationsDeps): ConversationsModule {
-  const uow = createDrizzleUnitOfWork(deps.db);
+  const uow = createDrizzleUnitOfWork(deps.db, {
+    ...(deps.customOrders !== undefined && { customOrders: deps.customOrders }),
+  });
   const clock = deps.clock ?? systemClock;
   const commands = createConversationCommands({
     uow,

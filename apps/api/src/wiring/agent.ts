@@ -16,6 +16,7 @@ import {
 import type { AlertsModule } from '../modules/alerts';
 import type { ConnectorsModule } from '../modules/connectors';
 import type { BubbleGuard, CardReader, DraftComposer } from '../modules/conversations';
+import type { CustomOrdersModule } from '../modules/custom-orders';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
 import { createDbVoiceExampleBank } from '../modules/playground';
@@ -52,6 +53,8 @@ export function wireAgent(
     readonly scripts: ScriptsModule;
     /** His script history and last priced offer, read on the platform at each message (ADR 0018 § 5). */
     readonly connectors: ConnectorsModule;
+    /** Her grid of custom prices (ADR 0159 § C), read by the turn on his custom order. */
+    readonly customOrders: CustomOrdersModule;
     /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
     readonly composer?: DraftComposer;
   },
@@ -92,6 +95,7 @@ export function wireAgent(
       // Her clock is the creator's (`creators.timezone`); Paris when the row cannot be read.
       scripts: createAgentScriptSource(scriptReads),
       lastOfferAt: createLastOfferAt(scriptReads),
+      gridOf: (creatorId) => deps.customOrders.gridOf(CreatorIdSchema.parse(creatorId)),
       timeZoneOf: async (creatorId) => {
         const [creator] = await persona.creators.list([CreatorIdSchema.parse(creatorId)]);
         return creator?.timezone ?? DEFAULT_LLM_CONFIG.dailyBudget.timeZone;
