@@ -8,8 +8,8 @@ Deux mécanismes (ADR 0152 § 2) : la **sauvegarde du jour de Supabase** (retour
 2. Supabase → Database → Backups → la sauvegarde d'avant l'erreur → Restore. Le projet est indisponible pendant la restauration ; ce qui a été écrit depuis cette sauvegarde est perdu. Si l'erreur est localisée et récente, préférer § B sur une base jetable, puis recopier les seules tables touchées.
 3. Rejouer `packages/db/supabase/lock-down.sql` (`deploy.md` § 1.4, étape 2) : une restauration remet les droits de l'instant sauvegardé.
 4. Coolify → Start, `/ready`.
-6. **Réconcilier** : `connector.reconcile` immédiat pour ré-ingérer les messages reçus entre T et maintenant ; vérifier qu'aucun draft `approved`/`sending` d'avant T ne sera renvoyé (les marquer `expired`).
-7. Rallumer par paliers (`incident.md` §4).
+5. **Réconcilier** : `connector.reconcile` immédiat pour ré-ingérer les messages reçus entre T et maintenant ; vérifier qu'aucun draft `approved`/`sending` d'avant T ne sera renvoyé (les marquer `expired`).
+6. Rallumer par paliers (`incident.md` §4).
 
 ## B. Depuis l'export (perte de Supabase ou du projet)
 
@@ -21,7 +21,7 @@ L'export (ADR 0028, service `backup`) est un tar chiffré par `age` : le dump `p
    `sh ops/db-export/restore-check.sh impera-<date>.tar.age impera-backup.key "<DATABASE_ADMIN_URL de la nouvelle base>"`.
    Le script déchiffre, restaure (`pg_restore --no-owner --single-transaction`), **vide la file `graphile_worker`** (aucun job d'avant le sinistre ne repart) et compare les comptes de lignes au manifeste.
 4. Le script a créé `nirvana_app` et `impera_service` sans connexion : leur donner un mot de passe neuf, dans l'éditeur SQL (`ALTER ROLE nirvana_app LOGIN PASSWORD '<mot de passe>';` puis `ALTER ROLE impera_service LOGIN PASSWORD '<un autre>' BYPASSRLS;`, et le `GRANT CONNECT` de `deploy.md` § 1.1), puis mettre `DATABASE_URL`, `DATABASE_SERVICE_URL` et `DATABASE_ADMIN_URL` à jour dans Coolify, avec les **mêmes** `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` qu'avant (copie gardée avec la clé privée), redéployer, `/ready`.
-5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.6 et A.7.
+5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.5 et A.6.
 
 ## C. Essai trimestriel (ADR 0028 § 6)
 

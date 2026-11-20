@@ -83,7 +83,11 @@ services:
   worker:
     <<: *api-image
     command: ['node', 'dist/worker.js']
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # Graphile Worker runs on the service pool: one connection per job at once, one to LISTEN, and room for the
+      # worker's own reads (deploy.md § 1.1, budget). WORKER_CONCURRENCY + 3 at the defaults.
+      DATABASE_SERVICE_POOL_MAX: ${WORKER_DATABASE_SERVICE_POOL_MAX:-8}
     depends_on:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped

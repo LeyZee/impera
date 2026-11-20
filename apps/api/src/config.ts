@@ -359,7 +359,6 @@ export function ownerDatabaseUrl(config: Config): string {
   return config.DATABASE_ADMIN_URL;
 }
 
-/** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
 /**
  * True when a base at this host is reached over the network: neither this machine nor a service name of the compose
  * (a name without a dot, such as `postgres`).
@@ -370,6 +369,7 @@ function isNetworkDatabaseHost(hostname: string): boolean {
   return host.includes('.') || host.includes(':');
 }
 
+/** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const renamed = Object.keys(env).filter((name) => name.startsWith(OLD_PREFIX));
   if (renamed.length > 0) {
