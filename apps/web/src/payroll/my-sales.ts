@@ -24,13 +24,25 @@ const NBSP = ' ';
 const counted = (count: number, one: string, many: string): string =>
   `${String(count)}${NBSP}${count > 1 ? many : one}`;
 
-/** « Vente de 22 h 05 », « Remboursement de 9 h 15 », « Vente, heure inconnue ». */
-export function mySaleWhen(sale: Pick<MySale, 'event' | 'occurredAt'>, timeZone: string): string {
+/**
+ * « Vente de 22 h 05 », « Remboursement de 9 h 15 », « Vente, heure inconnue »; a late refund says the sale it takes
+ * back: « Remboursement de 9 h 15, d’une vente du 5 mai ».
+ */
+export function mySaleWhen(
+  sale: Pick<MySale, 'event' | 'occurredAt' | 'saleOccurredAt'>,
+  timeZone: string,
+): string {
   const what = sale.event === 'sale' ? 'Vente' : 'Remboursement';
-  return sale.occurredAt === null
-    ? `${what}, heure inconnue`
-    : `${what} de ${clockAt(sale.occurredAt, timeZone)}`;
+  const when =
+    sale.occurredAt === null ? `${what}, heure inconnue` : `${what} de ${clockAt(sale.occurredAt, timeZone)}`;
+  return sale.event === 'refund' && sale.saleOccurredAt !== null
+    ? `${when}, d’une vente du ${saleDayOf(sale.saleOccurredAt, timeZone)}`
+    : when;
 }
+
+/** « 5 mai »: the day of the sale a late refund takes back, in the reader's zone. */
+const saleDayOf = (at: string, timeZone: string): string =>
+  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone }).format(new Date(at));
 
 /** The line's net, signed: a refund takes off. */
 export const mySaleAmount = (sale: Pick<MySale, 'netMinor' | 'currency'>): string =>

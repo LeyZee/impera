@@ -1,5 +1,6 @@
 import {
   AccountPayRulesIdSchema,
+  MySalesSchema,
   newId,
   PayPeriodSchema,
   PayrollPeriodSchema,
@@ -48,6 +49,7 @@ async function refusalOf(write: () => PromiseLike<unknown>): Promise<{ code: str
 describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net (CRM-03)', () => {
   let team: PayrollTeam;
   let theo: TeamMember;
+  let theoCookie: string;
   let lea: TeamMember;
   let firstLink: string;
 
@@ -119,7 +121,7 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
 
   beforeAll(async () => {
     team = await startPayrollTeam(inject('pgSuperuserUrl'));
-    ({ member: theo } = await team.addMember('theo@example.test', 'Théo'));
+    ({ member: theo, cookie: theoCookie } = await team.addMember('theo@example.test', 'Théo'));
     ({ member: lea } = await team.addMember('lea@example.test', 'Léa'));
     const db = team.test.admin.db;
     await db.insert(schema.accountPayRules).values({
@@ -294,6 +296,11 @@ describe('Équipe › Paie : les ventes de la plateforme comptées sur leur net 
         },
       ],
     });
+    // Théo reads the refund with the day of the sale it takes back, kept on his statement of P1.
+    const ownRead = await team.call('GET', `/payroll/my-sales?period=${P2}`, theoCookie);
+    expect(
+      MySalesSchema.parse(ownRead.json()).items.map((one) => [one.event, one.lateFrom, one.saleOccurredAt]),
+    ).toEqual([['refund', P1, '2025-05-05T10:00:00.000Z']]);
     // Linked to Léa since, the sale P1 counted is read again late, and is not hers: the registry has it.
     await expect(team.statementOf(lea, P2)).rejects.toThrow('no statement');
     // The period as Paie reads it (lot b4): the line says its base and what it counted, never a sale's identifier;
