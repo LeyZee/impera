@@ -75,7 +75,7 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
   it('waits for the closing’s lock while no period is closed, and gives a bonus back on a retry', async () => {
     const body = bonus(theo, Q1);
     const lock = await holding(['payroll.close']);
-    const sent = post('/payroll/bonuses', monaCookie, body);
+    const sent = post('/payroll/bonuses', team.owner, body);
     try {
       await until(async () => (await waiting()) === 1);
     } finally {
@@ -85,25 +85,46 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
     expect(created.statusCode, created.body).toBe(201);
     expect(BonusSchema.parse(created.json())).toMatchObject({
       ...body,
-      createdBy: mona.userId,
+      createdBy: team.ownerId,
       cancellation: null,
     });
     expect(await team.jobsFor(Q1)).toEqual([{ period: Q1 }]);
     expect(await audited('bonus.create')).toBe(1);
 
     // The same bonus sent again is given back; the same id with other values is refused.
-    const again = await post('/payroll/bonuses', monaCookie, body);
+    const again = await post('/payroll/bonuses', team.owner, body);
     expect([again.statusCode, again.json()]).toEqual([200, created.json()]);
-    const other = await post('/payroll/bonuses', monaCookie, { ...body, amountMinor: 3_000 });
+    const other = await post('/payroll/bonuses', team.owner, { ...body, amountMinor: 3_000 });
     expect(team.refusal(other).code).toBe('bonus_conflict');
     expect(await audited('bonus.create')).toBe(1);
   });
 
-  it('lets the owner or an active manager write a member’s pay, never their own', async () => {
+  it('lets the owner alone give a bonus or an adjustment, and a manager a penalty, never their own', async () => {
     const refused = async (cookie: string, payload: object) =>
       team.refusal(await post('/payroll/bonuses', cookie, payload)).code;
     expect(await refused(theoCookie, bonus(lea, Q1))).toBe('payroll_forbidden');
     expect(await refused(monaCookie, bonus(mona, Q1))).toBe('payroll_own_forbidden');
+    // A manager takes with a penalty (below); what adds to a pay or corrects it is the owner's, and nothing is written.
+    const gift = await post('/payroll/bonuses', monaCookie, bonus(lea, Q1));
+    expect([gift.statusCode, ApiErrorSchema.parse(gift.json()).error.message]).toEqual([
+      403,
+      'Réservé au propriétaire',
+    ]);
+    const corrected = await post('/payroll/adjustments', monaCookie, {
+      id: newId(PayAdjustmentIdSchema),
+      memberId: lea.id,
+      amountMinor: 500,
+      reason: 'Vente oubliée',
+    });
+    expect(team.refusal(corrected).code).toBe('payroll_forbidden');
+    const [given] = await team.test.admin.db.select({ id: schema.bonuses.id }).from(schema.bonuses);
+    if (given === undefined) throw new Error('no bonus');
+    expect(team.refusal(await post(`/payroll/bonuses/${given.id}/cancel`, monaCookie)).code).toBe(
+      'payroll_forbidden',
+    );
+    expect(await audited('bonus.create')).toBe(1);
+    expect(await audited('bonus.cancel')).toBe(0);
+    expect(await audited('pay_adjustment.create')).toBe(0);
     expect(await refused(team.owner, { ...bonus(lea, Q1), memberId: newId(TeamMemberIdSchema) })).toBe(
       'team_member_not_found',
     );
@@ -126,9 +147,9 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
     expect(team.refusal(await post(`/payroll/bonuses/${id}/cancel`, theoCookie)).code).toBe(
       'payroll_own_forbidden',
     );
-    const cancelled = await post(`/payroll/bonuses/${id}/cancel`, monaCookie);
+    const cancelled = await post(`/payroll/bonuses/${id}/cancel`, team.owner);
     expect(cancelled.statusCode, cancelled.body).toBe(200);
-    expect(BonusSchema.parse(cancelled.json()).cancellation).toMatchObject({ cancelledBy: mona.userId });
+    expect(BonusSchema.parse(cancelled.json()).cancellation).toMatchObject({ cancelledBy: team.ownerId });
     const again = await post(`/payroll/bonuses/${id}/cancel`, team.owner);
     expect([again.statusCode, again.json()]).toEqual([200, cancelled.json()]);
     expect(await audited('bonus.cancel')).toBe(1);
@@ -144,16 +165,16 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
     // The first closing: the bonus cancelled in May no longer holds it back.
     expect((await team.validate(team.owner, theo, Q2)).statusCode).toBe(200);
 
-    const closed = await post('/payroll/bonuses', monaCookie, bonus(theo, Q2));
+    const closed = await post('/payroll/bonuses', team.owner, bonus(theo, Q2));
     expect(team.refusal(closed)).toEqual(
       expect.objectContaining({ code: 'pay_period_closed_conflict', details: { period: Q2 } }),
     );
     // Before the team's first closing, every period is closed for good.
-    expect(team.refusal(await post('/payroll/bonuses', monaCookie, bonus(lea, Q1))).code).toBe(
+    expect(team.refusal(await post('/payroll/bonuses', team.owner, bonus(lea, Q1))).code).toBe(
       'pay_period_closed_conflict',
     );
     // Closed for the team, open for Léa: her statement of the period is still a draft, and counts it.
-    expect((await post('/payroll/bonuses', monaCookie, bonus(lea, Q2))).statusCode).toBe(201);
+    expect((await post('/payroll/bonuses', team.owner, bonus(lea, Q2))).statusCode).toBe(201);
     await team.recalculate(Q2);
     expect((await team.validate(team.owner, lea, Q2)).statusCode).toBe(200);
     expect((await team.statementOf(lea, Q2)).bonusesMinor).toBe(2_000);
@@ -190,7 +211,7 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
         }, 2_000);
       });
       try {
-        return team.refusal(await Promise.race([post(url, monaCookie, payload), waited]));
+        return team.refusal(await Promise.race([post(url, team.owner, payload), waited]));
       } finally {
         clearTimeout(timer);
       }
@@ -258,14 +279,14 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
       reason: 'Vente remboursée par la plateforme',
       correctsStatementId: corrected.id,
     };
-    const created = await post('/payroll/adjustments', monaCookie, body);
+    const created = await post('/payroll/adjustments', team.owner, body);
     expect(created.statusCode, created.body).toBe(201);
     // Théo's statements are validated up to June: the team's first open period.
     expect(PayAdjustmentSchema.parse(created.json())).toMatchObject({ ...body, period: Q5 });
-    const again = await post('/payroll/adjustments', monaCookie, body);
+    const again = await post('/payroll/adjustments', team.owner, body);
     expect([again.statusCode, again.json()]).toEqual([200, created.json()]);
     expect(
-      team.refusal(await post('/payroll/adjustments', monaCookie, { ...body, amountMinor: 1_000 })).code,
+      team.refusal(await post('/payroll/adjustments', team.owner, { ...body, amountMinor: 1_000 })).code,
     ).toBe('pay_adjustment_conflict');
 
     // Léa's June statement is still a draft, in a period the team closed: her next statement to validate.
@@ -370,7 +391,7 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
     let sent: ReturnType<typeof post> | undefined;
     try {
       await until(async () => (await waiting()) === 1);
-      sent = post('/payroll/bonuses', monaCookie, bonus(theo, Q5));
+      sent = post('/payroll/bonuses', team.owner, bonus(theo, Q5));
       await until(async () => (await waiting()) === 2);
     } finally {
       await lock.release();
@@ -384,7 +405,7 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
     // Once a period is closed, an entry never waits for the closing's lock.
     const closing = await holding(['payroll.close']);
     try {
-      expect((await post('/payroll/bonuses', monaCookie, bonus(lea, Q6))).statusCode).toBe(201);
+      expect((await post('/payroll/bonuses', team.owner, bonus(lea, Q6))).statusCode).toBe(201);
     } finally {
       await closing.release();
     }
@@ -401,7 +422,7 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
 
     // The bonus holds Théo's periods from July's second half on, and waits for today's.
     const lock = await holding([memberPeriod(theo, today())]);
-    const sent = post('/payroll/bonuses', monaCookie, bonus(theo, Q6));
+    const sent = post('/payroll/bonuses', team.owner, bonus(theo, Q6));
     let validating: ReturnType<typeof post> | undefined;
     try {
       await until(async () => (await waiting()) === 1);

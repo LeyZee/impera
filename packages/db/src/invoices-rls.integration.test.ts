@@ -1473,7 +1473,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
 
     it('an adjustment corrects a validated statement of its member, of an earlier period', async () => {
       const adjustment = (correctsStatementId: string) =>
-        as(manager, (tx) =>
+        as(owner, (tx) =>
           tx.insert(s.payAdjustments).values({
             id: newId(PayAdjustmentIdSchema),
             memberId: member(kofi),
@@ -1481,7 +1481,7 @@ describe('contractors’ invoices (EQ-06): who reads and writes, and an issued i
             amountMinor: -1_000,
             reason: 'Vente remboursée après la paie',
             correctsStatementId,
-            createdBy: manager,
+            createdBy: owner,
           }),
         );
       expect(await failure(adjustment(statement(ama, '2026-08-01')))).toMatch(KEPT);
