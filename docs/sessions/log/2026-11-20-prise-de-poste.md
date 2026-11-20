@@ -1,0 +1,7 @@
+# 2026-11-20 — EQ-12 Prise de poste dans Aujourd'hui (trous des onglets n° 1) — in_progress
+Fait : « Je prends mon poste » dans Aujourd'hui. Colonne `shifts.checked_in_at`, écrite par la seule fonction SECURITY DEFINER `check_in_own_shift(uuid)` (migration 0235) : le shift du lecteur, non annulé, membre actif, de `starts_at − marge` à la fin ; idempotente (la seconde prise rend le premier instant) ; trace `shift.check_in` sans IP ; ne touche ni `updated_at` ni `updated_by`. Un trigger efface la prise quand le shift change de membre ou de début. Route `POST /v1/scheduling/shifts/:shiftId/check-in` (404 `shift_not_found`, 409 `shift_check_in_early_conflict`, 409 `shift_ended_conflict`), `Shift.checkedInAt` au contrat. Aujourd'hui : « Poste à prendre » en ambre et le bouton en tête tant que ce n'est pas pris, puis « En poste » et « Poste pris à … » ; un refus est dit sous le bouton.
+Pas fait : la prise depuis la notification de début de shift (notifications push d'EQ-12) ; le passage pour vendre d'EQ-08 au premier membre qui a pris son poste (attribution des ventes, non touchée) ; l'alerte « shift non pris » (fil Alertes, prévenu du contrat).
+Décisions : la prise ne déplace pas les heures du planning (paie, fenêtre d'accès, routage d'une vente les lisent toujours) ; aucun droit de colonne, ni le propriétaire ni un manager ne datent une prise pour un membre.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : intégration base (9 tests), API (shift-access, scheduling), contrats, web (Aujourd'hui et écrans du planning, 545 tests).

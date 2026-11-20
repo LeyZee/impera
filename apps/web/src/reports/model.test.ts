@@ -62,6 +62,7 @@ const shift = (id: string, startsAt: string): Shift =>
     endsAt: startsAt.replace('T08', 'T10'),
     templateId: null,
     stoppedAt: null,
+    checkedInAt: null,
   });
 
 const report = (
