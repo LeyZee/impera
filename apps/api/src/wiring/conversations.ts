@@ -93,6 +93,12 @@ export function wireConversations(
         logger,
         (payload, context) => module.jobs.followUp(payload, context.logger),
       ),
+      'conversation.after_sale': defineTask(
+        'conversation.after_sale',
+        JOB_PAYLOADS['conversation.after_sale'],
+        logger,
+        (payload, context) => module.jobs.afterSale(payload, context.logger),
+      ),
       'conversation.record_facts': defineTask(
         'conversation.record_facts',
         JOB_PAYLOADS['conversation.record_facts'],

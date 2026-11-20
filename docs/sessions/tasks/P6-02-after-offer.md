@@ -28,6 +28,7 @@ Appliquer en code ce que la méthode de chatting (document hors dépôt, tenu pa
 
 - [ ] Politique : `lastOfferAt` branché sur l'historique de P6-01 ; `refusalStep` (comprendre, insister, bouder, lâcher) ; `afterPurchase` ; `salesFollowUpDecision`. Tout en règles pures testées.
 - [ ] Composeur : brief fixé par le code à chaque étape (refus, aftercare, aide au paiement), comme le recadrage et les relances.
+  - [x] Aftercare : une vente d'étape ou un pourboire réveille sa conversation, brouillon d'après-achat (lot 3, `conversation.after_sale`).
 - [ ] Évals : fan qui refuse, fan qui achète, fan qui ne sait pas payer, fan qui demande s'il doit payer.
 
 ## Critères d'acceptation

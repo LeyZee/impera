@@ -1,6 +1,7 @@
 import {
   desireNow,
   normalise,
+  type AfterSaleType,
   type FanFlags,
   type MediaDescription,
   type ObjectionReplies,
@@ -129,6 +130,11 @@ export interface ComposeTurnInput {
    */
   readonly followUp?: FollowUpTurn;
   /**
+   * Her word after a sale of his (ADR 0156 § 2), not an answer: like a follow-up, no brain call, a brief set by code
+   * (thanks and tenderness, nothing to buy, nothing explicit), one bubble checked by every guard.
+   */
+  readonly aftercare?: AftercareTurn;
+  /**
    * She already waited once for his last message (« attends, je reviens », P3-11): a brain that would wait again is
    * overruled, she asks him lightly whether he is back.
    */
@@ -230,6 +236,11 @@ interface FollowUpTurn {
   readonly silentHours: number;
   /** `follow_ups.text` when her type is « custom »: the spirit of her follow-ups, written by the team. */
   readonly spirit: string | null;
+}
+
+interface AftercareTurn {
+  /** What he paid for: a step of her script, or a tip. */
+  readonly saleType: AfterSaleType;
 }
 
 /** What his desire score is counted from (`desireScore`). */
@@ -350,6 +361,29 @@ function followUpBrief(followUp: FollowUpTurn): Brief {
     action: 'reply',
     replyBrief: `Il ne lui a rien répondu depuis ${String(hours)} h. Elle lui écrit un petit message léger qui rebondit sur ce dont ils parlaient ou prend de ses nouvelles, sans reproche, sans rien proposer de payant, sans parler de prix.${spirit}`,
     toneHints: [NO_OPENING_HINT, 'court, une seule bulle'],
+  };
+}
+
+/** What he paid for, as she sees it: never a price, never the word « achat ». */
+const AFTERCARE_WHAT: Readonly<Record<AfterSaleType, string>> = {
+  ppv: 'Il vient d’ouvrir ce qu’elle lui a envoyé.',
+  tip: 'Il vient de lui laisser un pourboire.',
+};
+
+/**
+ * Her word after a sale of his (ADR 0156 § 2), decided by code, never by the brain (CLAUDE.md rule 3): thanks and
+ * tenderness, without overdoing it, nothing to buy, no sulking.
+ */
+function aftercareBrief(aftercare: AftercareTurn): Brief {
+  return {
+    intent: 'other',
+    sentiment: 'positive',
+    factsProposed: [],
+    kycMissing: [],
+    risks: [],
+    action: 'reply',
+    replyBrief: `${AFTERCARE_WHAT[aftercare.saleType]} Elle lui écrit un petit mot tendre, sincère et complice, qui le remercie sans en faire trop, sans rien proposer de payant, sans parler de prix ni d’argent, sans reproche.`,
+    toneHints: [NO_OPENING_HINT, 'court, une seule bulle', 'chaleureuse, jamais commerciale'],
   };
 }
 
@@ -581,6 +615,8 @@ export async function composeTurn(
   };
   if (input.followUp !== undefined)
     return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped);
+  if (input.aftercare !== undefined)
+    return writeFollowUp(gateway, persona, base, aftercareBrief(input.aftercare), notes.dropped);
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   const choices = scriptChoices(input.scripts, input.situation);

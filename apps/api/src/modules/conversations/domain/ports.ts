@@ -1,5 +1,6 @@
 import type {
   Actor,
+  AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
   CustomAlertGroupId,
@@ -160,6 +161,11 @@ interface ConversationRepository {
   /** The creator's conversations in this state, the one whose fan wrote first at the head. */
   idsInState(state: ConversationState): Promise<readonly ConversationId[]>;
   /**
+   * The conversation of the fan this platform id names on this account (ADR 0156 § 2: a sale names him, not the
+   * conversation), the one he last wrote in; `null` when no fan or no conversation of his is known.
+   */
+  idOfFan(platformAccountId: PlatformAccountId, platformFanId: string): Promise<ConversationId | null>;
+  /**
    * Whether `userId` holds the conversation (EQ-13): it is routed to him, or it is in `human` and his takeover is the
    * last word on who holds it (no release nor handoff since).
    */
@@ -205,6 +211,8 @@ interface DraftRepository {
   lock(id: DraftId): Promise<Draft | null>;
   /** Drafts not yet sent nor closed (`pending`, `approved`, `edited`), oldest first. */
   openFor(conversationId: ConversationId): Promise<readonly Draft[]>;
+  /** Whether a draft already carries this idempotency key (one word after a sale, ADR 0156 § 2). */
+  existsWithKey(idempotencyKey: string): Promise<boolean>;
   /** Her answers written in this conversation since `since`, whatever became of them, and when the last one was. */
   paceSince(
     conversationId: ConversationId,
@@ -631,6 +639,12 @@ export interface ComposeInput {
    */
   readonly followUp?: FollowUpContext;
   /**
+   * Present for her word after a sale of his (ADR 0156 § 2): a step he bought or a tip, nothing of his to answer. The
+   * engine decides whether it goes out now (`held` with `no_reply`, and `retryAt` for her night) and writes it like a
+   * follow-up: thanks and tenderness, nothing to buy.
+   */
+  readonly aftercare?: AftercareContext;
+  /**
    * How many times she already waited on his last message (P3-11): 1 on the second pass after « attends, je
    * reviens », when she may no longer wait; absent otherwise.
    */
@@ -701,6 +715,13 @@ interface ComposedDesire {
 }
 
 /** Which follow-up this is, after which silence. */
+/** The sale she thanks him for (ADR 0156 § 2). */
+export interface AftercareContext {
+  readonly saleType: AfterSaleType;
+  /** When he paid, as the platform dates it. */
+  readonly occurredAt: Date;
+}
+
 export interface FollowUpContext {
   /** The index of the delay in `persona.follow_ups.delays_hours`, from 0. */
   readonly step: number;

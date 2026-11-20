@@ -2,6 +2,7 @@ import {
   CreatorIdSchema,
   CreatorSalesSchema,
   EVENT_PAYLOADS,
+  JOB_PAYLOADS,
   FanIdSchema,
   newId,
   PlatformAccountIdSchema,
@@ -105,6 +106,27 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
        where t.identifier = 'notifications.creator_sale'
        order by l.platform_sale_id`);
     return z.array(ToldSchema).parse(result.rows);
+  }
+
+  /** Every `conversation.after_sale` waiting (ADR 0156 § 2), with the register's key of its sale. */
+  async function woken() {
+    const result = await test.admin.db.execute(sql`
+      select l.platform_sale_id, l.id as line_id, j.key, j.payload
+        from graphile_worker._private_jobs j
+        join graphile_worker._private_tasks t on t.id = j.task_id
+        join platform_sales l on l.id = (j.payload->>'saleId')::uuid
+       where t.identifier = 'conversation.after_sale'
+       order by l.platform_sale_id`);
+    return z
+      .array(
+        z.object({
+          platform_sale_id: z.string(),
+          line_id: z.string(),
+          key: z.string(),
+          payload: JOB_PAYLOADS['conversation.after_sale'],
+        }),
+      )
+      .parse(result.rows);
   }
 
   const api = (method: 'PUT', url: string, payload: object) =>
@@ -252,6 +274,18 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     const firstTold = await told();
     expect(firstTold.map((one) => one.platform_sale_id)).toEqual(first.map((one) => one.platform_sale_id));
     for (const one of firstTold) expect(one.key).toBe(`notifications.creator_sale:${one.line_id}`);
+    // A step he bought or a tip wakes his conversation, by his member id, once per line (ADR 0156 § 2).
+    const firstWoken = await woken();
+    expect(firstWoken.map((one) => one.platform_sale_id)).toEqual(first.map((one) => one.platform_sale_id));
+    for (const one of firstWoken) {
+      expect(one.key).toBe(`conversation.after_sale:${one.line_id}`);
+      expect(one.payload).toMatchObject({
+        creatorId,
+        platformAccountId: accountId,
+        platformFanId: 'member_test_01',
+      });
+    }
+    expect(firstWoken.find((one) => one.platform_sale_id === 'sale_agent')?.payload.saleType).toBe('tip');
 
     // The register read again from its start, a refund: nothing rings again.
     crm.refund('sale_member', new Date().toISOString());
@@ -262,6 +296,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     await read();
     expect(await rung()).toEqual(first);
     expect(await told()).toEqual(firstTold);
+    expect(await woken()).toEqual(firstWoken);
 
     // The quarantined sale joins the register when its model is linked: late, it rings nothing.
     const linked = await api('PUT', '/v1/settings/sales-feeds/reveal/models/model_test_02', {
@@ -275,6 +310,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
     expect(released).toEqual([{ creatorId: otherCreatorId }]);
     expect(await rung()).toEqual(first);
     expect(await told()).toEqual(firstTold);
+    expect(await woken()).toEqual(firstWoken);
   });
 
   it('gives a month of totals equal to Reveal’s statistics to the cent, a refund taken off its sale’s day', async () => {
