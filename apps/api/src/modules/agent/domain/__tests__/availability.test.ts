@@ -104,14 +104,15 @@ describe('sexualizes', () => {
     );
   });
 
-  it('reads a flirt as sexualizing only on explicit words or a role, never on his mood (Charles, 20/11)', () => {
-    expect(
-      sexualizes({
-        intent: 'flirt',
-        sentiment: 'aroused',
-        desireSignals: ['body_compliment', 'states_desire'],
-      }),
-    ).toBe(false);
+  it('reads a flirt as sexualizing only as his words do, never on his mood (Charles, 20/11)', () => {
+    const DESIRE = {
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire'],
+    };
+    expect(sexualizes(DESIRE)).toBe(false);
+    expect(sexualizes(DESIRE, 'tu es super belle')).toBe(false);
+    expect(sexualizes(DESIRE, 'j’ai trop envie de toi')).toBe(true);
     expect(
       sexualizes({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['asks_about_her_body'] }),
     ).toBe(false);

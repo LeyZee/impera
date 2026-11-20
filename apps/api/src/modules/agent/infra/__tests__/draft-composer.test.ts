@@ -1703,6 +1703,27 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     );
   });
 
+  it('still slows down a flirt whose words say desire, before his age is known (relecture Bilan de #888)', async () => {
+    const SAYS_DESIRE: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire'],
+    };
+    const { draftComposer, seen } = composer({ brief: SAYS_DESIRE }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose({
+      ...INPUT,
+      history: [
+        {
+          direction: 'inbound',
+          text: 't’es trop belle, j’ai trop envie de toi là',
+          at: new Date('2026-10-17T09:59:00Z'),
+        },
+      ],
+    });
+    expect(written(seen)?.replyBrief).toContain('ralentit');
+  });
+
   it('lets her tease « pas si vite » once the intimate is open (relecture Bilan de #876)', async () => {
     const { draftComposer } = composer(
       { brief: HOT, voice: { bubbles: ['Pas si vite 😏 j’ai envie de te faire attendre'] } },

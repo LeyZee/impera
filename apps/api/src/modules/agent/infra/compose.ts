@@ -646,7 +646,7 @@ export async function composeTurn(
             (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
           ageConfirmed,
           noExplicit,
-          fanSexualizes: offerSignals(brief).fanSexualizes,
+          fanSexualizes: offerSignals(brief, input.fanText).fanSexualizes,
           desire: heat,
           limits: input.sexualization?.limits ?? NO_LIMITS,
         });
@@ -697,7 +697,7 @@ export async function composeTurn(
       : readAvailability({
           previous: input.availability ?? null,
           signals: brief.desireSignals ?? [],
-          sexualizes: sexualizes(brief),
+          sexualizes: sexualizes(brief, input.fanText),
           desire: heat,
           threshold,
           now: input.situation.now,

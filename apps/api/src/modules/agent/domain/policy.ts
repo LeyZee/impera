@@ -1,4 +1,4 @@
-import type { FanFlags } from '@impera/contracts';
+import { normalise, type FanFlags } from '@impera/contracts';
 
 /**
  * When she may offer a script (docs/sessions/tasks/PROPOSED-sales-policy.md, Charles 17/10 22h00): one script per
@@ -106,33 +106,56 @@ const SEXUAL_ADVANCE_SIGNALS: readonly string[] = [
 ];
 
 /**
- * What still makes a flirt an advance (Charles, 20/11): explicit words or a sexual role only. The brain names his
- * message a flirt, nothing sexual, and still adds a desire to a stranger's compliment; a desire it reads beside a flirt
- * neither slows her down nor asks his age. An open doubt on his age is a risk, read elsewhere, and still stops her.
+ * What still makes a flirt an advance (Charles, 20/11): explicit words or a sexual role, read by the brain.
  */
-export const FLIRT_ADVANCE_SIGNALS: readonly string[] = ['explicit_language', 'roleplay'];
+const FLIRT_ADVANCE_SIGNALS: readonly string[] = ['explicit_language', 'roleplay'];
 
-/** The signals that make this message an advance: on a flirt, only its explicit words or a sexual role. */
-function advanceSignals(intent: string): readonly string[] {
-  return intent === 'flirt' ? FLIRT_ADVANCE_SIGNALS : SEXUAL_ADVANCE_SIGNALS;
+/** A desire or a pull to the intimate, which on a flirt counts only when his own words carry it. */
+const FLIRT_DESIRE_SIGNALS: readonly string[] = ['states_desire', 'steers_to_intimate'];
+
+/**
+ * His own words say desire (relecture Bilan de #888): « j'ai trop envie de toi », « tu m'excites », « dans mon lit ».
+ * A compliment never matches: « t'es trop belle », « j'ai envie de te parler », « ton sourire ».
+ */
+const DESIRE_MARKER =
+  /\b(?:(?:envie|besoin) de (?:toi|te (?:sentir|toucher|gouter|caresser|prendre|baiser|lecher|devorer)|ton corps|ta bouche)|je te (?:veux|desire)|(?:tu|ca) m'excite|t'es (?:trop )?excitante|excite(?:e|s)?|bande(?:r|s)?|mouill\w*|chaud(?:e|s)? (?:pour|de) toi|te (?:baiser|lecher|prendre|devorer)|dans (?:mon|ton) lit|a poil|toute nue|sous la couette avec)\b/u;
+
+/**
+ * His message is an advance (ADR 0103 § 11, Charles 20/11). The brain names it a flirt and still adds a desire to a
+ * stranger's compliment: on a flirt, a desire or a pull to the intimate counts only when his words carry it
+ * (`DESIRE_MARKER`), explicit words or a role always. Without his text, only these two. An open doubt on his age is a
+ * risk, read elsewhere, and still stops her.
+ */
+export function flirtAdvances(desireSignals: readonly string[], fanText: string | undefined): boolean {
+  if (desireSignals.some((signal) => FLIRT_ADVANCE_SIGNALS.includes(signal))) return true;
+  return (
+    fanText !== undefined &&
+    desireSignals.some((signal) => FLIRT_DESIRE_SIGNALS.includes(signal)) &&
+    DESIRE_MARKER.test(normalise(fanText))
+  );
 }
 
 /**
  * What the brain read that the policy needs: he makes a sexual advance now (the cursor follows him there or slows him
  * down), or asks for paid content himself.
  */
-export function offerSignals(brief: {
-  readonly intent: string;
-  readonly sentiment: string;
-  readonly desireSignals?: readonly string[] | undefined;
-}): {
+export function offerSignals(
+  brief: {
+    readonly intent: string;
+    readonly sentiment: string;
+    readonly desireSignals?: readonly string[] | undefined;
+  },
+  fanText?: string,
+): {
   readonly fanSexualizes: boolean;
   readonly fanAsksForPaid: boolean;
 } {
   return {
     fanSexualizes:
       brief.intent === 'sexting' ||
-      (brief.desireSignals ?? []).some((signal) => advanceSignals(brief.intent).includes(signal)),
+      (brief.intent === 'flirt'
+        ? flirtAdvances(brief.desireSignals ?? [], fanText)
+        : (brief.desireSignals ?? []).some((signal) => SEXUAL_ADVANCE_SIGNALS.includes(signal))),
     fanAsksForPaid: brief.intent === 'asks_for_media',
   };
 }

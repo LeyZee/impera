@@ -194,19 +194,22 @@ describe('offerSignals', () => {
     ).toBe(true);
   });
 
-  it('never slows a flirt down for a desire the brain adds to it, only for explicit words or a role (Charles, 20/11)', () => {
-    for (const signal of ['states_desire', 'steers_to_intimate'])
-      expect(
-        offerSignals({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['body_compliment', signal] })
-          .fanSexualizes,
-        signal,
-      ).toBe(false);
-    for (const signal of ['explicit_language', 'roleplay'])
-      expect(
-        offerSignals({ intent: 'flirt', sentiment: 'positive', desireSignals: ['body_compliment', signal] })
-          .fanSexualizes,
-        signal,
-      ).toBe(true);
+  it('reads a desire on a flirt only when his own words carry it (Charles, 20/11; relecture Bilan de #888)', () => {
+    const flirt = (signal: string, text?: string) =>
+      offerSignals(
+        { intent: 'flirt', sentiment: 'aroused', desireSignals: ['body_compliment', signal] },
+        text,
+      ).fanSexualizes;
+    for (const signal of ['states_desire', 'steers_to_intimate']) {
+      expect(flirt(signal), signal).toBe(false);
+      expect(flirt(signal, 'coucou toi, tu es super belle ! impossible de ne pas t’écrire'), signal).toBe(
+        false,
+      );
+      expect(flirt(signal, 'j’ai envie de te parler, t’as un sourire de fou'), signal).toBe(false);
+      expect(flirt(signal, 't’es trop belle, j’ai trop envie de toi là'), signal).toBe(true);
+      expect(flirt(signal, 'Tu m’EXCITES grave'), signal).toBe(true);
+    }
+    for (const signal of ['explicit_language', 'roleplay']) expect(flirt(signal), signal).toBe(true);
     expect(
       offerSignals({ intent: 'small_talk', sentiment: 'positive', desireSignals: ['states_desire'] })
         .fanSexualizes,
