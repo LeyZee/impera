@@ -529,9 +529,9 @@ describe('playground session, the offer policy and the cursor', () => {
     // Back to a new fan: his age is unknown again.
     playground.reset();
     playground.confirmAge(null);
-    const voiceAfter: VoiceInput[] = [];
-    await session(voiceAfter, true).handleFanMessage('T’es trop bonne');
-    expect(voiceAfter[0]?.brief.replyBrief).toContain('ralentit');
+    // The same session, not a fresh one: what is checked is that the reset forgets his age.
+    await playground.handleFanMessage('T’es trop bonne');
+    expect(voiceInputs[1]?.brief.replyBrief).toContain('ralentit');
   });
 
   it('offers only once his desire score reaches hers, as it builds message after message (P3-12)', async () => {
