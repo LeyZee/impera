@@ -185,7 +185,7 @@ function GridSheet({
     <section className="ps-page smp-page" aria-labelledby={`${id}-title`}>
       <div className="nv-plate ps-head smp-head" ref={head}>
         <p className="nv-eyebrow">Réservé au propriétaire</p>
-        <h2 className="ps-title smp-title" id={`${id}-title`}>
+        <h2 className="ps-title nv-h2" id={`${id}-title`}>
           Prix sur mesure de {creatorName}
         </h2>
         <p className="ps-muted">
@@ -331,7 +331,7 @@ function Card({ title, lead, children }: { title: string; lead: string; children
   return (
     <div className="nv-plate ps-panel smp-card" role="group" aria-labelledby={id}>
       <div className="smp-card__head">
-        <h3 className="smp-card__title" id={id}>
+        <h3 className="nv-h2 smp-card__title" id={id}>
           {title}
         </h3>
         <p className="ps-muted">{lead}</p>

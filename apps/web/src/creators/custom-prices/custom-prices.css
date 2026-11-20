@@ -2,16 +2,8 @@
  * Créatrices › Sur mesure (ADR 0159 § C). The head, panel, hints, chips and errors are the persona's (`ps-*`); the
  * rows of the grid and the calculator live here, prefixed `smp-`. One card per subject (Formats, Suppléments,
  * Calculateur). Colours are tokens only: a price is data, not an alarm; the one neon of the screen is « Enregistrer »,
- * and the price of the calculator is the one large figure.
+ * and the price of the calculator is the one large figure. Titles are the design system's (`nv-h2`), never serif.
  */
-.smp-title {
-  margin: 0;
-  font-family: var(--nv-font-serif);
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-  font-weight: 400;
-}
-
 .smp-saved {
   font-size: var(--nv-text-footnote);
 }
@@ -35,11 +27,6 @@
 }
 .smp-card__title {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
-  font-weight: 600;
-  color: var(--nv-ink);
 }
 
 /* A line of the grid. On a PC, fixed columns under one header per card, the field labels read by screen readers
@@ -219,7 +206,6 @@
 }
 .smp-calc__total {
   margin: 0;
-  font-family: var(--nv-font-serif);
   font-size: var(--nv-text-metric);
   line-height: var(--nv-text-metric-leading);
   font-variant-numeric: tabular-nums;
