@@ -4,6 +4,7 @@ import {
   CREATOR_ALERT_DEFAULTS,
   CREATOR_ALERT_FAMILY,
   SetCreatorAlertBodySchema,
+  isClosedToChatters,
   isCreatorAlertLocked,
   type CreatorAlertLine,
 } from '@impera/contracts';
@@ -28,6 +29,7 @@ const lines = (): CreatorAlertLine[] =>
     code,
     family: CREATOR_ALERT_FAMILY[code],
     locked: isCreatorAlertLocked(code),
+    chattersClosed: isClosedToChatters(code),
     routes: CREATOR_ALERT_DEFAULTS[code],
     isDefault: true,
   }));
@@ -93,7 +95,7 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
   it('shows her alerts by family, the three roles of each, and the safety relay with words, no control', async () => {
     serve(lines());
     renderTab();
-    for (const family of ['Sécurité', 'Ventes', 'Conversation', 'Système']) {
+    for (const family of ['Sécurité', 'Ventes', 'Conversation', 'Pilotage', 'Système']) {
       expect(await screen.findByRole('heading', { name: family })).toBeTruthy();
     }
     const safety = await lineOf('Relais de sécurité');
@@ -113,6 +115,26 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
         .getByRole('radio', { name: 'Sourdine' })
         .getAttribute('aria-checked'),
     ).toBe('true');
+  });
+
+  it('shuts « Compte sans personne » to the chatters, the owner and the manager still to choose (ADR 0094 § 3)', async () => {
+    const writes = serve(lines());
+    renderTab();
+    const uncovered = await lineOf('Compte sans personne');
+    const groups = within(uncovered).getAllByRole('radiogroup');
+    expect(groups.map((group) => group.getAttribute('aria-label'))).toEqual([
+      'Compte sans personne, Propriétaire',
+      'Compte sans personne, Manager',
+    ]);
+    expect(within(uncovered).getByText('Jamais')).toBeTruthy();
+    fireEvent.click(within(groups[1] ?? uncovered).getByRole('radio', { name: 'Sourdine' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(writes[0]).toEqual({
+      path: `/v1/creators/${CREATOR}/alerts/uncovered_account`,
+      body: { routes: { owner: 'deliver', manager: 'muted', chatter_on_shift: 'off' } },
+    });
   });
 
   it('saves a role’s choice at once, the three roles whole', async () => {

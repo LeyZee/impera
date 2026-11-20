@@ -1198,6 +1198,13 @@
       "when": 1795155296704,
       "tag": "0229_notification_kind_preferences",
       "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1795176025595,
+      "tag": "0230_steering_alerts_uncovered_account",
+      "breakpoints": true
     }
   ]
 }

@@ -185,13 +185,21 @@ function AlertRow({
           {CREATOR_ALERT_ROLES.map((role) => (
             <div key={role} className="ca-role">
               <span className="ca-role__name">{ROLE_LABELS[role]}</span>
-              <ModeChoice
-                label={`${text.title}, ${ROLE_LABELS[role]}`}
-                value={line.routes[role]}
-                onChange={(mode) => {
-                  onChange(role, mode);
-                }}
-              />
+              {line.chattersClosed && role === 'chatter_on_shift' ? (
+                // Never to a chatter (ADR 0094 § 3): an alert of the agency, shut for them by the code.
+                <p className="ca-role__closed" title="Une alerte de pilotage ne va jamais à un chatteur.">
+                  <LockIcon />
+                  Jamais
+                </p>
+              ) : (
+                <ModeChoice
+                  label={`${text.title}, ${ROLE_LABELS[role]}`}
+                  value={line.routes[role]}
+                  onChange={(mode) => {
+                    onChange(role, mode);
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>
