@@ -293,3 +293,213 @@ export function FansArt(): JSX.Element {
     </Art>
   );
 }
+
+/** Nobody in the team yet: three of them, the one in the middle wearing the headset of a shift. */
+export function TeamArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [22, 34, 4],
+        [142, 30, 3.4],
+        [148, 96, 3],
+      ]}
+    >
+      {({ body, hot }) => (
+        <>
+          <g className="nv-art__float nv-art__float--2">
+            <path className="nv-art__line" fill={body} d="M20 114Q20 78 44 78Q68 78 68 114Z" />
+            <circle className="nv-art__line nv-art__violet" cx="44" cy="60" r="12" />
+          </g>
+          <g className="nv-art__float nv-art__float--3">
+            <path className="nv-art__line" fill={body} d="M92 114Q92 78 116 78Q140 78 140 114Z" />
+            <circle className="nv-art__line nv-art__warm-light" cx="116" cy="60" r="12" />
+          </g>
+          <g className="nv-art__float">
+            <path className="nv-art__line" fill={hot} d="M50 116Q50 72 80 72Q110 72 110 116Z" />
+            <circle className="nv-art__line nv-art__white" cx="80" cy="48" r="15" />
+            <path className="nv-art__quill" d="M63 48A17 17 0 0 1 97 48" />
+            <rect className="nv-art__line nv-art__warm" x="58" y="43" width="8" height="14" rx="4" />
+            <rect className="nv-art__line nv-art__warm" x="94" y="43" width="8" height="14" rx="4" />
+          </g>
+        </>
+      )}
+    </Art>
+  );
+}
+
+/** An empty file: a folder half open, the first sheet coming out of it. */
+export function FolderArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [22, 48, 4],
+        [144, 34, 3.4],
+        [138, 110, 3],
+      ]}
+    >
+      {({ body, hot }) => (
+        <>
+          <g className="nv-art__float nv-art__float--2">
+            <path
+              className="nv-art__line"
+              fill={body}
+              d="M30 46Q30 36 40 36H64L74 46H120Q130 46 130 56V102Q130 112 120 112H40Q30 112 30 102Z"
+            />
+          </g>
+          <g className="nv-art__float nv-art__float--3">
+            <rect className="nv-art__line nv-art__paper" x="46" y="24" width="68" height="70" rx="5" />
+            <path className="nv-art__rule" d="M58 40H102M58 52H92" />
+          </g>
+          <g className="nv-art__float nv-art__float--2">
+            <path
+              className="nv-art__line"
+              fill={hot}
+              d="M24 70Q23 62 31 62H129Q137 62 136 70L131 104Q130 112 121 112H39Q30 112 29 104Z"
+            />
+            <circle className="nv-art__white" cx="64" cy="87" r="7" />
+            <path className="nv-art__rule" d="M80 82H112M80 93H102" />
+          </g>
+        </>
+      )}
+    </Art>
+  );
+}
+
+/** A page that does not exist: a compass, its needle looking for the way. */
+export function CompassArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [24, 40, 4],
+        [142, 100, 3.4],
+        [134, 22, 3],
+      ]}
+    >
+      {({ body }) => (
+        <g className="nv-art__float">
+          <circle className="nv-art__line nv-art__warm" cx="80" cy="20" r="7" />
+          <circle className="nv-art__line" fill={body} cx="80" cy="70" r="44" />
+          <circle className="nv-art__line nv-art__paper" cx="80" cy="70" r="33" />
+          <path className="nv-art__rule" d="M80 42V46M80 94V98M52 70H56M104 70H108" />
+          <g transform="rotate(34 80 70)">
+            <path className="nv-art__line nv-art__neon" d="M80 44L90 70H70Z" />
+            <path className="nv-art__line nv-art__white" d="M70 70H90L80 96Z" />
+          </g>
+          <circle className="nv-art__line nv-art__warm-light" cx="80" cy="70" r="4.5" />
+        </g>
+      )}
+    </Art>
+  );
+}
+
+/** No goal yet: a target, the arrow already in its heart. */
+export function TargetArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [22, 30, 4],
+        [146, 70, 3.4],
+        [28, 108, 3],
+      ]}
+    >
+      {({ body, hot }) => (
+        <>
+          <g className="nv-art__float nv-art__float--2">
+            <circle className="nv-art__line" fill={body} cx="74" cy="72" r="44" />
+            <circle className="nv-art__line nv-art__paper" cx="74" cy="72" r="31" />
+            <circle className="nv-art__line" fill={hot} cx="74" cy="72" r="18" />
+            <circle className="nv-art__white" cx="74" cy="72" r="6" />
+          </g>
+          <g className="nv-art__float">
+            <path className="nv-art__shaft" d="M76 70L128 22" />
+            <path className="nv-art__line nv-art__warm" d="M120 30L134 8L140 22L148 28L128 38Z" />
+          </g>
+        </>
+      )}
+    </Art>
+  );
+}
+
+/** Nothing dropped yet: her camera, the lens lit, a heart for what it will bring. */
+export function CameraArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [20, 60, 4],
+        [144, 104, 3.4],
+        [36, 22, 3],
+      ]}
+    >
+      {({ body, hot, deep }) => (
+        <>
+          <g className="nv-art__float nv-art__float--2">
+            <path className="nv-art__line" fill={body} d="M56 46L63 32H97L104 46Z" />
+            <rect className="nv-art__line" fill={body} x="28" y="44" width="104" height="68" rx="14" />
+            <rect className="nv-art__line nv-art__warm" x="40" y="54" width="16" height="9" rx="4.5" />
+            <circle className="nv-art__line" fill={hot} cx="80" cy="79" r="24" />
+            <circle className="nv-art__screen" fill={deep} cx="80" cy="79" r="14" />
+            <circle className="nv-art__white" cx="74" cy="73" r="4" />
+          </g>
+          <g className="nv-art__float nv-art__float--3" transform="translate(128 36)">
+            <path className="nv-art__line nv-art__neon" d={HEART} transform="rotate(14) scale(0.9)" />
+          </g>
+        </>
+      )}
+    </Art>
+  );
+}
+
+/** No alert: the bell at rest, nothing ringing. */
+export function BellArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [24, 30, 4],
+        [140, 26, 3.4],
+        [136, 108, 3],
+      ]}
+    >
+      {({ hot }) => (
+        <>
+          <g className="nv-art__float">
+            <circle className="nv-art__line nv-art__warm" cx="80" cy="100" r="9" />
+            <path
+              className="nv-art__line"
+              fill={hot}
+              d="M80 24C60 24 50 40 50 60V78L38 96H122L110 78V60C110 40 100 24 80 24Z"
+            />
+            <circle className="nv-art__line nv-art__white" cx="80" cy="22" r="5.5" />
+            <path className="nv-art__rule" d="M62 60Q62 44 74 38" />
+          </g>
+          <path className="nv-art__rule nv-art__rule--ink" d="M28 52Q22 64 28 76M132 52Q138 64 132 76" />
+        </>
+      )}
+    </Art>
+  );
+}
+
+/** No creator yet: her crown, waiting for her. */
+export function CrownArt(): JSX.Element {
+  return (
+    <Art
+      sparks={[
+        [22, 84, 4],
+        [144, 80, 3.4],
+        [112, 16, 3],
+      ]}
+    >
+      {({ body, hot }) => (
+        <g className="nv-art__float">
+          <path className="nv-art__line" fill={hot} d="M38 96L28 48L56 68L80 32L104 68L132 48L122 96Z" />
+          <rect className="nv-art__line" fill={body} x="34" y="92" width="92" height="18" rx="7" />
+          <circle className="nv-art__line nv-art__violet" cx="28" cy="46" r="6.5" />
+          <circle className="nv-art__line nv-art__warm-light" cx="80" cy="30" r="7.5" />
+          <circle className="nv-art__line nv-art__violet" cx="132" cy="46" r="6.5" />
+          <circle className="nv-art__line nv-art__white" cx="80" cy="101" r="4.5" />
+          <circle className="nv-art__line nv-art__warm" cx="56" cy="101" r="3.5" />
+          <circle className="nv-art__line nv-art__warm" cx="104" cy="101" r="3.5" />
+        </g>
+      )}
+    </Art>
+  );
+}
