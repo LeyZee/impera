@@ -7,9 +7,9 @@ import { CurrencySchema } from './money';
 
 /**
  * What a creator reads of her own account in her space (CR-02, ADR 0042 § 2): her fans and their conversations, read
- * only. Every object is `strict`: she sees a message, never who wrote it (chatter or agent, ADR 0021), so a field the
- * server would add by mistake (`author`, `draftId`) fails the contract instead of reaching her screen. Her creator is
- * read in her account by the server (`withCreatorAccount`), never in the request.
+ * only. Every object is `strict`: of who wrote a message she reads only `writtenBy` (ADR 0065 § 1), never the agency's
+ * own fields, so a field the server would add by mistake (`author`, `draftId`) fails the contract instead of reaching
+ * her screen. Her creator is read in her account by the server (`withCreatorAccount`), never in the request.
  */
 
 /** What a fan paid in his conversation, per currency, in minor units: unlocked paid messages only. */
@@ -54,19 +54,40 @@ export const CreatorConversationSchema = z.strictObject({
 export type CreatorConversation = z.infer<typeof CreatorConversationSchema>;
 
 /**
- * One message as she reads it: its direction, never its author. `inbound` is her fan's, `outbound` is hers as the fan
- * saw it, whoever wrote it.
+ * Who wrote one of her sent messages, as she reads it (CRE-04, ADR 0065 § 1): a chatter by his display name (the one
+ * of « Qui répond à tes fans »), the AI (`ai`, « Automatique »), or someone on the platform outside Impera (`platform`,
+ * « Écrit sur Reveal »). `agency`: a draft corrected by someone of the agency who is not a member of the team (the
+ * owner), who has no display name to show. The screen turns each kind into its words; nothing else of the AI or the
+ * team comes out: no draft, no reviewer, no guard's verdict, no model call.
  */
-export const CreatorMessageSchema = z.strictObject({
-  id: MessageIdSchema,
-  direction: MessageDirectionSchema,
-  text: z.string(),
-  media: z.array(MessageMediaViewSchema.strict()),
-  priceMinor: z.number().int().min(0).nullable(),
-  currency: CurrencySchema.nullable(),
-  isPaid: z.boolean(),
-  platformCreatedAt: z.iso.datetime(),
-});
+export const CreatorMessageWriterSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('chatter'), displayName: z.string().min(1) }),
+  z.strictObject({ kind: z.literal('ai') }),
+  z.strictObject({ kind: z.literal('platform') }),
+  z.strictObject({ kind: z.literal('agency') }),
+]);
+export type CreatorMessageWriter = z.infer<typeof CreatorMessageWriterSchema>;
+
+/**
+ * One message as she reads it: its direction and, for one of hers, who wrote it (`writtenBy`, ADR 0065 § 1). `inbound`
+ * is her fan's and carries no writer (`null`); `outbound` is hers as the fan saw it.
+ */
+export const CreatorMessageSchema = z
+  .strictObject({
+    id: MessageIdSchema,
+    direction: MessageDirectionSchema,
+    writtenBy: CreatorMessageWriterSchema.nullable(),
+    text: z.string(),
+    media: z.array(MessageMediaViewSchema.strict()),
+    priceMinor: z.number().int().min(0).nullable(),
+    currency: CurrencySchema.nullable(),
+    isPaid: z.boolean(),
+    platformCreatedAt: z.iso.datetime(),
+  })
+  .refine((message) => (message.direction === 'inbound') === (message.writtenBy === null), {
+    message: 'a fan’s message has no writer, and each of hers has one',
+    path: ['writtenBy'],
+  });
 export type CreatorMessage = z.infer<typeof CreatorMessageSchema>;
 
 /** `GET /v1/creator-space/conversations/:id/messages?limit=&cursor=` (creator): newest first. */

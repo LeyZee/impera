@@ -1,0 +1,7 @@
+# 2026-11-16 — CRE-04 Qui a écrit chacun de ses messages — review
+Fait : contrat `writtenBy` (`chatter` + nom affiché, `ai`, `platform`, `agency`, nul pour un message du fan, et seulement pour lui) sur le message de la créatrice ; règle pure `writtenBy` dans `conversations/domain` ; lecture : `messages.author`/`draft_id` lus par sa porte, correcteur du brouillon lu dans `draft_edited` (côté agence, sa créatrice), nom affiché de `team_members` sur la connexion admin ; test d'intégration des quatre sortes et du message du fan ; glossaire.
+Pas fait : l'écran (Design, après fusion). Seules les fixtures de deux tests de `apps/web/src/screens/sales` prennent `writtenBy`, imposé par le contrat.
+Décisions : pas de migration (lecture admin bornée, comme les noms des collègues, ADR 0031). Un brouillon corrigé par le propriétaire, sans fiche de membre, rend `agency` : les mots de l'écran restent à choisir par Charles.
+Découvertes : `conversation.send` passe `decidedBy: null` au statut `sent`, ce qui efface `drafts.decided_by` et `decided_at` de la décision humaine ; le journal (`draft_edited`) est donc la seule trace du correcteur. Le rapprochement d'un brouillon placé (ADR 0086 § 5) n'écrit pas encore `draft_id` sur le message lu : un message envoyé depuis le panneau copilote se lit « Écrit sur Reveal » tant qu'il n'existe pas.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓ ; intégration écrite mais pas lancée ici (pas de Docker), à confirmer en CI.

@@ -43,6 +43,7 @@ const messages = {
     {
       id: '0192f3a0-0000-7000-8000-0000000a0002',
       direction: 'outbound',
+      writtenBy: { kind: 'ai' },
       text: 'tu vas adorer',
       media: [{ kind: 'image', isLocked: true, description: null }],
       priceMinor: 1500,
@@ -53,6 +54,7 @@ const messages = {
     {
       id: '0192f3a0-0000-7000-8000-0000000a0001',
       direction: 'inbound',
+      writtenBy: null,
       text: 'salut toi',
       media: [],
       priceMinor: null,

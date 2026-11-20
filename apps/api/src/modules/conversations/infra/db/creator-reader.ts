@@ -3,6 +3,7 @@ import {
   CreatorIdSchema,
   CurrencySchema,
   FanIdSchema,
+  MessageAuthorSchema,
   MediaAssetIdSchema,
   MessageDirectionSchema,
   MessageIdSchema,
@@ -13,7 +14,9 @@ import { and, eq, schema, sql, withCreatorAccount, type Database, type Transacti
 import { z } from 'zod';
 
 import type { CreatorSpaceReader, MediaDescriptions, PageRequest } from '../../domain/ports';
+import { correctedDrafts, writtenBy } from '../../domain/written-by';
 
+import { draftEditors } from './draft-editors';
 import { readFanInsights } from './fan-insights';
 import { openedLately, writeOpening } from './openings';
 import { mediaOf } from './reader';
@@ -63,11 +66,13 @@ async function conversationOf(tx: Transaction, id: ConversationId) {
 /**
  * The creator's reads of her own account (CR-02), each in her own transaction (`withCreatorAccount`): her role and her
  * creator come from her account, and the restrictive policies close to her what only the agency reads. The columns are
- * named one by one: `messages.author` and `messages.draft_id` are never selected (ADR 0021), and the contracts are
- * `strict`, so an added field fails before it reaches her.
+ * named one by one: `messages.author` and `messages.draft_id` are read only to say who wrote each of her messages
+ * (`writtenBy`, ADR 0065 § 1) and never leave as such, and the contracts are `strict`, so an added field fails before
+ * it reaches her. `adminDb` reads only the display name of the member who corrected a draft (`draftEditors`).
  */
 export function createDrizzleCreatorSpaceReader(
   db: Database,
+  adminDb: Database,
   mediaDescriptions: MediaDescriptions,
 ): CreatorSpaceReader {
   return {
@@ -142,6 +147,8 @@ export function createDrizzleCreatorSpaceReader(
           .select({
             id: schema.messages.id,
             direction: schema.messages.direction,
+            author: schema.messages.author,
+            draftId: schema.messages.draftId,
             text: schema.messages.text,
             mediaIds: schema.messages.mediaIds,
             platformMedia: schema.messages.platformMedia,
@@ -165,6 +172,22 @@ export function createDrizzleCreatorSpaceReader(
         return { creatorId, ...paged(rows, page, (last) => encodeCursor(last.cursorAt, last.id)) };
       });
       if (read === null) return null;
+      const rows = read.items.map((row) => ({
+        ...row,
+        writer: {
+          direction: MessageDirectionSchema.parse(row.direction),
+          author: MessageAuthorSchema.parse(row.author),
+          draftId: row.draftId,
+        },
+      }));
+      // Outside her door, once it showed these messages are hers: who corrected her drafts (ADR 0065 § 1).
+      const editors = await draftEditors(
+        db,
+        adminDb,
+        read.creatorId,
+        id,
+        correctedDrafts(rows.map((row) => row.writer)),
+      );
       // Outside the read: the `media` module reads its own table, bound to the creator her account names.
       const stored = read.items.flatMap((row) => row.mediaIds.map((m) => MediaAssetIdSchema.parse(m)));
       const descriptions =
@@ -172,9 +195,10 @@ export function createDrizzleCreatorSpaceReader(
           ? new Map<string, string>()
           : await mediaDescriptions.of(CreatorIdSchema.parse(read.creatorId), stored);
       return {
-        items: read.items.map((row) => ({
+        items: rows.map((row) => ({
           id: MessageIdSchema.parse(row.id),
-          direction: MessageDirectionSchema.parse(row.direction),
+          direction: row.writer.direction,
+          writtenBy: writtenBy(row.writer, editors),
           text: row.text,
           media: mediaOf(row.platformMedia, row.mediaIds, descriptions),
           priceMinor: row.priceMinor,

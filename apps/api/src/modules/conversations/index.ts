@@ -101,7 +101,10 @@ export interface ConversationsModule extends ConversationCommands {
 export interface ConversationsDeps {
   /** Application role (RLS). */
   readonly db: Database;
-  /** Owner role: read across creators which conversations members who are away still hold (EQ-13). */
+  /**
+   * Owner role: read across creators which conversations members who are away still hold (EQ-13), and the display name
+   * of the member who corrected one of her drafts, for the creator's reading (ADR 0065 § 1).
+   */
   readonly adminDb: Database;
   readonly fans: FanDirectory;
   /** Implemented by the `connectors` module (P0-06). */
@@ -181,7 +184,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
           requireRole: deps.requireRole,
         })(app, options);
       await createCreatorSpaceRoutes(
-        createDrizzleCreatorSpaceReader(deps.db, deps.mediaDescriptions ?? noMediaDescriptions),
+        createDrizzleCreatorSpaceReader(deps.db, deps.adminDb, deps.mediaDescriptions ?? noMediaDescriptions),
         deps.requireRole,
         clock,
       )(app, options);

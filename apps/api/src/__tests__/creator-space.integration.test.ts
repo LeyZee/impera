@@ -3,10 +3,14 @@ import {
   CreatorFanPageSchema,
   CreatorIdSchema,
   CreatorMessagePageSchema,
+  DraftIdSchema,
+  EventIdSchema,
   FanIdSchema,
   AuditEntryIdSchema,
   newId,
   PlatformAccountIdSchema,
+  TeamMemberIdSchema,
+  UserIdSchema,
   type ConversationId,
   type CreatorId,
   type FanId,
@@ -27,8 +31,9 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const PASSWORD = 'correct horse battery';
 
 /**
- * The creator's own space (CR-02, ADR 0042 § 2): her fans and their conversations, read through her own door, a
- * message never with its author, each opening in the audit log. Invented data only (ADR 0010).
+ * The creator's own space (CR-02, ADR 0042 § 2): her fans and their conversations, read through her own door, each of
+ * her messages with who wrote it and nothing more of the agency (ADR 0065 § 1), each opening in the audit log.
+ * Invented data only (ADR 0010).
  */
 describe('/v1/creator-space', () => {
   let test: TestDb;
@@ -39,6 +44,7 @@ describe('/v1/creator-space', () => {
   let otherCookie: string;
   let operatorCookie: string;
   let nora: CreatorId;
+  let noraAccount: string;
   let ines: CreatorId;
   const conversations = new Map<string, { conversationId: ConversationId; fanId: FanId }>();
 
@@ -118,6 +124,7 @@ describe('/v1/creator-space', () => {
     const a = await seedCreator('Nora');
     const b = await seedCreator('Ines');
     nora = a.creatorId;
+    noraAccount = a.accountId;
     ines = b.creatorId;
     await message({
       ...a,
@@ -161,7 +168,7 @@ describe('/v1/creator-space', () => {
       text: 'Hello',
       at: '2026-11-02T09:00:00Z',
     });
-    // Written by the agent: the author is a column, never read for her.
+    // Written by the agent: she reads « Automatique », never the column.
     await test.admin.db
       .update(schema.messages)
       .set({ author: 'ai' })
@@ -266,7 +273,7 @@ describe('/v1/creator-space', () => {
     });
   });
 
-  it('reads the messages newest first, with their direction and price, never their author nor their draft', async () => {
+  it('reads the messages newest first, with their direction, price and writer, never their author nor their draft', async () => {
     const julien = conversations.get('Julien');
     const response = await get(
       `/v1/creator-space/conversations/${julien?.conversationId ?? ''}/messages`,
@@ -275,12 +282,109 @@ describe('/v1/creator-space', () => {
     expect(response.statusCode, response.body).toBe(200);
     const body: unknown = response.json();
     const page = CreatorMessagePageSchema.parse(body);
-    expect(page.items.map((m) => [m.direction, m.text, m.priceMinor, m.isPaid])).toEqual([
-      ['outbound', 'Et celui-ci, pas encore ouvert', 2500, false],
-      ['outbound', 'Un petit cadeau pour toi', 1500, true],
-      ['inbound', 'Salut', null, false],
+    expect(page.items.map((m) => [m.direction, m.text, m.priceMinor, m.isPaid, m.writtenBy])).toEqual([
+      ['outbound', 'Et celui-ci, pas encore ouvert', 2500, false, { kind: 'platform' }],
+      ['outbound', 'Un petit cadeau pour toi', 1500, true, { kind: 'ai' }],
+      ['inbound', 'Salut', null, false, null],
     ]);
     expect(response.body).not.toMatch(/"author"|"draftId"/u);
+  });
+
+  it('names who wrote each of her messages: the chatter who corrected a draft, the AI, the platform (ADR 0065 § 1)', async () => {
+    const at = (minute: number) => `2026-11-04T10:${String(minute).padStart(2, '0')}:00Z`;
+    const seed = { creatorId: nora, accountId: noraAccount, fan: 'Hugo', direction: 'outbound' } as const;
+    await message({ ...seed, ref: 'h1', direction: 'inbound', text: 'Tu fais quoi ?', at: at(0) });
+    await message({ ...seed, ref: 'h2', text: 'Je pensais à toi', at: at(1) });
+    await message({ ...seed, ref: 'h3', text: 'Corrigé par Kofi', at: at(2) });
+    await message({ ...seed, ref: 'h4', text: 'Écrit sur la plateforme', at: at(3) });
+    await message({ ...seed, ref: 'h5', text: 'Corrigé par le propriétaire', at: at(4) });
+    const hugo = conversations.get('Hugo')?.conversationId;
+    if (hugo === undefined) throw new Error('seed failed');
+
+    // Kofi, a chatter of the team; the owner corrects too, with no member record.
+    const kofi = newId(UserIdSchema);
+    const owner = newId(UserIdSchema);
+    await test.admin.db.insert(schema.user).values([
+      { id: kofi, name: 'Kofi Compte', email: 'kofi@example.test' },
+      { id: owner, name: 'Propriétaire Inventé', email: 'patron@example.test', role: 'owner' },
+    ]);
+    await test.admin.db.insert(schema.teamMembers).values({
+      id: newId(TeamMemberIdSchema),
+      userId: kofi,
+      teamRole: 'chatter',
+      firstName: 'Kofi',
+      lastName: 'Inventé',
+      displayName: 'Kofi',
+      country: 'BJ',
+      timeZone: 'Africa/Porto-Novo',
+      joinedOn: '2026-09-01',
+    });
+
+    // h2: the agent's draft sent as proposed; h3 and h5: drafts corrected before they left; h4: no draft.
+    const drafts = { h2: newId(DraftIdSchema), h3: newId(DraftIdSchema), h5: newId(DraftIdSchema) };
+    await test.admin.db.insert(schema.drafts).values(
+      Object.entries(drafts).map(([ref, id]) => ({
+        id,
+        creatorId: nora,
+        conversationId: hugo,
+        status: 'sent',
+        bubbles: ['Brouillon de l’agent'],
+        idempotencyKey: `writer:${ref}`,
+      })),
+    );
+    for (const [ref, author] of [
+      ['h2', 'ai'],
+      ['h3', 'human'],
+      ['h4', 'human'],
+      ['h5', 'human'],
+    ] as const) {
+      const draftId = ref === 'h4' ? null : drafts[ref];
+      await test.admin.db
+        .update(schema.messages)
+        .set({ author, draftId })
+        .where(and(eq(schema.messages.creatorId, nora), eq(schema.messages.platformMessageId, ref)));
+    }
+    for (const [draftId, userId, type] of [
+      [drafts.h2, kofi, 'draft_approved'],
+      [drafts.h3, kofi, 'draft_edited'],
+      [drafts.h5, owner, 'draft_edited'],
+    ] as const) {
+      const [last] = await test.admin.db
+        .select({ seq: sql<number>`max(${schema.conversationEvents.seq})::int` })
+        .from(schema.conversationEvents)
+        .where(eq(schema.conversationEvents.conversationId, hugo));
+      await test.admin.db.insert(schema.conversationEvents).values({
+        id: newId(EventIdSchema),
+        creatorId: nora,
+        conversationId: hugo,
+        seq: (last?.seq ?? 0) + 1,
+        type,
+        payload: {
+          draftId,
+          status: type === 'draft_edited' ? 'edited' : 'approved',
+          decidedBy: userId,
+          ...(type === 'draft_edited' && { editedBubbles: ['Le texte corrigé'] }),
+        },
+        actor: `human:${userId}`,
+        correlationId: 'writer',
+      });
+    }
+
+    const response = await get(`/v1/creator-space/conversations/${hugo}/messages`, creatorCookie);
+    expect(response.statusCode, response.body).toBe(200);
+    const page = CreatorMessagePageSchema.parse(response.json());
+    expect(page.items.map((m) => [m.text, m.writtenBy])).toEqual([
+      ['Corrigé par le propriétaire', { kind: 'agency' }],
+      ['Écrit sur la plateforme', { kind: 'platform' }],
+      ['Corrigé par Kofi', { kind: 'chatter', displayName: 'Kofi' }],
+      ['Je pensais à toi', { kind: 'ai' }],
+      ['Tu fais quoi ?', null],
+    ]);
+    // Nothing else of the agency: no draft, no reviewer, no account of the chatter, no edit.
+    expect(response.body).not.toMatch(
+      /"author"|"draftId"|decidedBy|Kofi Compte|kofi@|Propriétaire|Brouillon de l’agent|Le texte corrigé/u,
+    );
+    expect(response.body).not.toContain(kofi);
   });
 
   it('never reads a thread without a trace: a read of its messages with no recent opening is written as one', async () => {

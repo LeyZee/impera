@@ -830,7 +830,8 @@ export interface Page<T> {
 
 /**
  * What a creator reads of her own account (CR-02, ADR 0042 § 2), through her own door (`withCreatorAccount`): her
- * creator is read in her account, never given by the caller. No author of a message is ever read (ADR 0021).
+ * creator is read in her account, never given by the caller. Of who wrote a message she reads only `writtenBy` (ADR 0065
+ * § 1): a chatter's display name, « Automatique » or « Écrit sur Reveal », never a draft, its reviewer or a model call.
  */
 export interface CreatorSpaceReader {
   fans(userId: UserId, page: PageRequest): Promise<CreatorFanPage>;
