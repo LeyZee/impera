@@ -50,6 +50,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   llm_calls: ['insert'],
   media_assets: ['insert', 'update'],
   media_descriptions: ['insert'],
+  // Plus two columns, its end (cancelled_at, applied_at, ADR 0096 § 2): a column right, not a table's.
+  owner_removals: ['insert'],
   passkey: ['update', 'delete'],
   password_reset_links: ['insert', 'update'],
   pay_period_blocks: ['insert', 'update', 'delete'],
