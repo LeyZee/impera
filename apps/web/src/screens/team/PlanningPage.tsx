@@ -73,6 +73,7 @@ import {
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Answers } from '@/screens/planning/Exchanges';
+import { PlanningArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
 import { Empty, Failure } from '@/shell/states';
@@ -844,7 +845,7 @@ function Grid({
 }): JSX.Element {
   if (planning.accounts.length === 0) {
     return (
-      <Empty plate title="Aucun compte à planifier">
+      <Empty plate art={<PlanningArt />} title="Aucun compte à planifier">
         Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
         d’abord.
       </Empty>

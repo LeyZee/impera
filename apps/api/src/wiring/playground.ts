@@ -67,5 +67,8 @@ export async function wirePlayground(
         logger.warn({ err: error }, 'playground not started: persona unreadable');
         return null;
       });
-  return { module, routes: module === null ? [] : [module.routes({ guard: requireRole('owner') })] };
+  return {
+    module,
+    routes: module === null ? [] : [module.routes({ guard: requireRole('owner', 'operator') })],
+  };
 }

@@ -48,7 +48,7 @@ describe('exportViewOf', () => {
   it('says when the copy last succeeded, and the latest attempt in one faint line', () => {
     expect(exportViewOf(status(), NOW, PARIS)).toEqual({
       tone: 'ok',
-      title: 'Sauvegardée le 27 octobre à 03:12',
+      title: 'Sauvegardée le 27 octobre à 3\u00a0h\u00a012',
       text: 'Chaque copie est gardée 30\u00a0jours. Après 26\u00a0h sans copie réussie, le Dashboard et Telegram te préviennent.',
       lastRun:
         'Dernière tentative réussie le 27 octobre, en 3\u00a0min\u00a030\u00a0s, 42,4\u00a0Mo chiffrés.',
@@ -72,10 +72,10 @@ describe('exportViewOf', () => {
       PARIS,
     );
     expect(view.tone).toBe('warn');
-    expect(view.title).toBe('Aucune sauvegarde réussie depuis le 25 octobre à 03:12');
+    expect(view.title).toBe('Aucune sauvegarde réussie depuis le 25 octobre à 3\u00a0h\u00a012');
     expect(view.text).toMatch(/^La dernière tentative a échoué\./u);
     expect(view.lastRun).toBe(
-      'Dernière tentative échouée le 27 octobre à 03:00 : l’envoi vers le stockage a échoué.',
+      'Dernière tentative échouée le 27 octobre à 3\u00a0h\u00a000 : l’envoi vers le stockage a échoué.',
     );
   });
 
@@ -96,7 +96,7 @@ describe('exportViewOf', () => {
       PARIS,
     );
     expect(view.title).toBe('Aucune sauvegarde encore');
-    expect(view.lastRun).toBe('Une sauvegarde est en cours depuis 03:00.');
+    expect(view.lastRun).toBe('Une sauvegarde est en cours depuis 3\u00a0h\u00a000.');
   });
 
   it('has no attempt line before the first run', () => {
@@ -109,7 +109,7 @@ describe('exportViewOf', () => {
 describe('the first of a month (PAIE-19)', () => {
   it('writes it « 1er » in the export and on a restore test', () => {
     expect(exportViewOf(status({ lastSucceededAt: '2026-11-01T02:12:00Z' }), NOW, PARIS).title).toBe(
-      'Sauvegardée le 1er novembre à 03:12',
+      'Sauvegardée le 1er novembre à 3\u00a0h\u00a012',
     );
     expect(testedDay('2026-11-01T12:00:00Z')).toBe('1er novembre');
     expect(testedDay('2026-10-20T12:00:00Z')).toBe('20 octobre');
@@ -131,7 +131,7 @@ describe('runNowOf (REG-24)', () => {
     expect(runNowOf(status())).toEqual({ kind: 'offer' });
     expect(runNowOf(status({ runRequestedAt: '2026-10-27T09:58:00Z' }), PARIS, NOW)).toEqual({
       kind: 'asked',
-      text: 'Relance demandée à 10:58 : elle démarre dans la minute.',
+      text: 'Relance demandée à 10\u00a0h\u00a058 : elle démarre dans la minute.',
     });
     expect(
       runNowOf(
@@ -153,7 +153,7 @@ describe('runNowOf (REG-24)', () => {
     expect(runNowOf(asked, PARIS, new Date('2026-10-27T10:02:00Z')).kind).toBe('asked');
     expect(runNowOf(asked, PARIS, new Date('2026-10-27T10:12:00Z'))).toEqual({
       kind: 'unheard',
-      text: 'Le service de sauvegarde n’a pas pris la demande de 10:58. Tu peux redemander.',
+      text: 'Le service de sauvegarde n’a pas pris la demande de 10\u00a0h\u00a058. Tu peux redemander.',
     });
   });
 });

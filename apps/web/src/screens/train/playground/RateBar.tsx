@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, type JSX } from 'react';
 
 import { euros, FICTIONAL, percent, personaLabel, PLAYED, rateTone } from './logic';
+import { useTrainsAsOwner } from './trainer';
 
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
 
@@ -19,6 +20,7 @@ export function RateBar({ state, isDemo }: { state: PlaygroundState; isDemo: boo
   const tone = rateTone(rate, target);
   const valueRef = useRef<HTMLSpanElement>(null);
   const shown = useRef(0);
+  const asOwner = useTrainsAsOwner();
 
   // The rate counts up to its new value from the one on screen, never from zero.
   useEffect(() => {
@@ -95,7 +97,7 @@ export function RateBar({ state, isDemo }: { state: PlaygroundState; isDemo: boo
           </span>
           <span>{euros(state.sessionCostEur)} cette session</span>
         </span>
-      ) : (
+      ) : asOwner ? (
         <Link
           to="/reglages/modeles-ia"
           className="pg-key"
@@ -103,6 +105,14 @@ export function RateBar({ state, isDemo }: { state: PlaygroundState; isDemo: boo
         >
           Clé manquante
         </Link>
+      ) : (
+        // The keys are the owner's settings (ADR 0092 § 8): a manager reads that one is missing, nothing to open.
+        <span
+          className="pg-key"
+          title="Aucune clé n’atteint le modèle de la voix : le propriétaire l’ajoute."
+        >
+          Clé manquante
+        </span>
       )}
     </div>
   );

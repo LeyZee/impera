@@ -941,6 +941,13 @@ const playground = createRoute({
 const channelPost = createRoute({
   getParentRoute: () => train,
   path: '/canal',
+  // Her channel's posts are the owner's (ADR 0092 § 8): a manager who has the address finds the Playground.
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/entrainer/playground', replace: true });
+    }
+  },
   component: ChannelPostPage,
 });
 /*
