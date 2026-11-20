@@ -562,7 +562,7 @@ describe('the native scripts imported from the platform', () => {
         },
       },
     ]);
-    // Its identity is asked again from what is validated now: one waiting job for the script.
+    // No identity is asked after it any more (ADR 0161 § 5): no job waits for the script.
     const jobs = z.array(z.object({ key: z.string() })).parse(
       (
         await test.admin.db.execute(
@@ -572,7 +572,7 @@ describe('the native scripts imported from the platform', () => {
         )
       ).rows,
     );
-    expect(jobs).toHaveLength(1);
+    expect(jobs).toHaveLength(0);
   });
 
   it('lets the owner and an active manager of her list read, never a chatter nor her own account', async () => {
@@ -838,7 +838,7 @@ describe('the native scripts imported from the platform', () => {
     expect(cause).toMatch(/permission denied/u);
   });
 
-  it('asks the identity again after an import that changes a script, and each hour for those of a switch on', async () => {
+  it('no longer asks an identity after an import that changes a script (ADR 0161 § 5)', async () => {
     await test.admin.db.execute(
       sql`delete from graphile_worker._private_jobs j using graphile_worker._private_tasks t
           where t.id = j.task_id and t.identifier = 'scripts.identify_platform_script'`,
@@ -859,7 +859,7 @@ describe('the native scripts imported from the platform', () => {
     await scenario([{ type: 'script_changed', scriptId: 'script_4_2', priceCents: 2_500 }]);
     expect(await importOf(noraAccount, nora, new Date('2026-11-15T10:00:00Z'))).toMatchObject({ changed: 1 });
     const changed = await ownerView('sequence_4');
-    expect(await identityJobs()).toEqual([`scripts.identify_platform_script:${changed?.id ?? ''}`]);
+    expect(await identityJobs()).toEqual([]);
     // A price is not in the identity: the one written by hand still stands, the script still proposable.
     expect(changed).toMatchObject({ proposable: true, identity: { author: 'human' } });
     const active = (await scriptRows()).filter((row) => row.active && row.creatorId === nora);
