@@ -56,6 +56,7 @@ export {
   type CallMeta,
   type ChannelPostInput,
   type ChannelPostResult,
+  type InstagramCommentInput,
   type ConnectionTest,
   type ConversationInput,
   type ConversationTurn,

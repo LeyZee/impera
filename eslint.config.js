@@ -13,7 +13,8 @@ import prettier from 'eslint-config-prettier';
  * phase 6) enters here with its first code.
  */
 const MODULE_DEPENDENCIES = {
-  connectors: ['conversations'],
+  // INS-04: `FakeInstagram` implements the comments port of `instagram-comments`, read through its index.
+  connectors: ['conversations', 'instagram-comments'],
   conversations: ['fans', 'persona', 'agent', 'media'],
   fans: [],
   persona: [],
@@ -44,6 +45,8 @@ const MODULE_DEPENDENCIES = {
   trends: ['agent', 'content-drops', 'creator-tasks'],
   // INS-03, ADR 0121 § 1: her redirect links, out of the Telegram channel's setting; a leaf, read through its index.
   'redirect-links': [],
+  // INS-04, ADR 0122: the comments under her Instagram posts. Lot a: pure rules and its port; imports no module.
+  'instagram-comments': [],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
   'creator-tasks': ['scheduling'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
