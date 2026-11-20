@@ -716,7 +716,7 @@ interface ComposedDesire {
 
 /** Which follow-up this is, after which silence. */
 /** The sale she thanks him for (ADR 0156 § 2). */
-export interface AftercareContext {
+interface AftercareContext {
   readonly saleType: AfterSaleType;
   /** When he paid, as the platform dates it. */
   readonly occurredAt: Date;
