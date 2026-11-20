@@ -41,6 +41,7 @@ import {
   CommissionRateConflict,
   MemberConflict,
   MemberNotFound,
+  OwnerProtected,
   OwnNotesForbidden,
   PlatformAccountLinked,
   RoleChangeConflict,
@@ -350,6 +351,9 @@ export function createDrizzleTeamStore(
         // Asked twice, the same status changes nothing and writes nothing.
         if (current.status === status) return;
         assertStillInTeam(current.status);
+        // An owner is never shut out by a status (ADR 0096 § 2): his sign-in reads it, his removal has its notice.
+        const [holder] = await tx.select({ role: user.role }).from(user).where(eq(user.id, current.userId));
+        if (holder?.role === 'owner') throw new OwnerProtected();
         const leaving = leavesTeam(current.status, status);
         await tx
           .update(teamMembers)

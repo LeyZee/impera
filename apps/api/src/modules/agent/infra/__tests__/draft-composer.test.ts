@@ -266,6 +266,35 @@ describe('createDraftComposer', () => {
     });
   });
 
+  it('names her examples on the voice call only (ADR 0102 § 6)', async () => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    await createDraftComposer({
+      gateway: gateway({}, seen),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        voiceExamples: [
+          { id: 'example-2', text: 'Hey toi' },
+          { id: 'example-1', text: 'Coucou toi' },
+        ],
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(seen.voiceInputs?.[0]?.trace).toEqual({
+      creatorId: 'creator-1',
+      conversationId: 'conversation-1',
+      draftId: 'draft-1',
+      voiceExampleIds: ['example-2', 'example-1'],
+    });
+    expect(seen.traces[0]).toEqual({
+      creatorId: 'creator-1',
+      conversationId: 'conversation-1',
+      draftId: 'draft-1',
+    });
+  });
+
   it('gives the voice the bubbles code allows, and leaves out what goes past them (Charles 16/11)', async () => {
     const { draftComposer, seen } = composer({
       voice: { bubbles: ['Salut toi', 'ça va et toi ?', 'je file'] },

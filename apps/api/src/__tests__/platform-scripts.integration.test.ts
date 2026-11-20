@@ -14,6 +14,8 @@ import {
   PreparedScriptIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
+  type DescriptionReviewReason,
+  type DropMediaDescription,
   type PlatformAccountId,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withCreatorAccount, withTenant } from '@impera/db';
@@ -321,7 +323,15 @@ describe('the native scripts imported from the platform', () => {
       );
     // Listed by the sync, its file not read yet; the preview no longer in her vault.
     expect((await step())?.media).toEqual([
-      { ref: 'media_02', kind: 'image', inVault: true, imported: true, mediaAssetId: null, described: false },
+      {
+        ref: 'media_02',
+        kind: 'image',
+        inVault: true,
+        imported: true,
+        mediaAssetId: null,
+        described: false,
+        description: null,
+      },
     ]);
     expect((await step())?.previewMedia).toEqual([
       {
@@ -331,6 +341,7 @@ describe('the native scripts imported from the platform', () => {
         imported: false,
         mediaAssetId: null,
         described: false,
+        description: null,
       },
     ]);
     expect((await step())?.complete).toBe(false);
@@ -346,8 +357,9 @@ describe('the native scripts imported from the platform', () => {
       bytes: 1000,
       sha256: asset,
     });
+    const validated = newId(z.uuid());
     await test.admin.db.insert(schema.mediaDescriptions).values({
-      id: newId(z.uuid()),
+      id: validated,
       creatorId: nora,
       mediaAssetId: asset,
       vocabularyVersion: '1',
@@ -367,7 +379,15 @@ describe('the native scripts imported from the platform', () => {
         ),
       );
     expect((await step())?.media).toEqual([
-      { ref: 'media_02', kind: 'image', inVault: true, imported: true, mediaAssetId: asset, described: true },
+      {
+        ref: 'media_02',
+        kind: 'image',
+        inVault: true,
+        imported: true,
+        mediaAssetId: asset,
+        described: true,
+        description: { id: validated, detailed: 'Une photo inventée.', reviewReasons: [], validated: true },
+      },
     ]);
     expect(await ownerView('sequence_1')).toMatchObject({
       gaps: ['media_absent', 'media_not_described', 'identity_not_validated'],
@@ -382,6 +402,176 @@ describe('the native scripts imported from the platform', () => {
     expect((await scripts().forJobs.platformScript(nora, managerView.id))?.steps[1]?.previewMedia).toEqual(
       (await step())?.previewMedia,
     );
+  });
+
+  /** Invented (ADR 0010): a vision's description of a vault media, as `media.describe_vault` writes it. */
+  const VISION: DropMediaDescription = {
+    vocabularyVersion: '1.0.0',
+    kind: 'image',
+    detailed: 'Une photo inventée, à valider.',
+    factualDescription: 'Une photo inventée.',
+    durationS: null,
+    segments: [],
+    intensity: 'soft',
+    anatomyVisible: [],
+    castMode: 'solo',
+    mood: [],
+    setting: null,
+    audio: null,
+    textVisible: null,
+    quality: 'good',
+    confidenceLow: false,
+    notVisible: false,
+    flags: [],
+  };
+
+  /** A vault media of hers read and described by the vision, waiting for a person; gives the description's id. */
+  async function seen(ref: string, detailed: string, reasons: DescriptionReviewReason[]): Promise<string> {
+    const asset = newId(MediaAssetIdSchema);
+    await test.admin.db.insert(schema.mediaAssets).values({
+      id: asset,
+      creatorId: nora,
+      kind: 'image',
+      origin: 'creator',
+      storageKey: `test/${asset}`,
+      mime: 'image/jpeg',
+      bytes: 1000,
+      sha256: asset,
+    });
+    const description = newId(z.uuid());
+    await test.admin.db.insert(schema.mediaDescriptions).values({
+      id: description,
+      creatorId: nora,
+      mediaAssetId: asset,
+      vocabularyVersion: '1.0.0',
+      content: { ...VISION, detailed },
+      model: 'vision-test',
+      promptHash: 'drop-v1',
+      reviewReasons: reasons,
+    });
+    await test.admin.db
+      .update(schema.mediaPlatformRefs)
+      .set({ mediaAssetId: asset })
+      .where(
+        and(
+          eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+          eq(schema.mediaPlatformRefs.platformMediaId, ref),
+        ),
+      );
+    return description;
+  }
+
+  it('lets the team validate the descriptions of a script’s media as shown, or rewrite one, then asks its identity', async () => {
+    const before = await ownerView('sequence_1');
+    if (before === undefined) throw new Error('imported');
+    // The vision's descriptions of its first and last photos, waiting for a person; the last with a reason.
+    const first = await seen('media_01', 'Une photo inventée, à valider.', []);
+    const unsure = await seen('media_03', 'Une photo inventée, pas sûre.', ['unsure']);
+    const shown = await ownerView('sequence_1');
+    expect(shown?.steps[0]?.media[0]).toMatchObject({
+      described: false,
+      description: {
+        id: first,
+        detailed: 'Une photo inventée, à valider.',
+        reviewReasons: [],
+        validated: false,
+      },
+    });
+    expect(shown?.steps[2]?.media[0]?.description).toMatchObject({ id: unsure, reviewReasons: ['unsure'] });
+    const base = `/v1/creators/${nora}/platform-scripts/${before.id}/descriptions`;
+    const code = (response: { json: () => unknown }) =>
+      z.object({ error: z.object({ code: z.string() }) }).parse(response.json()).error.code;
+    // A chatter, her own account, a creator not on his list: never.
+    expect((await post('chatter', `${base}/validate`, { descriptionIds: [first] })).statusCode).toBe(404);
+    expect((await post('nora', `${base}/validate`, { descriptionIds: [first] })).statusCode).toBe(403);
+    expect(
+      (
+        await post('manager', `/v1/creators/${ines}/platform-scripts/${before.id}/descriptions/validate`, {
+          descriptionIds: [first],
+        })
+      ).statusCode,
+    ).toBe(403);
+    // One that waits for a reason never goes with others; one that is not of this script is stale.
+    const together = await post('owner', `${base}/validate`, { descriptionIds: [first, unsure] });
+    expect([together.statusCode, code(together)]).toEqual([
+      409,
+      'platform_script_description_alone_conflict',
+    ]);
+    const other = await post('owner', `${base}/validate`, { descriptionIds: [newId(z.uuid())] });
+    expect([other.statusCode, code(other)]).toEqual([409, 'platform_script_description_stale_conflict']);
+    // Validated as shown by a manager of her list; again, nothing is written twice.
+    const validated = await post('manager', `${base}/validate`, { descriptionIds: [first] });
+    expect(validated.statusCode).toBe(200);
+    expect(PlatformScriptViewSchema.parse(validated.json()).steps[0]?.media[0]).toMatchObject({
+      described: true,
+      description: { id: first, validated: true },
+    });
+    expect((await post('owner', `${base}/validate`, { descriptionIds: [first] })).statusCode).toBe(200);
+    // The unsure one rewritten by hand: a new row, validated by whoever writes it; the vision's stays as it was.
+    const corrected = await post('owner', `${base}/correct`, {
+      descriptionId: unsure,
+      detailed: '  Une photo inventée, relue par l’agence.  ',
+    });
+    expect(corrected.statusCode).toBe(200);
+    const after = PlatformScriptViewSchema.parse(corrected.json()).steps[2]?.media[0];
+    expect(after).toMatchObject({
+      described: true,
+      description: {
+        detailed: 'Une photo inventée, relue par l’agence.',
+        reviewReasons: [],
+        validated: true,
+      },
+    });
+    expect(after?.description?.id).not.toBe(unsure);
+    const [vision] = await test.admin.db
+      .select()
+      .from(schema.mediaDescriptions)
+      .where(eq(schema.mediaDescriptions.id, unsure));
+    expect(vision).toMatchObject({ validatedAt: null, author: 'sense' });
+    // The row corrected is no longer the one shown: a second correction of it is stale.
+    const late = await post('owner', `${base}/correct`, { descriptionId: unsure, detailed: 'Trop tard.' });
+    expect([late.statusCode, code(late)]).toEqual([409, 'platform_script_description_stale_conflict']);
+    expect((await post('owner', `${base}/correct`, { descriptionId: first, detailed: ' ' })).statusCode).toBe(
+      400,
+    );
+    // The trail says who lifted which reason, the text never.
+    const audit = await test.admin.db
+      .select({
+        userId: schema.auditLog.userId,
+        action: schema.auditLog.action,
+        details: schema.auditLog.details,
+      })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, before.id))
+      .orderBy(schema.auditLog.createdAt);
+    expect(audit).toEqual([
+      {
+        userId: ids.manager,
+        action: 'media_description.validated',
+        details: { descriptionIds: [first], lifted: [], creatorId: nora },
+      },
+      {
+        userId: ids.owner,
+        action: 'media_description.corrected',
+        details: {
+          from: unsure,
+          to: after?.description?.id,
+          lifted: [{ descriptionId: unsure, reasons: ['unsure'] }],
+          creatorId: nora,
+        },
+      },
+    ]);
+    // Its identity is asked again from what is validated now: one waiting job for the script.
+    const jobs = z.array(z.object({ key: z.string() })).parse(
+      (
+        await test.admin.db.execute(
+          sql`select j.key from graphile_worker._private_jobs j
+                join graphile_worker._private_tasks t on t.id = j.task_id
+                where t.identifier = 'scripts.identify_platform_script' and j.key = ${`scripts.identify_platform_script:${before.id}`}`,
+        )
+      ).rows,
+    );
+    expect(jobs).toHaveLength(1);
   });
 
   it('lets the owner and an active manager of her list read, never a chatter nor her own account', async () => {
@@ -518,6 +708,16 @@ describe('the native scripts imported from the platform', () => {
       return scripts().jobs.identifyPlatformScript({ creatorId: nora, platformScriptId: view.id });
     });
 
+  /** One sign-in per person for the whole file: the sign-in limiter counts each one. */
+  const cookies = new Map<string, string>();
+  const cookieOf = async (who: string): Promise<string> => {
+    const known = cookies.get(who);
+    if (known !== undefined) return known;
+    const cookie = await signIn(server, `${who}@example.test`, PASSWORD);
+    cookies.set(who, cookie);
+    return cookie;
+  };
+
   const post = async (
     who: 'owner' | 'manager' | 'chatter' | 'nora',
     url: string,
@@ -527,7 +727,7 @@ describe('the native scripts imported from the platform', () => {
     server.inject({
       method,
       url,
-      headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
+      headers: { cookie: await cookieOf(who), origin: DASHBOARD_ORIGIN },
       payload,
     });
 
