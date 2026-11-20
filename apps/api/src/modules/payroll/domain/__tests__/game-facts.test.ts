@@ -24,6 +24,7 @@ const line = (
   currency,
   netMinor,
   occurredAt: at === null ? null : new Date(at),
+  saleType: 'ppv',
 });
 
 describe('payGameFacts (ADR 0104 § 12, § 14 to § 16)', () => {
@@ -91,6 +92,7 @@ describe('the validated reports in the game (ADR 0118 § 1 to § 4)', () => {
         currency: 'EUR',
         netMinor: 8_000,
         occurredAt: new Date('2025-06-03T18:00:00Z'),
+        saleType: null,
       },
     ]);
   });

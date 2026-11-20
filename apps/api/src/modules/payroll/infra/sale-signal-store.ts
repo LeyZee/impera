@@ -11,6 +11,7 @@ import {
   PlatformSchema,
   SaleDecisionOutcomeSchema,
   SaleEventSchema,
+  SaleTypeSchema,
   payPeriodAt,
   SaleSignalKindSchema,
   TeamMemberIdSchema,
@@ -81,6 +82,7 @@ const StoredSaleSchema = z.object({
   lateFrom: PayPeriodSchema.nullish(),
   occurredAt: z.iso.datetime().nullish(),
   shareBp: z.number().int().nullish(),
+  saleType: SaleTypeSchema.nullish(),
 });
 
 const SignalRowSchema = z.object({
@@ -228,6 +230,7 @@ export async function figureLinesOf(tx: Transaction, memberId: TeamMemberId): Pr
         currency,
         netMinor: one.netMinor,
         occurredAt: one.occurredAt == null ? null : new Date(one.occurredAt),
+        saleType: one.saleType ?? null,
       }));
   });
 }

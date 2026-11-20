@@ -196,7 +196,7 @@ export interface StatementDraft {
   readonly inputsHash: string;
 }
 
-/** A sale as `inputsHash` covers it: without its instant, which only shows (CRM-03 lot b4c). */
+/** A sale as `inputsHash` covers it: without its instant nor what was sold, which only show (CRM-03 lot b4c, ADR 0104 § 6). */
 const counted = (sale: StatementSale): StatementSale => ({
   platform: sale.platform,
   platformSaleId: sale.platformSaleId,

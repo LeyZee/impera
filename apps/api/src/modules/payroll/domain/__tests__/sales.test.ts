@@ -79,6 +79,7 @@ const sale = (
     platformSaleId: `sale-${String(saleNumber).padStart(3, '0')}`,
     event: 'sale',
     platformAccountId: ACCOUNT,
+    saleType: 'ppv',
     status: 'paid',
     occurredAt: new Date(at),
     period,
@@ -588,6 +589,7 @@ describe('a statement on the platform’s net (ADR 0050 § 8)', () => {
         netMinor: 10_000,
         linkVersion: 'v1',
         occurredAt: '2025-03-17T11:00:00.000Z',
+        saleType: 'ppv',
       },
     ]);
     expect(content.lines[1]?.shiftReportIds).toEqual([]);
@@ -695,6 +697,43 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
     expect(inputsHashOf(other)).not.toBe(inputsHashOf(content));
   });
 
+  it('keeps what was sold on each sale without moving an amount, a total nor the hash (ADR 0104 § 6)', () => {
+    const tip = sale(linked(theo), '2025-03-17T11:00:00.000Z', 4_000, { saleType: 'tip' });
+    const ppv = { ...tip, saleType: 'ppv' as const };
+    const with_ = (line: SaleForPay) =>
+      statementOf(
+        snapshot({ period: P2, members: [theo, lea], sales: salesOf({ lines: [line], shifts }) }),
+        theo.id,
+      );
+    const withTip = with_(tip);
+    const withPpv = with_(ppv);
+    expect(withTip.content.lines[0]?.sales?.map((one) => one.saleType)).toEqual(['tip']);
+    expect(withPpv.content.lines[0]?.sales?.map((one) => one.saleType)).toEqual(['ppv']);
+    // The type is the only thing that differs: once levelled, every amount, every total and the hash are the same.
+    const bare = (content: typeof withTip.content) => ({
+      ...content,
+      lines: content.lines.map(({ sales, ...line }) => ({
+        ...line,
+        ...(sales !== undefined && { sales: sales.map((one) => ({ ...one, saleType: 'other' as const })) }),
+      })),
+    });
+    expect(bare(withTip.content)).toEqual(bare(withPpv.content));
+    expect(withTip.inputsHash).toBe(withPpv.inputsHash);
+    // A statement written before the type was kept: the same hash, never written again for it.
+    const line = withTip.content.lines[0];
+    if (line?.sales === undefined) throw new Error('a line of sales');
+    const before = line.sales.map(({ platform, platformSaleId, event, netMinor, linkVersion }) => ({
+      platform,
+      platformSaleId,
+      event,
+      netMinor,
+      linkVersion,
+    }));
+    expect(inputsHashOf({ ...withTip.content, lines: [{ ...line, sales: before }] })).toBe(
+      withTip.inputsHash,
+    );
+  });
+
   it('takes a refund after the closing off the first open period, for the member the sale paid', () => {
     const { closed } = closePeriod(open);
     const refund = refundOf(one, P3, 10_000, linked(lea, 'v2'));
@@ -720,6 +759,7 @@ describe('the closing of a period with sales (ADR 0032, ADR 0050 § 7)', () => {
         linkVersion: 'v1',
         lateFrom: P2,
         occurredAt: refund.occurredAt.toISOString(),
+        saleType: 'ppv',
       },
     ]);
     expect(paysMember(next, lea.id)).toBe(false);
@@ -864,6 +904,7 @@ describe('a sale given to the member who was decisive, whole or shared (ADR 0101
         linkVersion: 'v1',
         shareBp: 5_000,
         occurredAt: night.occurredAt.toISOString(),
+        saleType: 'ppv',
       },
     ]);
     expect(closePeriod(open).closing.teamNetMinor).toBe(10_001);

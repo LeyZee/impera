@@ -23,7 +23,7 @@ import { CurrencySchema, PAY_AMOUNT_MAX_MINOR } from './money';
 import { PayPeriodSchema, type PayPeriod } from './pay-periods';
 import { EarningsBaseSchema } from './pay-rules';
 import { TimezoneSchema } from './persona';
-import { SaleEventSchema, SaleStatusSchema } from './sales-feed';
+import { SaleEventSchema, SaleStatusSchema, SaleTypeSchema } from './sales-feed';
 import { BasisPointsSchema } from './team';
 import { CalendarDaySchema } from './team-members';
 
@@ -1364,6 +1364,14 @@ export const MyFiguresDaySchema = z.object({
 });
 export type MyFiguresDay = z.infer<typeof MyFiguresDaySchema>;
 
+/** What the member sold of one type in the period under way: how many sales, and their net (refunds taken off). */
+export const MyFiguresKindSchema = z.object({
+  type: SaleTypeSchema,
+  sales: z.number().int().min(0),
+  nets: z.array(MyNetSchema),
+});
+export type MyFiguresKind = z.infer<typeof MyFiguresKindSchema>;
+
 /** An hour of a weekday (1 Monday to 7 Sunday) in the member's own zone: the sales that fell in it and their net. */
 export const MyFiguresCellSchema = z.object({
   weekday: z.number().int().min(1).max(7),
@@ -1389,6 +1397,10 @@ export const MyFiguresSchema = z.object({
   timeZone: TimezoneSchema,
   days: z.array(MyFiguresDaySchema),
   nets: z.array(MyNetSchema),
+  kinds: z.object({
+    items: z.array(MyFiguresKindSchema),
+    untyped: z.number().int().min(0),
+  }),
   previous: z
     .object({
       period: PayPeriodSchema,

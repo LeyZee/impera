@@ -17,6 +17,7 @@ import {
   type Platform,
   type PlatformAccountId,
   type SaleStatus,
+  type SaleType,
   type TeamMemberId,
 } from '@impera/contracts';
 import { enterCreator, eq, schema, sql, type Transaction } from '@impera/db';
@@ -43,6 +44,7 @@ const { payPeriodClosings, payPeriodSales, paySaleDecisions } = schema;
 
 /** A line of the platform's register as the sales feed gives it to pay (connectors' `PaySaleLine`, CRM-03). */
 interface SaleLineRead extends SaleKey {
+  readonly saleType: SaleType;
   readonly status: SaleStatus;
   readonly platformAccountId: PlatformAccountId;
   /** When the line happened: a sale's instant, or the refund's own. */
@@ -158,6 +160,7 @@ function saleForPayOf(line: SaleLineRead, timeZone: string): SaleForPay {
     platformSaleId: line.platformSaleId,
     event: line.event,
     platformAccountId: line.platformAccountId,
+    saleType: line.saleType,
     status: line.status,
     occurredAt: line.occurredAt,
     period: payPeriodOfDay(calendarDayAt(line.occurredAt, timeZone)),
