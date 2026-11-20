@@ -15,6 +15,7 @@ const { customOrders } = schema;
 /** The states of an order still before her yes: at most one per fan (`custom_orders_open_per_fan`). */
 const OPEN_STATES = ['gathering', 'awaiting_creator'] as const;
 
+/** @public What the agent's turn hands in to keep its decision about his order. */
 export interface CustomOrderRecord {
   readonly creatorId: CreatorId;
   readonly fanId: FanId;
