@@ -27,7 +27,7 @@ import { testConfig } from '../../../../__tests__/support/config';
 import { createLogger } from '../../../../logger';
 import { buildServer } from '../../../../server';
 import type { CalibrationRecord, CalibrationStore, VoiceExample } from '../../../agent/index';
-import { createPlaygroundModule } from '../../index';
+import { createPlaygroundModule, type HerScriptsSource } from '../../index';
 
 const BRIEF: Brief = {
   intent: 'small_talk',
@@ -142,6 +142,7 @@ async function server(
     voice?: VoiceOutput;
     control?: GatewayControl;
     creatorId?: string | null;
+    herScripts?: HerScriptsSource;
     voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
   } = {},
 ) {
@@ -186,6 +187,7 @@ async function server(
     gatewayForVoice: (model) => (model === 'mistral-large-4' ? gateway({ bubbles: ['Hey toi'] }) : undefined),
     now: () => new Date('2026-10-17T10:00:00Z'),
     ...(options.creatorId !== undefined && { creatorId: () => Promise.resolve(options.creatorId ?? null) }),
+    ...(options.herScripts !== undefined && { herScripts: options.herScripts }),
     ...(options.voiceExamplesOf !== undefined && { voiceExamplesOf: options.voiceExamplesOf }),
   });
   const config = testConfig();
@@ -297,6 +299,25 @@ describe('/v1/playground', () => {
 
     const back = stateOf(await post('/persona', { kind: 'invented' }));
     expect(back.persona).toEqual({ name: 'Lina', played: null });
+  });
+
+  it('reads her own scripts with one of her versions, and says at once why the trial ones play instead (ADR 0103 § 15)', async () => {
+    const asked: [string, string][] = [];
+    const { post } = await server({
+      herScripts: (creatorId, userId) => {
+        asked.push([creatorId, userId]);
+        return Promise.resolve({ kind: 'none', reason: 'none_ready' });
+      },
+    });
+    const hers = stateOf(await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT }));
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.[0]).toBe(MIA);
+    expect(hers.scripts).toMatchObject({ source: 'trial', unavailable: { code: 'none_ready' }, run: null });
+    expect(hers.scripts.unavailable?.label).toBe('Aucun de ses scripts n’est prêt');
+    // The invented persona plays the trial scripts, and never reads hers.
+    const back = stateOf(await post('/persona', { kind: 'invented' }));
+    expect(back.scripts).toMatchObject({ source: 'trial', unavailable: null });
+    expect(asked).toHaveLength(1);
   });
 
   it('answers, rates once, and counts the rate', async () => {
@@ -541,6 +562,22 @@ describe('/v1/playground', () => {
     expect((await first).statusCode).toBe(200);
     const answered = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
     expect(answered.reading).toBeUndefined();
+  });
+
+  it('answers « Payer (fictif) » and « Refuser » only while a paid step of a trial script waits (ADR 0103 § 16)', async () => {
+    const { app, headers, post } = await server();
+    const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(state.scripts).toEqual({
+      source: 'trial',
+      unavailable: null,
+      run: null,
+      fictiveSpentCents: 0,
+      salesFrozen: false,
+    });
+    const buy = await post('/script/buy');
+    expect(buy.statusCode).toBe(409);
+    expect(codeOf(buy)).toBe('script_step_not_waiting_conflict');
+    expect(codeOf(await post('/script/refuse'))).toBe('script_step_not_waiting_conflict');
   });
 
   it('has nothing to compare after a handoff', async () => {

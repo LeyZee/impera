@@ -55,6 +55,7 @@ const STATE: PlaygroundState = {
   sessionCostEur: 0,
   voice: { reachable: true },
   pending: null,
+  scripts: { source: 'trial', unavailable: null, run: null, fictiveSpentCents: 0, salesFrozen: false },
 };
 
 afterEach(cleanup);
@@ -92,6 +93,7 @@ function playground(client: Pick<PlaygroundClient, 'bank' | 'withdrawExample'>):
       setNotes: unused,
       setSpent: unused,
       sendCreatorMedia: unused,
+      answerScriptStep: unused,
       ...client,
     },
     state: undefined,

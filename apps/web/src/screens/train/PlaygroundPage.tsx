@@ -439,6 +439,9 @@ export function PlaygroundPage(): JSX.Element {
                 }
           }
           onSend={send}
+          onScriptStep={(answer) => {
+            void pg.run((c) => c.answerScriptStep(answer));
+          }}
         />
         <div className="pg-dock">
           {filed === undefined || mode === 'lesson' ? null : (
