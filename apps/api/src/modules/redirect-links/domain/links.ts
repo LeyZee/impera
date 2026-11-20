@@ -21,7 +21,7 @@ function sameName(a: string, b: string): boolean {
 }
 
 /** One address however it is typed: the host in lower case (`URL` does it), no trailing slash. */
-function sameAddress(url: string): string {
+export function sameAddress(url: string): string {
   try {
     return new URL(url).href.replace(/\/+$/u, '');
   } catch {

@@ -1,4 +1,4 @@
-import type { LinkHourReading, LinkHourTotal, LinkRef } from '@impera/contracts';
+import type { DetectedLink, LinkHourReading, LinkHourTotal, LinkRef } from '@impera/contracts';
 
 /**
  * The link connector (ADR 0120 § 3), pure: its read-only port, the hours kept of a reading once the robots are
@@ -23,6 +23,8 @@ export interface LinkStatsRange {
  * (ADR 0120 § 3). An adapter throws on a refusal or an outage; it never answers with a guess.
  */
 export interface LinkStatsConnector {
+  /** The links of the account at the service: how it names each one, its name there and its address. No figure. */
+  listLinks(): Promise<readonly DetectedLink[]>;
   /** The hours of `link` in `range` as the service counts them, robots included; an hour without a visit may be absent. */
   readHours(link: LinkRef, range: LinkStatsRange): Promise<readonly LinkHourReading[]>;
   /** The instants of the visits of `link` in `range` that the service flags as a robot. */

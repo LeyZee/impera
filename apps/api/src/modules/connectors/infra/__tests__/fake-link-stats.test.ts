@@ -32,10 +32,17 @@ describe('FakeLinkStats (ADR 0120 § 3)', () => {
     await expect(fake.restore().readHours(link, range)).resolves.toEqual([]);
   });
 
+  it('lists the links of the account, and fails like the rest during an outage', async () => {
+    const found = { ref: link, name: 'Story du jour', url: 'https://liens.example/jour' };
+    const fake = new FakeLinkStats().seedLinks(found);
+    expect(await fake.listLinks()).toEqual([found]);
+    await expect(fake.failWith(new Error('service injoignable')).listLinks()).rejects.toThrow();
+  });
+
   it('has nothing that writes to the service', () => {
     const methods = Object.getOwnPropertyNames(FakeLinkStats.prototype).filter(
       (name) => name !== 'constructor',
     );
-    expect(methods.filter((name) => !/^(read|seed|failWith$|restore$)/u.test(name))).toEqual([]);
+    expect(methods.filter((name) => !/^(read|list|seed|failWith$|restore$)/u.test(name))).toEqual([]);
   });
 });

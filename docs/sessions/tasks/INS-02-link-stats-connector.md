@@ -1,5 +1,5 @@
 # INS-02 Connecteur de liens en lecture seule : clics par endroit et par heure
-Statut : in progress (lot a fait : contrats, domaine, faux)
+Statut : in progress (lots a et b faits : contrats, domaine, faux, détection des liens sans écran)
 Phase : Instagram (ADR 0120)
 Dépend de : ADR 0120 acceptée
 Branche : task/ins-02-link-stats-connector
@@ -32,3 +32,5 @@ ADR 0120 § 3 et § 6, ADR 0080 (lien de redirection), ADR 0016, `docs/playbooks
 Créer ou modifier un lien chez le service de redirection ; l'entonnoir d'acquisition (lot suivant).
 
 ## Notes de session
+- 20/11/2026, lot b (demande de Charles du 16/11 : détecter les liens de la créatrice chez le service, les associer, y voir plus clair) : le port gagne `listLinks()` (lecture, aucun chiffre) ; contrats `DetectedLinkSchema` et `LinkProposalSchema` ; `redirect-links/domain/detection.ts` : `linkProposals` reconnaît par son adresse un lien déjà gardé, préremplit le nom et devine l'endroit dans le nom donné chez le service (`placementHint`), sans jamais fabriquer un endroit. Une proposition n'écrit rien : seul le clic d'une personne associe un lien. Aucune table, route ni appel au service.
+- Lots suivants : c = clé saisie dans Réglages et scellée, adaptateur officiel (hôte écrit dans le code ; à voir avec Sécurité : le nom d'hôte du service entre alors dans le dépôt public), route « Détecter ses liens » ; d = écran dans l'onglet Liens (avis Design, captures) ; e = référence du service gardée sur le lien (migration additive) et totaux par heure.

@@ -1,4 +1,4 @@
-import type { LinkHourReading, LinkRef } from '@impera/contracts';
+import type { DetectedLink, LinkHourReading, LinkRef } from '@impera/contracts';
 
 import type { LinkStatsConnector, LinkStatsRange } from '../../domain/link-stats';
 
@@ -11,7 +11,22 @@ export class FakeLinkStats implements LinkStatsConnector {
   private readonly robots = new Map<LinkRef, Date[]>();
   private outage: Error | null = null;
   /** The calls made, in order: a test reads them to check what was asked. */
-  readonly calls: { readonly method: 'readHours' | 'readRobotVisits'; readonly link: LinkRef }[] = [];
+  readonly calls: {
+    readonly method: 'listLinks' | 'readHours' | 'readRobotVisits';
+    readonly link: LinkRef | null;
+  }[] = [];
+  private links: DetectedLink[] = [];
+
+  seedLinks(...links: readonly DetectedLink[]): this {
+    this.links = [...this.links, ...links];
+    return this;
+  }
+
+  listLinks(): Promise<readonly DetectedLink[]> {
+    this.calls.push({ method: 'listLinks', link: null });
+    if (this.outage) return Promise.reject(this.outage);
+    return Promise.resolve([...this.links]);
+  }
 
   seedHours(link: LinkRef, readings: readonly LinkHourReading[]): this {
     this.hours.set(link, [...(this.hours.get(link) ?? []), ...readings]);
