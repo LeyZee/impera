@@ -237,6 +237,10 @@ export type AvailabilityId = z.infer<typeof AvailabilityIdSchema>;
 export const SuggestionIdSchema = uuid.brand<'SuggestionId'>();
 export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
 
+/** One thing to shoot on one of her shooting days (`creator_shoot_items`, ADR 0140 § 24). */
+export const ShootItemIdSchema = uuid.brand<'ShootItemId'>();
+export type ShootItemId = z.infer<typeof ShootItemIdSchema>;
+
 /** A drop of hers (`content_drops`, CR-06, ADR 0044 § 1 and ADR 0055): drawn by her phone, so that a replay adds nothing. */
 export const ContentDropIdSchema = uuid.brand<'ContentDropId'>();
 export type ContentDropId = z.infer<typeof ContentDropIdSchema>;

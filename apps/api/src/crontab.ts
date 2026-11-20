@@ -133,6 +133,13 @@ const CRON_JOBS: readonly CronJob[] = [
   },
   // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
   // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.
+  // Her week (ADR 0140 § 2): each creator whose Sunday 18 h has passed gets the week after as a draft for the owner,
+  // refreshed each hour until he validates it. No backfill: the next hour computes it on the stock of then.
+  {
+    task: 'creator_week.plan',
+    match: '50 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['creator_week.plan'] },
+  },
   {
     task: 'scripts.ask_scripts',
     match: '25 * * * *',

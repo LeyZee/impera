@@ -42,6 +42,7 @@ import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
+import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
@@ -76,6 +77,7 @@ import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
+import { wireCreatorWeek } from './wiring/creator-week';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
@@ -108,6 +110,8 @@ interface Modules {
   readonly media: MediaModule;
   readonly notifications: NotificationsModule;
   readonly creatorTasks: CreatorTasksModule;
+  /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
+  readonly creatorWeek: CreatorWeekModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -384,6 +388,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     notifications: notifications.module,
     persona: persona.module,
   });
+  const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,
@@ -535,6 +540,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media: media.module,
     notifications: notifications.module,
     creatorTasks: creatorTasks.module,
+    creatorWeek: creatorWeek.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -561,6 +567,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
+    ...creatorWeek.tasks,
     ...trends.tasks,
     // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
     // never waits for push: with push off the alerts reach Telegram only.
@@ -682,6 +689,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...trends.routes,
       ...redirectLinks.routes,
       ...creatorTasks.routes,
+      ...creatorWeek.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,
       ...contractors.routes,

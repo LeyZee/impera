@@ -16,6 +16,8 @@ import type {
   IdeaDropCategory,
   ReelBrief,
   UpdateCreatorTaskBody,
+  WeekNeed,
+  WeekRole,
 } from '@impera/contracts';
 
 /**
@@ -102,3 +104,57 @@ export interface ShootGuardFault {
  * imports no other module.
  */
 export type ShootGuard = (creatorId: string, shoot: GuardedShoot) => Promise<ShootGuardFault | null>;
+
+/** One line of a shooting day as the owner validated it (ADR 0140 § 24): its id drawn by the week, so a replay adds nothing. */
+interface WeekFrameLine {
+  readonly id: string;
+  readonly need: WeekNeed;
+  readonly label: string;
+  readonly sheet: string | null;
+  readonly count: number;
+  readonly requestId: string | null;
+}
+
+/**
+ * Her week as it enters her agenda (ADR 0140 § 7): a « Jour de tournage » per shooting day with its lines, and
+ * « Livrer ma semaine » on the delivery's day. Ids drawn from (her, the week, the role, the day) by the caller.
+ */
+export interface WeekFrames {
+  readonly week: string;
+  readonly shootDays: readonly {
+    readonly id: string;
+    readonly day: string;
+    readonly lines: readonly WeekFrameLine[];
+  }[];
+  readonly delivery: { readonly id: string; readonly day: string };
+}
+
+/** A frame of her week as she reads it: the suggestion, the task she made of it, its day (the task's once moved). */
+export interface HerWeekFrame {
+  readonly suggestionId: string;
+  readonly role: WeekRole;
+  readonly state: 'suggested' | 'accepted' | 'declined';
+  readonly taskId: string | null;
+  readonly day: string;
+  readonly lines: readonly (WeekFrameLine & { readonly done: boolean })[];
+}
+
+interface HerWeekRead {
+  readonly creatorId: string;
+  readonly timeZone: string;
+  readonly today: string;
+  readonly frames: readonly HerWeekFrame[];
+}
+
+/** Her week in her agenda (ADR 0140 § 22 to § 27): the agenda writes it, the week module computes it. */
+export interface WeekAgendaStore {
+  /**
+   * The owner's validated week written as suggestions and lines (`withTenantMember`), replayable: a frame or a line
+   * already there is kept as it is. The rule of the week after does not apply to these frames (ADR 0140 § 23).
+   */
+  suggestWeek(creatorId: string, userId: string, frames: WeekFrames): Promise<void>;
+  /** Her frames of the week starting `week` (her Monday), in her own account. */
+  herWeek(userId: string, week: string, now: Date): Promise<HerWeekRead>;
+  /** A line shot, or taken back; the day's task ticked when every line is, the tick taken back with a line. */
+  tickLine(userId: string, lineId: string, done: boolean, now: Date): Promise<void>;
+}
