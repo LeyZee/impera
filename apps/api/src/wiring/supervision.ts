@@ -67,6 +67,7 @@ export function wireSupervision(
     allCreatorIds: deps.allCreatorIds,
     // The one sum of the register (CRM-04 lot a): the sales panel reads it, never sums again.
     salesTotalsOf: salesFeedTotals.totalsOf,
+    refundListOf: salesFeedTotals.refundListOf,
     salesTimeZone: salesFeedTimeZone,
     // The snapshot of the platforms' daily statistics (ADR 0081): subscribers, PPV and messages, never money.
     dailyStatsOf,

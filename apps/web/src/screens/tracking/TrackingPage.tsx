@@ -43,6 +43,7 @@ import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queu
 import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
+import { ChatArt, CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
 import { Empty, Failure } from '@/shell/states';
@@ -231,6 +232,7 @@ export function TrackingPage({
         </Panel>
       ) : creators.length === 0 && canAddCreator ? (
         <Notice
+          art={<CrownArt />}
           title="Aucune créatrice pour l’instant"
           text="Ajoute ta première créatrice : ses conversations arriveront ici dès que sa session Reveal sera reliée."
         >
@@ -249,6 +251,7 @@ export function TrackingPage({
         </>
       ) : creators.length === 0 && isQueueEmpty ? (
         <Notice
+          art={<ChatArt />}
           title="Rien pour toi pour l’instant"
           text="Les conversations des créatrices qui te sont confiées arrivent ici."
         />
@@ -401,7 +404,7 @@ export function TrackingPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <Empty title="Choisis une conversation à gauche.">
+              <Empty art={<ChatArt />} title="Choisis une conversation à gauche.">
                 Elle s’ouvre ici, avec son brouillon s’il y en a un.
               </Empty>
             </section>
@@ -710,14 +713,17 @@ function noticeOf(text: string | null): JSX.Element | null {
 function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Empty plate title={title} action={children}>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
       {text}
     </Empty>
   );

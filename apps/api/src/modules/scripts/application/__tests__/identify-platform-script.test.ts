@@ -80,6 +80,7 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
       },
     ],
     identities: [],
+    ours: null,
     ...overrides,
   };
 }

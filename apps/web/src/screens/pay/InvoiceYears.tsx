@@ -5,6 +5,7 @@ import type { JSX, ReactNode } from 'react';
 import { Empty, Loading, Unreachable } from './parts';
 
 import { gapText, yearRange, yearSlices } from '@/invoices/model';
+import { InvoiceArt } from '@/shell/art/EmptyArt';
 import { Failure } from '@/shell/states';
 
 /**
@@ -65,7 +66,7 @@ export function InvoiceYears({
   return (
     <div className="rp-sec">
       {only?.kind === 'gap' && none !== undefined && (years.data.pages.length === 1 || !further) ? (
-        <Empty whisper={none.whisper} text={none.text} action={none.action} />
+        <Empty whisper={none.whisper} text={none.text} action={none.action} art={<InvoiceArt />} />
       ) : only?.kind === 'gap' ? (
         <Empty
           whisper={gapText(only.range)}

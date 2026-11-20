@@ -1,7 +1,7 @@
 import { Link, useRouteContext } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
-import { NavIcon } from './NavIcon';
+import { CompassArt } from './art/EmptyArt';
 import { Page, PageHeader } from './layout';
 import { railOf, sectionLabel } from './nav';
 import { Empty } from './states';
@@ -21,7 +21,7 @@ export function NotFoundPage(): JSX.Element {
       <Empty
         plate
         className="nv-notfound"
-        icon={<NavIcon name="compass" />}
+        art={<CompassArt />}
         title="Cette page n’existe pas"
         action={
           <Link to={home} className="nv-btn nv-btn--soft">

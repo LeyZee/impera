@@ -34,6 +34,7 @@ import {
   type Turn,
   unansweredReason,
 } from './model';
+import { useTrainsAsOwner } from './trainer';
 
 const KIND_LABELS: Readonly<Record<MediaKind, string>> = { image: 'Photo', video: 'Vidéo', audio: 'Vocal' };
 
@@ -193,13 +194,19 @@ function Empty({
 
 /** With no key nothing can be written: the empty state says so and leads to the setting, nothing invites a start. */
 function NoKey(): JSX.Element {
+  const asOwner = useTrainsAsOwner();
   return (
     <div className="pg-empty">
       <p className="pg-empty__t">Ajoute une clé pour que l’agent réponde</p>
       <p className="pg-empty__s">Aucune clé n’atteint le modèle de la voix : l’agent ne peut rien écrire.</p>
-      <Link to="/reglages/modeles-ia" className="nv-btn nv-btn--soft nv-btn--sm pg-empty__key">
-        Ouvrir Modèles IA
-      </Link>
+      {/* The keys are the owner's settings: a manager is told who adds one. */}
+      {asOwner ? (
+        <Link to="/reglages/modeles-ia" className="nv-btn nv-btn--soft nv-btn--sm pg-empty__key">
+          Ouvrir Modèles IA
+        </Link>
+      ) : (
+        <p className="pg-empty__s">Le propriétaire l’ajoute dans ses réglages.</p>
+      )}
     </div>
   );
 }
@@ -602,12 +609,15 @@ function VerdictView({ verdict, state }: { verdict: Verdict; state: PlaygroundSt
 /** After a correction or a rejection: where the lesson goes. One destination is proposed. */
 export function LessonCard({
   destination,
+  destinations = DestinationSchema.options,
   busy,
   onDestination,
   onConfirm,
   onCancel,
 }: {
   destination: Destination;
+  /** What this trainer may choose: a manager files nothing in her bank (ADR 0092 § 8). */
+  destinations?: readonly Destination[];
   busy: boolean;
   onDestination: (d: Destination) => void;
   onConfirm: () => void;
@@ -620,7 +630,7 @@ export function LessonCard({
         <small>{DESTINATION_HINTS[destination]}</small>
       </span>
       <div className="pg-chips" role="radiogroup" aria-label="Destination">
-        {DestinationSchema.options.map((d) => (
+        {destinations.map((d) => (
           <button
             key={d}
             type="button"

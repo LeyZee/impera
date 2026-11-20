@@ -32,9 +32,9 @@ describe('the invoices’ card of the owner’s Dashboard', () => {
       null,
     );
     expect(lines.map((line) => [line.tone, line.text])).toEqual([
-      ['danger', '1 facture en retard : l’échéance est passée sans règlement.'],
-      ['warn', '2 factures arrivent à échéance dans les sept jours.'],
-      ['warn', '1 contestation à trancher.'],
+      ['danger', '1 facture en retard'],
+      ['warn', '2 factures à échéance dans les sept jours'],
+      ['warn', '1 contestation à trancher'],
     ]);
   });
 
@@ -46,7 +46,7 @@ describe('the invoices’ card of the owner’s Dashboard', () => {
     expect(line).toEqual({
       kind: 'documents',
       tone: 'neutral',
-      text: 'Plus de 3 pièces à examiner :',
+      text: 'Plus de 3 pièces à examiner',
       members: [
         { memberId: THEO.id, name: 'Théo' },
         { memberId: LOU.id, name: 'Lou' },

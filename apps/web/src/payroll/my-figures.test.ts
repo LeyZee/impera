@@ -14,7 +14,9 @@ import {
   heatGrid,
   heatSlots,
   hourEndText,
+  hasMoneyKinds,
   hourText,
+  moneySlices,
   netIn,
   recordToday,
   slotWords,
@@ -39,6 +41,7 @@ const figures = (over: Partial<Record<keyof MyFigures, unknown>> = {}): MyFigure
     },
     hours: { since: '2026-09-10', sales: 0, enough: false, cells: [] },
     records: { bestDay: null, bestPeriod: null },
+    kinds: { items: [], untyped: 0 },
     ...over,
   });
 
@@ -179,5 +182,36 @@ describe('Mes chiffres, côté écran (ADR 0104 § A)', () => {
     });
     expect(recordToday(today)).toBe(true);
     expect(recordToday(figures())).toBe(false);
+  });
+
+  it('range le net de la quinzaine dans les parts du Dashboard : un renouvellement est un abonnement, le reste se replie', () => {
+    const net = (netMinor: number) => [{ currency: 'EUR', netMinor }];
+    const read = figures({
+      kinds: {
+        untyped: 0,
+        items: [
+          { type: 'ppv', sales: 4, nets: net(6_000) },
+          { type: 'subscription', sales: 2, nets: net(1_000) },
+          { type: 'renewal', sales: 1, nets: net(500) },
+          { type: 'boudoir', sales: 1, nets: net(700) },
+          { type: 'paid_message', sales: 2, nets: net(300) },
+          // Remboursé en entier : pas de part.
+          { type: 'tip', sales: 1, nets: net(0) },
+        ],
+      },
+    });
+    expect(
+      moneySlices(read, 'EUR').map((slice) => [slice.key, slice.label, slice.cents, slice.sales]),
+    ).toEqual([
+      ['subscriptions', 'Abonnements', 1_500, 3],
+      ['ppv', 'PPV en privé', 6_000, 4],
+      ['other', 'Autres ventes', 1_000, 3],
+    ]);
+    expect(hasMoneyKinds(read, 'EUR')).toBe(true);
+  });
+
+  it('n’a rien à dire sans vente, et le dit dès qu’une vente attend son type', () => {
+    expect(hasMoneyKinds(figures(), 'EUR')).toBe(false);
+    expect(hasMoneyKinds(figures({ kinds: { items: [], untyped: 2 } }), 'EUR')).toBe(true);
   });
 });

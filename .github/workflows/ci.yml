@@ -44,10 +44,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
-  test:
-    name: Tests (unit + integration)
+  # The tests in parallel, so that a pull request waits about a quarter of the time (Charles, 20/11/2026: the merge
+  # queue was slow, never by taking a test out). Every test still runs on every pull request: the unit tests and the
+  # end to end on their own runners, the integration tests split in four by Vitest (`--shard`), each with its own
+  # Postgres. `Tests (unit + integration)` below waits for them all, under the name the branch protection requires.
+  test-part:
+    name: Tests (${{ matrix.part }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [unit, e2e, integration 1/4, integration 2/4, integration 3/4, integration 4/4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
@@ -100,14 +108,33 @@ jobs:
           path: ~/ffmpeg-debs
           key: ${{ steps.image.outputs.key }}
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-      - run: pnpm test:integration
+      - if: matrix.part == 'unit'
+        run: pnpm test
+      # One shard of every package's integration tests; a package with no file in this shard passes.
+      - if: startsWith(matrix.part, 'integration ')
+        run: pnpm exec turbo run test:integration -- --shard="${PART#integration }" --passWithNoTests
         env:
+          PART: ${{ matrix.part }}
           TESTCONTAINERS_RYUK_DISABLED: 'true'
       # Phase 0 end to end: API and worker inline, FakeConnector, a fan message to a sent draft (P0-07b).
-      - run: pnpm test:e2e
+      - if: matrix.part == 'e2e'
+        run: pnpm test:e2e
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
+
+  test:
+    name: Tests (unit + integration)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [test-part]
+    if: always()
+    steps:
+      - name: Every part passed
+        env:
+          RESULT: ${{ needs.test-part.result }}
+        run: |
+          echo "test-part: $RESULT"
+          test "$RESULT" = success
 
   audit:
     name: Dependency audit
@@ -125,7 +152,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [check, test]
+    needs: [check]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6

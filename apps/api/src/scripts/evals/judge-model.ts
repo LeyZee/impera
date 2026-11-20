@@ -9,6 +9,13 @@ export const EVALS_CAP_EUR = 6;
  */
 export const EVALS_JUDGE_TIMEOUT_MS = 90_000;
 
+/**
+ * The judge's room to answer in the evals: nine criteria, each with its reason, do not fit in the 600 tokens of the
+ * production role, and a cut answer is no score (Mistral « no output », Gemini « truncated », 4 calls out of 4 on the
+ * PC, 20/11). The evals only.
+ */
+export const EVALS_JUDGE_MAX_OUTPUT_TOKENS = 2_000;
+
 // Another family than the voice's: a model scoring its own words is too kind to them.
 const INDEPENDENT_JUDGES: readonly (readonly [keyof ProviderCredentials, ModelRef])[] = [
   ['LLM_MISTRAL_API_KEY', { provider: 'mistral', model: MISTRAL_FALLBACK_MODEL }],
@@ -32,7 +39,12 @@ export function evalsConfig(
     ...config,
     roles: {
       ...config.roles,
-      judge: { ...config.roles.judge, ...ref, timeoutMs: EVALS_JUDGE_TIMEOUT_MS },
+      judge: {
+        ...config.roles.judge,
+        ...ref,
+        timeoutMs: EVALS_JUDGE_TIMEOUT_MS,
+        maxOutputTokens: EVALS_JUDGE_MAX_OUTPUT_TOKENS,
+      },
     },
   });
   if (judge === undefined)
