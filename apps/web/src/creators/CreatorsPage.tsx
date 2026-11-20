@@ -162,6 +162,7 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           timezone={current.timezone}
+          canValidate={isOwner}
         />
       );
     }
