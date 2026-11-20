@@ -1404,9 +1404,7 @@
   margin-left: 6px;
   padding: 1px 6px;
   border-radius: 999px;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 11px;
   color: var(--nv-ink-muted);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
