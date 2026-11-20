@@ -349,6 +349,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         ),
         spentCents: preset.spentCents,
       });
+      session.confirmAge(preset.declaredAge === null ? null : session.situation.relationshipStartedAt);
       return state();
     },
 
