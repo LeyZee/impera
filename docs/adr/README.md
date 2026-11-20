@@ -160,3 +160,4 @@ Date : AAAA-MM-JJ
 | 0150 | Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine | accepted (précise P4-01, 0020, 0042 § 7, 0091, 0128 § C, 0143 § 13) |
 | 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |
 | 0152 | Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs | accepted (remplace 0027 sur le lieu et 0005 sur la base de production ; précise 0028, 0037, 0067, 0087) |
+| 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |

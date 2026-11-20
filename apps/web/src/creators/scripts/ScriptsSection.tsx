@@ -2,7 +2,6 @@ import type { CreatorId } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
-import { RevealScripts } from './RevealScripts';
 import { ScriptReview } from './ScriptReview';
 import { archiveHref, confirmCopied, contentKey, useCreatorContent } from './api';
 import {
@@ -111,8 +110,6 @@ export function ScriptsSection({
         {...(folderId === undefined ? {} : { folderId })}
         {...(onFolder === undefined ? {} : { onFolder })}
       />
-      {/* Her Reveal scripts under her vault: what they need to be offered, their descriptions and identity to validate. */}
-      <RevealScripts creatorId={creatorId} />
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">
