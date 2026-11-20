@@ -87,6 +87,29 @@ body {
   color: var(--nv-ink-muted);
   text-wrap: pretty;
 }
+.pp-steps {
+  margin: 0 0 var(--nv-space-2);
+  padding: 0;
+  list-style: none;
+  counter-reset: pp-step;
+  display: grid;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  color: var(--nv-ink-muted);
+}
+.pp-steps li {
+  counter-increment: pp-step;
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: baseline;
+  text-wrap: pretty;
+}
+.pp-steps li::before {
+  content: counter(pp-step) '.';
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
 .pp-fine {
   margin: var(--nv-space-1) 0 0;
   display: flex;
@@ -634,7 +657,39 @@ body {
   opacity: 1;
   transform: none;
 }
+.pp-foot__where {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* A long host is cut with an ellipsis on the address alone, never mid-word nor over the way back (avis Design, 19/11). */
+.pp-foot__where .pp-address {
+  min-width: 0;
+  max-width: 100%;
+}
+.pp-address > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-address .popup-icon {
+  flex: none;
+}
+/* Another CRM than the built-in one (ADR 0067, second amendement): a warning, so amber, and the way back beside it. */
+.pp-address--changed,
+.pp-address--changed:hover {
+  color: var(--nv-warning);
+}
+.pp-revert {
+  flex: none;
+  font-size: var(--nv-text-caption);
+  white-space: nowrap;
+}
 .pp-version {
+  flex: none;
   font-variant-numeric: tabular-nums;
 }
 
@@ -976,4 +1031,35 @@ body {
 .pp-sync__cause {
   font-weight: 600;
   color: var(--nv-warning);
+}
+
+/* ───────────── Relier l'extension depuis le CRM (ADR 0067, amendement du 19/11) ───────────── */
+
+/* The host in full: a long name wraps rather than hides its end. */
+.pp-offer__question,
+.pp-offer__from {
+  overflow-wrap: anywhere;
+}
+/* A host in a button's label: one line, cut with an ellipsis; the full host is in the question above. */
+.pp-offer .pp-btn {
+  max-width: 100%;
+  min-width: 0;
+}
+.pp-offer .pp-btn > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-offer__done {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.pp-offer__done .popup-icon {
+  flex: none;
+  color: var(--nv-success);
 }

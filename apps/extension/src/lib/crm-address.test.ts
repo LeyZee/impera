@@ -58,4 +58,10 @@ describe('changedOrigin', () => {
       changedOrigin({ crmOrigin: { newValue: 'https://crm.exemple.fr' } }, 'session', 'crmOrigin'),
     ).toBeNull();
   });
+
+  it('goes back to the built-in CRM of a hosted build when the saved address is removed (ADR 0067)', () => {
+    expect(changedOrigin({ crmOrigin: {} }, 'local', 'crmOrigin', 'https://crm.exemple.fr')).toBe(
+      'https://crm.exemple.fr',
+    );
+  });
 });
