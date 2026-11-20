@@ -438,6 +438,9 @@ function Kinds(): JSX.Element {
   const data = kinds.data;
   return (
     <Panel title="Ce que tu reçois">
+      <PanelSection>
+        <span className="nv-notif__hint">Toi seule vois ces choix ; l’agence ne les voit pas.</span>
+      </PanelSection>
       {NOTIFICATION_KINDS.map((kind) => (
         <PanelSection key={kind}>
           <label className="nv-notif__row">
@@ -457,14 +460,16 @@ function Kinds(): JSX.Element {
           </label>
         </PanelSection>
       ))}
-      <PanelSection className="nv-notif__save">
-        <span
-          className={note?.failed === true ? 'nv-notif__error' : 'nv-notif__hint'}
-          role={note?.failed === true ? 'alert' : 'status'}
-        >
-          {note === null ? 'Toi seule vois ces choix ; l’agence ne les voit pas.' : note.text}
-        </span>
-      </PanelSection>
+      {note === null ? null : (
+        <PanelSection className="nv-notif__save">
+          <span
+            className={note.failed ? 'nv-notif__error' : 'nv-notif__hint'}
+            role={note.failed ? 'alert' : 'status'}
+          >
+            {note.text}
+          </span>
+        </PanelSection>
+      )}
     </Panel>
   );
 }
