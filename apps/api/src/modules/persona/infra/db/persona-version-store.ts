@@ -12,6 +12,7 @@ import {
   type PersonaVersionSummary,
 } from '@impera/contracts';
 import { and, eq, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
+import { z } from 'zod';
 
 import { canonicalJson } from '../../domain/canonical';
 import { PersonaVersionConflict, PersonaVersionNotFound } from '../../domain/errors';
@@ -21,6 +22,11 @@ type SQL = ReturnType<typeof eq>;
 
 /** What `source_path` says of a version saved from the dashboard rather than loaded from a YAML file. */
 const FROM_DASHBOARD = 'dashboard';
+
+/** A chatter's reading of her sheet on shift, in the audit log (ADR 0153). */
+const CHATTER_OPENING = 'persona.open';
+/** How long one opening covers the same chatter's reads of the same sheet, as for a conversation (ADR 0025). */
+const OPENING_TRACE_MINUTES = 15;
 
 /** Who stored a version loaded by `pnpm persona:load` (no signed-in user on the command line). */
 const FROM_COMMAND = 'cli';
@@ -161,6 +167,29 @@ export function createDrizzlePersonaVersionStore(
   return {
     active(creatorId) {
       return readOne(creatorId, eq(schema.personaVersions.isActive, true));
+    },
+
+    traceChatterOpening(creatorId, userId, ip) {
+      return withTenant(db, creatorId, async (tx) => {
+        const lately = await tx.execute(sql`
+          select exists (
+            select 1 from ${schema.auditLog}
+             where ${schema.auditLog.userId} = ${userId}
+               and ${schema.auditLog.action} = ${CHATTER_OPENING}
+               and ${schema.auditLog.entityId} = ${creatorId}
+               and ${schema.auditLog.createdAt} > now() - make_interval(mins => ${OPENING_TRACE_MINUTES})
+          ) as opened`);
+        if (z.array(z.object({ opened: z.boolean() })).parse(lately.rows)[0]?.opened === true) return;
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: CHATTER_OPENING,
+          entity: 'creator',
+          entityId: creatorId,
+          ip,
+          details: { by: 'chatter' },
+        });
+      });
     },
 
     version(creatorId, versionId) {

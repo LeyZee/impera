@@ -4,6 +4,7 @@ import { GuardCodeSchema } from './guards';
 import { CreatorIdSchema, PersonaCorrectionIdSchema, PersonaVersionIdSchema } from './ids';
 import { BankedObjectionKindSchema, OBJECTION_REPLIES_MAX } from './objections';
 import {
+  PersonaAgentRulesSchema,
   PersonaDetailsSchema,
   PersonaIntimateSchema,
   PersonaLifestyleSchema,
@@ -15,6 +16,14 @@ import {
 } from './persona';
 import {
   PERSONA_SHEET_SECTION_KEYS,
+  PersonaAgentBehaviorSchema,
+  PersonaBoundariesSchema,
+  PersonaConversationSchema,
+  PersonaIdentitySchema,
+  PersonaIntimacySchema,
+  PersonaLifestyleSheetSchema,
+  PersonaPreferencesSchema,
+  PersonaRelationshipsSchema,
   PersonaSheetSchema,
   PersonaV2Schema,
   StoredPersonaSchema,
@@ -89,6 +98,66 @@ export const MyPersonaSchema = z.strictObject({
   answers: PersonaSheetSchema.nullable(),
 });
 export type MyPersona = z.infer<typeof MyPersonaSchema>;
+
+/**
+ * What a chatter reads of her during his shift (ADR 0153): a list of what he may see, never the sheet minus a few
+ * fields, so a field added later stays hidden until an ADR adds it here. Never the agency's method (thresholds,
+ * prices, delays, follow-ups, alert words, the agent's switches) nor her birth date.
+ */
+export const ChatterPersonaSheetSchema = z.strictObject({
+  /** Who she is: her age on the day he reads it, never her birth date. */
+  her: z.strictObject({
+    nickname: PersonaIdentitySchema.shape.nickname,
+    age: z.int().positive().nullable(),
+    city: PersonaIdentitySchema.shape.city,
+    country: PersonaIdentitySchema.shape.country,
+    job: PersonaIdentitySchema.shape.job,
+    spoken_languages: PersonaIdentitySchema.shape.spoken_languages,
+    relationship_status: PersonaRelationshipsSchema.shape.relationship_status,
+    kids_status: PersonaRelationshipsSchema.shape.kids_status,
+  }),
+  /** What fans ask about her body. */
+  physique: PersonaIdentitySchema.pick({
+    physical_description: true,
+    height_m: true,
+    weight_kg: true,
+    eye_color: true,
+    hair_color: true,
+    breast_size: true,
+    shoe_size: true,
+  }),
+  lifestyle: PersonaLifestyleSheetSchema,
+  preferences: PersonaPreferencesSchema,
+  /** How she writes: her voice guide, the pet names she gives, the emojis she never uses. */
+  writing: PersonaConversationSchema.extend({
+    pet_names: PersonaAgentBehaviorSchema.shape.pet_names,
+    emojis_forbidden: PersonaAgentRulesSchema.shape.emojis_forbidden,
+  }),
+  /** What she never does, shows or says: the screen shows it first, always open. */
+  limits: PersonaAgentRulesSchema.pick({
+    never_do: true,
+    never_show: true,
+    never_say: true,
+    disgusts: true,
+  }).extend({
+    off_limits: PersonaBoundariesSchema.shape.off_limits,
+    no_go_zones: PersonaIntimacySchema.shape.no_go_zones,
+    turn_offs: PersonaRelationshipsSchema.shape.turn_offs,
+  }),
+  /** Her intimate side, folded by default under her limits (Charles, 20/11). */
+  intimate: PersonaIntimacySchema.omit({ no_go_zones: true }).extend({
+    turn_ons: PersonaRelationshipsSchema.shape.turn_ons,
+    body_count: PersonaRelationshipsSchema.shape.body_count,
+  }),
+});
+export type ChatterPersonaSheet = z.infer<typeof ChatterPersonaSheetSchema>;
+
+/** `GET /v1/creators/:creatorId/persona/chatter` → 200: her active version as a chatter reads it, `null` without one. */
+export const ChatterPersonaSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  sheet: ChatterPersonaSheetSchema.nullable(),
+});
+export type ChatterPersona = z.infer<typeof ChatterPersonaSchema>;
 
 /**
  * `POST /v1/creators/:creatorId/persona/versions` → 201 `PersonaVersionSummary`, never active. `basedOn` is the
