@@ -94,6 +94,20 @@ function RankBar({
           style={{ '--rw-quest-at': `${String(at)}%` }}
         >
           <span className="rw-quest__fill" />
+          {/* The fire the bar burns with: the flames trailing behind its head, the flame at its head, three sparks. Drawn only. */}
+          <span className="rw-quest__fire" aria-hidden="true">
+            <span className="rw-quest__trail">
+              <i />
+              <i />
+            </span>
+            <svg className="rw-quest__torch" viewBox="0 0 16 16" focusable="false">
+              <path d="M8.300 0.500c.6 3.300 4.700 4.800 4.700 9.100 0 3.100-2.200 5.400-5 5.400s-5-2.100-5-5.200c0-1.900.8-3.200 1.600-4.100.2 1.300.7 2 1.400 2.400C5.700 5.400 6.400 2.400 8.300 0.500z" />
+              <path d="M8.100 7.200c.3 1.500 2 2.200 2 4.100 0 1.400-.9 2.400-2.100 2.400s-2.100-.9-2.100-2.300c0-.9.400-1.500.8-1.900.1.600.3.900.6 1.100 0-1.100.1-2.400.8-3.400z" />
+            </svg>
+            <b />
+            <b />
+            <b />
+          </span>
           {MARKS.map((mark) => (
             <i
               key={mark}
@@ -115,7 +129,7 @@ function RankBar({
 function GoalRow({ goal, index }: { goal: Goal; index: number }): JSX.Element {
   return (
     <li className="rw-quest__goal nv-enter" data-near={goal.near} style={{ '--nv-i': index + 2 }}>
-      <TrophyBadge kind={goal.kind} earned={false} size={36} />
+      <TrophyBadge kind={goal.kind} earned={false} size={48} />
       <div className="rw-quest__goal-main">
         <p className="rw-quest__goal-name">
           <span className="rw-quest__goal-what">{goal.name}</span>
