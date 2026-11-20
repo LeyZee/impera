@@ -804,41 +804,77 @@
   color: var(--nv-ink);
 }
 
-/* ───────────── Ma progression, sur Aujourd'hui (ADR 0134) ───────────── */
+/* ───────────── Ma progression, sur Aujourd'hui (ADR 0134, ADR 0104 § 19) ─────────────
+   A game's card: the bar fills on arrival, a light runs along it, the steps passed are lit, the goals within reach
+   come one after the other. Everything is still, and in place, with « Réduire les animations ». */
 
-.rw-progress__body {
-  display: flex;
-  align-items: center;
+.rw-quest {
+  /* The blue of every progress in the game, and what is mixed from it. */
+  --rw-quest-ink: var(--nv-series-2);
+  --rw-quest-glow: color-mix(in srgb, var(--rw-quest-ink) 45%, transparent);
+  --rw-quest-soft: color-mix(in srgb, var(--rw-quest-ink) 14%, transparent);
+}
+.rw-quest__body {
+  display: grid;
   gap: var(--nv-space-4);
   padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
 }
-.rw-progress__body > svg {
-  flex: none;
+.rw-quest__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
 }
-.rw-progress__main {
+.rw-quest__insignia {
+  flex: none;
   display: grid;
-  gap: 6px;
+  place-items: center;
+  border-radius: var(--nv-radius-full);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rw-quest__who {
+  display: grid;
+  gap: 4px;
   min-width: 0;
   flex: 1;
 }
-.rw-progress__name {
+.rw-quest__name {
   margin: 0;
   font-family: var(--nv-font-display);
-  font-size: var(--nv-text-title-2);
+  font-size: var(--nv-text-title-1);
   line-height: 1.1;
   color: var(--nv-ink);
 }
-.rw-progress__line {
+.rw-quest__line,
+.rw-quest__streak {
   margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-.rw-progress__line b {
+.rw-quest__line b,
+.rw-quest__streak b {
   font-weight: 600;
   color: var(--nv-ink);
 }
-.rw-progress__go {
+.rw-quest__streak {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+}
+.rw-quest__streak svg {
+  width: 14px;
+  height: 14px;
+  fill: var(--nv-neon);
+  transform-origin: 50% 90%;
+  animation: rw-quest-flame var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-flame {
+  to {
+    transform: scale(1.12) rotate(-3deg);
+  }
+}
+.rw-quest__go {
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -846,8 +882,9 @@
   font-size: var(--nv-text-footnote);
   font-weight: 600;
   color: var(--nv-ink-muted);
+  transition: color var(--nv-dur-fast);
 }
-.rw-progress__go svg {
+.rw-quest__go svg {
   width: 14px;
   height: 14px;
   fill: none;
@@ -855,12 +892,315 @@
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+
+/* The way to the next rank. */
+.rw-quest__way {
+  display: grid;
+  gap: 8px;
+}
+.rw-quest__figures {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.rw-quest__reach {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.rw-quest__towards {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-quest__track {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rw-quest__track .rw-quest__bar {
+  flex: 1;
+}
+.rw-quest__end {
+  flex: none;
+  display: grid;
+  place-items: center;
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rw-quest__percent {
+  font-size: var(--nv-text-title-2);
+  font-weight: 650;
+  line-height: 1;
+  color: var(--nv-ink);
+}
+.rw-quest__gain {
+  padding: 3px 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rw-quest-soft);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink);
+  animation: rw-quest-pop var(--nv-dur-slow) var(--nv-ease-spring) both;
+  animation-delay: var(--nv-dur-data);
+}
+@keyframes rw-quest-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+}
+.rw-quest__bar {
+  position: relative;
+  height: 14px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.rw-quest__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--rw-quest-at, 0%);
+  min-width: 14px;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--rw-quest-ink) 70%, var(--nv-ink)) 0%,
+    var(--rw-quest-ink) 100%
+  );
+  box-shadow: 0 0 14px var(--rw-quest-glow);
+  transition: width var(--nv-dur-data) var(--nv-ease-out);
+}
+/* The light that runs along the bar once it has arrived, and again under the pointer. */
+.rw-quest__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--nv-surface-raised) 70%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  animation: rw-quest-shine var(--nv-dur-data) var(--nv-ease-in-out) both;
+  animation-delay: var(--nv-dur-data);
+}
+@keyframes rw-quest-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+.rw-quest__mark {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--nv-ink-faint);
+  opacity: 0.5;
+}
+.rw-quest__mark[data-passed='true'] {
+  background: var(--nv-surface-raised);
+  opacity: 0.7;
+}
+
+/* The goals within reach. */
+.rw-quest__goals {
+  display: grid;
+  gap: 8px;
+}
+.rw-quest__label {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+}
+.rw-quest__goals ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+.rw-quest__goal {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  transition:
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    background var(--nv-dur-fast);
+}
+.rw-quest__goal > svg {
+  flex: none;
+}
+.rw-quest__goal[data-near='true'] {
+  background: var(--rw-quest-soft);
+  box-shadow: inset 0 0 0 1px var(--rw-quest-glow);
+}
+.rw-quest__goal-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.rw-quest__goal-name {
+  display: flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-quest__near {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rw-quest-ink);
+  font-size: 11px;
+  color: var(--nv-surface-raised);
+  animation: rw-quest-near var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-near {
+  to {
+    box-shadow: 0 0 10px var(--rw-quest-glow);
+  }
+}
+.rw-quest__goal-way {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.rw-quest__mini,
+.rw-quest__steps {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 3px;
+  height: 6px;
+}
+.rw-quest__mini {
+  overflow: hidden;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+}
+.rw-quest__mini i {
+  border-radius: inherit;
+  background: var(--rw-quest-ink);
+  transform-origin: left;
+  animation: rw-quest-grow var(--nv-dur-progress) var(--nv-ease-out) both;
+  animation-delay: var(--nv-dur-slow);
+}
+@keyframes rw-quest-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.rw-quest__steps i {
+  flex: 1;
+  max-width: 28px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+}
+.rw-quest__steps i[data-done='true'] {
+  background: var(--rw-quest-ink);
+  animation: rw-quest-step var(--nv-dur-base) var(--nv-ease-spring) both;
+  animation-delay: calc(var(--nv-dur-slow) + var(--_i, 0) * 70ms);
+}
+@keyframes rw-quest-step {
+  from {
+    opacity: 0.2;
+    transform: scaleY(0.4);
+  }
+}
+.rw-quest__goal-what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rw-quest__left {
+  flex: none;
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__insignia {
+    transform: scale(1.08) rotate(-5deg);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__go {
+    color: var(--nv-ink);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__end {
+    transform: scale(1.12);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__go svg {
+    transform: translateX(3px);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fill::after {
+    animation: rw-quest-shine-again var(--nv-dur-data) var(--nv-ease-in-out);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal[data-near='true'] {
+    transform: translateY(-2px);
+  }
+}
+@keyframes rw-quest-shine-again {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
 }
 @media (max-width: 520px) {
+  .rw-quest__name {
+    font-size: var(--nv-text-title-2);
+  }
   /* The words leave; the arrow alone says the card opens. */
-  .rw-progress__go {
+  .rw-quest__go {
     font-size: 0;
     gap: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-quest__fill,
+  .rw-quest__insignia,
+  .rw-quest__end,
+  .rw-quest__goal,
+  .rw-quest__go svg {
+    transition: none;
+  }
+  .rw-quest__fill::after,
+  .rw-quest__streak svg,
+  .rw-quest__gain,
+  .rw-quest__near,
+  .rw-quest__mini i,
+  .rw-quest__steps i[data-done='true'] {
+    animation: none;
+  }
+  .rw-quest__fill::after {
+    display: none;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__insignia,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__end,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal[data-near='true'] {
+    transform: none;
   }
 }
 

@@ -38,7 +38,7 @@ export function lastShown(userId: string, name: string): Shown | null {
   }
 }
 
-function keepShown(userId: string, name: string, shown: Shown): void {
+export function keepShown(userId: string, name: string, shown: Shown): void {
   try {
     localStorage.setItem(`${KEY}.${userId}.${name}`, JSON.stringify(shown));
   } catch {
