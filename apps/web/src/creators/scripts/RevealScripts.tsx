@@ -144,7 +144,7 @@ function ScriptRow({
         <span className="rx-row__meta nv-num">{priceLine(script)}</span>
       </span>
       <span className="rx-row__end">
-        {/* A review waits on a gesture here and carries the neon's dot; an import is done in the vault, neutral. */}
+        {/* A review waits on a gesture here and carries the full ink's dot; an import is done in the vault, faint. */}
         <span
           className="aa-pill sx-state rx-row__state"
           data-tone={standing.opens === null ? standing.tone : 'review'}

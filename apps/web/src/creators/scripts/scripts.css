@@ -591,7 +591,7 @@ button.rx-row:focus-visible {
   color: var(--nv-ink);
 }
 .rx-row__state[data-tone='review']::before {
-  background: var(--nv-neon);
+  background: var(--nv-ink);
 }
 .rx-row__chev {
   flex: none;
