@@ -11,7 +11,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { Bundle } from './Bundle';
-import { bundleCount, bundleStepOf, trialTint, type BundleStep, type TurnMedia } from './bundle';
+import { bundleCount, bundleStepOf, trialTint, type BundleStep, type TurnMedia } from './bundle-step';
 
 import { vaultKey } from '@/creators/vault/api';
 import { setMediaBlur } from '@/shell/media-blur';

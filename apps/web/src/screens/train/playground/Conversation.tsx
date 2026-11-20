@@ -18,7 +18,7 @@ import { Bundle } from './Bundle';
 import { DesireTag } from './Desire';
 import { ScriptStrip } from './ScriptStrip';
 import { MEDIA_KINDS } from './SetupPanel';
-import { bundleStepOf } from './bundle';
+import { bundleStepOf } from './bundle-step';
 import type { ScriptStepAnswer } from './client';
 import { bubblesOf } from './logic';
 import {

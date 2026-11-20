@@ -1,7 +1,7 @@
 import type { CreatorId } from '@impera/contracts';
 import { useMemo, type JSX } from 'react';
 
-import { BUNDLE_TILES, bundleCount, trialTint, type BundleStep, type TurnMedia } from './bundle';
+import { BUNDLE_TILES, bundleCount, trialTint, type BundleStep, type TurnMedia } from './bundle-step';
 import type { ScriptStepAnswer } from './client';
 import { money } from './logic';
 
