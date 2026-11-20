@@ -96,6 +96,10 @@ describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
     expect(open.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('Description inventée 1.')).toBeDefined();
     expect(screen.getByText('L’IA n’est pas sûre')).toBeDefined();
+    // Those validated at once, then the one read alone, each group with its count.
+    expect(screen.getByText('À relire · 2')).toBeDefined();
+    expect(screen.getByText('À regarder de près · 1')).toBeDefined();
+    expect(screen.getByText('Étape 1 · Photo 2 sur 2')).toBeDefined();
     // A ready script has nothing to open.
     expect(screen.queryByRole('button', { name: /Prêt inventé/u })).toBeNull();
   });
@@ -156,7 +160,7 @@ describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
     });
     show();
     expect(await screen.findByText(IDENTITY_CONTENT.ambiance)).toBeDefined();
-    expect(screen.getByText('Qui monte')).toBeDefined();
+    expect(screen.getByText('qui monte')).toBeDefined();
     expect(screen.getByText('il raconte sa soirée')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Valider l’identité' }));
     expect(await screen.findByText('L’IA peut le proposer.')).toBeDefined();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { batchOf, mediaToValidate, priceLine, revealStanding, revealSummary } from './reveal';
+import { batchOf, mediaToValidate, placeOf, priceLine, revealStanding, revealSummary } from './reveal';
 import { descriptionId, identityOf, mediaOf, revealScriptOf, stepOf } from './reveal-fixtures';
 
 const shown = (n: number, reviewReasons: ('unsure' | 'flagged')[] = [], validated = false) => ({
@@ -81,6 +81,8 @@ describe('« Ses scripts dans Reveal »: what keeps each one from being offered'
       ['m3', 2],
     ]);
     expect(batchOf(media)).toEqual([descriptionId(1)]);
+    // Two media in the first step: each says which; one alone in its step says only its kind.
+    expect(media.map(placeOf)).toEqual(['Étape 1 · Photo 1 sur 2', 'Étape 2 · Photo 1 sur 2']);
     expect(priceLine(script)).toBe('2 étapes · Offert · 12 €');
   });
 

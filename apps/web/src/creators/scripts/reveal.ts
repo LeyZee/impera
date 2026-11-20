@@ -19,6 +19,9 @@ export interface MediaToValidate {
   readonly kind: StepMedia['kind'];
   /** The step it is sold or teased in, counted from 1 in the script's order. */
   readonly step: number;
+  /** Its place among that step's media (sold, then previews), counted from 1, and how many the step has. */
+  readonly place: number;
+  readonly of: number;
   readonly description: PlatformMediaDescriptionView;
 }
 
@@ -30,14 +33,29 @@ export function mediaToValidate(script: PlatformScriptViewDto): readonly MediaTo
   const seen = new Set<string>();
   const out: MediaToValidate[] = [];
   script.steps.forEach((step, index) => {
-    for (const media of [...step.media, ...step.previewMedia]) {
+    const all = [...step.media, ...step.previewMedia];
+    all.forEach((media, at) => {
       const description = media.description;
-      if (description === null || description.validated || seen.has(description.id)) continue;
+      if (description === null || description.validated || seen.has(description.id)) return;
       seen.add(description.id);
-      out.push({ ref: media.ref, kind: media.kind, step: index + 1, description });
-    }
+      out.push({
+        ref: media.ref,
+        kind: media.kind,
+        step: index + 1,
+        place: at + 1,
+        of: all.length,
+        description,
+      });
+    });
   });
   return out;
+}
+
+/** Where it is in the script: « Étape 2 · Photo », « Étape 2 · Photo 1 sur 2 » when the step has more than one. */
+export function placeOf(media: MediaToValidate): string {
+  const kind = media.kind === 'video' ? 'Vidéo' : media.kind === 'audio' ? 'Vocal' : 'Photo';
+  const where = media.of > 1 ? ` ${String(media.place)} sur ${String(media.of)}` : '';
+  return `Étape ${String(media.step)} · ${kind}${where}`;
 }
 
 /** What « Tout valider » validates: each one with nothing holding it back; one with a reason is read alone. */
@@ -153,6 +171,13 @@ export const ENERGY_LABELS: Readonly<Record<ScriptEnergy, string>> = {
   soft: 'Douce',
   rising: 'Qui monte',
   intense: 'Intense',
+};
+
+/** The same, as a value read among the others of its identity: in lower case, like them. */
+export const ENERGY_VALUES: Readonly<Record<ScriptEnergy, string>> = {
+  soft: 'douce',
+  rising: 'qui monte',
+  intense: 'intense',
 };
 
 /** Its steps' prices, offered steps said so, in the script's order: « Offert · 12 € · 25 € ». */

@@ -15,8 +15,10 @@ import { useId, useMemo, useState, type JSX } from 'react';
 import { MOMENT_EMOJIS } from './model';
 import {
   ENERGY_LABELS,
+  ENERGY_VALUES,
   batchOf,
   mediaToValidate,
+  placeOf,
   priceLine,
   revealStanding,
   revealSummary,
@@ -141,12 +143,18 @@ function ScriptRow({
         </span>
         <span className="rx-row__meta nv-num">{priceLine(script)}</span>
       </span>
-      <span className="aa-pill sx-state rx-row__state" data-tone={standing.tone}>
-        {standing.label}
-      </span>
-      {/* Kept on every row, empty where nothing opens: the pills stay in one column. */}
-      <span className="rx-row__chev" aria-hidden="true">
-        {sheet ? <ChevronIcon /> : null}
+      <span className="rx-row__end">
+        {/* A review waits on a gesture here and carries the neon's dot; an import is done in the vault, neutral. */}
+        <span
+          className="aa-pill sx-state rx-row__state"
+          data-tone={standing.opens === null ? standing.tone : 'review'}
+        >
+          {standing.label}
+        </span>
+        {/* Kept on every row, empty where nothing opens: the pills stay in one column. */}
+        <span className="rx-row__chev" aria-hidden="true">
+          {sheet ? <ChevronIcon /> : null}
+        </span>
       </span>
     </>
   );
@@ -219,51 +227,63 @@ function Descriptions({
   const batch = batchOf(media);
   const validate = (what: string, ids: readonly MediaDescriptionId[]) =>
     void run(what, () => validateScriptDescriptions(creatorId, script.id, ids));
+  const alone = media.filter((each) => each.description.reviewReasons.length > 0);
+  const item = (each: MediaToValidate): JSX.Element => (
+    <MediaToRead
+      key={each.description.id}
+      creatorId={creatorId}
+      media={each}
+      picture={pictures.get(each.ref) ?? null}
+      busy={busy !== null}
+      onValidate={() => {
+        validate(each.description.id, [each.description.id]);
+      }}
+      onCorrect={(detailed) =>
+        run(each.description.id, () =>
+          correctScriptDescription(creatorId, script.id, each.description.id, detailed),
+        )
+      }
+    />
+  );
   return (
     <>
-      <div className="rx-sheet__head">
-        <p className="rx-sheet__title">À relire</p>
-        {batch.length > 0 ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--sm nv-btn--neon"
-            disabled={busy !== null}
-            onClick={() => {
-              validate('all', batch);
-            }}
-          >
-            {busy === 'all'
-              ? 'Validation…'
-              : batch.length === 1
-                ? 'Valider la description'
-                : `Valider les ${String(batch.length)} descriptions`}
-          </button>
-        ) : null}
-      </div>
       {error === null ? null : (
         <p className="sx-error nv-swap" role="alert">
           {error}
         </p>
       )}
-      <ul className="rx-media">
-        {media.map((each) => (
-          <MediaToRead
-            key={each.description.id}
-            creatorId={creatorId}
-            media={each}
-            picture={pictures.get(each.ref) ?? null}
-            busy={busy !== null}
-            onValidate={() => {
-              validate(each.description.id, [each.description.id]);
-            }}
-            onCorrect={(detailed) =>
-              run(each.description.id, () =>
-                correctScriptDescription(creatorId, script.id, each.description.id, detailed),
-              )
-            }
-          />
-        ))}
-      </ul>
+      {batch.length === 0 ? null : (
+        <div className="rx-group">
+          <div className="rx-sheet__head">
+            <p className="rx-sheet__title nv-num">À relire · {batch.length}</p>
+            <button
+              type="button"
+              className="nv-btn nv-btn--sm nv-btn--neon"
+              disabled={busy !== null}
+              onClick={() => {
+                validate('all', batch);
+              }}
+            >
+              {busy === 'all'
+                ? 'Validation…'
+                : batch.length === 1
+                  ? 'Valider la description'
+                  : `Valider les ${String(batch.length)} descriptions`}
+            </button>
+          </div>
+          <ul className="rx-media">
+            {media.filter((each) => each.description.reviewReasons.length === 0).map(item)}
+          </ul>
+        </div>
+      )}
+      {alone.length === 0 ? null : (
+        <div className="rx-group">
+          <div className="rx-sheet__head">
+            <p className="rx-sheet__title nv-num">À regarder de près · {alone.length}</p>
+          </div>
+          <ul className="rx-media">{alone.map(item)}</ul>
+        </div>
+      )}
     </>
   );
 }
@@ -296,9 +316,7 @@ function MediaToRead({
         {picture !== null && !blurred ? <Sharp creatorId={creatorId} media={picture} /> : null}
       </span>
       <div className="rx-medium__body">
-        <p className="rx-medium__where nv-num">
-          Étape {media.step} · {media.kind === 'video' ? 'Vidéo' : 'Photo'}
-        </p>
+        <p className="rx-medium__where nv-num">{placeOf(media)}</p>
         {draft === null ? (
           <>
             <p className="sx-medium__text">{description.detailed}</p>
@@ -429,6 +447,28 @@ function Identity({
     <>
       <div className="rx-sheet__head">
         <p className="rx-sheet__title">Son identité</p>
+        <div className="rx-sheet__actions">
+          <button
+            type="button"
+            className="nv-btn nv-btn--sm nv-btn--plain"
+            disabled={busy !== null}
+            onClick={() => {
+              setDraft(content);
+            }}
+          >
+            Corriger
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--sm nv-btn--neon"
+            disabled={busy !== null}
+            onClick={() =>
+              void run('identity', () => validateScriptIdentity(creatorId, script.id, identity.id))
+            }
+          >
+            {busy === 'identity' ? 'Validation…' : 'Valider l’identité'}
+          </button>
+        </div>
       </div>
       {error === null ? null : (
         <p className="sx-error nv-swap" role="alert">
@@ -442,7 +482,7 @@ function Identity({
         </div>
         <div className="rx-identity__row">
           <dt>Énergie</dt>
-          <dd>{ENERGY_LABELS[content.energy]}</dd>
+          <dd>{ENERGY_VALUES[content.energy]}</dd>
         </div>
         <div className="rx-identity__row">
           <dt>Décor</dt>
@@ -473,28 +513,6 @@ function Identity({
           </dd>
         </div>
       </dl>
-      <div className="rx-medium__actions">
-        <button
-          type="button"
-          className="nv-btn nv-btn--sm nv-btn--plain"
-          disabled={busy !== null}
-          onClick={() => {
-            setDraft(content);
-          }}
-        >
-          Corriger
-        </button>
-        <button
-          type="button"
-          className="nv-btn nv-btn--sm nv-btn--neon"
-          disabled={busy !== null}
-          onClick={() =>
-            void run('identity', () => validateScriptIdentity(creatorId, script.id, identity.id))
-          }
-        >
-          {busy === 'identity' ? 'Validation…' : 'Valider l’identité'}
-        </button>
-      </div>
     </>
   );
 }

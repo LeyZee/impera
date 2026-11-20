@@ -513,6 +513,7 @@
   background: var(--nv-fill-soft);
 }
 .rx-row {
+  --rx-name-line: 24px;
   appearance: none;
   display: flex;
   align-items: center;
@@ -547,7 +548,14 @@ button.rx-row:focus-visible {
   flex-direction: column;
   gap: 2px;
 }
+.rx-row__end {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
 .rx-row__name {
+  line-height: var(--rx-name-line);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -572,8 +580,18 @@ button.rx-row:focus-visible {
   flex: none;
   margin-left: 0;
 }
-.rx-row__state[data-tone='wait']::before {
+.rx-row__state[data-tone='wait']::before,
+.rx-row__state[data-tone='todo']::before {
   background: var(--nv-ink-faint);
+}
+.rx-row__state[data-tone='todo'] {
+  color: var(--nv-ink-muted);
+}
+.rx-row__state[data-tone='review'] {
+  color: var(--nv-ink);
+}
+.rx-row__state[data-tone='review']::before {
+  background: var(--nv-neon);
 }
 .rx-row__chev {
   flex: none;
@@ -607,6 +625,18 @@ button.rx-row:focus-visible {
   justify-content: space-between;
   gap: var(--nv-space-3);
   min-height: 32px;
+}
+.rx-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rx-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
 }
 .rx-sheet__title {
   margin: 0;
@@ -710,8 +740,10 @@ button.rx-row:focus-visible {
 }
 
 @media (max-width: 560px) {
-  .rx-row__state {
+  /* The pill and the chevron on the name's line. */
+  .rx-row__end {
     align-self: flex-start;
+    height: var(--rx-name-line);
   }
   .rx-medium {
     padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-2);
