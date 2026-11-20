@@ -700,11 +700,31 @@
   border-radius: var(--nv-radius-md);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
+.dy-card {
+  /* An opaque base under the plate: nothing of the page shows through her day. */
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--ag-c) 8%, transparent), transparent 60%),
+    linear-gradient(var(--nv-plate), var(--nv-plate)), var(--nv-surface-raised);
+}
+.dy-parts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+/* On a computer, the essentials on the left and the bonus beside them. */
+@media (min-width: 900px) {
+  .dy-parts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--nv-space-4);
+  }
+}
 .dy-part--lead {
   gap: var(--nv-space-3);
   padding: var(--nv-space-4);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ag-c) 45%, transparent);
-  background: color-mix(in srgb, var(--ag-c) 6%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--nv-hairline);
+  background: color-mix(in srgb, var(--nv-ink) 3%, transparent);
 }
 .dy-part--lead[data-full] {
   box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--nv-success) 45%, transparent);
@@ -759,6 +779,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-1);
+}
+.dy-group + .dy-group {
+  margin-top: var(--nv-space-2);
+}
+/* A closed line is its title alone on a phone; its sentence shows once opened. */
+@media (max-width: 640px) {
+  .dy-peek {
+    display: none;
+  }
 }
 .dy-group__name {
   font-size: var(--nv-text-caption);

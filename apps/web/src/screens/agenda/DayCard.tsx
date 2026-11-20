@@ -5,6 +5,7 @@ import { useState, type JSX } from 'react';
 import { NOT_SENT, type Outcome } from './api';
 import { readDayAgain, tickDayItem, useCreatorDay } from './day-api';
 import { doneAfterTap, firstSentence, kindOf, PLATFORM_WORDS, tallyOf } from './day-model';
+import { useWide } from './useWide';
 import { colorVars, useWeekColors, type ColorKind } from './week-colors';
 import { Icon, Palette } from './week-parts';
 import './week-card.css';
@@ -28,6 +29,7 @@ export function DayCard(): JSX.Element | null {
   const client = useQueryClient();
   const read = useCreatorDay();
   const palette = useWeekColors();
+  const wide = useWide();
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [painting, setPainting] = useState(false);
@@ -104,60 +106,65 @@ export function DayCard(): JSX.Element | null {
           {failed}
         </p>
       )}
-      <section
-        className="dy-part dy-part--lead"
-        aria-labelledby="dy-essentials"
-        data-full={settled || undefined}
-      >
-        <div className="dy-part__head">
-          <b id="dy-essentials" className="dy-part__title">
-            L’essentiel du jour
-          </b>
-          <span
-            className="wk-day__count nv-num"
-            aria-label={`${String(essential.done)} sur ${String(essential.total)} faits`}
-          >
-            {essential.done} / {essential.total}
-          </span>
-        </div>
-        {settled ? (
-          <p className="dy-settled">L’essentiel est fait. Tout le reste, c’est du bonus ✨</p>
-        ) : null}
-        <ul className="wk-lines">
-          {essentials.map((line) => (
-            <DayRow key={line.item} line={line} busy={busy} onTap={onTap} />
-          ))}
-        </ul>
-      </section>
-      {bonus.length === 0 ? null : (
-        <details className="dy-part dy-part--bonus" open>
-          <summary className="dy-part__head dy-part__fold">
-            <b className="dy-part__title">En bonus</b>
-            <span className="dy-part__hint">Si tu as le temps</span>
+      <div className="dy-parts">
+        <section
+          className="dy-part dy-part--lead"
+          aria-labelledby="dy-essentials"
+          data-full={settled || undefined}
+        >
+          <div className="dy-part__head">
+            <b id="dy-essentials" className="dy-part__title">
+              L’essentiel du jour
+            </b>
             <span
               className="wk-day__count nv-num"
-              aria-label={`${String(extra.done)} sur ${String(extra.total)} faits`}
+              aria-label={`${String(essential.done)} sur ${String(essential.total)} faits`}
             >
-              {extra.done} / {extra.total}
+              {essential.done} / {essential.total}
             </span>
-            <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m6 3 5 5-5 5" />
-            </svg>
-          </summary>
-          {platforms.map((platform) => (
-            <div key={platform} className="dy-group">
-              <span className="dy-group__name">{PLATFORM_WORDS[platform]}</span>
-              <ul className="wk-lines">
-                {bonus
-                  .filter((line) => line.platform === platform)
-                  .map((line) => (
-                    <DayRow key={line.item} line={line} busy={busy} onTap={onTap} />
-                  ))}
-              </ul>
-            </div>
-          ))}
-        </details>
-      )}
+          </div>
+          {settled ? <p className="dy-settled">L’essentiel est fait&nbsp;✨</p> : null}
+          <ul className="wk-lines">
+            {essentials.map((line) => (
+              <DayRow key={line.item} line={line} busy={busy} onTap={onTap} />
+            ))}
+          </ul>
+        </section>
+        {bonus.length === 0 ? null : (
+          // Folded on a phone until the essentials are done: one thing large (Design, 20/11); open beside them on a computer.
+          <details
+            key={settled || wide ? 'open' : 'folded'}
+            className="dy-part dy-part--bonus"
+            open={settled || wide}
+          >
+            <summary className="dy-part__head dy-part__fold">
+              <b className="dy-part__title">En bonus</b>
+              <span className="dy-part__hint">Si tu as le temps</span>
+              <span
+                className="wk-day__count nv-num"
+                aria-label={`${String(extra.done)} sur ${String(extra.total)} faits`}
+              >
+                {extra.done} / {extra.total}
+              </span>
+              <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m6 3 5 5-5 5" />
+              </svg>
+            </summary>
+            {platforms.map((platform) => (
+              <div key={platform} className="dy-group">
+                <span className="dy-group__name">{PLATFORM_WORDS[platform]}</span>
+                <ul className="wk-lines">
+                  {bonus
+                    .filter((line) => line.platform === platform)
+                    .map((line) => (
+                      <DayRow key={line.item} line={line} busy={busy} onTap={onTap} />
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </details>
+        )}
+      </div>
     </article>
   );
 }
@@ -186,7 +193,7 @@ function DayRow({
         <summary className="wk-line__summary">
           <span className="wk-line__words">
             <span className="wk-line__label">{line.label}</span>
-            <span className="wk-line__peek">{firstSentence(line.sheet)}</span>
+            <span className="wk-line__peek dy-peek">{firstSentence(line.sheet)}</span>
           </span>
           <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
             <path d="m6 3 5 5-5 5" />
