@@ -1,5 +1,5 @@
 # SCB-04 Éditeur des scripts à branches
-Statut : in_progress (lot 1 serveur #873, lot 2 reconnaissance, 20/11/2026)
+Statut : in_progress (lot 1 serveur #873, lot 2 reconnaissance #884, lot 3 écran, 20/11/2026)
 Phase : scripts (ADR 0112, amendement du 19/11, §§ 20-26)
 Dépend de : SCB-01 (#814), onglet Scripts de la fiche créatrice (ADR 0149) pour l'écran
 Branche : claude/project-thread-moagsx
@@ -14,7 +14,7 @@ ADR 0112 (§§ 13, 14, 20-26), ADR 0145 (coffre), ADR 0149 (fiche créatrice), m
 - [x] Lot 1 serveur : table `prepared_scripts` (migration 0229, RLS forcée, fermée au compte de la créatrice), manques et refus comptés à chaque lecture, avertissements de prix, états `editing` → `ready_to_copy` → `matched`, routes `…/prepared-scripts` (création idempotente, enregistrement sur révision, prêt à copier sans manque), journal d'audit.
 - [x] Lot 2 : reconnaissance à l'import (correspondance exacte nom, étapes, branches par rang, médias, prix), ordre et conditions transférés (`platform_script_branches`, migration 0230), script fermé, `copyDifferences` à la lecture.
 - [ ] Teaser, messages après le média et rythme : lus sur le script fermé par le déroulé à branches (lot 3 du moteur, fil Agent).
-- [ ] Lot 3 : écran (onglet Scripts, vues « À copier dans Reveal » et « Structures », éditeur), après l'ADR 0149 sur `main`.
+- [x] Lot 3 : écran de l'onglet Scripts (`apps/web/src/creators/scripts/prepared/`) : vues « Scripts » (liste, « Nouveau script », éditeur enregistré tout seul sur la révision lue, manques et avertissements du serveur, chemins et prix de chaque chemin) et « À copier dans Reveal » (textes et prix à copier, médias dans l'ordre, ce qui diffère encore), puis l'écran d'avant (scripts envoyés).
 - [ ] Lot 4 : vue Performances (lecture serveur puis écran).
 
 ## Critères d'acceptation

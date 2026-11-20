@@ -21,7 +21,7 @@ import {
 import { publishBudgetThreshold } from './budget-events';
 import type { Config } from './config';
 import { cronKnownSince } from './crontab';
-import { assertDatabaseRoles } from './database-roles';
+import { assertDatabaseRoles, assertNoForeignAccess } from './database-roles';
 import { createInvitationLinkRoutes } from './invitation-links';
 import { createJobQueue, defineTask, type JobQueue } from './jobs';
 import { createAppLlm } from './llm';
@@ -257,9 +257,25 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
   const sandbox = sandboxOf(config);
   if (sandbox !== null) installSandboxGuard(sandbox, logger);
-  const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
-  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, { ...POOL_OPTIONS, max: 5 });
-  const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
+  const db = createDbClient(config.DATABASE_URL, { ...POOL_OPTIONS, max: config.DATABASE_POOL_MAX });
+  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, {
+    ...POOL_OPTIONS,
+    max: config.DATABASE_SERVICE_POOL_MAX,
+  });
+  const rateLimitDb = createDbClient(config.DATABASE_URL, {
+    ...RATE_LIMIT_POOL_OPTIONS,
+    max: config.RATE_LIMIT_POOL_MAX,
+  });
+  // The connections this process may hold, for the budget of the pooler (ADR 0152 § 2, deploy.md).
+  logger.info(
+    {
+      app: config.DATABASE_POOL_MAX,
+      service: config.DATABASE_SERVICE_POOL_MAX,
+      rateLimit: config.RATE_LIMIT_POOL_MAX,
+      total: config.DATABASE_POOL_MAX + config.DATABASE_SERVICE_POOL_MAX + config.RATE_LIMIT_POOL_MAX,
+    },
+    'database connection budget of this process',
+  );
   // A client losing its connection must not crash the process; the next query reconnects.
   for (const [role, pool] of [
     ['app', db.pool],
@@ -275,6 +291,14 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // A role that silences RLS (or skips it), or a service role that could change a structure, must stop the process.
   try {
     await assertDatabaseRoles(db.db, adminDb.db);
+    await assertNoForeignAccess(adminDb.db, config.NODE_ENV === 'production', {
+      warn: (message) => {
+        logger.warn(message);
+      },
+      info: (message) => {
+        logger.info(message);
+      },
+    });
   } catch (error) {
     await Promise.all([db.close(), adminDb.close(), rateLimitDb.close()]);
     throw error;
@@ -420,6 +444,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
+    scripts: scripts.module,
     personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,

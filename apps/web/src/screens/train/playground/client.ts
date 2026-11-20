@@ -54,11 +54,16 @@ export interface PlaygroundClient {
   setNotes(notes: readonly string[]): Promise<PlaygroundState>;
   setSpent(cents: number): Promise<PlaygroundState>;
   sendCreatorMedia(media: CreatorMedia): Promise<PlaygroundState>;
+  /** « Payer (fictif) » or « Refuser » the paid step of a trial script waiting for him (ADR 0103 § 16). */
+  answerScriptStep(answer: ScriptStepAnswer): Promise<PlaygroundState>;
   /** Her bank for the version played (ADR 0102 § 5): what her voice reads, here and with her real fans. */
   bank(creatorId: CreatorId, versionId: PersonaVersionId): Promise<VoiceBank>;
   /** Out of her bank everywhere, kept for history; her bank as it is now. */
   withdrawExample(creatorId: CreatorId, versionId: PersonaVersionId, id: string): Promise<VoiceBank>;
 }
+
+/** What he does with the paid step waiting: buys it fictively, or says no. */
+export type ScriptStepAnswer = 'buy' | 'refuse';
 
 export type RatedState = PlaygroundState & {
   readonly exampleBlockedBy?: readonly PlaygroundGuardViolation[];
@@ -159,6 +164,7 @@ export function createHttpClient(): PlaygroundClient {
     setNotes: (notes) => call(PlaygroundStateSchema, '/notes', 'PUT', { notes }),
     setSpent: (spentCents) => call(PlaygroundStateSchema, '/situation', 'PATCH', { spentCents }),
     sendCreatorMedia: (media) => call(PlaygroundStateSchema, '/creator-media', 'POST', media),
+    answerScriptStep: (answer) => call(PlaygroundStateSchema, `/script/${answer}`, 'POST'),
     bank: (creatorId, versionId) =>
       call(
         VoiceBankSchema,

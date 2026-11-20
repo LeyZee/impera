@@ -21,8 +21,11 @@ export interface PlaygroundService {
 export function createPlaygroundService(factories: {
   /** The invented persona's playground, each user's first. */
   readonly invented: () => PlaygroundEngine;
-  /** A creator's version's; throws `PlaygroundPersonaNotFound` when she has no such version. */
-  readonly ofVersion: (choice: NonNullable<PersonaChoice>) => Promise<PlaygroundEngine>;
+  /**
+   * A creator's version's, for this user: her scripts are read as this user reads them. Throws
+   * `PlaygroundPersonaNotFound` when she has no such version.
+   */
+  readonly ofVersion: (choice: NonNullable<PersonaChoice>, userId: string) => Promise<PlaygroundEngine>;
 }): PlaygroundService {
   const engines = new Map<string, PlaygroundEngine>();
   return {
@@ -37,7 +40,7 @@ export function createPlaygroundService(factories: {
     async choose(userId, choice) {
       // Throws while an answer runs: the conversation under way is never cut.
       engines.get(userId)?.reset();
-      const engine = choice === null ? factories.invented() : await factories.ofVersion(choice);
+      const engine = choice === null ? factories.invented() : await factories.ofVersion(choice, userId);
       engines.set(userId, engine);
       return engine;
     },
