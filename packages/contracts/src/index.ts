@@ -41,6 +41,7 @@ export * from './invoices';
 export * from './jobs';
 export * from './creator-links';
 export * from './instagram-comments';
+export * from './instagram-insights';
 export * from './link-stats';
 export * from './mcp';
 export * from './media';
