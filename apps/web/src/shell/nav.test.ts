@@ -71,7 +71,15 @@ describe('layoutRail, once every screen exists', () => {
       '/paie',
       '/reglages',
     ]);
-    expect(order('manager')).toEqual(['/', '/suivi', '/creatrices', '/equipe', '/paie', '/moi']);
+    expect(order('manager')).toEqual([
+      '/',
+      '/suivi',
+      '/entrainer',
+      '/creatrices',
+      '/equipe',
+      '/paie',
+      '/moi',
+    ]);
     expect(order('chatter')).toEqual(['/aujourdhui', '/suivi', '/planning', '/commissions', '/moi']);
   });
 
@@ -85,8 +93,8 @@ describe('layoutRail, once every screen exists', () => {
     expect(layoutRail('chatter', all).more.size).toBe(0);
   });
 
-  it('puts Paie and Moi on the manager’s « Plus », his bar keeping Créatrices and Équipe (ADR 0149 § 2)', () => {
-    expect([...layoutRail('manager', all).more]).toEqual(['/paie', '/moi']);
+  it('puts Entraîner, Paie and Moi on the manager’s « Plus », his bar keeping Créatrices and Équipe (ADR 0149 § 2)', () => {
+    expect([...layoutRail('manager', all).more]).toEqual(['/entrainer', '/paie', '/moi']);
   });
 
   it('fills the bar from the phone order, then the rail order, when only Équipe is new', () => {
@@ -113,7 +121,16 @@ describe('railOf, with the screens of today', () => {
     expect(labels(operator)).toEqual(['Dashboard', 'Suivi', 'Créatrices']);
     // Moi, the fifth tab of the chatter, on the phone's bar too (EQ-06 lot 8b): no « Plus ». The manager's sixth,
     // Créatrices for her agenda alone (CR-05 lot c), sends it and Moi to « Plus » on the phone.
-    expect(labels(manager)).toEqual(['Dashboard', 'Suivi', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    // Entraîner too, on the creators of his list (ADR 0092 § 8): he notes and corrects, the owner files.
+    expect(labels(manager)).toEqual([
+      'Dashboard',
+      'Suivi',
+      'Entraîner',
+      'Créatrices',
+      'Équipe',
+      'Paie',
+      'Moi',
+    ]);
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
     expect(railOf(chatter).more.size).toBe(0);
     // The chatter's bar ends there: Moi › Préférences holds what « Plus » held (D-03). The manager, whose sixth tab
