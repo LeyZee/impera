@@ -17,7 +17,7 @@ ADR 0092 § 4, ADR 0078 (droits de lecture), ADR 0144 (le MCP ne voit jamais qui
 - [x] Supervision : lecture dans le tenant de chaque créatrice, mêmes droits que « Qui a vendu » ; le MCP ne la recopie pas (test).
 - [x] Écran : carte « Les remboursements » sous « Les fans qui paient », tableau sur ordinateur, une fiche par remboursement au téléphone, filtres en listes du design system ; rien quand la période n'en a pas.
 - [x] Tests : domaine des connecteurs et de la supervision, intégration de la route, MCP, écran.
-- [ ] Captures Nuit/Jour, PC/téléphone, données inventées ; avis Design puis « ok captures » de Charles.
+- [x] Captures Nuit/Jour, PC/téléphone, données inventées ; avis Design, puis « ok captures dashboard-remboursements-1 » de Charles le 20/11.
 - [ ] OK de Bilan (serveur, contrat) et de Design (écran) sur le dernier commit.
 
 ## Critères d'acceptation
