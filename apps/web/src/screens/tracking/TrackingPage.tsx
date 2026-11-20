@@ -43,6 +43,7 @@ import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queu
 import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
+import { ChatArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
 import { Empty, Failure } from '@/shell/states';
@@ -401,7 +402,7 @@ export function TrackingPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <Empty title="Choisis une conversation à gauche.">
+              <Empty art={<ChatArt />} title="Choisis une conversation à gauche.">
                 Elle s’ouvre ici, avec son brouillon s’il y en a un.
               </Empty>
             </section>

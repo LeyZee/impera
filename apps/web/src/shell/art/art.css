@@ -1,0 +1,183 @@
+/*
+ * The pictures of an empty screen (shell/art/EmptyArt.tsx), in the hand of the vault's chest: lines in the theme's ink,
+ * fills mixed from its colours so that a picture reads by day as by night. `var()` in a `stop-color` attribute does not
+ * follow the theme: the gradients' stops are classes.
+ */
+.nv-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+/* An `Empty` that carries a picture: no round of glass around it. */
+.nv-empty__art {
+  width: 176px;
+  margin-bottom: var(--nv-space-2);
+}
+.nv-art__line {
+  stroke: var(--nv-ink);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.nv-art__ground {
+  fill: var(--nv-ink);
+  opacity: 0.1;
+}
+.nv-art__light {
+  transform-box: fill-box;
+  transform-origin: 50% 60%;
+  animation: nv-art-glow 3.6s var(--nv-ease-in-out) infinite;
+}
+.nv-art__stop-light {
+  stop-color: var(--nv-neon);
+  stop-opacity: 0.4;
+}
+.nv-art__stop-clear {
+  stop-color: var(--nv-agent);
+  stop-opacity: 0;
+}
+.nv-art__stop-body-top {
+  stop-color: color-mix(in srgb, var(--nv-neon) 26%, var(--nv-surface-raised));
+}
+.nv-art__stop-body-bottom {
+  stop-color: color-mix(in srgb, var(--nv-agent) 18%, var(--nv-surface-raised));
+}
+.nv-art__stop-hot-top {
+  stop-color: color-mix(in srgb, var(--nv-neon) 82%, #fff);
+}
+.nv-art__stop-hot-bottom {
+  stop-color: color-mix(in srgb, var(--nv-neon) 62%, var(--nv-agent));
+}
+.nv-art__stop-deep-top {
+  stop-color: color-mix(in srgb, var(--nv-neon) 70%, var(--nv-void));
+}
+.nv-art__stop-deep-bottom {
+  stop-color: color-mix(in srgb, var(--nv-agent) 30%, var(--nv-void));
+}
+.nv-art__white {
+  fill: #fff;
+}
+.nv-art__paper {
+  fill: color-mix(in srgb, var(--nv-surface-raised) 12%, #fff);
+}
+.nv-art__neon {
+  fill: var(--nv-neon);
+}
+.nv-art__violet {
+  fill: color-mix(in srgb, var(--nv-agent) 80%, #fff);
+}
+.nv-art__warm {
+  fill: color-mix(in srgb, var(--nv-warning) 50%, #ffb347);
+}
+.nv-art__warm-light {
+  fill: color-mix(in srgb, var(--nv-warning) 30%, #ffd166);
+}
+.nv-art__coin-mark {
+  fill: none;
+  stroke: rgba(12, 10, 16, 0.32);
+  stroke-width: 1.4;
+}
+.nv-art__cell {
+  fill: color-mix(in srgb, var(--nv-ink) 16%, transparent);
+}
+/* Lines of writing: on a bubble or on paper, never as loud as the outline. */
+.nv-art__rule {
+  fill: none;
+  stroke: rgba(12, 10, 16, 0.26);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.nv-art__rule--ink {
+  stroke: color-mix(in srgb, var(--nv-ink) 30%, transparent);
+}
+.nv-art__total {
+  fill: none;
+  stroke: var(--nv-neon);
+  stroke-width: 4.4;
+  stroke-linecap: round;
+}
+.nv-art__thread {
+  fill: none;
+  stroke: rgba(12, 10, 16, 0.26);
+  stroke-width: 1.6;
+  stroke-dasharray: 2 3;
+  stroke-linecap: round;
+}
+.nv-art__quill {
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+.nv-art__screen {
+  stroke: color-mix(in srgb, var(--nv-ink) 30%, transparent);
+  stroke-width: 1;
+}
+.nv-art__notch {
+  fill: color-mix(in srgb, var(--nv-ink) 40%, transparent);
+}
+/* A link of a chain: a thick ring, its edge in ink under it. */
+.nv-art__ring-edge {
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 14.2;
+}
+.nv-art__ring {
+  fill: none;
+  stroke-width: 11;
+}
+.nv-art__ring--hot {
+  stroke: var(--nv-neon);
+}
+.nv-art__ring--soft {
+  stroke: color-mix(in srgb, var(--nv-agent) 62%, var(--nv-surface-raised));
+}
+.nv-art__float {
+  animation: nv-art-rise 3.6s var(--nv-ease-in-out) infinite;
+}
+.nv-art__float--2 {
+  animation-delay: -1.2s;
+}
+.nv-art__float--3 {
+  animation-delay: -2.4s;
+}
+.nv-art__spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nv-art-twinkle 2.8s var(--nv-ease-in-out) infinite;
+}
+.nv-art__spark--a {
+  fill: var(--nv-warning);
+}
+.nv-art__spark--b {
+  fill: var(--nv-agent);
+  animation-delay: -0.9s;
+}
+.nv-art__spark--c {
+  fill: var(--nv-neon);
+  animation-delay: -1.8s;
+}
+@keyframes nv-art-rise {
+  50% {
+    translate: 0 -4px;
+  }
+}
+@keyframes nv-art-glow {
+  50% {
+    opacity: 0.7;
+    scale: 0.94;
+  }
+}
+@keyframes nv-art-twinkle {
+  50% {
+    scale: 0.6;
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-art__light,
+  .nv-art__float,
+  .nv-art__spark {
+    animation: none;
+  }
+}

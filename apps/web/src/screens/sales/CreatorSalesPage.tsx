@@ -10,6 +10,7 @@ import './sales.css';
 import { initialOf } from '@/lib/utils';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { FansArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
@@ -64,7 +65,7 @@ export function CreatorSalesPage({
               <Panel className="nv-enter" title="Tes fans">
                 <PanelSection>
                   {list.length === 0 ? (
-                    <Empty title="Aucun fan pour l’instant.">
+                    <Empty art={<FansArt />} title="Aucun fan pour l’instant.">
                       Ils arrivent ici dès leur premier message.
                     </Empty>
                   ) : (

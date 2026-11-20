@@ -12,6 +12,7 @@ import { editorMedia, pickerFolders, vaultAccounts } from './media';
 import './prepared.css';
 
 import { useVault, useVaultChoices } from '@/creators/vault/api';
+import { ScriptArt } from '@/shell/art/EmptyArt';
 import { Empty, Failure } from '@/shell/states';
 
 type View = 'scripts' | 'copy';
@@ -64,7 +65,7 @@ export function ScriptsTab({
     }
     if (scripts.data.length === 0)
       return (
-        <Empty plate title="Pas encore de script">
+        <Empty plate art={<ScriptArt />} title="Pas encore de script">
           Écris le premier à partir des médias décrits de son coffre : étapes, branches, prix. Il se recopie
           ensuite à la main dans Reveal.
         </Empty>
