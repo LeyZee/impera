@@ -345,7 +345,15 @@ const NO_OPENING_HINT =
   'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis';
 /** He compliments or flirts, nothing sexual: she welcomes it, never dodges it (Charles, 16/11). */
 const FLIRT_HINT =
-  'il la complimente ou flirte : elle le reçoit avec plaisir, l’assume et le remercie, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part ; jamais elle ne le freine ni ne lui dit qu’il va trop vite ou trop fort';
+  'il la complimente ou flirte : elle le reçoit avec plaisir, l’assume et le remercie, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part ; jamais elle ne commente sa façon de l’aborder (ni trop vite, ni trop fort, ni direct, ni pressé)';
+/**
+ * He compliments or flirts and nothing sexual opens: code writes what she does, not the brain, whose own words kept
+ * reading a stranger's compliment as him going too fast (« tu vises direct », Charles 20/11). She knows it, plays with
+ * it, thanks him, then bounces on him with an open question; anything else he said is answered too.
+ */
+const COMPLIMENT_BRIEF =
+  'Il lui fait un compliment ou la drague, sans rien de sexuel. Elle le reçoit avec assurance et jeu, comme une fille qui sait qu’elle plaît et que ça amuse, et elle le remercie. Puis elle rebondit sur lui avec une question ouverte, née de ce qu’il vient de dire. S’il dit ou demande autre chose dans le même message, elle y répond aussi.';
+const COMPLIMENT_TONE_HINTS = ['assurée', 'joueuse', 'chaleureuse'] as const;
 
 // She asked his age already in this conversation: « t'as quel âge ? », « tu as quel âge », « et ton âge ? ».
 const ASKED_AGE = /\b(?:quel age|ton age|age as[- ]tu|age t'?as)\b/u;
@@ -386,7 +394,8 @@ function careBrief(read: Brief): Brief {
 
 /**
  * The brief as the cursor lets the voice write it. His age is asked at most once, and never right after he gave it
- * (`ageAsked`): she slows down without asking it again. A flirt she may not take further is still welcomed.
+ * (`ageAsked`): she slows down without asking it again. A flirt she may not take further is still welcomed, in code's
+ * words (`COMPLIMENT_BRIEF`).
  */
 function withinCursor(brief: Brief, decision: SexualizationDecision, ageAsked: boolean): Brief {
   if (decision.kind === 'steer_back') {
@@ -394,10 +403,16 @@ function withinCursor(brief: Brief, decision: SexualizationDecision, ageAsked: b
     return { ...brief, action: 'reply', replyBrief: STEER_BACK_BRIEF[reason] };
   }
   if (decision.kind === 'no_opening')
-    return {
-      ...brief,
-      toneHints: [...brief.toneHints, ...(brief.intent === 'flirt' ? [FLIRT_HINT] : []), NO_OPENING_HINT],
-    };
+    return brief.intent === 'flirt' && brief.action === 'reply'
+      ? {
+          ...brief,
+          replyBrief: COMPLIMENT_BRIEF,
+          toneHints: [...COMPLIMENT_TONE_HINTS, FLIRT_HINT, NO_OPENING_HINT],
+        }
+      : {
+          ...brief,
+          toneHints: [...brief.toneHints, ...(brief.intent === 'flirt' ? [FLIRT_HINT] : []), NO_OPENING_HINT],
+        };
   if (decision.kind === 'suggestive_only')
     return { ...brief, toneHints: [...brief.toneHints, SUGGESTIVE_HINT] };
   return brief;
@@ -663,7 +678,7 @@ export async function composeTurn(
             (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
           ageConfirmed,
           noExplicit,
-          fanSexualizes: offerSignals(brief).fanSexualizes,
+          fanSexualizes: offerSignals(brief, input.fanText).fanSexualizes,
           desire: heat,
           limits: input.sexualization?.limits ?? NO_LIMITS,
         });
@@ -714,7 +729,7 @@ export async function composeTurn(
       : readAvailability({
           previous: input.availability ?? null,
           signals: brief.desireSignals ?? [],
-          sexualizes: sexualizes(brief),
+          sexualizes: sexualizes(brief, input.fanText),
           desire: heat,
           threshold,
           now: input.situation.now,

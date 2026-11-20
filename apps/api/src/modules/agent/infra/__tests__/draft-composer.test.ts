@@ -1682,6 +1682,77 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
   });
 
+  it('writes what she does on a compliment itself, never in the brain’s words (Charles, 20/11)', async () => {
+    // The brain still read a stranger's compliment as him going fast: its brief and tones never reach the voice.
+    const READ_AS_FAST: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'positive',
+      desireSignals: ['body_compliment'],
+      replyBrief: 'Accueillir le compliment avec une petite réserve joueuse, il y va direct.',
+      toneHints: ['réservée'],
+    };
+    const { draftComposer, seen } = composer(
+      {
+        brief: READ_AS_FAST,
+        voice: { bubbles: ['Merci 😏 tu vises direct toi'] },
+        voiceAfter: { bubbles: ['Merci 😏 ça me fait plaisir, tu fais quoi de beau ?'] },
+      },
+      undefined,
+      limitsOf({}).limits,
+      cursor,
+    );
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Merci 😏 ça me fait plaisir, tu fais quoi de beau ?'],
+    });
+    const brief = seen.voiceInputs?.[0]?.brief;
+    expect(brief?.replyBrief).toContain('avec assurance et jeu');
+    expect(brief?.replyBrief).toContain('question ouverte');
+    expect(brief?.replyBrief).not.toMatch(/réserve|direct/u);
+    expect(brief?.toneHints).not.toContain('réservée');
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
+  });
+
+  it('welcomes a compliment the brain adds a desire to, never slowed down nor asked his age (Charles, 20/11)', async () => {
+    // Eval of 20/11: « doucement » and an age question on a first compliment, the brain having added a desire to it.
+    const WITH_DESIRE: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire', 'asks_about_her_body'],
+    };
+    const { draftComposer, seen } = composer({ brief: WITH_DESIRE }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose(INPUT);
+    const brief = written(seen);
+    expect(brief?.replyBrief).toContain('avec assurance et jeu');
+    expect(brief?.replyBrief).not.toMatch(/ralentit|son âge/u);
+    expect(brief?.toneHints).toEqual(
+      expect.arrayContaining([expect.stringContaining('aucune allusion sexuelle')]),
+    );
+  });
+
+  it('still slows down a flirt whose words say desire, before his age is known (relecture Bilan de #888)', async () => {
+    const SAYS_DESIRE: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire'],
+    };
+    const { draftComposer, seen } = composer({ brief: SAYS_DESIRE }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose({
+      ...INPUT,
+      history: [
+        {
+          direction: 'inbound',
+          text: 't’es trop belle, j’ai trop envie de toi là',
+          at: new Date('2026-10-17T09:59:00Z'),
+        },
+      ],
+    });
+    expect(written(seen)?.replyBrief).toContain('ralentit');
+  });
+
   it('lets her tease « pas si vite » once the intimate is open (relecture Bilan de #876)', async () => {
     const { draftComposer } = composer(
       { brief: HOT, voice: { bubbles: ['Pas si vite 😏 j’ai envie de te faire attendre'] } },

@@ -4,8 +4,8 @@
  * threshold (`evals/thresholds.json`). Nothing is sent. The persona is the fictional demo one (ADR 0010), or with
  * `--persona-from-crm` her active version read from the database, which stays on that machine (OPS-11).
  * Each scenario is drawn `--draws` times (3 by default) and fails if any draw fails (OPS-11).
- * Usage: `pnpm evals [--full] [--draws 3] [--file evals/adversarial/asks-if-bot.yaml] [--persona-from-crm
- * [--creator <id>]]` (the path from the repository root), with
+ * Usage: `pnpm evals [--full] [--draws 3] [--file evals/adversarial/asks-if-bot.yaml] [--match compliment-]
+ * [--persona-from-crm [--creator <id>]]` (the path from the repository root), with
  * LLM_XAI_API_KEY in the environment, or `--key-from-crm`: the keys saved in Réglages › Modèles IA of the database
  * DATABASE_ADMIN_URL names, opened with CREDENTIALS_ENCRYPTION_KEYS (`readSavedProviderKeys`), kept in memory only.
  */
@@ -73,6 +73,8 @@ const { values } = parseArgs({
   options: {
     full: { type: 'boolean', default: false },
     file: { type: 'string' },
+    /** Only the scenarios whose file name holds it: a set replayed alone (« compliment- », Charles 20/11). */
+    match: { type: 'string' },
     'key-from-crm': { type: 'boolean', default: false },
     'persona-from-crm': { type: 'boolean', default: false },
     creator: { type: 'string' },
@@ -147,7 +149,11 @@ const files =
         } catch {
           names = [];
         }
-        return names.filter((name) => /\.ya?ml$/.test(name)).map((name) => resolve(EVALS, suite, name));
+        return names
+          .filter(
+            (name) => /\.ya?ml$/.test(name) && (values.match === undefined || name.includes(values.match)),
+          )
+          .map((name) => resolve(EVALS, suite, name));
       })
     : [resolve(ROOT, values.file)];
 
@@ -493,7 +499,11 @@ if (isCapReached) {
     `\nevals : plafond de ${String(EVALS_CAP_EUR)} € atteint, suite arrêtée après ${String(results.length)} scénarios.`,
   );
 }
-const report = judgeSuite(results, values.file === undefined ? tier : { ...tier, min_scenarios: 1 }, minima);
+const report = judgeSuite(
+  results,
+  values.file === undefined && values.match === undefined ? tier : { ...tier, min_scenarios: 1 },
+  minima,
+);
 const means = Object.entries(report.means);
 if (means.length > 0)
   console.log(`\nMoyennes : ${means.map(([c, m]) => `${c} ${m.toFixed(2)}`).join(' · ')}`);
