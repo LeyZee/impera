@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema, type PlatformScriptViewDto } from '@impera/contracts';
+import { CreatorIdSchema, PreparedScriptIdSchema, type PlatformScriptViewDto } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RevealScripts } from './RevealScripts';
+import { viewOf } from './prepared/fixtures';
 import {
   descriptionId,
   IDENTITY_CONTENT,
@@ -68,6 +69,20 @@ function serve(
 }
 
 const LIST = `GET /creators/${CREATOR}/platform-scripts`;
+const PREPARED = `GET /creators/${CREATOR}/prepared-scripts`;
+/** Each native given recognised as the copy of a script prepared in Impera. */
+const ours =
+  (...natives: PlatformScriptViewDto[]) =>
+  () => ({
+    status: 200,
+    body: natives.map((native, at) =>
+      viewOf({
+        id: PreparedScriptIdSchema.parse(`0192f3a0-0000-7000-8000-00000000f0${String(at).padStart(2, '0')}`),
+        state: 'matched',
+        matchedPlatformScriptId: native.id,
+      }),
+    ),
+  });
 const url = (script: PlatformScriptViewDto, what: string) =>
   `POST /creators/${CREATOR}/platform-scripts/${script.id}/${what}`;
 
@@ -85,8 +100,34 @@ afterEach(() => {
 });
 
 describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
+  it('lists only the copies of scripts prepared in Impera, never her other Reveal scripts', async () => {
+    const other = revealScriptOf(9, { name: 'Ancien PPV inventé' });
+    serve({
+      [LIST]: () => ({ status: 200, body: [READY, other] }),
+      [PREPARED]: ours(READY),
+    });
+    show();
+    expect(await screen.findByText('1 prêt à proposer sur 1')).toBeDefined();
+    expect(screen.getByText(/Prêt inventé/u)).toBeDefined();
+    expect(screen.queryByText(/Ancien PPV inventé/u)).toBeNull();
+  });
+
+  it('says where a copy comes from while none of ours is recognised yet', async () => {
+    serve({
+      [LIST]: () => ({ status: 200, body: [revealScriptOf(9, { name: 'Ancien PPV inventé' })] }),
+      [PREPARED]: () => ({ status: 200, body: [viewOf()] }),
+    });
+    show();
+    expect(await screen.findByText('Aucun de nos scripts recopié dans Reveal')).toBeDefined();
+    expect(screen.getByText(/Ses autres scripts Reveal n’y figurent pas/u)).toBeDefined();
+    expect(screen.queryByText(/Ancien PPV inventé/u)).toBeNull();
+  });
+
   it('says what each script lacks, and opens the first to review on its descriptions', async () => {
-    serve({ [LIST]: () => ({ status: 200, body: [TO_READ, TO_NAME, READY] }) });
+    serve({
+      [LIST]: () => ({ status: 200, body: [TO_READ, TO_NAME, READY] }),
+      [PREPARED]: ours(TO_READ, TO_NAME, READY),
+    });
     show();
     expect(await screen.findByText('1 prêt à proposer sur 3 · 2 à valider ou importer')).toBeDefined();
     expect(screen.getByText('3 descriptions à valider.')).toBeDefined();
@@ -114,6 +155,7 @@ describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
     };
     const calls = serve({
       [LIST]: () => ({ status: 200, body: [TO_READ] }),
+      [PREPARED]: ours(TO_READ),
       [url(TO_READ, 'descriptions/validate')]: () => ({ status: 200, body: after }),
     });
     show();
@@ -131,6 +173,7 @@ describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
   it('rewrites a description by hand, validated as it is saved', async () => {
     const calls = serve({
       [LIST]: () => ({ status: 200, body: [TO_READ] }),
+      [PREPARED]: ours(TO_READ),
       [url(TO_READ, 'descriptions/correct')]: () => ({ status: 200, body: TO_READ }),
     });
     show();
@@ -153,6 +196,7 @@ describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
   it('shows the identity the AI wrote and validates it as it is', async () => {
     const calls = serve({
       [LIST]: () => ({ status: 200, body: [TO_NAME] }),
+      [PREPARED]: ours(TO_NAME),
       [url(TO_NAME, 'identity/validate')]: () => ({
         status: 200,
         body: { ...TO_NAME, gaps: [], proposable: true, identity: identityOf('2026-11-20T01:00:00.000Z') },
@@ -170,6 +214,7 @@ describe('« Ses scripts dans Reveal » (ADR 0099 § 4)', () => {
   it('says a refusal as the server words it, and reads the list again', async () => {
     const calls = serve({
       [LIST]: () => ({ status: 200, body: [TO_NAME] }),
+      [PREPARED]: ours(TO_NAME),
       [url(TO_NAME, 'identity/validate')]: () => ({
         status: 409,
         body: {

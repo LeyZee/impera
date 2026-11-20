@@ -13,11 +13,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useId, useMemo, useState, type JSX } from 'react';
 
 import { MOMENT_EMOJIS } from './model';
+import { usePreparedScripts } from './prepared/api';
 import {
   ENERGY_LABELS,
   ENERGY_VALUES,
   batchOf,
   mediaToValidate,
+  ourCopies,
   placeOf,
   priceLine,
   revealStanding,
@@ -45,10 +47,12 @@ import { Failure } from '@/shell/states';
  * « Ses scripts dans Reveal » (ADR 0030 § 3, ADR 0099 § 4, SC-04 lot c8): her Reveal scripts, each with the one thing
  * that keeps it from being offered by the agent, said as the next gesture. A script to review opens on what is to
  * validate, its media's descriptions first, then its identity; the first of them is open already. The owner and the
- * managers of her list only: the server refuses anyone else.
+ * managers of her list only: the server refuses anyone else. Only the copies of scripts prepared in Impera (Charles,
+ * 20/11): her other Reveal scripts, those of an earlier tool among them, are never listed, offered or validated here.
  */
 export function RevealScripts({ creatorId }: { creatorId: CreatorId }): JSX.Element {
-  const scripts = useRevealScripts(creatorId);
+  const natives = useRevealScripts(creatorId);
+  const prepared = usePreparedScripts(creatorId);
   const vault = useVault(creatorId, false);
   const [opened, setOpened] = useState<string | null | undefined>(undefined);
 
@@ -70,28 +74,35 @@ export function RevealScripts({ creatorId }: { creatorId: CreatorId }): JSX.Elem
     </div>
   );
 
-  if (scripts.data === undefined) {
-    if (scripts.isError)
+  if (natives.data === undefined || prepared.data === undefined) {
+    if (natives.isError || prepared.isError)
       return (
         <div className="nv-plate rx">
           {head(null)}
-          <Failure title="Ses scripts Reveal ne se chargent pas" onRetry={() => void scripts.refetch()} />
+          <Failure
+            title="Ses scripts Reveal ne se chargent pas"
+            onRetry={() => {
+              void natives.refetch();
+              void prepared.refetch();
+            }}
+          />
         </div>
       );
     return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
   }
 
-  const active = scripts.data.filter((script) => script.active);
+  const scripts = ourCopies(natives.data, prepared.data);
+  const active = scripts.filter((script) => script.active);
   // The first one to review is open at first; then whatever the agency opens or closes.
   const first = active.find((script) => revealStanding(script).opens !== null)?.id ?? null;
   const open = opened === undefined ? first : opened;
   return (
     <section className="nv-plate rx" aria-label="Ses scripts dans Reveal">
-      {head(revealSummary(scripts.data))}
+      {head(revealSummary(scripts))}
       {active.length === 0 ? (
         <p className="ps-muted">
-          Synchronise son coffre : ses scripts Reveal arrivent avec lui, chacun avec ce qui lui manque pour
-          être proposé.
+          Un script prêt à copier arrive ici dès que la synchro de son coffre reconnaît sa copie dans Reveal,
+          avec ce qui lui manque pour être proposé. Ses autres scripts Reveal n’y figurent pas.
         </p>
       ) : (
         <ul className="rx-list">
