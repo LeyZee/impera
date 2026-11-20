@@ -221,7 +221,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 28px;
+  height: var(--nv-pill-choice);
   margin: 0;
   padding: 0 6px 0 8px;
   border: 0;

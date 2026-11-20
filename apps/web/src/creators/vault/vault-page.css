@@ -927,6 +927,9 @@
   box-shadow: none;
 }
 .vp-art {
+  /* Her photos' paper and their hills' shade: the same white and shade by day and by night. */
+  --vp-art-paper: #fff;
+  --vp-art-shade: rgba(12, 10, 16, 0.32);
   display: block;
   width: 100%;
   height: auto;
@@ -1006,7 +1009,7 @@
 }
 /* Her photos: white frames, a sky of the theme's colours, a sun, hills. */
 .vp-art__frame {
-  fill: #fff;
+  fill: var(--vp-art-paper);
 }
 .vp-art__sky--a {
   fill: color-mix(in srgb, var(--nv-warning) 55%, var(--nv-neon));
@@ -1015,14 +1018,14 @@
   fill: color-mix(in srgb, var(--nv-neon) 70%, var(--nv-agent));
 }
 .vp-art__sky--c {
-  fill: color-mix(in srgb, var(--nv-agent) 80%, #fff);
+  fill: color-mix(in srgb, var(--nv-agent) 80%, var(--vp-art-paper));
 }
 .vp-art__sun {
-  fill: #fff;
+  fill: var(--vp-art-paper);
   opacity: 0.9;
 }
 .vp-art__hill {
-  fill: rgba(12, 10, 16, 0.32);
+  fill: var(--vp-art-shade);
 }
 .vp-art__photo {
   animation: vp-rise 3.6s var(--nv-ease-in-out) infinite;
