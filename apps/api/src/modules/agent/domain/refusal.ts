@@ -29,8 +29,9 @@ export interface RefusalMoment {
 
 /**
  * Her move on this answer after his refusal, or `null` when none is left. Pushing back a little (insisting, sulking)
- * is never for a fan whose sales are frozen, who is fragile, nobody may write to, or in the care mode (`maySulk`): to
- * him she only asks what did not please him. A refusal from another session holds nothing.
+ * is never for a fan whose sales are frozen, who is fragile, nobody may write to, or in the care mode (`maySulk`), nor
+ * for one who already paid a step of this script: to him she only asks what did not please him. A refusal from another
+ * session holds nothing.
  */
 export function refusalMove(moment: RefusalMoment): RefusalMove | null {
   const { run } = moment;
@@ -39,5 +40,7 @@ export function refusalMove(moment: RefusalMoment): RefusalMove | null {
   const move = MOVES[moment.herAnswersSince];
   if (move === undefined) return null;
   if (move === 'ask_why') return move;
+  // He already paid a step of this script: no whining, aftercare (Charles, 20/11). Only a fan who paid nothing in it.
+  if (run.steps.some((step) => step.outcome === 'bought')) return null;
   return !moment.care && maySulk(moment.flags) ? move : null;
 }
