@@ -87,6 +87,8 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
     expect(await screen.findByText('Pas encore de script')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: '＋ Nouveau script' }));
     fireEvent.change(await screen.findByLabelText('Nom'), { target: { value: 'Matin inventé' } });
+    // Played the day and the night alike: chosen by hand, never read from its media (Charles, 20/11).
+    fireEvent.click(screen.getByRole('radio', { name: 'jour et nuit' }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Créer le brouillon' }).hasAttribute('disabled')).toBe(false);
     });
@@ -95,7 +97,7 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
     const created = calls.find((call) => call.method === 'POST');
     expect(created?.body).toMatchObject({
       platformAccountId: VAULT.folders[0]?.platformAccountId,
-      content: { name: 'Matin inventé', moment: 'night', steps: [{ rhythm: 0 }] },
+      content: { name: 'Matin inventé', moment: 'both', steps: [{ rhythm: 0 }] },
     });
   });
 

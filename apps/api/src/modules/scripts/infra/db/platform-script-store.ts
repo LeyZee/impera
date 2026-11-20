@@ -302,7 +302,9 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
         inArray(schema.preparedScripts.matchedPlatformScriptId, ids),
         eq(schema.preparedScripts.state, 'matched'),
       ),
-    );
+    )
+    // Nothing keeps two of ours from naming the same native script: the last recognised wins, always the same one.
+    .orderBy(schema.preparedScripts.matchedAt, schema.preparedScripts.id);
   const ours = new Map(
     oursRows.map((row): [string | null, OurCopy] => {
       const content = PreparedScriptContentSchema.parse(row.content);
