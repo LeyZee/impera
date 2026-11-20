@@ -1254,6 +1254,13 @@
       "when": 1795196579311,
       "tag": "0237_creator_week",
       "breakpoints": true
+    },
+    {
+      "idx": 179,
+      "version": "7",
+      "when": 1795213970584,
+      "tag": "0238_media_insight_snapshots",
+      "breakpoints": true
     }
   ]
 }

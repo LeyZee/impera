@@ -136,6 +136,11 @@ const configSchema = z
     S3_BUCKET: optionalValue,
     S3_ACCESS_KEY_ID: optionalValue,
     S3_SECRET_ACCESS_KEY: optionalValue,
+    /**
+     * Where production errors go (OPS-18): a Sentry DSN, EU region, `https://<key>@<host>/<project>`. Required in
+     * production (below); unset elsewhere, error reporting stays inert: no client, no network.
+     */
+    SENTRY_DSN: optionalValue,
   })
   .superRefine((config, context) => {
     // ADR 0075: never outside a developer's machine. Production refuses it, and so does any address that is not
@@ -218,6 +223,14 @@ const configSchema = z
       path: ['SESSION_ENCRYPTION_KEYS'],
     },
   )
+  .refine((config) => config.SENTRY_DSN === undefined || sentryDsnOf(config.SENTRY_DSN) !== null, {
+    message: 'SENTRY_DSN must be an https Sentry DSN, https://<key>@<host>/<project>',
+    path: ['SENTRY_DSN'],
+  })
+  .refine((config) => config.NODE_ENV !== 'production' || config.SENTRY_DSN !== undefined, {
+    message: 'SENTRY_DSN is required in production: its errors must reach Sentry (OPS-18)',
+    path: ['SENTRY_DSN'],
+  })
   .superRefine((config, context) => {
     // The media bucket: all five or none, its endpoint a plain URL, https in production. Its name alone counts for
     // none: `.env.example` and the production compose have always given `impera-media`, with nothing else.
@@ -295,6 +308,22 @@ function endpointOf(value: string | undefined): URL | null {
   const url = new URL(value);
   const plain = url.search === '' && url.hash === '' && url.username === '' && url.password === '';
   return plain && (url.protocol === 'https:' || url.protocol === 'http:') ? url : null;
+}
+
+/**
+ * A Sentry DSN: https, a public key as its user, no password, query nor fragment, a project id as its path; `null`
+ * otherwise. Sentry's own parser would refuse a malformed one in silence, and production would report nothing.
+ */
+function sentryDsnOf(value: string): URL | null {
+  if (!URL.canParse(value)) return null;
+  const url = new URL(value);
+  const plain = url.search === '' && url.hash === '' && url.password === '';
+  return plain &&
+    url.protocol === 'https:' &&
+    url.username !== '' &&
+    /^\/(?:[^/]+\/)*\d+$/u.test(url.pathname)
+    ? url
+    : null;
 }
 
 /** Where an endpoint points, as the store builds its URLs (`<endpoint>/<bucket>/<key>`). */

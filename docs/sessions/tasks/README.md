@@ -87,7 +87,7 @@ Branche : task/<id>-<slug>
 | EQ-15 | Double authentification pour le propriétaire et les managers | équipe | todo | EQ-01, EQ-10, EQ-11 |
 | EQ-16 | S'entraîner : les recrues s'exercent contre des fans simulés | équipe | blocked (clés, comme le playground) | EQ-10, EQ-11, P3-01, P3-05 |
 | EQ-17 | Mise en service de la paie : sauvegardes, comptable, paie à blanc | équipe | in_progress | EQ-04 à EQ-06, EQ-15, déploiement |
-| EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | todo | EQ-11 |
+| EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | in_progress | EQ-11 |
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
 | EQ-20 | Inviter un chatteur depuis Reveal : la part d'Équipe de l'ADR 0076 | équipe | in_progress | ADR 0076, la route et la migration de Bilan, l'écran d'Extension |
 | EQ-21 | Rappel du rapport de fin de shift sur le téléphone du chatteur | équipe | in_progress | ADR 0077, CR-01, EQ-03 |
@@ -167,6 +167,7 @@ Branche : task/<id>-<slug>
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
 | OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
+| OPS-18 | Les erreurs de production arrivent dans Sentry, sans rien de personnel | exploitation | done | OPS-01 |
 | OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | in_progress | ADR 0152, OPS-01, OPS-02 |
 | OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |

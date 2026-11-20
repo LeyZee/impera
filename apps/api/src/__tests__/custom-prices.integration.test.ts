@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import { createCustomPriceGridReader } from '../modules/custom-orders/infra/db/grid-store';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -147,6 +148,11 @@ describe('/v1/creators/:creatorId/custom-prices', () => {
       .from(schema.auditLog)
       .where(eq(schema.auditLog.action, 'custom_price_grid.save'));
     expect(audit).toEqual([{ details: { version: 1, formatsOffered: 7, supplements: 2 } }]);
+
+    // The agent's turn reads her grid in force as the service role, one creator at a time.
+    const gridOf = createCustomPriceGridReader(test.service.db);
+    expect(await gridOf(nora)).toEqual(filled());
+    expect(await gridOf(ines)).toBeNull();
   });
 
   it('refuses a save on a stale version, and writes nothing', async () => {

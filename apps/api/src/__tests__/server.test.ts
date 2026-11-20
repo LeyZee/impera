@@ -522,6 +522,48 @@ describe('loadConfig', () => {
     expect(config.SPEECH_ELEVENLABS_API_KEY).toBeUndefined();
   });
 
+  describe('the Sentry DSN (OPS-18)', () => {
+    /** Production beside the DSN: the buckets and the keys it needs anyway. Invented, nothing here is reached. */
+    const bucket = (prefix: string, endpoint: string): NodeJS.ProcessEnv => ({
+      [`${prefix}ENDPOINT`]: endpoint,
+      [`${prefix}REGION`]: 'eu-central',
+      [`${prefix}BUCKET`]: `${prefix.toLowerCase()}bucket`,
+      [`${prefix}ACCESS_KEY_ID`]: 'EXAMPLEKEYID',
+      [`${prefix}SECRET_ACCESS_KEY`]: 'example-secret-for-tests-only',
+    });
+    const PRODUCTION: NodeJS.ProcessEnv = {
+      NODE_ENV: 'production',
+      CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
+      SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
+      ...bucket('INVOICES_S3_', 'https://fsn1.objects.example.test'),
+      ...bucket('INVOICES_COPY_S3_', 'https://s3.gra.copies.example.test'),
+    };
+    const DSN = 'https://publickey@errors.example.test/42';
+
+    it('is optional outside production, empty counting as unset', () => {
+      expect(testConfig().SENTRY_DSN).toBeUndefined();
+      expect(testConfig({ SENTRY_DSN: '' }).SENTRY_DSN).toBeUndefined();
+      expect(testConfig({ SENTRY_DSN: DSN }).SENTRY_DSN).toBe(DSN);
+    });
+
+    it('is required in production', () => {
+      expect(() => testConfig(PRODUCTION)).toThrow(/SENTRY_DSN is required in production/u);
+      expect(() => testConfig({ ...PRODUCTION, SENTRY_DSN: '' })).toThrow(/SENTRY_DSN is required/u);
+      expect(testConfig({ ...PRODUCTION, SENTRY_DSN: DSN }).SENTRY_DSN).toBe(DSN);
+    });
+
+    it.each([
+      ['http, not https', 'http://publickey@errors.example.test/42'],
+      ['no key', 'https://errors.example.test/42'],
+      ['no project', 'https://publickey@errors.example.test/'],
+      ['a query', 'https://publickey@errors.example.test/42?debug=1'],
+      ['a password', 'https://publickey:secret@errors.example.test/42'],
+      ['not a URL', 'publickey@errors.example.test/42'],
+    ])('refuses a DSN with %s', (_why, value) => {
+      expect(() => testConfig({ SENTRY_DSN: value })).toThrow(/SENTRY_DSN must be an https Sentry DSN/u);
+    });
+  });
+
   it('reads the inline-worker flag', () => {
     expect(testConfig().IMPERA_INLINE_WORKER).toBe(false);
     expect(testConfig({ IMPERA_INLINE_WORKER: '1' }).IMPERA_INLINE_WORKER).toBe(true);
@@ -565,6 +607,7 @@ describe('loadConfig', () => {
       NODE_ENV: 'production',
       CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
       SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
+      SENTRY_DSN: 'https://publickey@errors.example.test/1',
     };
 
     it('refuses in production a remote base reached without a checked certificate (ADR 0152 § 2)', () => {

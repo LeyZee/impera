@@ -1,0 +1,5 @@
+# 2026-11-20 — INS-01 lot b (relevés de chiffres d'Instagram : palier à fenêtre, table, passage de lecture) — in progress
+
+Fait : avenants du 20/11 à l'ADR 0120, acceptés par Charles (§ 2 : un palier manqué est gardé sans nombre ; § 3 : l'hôte du service de redirection vient du déploiement, jamais du dépôt). Domaine : `stepsDue`, `snapshotsOf`, `readingBudget`, `planReadings` à la nouvelle règle. Table `media_insight_snapshots` (migration 0238, FORCE RLS), écrite par la tâche `media_insights` sous le rôle applicatif (`withTenantJob`), lue par le propriétaire et le manager qui suit la créatrice. Passage `readMediaInsights` contre `FakeInstagramInsights`, avec test d'étanchéité entre deux créatrices.
+Reste : comptes branchés et jeton (lot c), adaptateur officiel et compteur d'appels (lot d), job de nuit qui parcourt les comptes, écran qui lit les relevés ; INS-02 lot c peut commencer (hôte tranché).
+Découvertes : `docs/architecture/data-model.md` ne décrit la porte `withTenantJob` que dans un paragraphe de plus en plus long ; une liste des tâches et de leurs tables y serait plus lisible.

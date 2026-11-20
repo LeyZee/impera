@@ -13,6 +13,7 @@ import { linkPageOf } from './auth/api';
 import { forgetChosenPassword } from './auth/chosen-password';
 import { readSession, SessionServerError, signOut } from './auth/session';
 import { watchSessionEnd } from './auth/session-end';
+import { listenForErrors } from './lib/error-reports';
 import { createQueryClient } from './lib/query-client';
 import { forgetDevice } from './pwa/device';
 import { keepSession, keptSession } from './pwa/keptSession';
@@ -235,6 +236,8 @@ export function App(): JSX.Element {
 function SignedIn({ user, onSignOut }: RouterContext): JSX.Element {
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
   const [queryClient] = useState(createQueryClient);
+  // The page's own errors go to the API while signed in (OPS-18), each with the template of the route it happened on.
+  useEffect(() => listenForErrors(() => router.state.matches.at(-1)?.fullPath), [router]);
   // A touched notification opens its page here, without a reload (public/sw.js).
   useEffect(
     () =>

@@ -1,17 +1,23 @@
-import { Link, useRouteContext } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import { Link, useRouteContext, useRouter, type ErrorComponentProps } from '@tanstack/react-router';
+import { useEffect, type JSX } from 'react';
 
 import { NavIcon } from './NavIcon';
 import { Page, PageHeader, Panel } from './layout';
 import { railOf, sectionLabel } from './nav';
 
+import { reportError } from '@/lib/error-reports';
+
 /**
  * A screen that could not draw itself (a broken link, a fault of ours): said in French and plainly, with the way back
  * to the account's first tab, in place of the router's « Something went wrong! » in English (recette CHT-06). The
- * same card as « Page introuvable ».
+ * same card as « Page introuvable ». The error is told to the API, which forwards it to Sentry (OPS-18).
  */
-export function ErrorPage(): JSX.Element {
+export function ErrorPage({ error }: ErrorComponentProps): JSX.Element {
   const { user } = useRouteContext({ from: '__root__' });
+  const router = useRouter();
+  useEffect(() => {
+    reportError(error, router.state.matches.at(-1)?.fullPath);
+  }, [error, router]);
   const home = railOf(user).home;
   return (
     <Page>

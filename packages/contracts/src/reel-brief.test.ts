@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CreateSuggestionBodySchema,
@@ -66,6 +66,15 @@ describe('ReelBriefSchema', () => {
 });
 
 describe('a reel sheet goes only with a Reel Insta', () => {
+  // The body's day is checked against the clock (a year back at most, CREA-14): frozen near it, never today's date.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-08T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   const body = {
     id: '01960000-0000-7000-8000-000000000001',
     when: { kind: 'day', day: '2026-11-10' },

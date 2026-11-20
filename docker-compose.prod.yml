@@ -4,8 +4,8 @@
 # (sslmode=verify-full). Every variable is set in Coolify, never in a file of the repository.
 #
 # Local rehearsal against the development Postgres, with a .env.prod (ignored by git) copied from .env.example and the
-# database host set to `postgres`, and the invoices' buckets as the CI job `images` writes them (two https hosts under
-# `.invalid`: nothing is issued, none is reached); the database first, the migrations need it up:
+# database host set to `postgres`, and the invoices' buckets and SENTRY_DSN as the CI job `images` writes them (https
+# hosts under `.invalid`: nothing is issued, none is reached); the database first, the migrations need it up:
 #   docker compose up -d --wait postgres
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
 x-api-env: &api-env
@@ -31,7 +31,8 @@ x-api-env: &api-env
   AUTH_BASE_URL: ${AUTH_BASE_URL:?}
   WEB_ORIGIN: ${WEB_ORIGIN:?}
   PLAYGROUND_PERSONA_PATH: ${PLAYGROUND_PERSONA_PATH:-}
-  SENTRY_DSN: ${SENTRY_DSN:-}
+  # Required (OPS-18): production errors reach Sentry, EU region, scrubbed by the API (operations.md § Observabilité).
+  SENTRY_DSN: ${SENTRY_DSN:?}
   LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
   LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
   LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
@@ -106,7 +107,13 @@ services:
       dockerfile: apps/web/Dockerfile
       # EXTENSION_CRM_ORIGIN set and empty: no built-in address (the CI's stack, served over http). Set to another site
       # than WEB_ORIGIN, the extension's build fails.
-      args: { EXTENSION_CRM_ORIGIN: '${EXTENSION_CRM_ORIGIN-${WEB_ORIGIN}}', WEB_ORIGIN: '${WEB_ORIGIN-}' }
+      # RELEASE: the commit, as the API's (OPS-18), for the release of the dashboard's error reports.
+      args:
+        {
+          EXTENSION_CRM_ORIGIN: '${EXTENSION_CRM_ORIGIN-${WEB_ORIGIN}}',
+          WEB_ORIGIN: '${WEB_ORIGIN-}',
+          RELEASE: '${SOURCE_COMMIT:-unknown}',
+        }
     environment:
       API_UPSTREAM: api:3000
       MEDIA_ORIGIN: ${S3_ENDPOINT:-}

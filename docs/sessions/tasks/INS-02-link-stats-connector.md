@@ -17,7 +17,7 @@ ADR 0120 § 3 et § 6, ADR 0080 (lien de redirection), ADR 0016, `docs/playbooks
 - [ ] Clé saisie dans Réglages, scellée, vérifiée au collage.
 - [ ] Endroit sur le lien de redirection : migration nouvelle et additive, `NULL` pour les liens déjà enregistrés avec « à renseigner » à l'écran ; écran de Réglages.
 - [ ] Upsert sur (lien, heure UTC) : le total est remplacé tant que l'heure n'est pas close, puis figé.
-- [ ] Hôte de sortie écrit dans l'adaptateur, jamais tiré d'un réglage (ADR 0120 § 3, ADR 0113 § 2).
+- [ ] Hôte de sortie tiré de la configuration du déploiement, jamais du dépôt ni d'un réglage du CRM ; validé au démarrage ; ni l'hôte ni la clé dans un journal, une erreur, une réponse ou l'audit (avenant du 20/11 à l'ADR 0120 § 3, accepté par Charles).
 - [ ] Robots retirés par le code, leur part montrée à l'agence ; aucune donnée de visiteur en base.
 - [ ] Alerte rouge d'un lien « story » tombé à zéro (ADR 0120 § 6).
 
