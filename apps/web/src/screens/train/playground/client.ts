@@ -5,15 +5,19 @@ import {
   PlaygroundComparisonSchema,
   PlaygroundRatingResultSchema,
   PlaygroundStateSchema,
+  VoiceBankSchema,
   type CreatorId,
   type DesireMarks,
   type DesireMarkVerdict,
   type Destination,
   type PlaygroundComparison,
   type PlaygroundMedia,
+  type PersonaVersionId,
+  type PlaygroundGuardViolation,
   type PlaygroundPersonaBody,
   type PlaygroundState,
   type Verdict,
+  type VoiceBank,
 } from '@impera/contracts';
 import type { z } from 'zod';
 
@@ -33,7 +37,8 @@ export interface PlaygroundClient {
   reset(): Promise<PlaygroundState>;
   /** His message; her answer comes back as `pending`. */
   send(text: string, media: readonly PlaygroundMedia[]): Promise<PlaygroundState>;
-  rate(verdict: Verdict, destination?: Destination): Promise<PlaygroundState>;
+  /** The state after it; a correction a hard guard keeps out of her bank says which guard (ADR 0102 § 4). */
+  rate(verdict: Verdict, destination?: Destination): Promise<RatedState>;
   /** Back to just before his n-th message (from 1), sent again: a new answer to the same moment. */
   branch(fanMessageNumber: number): Promise<PlaygroundState>;
   /** The owner's mark on his desire score after his n-th message (ADR 0103 § 6): kept, with what was counted. */
@@ -49,7 +54,15 @@ export interface PlaygroundClient {
   setNotes(notes: readonly string[]): Promise<PlaygroundState>;
   setSpent(cents: number): Promise<PlaygroundState>;
   sendCreatorMedia(media: CreatorMedia): Promise<PlaygroundState>;
+  /** Her bank for the version played (ADR 0102 § 5): what her voice reads, here and with her real fans. */
+  bank(creatorId: CreatorId, versionId: PersonaVersionId): Promise<VoiceBank>;
+  /** Out of her bank everywhere, kept for history; her bank as it is now. */
+  withdrawExample(creatorId: CreatorId, versionId: PersonaVersionId, id: string): Promise<VoiceBank>;
 }
+
+export type RatedState = PlaygroundState & {
+  readonly exampleBlockedBy?: readonly PlaygroundGuardViolation[];
+};
 
 /** The voice the comparison asks for: the fallback of the voice role (ADR 0017), to see if it holds up. */
 export const COMPARE_MODEL = 'mistral-large-4';
@@ -125,11 +138,14 @@ export function createHttpClient(): PlaygroundClient {
       return state();
     },
     rate: async (verdict, destination) => {
-      await call(PlaygroundRatingResultSchema, '/rating', 'POST', {
+      const result = await call(PlaygroundRatingResultSchema, '/rating', 'POST', {
         verdict,
         ...(destination !== undefined && { destination }),
       });
-      return state();
+      const next = await state();
+      return result.exampleBlockedBy === undefined
+        ? next
+        : { ...next, exampleBlockedBy: result.exampleBlockedBy };
     },
     branch: (fanMessageNumber) => call(PlaygroundStateSchema, '/branch', 'POST', { fanMessageNumber }),
     markDesire: (fanMessageNumber, verdict) =>
@@ -143,5 +159,12 @@ export function createHttpClient(): PlaygroundClient {
     setNotes: (notes) => call(PlaygroundStateSchema, '/notes', 'PUT', { notes }),
     setSpent: (spentCents) => call(PlaygroundStateSchema, '/situation', 'PATCH', { spentCents }),
     sendCreatorMedia: (media) => call(PlaygroundStateSchema, '/creator-media', 'POST', media),
+    bank: (creatorId, versionId) =>
+      call(
+        VoiceBankSchema,
+        `/bank?creatorId=${encodeURIComponent(creatorId)}&versionId=${encodeURIComponent(versionId)}`,
+      ),
+    withdrawExample: (creatorId, versionId, id) =>
+      call(VoiceBankSchema, '/bank/withdraw', 'POST', { creatorId, versionId, id }),
   };
 }

@@ -30,6 +30,7 @@ import {
 } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { CalendarLinkBody, SHIFT_LINK_WORDS } from '@/scheduling/CalendarLinkBody';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
@@ -53,6 +54,7 @@ import {
 import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
+import { Dialog } from '@/shell/Dialog';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { Empty, Failure } from '@/shell/states';
 
@@ -61,6 +63,8 @@ export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | un
 
 type Open =
   | { readonly kind: 'leave' }
+  /** « Dans mon téléphone »: the link that puts his shifts in his phone's calendar (CR-12; Moi › Calendrier before). */
+  | { readonly kind: 'phone' }
   | { readonly kind: 'swap'; readonly shift: Shift; readonly creatorName: string | undefined }
   | { readonly kind: 'report'; readonly shiftId: string; readonly draft: ReportDraft | null };
 
@@ -260,7 +264,19 @@ export function MyPlanningPage({
                 Mois
               </button>
             </div>
-          ) : null}
+          ) : (
+            // His own shifts in his phone's calendar: where the shifts are, not a tab of Moi (ADR 0134, lot 1).
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm cal-bar__end"
+              onClick={() => {
+                setOpen({ kind: 'phone' });
+              }}
+            >
+              <PhoneMark />
+              Dans mon téléphone
+            </button>
+          )}
         </div>
         {/* The planning silent says it for the page: the lines of its other reads keep quiet then (ETA-05). */}
         {members.isError && me === null && !planning.isError ? (
@@ -359,6 +375,17 @@ export function MyPlanningPage({
             {swaps.data === undefined ? null : <MySwaps list={swaps.data} memberId={me.id} zone={zone} />}
           </div>
         )}
+        {open?.kind === 'phone' ? (
+          <Dialog
+            title="Mes shifts dans mon téléphone"
+            lead="iPhone, Mac, Google Agenda"
+            onClose={() => {
+              setOpen(null);
+            }}
+          >
+            <CalendarLinkBody words={SHIFT_LINK_WORDS} />
+          </Dialog>
+        ) : null}
         {open?.kind === 'leave' && me !== null ? (
           <LeavePanel
             today={dayOf(now, me.timeZone)}
@@ -407,6 +434,16 @@ export function MyPlanningPage({
 function mineOf(planning: Planning, me: Pick<TeamMember, 'id'> | null): Planning {
   if (me === null) return planning;
   return { ...planning, shifts: planning.shifts.filter((shift) => shift.memberId === me.id) };
+}
+
+/** A phone, drawn in the line of the menu's icons. */
+function PhoneMark(): JSX.Element {
+  return (
+    <svg className="cal-bar__mark" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="4.25" y="1.75" width="7.5" height="12.5" rx="1.75" />
+      <path d="M7 12h2" />
+    </svg>
+  );
 }
 
 /** The reader's open proposals by shift, with the colleague each one waits on. */

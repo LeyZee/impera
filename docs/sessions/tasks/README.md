@@ -165,6 +165,7 @@ Branche : task/<id>-<slug>
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
 | OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
 | OPS-18 | Les erreurs de production arrivent dans Sentry, sans rien de personnel | exploitation | done | OPS-01 |
+| OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | todo | ADR 0152, OPS-01, OPS-02 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -178,6 +179,7 @@ Branche : task/<id>-<slug>
 | SEC-11 | Droits des tables en ajout seul et journaux de la bibliothèque d'authentification alignés sur la doc | exploitation | done | SEC-10 |
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
+| SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | in_progress | SEC-02, SEC-04, EQ-10, EQ-18 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |

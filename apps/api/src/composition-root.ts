@@ -59,6 +59,7 @@ import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
 import { createClientErrorRoutes } from './observability/client-errors';
 import { INERT_ERROR_REPORTER, type ErrorReporter } from './observability/error-reporter';
+import { applyOwnerRemovalsUnscoped, createOwnersRoutes, relayOwnerAlertsUnscoped } from './owners';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
@@ -543,6 +544,25 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,
+    // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
+    // never waits for push: with push off the alerts reach Telegram only.
+    'owners.watch': defineTask(
+      'owners.watch',
+      JOB_PAYLOADS['owners.watch'],
+      logger,
+      async (_payload, context) => {
+        const removals = await applyOwnerRemovalsUnscoped(adminDb.db);
+        if (removals.applied > 0 || removals.lapsed > 0) {
+          context.logger.warn(removals, 'owners: removals past their notice');
+        }
+        const notify = notifications.module.notify;
+        if (notify === null) return;
+        await relayOwnerAlertsUnscoped(adminDb.db, {
+          notify,
+          agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+        });
+      },
+    ),
     // ADR 0150 lot 2: each alert of a creator's tab, to the roles it reaches; nothing while push is off.
     'alerts.route': defineTask(
       'alerts.route',
@@ -611,6 +631,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         privateChat: telegram.module?.privateChat ?? null,
       }),
       createClientErrorRoutes({ requireRole, reporter: errorReporter }),
+      createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),
       createSecuritySettingsRoutes({
         auth,
         db: db.db,

@@ -13,11 +13,11 @@ import {
   composeTurn,
   followUpDecision,
   guardContextOf,
-  withExamples,
   withoutOrders,
   isBlocked,
   type GuardSettings,
   type GuardViolation,
+  type VoiceExample,
   type FollowUpDecision,
   measureDesire,
   holdDecision,
@@ -147,8 +147,11 @@ export interface PlaygroundDeps {
   readonly guardSettings: GuardSettings;
   /** False: her answer is shown as one message, as the fan would get it (`behavior.split_messages`). */
   readonly splitMessages?: boolean;
-  /** Answers the team corrected earlier: given to the voice as her examples (they take precedence). */
-  readonly voiceExamples?: readonly string[];
+  /**
+   * Her bank's examples her hard guards let through, newest first (ADR 0102): each turn takes the twelve this fan may
+   * read, as her real drafts do (`examplesForTurn`).
+   */
+  readonly voiceExamples?: readonly VoiceExample[];
   readonly timeZone?: string;
   readonly now?: () => Date;
   /**
@@ -196,7 +199,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   const history: ConversationTurn[] = [];
   // In-memory fan notes until the fans module stores facts (P3-02).
   const fanNotes: string[] = [];
-  const personaSheet = withExamples(deps.personaSheet, deps.voiceExamples ?? []);
+  const personaSheet = deps.personaSheet;
+  const voiceExamples = deps.voiceExamples ?? [];
   const startedAt = (deps.now ?? (() => new Date()))();
   let situation: Situation = {
     now: startedAt,
@@ -381,6 +385,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           personaSheet,
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
+          ...(voiceExamples.length > 0 && { voiceExamples }),
         },
         {
           history: dated(),
@@ -459,6 +464,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           personaSheet,
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
+          ...(voiceExamples.length > 0 && { voiceExamples }),
         },
         {
           history: dated(),

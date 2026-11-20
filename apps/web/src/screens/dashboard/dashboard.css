@@ -502,15 +502,6 @@
 .db-creators .nv-chip {
   flex: none;
 }
-/* « Toute l'agence » (ADR 0078): the first chip, a ring for the whole instead of a face. */
-.nv-chip.db-creators__agency {
-  gap: 7px;
-}
-.db-creators__agency-mark {
-  font-size: 15px;
-  line-height: 1;
-  color: var(--nv-ink-muted);
-}
 .db-mode .nv-seg__opt {
   height: 36px;
   display: inline-flex;
@@ -822,14 +813,6 @@ div.db-fan {
   .db-agency__gauge {
     grid-column: 1 / -1;
   }
-}
-/* A chip's place while the creators load (ADM-21). */
-.nv-chip.db-creators__ghost {
-  min-height: 0;
-  width: 120px;
-  height: var(--nv-target-min);
-  border-radius: var(--nv-radius-full);
-  pointer-events: none;
 }
 /* Another creator's urgencies, on her chip: red, they are urgencies (DASH-03). */
 .db-creators__grave {

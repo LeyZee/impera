@@ -26,7 +26,7 @@ import { parse } from 'yaml';
 import { testConfig } from '../../../../__tests__/support/config';
 import { createLogger } from '../../../../logger';
 import { buildServer } from '../../../../server';
-import type { CalibrationRecord, CalibrationStore } from '../../../agent/index';
+import type { CalibrationRecord, CalibrationStore, VoiceExample } from '../../../agent/index';
 import { createPlaygroundModule } from '../../index';
 
 const BRIEF: Brief = {
@@ -76,6 +76,8 @@ function health(hasKey: boolean): HealthReport {
 interface GatewayControl {
   hasKey: boolean;
   hold?: Promise<void>;
+  /** The sheets the voice was given, when the test reads them. */
+  sheets?: string[];
 }
 
 function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true }): LlmGateway {
@@ -91,7 +93,8 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     readCard: () => Promise.reject(new Error('not used')),
     promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
-    voice: async () => {
+    voice: async (input) => {
+      control.sheets?.push(input.personaSheet);
       await control.hold;
       return { ok: true, value: { output: voice, meta: META } };
     },
@@ -135,7 +138,12 @@ const MIA = CreatorIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c1');
 const DRAFT = PersonaVersionIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e3');
 
 async function server(
-  options: { voice?: VoiceOutput; control?: GatewayControl; creatorId?: string | null } = {},
+  options: {
+    voice?: VoiceOutput;
+    control?: GatewayControl;
+    creatorId?: string | null;
+    voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
+  } = {},
 ) {
   const records: CalibrationRecord[] = [];
   const stored: CalibrationRecord[] = [];
@@ -178,6 +186,7 @@ async function server(
     gatewayForVoice: (model) => (model === 'mistral-large-4' ? gateway({ bubbles: ['Hey toi'] }) : undefined),
     now: () => new Date('2026-10-17T10:00:00Z'),
     ...(options.creatorId !== undefined && { creatorId: () => Promise.resolve(options.creatorId ?? null) }),
+    ...(options.voiceExamplesOf !== undefined && { voiceExamplesOf: options.voiceExamplesOf }),
   });
   const config = testConfig();
   const app = await buildServer({
@@ -194,6 +203,48 @@ async function server(
 }
 
 describe('/v1/playground', () => {
+  it('keeps a correction a hard guard stops as a correction, out of her bank, and says which guard (ADR 0102 § 4)', async () => {
+    const { post, stored } = await server();
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    await post('/messages', { text: 'Salut' });
+    const rated = await post('/rating', {
+      verdict: { kind: 'corrected', text: 'Je suis une IA' },
+      destination: 'voice_example',
+    });
+    const result = PlaygroundRatingResultSchema.parse(rated.json());
+    expect(result.exampleBlockedBy?.map((v) => v.severity)).toContain('blocking');
+    expect(result.exampleBlockedBy?.[0]?.label).not.toBe('');
+    expect(stored.at(-1)).toMatchObject({ destination: 'voice_example', exampleBlocked: true });
+
+    await post('/messages', { text: 'Et toi ?' });
+    const fine = PlaygroundRatingResultSchema.parse(
+      (await post('/rating', { verdict: { kind: 'corrected', text: 'Coucou toi ✨' } })).json(),
+    );
+    expect(fine.exampleBlockedBy).toBeUndefined();
+    expect(stored.at(-1)?.exampleBlocked).toBeUndefined();
+  });
+
+  it('gives her version the examples of her bank, chosen as her drafts choose them (ADR 0102 § 2)', async () => {
+    const control: GatewayControl = { hasKey: true, sheets: [] };
+    const asked: string[] = [];
+    const { post } = await server({
+      control,
+      voiceExamplesOf: (creatorId) => {
+        asked.push(creatorId);
+        return Promise.resolve([
+          { id: 'e2', text: 'Hey toi, exemple de sa banque' },
+          { id: 'e1', text: 'Je suis une IA' },
+        ]);
+      },
+    });
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    await post('/messages', { text: 'Salut' });
+    // Her one bank, whichever version is played (ADR 0102 § 1).
+    expect(asked).toEqual([MIA]);
+    expect(control.sheets?.at(-1)).toContain('Hey toi, exemple de sa banque');
+    expect(control.sheets?.at(-1)).not.toContain('Je suis une IA');
+  });
+
   it('is closed to anyone without the owner session', async () => {
     const { app } = await server();
     expect((await app.inject({ method: 'GET', url: '/v1/playground' })).statusCode).toBe(403);

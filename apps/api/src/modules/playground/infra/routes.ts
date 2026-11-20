@@ -19,6 +19,9 @@ import {
   PlaygroundRatingResultSchema,
   PlaygroundSituationBodySchema,
   PlaygroundStateSchema,
+  VoiceBankQuerySchema,
+  VoiceBankSchema,
+  VoiceBankWithdrawBodySchema,
 } from '@impera/contracts';
 import type { FastifyRequest, preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -32,6 +35,8 @@ import {
 import type { DesireMarkStore } from '../application/desire-marks';
 import { LlmUnavailable, type PlaygroundEngine } from '../application/engine';
 import type { PlaygroundService } from '../application/playground-service';
+
+import type { VoiceBankView } from './bank';
 
 export interface PlaygroundRoutesOptions {
   /** `requireRole('owner')` for now (coordinator, 17/10); Messa (`creator`) later. */
@@ -52,6 +57,7 @@ export function createPlaygroundRoutes(
   alertTester: AlertTester,
   desireMarks: DesireMarkStore,
   options: PlaygroundRoutesOptions,
+  bank?: VoiceBankView,
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.addHook('preValidation', options.guard);
@@ -196,6 +202,24 @@ export function createPlaygroundRoutes(
         };
       },
     );
+
+    // ADR 0102 § 5: her bank in Entraîner, and « Retirer ». Without a database there is no bank to show.
+    if (bank !== undefined) {
+      app.get(
+        '/playground/bank',
+        { schema: { querystring: VoiceBankQuerySchema, response: { 200: VoiceBankSchema } } },
+        (request) => bank.list(request.query.creatorId, request.query.versionId),
+      );
+      app.post(
+        '/playground/bank/withdraw',
+        { schema: { body: VoiceBankWithdrawBodySchema, response: { 200: VoiceBankSchema } } },
+        async (request) => {
+          const { creatorId, versionId, id } = request.body;
+          await bank.withdraw(creatorId, id);
+          return bank.list(creatorId, versionId);
+        },
+      );
+    }
 
     // Réglages › Alertes (P4-01): served here, beside the persona the brain reads; `/v1/alerts` stays the module's.
     app.post(

@@ -757,6 +757,9 @@
   color: var(--nv-ink-muted);
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
+.pg-ack--warn {
+  color: var(--nv-warning);
+}
 .pg-dock {
   display: flex;
   flex-direction: column;
@@ -1087,6 +1090,126 @@
   height: 28px;
   padding: 0 var(--nv-space-3);
   font-size: 13px;
+}
+.pg-hint--warn {
+  color: var(--nv-warning);
+}
+/* « Sa banque » (ADR 0102 § 5): one card per example, its standing in a quiet line, « Retirer » at the end. */
+.pg-bank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.pg-bank__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-surface-raised);
+  border: 1px solid var(--nv-hairline);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+/* Only where a pointer hovers: on a touch screen the fill would stay on the card after each tap (sa-banque-2). */
+@media (hover: hover) {
+  .pg-bank__item:hover {
+    background: var(--nv-select);
+  }
+}
+.pg-bank__text {
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.pg-bank__meta,
+.pg-bank__status {
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.pg-bank__item[data-state='read'] .pg-bank__status {
+  color: var(--nv-ink);
+}
+.pg-bank__item[data-state='blocked'] .pg-bank__status {
+  color: var(--nv-warning);
+}
+.pg-bank__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+.pg-bank__foot .nv-btn {
+  flex: none;
+}
+.pg-bank__confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+/* What « Retirer » did: a status line of its own, with its check, gone at the next action. */
+.pg-bank__done {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font-size: 12px;
+  line-height: 16px;
+  animation: pg-bank-done var(--nv-dur-slow, 240ms) var(--nv-ease-out, ease-out);
+}
+.pg-bank__done svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@keyframes pg-bank-done {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pg-bank__done {
+    animation: none;
+  }
+}
+/* Open and scrolled, the fold keeps its name in view: where one is, and how to close it. */
+.pg-fold--sticky[open] > summary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--nv-surface-raised);
+}
+/* The sheet's close on a phone: the same round button by day as by night, a tint on its glass. */
+.pg-setup .nv-close {
+  background: var(--nv-fill-soft);
+}
+.pg-bank__confirm {
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+}
+.pg-bank__actions {
+  display: flex;
+  gap: 8px;
 }
 .pg-marks {
   list-style: none;

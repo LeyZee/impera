@@ -121,3 +121,10 @@ export class DesireMarkInventedPersona extends PlaygroundError {
     );
   }
 }
+
+/** No example of hers in her bank under this id: withdrawn already, another creator's, or never filed (ADR 0102 § 5). */
+export class VoiceExampleNotFound extends PlaygroundError {
+  constructor() {
+    super('voice_example_not_found', 'Cet exemple n’est plus dans sa banque.');
+  }
+}

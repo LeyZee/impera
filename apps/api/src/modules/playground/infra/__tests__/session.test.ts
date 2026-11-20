@@ -239,7 +239,7 @@ describe('playground session, calibration', () => {
     const voiceInputs: VoiceInput[] = [];
     const session = make({
       gateway: fakeGateway({ bubbles: ['Coucou'] }, voiceInputs, brainInputs),
-      voiceExamples: ['Okidoki toi ✨'],
+      voiceExamples: [{ id: 'e1', text: 'Okidoki toi ✨' }],
     });
     session.setSituation({ spentCents: 3_000 });
     session.advance(11 * 3_600_000);
@@ -251,6 +251,27 @@ describe('playground session, calibration', () => {
     expect(voiceInputs[0]?.personaSheet).toContain('- Okidoki toi ✨');
     expect(session.lastExchange?.moment.history).toHaveLength(1);
     expect(session.lastExchange?.moment.brief?.replyBrief).toBe(BRIEF.replyBrief);
+  });
+
+  it('keeps an explicit example of hers out until his adult age is confirmed (ADR 0102, P3-09)', async () => {
+    const voiceInputs: VoiceInput[] = [];
+    const session = make({
+      gateway: fakeGateway({ bubbles: ['Coucou'] }, voiceInputs, []),
+      sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
+      voiceExamples: [
+        { id: 'e2', text: 'Je me touche en pensant à toi' },
+        { id: 'e1', text: 'Okidoki toi ✨' },
+      ],
+    });
+    await session.handleFanMessage('Salut');
+    expect(voiceInputs[0]?.personaSheet).toContain('Okidoki toi ✨');
+    expect(voiceInputs[0]?.personaSheet).not.toContain('Je me touche');
+    expect(voiceInputs[0]?.trace?.voiceExampleIds).toEqual(['e1']);
+
+    session.confirmAge(new Date('2026-10-17T09:00:00Z'));
+    await session.handleFanMessage('Tu fais quoi ?');
+    expect(voiceInputs.at(-1)?.personaSheet).toContain('Je me touche');
+    expect(voiceInputs.at(-1)?.trace?.voiceExampleIds).toEqual(['e2', 'e1']);
   });
 
   it('goes on from the corrected answer', async () => {
