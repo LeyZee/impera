@@ -825,10 +825,9 @@ export async function composeTurn(
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),
-      // He did not go there: she welcomes him, never slows him down (Charles, 20/11).
-      ...(sexualization !== undefined && sexualization.kind !== 'steer_back' && !care
-        ? checkWelcome(written)
-        : []),
+      // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
+      // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
+      ...(sexualization?.kind === 'no_opening' && !care ? checkWelcome(written) : []),
     ];
     return { voice, written, violations };
   };

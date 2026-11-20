@@ -1589,6 +1589,16 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
   });
 
+  it('lets her tease « pas si vite » once the intimate is open (relecture Bilan de #876)', async () => {
+    const { draftComposer } = composer(
+      { brief: HOT, voice: { bubbles: ['Pas si vite 😏 j’ai envie de te faire attendre'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      cursor,
+    );
+    expect((await draftComposer.compose(dayOld)).kind).toBe('draft');
+  });
+
   it('lets her slow him down when the cursor steers him back', async () => {
     const { draftComposer } = composer(
       { brief: HOT, voice: { bubbles: ['Doucement toi 😅 tu fais quoi ce soir ?'] } },
