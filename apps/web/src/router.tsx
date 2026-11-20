@@ -15,6 +15,7 @@ import { MyPersonaPage } from './creators/MyPersonaPage';
 import { useCreators } from './creators/api';
 import { creatorsSearch, parseCreatorsSearch, sheetOf, sheetsFor } from './creators/search';
 import { parsePaySearch } from './payroll/model';
+import { ExtensionLinkPage } from './pwa/ExtensionLinkPage';
 import { ExtensionPage } from './pwa/ExtensionPage';
 import { InstallPage } from './pwa/InstallPage';
 import { NotificationsPage } from './pwa/NotificationsPage';
@@ -1141,6 +1142,21 @@ const extensionHelp = createRoute({
     return <ExtensionPage watches={user.role === 'owner'} />;
   },
 });
+/**
+ * /extension/lier (ADR 0067, amendement du 19/11): the page whose address the extension recognises to link itself to
+ * this CRM. Open to whoever has the guide; a creator is sent home like from the guide.
+ */
+const extensionLink = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/extension/lier',
+  beforeLoad: ({ context }) => {
+    if (context.user.role === 'creator') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: railOf(context.user).home, replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: ExtensionLinkPage,
+});
 /** /aide/reveal (P2-01): reconnect Reveal with the extension's « Sync », the owner's alone like the button itself. */
 const revealHelp = createRoute({
   getParentRoute: () => rootRoute,
@@ -1167,6 +1183,7 @@ const notifications = createRoute({
 const routeTree = rootRoute.addChildren([
   installHelp,
   extensionHelp,
+  extensionLink,
   revealHelp,
   notifications,
   dashboard,

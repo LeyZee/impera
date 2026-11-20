@@ -6,7 +6,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,6 +43,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe('browserOf', () => {
@@ -119,25 +120,31 @@ describe('ExtensionPage', () => {
     expect(screen.getAllByText('Le copilote sur Reveal').length).toBeGreaterThan(0);
   });
 
-  // EXT-06, EXT-07: the popup asks where the CRM opens, so its address is given on localhost too.
-  it('gives the CRM’s address to paste in the popup, on localhost too', async () => {
+  // ADR 0067, amendement du 19/11: nothing to type, the popup links itself from the CRM's own page.
+  it('leads each browser’s steps to the CRM’s link page, with no address to paste', async () => {
     await renderAs(CHROME);
-    expect(screen.getAllByRole('button', { name: 'Copier l’adresse' })).toHaveLength(2);
-    expect(screen.getAllByText(/elle te demande où s’ouvre ton CRM/u)).toHaveLength(2);
+    const links = screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' });
+    expect(links).toHaveLength(2);
+    expect(links[0]?.getAttribute('href')).toBe('/extension/lier');
+    expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
+    expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
   });
 
-  it('gives a deployed CRM its address to paste in the popup', async () => {
-    vi.stubGlobal('location', new URL('https://crm.exemple.fr/aide/extension'));
-    const writeText = vi.fn(() => Promise.resolve());
-    vi.stubGlobal('navigator', { userAgent: CHROME, clipboard: { writeText } });
-    serves(true);
-    await renderPage(<ExtensionPage watches />);
-    expect(screen.getAllByText('https://crm.exemple.fr')).toHaveLength(2);
-    const [copy] = screen.getAllByRole('button', { name: 'Copier l’adresse' });
-    if (copy === undefined) throw new Error('no copy button');
-    fireEvent.click(copy);
-    expect(writeText).toHaveBeenCalledWith('https://crm.exemple.fr');
-    expect(await screen.findByRole('button', { name: 'Copiée' })).toBeTruthy();
+  // ADR 0067, second amendement: the extension this CRM built knows its address, so there is nothing to link.
+  it('drops the link step when the served extension was built for this CRM', async () => {
+    vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', window.location.origin);
+    await renderAs(CHROME);
+    expect(screen.queryByRole('link', { name: 'Relier l’extension à ce CRM' })).toBeNull();
+    // The last step says what to do, and no longer « alors » after a step that is gone (avis Design du 19/11).
+    expect(screen.getAllByText('Clique sur l’icône Impera : elle affiche ton nom.')).toHaveLength(2);
+    expect(screen.queryByText(/l’extension affiche alors ton nom/u)).toBeNull();
+  });
+
+  it('keeps the link step when the extension was built for another address', async () => {
+    vi.stubEnv('VITE_EXTENSION_CRM_ORIGIN', 'https://autre.exemple.fr');
+    await renderAs(CHROME);
+    expect(screen.getAllByRole('link', { name: 'Relier l’extension à ce CRM' })).toHaveLength(2);
     expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
+    expect(screen.queryByText('Clique sur l’icône Impera : elle affiche ton nom.')).toBeNull();
   });
 });

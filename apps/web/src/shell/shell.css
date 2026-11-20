@@ -1991,3 +1991,69 @@ label.nv-notif__row {
   background: var(--nv-ink-muted);
   box-shadow: 0 0 0 2px var(--nv-surface-raised);
 }
+
+/* ───────────── /extension/lier (ADR 0067, amendement du 19/11): where to click, the icon in sight or behind the puzzle.
+   A sketch in the tokens, never a capture of a real browser (avis Design du 19/11). ───────────── */
+
+.nv-ext-link__cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+  gap: var(--nv-space-4);
+}
+.nv-ext-link__case {
+  margin: 0;
+  display: grid;
+  gap: var(--nv-space-2);
+  align-content: start;
+}
+.nv-ext-link__case figcaption,
+.nv-ext-link__then {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.nv-ext-link__sketch {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.nv-ext-link__bar {
+  fill: var(--nv-glass-fill-strong);
+  stroke: var(--nv-hairline);
+}
+.nv-ext-link__field {
+  fill: var(--nv-plate);
+  stroke: var(--nv-hairline);
+}
+.nv-ext-link__text {
+  fill: var(--nv-ink-faint);
+}
+.nv-ext-link__puzzle {
+  fill: none;
+  stroke: var(--nv-ink-muted);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.nv-ext-link__puzzle.nv-ext-link__target {
+  stroke: var(--nv-neon-ink);
+}
+.nv-ext-link__menu {
+  fill: var(--nv-surface-raised);
+  stroke: var(--nv-hairline);
+}
+.nv-ext-link__row {
+  fill: var(--nv-glass-fill-strong);
+}
+.nv-ext-link__label {
+  fill: var(--nv-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+.nv-ext-link__ring {
+  fill: none;
+  stroke: var(--nv-neon-ink);
+  stroke-width: 1.6;
+  stroke-dasharray: 3 3;
+}

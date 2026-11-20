@@ -57,6 +57,16 @@ export function rankOfKind(kind: string): number | null {
   return match?.[1] === undefined ? null : Number(match[1]);
 }
 
+/**
+ * How high a gain stands when several are owed at once: a rank, then a tier's medal, then a trophy, then a streak.
+ * The highest gets the one ceremony; the others are named under it (Design's rule: one ceremony an arrival).
+ */
+export function heightOfKind(kind: string): number {
+  if (rankOfKind(kind) !== null) return 3;
+  if (tierOfKind(kind) !== null) return 2;
+  return kind.startsWith('streak_') ? 0 : 1;
+}
+
 const OBJECT_SIZE = 220;
 
 /**
@@ -68,10 +78,13 @@ export function revealWordsOf(
   item: Pick<TrophyCaseItem, 'kind' | 'basis'>,
   current: PayPeriod | null,
   tiers: readonly BonusTier[],
+  /** The object's side: the reveal's own by default; a small one, without its light, for « Aussi gagné ». */
+  size = OBJECT_SIZE,
 ): RevealWords | null {
+  const glow = size === OBJECT_SIZE;
   if (isTrophy(item.kind)) {
     return {
-      object: <TrophyBadge kind={item.kind} size={OBJECT_SIZE} glow />,
+      object: <TrophyBadge kind={item.kind} size={size} glow={glow} />,
       kicker: item.kind.startsWith('streak_') ? 'Série' : 'Trophée gagné',
       title: TROPHY_NAMES[item.kind],
       text: TROPHY_TEXTS[item.kind],
@@ -83,7 +96,7 @@ export function revealWordsOf(
     const name = levelName(rank);
     if (name === null) return null;
     return {
-      object: <LevelInsignia rank={rank} size={OBJECT_SIZE} glow />,
+      object: <LevelInsignia rank={rank} size={size} glow={glow} />,
       kicker: 'Nouveau rang',
       title: name,
       text:
@@ -103,7 +116,7 @@ export function revealWordsOf(
   const fallback = { metal: 'or' as const, rank: 1 };
   const medal = known === undefined ? fallback : (tierMedals(tiers).of(known.thresholdMinor) ?? fallback);
   return {
-    object: <Medal medal={medal} size={OBJECT_SIZE} glow />,
+    object: <Medal medal={medal} size={size} glow={glow} />,
     kicker: 'Palier atteint',
     title: known === undefined ? 'Palier atteint' : `Palier ${known.label}`,
     text: 'Ton net de la quinzaine a passé le seuil.',
