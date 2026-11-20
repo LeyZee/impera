@@ -176,7 +176,8 @@ export default defineBackground(() => {
     let outcome: 'sent' | 'kept' | 'revoked' = 'sent';
     for (const batch of batches) {
       const sent = await sendReadings(origin, token, batch);
-      if (sent.kind === 'unreachable') {
+      // A CRM counting too many tries (429) keeps the batch too: it is sent again with the next flush.
+      if (sent.kind === 'unreachable' || sent.kind === 'busy') {
         unsent.push(batch);
         outcome = 'kept';
       } else if (sent.kind === 'revoked') {
@@ -376,6 +377,8 @@ export default defineBackground(() => {
           state: answer.code === CONNECTOR_LINK_FORBIDDEN ? 'not-owner' : 'unreachable',
           accounts: [],
         };
+      case 'busy':
+        return { state: 'busy', accounts: [] };
       case 'unreachable':
         return { state: 'unreachable', accounts: [] };
     }
@@ -460,7 +463,8 @@ export default defineBackground(() => {
         const answer = await fetchMarkableCreators(await crmOrigin(), trimmed);
         if (answer.kind === 'revoked' || answer.kind === 'refused')
           return { state: 'refused' } satisfies LinkSaved;
-        if (answer.kind === 'unreachable') return { state: 'unreachable' } satisfies LinkSaved;
+        if (answer.kind === 'busy' || answer.kind === 'unreachable')
+          return { state: answer.kind } satisfies LinkSaved;
         await saveLink(trimmed);
         await rebuildMenu(answer.value.items);
         return { state: 'linked' } satisfies LinkSaved;

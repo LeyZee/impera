@@ -50,7 +50,8 @@ const STORED_UNKNOWN: Stored = { expiresAt: null, reconnectFirst: false, kept: f
 export type Synced =
   | { readonly state: 'synced'; readonly stored: Stored }
   | {
-      readonly state: 'revoked' | 'not-owner' | 'other-model' | 'other-member' | 'refused' | 'unreachable';
+      readonly state:
+        'revoked' | 'not-owner' | 'other-model' | 'other-member' | 'refused' | 'busy' | 'unreachable';
     };
 
 export async function sendSession(
@@ -82,6 +83,8 @@ export async function sendSession(
       return { state: 'synced', stored: sent.value };
     case 'revoked':
       return { state: 'revoked' };
+    case 'busy':
+      return { state: 'busy' };
     case 'unreachable':
       return { state: 'unreachable' };
     case 'refused':
