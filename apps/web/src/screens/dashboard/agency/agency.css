@@ -977,6 +977,8 @@
   display: contents;
 }
 .ins-heat__hour {
+  /* Air between the hours and the grid, so the best slot's ring never touches its label (Design, 20/11). */
+  padding-bottom: 6px;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   font-variant-numeric: tabular-nums;
