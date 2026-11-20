@@ -34,3 +34,16 @@ export function builtInCrmOf(raw: string | undefined): string | null {
   if (url.hostname.split('.').some((label) => label.startsWith('xn--'))) refuse('un nom en ASCII');
   return url.origin;
 }
+
+/**
+ * The image's two addresses agree (avis Sécurité et Bilan du 20/11 sur #870): when the deployment gives both the CRM's
+ * WEB_ORIGIN and a built-in address, they name the same site, a final slash aside, or the build fails. An extension
+ * granted another site would send the team's sessions there. Nothing to compare when either is missing or empty.
+ */
+export function assertSameCrm(builtIn: string | null, webOrigin: string | undefined): void {
+  const web = webOrigin?.trim().replace(/\/$/u, '') ?? '';
+  if (builtIn === null || web === '' || web === builtIn) return;
+  throw new Error(
+    `EXTENSION_CRM_ORIGIN refusée (ADR 0067, second amendement) : elle doit être l’adresse du CRM (WEB_ORIGIN).`,
+  );
+}

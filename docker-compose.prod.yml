@@ -92,8 +92,9 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      # EXTENSION_CRM_ORIGIN set and empty: no built-in address (the CI's stack, served over http).
-      args: { EXTENSION_CRM_ORIGIN: '${EXTENSION_CRM_ORIGIN-${WEB_ORIGIN}}' }
+      # EXTENSION_CRM_ORIGIN set and empty: no built-in address (the CI's stack, served over http). Set to another site
+      # than WEB_ORIGIN, the extension's build fails.
+      args: { EXTENSION_CRM_ORIGIN: '${EXTENSION_CRM_ORIGIN-${WEB_ORIGIN}}', WEB_ORIGIN: '${WEB_ORIGIN-}' }
     environment:
       API_UPSTREAM: api:3000
       MEDIA_ORIGIN: ${S3_ENDPOINT:-}
