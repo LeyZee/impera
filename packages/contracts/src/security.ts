@@ -17,6 +17,10 @@ export const SECURITY_ALERT_REASONS = [
   'platform_session_replaced',
   'passkey_added',
   'passkey_new_sign_in',
+  'owner_added',
+  'owner_removal_requested',
+  'owner_removal_cancelled',
+  'owner_removed',
 ] as const;
 export const SecurityAlertReasonSchema = z.enum(SECURITY_ALERT_REASONS);
 export type SecurityAlertReason = z.infer<typeof SecurityAlertReasonSchema>;
@@ -59,6 +63,20 @@ export const SecurityAlertPayloadSchema = z.discriminatedUnion('reason', [
   z.object({ reason: z.literal('passkey_added'), ...account }),
   /** The owner's account signed in with a passkey never used before (ADR 0053 § 7). */
   z.object({ reason: z.literal('passkey_new_sign_in'), ...account }),
+  /** An account was made the second owner (ADR 0096 § 1). `userId` is the new owner, `by` who did it. */
+  z.object({ reason: z.literal('owner_added'), ...account, by: z.string().min(1) }),
+  /**
+   * An owner asked for the other's removal, which waits for its notice (ADR 0096 § 2); `userId` is the owner it is
+   * about. Then that owner cancelled it, or the notice ended and the role was taken back.
+   */
+  z.object({
+    reason: z.literal('owner_removal_requested'),
+    ...account,
+    by: z.string().min(1),
+    effectiveAt: z.iso.datetime(),
+  }),
+  z.object({ reason: z.literal('owner_removal_cancelled'), ...account }),
+  z.object({ reason: z.literal('owner_removed'), ...account, by: z.string().min(1) }),
   /** Another version of her persona became the active one. */
   z.object({ reason: z.literal('persona_activated'), ...actor, version: z.string().min(1).max(64) }),
   /** Automatique was switched on: for all her conversations, or for one. */

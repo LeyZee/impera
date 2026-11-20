@@ -134,6 +134,11 @@ export const NOTIFICATION_REASONS = [
    * outside the daily cap, which it does not consume.
    */
   'safety_alert',
+  /**
+   * A change among the owners (ADR 0096 §§ 2 and 5): an owner added, a removal asked, cancelled or applied. It rings
+   * even in the quiet hours and outside the daily cap: the notice only protects an owner who hears of it.
+   */
+  'owner_change',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
