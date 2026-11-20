@@ -91,35 +91,46 @@ export async function assertDatabaseRoles(db: Database, serviceDb: Database): Pr
   }
 }
 
-/** Roles a managed host creates for its own services: they must reach nothing of Impera (ADR 0152 § 2). */
-const PREDEFINED_ROLES = [
-  'anon',
-  'authenticated',
-  'service_role',
-  'authenticator',
-  'supabase_read_only_user',
-];
+/** Impera's own roles (ADR 0087): the only ones meant to reach its schemas. */
+const OUR_ROLES = ['nirvana_app', 'impera_service', 'nirvana_admin'];
 /** The schemas Impera's data lives in. */
 const OUR_SCHEMAS = ['public', 'graphile_worker'];
+/** Built-in roles that read, or write, every table of the base whatever its rights: only the host gives them. */
+const READ_ALL_ROLES = ['pg_read_all_data', 'pg_write_all_data'];
+
+const literalArray = (values: readonly string[]) => sql.raw(`array['${values.join("','")}']`);
 
 const ForeignAccessSchema = z.object({
   reachable: z.array(z.string()),
+  hostReaders: z.array(z.string()),
   owners: z.array(z.string()),
+  migrator: z.string().nullable(),
 });
 
+export interface ForeignAccess {
+  /** Why the base is not as closed as ADR 0152 § 2 wants; empty when it is. */
+  readonly problems: readonly string[];
+  /**
+   * The host's own roles that read every table through `pg_read_all_data` (on Supabase: `postgres`,
+   * `supabase_read_only_user`…). No right of ours can close the base to them: they are the host itself, an accepted
+   * risk written in ADR 0152 (Conséquences), and are only named in the log.
+   */
+  readonly hostReaders: readonly string[];
+}
+
 /**
- * Why the base is not as closed as ADR 0152 § 2 wants; empty when it is. Two things are read:
- * - a predefined role of the host with USAGE on one of our schemas (`packages/db/supabase/lock-down.sql` takes it
- *   away): without USAGE it reaches no table, function or sequence of the schema, whatever their own rights;
- * - more than one owner for the tables, views, sequences and functions of our schemas, those of extensions apart:
- *   everything is created by the owner role through the migrations, so another owner means an object created by
- *   hand, by `postgres` or by the host, with the host's default rights.
+ * Reads how closed the base is (ADR 0152 § 2):
+ * - a closed list: a role other than ours, a superuser or a reader of everything that has USAGE on one of our schemas
+ *   is a problem (`packages/db/supabase/lock-down.sql` takes USAGE away). Without USAGE a role reaches no table,
+ *   function or sequence of the schema, whatever their own rights;
+ * - one owner for the tables, views, sequences and functions of our schemas (those of extensions apart), and it is
+ *   the role that ran the migrations: another owner means an object created by hand, by `postgres` or by the host,
+ *   with the host's default rights.
  */
-export async function foreignAccessProblems(db: Database): Promise<string[]> {
+export async function readForeignAccess(db: Database): Promise<ForeignAccess> {
   const result = await db.execute(
     sql`with schemas as (
-          select n.oid, n.nspname from pg_namespace n
-           where n.nspname = any(${sql.raw(`array['${OUR_SCHEMAS.join("','")}']`)})
+          select n.oid, n.nspname from pg_namespace n where n.nspname = any(${literalArray(OUR_SCHEMAS)})
         ),
         objects as (
           select c.relowner as owner, c.oid, 'pg_class'::regclass as catalog
@@ -128,47 +139,66 @@ export async function foreignAccessProblems(db: Database): Promise<string[]> {
           union all
           select p.proowner, p.oid, 'pg_proc'::regclass
             from pg_proc p join schemas s on s.oid = p.pronamespace
+        ),
+        others as (
+          select r.oid, r.rolname from pg_roles r
+           where not r.rolsuper
+             and r.rolname <> all(${literalArray(OUR_ROLES)})
+             and r.rolname not like 'pg\_%'
+             and r.oid <> (select d.datdba from pg_database d where d.datname = current_database())
+        ),
+        readers as (
+          select o.oid, o.rolname from others o
+           where exists (select 1 from pg_roles b
+                          where b.rolname = any(${literalArray(READ_ALL_ROLES)}) and pg_has_role(o.oid, b.oid, 'MEMBER'))
         )
         select
-          array(select r.rolname || ' on ' || s.nspname
-                  from pg_roles r cross join schemas s
-                 where r.rolname = any(${sql.raw(`array['${PREDEFINED_ROLES.join("','")}']`)})
-                   and has_schema_privilege(r.oid, s.oid, 'USAGE')
+          array(select o.rolname || ' on ' || s.nspname
+                  from others o cross join schemas s
+                 where has_schema_privilege(o.oid, s.oid, 'USAGE')
+                   and not exists (select 1 from readers r where r.oid = o.oid)
                  order by 1) as reachable,
+          array(select r.rolname from readers r order by 1) as "hostReaders",
           array(select distinct pg_get_userbyid(o.owner)
                   from objects o
                  where not exists (select 1 from pg_depend d
                                     where d.classid = o.catalog and d.objid = o.oid and d.deptype = 'e')
-                 order by 1) as owners`,
+                 order by 1) as owners,
+          (select pg_get_userbyid(c.relowner) from pg_class c
+            where c.oid = to_regclass('drizzle.__drizzle_migrations')) as migrator`,
   );
-  const { reachable, owners } = ForeignAccessSchema.parse(result.rows[0]);
+  const { reachable, hostReaders, owners, migrator } = ForeignAccessSchema.parse(result.rows[0]);
   const problems: string[] = [];
   if (reachable.length > 0) {
     problems.push(
-      `the host's roles reach our schemas (${reachable.join(', ')}): play packages/db/supabase/lock-down.sql as postgres`,
+      `roles other than ours reach our schemas (${reachable.join(', ')}): play packages/db/supabase/lock-down.sql as postgres`,
     );
   }
-  if (owners.length > 1) {
+  const strangers = owners.filter((owner) => owner !== migrator);
+  if (strangers.length > 0) {
     problems.push(
-      `our schemas hold objects of several owners (${owners.join(', ')}): only the owner role creates them`,
+      `our schemas hold objects owned by ${strangers.join(', ')}: only the role that ran the migrations${migrator === null ? '' : ` (${migrator})`} creates them`,
     );
   }
-  return problems;
+  return { problems, hostReaders };
 }
 
 /**
- * Refuses to start in production on a base the host's roles can still reach, or holding an object not created by the
- * migrations (ADR 0152 § 2). Elsewhere it only warns: a developer's base has no such roles, and a stray object there
- * is not worth stopping the day for.
+ * Refuses to start in production on a base other roles than ours can still reach, or holding an object not created
+ * by the migrations (ADR 0152 § 2). Elsewhere it only warns: a developer's base is open to PUBLIC, and a stray object
+ * there is not worth stopping the day for. The host's readers of everything are named, never refused.
  */
 export async function assertNoForeignAccess(
   db: Database,
   production: boolean,
-  warn: (message: string) => void,
+  log: { readonly warn: (message: string) => void; readonly info: (message: string) => void },
 ): Promise<void> {
-  const problems = await foreignAccessProblems(db);
+  const { problems, hostReaders } = await readForeignAccess(db);
+  if (hostReaders.length > 0) {
+    log.info(`roles of the host that read every table (accepted, ADR 0152): ${hostReaders.join(', ')}`);
+  }
   if (problems.length === 0) return;
-  const message = `Database not closed to the host (docs/runbooks/deploy.md, ADR 0152 § 2): ${problems.join('; ')}`;
+  const message = `Database not closed to other roles (docs/runbooks/deploy.md, ADR 0152 § 2): ${problems.join('; ')}`;
   if (production) throw new Error(message);
-  warn(message);
+  log.warn(message);
 }

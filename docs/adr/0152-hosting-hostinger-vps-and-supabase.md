@@ -88,6 +88,7 @@ La session Reveal du compte bot dure 24 heures depuis la connexion, et son renou
 ## Conséquences
 
 - Coût mensuel hors IA : environ 8 € pour le VPS (prix promotionnel sur 24 mois, puis environ 15 €), Supabase déjà payé, et quelques euros pour les buckets.
+- Risque accepté : les rôles de lecture de l'hébergeur (membres de `pg_read_all_data`, par exemple le rôle en lecture seule du tableau de bord Supabase) lisent toutes nos tables. C'est le prix d'une base gérée ; le démarrage les nomme dans les journaux sans refuser, et l'organisation de production reste invisible des connecteurs.
 - `docs/runbooks/deploy.md` et `docs/architecture/operations.md` sont réécrits pour Hostinger et Supabase dans la fiche de déploiement. Les étapes Neon disparaissent, les vérifications de rôles restent.
 - Un test d'intégration prouve que les rôles `anon`, `authenticated` et `service_role` n'ont aucun droit sur `public`.
 - Deux sous-traitants de plus dans le registre : Hostinger (société de l'Union européenne) et Supabase (société américaine, hébergée chez AWS, région dans l'Union européenne, avec un accord de sous-traitance à signer). Les messages des fans touchent à la vie sexuelle de personnes identifiables, une catégorie de données que le RGPD traite comme sensible. Seuls les secrets scellés sont chiffrés par l'application ; les messages ne le sont pas, et les deux prestataires ont un accès technique au disque.

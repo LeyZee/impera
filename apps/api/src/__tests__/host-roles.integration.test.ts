@@ -5,13 +5,17 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { assertNoForeignAccess, foreignAccessProblems } from '../database-roles';
+import { assertNoForeignAccess, readForeignAccess } from '../database-roles';
 
 /** Played by hand as `postgres` on Supabase (deploy.md); here as the test server's superuser. */
 const LOCK_DOWN = new URL('../../../../packages/db/supabase/lock-down.sql', import.meta.url);
 
 /** The roles Supabase creates for its own services (ADR 0152 § 2), made here as it makes them: without a login. */
 const PREDEFINED = ['anon', 'authenticated', 'service_role'];
+/** Like Supabase's `supabase_read_only_user`: a member of `pg_read_all_data`, which no right of ours can close. */
+const HOST_READER = 'host_reads_everything';
+
+const silent = { warn: () => undefined, info: () => undefined };
 
 const ENQUEUE_JOB = 'public.enqueue_job(text, jsonb, text, timestamptz, integer, text, text)';
 
@@ -31,6 +35,9 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
         `do $$ begin create role ${role} nologin; exception when duplicate_object then null; end $$`,
       );
     }
+    await root.query(
+      `do $$ begin create role ${HOST_READER} nologin in role pg_read_all_data; exception when duplicate_object then null; end $$`,
+    );
   });
 
   afterAll(async () => {
@@ -79,11 +86,14 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     });
   });
 
-  it('names an object not created by the owner role', async () => {
+  it('names an object not created by the role that ran the migrations', async () => {
     await root.query('create table public.made_by_hand (id int)');
     try {
-      expect(await foreignAccessProblems(test.service.db)).toContainEqual(
-        expect.stringMatching(/objects of several owners \(.*nirvana_admin.*\)/),
+      const { problems } = await readForeignAccess(test.service.db);
+      expect(problems).toContainEqual(
+        expect.stringMatching(
+          /objects owned by [a-z_]+: only the role that ran the migrations \(nirvana_admin\)/,
+        ),
       );
     } finally {
       await root.query('drop table public.made_by_hand');
@@ -92,22 +102,31 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
 
   it('refuses to start in production until the lock-down is played, then lets our roles work as before', async () => {
     const warnings: string[] = [];
-    await expect(
-      assertNoForeignAccess(test.service.db, true, (message) => {
+    const infos: string[] = [];
+    const log = {
+      warn: (message: string) => {
         warnings.push(message);
-      }),
-    ).rejects.toThrow(/the host's roles reach our schemas \(anon on public.*\): play packages\/db\/supabase/);
-    await assertNoForeignAccess(test.service.db, false, (message) => {
-      warnings.push(message);
-    });
+      },
+      info: (message: string) => {
+        infos.push(message);
+      },
+    };
+    await expect(assertNoForeignAccess(test.service.db, true, log)).rejects.toThrow(
+      /roles other than ours reach our schemas \(.*anon on public.*\): play packages\/db\/supabase/,
+    );
+    await assertNoForeignAccess(test.service.db, false, log);
     expect(warnings).toHaveLength(1);
+    // The host's reader of everything is named, never refused: lock-down.sql cannot close it.
+    expect(infos.join('\n')).toContain(HOST_READER);
 
     await root.query(await readFile(LOCK_DOWN, 'utf8'));
     // Twice: the runbook replays it after every upgrade of the host.
     await root.query(await readFile(LOCK_DOWN, 'utf8'));
 
-    expect(await foreignAccessProblems(test.service.db)).toEqual([]);
-    await expect(assertNoForeignAccess(test.service.db, true, () => undefined)).resolves.toBeUndefined();
+    const after = await readForeignAccess(test.service.db);
+    expect(after.problems).toEqual([]);
+    expect(after.hostReaders).toContain(HOST_READER);
+    await expect(assertNoForeignAccess(test.service.db, true, silent)).resolves.toBeUndefined();
     for (const role of PREDEFINED) {
       const reach = await root.query<{ public: boolean; queue: boolean }>(
         `select has_schema_privilege($1, 'public', 'USAGE') as public,

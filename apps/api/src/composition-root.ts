@@ -290,10 +290,14 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // A role that silences RLS (or skips it), or a service role that could change a structure, must stop the process.
   try {
     await assertDatabaseRoles(db.db, adminDb.db);
-    const warn = (message: string): void => {
-      logger.warn(message);
-    };
-    await assertNoForeignAccess(adminDb.db, config.NODE_ENV === 'production', warn);
+    await assertNoForeignAccess(adminDb.db, config.NODE_ENV === 'production', {
+      warn: (message) => {
+        logger.warn(message);
+      },
+      info: (message) => {
+        logger.info(message);
+      },
+    });
   } catch (error) {
     await Promise.all([db.close(), adminDb.close(), rateLimitDb.close()]);
     throw error;
