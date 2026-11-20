@@ -265,7 +265,7 @@ describe('/v1/playground', () => {
     expect(asked).toHaveLength(1);
     expect(asked[0]?.[0]).toBe(MIA);
     expect(hers.scripts).toMatchObject({ source: 'trial', unavailable: { code: 'none_ready' }, run: null });
-    expect(hers.scripts.unavailable?.label).toContain('Ses scripts dans Reveal');
+    expect(hers.scripts.unavailable?.label).toBe('Aucun de ses scripts n’est prêt');
     // The invented persona plays the trial scripts, and never reads hers.
     const back = stateOf(await post('/persona', { kind: 'invented' }));
     expect(back.scripts).toMatchObject({ source: 'trial', unavailable: null });

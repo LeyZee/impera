@@ -97,7 +97,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
   return (
     <div className="pg-thread nv-scroll" ref={threadRef}>
       <div className="nv-thread">
-        <ScriptStrip scripts={state.scripts} />
+        <ScriptStrip scripts={state.scripts} creatorId={state.persona.played?.creatorId ?? null} />
         {state.history.length === 0 && pending === null && !writing ? (
           state.voice.reachable ? (
             <Empty

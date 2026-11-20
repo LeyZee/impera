@@ -88,12 +88,10 @@ export function offerRefusalLabel(code: string): string {
 
 /** Why none of her scripts can be played in the playground (ADR 0103 § 15), as production would sell none either. */
 const CATALOGUE_LABELS: Readonly<Record<string, string>> = {
-  no_script: 'Aucun script Reveal importé pour elle',
-  none_ready:
-    'Aucun de ses scripts n’est prêt : identité ou descriptions à valider dans « Ses scripts dans Reveal »',
-  several_accounts:
-    'Elle a des scripts sur plusieurs comptes Reveal : le Playground ne sait pas lequel jouer',
-  unreadable: 'Ses scripts n’ont pas pu être lus (en réel, aucune vente)',
+  no_script: 'Aucun de ses scripts Reveal n’est importé',
+  none_ready: 'Aucun de ses scripts n’est prêt',
+  several_accounts: 'Ses scripts sont sur plusieurs comptes Reveal',
+  unreadable: 'Ses scripts ne se lisent pas',
 };
 
 export function catalogueLabel(code: string): string {

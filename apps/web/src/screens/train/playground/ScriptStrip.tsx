@@ -1,7 +1,10 @@
-import type { PlaygroundScriptRun, PlaygroundState } from '@impera/contracts';
+import type { CreatorId, PlaygroundScriptRun, PlaygroundState } from '@impera/contracts';
+import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { money } from './logic';
+
+import { creatorsSearch } from '@/creators/search';
 
 const STATUS_LABELS: Readonly<Record<PlaygroundScriptRun['status'], string>> = {
   open: 'en cours',
@@ -58,14 +61,33 @@ const stepTitle = (step: Step, index: number): string => {
  * rules; its steps as a path, and what he paid fictively. When none of hers can be played, it says why and that the
  * trial scripts play instead. Nothing here reaches Reveal, the sales or the figures.
  */
-export function ScriptStrip({ scripts }: { scripts: PlaygroundState['scripts'] }): JSX.Element | null {
+export function ScriptStrip({
+  scripts,
+  creatorId,
+}: {
+  scripts: PlaygroundState['scripts'];
+  /** Hers when one of her versions is played: the line leads to « Ses scripts dans Reveal ». */
+  creatorId: CreatorId | null;
+}): JSX.Element | null {
   const { run, unavailable, fictiveSpentCents } = scripts;
   if (run === null && unavailable === null) return null;
   return (
     <section className="pg-script" aria-label={run?.source === 'hers' ? 'Son script' : 'Script d’essai'}>
       {unavailable === null ? null : (
+        // Amber for the dot alone, the sentence in ink, short (avis Design, groupes-medias-1).
         <p className="pg-script__why">
-          {unavailable.label}. Les scripts d’essai jouent à la place des siens.
+          <span className="pg-script__dot" aria-hidden="true" />
+          <span>
+            {unavailable.label} : les scripts d’essai jouent à la place.
+            {creatorId === null || unavailable.code === 'unreadable' ? null : (
+              <>
+                {' '}
+                <Link to="/creatrices" search={creatorsSearch('scripts', creatorId)}>
+                  Ses scripts dans Reveal
+                </Link>
+              </>
+            )}
+          </span>
         </p>
       )}
       {run === null ? null : (

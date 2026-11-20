@@ -1738,10 +1738,26 @@
   color: var(--nv-warning);
 }
 .pg-script__why {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin: 0;
   font-size: var(--nv-text-caption);
   line-height: 17px;
-  color: var(--nv-warning);
+  color: var(--nv-ink);
+}
+.pg-script__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--nv-warning);
+  transform: translateY(-1px);
+}
+.pg-script__why a {
+  color: var(--nv-neon-ink);
+  font-weight: 500;
+  text-underline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .pg-tile .vx-sharp {
