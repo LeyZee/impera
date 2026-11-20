@@ -236,6 +236,10 @@ function Hero({
   // says « En poste »; under way and not taken, it says so in amber. The report, once due, takes the light instead.
   const taken = shift.checkedInAt;
   const toTake = (state.kind === 'on' || state.kind === 'soon') && taken === null && report.kind !== 'due';
+  // A shift of today not open yet: the gesture is there, held, with the minute it opens (Design, 20/11): never a
+  // button that answers « pas encore » once pressed.
+  const opensAt = new Date(shift.accessStartsAt);
+  const notYet = state.kind === 'later' && dayOf(opensAt, zone) === today;
   const tone =
     state.kind === 'on'
       ? taken === null
@@ -296,6 +300,14 @@ function Hero({
           style={{ '--nv-gauge-value': `${String(Math.round(progressOf(shift, now) * 1000) / 10)}%` }}
         >
           <span className="nv-gauge__fill" />
+        </div>
+      ) : null}
+      {notYet ? (
+        <div className="sc-hero__actions">
+          <button type="button" className="nv-btn nv-btn--soft" disabled>
+            Je prends mon poste
+          </button>
+          <p className="td-checkin__when nv-num">Tu pourras prendre ton poste à {clockAt(opensAt, zone)}.</p>
         </div>
       ) : null}
       {state.kind === 'later' ? (

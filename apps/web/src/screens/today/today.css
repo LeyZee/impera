@@ -39,3 +39,11 @@
   color: var(--nv-warning);
   font-size: var(--nv-text-footnote);
 }
+
+/* When a shift of today opens to « Je prends mon poste »: an information, in the grey of the sentences. */
+.td-checkin__when {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}

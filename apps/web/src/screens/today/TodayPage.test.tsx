@@ -412,6 +412,21 @@ describe('Aujourd’hui, « Je prends mon poste » (EQ-12)', () => {
     );
   });
 
+  it('holds the gesture on a shift of today not open yet, and says the minute it opens, in grey', async () => {
+    // 00:00Z is 1 h in Paris: a shift at 10 h opens at 9 h 45, the same day.
+    serveCheckIn(
+      () => ({ current: null, next: mine(5, '2026-10-28T09:00:00Z', '2026-10-28T15:00:00Z'), ended: null }),
+      { status: 200, body: null },
+    );
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 });
+    const held = screen.getByRole('button', { name: 'Je prends mon poste' });
+    expect(held.hasAttribute('disabled')).toBe(true);
+    expect(held.className).toContain('nv-btn--soft');
+    expect(screen.getByText(/Tu pourras prendre ton poste à 9\s?h\s?45\./u)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('offers nothing to take on a shift ahead, nor once it has ended', async () => {
     serveCheckIn(
       () => ({
