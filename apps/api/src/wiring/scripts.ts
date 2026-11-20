@@ -87,7 +87,12 @@ export function wireScripts(
         JOB_PAYLOADS['scripts.import_platform_scripts'],
         shared.logger,
         async (payload, context) => {
-          const run = await module.jobs.importPlatformScripts(payload, now());
+          const run = await module.jobs.importPlatformScripts(payload, now(), (error) => {
+            context.logger.warn(
+              { err: error, platformAccountId: payload.platformAccountId },
+              'scripts: the scripts ready to copy could not be recognised; the next import retries',
+            );
+          });
           context.logger.info(
             { platformAccountId: payload.platformAccountId, ...run },
             'scripts: the native scripts imported',

@@ -29,6 +29,7 @@ import type {
 import type { BranchSetting } from './branches';
 import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
 import type { PreparedVaultMedia } from './prepared-scripts';
+import type { NativeScriptForMatch, PreparedForMatch, Recognition } from './recognition';
 
 /** A structure of a queue, with the version a request would take: the latest. */
 export interface QueuedStructure {
@@ -192,6 +193,23 @@ export interface PlatformScriptImportStore {
  * root): a read, never behind the write guard. `null` when the account's connector reads no scripts (no session, no
  * adapter, or `capabilities.scripts` false): the import then changes nothing for it.
  */
+/**
+ * The recognition of the scripts copied into Reveal (ADR 0112 § 23), as the service role, after an import: in one
+ * transaction, the account's scripts « prêt à copier » (the oldest first) and its active native scripts no script in
+ * preparation took and the agency set nothing on are given to `decide`; each recognition passes its settings to the
+ * native script and closes the script in preparation. Gives how many were tied.
+ */
+export interface PreparedRecognitionStore {
+  recognise(
+    account: ImportAccount,
+    decide: (
+      prepared: readonly PreparedForMatch[],
+      natives: readonly NativeScriptForMatch[],
+    ) => readonly Recognition[],
+    now: Date,
+  ): Promise<number>;
+}
+
 export type PlatformScriptSource = (account: ImportAccount) => Promise<readonly PlatformScript[] | null>;
 
 /** A vault media as its link says it (`media_platform_refs`): listed by the last sync of the vault and not removed. */
@@ -424,6 +442,8 @@ export interface StoredPreparedScript {
   readonly updatedAt: Date;
   /** Where each media it names stands in her vault, read in the same transaction; a ref absent is not in it. */
   readonly vault: ReadonlyMap<string, PreparedVaultMedia>;
+  /** « Prêt à copier » only: the account's active native scripts of its name, to say what differs; `null` otherwise. */
+  readonly natives: readonly NativeScriptForMatch[] | null;
 }
 
 export type CreatePreparedOutcome = 'created' | 'replayed' | 'conflict' | 'account_invalid' | 'not_found';
