@@ -89,6 +89,13 @@
   --nv-series-4: #9c9630;
   --nv-series-other: rgba(246, 238, 241, 0.32);
   /*
+   * The intensity of one measure (Dashboard de l'agence, « Quand ça vend »: the hours map and the ten biggest fans'
+   * bar, Charles 20/11): one violet-fuchsia, mixed toward --nv-fill-track from pale to vivid. Never a state nor a
+   * category. Apart from the creators' rose, the agent's violet and the agency's blue for full colour vision, and at
+   * 3:1 on the plate, Nuit and Jour (dataviz validator).
+   */
+  --nv-heat: #a64ff0;
+  /*
    * Where the money goes (ADR 0106 § 10, avenant du 17/11): the creator's part rose, the agency's blue, the same on
    * every block of the Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second
    * hatched). Validated at 3:1 at least on the plate, Nuit and Jour, and apart for colour-blind readers (dataviz
@@ -198,6 +205,7 @@
   --nv-series-3: #c2457e;
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
+  --nv-heat: #b040d8;
   --nv-money-creator: #b8406f;
   /* The Impera logo's navy itself, Charles's value (19/11), unretouched. */
   --nv-money-agency: #001a33;
