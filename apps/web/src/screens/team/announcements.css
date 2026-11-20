@@ -61,11 +61,11 @@
   gap: var(--nv-space-2);
 }
 /* The way to the readers and « Retirer » are plain buttons: their padding pulled back, their text on the body's line. */
-.an-reads {
+.an-item .an-reads {
   margin-inline-start: calc(-1 * var(--nv-space-4));
 }
-.an-withdraw {
-  margin-inline-start: auto;
+.an-item .an-withdraw {
+  margin-inline: auto calc(-1 * var(--nv-space-4));
 }
 .an-read {
   display: inline-flex;
