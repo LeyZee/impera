@@ -10,7 +10,7 @@ import './sales.css';
 import { initialOf } from '@/lib/utils';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
-import { FansArt } from '@/shell/art/EmptyArt';
+import { ChatArt, FansArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
@@ -103,7 +103,7 @@ export function CreatorSalesPage({
           </div>
           <div className="vt-side">
             {selected === null ? (
-              <Empty plate title="Choisis un fan pour lire sa conversation." />
+              <Empty plate art={<ChatArt />} title="Choisis un fan pour lire sa conversation." />
             ) : (
               <CreatorReader
                 key={selected}

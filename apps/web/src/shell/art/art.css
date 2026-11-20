@@ -4,6 +4,12 @@
  * follow the theme: the gradients' stops are classes.
  */
 .nv-art {
+  /* The picture's own colours, the same by day and by night: its white, its gold, the ink of what is written on paper. */
+  --art-white: #fff;
+  --art-gold: #ffb347;
+  --art-gold-light: #ffd166;
+  --art-rule: rgba(12, 10, 16, 0.26);
+  --art-mark: rgba(12, 10, 16, 0.32);
   display: block;
   width: 100%;
   height: auto;
@@ -43,7 +49,7 @@
   stop-color: color-mix(in srgb, var(--nv-agent) 18%, var(--nv-surface-raised));
 }
 .nv-art__stop-hot-top {
-  stop-color: color-mix(in srgb, var(--nv-neon) 82%, #fff);
+  stop-color: color-mix(in srgb, var(--nv-neon) 82%, var(--art-white));
 }
 .nv-art__stop-hot-bottom {
   stop-color: color-mix(in srgb, var(--nv-neon) 62%, var(--nv-agent));
@@ -55,26 +61,26 @@
   stop-color: color-mix(in srgb, var(--nv-agent) 30%, var(--nv-void));
 }
 .nv-art__white {
-  fill: #fff;
+  fill: var(--art-white);
 }
 .nv-art__paper {
-  fill: color-mix(in srgb, var(--nv-surface-raised) 12%, #fff);
+  fill: color-mix(in srgb, var(--nv-surface-raised) 12%, var(--art-white));
 }
 .nv-art__neon {
   fill: var(--nv-neon);
 }
 .nv-art__violet {
-  fill: color-mix(in srgb, var(--nv-agent) 80%, #fff);
+  fill: color-mix(in srgb, var(--nv-agent) 80%, var(--art-white));
 }
 .nv-art__warm {
-  fill: color-mix(in srgb, var(--nv-warning) 50%, #ffb347);
+  fill: color-mix(in srgb, var(--nv-warning) 50%, var(--art-gold));
 }
 .nv-art__warm-light {
-  fill: color-mix(in srgb, var(--nv-warning) 30%, #ffd166);
+  fill: color-mix(in srgb, var(--nv-warning) 30%, var(--art-gold-light));
 }
 .nv-art__coin-mark {
   fill: none;
-  stroke: rgba(12, 10, 16, 0.32);
+  stroke: var(--art-mark);
   stroke-width: 1.4;
 }
 .nv-art__cell {
@@ -83,7 +89,7 @@
 /* Lines of writing: on a bubble or on paper, never as loud as the outline. */
 .nv-art__rule {
   fill: none;
-  stroke: rgba(12, 10, 16, 0.26);
+  stroke: var(--art-rule);
   stroke-width: 3;
   stroke-linecap: round;
 }
@@ -98,7 +104,7 @@
 }
 .nv-art__thread {
   fill: none;
-  stroke: rgba(12, 10, 16, 0.26);
+  stroke: var(--art-rule);
   stroke-width: 1.6;
   stroke-dasharray: 2 3;
   stroke-linecap: round;
