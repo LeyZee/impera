@@ -86,12 +86,9 @@ export function WeekCard({
             Ta semaine de tournage
           </b>
           {week.delivery === null ? null : (
-            <span
-              className="wk-due nv-num"
-              data-late={dueIn(week.delivery.dueAt, zone, today) === 'passé' || undefined}
-            >
+            <span className="wk-due nv-num">
               Tout déposer avant {dueShort(week.delivery.dueAt, zone)}
-              <span className="wk-due__in"> · {dueIn(week.delivery.dueAt, zone, today)}</span>
+              <DueIn words={dueIn(week.delivery.dueAt, zone, today)} />
             </span>
           )}
         </div>
@@ -114,7 +111,15 @@ export function WeekCard({
         </button>
       </header>
       {painting ? (
-        <Palette kinds={kinds} colors={palette.colors} onPaint={palette.paint} onReset={palette.reset} />
+        <Palette
+          kinds={kinds}
+          colors={palette.colors}
+          onPaint={palette.paint}
+          onReset={palette.reset}
+          onClose={() => {
+            setPainting(false);
+          }}
+        />
       ) : null}
       {week.toAccept ? (
         <div className="wk-ask">
@@ -153,21 +158,45 @@ export function WeekCard({
   );
 }
 
+/** « Dans 9 jours », a pill of its own; amber once the deadline passed. */
+function DueIn({ words }: { words: string }): JSX.Element {
+  return (
+    <span className="wk-due__in" data-late={words === 'passé' || undefined}>
+      {words.charAt(0).toUpperCase() + words.slice(1)}
+    </span>
+  );
+}
+
 /** Her colours, a row a kind: seven swatches, ours marked, one tap to change. Kept on this device. */
 function Palette({
   kinds,
   colors,
   onPaint,
   onReset,
+  onClose,
 }: {
   kinds: readonly WeekNeed[];
   colors: Readonly<Record<WeekNeed, Swatch>>;
   onPaint: (need: WeekNeed, swatch: Swatch) => void;
   onReset: () => void;
+  onClose: () => void;
 }): JSX.Element {
   return (
-    <div id="wk-palette" className="wk-palette">
-      <p className="wk-palette__lead">Choisis la couleur de chaque type de contenu.</p>
+    <div
+      id="wk-palette"
+      className="wk-palette"
+      role="dialog"
+      aria-label="Tes couleurs"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
+    >
+      <div className="wk-palette__top">
+        <p className="wk-palette__lead">Choisis la couleur de chaque type de contenu.</p>
+        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onClose}>
+          Fermer
+        </button>
+      </div>
       <ul className="wk-palette__rows">
         {kinds.map((need) => (
           <li key={need} className="wk-palette__row">

@@ -39,7 +39,7 @@ export interface WeekDraftStore {
  * job, which reads every creator; `arrivals` alone runs in her request, so in her own account.
  */
 /** Her figures as read: her last script as an instant, made her day by the week's job in her zone. */
-export type WeekFactsRead = Omit<WeekFacts, 'lastScriptOn'> & { readonly lastScriptAt: Date | null };
+type WeekFactsRead = Omit<WeekFacts, 'lastScriptOn'> & { readonly lastScriptAt: Date | null };
 
 export interface WeekFactsReader {
   facts(creatorId: string, dueBy: string): Promise<WeekFactsRead>;

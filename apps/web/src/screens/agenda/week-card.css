@@ -8,7 +8,7 @@
   --wk-sw-cyan: #5cc8d8;
   --wk-sw-bleu: #79b0ff;
   --wk-sw-vert: #93cf7c;
-  --wk-sw-or: #e6c65c;
+  --wk-sw-citron: #c6e35a;
   --wk-sw-lilas: #e08ee6;
   --wk-mark: #0b0b10;
   padding: var(--nv-plate-pad);
@@ -29,7 +29,7 @@
   --wk-sw-cyan: #127f8f;
   --wk-sw-bleu: #2f6fd6;
   --wk-sw-vert: #3d8a2a;
-  --wk-sw-or: #8a6d00;
+  --wk-sw-citron: #557000;
   --wk-sw-lilas: #a03aa8;
   --wk-mark: #fff;
 }
@@ -50,7 +50,7 @@
   --wk-c: var(--wk-mass_dm, var(--wk-sw-vert));
 }
 .wk-card [data-need='idea'] {
-  --wk-c: var(--wk-idea, var(--wk-sw-or));
+  --wk-c: var(--wk-idea, var(--wk-sw-citron));
 }
 @keyframes wk-in {
   from {
@@ -119,27 +119,48 @@
   line-height: 1.2;
 }
 .wk-due {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--nv-space-2);
   font-size: var(--nv-text-footnote);
   font-weight: 600;
   color: var(--nv-ink);
 }
+/* « Dans 9 jours »: a pill of its own, never a word left alone at the end of a line. */
 .wk-due__in {
-  color: var(--ag-c);
+  display: inline-flex;
+  align-items: center;
+  height: var(--nv-pill-info);
+  padding-inline: 8px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-track);
 }
-.wk-due[data-late] .wk-due__in {
+.wk-due__in[data-late] {
   color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
 }
 .wk-paint {
   flex: none;
   gap: 6px;
   align-self: flex-start;
+  min-height: var(--nv-target-min);
 }
 .wk-paint__dots {
   display: inline-flex;
   padding-left: 3px;
 }
-/* On a phone the dots alone say it: the title keeps its line. */
+/* On a phone, a 44 px round button of her three colours, named for her screen reader: the title keeps its line. */
 @media (max-width: 640px) {
+  .wk-paint {
+    width: var(--nv-target-min);
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--nv-fill-track);
+  }
   .wk-paint__word {
     display: none;
   }
@@ -153,15 +174,34 @@
   box-shadow: 0 0 0 2px var(--nv-plate);
 }
 
-/* ── Her colours: a row a kind, seven swatches ── */
+/* ── Her colours: a sheet over the card, never pushing her week down; a row a kind, seven swatches ── */
+.wk-card {
+  position: relative;
+}
 .wk-palette {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--nv-plate-pad) + 48px);
+  right: var(--nv-plate-pad);
+  width: min(420px, calc(100% - 2 * var(--nv-plate-pad)));
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
   padding: var(--nv-space-3);
   border-radius: var(--nv-radius-md);
-  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  background:
+    linear-gradient(165deg, var(--nv-glass-fill-strong) 0%, var(--nv-glass-fill) 62%),
+    var(--nv-surface-raised);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-hairline),
+    0 18px 48px rgb(0 0 0 / 0.35);
   animation: wk-in var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.wk-palette__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
 }
 .wk-palette__lead {
   margin: 0;
@@ -191,14 +231,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0;
-}
-@media (min-width: 641px) {
-  .wk-palette__row {
-    grid-template-columns: auto 160px 1fr;
-  }
-  .wk-swatches {
-    grid-column: auto;
-  }
 }
 /* A swatch: a 40 × 44 px target around a 22 px dot, seven on one line of a phone; the chosen one ringed. */
 .wk-swatch {
@@ -246,8 +278,8 @@
 .wk-swatch[data-swatch='vert'] {
   --wk-sw: var(--wk-sw-vert);
 }
-.wk-swatch[data-swatch='or'] {
-  --wk-sw: var(--wk-sw-or);
+.wk-swatch[data-swatch='citron'] {
+  --wk-sw: var(--wk-sw-citron);
 }
 .wk-swatch[data-swatch='lilas'] {
   --wk-sw: var(--wk-sw-lilas);
@@ -519,7 +551,7 @@
   white-space: pre-line;
 }
 .wk-line[data-done] {
-  background: transparent;
+  background: color-mix(in srgb, var(--wk-c) 3%, transparent);
 }
 .wk-line[data-done] .wk-line__label {
   color: var(--nv-ink-muted);
@@ -594,7 +626,8 @@
   padding: 0;
   display: grid;
   gap: var(--nv-space-3);
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  column-gap: var(--nv-space-5, var(--nv-space-4));
 }
 /* One row a kind: its mark, its word, « 1 / 2 », and a thin bar in its colour under the words. */
 .wk-tally__line {

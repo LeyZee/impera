@@ -6,7 +6,7 @@ import { z } from 'zod';
  * The colours of her week, one per kind of thing she shoots (Charles, 20/11: « un code couleur par catégorie »). Each
  * swatch has its night and day tone in `week-card.css`; red and amber stay for urgencies and warnings, never here.
  */
-export const SWATCHES = ['rose', 'violet', 'cyan', 'bleu', 'vert', 'or', 'lilas'] as const;
+export const SWATCHES = ['rose', 'violet', 'cyan', 'bleu', 'vert', 'citron', 'lilas'] as const;
 export type Swatch = (typeof SWATCHES)[number];
 const SwatchSchema = z.enum(SWATCHES);
 
@@ -17,7 +17,7 @@ export const SWATCH_WORDS: Readonly<Record<Swatch, string>> = {
   cyan: 'Cyan',
   bleu: 'Bleu',
   vert: 'Vert',
-  or: 'Or',
+  citron: 'Citron',
   lilas: 'Lilas',
 };
 
@@ -28,7 +28,7 @@ export const DEFAULT_COLORS: Readonly<Record<WeekNeed, Swatch>> = {
   reveal_story: 'cyan',
   script: 'bleu',
   mass_dm: 'vert',
-  idea: 'or',
+  idea: 'citron',
 };
 
 const KEY = 'impera.week-colors';

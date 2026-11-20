@@ -81,7 +81,8 @@ const SHEETS = {
 /** A boudoir session's sheet: everything it feeds, so that she brings back each piece in one sitting. */
 const sessionSheet = (gifts: number): string =>
   [
-    'Une tenue, une lumière, et tu ramènes :',
+    'Une tenue, une lumière : de quoi faire le post, le Mass DM et les cadeaux.',
+    'Tu ramènes :',
     '• les photos et deux ou trois vidéos de quelques secondes pour le post du feed ;',
     '• une photo ou une vidéo pour annoncer la séance en Mass DM ;',
     gifts === 1
