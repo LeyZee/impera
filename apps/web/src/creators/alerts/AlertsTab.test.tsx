@@ -126,7 +126,10 @@ describe('Créatrices › Alertes (ADR 0150)', () => {
       'Compte sans personne, Propriétaire',
       'Compte sans personne, Manager',
     ]);
-    expect(within(uncovered).getByText('Jamais')).toBeTruthy();
+    const closed = uncovered.querySelector('.ca-role__closed');
+    expect(closed?.textContent).toBe('Chatteur en shift : Jamais');
+    expect(closed?.getAttribute('tabindex')).toBeNull();
+    expect(within(uncovered).getByText(/Jamais envoyée à un chatteur/u)).toBeTruthy();
     fireEvent.click(within(groups[1] ?? uncovered).getByRole('radio', { name: 'Sourdine' }));
     await waitFor(() => {
       expect(writes).toHaveLength(1);

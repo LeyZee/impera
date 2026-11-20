@@ -172,6 +172,7 @@ function AlertRow({
           <p className="ca-line__sentence">
             {line.locked ? 'Part toujours, à tout le monde, même la nuit. ' : null}
             {text.sentence}
+            {line.chattersClosed ? ' Jamais envoyée à un chatteur : c’est une alerte de pilotage.' : null}
           </p>
         )}
       </div>
@@ -187,8 +188,9 @@ function AlertRow({
               <span className="ca-role__name">{ROLE_LABELS[role]}</span>
               {line.chattersClosed && role === 'chatter_on_shift' ? (
                 // Never to a chatter (ADR 0094 § 3): an alert of the agency, shut for them by the code.
-                <p className="ca-role__closed" title="Une alerte de pilotage ne va jamais à un chatteur.">
+                <p className="ca-role__closed">
                   <LockIcon />
+                  <span className="ca-vh">{ROLE_LABELS[role]} : </span>
                   Jamais
                 </p>
               ) : (
