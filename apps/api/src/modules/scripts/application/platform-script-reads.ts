@@ -181,6 +181,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     gaps,
     proposable: script.active && gaps.length === 0,
     identity,
+    ours: script.ours,
   };
 }
 
