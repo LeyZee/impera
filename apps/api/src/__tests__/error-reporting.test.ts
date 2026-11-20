@@ -11,7 +11,7 @@ import {
   startErrorReporting,
   type ErrorReporter,
 } from '../observability/error-reporter';
-import { scrubEvent, scrubText } from '../observability/scrub';
+import { maskQuoted, scrubEvent, scrubText } from '../observability/scrub';
 import { buildServer } from '../server';
 
 import { testConfig } from './support/config';
@@ -313,7 +313,7 @@ describe('startErrorReporting (OPS-18)', () => {
         '    at https://crm.example.test/assets/vendor-9c1d.js:1:2',
       ].join('\n'),
       route: '/equipe/$memberId',
-      release: 'abc123',
+      release: 'web-777',
     });
     await reporter.flush(2_000);
     const everything = sent.join('\n');
@@ -321,8 +321,9 @@ describe('startErrorReporting (OPS-18)', () => {
     expect(everything).not.toContain('crm.example.test');
     expect(eventsOf(sent)).toEqual([
       expect.objectContaining({
+        // The API's release, never the browser's: that one is a tag.
         release: 'abc123',
-        tags: { service: 'web', route: '/equipe/$memberId' },
+        tags: { service: 'web', route: '/equipe/$memberId', web_release: 'web-777' },
         exception: {
           values: [
             {
@@ -346,6 +347,110 @@ describe('startErrorReporting (OPS-18)', () => {
         },
       }),
     ]);
+  });
+});
+
+/** An invented fan sentence (ADR 0010), of words found nowhere else in an envelope. */
+const FAN_SENTENCE = 'Zorblax adore tes chaussettes violettes';
+const FAN_WORDS = FAN_SENTENCE.split(' ').filter((word) => word.length >= 4);
+
+/** The error `JSON.parse` throws on that sentence: it quotes the sentence's start. */
+function parseErrorOf(text: string): Error {
+  try {
+    JSON.parse(text);
+  } catch (error) {
+    if (error instanceof Error) return error;
+  }
+  throw new Error('JSON.parse accepted the sentence');
+}
+
+describe('maskQuoted (Sécurité on #895)', () => {
+  it('masks what an error quotes, but one identifier', () => {
+    expect(maskQuoted("Cannot read properties of undefined (reading 'foo')")).toBe(
+      "Cannot read properties of undefined (reading 'foo')",
+    );
+    expect(maskQuoted(parseErrorOf(FAN_SENTENCE).message)).toBe(
+      `Unexpected token 'Z', "[texte]"... is not valid JSON`,
+    );
+    const pairs: readonly (readonly [string, string])[] = [
+      ['"', '"'],
+      ['`', '`'],
+      ['«', '»'],
+      ['“', '”'],
+      ['‘', '’'],
+      ["'", "'"],
+    ];
+    for (const [open, close] of pairs) {
+      expect(maskQuoted(`refusé : ${open}viens ce soir${close} !`)).toBe(`refusé : ${open}[texte]${close} !`);
+    }
+  });
+
+  it('masks to the end a quote never closed, and leaves an apostrophe inside a word', () => {
+    expect(maskQuoted('Unterminated string "viens dans mon lit')).toBe('Unterminated string "[texte]');
+    expect(maskQuoted("l'élément est introuvable")).toBe("l'élément est introuvable");
+  });
+
+  it('masks the value of a Postgres duplicate key', () => {
+    expect(
+      maskQuoted(
+        'duplicate key value violates unique constraint "fans_pseudo_key" Key (pseudo)=(Zorblax adore) already exists.',
+      ),
+    ).toBe(
+      'duplicate key value violates unique constraint "fans_pseudo_key" Key (pseudo)=([texte]) already exists.',
+    );
+  });
+
+  it('stays linear on 10 000 hostile characters', () => {
+    const hostile = [
+      'a'.repeat(10_000),
+      '"'.repeat(10_000),
+      `'a`.repeat(5_000),
+      '=('.repeat(5_000),
+      'x@'.repeat(5_000),
+      'http'.repeat(2_500),
+      `${'a'.repeat(31)} `.repeat(312),
+      '1:'.repeat(5_000),
+      ' ('.repeat(5_000),
+    ];
+    const started = performance.now();
+    for (const text of hostile) {
+      scrubText(maskQuoted(text));
+      framesOfBrowserStack(text.slice(0, 4_000));
+      framesOfBrowserStack(`at ${text.slice(0, 4_000)})`);
+    }
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
+describe('a fan sentence quoted by an error (Sécurité on #895)', () => {
+  it('sends none of its words from a job', async () => {
+    const { reporter, sent } = reporterWithFakeTransport();
+    reporter.captureException(parseErrorOf(FAN_SENTENCE), {
+      service: 'worker',
+      task: 'conversation.generate_draft',
+      attempt: 1,
+    });
+    await reporter.flush(2_000);
+    expect(eventsOf(sent)).toHaveLength(1);
+    const everything = sent.join('\n');
+    for (const word of [...FAN_WORDS, 'Zorblax ad']) expect(everything).not.toContain(word);
+    expect(everything).toContain('[texte]');
+  });
+
+  it('sends none of its words from the dashboard', async () => {
+    const { reporter, sent } = reporterWithFakeTransport();
+    const message = `SyntaxError: ${parseErrorOf(FAN_SENTENCE).message}`;
+    reporter.captureClientError({
+      message,
+      stack: `${message}\n    at readDraft (https://crm.example.test/assets/index-3f2a.js:12:345)`,
+      route: '/conversations/$conversationId',
+      release: 'web-777',
+    });
+    await reporter.flush(2_000);
+    expect(eventsOf(sent)).toHaveLength(1);
+    const everything = sent.join('\n');
+    for (const word of [...FAN_WORDS, 'Zorblax ad']) expect(everything).not.toContain(word);
+    expect(everything).toContain('[texte]');
   });
 });
 

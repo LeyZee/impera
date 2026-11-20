@@ -18,13 +18,19 @@ const FRAMES_MAX = 50;
 const EXCEPTIONS_MAX = 5;
 
 /** The tags that may leave: where it happened, never who nor what. */
-const TAGS = ['service', 'route', 'task', 'attempt'] as const;
+const TAGS = ['service', 'route', 'task', 'attempt', 'web_release'] as const;
+/** The dashboard's own release, as its bundle says it: a tag, never the event's release (the API's). */
+const WEB_RELEASE = /^[\w.-]{1,64}$/u;
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 const LEVELS = new Set(['fatal', 'error', 'warning', 'log', 'info', 'debug']);
 
-const URL_LIKE = /\b(?:[a-z][a-z0-9+.-]*:\/\/|www\.)[^\s"'<>]+/giu;
-const EMAIL = /[^\s@"'<>(),;:[\]]+@[^\s@"'<>(),;:[\]]+/gu;
-const BEARER = /\bbearer\s+[^\s"']+/giu;
+/**
+ * Every pattern below is linear in the length of the text (10 000 characters at most, `SCAN_MAX`): the text is cut into
+ * words by one class without alternation, and each word is judged on its own; quotes are found by a scan, never by a
+ * pattern that could backtrack. A hostile message costs a pass, never a stall of the event loop.
+ */
+const WORD = /[^\s"'`<>(),;[\]«»“”‘’]+/gu;
+const SCHEME = /^[a-z][a-z0-9+.-]{0,30}:\/\//iu;
 /** A key, a session, a JWT: one long run without a space nor a sign of prose. */
 const OPAQUE = /[\w-]{32,}(?:\.[\w-]{8,})*/gu;
 const DIGITS = /\d{6,}/gu;
@@ -32,13 +38,73 @@ const DIGITS = /\d{6,}/gu;
 /** Our own ids (ADR 0011): they name a row, never a person, and are what makes an error findable. Kept whole. */
 const UUID = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/iu;
 
+/** What stands for a quoted text, whatever it was. */
+const QUOTED_PLACEHOLDER = '[texte]';
+
+/** Each opening quote and the one that closes it. */
+const QUOTES: ReadonlyMap<string, string> = new Map([
+  ['"', '"'],
+  ["'", "'"],
+  ['`', '`'],
+  ['«', '»'],
+  ['“', '”'],
+  ['‘', '’'],
+]);
+
+/** A quoted segment kept as it is: one word of code (`'foo'`, `"user_id"`, `'$ref'`), never prose. */
+const IDENTIFIER = /^[\p{L}\p{N}_$.-]{1,40}$/u;
+
+/**
+ * What an error quotes is masked (Sécurité on #895): `JSON.parse` quotes the start of what it was given (a model's
+ * answer, a connector's body), a library quotes the value it refused, in the browser too, and that can be a fan's
+ * sentence. Every segment between quotes becomes `[texte]` unless it is one identifier; a quote never closed masks to the
+ * end; Postgres's `Key (column)=(value)` loses its value. An apostrophe inside a word (`l'élément`) opens nothing.
+ */
+export function maskQuoted(text: string): string {
+  let out = '';
+  let index = 0;
+  while (index < text.length) {
+    const char = text.charAt(index);
+    // Postgres: `Key (email)=(fan@example.test) already exists` — the value up to the last `)` of the text.
+    if (char === '=' && text.charAt(index + 1) === '(') {
+      const close = text.lastIndexOf(')');
+      if (close <= index + 1) return `${out}=(${QUOTED_PLACEHOLDER}`;
+      out += `=(${QUOTED_PLACEHOLDER})`;
+      index = close + 1;
+      continue;
+    }
+    const closing = QUOTES.get(char);
+    const previous = index === 0 ? '' : text.charAt(index - 1);
+    const insideWord = char === "'" && /[\p{L}\p{N}]/u.test(previous);
+    if (closing === undefined || insideWord) {
+      out += char;
+      index += 1;
+      continue;
+    }
+    const end = text.indexOf(closing, index + 1);
+    if (end < 0) return `${out}${char}${QUOTED_PLACEHOLDER}`;
+    const quoted = text.slice(index + 1, end);
+    out += `${char}${IDENTIFIER.test(quoted) ? quoted : QUOTED_PLACEHOLDER}${closing}`;
+    index = end + 1;
+  }
+  return out;
+}
+
+/** A word, without what could reach someone: an address, an e-mail, a token, a long number. */
+function scrubWord(word: string, afterBearer: boolean): string {
+  if (afterBearer) return '[token]';
+  if (SCHEME.test(word) || word.toLowerCase().startsWith('www.')) return '[url]';
+  if (word.includes('@')) return '[email]';
+  return word.replace(OPAQUE, '[token]').replace(DIGITS, '[number]');
+}
+
 function scrubPart(part: string): string {
-  return part
-    .replace(URL_LIKE, '[url]')
-    .replace(BEARER, 'Bearer [token]')
-    .replace(EMAIL, '[email]')
-    .replace(OPAQUE, '[token]')
-    .replace(DIGITS, '[number]');
+  let afterBearer = false;
+  return part.replace(WORD, (word) => {
+    const scrubbed = scrubWord(word, afterBearer);
+    afterBearer = word.toLowerCase() === 'bearer';
+    return scrubbed;
+  });
 }
 
 /** A text without what could name or reach someone, on one line of at most `max` characters. */
@@ -85,7 +151,9 @@ function exceptionOf(exception: Exception): Exception {
   const mechanism = exception.mechanism;
   return {
     ...(exception.type === undefined ? {} : { type: scrubText(exception.type, NAME_MAX) }),
-    ...(exception.value === undefined ? {} : { value: scrubText(exception.value) }),
+    ...(exception.value === undefined
+      ? {}
+      : { value: scrubText(maskQuoted(exception.value.slice(0, SCAN_MAX))) }),
     ...(mechanism === undefined
       ? {}
       : {
@@ -102,8 +170,10 @@ function tagsOf(tags: ErrorEvent['tags']): Record<string, string> {
   const kept: Record<string, string> = {};
   for (const name of TAGS) {
     const value = tags?.[name];
-    if (typeof value === 'string' || typeof value === 'number')
-      kept[name] = scrubText(String(value), TAG_MAX);
+    if (typeof value !== 'string' && typeof value !== 'number') continue;
+    const text = scrubText(String(value), TAG_MAX);
+    if (name === 'web_release' && !WEB_RELEASE.test(text)) continue;
+    kept[name] = text;
   }
   return kept;
 }

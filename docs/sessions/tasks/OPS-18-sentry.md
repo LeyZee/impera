@@ -31,6 +31,7 @@ La création du compte et du projet Sentry (Charles), la performance et les trac
 - 20/11 : la limite de la route est de 12 par quart d'heure, pas 10 par 10 minutes : le magasin partagé nomme un limiteur sans route par ses bornes, et 10/10 min est celui de la reconfirmation (le test d'intégration l'a montré au démarrage).
 - La limite est par compte (`request.user.id`), pas par session : la garde ne lit pas l'identifiant de session, et un compte qui ouvre plusieurs sessions garde le même plafond.
 - Les 503 et 502 sont aussi envoyés (toute réponse ≥ 500, base indisponible comprise) : une panne de base longue peut en envoyer beaucoup, Sentry les regroupe.
+- Relecture Sécurité (#895) : tout segment cité entre guillemets dans le message d'une erreur, et la valeur `=(…)` d'une clé en double de Postgres, devient `[texte]` sauf un identifiant d'un mot ; les nettoyages lisent en une passe (plus aucun motif à retour arrière, pile du navigateur comprise) ; la release d'un rapport du dashboard est celle de l'API, la sienne une étiquette `web_release`. Règle « jamais de texte de fan dans un message d'erreur » dans `coding.md`, risque restant dans `threat-model.md`.
 
 ## Résultat
 Fait, branche `task/ops-18-sentry`. Reste pour Charles : créer le projet Sentry en région UE et poser `SENTRY_DSN` dans Coolify avant le prochain déploiement (sans lui, le déploiement s'arrête).

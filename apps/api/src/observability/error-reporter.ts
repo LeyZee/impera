@@ -57,32 +57,62 @@ const tagsOf = (place: ReportPlace): Record<string, string> => ({
   ...(place.attempt === undefined ? {} : { attempt: String(place.attempt) }),
 });
 
+/** An error's name: `TypeError`, `DOMException`, at most 60 characters. */
+const ERROR_NAME = /^[A-Z][A-Za-z]{0,50}(?:Error|Exception)$/u;
+
 /** `TypeError: x is undefined` → its type and its message; a message without a name is an `Error`. */
 function typedMessage(message: string): { readonly type: string; readonly value: string } {
-  const named = /^([A-Z][A-Za-z]*(?:Error|Exception)): ([\s\S]*)$/u.exec(message);
-  return named?.[1] === undefined || named[2] === undefined
-    ? { type: 'Error', value: message }
-    : { type: named[1], value: named[2] };
+  const colon = message.indexOf(': ');
+  const name = colon < 0 ? '' : message.slice(0, colon);
+  return ERROR_NAME.test(name)
+    ? { type: name, value: message.slice(colon + 2) }
+    : { type: 'Error', value: message };
 }
 
-const CHROME_FRAME = /^\s*at (?:(.+?) \()?(.+?):(\d+):(\d+)\)?\s*$/u;
-const GECKO_FRAME = /^(.*?)@(.+?):(\d+):(\d+)\s*$/u;
+/** `file:12:34` → its file, line and column; read from the end, without a pattern that could backtrack. */
+function locationOf(text: string): { filename: string; lineno: number; colno: number } | null {
+  const second = text.lastIndexOf(':');
+  const first = second < 0 ? -1 : text.lastIndexOf(':', second - 1);
+  if (first <= 0) return null;
+  const lineno = text.slice(first + 1, second);
+  const colno = text.slice(second + 1);
+  if (!/^\d{1,9}$/u.test(lineno) || !/^\d{1,9}$/u.test(colno)) return null;
+  return { filename: text.slice(0, first), lineno: Number(lineno), colno: Number(colno) };
+}
 
-/** A browser's stack (Chrome's `at f (file:1:2)` or Firefox's and Safari's `f@file:1:2`) as Sentry's frames, oldest first. */
+/**
+ * One line of a browser's stack: Chrome's `at f (file:1:2)` or `at file:1:2`, Firefox's and Safari's `f@file:1:2`.
+ * Read by positions, in one pass: a stack of 4 000 hostile characters costs nothing more.
+ */
+function frameOfLine(raw: string): StackFrame | null {
+  const line = raw.trim();
+  let name = '';
+  let location: string;
+  if (line.startsWith('at ')) {
+    const rest = line.slice(3);
+    const open = rest.lastIndexOf(' (');
+    if (open >= 0 && rest.endsWith(')')) {
+      name = rest.slice(0, open);
+      location = rest.slice(open + 2, -1);
+    } else {
+      location = rest;
+    }
+  } else {
+    const at = line.indexOf('@');
+    if (at < 0) return null;
+    name = line.slice(0, at);
+    location = line.slice(at + 1);
+  }
+  const place = locationOf(location);
+  return place === null ? null : { ...place, function: name === '' ? '?' : name, in_app: true };
+}
+
+/** A browser's stack as Sentry's frames, oldest first. */
 export function framesOfBrowserStack(stack: string): StackFrame[] {
   const frames: StackFrame[] = [];
   for (const line of stack.split('\n')) {
-    const match = CHROME_FRAME.exec(line) ?? GECKO_FRAME.exec(line);
-    if (match === null) continue;
-    const [, name, filename, lineno, colno] = match;
-    if (filename === undefined || lineno === undefined || colno === undefined) continue;
-    frames.push({
-      filename,
-      function: name === undefined || name === '' ? '?' : name,
-      lineno: Number(lineno),
-      colno: Number(colno),
-      in_app: true,
-    });
+    const frame = frameOfLine(line);
+    if (frame !== null) frames.push(frame);
   }
   return frames.reverse();
 }
@@ -155,12 +185,12 @@ export function startErrorReporting(
         mechanism: { type: 'onerror', handled: false },
         ...(frames.length === 0 ? {} : { stacktrace: { frames } }),
       };
+      // The event's release is the API's (`config.RELEASE`): what the browser says is only a tag (Sécurité on #895).
       captureEvent({
         level: 'error',
         platform: 'javascript',
-        release: report.release,
         exception: { values: [exception] },
-        tags: tagsOf({ service: 'web', route: report.route }),
+        tags: { ...tagsOf({ service: 'web', route: report.route }), web_release: report.release },
       });
     },
     flush: async (timeoutMs) => {
