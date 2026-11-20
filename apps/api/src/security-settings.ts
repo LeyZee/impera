@@ -15,6 +15,7 @@ import {
   type AccountsSecurity,
   type ClosedSessions,
   type OpenSessions,
+  type OwnerErrorCode,
   type PasskeyErrorCode,
   type Passkeys,
   type RemovedPasskeys,
@@ -50,6 +51,7 @@ import {
   type Auth,
   type RequireRole,
 } from './auth';
+import { isOwnerAccount } from './owners';
 import { passkeysOf } from './passkeys';
 import { recordRefusal } from './security-alerts';
 
@@ -86,6 +88,15 @@ class OwnAccountConflict extends DomainError {
     super(
       'account_current_conflict' satisfies SecuritySettingsErrorCode,
       'C’est ton compte : ferme tes autres sessions plus haut',
+    );
+  }
+}
+
+class OtherOwnerProtected extends DomainError {
+  constructor() {
+    super(
+      'owner_protected_conflict' satisfies OwnerErrorCode,
+      'Ce compte est propriétaire : lui seul retire ses clés d’accès',
     );
   }
 }
@@ -410,6 +421,8 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             .from(schema.user)
             .where(eq(schema.user.id, target));
           if (account === undefined) throw new AccountNotFound();
+          // The other owner's keys are his own (ADR 0096 § 2): one owner never weakens the other's sign-in.
+          if (target !== ownerId && (await isOwnerAccount(tx, target))) throw new OtherOwnerProtected();
           const removed = await removePasskeys(tx, target);
           await audit(tx, {
             userId: ownerId,

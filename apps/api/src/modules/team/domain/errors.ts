@@ -130,3 +130,16 @@ export class PlatformAccountLinked extends DomainError {
     super('member_conflict', 'Ce compte de la plateforme est déjà relié à un autre membre');
   }
 }
+
+/**
+ * A status never shuts an owner out (ADR 0096 § 2): the member who became the second owner keeps his record, and the
+ * only way to take his access back is the removal with its notice, in Réglages › Sécurité.
+ */
+export class OwnerProtected extends DomainError {
+  constructor() {
+    super(
+      'owner_protected_conflict',
+      'Ce membre est propriétaire : son retrait se demande dans Réglages › Sécurité, avec un préavis de 72 h',
+    );
+  }
+}
