@@ -1,6 +1,7 @@
 import {
   payPeriodLastDay,
   CUSTOM_ALERT_TOPIC,
+  OWNER_REMOVAL_NOTICE_HOURS,
   SYSTEM_ALERT_LABELS,
   SYSTEM_ALERT_TOPICS,
   type AlertRef,
@@ -415,6 +416,26 @@ function securityNotice(alert: SecurityAlertPayload): Pick<Notice, 'body' | 'lin
     case 'passkey_new_sign_in':
       return {
         body: `Connexion au compte propriétaire avec une clé d’accès jamais utilisée${alert.network === null ? '' : ` (réseau ${alert.network})`}. Si ce n’est pas le propriétaire, retire ses clés et ferme ses sessions.`,
+        link: SECURITY_LINK,
+      };
+    case 'owner_added':
+      return {
+        body: 'Un membre de l’équipe vient de devenir propriétaire (deux au plus). Si ce n’est pas voulu, l’autre propriétaire peut demander son retrait dans Réglages › Sécurité.',
+        link: SECURITY_LINK,
+      };
+    case 'owner_removal_requested':
+      return {
+        body: `Un propriétaire a demandé le retrait de l’autre : il prend effet dans ${String(OWNER_REMOVAL_NOTICE_HOURS)} h. Le propriétaire visé peut l’annuler d’ici là dans Réglages › Sécurité.`,
+        link: SECURITY_LINK,
+      };
+    case 'owner_removal_cancelled':
+      return {
+        body: 'Le propriétaire visé a annulé le retrait qui attendait : il y a toujours deux propriétaires.',
+        link: SECURITY_LINK,
+      };
+    case 'owner_removed':
+      return {
+        body: 'Le préavis est passé sans annulation : un compte n’est plus propriétaire, ses sessions sont fermées.',
         link: SECURITY_LINK,
       };
     case 'persona_activated':

@@ -1,5 +1,5 @@
 {
-  "id": "5a054b0b-60a9-476d-91e4-c54bf4d6a7f1",
+  "id": "498fee5b-f455-4f8d-be01-99b11dc4700b",
   "prevId": "fe1116af-99ea-41a9-b941-4fbdd402bfae",
   "version": "7",
   "dialect": "postgresql",
@@ -9722,73 +9722,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.notification_kind_preferences": {
-      "name": "notification_kind_preferences",
-      "schema": "",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "enabled": {
-          "name": "enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "notification_kind_preferences_user_id_user_id_fk": {
-          "name": "notification_kind_preferences_user_id_user_id_fk",
-          "tableFrom": "notification_kind_preferences",
-          "tableTo": "user",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "notification_kind_preferences_user_id_kind_pk": {
-          "name": "notification_kind_preferences_user_id_kind_pk",
-          "columns": ["user_id", "kind"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "own_rows": {
-          "name": "own_rows",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "\"notification_kind_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')",
-          "withCheck": "\"notification_kind_preferences\".\"user_id\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "notification_kind_preferences_kind_check": {
-          "name": "notification_kind_preferences_kind_check",
-          "value": "\"notification_kind_preferences\".\"kind\" in ('agency_request', 'week_to_validate', 'earnings', 'lives')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.notification_preferences": {
       "name": "notification_preferences",
       "schema": "",
@@ -18972,6 +18905,210 @@
         "platform_scripts_text_check": {
           "name": "platform_scripts_text_check",
           "value": "char_length(\"platform_scripts\".\"name\") <= 200 and char_length(\"platform_scripts\".\"platform_script_ref\") <= 200"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.prepared_scripts": {
+      "name": "prepared_scripts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'editing'"
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "content": {
+          "name": "content",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "matched_platform_script_id": {
+          "name": "matched_platform_script_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matched_at": {
+          "name": "matched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "prepared_scripts_creator_idx": {
+          "name": "prepared_scripts_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "prepared_scripts_creator_id_creators_id_fk": {
+          "name": "prepared_scripts_creator_id_creators_id_fk",
+          "tableFrom": "prepared_scripts",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prepared_scripts_created_by_user_id_fk": {
+          "name": "prepared_scripts_created_by_user_id_fk",
+          "tableFrom": "prepared_scripts",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prepared_scripts_updated_by_user_id_fk": {
+          "name": "prepared_scripts_updated_by_user_id_fk",
+          "tableFrom": "prepared_scripts",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prepared_scripts_account_creator_fk": {
+          "name": "prepared_scripts_account_creator_fk",
+          "tableFrom": "prepared_scripts",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "prepared_scripts_matched_creator_fk": {
+          "name": "prepared_scripts_matched_creator_fk",
+          "tableFrom": "prepared_scripts",
+          "tableTo": "platform_scripts",
+          "columnsFrom": ["matched_platform_script_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "team_write": {
+          "name": "team_write",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"prepared_scripts\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"prepared_scripts\".\"updated_by\" = nullif(current_setting('app.user_id', true), '') and \"prepared_scripts\".\"state\" = 'editing'"
+        },
+        "team_update": {
+          "name": "team_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"prepared_scripts\".\"state\" <> 'matched'",
+          "withCheck": "\"prepared_scripts\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"prepared_scripts\".\"updated_by\" = nullif(current_setting('app.user_id', true), '') and \"prepared_scripts\".\"state\" <> 'matched'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "prepared_scripts_state_check": {
+          "name": "prepared_scripts_state_check",
+          "value": "\"prepared_scripts\".\"state\" in ('editing', 'ready_to_copy', 'matched')"
+        },
+        "prepared_scripts_revision_check": {
+          "name": "prepared_scripts_revision_check",
+          "value": "\"prepared_scripts\".\"revision\" >= 1"
+        },
+        "prepared_scripts_matched_check": {
+          "name": "prepared_scripts_matched_check",
+          "value": "(\"prepared_scripts\".\"state\" = 'matched') = (\"prepared_scripts\".\"matched_platform_script_id\" is not null and \"prepared_scripts\".\"matched_at\" is not null)"
+        },
+        "prepared_scripts_content_check": {
+          "name": "prepared_scripts_content_check",
+          "value": "jsonb_typeof(\"prepared_scripts\".\"content\") = 'object' and jsonb_typeof(\"prepared_scripts\".\"content\"->'steps') = 'array'"
         }
       },
       "isRLSEnabled": false

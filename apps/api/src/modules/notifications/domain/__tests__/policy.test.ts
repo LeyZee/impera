@@ -90,6 +90,17 @@ describe('decideNotification', () => {
     expect(isCapped('own_shift_start')).toBe(false);
   });
 
+  it('rings a change among the owners at night and past the cap: the notice only helps an owner who hears of it (ADR 0096 § 2)', () => {
+    const night = new Date('2026-11-10T23:00:00Z');
+    expect(decideNotification({ ...base, kind: 'owner_change', at: night })).toEqual({ action: 'ring' });
+    expect(decideNotification({ ...base, kind: 'owner_change', cappedRungToday: DEFAULT_DAILY_CAP })).toEqual(
+      {
+        action: 'ring',
+      },
+    );
+    expect(isCapped('owner_change')).toBe(false);
+  });
+
   it('rings a safety relay of a creator at night, past the cap, under any quiet hours, and never counts it (ADR 0150 § 6)', () => {
     const night = new Date('2026-11-10T23:00:00Z');
     expect(decideNotification({ ...base, kind: 'safety_alert', at: night })).toEqual({ action: 'ring' });

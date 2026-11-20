@@ -26,6 +26,7 @@ describe('readCrmSession', () => {
     const [url, init] = fetchFn.mock.calls[0] ?? [];
     expect(url).toBe('http://localhost:5173/v1/me');
     expect(init?.credentials).toBe('include');
+    expect(init?.redirect).toBe('error');
     expect(init?.method ?? 'GET').toBe('GET');
     expect(JSON.stringify(init?.headers)).not.toMatch(/token|authorization/iu);
   });

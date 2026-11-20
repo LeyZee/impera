@@ -117,6 +117,7 @@ Branche : task/<id>-<slug>
 | SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
 | SCB-01 | Import et envoi des branches d'un script | scripts | in_progress | SC-04 |
+| SCB-04 | Éditeur des scripts à branches | scripts | in_progress | SCB-01 |
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | PUB-03 | Légende Instagram : la fenêtre visible avant « … plus », vérifiée pour le modèle, montrée à tous | publication | blocked (PUB-02) | PUB-02, ADR 0082 |
@@ -129,7 +130,7 @@ Branche : task/<id>-<slug>
 | VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
-| INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | todo (essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
+| INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | in progress (lot a ; essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lot a) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
 | INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
@@ -163,6 +164,7 @@ Branche : task/<id>-<slug>
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
 | OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
+| OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | in_progress | ADR 0152, OPS-01, OPS-02 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -176,6 +178,8 @@ Branche : task/<id>-<slug>
 | SEC-11 | Droits des tables en ajout seul et journaux de la bibliothèque d'authentification alignés sur la doc | exploitation | done | SEC-10 |
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
+| SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | done | SEC-02, SEC-04, EQ-10, EQ-18 |
+| SEC-16 | Le rôle de service cesse de grandir : test de plafond par module, puis réduction (ADR 0087, lots b et c) | exploitation | en cours | SEC-10, ADR 0087 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |

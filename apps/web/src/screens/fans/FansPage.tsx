@@ -6,7 +6,7 @@ import {
   type FanListSort,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useDeferredValue, useEffect, useId, useState, type JSX } from 'react';
+import { useDeferredValue, useEffect, useId, useState, type JSX, type ReactNode } from 'react';
 
 import { FANS_ERRORS, fansErrorKind, useFans } from './api';
 import './fans.css';
@@ -27,6 +27,7 @@ import {
 import { useCreators } from '@/creators/api';
 import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 const PERIODS: readonly AgencyPeriod[] = ['week', 'month', 'quarter'];
 const SORTS: readonly FanListSort[] = ['last_message', 'paid', 'last_payment'];
@@ -36,22 +37,30 @@ const SORTS: readonly FanListSort[] = ['last_message', 'paid', 'last_payment'];
  * His pseudonym, who holds him, his states and what he paid; a line opens his conversation in Suivi. Read only: nothing
  * here writes, and no button acts.
  */
-export function FansPage(): JSX.Element {
+export function FansPage({
+  nav,
+  scoped = null,
+}: {
+  nav?: ReactNode;
+  /** The creator the menu's selector is set on (ADR 0134 § 3), or null on « Toutes »: the list then asks which one. */
+  scoped?: string | null;
+}): JSX.Element {
   const creatorsQuery = useCreators();
   const creators = creatorsQuery.data ?? [];
   const [chosen, setChosen] = useState<string | null>(null);
-  const creatorId = chosen ?? creators[0]?.id ?? null;
+  const creatorId = scoped ?? chosen ?? creators[0]?.id ?? null;
   const creator = creators.find((one) => one.id === creatorId);
   const id = useId();
 
   return (
     <Page className="fa-page">
       <PageHeader
-        eyebrow="Chatting"
+        eyebrow="Suivi"
         title="Fans"
+        tabs={nav}
         lead={`Chaque fan que le CRM connaît pour ${creator?.displayName ?? 'elle'}, qui le tient et ce qu’il a payé. Une ligne ouvre sa conversation dans Suivi.`}
         actions={
-          creators.length > 1 && creatorId !== null ? (
+          creators.length > 1 && creatorId !== null && scoped === null ? (
             <>
               <label className="sr-only" htmlFor={`${id}-creator`}>
                 Créatrice
@@ -70,24 +79,15 @@ export function FansPage(): JSX.Element {
         }
       />
       {creatorsQuery.isError ? (
-        <Panel className="fa-panel">
-          <div className="fa-empty" role="alert">
-            <p>{FANS_ERRORS.unavailable}</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void creatorsQuery.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
-        </Panel>
+        <Failure
+          onRetry={() => {
+            void creatorsQuery.refetch();
+          }}
+        />
       ) : creatorsQuery.isPending ? (
-        <Panel className="fa-panel">
-          <Skeleton />
-        </Panel>
+        <Skeleton>
+          <SkeletonCard lines={5} />
+        </Skeleton>
       ) : creatorId === null ? (
         <Panel className="fa-panel">
           <p className="fa-empty">
@@ -175,22 +175,25 @@ function FanList({ creatorId }: { creatorId: string }): JSX.Element {
       </div>
 
       {fans.isError && items.length === 0 ? (
-        <div className="fa-empty" role="alert">
-          <p>{FANS_ERRORS[fansErrorKind(fans.error)]}</p>
-          {fansErrorKind(fans.error) === 'unavailable' ? (
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void fans.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          ) : null}
-        </div>
+        fansErrorKind(fans.error) === 'unavailable' ? (
+          // The server is silent: the app's one way to say it (ETA-04), inside the list's card.
+          <Failure
+            inline
+            onRetry={() => {
+              void fans.refetch();
+            }}
+          />
+        ) : (
+          <p className="fa-empty" role="alert">
+            {FANS_ERRORS[fansErrorKind(fans.error)]}
+          </p>
+        )
       ) : fans.isPending ? (
-        <Skeleton />
+        <Skeleton className="fa-skeleton">
+          {[0, 1, 2].map((row) => (
+            <i key={row} className="nv-skeleton__bar fa-skeleton__row" />
+          ))}
+        </Skeleton>
       ) : items.length === 0 ? (
         <p className="fa-empty">{q.trim() === '' ? EMPTY_LINES[filter] : 'Aucun fan ne porte ce pseudo.'}</p>
       ) : (
@@ -299,16 +302,6 @@ function Paid({ paid, base }: { paid: FanListItem['paidEver']; base: string }): 
         </span>
       ))}
     </span>
-  );
-}
-
-function Skeleton(): JSX.Element {
-  return (
-    <div className="fa-skeleton" aria-busy="true" aria-label="Lecture des fans">
-      <i />
-      <i />
-      <i />
-    </div>
   );
 }
 

@@ -200,6 +200,9 @@ export function failureOf(
         cause: 'Le CRM a refusé cette session.',
         gesture: 'Recharge l’onglet Reveal, puis resynchronise.',
       };
+    case 'busy':
+      // A 429: the CRM is up, it counts the tries of the last minute (Bilan, 20/11).
+      return { cause: 'Trop d’essais d’un coup.', gesture: 'Attends une minute, puis resynchronise.' };
     case 'unreachable':
       return { cause: `Le CRM ne répond pas à ${crm}.`, gesture: 'Vérifie qu’il tourne, puis réessaie.' };
     case 'extension':
@@ -423,8 +426,8 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
 
 function syncBody(view: SyncView, actions: SyncActions): readonly (HTMLElement | null)[] {
   const { state, accounts } = view.accounts;
-  if (state === 'unreachable') {
-    const { cause, gesture } = failureOf('unreachable', view.crm);
+  if (state === 'unreachable' || state === 'busy') {
+    const { cause, gesture } = failureOf(state, view.crm);
     return [
       h(
         'p',

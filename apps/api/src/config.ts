@@ -73,6 +73,17 @@ const configSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     /** Jobs a worker runs at once; jobs of one conversation stay serial whatever this is (ADR 0006). */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+    /**
+     * Connections each process may hold, pool by pool (ADR 0152 § 2). Behind Supabase's pooler in session mode every
+     * client connection holds a server one, so the sum over the API and the worker (plus `migrate` and `backup`) must
+     * stay under the pool size of the project's compute: the runbook writes that budget down. The defaults are the
+     * sizes used until now.
+     */
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+    /** The service role's pool: `withAdmin` and the job queue, so the worker's Graphile Worker runs on it. */
+    DATABASE_SERVICE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
+    /** The rate limiter's own pool (ADR 0027 § 6), apart so a slow count never takes a connection of the modules. */
+    RATE_LIMIT_POOL_MAX: z.coerce.number().int().min(1).max(10).default(3),
     /** Development: run the worker inside the API process (`pnpm dev`). */
     IMPERA_INLINE_WORKER: flag,
     /**
@@ -155,6 +166,30 @@ const configSchema = z
         context.addIssue({
           code: 'custom',
           message: `${field} must be an address on this machine in the sandbox (ADR 0075)`,
+          path: [field],
+        });
+      }
+    }
+  })
+  .superRefine((config, context) => {
+    // ADR 0152 § 2: a base reached over the network is reached in TLS whose certificate is checked, never in clear
+    // nor on a certificate taken on trust. A base on this machine or behind a service name of the compose (the CI,
+    // a rehearsal) is not on the network.
+    if (config.NODE_ENV !== 'production') return;
+    const urls = {
+      DATABASE_URL: config.DATABASE_URL,
+      DATABASE_SERVICE_URL: config.DATABASE_SERVICE_URL,
+      ...(config.DATABASE_ADMIN_URL === undefined ? {} : { DATABASE_ADMIN_URL: config.DATABASE_ADMIN_URL }),
+    };
+    for (const [field, value] of Object.entries(urls)) {
+      const url = new URL(value);
+      if (!isNetworkDatabaseHost(url.hostname)) continue;
+      // One sslmode only: given twice, the connection library may keep the last one.
+      const modes = url.searchParams.getAll('sslmode');
+      if (modes.length !== 1 || modes[0] !== 'verify-full') {
+        context.addIssue({
+          code: 'custom',
+          message: `${field} reaches a remote base: it must carry sslmode=verify-full, once (ADR 0152 § 2, deploy.md)`,
           path: [field],
         });
       }
@@ -322,6 +357,16 @@ export function ownerDatabaseUrl(config: Config): string {
     );
   }
   return config.DATABASE_ADMIN_URL;
+}
+
+/**
+ * True when a base at this host is reached over the network: neither this machine nor a service name of the compose
+ * (a name without a dot, such as `postgres`).
+ */
+function isNetworkDatabaseHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host === '::1' || host.startsWith('127.')) return false;
+  return host.includes('.') || host.includes(':');
 }
 
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */

@@ -82,6 +82,7 @@ describe('sendSession', () => {
     expect(await state(409, CONNECTOR_SESSION_MEMBER_CONFLICT)).toBe('other-member');
     expect(await state(422, CONNECTOR_SESSION_UNPROCESSABLE)).toBe('refused');
     expect(await state(503, 'x')).toBe('unreachable');
+    expect(await state(429, 'x')).toBe('busy');
   });
 });
 

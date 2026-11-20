@@ -33,6 +33,8 @@ export async function readCrmSession(origin: string, fetchFn: Fetch = fetch): Pr
   try {
     response = await fetchFn(`${origin}/v1/me`, {
       credentials: 'include',
+      // A CRM answers here itself: a redirect is not followed, whoever it would lead to (ADR 0067, amendement du 19/11).
+      redirect: 'error',
       headers: { accept: 'application/json' },
       signal: AbortSignal.timeout(SESSION_TIMEOUT_MS),
     });

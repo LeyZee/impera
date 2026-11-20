@@ -10,7 +10,7 @@ import { browser, type Browser } from 'wxt/browser';
 import { z } from 'zod';
 
 import { FromPanelSchema, sendVerdict, type VerdictSent } from '../lib/copilot/verdict';
-import { crmOriginOf, DEFAULT_CRM_ADDRESS } from '../lib/crm-address';
+import { storedOrigin } from '../lib/crm-origin-store';
 import { fetchSyncableAccounts, sendSession } from '../lib/reveal/api';
 import { REVEAL_API_PATTERN } from '../lib/reveal/capture';
 import {
@@ -69,7 +69,6 @@ const MODELS_KEY = 'revealModels';
 const ModelsSchema = z.record(z.string(), z.string());
 /** The popup's port: when it closes, a session it held is forgotten. */
 const POPUP_PORT = 'popup';
-const ADDRESS_KEY = 'crmOrigin';
 const FLUSH_ALARM = 'watch-flush';
 const MENU_PARENT = 'watch-mark';
 const MENU_PREFIX = 'watch-mark:';
@@ -101,11 +100,8 @@ export default defineBackground(() => {
   }
   const readState = (): Promise<WatchState> => withState((state) => [state, state]);
 
-  async function crmOrigin(): Promise<string> {
-    const stored: Record<string, unknown> = await browser.storage.local.get(ADDRESS_KEY).catch(() => ({}));
-    const value = stored[ADDRESS_KEY];
-    return typeof value === 'string' ? (crmOriginOf(value) ?? DEFAULT_CRM_ADDRESS) : DEFAULT_CRM_ADDRESS;
-  }
+  // The popup's address, or the built-in one of a hosted build (ADR 0067, second amendement), or this computer's.
+  const crmOrigin = storedOrigin;
 
   /* ---- The reader in a tab ---- */
 
@@ -180,7 +176,8 @@ export default defineBackground(() => {
     let outcome: 'sent' | 'kept' | 'revoked' = 'sent';
     for (const batch of batches) {
       const sent = await sendReadings(origin, token, batch);
-      if (sent.kind === 'unreachable') {
+      // A CRM counting too many tries (429) keeps the batch too: it is sent again with the next flush.
+      if (sent.kind === 'unreachable' || sent.kind === 'busy') {
         unsent.push(batch);
         outcome = 'kept';
       } else if (sent.kind === 'revoked') {
@@ -380,6 +377,8 @@ export default defineBackground(() => {
           state: answer.code === CONNECTOR_LINK_FORBIDDEN ? 'not-owner' : 'unreachable',
           accounts: [],
         };
+      case 'busy':
+        return { state: 'busy', accounts: [] };
       case 'unreachable':
         return { state: 'unreachable', accounts: [] };
     }
@@ -464,7 +463,8 @@ export default defineBackground(() => {
         const answer = await fetchMarkableCreators(await crmOrigin(), trimmed);
         if (answer.kind === 'revoked' || answer.kind === 'refused')
           return { state: 'refused' } satisfies LinkSaved;
-        if (answer.kind === 'unreachable') return { state: 'unreachable' } satisfies LinkSaved;
+        if (answer.kind === 'busy' || answer.kind === 'unreachable')
+          return { state: answer.kind } satisfies LinkSaved;
         await saveLink(trimmed);
         await rebuildMenu(answer.value.items);
         return { state: 'linked' } satisfies LinkSaved;

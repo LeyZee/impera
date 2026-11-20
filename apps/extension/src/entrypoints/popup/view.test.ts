@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import html from './index.html?raw';
 import type { SyncView } from './reveal-view';
-import { accountPathOf, greetingAt, render, type Actions, type Screen } from './view';
+import { accountPathOf, greetingAt, render, type Actions, type Frame, type Screen } from './view';
 
 const ME: Me = {
   id: 'u1',
@@ -19,7 +19,13 @@ const ME: Me = {
   preferences: { sounds: true },
 };
 
-const frame = { origin: 'http://localhost:5173', version: '0.1.0', hour: 20, dev: false };
+const frame: Frame = {
+  origin: 'http://localhost:5173',
+  version: '0.1.0',
+  hour: 20,
+  dev: false,
+  builtIn: null,
+};
 
 const CHATTER: Me = {
   ...ME,
@@ -29,7 +35,7 @@ const CHATTER: Me = {
   teamScope: 'self',
 };
 
-function draw(screen: Screen, at: typeof frame = frame): { root: HTMLElement; actions: Actions } {
+function draw(screen: Screen, at: Frame = frame): { root: HTMLElement; actions: Actions } {
   const actions: Actions = {
     signIn: vi.fn(),
     open: vi.fn(),
@@ -38,8 +44,14 @@ function draw(screen: Screen, at: typeof frame = frame): { root: HTMLElement; ac
     editAddress: vi.fn(),
     openPanel: vi.fn(),
     saveAddress: vi.fn(),
+    linkFromPage: vi.fn(),
+    declineLink: vi.fn(),
+    typeAddress: vi.fn(),
     resetAddress: vi.fn(),
     cancelAddress: vi.fn(),
+    keepCrm: vi.fn(),
+    changeCrm: vi.fn(),
+    revertCrm: vi.fn(),
     watch: {
       link: vi.fn(),
       allow: vi.fn(),
@@ -316,12 +328,75 @@ describe('popup', () => {
     expect(root.textContent).not.toContain('localhost');
     expect(root.querySelector('.pp-pill')).toBeNull();
     expect(root.querySelector('.pp-address')).toBeNull();
-    expect([...root.querySelectorAll('button')].map((b) => b.textContent.trim())).toEqual(['Enregistrer']);
-    // No way back from the welcome: Échap leaves it to the browser.
+    expect([...root.querySelectorAll('button')].map((b) => b.textContent.trim())).toEqual([
+      'Enregistrer',
+      'Annuler',
+    ]);
+    // Typed from the welcome, it steps back to it (ADR 0067, amendement du 19/11).
     root
       .querySelector('#crm-address')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(actions.cancelAddress).not.toHaveBeenCalled();
+    expect(actions.cancelAddress).toHaveBeenCalledOnce();
+  });
+
+  // ADR 0067, amendement du 19/11: the way to link is in the CRM, typing behind a small link.
+  it('sends a first opening to the CRM’s page, and types only on demand', () => {
+    const { root, actions } = draw({ kind: 'welcome' });
+    expect(root.querySelector('.pp-whisper')?.textContent).toBe('Bienvenue.');
+    expect([...root.querySelectorAll('.pp-steps li')].map((step) => step.textContent)).toEqual([
+      'Ouvre ton CRM.',
+      'Menu de ton compte, puis Extension.',
+      'Clique « Relier l’extension à ce CRM », puis de nouveau sur l’icône Impera.',
+    ]);
+    expect(root.querySelector('.pp-pill')).toBeNull();
+    expect(root.querySelector('.pp-address')).toBeNull();
+    expect(root.querySelector('input')).toBeNull();
+    buttonNamed(root, 'Saisir l’adresse').click();
+    expect(actions.typeAddress).toHaveBeenCalledOnce();
+  });
+
+  it('asks before linking to the CRM of the open tab, its host in full, and warns of the browser’s question', () => {
+    const { root, actions } = draw({
+      kind: 'link-offer',
+      offer: { origin: 'https://crm.exemple.fr', host: 'crm.exemple.fr' },
+      error: null,
+    });
+    expect(root.querySelector('h1')?.textContent).toBe('Relier l’extension à crm.exemple.fr ?');
+    expect(root.textContent).toContain('Ton navigateur va te demander d’autoriser ce site. Accepte.');
+    expect(root.querySelector('.pp-address')).toBeNull();
+    buttonNamed(root, 'Relier').click();
+    expect(actions.linkFromPage).toHaveBeenCalledOnce();
+    buttonNamed(root, 'Pas maintenant').click();
+    expect(actions.declineLink).toHaveBeenCalledOnce();
+  });
+
+  it('names this computer rather than a site, with no browser question to announce', () => {
+    const { root } = draw({
+      kind: 'link-offer',
+      offer: { origin: 'http://localhost:5173', host: null },
+      error: null,
+    });
+    expect(root.querySelector('h1')?.textContent).toBe('Relier l’extension au CRM de cet ordinateur ?');
+    expect(root.textContent).not.toContain('localhost');
+    expect(root.textContent).not.toContain('Ton navigateur va te demander');
+  });
+
+  it('says why a link failed in place of the browser’s question', () => {
+    const { root } = draw({
+      kind: 'link-offer',
+      offer: { origin: 'https://crm.exemple.fr', host: 'crm.exemple.fr' },
+      error: 'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
+    });
+    expect(root.querySelector('.pp-hint--amber')?.textContent).toBe(
+      'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
+    );
+    expect(root.textContent).not.toContain('Ton navigateur va te demander');
+  });
+
+  it('says once that the extension is linked', () => {
+    const { root } = draw({ kind: 'linked', host: 'crm.exemple.fr' });
+    expect(root.textContent).toContain('Extension reliée à crm.exemple.fr');
+    expect(root.querySelector('.nv-status--sent')?.textContent).toContain('CRM relié');
   });
 
   it('offers the way back to localhost in a development build only', () => {
@@ -380,5 +455,50 @@ describe('popup', () => {
   it('sends each account to its own security page', () => {
     expect(accountPathOf({ ...ME, role: 'creator', teamScope: 'self' })).toBe('/moi/securite');
     expect(accountPathOf({ ...ME, role: 'operator', teamScope: 'self' })).toBe('/compte/securite');
+  });
+
+  // ADR 0067, second amendement, § 5: leaving the CRM a hosted build was made for is asked, both hosts named.
+  it('asks before leaving the built-in CRM, the safe choice first and focused', () => {
+    const { root, actions } = draw({ kind: 'change-crm', from: 'crm.exemple.fr', to: 'autre.exemple.fr' });
+    document.body.append(root);
+    // Drawn again once in the page, as the popup is: the focus needs a mounted element.
+    render(root, { kind: 'change-crm', from: 'crm.exemple.fr', to: 'autre.exemple.fr' }, frame, actions);
+    expect(root.textContent).toContain('Cette extension est prévue pour crm.exemple.fr.');
+    expect(root.querySelector('h1')?.textContent).toBe('La relier à autre.exemple.fr à la place ?');
+    expect(root.textContent).toContain('Fais-le seulement si ton responsable te l’a demandé.');
+    const keep = buttonNamed(root, 'Garder crm.exemple.fr');
+    const change = buttonNamed(root, 'Relier à autre.exemple.fr');
+    expect(keep.classList.contains('nv-btn--neon')).toBe(true);
+    expect(change.classList.contains('nv-btn--neon')).toBe(false);
+    expect(document.activeElement).toBe(keep);
+    expect([...root.querySelectorAll('.pp-actions button')]).toEqual([keep, change]);
+    expect(root.querySelector('.pp-address')).toBeNull();
+    keep.click();
+    expect(actions.keepCrm).toHaveBeenCalledOnce();
+    change.click();
+    expect(actions.changeCrm).toHaveBeenCalledOnce();
+    root.remove();
+  });
+
+  it('shows another CRM than the built-in one in amber, with the way back named for screen readers', () => {
+    const hosted: Frame = { ...frame, origin: 'https://autre.exemple.fr', builtIn: 'https://crm.exemple.fr' };
+    const { root, actions } = draw({ kind: 'signed_out' }, hosted);
+    expect(root.querySelector('.pp-address')?.classList.contains('pp-address--changed')).toBe(true);
+    const back = root.querySelector<HTMLButtonElement>('.pp-revert');
+    expect(back?.textContent).toBe('Revenir à l’adresse d’origine');
+    expect(back?.getAttribute('aria-label')).toBe('Revenir à l’adresse d’origine (crm.exemple.fr)');
+    back?.click();
+    expect(actions.revertCrm).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the footer quiet on the built-in CRM, and without one', () => {
+    for (const at of [
+      { ...frame, origin: 'https://crm.exemple.fr', builtIn: 'https://crm.exemple.fr' },
+      frame,
+    ]) {
+      const { root } = draw({ kind: 'signed_out' }, at);
+      expect(root.querySelector('.pp-address--changed')).toBeNull();
+      expect(root.querySelector('.pp-revert')).toBeNull();
+    }
   });
 });

@@ -653,6 +653,37 @@ describe('classification (ADR 0020 §2)', () => {
     ).toBe(
       'Clé d’accès (Face ID, empreinte) ajoutée sur un compte de l’équipe (réseau 198.51.100.x). Si personne ne l’a fait, retire ses clés et ferme ses sessions.',
     );
+    // The owners (ADR 0096): never a name, and the notice said in hours, not as a date of some zone.
+    const owner = { userId: 'owner-2', role: 'owner' as const, network: null };
+    expect(
+      bodyOf({ kind: 'security_alert', alert: { reason: 'owner_added', ...owner, by: 'owner-1' } })?.body,
+    ).toBe(
+      'Un membre de l’équipe vient de devenir propriétaire (deux au plus). Si ce n’est pas voulu, l’autre propriétaire peut demander son retrait dans Réglages › Sécurité.',
+    );
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: {
+          reason: 'owner_removal_requested',
+          ...owner,
+          by: 'owner-1',
+          effectiveAt: '2026-11-23T10:00:00.000Z',
+        },
+      })?.body,
+    ).toBe(
+      'Un propriétaire a demandé le retrait de l’autre : il prend effet dans 72 h. Le propriétaire visé peut l’annuler d’ici là dans Réglages › Sécurité.',
+    );
+    expect(
+      bodyOf({ kind: 'security_alert', alert: { reason: 'owner_removal_cancelled', ...owner } })?.body,
+    ).toBe('Le propriétaire visé a annulé le retrait qui attendait : il y a toujours deux propriétaires.');
+    expect(
+      bodyOf({
+        kind: 'security_alert',
+        alert: { reason: 'owner_removed', userId: 'owner-2', role: 'operator', network: null, by: 'owner-1' },
+      })?.body,
+    ).toBe(
+      'Le préavis est passé sans annulation : un compte n’est plus propriétaire, ses sessions sont fermées.',
+    );
     expect(
       bodyOf({
         kind: 'security_alert',

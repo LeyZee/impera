@@ -255,3 +255,27 @@ export function platformScriptGaps(
   if (steps.some((step) => step.discounted)) gaps.push('step_discounted');
   return gaps;
 }
+
+/** What the agency names to validate, against the descriptions a script's media are shown with now. */
+export type DescriptionRefusal = 'stale' | 'alone';
+
+/**
+ * Whether these descriptions can be validated together (ADR 0030 § 3, ADR 0083 § 3 to 5): each the one a media of the
+ * script is shown with now (`stale` otherwise: a newer one came, or the media left the script), and one that waits for
+ * a person for a reason only alone, never under « Tout valider ».
+ */
+export function descriptionRefusal(
+  named: readonly string[],
+  shown: ReadonlyMap<string, { readonly reviewReasons: readonly string[]; readonly validated: boolean }>,
+): DescriptionRefusal | null {
+  if (named.some((id) => !shown.has(id))) return 'stale';
+  if (
+    named.length > 1 &&
+    named.some((id) => {
+      const row = shown.get(id);
+      return row !== undefined && !row.validated && row.reviewReasons.length > 0;
+    })
+  )
+    return 'alone';
+  return null;
+}

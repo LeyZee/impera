@@ -61,4 +61,33 @@ describe('demo client', () => {
     expect((await client.state()).situation.isNight).toBe(true);
     expect((await client.advance(12)).situation.isNight).toBe(false);
   });
+
+  it('plays its trial script with the fans who buy: teaser, paid step, fictive purchase (ADR 0103 § 16)', async () => {
+    const client = createDemoClient();
+    await client.choosePreset('chaud');
+    await client.send('Salut', []);
+    const teased = PlaygroundStateSchema.parse(await client.send('Encore', []));
+    // Each step goes as one message, as on Reveal: its words, then its bundle, the teaser open and the rest locked.
+    const sent = teased.history.filter((turn) => turn.media?.some((m) => m.scriptStep !== undefined));
+    expect(
+      sent.map((turn) => [turn.media?.[0]?.scriptStep?.kind, turn.media?.[0]?.scriptStep?.state]),
+    ).toEqual([
+      ['free', 'offered'],
+      ['paid', 'waiting'],
+    ]);
+    expect(sent.map((turn) => turn.text)).toEqual(['Enfin rentrée 😌', 'Juste entre nous']);
+    expect(sent[1]?.media?.map((m) => [m.scriptMedia?.teaser, m.isLocked])).toEqual([
+      [true, false],
+      [false, true],
+      [false, true],
+    ]);
+    const bought = PlaygroundStateSchema.parse(await client.answerScriptStep('buy'));
+    expect(bought.scripts.fictiveSpentCents).toBe(1200);
+    expect(bought.history.flatMap((turn) => turn.media ?? []).some((m) => m.isLocked)).toBe(false);
+    const refused = PlaygroundStateSchema.parse(
+      await (await client.send('Wow', []), client.answerScriptStep('refuse')),
+    );
+    expect(refused.scripts.run?.status).toBe('refused');
+    expect(refused.scripts.fictiveSpentCents).toBe(1200);
+  });
 });

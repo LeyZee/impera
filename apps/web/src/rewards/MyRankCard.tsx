@@ -1,6 +1,7 @@
 import type { Me } from '@impera/contracts';
 import type { JSX } from 'react';
 
+import { GameGauge } from './GameGauge';
 import { LevelInsignia } from './LevelInsignia';
 import { playsTheGame, useMyTrophyCase } from './api';
 import './rewards.css';
@@ -43,17 +44,14 @@ export function MyRankCard({ user }: { user: Me }): JSX.Element | null {
                 {level === null ? 'Premier rang' : 'Rang suivant'}&nbsp;: <b>{nextLevel.name}</b> à{' '}
                 {amountText(nextLevel.thresholdMinor, nextLevel.currency)} de net cumulé
               </p>
-              <div
-                className="nv-gauge rw-rank__gauge"
-                role="progressbar"
-                aria-label={`Avancée vers le rang ${nextLevel.name}`}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={percent}
-                style={{ '--nv-gauge-value': `${String(percent)}%` }}
-              >
-                <span className="nv-gauge__fill" />
-              </div>
+              <GameGauge
+                userId={user.id}
+                name="rank"
+                scope={String(nextLevel.rank)}
+                percent={percent}
+                label={`Avancée vers le rang ${nextLevel.name}`}
+                className="rw-rank__gauge"
+              />
               <p className="rw-rank__note nv-num">
                 {amountText(nextLevel.currentMinor, nextLevel.currency)} de net à ce jour. Honorifique&nbsp;:
                 ni ton taux ni ta paie n’en dépendent. Il redescend si une vente est remboursée ou un rapport

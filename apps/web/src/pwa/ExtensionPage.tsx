@@ -1,9 +1,10 @@
+import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
 
 import { OffRailBack } from '../shell/OffRailBack';
 import { Page, PageHeader, Panel, PanelSection } from '../shell/layout';
 
-import { browserOf, EXTENSION_ZIP, type Browser } from './extension';
+import { browserOf, EXTENSION_ZIP, extensionKnowsThisCrm, type Browser } from './extension';
 
 interface Steps {
   readonly title: string;
@@ -33,42 +34,22 @@ const STEPS: Record<Exclude<Browser, 'other'>, Steps> = {
   },
 };
 
+/** After the link step, its outcome; with no link step (a hosted build), what to do (avis Design du 19/11). */
 const LAST_STEP = 'Connecté au CRM, l’extension affiche alors ton nom.';
+const LAST_STEP_LINKED = 'Clique sur l’icône Impera : elle affiche ton nom.';
 
 /**
- * The zip carries no CRM address (ADR 0067 § 4): at its first opening the popup asks where the CRM opens (recette du
- * 16/11, EXT-06, EXT-07), so this CRM's own address is given ready to copy, on localhost as anywhere.
+ * The zip carries no CRM address (ADR 0067 § 4): the popup links itself from this CRM's own page, nothing to type
+ * (amendement du 19/11).
  */
-function AddressStep({ origin }: { readonly origin: string }): JSX.Element {
-  const [state, setState] = useState<'idle' | 'copied' | 'refused'>('idle');
+function LinkStep(): JSX.Element {
   return (
     <li>
       <span className="nv-help-ext__address">
-        <span>
-          Clique l’icône Impera : elle te demande où s’ouvre ton CRM. Colle <code>{origin}</code>, «
-          Enregistrer », et accepte l’autorisation que le navigateur demande pour ce site.
-        </span>
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm"
-          aria-live="polite"
-          onClick={() => {
-            try {
-              navigator.clipboard.writeText(origin).then(
-                () => {
-                  setState('copied');
-                },
-                () => {
-                  setState('refused');
-                },
-              );
-            } catch {
-              setState('refused');
-            }
-          }}
-        >
-          {state === 'copied' ? 'Copiée' : state === 'refused' ? 'Copie-la à la main' : 'Copier l’adresse'}
-        </button>
+        <span>Relie-la à ce CRM, sans rien taper : un clic ici, puis sur l’icône Impera.</span>
+        <Link to="/extension/lier" className="nv-btn nv-btn--soft nv-btn--sm">
+          Relier l’extension à ce CRM
+        </Link>
       </span>
     </li>
   );
@@ -135,9 +116,9 @@ function useZipServed(): 'checking' | 'served' | 'missing' {
 /** /aide/extension (ADR 0067): what the extension offers, then the steps for Chrome and Edge, this browser's first. */
 export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.Element {
   const browser = browserOf(navigator.userAgent);
-  const origin = window.location.origin;
   const zip = useZipServed();
   const offers = watches ? [...OFFERS, WATCH] : OFFERS;
+  const linked = extensionKnowsThisCrm();
   const order: readonly Exclude<Browser, 'other'>[] =
     browser === 'edge' ? ['edge', 'chrome'] : ['chrome', 'edge'];
   return (
@@ -209,8 +190,9 @@ export function ExtensionPage({ watches }: { readonly watches: boolean }): JSX.E
                   {STEPS[key].steps.map((step) => (
                     <li key={step}>{step}</li>
                   ))}
-                  <AddressStep origin={origin} />
-                  <li>{LAST_STEP}</li>
+                  {/* A hosted build is linked from the install: no step that would lead nowhere (ADR 0067). */}
+                  {linked ? null : <LinkStep />}
+                  <li>{linked ? LAST_STEP_LINKED : LAST_STEP}</li>
                 </ol>
               </PanelSection>
             </Panel>

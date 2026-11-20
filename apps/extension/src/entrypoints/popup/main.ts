@@ -11,7 +11,9 @@ import {
   permissionPatternOf,
   shortAddress,
 } from '../../lib/crm-address';
-import { ADDRESS_KEY, savedOrigin } from '../../lib/crm-origin-store';
+import { linkCrm, type LinkFailure } from '../../lib/crm-link';
+import { GUIDE_PATH, linkOfferOf, type LinkOffer } from '../../lib/crm-link-page';
+import { activeOrigin, ADDRESS_KEY, BUILT_IN_CRM, saveOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { placeOf } from '../../lib/tab';
 import {
@@ -54,6 +56,10 @@ if (root === null) throw new Error('popup: #app is missing');
 let origin = DEFAULT_CRM_ADDRESS;
 /** No address was ever saved: the welcome stays until one is (EXT-07). */
 let welcome = false;
+/** What the open tab offers at a first opening, read once (ADR 0067, amendement du 19/11); « Pas maintenant » drops it. */
+let offer: LinkOffer | null = null;
+/** The address « Relier à B » would link to, while the question of a hosted build is open (ADR 0067, § 5). */
+let leaving: string | null = null;
 let screen: Screen = { kind: 'loading' };
 let previous: Screen = screen;
 
@@ -69,6 +75,7 @@ function show(next: Screen): void {
       version: browser.runtime.getManifest().version,
       hour: new Date().getHours(),
       dev: import.meta.env.DEV,
+      builtIn: BUILT_IN_CRM,
     },
     actions,
   );
@@ -129,9 +136,10 @@ async function gesture(run: () => Promise<WatchNotice | null>): Promise<void> {
   await redrawWatch();
 }
 
-const LINK_NOTICES: Readonly<Record<'refused' | 'unreachable' | 'malformed', string>> = {
+const LINK_NOTICES: Readonly<Record<'refused' | 'busy' | 'unreachable' | 'malformed', string>> = {
   malformed: 'Ce n’est pas un code de liaison : copie-le en entier depuis le CRM.',
   refused: 'Le CRM ne reconnaît pas ce code : il a été délié ou remplacé. Crées-en un nouveau dans Sécurité.',
+  busy: 'Trop d’essais d’un coup : attends une minute, puis réessaie.',
   unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
 };
 
@@ -271,7 +279,7 @@ function cancelSession(): void {
 
 async function refresh(): Promise<void> {
   if (welcome) {
-    show({ kind: 'address', draft: '', error: null, first: true });
+    show(offer === null ? { kind: 'welcome' } : { kind: 'link-offer', offer, error: null });
     return;
   }
   show({ kind: 'loading' });
@@ -335,7 +343,57 @@ async function openCrm(path: string): Promise<void> {
   window.close();
 }
 
-/** Saves an address the person typed; a deployed CRM asks the browser for that site alone, in the same click. */
+const LINK_FAILURES: Readonly<Record<'page' | 'typed', Readonly<Record<LinkFailure, string>>>> = {
+  page: {
+    denied: 'Ton navigateur n’a pas autorisé ce site. Clique sur Relier et accepte sa question.',
+    signed_out: 'Connecte-toi au CRM dans cet onglet, puis clique sur Relier.',
+    not_crm: 'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
+  },
+  typed: {
+    denied: 'Ton navigateur n’a pas autorisé ce site. Enregistre à nouveau et accepte sa question.',
+    signed_out: 'Connecte-toi d’abord au CRM à cette adresse, puis enregistre-la.',
+    not_crm: 'Cette adresse ne répond pas comme un CRM Impera.',
+  },
+};
+
+/** How long « Extension reliée » stays before the popup's home. */
+const LINKED_MS = 1400;
+
+/** From the CRM's page or typed: the same checks (ADR 0067, amendement du 19/11). Called inside the click. */
+function linkTo(next: string, from: 'page' | 'typed'): void {
+  const linked = linkCrm(next, {
+    contains: (pattern) => browser.permissions.contains(pattern),
+    request: (pattern) => browser.permissions.request(pattern),
+    remove: (pattern) => browser.permissions.remove(pattern),
+    readSession: (at) => readCrmSession(at),
+    saved: activeOrigin,
+    save: saveOrigin,
+    forget: () => ask({ type: 'popup/unlink' }),
+    builtIn: BUILT_IN_CRM,
+  });
+  show({ kind: 'loading' });
+  void linked.then((result) => {
+    if (result.state === 'failed') {
+      const error = LINK_FAILURES[from][result.failure];
+      if (from === 'page' && offer !== null) show({ kind: 'link-offer', offer, error });
+      else show({ kind: 'address', draft: shortAddress(next), error, first: welcome });
+      return;
+    }
+    origin = next;
+    welcome = false;
+    offer = null;
+    show({ kind: 'linked', host: isGrantedAtInstall(next) ? null : new URL(next).hostname });
+    setTimeout(() => {
+      // From the CRM's page, the tab goes back to its guide: the page cannot learn it from the extension (§ 6).
+      if (from === 'page' && tabId !== undefined) {
+        void browser.tabs.update(tabId, { url: `${next}${GUIDE_PATH}` }).catch(() => undefined);
+      }
+      void refresh();
+    }, LINKED_MS);
+  });
+}
+
+/** Saves an address the person typed: the same checks as the CRM's page. */
 function saveAddress(value: string): void {
   const next = crmOriginOf(value);
   if (next === null) {
@@ -347,18 +405,41 @@ function saveAddress(value: string): void {
     });
     return;
   }
-  origin = next;
-  welcome = false;
-  // Stored first, without waiting: the permission request must stay inside the click (user gesture).
-  void browser.storage.local.set({ [ADDRESS_KEY]: next });
-  if (isGrantedAtInstall(next)) {
-    void refresh();
+  // Leaving the CRM a hosted build was made for is asked first, with both addresses (ADR 0067, second amendement, § 5).
+  if (BUILT_IN_CRM !== null && next !== BUILT_IN_CRM && next !== origin) {
+    leaving = next;
+    show({ kind: 'change-crm', from: shortAddress(BUILT_IN_CRM), to: shortAddress(next) });
     return;
   }
-  void browser.permissions
-    .request({ origins: [permissionPatternOf(next)] })
-    .catch(() => false)
-    .then(() => refresh());
+  linkTo(next, 'typed');
+}
+
+/**
+ * « Revenir à l'adresse d'origine »: the link with the other CRM is forgotten and the browser's leave on its site given
+ * back, then the built-in address is in force again (§ 5).
+ */
+function revertCrm(): void {
+  if (BUILT_IN_CRM === null) return;
+  const builtIn = BUILT_IN_CRM;
+  const left = origin;
+  show({ kind: 'loading' });
+  void (async () => {
+    await ask({ type: 'popup/unlink' });
+    if (!isGrantedAtInstall(left)) {
+      await browser.permissions.remove({ origins: [permissionPatternOf(left)] }).catch(() => false);
+    }
+    await saveOrigin(builtIn).catch(() => undefined);
+    origin = builtIn;
+    await refresh();
+  })();
+}
+
+/** Back to the developer's address, offered in a development build only: this computer, saved as before. */
+function resetAddress(): void {
+  origin = DEFAULT_CRM_ADDRESS;
+  welcome = false;
+  offer = null;
+  void browser.storage.local.set({ [ADDRESS_KEY]: DEFAULT_CRM_ADDRESS }).then(() => refresh());
   show({ kind: 'loading' });
 }
 
@@ -407,12 +488,30 @@ const actions: Actions = {
     show({ kind: 'address', draft: origin.replace(/^https?:\/\//u, ''), error: null, first: false });
   },
   saveAddress,
-  resetAddress: () => {
-    saveAddress(DEFAULT_CRM_ADDRESS);
+  linkFromPage: () => {
+    if (offer !== null) linkTo(offer.origin, 'page');
   },
+  declineLink: () => {
+    offer = null;
+    show({ kind: 'welcome' });
+  },
+  typeAddress: () => {
+    show({ kind: 'address', draft: '', error: null, first: true });
+  },
+  resetAddress,
   cancelAddress: () => {
     show(previous);
   },
+  keepCrm: () => {
+    leaving = null;
+    void refresh();
+  },
+  changeCrm: () => {
+    // Inside the click: the browser's question about the other site must come from it.
+    if (leaving !== null) linkTo(leaving, 'typed');
+    leaving = null;
+  },
+  revertCrm,
   watch: {
     link: (code) => {
       watchDraft = code;
@@ -495,8 +594,12 @@ setInterval(() => {
 // The popup's port to the service worker: closing the popup closes it, and a session read and not sent is forgotten.
 browser.runtime.connect({ name: 'popup' });
 
-void savedOrigin().then((saved) => {
-  welcome = saved === null;
-  origin = saved ?? DEFAULT_CRM_ADDRESS;
+void Promise.all([activeOrigin(), activeTab()]).then(([active, tab]) => {
+  // A hosted build is in force from the install: no welcome, no page to link from (ADR 0067, second amendement).
+  welcome = active === null;
+  origin = active ?? DEFAULT_CRM_ADDRESS;
+  tabId = tab.id;
+  // Only the tab's own address, and only while nothing is saved: a linked extension ignores the page (§ 4).
+  offer = welcome ? linkOfferOf(tab.url) : null;
   return refresh();
 });

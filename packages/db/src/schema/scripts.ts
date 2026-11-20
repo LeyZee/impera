@@ -7,6 +7,7 @@ import {
   PLATFORM_SCRIPT_STEP_MEDIA_MAX,
   PLATFORM_SCRIPT_STEP_TEXT_MAX,
   PLATFORM_SCRIPT_STEPS_MAX,
+  PREPARED_SCRIPT_STATES,
   SCRIPT_IDENTITY_AUTHORS,
   PlatformScriptMomentSchema,
   SCRIPT_CADENCE_DEFAULT_DAYS,
@@ -518,6 +519,75 @@ export const platformScriptBranches = pgTable(
     pgPolicy('team_clear', {
       for: 'delete',
       using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * Scripts in preparation (ADR 0112 §§ 20-23, « script en préparation »): written in Impera's editor, not at Reveal yet,
+ * never offered nor sent. `content` is `PreparedScriptContentSchema`, read through it; `revision` rises with each save,
+ * and a save names the one it was made on. Written by the owner and the active managers of her list, under her RLS,
+ * closed to her account; never deleted. The import that recognises it (§ 23) marks it `matched` as the service role.
+ */
+export const preparedScripts = pgTable(
+  'prepared_scripts',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    /** The Reveal account it is to be copied into. */
+    platformAccountId: uuid('platform_account_id').notNull(),
+    state: enumText('state').notNull().default('editing'),
+    revision: integer('revision').notNull().default(1),
+    content: jsonb('content').notNull(),
+    /** The native script it became; set with `matched` only. */
+    matchedPlatformScriptId: uuid('matched_platform_script_id'),
+    matchedAt: timestampTz('matched_at'),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: 'prepared_scripts_account_creator_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    foreignKey({
+      name: 'prepared_scripts_matched_creator_fk',
+      columns: [t.matchedPlatformScriptId, t.creatorId],
+      foreignColumns: [platformScripts.id, platformScripts.creatorId],
+    }),
+    index('prepared_scripts_creator_idx').on(t.creatorId, t.updatedAt),
+    enumCheck('prepared_scripts', t.state, PREPARED_SCRIPT_STATES),
+    check('prepared_scripts_revision_check', sql`${t.revision} >= 1`),
+    check(
+      'prepared_scripts_matched_check',
+      sql`(${t.state} = 'matched') = (${t.matchedPlatformScriptId} is not null and ${t.matchedAt} is not null)`,
+    ),
+    check(
+      'prepared_scripts_content_check',
+      sql`jsonb_typeof(${t.content}) = 'object' and jsonb_typeof(${t.content}->'steps') = 'array'`,
+    ),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    pgPolicy('team_write', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.createdBy} = ${currentUser} and ${t.updatedBy} = ${currentUser} and ${t.state} = 'editing'`,
+    }),
+    pgPolicy('team_update', {
+      for: 'update',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.state} <> 'matched'`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${readsTeam} and ${t.updatedBy} = ${currentUser} and ${t.state} <> 'matched'`,
     }),
     closedToCreator(),
   ],

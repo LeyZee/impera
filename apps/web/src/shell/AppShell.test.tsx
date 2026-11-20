@@ -85,16 +85,7 @@ describe('the rail of each role', () => {
   it('gives the owner his tabs in the order of ADR 0024, under Chatting and Agence', async () => {
     renderApp(owner, '/');
     await screen.findByText('Chatting');
-    expect(tabs()).toEqual([
-      'Dashboard',
-      'Suivi',
-      'Fans',
-      'Entraîner',
-      'Équipe',
-      'Paie',
-      'Créatrices',
-      'Réglages',
-    ]);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Réglages']);
     expect(screen.getByText('Agence')).toBeDefined();
     // Eight places: the phone keeps four on its bar and folds the rest under « Plus ».
     expect(screen.getByRole('button', { name: 'Plus' })).toBeDefined();
@@ -186,7 +177,7 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Fans', 'Équipe', 'Paie', 'Créatrices', 'Moi']);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
   });
 });
 
@@ -322,7 +313,12 @@ describe('« Plus » on the phone', () => {
       routeTree: root.addChildren(routes),
       history: createMemoryHistory({ initialEntries: [path] }),
     });
-    render(<RouterProvider router={router} />);
+    // The rail reads its counts (ADR 0134 § 8): a client of its own, as in the app.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
   }
 
   it('lights up when the screen shown is one of its tabs', async () => {
@@ -390,7 +386,12 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
       routeTree: root.addChildren([createRoute({ getParentRoute: () => root, path: '/suivi' })]),
       history: createMemoryHistory({ initialEntries: ['/suivi'] }),
     });
-    render(<RouterProvider router={router} />);
+    // The rail reads its counts (ADR 0134 § 8): a client of its own, as in the app.
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
   }
 
   it('leaves « Plus » out when every tab fits and Moi › Préférences holds the rest (D-03)', async () => {
@@ -423,7 +424,7 @@ describe('« Plus » on the phone, signing out (recette 28/10, M14)', () => {
   });
 });
 
-describe('Suivi › Historique des alertes (P4-01)', () => {
+describe('Suivi › Alertes (P4-01, ADR 0134 § 5)', () => {
   const suiviTabs = async (): Promise<{ readonly label: string; readonly current: boolean }[]> =>
     within(await screen.findByRole('navigation', { name: 'Suivi' }))
       .getAllByRole('link')
@@ -443,13 +444,15 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     renderApp(owner, '/suivi/alertes');
     expect(await suiviTabs()).toEqual([
       { label: 'Conversations', current: false },
-      { label: 'Historique des alertes', current: true },
+      { label: 'Fans', current: false },
+      { label: 'Alertes', current: true },
     ]);
     cleanup();
     renderApp(manager, '/suivi?conversation=0192f3a0-0000-7000-8000-0000000000d1');
     expect(await suiviTabs()).toEqual([
       { label: 'Conversations', current: true },
-      { label: 'Historique des alertes', current: false },
+      { label: 'Fans', current: false },
+      { label: 'Alertes', current: false },
     ]);
   });
 
@@ -466,6 +469,56 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/aujourdhui');
     });
+  });
+
+  it('opens Fans as a view of Suivi, the address it had as a section leading there (ADR 0134 §§ 5, 10)', async () => {
+    const router = renderApp(owner, '/fans');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/suivi/fans');
+    });
+    expect(await suiviTabs()).toEqual([
+      { label: 'Conversations', current: false },
+      { label: 'Fans', current: true },
+      { label: 'Alertes', current: false },
+    ]);
+    // Lit under Suivi in the rail: Fans is no tab of its own any more.
+    expect(tabs()).not.toContain('Fans');
+  });
+
+  it('keeps Fans from a chatter, on its old address too: he lands on his own Suivi', async () => {
+    const router = renderApp(chatter, '/fans');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/suivi');
+    });
+    expect(screen.queryByRole('link', { name: 'Fans' })).toBeNull();
+  });
+
+  it('sends a chatter’s Moi › Calendrier to Planning, where « Dans mon téléphone » is, and leaves a manager’s (ADR 0134, lot 1)', async () => {
+    const mine = renderApp(chatter, '/moi/calendrier');
+    await waitFor(() => {
+      expect(mine.state.location.pathname).toBe('/planning');
+    });
+    cleanup();
+    const his = renderApp(manager, '/moi/calendrier');
+    await waitFor(() => {
+      expect(his.state.location.pathname).toBe('/moi/calendrier');
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calendrier' })).toBeTruthy();
+  });
+
+  it('keeps under « Plus » the counts of the tabs it holds, for its dot (ADR 0134 § 8)', async () => {
+    renderApp(owner, '/suivi');
+    const more = await screen.findByRole('button', { name: /^Plus/u });
+    // Nothing waits in this test: the holder is there, empty, and « Plus » reads bare.
+    expect(more.querySelector('.nv-rail__under')).not.toBeNull();
+    expect(more.querySelector('.nv-rail__under .nv-count')).toBeNull();
+  });
+
+  it('closes the manager’s Agence before Moi, a tab of no family (ADR 0149 § 2)', async () => {
+    renderApp(manager, '/suivi');
+    const moi = await screen.findByRole('link', { name: 'Moi' });
+    expect(moi.previousElementSibling?.className).toBe('nv-rail__gap');
+    expect(screen.getByText('Agence').className).toBe('nv-rail__heading');
   });
 });
 
@@ -981,7 +1034,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
   // their own (never in the actions), and one width for every tab of a section.
   it.each([
     ['/suivi', 'Suivi', 'Conversations', 'wide', owner],
-    ['/suivi/alertes', 'Suivi', 'Historique des alertes', 'wide', owner],
+    ['/suivi/alertes', 'Suivi', 'Alertes', 'wide', owner],
     ['/entrainer/playground', 'Entraîner', 'Chatting', 'wide', owner],
     ['/entrainer/canal', 'Entraîner', 'Post du canal', 'wide', owner],
     ['/equipe/planning', 'Équipe', 'Planning', 'wide', owner],

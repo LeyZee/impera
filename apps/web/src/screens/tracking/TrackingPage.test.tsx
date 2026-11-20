@@ -203,6 +203,7 @@ function renderPage(
   canAddCreator = true,
   selfScope = false,
   nothingListed?: string,
+  only: string | null = null,
 ): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
@@ -220,6 +221,7 @@ function renderPage(
           onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
           canDecide={canDecide}
           canAddCreator={canAddCreator}
+          only={only}
           selfScope={selfScope}
           nothingListed={nothingListed}
         />
@@ -387,6 +389,34 @@ describe('TrackingPage', () => {
       .map((row) => row.querySelector('.tr-row__creator')?.textContent.replace(' · ', ''));
     expect(names).toContain('Léa');
     expect(names).toContain('Nina');
+  });
+
+  it('reads one creator alone when the menu’s selector is set on her, as an account that has only her (ADR 0134 § 3)', async () => {
+    serve({
+      creators: { status: 200, body: { creators: [LEA, NINA] } },
+      conversations: {
+        [LEA.id]: { items: [conversation('1')], nextCursor: null },
+        [NINA.id]: { items: [conversation('2')], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, true, false, undefined, NINA.id);
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    // One creator on screen: her name is not said again on the row.
+    expect(list.querySelector('.tr-row__creator')).toBeNull();
+  });
+
+  it('reads every creator when the one chosen is no longer listed', async () => {
+    serve({
+      creators: { status: 200, body: { creators: [LEA, NINA] } },
+      conversations: {
+        [LEA.id]: { items: [conversation('1')], nextCursor: null },
+        [NINA.id]: { items: [conversation('2')], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, true, false, undefined, '0192f3a0-0000-7000-8000-00000000dead');
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('opens a conversation outside every list when the link names its creator (Dashboard, fan reader)', async () => {

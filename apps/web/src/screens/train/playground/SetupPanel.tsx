@@ -3,6 +3,7 @@ import { useEffect, useState, type JSX } from 'react';
 
 import { DesireMarksFold } from './DesireMarks';
 import { PersonaPicker } from './PersonaPicker';
+import { VoiceBankFold } from './VoiceBank';
 import { clockAt, duration, money, scriptsHint } from './logic';
 import type { CreatorMedia as CreatorMediaInput, MediaKind } from './model';
 import type { Playground } from './usePlayground';
@@ -128,6 +129,8 @@ export function SetupPanel({
             />
           </div>
         </details>
+
+        <VoiceBankFold state={state} pg={pg} />
 
         <DesireMarksFold state={state} pg={pg} />
       </div>

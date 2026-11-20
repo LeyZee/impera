@@ -213,6 +213,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '*/5 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.remind_reports'] },
   },
+  // The owners (ADR 0096): a removal whose 72 hours ended is applied within the minute, and each change among the
+  // owners is told to them in the app. No backfill: the next minute reads everything again.
+  {
+    task: 'owners.watch',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['owners.watch'] },
+  },
   // A role dated for a 1st or a 16th becomes the member's on that day (Charles, 28/10): each record takes the role in
   // force today, before the hour's recalculation. A run missed is caught up by the next one, no backfill.
   {

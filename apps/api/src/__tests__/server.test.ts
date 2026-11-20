@@ -530,6 +530,25 @@ describe('loadConfig', () => {
     expect(testConfig({ IMPERA_INLINE_WORKER: '' }).IMPERA_INLINE_WORKER).toBe(false);
   });
 
+  it('sizes each database pool from its variable, the former sizes by default (ADR 0152 § 2)', () => {
+    const defaults = testConfig();
+    expect([
+      defaults.DATABASE_POOL_MAX,
+      defaults.DATABASE_SERVICE_POOL_MAX,
+      defaults.RATE_LIMIT_POOL_MAX,
+    ]).toEqual([10, 5, 3]);
+    const sized = testConfig({
+      DATABASE_POOL_MAX: '4',
+      DATABASE_SERVICE_POOL_MAX: '3',
+      RATE_LIMIT_POOL_MAX: '1',
+    });
+    expect([sized.DATABASE_POOL_MAX, sized.DATABASE_SERVICE_POOL_MAX, sized.RATE_LIMIT_POOL_MAX]).toEqual([
+      4, 3, 1,
+    ]);
+    expect(() => testConfig({ DATABASE_POOL_MAX: '0' })).toThrow(/DATABASE_POOL_MAX/);
+    expect(() => testConfig({ DATABASE_SERVICE_POOL_MAX: 'many' })).toThrow(/DATABASE_SERVICE_POOL_MAX/);
+  });
+
   describe('the invoices’ buckets (ADR 0037)', () => {
     /** A whole bucket, invented (ADR 0010): nothing here reaches a provider. */
     const bucket = (prefix: string, endpoint: string, name: string): NodeJS.ProcessEnv => ({
@@ -547,6 +566,57 @@ describe('loadConfig', () => {
       CREDENTIALS_ENCRYPTION_KEYS: 'k1:' + 'a'.repeat(44),
       SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
     };
+
+    it('refuses in production a remote base reached without a checked certificate (ADR 0152 § 2)', () => {
+      const remote = (role: string, query: string) =>
+        `postgres://${role}:test@pooler.db.example.test:5432/postgres${query}`;
+      const verified = {
+        DATABASE_URL: remote('nirvana_app', '?sslmode=verify-full'),
+        DATABASE_SERVICE_URL: remote('impera_service', '?sslmode=verify-full'),
+        DATABASE_ADMIN_URL: remote('nirvana_admin', '?sslmode=verify-full&sslrootcert=/run/ca.crt'),
+      };
+      expect(() => testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY, ...verified })).not.toThrow();
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          ...verified,
+          DATABASE_SERVICE_URL: remote('impera_service', '?sslmode=require'),
+        }),
+      ).toThrow(/DATABASE_SERVICE_URL reaches a remote base: it must carry sslmode=verify-full, once/u);
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          ...verified,
+          DATABASE_ADMIN_URL: remote('nirvana_admin', ''),
+        }),
+      ).toThrow(/DATABASE_ADMIN_URL reaches a remote base/u);
+      // Given twice, the library may keep the last value: refused even when the first one is right.
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          ...verified,
+          DATABASE_URL: remote('nirvana_app', '?sslmode=verify-full&sslmode=disable'),
+        }),
+      ).toThrow(/DATABASE_URL reaches a remote base/u);
+      // A base on this machine, or behind a service name of the compose, is not on the network; nor is any outside
+      // production.
+      expect(() => testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY })).not.toThrow();
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          DATABASE_URL: 'postgres://nirvana_app:test@postgres:5432/impera',
+        }),
+      ).not.toThrow();
+      expect(() => testConfig({ DATABASE_URL: remote('nirvana_app', '') })).not.toThrow();
+    });
 
     it('takes both buckets whole, or none outside production, never half of one', () => {
       expect(() => testConfig({ ...PRIMARY, ...COPY })).not.toThrow();
