@@ -1,4 +1,4 @@
-import type { PlaygroundScriptRun } from '@impera/contracts';
+import type { PlaygroundScriptRun, PlaygroundState } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { money } from './logic';
@@ -54,50 +54,58 @@ const stepTitle = (step: Step, index: number): string => {
 };
 
 /**
- * The trial script under way (ADR 0103 § 15-17): an invented script played by the same rules as production, its steps
- * as a path, and what he paid fictively. Nothing here reaches Reveal, the sales or the figures.
+ * The script under way (ADR 0103 § 15-17): one of hers, read as production reads it, or a trial one, played by the same
+ * rules; its steps as a path, and what he paid fictively. When none of hers can be played, it says why and that the
+ * trial scripts play instead. Nothing here reaches Reveal, the sales or the figures.
  */
-export function ScriptStrip({
-  run,
-  fictiveSpentCents,
-}: {
-  run: PlaygroundScriptRun;
-  fictiveSpentCents: number;
-}): JSX.Element {
+export function ScriptStrip({ scripts }: { scripts: PlaygroundState['scripts'] }): JSX.Element | null {
+  const { run, unavailable, fictiveSpentCents } = scripts;
+  if (run === null && unavailable === null) return null;
   return (
-    <section className="pg-script" aria-label="Script d’essai">
-      <p className="pg-script__t">
-        <span className="pg-script__k">
-          Script d’essai{run.moment === 'night' ? ' · Nuit' : run.moment === 'day' ? ' · Jour' : ''}
-        </span>
-        <span className={`pg-script__s is-${run.status}`}>{STATUS_LABELS[run.status]}</span>
-      </p>
-      <ol className="pg-script__path">
-        {run.steps.map((step, index) => (
-          // Each step says its state in words, never by its colour alone (avis Design, 20/11).
-          <li
-            key={index}
-            className={`pg-script__step ${stepTone(step)}`}
-            title={stepTitle(step, index)}
-            aria-label={stepTitle(step, index)}
-          >
-            <span className="pg-script__dot" aria-hidden="true">
-              {step.outcome === 'bought' ? (
-                <svg viewBox="0 0 12 12" focusable="false">
-                  <path d="M3 6.2 5.1 8.3 9 4" />
-                </svg>
-              ) : null}
+    <section className="pg-script" aria-label={run?.source === 'hers' ? 'Son script' : 'Script d’essai'}>
+      {unavailable === null ? null : (
+        <p className="pg-script__why">
+          {unavailable.label}. Les scripts d’essai jouent à la place des siens.
+        </p>
+      )}
+      {run === null ? null : (
+        <>
+          <p className="pg-script__t">
+            <span className="pg-script__k">
+              {run.source === 'hers'
+                ? `Son script · ${run.name}`
+                : `Script d’essai${run.moment === 'night' ? ' · Nuit' : run.moment === 'day' ? ' · Jour' : ''}`}
             </span>
-            <span className="pg-script__l" aria-hidden="true">
-              {stepWord(step)}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <p className="pg-script__f">
-        {fictiveSpentCents === 0 ? 'Rien acheté' : `${money(fictiveSpentCents)} achetés`} · fictif, rien ne
-        part vers Reveal
-      </p>
+            <span className={`pg-script__s is-${run.status}`}>{STATUS_LABELS[run.status]}</span>
+          </p>
+          <ol className="pg-script__path">
+            {run.steps.map((step, index) => (
+              // Each step says its state in words, never by its colour alone (avis Design, 20/11).
+              <li
+                key={index}
+                className={`pg-script__step ${stepTone(step)}`}
+                title={stepTitle(step, index)}
+                aria-label={stepTitle(step, index)}
+              >
+                <span className="pg-script__dot" aria-hidden="true">
+                  {step.outcome === 'bought' ? (
+                    <svg viewBox="0 0 12 12" focusable="false">
+                      <path d="M3 6.2 5.1 8.3 9 4" />
+                    </svg>
+                  ) : null}
+                </span>
+                <span className="pg-script__l" aria-hidden="true">
+                  {stepWord(step)}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="pg-script__f">
+            {fictiveSpentCents === 0 ? 'Rien acheté' : `${money(fictiveSpentCents)} achetés`} · fictif, rien
+            ne part vers Reveal
+          </p>
+        </>
+      )}
     </section>
   );
 }

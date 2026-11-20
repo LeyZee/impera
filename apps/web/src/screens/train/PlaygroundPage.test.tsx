@@ -53,7 +53,7 @@ const BASE: PlaygroundState = {
   voice: { reachable: true },
   persona: { name: 'Elena', played: null },
   pending: null,
-  scripts: { run: null, fictiveSpentCents: 0, salesFrozen: false },
+  scripts: { source: 'trial', unavailable: null, run: null, fictiveSpentCents: 0, salesFrozen: false },
 };
 
 const ANSWER: PlaygroundAnswer = {
@@ -302,6 +302,7 @@ describe('Playground', () => {
       },
       isLocked,
       scriptStep: {
+        source: 'trial',
         scriptRef: 'essai-nuit',
         stepIndex: kind === 'free' ? 0 : 1,
         kind,
@@ -317,8 +318,12 @@ describe('Playground', () => {
         { index: 2, from: 'creator', text: '', media: [media('paid', true, 'waiting')] },
       ],
       scripts: {
+        source: 'trial',
+        unavailable: null,
         run: {
           scriptRef: 'essai-nuit',
+          name: 'Essai · Nuit',
+          source: 'trial',
           description: 'Fin de soirée.',
           moment: 'night',
           status: 'open',

@@ -786,17 +786,16 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
       expect(playground.buyStep()).toBe('done');
     });
 
-    it('sells nothing when none of hers is ready or her scripts cannot be read, and says why', async () => {
+    it('plays the trial scripts when none of hers is ready or her scripts cannot be read, and says why', async () => {
       const none = await atPaidStep(HOT, () =>
         Promise.resolve({ source: 'hers', scripts: [], unavailable: 'none_ready' }),
       );
-      expect(none.history.some((turn) => turn.from === 'creator' && turn.media !== undefined)).toBe(false);
-      expect(none.catalogue).toEqual({ source: 'hers', unavailable: 'none_ready' });
-      expect(none.scriptRun).toBeNull();
+      expect(none.catalogue).toEqual({ source: 'trial', unavailable: 'none_ready' });
+      expect(none.scriptRun).toMatchObject({ source: 'trial' });
 
       const failing = await atPaidStep(HOT, () => Promise.reject(new Error('base injoignable')));
-      expect(failing.history.some((turn) => turn.from === 'creator' && turn.media !== undefined)).toBe(false);
-      expect(failing.catalogue).toEqual({ source: 'hers', unavailable: 'unreadable' });
+      expect(failing.catalogue).toEqual({ source: 'trial', unavailable: 'unreadable' });
+      expect(failing.scriptRun).toMatchObject({ source: 'trial' });
     });
   });
 });

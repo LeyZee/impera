@@ -490,7 +490,13 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
       sessionCostEur: costEur,
       voice: { reachable: true },
       pending,
-      scripts: { run: run === null ? null : runView(run), fictiveSpentCents, salesFrozen: false },
+      scripts: {
+        source: 'trial',
+        unavailable: null,
+        run: run === null ? null : runView(run),
+        fictiveSpentCents,
+        salesFrozen: false,
+      },
     };
   };
 
@@ -505,17 +511,22 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
     const index = current.outcomes.length;
     const step = DEMO_SCRIPT.steps[index];
     if (step === undefined) return;
-    run = { ...current, outcomes: [...current.outcomes, 'sent'] };
+    const sent: DemoRun = { ...current, outcomes: [...current.outcomes, 'sent'] };
+    run = sent;
+    // As the platform sends a step: its words, the teaser open, the bundle locked while paid.
+    const bundle = [
+      ...(step.teaser ?? []).map((media) => ({ media, teaser: true })),
+      ...step.media.map((media) => ({ media, teaser: false })),
+    ];
     history.push({
       from: 'creator',
-      text: '',
-      media: [
-        {
-          description: describe({ kind: step.media, factualDescription: step.sheet }),
-          isLocked: step.kind === 'paid',
-          scriptStep: stepView(run, index),
-        },
-      ],
+      text: step.text,
+      media: bundle.map(({ media, teaser }) => ({
+        description: describe({ kind: media.kind, factualDescription: media.sheet }),
+        isLocked: step.kind === 'paid' && !teaser,
+        scriptStep: stepView(sent, index),
+        scriptMedia: { ref: media.ref, teaser },
+      })),
     });
   };
 
@@ -543,7 +554,11 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
         media: turn.media.map((m) => {
           if (m.scriptStep === undefined) return m;
           const view = stepView(current, m.scriptStep.stepIndex);
-          return { ...m, scriptStep: view, isLocked: view.state === 'waiting' };
+          return {
+            ...m,
+            scriptStep: view,
+            isLocked: view.state === 'waiting' && m.scriptMedia?.teaser !== true,
+          };
         }),
       }),
     }));
@@ -721,38 +736,87 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
   };
 }
 
-/** The demo's trial script: invented from end to end, as the server's (playground/domain/trial-scripts.ts). */
+/** The demo's trial script: invented from end to end, as the server's (playground/infra/trial-scripts.ts). */
+interface DemoMedia {
+  readonly ref: string;
+  readonly kind: 'image' | 'video';
+  readonly sheet: string;
+}
 interface DemoStep {
   readonly kind: 'free' | 'paid';
   readonly priceCents: number | null;
-  readonly media: 'image' | 'video';
-  readonly sheet: string;
+  readonly text: string;
+  readonly teaser?: readonly DemoMedia[];
+  readonly media: readonly DemoMedia[];
 }
 const DEMO_SCRIPT: {
   readonly scriptRef: string;
+  readonly name: string;
   readonly description: string;
   readonly steps: readonly DemoStep[];
 } = {
   scriptRef: 'essai-nuit',
+  name: 'Essai · Nuit',
   description: 'Fin de soirée, elle est rentrée et ne dort pas encore : un moment à deux, tard.',
   steps: [
     {
       kind: 'free',
       priceCents: null,
-      media: 'image',
-      sheet: 'Photo d’elle sur le canapé, lumière tamisée, plaid sur les jambes.',
+      text: 'Enfin rentrée 😌',
+      media: [
+        {
+          ref: 'essai-media-8',
+          kind: 'image',
+          sheet: 'Photo d’elle sur le canapé, lumière tamisée, plaid sur les jambes.',
+        },
+      ],
     },
     {
       kind: 'paid',
       priceCents: 1200,
-      media: 'image',
-      sheet: 'Photo d’elle en tenue de nuit, cadrage serré, ambiance tamisée.',
+      text: 'Juste entre nous',
+      teaser: [
+        {
+          ref: 'essai-media-9',
+          kind: 'image',
+          sheet: 'Photo d’elle de profil près de la lampe, en tenue de nuit.',
+        },
+      ],
+      media: [
+        {
+          ref: 'essai-media-10',
+          kind: 'image',
+          sheet: 'Photo d’elle en tenue de nuit, cadrage serré, ambiance tamisée.',
+        },
+        {
+          ref: 'essai-media-11',
+          kind: 'image',
+          sheet: 'Photo d’elle allongée, le téléphone à la main, sourire en coin.',
+        },
+      ],
     },
     {
       kind: 'paid',
       priceCents: 2000,
-      media: 'video',
-      sheet: 'Vidéo d’elle qui lui souhaite bonne nuit, voix basse, lumière d’une lampe.',
+      text: 'Pour finir la soirée',
+      media: [
+        {
+          ref: 'essai-media-12',
+          kind: 'video',
+          sheet: 'Vidéo d’elle qui lui souhaite bonne nuit, voix basse, lumière d’une lampe.',
+        },
+        { ref: 'essai-media-13', kind: 'video', sheet: 'Courte vidéo d’elle qui éteint la lampe en riant.' },
+        {
+          ref: 'essai-media-14',
+          kind: 'image',
+          sheet: 'Photo d’elle sous la couette, seul son regard dépasse.',
+        },
+        {
+          ref: 'essai-media-15',
+          kind: 'image',
+          sheet: 'Photo de la lampe de chevet allumée, la pièce dans la pénombre.',
+        },
+      ],
     },
   ],
 };
@@ -768,6 +832,7 @@ function stepView(run: DemoRun, stepIndex: number): ScriptStepView {
   const step = DEMO_SCRIPT.steps[stepIndex];
   const outcome = run.outcomes[stepIndex];
   return {
+    source: 'trial',
     scriptRef: DEMO_SCRIPT.scriptRef,
     stepIndex,
     kind: step?.kind ?? 'free',
@@ -786,6 +851,8 @@ function stepView(run: DemoRun, stepIndex: number): ScriptStepView {
 function runView(run: DemoRun): NonNullable<PlaygroundState['scripts']['run']> {
   return {
     scriptRef: DEMO_SCRIPT.scriptRef,
+    name: DEMO_SCRIPT.name,
+    source: 'trial',
     description: DEMO_SCRIPT.description,
     moment: 'night',
     status: run.status,

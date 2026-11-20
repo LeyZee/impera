@@ -25,7 +25,7 @@ const STATE: PlaygroundState = {
   voice: { reachable: true },
   persona: { name: 'Elena', played: null },
   pending: null,
-  scripts: { run: null, fictiveSpentCents: 0, salesFrozen: false },
+  scripts: { source: 'trial', unavailable: null, run: null, fictiveSpentCents: 0, salesFrozen: false },
 };
 
 const ANSWER: PlaygroundAnswer = {

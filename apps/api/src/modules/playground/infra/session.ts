@@ -301,8 +301,13 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     { readonly script: PlaygroundScript; readonly source: Catalogue['source'] }
   >();
   const learn = (read: Catalogue): void => {
-    catalogue = read;
-    for (const script of read.scripts) known.set(script.view.scriptRef, { script, source: read.source });
+    // None of hers can be played: the trial scripts take their place, and the screen says which and why.
+    catalogue =
+      read.source === 'hers' && read.scripts.length === 0
+        ? { source: 'trial', scripts: TRIAL_CATALOGUE, unavailable: read.unavailable ?? 'none_ready' }
+        : read;
+    for (const script of catalogue.scripts)
+      known.set(script.view.scriptRef, { script, source: catalogue.source });
   };
   learn(catalogue);
   const readCatalogue = async (): Promise<void> => {
@@ -310,7 +315,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     try {
       learn(await deps.herScripts());
     } catch {
-      // As production: a catalogue that cannot be read sells nothing.
+      // Production would sell nothing: the trial scripts are played instead, and the screen says why.
       learn({ source: 'hers', scripts: [], unavailable: 'unreadable' });
     }
   };

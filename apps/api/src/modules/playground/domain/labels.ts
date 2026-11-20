@@ -93,7 +93,7 @@ const CATALOGUE_LABELS: Readonly<Record<string, string>> = {
     'Aucun de ses scripts n’est prêt : identité ou descriptions à valider dans « Ses scripts dans Reveal »',
   several_accounts:
     'Elle a des scripts sur plusieurs comptes Reveal : le Playground ne sait pas lequel jouer',
-  unreadable: 'Ses scripts n’ont pas pu être lus : aucune vente, comme en réel',
+  unreadable: 'Ses scripts n’ont pas pu être lus (en réel, aucune vente)',
 };
 
 export function catalogueLabel(code: string): string {

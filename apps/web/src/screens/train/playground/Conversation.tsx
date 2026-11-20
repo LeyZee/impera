@@ -1,5 +1,6 @@
 import {
   DestinationSchema,
+  type CreatorId,
   type DesireMarkVerdict,
   type Destination,
   type PlaygroundAnswer as Answer,
@@ -13,11 +14,13 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
+import { Bundle } from './Bundle';
 import { DesireTag } from './Desire';
 import { ScriptStrip } from './ScriptStrip';
 import { MEDIA_KINDS } from './SetupPanel';
+import { bundleStepOf } from './bundle';
 import type { ScriptStepAnswer } from './client';
-import { bubblesOf, money } from './logic';
+import { bubblesOf } from './logic';
 import {
   DESTINATION_HINTS,
   DESTINATION_LABELS,
@@ -94,9 +97,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
   return (
     <div className="pg-thread nv-scroll" ref={threadRef}>
       <div className="nv-thread">
-        {state.scripts.run === null ? null : (
-          <ScriptStrip run={state.scripts.run} fictiveSpentCents={state.scripts.fictiveSpentCents} />
-        )}
+        <ScriptStrip scripts={state.scripts} />
         {state.history.length === 0 && pending === null && !writing ? (
           state.voice.reachable ? (
             <Empty
@@ -120,6 +121,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
               busy={busy}
               salesFrozen={state.scripts.salesFrozen}
               onScriptStep={props.onScriptStep}
+              creatorId={state.persona.played?.creatorId ?? null}
               onReplay={() => {
                 props.onReplay(n);
               }}
@@ -211,6 +213,7 @@ function TurnView({
   busy,
   salesFrozen,
   onScriptStep,
+  creatorId,
 }: {
   turn: Turn;
   canReplay: boolean;
@@ -221,7 +224,10 @@ function TurnView({
   isLastFan: boolean;
   onReplay: () => void;
   onMark: ((verdict: DesireMarkVerdict) => void) | undefined;
+  /** Her creator, when one of her versions is played: the media of her scripts are drawn from her vault. */
+  creatorId: CreatorId | null;
 }): JSX.Element {
+  const step = bundleStepOf(turn.media);
   return (
     <div className={`pg-m pg-m--${turn.from}`}>
       {canReplay ? (
@@ -234,21 +240,29 @@ function TurnView({
           Rejouer d’ici
         </button>
       ) : null}
-      {(turn.media ?? []).map((m, i) => (
-        <MediaCard
-          key={i}
-          media={m}
-          from={turn.from}
+      {step !== undefined ? (
+        // A step of a script goes as one message, as on Reveal: its words and its whole bundle.
+        <Bundle
+          media={turn.media ?? []}
+          step={step}
+          text={turn.text}
+          creatorId={creatorId}
           busy={busy}
           salesFrozen={salesFrozen}
           onScriptStep={onScriptStep}
         />
-      ))}
-      {bubblesOf(turn.text).map((line, i) => (
-        <div key={i} className={`nv-bubble nv-bubble--${turn.from}`}>
-          {line}
-        </div>
-      ))}
+      ) : (
+        <>
+          {(turn.media ?? []).map((m, i) => (
+            <MediaCard key={i} media={m} from={turn.from} />
+          ))}
+          {bubblesOf(turn.text).map((line, i) => (
+            <div key={i} className={`nv-bubble nv-bubble--${turn.from}`}>
+              {line}
+            </div>
+          ))}
+        </>
+      )}
       {turn.desire === undefined ? null : <DesireTag desire={turn.desire} onMark={onMark} />}
     </div>
   );
@@ -257,80 +271,23 @@ function TurnView({
 function MediaCard({
   media,
   from,
-  busy,
-  salesFrozen,
-  onScriptStep,
 }: {
   media: NonNullable<Turn['media']>[number];
   from: Turn['from'];
-  busy: boolean;
-  /** A possible minor or his distress froze his sales: production would never sell, nor does the playground. */
-  salesFrozen: boolean;
-  onScriptStep: (answer: ScriptStepAnswer) => void;
 }): JSX.Element {
-  const { description, isLocked, scriptStep: step } = media;
+  const { description, isLocked } = media;
   const flags = description.flags.map((f) => MEDIA_FLAG_LABELS[f] ?? f);
-  const price = step?.priceCents ?? null;
   return (
-    <div
-      className={`pg-media ${isLocked ? 'is-locked' : ''} ${flags.length > 0 ? 'is-flagged' : ''} ${
-        step === undefined ? '' : `is-step is-${step.state}`
-      }`}
-    >
+    <div className={`pg-media ${isLocked ? 'is-locked' : ''} ${flags.length > 0 ? 'is-flagged' : ''}`}>
       <span className="pg-media__k">
         {KIND_LABELS[description.kind]}{' '}
-        {from === 'fan'
-          ? 'du fan'
-          : price !== null
-            ? `payante · ${money(price)}`
-            : isLocked
-              ? 'payante, floutée'
-              : 'offerte'}
+        {from === 'fan' ? 'du fan' : isLocked ? 'payante, floutée' : 'offerte'}
         {flags.length > 0 ? ` · ${flags.join(', ')}` : ''}
-        {step === undefined ? null : <span className="pg-media__essai">Essai</span>}
       </span>
       <span className="pg-media__d">{description.factualDescription}</span>
-      {step === undefined || step.state === 'offered' ? null : step.state === 'waiting' ? (
-        <span className="pg-media__act">
-          <button
-            type="button"
-            className="nv-btn nv-btn--plain nv-btn--sm"
-            disabled={busy}
-            title="Il dit non à cette étape : le script s’arrête là"
-            onClick={() => {
-              onScriptStep('refuse');
-            }}
-          >
-            Refuser
-          </button>
-          <button
-            type="button"
-            className="nv-btn nv-btn--neon nv-btn--sm"
-            disabled={busy || salesFrozen}
-            title={
-              salesFrozen
-                ? 'Ventes gelées pour ce fan (âge douteux ou détresse) : aucun achat, même fictif'
-                : 'Achat fictif : rien ne part vers Reveal ni dans les chiffres'
-            }
-            onClick={() => {
-              onScriptStep('buy');
-            }}
-          >
-            Payer {price === null ? '' : money(price)} (fictif)
-          </button>
-        </span>
-      ) : (
-        <span className="pg-media__state">{STEP_STATE_LABELS[step.state]}</span>
-      )}
     </div>
   );
 }
-
-const STEP_STATE_LABELS = {
-  bought: 'Achetée, en fictif',
-  refused: 'Refusée',
-  closed: 'Sans réponse : le script s’est arrêté',
-} as const;
 
 /** She is writing: what a fan sees between two of her bubbles, and while the answer is being written. */
 function Typing(): JSX.Element {

@@ -253,7 +253,7 @@ describe('/v1/playground', () => {
     expect(back.persona).toEqual({ name: 'Lina', played: null });
   });
 
-  it('sells from her own scripts with one of her versions, and says at once why none can be played (ADR 0103 § 15)', async () => {
+  it('reads her own scripts with one of her versions, and says at once why the trial ones play instead (ADR 0103 § 15)', async () => {
     const asked: [string, string][] = [];
     const { post } = await server({
       herScripts: (creatorId, userId) => {
@@ -264,7 +264,7 @@ describe('/v1/playground', () => {
     const hers = stateOf(await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT }));
     expect(asked).toHaveLength(1);
     expect(asked[0]?.[0]).toBe(MIA);
-    expect(hers.scripts).toMatchObject({ source: 'hers', unavailable: { code: 'none_ready' }, run: null });
+    expect(hers.scripts).toMatchObject({ source: 'trial', unavailable: { code: 'none_ready' }, run: null });
     expect(hers.scripts.unavailable?.label).toContain('Ses scripts dans Reveal');
     // The invented persona plays the trial scripts, and never reads hers.
     const back = stateOf(await post('/persona', { kind: 'invented' }));

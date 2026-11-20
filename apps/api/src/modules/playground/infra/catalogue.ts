@@ -29,9 +29,8 @@ export interface PlaygroundScript {
   readonly steps: readonly ShownStep[];
 }
 
-/** Why none of her scripts can be played, in the words of `offerRefusalLabel`'s neighbour, `catalogueLabel`. */
-export const CATALOGUE_UNAVAILABLE = ['no_script', 'none_ready', 'several_accounts', 'unreadable'] as const;
-export type CatalogueUnavailable = (typeof CATALOGUE_UNAVAILABLE)[number];
+/** Why none of her scripts can be played; said in French by `catalogueLabel`. */
+export type CatalogueUnavailable = 'no_script' | 'none_ready' | 'several_accounts' | 'unreadable';
 
 /** Her catalogue as the playground reads it: her scripts that production would offer, or why there is none. */
 export type HerCatalogue =
