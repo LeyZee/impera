@@ -1,4 +1,4 @@
-/** Shared Zod schemas and types: the agency's percentage of each creator, the agent's hours, alerts, auth, the Automatique rule, backups, the brain's intents, conversations, the creator's own space, creators and their cards in the list, dashboard, the desire score, the fan's availability (ADR 0103), fans (KYC slots, flags), the agent's guard codes, ids, invitation links, what the link connector reads of a redirect link (ADR 0120), money, text normalisation, enums, errors, events, jobs, connector port data, media, pay periods and an account's pay rules, payroll (commission statements, bonuses, penalties, adjustments, carry-overs, tiers, goals, exchange rates), contractors' invoices (regimes, contractor files, contract texts, invoices and credit notes), settings, persona and its API, the sales feed of a platform's register (ADR 0050), scheduling, the shift calendar, the end-of-shift reports and the mini feedback, script structures (ADR 0056) and a script's run with one fan (ADR 0098), the security alerts, team and its members, telegram and the creator's Telegram channel (ADR 0080), the drop categories (ADR 0055) and the trend watch (ADR 0060), the trophy case (ADR 0104, 0107, 0108), and the table of the CRM's menus shared with the extension (ADR 0066 § 6). */
+/** Shared Zod schemas and types: the agency's percentage of each creator, the agent's hours, alerts, auth, the Automatique rule, the audit journal's entries and their French sentences (EQ-18), backups, the brain's intents, the dashboard's reports of its own errors (OPS-18), conversations, the creator's own space, creators and their cards in the list, dashboard, the desire score, the fan's availability (ADR 0103), fans (KYC slots, flags), the agent's guard codes, ids, invitation links, what the link connector reads of a redirect link (ADR 0120), money, text normalisation, enums, errors, events, jobs, connector port data, media, pay periods and an account's pay rules, payroll (commission statements, bonuses, penalties, adjustments, carry-overs, tiers, goals, exchange rates), contractors' invoices (regimes, contractor files, contract texts, invoices and credit notes), settings, persona and its API, the sales feed of a platform's register (ADR 0050), scheduling, the shift calendar, the end-of-shift reports and the mini feedback, script structures (ADR 0056) and a script's run with one fan (ADR 0098), the security alerts, team and its members, telegram and the creator's Telegram channel (ADR 0080), the drop categories (ADR 0055) and the trend watch (ADR 0060), the trophy case (ADR 0104, 0107, 0108), and the table of the CRM's menus shared with the extension (ADR 0066 § 6). */
 export const CONTRACTS_PACKAGE = '@impera/contracts';
 
 export * from './agency-rates';
@@ -6,6 +6,8 @@ export * from './agent-hours';
 export * from './alert-history';
 export * from './alerts';
 export * from './creator-alerts';
+export * from './audit';
+export * from './audit-actions';
 export * from './custom-orders';
 export * from './custom-prices';
 export * from './auth';
@@ -13,6 +15,7 @@ export * from './automatic';
 export * from './backups';
 export * from './brief';
 export * from './calendar';
+export * from './client-errors';
 export * from './connector';
 export * from './connector-reads';
 export * from './content-drops';
