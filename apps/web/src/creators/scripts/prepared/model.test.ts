@@ -50,7 +50,7 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
     expect(paths.shown).toHaveLength(8);
   });
 
-  it('never counts a path through a branch kept for those who took another branch before', () => {
+  it('never counts a path a fan cannot take, and names a following branch by what it says', () => {
     const [first, second] = CONTENT.steps;
     if (first === undefined || second === undefined) throw new Error('fixture');
     const special = second.branches[1];
@@ -74,12 +74,20 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
       ],
     };
     const paths = scriptPaths(followers);
-    expect(paths.count).toBe(3);
+    expect(paths.count).toBe(2);
     expect(paths.shown.map((path) => [path.name, path.totalMinor])).toEqual([
       ['Par défaut', 3200],
-      ['S’il aime le rouge', 3500],
-      ['S’il aime le rouge, puis branche 2 à l’étape 3', 5500],
+      ['S’il aime le rouge, puis « Un texte d’offre inventé »', 5500],
     ]);
+    const said = scriptPaths({
+      ...followers,
+      steps: followers.steps.map((step, at) =>
+        at === 2
+          ? { ...step, branches: step.branches.map((b) => ({ ...b, teaser: 'La version longue' })) }
+          : step,
+      ),
+    });
+    expect(said.shown.at(-1)?.name).toBe('S’il aime le rouge, puis « La version longue »');
   });
 
   it('says each gap where it is, and a limit as she wrote it', () => {

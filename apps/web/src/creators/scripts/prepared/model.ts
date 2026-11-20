@@ -199,9 +199,10 @@ export interface ScriptPath {
 export const PATHS_SHOWN = 8;
 
 /**
- * A path named whole, after every branch taken that is not a default one: « Par défaut », or « Branche 2 à l’étape 2,
- * puis s’il a parlé de la robe ». A condition said in words keeps its words; a branch kept for those who took another
- * one is named by its place, since the branch it follows is already in the name.
+ * A path named whole, after every branch taken that is not a default one: « Par défaut », or « A déjà dépensé 50 € ou
+ * plus chez elle, puis s’il a parlé de la robe ». A condition said in words keeps its words; a branch kept for those
+ * who took another one, whose condition is already in the name, is named by what it says (its teaser, else its offer),
+ * by its place only when it says nothing yet.
  */
 function pathName(content: PreparedScriptContent, taken: readonly PreparedBranch[]): string {
   const parts = taken.flatMap((branch, step) => {
@@ -209,6 +210,8 @@ function pathName(content: PreparedScriptContent, taken: readonly PreparedBranch
     if (condition === null || condition.kind === 'none') return [];
     if (condition.kind === 'text' || condition.rule.kind === 'spent_at_least')
       return [conditionLabel(condition, content).text];
+    const said = (branch.teaser.trim() === '' ? branch.offerText : branch.teaser).trim();
+    if (said !== '') return [`« ${said} »`];
     const index = content.steps[step]?.branches.indexOf(branch) ?? 0;
     return [`branche ${String(index + 1)} à l’étape ${String(step + 1)}`];
   });
@@ -227,7 +230,27 @@ const followed = (branch: PreparedBranch): string | null =>
     : null;
 
 /**
- * The paths a fan can take: one branch at each step, never a branch kept for those who took another branch before.
+ * Whether a fan who took `taken` can take this branch: a branch kept for those who took another one needs it; and when
+ * such a branch of the step holds for him, its rule passes before what the AI reads and before the default, so neither
+ * of those is taken.
+ */
+function reachable(
+  branch: PreparedBranch,
+  siblings: readonly PreparedBranch[],
+  taken: (key: string) => boolean,
+): boolean {
+  const after = followed(branch);
+  if (after !== null) return taken(after);
+  const kind = branch.condition?.kind;
+  if (kind === 'structured') return true;
+  return !siblings.some((one) => {
+    const key = followed(one);
+    return key !== null && taken(key);
+  });
+}
+
+/**
+ * The paths a fan can take: one branch at each step, as `reachable` allows.
  * Counted step by step on the branches some later branch follows (four branches on ten steps would be a million to
  * walk), and only the first `PATHS_SHOWN` built, the default branches first, each named whole (`pathName`).
  */
@@ -244,8 +267,7 @@ export function scriptPaths(content: PreparedScriptContent): {
     for (const [state, n] of ways) {
       const taken = new Set(state === '' ? [] : state.split(' '));
       for (const branch of step.branches) {
-        const after = followed(branch);
-        if (after !== null && !taken.has(after)) continue;
+        if (!reachable(branch, step.branches, (key) => taken.has(key))) continue;
         const key = watched.has(branch.key) ? [...taken, branch.key].sort().join(' ') : state;
         next.set(key, (next.get(key) ?? 0) + n);
       }
@@ -269,8 +291,7 @@ export function scriptPaths(content: PreparedScriptContent): {
       (a, b) => Number(b.condition?.kind === 'none') - Number(a.condition?.kind === 'none'),
     );
     for (const branch of ordered) {
-      const after = followed(branch);
-      if (after !== null && !taken.some((was) => was.key === after)) continue;
+      if (!reachable(branch, one.branches, (key) => taken.some((was) => was.key === key))) continue;
       walk(step + 1, [...taken, branch]);
     }
   };
