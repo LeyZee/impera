@@ -366,8 +366,6 @@ export interface ScriptIdentityJobStore {
    * identity first, queued for the job, which decides. Gives how many.
    */
   enqueueBacklog(correlationId: string): Promise<number>;
-  /** Queues the job for these scripts of hers, now. */
-  enqueue(creatorId: CreatorId, scriptIds: readonly string[], correlationId: string): Promise<void>;
 }
 
 /** The brain that writes an identity (`brain/script-identity`, `llm`, wired by the composition root). */
@@ -397,40 +395,27 @@ export interface ScriptIdentifier {
   >;
 }
 
-/** What a person of the agency does to an identity, given the script as it is now in the same transaction. */
-export type IdentityReview =
-  | { readonly kind: 'validate'; readonly identityId: ScriptIdentityId }
-  | { readonly kind: 'correct'; readonly content: ScriptIdentityContent };
-
 /** The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4). */
 export type DescriptionReview =
   | { readonly kind: 'validate'; readonly descriptionIds: readonly string[] }
   | { readonly kind: 'correct'; readonly descriptionId: string; readonly detailed: string };
 
 /**
- * The agency's validation and correction of an identity (SC-04 lot c8, ADR 0030 § 3), in the person's transaction,
- * under her RLS and his scope, audited. `currentHash` reads the version of the script as the same transaction sees
- * it: an identity of another version is `stale`.
+ * The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4), in the person's
+ * transaction, under her RLS and his scope, audited. Its identity is no longer reviewed by hand: the agent offers only
+ * the scripts written in Impera (ADR 0161).
  */
 export interface ScriptIdentityReviewStore {
-  review(
-    creatorId: CreatorId,
-    scriptId: string,
-    review: IdentityReview,
-    userId: string,
-    currentHash: (script: StoredPlatformScript) => string,
-  ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'>;
   /**
    * The descriptions of its media validated as shown, or one rewritten by hand and validated (ADR 0099 § 4), in the
    * same way: a description that is not the one a media of this script is shown with now is `stale`, one that waits
-   * for a person named with others `alone`. Each write asks the script's identity again (`scripts.identify_platform_script`).
+   * for a person named with others `alone`. No identity is asked after it any more (ADR 0161 § 5).
    */
   describe(
     creatorId: CreatorId,
     scriptId: string,
     review: DescriptionReview,
     userId: string,
-    correlationId: string,
   ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'>;
 }
 

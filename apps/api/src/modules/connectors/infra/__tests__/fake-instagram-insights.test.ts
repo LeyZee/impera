@@ -40,6 +40,7 @@ async function run(fake: FakeInstagramInsights, kept: MediaInsightSnapshot[], no
     if (one === undefined) continue;
     kept.push(...snapshotsOf(one, await fake.readInsights(ref), now, keptOf(ref)));
   }
+  for (const one of media) kept.push(...snapshotsOf(one, null, now, keptOf(one.ref)));
   return plan;
 }
 
@@ -65,14 +66,30 @@ describe('FakeInstagramInsights (ADR 0120 § 1 and § 2)', () => {
     fake.setNumbers(reel.ref, numbers(500));
     await run(fake, kept, night(17));
     expect(kept).toHaveLength(1);
-    expect(kept[0]?.numbers.views).toBe(100);
+    expect(kept[0]?.numbers?.views).toBe(100);
     expect(fake.calls.filter((call) => call.method === 'readInsights')).toHaveLength(1);
 
     await run(fake, kept, night(18));
-    expect(kept.map((snapshot) => [snapshot.age, snapshot.numbers.views])).toEqual([
+    expect(kept.map((snapshot) => [snapshot.age, snapshot.numbers?.views])).toEqual([
       ['1h', 100],
       ['24h', 500],
     ]);
+  });
+
+  it('marks missed the steps of a night that never ran, without a call for a media too old to read', async () => {
+    const fake = new FakeInstagramInsights().seedMedia(reel, numbers(100));
+    const kept: MediaInsightSnapshot[] = [];
+    await run(fake, kept, night(20));
+    expect(kept.map((snapshot) => [snapshot.age, snapshot.numbers?.views ?? null])).toEqual([
+      ['1h', null],
+      ['24h', null],
+      ['48h', 100],
+    ]);
+
+    await run(fake, kept, new Date('2026-12-20T03:00:00.000Z'));
+    expect(kept.map((snapshot) => snapshot.age)).toEqual(['1h', '24h', '48h', '7d']);
+    expect(kept[3]?.numbers).toBeNull();
+    expect(fake.calls.filter((call) => call.method === 'readInsights')).toHaveLength(1);
   });
 
   it('stops at the quota, then picks up what waited on a later run', async () => {

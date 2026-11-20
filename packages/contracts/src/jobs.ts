@@ -59,6 +59,7 @@ export const JOB_NAMES = [
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
+  'creator_week.plan',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
@@ -142,6 +143,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
+  'creator_week.plan': 'Semaine de la créatrice',
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
@@ -317,6 +319,11 @@ export const JOB_PAYLOADS = {
     state: z.enum(['accepted', 'declined']),
     day: z.iso.date(),
   }),
+  /**
+   * Each hour (ADR 0140 § 2): for each creator whose Sunday 18 h has passed in her zone, the week after computed as a
+   * draft for the owner. Replayable: one week per creator, a draft already there is kept.
+   */
+  'creator_week.plan': z.object({}),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -629,6 +636,8 @@ export const JOB_MAX_ATTEMPTS = {
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
   'creator_tasks.suggestion_decided': 5,
+  // Each hour: the next run is the retry, and a week is written once.
+  'creator_week.plan': 1,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
@@ -785,5 +794,5 @@ export function resumeRunAt(index: number, now: Date): Date {
  * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
  * (`withTenantJob`) refuses any other.
  */
-export const TenantJobSchema = z.enum(['daily_stats']);
+export const TenantJobSchema = z.enum(['daily_stats', 'media_insights']);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

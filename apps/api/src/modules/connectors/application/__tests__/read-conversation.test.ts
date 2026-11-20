@@ -35,6 +35,8 @@ function storeOf(held: ConnectorAccount): AccountStore & { failures: number } {
     get: () => Promise.resolve(held),
     sessionOf: unused,
     recordPoll: unused,
+    recordProfileBio: unused,
+    profileBioOf: unused,
     recordFailure: () => {
       store.failures += 1;
       return Promise.resolve();

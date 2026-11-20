@@ -1,6 +1,6 @@
 import type { JobPayload, SessionState } from '@impera/contracts';
 
-import { ConnectorError } from '../domain/platform-connector';
+import { ConnectorError, type PlatformConnector } from '../domain/platform-connector';
 import type { AccountStore, Clock, ConnectorAccount, IngestMessage, JobLogger } from '../domain/ports';
 import { isPaused, POLL_OVERLAP_SECONDS } from '../domain/rhythm';
 
@@ -18,6 +18,39 @@ const FIRST_POLL_LOOKBACK_HOURS = 24;
 export const CATCH_UP_AFTER_HOURS = 6;
 
 const POLLABLE: readonly SessionState[] = ['valid', 'warning'];
+
+/** Her profile's bio is read again at most this often (ADR 0154 § 1): the pace of her automations' read. */
+export const PROFILE_BIO_EVERY_MINUTES = 15;
+/** What is kept of a bio: a profile text, never a page (the agent reads less still). */
+const PROFILE_BIO_KEPT_MAX = 4_000;
+
+/**
+ * Her bio, read again when the last read is older than `PROFILE_BIO_EVERY_MINUTES` (ADR 0154 § 1-2). Read only. A read
+ * that fails keeps the last bio and never stops the poll; an expired session stops it, as anywhere else.
+ */
+async function refreshProfileBio(
+  connector: PlatformConnector,
+  deps: Pick<AccountJobDeps, 'accounts'>,
+  account: ConnectorAccount,
+  now: Date,
+  logger: JobLogger,
+): Promise<void> {
+  if (!connector.capabilities.creatorProfile || connector.getCreatorProfile === undefined) return;
+  const last = account.profileBioReadAt ?? null;
+  if (last !== null && now.getTime() - last.getTime() < PROFILE_BIO_EVERY_MINUTES * 60_000) return;
+  try {
+    const profile = await connector.getCreatorProfile();
+    await deps.accounts.recordProfileBio(
+      account.creatorId,
+      account.id,
+      profile.bio.trim().slice(0, PROFILE_BIO_KEPT_MAX),
+      now,
+    );
+  } catch (error) {
+    if (error instanceof ConnectorError && error.code === 'session_expired') throw error;
+    logger.info({ platformAccountId: account.id }, 'poll: profile bio not read, the last one is kept');
+  }
+}
 
 export interface AccountJobDeps {
   readonly accounts: AccountStore;
@@ -66,6 +99,7 @@ export function createPollJob(deps: AccountJobDeps) {
       if (health !== account.sessionState) {
         await deps.accounts.setSessionState(account.creatorId, account.id, health, meta);
       }
+      await refreshProfileBio(connector, deps, account, now, logger);
       const since =
         account.lastPollAt === null
           ? new Date(now.getTime() - FIRST_POLL_LOOKBACK_HOURS * 3_600_000)

@@ -72,18 +72,6 @@ const bodiesFor = (
   'POST /v1/creators/:creatorId/drops/:id/summary/validate': {
     summaryId: '00000000-0000-4000-8000-000000000000',
   },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/validate': {
-    identityId: '00000000-0000-4000-8000-000000000000',
-  },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/correct': {
-    content: {
-      ambiance: 'Ambiance inventée',
-      energy: 'soft',
-      setting: 'Décor inventé',
-      useWhen: ['Situation inventée'],
-      avoidWhen: [],
-    },
-  },
   // The owner's alone (ADR 0092 § 6): A's people stop at the guard, B's creator or not.
   'PUT /v1/dashboard/agency/objectives/:creatorId/:month': { amountMinor: 100_000 },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
@@ -223,6 +211,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'PATCH /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id/ticks/:day': 'creator space: creator-tasks tests',
+  'PUT /v1/creator-space/shoot-items/:id': 'creator space: creator-week tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',

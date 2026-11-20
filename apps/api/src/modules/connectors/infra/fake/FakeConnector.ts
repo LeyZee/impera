@@ -56,6 +56,7 @@ export class FakeConnector implements PlatformConnector {
     fanNoteRead: false,
     fanNoteWrite: false,
     creatorNotes: false,
+    creatorProfile: false,
     ppvStats: false,
     scripts: false,
     scriptHistory: false,
