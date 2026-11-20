@@ -584,7 +584,7 @@ describe('loadConfig', () => {
           ...verified,
           DATABASE_SERVICE_URL: remote('impera_service', '?sslmode=require'),
         }),
-      ).toThrow(/DATABASE_SERVICE_URL reaches a remote base: it must end with sslmode=verify-full/u);
+      ).toThrow(/DATABASE_SERVICE_URL reaches a remote base: it must carry sslmode=verify-full, once/u);
       expect(() =>
         testConfig({
           ...PRODUCTION,
@@ -594,6 +594,16 @@ describe('loadConfig', () => {
           DATABASE_ADMIN_URL: remote('nirvana_admin', ''),
         }),
       ).toThrow(/DATABASE_ADMIN_URL reaches a remote base/u);
+      // Given twice, the library may keep the last value: refused even when the first one is right.
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          ...verified,
+          DATABASE_URL: remote('nirvana_app', '?sslmode=verify-full&sslmode=disable'),
+        }),
+      ).toThrow(/DATABASE_URL reaches a remote base/u);
       // A base on this machine, or behind a service name of the compose, is not on the network; nor is any outside
       // production.
       expect(() => testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY })).not.toThrow();

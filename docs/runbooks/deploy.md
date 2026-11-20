@@ -165,9 +165,9 @@ Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des
    node dist/scripts/create-owner.js --email <e-mail> --name <nom>
    ```
 
-   Le mot de passe se tape deux fois, sans écho (12 caractères au moins).
-6. **Changer le mot de passe de `postgres`** une fois la mise en service finie (Database → Settings → Reset database password), et ne le garder que dans le gestionnaire de mots de passe. Retirer l'adresse du PC des restrictions réseau si elle y avait été ajoutée.
+   Le mot de passe se tape deux fois, sans écho (12 caractères au moins). L'e-mail, passé en argument, reste dans l'historique du terminal de Coolify : le vider ensuite (`history -c`), le script ne sachant pas encore le demander au clavier.
 5. Se connecter au dashboard, créer la créatrice dans Créatrices (ou `node dist/scripts/create-creator.js --name <nom>`).
+6. **Changer le mot de passe de `postgres`** une fois la mise en service finie (Database → Settings → Reset database password), et ne le garder que dans le gestionnaire de mots de passe. Retirer l'adresse du PC des restrictions réseau si elle y avait été ajoutée.
 
 ### 1.5 Persona réelle
 

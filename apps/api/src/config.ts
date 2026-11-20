@@ -184,10 +184,12 @@ const configSchema = z
     for (const [field, value] of Object.entries(urls)) {
       const url = new URL(value);
       if (!isNetworkDatabaseHost(url.hostname)) continue;
-      if (url.searchParams.get('sslmode') !== 'verify-full') {
+      // One sslmode only: given twice, the connection library may keep the last one.
+      const modes = url.searchParams.getAll('sslmode');
+      if (modes.length !== 1 || modes[0] !== 'verify-full') {
         context.addIssue({
           code: 'custom',
-          message: `${field} reaches a remote base: it must end with sslmode=verify-full (ADR 0152 § 2, deploy.md)`,
+          message: `${field} reaches a remote base: it must carry sslmode=verify-full, once (ADR 0152 § 2, deploy.md)`,
           path: [field],
         });
       }
