@@ -42,7 +42,8 @@ function playable(script: HerScript): boolean {
 
 /**
  * A native script as the agent decides on it (ADR 0098), or `null` when it may not be offered (ADR 0161 § 4): only
- * the recognised copy of a script we prepared, still the same on Reveal, with our description and moment. A native
+ * the recognised copy of a script we prepared, still the same on Reveal, with our description and moment (`both`
+ * giving none, so it is offered by day as by night). A native
  * script of no script of ours is never offered, whatever identity it carries (those rows are ignored, § 5). Neither is
  * one with another gap of P6-01, or with a step of several branches: the branch engine (ADR 0112, lot 2) reads those.
  * A step is paid when the platform prices it, offered when it sends a media for free, and a bridge when it is text.
@@ -55,7 +56,8 @@ export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
   const media = script.steps.flatMap((step) => [...step.media, ...step.previewMedia]);
   return {
     scriptRef: script.ref,
-    moment: ours.moment,
+    // Day and night (ADR 0112 § 27): no moment imposed, offered at either.
+    moment: ours.moment === 'both' ? null : ours.moment,
     description: ours.description,
     steps: script.steps.map((step) => ({
       stepRef: step.ref,

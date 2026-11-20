@@ -15,6 +15,7 @@ import {
   type SaleExcludeReason,
   type SaleHeldReason,
   type SaleStatus,
+  type SaleType,
   type TeamMemberId,
 } from '@impera/contracts';
 
@@ -80,6 +81,8 @@ export type SaleAuthorForPay =
 /** A line of the register as pay reads it: a sale, or the refund of one, never a sum. */
 export interface SaleForPay extends SaleKey {
   readonly platformAccountId: PlatformAccountId;
+  /** What was sold (a refund's is its line's own): shown to its member, never read by a rule nor an amount. */
+  readonly saleType: SaleType;
   /** Its status when first read, which it keeps. */
   readonly status: SaleStatus;
   /** When the line happened: a sale's instant, or the refund's own. */
@@ -586,6 +589,8 @@ export interface CountedSale extends CountedSaleLine {
   readonly lateFrom: PayPeriod | null;
   /** The line's own instant, for its member to read (CRM-03 lot b4c); `null` from a closing's registry. */
   readonly occurredAt: Date | null;
+  /** What was sold, for its member to read (ADR 0104 § 6); `null` from a closing's registry, which does not keep it. */
+  readonly saleType: SaleType | null;
 }
 
 /** A line the period would count but holds, and why. */
@@ -645,6 +650,7 @@ export function salesCounted(sales: SalesSnapshot, place: PeriodPlace): CountedS
           ...countedLineOf(registered),
           lateFrom: lateFrom(registered.salePeriod, place.period),
           occurredAt: null,
+          saleType: null,
         });
       }
     }
@@ -669,6 +675,7 @@ export function salesCounted(sales: SalesSnapshot, place: PeriodPlace): CountedS
       part,
       lateFrom: lateFrom(salePeriod, place.period),
       occurredAt: line.occurredAt,
+      saleType: line.saleType,
     });
     if (attribution.kind === 'member') {
       counted.push(one(attribution, line.netMinor, null));
@@ -735,6 +742,11 @@ export interface StatementSale extends SaleKey {
    * of its `inputsHash` (`inputsHashOf`), absent on a statement written before it and on a closed period's.
    */
   readonly occurredAt?: string;
+  /**
+   * What was sold, for its member's own figures (ADR 0104 § 6): kept on the statement as the instant is, out of its
+   * `inputsHash`, absent on a statement written before it and on a closed period's. No amount reads it.
+   */
+  readonly saleType?: SaleType;
 }
 
 /** The counted lines of one account and currency for one member: one line of the statement, on the platform's net. */
@@ -779,6 +791,7 @@ export function saleLinesOf(counted: readonly CountedSale[]): SaleLineGroup[] {
         ...(one.lateFrom !== null && { lateFrom: one.lateFrom }),
         ...(one.part !== null && { shareBp: one.part.shareBp }),
         ...(one.occurredAt !== null && { occurredAt: one.occurredAt.toISOString() }),
+        ...(one.saleType !== null && { saleType: one.saleType }),
       })),
     }));
 }

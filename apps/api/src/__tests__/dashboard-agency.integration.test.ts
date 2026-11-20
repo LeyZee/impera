@@ -238,6 +238,15 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     // One fan, who bought ten days ago too: paying, not new; what he spent less the refund of his sale.
     expect(result.fans).toMatchObject({ paying: 1, newPaying: 0, averagePerPayingMinor: 6000 });
     expect(result.refundsWithoutSale).toBe(1);
+    // The refunds one by one (ADR 0092 § 4): the sale's seller, the days since it, none for a sale out of the register.
+    expect(
+      result.refundList
+        .map((one) => [one.creatorId, one.kind, one.amountMinor, one.seller, one.delayDays])
+        .sort((a, b) => Number(a[2]) - Number(b[2])),
+    ).toEqual([
+      [creatorId, 'ppv', 600, { kind: 'member', memberId: theo, name: 'Théo' }, 0],
+      [creatorId, 'ppv', 900, { kind: 'member', memberId: theo, name: 'Théo' }, null],
+    ]);
     // Nothing in the photo of the statistics yet: no subscriber figure, never a zero (ADR 0081).
     expect(result.subscribers).toBeNull();
     // Never the fan: neither his id at the platform nor anything of his.

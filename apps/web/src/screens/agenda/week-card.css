@@ -1,0 +1,682 @@
+/* ── Ta semaine de tournage (ADR 0140) ─────────────────────────────────────────────────────────────────────────── */
+/* One card above her agenda. One thing leads, her next shooting day; each kind of thing in its own colour (Charles,
+   20/11), hers to change; no bar on any side; red and amber stay for urgencies and warnings, never a kind's colour. */
+.wk-card {
+  /* The swatches she picks from: light mid tones by night, darker ones by day (a ring at 3:1 on the plate). */
+  --wk-sw-rose: #f07a94;
+  --wk-sw-violet: #a395ff;
+  --wk-sw-cyan: #5cc8d8;
+  --wk-sw-bleu: #79b0ff;
+  --wk-sw-vert: #93cf7c;
+  --wk-sw-citron: #c6e35a;
+  --wk-sw-lilas: #e08ee6;
+  --wk-mark: #0b0b10;
+  padding: var(--nv-plate-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin-bottom: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--ag-c) 10%, transparent), transparent 60%),
+    var(--nv-plate);
+  animation: wk-in var(--nv-dur-slow) var(--nv-ease-out) both;
+}
+:root[data-theme='light'] .wk-card {
+  --wk-sw-rose: #c8385a;
+  --wk-sw-violet: #6a55e0;
+  --wk-sw-cyan: #127f8f;
+  --wk-sw-bleu: #2f6fd6;
+  --wk-sw-vert: #3d8a2a;
+  --wk-sw-citron: #557000;
+  --wk-sw-lilas: #a03aa8;
+  --wk-mark: #fff;
+}
+/* Each kind's colour: hers when she chose one, ours otherwise. */
+.wk-card [data-need='feed_shoot'] {
+  --wk-c: var(--wk-feed_shoot, var(--wk-sw-rose));
+}
+.wk-card [data-need='feed_video'] {
+  --wk-c: var(--wk-feed_video, var(--wk-sw-violet));
+}
+.wk-card [data-need='reveal_story'] {
+  --wk-c: var(--wk-reveal_story, var(--wk-sw-cyan));
+}
+.wk-card [data-need='script'] {
+  --wk-c: var(--wk-script, var(--wk-sw-bleu));
+}
+.wk-card [data-need='mass_dm'] {
+  --wk-c: var(--wk-mass_dm, var(--wk-sw-vert));
+}
+.wk-card [data-need='idea'] {
+  --wk-c: var(--wk-idea, var(--wk-sw-citron));
+}
+@keyframes wk-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ── Head: her week, its deadline, her colours ── */
+.wk-head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.wk-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--ag-c) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 34%, transparent);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.wk-card:hover .wk-mark {
+  transform: rotate(-6deg) scale(1.05);
+}
+.wk-mark svg {
+  width: 24px;
+  height: 24px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.wk-mark__board {
+  fill: color-mix(in srgb, var(--ag-c) 55%, transparent);
+  stroke: var(--ag-c);
+  stroke-width: 1.4;
+}
+.wk-mark__clap {
+  fill: var(--ag-c);
+  stroke: var(--ag-c);
+  stroke-width: 1.4;
+  transform-origin: 4px 9px;
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.wk-card:hover .wk-mark__clap {
+  transform: rotate(-8deg);
+}
+.wk-mark__stripes {
+  fill: none;
+  stroke: var(--nv-plate);
+  stroke-width: 1.6;
+}
+.wk-heading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wk-title {
+  font-family: var(--nv-font-display);
+  font-weight: 650;
+  font-size: var(--nv-text-headline);
+  line-height: 1.2;
+}
+.wk-due {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+/* « Dans 9 jours »: a pill of its own, never a word left alone at the end of a line. */
+.wk-due__in {
+  display: inline-flex;
+  align-items: center;
+  height: var(--nv-pill-info);
+  padding-inline: 8px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-track);
+}
+.wk-due__in[data-late] {
+  color: var(--nv-warning);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+}
+.wk-paint {
+  flex: none;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: var(--nv-target-min);
+}
+.wk-paint__dots {
+  display: inline-flex;
+  padding-left: 3px;
+}
+/* On a phone, a 44 px round button of her three colours, named for her screen reader: the title keeps its line. */
+@media (max-width: 640px) {
+  .wk-paint {
+    width: var(--nv-target-min);
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--nv-fill-track);
+  }
+  .wk-paint__word {
+    display: none;
+  }
+}
+.wk-paint__dots i {
+  width: 10px;
+  height: 10px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--wk-c);
+  box-shadow: 0 0 0 2px var(--nv-plate);
+}
+
+/* ── Her colours: a sheet over the card, never pushing her week down; a row a kind, seven swatches ── */
+.wk-card {
+  position: relative;
+}
+.wk-palette {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--nv-plate-pad) + 48px);
+  right: var(--nv-plate-pad);
+  width: min(420px, calc(100% - 2 * var(--nv-plate-pad)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background:
+    linear-gradient(165deg, var(--nv-glass-fill-strong) 0%, var(--nv-glass-fill) 62%),
+    var(--nv-surface-raised);
+  box-shadow:
+    inset 0 0 0 1px var(--nv-hairline),
+    0 18px 48px rgb(0 0 0 / 0.35);
+  animation: wk-in var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.wk-palette__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.wk-palette__lead {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.wk-palette__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.wk-palette__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px var(--nv-space-2);
+}
+.wk-palette__word {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.wk-swatches {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+/* A swatch: a 40 × 44 px target around a 22 px dot, seven on one line of a phone; the chosen one ringed. */
+.wk-swatch {
+  position: relative;
+  width: 40px;
+  height: var(--nv-target-min);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.wk-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 11px 9px;
+  border-radius: 50%;
+  background: var(--wk-sw);
+  transition: transform var(--nv-dur-fast) var(--nv-ease-spring-bouncy);
+}
+.wk-swatch:hover::after {
+  transform: scale(1.12);
+}
+.wk-swatch[aria-checked='true']::after {
+  box-shadow:
+    0 0 0 2px var(--nv-plate),
+    0 0 0 4px var(--wk-sw);
+}
+.wk-swatch:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.wk-swatch[data-swatch='rose'] {
+  --wk-sw: var(--wk-sw-rose);
+}
+.wk-swatch[data-swatch='violet'] {
+  --wk-sw: var(--wk-sw-violet);
+}
+.wk-swatch[data-swatch='cyan'] {
+  --wk-sw: var(--wk-sw-cyan);
+}
+.wk-swatch[data-swatch='bleu'] {
+  --wk-sw: var(--wk-sw-bleu);
+}
+.wk-swatch[data-swatch='vert'] {
+  --wk-sw: var(--wk-sw-vert);
+}
+.wk-swatch[data-swatch='citron'] {
+  --wk-sw: var(--wk-sw-citron);
+}
+.wk-swatch[data-swatch='lilas'] {
+  --wk-sw: var(--wk-sw-lilas);
+}
+.wk-palette__reset {
+  align-self: flex-start;
+}
+
+/* ── The ask ── */
+.wk-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--ag-c) 9%, transparent);
+}
+.wk-ask__text {
+  margin: 0;
+  flex: 1 1 260px;
+  font-size: var(--nv-text-footnote);
+  line-height: 1.45;
+}
+/* On a phone the button takes the whole width: one obvious gesture under her thumb. */
+@media (max-width: 640px) {
+  .wk-ask__go {
+    flex: 1 1 100%;
+  }
+}
+.wk-failed {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-warning);
+}
+
+/* ── Her days: the lead one large, the others folded ── */
+.wk-days {
+  display: grid;
+  gap: var(--nv-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.wk-day,
+.wk-delivery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.wk-day--lead {
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ag-c) 45%, transparent);
+  background: color-mix(in srgb, var(--ag-c) 6%, transparent);
+}
+.wk-day__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.wk-day__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The lead day's date takes its own line; when and how many under it. */
+.wk-day--lead > .wk-day__head {
+  flex-wrap: wrap;
+  row-gap: var(--nv-space-1);
+}
+.wk-day--lead .wk-day__titles {
+  flex: 1 1 100%;
+}
+/* Folded, a later day is its one line: no room left for what it hides. */
+.wk-day--later:not([open]) {
+  gap: 0;
+}
+.wk-day__lead {
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  color: var(--ag-c);
+}
+.wk-day__date {
+  min-width: 0;
+  font-size: var(--nv-text-callout);
+}
+.wk-day--lead .wk-day__date {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-title-2);
+  line-height: 1.2;
+}
+.wk-day__date::first-letter {
+  text-transform: uppercase;
+}
+.wk-day__when {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: var(--nv-pill-info);
+  padding-inline: 8px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-track);
+}
+.wk-day[data-today] .wk-day__when {
+  color: var(--wk-mark);
+  background: var(--ag-c);
+}
+.wk-day__count {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.wk-day__fold {
+  list-style: none;
+  min-height: var(--nv-target-min);
+  margin: -6px 0;
+  cursor: pointer;
+  border-radius: var(--nv-radius-sm);
+}
+.wk-day__fold::-webkit-details-marker {
+  display: none;
+}
+.wk-day__fold:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.wk-day--later[open] > .wk-day__fold .wk-line__chevron {
+  transform: rotate(90deg);
+}
+.wk-bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.wk-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wk-c, var(--ag-c));
+  transition: width var(--nv-dur-data) var(--nv-ease-out);
+}
+.wk-day[data-full] .wk-bar i {
+  background: var(--nv-success);
+}
+
+/* ── A line: its kind in its colour, its words, her tick at the end ── */
+.wk-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.wk-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-2);
+  margin-inline: calc(-1 * var(--nv-space-2));
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--wk-c) 7%, transparent);
+  transition: background var(--nv-dur-base) var(--nv-ease-out);
+}
+.wk-kind {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  color: var(--wk-c);
+  background: color-mix(in srgb, var(--wk-c) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wk-c) 30%, transparent);
+}
+.wk-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wk-icon__fill {
+  fill: color-mix(in srgb, currentColor 22%, transparent);
+}
+.wk-icon__ink {
+  fill: currentColor;
+}
+.wk-line__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wk-line__body:not(details) {
+  justify-content: center;
+  min-height: 36px;
+}
+.wk-line__label {
+  font-size: var(--nv-text-body);
+  font-weight: 600;
+  transition: color var(--nv-dur-base) var(--nv-ease-out);
+}
+/* The line itself is the way to its sheet: a chevron at its end that turns when open. */
+.wk-line__summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  min-height: 36px;
+  padding-right: 4px;
+  border-radius: var(--nv-radius-sm);
+  cursor: pointer;
+}
+.wk-line__summary::-webkit-details-marker {
+  display: none;
+}
+.wk-line__summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.wk-line__words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The first words of its sheet, before she opens it: she knows what to shoot at a glance. */
+.wk-line__peek {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wk-line__sheet[open] .wk-line__peek {
+  display: none;
+}
+.wk-line__chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-base) var(--nv-ease-out);
+}
+.wk-line__sheet[open] .wk-line__chevron {
+  transform: rotate(90deg);
+}
+.wk-line__text {
+  margin: var(--nv-space-1) 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: 1.5;
+  color: var(--nv-ink-muted);
+  white-space: pre-line;
+}
+.wk-line[data-done] {
+  background: color-mix(in srgb, var(--wk-c) 3%, transparent);
+}
+.wk-line[data-done] .wk-line__label {
+  color: var(--nv-ink-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--wk-c) 60%, transparent);
+}
+/* Her tick: a ring in the kind's colour, filled once shot; 44 px to the thumb. */
+.wk-tick {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--wk-c);
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-spring-bouncy);
+}
+.wk-tick::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+.wk-tick svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--wk-mark);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.wk-tick[aria-pressed='true'] {
+  background: var(--wk-c);
+}
+.wk-tick[aria-pressed='true'] svg {
+  opacity: 1;
+}
+.wk-tick:active {
+  transform: scale(0.9);
+}
+.wk-tick:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 3px;
+}
+.wk-tick:disabled {
+  cursor: default;
+}
+
+/* ── What is left to drop ── */
+.wk-delivery[data-delivered] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 40%, transparent);
+  background: color-mix(in srgb, var(--nv-success) 8%, transparent);
+}
+.wk-done {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-success);
+}
+.wk-tally {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--nv-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  column-gap: var(--nv-space-5, var(--nv-space-4));
+}
+/* One row a kind: its mark, its word, « 1 / 2 », and a thin bar in its colour under the words. */
+.wk-tally__line {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: var(--nv-space-2);
+  row-gap: 6px;
+  font-size: var(--nv-text-body);
+}
+.wk-tally__line .wk-kind {
+  grid-row: span 2;
+}
+.wk-tally__word {
+  min-width: 0;
+}
+.wk-tally__count {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.wk-tally__bar {
+  grid-column: 2 / -1;
+}
+.wk-tally__line[data-full] .wk-tally__count {
+  color: var(--nv-success);
+}
+.wk-tally__line[data-full] .wk-bar i {
+  background: var(--nv-success);
+}
+.wk-drop {
+  align-self: flex-start;
+  gap: var(--nv-space-2);
+}
+@media (max-width: 640px) {
+  .wk-drop {
+    align-self: stretch;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wk-card,
+  .wk-palette {
+    animation: none;
+  }
+  .wk-mark,
+  .wk-mark__clap,
+  .wk-swatch::after,
+  .wk-tick,
+  .wk-bar i {
+    transition: none;
+  }
+}

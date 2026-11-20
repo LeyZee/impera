@@ -45,10 +45,15 @@ const MODULE_DEPENDENCIES = {
   trends: ['agent', 'content-drops', 'creator-tasks'],
   // INS-03, ADR 0121 § 1: her redirect links, out of the Telegram channel's setting; a leaf, read through its index.
   'redirect-links': [],
+  // ADR 0159: custom orders, first lot her grid of custom prices; a leaf.
+  'custom-orders': [],
   // INS-04, ADR 0122: the comments under her Instagram posts. Lot a: pure rules and its port; imports no module.
   'instagram-comments': [],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
   'creator-tasks': ['scheduling'],
+  // ADR 0140: her week, computed out of her agenda and written in it through its own door (`week`, § 22); her stock
+  // and drops are read through what the composition root plugs, never their tables.
+  'creator-week': ['scheduling', 'creator-tasks'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs

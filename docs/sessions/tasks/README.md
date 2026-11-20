@@ -107,6 +107,7 @@ Branche : task/<id>-<slug>
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
 | CR-15 | Qui sont tes fans : les chiffres de sa base, tirés de leurs faits déclarés | espaces | todo | CR-02, ADR 0074 |
+| CR-16 | La semaine de la créatrice : deux jours de tournage, une livraison le dimanche, un agenda que le code remplit | espaces | in_progress (lot 1 en PR) | CR-05, CR-06, SC-02, ADR 0140 |
 | SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
@@ -149,6 +150,7 @@ Branche : task/<id>-<slug>
 | DSH-04 | Le Dashboard de l'agence par jour, semaine, mois ou période choisie, la comparaison choisie, la courbe au survol | API CRM | done | DSH-01, ADR 0146 |
 | DSH-05 | Le Dashboard de l'agence en couleurs : l'agence en bleu, la courbe selon la tendance, une petite courbe sous Net | API CRM | done | DSH-04, ADR 0106 avenant du 17/11 |
 | DSH-06 | Le Dashboard de l'agence ne conclut pas sur trop peu de ventes | Web | review | DSH-01, DSH-04, ADR 0092 § 5 |
+| DSH-07 | Le Dashboard de l'agence liste les remboursements un par un | API CRM | in-progress | DSH-06, ADR 0092 § 4 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
