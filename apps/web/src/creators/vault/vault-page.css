@@ -920,7 +920,7 @@
 /* ───────────── Nothing in Impera yet: the vault's picture, its title, one neon ───────────── */
 
 .vp-empty-start .nv-empty__icon {
-  width: 132px;
+  width: 176px;
   height: auto;
   border-radius: 0;
   background: none;
@@ -932,63 +932,145 @@
   height: auto;
   overflow: visible;
 }
-.vp-art__chest,
-.vp-art__lid {
-  fill: var(--nv-glass-fill-strong);
+/* Its lines: the theme's ink, a little rounder than a pictogram's. */
+.vp-art__lid,
+.vp-art__body,
+.vp-art__rim,
+.vp-art__frame,
+.vp-art__lock {
   stroke: var(--nv-ink);
   stroke-width: 1.6;
   stroke-linejoin: round;
 }
-.vp-art__band {
-  stroke: var(--nv-ink-faint);
+.vp-art__ground {
+  fill: var(--nv-ink);
+  opacity: 0.1;
+}
+.vp-art__lid {
+  fill: color-mix(in srgb, var(--nv-neon) 14%, var(--nv-surface-raised));
+}
+.vp-art__strap {
+  fill: none;
+  stroke: color-mix(in srgb, var(--nv-ink) 30%, transparent);
   stroke-width: 1.4;
+  stroke-linecap: round;
+}
+.vp-art__stop-lid-bottom {
+  stop-color: color-mix(in srgb, var(--nv-neon) 55%, var(--nv-surface-raised));
+}
+.vp-art__stop-lid-top {
+  stop-color: color-mix(in srgb, var(--nv-agent) 22%, var(--nv-surface-raised));
+}
+.vp-art__stop-ray {
+  stop-color: var(--nv-neon);
+  stop-opacity: 0.32;
+}
+.vp-art__rays {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: vp-glow 3.6s var(--nv-ease-in-out) infinite;
+}
+.vp-art__stop-light {
+  stop-color: var(--nv-neon);
+  stop-opacity: 0.55;
+}
+.vp-art__stop-clear {
+  stop-color: var(--nv-agent);
+  stop-opacity: 0;
+}
+.vp-art__light {
+  transform-box: fill-box;
+  transform-origin: 50% 70%;
+  animation: vp-glow 3.6s var(--nv-ease-in-out) infinite;
+}
+.vp-art__stop-inside-top {
+  stop-color: color-mix(in srgb, var(--nv-neon) 70%, var(--nv-void));
+}
+.vp-art__stop-inside-bottom {
+  stop-color: var(--nv-void);
+}
+.vp-art__stop-body-top {
+  stop-color: color-mix(in srgb, var(--nv-neon) 26%, var(--nv-surface-raised));
+}
+.vp-art__stop-body-bottom {
+  stop-color: color-mix(in srgb, var(--nv-agent) 18%, var(--nv-surface-raised));
+}
+.vp-art__rim {
+  fill: color-mix(in srgb, var(--nv-neon) 34%, var(--nv-surface-raised));
 }
 .vp-art__lock {
   fill: var(--nv-neon);
 }
-.vp-art__card {
-  fill: var(--nv-surface-raised);
-  stroke: var(--nv-ink-muted);
-  stroke-width: 1.4;
-  transform-box: fill-box;
-  transform-origin: 50% 100%;
-  animation: vp-float 3.6s var(--nv-ease-in-out) infinite;
+.vp-art__keyhole {
+  fill: var(--nv-void);
 }
-.vp-art__card--a {
-  transform: rotate(-12deg);
+/* Her photos: white frames, a sky of the theme's colours, a sun, hills. */
+.vp-art__frame {
+  fill: #fff;
+}
+.vp-art__sky--a {
+  fill: color-mix(in srgb, var(--nv-warning) 55%, var(--nv-neon));
+}
+.vp-art__sky--b {
+  fill: color-mix(in srgb, var(--nv-neon) 70%, var(--nv-agent));
+}
+.vp-art__sky--c {
+  fill: color-mix(in srgb, var(--nv-agent) 80%, #fff);
+}
+.vp-art__sun {
+  fill: #fff;
+  opacity: 0.9;
+}
+.vp-art__hill {
+  fill: rgba(12, 10, 16, 0.32);
+}
+.vp-art__photo {
+  animation: vp-rise 3.6s var(--nv-ease-in-out) infinite;
+}
+.vp-art__photo--a {
   animation-delay: -1.2s;
 }
-.vp-art__card--b {
-  fill: color-mix(in srgb, var(--nv-neon) 22%, var(--nv-surface-raised));
-  stroke: var(--nv-neon);
-}
-.vp-art__card--c {
-  transform: rotate(12deg);
+.vp-art__photo--c {
   animation-delay: -2.4s;
 }
 .vp-art__spark {
-  fill: var(--nv-agent);
   transform-box: fill-box;
   transform-origin: center;
   animation: vp-twinkle 2.8s var(--nv-ease-in-out) infinite;
 }
-.vp-art__glow {
-  opacity: 0.5;
+.vp-art__spark--a {
+  fill: var(--nv-warning);
 }
-@keyframes vp-float {
+.vp-art__spark--b {
+  fill: var(--nv-agent);
+  animation-delay: -0.9s;
+}
+.vp-art__spark--c {
+  fill: var(--nv-neon);
+  animation-delay: -1.8s;
+}
+@keyframes vp-rise {
   50% {
     translate: 0 -4px;
   }
 }
+@keyframes vp-glow {
+  50% {
+    opacity: 0.7;
+    scale: 0.94;
+  }
+}
 @keyframes vp-twinkle {
   50% {
-    scale: 0.7;
-    opacity: 0.6;
+    scale: 0.6;
+    opacity: 0.55;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vp-art__card,
+  .vp-art__rays,
+  .vp-art__photo,
+  .vp-art__light,
   .vp-art__spark,
   .vp-folder,
   .vp-pane,
