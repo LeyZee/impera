@@ -36,6 +36,8 @@ interface ImportDeps {
     scriptIds: readonly string[],
     correlationId: string,
   ) => Promise<void>;
+  /** Hears a recognition that failed, with its cause, for the log: the import stays written, the next one retries. */
+  readonly onRecognitionFailed?: (error: unknown) => void;
 }
 
 /**
@@ -62,8 +64,14 @@ export async function importPlatformScripts(
   const plan = planPlatformScripts(await deps.store.known(account.id), listed);
   const written = await deps.store.apply(account, plan, now);
   if (written.length > 0) await deps.askIdentities(account.creatorId, written, request.correlationId);
-  // After the import is written, so that a script copied by hand since the last one is read first.
-  const recognised = await deps.recognition.recognise(account, recognise, now);
+  // After the import is written, so that a script copied by hand since the last one is read first. A recognition that
+  // fails (a tie written at the same moment by hand) never fails the import: the next one finds the script again.
+  let recognised = 0;
+  try {
+    recognised = await deps.recognition.recognise(account, recognise, now);
+  } catch (error) {
+    deps.onRecognitionFailed?.(error);
+  }
   return {
     outcome: 'imported',
     added: plan.added.length,
