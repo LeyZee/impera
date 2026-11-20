@@ -1,4 +1,4 @@
-# 2026-11-20 — SEC-15 Durée d'une session selon le rôle — in progress
+# 2026-11-20 — SEC-17 Durée d'une session selon le rôle — in progress
 
 Fait : `apps/api/src/session-lifetime.ts` (12 h, 48 h, 7 jours, `LONG_IDLE_ROLES` = propriétaire seul, rôle inconnu en durée courte) ; `expiresIn` de Better Auth à 48 h ; crochet `session.update.before` qui refuse et supprime la prolongation d'une session finie ; `sessionOf` vérifie l'inactivité selon le rôle en plus des 7 jours ; cookie renouvelé avec la session (`requireRole`, `GET /v1/session`) ; Réglages › Sécurité ne liste et ne compte que les sessions vivantes ; `security.md` § 6. Tests : unitaire (5), intégration (8, écrits et typés).
 Reste : lancer `pnpm test:integration` avec Docker ; décision sur la durée de la créatrice ; PR.

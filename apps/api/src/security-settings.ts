@@ -183,7 +183,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
               updatedAt: schema.session.updatedAt,
             })
             .from(schema.session)
-            // Alive only: a session past its 7 days (ADR 0046 § 6) or idle past its role's limit (SEC-15) is refused
+            // Alive only: a session past its 7 days (ADR 0046 § 6) or idle past its role's limit (SEC-17) is refused
             // at its next request, never shown.
             .where(
               and(

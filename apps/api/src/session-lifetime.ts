@@ -1,7 +1,7 @@
 import { UserRoleSchema, type UserRole } from '@impera/contracts';
 
 /**
- * How long a dashboard session lives (security.md § 6, SEC-15). Two limits, whichever comes first: a time without
+ * How long a dashboard session lives (security.md § 6, SEC-17). Two limits, whichever comes first: a time without
  * activity that depends on the role, and 7 days from its creation whatever its use (ADR 0046 § 6). Neither counts as a
  * recent sign-in: a sensitive action still asks for the password and the code (`requireRecentLogin`).
  */
@@ -13,7 +13,7 @@ export const SHORT_IDLE_MS = 12 * 60 * 60 * 1000;
 /** Without activity, the session of a role of `LONG_IDLE_ROLES` ends after 48 hours (the owner's choice, 20/11/2026). */
 export const LONG_IDLE_MS = 48 * 60 * 60 * 1000;
 /**
- * The roles whose sessions get the long idle. The owner only: the creator's stays short until it is decided (SEC-15),
+ * The roles whose sessions get the long idle. The owner only: the creator's stays short until it is decided (SEC-17),
  * and adding her here is the whole change.
  */
 export const LONG_IDLE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['owner']);

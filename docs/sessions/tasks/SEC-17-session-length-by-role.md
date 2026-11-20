@@ -1,4 +1,4 @@
-# SEC-15 Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire, 12 h pour les autres, 7 jours au plus
+# SEC-17 Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire, 12 h pour les autres, 7 jours au plus
 Statut : in_progress
 Phase : exploitation
 Dépend de : ADR 0046, ADR 0160, SEC-03

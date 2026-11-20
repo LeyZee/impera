@@ -14,7 +14,7 @@ const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
 
-describe('session lifetime by role (SEC-15)', () => {
+describe('session lifetime by role (SEC-17)', () => {
   it('gives the owner 48 hours without activity and every other role 12', () => {
     expect(SHORT_IDLE_MS).toBe(12 * HOUR);
     expect(LONG_IDLE_MS).toBe(48 * HOUR);

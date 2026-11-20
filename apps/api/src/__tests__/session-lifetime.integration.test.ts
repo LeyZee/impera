@@ -23,11 +23,11 @@ const RowSchema = z.object({ updated_at: z.coerce.date(), expires_at: z.coerce.d
 const HOUR = 60 * 60 * 1000;
 
 /**
- * How long a session lives by role (SEC-15): the owner 48 h without activity, every other role 12 h, all 7 days at
+ * How long a session lives by role (SEC-17): the owner 48 h without activity, every other role 12 h, all 7 days at
  * most; never a recent sign-in. Times are moved in the base, as Better Auth reads its own clock: `updated_at` is the
- * last refresh, `expires_at` what Better Auth wrote then (48 h later; 12 h for a row written before SEC-15).
+ * last refresh, `expires_at` what Better Auth wrote then (48 h later; 12 h for a row written before SEC-17).
  */
-describe('session lifetime by role (SEC-15)', () => {
+describe('session lifetime by role (SEC-17)', () => {
   let test: TestDb;
   let app: App;
   let server: Server;
@@ -168,7 +168,7 @@ describe('session lifetime by role (SEC-15)', () => {
     expect(await dashboardSession(cookie)).toBe('signed_out');
   });
 
-  it('keeps a session written before SEC-15 (12 hours ahead) and gives it the new lifetime', async () => {
+  it('keeps a session written before SEC-17 (12 hours ahead) and gives it the new lifetime', async () => {
     const cookie = await freshSession(MANAGER);
     await setTimes(MANAGER.email, { idle: '2 hours', expiresIn: '10 hours' });
     expect((await me(cookie)).statusCode).toBe(200);
