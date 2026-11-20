@@ -17,7 +17,16 @@ import { CountUp, Section, type FloatingTip } from '../parts';
 
 import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
-import { againstText, comparable, readName, shortDate, spanText, type AgencySelection } from './period';
+import {
+  againstText,
+  canConclude,
+  comparable,
+  readName,
+  shortDate,
+  spanText,
+  TOO_FEW_TO_CONCLUDE,
+  type AgencySelection,
+} from './period';
 import { useNarrow } from './useNarrow';
 import {
   arcs,
@@ -1186,14 +1195,19 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   };
   return (
     <div className="nv-plate ins-hours">
-      <p className="ins-hours__lead">
-        Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
-        chiffre d’affaires. Le pic :{' '}
-        <b className="ins-nowrap">
-          {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
-        </b>
-        .
-      </p>
+      {/* The map stays; the sentence that reads it waits for enough sales (ADR 0092 § 5). */}
+      {canConclude(insights) ? (
+        <p className="ins-hours__lead">
+          Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
+          chiffre d’affaires. Le pic :{' '}
+          <b className="ins-nowrap">
+            {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
+          </b>
+          .
+        </p>
+      ) : (
+        <p className="ins-hours__lead">{TOO_FEW_TO_CONCLUDE}</p>
+      )}
       <div
         className="ins-heat"
         role="group"
@@ -1268,11 +1282,14 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
         <p className="ins-fans__hint">
-          {top >= 60
-            ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
-            : top >= 35
-              ? 'Assez concentré : quelques gros fans portent une bonne part des ventes.'
-              : 'Bien réparti : les ventes ne dépendent pas de quelques fans.'}
+          {/* The meter and its share stay; what they mean waits for enough sales (ADR 0092 § 5). */}
+          {!canConclude(insights)
+            ? TOO_FEW_TO_CONCLUDE
+            : top >= 60
+              ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
+              : top >= 35
+                ? 'Assez concentré : quelques gros fans portent une bonne part des ventes.'
+                : 'Bien réparti : les ventes ne dépendent pas de quelques fans.'}
         </p>
       </div>
       <dl className="ins-fans__figures">
