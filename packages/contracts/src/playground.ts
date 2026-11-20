@@ -10,6 +10,7 @@ import {
 } from './fan-availability';
 import { CreatorIdSchema, DesireMarkIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
+import { ScriptRunStatusSchema, ScriptStepKindSchema, ScriptStepOutcomeSchema } from './script-runs';
 
 /**
  * Entraîner > Playground (P3-06): the training screen talks to the calibration engine of P3-05 through
@@ -133,11 +134,34 @@ export const PlaygroundDesireSchema = z.object({
 });
 export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
 
+/**
+ * A step of a trial script she sent in the playground (ADR 0103 § 16), on its media: offered, or paid and waiting for
+ * « Payer (fictif) » or « Refuser », then bought or refused; `closed` when the run ended without him deciding (his two
+ * messages about something else, a cooled session). Fictive from end to end: nothing reaches Reveal or the figures.
+ */
+export const PlaygroundScriptStepSchema = z.object({
+  scriptRef: z.string(),
+  stepIndex: z.number().int().nonnegative(),
+  kind: ScriptStepKindSchema,
+  priceCents: z.number().int().positive().nullable(),
+  state: z.enum(['offered', 'waiting', 'bought', 'refused', 'closed']),
+});
+export type PlaygroundScriptStep = z.infer<typeof PlaygroundScriptStepSchema>;
+
 export const PlaygroundTurnSchema = z.object({
   index: z.number().int().nonnegative(),
   from: z.enum(['fan', 'creator']),
   text: z.string(),
-  media: z.array(z.object({ description: MediaDescriptionSchema, isLocked: z.boolean() })).exactOptional(),
+  media: z
+    .array(
+      z.object({
+        description: MediaDescriptionSchema,
+        isLocked: z.boolean(),
+        /** A step of a trial script: what « Payer (fictif) » and « Refuser » act on. */
+        scriptStep: PlaygroundScriptStepSchema.exactOptional(),
+      }),
+    )
+    .exactOptional(),
   /** On his messages the brain read: his desire score after it. */
   desire: PlaygroundDesireSchema.exactOptional(),
 });
@@ -228,6 +252,28 @@ export const PlaygroundRateSchema = z.object({
 });
 export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
 
+/**
+ * The trial script under way or last played (ADR 0103 § 15-17): its steps, what each became, and what he paid in
+ * fictive sales this session. Invented scripts, played by the same rules as production; nothing leaves the playground.
+ */
+export const PlaygroundScriptRunSchema = z.object({
+  scriptRef: z.string(),
+  description: z.string(),
+  moment: z.enum(['day', 'night']).nullable(),
+  status: ScriptRunStatusSchema,
+  steps: z
+    .array(
+      z.object({
+        kind: ScriptStepKindSchema,
+        priceCents: z.number().int().positive().nullable(),
+        /** `null`: not sent yet. */
+        outcome: ScriptStepOutcomeSchema.nullable(),
+      }),
+    )
+    .max(30),
+});
+export type PlaygroundScriptRun = z.infer<typeof PlaygroundScriptRunSchema>;
+
 export const PlaygroundStateSchema = z.object({
   /**
    * While an answer is being written: the brain's reading of his message, as soon as it has read it, so the screen
@@ -264,6 +310,13 @@ export const PlaygroundStateSchema = z.object({
   voice: z.object({ reachable: z.boolean() }),
   /** The last answer, until it is rated. */
   pending: PlaygroundAnswerSchema.nullable(),
+  /** The trial scripts (ADR 0103 § 15-17): the run under way or last played, and his fictive purchases. */
+  scripts: z.object({
+    run: PlaygroundScriptRunSchema.nullable(),
+    fictiveSpentCents: z.number().int().nonnegative(),
+    /** A possible minor or his distress froze his sales: « Payer (fictif) » is refused, as production never sells then. */
+    salesFrozen: z.boolean(),
+  }),
 });
 export type PlaygroundState = z.infer<typeof PlaygroundStateSchema>;
 
@@ -395,5 +448,7 @@ export const PLAYGROUND_ERROR_CODES = [
   'time_zone_invalid',
   'playground_persona_not_found',
   'desire_mark_invented_persona_conflict',
+  'script_step_not_waiting_conflict',
+  'script_sales_frozen_conflict',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

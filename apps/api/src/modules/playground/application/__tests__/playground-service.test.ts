@@ -22,6 +22,8 @@ function engine(reset: () => never = unused): PlaygroundEngine {
     setNotes: unused,
     sendCreatorMedia: unused,
     markDesire: unused,
+    buyScriptStep: unused,
+    refuseScriptStep: unused,
   };
 }
 

@@ -1398,3 +1398,145 @@
 .pg-loading__in .pg-loading__t.is-warn {
   color: var(--nv-warning);
 }
+
+/* Trial scripts (ADR 0103 § 15-17): the step on her media, and the script's path at the head of the thread. */
+.pg-media__essai {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nv-ink-muted);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.pg-media.is-step.is-bought {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 50%, transparent);
+}
+.pg-media.is-step.is-refused,
+.pg-media.is-step.is-closed {
+  opacity: 0.72;
+}
+.pg-media__act {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+.pg-media__state {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.pg-media.is-bought .pg-media__state {
+  color: var(--nv-success);
+}
+.pg-script {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Apart from the line under « Fan fictif » as two bubbles are apart. */
+  margin-top: var(--nv-space-2);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: linear-gradient(150deg, var(--nv-glass-fill-strong), var(--nv-glass-fill));
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.pg-script__t {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+}
+.pg-script__k {
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.pg-script__s {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-muted);
+}
+.pg-script__s.is-bought_out {
+  color: var(--nv-success);
+}
+/* The path from edge to edge: the first dot under the title, the last under the state. */
+.pg-script__path {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pg-script__path::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 7px;
+  right: 7px;
+  height: 2px;
+  background: var(--nv-hairline);
+}
+.pg-script__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--nv-ink-faint);
+}
+.pg-script__step:first-child {
+  align-items: flex-start;
+}
+.pg-script__step:last-child {
+  align-items: flex-end;
+}
+.pg-script__dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 2px var(--nv-hairline);
+}
+.pg-script__dot svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: var(--nv-on-neon);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pg-script__step.is-done .pg-script__dot {
+  background: var(--nv-ink-muted);
+  box-shadow: none;
+}
+.pg-script__step.is-sent .pg-script__dot {
+  background: var(--nv-sale);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--nv-sale) 55%, transparent);
+}
+.pg-script__step.is-bought .pg-script__dot {
+  background: var(--nv-success);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--nv-success) 60%, transparent);
+}
+.pg-script__step.is-refused .pg-script__dot {
+  box-shadow: inset 0 0 0 2px var(--nv-ink-faint);
+}
+.pg-script__step.is-sent,
+.pg-script__step.is-done,
+.pg-script__step.is-bought {
+  color: var(--nv-ink-muted);
+}
+.pg-script__f {
+  margin: 0;
+  font-size: 11px;
+  color: var(--nv-ink-faint);
+}
