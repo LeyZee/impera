@@ -66,13 +66,30 @@ const messages = {
 
 type Served = Record<string, { status: number; body: unknown }>;
 
+/** « Ta part » over a day with nothing, above her fans on every test of the page (CR-04). */
+const NO_EARNINGS = {
+  period: 'day',
+  from: '2026-11-03',
+  to: '2026-11-03',
+  estimated: true,
+  latest: true,
+  totals: [],
+  lines: [],
+  linesOmitted: 0,
+  refundsWithoutSale: 0,
+};
+
 function serve(routes: Served): ReturnType<typeof vi.fn> {
   const fetcher = vi.fn((url: string) => {
     const path = url.split('?')[0] ?? url;
     // « Qui sont tes fans » sits above her fans on every test of the page.
     const route =
       routes[path] ??
-      (path === '/v1/creator-space/fan-insights' ? { status: 200, body: DEMO_INSIGHTS } : undefined);
+      (path === '/v1/creator-space/fan-insights'
+        ? { status: 200, body: DEMO_INSIGHTS }
+        : path === '/v1/creator-space/earnings'
+          ? { status: 200, body: NO_EARNINGS }
+          : undefined);
     return Promise.resolve(
       route === undefined
         ? new Response('null', { status: 404 })

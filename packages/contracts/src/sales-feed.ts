@@ -767,6 +767,69 @@ export const CreatorSalesSchema = z.strictObject({
 });
 export type CreatorSales = z.infer<typeof CreatorSalesSchema>;
 
+/** The periods of her Ventes (CR-04): a day, a fortnight (1–15, 16–end, as the pay's) and a month. */
+export const EARNINGS_PERIODS = ['day', 'fortnight', 'month'] as const;
+export const EarningsPeriodSchema = z.enum(EARNINGS_PERIODS);
+export type EarningsPeriod = z.infer<typeof EarningsPeriodSchema>;
+
+/**
+ * `GET /v1/creator-space/earnings?period=&day=` (creator only, CR-04): the period that holds `day` (today by default,
+ * in the platform's zone, never ahead). A day further back than `EARNINGS_MAX_DAYS_BACK` is refused.
+ */
+export const CreatorEarningsQuerySchema = z.strictObject({
+  period: EarningsPeriodSchema.default('day'),
+  day: z.iso.date().optional(),
+});
+export type CreatorEarningsQuery = z.infer<typeof CreatorEarningsQuerySchema>;
+
+/** How far back her Ventes go, in days: the register's own reach, a year and a little. */
+export const EARNINGS_MAX_DAYS_BACK = 400;
+
+/** The lines of a period sent at most, the newest first; the totals always count them all. */
+export const EARNINGS_MAX_LINES = 300;
+
+/**
+ * Her part over a period, per currency (`modelRevenue` on Reveal, ADR 0054), refunds taken off their sale's day: the
+ * only money she reads (Charles: « elle voit sa part seulement »). Never the price the fan paid, the platform's share,
+ * the agency's, nor who sold.
+ */
+export const CreatorEarningsTotalSchema = z.strictObject({
+  currency: CurrencySchema,
+  creatorMinor: z.number().int(),
+  sales: z.number().int().min(0),
+  refunds: z.number().int().min(0),
+});
+export type CreatorEarningsTotal = z.infer<typeof CreatorEarningsTotalSchema>;
+
+/** One sale or refund of the period: when, what, her part of it, and the fan's name when his card is hers. */
+export const CreatorEarningsLineSchema = z.strictObject({
+  occurredAt: z.iso.datetime(),
+  event: SaleEventSchema,
+  saleType: SaleTypeSchema,
+  currency: CurrencySchema,
+  creatorMinor: z.number().int().min(0),
+  fanName: z.string().min(1).nullable(),
+});
+export type CreatorEarningsLine = z.infer<typeof CreatorEarningsLineSchema>;
+
+/**
+ * Her Ventes over one period (CR-04): `from` and `to` both included, `estimated` while the period is not over (a
+ * sale may still come, a refund still be taken), `latest` when it is the current one. Strict: no seller, no gross, no
+ * agency share can pass.
+ */
+export const CreatorEarningsSchema = z.strictObject({
+  period: EarningsPeriodSchema,
+  from: z.iso.date(),
+  to: z.iso.date(),
+  estimated: z.boolean(),
+  latest: z.boolean(),
+  totals: z.array(CreatorEarningsTotalSchema),
+  lines: z.array(CreatorEarningsLineSchema),
+  linesOmitted: z.number().int().min(0),
+  refundsWithoutSale: z.number().int().min(0),
+});
+export type CreatorEarnings = z.infer<typeof CreatorEarningsSchema>;
+
 /**
  * `GET /v1/settings/sales-feeds/new-models` (owner, ADR 0069 § 5, CRM-07 a2): how many models the platforms listed
  * last that have no link and were not set aside, read in the base without calling the platform, for the badge

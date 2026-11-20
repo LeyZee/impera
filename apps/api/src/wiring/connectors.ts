@@ -178,6 +178,7 @@ export function wireConnectors(
       }),
       module.salesFeedDeliveryRoutes,
       module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
+      module.creatorEarningsRoutes(requireRole('creator')),
       module.vaultRoutes({ teamGuard: requireRole('owner', 'operator'), ownerGuard: requireRole('owner') }),
     ],
   };

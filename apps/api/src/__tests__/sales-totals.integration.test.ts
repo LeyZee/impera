@@ -1,5 +1,6 @@
 import {
   CreatorIdSchema,
+  CreatorEarningsSchema,
   CreatorSalesSchema,
   EVENT_PAYLOADS,
   FanIdSchema,
@@ -468,5 +469,44 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
           url: '/ventes',
         })),
     );
+  });
+
+  it('shows her her part on her Ventes, by month and by fortnight, never the gross, the agency nor the seller (CR-04)', async () => {
+    const email = 'creatrice-ventes@example.test';
+    const { userId } = await createOwner(app.auth, app.db.db, {
+      email,
+      name: 'Créatrice',
+      password: OWNER.password,
+    });
+    await test.admin.db
+      .update(schema.user)
+      .set({ role: 'creator', creatorIds: [creatorId] })
+      .where(eq(schema.user.id, userId));
+    const cookie = await signIn(server, email, OWNER.password);
+    const earnings = (query: string, as = cookie) =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/creator-space/earnings?${query}`,
+        headers: { cookie: as, origin: DASHBOARD_ORIGIN },
+      });
+
+    const month = await earnings('period=month&day=2026-10-15');
+    expect(month.statusCode).toBe(200);
+    const read = CreatorEarningsSchema.parse(month.json());
+    const mine = await withCreatorAccount(app.db.db, userId, (tx) => creatorSalesReads.salesOf(tx, OCTOBER));
+    const part = mine.rows.reduce((sum, row) => sum + row.creatorMinor, 0);
+    expect(read).toMatchObject({ period: 'month', from: '2026-10-01', to: '2026-10-31', estimated: false });
+    expect(read.totals.reduce((sum, total) => sum + total.creatorMinor, 0)).toBe(part);
+    expect(read.lines.length).toBe(mine.lines.length);
+    // Her fan by the name of his card in her creator; never the platform's id, the seller, the gross nor the agency.
+    expect(new Set(read.lines.map((line) => line.fanName))).toEqual(new Set(['Fan test']));
+    expect(month.body).not.toMatch(/agency|gross|net|seller|chatter|member_test_01|fan_test_01/iu);
+
+    const fortnight = CreatorEarningsSchema.parse((await earnings('period=fortnight&day=2026-10-25')).json());
+    expect([fortnight.from, fortnight.to]).toEqual(['2026-10-16', '2026-10-31']);
+
+    // A day ahead is refused; the agency's accounts never read her door.
+    expect((await earnings('period=day&day=2099-01-01')).statusCode).toBe(400);
+    expect((await earnings('period=month', owner)).statusCode).toBe(403);
   });
 });

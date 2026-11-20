@@ -1,0 +1,82 @@
+/* « Ta part » (CR-04): her part over a period, in large, and each sale with her part of it. Tokens only. */
+
+.vt-earn__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.vt-earn__part {
+  margin: var(--nv-space-3) 0 0;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-large-title);
+  font-weight: 700;
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+}
+.vt-earn__meta {
+  margin: var(--nv-space-1) 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.vt-earn__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--nv-space-4) calc(var(--nv-space-2) * -1) 0;
+  padding: 0;
+  list-style: none;
+}
+.vt-earn__line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--nv-space-3);
+  align-items: baseline;
+  padding: var(--nv-space-2);
+  border-radius: var(--nv-radius-md);
+  transition: background var(--nv-dur-fast);
+}
+.vt-earn__line:hover {
+  background: var(--nv-plate-hover);
+}
+.vt-earn__when {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+.vt-earn__what {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--nv-space-2);
+  min-width: 0;
+}
+.vt-earn__what b {
+  font-weight: 600;
+}
+.vt-earn__fan {
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vt-earn__amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vt-earn__line.is-refund .vt-earn__amount {
+  color: var(--nv-ink-muted);
+}
+.vt-earn__none {
+  margin: var(--nv-space-3) 0 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 40rem) {
+  .vt-earn__line {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .vt-earn__when {
+    grid-column: 1 / -1;
+  }
+}
