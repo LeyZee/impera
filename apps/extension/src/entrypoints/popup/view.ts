@@ -1,6 +1,7 @@
 import type { Me } from '@impera/contracts';
 
 import { shortAddress } from '../../lib/crm-address';
+import type { LinkOffer } from '../../lib/crm-link-page';
 import { h } from '../../lib/dom';
 import { icon, type IconName } from '../../lib/icons';
 import type { Place } from '../../lib/tab';
@@ -53,7 +54,18 @@ export type Screen =
       /** The Reveal session on a Reveal tab, for the owner alone (P2-01); null elsewhere. */
       readonly sync: SyncView | null;
     }
-  /** `first`: no address was ever saved, the welcome (EXT-07). */
+  /** No address was ever saved, and the open tab offers none: the way to the CRM's page (ADR 0067, amendement). */
+  | { readonly kind: 'welcome' }
+  /** The open tab is the CRM's page « Relier l'extension à ce CRM »: the question, then the browser's. */
+  | { readonly kind: 'link-offer'; readonly offer: LinkOffer; readonly error: string | null }
+  /** The address is saved: said once, before the popup's home. */
+  | { readonly kind: 'linked'; readonly host: string | null }
+  /**
+   * A hosted build asked to leave its built-in CRM (ADR 0067, second amendement, § 5): both addresses as the footer
+   * writes them, the safe choice first.
+   */
+  | { readonly kind: 'change-crm'; readonly from: string; readonly to: string }
+  /** `first`: no address was ever saved, typed from the welcome (EXT-07). */
   | {
       readonly kind: 'address';
       readonly draft: string;
@@ -70,9 +82,21 @@ export interface Actions {
   /** The copilot side panel (ADR 0086), from a Reveal tab. */
   readonly openPanel: () => void;
   readonly saveAddress: (value: string) => void;
+  /** « Relier » on the CRM's page: the address of the open tab. */
+  readonly linkFromPage: () => void;
+  /** « Pas maintenant »: nothing is kept. */
+  readonly declineLink: () => void;
+  /** « Saisir l'adresse », from the welcome. */
+  readonly typeAddress: () => void;
   /** Back to the developer's address: offered in a development build only (EXT-07). */
   readonly resetAddress: () => void;
   readonly cancelAddress: () => void;
+  /** « Garder A »: the built-in CRM stays. */
+  readonly keepCrm: () => void;
+  /** « Relier à B »: the same checks as any typed address. */
+  readonly changeCrm: () => void;
+  /** « Revenir à l'adresse d'origine », from the footer: back to the built-in CRM. */
+  readonly revertCrm: () => void;
   readonly copilot: CopilotActions;
   readonly watch: WatchActions;
   readonly sync: SyncActions;
@@ -85,6 +109,8 @@ export interface Frame {
   readonly hour: number;
   /** A development build: the way back to localhost is offered. */
   readonly dev: boolean;
+  /** The CRM a hosted build was made for (ADR 0067, second amendement), null without one. */
+  readonly builtIn: string | null;
 }
 
 /** « Bonjour » from 5 h to 17 h 59, « Bonsoir » the rest of the day. */
@@ -99,6 +125,8 @@ function button(
     readonly variant?: 'neon' | 'soft' | 'plain';
     readonly icon?: IconName;
     readonly wide?: boolean;
+    /** Takes the focus when the screen is drawn: the safe choice of a question. */
+    readonly autofocus?: boolean;
   } = {},
 ): HTMLButtonElement {
   const variant = options.variant ?? 'soft';
@@ -109,6 +137,7 @@ function button(
       class: ['nv-btn', `nv-btn--${variant}`, 'pp-btn', options.wide === true ? 'pp-wide' : '']
         .join(' ')
         .trim(),
+      'data-autofocus': options.autofocus === true ? 'true' : undefined,
     },
     h('span', {}, label),
     options.icon === undefined ? null : icon(options.icon, 16),
@@ -151,7 +180,12 @@ function pillOf(screen: Screen): HTMLElement | null {
       // The pill's place, so the head does not jump when the screen arrives (V-EXT-25).
       return h('span', { class: 'pp-skeleton pp-skeleton--pill', 'aria-hidden': 'true' });
     case 'address':
+    case 'welcome':
+    case 'link-offer':
+    case 'change-crm':
       return null;
+    case 'linked':
+      return pill('sent', 'CRM relié');
   }
 }
 
@@ -385,7 +419,7 @@ function addressForm(
       'div',
       { class: 'pp-actions' },
       h('button', { type: 'submit', class: 'nv-btn nv-btn--neon pp-btn pp-wide' }, 'Enregistrer'),
-      screen.first ? null : button('Annuler', actions.cancelAddress, { variant: 'plain', wide: true }),
+      button('Annuler', actions.cancelAddress, { variant: 'plain', wide: true }),
       back,
     ),
   );
@@ -395,11 +429,108 @@ function addressForm(
   });
   // Échap steps back, as it closes a modal in the CRM: the popup itself stays open. The welcome has no way back.
   form.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || screen.first) return;
+    if (event.key !== 'Escape') return;
     event.preventDefault();
     actions.cancelAddress();
   });
   return form;
+}
+
+/** Where the CRM is named: its full host, or this computer (avis Sécurité du 19/11). */
+function crmOf(host: string | null): string {
+  return host === null ? 'au CRM de cet ordinateur' : `à ${host}`;
+}
+
+/** No address yet: the way is in the CRM, typing stays behind a small link (ADR 0067, amendement du 19/11 § 7). */
+function welcomeScreen(actions: Actions): HTMLElement {
+  const type = h('button', { type: 'button', class: 'pp-link', 'data-action': 'type' }, 'Saisir l’adresse');
+  type.addEventListener('click', actions.typeAddress);
+  return h(
+    'section',
+    { class: 'pp-hero' },
+    h('p', { class: 'pp-whisper nv-enter', style: '--nv-i: 1' }, 'Bienvenue.'),
+    // Three short steps, numbered, rather than one long sentence (avis Design du 19/11).
+    h(
+      'ol',
+      { class: 'pp-steps nv-enter', style: '--nv-i: 2' },
+      h('li', {}, 'Ouvre ton CRM.'),
+      h('li', {}, 'Menu de ton compte, puis Extension.'),
+      h('li', {}, 'Clique « Relier l’extension à ce CRM », puis de nouveau sur l’icône Impera.'),
+    ),
+    h('div', { class: 'pp-actions nv-enter', style: '--nv-i: 3' }, type),
+  );
+}
+
+/** The question the CRM's page brings: the host in full, then the browser's own question, announced. */
+function linkOfferScreen(screen: Extract<Screen, { kind: 'link-offer' }>, actions: Actions): HTMLElement {
+  const local = screen.offer.host === null;
+  return h(
+    'section',
+    { class: 'pp-hero pp-offer' },
+    h('p', { class: 'pp-whisper nv-enter', style: '--nv-i: 1' }, 'Bienvenue.'),
+    h(
+      'h1',
+      { class: 'pp-form__title pp-offer__question nv-enter', style: '--nv-i: 2' },
+      `Relier l’extension ${crmOf(screen.offer.host)} ?`,
+    ),
+    screen.error !== null
+      ? h('p', { class: 'pp-hint pp-hint--amber nv-enter', role: 'status', style: '--nv-i: 3' }, screen.error)
+      : local
+        ? null
+        : h(
+            'p',
+            { class: 'pp-hint nv-enter', style: '--nv-i: 3' },
+            'Ton navigateur va te demander d’autoriser ce site. Accepte.',
+          ),
+    h(
+      'div',
+      { class: 'pp-actions nv-enter', style: '--nv-i: 4' },
+      button('Relier', actions.linkFromPage, { variant: 'neon', wide: true }),
+      button('Pas maintenant', actions.declineLink, { variant: 'plain', wide: true }),
+    ),
+  );
+}
+
+function linkedScreen(screen: Extract<Screen, { kind: 'linked' }>): HTMLElement {
+  return h(
+    'section',
+    { class: 'pp-hero', role: 'status' },
+    h(
+      'p',
+      { class: 'pp-hero__text pp-offer__done nv-enter', style: '--nv-i: 1' },
+      icon('check', 16),
+      h('span', {}, `Extension reliée ${crmOf(screen.host)}`),
+    ),
+  );
+}
+
+/** Leaving the built-in CRM, asked once: the safe choice holds the focus and the most visible style (§ 5). */
+function changeCrmScreen(screen: Extract<Screen, { kind: 'change-crm' }>, actions: Actions): HTMLElement {
+  return h(
+    'section',
+    { class: 'pp-hero pp-offer' },
+    h(
+      'p',
+      { class: 'pp-hero__text pp-offer__from nv-enter', style: '--nv-i: 1' },
+      `Cette extension est prévue pour ${screen.from}.`,
+    ),
+    h(
+      'h1',
+      { class: 'pp-form__title pp-offer__question nv-enter', style: '--nv-i: 2' },
+      `La relier à ${screen.to} à la place ?`,
+    ),
+    h(
+      'p',
+      { class: 'pp-hint pp-hint--amber nv-enter', style: '--nv-i: 3' },
+      'Fais-le seulement si ton responsable te l’a demandé.',
+    ),
+    h(
+      'div',
+      { class: 'pp-actions nv-enter', style: '--nv-i: 4' },
+      button(`Garder ${screen.from}`, actions.keepCrm, { variant: 'neon', wide: true, autofocus: true }),
+      button(`Relier à ${screen.to}`, actions.changeCrm, { variant: 'soft', wide: true }),
+    ),
+  );
 }
 
 function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElement[] {
@@ -483,6 +614,14 @@ function body(screen: Screen, frame: Frame, actions: Actions): readonly HTMLElem
       ];
     case 'address':
       return [addressForm(screen, frame, actions)];
+    case 'welcome':
+      return [welcomeScreen(actions)];
+    case 'link-offer':
+      return [linkOfferScreen(screen, actions)];
+    case 'linked':
+      return [linkedScreen(screen)];
+    case 'change-crm':
+      return [changeCrmScreen(screen, actions)];
   }
 }
 
@@ -500,6 +639,22 @@ export function render(root: HTMLElement, screen: Screen, frame: Frame, actions:
     icon('pencil', 12),
   );
   address.addEventListener('click', actions.editAddress);
+  // Another CRM than the one this build was made for: said in amber, and undone in one click (§ 5).
+  const builtIn = frame.builtIn;
+  const changed = builtIn !== null && frame.origin !== builtIn;
+  if (changed) address.classList.add('pp-address--changed');
+  const revert = changed
+    ? h(
+        'button',
+        {
+          type: 'button',
+          class: 'pp-link pp-revert',
+          'aria-label': `Revenir à l’adresse d’origine (${shortAddress(builtIn)})`,
+        },
+        'Revenir à l’adresse d’origine',
+      )
+    : null;
+  revert?.addEventListener('click', actions.revertCrm);
   const main = h(
     'main',
     { class: 'nv-aura nv-popup pp', 'data-screen': screen.kind },
@@ -518,7 +673,14 @@ export function render(root: HTMLElement, screen: Screen, frame: Frame, actions:
     h(
       'footer',
       { class: 'pp-foot' },
-      screen.kind === 'address' ? h('span', {}) : address,
+      // No address to show nor change before one is saved.
+      screen.kind === 'address' ||
+        screen.kind === 'welcome' ||
+        screen.kind === 'link-offer' ||
+        screen.kind === 'linked' ||
+        screen.kind === 'change-crm'
+        ? h('span', {})
+        : h('span', { class: 'pp-foot__where' }, address, revert),
       h('span', { class: 'pp-version' }, `v${frame.version}`),
     ),
   );

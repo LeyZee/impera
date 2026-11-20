@@ -135,6 +135,22 @@ describe('ElevenLabs and the « Essai réel » (ADR 0091 § 7)', () => {
     expect(useSlices(onlyProbes).map((s) => s.label)).toEqual(['Essais réels']);
   });
 
+  it('names what the neutral slice holds when her Instagram comments are in it (ADR 0122)', () => {
+    const usage = usageFixture({
+      uses: [
+        { use: 'voice', eur: 10, calls: 100 },
+        { use: 'instagram_comment', eur: 0.5, calls: 40 },
+        { use: 'judge', eur: 1, calls: 4 },
+      ],
+    });
+    expect(useSlices(usage).map((s) => [s.key, s.label, s.note])).toEqual([
+      ['voice', 'Écrire les messages', expect.stringContaining('100 appels')],
+      ['others', 'Autres usages', 'Commentaires Instagram, Tests de qualité · 44 appels'],
+    ]);
+    const alone = usageFixture({ uses: [{ use: 'instagram_comment', eur: 0.5, calls: 40 }] });
+    expect(useSlices(alone).map((s) => s.label)).toEqual(['Commentaires Instagram']);
+  });
+
   it('reads the month left, amber under 10 %, red at nothing', () => {
     const voice = {
       used: 9_950,

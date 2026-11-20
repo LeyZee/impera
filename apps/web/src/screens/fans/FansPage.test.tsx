@@ -151,7 +151,7 @@ describe('Chatting › Fans (ADR 0124)', () => {
     serve(() => ({ status: 500 }));
     renderPage();
     expect(
-      await screen.findByText('Le serveur ne répond pas. Réessaie dans un instant.', undefined, {
+      await screen.findByText('Le serveur ne répond pas', undefined, {
         timeout: 3000,
       }),
     ).toBeDefined();

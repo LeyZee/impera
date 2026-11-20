@@ -270,6 +270,7 @@ export function createConversationCommands({
           platformMedia: isInbound ? message.media.slice(0, FAN_MEDIA_MAX) : message.media,
           platformCreatedAt: new Date(message.createdAt),
           draftId: null,
+          ...(message.origin === undefined ? {} : { origin: message.origin }),
         });
         if (!isNew) return { conversationId: conversation.id, isNew: false };
 

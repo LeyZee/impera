@@ -99,6 +99,8 @@ export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/scrip
 
 /** @public Her persona and guards for a post of her Telegram channel (ADR 0080 § 5), the `telegram` port. */
 export { channelWriterPersona } from './infra/channel-persona';
+/** @public Her public panels and guards for a reply to an Instagram comment (ADR 0122 § 2), the `instagram-comments` port. */
+export { commentWriterPersona } from './infra/channel-persona';
 /** @public Réglages › Alertes tries an alert on an example message (`POST /v1/alerts/test`, P4-01). */
 export { createAlertTester, type AlertTester } from './infra/alert-test';
 /** @public The persona module refuses a version whose sample replies a hard guard would block (P5-01). */

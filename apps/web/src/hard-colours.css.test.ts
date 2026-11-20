@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
  * The count of 17/11/2026, when the ratchet reached main. It can only go down: a sheet cleaned of a colour lowers it in the same change; a new colour
  * goes into a token, never here.
  */
-const HARD_COLOURS_TODAY = 85;
+const HARD_COLOURS_TODAY = 84;
 
 const SRC = fileURLToPath(new URL('.', import.meta.url));
 

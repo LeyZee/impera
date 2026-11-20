@@ -317,6 +317,49 @@ describe('agencyInsights', () => {
     ]);
   });
 
+  it('gives each day its two parts, a refund on its sale’s day, adding up to the period’s to the cent', () => {
+    const result = insights([
+      creator(LINA, 'Lina', [
+        row({ day: '2026-11-04', agencyMinor: 301, creatorMinor: 499 }),
+        row({ day: '2026-11-05' }),
+        // The refund of a sale of the 5th, on the 5th as its revenue (the register dates it on its sale).
+        row({
+          day: '2026-11-05',
+          sales: 0,
+          refunds: 1,
+          grossInclVatMinor: -1200,
+          grossExclVatMinor: -1000,
+          netMinor: -800,
+          agencyMinor: -300,
+          creatorMinor: -500,
+        }),
+        // Before the period: never on its days.
+        row({ day: '2026-11-02', agencyMinor: 7_777, creatorMinor: 8_888 }),
+      ]),
+      creator(MAYA, 'Maya', [row({ day: '2026-11-06', agencyMinor: 123, creatorMinor: 677 })]),
+    ]);
+    expect(result.days.map((one) => [one.day, one.agencyMinor, one.creatorMinor])).toEqual([
+      ['2026-11-04', 301, 499],
+      ['2026-11-05', 0, 0],
+      ['2026-11-06', 123, 677],
+    ]);
+    const sum = (key: 'agencyMinor' | 'creatorMinor'): number =>
+      result.days.reduce((total, one) => total + one[key], 0);
+    expect(sum('agencyMinor')).toBe(result.totals.current.agencyMinor);
+    expect(sum('creatorMinor')).toBe(result.totals.current.creatorMinor);
+  });
+
+  it('rounds each day’s dollars on their own: the days stay within a cent a day of the period’s parts', () => {
+    const dollars = (day: string) =>
+      row({ day, currency: 'USD', grossInclVatMinor: 3, netMinor: 3, agencyMinor: 1, creatorMinor: 1 });
+    const result = insights(
+      [creator(LINA, 'Lina', [dollars('2026-11-04'), dollars('2026-11-05'), dollars('2026-11-06')])],
+      { day: '2026-11-05', rateMicros: 900_000 },
+    );
+    const sum = result.days.reduce((total, one) => total + one.agencyMinor, 0);
+    expect(Math.abs(sum - result.totals.current.agencyMinor)).toBeLessThanOrEqual(result.days.length);
+  });
+
   it('puts the sales on their hour, Monday first', () => {
     const result = insights([
       creator(LINA, 'Lina', [], {

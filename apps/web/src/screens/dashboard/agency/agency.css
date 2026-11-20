@@ -1,6 +1,6 @@
 /*
- * « L'agence en chiffres » (ADR 0078). Content on plates, one palette per axis: the kinds of sale take --nv-series-*
- * (validated Nuit and Jour), who sold the team's ink, the agent's violet and the data gold, a total and a ramp the data
+ * « L'agence en chiffres » (ADR 0078). Content on plates, one palette per axis: the kinds of sale take the cyan
+ * ramp --nv-kind-* (apart from the money's rose and blue), the curves the trend's, who sold the team's ink, the agent's violet and the data gold, a total and a ramp the data
  * ink alone. Thin marks with rounded ends, a 2px gap between stacked parts, the money in Geist tabular figures. Tokens
  * only. The screen's styles load before components.css: a rule that overrides a design-system class takes two classes.
  */
@@ -39,19 +39,27 @@
   font-size: clamp(40px, 5vw, var(--nv-text-hero));
   line-height: 1.04;
 }
-/* The curve under the lead figure (ADR 0146 § 5): the period's revenue in data ink over a soft fill, the comparison
+/* The curve under the lead figure (ADR 0146 § 5): the period's revenue in the trend's colour over a soft fill (green
+   above the period compared or with nothing to compare, amber below, never red: lot couleurs 17/11), the comparison
    as a quiet dashed line behind, a hairline and a dot following the pointer, the last day's dot at rest. */
 .ins-curve {
+  --_trend: var(--nv-trend-up);
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
 }
+/* No tip floats over this curve (relecture Design 19/11): the note under the figure reads the day in place, so the plot
+   takes the card's free height, 96px at least, and the card keeps its size. */
 .ins-curve__plot {
   position: relative;
-  height: 96px;
+  flex: 1 1 96px;
+  min-height: 96px;
 }
 .ins-curve__plot svg {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -59,10 +67,13 @@
 }
 .ins-curve__line {
   fill: none;
-  stroke: var(--nv-data-1);
+  stroke: var(--_trend);
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.ins-curve--down {
+  --_trend: var(--nv-trend-down);
 }
 .ins-curve__compared {
   fill: none;
@@ -96,17 +107,63 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--nv-data-1);
+  background: var(--_trend);
   box-shadow: 0 0 0 2px var(--nv-surface-raised);
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
 .ins-curve__fill-top {
-  stop-color: var(--nv-data-1);
-  stop-opacity: 0.16;
+  stop-color: var(--_trend);
+  stop-opacity: 0.18;
 }
 .ins-curve__fill-bottom {
-  stop-color: var(--nv-data-1);
+  stop-color: var(--_trend);
+  stop-opacity: 0;
+}
+/* The changes say the trend in the curve's colours (lot couleurs 17/11): one code for better and worse, green and
+   amber, never the statuses' cyan beside the agency's blue nor the danger's red. */
+.ins-body .nv-delta.nv-delta--better {
+  color: var(--nv-trend-up-text);
+  background: color-mix(in srgb, var(--nv-trend-up) 16%, transparent);
+}
+.ins-body .nv-delta.nv-delta--worse {
+  color: var(--nv-trend-down-text);
+  background: color-mix(in srgb, var(--nv-trend-down) 16%, transparent);
+}
+/* A tile's small curve (lot couleurs 17/11): at its foot, 1.5px, no axis nor point, a 12 % fill at most, drawn in
+   with the tiles' progress. The net takes the trend's colour, a part its money's. */
+.ins-tile__spark {
+  margin-top: auto;
+  padding-top: 6px;
+}
+.ins-spark {
+  --_c: var(--nv-trend-up);
+  display: block;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+  clip-path: inset(-2px 100% -2px -2px);
+  animation: ins-draw var(--nv-dur-progress) var(--nv-ease-out) 260ms forwards;
+}
+.ins-spark--down {
+  --_c: var(--nv-trend-down);
+}
+.ins-spark__line {
+  fill: none;
+  stroke: var(--_c);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ins-spark__area {
+  stroke: none;
+}
+.ins-spark__fill-top {
+  stop-color: var(--_c);
+  stop-opacity: 0.12;
+}
+.ins-spark__fill-bottom {
+  stop-color: var(--_c);
   stop-opacity: 0;
 }
 .ins-curve__hits {
@@ -126,9 +183,59 @@
   gap: var(--nv-card-gap);
   margin: 0;
 }
-.ins-figures > .ins-tiles,
 .ins-tiles--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+/* The money beside the revenue (relecture Design 19/11), in the sense of the figures: the net alone on the top row,
+   its small curve low under its sentence, then what it splits into and the VAT on the transfers, three equal tiles with no curve.
+   Two rows of one height fill the lead card's exactly. */
+.ins-figures > .ins-tiles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+}
+.ins-figures > .ins-tiles > .ins-tile:first-child {
+  grid-column: 1 / -1;
+}
+/* The net's small curve under its sentence, the tile's width, low: it fills the tile's foot and never rivals the lead's. */
+.ins-figures > .ins-tiles > .ins-tile:first-child .ins-spark {
+  height: 52px;
+}
+/* A third has no room for a long amount and its change side by side: always under it, the three tiles alike. */
+.ins-figures > .ins-tiles > .ins-tile:not(:first-child) dd:first-of-type {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+/* The lead's note: the day read on the curve lies over the sentence, in its box, which keeps its place while hidden,
+   so reading a day moves nothing; the day stays on one line. */
+.ins-lead__note {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ins-lead__note > span:last-child {
+  position: absolute;
+  inset: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ins-lead__pill {
+  position: relative;
+  display: inline-flex;
+}
+.ins-lead__pill:has(> span:first-child:empty) {
+  display: none;
+}
+.ins-lead__pill > span:last-child {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: inline-flex;
+  white-space: nowrap;
+}
+.ins-lead__pill > [aria-hidden='true'],
+.ins-lead__note > [aria-hidden='true'] {
+  visibility: hidden;
 }
 .ins-lead__sub {
   font-size: var(--nv-text-caption);
@@ -138,7 +245,7 @@
 
 /* ── Où va l'argent (ADR 0106 § 5 and § 10): a tall segmented bar, one colour per destination of the money, the same
    on the tiles' keys: the fans' VAT and the platform's commission the neutral fold (the second hatched, never read by
-   its colour alone), the creator's part rose, the agency's gold; 2px between blocks, 4px corners, 28px high. */
+   its colour alone), the creator's part rose, the agency's blue (avenant du 17/11); 2px between blocks, 4px corners, 28px high. */
 .ins-money {
   display: flex;
   flex-direction: column;
@@ -470,6 +577,11 @@
   overflow: visible;
   color: var(--nv-ink-faint);
   text-align: left;
+}
+/* The last day's label ends at its column's right edge: left-aligned, it ran past the card on a phone. */
+.ins-col:last-child .ins-col__label {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* ── Two rings side by side. */
@@ -1011,6 +1123,12 @@
   min-height: 120px;
 }
 
+/* Beside the tiles, the curve keeps the height it had when the parts drew theirs (relecture Design 19/11). */
+@media (min-width: 1101px) {
+  .ins-figures .ins-curve__plot {
+    min-height: 110px;
+  }
+}
 @media (max-width: 1100px) {
   .ins-figures {
     grid-template-columns: minmax(0, 1fr);
@@ -1295,6 +1413,14 @@
   .ins-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  /* A phone: the net on its own row with its curve under it, the two parts side by side, the VAT on its own row. */
+  .ins-figures > .ins-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+  }
+  .ins-figures > .ins-tiles > .ins-tile:last-child {
+    grid-column: 1 / -1;
+  }
   .ins-money__legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 14px;
@@ -1406,6 +1532,7 @@
 @media (prefers-reduced-motion: reduce) {
   .ins-curve__plot svg,
   .ins-subs__plot svg,
+  .ins-spark,
   .ins-col__part,
   .ins-ring__arc,
   .ins-rank__bar > span,
@@ -1415,7 +1542,8 @@
   }
   /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
   .ins-curve__plot svg,
-  .ins-subs__plot svg {
+  .ins-subs__plot svg,
+  .ins-spark {
     clip-path: none;
   }
   .ins-ring__arc {

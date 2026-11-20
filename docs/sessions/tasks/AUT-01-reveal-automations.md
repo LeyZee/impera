@@ -16,4 +16,5 @@ ADR 0110, ADR 0006, ADR 0007, `docs/reference/reveal-connector-inventory.md`, `d
 
 ## Résultat
 - Lot 1 : fait (tests unitaires de projection, tests d'intégration du module conversations).
-- Lot 2 : attend la capture.
+- Lot 2 : fait, d'après la capture du 16/11 (forme seulement, aucun texte réel). Le connecteur lit les accroches (`GET /models/:id/say-hello`), la bienvenue et le rappel d'expiration (`GET /models/:id`) au plus tous les quarts d'heure et marque l'origine de chaque message (`MessageOrigin` : `hook`, `welcome`, `expiration_reminder`, `story_reply`), gardée en base (`messages.origin`, migration 0227). Le cerveau lit une note écrite par le code avant le message du fan (accroche : pas ses mots ; story) et une ligne dans « le moment » pour la bienvenue et le rappel. Une réponse vide à une story est répondue (règle 4). Une relance attend 6 h après une bienvenue ou un rappel d'expiration (règle 6).
+- Reste : la règle 5 (Mass DM) et la bienvenue 2 et 3, dont Reveal n'a pas montré la forme dans la capture ; la relance « à la connexion » reste hors code (ADR 0110 § 6).

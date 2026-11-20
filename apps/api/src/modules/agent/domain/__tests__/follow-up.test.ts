@@ -97,6 +97,23 @@ describe('followUpDecision', () => {
     }
   });
 
+  it('waits 6 h after a message an automation of the platform wrote to him (ADR 0110 § 6)', () => {
+    const fiveHoursAgo = new Date(AFTERNOON.getTime() - 5 * 3_600_000);
+    expect(followUpDecision({ ...base, lastAutomationAt: fiveHoursAgo })).toEqual({
+      kind: 'later',
+      reason: 'follow_up_after_automation',
+      at: new Date(fiveHoursAgo.getTime() + 6 * 3_600_000),
+    });
+    const sixHoursAgo = new Date(AFTERNOON.getTime() - 6 * 3_600_000);
+    expect(followUpDecision({ ...base, lastAutomationAt: sixHoursAgo })).toEqual({ kind: 'write' });
+    expect(
+      followUpDecision({ ...base, flags: { doNotContact: true }, lastAutomationAt: fiveHoursAgo }),
+    ).toEqual({
+      kind: 'skip',
+      reason: 'follow_up_do_not_contact',
+    });
+  });
+
   describe('her dated exceptions (ADR 0148 § 3)', () => {
     // 27/10 at 15:00 in Paris, open by her week; an exception opens 14:00 – 18:00 on a date mid-shift, or closes it.
     const afternoon = [{ date: '2026-10-27', ranges: [{ startMinute: 840, endMinute: 1080 }] }];

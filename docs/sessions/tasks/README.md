@@ -117,6 +117,7 @@ Branche : task/<id>-<slug>
 | SC-08 | Photo d'exemple par étape | scripts | todo | SC-03, CR-06 |
 | SC-09 | Séries proposées par l'IA | scripts | blocked (clé xAI) | SC-01 |
 | SCB-01 | Import et envoi des branches d'un script | scripts | in_progress | SC-04 |
+| SCB-04 | Éditeur des scripts à branches | scripts | in_progress | SCB-01 |
 | PUB-01 | Connecteur de publication Telegram : le canal d'actualité de la créatrice | publication | in_progress (ADR 0080, lot A1) | CR-06, P3-07 ; vidéo publique Reveal : CR-08 |
 | PUB-02 | Connecteur de publication Instagram : Reels, stories, photos, avec l'accord de la créatrice | publication | blocked (compte pro, appli Meta) | PUB-01, CR-08 |
 | PUB-03 | Légende Instagram : la fenêtre visible avant « … plus », vérifiée pour le modèle, montrée à tous | publication | blocked (PUB-02) | PUB-02, ADR 0082 |
@@ -129,9 +130,10 @@ Branche : task/<id>-<slug>
 | VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
-| INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | todo (essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
+| INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | in progress (lot a ; essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lot a) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
+| INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
@@ -145,6 +147,7 @@ Branche : task/<id>-<slug>
 | DSH-02 | Le Dashboard de l'agence : l'argent sur des tuiles séparées, et la TVA des virements | API CRM | done | DSH-01, ADR 0106 |
 | DSH-03 | La part de l'agence lue chez Reveal, le pourcentage facultatif | API CRM | review | CR-04, CRM-04 d3, ADR 0054 amendée le 14/11 |
 | DSH-04 | Le Dashboard de l'agence par jour, semaine, mois ou période choisie, la comparaison choisie, la courbe au survol | API CRM | done | DSH-01, ADR 0146 |
+| DSH-05 | Le Dashboard de l'agence en couleurs : l'agence en bleu, la courbe selon la tendance, une petite courbe sous Net | API CRM | done | DSH-04, ADR 0106 avenant du 17/11 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
