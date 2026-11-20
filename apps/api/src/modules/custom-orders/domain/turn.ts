@@ -18,7 +18,7 @@ import {
  * briefs name the box to ask for, never what he wrote: his words reach the prompt only in an untrusted block.
  */
 
-/** What stops an order before anything is asked, read by the caller from the rules that come first (§ A.11). */
+/** @public What stops an order before anything is asked, read by the caller from the rules that come first (§ A.11). */
 export type CustomOrderStop =
   /** Nothing stops it. */
   | 'none'
@@ -43,14 +43,14 @@ export interface CustomOrderTurnInput {
   readonly grid: CustomPriceGrid | null;
 }
 
-/** The voice guards a reply of this turn runs under, on top of every usual one. */
+/** @public The voice guards a reply of this turn runs under, on top of every usual one. */
 export type CustomOrderGuard =
   /** No yes, no price, no delay (ADR 0090 § A). */
   | 'no_commitment'
   /** No tip asked: a tip is asked only as the deposit of an order she said yes to (§ A.4). */
   | 'no_tip_request';
 
-/** The card for her (§ A.2 bis): everything she needs to say yes or no, and the price her grid proposes. */
+/** @public The card for her (§ A.2 bis): everything she needs to say yes or no, and the price her grid proposes. */
 export interface CustomOrderCard {
   readonly format: CustomFormat | null;
   readonly supplements: readonly string[];
@@ -63,6 +63,7 @@ export interface CustomOrderCard {
   readonly missing: readonly (CustomDetailKey | 'format')[];
 }
 
+/** @public What the turn records for the conversation and the card queue. */
 export type CustomOrderEvent =
   /** Her order is being gathered: what is known so far, and the question she asks now. */
   | { readonly type: 'custom_order_gathering'; readonly asked: CustomDetailKey | 'format' }

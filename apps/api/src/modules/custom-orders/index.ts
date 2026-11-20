@@ -3,18 +3,16 @@ import type { CreatorId, CustomPriceGrid } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-export {
-  CUSTOM_ORDER_DECLINE_BRIEF,
-  CUSTOM_ORDER_HOLD_BRIEF,
-  CUSTOM_ORDER_WAIT_BRIEF,
-  customOrderTurn,
-  missingDetails,
-  type CustomOrderCard,
-  type CustomOrderEvent,
-  type CustomOrderGuard,
-  type CustomOrderStop,
-  type CustomOrderTurn,
-  type CustomOrderTurnInput,
+/** @public The agent's turn on a custom request (ADR 0159 § A.1–A.2 bis); wired by the agent module. */
+export { customOrderTurn } from './domain/turn';
+/** @public What the agent's turn hands in and gets back. */
+export type {
+  CustomOrderCard,
+  CustomOrderEvent,
+  CustomOrderGuard,
+  CustomOrderStop,
+  CustomOrderTurn,
+  CustomOrderTurnInput,
 } from './domain/turn';
 import { createCustomPriceGridReader, createDrizzleCustomPriceGridStore } from './infra/db/grid-store';
 import { createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
