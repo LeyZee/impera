@@ -40,7 +40,7 @@ payroll ──▶ contractors                   (paie en quatre modules, ADR 004
 invoicing ──▶ payroll, contractors       (factures et avoirs, ADR 0047 § 1)
 accounting ──▶ payroll, invoicing, contractors  (exports du comptable, ADR 0047 § 1)
 rewards ──▶ (feuille ; lit la paie et le planning par le composition root, ADR 0104)
-fans, persona, providers, telegram, team, backups, ai-usage, ai-budget, scheduling, alerts, contractors, notifications, scripts, redirect-links, instagram-comments ──▶ (feuilles)
+fans, persona, providers, telegram, team, backups, ai-usage, ai-budget, scheduling, alerts, contractors, notifications, scripts, redirect-links, custom-orders, instagram-comments ──▶ (feuilles)
 ```
 
 Ce graphe est **sans cycle**, et `import-x/no-cycle` le vérifie. Deux inversions le rendent possible :

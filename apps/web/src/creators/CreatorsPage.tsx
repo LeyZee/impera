@@ -9,6 +9,7 @@ import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
 import { AlertsTab } from './alerts/AlertsTab';
 import { useCreators } from './api';
+import { CustomPricesSection } from './custom-prices/CustomPricesSection';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
@@ -207,6 +208,16 @@ export function CreatorsPage({
         />
       );
     }
+    if (shown === 'custom' && current !== undefined) {
+      return (
+        <CustomPricesSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          onDirty={setDirty}
+        />
+      );
+    }
     if (shown === 'content' && current !== undefined) {
       return (
         <DropsSection
@@ -278,6 +289,7 @@ export function CreatorsPage({
     ideas: 'Idées du jour',
     requests: 'Demandes',
     scripts: 'Scripts',
+    custom: 'Sur mesure',
     content: 'Contenu',
     telegram: 'Canal Telegram',
     alerts: 'Alertes',
@@ -294,6 +306,7 @@ export function CreatorsPage({
     'ideas',
     'requests',
     'scripts',
+    'custom',
     'content',
     'telegram',
     'alerts',

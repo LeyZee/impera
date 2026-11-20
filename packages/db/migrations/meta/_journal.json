@@ -1242,6 +1242,13 @@
       "breakpoints": true
     },
     {
+      "idx": 177,
+      "version": "7",
+      "when": 1795196519311,
+      "tag": "0236_custom_price_grids",
+      "breakpoints": true
+    },
+    {
       "idx": 178,
       "version": "7",
       "when": 1795196579311,

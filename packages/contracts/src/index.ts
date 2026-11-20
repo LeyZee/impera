@@ -6,6 +6,7 @@ export * from './agent-hours';
 export * from './alert-history';
 export * from './alerts';
 export * from './creator-alerts';
+export * from './custom-prices';
 export * from './auth';
 export * from './automatic';
 export * from './backups';
