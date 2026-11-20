@@ -314,6 +314,8 @@ export const PlaygroundStateSchema = z.object({
   scripts: z.object({
     run: PlaygroundScriptRunSchema.nullable(),
     fictiveSpentCents: z.number().int().nonnegative(),
+    /** A possible minor or his distress froze his sales: « Payer (fictif) » is refused, as production never sells then. */
+    salesFrozen: z.boolean(),
   }),
 });
 export type PlaygroundState = z.infer<typeof PlaygroundStateSchema>;
@@ -447,5 +449,6 @@ export const PLAYGROUND_ERROR_CODES = [
   'playground_persona_not_found',
   'desire_mark_invented_persona_conflict',
   'script_step_not_waiting_conflict',
+  'script_sales_frozen_conflict',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

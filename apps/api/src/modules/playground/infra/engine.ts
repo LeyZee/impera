@@ -41,6 +41,7 @@ import {
   NothingToCompare,
   NothingToRate,
   PresetNotFound,
+  ScriptSalesFrozen,
   ScriptStepNotWaiting,
   TimeZoneInvalid,
   VoiceModelInvalid,
@@ -316,7 +317,11 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       sessionCostEur: sessionCostUsd / deps.usdPerEur,
       voice: { reachable: isVoiceReachable() },
       pending: lastExchange !== undefined && !isRated ? toAnswer(lastExchange.turn, deps.usdPerEur) : null,
-      scripts: { run: scriptRunView(session.scriptRun), fictiveSpentCents: session.fictiveSpentCents },
+      scripts: {
+        run: scriptRunView(session.scriptRun),
+        fictiveSpentCents: session.fictiveSpentCents,
+        salesFrozen: session.salesFrozen,
+      },
     };
   };
 
@@ -502,7 +507,9 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
     buyScriptStep() {
       idle();
-      if (session.buyStep() === 'nothing_waiting') throw new ScriptStepNotWaiting();
+      const bought = session.buyStep();
+      if (bought === 'nothing_waiting') throw new ScriptStepNotWaiting();
+      if (bought === 'sales_frozen') throw new ScriptSalesFrozen();
       return state();
     },
 

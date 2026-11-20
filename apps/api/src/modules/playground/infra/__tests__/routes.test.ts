@@ -494,7 +494,7 @@ describe('/v1/playground', () => {
   it('answers « Payer (fictif) » and « Refuser » only while a paid step of a trial script waits (ADR 0103 § 16)', async () => {
     const { app, headers, post } = await server();
     const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
-    expect(state.scripts).toEqual({ run: null, fictiveSpentCents: 0 });
+    expect(state.scripts).toEqual({ run: null, fictiveSpentCents: 0, salesFrozen: false });
     const buy = await post('/script/buy');
     expect(buy.statusCode).toBe(409);
     expect(codeOf(buy)).toBe('script_step_not_waiting_conflict');

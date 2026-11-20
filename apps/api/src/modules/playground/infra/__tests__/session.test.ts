@@ -712,6 +712,17 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
     expect(playground.scriptRun?.run.status).toBe('refused');
   });
 
+  it('refuses a fictive purchase once his distress froze his sales, as production never sells then', async () => {
+    const playground = await atPaidStep();
+    await playground.handleFanMessage('J’en peux plus, je veux en finir');
+    expect(playground.salesFrozen).toBe(true);
+    expect(playground.buyStep()).toBe('sales_frozen');
+    expect(playground.fictiveSpentCents).toBe(0);
+    // Back before that message, his sales are open again.
+    playground.branchAt(4);
+    expect(playground.salesFrozen).toBe(false);
+  });
+
   it('goes back with a branch, purchases included, and starts over with a reset', async () => {
     const playground = await atPaidStep();
     playground.buyStep();

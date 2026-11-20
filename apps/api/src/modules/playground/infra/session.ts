@@ -128,7 +128,7 @@ interface TrialStep {
 }
 
 /** What « Payer (fictif) » or « Refuser » did: nothing when no paid step waits for him. */
-type TrialStepAction = 'done' | 'nothing_waiting';
+type TrialStepAction = 'done' | 'nothing_waiting' | 'sales_frozen';
 
 export interface PlaygroundSession {
   /** His message, with the descriptions of the media he sends with it. */
@@ -161,6 +161,11 @@ export interface PlaygroundSession {
   readonly scriptRun: { readonly run: ScriptRun; readonly script: AgentScriptView } | null;
   /** What he paid in fictive purchases since the start, or the reset. */
   readonly fictiveSpentCents: number;
+  /**
+   * A possible minor or his distress froze his sales in this conversation (agent/domain/hold.ts): « Payer (fictif) » is
+   * refused, so the playground never shows a sale production would not make. Lifted by a reset or a branch before it.
+   */
+  readonly salesFrozen: boolean;
   /** The step of a trial script a media of hers carries, with what became of it. */
   trialStepOf(turn: ConversationTurn): TrialStep | undefined;
   readonly history: readonly ConversationTurn[];
@@ -394,6 +399,10 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       return scripts.fictiveSpentCents;
     },
 
+    get salesFrozen() {
+      return scripts.salesFrozen;
+    },
+
     trialStepOf(turn) {
       const tag = stepTurns.get(turn);
       const step = tag === undefined ? undefined : trialScript(tag.scriptRef)?.steps[tag.stepIndex];
@@ -414,6 +423,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     buyStep() {
       const open = waiting();
       if (open === undefined) return 'nothing_waiting';
+      if (scripts.salesFrozen) return 'sales_frozen';
       const bought = applyScriptRunEvent(open.run, open.script, {
         type: 'step_bought',
         stepIndex: open.step.stepIndex,
@@ -605,6 +615,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           .join('\n'),
       );
       if (signs.includes('minor_suspected')) {
+        scripts = { ...scripts, salesFrozen: true };
         const held: PlaygroundTurn = {
           bubbles: [],
           violations: [],
@@ -693,6 +704,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
             : decided?.kind === 'no_reply'
               ? decided
               : undefined;
+      if (hold?.kind === 'handoff' || hold?.kind === 'care') scripts = { ...scripts, salesFrozen: true };
       if (composed.desire !== undefined) desire = { score: composed.desire.score, at: situation.now };
       if (composed.availability !== undefined) availability = composed.availability.record;
       if (composed.customOrder?.kind === 'reply' && composed.customOrder.opens) customOrderOpen = true;
@@ -789,6 +801,7 @@ interface TrialScripts {
   /** What each step sent became, by `script:index`, kept once its run is over. */
   readonly outcomes: ReadonlyMap<string, ScriptRun['steps'][number]['outcome']>;
   readonly fictiveSpentCents: number;
+  readonly salesFrozen: boolean;
 }
 
 const noScripts = (): TrialScripts => ({
@@ -796,6 +809,7 @@ const noScripts = (): TrialScripts => ({
   played: new Map(),
   outcomes: new Map(),
   fictiveSpentCents: 0,
+  salesFrozen: false,
 });
 
 const copyScripts = (scripts: TrialScripts): TrialScripts => ({

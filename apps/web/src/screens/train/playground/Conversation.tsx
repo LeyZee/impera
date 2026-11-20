@@ -118,6 +118,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
               canReplay={turn.from === 'fan' && !busy}
               isLastFan={index === lastFan}
               busy={busy}
+              salesFrozen={state.scripts.salesFrozen}
               onScriptStep={props.onScriptStep}
               onReplay={() => {
                 props.onReplay(n);
@@ -208,11 +209,13 @@ function TurnView({
   onReplay,
   onMark,
   busy,
+  salesFrozen,
   onScriptStep,
 }: {
   turn: Turn;
   canReplay: boolean;
   busy: boolean;
+  salesFrozen: boolean;
   onScriptStep: (answer: ScriptStepAnswer) => void;
   /** On a phone only his last message offers to replay: a pill on every message is noise there. */
   isLastFan: boolean;
@@ -232,7 +235,14 @@ function TurnView({
         </button>
       ) : null}
       {(turn.media ?? []).map((m, i) => (
-        <MediaCard key={i} media={m} from={turn.from} busy={busy} onScriptStep={onScriptStep} />
+        <MediaCard
+          key={i}
+          media={m}
+          from={turn.from}
+          busy={busy}
+          salesFrozen={salesFrozen}
+          onScriptStep={onScriptStep}
+        />
       ))}
       {bubblesOf(turn.text).map((line, i) => (
         <div key={i} className={`nv-bubble nv-bubble--${turn.from}`}>
@@ -248,11 +258,14 @@ function MediaCard({
   media,
   from,
   busy,
+  salesFrozen,
   onScriptStep,
 }: {
   media: NonNullable<Turn['media']>[number];
   from: Turn['from'];
   busy: boolean;
+  /** A possible minor or his distress froze his sales: production would never sell, nor does the playground. */
+  salesFrozen: boolean;
   onScriptStep: (answer: ScriptStepAnswer) => void;
 }): JSX.Element {
   const { description, isLocked, scriptStep: step } = media;
@@ -293,8 +306,12 @@ function MediaCard({
           <button
             type="button"
             className="nv-btn nv-btn--neon nv-btn--sm"
-            disabled={busy}
-            title="Achat fictif : rien ne part vers Reveal ni dans les chiffres"
+            disabled={busy || salesFrozen}
+            title={
+              salesFrozen
+                ? 'Ventes gelées pour ce fan (âge douteux ou détresse) : aucun achat, même fictif'
+                : 'Achat fictif : rien ne part vers Reveal ni dans les chiffres'
+            }
             onClick={() => {
               onScriptStep('buy');
             }}

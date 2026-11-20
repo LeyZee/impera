@@ -39,7 +39,7 @@ const BASE: PlaygroundState = {
   sessionCostEur: 0,
   voice: { reachable: true },
   pending: null,
-  scripts: { run: null, fictiveSpentCents: 0 },
+  scripts: { run: null, fictiveSpentCents: 0, salesFrozen: false },
 };
 
 const summary = (id: string, version: string, isActive: boolean) => ({

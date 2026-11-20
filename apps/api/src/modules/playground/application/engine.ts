@@ -92,6 +92,13 @@ export class ScriptStepNotWaiting extends PlaygroundError {
   }
 }
 
+/** « Payer (fictif) » once a possible minor or his distress froze his sales: production would never sell then. */
+export class ScriptSalesFrozen extends PlaygroundError {
+  constructor() {
+    super('script_sales_frozen_conflict', 'Ventes gelées pour ce fan : aucun achat, même fictif.');
+  }
+}
+
 export class PresetNotFound extends PlaygroundError {
   constructor() {
     super('preset_not_found', 'Ce fan préréglé n’existe pas.');

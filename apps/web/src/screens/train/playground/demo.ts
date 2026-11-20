@@ -490,7 +490,7 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
       sessionCostEur: costEur,
       voice: { reachable: true },
       pending,
-      scripts: { run: run === null ? null : runView(run), fictiveSpentCents },
+      scripts: { run: run === null ? null : runView(run), fictiveSpentCents, salesFrozen: false },
     };
   };
 
