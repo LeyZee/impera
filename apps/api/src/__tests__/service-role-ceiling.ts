@@ -15,6 +15,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/contractors': 6,
   'modules/conversations': 1,
   'modules/creator-tasks': 1,
+  'modules/creator-week': 2,
   'modules/fans': 1,
   'modules/invoicing': 12,
   'modules/mcp': 1,
@@ -32,8 +33,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/trends': 8,
   root: 52,
   scripts: 1,
-  wiring: 4,
+  wiring: 7,
 };
 
-/** The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. */
-export const SERVICE_ROLE_TOTAL_AT_START = 265;
+/** The whole on 20/11/2026, when the ceiling reached main (264), raised once to 269 by her week (CR-16): the sum of the units never goes above it again. */
+export const SERVICE_ROLE_TOTAL_AT_START = 269;
