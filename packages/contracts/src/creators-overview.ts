@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
+import { AgentHoursNowSchema } from './agent-hours';
 import { DropCategorySchema } from './content-drops';
-import { AgentModeSchema } from './dashboard';
+import { AgentModeSchema, ResumeModeSchema } from './dashboard';
 import { CreatorIdSchema, TeamMemberIdSchema } from './ids';
 
 /**
@@ -58,6 +59,14 @@ export type CreatorOverviewRequests = z.infer<typeof CreatorOverviewRequestsSche
 export const CreatorOverviewSchema = z.object({
   creatorId: CreatorIdSchema,
   mode: AgentModeSchema,
+  /** Her Arrêt is a pause (ADR 0148 § 1): it lifts itself at this instant. `null` otherwise. */
+  pausedUntil: z.iso.datetime().nullable().default(null),
+  /** The global switch is on: Arrêt for every creator. */
+  globalStop: z.boolean().default(false),
+  /** Her hours now (ADR 0148 § 1); `null` from a server that does not say it yet. */
+  hoursNow: AgentHoursNowSchema.nullable().default(null),
+  /** The mode lifting her Arrêt gives back, the one she had (ADR 0148 § 1 « Rallumer »). */
+  resumesAs: ResumeModeSchema.default('copilot'),
   /** Null when no account is linked to the register, and for a reader whose scope is his own. */
   sales: CreatorOverviewSalesSchema.nullable(),
   /** Null for a reader whose scope is his own; empty when nobody is on shift. */

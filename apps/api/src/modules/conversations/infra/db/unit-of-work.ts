@@ -36,6 +36,10 @@ import { bindScriptRuns } from './script-runs';
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 
 const PlatformMediaSchema = z.array(ExternalMediaSchema);
+/** The latest switch of each scope, read through its end: a pause past its end reads as off (ADR 0148 § 1). */
+const SwitchStateRowsSchema = z.array(
+  z.object({ scope: z.string(), active: z.boolean(), until: z.coerce.date().nullable() }),
+);
 
 /** The repositories of one tenant transaction (`withTenant`: RLS scopes every statement to the creator). */
 function bind(tx: DbTransaction, creatorId: string): Transaction {
@@ -463,14 +467,24 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         );
         return rows.rows[0]?.found === true;
       },
+      async archived() {
+        const [creator] = await tx
+          .select({ archivedAt: schema.creators.archivedAt })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        return creator !== undefined && creator.archivedAt !== null;
+      },
       async isOn() {
-        const rows = await tx.execute<{ scope: string; active: boolean }>(sql`
-          select distinct on (scope) scope, active
+        const rows = await tx.execute(sql`
+          select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active,
+                 case when active and active_until > now() then active_until end as until
           from kill_switches
           where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
           order by scope, set_at desc`);
-        const on = (scope: string) => rows.rows.some((row) => row.scope === scope && row.active);
-        return { global: on('global'), creator: on('creator') };
+        const switches = SwitchStateRowsSchema.parse(rows.rows);
+        const on = (scope: string) => switches.some((row) => row.scope === scope && row.active);
+        const creatorUntil = switches.find((row) => row.scope === 'creator')?.until ?? null;
+        return { global: on('global'), creator: on('creator'), creatorUntil };
       },
       async setCreator(entry) {
         await tx.insert(schema.killSwitches).values({
@@ -479,6 +493,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           scopeId: creatorId,
           creatorId,
           active: entry.active,
+          activeUntil: entry.until ?? null,
           reason: entry.reason,
           setBy: entry.setBy,
           setAt: sql`clock_timestamp()`,
@@ -566,7 +581,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         if (creator !== undefined && creator.archivedAt !== null) return 'creator_archived';
         // The latest switch of each scope decides; a global one has no creator and stays visible (RLS).
         const switches = await tx.execute<{ active: boolean }>(sql`
-          select distinct on (scope, scope_id) active
+          select distinct on (scope, scope_id) (active and (active_until is null or active_until > now())) as active
           from kill_switches
           where scope = 'global'
              or (scope = 'creator' and scope_id = ${conversation.creatorId})

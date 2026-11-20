@@ -7,6 +7,7 @@ import type {
   EventId,
   SystemAlertCode,
   AgentHours,
+  DatedRanges,
   ConversationDetail,
   ConversationEventView,
   ConversationHolder,
@@ -311,9 +312,19 @@ interface KillSwitches {
    * creator does not exist (nothing to change).
    */
   lockCreator(): Promise<boolean>;
-  isOn(): Promise<{ readonly global: boolean; readonly creator: boolean }>;
-  /** Stamped by the database clock once the lock is held, so the later change is always the latest row. */
-  setCreator(entry: { active: boolean; reason: string; setBy: string }): Promise<void>;
+  /** She is archived (ADR 0071 § 2): her Arrêt is the code's, never a pause. */
+  archived(): Promise<boolean>;
+  /** `creatorUntil`: her switch is a pause that lifts itself then (ADR 0148 § 1); `null` otherwise. */
+  isOn(): Promise<{
+    readonly global: boolean;
+    readonly creator: boolean;
+    readonly creatorUntil: Date | null;
+  }>;
+  /**
+   * Stamped by the database clock once the lock is held, so the later change is always the latest row. `until` makes
+   * an Arrêt a pause: on until then, off after, without another row.
+   */
+  setCreator(entry: { active: boolean; reason: string; setBy: string; until?: Date }): Promise<void>;
 }
 
 /**
@@ -459,11 +470,17 @@ export interface GuardReadContext {
 }
 
 /**
- * Her hours (P3-14) and the clock they are read on (`creators.timezone`), implemented by `persona`: the defaults when
- * none is stored. `null` when she does not exist.
+ * Her hours (P3-14), her dated exceptions from her today on (ADR 0148 § 3) and the clock they are read on
+ * (`creators.timezone`), implemented by `persona`: the defaults when none is stored. `null` when she does not exist.
  */
 export interface ReplyHours {
-  of(creatorId: CreatorId): Promise<{ readonly hours: AgentHours; readonly timeZone: string } | null>;
+  of(creatorId: CreatorId): Promise<HerHours | null>;
+}
+
+export interface HerHours {
+  readonly hours: AgentHours;
+  readonly timeZone: string;
+  readonly exceptions: DatedRanges;
 }
 
 /** The fan as `conversations` needs it; implemented by the `fans` module. */
@@ -619,6 +636,8 @@ export interface ComposeInput {
   readonly desire?: { readonly score: number; readonly at: Date };
   /** Her hours (P3-14) as stored; absent, the defaults. They set her night and when a follow-up may go out. */
   readonly hours?: AgentHours;
+  /** Her dated exceptions (ADR 0148 § 3), from her today on: a date that has one follows its ranges alone. */
+  readonly exceptions?: DatedRanges;
   /** A custom order of his already waits for the team (ADR 0090 § A). */
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
