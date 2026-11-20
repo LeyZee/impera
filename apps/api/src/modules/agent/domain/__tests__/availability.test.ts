@@ -103,6 +103,22 @@ describe('sexualizes', () => {
       false,
     );
   });
+
+  it('reads a flirt as sexualizing only on explicit words or a role, never on his mood (Charles, 20/11)', () => {
+    expect(
+      sexualizes({
+        intent: 'flirt',
+        sentiment: 'aroused',
+        desireSignals: ['body_compliment', 'states_desire'],
+      }),
+    ).toBe(false);
+    expect(
+      sexualizes({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['asks_about_her_body'] }),
+    ).toBe(false);
+    expect(sexualizes({ intent: 'flirt', sentiment: 'positive', desireSignals: ['explicit_language'] })).toBe(
+      true,
+    );
+  });
 });
 
 describe('scriptStartGate', () => {

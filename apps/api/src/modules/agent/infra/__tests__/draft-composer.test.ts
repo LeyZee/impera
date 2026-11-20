@@ -1685,6 +1685,24 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
   });
 
+  it('welcomes a compliment the brain adds a desire to, never slowed down nor asked his age (Charles, 20/11)', async () => {
+    // Eval of 20/11: « doucement » and an age question on a first compliment, the brain having added a desire to it.
+    const WITH_DESIRE: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire', 'asks_about_her_body'],
+    };
+    const { draftComposer, seen } = composer({ brief: WITH_DESIRE }, undefined, limitsOf({}).limits, cursor);
+    await draftComposer.compose(INPUT);
+    const brief = written(seen);
+    expect(brief?.replyBrief).toContain('avec assurance et jeu');
+    expect(brief?.replyBrief).not.toMatch(/ralentit|son âge/u);
+    expect(brief?.toneHints).toEqual(
+      expect.arrayContaining([expect.stringContaining('aucune allusion sexuelle')]),
+    );
+  });
+
   it('lets her tease « pas si vite » once the intimate is open (relecture Bilan de #876)', async () => {
     const { draftComposer } = composer(
       { brief: HOT, voice: { bubbles: ['Pas si vite 😏 j’ai envie de te faire attendre'] } },

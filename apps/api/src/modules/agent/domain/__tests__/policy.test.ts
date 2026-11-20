@@ -189,7 +189,27 @@ describe('offerSignals', () => {
         .fanSexualizes,
     ).toBe(false);
     expect(
-      offerSignals({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['states_desire'] }).fanSexualizes,
+      offerSignals({ intent: 'sexting', sentiment: 'aroused', desireSignals: ['states_desire'] })
+        .fanSexualizes,
+    ).toBe(true);
+  });
+
+  it('never slows a flirt down for a desire the brain adds to it, only for explicit words or a role (Charles, 20/11)', () => {
+    for (const signal of ['states_desire', 'steers_to_intimate'])
+      expect(
+        offerSignals({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['body_compliment', signal] })
+          .fanSexualizes,
+        signal,
+      ).toBe(false);
+    for (const signal of ['explicit_language', 'roleplay'])
+      expect(
+        offerSignals({ intent: 'flirt', sentiment: 'positive', desireSignals: ['body_compliment', signal] })
+          .fanSexualizes,
+        signal,
+      ).toBe(true);
+    expect(
+      offerSignals({ intent: 'small_talk', sentiment: 'positive', desireSignals: ['states_desire'] })
+        .fanSexualizes,
     ).toBe(true);
   });
 });

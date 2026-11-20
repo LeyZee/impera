@@ -6,6 +6,8 @@ import {
   type ScriptStartBlock,
 } from '@impera/contracts';
 
+import { FLIRT_ADVANCE_SIGNALS } from './policy';
+
 /**
  * His availability and the gate before a script (ADR 0103, amendement du 13/11; ADR 0098). The brain only reports
  * signals in his last message; code holds the state, its lapse and the gate (CLAUDE.md rule 3).
@@ -121,6 +123,10 @@ export function sexualizes(brief: {
   readonly sentiment: string;
   readonly desireSignals?: readonly string[] | undefined;
 }): boolean {
+  // A flirt sexualizes only by explicit words or a sexual role (Charles, 20/11): his mood or a desire the brain adds
+  // to a compliment does not open the gate of a sale.
+  if (brief.intent === 'flirt')
+    return (brief.desireSignals ?? []).some((signal) => FLIRT_ADVANCE_SIGNALS.includes(signal));
   return (
     brief.intent === 'sexting' ||
     brief.sentiment === 'aroused' ||

@@ -106,6 +106,18 @@ const SEXUAL_ADVANCE_SIGNALS: readonly string[] = [
 ];
 
 /**
+ * What still makes a flirt an advance (Charles, 20/11): explicit words or a sexual role only. The brain names his
+ * message a flirt, nothing sexual, and still adds a desire to a stranger's compliment; a desire it reads beside a flirt
+ * neither slows her down nor asks his age. An open doubt on his age is a risk, read elsewhere, and still stops her.
+ */
+export const FLIRT_ADVANCE_SIGNALS: readonly string[] = ['explicit_language', 'roleplay'];
+
+/** The signals that make this message an advance: on a flirt, only its explicit words or a sexual role. */
+function advanceSignals(intent: string): readonly string[] {
+  return intent === 'flirt' ? FLIRT_ADVANCE_SIGNALS : SEXUAL_ADVANCE_SIGNALS;
+}
+
+/**
  * What the brain read that the policy needs: he makes a sexual advance now (the cursor follows him there or slows him
  * down), or asks for paid content himself.
  */
@@ -120,7 +132,7 @@ export function offerSignals(brief: {
   return {
     fanSexualizes:
       brief.intent === 'sexting' ||
-      (brief.desireSignals ?? []).some((signal) => SEXUAL_ADVANCE_SIGNALS.includes(signal)),
+      (brief.desireSignals ?? []).some((signal) => advanceSignals(brief.intent).includes(signal)),
     fanAsksForPaid: brief.intent === 'asks_for_media',
   };
 }
