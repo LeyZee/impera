@@ -34,7 +34,7 @@ export interface Outcome {
 }
 
 /** Every expectation of the scenario the outcome breaks, in French for the report; empty when it passes. */
-export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
+export function checkScenario(scenario: Pick<Scenario, 'expect'>, outcome: Outcome): string[] {
   const failures: string[] = [];
   const { brief, decision, voice } = scenario.expect;
   if (outcome.brief === undefined) return ['le cerveau n’a pas répondu'];
