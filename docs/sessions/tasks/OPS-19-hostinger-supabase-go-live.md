@@ -1,5 +1,5 @@
 # OPS-19 Mise en service sur le VPS Hostinger et la base Supabase
-Statut : in_progress (lot a fusionné, #897 ; lot b en revue ; lot c avec Charles)
+Statut : in_progress (lot a fusionné, #897 ; lot b fusionné, #914 ; avenant « même projet » en revue ; lot c avec Charles)
 Phase : exploitation
 Dépend de : ADR 0152 (acceptée le 20/11/2026), ADR 0027, 0028, 0037, 0067, 0087 ; OPS-01, OPS-02
 Branche : claude/project-thread-nnqahk
@@ -27,7 +27,8 @@ ADR 0152, `docs/runbooks/deploy.md`, `docs/architecture/operations.md`, `docker-
 - [x] Surveillance extérieure, du disque et des connexions SSH refusées : outil choisi et étapes écrites (`deploy.md` § 1.6). `/health` et `/ready` ne sont pas exposés par nginx : seul `/healthz` est surveillé du dehors.
 - [x] Refus au démarrage, en production, d'une base distante sans `sslmode=verify-full` (`config.ts`, testé) ; le certificat de Supabase est monté dans les conteneurs.
 ### Lot c : la mise en service, avec Charles au clavier
-- [ ] Charles commande le VPS, choisit l'adresse définitive, crée le projet Supabase, saisit les secrets.
+- [x] Avenant à l'ADR 0152 (§ 9) : la production est le projet Supabase des essais, vidé à la mise en ligne ; `deploy.md` § 1.1 (plus aucun outil sur le compte, base repartie de zéro sur son mot, clés régénérées, réseau v4 et v6), `operations.md`, `restore.md`.
+- [ ] Charles commande le VPS, choisit l'adresse définitive, coupe l'accès des outils à son compte Supabase, saisit les secrets.
 - [ ] Vérifications du runbook jouées sur le vrai serveur (rôles, budget de connexions, `TRUST_PROXY_HOPS`, journal du proxy sans chemins).
 - [ ] Restauration de l'export chiffré jouée de bout en bout avant l'ouverture (ADR 0028).
 
