@@ -35,11 +35,16 @@ function dayOf(iso: string, now: Date, timeZone: string | undefined): string {
   );
 }
 
-/** « 03:12 ». */
+/** « 3 h 12 »: the app's one way to write an hour, as the Dashboard writes it. */
 function clockOf(iso: string, timeZone: string | undefined): string {
-  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone }).format(
-    new Date(iso),
-  );
+  const parts = new Intl.DateTimeFormat('fr-FR', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  }).formatToParts(new Date(iso));
+  const of = (type: 'hour' | 'minute'): string => parts.find((part) => part.type === type)?.value ?? '';
+  return `${of('hour')}\u00a0h\u00a0${of('minute')}`;
 }
 
 /** « 20 octobre », « 1er novembre »: the day a restore test was made, in the reader's zone. */
