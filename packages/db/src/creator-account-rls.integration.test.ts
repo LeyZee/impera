@@ -196,6 +196,7 @@ const CREATOR_DECISIONS: Readonly<
   custom_alerts: 'closed',
   alert_seen: 'closed',
   system_alert_settings: 'closed',
+  creator_alert_routes: 'closed',
   persona_versions: {
     exception:
       'elle écrit sa persona (Moi › Persona, ADR 0042 § 8) par la porte de l’agence : son enregistrement et son activation écrivent aussi le journal d’audit et les événements',

@@ -3,6 +3,7 @@ import {
   DraftIdSchema,
   newId,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   ShiftFeedbackIdSchema,
   ShiftIdSchema,
   ShiftTemplateIdSchema,
@@ -38,6 +39,18 @@ const bodiesFor = (
   ids: Readonly<Record<Seeded, string>>,
 ): Readonly<Record<string, Record<string, unknown>>> => ({
   'POST /v1/conversations/:id/mode': { mode: 'auto' },
+  // The vault by choice (ADR 0145 § 5): the owner's alone, so A's people stop at the guard, B's account or not.
+  'PUT /v1/creators/:creatorId/vault/choices': {
+    platformAccountId: newId(PlatformAccountIdSchema),
+    folders: [{ folderRef: null, imported: true }],
+    media: [],
+  },
+  'POST /v1/creators/:creatorId/vault/describe': {
+    platformAccountId: newId(PlatformAccountIdSchema),
+    platformMediaIds: ['vault_media_inventee'],
+    confirm: null,
+    idempotencyKey: newId(PlatformAccountIdSchema),
+  },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {

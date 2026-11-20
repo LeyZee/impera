@@ -58,7 +58,7 @@ describe('the words of a card of the list of Créatrices', () => {
       '2026-11-20',
     );
     expect(late?.late).toBe(true);
-    expect(late?.note).toBe('En retard depuis mercredi · 2 autres attendus');
+    expect(late?.note).toBe('En retard depuis mer. 18 nov. · 2 autres attendus');
   });
 
   it('counts « À traiter », red only when something urgent waits', () => {

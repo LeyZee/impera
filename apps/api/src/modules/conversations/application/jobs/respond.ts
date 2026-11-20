@@ -513,6 +513,15 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // No script left for him where one would open (ADR 0150 § 9): said once, until a script starts again for him.
+      if (result.scriptsExhausted === true && !(await tx.events.scriptsExhaustedSaid(conversation.id))) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'scripts_exhausted', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       // His script runs as his message and Reveal left them (ADR 0098); the step decided only with a draft.
       const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
       conversation = scripted.conversation;

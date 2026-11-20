@@ -180,3 +180,27 @@ describe('Select', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 });
+
+describe('Select › the width of its list', () => {
+  const LONG: SelectOption<string>[] = [
+    { value: '', label: 'Toutes les alertes' },
+    { value: 'doubt', label: 'Doute sur la personne' },
+  ];
+
+  it('opens as wide as its field by default', () => {
+    render(<Select ariaLabel="Alerte" value="" options={LONG} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Alerte' }));
+    const pop = screen.getByRole('listbox').parentElement;
+    expect(pop?.style.width).toBe('8px');
+    expect(pop?.style.minWidth).toBe('');
+  });
+
+  it('opens as wide as its longest option when asked, never narrower than its field (recette visuelle 16/11)', () => {
+    render(<Select ariaLabel="Alerte" value="" options={LONG} onChange={vi.fn()} listWidth="options" />);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Alerte' }));
+    const pop = screen.getByRole('listbox').parentElement;
+    expect(pop?.style.width).toBe('max-content');
+    expect(pop?.style.minWidth).toBe('8px');
+    expect(pop?.style.maxWidth).not.toBe('');
+  });
+});

@@ -55,6 +55,7 @@ export const JOB_NAMES = [
   'rewards.evaluate_creator',
   'ai_usage.check_credits',
   'notifications.recap',
+  'alerts.route',
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
@@ -81,7 +82,6 @@ export const JOB_NAMES = [
   'payroll.lock_payout_certificate',
   'media.describe',
   'media.describe_vault',
-  'media.describe_vault_backlog',
   'content_drops.receive_file',
   'content_drops.convert_file',
   'content_drops.erase_originals',
@@ -137,6 +137,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'rewards.evaluate_creator': 'Gains de la créatrice après son geste',
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
+  'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
@@ -163,7 +164,6 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.lock_payout_certificate': 'Attestation de paiement',
   'media.describe': 'Description des médias',
   'media.describe_vault': 'Description des médias du coffre',
-  'media.describe_vault_backlog': 'Rattrapage des descriptions du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
   'content_drops.convert_file': 'Conversion des vidéos',
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
@@ -285,6 +285,11 @@ export const JOB_PAYLOADS = {
   'ai_usage.check_credits': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
+  /**
+   * Each minute (crontab, ADR 0150 lot 2): the alerts of the outbox's recent window, to the roles each creator's tab
+   * chooses. Re-reading the window is harmless: a notification is once per account, reason and event.
+   */
+  'alerts.route': z.object({}),
   /**
    * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
    * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
@@ -423,18 +428,17 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
-   * The media of an account's vault that have no file yet, described by lots (ADR 0113 § 1, § 5): each read from the
-   * platform into a folder of the job's own, described by the vision AI, reduced to its picture, then erased. On the
-   * account's queue under `vaultDescribeJobKey`: one waiting run per account. Queued at the end of each vault sync and
-   * by the hourly catch-up; a spent AI budget puts it off an hour. Replayable: a media linked is never taken again.
+   * The media of an account's vault the owner asked to describe and that have no file yet, described by lots (ADR 0113
+   * § 1, ADR 0145 § 5): each read from the platform into a folder of the job's own, described by the vision AI, reduced
+   * to its picture, then erased. On the account's queue under `vaultDescribeJobKey`: one waiting run per account.
+   * Queued by the owner's confirmed request and at the end of each vault sync (a request waiting for a file the sync
+   * now lists); never on its own. A spent AI budget puts it off an hour. Replayable: a media linked is never taken again.
    */
   'media.describe_vault': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
-  /** Each hour (ADR 0113 § 5): `media.describe_vault` queued for each account whose vault still waits, her switch on. */
-  'media.describe_vault_backlog': z.object({}),
   /**
    * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared and
    * marks the file received, then cleans it (metadata removed, format checked, fingerprint) into her library or finds
@@ -609,6 +613,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Each hour: the next run is the retry; an alert is published once per episode.
   'ai_usage.check_credits': 1,
   'notifications.recap': 3,
+  // The next minute re-reads the window: one try is enough.
+  'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
   // Replayable: told once per task and start (`notification_deliveries`).
@@ -656,8 +662,6 @@ export const JOB_MAX_ATTEMPTS = {
   'media.describe': 3,
   // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
   'media.describe_vault': 3,
-  // Each hour: the next run is the retry.
-  'media.describe_vault_backlog': 1,
   // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
   // short outage of the storage; a file left waiting is sent again by her phone.
   'content_drops.receive_file': 9,

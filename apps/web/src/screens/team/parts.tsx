@@ -3,14 +3,17 @@ import type { JSX, ReactNode } from 'react';
 
 import { STATUS_LABELS, STATUS_TONES } from './model';
 
-import { initialOf } from '@/lib/utils';
 import '@/scheduling/exchanges.css';
+import { initialsOf } from '@/settings/sales-feed/importing';
 import { Panel } from '@/shell/layout';
 import { Empty } from '@/shell/states';
 
 /** The pieces the list, the sheet and the add panel share. */
 
-/** The member's initial, on his planning colour once he has one. */
+/**
+ * The member's initials, two letters as Équipe › Reveal writes them (« Chatteur Un » → « CU »), on his planning colour
+ * once he has one: one letter made every « Chatteur … » the same « C » (recette visuelle 16/11, GES-21).
+ */
 export function Avatar({ member, large = false }: { member: TeamMember; large?: boolean }): JSX.Element {
   return (
     <span
@@ -19,7 +22,7 @@ export function Avatar({ member, large = false }: { member: TeamMember; large?: 
       data-color={member.color === null ? undefined : 'true'}
       aria-hidden="true"
     >
-      {initialOf(member.displayName)}
+      {initialsOf(member.displayName)}
     </span>
   );
 }

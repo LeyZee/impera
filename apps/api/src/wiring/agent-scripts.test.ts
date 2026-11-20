@@ -29,6 +29,7 @@ const media = (ref: string, described = true) => ({
   ref,
   kind: 'image' as const,
   inVault: true,
+  imported: true,
   mediaAssetId: null,
   described,
 });

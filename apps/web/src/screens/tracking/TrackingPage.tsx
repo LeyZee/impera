@@ -29,11 +29,13 @@ import {
   searchLines,
   sharedMode,
   situationOf,
+  sharedLabel,
   STOP_SITUATION,
   storeListOrder,
   subline,
   type Hand,
   type ListOrder,
+  type Situation,
 } from './view';
 import './tracking.css';
 
@@ -335,34 +337,48 @@ export function TrackingPage({
                   ) : null}
                   {/* Grouped by who acts (CHAT-22): the state is said by the group, not on every line. */}
                   <div role="group" aria-label="Conversations" className="tr-groups">
-                    {groupByHand(shown, selfScope).map((group) => (
-                      <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
-                        <h3 className="nv-eyebrow tr-group__title">
-                          {HAND_TITLES[group.hand]}
-                          {group.hand === 'yours' ? (
-                            <span className="tr-group__count">{group.lines.length}</span>
-                          ) : null}
-                        </h3>
-                        <ul className="nv-list tr-list" aria-label={HAND_TITLES[group.hand]}>
-                          {group.lines.map(({ conversation, creatorId, creatorName }) => (
-                            <Row
-                              key={conversation.id}
-                              conversation={conversation}
-                              hand={group.hand}
-                              selfScope={selfScope}
-                              creatorName={showsCreator ? creatorName : undefined}
-                              stopped={isStopped(creatorId)}
-                              now={now}
-                              isOpen={conversation.id === selected}
-                              onOpen={() => {
-                                setNotice(null);
-                                onSelect(conversation.id);
-                              }}
-                            />
-                          ))}
-                        </ul>
-                      </section>
-                    ))}
+                    {groupByHand(shown, selfScope).map((group) => {
+                      // In « À toi », a state all its lines share is said once, by the title (PIL-10).
+                      const shared =
+                        group.hand === 'yours'
+                          ? sharedLabel(
+                              group.lines.map(
+                                (line) =>
+                                  rowSituation(line.conversation, selfScope, isStopped(line.creatorId)).label,
+                              ),
+                            )
+                          : null;
+                      return (
+                        <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
+                          <h3 className="nv-eyebrow tr-group__title">
+                            {HAND_TITLES[group.hand]}
+                            {group.hand === 'yours' ? (
+                              <span className="tr-group__count">{group.lines.length}</span>
+                            ) : null}
+                            {shared === null ? null : <span>{lowerFirst(shared)}</span>}
+                          </h3>
+                          <ul className="nv-list tr-list" aria-label={HAND_TITLES[group.hand]}>
+                            {group.lines.map(({ conversation, creatorId, creatorName }) => (
+                              <Row
+                                key={conversation.id}
+                                conversation={conversation}
+                                hand={group.hand}
+                                saidByGroup={shared !== null}
+                                selfScope={selfScope}
+                                creatorName={showsCreator ? creatorName : undefined}
+                                stopped={isStopped(creatorId)}
+                                now={now}
+                                isOpen={conversation.id === selected}
+                                onOpen={() => {
+                                  setNotice(null);
+                                  onSelect(conversation.id);
+                                }}
+                              />
+                            ))}
+                          </ul>
+                        </section>
+                      );
+                    })}
                   </div>
                   {hasMore ? (
                     <p className="tr-more">
@@ -576,9 +592,20 @@ function QueueGroupRow({
  * when he wrote under it. The state shows only where it tells something: in « À toi », why a person must act; elsewhere
  * the group's title says it, but for a pause and another person's hand (CHAT-22, EQ-13).
  */
+/** Where a line stands: a draft held by her emergency stop never says « À valider » (CHAT-07). */
+function rowSituation(conversation: ConversationSummary, selfScope: boolean, stopped: boolean): Situation {
+  return stopped && conversation.state === 'awaiting_approval'
+    ? STOP_SITUATION
+    : situationOf(conversation, selfScope);
+}
+
+/** « Un humain répond » after « À toi · 30 »: the group's title goes on in lower case. */
+const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr') + text.slice(1);
+
 function Row({
   conversation,
   hand,
+  saidByGroup,
   selfScope,
   creatorName,
   stopped,
@@ -589,6 +616,8 @@ function Row({
   conversation: ConversationSummary;
   /** The group the line is in: its state is said once, by the group. */
   hand: Hand;
+  /** Every line of « À toi » says the same: its title says it, the line does not. */
+  saidByGroup: boolean;
   /** A member whose scope is `self`: another person's hand is said beside it, in the quiet ones. */
   selfScope: boolean;
   /** Shown beside his pseudo when the account sees several creators, never cut. */
@@ -601,14 +630,13 @@ function Row({
 }): JSX.Element {
   const name = conversation.fanDisplayName.trim() === '' ? 'Fan sans nom' : conversation.fanDisplayName;
   const line = subline(conversation, now);
-  const situation =
-    stopped && conversation.state === 'awaiting_approval'
-      ? STOP_SITUATION
-      : situationOf(conversation, selfScope);
+  const situation = rowSituation(conversation, selfScope, stopped);
   // Outside « À toi », only a pause and another person's hand are worth a word: the group says the rest.
   const says =
     hand === 'yours'
-      ? 'pill'
+      ? saidByGroup
+        ? null
+        : 'pill'
       : conversation.state === 'paused' || conversation.state === 'human'
         ? 'word'
         : null;
@@ -636,9 +664,7 @@ function Row({
               </span>
             ) : null}
             {creatorName === undefined ? null : (
-              <span className="nv-tag nv-tag--declared tr-row__creator" title={creatorName}>
-                {creatorName}
-              </span>
+              <span className="nv-tag nv-tag--declared tr-row__creator">{creatorName}</span>
             )}
           </span>
           <span className="nv-convo__preview">

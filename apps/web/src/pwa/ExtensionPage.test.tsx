@@ -11,7 +11,7 @@ import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExtensionPage } from './ExtensionPage';
-import { browserOf, EXTENSION_ZIP, isLocalCrm } from './extension';
+import { browserOf, EXTENSION_ZIP } from './extension';
 
 const CHROME =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
@@ -19,8 +19,24 @@ const EDGE = `${CHROME} Edg/142.0.0.0`;
 const IPHONE =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 Version/19.0 Mobile/15E148 Safari/604.1';
 
+/** The CRM's answer for the extension's file: the zip, or the page a server answers for what it does not have. */
+function serves(zip: boolean): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        new Response(null, {
+          status: 200,
+          headers: { 'content-type': zip ? 'application/zip' : 'text/html' },
+        }),
+      ),
+    ),
+  );
+}
+
 beforeEach(() => {
   vi.stubGlobal('scrollTo', vi.fn());
+  serves(true);
 });
 
 afterEach(() => {
@@ -60,9 +76,17 @@ async function renderAs(userAgent: string, watches = true): Promise<void> {
 describe('ExtensionPage', () => {
   it('offers the file of the extension', async () => {
     await renderAs(CHROME);
-    expect(screen.getByRole('link', { name: 'Télécharger l’extension' }).getAttribute('href')).toBe(
+    expect((await screen.findByRole('link', { name: 'Télécharger l’extension' })).getAttribute('href')).toBe(
       EXTENSION_ZIP,
     );
+  });
+
+  // V-CHA, recette du 16/11: a link to a file that is not served downloads an error page.
+  it('offers no download when this CRM does not serve the file', async () => {
+    serves(false);
+    await renderAs(CHROME);
+    expect(await screen.findByText(/le fichier n’est pas servi/u)).toBeDefined();
+    expect(screen.queryByRole('link', { name: 'Télécharger l’extension' })).toBeNull();
   });
 
   it('puts the steps of the browser that opens the page first', async () => {
@@ -77,33 +101,36 @@ describe('ExtensionPage', () => {
     expect(screen.getByText(/marche sur ordinateur/u)).toBeTruthy();
   });
 
-  it('says what is not there yet in one line at the foot, not among what the extension does (PRO-24)', async () => {
+  // Recette du 16/11, EXT-06: the copilot exists, nothing is announced as coming.
+  it('says what the extension does today, the copilot on Reveal included', async () => {
     await renderAs(CHROME);
-    expect(screen.queryByText('Bientôt')).toBeNull();
-    expect(
-      screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent),
-    ).toContain('Tes raccourcis');
-    expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u).textContent).toContain(
-      'la veille Instagram',
-    );
+    expect(screen.queryByText(/Bientôt/u)).toBeNull();
+    const offers = screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent);
+    expect(offers).toContain('Tes raccourcis');
+    expect(offers).toContain('Le copilote sur Reveal');
+    expect(offers).toContain('La veille Instagram');
+    expect(screen.getByRole('heading', { name: 'Le copilote sur Reveal' })).toBeDefined();
+    expect(screen.getByText(/Trois touches : A copie le brouillon pour Reveal/u)).toBeDefined();
   });
 
   it('keeps the trend watch for those who do it', async () => {
     await renderAs(CHROME, false);
     expect(screen.queryByText(/veille Instagram/u)).toBeNull();
-    expect(screen.getByText(/^Bientôt dans l’extension : sur Reveal/u)).toBeTruthy();
+    expect(screen.getAllByText('Le copilote sur Reveal').length).toBeGreaterThan(0);
   });
 
-  it('tells the popup nothing on localhost, its default address', async () => {
+  // EXT-06, EXT-07: the popup asks where the CRM opens, so its address is given on localhost too.
+  it('gives the CRM’s address to paste in the popup, on localhost too', async () => {
     await renderAs(CHROME);
-    expect(screen.queryByRole('button', { name: 'Copier l’adresse' })).toBeNull();
-    expect(screen.getAllByText(/tu vois ton nom/u)).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Copier l’adresse' })).toHaveLength(2);
+    expect(screen.getAllByText(/elle te demande où s’ouvre ton CRM/u)).toHaveLength(2);
   });
 
   it('gives a deployed CRM its address to paste in the popup', async () => {
     vi.stubGlobal('location', new URL('https://crm.exemple.fr/aide/extension'));
     const writeText = vi.fn(() => Promise.resolve());
     vi.stubGlobal('navigator', { userAgent: CHROME, clipboard: { writeText } });
+    serves(true);
     await renderPage(<ExtensionPage watches />);
     expect(screen.getAllByText('https://crm.exemple.fr')).toHaveLength(2);
     const [copy] = screen.getAllByRole('button', { name: 'Copier l’adresse' });
@@ -112,15 +139,5 @@ describe('ExtensionPage', () => {
     expect(writeText).toHaveBeenCalledWith('https://crm.exemple.fr');
     expect(await screen.findByRole('button', { name: 'Copiée' })).toBeTruthy();
     expect(screen.getAllByText(/l’extension affiche alors ton nom/u)).toHaveLength(2);
-  });
-});
-
-describe('isLocalCrm', () => {
-  it.each([
-    ['http://localhost:5173', true],
-    ['http://127.0.0.1:5173', true],
-    ['https://crm.exemple.fr', false],
-  ])('knows the default address', (origin, local) => {
-    expect(isLocalCrm(origin)).toBe(local);
   });
 });
