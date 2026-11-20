@@ -1,4 +1,4 @@
-# OPS-17 Mise en service sur le VPS Hostinger et la base Supabase
+# OPS-19 Mise en service sur le VPS Hostinger et la base Supabase
 Statut : todo
 Phase : exploitation
 Dépend de : ADR 0152 (acceptée le 20/11/2026), ADR 0027, 0028, 0037, 0067, 0087 ; OPS-01, OPS-02
