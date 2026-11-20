@@ -64,6 +64,11 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
    * activating it. Absent: only the invented persona plays.
    */
   readonly personaVersion?: PersonaVersionSource;
+  /**
+   * Her bio on her platform profile as the poll last read it (ADR 0154 § 7): her version played reads it as her real
+   * fans' drafts do. Absent, or the invented persona: none.
+   */
+  readonly profileBioOf?: (creatorId: string) => Promise<string | null>;
   readonly store: CalibrationStore;
   /** The ratings already kept: the rate starts from them and the corrections come back as voice examples. */
   readonly records: CalibrationRecord[];
@@ -87,9 +92,10 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   };
   const now = deps.now ?? (() => new Date());
   const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
-  const engineFor = (persona: PersonaForModels, played?: PlayedVersion) =>
+  const engineFor = (persona: PersonaForModels, played?: PlayedVersion, profileBio: string | null = null) =>
     createPlaygroundEngine({
       gateway,
+      ...(profileBio !== null && { profileBio }),
       gatewayForVoice: deps.gatewayForVoice ?? ((model) => createVoiceVariant(deps, model)),
       persona,
       store: deps.store,
@@ -111,7 +117,9 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       // Read as her drafts read her active one: her name for a placeholder first name, her day for her age.
       const persona = await activePersonaForModels(() => Promise.resolve(stored), creatorId, now());
       if (persona === null) throw new PlaygroundPersonaNotFound();
-      return engineFor(persona, { creatorId, versionId, version: stored.version });
+      // Her bio as her real fans' drafts read it; a failed read plays without it, as a draft would.
+      const profileBio = await (deps.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
+      return engineFor(persona, { creatorId, versionId, version: stored.version }, profileBio);
     },
   });
   const alertTester = createAlertTester({
@@ -133,6 +141,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly creatorId?: () => Promise<string | null>;
   readonly activePersona: ActivePersonaSource;
   readonly personaVersion?: PersonaVersionSource;
+  readonly profileBioOf?: (creatorId: string) => Promise<string | null>;
   readonly desireMarks?: DesireMarkStore;
 }
 

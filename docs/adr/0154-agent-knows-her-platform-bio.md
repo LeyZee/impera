@@ -1,6 +1,6 @@
 # 0154. L'IA connaît la bio de la créatrice sur la plateforme
 
-Statut : proposed (demande de Charles du 20/11/2026, 12 h 54 heure de Paris : « que l'IA de chatting ait accès, en plus de la fiche persona, à la bio sur Reveal » ; choix « La bio » sur la carte du 20/11, 12 h 57 ; fil « Donner la bio Reveal à l’IA » ; numéro attribué par le coordinateur le 20/11)
+Statut : accepted (« ok 0154 » de Charles le 20/11/2026, 13 h 00 heure de Paris ; demande de Charles du 20/11/2026, 12 h 54 heure de Paris : « que l'IA de chatting ait accès, en plus de la fiche persona, à la bio sur Reveal » ; choix « La bio » sur la carte du 20/11, 12 h 57 ; fil « Donner la bio Reveal à l’IA » ; numéro attribué par le coordinateur le 20/11)
 Date : 2026-11-20
 Précise : l'ADR 0110 (automatisations de Reveal : les accroches restent régies par son § 1), l'ADR 0018 (ce que la plateforme donne), l'ADR 0079 (la fiche lue par les modèles).
 

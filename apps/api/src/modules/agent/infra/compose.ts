@@ -87,6 +87,11 @@ export interface ComposerPersona {
   readonly guardSettings: GuardSettings;
   /** False: her answer goes out as one message (`behavior.split_messages`). Absent: as the voice wrote it. */
   readonly splitMessages?: boolean;
+  /**
+   * Her bio on her platform profile, as last read (ADR 0154): beside her sheet, read as data, it wins where they
+   * differ. Absent or empty: no section.
+   */
+  readonly profileBio?: string | null;
 }
 
 /** What the fan receives: her bubbles, or one message when she does not split hers. */
@@ -570,10 +575,13 @@ export async function composeTurn(
     };
   }
   const notes = screenNotes(input.fanNotes);
+  // Her bio is the platform's text: a line of it shaped like an order never reaches a prompt (ADR 0154 § 3).
+  const bio = screenNotes(persona.profileBio ?? '');
   // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
   const base = {
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
+    ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
     history: withTimeNotes(input.history, input.situation.timeZone),

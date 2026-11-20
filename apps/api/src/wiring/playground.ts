@@ -1,5 +1,8 @@
+import { CreatorIdSchema } from '@impera/contracts';
+
 import type { AppLlm } from '../llm';
 import type { ActivePersonaSource } from '../modules/agent';
+import type { ConnectorsModule } from '../modules/connectors';
 import type { PersonaModule } from '../modules/persona';
 import { createDbDesireMarkStore, startPlaygroundModule, type PlaygroundModule } from '../modules/playground';
 
@@ -17,6 +20,8 @@ export async function wirePlayground(
     readonly llm: AppLlm;
     readonly persona: PersonaModule;
     readonly activePersona: ActivePersonaSource;
+    /** Her bio as the poll last read it (ADR 0154 § 7): her version played reads it as her real fans' drafts do. */
+    readonly connectors: ConnectorsModule;
     /** The persona file and the training folder, from the repository root (`composition-root.ts`). */
     readonly personaPath: string;
     readonly trainingDir: string;
@@ -39,6 +44,7 @@ export async function wirePlayground(
         trainingDir: deps.trainingDir,
         activePersona: deps.activePersona,
         personaVersion: (creatorId, versionId) => deps.persona.versions.version(creatorId, versionId),
+        profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),
         desireMarks: createDbDesireMarkStore(shared.db),
       }).catch((error: unknown) => {
         logger.warn({ err: error }, 'playground not started: persona unreadable');

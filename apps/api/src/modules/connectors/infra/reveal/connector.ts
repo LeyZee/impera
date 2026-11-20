@@ -2,6 +2,7 @@ import type {
   ConnectorCapabilities,
   ConversationSnapshot,
   CreatorNote,
+  CreatorProfile,
   ExternalMessage,
   ExternalRef,
   ExternalTransaction,
@@ -143,6 +144,7 @@ const CAPABILITIES: ConnectorCapabilities = {
   fanNoteRead: true,
   fanNoteWrite: true,
   creatorNotes: true,
+  creatorProfile: true,
   ppvStats: true,
   scripts: true,
   scriptHistory: true,
@@ -530,6 +532,12 @@ export class RevealApiConnector implements PlatformConnector {
   async getCreatorNotes(): Promise<CreatorNote[]> {
     const model = await this.session().get('models.get', REVEAL_ENDPOINTS['models.get'].shape, this.modelId);
     return model.creatorNote.trim() === '' ? [] : [{ text: model.creatorNote }];
+  }
+
+  /** Her bio as every subscriber reads it on her profile (ADR 0154): read only, never written. */
+  async getCreatorProfile(): Promise<CreatorProfile> {
+    const model = await this.session().get('models.get', REVEAL_ENDPOINTS['models.get'].shape, this.modelId);
+    return { bio: model.description.trim() };
   }
 
   async getFanPpvStats(fanRef: ExternalRef): Promise<FanPpvStats> {

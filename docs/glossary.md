@@ -19,6 +19,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Brouillon, proposition | `draft` | Une réponse proposée par l'IA, en attente d'approbation ou auto-approuvée. |
 | Brouillon placé | `drafts.placed_at`, verdict `placed` | Un brouillon que le chatteur a mis dans le champ de saisie de la plateforme depuis le panneau copilote (`a`, ou `e` après retouche) : il l'envoie lui-même, le brouillon reste en attente, et c'est le message parti qui le juge validé ou corrigé (ADR 0086 § 4 et 5). Jamais « Envoyé » au clic. |
 | Note de calibrage en réel | `calibration_ratings.source = 'live'` | Le jugement d'un vrai brouillon passé par le panneau copilote, une note par brouillon, sans les mots du fan ; celles du playground sont `playground` (ADR 0086 § 5). |
+| Bio | `profile_bio` | Le texte public de son profil sur la plateforme, que tout abonné a pu lire avant de lui écrire. Lu en lecture seule par le poll (au plus toutes les 15 minutes), gardé sur le compte de plateforme, donné au cerveau, à la voix, au juge et au Playground dans un bloc `<profile_bio>` ; il l'emporte sur la fiche où ils diffèrent (ADR 0154). |
 | Brief | `brief` | La sortie structurée du cerveau qui dit à la voix quoi écrire. |
 | Sens | `sense` | Rôle LLM qui décrit les médias. |
 | Cerveau | `brain` | Rôle LLM qui analyse et décide. |

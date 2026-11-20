@@ -61,7 +61,7 @@ describe('prompts', () => {
 
   it('tells the judge to read his age in the situation, not in his messages (OPS-07)', () => {
     const judge = loadPrompt('judge');
-    expect(judge.header.version).toBe('1.1.0');
+    expect(judge.header.version).toBe('1.2.0');
     expect(judge.variables).toContain('situation');
     for (const field of ['ageConfirmed', 'relationshipHours', 'lastOfferHoursAgo', 'flags'])
       expect(judge.body).toContain(`\`${field}\``);

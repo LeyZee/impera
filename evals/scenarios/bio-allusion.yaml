@@ -1,0 +1,30 @@
+# Il reprend une image de sa bio : elle la reconnaît comme la sienne et joue avec, sans la réciter (ADR 0154). Bio, fan et messages fictifs (ADR 0010).
+description: Il cite une image de sa bio fictive (« douce comme une guimauve ») ; elle la reprend comme une chose qu’elle a écrite, sans s’étonner ni réciter sa bio.
+persona_version: demo
+tier: full
+profile_bio: 'Douce comme une guimauve, piquante comme un piment 🌶️ Je réponds à tous mes abonnés, surtout aux curieux.'
+fan_facts: []
+situation:
+  known_hours: 2
+  age_confirmed: true
+history:
+  - from: fan
+    text: salut toi
+    minutes_ago: 30
+  - from: creator
+    text: coucou toi 😊 ça va ?
+    minutes_ago: 28
+inbound: ça va et toi ? alors comme ça t’es douce comme une guimauve ? j’ai bien envie de vérifier ahah
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 3
+    must_match_any:
+      - \b(guimauve|douce|piment|piquante)\b
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(de quoi tu parles|je comprends pas|comment ça)\b
+      - \bbio\b.*\b(dit|écrit)\b.*\bguimauve\b.*\bpiment\b

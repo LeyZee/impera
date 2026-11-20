@@ -164,6 +164,8 @@ export const FakeFixtureSchema = z.object({
     userName: z.string(),
     displayName: z.string(),
     creatorNote: z.string(),
+    /** Her bio on her profile (ADR 0154); `Description de test` when left out. */
+    bio: z.string().optional(),
     /** Her automations (ADR 0110): openers offered to a new fan (`%NAME%` for his name), welcome, reminder. */
     hooks: z.array(z.string()).optional(),
     welcomeMessage: z.string().optional(),
@@ -242,6 +244,7 @@ export const REVEAL_EXPECTED_CAPABILITIES = {
   /** `PATCH …/note` (E4). */
   fanNoteWrite: true,
   creatorNotes: true,
+  creatorProfile: true,
   ppvStats: true,
   scripts: true,
   scriptHistory: true,

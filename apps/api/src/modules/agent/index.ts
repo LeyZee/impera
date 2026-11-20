@@ -120,6 +120,11 @@ export interface DraftComposerStartOptions {
   readonly activePersona: ActivePersonaSource;
   /** Her clock, read for each draft: the creator's time zone. */
   readonly timeZoneOf: (creatorId: string) => Promise<string>;
+  /**
+   * Her bio on her platform profile, as last read (ADR 0154), read at each draft beside her persona; `null`: none.
+   * Without it, she writes from her sheet alone. A failed read writes without it, never stops the draft.
+   */
+  readonly profileBioOf?: (creatorId: string) => Promise<string | null>;
   /** His media seen before she answers; without it, any media goes to a human. */
   readonly sight?: MediaSight;
   /** His limits: nothing is written to a stopped fan, and a risk sets them itself (P3-02). */
@@ -145,13 +150,14 @@ export interface DraftComposerStartOptions {
  * Her fields for the composer, from her persona: her sheet as it is, her own sample replies in it (P5-01). The
  * playground's corrected answers never join it: they were written on its fictional persona, not hers (M13).
  */
-function composerFields(persona: PersonaForModels): ComposerPersonaFields {
+function composerFields(persona: PersonaForModels, profileBio: string | null = null): ComposerPersonaFields {
   return {
     persona: {
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
+      ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -171,7 +177,9 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     gateway: options.gateway,
     personaOf: async (creatorId, now) => {
       const persona = await activePersonaForModels(options.activePersona, creatorId, now);
-      return persona === null ? null : composerFields(persona);
+      if (persona === null) return null;
+      const profileBio = await (options.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
+      return composerFields(persona, profileBio);
     },
     timeZoneOf: options.timeZoneOf,
     voicePrompt: loadPrompt('voice').header.version,

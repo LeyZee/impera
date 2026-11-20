@@ -318,6 +318,8 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect((await connector.getFanNote(fan('fan_02'))).text).toContain('Prénom : Prénom02');
     expect(await connector.getFanNote(fan('fan_01'))).toEqual({ text: '' });
     expect(await connector.getCreatorNotes()).toEqual([{ text: 'Note du modèle de test' }]);
+    // Her bio, read only (ADR 0154): the profile's own text.
+    expect(await connector.getCreatorProfile()).toEqual({ bio: 'Description de test' });
     const ppv = await connector.getFanPpvStats(fan('fan_02'));
     expect(ppv).toMatchObject({ purchased: 2, offered: 3, highestPriceMinor: 3_000, lowestPriceMinor: 500 });
     // Sequence 1's last step, sent to fan 02 at minute 2 240 of the world, never bought.

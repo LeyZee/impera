@@ -22,6 +22,8 @@ export interface ConnectorAccount extends BreakerState {
   readonly platform: Platform;
   readonly sessionState: SessionState;
   readonly lastPollAt: Date | null;
+  /** When her profile's bio was last read (ADR 0154); `null` or absent: never. */
+  readonly profileBioReadAt?: Date | null;
   readonly config: ConnectorConfig;
 }
 
@@ -92,6 +94,10 @@ export interface AccountStore {
   /** The encrypted session, or `null`. */
   sessionOf(creatorId: CreatorId, id: PlatformAccountId): Promise<Buffer | null>;
   recordPoll(creatorId: CreatorId, id: PlatformAccountId, at: Date): Promise<void>;
+  /** Her bio as just read on her profile (ADR 0154), and when: an empty one is kept as empty. */
+  recordProfileBio(creatorId: CreatorId, id: PlatformAccountId, bio: string, at: Date): Promise<void>;
+  /** Her bio last read on any of her accounts, the most recent read first (ADR 0154); `null`: none read or empty. */
+  profileBioOf(creatorId: CreatorId): Promise<string | null>;
   recordFailure(creatorId: CreatorId, id: PlatformAccountId, state: BreakerState): Promise<void>;
   /** Sets the state and publishes `session_state_changed` in one transaction; no event when it did not change. */
   setSessionState(
