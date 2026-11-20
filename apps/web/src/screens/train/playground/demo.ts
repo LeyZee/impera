@@ -733,6 +733,9 @@ export function createDemoClient(start: Date = new Date('2026-10-17T22:40:00+02:
           snapshot()
         ),
       ),
+    // The demo plays the invented persona: no creator, so no bank (ADR 0102 § 1).
+    bank: () => later(() => ({ examples: [] })),
+    withdrawExample: () => later(() => ({ examples: [] })),
   };
 }
 

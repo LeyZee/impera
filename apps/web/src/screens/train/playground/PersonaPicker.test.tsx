@@ -182,6 +182,8 @@ function stubClient(): PlaygroundClient {
     setSpent: unused,
     sendCreatorMedia: unused,
     answerScriptStep: unused,
+    bank: unused,
+    withdrawExample: unused,
   };
 }
 

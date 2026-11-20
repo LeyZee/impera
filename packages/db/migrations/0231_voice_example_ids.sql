@@ -1,0 +1,1 @@
+ALTER TABLE "llm_calls" ADD COLUMN "voice_example_ids" uuid[];

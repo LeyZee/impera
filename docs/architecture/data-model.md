@@ -11,7 +11,7 @@ Dernière revue : 2026-10-16. Le schéma Drizzle (`packages/db/src/schema/`, P0-
 - Enum : `text` + `check` (plus simple à migrer qu'un type enum Postgres), valeurs définies dans `packages/contracts`.
 - Nommage : colonnes SQL en `snake_case` ; clés des colonnes `jsonb`, des payloads d'événements et de jobs, et des DTO en `camelCase` (voir `docs/conventions/coding.md`). Ce qui reste en `jsonb` et ce qui devient colonne : `docs/architecture/jsonb.md`.
 - Suppression : logique (`deleted_at`) pour les tables d'état ; les tables append-only ne se suppriment pas (on anonymise via `erase-fan`).
-- Table append-only : un trigger `<table>_append_only` refuse `UPDATE` et `DELETE`, et la migration retire aussi `UPDATE`, `DELETE` et `TRUNCATE` aux rôles `nirvana_app` et `impera_service` (`REVOKE` explicite : les privilèges par défaut de `init.sql` les donnent). `packages/db/src/append-only.integration.test.ts` le vérifie sur le catalogue pour toute table qui porte ce trigger ; une table dont le trigger laisse passer un changement précis (`calibration_ratings`, la purge de `moment`) y est nommée.
+- Table append-only : un trigger `<table>_append_only` refuse `UPDATE` et `DELETE`, et la migration retire aussi `UPDATE`, `DELETE` et `TRUNCATE` aux rôles `nirvana_app` et `impera_service` (`REVOKE` explicite : les privilèges par défaut de `init.sql` les donnent). `packages/db/src/append-only.integration.test.ts` le vérifie sur le catalogue pour toute table qui porte ce trigger ; une table dont le trigger laisse passer un changement précis (`calibration_ratings` : la purge de `moment`, et un exemple de voix retiré de sa banque, ADR 0102 § 5) y est nommée.
 
 ## Tenant et comptes
 
