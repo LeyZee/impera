@@ -190,6 +190,51 @@ export const AgencySpanSchema = z.strictObject({
 });
 export type AgencySpan = z.infer<typeof AgencySpanSchema>;
 
+/**
+ * The month's revenue objectives (ADR 0092 § 6), on a calendar month read: each creator counted with the owner's
+ * objective (null when none is set), her revenue so far and its linear projection to the month's end; the agency's
+ * objective is the sum of those set. Internal: never her account's, never the MCP's.
+ */
+export const AgencyObjectivesSchema = z.strictObject({
+  /** The month's first day. */
+  month: day,
+  /** Days of the month gone, today counted, out of its days: equal once the month is over. */
+  daysGone: z.number().int().positive(),
+  days: z.number().int().positive(),
+  creators: z.array(
+    z.strictObject({
+      creatorId: CreatorIdSchema,
+      objectiveMinor: count.nullable(),
+      revenueMinor: cents,
+      /** At this pace to the month's end; null once the month is over (the revenue is final). */
+      projectedMinor: cents.nullable(),
+    }),
+  ),
+  /** The sum of the objectives set; null when none is. */
+  objectiveMinor: count.nullable(),
+  revenueMinor: cents,
+  projectedMinor: cents.nullable(),
+});
+export type AgencyObjectives = z.infer<typeof AgencyObjectivesSchema>;
+
+/** The largest objective the owner may set for a creator's month, in euro cents: a typo of zeros stops here. */
+export const AGENCY_OBJECTIVE_MAX_MINOR = 100_000_000;
+
+/** `PUT /v1/dashboard/agency/objectives/:creatorId/:month` and its `DELETE`: the owner's alone (ADR 0092 § 6). */
+export const AgencyObjectiveParamsSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  month: day.refine((value) => value.endsWith('-01'), { message: 'Le premier jour du mois' }),
+});
+export const AgencyObjectiveBodySchema = z.strictObject({
+  amountMinor: z.number().int().positive().max(AGENCY_OBJECTIVE_MAX_MINOR),
+});
+export const AgencyObjectiveSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  month: day,
+  amountMinor: count,
+});
+export type AgencyObjective = z.infer<typeof AgencyObjectiveSchema>;
+
 export const AgencyInsightsSchema = z.strictObject({
   /** The older form's period; null for a calendar's (ADR 0146 § 6). */
   period: AgencyPeriodSchema.nullable(),
@@ -295,6 +340,8 @@ export const AgencyInsightsSchema = z.strictObject({
   ),
   /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
   refundsWithoutSale: count,
+  /** On a calendar month, its revenue objectives (ADR 0092 § 6); null for any other period. */
+  objectives: AgencyObjectivesSchema.nullable(),
   /** The zone of the platform's days and hours (IANA), the one every day and hour here is read in. */
   timeZone: z.string().min(1),
   /** A dollar line falls in the period and no rate is known: left out of every figure. */

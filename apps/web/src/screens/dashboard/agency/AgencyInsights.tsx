@@ -15,6 +15,7 @@ import {
 
 import { CountUp, Section, type FloatingTip } from '../parts';
 
+import { ObjectivesCard, objectivesSub } from './Objectives';
 import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
 import {
@@ -1846,6 +1847,12 @@ export function AgencyInsightsPanel({
             </p>
           ) : null}
         </Section>
+
+        {insights.objectives === null ? null : (
+          <Section title="Objectifs du mois" sub={objectivesSub(insights.objectives)} index={next()}>
+            <ObjectivesCard insights={insights} objectives={insights.objectives} canEdit={canOpenSettings} />
+          </Section>
+        )}
 
         <Section title="Chiffre d’affaires" sub={dailySub(insights)} index={next()}>
           <Daily key={`${insights.from}:${insights.to}`} insights={insights} tip={tip} />

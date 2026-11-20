@@ -2,6 +2,9 @@ import {
   AgencyInsightsQuerySchema,
   agencySpanQueryOf,
   AgencyInsightsSchema,
+  AgencyObjectiveBodySchema,
+  AgencyObjectiveParamsSchema,
+  AgencyObjectiveSchema,
   CreatorIdSchema,
   CreatorSetupListSchema,
   CreatorsOverviewSchema,
@@ -44,6 +47,7 @@ import type {
 } from '../../domain/dashboard-ports';
 import { revealSalesPanel, salesDays } from '../../domain/reveal-sales';
 import { creatorSetup, memberSetup, memberSetupSeenBy } from '../../domain/setup';
+import type { ObjectivesStore } from '../db/objectives-store';
 import type { AgencyInsightsReader } from '../views/agency-insights-reader';
 import type { SetupReader } from '../views/setup-reader';
 
@@ -79,6 +83,8 @@ export interface DashboardRouteDeps {
   readonly agency: AgencyInsightsReader;
   /** The zone the agency's days are counted in: the platforms' (Reveal's, Europe/Paris). */
   readonly agencyTimeZone: string;
+  /** The owner's monthly revenue objectives (ADR 0092 § 6). */
+  readonly objectives: ObjectivesStore;
   /** « Mise en route » of the creators and the members (pilotage plan W1), the owner's alone. */
   readonly setup: SetupReader;
   readonly now?: () => Date;
@@ -186,6 +192,44 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           );
         }
         return answer.insights;
+      },
+    );
+
+    // The month's revenue objective of a creator (ADR 0092 § 6): the owner's alone to set or take away, read with the
+    // agency's figures. Internal: never her account's, never a manager's to write.
+    app.put(
+      '/dashboard/agency/objectives/:creatorId/:month',
+      {
+        preValidation: deps.requireRole('owner'),
+        schema: {
+          params: AgencyObjectiveParamsSchema,
+          body: AgencyObjectiveBodySchema,
+          response: { 200: AgencyObjectiveSchema },
+        },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const objective = { ...request.params, amountMinor: request.body.amountMinor };
+        const written = await deps.objectives.set(objective, UserIdSchema.parse(user.id));
+        if (written.kind === 'not_owner') {
+          throw new DomainError('role_forbidden', 'Réservé au propriétaire');
+        }
+        return objective;
+      },
+    );
+    app.delete(
+      '/dashboard/agency/objectives/:creatorId/:month',
+      { preValidation: deps.requireRole('owner'), schema: { params: AgencyObjectiveParamsSchema } },
+      async (request, reply) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const { creatorId, month } = request.params;
+        const removed = await deps.objectives.remove(creatorId, month, UserIdSchema.parse(user.id));
+        if (removed.kind === 'not_owner') {
+          throw new DomainError('role_forbidden', 'Réservé au propriétaire');
+        }
+        return reply.code(204).send();
       },
     );
 

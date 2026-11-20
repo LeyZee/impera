@@ -84,6 +84,8 @@ const bodiesFor = (
       avoidWhen: [],
     },
   },
+  // The owner's alone (ADR 0092 § 6): A's people stop at the guard, B's creator or not.
+  'PUT /v1/dashboard/agency/objectives/:creatorId/:month': { amountMinor: 100_000 },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
@@ -273,6 +275,7 @@ function filler(name: string): string {
   if (name === 'date') return '2099-01-01';
   if (name === 'slotKey' || name === 'segmentKey') return 'a';
   if (name === 'field') return 'first_name';
+  if (name === 'month') return '2026-11-01';
   return '00000000-0000-4000-8000-000000000000';
 }
 
