@@ -23,6 +23,8 @@ L'export (ADR 0028, service `backup`) est un tar chiffré par `age` : le dump `p
 4. Le script a créé `nirvana_app` et `impera_service` sans connexion : leur donner un mot de passe neuf, dans l'éditeur SQL (`ALTER ROLE nirvana_app LOGIN PASSWORD '<mot de passe>';` puis `ALTER ROLE impera_service LOGIN PASSWORD '<un autre>' BYPASSRLS;`, et le `GRANT CONNECT` de `deploy.md` § 1.1), puis mettre `DATABASE_URL`, `DATABASE_SERVICE_URL` et `DATABASE_ADMIN_URL` à jour dans Coolify, avec les **mêmes** `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` qu'avant (copie gardée avec la clé privée), redéployer, `/ready`.
 5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.5 et A.6.
 
+Ce que la restauration par l'export perd en plus : l'heure de **prise de poste** des shifts (`shifts.checked_in_at`, migration 0235). Le déclencheur qui l'efface à chaque insertion joue aussi pendant le `COPY` de `pg_restore` : les shifts reviennent, sans l'heure où leur membre a pris son poste. Elle ne compte ni dans la paie ni dans l'attribution des ventes ; rien à refaire.
+
 ## C. Essai trimestriel (ADR 0028 § 6)
 
 **Une sauvegarde non testée n'existe pas.** Tous les 3 mois, et une première fois dès la mise en service de l'export, une session Remote Control joue l'essai sur le PC de Charles. Charles approuve et fournit la clé privée et la clé d'accès en lecture seule ; il ne tape aucune commande. **Rien ne doit pouvoir partir pendant l'essai** : la copie contient la file des jobs, les comptes de plateforme, le bot Telegram et les clés des services.

@@ -1,5 +1,5 @@
 # EQ-12 Annonces, prise de poste et notifications de l'équipe, sans Telegram
-Statut : in_progress, prise de poste dans Aujourd'hui faite le 20/11 (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous » ; précisée le 02/11/2026 par les ADR 0042 § 7 et 0045 § 4 : le socle installable et Web Push passent à CR-01, les rappels de shift arrivent ici)
+Statut : in_progress, prise de poste dans Aujourd'hui et Annonces faites le 20/11 (ID validé par Charles le 27/10/2026, 15h11 : « je les veux tous » ; précisée le 02/11/2026 par les ADR 0042 § 7 et 0045 § 4 : le socle installable et Web Push passent à CR-01, les rappels de shift arrivent ici)
 Phase : équipe (ADR 0023, ADR 0024)
 Dépend de : CR-01 (application installable, Web Push, heures calmes, registre des envois), EQ-02 (shifts), CR-13 (événements des gestes du calendrier), EQ-10 (connexion du chatteur), EQ-11 (shell par rôle) ; les rappels de pièces se branchent sur EQ-06 quand elle existe
 Branche : task/eq-12-team-notifications
@@ -11,7 +11,9 @@ Prévenir chaque membre de l'équipe sur son téléphone, même quand il n'a pas
 `docs/adr/0023-team-management.md`, `docs/adr/0024-roles-and-navigation.md`, EQ-02, EQ-03, EQ-06, EQ-10, `docs/reference/legacy-projects.md` (la spécification PWA d'Imperium : Web Push, service worker), ADR 0016 (secrets posés depuis le CRM), ADR 0020 (une notification ne porte jamais de donnée de fan). Charles (27/10) ne veut plus de Telegram pour l'équipe. EQ-02 et EQ-03 mettent le rappel de shift et le rapport manquant « dans l'application », c'est-à-dire seulement quand le membre l'a ouverte ; les Annonces figurent dans Équipe (ADR 0024) et le manager peut en publier (EQ-01), mais aucune autre fiche ne les construit.
 
 ## À faire
-- [ ] **Annonces** (`announcement`) : le propriétaire ou un manager actif écrit une annonce à toute l'équipe ou aux membres d'une créatrice ; elle s'affiche dans Aujourd'hui avec « Lu » ; l'auteur voit qui l'a lue. Jamais de donnée de fan.
+- [x] **Annonces** (`announcement`) : le propriétaire ou un manager actif écrit une annonce à toute l'équipe ou aux membres d'une créatrice ; elle s'affiche dans Aujourd'hui avec « Lu » ; l'auteur voit qui l'a lue. Jamais de donnée de fan.
+  - Fait le 20/11 (trous des onglets n° 6) : tables `announcements` et `announcement_reads` (migration 0236, RLS forcée, jamais supprimées ni modifiées, seulement retirées par l'auteur ou le propriétaire), Équipe › Annonces pour écrire, retirer et voir qui a lu, carte Annonces dans Aujourd'hui avec « J'ai lu ».
+  - [ ] La notification « nouvelle annonce » (avec les notifications push ci-dessous).
 - [ ] **Prise de poste** (`shift_check_in`) : « Je prends mon poste » en un geste dans Aujourd'hui, et depuis la notification de début de shift. Elle date le vrai début du shift ; le passage pour vendre d'EQ-08 part au premier membre qui a pris son poste.
   - [x] Le geste dans Aujourd'hui (trous des onglets n° 1, 20/11) : `shifts.checked_in_at`, écrit par la seule fonction `check_in_own_shift` (migration 0235, SECURITY DEFINER : son propre shift, membre actif, de l'ouverture de la fenêtre d'accès à la fin, une trace `shift.check_in`), effacé par la base quand le shift change de membre ou de début ; `POST /v1/scheduling/shifts/:shiftId/check-in`, `Shift.checkedInAt` dans le planning et Mes shifts.
   - [ ] Depuis la notification de début de shift (avec les notifications push ci-dessous).
