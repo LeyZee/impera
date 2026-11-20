@@ -1,0 +1,8 @@
+# 2026-11-20 — SEC-15 Durée d'une session selon le rôle — in progress
+
+Fait : `apps/api/src/session-lifetime.ts` (12 h, 48 h, 7 jours, `LONG_IDLE_ROLES` = propriétaire seul, rôle inconnu en durée courte) ; `expiresIn` de Better Auth à 48 h ; crochet `session.update.before` qui refuse et supprime la prolongation d'une session finie ; `sessionOf` vérifie l'inactivité selon le rôle en plus des 7 jours ; cookie renouvelé avec la session (`requireRole`, `GET /v1/session`) ; Réglages › Sécurité ne liste et ne compte que les sessions vivantes ; `security.md` § 6. Tests : unitaire (5), intégration (8, écrits et typés).
+Reste : lancer `pnpm test:integration` avec Docker ; décision sur la durée de la créatrice ; PR.
+Décisions : aucune ADR nouvelle ; la durée de 48 h du propriétaire amende de fait le « 12 heures » de l'ADR 0046 § 6, à acter par une ADR si Charles le veut.
+Découvertes : Better Auth prolonge une session avant de la rendre (`updated_at` à maintenant), une vérification après coup ne voit jamais l'inactivité ; et `auth.api.getSession` jetait le `Set-Cookie` de la prolongation, si bien que le navigateur oubliait toute session 12 h après la connexion, même utilisée. Une connexion envoyée avec `rememberMe: false` n'est jamais prolongée par Better Auth (24 h au plus, son cookie meurt avec le navigateur) : `sessionOf` la ferme 12 h après la connexion pour un rôle court, c'est le plus sûr.
+Candidats à suppression : aucun.
+Vérifié : prettier ✓, eslint ✓, `tsc --noEmit` (api) ✓, `pnpm --filter ./apps/api test` ✓ (3047 tests, dont les 5 nouveaux), `node scripts/check-repo.mjs` ✓ ; intégration non lancée (pas de Docker).

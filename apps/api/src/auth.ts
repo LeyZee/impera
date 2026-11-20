@@ -63,6 +63,7 @@ import {
 import type { PasswordBreachCheck } from './password-breaches';
 import { forgetCount } from './rate-limit-store';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
+import { LONG_IDLE_MS, sessionEnd } from './session-lifetime';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -73,8 +74,12 @@ declare module 'fastify' {
   }
 }
 
-/** Dashboard sessions are short (security.md §6): 12 h, refreshed at most once an hour while in use. */
-const SESSION_SECONDS = 12 * 60 * 60;
+/**
+ * Better Auth's own lifetime of a session without activity is the longest a role gets (48 h, `session-lifetime.ts`);
+ * the shorter one of the other roles is ours to apply (`refuseEndedRefresh`, `sessionOf`). Refreshed at most once an
+ * hour while in use.
+ */
+const SESSION_SECONDS = LONG_IDLE_MS / 1000;
 const SESSION_REFRESH_SECONDS = 60 * 60;
 /**
  * Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit, wide enough for a team behind one
@@ -93,8 +98,6 @@ const SIGN_IN_ACCOUNT_WINDOW_MS = 15 * 60 * 1000;
 /** The cookies of Better Auth's `two-factor` plugin: the code step of a sign-in, and a trusted device. */
 const TWO_FACTOR_COOKIE = 'two_factor';
 const TRUST_DEVICE_COOKIE = 'trust_device';
-/** However much it is used, a session opened more than 7 days ago is refused at its next request (ADR 0046 § 6). */
-export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * The client IP as Fastify resolved it (`trustProxy`, TRUST_PROXY_HOPS), handed to Better Auth under a header of
  * our own: it never reads `x-forwarded-for`, which any client can write.
@@ -416,9 +419,43 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
             await recordLogin(db, logger, session, context?.path);
           },
         },
+        // A refresh is the only write that carries `expiresAt` (Better Auth's `getSession`, once an hour of use).
+        update: {
+          before: (data, context) =>
+            data.expiresAt === undefined ? Promise.resolve(undefined) : refuseEndedRefresh(db, context),
+        },
       },
     },
   });
+}
+
+/** What Better Auth's endpoint context holds of the session it is about to refresh, read for its times and role. */
+const RefreshedSessionSchema = z.object({
+  session: z.object({ id: z.string(), createdAt: z.coerce.date(), updatedAt: z.coerce.date() }),
+  user: z.object({ role: z.unknown() }),
+});
+
+/**
+ * Refuses, and closes, the refresh of a session already over: idle past its role's limit, or past its 7 days
+ * (`session-lifetime.ts`). Better Auth refreshes before it hands the session over, so `sessionOf` alone would see a
+ * session idle 13 hours as used just now; and its plugins read sessions too, the passkey sign-in options without any
+ * guard of ours. Better Auth then answers as without a session. The session being refreshed is the one `getSession`
+ * has just put in its context; without it, the refresh is refused.
+ */
+async function refuseEndedRefresh(
+  db: Database,
+  context: { context: { session: unknown } } | null,
+): Promise<false | undefined> {
+  const current = RefreshedSessionSchema.safeParse(context?.context.session);
+  if (!current.success) return false;
+  const { session, user } = current.data;
+  const ended = sessionEnd(
+    { role: user.role, createdAt: session.createdAt, lastActiveAt: session.updatedAt },
+    new Date(),
+  );
+  if (ended === null) return undefined;
+  await db.delete(schema.session).where(eq(schema.session.id, session.id));
+  return false;
 }
 
 export type Auth = ReturnType<typeof createAuth>;
@@ -507,29 +544,48 @@ function cookieOf(request: FastifyRequest, name: string): string | undefined {
  * while the database restarts (recette 07/11, BIL-01). On that 500, one `select 1` tells which it was: when it fails,
  * its connection error goes up and the error handler answers 503; when it passes, Better Auth's error goes up as is.
  */
-async function readSession(auth: Auth, db: Database, request: FastifyRequest) {
+async function readSession(auth: Auth, db: Database, request: FastifyRequest, reply?: FastifyReply) {
   try {
-    return await auth.api.getSession({ headers: authHeaders(request) });
+    const { headers, response } = await auth.api.getSession({
+      headers: authHeaders(request),
+      returnHeaders: true,
+    });
+    // A refresh renews the cookie too (its `Max-Age` is the 48 h of `SESSION_SECONDS`): without it, the browser would
+    // drop a session in use 48 h after its sign-in, whatever its role allows.
+    const cookies = headers.getSetCookie();
+    if (reply !== undefined && response !== null && cookies.length > 0)
+      void reply.header('set-cookie', cookies);
+    return response;
   } catch (error) {
+    // The refresh of a session already over, refused and closed by `refuseEndedRefresh`.
+    if (isAPIError(error) && error.statusCode === 401) return null;
     if (isAPIError(error) && error.statusCode >= 500) await db.execute(sql`select 1`);
     throw error;
   }
 }
 
 /**
- * The session of a request, as Better Auth reads it (12 hours without activity), refused past 7 days from its creation
- * whatever its use (ADR 0046 § 6): the row goes, and the request is answered as without a session.
+ * The session of a request, as Better Auth reads it, refused when it is over (`session-lifetime.ts`): idle past its
+ * role's limit (48 hours for the owner, 12 for every other role), or opened more than 7 days ago whatever its use
+ * (ADR 0046 § 6). The row goes, and the request is answered as without a session. `now` is ours only: Better Auth reads
+ * the clock itself. With `reply`, a refreshed cookie goes out with the answer.
  */
 export async function sessionOf(
   auth: Auth,
   db: Database,
   request: FastifyRequest,
   now: Date = new Date(),
+  reply?: FastifyReply,
 ): Promise<Awaited<ReturnType<Auth['api']['getSession']>>> {
-  const result = await readSession(auth, db, request);
+  const result = await readSession(auth, db, request, reply);
   if (result === null) return null;
-  if (now.getTime() - result.session.createdAt.getTime() <= SESSION_MAX_AGE_MS) return result;
-  await db.delete(schema.session).where(eq(schema.session.id, result.session.id));
+  const { session, user } = result;
+  const ended = sessionEnd(
+    { role: user.role, createdAt: session.createdAt, lastActiveAt: session.updatedAt },
+    now,
+  );
+  if (ended === null) return result;
+  await db.delete(schema.session).where(eq(schema.session.id, session.id));
   return null;
 }
 
@@ -545,8 +601,9 @@ async function currentUser(
   db: Database,
   shiftCreators: ShiftCreators,
   request: FastifyRequest,
+  reply?: FastifyReply,
 ): Promise<{ user: CurrentUser; membership: Membership | null; secondFactorEnabled: boolean } | null> {
-  const result = await sessionOf(auth, db, request);
+  const result = await sessionOf(auth, db, request, new Date(), reply);
   if (result === null) return null;
   const signedIn = await userOf(db, shiftCreators, result.user);
   if (signedIn === null) return null;
@@ -620,8 +677,8 @@ export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandle
  */
 export function createRequireRole(auth: Auth, db: Database, shiftCreators: ShiftCreators): RequireRole {
   return (...roles) =>
-    async (request) => {
-      const session = await currentUser(auth, db, shiftCreators, request);
+    async (request, reply) => {
+      const session = await currentUser(auth, db, shiftCreators, request, reply);
       if (session === null) throw new SessionUnauthenticated();
       if (!session.secondFactorEnabled) throw new SecondFactorRequired();
       if (!roles.includes(session.user.role)) throw new RoleForbidden();
@@ -1557,8 +1614,8 @@ export function createAuthRoutes(
     );
     // The dashboard's first read (recette 05/11, SEC-13): 200 with or without a session, so that every public page
     // does not log « 401 » in the console. It opens nothing: the guarded routes still refuse on their own.
-    app.get('/session', { schema: { response: { 200: DashboardSessionSchema } } }, async (request) => {
-      const session = await currentUser(auth, db, shiftCreators, request);
+    app.get('/session', { schema: { response: { 200: DashboardSessionSchema } } }, async (request, reply) => {
+      const session = await currentUser(auth, db, shiftCreators, request, reply);
       if (session === null) return { state: 'signed_out' as const };
       if (!session.secondFactorEnabled) return { state: 'second_factor_required' as const };
       const me = {

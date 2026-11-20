@@ -40,7 +40,6 @@ import { z } from 'zod';
 
 import {
   authHeaders,
-  SESSION_MAX_AGE_MS,
   identityConfirmed,
   ReauthenticationLimited,
   ReauthenticationRefused,
@@ -54,6 +53,13 @@ import {
 import { isOwnerAccount } from './owners';
 import { passkeysOf } from './passkeys';
 import { recordRefusal } from './security-alerts';
+import {
+  idleLimitMs,
+  LONG_IDLE_MS,
+  LONG_IDLE_ROLES,
+  SESSION_MAX_AGE_MS,
+  SHORT_IDLE_MS,
+} from './session-lifetime';
 
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): each person sees and closes their own sessions and gets new backup
@@ -152,15 +158,21 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
     if (request.user === null) throw new SessionUnauthenticated();
     const current = await sessionOf(auth, db, request);
     if (current === null) throw new SessionUnauthenticated();
-    return { userId: request.user.id, sessionId: current.session.id };
+    return { userId: request.user.id, role: request.user.role, sessionId: current.session.id };
   };
+
+  /** The idle limit in seconds of a session of the account `u`, as `idleLimitMs` says it (an unknown role: short). */
+  const accountIdleSeconds = sql`case when u.role in (${sql.join(
+    [...LONG_IDLE_ROLES].map((long) => sql`${long}`),
+    sql`, `,
+  )}) then ${LONG_IDLE_MS / 1000}::int else ${SHORT_IDLE_MS / 1000}::int end`;
 
   return (app) => {
     app.get(
       '/auth/sessions',
       { preValidation: anyone, schema: { response: { 200: OpenSessionsSchema } } },
       async (request): Promise<OpenSessions> => {
-        const { userId, sessionId } = await signedIn(request);
+        const { userId, role, sessionId } = await signedIn(request);
         const rows = await withAdmin(adminDb, (tx) =>
           tx
             .select({
@@ -171,12 +183,14 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
               updatedAt: schema.session.updatedAt,
             })
             .from(schema.session)
-            // Alive only: a session past its 7 days (ADR 0046 § 6) is refused at its next request, never shown.
+            // Alive only: a session past its 7 days (ADR 0046 § 6) or idle past its role's limit (SEC-15) is refused
+            // at its next request, never shown.
             .where(
               and(
                 eq(schema.session.userId, userId),
                 sql`${schema.session.expiresAt} > now()`,
                 sql`${schema.session.createdAt} > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})`,
+                sql`${schema.session.updatedAt} > now() - make_interval(secs => ${idleLimitMs(role) / 1000})`,
               ),
             )
             .orderBy(sql`${schema.session.updatedAt} desc`),
@@ -356,6 +370,7 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
             from "user" u
             left join session s on s.user_id = u.id and s.expires_at > now()
               and s.created_at > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})
+              and s.updated_at > now() - make_interval(secs => ${accountIdleSeconds})
             where not exists (select 1 from team_members m where m.user_id = u.id and m.status = 'left')
             group by u.id
             order by (u.role = 'owner') desc, u.name`),
