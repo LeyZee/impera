@@ -7,10 +7,9 @@
 .bk-page {
   width: 100%;
   min-width: 0;
-  max-width: 760px;
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-5);
+  gap: var(--nv-card-gap);
 }
 .bk-page > * {
   flex-shrink: 0;
@@ -22,10 +21,8 @@
 }
 .bk-eyebrow {
   margin: 0;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
   color: var(--nv-ink-faint);
 }
@@ -65,7 +62,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
   transition:
     transform var(--nv-dur-slow) var(--nv-ease-spring),
     box-shadow var(--nv-dur-base) var(--nv-ease-out);
@@ -84,9 +81,6 @@
 }
 .bk-strip__title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 600;
   text-wrap: balance;
 }
 .bk-strip[data-tone='warn'] .bk-strip__title {
@@ -98,7 +92,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
   transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .bk-card:hover {
@@ -111,27 +105,12 @@
 }
 .bk-card__title {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  font-weight: 650;
-  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 .bk-card[data-tone='warn'] .bk-card__title {
   color: var(--nv-warning);
 }
-/* No copy yet: the copy is the problem to fix first, the restore test waits for it (recette 05/11, PRO-19). */
-.bk-page[data-first='copy'] .bk-strip__title {
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  font-weight: 650;
-  letter-spacing: -0.02em;
-}
 .bk-page[data-first='copy'] .bk-card__title {
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 600;
-  letter-spacing: normal;
   color: var(--nv-ink-muted);
 }
 .bk-validity {
@@ -187,7 +166,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .bk-cover__title {
   margin: 0;
@@ -244,9 +223,6 @@
 }
 .bk-dialog__title h2 {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  font-weight: 650;
-  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 .bk-dialog__body {
@@ -379,11 +355,7 @@
 }
 
 @media (max-width: 520px) {
-  .bk-card,
   .bk-dialog {
-    padding: var(--nv-space-4);
-  }
-  .bk-strip {
     padding: var(--nv-space-4);
   }
   .bk-dialog__foot .nv-btn {

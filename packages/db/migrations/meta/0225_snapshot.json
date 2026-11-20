@@ -1,6 +1,6 @@
 {
-  "id": "d57ddecd-c74b-4e43-9609-5df39b49fe27",
-  "prevId": "0e93d1bd-1f32-4396-a292-538ec4a71cc7",
+  "id": "d24d459b-f3d2-47fe-8811-92dcc1b42003",
+  "prevId": "db6cd8b3-143c-448b-98bf-4a82e19db80e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -89,6 +89,113 @@
         }
       },
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.creator_alert_routes": {
+      "name": "creator_alert_routes",
+      "schema": "",
+      "columns": {
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "alert_code": {
+          "name": "alert_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "creator_alert_routes_creator_id_creators_id_fk": {
+          "name": "creator_alert_routes_creator_id_creators_id_fk",
+          "tableFrom": "creator_alert_routes",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_alert_routes_updated_by_user_id_fk": {
+          "name": "creator_alert_routes_updated_by_user_id_fk",
+          "tableFrom": "creator_alert_routes",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "creator_alert_routes_pkey": {
+          "name": "creator_alert_routes_pkey",
+          "columns": ["creator_id", "alert_code", "role"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "tenant_isolation": {
+          "name": "tenant_isolation",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "\"creator_alert_routes\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "\"creator_alert_routes\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "creator_alert_routes_alert_code_check": {
+          "name": "creator_alert_routes_alert_code_check",
+          "value": "\"creator_alert_routes\".\"alert_code\" in ('safety_handoff', 'identity_doubt', 'sale', 'offer_proposed', 'script_price', 'scripts_exhausted', 'her_alerts', 'ai_budget', 'session_expired')"
+        },
+        "creator_alert_routes_role_check": {
+          "name": "creator_alert_routes_role_check",
+          "value": "\"creator_alert_routes\".\"role\" in ('owner', 'manager', 'chatter_on_shift')"
+        },
+        "creator_alert_routes_mode_check": {
+          "name": "creator_alert_routes_mode_check",
+          "value": "\"creator_alert_routes\".\"mode\" in ('deliver', 'muted', 'off')"
+        },
+        "creator_alert_routes_locked_check": {
+          "name": "creator_alert_routes_locked_check",
+          "value": "\"creator_alert_routes\".\"alert_code\" not in ('safety_handoff') or \"creator_alert_routes\".\"mode\" = 'deliver'"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.custom_alerts": {
@@ -2592,7 +2699,7 @@
       "checkConstraints": {
         "conversation_events_type_check": {
           "name": "conversation_events_type_check",
-          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"conversation_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -3190,12 +3297,6 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "origin": {
-          "name": "origin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "price_minor": {
           "name": "price_minor",
           "type": "integer",
@@ -3343,10 +3444,6 @@
         "messages_author_check": {
           "name": "messages_author_check",
           "value": "\"messages\".\"author\" in ('fan', 'human', 'ai')"
-        },
-        "messages_origin_check": {
-          "name": "messages_origin_check",
-          "value": "\"messages\".\"origin\" in ('hook', 'welcome', 'expiration_reminder', 'story_reply')"
         },
         "messages_currency_check": {
           "name": "messages_currency_check",
@@ -4458,6 +4555,48 @@
           "primaryKey": false,
           "notNull": false
         },
+        "characters_limit": {
+          "name": "characters_limit",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "characters_reset_at": {
+          "name": "characters_reset_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "plan_tier": {
+          "name": "plan_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "probed_at": {
+          "name": "probed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "probe_outcome": {
+          "name": "probe_outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "probe_latency_ms": {
+          "name": "probe_latency_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "probe_model": {
+          "name": "probe_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_error_kind": {
           "name": "last_error_kind",
           "type": "text",
@@ -4502,6 +4641,14 @@
         "provider_credentials_last_error_kind_check": {
           "name": "provider_credentials_last_error_kind_check",
           "value": "\"provider_credentials\".\"last_error_kind\" in ('too_short', 'wrong_provider', 'unauthorized', 'model_not_allowed', 'no_credit', 'api_not_enabled', 'vision_model_missing', 'missing_permission', 'unreachable')"
+        },
+        "provider_credentials_plan_tier_check": {
+          "name": "provider_credentials_plan_tier_check",
+          "value": "\"provider_credentials\".\"plan_tier\" in ('free', 'paid')"
+        },
+        "provider_credentials_probe_outcome_check": {
+          "name": "provider_credentials_probe_outcome_check",
+          "value": "\"provider_credentials\".\"probe_outcome\" in ('answers', 'budget_reached', 'no_voice', 'no_credit', 'key_refused', 'model_missing', 'rate_limited', 'timeout', 'not_answering')"
         }
       },
       "isRLSEnabled": false
@@ -4808,7 +4955,7 @@
       "checkConstraints": {
         "domain_events_type_check": {
           "name": "domain_events_type_check",
-          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
+          "value": "\"domain_events\".\"type\" in ('message_received', 'message_sent', 'send_attempted', 'send_failed', 'send_verified', 'media_described', 'draft_created', 'draft_approved', 'draft_edited', 'draft_rejected', 'draft_expired', 'fact_proposed', 'fact_confirmed', 'fact_rejected', 'summary_refreshed', 'handoff_requested', 'alert_triggered', 'custom_order_opened', 'objection_reply_used', 'reply_skipped', 'reply_deferred', 'desire_scored', 'fan_availability_changed', 'care_opened', 'care_closed', 'takeover_started', 'takeover_ended', 'mode_changed', 'kill_switch_toggled', 'follow_up_scheduled', 'follow_up_cancelled', 'offer_made', 'sale_detected', 'script_started', 'script_step_sent', 'script_step_opened', 'script_step_refused', 'script_ended', 'scripts_exhausted', 'offer_proposed', 'session_state_changed', 'budget_threshold_crossed', 'ai_credits_low', 'ai_quota_exhausted', 'backup_overdue', 'exchange_rate_overdue', 'invoice_not_issued', 'invoice_pdf_conflict', 'invoice_pdf_missing', 'invoice_contested', 'invoice_due_soon', 'invoice_overdue', 'contractor_document_expiring', 'automatic_closed', 'fan_flag_set', 'fan_flag_cleared', 'fan_fragile_dismissed', 'sales_feed_signal', 'sales_feed_mismatch', 'agency_share_mismatch', 'agency_share_changed', 'connection_state_changed', 'security_alert', 'content_drop_received', 'content_media_expiring', 'content_media_erased', 'content_media_erase_failed', 'error')"
         }
       },
       "isRLSEnabled": false
@@ -7540,7 +7687,7 @@
         },
         "llm_calls_purpose_check": {
           "name": "llm_calls_purpose_check",
-          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch')"
+          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch', 'probe')"
         },
         "llm_calls_status_check": {
           "name": "llm_calls_status_check",
@@ -8274,6 +8421,12 @@
           "notNull": true,
           "default": 0
         },
+        "preview_blurhash": {
+          "name": "preview_blurhash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "last_synced_at": {
           "name": "last_synced_at",
           "type": "timestamp with time zone",
@@ -8435,6 +8588,10 @@
         "media_platform_refs_description_failures_check": {
           "name": "media_platform_refs_description_failures_check",
           "value": "\"media_platform_refs\".\"description_failures\" >= 0"
+        },
+        "media_platform_refs_blurhash_check": {
+          "name": "media_platform_refs_blurhash_check",
+          "value": "char_length(\"media_platform_refs\".\"preview_blurhash\") <= 166"
         },
         "media_platform_refs_duration_check": {
           "name": "media_platform_refs_duration_check",
@@ -8613,6 +8770,361 @@
         "media_sends_price_minor_check": {
           "name": "media_sends_price_minor_check",
           "value": "\"media_sends\".\"price_minor\" is null or \"media_sends\".\"price_minor\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.vault_describe_requests": {
+      "name": "vault_describe_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_media_id": {
+          "name": "platform_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_key": {
+          "name": "asked_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_by": {
+          "name": "asked_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asked_at": {
+          "name": "asked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vault_describe_requests_key_idx": {
+          "name": "vault_describe_requests_key_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "asked_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vault_describe_requests_creator_id_creators_id_fk": {
+          "name": "vault_describe_requests_creator_id_creators_id_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_describe_requests_asked_by_user_id_fk": {
+          "name": "vault_describe_requests_asked_by_user_id_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "user",
+          "columnsFrom": ["asked_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_describe_requests_ref_fk": {
+          "name": "vault_describe_requests_ref_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "media_platform_refs",
+          "columnsFrom": ["platform_account_id", "platform_media_id"],
+          "columnsTo": ["platform_account_id", "platform_media_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_describe_requests_account_fk": {
+          "name": "vault_describe_requests_account_fk",
+          "tableFrom": "vault_describe_requests",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "vault_describe_requests_media_unique": {
+          "name": "vault_describe_requests_media_unique",
+          "nullsNotDistinct": false,
+          "columns": ["platform_account_id", "platform_media_id"]
+        }
+      },
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"vault_describe_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_ask": {
+          "name": "owner_ask",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"vault_describe_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"vault_describe_requests\".\"asked_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.vault_import_choices": {
+      "name": "vault_import_choices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folder_ref": {
+          "name": "folder_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_media_id": {
+          "name": "platform_media_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imported": {
+          "name": "imported",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chosen_by": {
+          "name": "chosen_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chosen_at": {
+          "name": "chosen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vault_import_choices_folder_unique": {
+          "name": "vault_import_choices_folder_unique",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"folder_ref\", '')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"vault_import_choices\".\"scope\" = 'folder'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vault_import_choices_media_unique": {
+          "name": "vault_import_choices_media_unique",
+          "columns": [
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_media_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"vault_import_choices\".\"scope\" = 'media'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vault_import_choices_creator_idx": {
+          "name": "vault_import_choices_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vault_import_choices_creator_id_creators_id_fk": {
+          "name": "vault_import_choices_creator_id_creators_id_fk",
+          "tableFrom": "vault_import_choices",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_import_choices_chosen_by_user_id_fk": {
+          "name": "vault_import_choices_chosen_by_user_id_fk",
+          "tableFrom": "vault_import_choices",
+          "tableTo": "user",
+          "columnsFrom": ["chosen_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "vault_import_choices_account_fk": {
+          "name": "vault_import_choices_account_fk",
+          "tableFrom": "vault_import_choices",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_write": {
+          "name": "owner_write",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"vault_import_choices\".\"chosen_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_change": {
+          "name": "owner_change",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"vault_import_choices\".\"chosen_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_clear": {
+          "name": "owner_clear",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"vault_import_choices\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "vault_import_choices_scope_check": {
+          "name": "vault_import_choices_scope_check",
+          "value": "\"vault_import_choices\".\"scope\" in ('folder', 'media')"
+        },
+        "vault_import_choices_target_check": {
+          "name": "vault_import_choices_target_check",
+          "value": "(\"vault_import_choices\".\"scope\" = 'folder' and \"vault_import_choices\".\"platform_media_id\" is null) or (\"vault_import_choices\".\"scope\" = 'media' and \"vault_import_choices\".\"platform_media_id\" is not null and \"vault_import_choices\".\"folder_ref\" is null)"
+        },
+        "vault_import_choices_text_check": {
+          "name": "vault_import_choices_text_check",
+          "value": "char_length(\"vault_import_choices\".\"folder_ref\") <= 200 and char_length(\"vault_import_choices\".\"platform_media_id\") <= 200"
         }
       },
       "isRLSEnabled": false
@@ -9070,7 +9582,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert')"
         }
       },
       "isRLSEnabled": false
@@ -12630,9 +13142,49 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "taken_back_at": {
+          "name": "taken_back_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "basis_minor": {
+          "name": "basis_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
+        "reward_gains_once": {
+          "name": "reward_gains_once",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scope_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"reward_gains\".\"taken_back_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "reward_gains_user_idx": {
           "name": "reward_gains_user_idx",
           "columns": [
@@ -12667,13 +13219,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "reward_gains_once": {
-          "name": "reward_gains_once",
-          "nullsNotDistinct": false,
-          "columns": ["user_id", "kind", "scope_key"]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {
         "own_read": {
           "name": "own_read",
@@ -12699,6 +13245,14 @@
         }
       },
       "checkConstraints": {
+        "reward_gains_taken_back_check": {
+          "name": "reward_gains_taken_back_check",
+          "value": "\"reward_gains\".\"taken_back_at\" is null or \"reward_gains\".\"taken_back_at\" >= \"reward_gains\".\"earned_at\""
+        },
+        "reward_gains_basis_check": {
+          "name": "reward_gains_basis_check",
+          "value": "\"reward_gains\".\"basis_minor\" is null or (\"reward_gains\".\"kind\" = 'level' and \"reward_gains\".\"basis_minor\" >= 0)"
+        },
         "reward_gains_kind_check": {
           "name": "reward_gains_kind_check",
           "value": "\"reward_gains\".\"kind\" in ('tier', 'level', 'first_sale', 'day_record', 'fortnight_record', 'fortnight_on_time', 'streak_5', 'streak_10', 'streak_25', 'ten_ppv_shift', 'day_streak_7', 'day_streak_14', 'day_streak_30', 'day_streak_50', 'day_streak_100', 'first_drop', 'first_on_time_delivery', 'delivery_streak_5', 'delivery_streak_10', 'delivery_streak_25', 'perfect_day', 'first_script', 'full_stock', 'hit_content')"
@@ -17438,6 +17992,167 @@
       },
       "isRLSEnabled": false
     },
+    "public.redirect_links": {
+      "name": "redirect_links",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "destination": {
+          "name": "destination",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "placement": {
+          "name": "placement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usage_note": {
+          "name": "usage_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "redirect_links_creator_idx": {
+          "name": "redirect_links_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "redirect_links_creator_id_creators_id_fk": {
+          "name": "redirect_links_creator_id_creators_id_fk",
+          "tableFrom": "redirect_links",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "redirect_links_updated_by_user_id_fk": {
+          "name": "redirect_links_updated_by_user_id_fk",
+          "tableFrom": "redirect_links",
+          "tableTo": "user",
+          "columnsFrom": ["updated_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "redirect_links_creator_name_unique": {
+          "name": "redirect_links_creator_name_unique",
+          "nullsNotDistinct": false,
+          "columns": ["creator_id", "name"]
+        }
+      },
+      "policies": {
+        "creator_read": {
+          "name": "creator_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"redirect_links\".\"enabled\" and \"redirect_links\".\"placement\" is not null"
+        },
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "redirect_links_placement_check": {
+          "name": "redirect_links_placement_check",
+          "value": "\"redirect_links\".\"placement\" in ('story_highlight', 'story_daily', 'telegram_channel', 'other_network')"
+        },
+        "redirect_links_name_check": {
+          "name": "redirect_links_name_check",
+          "value": "char_length(\"redirect_links\".\"name\") between 1 and 60"
+        },
+        "redirect_links_url_check": {
+          "name": "redirect_links_url_check",
+          "value": "\"redirect_links\".\"url\" ~ '^https://[^[:space:]]+$' and char_length(\"redirect_links\".\"url\") <= 2048"
+        },
+        "redirect_links_destination_check": {
+          "name": "redirect_links_destination_check",
+          "value": "char_length(\"redirect_links\".\"destination\") <= 120"
+        },
+        "redirect_links_usage_note_check": {
+          "name": "redirect_links_usage_note_check",
+          "value": "char_length(\"redirect_links\".\"usage_note\") <= 120"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.platform_script_branches": {
       "name": "platform_script_branches",
       "schema": "",
@@ -17785,6 +18500,18 @@
           "primaryKey": false,
           "notNull": true
         },
+        "discount_price_minor": {
+          "name": "discount_price_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "discount_minutes": {
+          "name": "discount_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "currency": {
           "name": "currency",
           "type": "text",
@@ -17875,6 +18602,10 @@
           "name": "platform_script_steps_price_check",
           "value": "\"platform_script_steps\".\"price_minor\" >= 0"
         },
+        "platform_script_steps_discount_check": {
+          "name": "platform_script_steps_discount_check",
+          "value": "coalesce(\"platform_script_steps\".\"discount_price_minor\", 0) >= 0 and coalesce(\"platform_script_steps\".\"discount_minutes\", 0) >= 0"
+        },
         "platform_script_steps_currency_check": {
           "name": "platform_script_steps_currency_check",
           "value": "\"platform_script_steps\".\"currency\" in ('EUR', 'USD')"
@@ -17943,6 +18674,12 @@
         },
         "synced_at": {
           "name": "synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version_at": {
+          "name": "version_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
@@ -21828,7 +22565,7 @@
       "checkConstraints": {
         "content_ideas_category_check": {
           "name": "content_ideas_category_check",
-          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
         },
         "content_ideas_suggestion_check": {
           "name": "content_ideas_suggestion_check",

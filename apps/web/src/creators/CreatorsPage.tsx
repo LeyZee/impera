@@ -1,4 +1,4 @@
-import type { CreatorId } from '@impera/contracts';
+import type { CreatorId, CreatorSummary } from '@impera/contracts';
 import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
@@ -11,7 +11,9 @@ import { useCreators } from './api';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
+import { LinksSection } from './links/LinksSection';
 import { CreatorsList } from './overview/CreatorsList';
+import { useCreatorsOverview } from './overview/api';
 import { PersonaSection } from './persona/PersonaSection';
 import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
@@ -20,8 +22,11 @@ import { ScriptsSection } from './scripts/ScriptsSection';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
+import { AgentSwitch } from '@/agent/AgentSwitch';
+import { canSwitch } from '@/agent/state';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
 
@@ -38,11 +43,16 @@ export function CreatorsPage({
   tab,
   creatorId,
   onCreator,
+  folderId = null,
+  onFolder,
 }: {
   tab: CreatorTab;
   /** The creator in the address; none, or one the list does not hold, shows the list. */
   creatorId: CreatorId | null;
   onCreator: (id: CreatorId) => void;
+  /** Her vault folder opened in Scripts, from the address (`dossier`). */
+  folderId?: string | null;
+  onFolder?: (id: string | null) => void;
 }): JSX.Element {
   const { user } = useRouteContext({ from: '__root__' });
   const query = useCreators();
@@ -81,17 +91,7 @@ export function CreatorsPage({
     if (query.isError) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">La liste des créatrices ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={() => void query.refetch()} />
         </section>
       );
     }
@@ -99,10 +99,12 @@ export function CreatorsPage({
       // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
       if (creatorId === null)
         return (
-          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
-            <li className="nv-plate cl-card cl-card--skeleton" />
-            <li className="nv-plate cl-card cl-card--skeleton" />
-          </ul>
+          <Skeleton label="Chargement des créatrices…">
+            <div className="cl-grid">
+              <SkeletonCard lines={2} height={136} />
+              <SkeletonCard lines={2} height={136} />
+            </div>
+          </Skeleton>
         );
       return (
         <section className="ps-page" aria-busy="true">
@@ -148,7 +150,8 @@ export function CreatorsPage({
         </section>
       );
     }
-    if (listing) return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} />;
+    if (listing)
+      return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} switches={canSwitch(user)} />;
     if (shown === 'agenda' && current !== undefined) {
       return (
         <AgendaSection
@@ -188,6 +191,8 @@ export function CreatorsPage({
           creatorName={current.displayName}
           timezone={current.timezone}
           isOwner={isOwner}
+          folderId={folderId}
+          {...(onFolder === undefined ? {} : { onFolder })}
         />
       );
     }
@@ -198,12 +203,21 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           timezone={current.timezone}
-          isOwner={isOwner}
         />
       );
     }
     if (shown === 'telegram' && current !== undefined) {
       return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
+    }
+    if (shown === 'links' && current !== undefined) {
+      return (
+        <LinksSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          canEdit={isOwner}
+        />
+      );
     }
     if (shown === 'access' && current !== undefined) {
       return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
@@ -252,6 +266,7 @@ export function CreatorsPage({
     scripts: 'Scripts',
     content: 'Contenu',
     telegram: 'Canal Telegram',
+    links: 'Liens',
     hours: 'Heures d’activité',
     access: 'Accès',
     rate: 'Part de l’agence',
@@ -266,6 +281,7 @@ export function CreatorsPage({
     'scripts',
     'content',
     'telegram',
+    'links',
     'hours',
     'access',
     'rate',
@@ -273,9 +289,9 @@ export function CreatorsPage({
   ];
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche et tous ses réglages.'
     : sheets.includes('agenda')
-      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes, ses scripts et son contenu.'
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour sa fiche.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
 
   return (
@@ -316,7 +332,10 @@ export function CreatorsPage({
             </Link>
           }
           title={current.displayName}
-          actions={
+          // Her AI's switch (ADR 0148 § 1) next to her name, on every tab of her sheet: the same setting as the
+          // Dashboard's control (avis Design, 19/11: in the header, not as a card of the tab).
+          actions={showForm ? undefined : <CreatorAgentSwitch creator={current} user={user} />}
+          tabs={
             switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"
@@ -345,5 +364,29 @@ export function CreatorsPage({
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
+  );
+}
+
+/** Her switch on her sheet, from her card of the list (`GET /v1/dashboard/creators`): nothing until it is read. */
+function CreatorAgentSwitch({
+  creator,
+  user,
+}: {
+  creator: CreatorSummary;
+  user: { readonly role: string; readonly teamScope: string | null };
+}): JSX.Element | null {
+  const overview = useCreatorsOverview();
+  const card = overview.data?.find((one) => one.creatorId === creator.id);
+  if (card === undefined) return null;
+  return (
+    <AgentSwitch
+      creatorId={creator.id}
+      creatorName={creator.displayName}
+      zone={creator.timezone}
+      state={card}
+      read={overview.dataUpdatedAt}
+      variant="header"
+      readOnly={!canSwitch(user)}
+    />
   );
 }

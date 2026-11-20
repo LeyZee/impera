@@ -10,6 +10,7 @@ import type {
   PlatformScript,
   PlatformScriptId,
   PlatformScriptMoment,
+  PlatformStepDiscount,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
   ScriptIdentityContent,
@@ -198,6 +199,8 @@ interface VaultLink {
    * identity is written from (SC-04 lot c8); `null` while there is none.
    */
   readonly descriptionId: string | null;
+  /** Chosen for the CRM, by its own tick or its folder's (ADR 0145 § 5): `false`, the agent does not see it. */
+  readonly imported: boolean;
 }
 
 /** A media of a step, by the platform's id of the vault media. */
@@ -222,6 +225,8 @@ interface StoredPlatformStep {
   readonly text: string;
   readonly priceMinor: number;
   readonly currency: Currency;
+  /** A « Tarif réduit » set on the platform, as read; `null` when none (recette 16/11). */
+  readonly discount: PlatformStepDiscount | null;
   readonly media: readonly StoredStepMedia[];
   readonly previewMedia: readonly StoredStepMedia[];
 }
@@ -271,13 +276,33 @@ export interface PlatformScriptReadStore {
    * (`forJobs.platformScript`). `null` when it is not hers.
    */
   oneForJob(creatorId: CreatorId, scriptId: string): Promise<StoredPlatformScript | null>;
+  /** Hers on one account, active or not, as the service role: what the agent decides on for a fan (ADR 0098). */
+  ofAccountForJob(
+    creatorId: CreatorId,
+    platformAccountId: PlatformAccountId,
+  ): Promise<readonly StoredPlatformScript[]>;
+  /**
+   * Her active native scripts with a « Tarif réduit » on a step (recette 16/11), read as `ofCreator` is and under the
+   * same rights, without their texts nor their media: what « À traiter » warns of. `null` for a reader who may not
+   * read her.
+   */
+  discountedOf(creatorId: CreatorId, userId: string): Promise<readonly DiscountedPlatformScript[] | null>;
+}
+
+/** A native script of hers kept from being offered by a « Tarif réduit » on the platform, as long as it is there. */
+export interface DiscountedPlatformScript {
+  readonly id: PlatformScriptId;
+  /** As the platform names it. */
+  readonly name: string;
+  /** How many of its steps carry one (1 or more). */
+  readonly steps: number;
+  /** The import that wrote its current version, the one with the discount: since when it waits. */
+  readonly since: Date;
 }
 
 /** What the identity job reads of a script, as the service role. */
 export interface IdentityTarget {
   readonly script: StoredPlatformScript;
-  /** Her descriptions switch (`creators.settings.describeDrops`): off, the brain writes nothing for her. */
-  readonly describes: boolean;
   /** The `detailed` text of each validated description its media name, by row. */
   readonly descriptions: ReadonlyMap<string, string>;
 }

@@ -165,12 +165,20 @@ describe('Réglages › Telegram without a bot', () => {
     vi.mocked(fetchOverview).mockResolvedValue({ bots: [], routes: [], coverage: [], version: 0 });
   });
 
-  it('shows one empty state and its one action, no strip and no tabs', async () => {
+  it('shows one empty state and its one action, no strip, and keeps its tabs (recette visuelle 16/11, GES-15)', async () => {
     renderSection();
     expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Ajouter un bot' })).toHaveLength(1);
-    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(5);
     expect(screen.queryByRole('button', { name: 'Mettre un bot dans un groupe' })).toBeNull();
+  });
+
+  it('says on each tab what a bot would bring there, with the same one action', async () => {
+    renderSection();
+    fireEvent.click(await screen.findByRole('tab', { name: /Mon chat privé/u }));
+    expect(await screen.findByText('Ton chat privé attend un bot')).toBeTruthy();
+    expect(screen.queryByText('Personne n’est prévenu la nuit')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Ajouter un bot' }).className).toContain('nv-btn--neon');
   });
 });
 

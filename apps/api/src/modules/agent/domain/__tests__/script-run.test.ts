@@ -27,10 +27,10 @@ const NIGHT: PlatformScriptView = {
   moment: 'night',
   description: 'Soirée en lingerie, de la douceur au plus chaud',
   steps: [
-    { kind: 'free', priceMinor: null, mediaRefs: [] },
-    { kind: 'bridge', priceMinor: null, mediaRefs: [] },
-    { kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
-    { kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'free', priceMinor: null, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'bridge', priceMinor: null, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
   ],
   mediaValidated: true,
   descriptionValidated: true,
@@ -91,9 +91,10 @@ const sent = (stepIndex: number, minutes: number): ScriptRunEvent => ({
 const toSend = (script: PlatformScriptView, stepIndex: number) => ({
   scriptRef: script.scriptRef,
   stepIndex,
+  stepRef: script.steps[stepIndex]?.stepRef,
   kind: script.steps[stepIndex]?.kind,
   priceMinor: script.steps[stepIndex]?.priceMinor,
-  idempotencyKey: `script-step:conv-demo:${script.scriptRef}:${String(stepIndex)}`,
+  idempotencyKey: `script-step:conv-demo:${script.scriptRef}:1:${String(stepIndex)}`,
 });
 
 describe('platformScriptFaults', () => {
@@ -107,10 +108,10 @@ describe('platformScriptFaults', () => {
       platformScriptFaults({
         ...NIGHT,
         steps: [
-          { kind: 'bridge', priceMinor: null, mediaRefs: [] },
-          { kind: 'paid', priceMinor: null, mediaRefs: [] },
-          { kind: 'free', priceMinor: 300, mediaRefs: [] },
-          { kind: 'bridge', priceMinor: null, mediaRefs: [] },
+          { stepRef: 'step-ref', kind: 'bridge', priceMinor: null, mediaRefs: [] },
+          { stepRef: 'step-ref', kind: 'paid', priceMinor: null, mediaRefs: [] },
+          { stepRef: 'step-ref', kind: 'free', priceMinor: 300, mediaRefs: [] },
+          { stepRef: 'step-ref', kind: 'bridge', priceMinor: null, mediaRefs: [] },
         ],
       }),
     ).toEqual(['paid_without_price', 'price_on_free_step', 'starts_with_bridge', 'bridge_at_edge']);
@@ -148,8 +149,8 @@ describe('permittedScripts', () => {
       ...BOTH,
       scriptRef,
       steps: [
-        { kind: 'free', priceMinor: null, mediaRefs: [] },
-        { kind: 'paid', priceMinor: 1_500, mediaRefs },
+        { stepRef: 'step-ref', kind: 'free', priceMinor: null, mediaRefs: [] },
+        { stepRef: 'step-ref', kind: 'paid', priceMinor: 1_500, mediaRefs },
       ],
     });
     const catalogue = [
@@ -169,7 +170,10 @@ describe('permittedScripts', () => {
 
   it('reads nothing received from a step the catalogue no longer holds: only its own script is ruled out', () => {
     const catalogue = [
-      { ...BOTH, steps: [{ kind: 'free' as const, priceMinor: null, mediaRefs: ['media-a'] }] },
+      {
+        ...BOTH,
+        steps: [{ stepRef: 'step-ref', kind: 'free' as const, priceMinor: null, mediaRefs: ['media-a'] }],
+      },
     ];
     const ids = (history: ScriptHistoryView): string[] =>
       permittedScripts(catalogue, { moment: 'night', history }).map((script) => script.scriptRef);
@@ -300,8 +304,27 @@ describe('nextScriptStep', () => {
     expect(nextScriptStep({ ...base, brainPick: 'script-day' })).toEqual({ kind: 'none', reason: 'no_pick' });
     expect(nextScriptStep({ ...base, history: history(['script-night', [0]]) })).toEqual({
       kind: 'none',
+      reason: 'scripts_exhausted',
+    });
+  });
+
+  it('says no script is left only where one would open, and from a catalogue that has some (ADR 0150 § 9)', () => {
+    const played = history(['script-night', [0]]);
+    expect(nextScriptStep({ ...base, catalogue: [], history: played })).toEqual({
+      kind: 'none',
       reason: 'no_script',
     });
+    expect(nextScriptStep({ ...base, history: played, careMode: true })).toEqual({
+      kind: 'none',
+      reason: 'held',
+    });
+    expect(
+      nextScriptStep({
+        ...base,
+        history: played,
+        startGate: { open: false, missing: ['availability_unconfirmed'] },
+      }),
+    ).toEqual({ kind: 'wait', reason: 'availability_unconfirmed' });
   });
 
   it('sends the teasing through the policy like a paid step: never before the cooldown (Charles, 12/11)', () => {
@@ -443,7 +466,7 @@ describe("Reveal's script history (ADR 0018 § 5)", () => {
     ]).toEqual(['script-night', 'script-both']);
     expect(nextScriptStep({ ...base, history: history(['script-night', [0, 1]]) })).toEqual({
       kind: 'none',
-      reason: 'no_script',
+      reason: 'scripts_exhausted',
     });
   });
 

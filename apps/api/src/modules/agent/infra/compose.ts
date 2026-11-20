@@ -72,6 +72,7 @@ import {
 import { scriptTurn, type ScriptTurn } from '../domain/script-turn';
 import {
   declaredAdultAge,
+  checkWelcome,
   sexualizationDecision,
   type SexualizationDecision,
   type SexualizationLimits,
@@ -216,6 +217,14 @@ function voiceStepOf(turn: ScriptTurn | undefined): VoiceScriptStep | undefined 
   };
 }
 
+/** The step decided sends a media of her vault: the bubbles that bring it may announce it. */
+function stepSendsMedia(turn: ScriptTurn | undefined): boolean {
+  const { decision, script } = turn ?? {};
+  if (script === undefined || script === null) return false;
+  if (decision?.kind !== 'start' && decision?.kind !== 'send_step') return false;
+  return (script.steps[decision.step.stepIndex]?.mediaRefs.length ?? 0) > 0;
+}
+
 /** A follow-up as the voice writes it: how long he has been silent, and her own way of following up if she wrote one. */
 interface FollowUpTurn {
   readonly silentHours: number;
@@ -254,6 +263,8 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
   price_outside_offer: 'elle écrivait un prix',
   no_commitment: 'elle s’engageait sur sa demande',
   care_breach: 'elle n’était pas assez douce pour ce moment',
+  unwarranted_brake:
+    'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
   media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
 };
@@ -308,10 +319,11 @@ const STEER_BACK_BRIEF: Readonly<Record<'age_unconfirmed' | 'too_early', string>
   age_unconfirmed:
     'Il va trop vite : elle ralentit avec douceur et humour, sans rien d’explicite ni de sous-entendu, sans reproche, et ramène la conversation sur lui ; si ça vient naturellement, elle lui demande son âge.',
 };
-const NO_OPENING_HINT = 'aucune allusion sexuelle, elle n’ouvre pas ce terrain';
+const NO_OPENING_HINT =
+  'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis';
 /** He compliments or flirts, nothing sexual: she welcomes it, never dodges it (Charles, 16/11). */
 const FLIRT_HINT =
-  'il la complimente ou flirte : elle le reçoit avec plaisir, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part';
+  'il la complimente ou flirte : elle le reçoit avec plaisir, l’assume et le remercie, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part ; jamais elle ne le freine ni ne lui dit qu’il va trop vite ou trop fort';
 
 // She asked his age already in this conversation: « t'as quel âge ? », « tu as quel âge », « et ton âge ? ».
 const ASKED_AGE = /\b(?:quel age|ton age|age as[- ]tu|age t'?as)\b/u;
@@ -425,12 +437,12 @@ export function withExamples(sheet: string, examples: readonly string[]): string
 }
 
 /**
- * What her guards read the draft against (P3-13): an engine draft never carries a media (a media goes out through
- * a script or a human), and her last turns are in the history.
+ * What her guards read the draft against (P3-13): a draft carries a media only through the step of her script that
+ * leaves with it (ADR 0098), and her last turns are in the history.
  */
-export function guardContextOf(history: readonly ConversationTurn[]): GuardContext {
+export function guardContextOf(history: readonly ConversationTurn[], hasMedia = false): GuardContext {
   return {
-    hasMedia: false,
+    hasMedia,
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
@@ -820,10 +832,17 @@ export async function composeTurn(
     const voice = await gateway.voice(asked);
     const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
     const violations = [
-      ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(input.history)),
+      ...checkVoiceOutput(
+        written,
+        persona.guardSettings,
+        guardContextOf(input.history, stepSendsMedia(scripts)),
+      ),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),
+      // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
+      // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
+      ...(sexualization?.kind === 'no_opening' && !care ? checkWelcome(written) : []),
     ];
     return { voice, written, violations };
   };

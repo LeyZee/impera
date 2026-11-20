@@ -8,7 +8,6 @@ import {
   queueNameFor,
   replyOpenAt,
   reopenJobKey,
-  type AgentHours,
   type AlertTrigger,
   type EventBody,
   type HandoffCause,
@@ -22,11 +21,13 @@ import type {
   ComposeResult,
   Conversation,
   DraftComposer,
+  DraftScriptStep,
   DraftVoice,
   EventMeta,
   FanDirectory,
   HoldReason,
   JobLogger,
+  HerHours,
   ReplyHours,
   StoredScriptRun,
   Transaction,
@@ -308,12 +309,9 @@ async function deferReply(
  * shift is not bound by her hours, but answers in Reveal (ADR 0025): a draft of the agent at 4:00 would serve nobody,
  * and her hours exist so that she does not answer at 4:00. `null` when she may answer now.
  */
-function closedUntil(
-  her: { readonly hours: AgentHours; readonly timeZone: string } | null,
-  now: Date,
-): Date | null {
-  if (her === null || replyOpenAt(her.hours, her.timeZone, now)) return null;
-  const opening = nextReplyOpening(her.hours, her.timeZone, now);
+function closedUntil(her: HerHours | null, now: Date): Date | null {
+  if (her === null || replyOpenAt(her.hours, her.timeZone, now, her.exceptions)) return null;
+  const opening = nextReplyOpening(her.hours, her.timeZone, now, her.exceptions);
   // Her hours always have an active slot (the contract); stored hours that had none never put a job off to now.
   return opening.getTime() > now.getTime() ? opening : null;
 }
@@ -348,8 +346,8 @@ async function recordScriptRuns(
   stored: StoredScriptRun | null,
   change: ScriptRunChange | undefined,
   meta: EventMeta,
-): Promise<Conversation> {
-  if (change === undefined) return conversation;
+): Promise<{ readonly conversation: Conversation; readonly step?: DraftScriptStep }> {
+  if (change === undefined) return { conversation };
   let current = conversation;
   const journal = async (id: StoredScriptRun['id'], events: readonly ScriptRunJournalEvent[]) => {
     for (const event of events) current = await appendEvent(tx, current, scriptEventOf(event, id), meta);
@@ -377,7 +375,10 @@ async function recordScriptRuns(
       meta,
     );
   }
-  return current;
+  // The step goes with the draft only once its run was written, like the offer.
+  return written && change.step !== undefined
+    ? { conversation: current, step: change.step }
+    : { conversation: current };
 }
 
 /**
@@ -432,7 +433,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       ...(waitedFor !== null && { waited: 1 }),
-      ...(hours !== null && { hours: hours.hours }),
+      ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
       ...(read.conversation.desireScore !== null &&
         read.conversation.desireAt !== null && {
           desire: { score: read.conversation.desireScore, at: read.conversation.desireAt },
@@ -512,8 +513,18 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // No script left for him where one would open (ADR 0150 § 9): said once, until a script starts again for him.
+      if (result.scriptsExhausted === true && !(await tx.events.scriptsExhaustedSaid(conversation.id))) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'scripts_exhausted', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       // His script runs as his message and Reveal left them (ADR 0098); the step decided only with a draft.
-      conversation = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
+      const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
+      conversation = scripted.conversation;
       if (result.kind === 'draft') {
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {
@@ -542,6 +553,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.voice !== undefined && { voice: result.voice }),
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
+          ...(scripted.step !== undefined && { scriptStep: scripted.step }),
         });
         await appendEvent(
           tx,

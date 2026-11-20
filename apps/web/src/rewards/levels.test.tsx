@@ -113,6 +113,19 @@ describe('LevelInsignia (ADR 0104 § 16)', () => {
     expect(`${words?.text ?? ''}${words?.chip ?? ''}`).not.toMatch(/€|\$/u);
     expect(revealWordsOf({ kind: 'level:12' }, period, [])).toBeNull();
   });
+
+  it('says the threshold just passed when the case carries it', () => {
+    const period = PayPeriodSchema.parse('2026-11-01');
+    const words = revealWordsOf({ kind: 'level:3', basis: { minor: 500_000, currency: 'EUR' } }, period, []);
+    expect(words?.text.replace(/\s/gu, ' ')).toBe('Ton net depuis ton arrivée vient de passer 5 000 €.');
+  });
+
+  it('no longer promises that a rank is kept for ever (ADR 0118 § 5)', () => {
+    const period = PayPeriodSchema.parse('2026-11-01');
+    for (const kind of ['level:1', 'level:4']) {
+      expect(revealWordsOf({ kind }, period, [])?.text).not.toMatch(/jamais|ne se perd/u);
+    }
+  });
 });
 
 describe('ShiftChallengeCard (ADR 0104 § 14)', () => {
@@ -171,7 +184,12 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
     show(<MyRankCard user={THEO_ME} />);
     expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
-    expect(screen.getByText(/honorifique/u)).toBeTruthy();
+    expect(screen.getByText(/Honorifique/u)).toBeTruthy();
+    // ADR 0118 § 5: a rank follows the net, and the card says what may bring it down.
+    expect(
+      screen.getByText(/Il redescend si une vente est remboursée ou un rapport\s+corrigé\./u),
+    ).toBeTruthy();
+    expect(screen.queryByText(/ne redescend jamais/u)).toBeNull();
   });
 
   it('never fills the bar before the rank is noted, and shows the true net past the threshold', async () => {
@@ -180,7 +198,7 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
     expect(rankPercent({ currentMinor: 0, thresholdMinor: 10_000 })).toBe(0);
     serve({ ...CASE, nextLevel: { ...CASE.nextLevel, thresholdMinor: 10_000, currentMinor: 124_400 } });
     show(<MyRankCard user={THEO_ME} />);
-    expect(await screen.findByText(/1\s244,00\s€ à ce jour/u)).toBeTruthy();
+    expect(await screen.findByText(/1\s244,00\s€ de net à ce jour/u)).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('99');
   });
 
@@ -200,16 +218,31 @@ describe('MyRankCard (ADR 0104 § 16)', () => {
 
 describe('MemberGameBlock (ADR 0104 § 20)', () => {
   it('shows a member’s rank, streak and trophies earned, with no amount', async () => {
-    const { sent } = serve({ ...CASE, nextLevel: null });
+    const later = { kind: 'streak_5', family: 'streak', progress: null, revealedAt: null } as const;
+    const { sent } = serve({
+      ...CASE,
+      items: [...CASE.items, { ...later, earnedAt: '2026-11-09T10:00:00.000Z' }],
+      nextLevel: null,
+    });
     show(<MemberGameBlock memberId="member-1" name="Théo" />);
     expect(await screen.findByText('Étincelle')).toBeTruthy();
     expect(sent[0]?.url).toBe('/v1/rewards/members/member-1/trophy-case');
-    expect(screen.getByText('3 shifts')).toBeTruthy();
     expect(screen.getByText('Première vente')).toBeTruthy();
     expect(screen.queryByText('Record du jour')).toBeNull();
-    // The coin drawn on a trophy aside, no amount is written: the facts hold a rank, a streak and a count.
+    // The rank comes first, then the two figures, then the trophies, the latest first (Charles, 16/11).
+    const block = document.querySelector('.rw-member');
+    const order = ['.rw-member__rank', '.rw-member__facts', '.rw-member__trophies'].map((selector) =>
+      [...(block?.querySelectorAll('*') ?? [])].indexOf(block?.querySelector(selector) ?? document.body),
+    );
+    expect(order).toEqual(order.toSorted((a, b) => a - b));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect(block?.querySelector('.rw-member__label')?.textContent).toBe('Trophées 2 sur 3');
+    expect(
+      [...(block?.querySelectorAll('.rw-member__trophies li > span') ?? [])].map((one) => one.textContent),
+    ).toEqual(['Série de 5', 'Première vente']);
+    // The coin drawn on a trophy aside, no amount is written: the facts hold a streak and a count.
     expect(document.querySelector('.rw-member__facts')?.textContent).toBe(
-      'RangÉtincelleSérie en cours3 shifts · meilleure : 9Quinzaines avec un palier atteint1',
+      'Série en cours3shifts avec le rapport à l’heureMeilleure : 9Quinzaines avec un palier1',
     );
   });
 });
@@ -248,7 +281,13 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     show(<LevelsPanel />);
     expect(await screen.findByText(/à 500,00\s€/u)).toBeTruthy();
     expect(screen.getAllByText('Pas de seuil')).toHaveLength(7);
+    // ADR 0118 § 7: moving a threshold takes no rank back; a corrected net may.
+    expect(screen.getByText(/Honorifique\s: ni taux, ni palier, ni paie\./u)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Régler les seuils' }));
+    // ADR 0118 § 7, said where the owner sets them: a threshold takes no rank back, a corrected net may.
+    expect(
+      screen.getByText(/ne reprend pas un rang déjà gagné\. Un rang suit le net du chatteur/u),
+    ).toBeTruthy();
     const form = screen.getByLabelText('Net cumulé pour le rang Allumeur').closest('ul');
     expect(form?.querySelectorAll('svg[data-earned="true"]')).toHaveLength(1);
     expect(form?.querySelectorAll('svg[data-earned="false"]')).toHaveLength(7);
@@ -265,5 +304,16 @@ describe('LevelsPanel (ADR 0104 § 16)', () => {
     await waitFor(() => {
       expect(sent.find((one) => one.method === 'PUT')?.body).toEqual({ thresholdsMinor: [50_000, 200_000] });
     });
+  });
+});
+
+describe('LevelsPanel with no threshold (recette EQU-04, ADR 0118 § 7)', () => {
+  it('says that no new rank opens and that a rank already earned stays', async () => {
+    serve({ ranks: LEVEL_NAMES.map((name, index) => ({ rank: index + 1, name })), thresholdsMinor: [] });
+    show(<LevelsPanel />);
+    expect(
+      await screen.findByText(/Sans seuil, aucun nouveau rang ne s’ouvre\s; un rang déjà gagné reste\./u),
+    ).toBeTruthy();
+    expect(screen.queryByText(/aucun chatteur n’a de rang/u)).toBeNull();
   });
 });

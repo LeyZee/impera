@@ -22,12 +22,12 @@ import type {
   ScriptVariantLetter,
   SlotLengths,
   StartScriptDropBody,
+  FileFamily,
 } from '@impera/contracts';
 
 import type { DropMediaContext } from './describe';
 import type { SentDrop } from './drop-export';
 import type { ExportedFile } from './script-export';
-import type { FileFamily } from './sniff';
 import type { StoredPart } from './upload';
 
 /**
@@ -446,8 +446,6 @@ export interface MediaToDescribe {
   readonly storageKey: string;
   /** Its original left the storage (CR-06 c): nothing to read. */
   readonly erased: boolean;
-  /** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9): off, her drops wait undescribed. */
-  readonly describes: boolean;
   readonly category: DropCategory;
   /** For a script's slot: its key and the frozen version she shot. */
   readonly script: { readonly slotKey: string; readonly versionId: string } | null;
@@ -490,8 +488,6 @@ export interface DropDescriber {
 /** A sent script to be told step by step (ADR 0083 § 6), as the owner role reads it. */
 export interface ScriptToSummarize {
   readonly creatorId: string;
-  /** Her switch (`CreatorSettings.describeDrops`, § 9): off, her script waits untold. */
-  readonly describes: boolean;
   readonly versionId: string;
   /** The moment her request fixed; `null`, the structure's own. */
   readonly moment: ShotMoment | null;
@@ -568,17 +564,6 @@ export interface DescriptionBacklog {
     prompts: { readonly describe: string; readonly summarize: string },
     correlationId: string,
   ): Promise<{ readonly media: number; readonly scripts: number }>;
-}
-
-/** Her switch (`CreatorSettings.describeDrops`, ADR 0083 § 9), read and set by the owner. */
-export interface DescribeSwitch {
-  /** `null` for a creator that does not exist. */
-  read(creatorId: string): Promise<boolean | null>;
-  /**
-   * Set and audited; turned on, the backlog of this creator is enqueued in the same transaction (her drops described
-   * while it was off). `null` for a creator that does not exist.
-   */
-  set(creatorId: string, on: boolean, userId: string): Promise<boolean | null>;
 }
 
 /**

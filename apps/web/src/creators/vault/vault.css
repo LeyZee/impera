@@ -1,0 +1,437 @@
+/*
+ * « Son coffre Reveal » (ADR 0099), prefixed `vx-`: the card, its head and figures, a media's tile, its previews (the
+ * platform's blur, the sharp small picture), a voice note's wave and a media's sheet. The page's layout by choice
+ * (rail, grid, selection, bar) is vault-page.css. Amber only for what asks her team to act; never a coloured edge.
+ */
+.vx-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+
+.vx-head {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--nv-space-3);
+}
+.vx-head__who {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.vx-synced {
+  font-variant-numeric: tabular-nums;
+}
+.vx-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.vx-sync__icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vx-sync:hover:not(:disabled) .vx-sync__icon {
+  transform: rotate(180deg);
+}
+
+/* What the sync says, kept in place even when empty so the card never jumps. */
+.vx-phase {
+  margin: 0;
+  min-height: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.vx-phase:empty {
+  display: none;
+}
+.vx-phase:not(:empty) {
+  animation: nv-rise var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.vx-phase--muted {
+  color: var(--nv-ink-muted);
+}
+.vx-phase--ok {
+  color: var(--nv-success);
+}
+.vx-phase--warn {
+  color: var(--nv-warning);
+}
+
+.vx-note {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+
+.nv-tiles.vx-tiles {
+  /* Three small figures side by side, on a phone too: never three stacked plates. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.vx-tiles .nv-tile__value {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+}
+.vx-tiles .nv-tone--warn .nv-tile__value {
+  color: var(--nv-warning);
+}
+
+/* ───────────── A preview: the platform's blurhash, stretched and smoothed ───────────── */
+
+.vx-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  user-select: none;
+}
+.vx-preview--none {
+  background:
+    radial-gradient(
+      120% 90% at 20% 10%,
+      color-mix(in srgb, var(--nv-neon) 22%, transparent),
+      transparent 60%
+    ),
+    var(--nv-select);
+}
+
+.vx-tile {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  overflow: hidden;
+  background: var(--nv-select);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.vx-tile .vx-preview {
+  position: absolute;
+  inset: 0;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    filter var(--nv-dur-base) var(--nv-ease-out);
+}
+.vx-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.28),
+    transparent 38%,
+    transparent 62%,
+    rgba(0, 0, 0, 0.36)
+  );
+  pointer-events: none;
+}
+.vx-tile:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: var(--nv-shadow-lift);
+}
+.vx-tile:hover .vx-preview {
+  transform: scale(1.1);
+  filter: saturate(1.25);
+}
+.vx-tile:active {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+.vx-tile:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.vx-tile[aria-pressed='true'] {
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-ink);
+}
+/* Gone from Reveal: the theme's own surface, its preview faded, a struck cloud; never a black block. */
+.vx-tile--removed {
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+}
+.vx-tile--removed .vx-preview {
+  opacity: 0.14;
+  filter: grayscale(1);
+}
+.vx-tile--removed::after,
+.vx-tile--audio::after {
+  display: none;
+}
+.vx-tile--audio .vx-tile__time {
+  background: var(--nv-glass-fill);
+  color: var(--nv-ink-muted);
+}
+
+/* A voice note: the theme's surface and a drawn wave that breathes under the pointer. */
+.vx-tile--audio {
+  color: var(--nv-ink);
+}
+.vx-voice {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22% 14%;
+  background:
+    radial-gradient(
+      110% 80% at 50% 110%,
+      color-mix(in srgb, var(--nv-neon) 18%, transparent),
+      transparent 70%
+    ),
+    var(--nv-select);
+  color: var(--nv-neon);
+}
+.vp-folder__cover .vx-voice {
+  padding: 18% 12%;
+}
+.vx-voice__wave {
+  width: 100%;
+  height: 100%;
+  max-height: 64px;
+  fill: currentColor;
+  overflow: visible;
+}
+.vx-voice__wave rect {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.vx-tile--audio:hover .vx-voice__wave rect,
+.vp-folder:hover .vx-voice__wave rect {
+  animation: vx-breathe 900ms var(--nv-ease-out) infinite alternate;
+}
+@keyframes vx-breathe {
+  to {
+    transform: scaleY(0.55);
+  }
+}
+.vx-tile__time {
+  position: absolute;
+  z-index: 1;
+  bottom: 7px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+}
+.vx-tile__time {
+  right: 7px;
+}
+.vx-tile__gone {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.vx-gone {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vx-tile__gone .vx-gone {
+  width: 22px;
+  height: 22px;
+}
+
+.tm-dialog.vx-dialog {
+  max-width: 460px;
+}
+.vx-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vx-sheet__preview {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--nv-radius-md);
+  overflow: hidden;
+  color: #fff;
+  background: var(--nv-select);
+  animation: nv-materialize var(--nv-dur-slow) var(--nv-ease-spring) both;
+}
+/* A voice note's sheet: a band of its wave, not a large frame that reads as a broken player. */
+.vx-sheet__preview.vx-tile--audio {
+  aspect-ratio: 5 / 2;
+}
+.vx-sheet__preview .vx-preview {
+  position: absolute;
+  inset: 0;
+}
+.vx-sheet__steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--nv-text-footnote);
+}
+.vx-sheet__step {
+  min-width: 40px;
+  justify-content: center;
+}
+.vx-sheet__step svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vx-sheet__back {
+  display: inline-grid;
+  transform: rotate(180deg);
+}
+.vx-sheet__gone {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-warning);
+}
+.vx-sheet__facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.vx-sheet__fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.vx-sheet__fact dd {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .vx-tiles .nv-tile {
+    padding: 10px 12px;
+  }
+}
+
+.vx-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vx-empty__title {
+  margin: 0;
+  font-weight: 600;
+}
+.vx-skeleton {
+  min-height: 120px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vx-sheet__preview,
+  .vx-phase:not(:empty) {
+    animation: none;
+  }
+  .vx-tile,
+  .vx-tile:hover,
+  .vx-tile:hover .vx-preview {
+    transform: none;
+  }
+  .vx-tile--audio:hover .vx-voice__wave rect,
+  .vp-folder:hover .vx-voice__wave rect {
+    animation: none;
+  }
+}
+
+/* ───────────── The sharp small picture (ADR 0138), over the blur, faded in once loaded ───────────── */
+
+.vx-sharp {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  opacity: 0;
+  filter: blur(12px);
+  transform: scale(1.04);
+  transition:
+    opacity var(--nv-dur-base) var(--nv-ease-out),
+    filter var(--nv-dur-slow) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.vx-sharp[data-state='shown'] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+.vx-tile:hover .vx-sharp[data-state='shown'] {
+  transform: scale(1.06);
+}
+.vx-open__sharp {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+.vx-eye {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vx-sharp,
+  .vx-sharp[data-state='shown'],
+  .vx-tile:hover .vx-sharp[data-state='shown'] {
+    transform: none;
+    transition: opacity var(--nv-dur-fast) linear;
+  }
+}

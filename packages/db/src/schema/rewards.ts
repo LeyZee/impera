@@ -1,5 +1,15 @@
 import { sql, type SQL } from 'drizzle-orm';
-import { boolean, check, index, integer, jsonb, pgPolicy, pgTable, text, unique } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  pgPolicy,
+  pgTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
 import { id, timestampTz, updatedAt } from './columns';
@@ -71,11 +81,13 @@ export const REWARD_GAIN_KINDS = [
 ] as const;
 
 /**
- * A gain: something an account earned, once. Written by the end-of-shift job alone (`withAdmin`), replayable thanks
- * to the unique key: `scope_key` is empty for what is earned once in a life, and names the fortnight and the
- * threshold for a tier. A gain is never deleted nor taken back (§ 15). The account reads its own and marks its
- * reveal played (`revealed_at`, the only column the application may change); the owner and the managers read the
- * team's (§ 20). No amount lives here: the game never touches pay (§ 17).
+ * A gain: something an account earned. Written by the end-of-shift job alone (`withAdmin`), replayable thanks to the
+ * unique key among the gains that hold: `scope_key` is empty for what is earned once in a life, and names the
+ * fortnight and the threshold for a tier, the rank for a level. A gain is never deleted. One a corrected net no longer
+ * justifies is taken back (ADR 0118 § 5): its row stays, dated (`taken_back_at`), and earning it again writes a new
+ * row. A level keeps the threshold it was reached at (`basis_minor`), so that moving the thresholds takes nothing back
+ * (§ 7). The account reads its own and marks its reveal played (`revealed_at`, the only column the application may
+ * change); the owner and the managers read the team's (§ 20). No net lives here: the game never touches pay (§ 17).
  */
 export const rewardGains = pgTable(
   'reward_gains',
@@ -88,9 +100,23 @@ export const rewardGains = pgTable(
     scopeKey: text('scope_key').notNull().default(''),
     earnedAt: timestampTz('earned_at').notNull(),
     revealedAt: timestampTz('revealed_at'),
+    /** When the job took it back (ADR 0118 § 5); `null` while it holds. */
+    takenBackAt: timestampTz('taken_back_at'),
+    /** A level's only: the threshold it was reached at, in minor units; `null` when it was not noted. */
+    basisMinor: integer('basis_minor'),
   },
   (t) => [
-    unique('reward_gains_once').on(t.userId, t.kind, t.scopeKey),
+    uniqueIndex('reward_gains_once')
+      .on(t.userId, t.kind, t.scopeKey)
+      .where(sql`${t.takenBackAt} is null`),
+    check(
+      'reward_gains_taken_back_check',
+      sql`${t.takenBackAt} is null or ${t.takenBackAt} >= ${t.earnedAt}`,
+    ),
+    check(
+      'reward_gains_basis_check',
+      sql`${t.basisMinor} is null or (${t.kind} = 'level' and ${t.basisMinor} >= 0)`,
+    ),
     index('reward_gains_user_idx').on(t.userId, t.earnedAt),
     check(
       'reward_gains_kind_check',

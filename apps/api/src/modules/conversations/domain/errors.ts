@@ -7,6 +7,7 @@ import {
 } from '@impera/contracts';
 
 import type { BlockedReason } from './ports';
+import type { StepCut } from './rules';
 import type { ConversationCommand } from './state-machine';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
@@ -44,6 +45,31 @@ export class AgeInDoubtConflict extends DomainError {
     super(
       'age_in_doubt_conflict',
       'Son âge est en doute : l’IA ne lui écrit plus tant que le propriétaire ou un manager ne l’a pas confirmé',
+    );
+  }
+}
+
+/** A pause ends in the future, within a week (ADR 0148 § 1); past that, it is an Arrêt lifted by hand. */
+export class AgentPauseInvalid extends DomainError {
+  constructor() {
+    super('agent_pause_invalid', 'Une pause finit plus tard, dans la semaine au plus');
+  }
+}
+
+/**
+ * A pause never lifts an Arrêt sooner (Sécurité, relecture de #865): an Arrêt without an end, an archived creator, or a
+ * pause asked to end before the one in force refuses; she is resumed first, behind the resume's own checks.
+ */
+export class AgentPauseConflict extends DomainError {
+  constructor(reason: 'stopped' | 'archived' | 'sooner') {
+    super(
+      'agent_pause_conflict',
+      reason === 'archived'
+        ? 'Une créatrice archivée reste arrêtée : pas de pause'
+        : reason === 'stopped'
+          ? 'L’IA est déjà arrêtée sans fin : reprends-la d’abord, puis mets-la en pause'
+          : 'Une pause ne finit pas plus tôt que celle en cours : reprends l’IA d’abord',
+      { details: { reason } },
     );
   }
 }
@@ -173,5 +199,32 @@ export class CareCloseForbidden extends DomainError {
 export class ConversationForbidden extends DomainError {
   constructor() {
     super('conversation_forbidden', 'Cette conversation ne t’a pas été confiée');
+  }
+}
+
+const STEP_CUT_WORDS: Readonly<Record<StepCut, string>> = {
+  care: 'il traverse un moment difficile',
+  do_not_contact: 'il ne doit plus recevoir de message',
+  sales_frozen: 'ses ventes sont gelées',
+  age_disputed: 'son âge est en doute',
+  limits_unreadable: 'ses limites sont illisibles',
+};
+
+/** Why a draft stopped before its paid step, in the words of its `draft_expired` event. */
+export function stepCutExpiryReason(cut: StepCut): string {
+  return `Étape payante retenue à l’envoi : ${STEP_CUT_WORDS[cut]}`;
+}
+
+/**
+ * A draft that carries a paid step of her script, approved while his limits keep it (relecture Sécurité de #812):
+ * nothing is approved, the draft stays as it was. A human answers him without the step.
+ */
+export class ScriptStepCut extends DomainError {
+  constructor(cut: StepCut) {
+    super(
+      'script_step_cut_unprocessable',
+      `Ce message porte une étape payante qui ne peut plus partir : ${STEP_CUT_WORDS[cut]}`,
+      { details: { cut } },
+    );
   }
 }

@@ -5,6 +5,7 @@ import {
   ConversationIdSchema,
   EventIdSchema,
   ExternalMediaSchema,
+  FanFlagsSchema,
   JOB_MAX_ATTEMPTS,
   KillSwitchIdSchema,
   JOB_PAYLOADS,
@@ -30,12 +31,16 @@ import { z } from 'zod';
 import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
-import { toConversation, toDraft, toStoredBrief, toStoredEvent } from './rows';
+import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 
 const PlatformMediaSchema = z.array(ExternalMediaSchema);
+/** The latest switch of each scope, read through its end: a pause past its end reads as off (ADR 0148 § 1). */
+const SwitchStateRowsSchema = z.array(
+  z.object({ scope: z.string(), active: z.boolean(), until: z.coerce.date().nullable() }),
+);
 
 /** The repositories of one tenant transaction (`withTenant`: RLS scopes every statement to the creator). */
 function bind(tx: DbTransaction, creatorId: string): Transaction {
@@ -111,7 +116,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
             target: [schema.messages.platformAccountId, schema.messages.platformMessageId],
           })
           .returning({ id: schema.messages.id });
-        return inserted.length > 0;
+        if (inserted.length > 0) return true;
+        // A script step is recorded at send with no text (the platform writes it): the synced copy fills it once.
+        if (message.direction === 'outbound' && (message.text !== '' || message.platformMedia.length > 0))
+          await tx
+            .update(schema.messages)
+            .set({ text: message.text, platformMedia: [...message.platformMedia] })
+            .where(
+              and(
+                eq(schema.messages.platformAccountId, message.platformAccountId),
+                eq(schema.messages.platformMessageId, message.platformMessageId),
+                eq(schema.messages.direction, 'outbound'),
+                eq(schema.messages.text, ''),
+                sql`${schema.messages.platformMedia} = '[]'::jsonb`,
+              ),
+            );
+        return false;
       },
       async countForDraft(draftId) {
         const [row] = await tx
@@ -268,10 +288,11 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .for('update');
         return rows.map(toDraft);
       },
-      async insert({ bubbles, softViolations, voice, personaVersionId, facts, ...draft }) {
+      async insert({ bubbles, softViolations, voice, personaVersionId, facts, scriptStep, ...draft }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
+          ...(scriptStep !== undefined && { policyTrace: toStoredPolicyTrace(scriptStep) }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
           guardTrace: { softViolations: [...(softViolations ?? [])] },
@@ -372,6 +393,20 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .map(toStoredEvent)
           .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
       },
+      async scriptsExhaustedSaid(conversationId) {
+        const [last] = await tx
+          .select({ type: schema.conversationEvents.type })
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              inArray(schema.conversationEvents.type, ['scripts_exhausted', 'script_started']),
+            ),
+          )
+          .orderBy(sql`${schema.conversationEvents.seq} desc`)
+          .limit(1);
+        return last?.type === 'scripts_exhausted';
+      },
       async salesState(conversationId) {
         const rows = await tx
           .select()
@@ -434,14 +469,24 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         );
         return rows.rows[0]?.found === true;
       },
+      async archived() {
+        const [creator] = await tx
+          .select({ archivedAt: schema.creators.archivedAt })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        return creator !== undefined && creator.archivedAt !== null;
+      },
       async isOn() {
-        const rows = await tx.execute<{ scope: string; active: boolean }>(sql`
-          select distinct on (scope) scope, active
+        const rows = await tx.execute(sql`
+          select distinct on (scope) scope, (active and (active_until is null or active_until > now())) as active,
+                 case when active and active_until > now() then active_until end as until
           from kill_switches
           where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
           order by scope, set_at desc`);
-        const on = (scope: string) => rows.rows.some((row) => row.scope === scope && row.active);
-        return { global: on('global'), creator: on('creator') };
+        const switches = SwitchStateRowsSchema.parse(rows.rows);
+        const on = (scope: string) => switches.some((row) => row.scope === scope && row.active);
+        const creatorUntil = switches.find((row) => row.scope === 'creator')?.until ?? null;
+        return { global: on('global'), creator: on('creator'), creatorUntil };
       },
       async setCreator(entry) {
         await tx.insert(schema.killSwitches).values({
@@ -450,6 +495,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           scopeId: creatorId,
           creatorId,
           active: entry.active,
+          activeUntil: entry.until ?? null,
           reason: entry.reason,
           setBy: entry.setBy,
           setAt: sql`clock_timestamp()`,
@@ -537,7 +583,7 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         if (creator !== undefined && creator.archivedAt !== null) return 'creator_archived';
         // The latest switch of each scope decides; a global one has no creator and stays visible (RLS).
         const switches = await tx.execute<{ active: boolean }>(sql`
-          select distinct on (scope, scope_id) active
+          select distinct on (scope, scope_id) (active and (active_until is null or active_until > now())) as active
           from kill_switches
           where scope = 'global'
              or (scope = 'creator' and scope_id = ${conversation.creatorId})
@@ -549,6 +595,15 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .from(schema.platformAccounts)
           .where(eq(schema.platformAccounts.id, conversation.platformAccountId));
         return account?.sessionState === 'expired' ? 'session_expired' : null;
+      },
+      async fanFlags(conversation) {
+        const [fan] = await tx
+          .select({ flags: schema.fans.flags })
+          .from(schema.fans)
+          .where(eq(schema.fans.id, conversation.fanId));
+        if (fan === undefined) return null;
+        const parsed = FanFlagsSchema.safeParse(fan.flags ?? {});
+        return parsed.success ? parsed.data : null;
       },
     },
 

@@ -1,4 +1,12 @@
-import type { BranchCondition, CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
+import type {
+  BranchCondition,
+  CreatorId,
+  Currency,
+  MediaSlotKind,
+  PlatformAccountId,
+  PlatformStepDiscount,
+  UserRole,
+} from '@impera/contracts';
 
 import { branchGaps, conditionOf, ranksOf, stepsWithoutDefault } from '../domain/branches';
 import {
@@ -9,6 +17,7 @@ import {
 } from '../domain/platform-scripts';
 import type {
   BranchInput,
+  DiscountedPlatformScript,
   IdentityReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
@@ -32,6 +41,8 @@ interface PlatformStepMediaView {
   readonly kind: MediaSlotKind;
   /** `false`: absent from the vault, the step is incomplete. */
   readonly inVault: boolean;
+  /** In the vault and chosen for the CRM (ADR 0145 § 5). */
+  readonly imported: boolean;
   /** The media it is once its file is read; `null` before, or absent from the vault. */
   readonly mediaAssetId: string | null;
   readonly described: boolean;
@@ -48,6 +59,8 @@ interface PlatformStepView {
   /** As the platform gives it: minor units, VAT included; 0 for an offered step. Never recalculated. */
   readonly priceMinor: number;
   readonly currency: Currency;
+  /** A « Tarif réduit » set on the platform; `null` when none. The step is blocked while it has one. */
+  readonly discount: PlatformStepDiscount | null;
   readonly media: readonly PlatformStepMediaView[];
   readonly previewMedia: readonly PlatformStepMediaView[];
   /** Every media of the step is in the vault. */
@@ -108,6 +121,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     ref: media.ref,
     kind: media.kind,
     inVault: media.vault !== null,
+    imported: media.vault?.imported ?? false,
     mediaAssetId: media.vault?.mediaAssetId ?? null,
     described: (media.vault?.descriptionId ?? null) !== null,
   });
@@ -133,7 +147,10 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     soldMediaRefs: step.media.map((media) => media.ref),
   }));
   const gaps = platformScriptGaps(
-    steps.map((step) => ({ media: [...step.media, ...step.previewMedia] })),
+    steps.map((step) => ({
+      discounted: step.discount !== null,
+      media: [...step.media, ...step.previewMedia],
+    })),
     identity?.validatedAt != null,
     branchGaps(branchSteps, script.branches),
   );
@@ -175,6 +192,20 @@ export async function creatorPlatformScripts(
 }
 
 /**
+ * Her active native scripts kept from being offered by a « Tarif réduit » on the platform (recette 16/11: bloquer et
+ * alerter), the longest waiting first: what « À traiter » warns of until the agency takes the discount off in Reveal.
+ * The owner and her active managers only, like `creatorPlatformScripts`; `null` for a reader who may not read her.
+ */
+export async function discountedPlatformScripts(
+  deps: Deps,
+  reader: PlatformScriptsReader,
+  creatorId: CreatorId,
+): Promise<readonly DiscountedPlatformScript[] | null> {
+  if (reader.role !== 'owner' && reader.role !== 'operator') return null;
+  return deps.store.discountedOf(creatorId, reader.userId);
+}
+
+/**
  * One native script of hers, out of any person and as the service role: what a job of the agent reads before sending a
  * step (ADR 0111, the reward: its step's ref and price, its media and the media they are). For a job only: its ids come
  * from the base (a run, a reward), never from a request, which reads through `creatorPlatformScripts`. `null` when it
@@ -187,6 +218,18 @@ export async function platformScriptForJob(
 ): Promise<PlatformScriptView | null> {
   const script = await deps.store.oneForJob(creatorId, scriptId);
   return script === null ? null : viewOf(script);
+}
+
+/**
+ * Her native scripts on one account, out of any person and as the service role: what the agent decides a script on
+ * for a fan (ADR 0098), each with its `proposable` and its steps by rank. For a job only, like `platformScriptForJob`.
+ */
+export async function accountPlatformScriptsForJob(
+  deps: Deps,
+  creatorId: CreatorId,
+  platformAccountId: PlatformAccountId,
+): Promise<readonly PlatformScriptView[]> {
+  return (await deps.store.ofAccountForJob(creatorId, platformAccountId)).map(viewOf);
 }
 
 /**

@@ -3,18 +3,21 @@ import {
   DESCRIPTION_REVIEW_REASONS,
   PlatformSchema,
   PlatformScriptMomentSchema,
+  VAULT_BLURHASH_MAX,
   VAULT_DESCRIPTION_MAX,
   VAULT_FOLDER_NAME_MAX,
 } from '@impera/contracts';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   char,
   check,
   foreignKey,
   index,
   integer,
   jsonb,
+  pgPolicy,
   pgTable,
   smallint,
   text,
@@ -24,7 +27,16 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { createdAt, creatorReadsOnly, enumCheck, enumText, id, tenantPolicy, timestampTz } from './columns';
+import {
+  closedToCreator,
+  createdAt,
+  creatorReadsOnly,
+  enumCheck,
+  enumText,
+  id,
+  tenantPolicy,
+  timestampTz,
+} from './columns';
 import { conversations, messages } from './conversations';
 import { fans } from './fans';
 import { creators, platformAccounts } from './tenancy';
@@ -145,6 +157,8 @@ export const mediaPlatformRefs = pgTable(
      * (« À décrire par l'agence »), never an invented description.
      */
     descriptionFailures: smallint('description_failures').notNull().default(0),
+    /** The platform's blurred preview (a blurhash, `BlurhashSchema`): a few colours, never the image (ADR 0030 § 4). */
+    previewBlurhash: text('preview_blurhash'),
     lastSyncedAt: timestampTz('last_synced_at').notNull(),
     removedAt: timestampTz('removed_at'),
     createdAt: createdAt(),
@@ -170,6 +184,10 @@ export const mediaPlatformRefs = pgTable(
     ),
     check('media_platform_refs_description_failures_check', sql`${t.descriptionFailures} >= 0`),
     check(
+      'media_platform_refs_blurhash_check',
+      sql`char_length(${t.previewBlurhash}) <= ${sql.raw(String(VAULT_BLURHASH_MAX))}`,
+    ),
+    check(
       'media_platform_refs_duration_check',
       sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`,
     ),
@@ -189,6 +207,135 @@ export const mediaPlatformRefs = pgTable(
     ),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
+  ],
+);
+
+const currentCreator: SQL = sql`nullif(current_setting('app.creator_id', true), '')::uuid`;
+const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
+const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), '')`;
+const readsTeam: SQL = sql`${currentScope} in ('owner', 'agency')`;
+const isOwner: SQL = sql`${currentScope} = 'owner'`;
+
+export const VAULT_CHOICE_SCOPES = ['folder', 'media'] as const;
+
+/**
+ * What enters the CRM of a vault (ADR 0145 § 5, amendment of 17/11): a folder ticked whole (`folder`, `folder_ref` null
+ * for the root), or one media's own tick (`media`), which wins over its folder's. No row: not imported. Set by the
+ * owner alone under her RLS, read by the owner and the active managers, closed to her account; read by the jobs as
+ * the service role.
+ */
+export const vaultImportChoices = pgTable(
+  'vault_import_choices',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    scope: enumText('scope').notNull(),
+    folderRef: text('folder_ref'),
+    platformMediaId: text('platform_media_id'),
+    imported: boolean('imported').notNull(),
+    chosenBy: text('chosen_by')
+      .notNull()
+      .references(() => user.id),
+    chosenAt: timestampTz('chosen_at').notNull().defaultNow(),
+  },
+  (t) => [
+    enumCheck('vault_import_choices', t.scope, VAULT_CHOICE_SCOPES),
+    check(
+      'vault_import_choices_target_check',
+      sql`(${t.scope} = 'folder' and ${t.platformMediaId} is null) or (${t.scope} = 'media' and ${t.platformMediaId} is not null and ${t.folderRef} is null)`,
+    ),
+    check(
+      'vault_import_choices_text_check',
+      sql`char_length(${t.folderRef}) <= 200 and char_length(${t.platformMediaId}) <= 200`,
+    ),
+    foreignKey({
+      name: 'vault_import_choices_account_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    // One tick per folder, the root's included (`''` stands for it here only), and one per media.
+    uniqueIndex('vault_import_choices_folder_unique')
+      .on(t.platformAccountId, sql`coalesce(${t.folderRef}, '')`)
+      .where(sql`${t.scope} = 'folder'`),
+    uniqueIndex('vault_import_choices_media_unique')
+      .on(t.platformAccountId, t.platformMediaId)
+      .where(sql`${t.scope} = 'media'`),
+    index('vault_import_choices_creator_idx').on(t.creatorId, t.platformAccountId),
+    pgPolicy('team_read', { for: 'select', using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}` }),
+    pgPolicy('owner_write', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.chosenBy} = ${currentUser}`,
+    }),
+    pgPolicy('owner_change', {
+      for: 'update',
+      using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.chosenBy} = ${currentUser}`,
+    }),
+    pgPolicy('owner_clear', { for: 'delete', using: sql`${t.creatorId} = ${currentCreator} and ${isOwner}` }),
+    closedToCreator(),
+  ],
+);
+
+/**
+ * Whether a vault media is in the CRM (ADR 0145 § 5): its own tick when it has one, else its folder's (the root's for
+ * `folder_ref` null), else not. Given the columns of a `media_platform_refs` row, in the caller's query and RLS.
+ */
+export function vaultImported(ref: {
+  readonly account: SQL;
+  readonly media: SQL;
+  readonly folder: SQL;
+}): SQL<boolean> {
+  return sql<boolean>`coalesce(
+    (select c.imported from vault_import_choices c
+      where c.platform_account_id = ${ref.account} and c.scope = 'media' and c.platform_media_id = ${ref.media}),
+    (select c.imported from vault_import_choices c
+      where c.platform_account_id = ${ref.account} and c.scope = 'folder'
+        and coalesce(c.folder_ref, '') = coalesce(${ref.folder}, '')),
+    false)`;
+}
+
+/**
+ * A media of the vault the owner asked to describe (ADR 0145 § 5, amendment of 17/11), after the count and the cost
+ * were shown: `media.describe_vault` takes only these. Once per media; `asked_key` is the gesture's, so a gesture
+ * replayed answers what it asked. Written by the owner alone, never changed nor removed.
+ */
+export const vaultDescribeRequests = pgTable(
+  'vault_describe_requests',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id').notNull(),
+    platformMediaId: text('platform_media_id').notNull(),
+    askedKey: uuid('asked_key').notNull(),
+    askedBy: text('asked_by')
+      .notNull()
+      .references(() => user.id),
+    askedAt: timestampTz('asked_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('vault_describe_requests_media_unique').on(t.platformAccountId, t.platformMediaId),
+    foreignKey({
+      name: 'vault_describe_requests_ref_fk',
+      columns: [t.platformAccountId, t.platformMediaId],
+      foreignColumns: [mediaPlatformRefs.platformAccountId, mediaPlatformRefs.platformMediaId],
+    }),
+    foreignKey({
+      name: 'vault_describe_requests_account_fk',
+      columns: [t.platformAccountId, t.creatorId],
+      foreignColumns: [platformAccounts.id, platformAccounts.creatorId],
+    }),
+    index('vault_describe_requests_key_idx').on(t.creatorId, t.askedKey),
+    pgPolicy('team_read', { for: 'select', using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}` }),
+    pgPolicy('owner_ask', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${isOwner} and ${t.askedBy} = ${currentUser}`,
+    }),
+    closedToCreator(),
   ],
 );
 

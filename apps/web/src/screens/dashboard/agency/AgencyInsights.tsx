@@ -1,14 +1,23 @@
-import { AGENCY_TRANSFER_VAT_BPS, type AgencyInsights, type AgencyPeriod } from '@impera/contracts';
-import { chartPoints, linePath, niceTicks, placeSegmentThumb } from '@impera/design-system';
+import { AGENCY_TRANSFER_VAT_BPS, type AgencyInsights } from '@impera/contracts';
+import { chartPoints, linePath, niceTicks } from '@impera/design-system';
 import { Link } from '@tanstack/react-router';
-import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  type JSX,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 
 import { CountUp, Section, type FloatingTip } from '../parts';
 
+import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
+import { againstText, comparable, readName, shortDate, spanText, type AgencySelection } from './period';
 import { useNarrow } from './useNarrow';
 import {
-  AGAINST,
   arcs,
   bestSlot,
   busiest,
@@ -25,21 +34,22 @@ import {
   moneyParts,
   moneyShares,
   moneyTip,
+  percentText,
   sharesOf,
   type MoneyPart,
   OTHER,
   OTHER_KINDS_NOTE,
-  PERIOD_OPTIONS,
   ppvRate,
   readAtLabel,
   SELLER_NOTES,
-  sellerSlices,
+  sellerRanking,
   shareOf,
   shortDay,
   shortEuros,
   signedCount,
   slotLabel,
   STACKS,
+  topFansWords,
   WEEKDAYS,
   WEEKDAYS_SHORT,
   zoneLabel,
@@ -48,7 +58,7 @@ import {
 import './agency.css';
 
 import { initialOf } from '@/lib/utils';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /*
  * « L'agence en chiffres » (ADR 0078): what the registers of sales say about the agency, or about one creator, over a
@@ -62,66 +72,11 @@ const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00
 const formatEuros = (cents: number): string => euros(Math.round(cents));
 const formatCount = (n: number): string => Math.round(n).toLocaleString('fr-FR');
 
-/** The four periods, a segment whose thumb slides; a radio group, one stop in the Tab order. */
-export function AgencyPeriodControl({
-  period,
-  onChange,
-}: {
-  period: AgencyPeriod;
-  onChange: (period: AgencyPeriod) => void;
-}): JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLSpanElement>(null);
-  const placed = useRef(false);
-  const index = PERIOD_OPTIONS.findIndex((p) => p.id === period);
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (element === null) return;
-    placeSegmentThumb(
-      element,
-      index,
-      PERIOD_OPTIONS.length,
-      placed.current ? (thumbRef.current ?? undefined) : undefined,
-    );
-    placed.current = true;
-  }, [index]);
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const step = STEPS[event.key];
-    if (step === undefined) return;
-    event.preventDefault();
-    const next = PERIOD_OPTIONS[(index + step + PERIOD_OPTIONS.length) % PERIOD_OPTIONS.length];
-    if (next === undefined) return;
-    ref.current?.querySelector<HTMLButtonElement>(`[data-period="${next.id}"]`)?.focus();
-    onChange(next.id);
-  };
-  return (
-    <div
-      className="nv-seg nv-glass nv-glass--thin ins-period"
-      role="radiogroup"
-      aria-label="Période"
-      ref={ref}
-      onKeyDown={onKeyDown}
-    >
-      <span className="nv-seg__thumb nv-glass nv-glass--thin" ref={thumbRef} aria-hidden="true" />
-      {PERIOD_OPTIONS.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          role="radio"
-          className="nv-seg__opt"
-          data-period={p.id}
-          aria-checked={p.id === period}
-          tabIndex={p.id === period ? 0 : -1}
-          onClick={() => {
-            onChange(p.id);
-          }}
-        >
-          {p.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+/**
+ * Whether the register reaches back to the comparison's first day (ADR 0146 § 4): when it does not, no percentage of
+ * money or fans is shown, never a false rise. The subscribers keep their own rule (ADR 0081 § 4).
+ */
+const Comparable = createContext(true);
 
 /**
  * « +18 % » in the colour of better or worse; nothing when there is nothing to compare with, nor when nothing then and
@@ -136,7 +91,8 @@ function Delta({
   previous: number;
   lowerIsBetter?: boolean;
 }): JSX.Element | null {
-  if (current === 0 && previous === 0) return null;
+  const compared = useContext(Comparable);
+  if (!compared || (current === 0 && previous === 0)) return null;
   const change = changeOf(current, previous);
   if (change === null) return null;
   const better = lowerIsBetter ? change < 0 : change > 0;
@@ -144,15 +100,179 @@ function Delta({
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
-/** The revenue of every day, a quiet line under the lead figure. */
-function Spark({ values }: { values: readonly number[] }): JSX.Element | null {
-  if (values.length < 2 || values.every((value) => value === 0)) return null;
-  const frame = { width: 240, height: 48, padTop: 4, padBottom: 4 };
-  const points = chartPoints(values, frame, { min: Math.min(0, ...values) });
+/** Under 640px the curve's tip is the compact one. */
+function narrowTip(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
+}
+
+/** One point of the curve: its label, its revenue, and the compared day's when the register holds it. */
+interface CurvePoint {
+  readonly key: string;
+  readonly title: string;
+  readonly cents: number;
+  readonly compared: { readonly title: string; readonly cents: number } | null;
+}
+
+/**
+ * The points under the lead figure (ADR 0146 § 5): every day from the register's first day when it falls in the period
+ * (the line no longer sinks to the right), each with the day compared, aligned day for day, when the register holds
+ * that day (the compared line stops where the register begins, never falls to zero); one day read hour by hour.
+ */
+export function curvePoints(insights: AgencyInsights): CurvePoint[] {
+  if (insights.from === insights.to) {
+    return insights.hourly.map((hour) => ({
+      key: String(hour.hour),
+      title: hoursLabel(hour.hour),
+      cents: hour.revenueMinor,
+      compared: null,
+    }));
+  }
+  const since = insights.registerSince;
+  const first =
+    since === null || since <= insights.from
+      ? 0
+      : Math.max(
+          0,
+          insights.days.findIndex((one) => one.day >= since),
+        );
+  const today = insights.span.today;
+  return insights.days.slice(first).map((one, i) => {
+    const before = insights.previousDays[i + first];
+    return {
+      key: one.day,
+      title: dayLabel(one.day),
+      cents: one.revenueMinor,
+      compared:
+        before === undefined || (since !== null && before.day < since)
+          ? null
+          : { title: spanText(before.day, before.day, today), cents: before.revenueMinor },
+    };
+  });
+}
+
+/**
+ * The revenue day by day under the lead figure, the comparison as a discreet dashed line behind, aligned day for day.
+ * A hairline and a dot follow the pointer or the finger to the nearest day, and the tip gives the date, then both
+ * amounts with their strokes (dataviz: one tip, every series). The subtitle says the days compared: no legend.
+ */
+function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element | null {
+  const [hover, setHover] = useState<number | null>(null);
+  const points = curvePoints(insights);
+  if (points.length < 2 || points.every((one) => one.cents === 0 && (one.compared?.cents ?? 0) === 0))
+    return null;
+  const frame = { width: 600, height: 96, padTop: 10, padBottom: 6 };
+  const top = Math.max(1, ...points.map((one) => Math.max(one.cents, one.compared?.cents ?? 0)));
+  const line = chartPoints(
+    points.map((one) => one.cents),
+    frame,
+    { min: 0, max: top },
+  );
+  const all = chartPoints(
+    points.map((one) => one.compared?.cents ?? 0),
+    frame,
+    { min: 0, max: top },
+  );
+  // The compared line where the register holds its days only: one run, from its first held day.
+  const behind = all.filter((_, i) => points[i]?.compared !== null);
+  const last = line.at(-1);
+  const lit = hover === null ? undefined : line[hover];
+  const dot = lit ?? last;
+  const area =
+    last === undefined || line[0] === undefined
+      ? ''
+      : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(line[0].x)},${String(frame.height)} Z`;
+  const pick = (event: ReactPointerEvent<HTMLDivElement>): { index: number; x: number } => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
+    const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
+    setHover(index);
+    return { index, x: box.left + ((line[index]?.x ?? 0) / frame.width) * box.width };
+  };
+  const tipAt = ({ index, x }: { index: number; x: number }): ReturnType<FloatingTip['bind']> => {
+    const one = points[index];
+    if (one === undefined) return tip.bind({ title: '' });
+    return tip.bind(
+      {
+        title: one.title,
+        // A phone's tip says only the amounts and the day compared: the labels took half the curve (recette DSH-04).
+        rows: narrowTip()
+          ? [
+              [euros(one.cents), ''],
+              ...(one.compared === null
+                ? []
+                : [[`${euros(one.compared.cents)} · ${one.compared.title}`, ''] as const]),
+            ]
+          : [
+              ['Chiffre d’affaires', euros(one.cents)],
+              ...(one.compared === null
+                ? []
+                : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
+            ],
+        rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
+        compact: narrowTip(),
+      },
+      { marker: x },
+    );
+  };
   return (
-    <svg className="ins-spark" viewBox="0 0 240 48" preserveAspectRatio="none" aria-hidden="true">
-      <path className="ins-spark__line" d={linePath(points)} vectorEffect="non-scaling-stroke" />
-    </svg>
+    <div className="ins-curve">
+      <div
+        className="ins-curve__plot"
+        role="img"
+        aria-label={`Chiffre d’affaires ${insights.from === insights.to ? 'heure par heure' : 'jour par jour'}, de ${points[0]?.title ?? ''} à ${points.at(-1)?.title ?? ''}${behind.length > 0 ? ', avec la période comparée' : ''}`}
+      >
+        <svg
+          viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="ins-curve-fill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" className="ins-curve__fill-top" />
+              <stop offset="1" className="ins-curve__fill-bottom" />
+            </linearGradient>
+          </defs>
+          {behind.length > 1 ? (
+            <path className="ins-curve__compared" d={linePath(behind)} vectorEffect="non-scaling-stroke" />
+          ) : null}
+          <path className="ins-curve__area" d={area} fill="url(#ins-curve-fill)" />
+          <path className="ins-curve__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
+        </svg>
+        {lit === undefined ? null : (
+          <span
+            className="ins-curve__hair"
+            style={{ '--_x': `${String((lit.x / frame.width) * 100)}%` }}
+            aria-hidden="true"
+          />
+        )}
+        {dot === undefined ? null : (
+          <span
+            className="ins-curve__dot"
+            style={{
+              '--_x': `${String((dot.x / frame.width) * 100)}%`,
+              '--_y': `${String((dot.y / frame.height) * 100)}%`,
+            }}
+            aria-hidden="true"
+          />
+        )}
+        {/* One layer for the pointer and the finger alike: the nearest day follows it (dataviz: the crosshair finds
+            the X), a tap shows it, a glide moves it. */}
+        <div
+          className="ins-curve__hits"
+          aria-hidden="true"
+          onPointerMove={(event) => {
+            tipAt(pick(event)).onPointerMove(event);
+          }}
+          onPointerDown={(event) => {
+            tipAt(pick(event)).onPointerDown(event);
+          }}
+          onPointerLeave={(event) => {
+            setHover(null);
+            tip.bind({ title: '' }).onPointerLeave(event);
+          }}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -173,14 +293,17 @@ function Tiles({
   from,
   label,
   tip,
+  pair = false,
 }: {
   tiles: readonly Tile[];
   from: number;
   label: string;
   tip: FloatingTip;
+  /** Two tiles on a row of their own: each takes half of it, no empty columns after them. */
+  pair?: boolean;
 }): JSX.Element {
   return (
-    <dl className="ins-tiles" aria-label={label}>
+    <dl className={pair ? 'ins-tiles ins-tiles--pair' : 'ins-tiles'} aria-label={label}>
       {tiles.map((tile, i) => (
         <div
           key={tile.label}
@@ -204,7 +327,7 @@ function Tiles({
               />
             )}
           </dd>
-          <dd className="ins-tile__note">{tile.note}</dd>
+          {tile.note === '' ? null : <dd className="ins-tile__note">{tile.note}</dd>}
         </div>
       ))}
     </dl>
@@ -245,7 +368,7 @@ function MoneySplit({
     });
   return (
     <article className="nv-plate ins-money nv-enter" style={{ '--nv-i': 6 }}>
-      <h3 className="ins-card__title">
+      <h3 className="nv-h3 ins-card__title">
         Où va l’argent
         {whole > 0 ? <span className="ins-card__total">{euros(revenue)}</span> : null}
       </h3>
@@ -289,26 +412,38 @@ function MoneySplit({
   );
 }
 
+/**
+ * The line under the lead figure: the days compared and their amount; the register's first day when it does not reach
+ * back to them (ADR 0146 § 4), never a percentage then.
+ */
+function leadNote(insights: AgencyInsights): string {
+  const { current, previous } = insights.totals;
+  const against = againstText(insights);
+  if (!comparable(insights) && insights.registerSince !== null) {
+    return `${against} : le registre commence le ${shortDate(insights.registerSince)}, rien à comparer`;
+  }
+  if (changeOf(current.revenueMinor, previous.revenueMinor) === null)
+    return `${against} : aucune vente alors`;
+  return `${against} (${euros(previous.revenueMinor)})`;
+}
+
 function Figures({
   insights,
-  period,
   several,
   tip,
 }: {
   insights: AgencyInsights;
-  period: AgencyPeriod;
   several: boolean;
   tip: FloatingTip;
 }): JSX.Element {
   const { current, previous } = insights.totals;
-  const { fans } = insights;
   const fansVat = current.revenueMinor - current.revenueExclVatMinor;
   const commission = current.revenueExclVatMinor - current.netMinor;
   // ADR 0106 § 4: the parts say their share of the net, the base a percentage agreed with a creator is set on.
   // The two parts' shares of the net are rounded together, to 100 %, as in « Où va l'argent ».
   const shares = moneyShares(current);
   const ofNet = (key: 'creator' | 'agency'): string =>
-    current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
+    current.netMinor > 0 ? `${percentText(shares.ofNet[key])} du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
   const tipOf = (
     title: string,
@@ -386,24 +521,9 @@ function Figures({
       }),
     },
   ];
+  // The paying fans and their average spend live in « Les fans qui paient », never twice (recette visuelle 16/11,
+  // PIL-21): two figures here, the sales and the refunds.
   const activity: readonly Tile[] = [
-    {
-      label: 'Fans qui ont payé',
-      value: fans.paying.toLocaleString('fr-FR'),
-      note:
-        fans.paying === 0
-          ? 'aucun sur la période'
-          : fans.newPaying === fans.paying
-            ? 'tous pour la première fois'
-            : `dont ${fans.newPaying.toLocaleString('fr-FR')} pour la première fois`,
-      delta: [fans.paying, fans.previousPaying],
-    },
-    {
-      label: 'Dépense moyenne par fan',
-      value: fans.averagePerPayingMinor === null ? '—' : euros(fans.averagePerPayingMinor),
-      note: 'ce qu’un fan payeur a dépensé sur la période',
-      delta: null,
-    },
     {
       label: 'Ventes',
       value: current.sales.toLocaleString('fr-FR'),
@@ -413,11 +533,12 @@ function Figures({
     {
       label: 'Remboursements',
       value: current.refunds.toLocaleString('fr-FR'),
+      // A zero says itself: « aucun remboursement » under it would say it twice (PIL-21).
       note:
         current.sales === 0
           ? 'aucune vente sur la période'
           : current.refunds === 0
-            ? 'aucun remboursement'
+            ? ''
             : `${String(shareOf(current.refunds, current.sales))} % des ventes`,
       delta: [current.refunds, previous.refunds],
       lowerIsBetter: true,
@@ -427,7 +548,24 @@ function Figures({
     <div className="ins-figures-stack">
       <div className="ins-figures">
         <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
-          <div className="nv-figure">
+          {/* A money tile, so its tip too (ADR 0106 § 12, PAY-16): to the cent, against the period before. On the
+              figure alone, never the whole card: the curve under it reads its own days. */}
+          <div
+            className="nv-figure"
+            tabIndex={0}
+            {...tip.bind(
+              moneyTip({
+                title: 'Chiffre d’affaires',
+                cents: current.revenueMinor,
+                previousCents: previous.revenueMinor,
+                // The whole itself: no share of it to say.
+                revenueMinor: 0,
+                netMinor: null,
+                text: 'Ce que les fans ont payé, TVA comprise, avant la commission de la plateforme.',
+              }),
+              { around: true },
+            )}
+          >
             <span className="nv-figure__label">Chiffre d’affaires</span>
             <CountUp
               className="nv-figure__value ins-lead__value"
@@ -436,20 +574,16 @@ function Figures({
             />
             <span className="nv-figure__note">
               <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
-              <span>
-                {changeOf(current.revenueMinor, previous.revenueMinor) === null
-                  ? 'rien à comparer sur la période d’avant'
-                  : `${AGAINST[period]} (${euros(previous.revenueMinor)})`}
-              </span>
+              <span>{leadNote(insights)}</span>
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
           </div>
-          <Spark values={insights.days.map((day) => day.revenueMinor)} />
+          <RevenueCurve insights={insights} tip={tip} />
         </div>
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
       </div>
       <MoneySplit insights={insights} several={several} tip={tip} />
-      <Tiles tiles={activity} from={7} label="Les fans et les ventes" tip={tip} />
+      <Tiles tiles={activity} from={7} label="Les ventes" tip={tip} pair />
     </div>
   );
 }
@@ -460,7 +594,7 @@ function Figures({
  */
 function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const narrow = useNarrow();
-  const today = insights.period === 'day';
+  const today = insights.from === insights.to;
   const days = today
     ? insights.hourly.map((hour) => ({
         key: String(hour.hour),
@@ -476,7 +610,8 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
         parts: dayStacks(day),
         total: day.revenueMinor,
       }));
-  const weekly = narrow && insights.period === 'quarter';
+  // A long period on a phone reads week by week: ninety columns do not fit a thumb.
+  const weekly = narrow && insights.days.length > 45;
   const columns = weekly ? byWeek(days) : days;
   const [focus, setFocus] = useState(columns.length - 1);
   const current = Math.min(Math.max(0, focus), columns.length - 1);
@@ -597,13 +732,11 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
 function Ring({
   title,
   slices,
-  notes,
   tipFor,
   tip,
 }: {
   title: string;
   slices: readonly Slice[];
-  notes?: Readonly<Record<string, string>>;
   tipFor?: string;
   tip: FloatingTip;
 }): JSX.Element {
@@ -626,7 +759,7 @@ function Ring({
   const litShare = lit === null ? 0 : (shares[lit] ?? 0);
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">{title}</h3>
+      <h3 className="nv-h3 ins-card__title">{title}</h3>
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (
@@ -678,7 +811,7 @@ function Ring({
           </div>
           <ul className="ins-legend">
             {shown.map((slice, i) => {
-              const help = slice.key === tipFor ? OTHER_KINDS_NOTE : notes?.[slice.key];
+              const help = slice.key === tipFor ? OTHER_KINDS_NOTE : undefined;
               const told = help === undefined ? null : tip.bind({ title: slice.label, text: help });
               return (
                 <li key={slice.key}>
@@ -744,22 +877,28 @@ const SELLER_NAME: Readonly<Record<'agent' | 'unlinked' | 'none', string>> = {
   none: 'Sans chatteur',
 };
 
-/** Who sold, one line each, bars from the same start: widths are shares of the best seller's revenue. */
+/**
+ * Who sold, one line each, bars from the same start: widths are shares of the biggest line's revenue. The sellers come
+ * first, ranked; the sales of no seller after them, unranked, under a rule (recette visuelle 16/11, PIL-03).
+ */
 function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element {
   const best = Math.max(0, ...insights.sellers.map((seller) => seller.revenueMinor));
   if (insights.sellers.length === 0)
     return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
+  const { ranked, rest } = sellerRanking(insights.sellers);
   return (
     <ol className="nv-plate ins-rank" aria-label="Classement de qui a vendu">
-      {insights.sellers.map((one, i) => {
+      {[...ranked, ...rest].map((one, i) => {
         const name = one.seller.kind === 'member' ? one.seller.name : SELLER_NAME[one.seller.kind];
         const average = one.sales > 0 ? Math.round(one.revenueMinor / one.sales) : null;
+        const isRanked = i < ranked.length;
         return (
           <li
             key={one.seller.kind === 'member' ? one.seller.memberId : one.seller.kind}
             className="ins-rank__row nv-enter"
             style={{ '--nv-i': i }}
             data-kind={one.seller.kind}
+            data-rule={i === ranked.length && i > 0 ? '' : undefined}
             tabIndex={0}
             {...tip.bind({
               title: name,
@@ -776,7 +915,7 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
             })}
           >
             <span className="ins-rank__pos" aria-hidden="true">
-              {String(i + 1)}
+              {isRanked ? String(i + 1) : null}
             </span>
             <span className="nv-avatar ins-rank__face" aria-hidden="true">
               {one.seller.kind === 'member' ? initialOf(one.seller.name) : SELLER_MARK[one.seller.kind]}
@@ -784,10 +923,14 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
             <span className="ins-rank__who">
               <span className="ins-rank__name">{name}</span>
               <span className="ins-rank__line">
-                {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
+                <span className="ins-nowrap">
+                  {one.sales.toLocaleString('fr-FR')} vente{one.sales > 1 ? 's' : ''}
+                </span>
                 {average === null ? null : (
                   <>
-                    {' · '}
+                    <span className="ins-rank__sep" aria-hidden="true">
+                      {' · '}
+                    </span>
                     <span className="ins-nowrap">panier moyen {euros(average)}</span>
                   </>
                 )}
@@ -986,13 +1129,15 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   if (fans.paying === 0) return <p className="nv-plate ins-empty">Aucun fan n’a payé sur la période.</p>;
   const newShare = shareOf(fans.newPaying, fans.paying);
   const top = fans.topTenShare ?? 0;
+  // Ten at most: with fewer paying fans, the count they are (PAY-16, « Les 10 fans » for 3).
+  const biggest = topFansWords(fans.paying);
   return (
     <div className="nv-plate ins-fans">
       <div className="ins-fans__meter">
         <p className="ins-fans__lead">
-          Les 10 fans qui dépensent le plus font <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
+          {biggest.lead} <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
         </p>
-        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par les 10 plus gros fans`}>
+        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par ${biggest.short}`}>
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
         <p className="ins-fans__hint">
@@ -1015,7 +1160,8 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
           <dt>Nouveaux payeurs</dt>
           <dd>
             <CountUp value={fans.newPaying} format={formatCount} />
-            <span className="ins-fans__part">{String(newShare)}&nbsp;%</span>
+            {/* Their share of the paying fans, in the neutral pill the other figures wear (PIL-21). */}
+            <span className="nv-delta ins-delta-flat">{String(newShare)}&nbsp;%</span>
           </dd>
         </div>
         <div>
@@ -1031,16 +1177,20 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
 const LATER = 'en calcul chez Reveal';
 const countText = (n: number | null): string => (n === null ? '—' : n.toLocaleString('fr-FR'));
 
+type SubscriberDays = NonNullable<AgencyInsights['subscribers']>['days'];
+
+/**
+ * A line needs two days read one after the other: a lone dot, or two far apart, draws a chart of nothing, and the
+ * counts take the whole card instead (recette visuelle 16/11, PIL-08).
+ */
+function hasLine(days: SubscriberDays): boolean {
+  return days.some((one, i) => one.active !== null && (days[i + 1]?.active ?? null) !== null);
+}
+
 /** Active subscribers day by day: a line over the read days, broken where a day is not read yet. */
-function ActiveLine({
-  days,
-  tip,
-}: {
-  days: NonNullable<AgencyInsights['subscribers']>['days'];
-  tip: FloatingTip;
-}): JSX.Element | null {
+function ActiveLine({ days, tip }: { days: SubscriberDays; tip: FloatingTip }): JSX.Element | null {
   const read = days.map((one) => one.active).filter((n): n is number => n !== null);
-  if (read.length < 2) return null;
+  if (!hasLine(days)) return null;
   const low = Math.min(...read);
   const high = Math.max(...read);
   const unread = days.length - read.length;
@@ -1187,6 +1337,11 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
   // A comparison needs the whole period before, read: a half-read one would show a false +700 % (ADR 0081 § 4).
   const comparable = previous.daysRead === previous.days;
   const rateBefore = comparable ? ppvRate(previous.ppvSent, previous.ppvPurchased) : null;
+  // The last day not read yet: the last count read stands, with its day, never a bare « — » (PIL-08).
+  const lastRead =
+    current.activeAtEnd === null ? subs.days.findLast((one) => one.active !== null) : undefined;
+  const active = current.activeAtEnd ?? lastRead?.active ?? null;
+  const chart = hasLine(subs.days);
   const tiles: readonly {
     label: string;
     value: string;
@@ -1250,25 +1405,23 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
     },
   ];
   return (
-    <div className="nv-plate ins-subs">
+    <div className={chart ? 'nv-plate ins-subs' : 'nv-plate ins-subs ins-subs--flat'}>
       <div className="ins-subs__lead">
         <div className="nv-figure">
           <span className="nv-figure__label">Abonnés actifs</span>
-          {current.activeAtEnd === null ? (
+          {active === null ? (
             <span className="nv-figure__value ins-lead__value">—</span>
           ) : (
-            <CountUp
-              className="nv-figure__value ins-lead__value"
-              value={current.activeAtEnd}
-              format={formatCount}
-            />
+            <CountUp className="nv-figure__value ins-lead__value" value={active} format={formatCount} />
           )}
           <span className="nv-figure__note">
             {growth === null ? (
               <span>
-                {current.activeAtEnd === null
-                  ? 'le dernier jour n’est pas encore lu'
-                  : 'rien à comparer avant la période'}
+                {current.activeAtEnd !== null
+                  ? 'rien à comparer avant la période'
+                  : lastRead === undefined
+                    ? 'le dernier jour n’est pas encore lu'
+                    : `au ${shortDay(lastRead.day)}, le dernier jour lu`}
               </span>
             ) : (
               <span>
@@ -1277,7 +1430,7 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
             )}
           </span>
         </div>
-        <ActiveLine key={insights.period} days={subs.days} tip={tip} />
+        <ActiveLine key={`${insights.from}:${insights.to}`} days={subs.days} tip={tip} />
       </div>
       <dl className="ins-tiles ins-subs__tiles">
         {tiles.map((tile) => (
@@ -1309,21 +1462,20 @@ function Subscribers({ insights, tip }: { insights: AgencyInsights; tip: Floatin
   );
 }
 
-/** Sections' reading lines, by period. */
-const DAILY_SUB: Readonly<Record<AgencyPeriod, string>> = {
-  day: 'heure par heure depuis minuit',
-  week: 'jour par jour, les 7 derniers jours',
-  month: 'jour par jour, les 30 derniers jours',
-  quarter: 'les 3 derniers mois, par type de vente',
-};
+/** The chart's reading line (ADR 0146): the unit of its columns and the days it covers. */
+function dailySub(insights: AgencyInsights): string {
+  if (insights.from === insights.to) return `heure par heure, ${zoneLabel(insights.timeZone)}`;
+  const span = spanText(insights.from, insights.to, insights.span.today);
+  return `jour par jour, ${span}, par type de vente`;
+}
 
 /**
  * The insights of the agency (`creatorId` null) or of one creator, from `index` in the page's entrance order. The
- * period control sits on the first section.
+ * days' control sits on the first section.
  */
 export function AgencyInsightsPanel({
-  period,
-  onPeriod,
+  selection,
+  onSelection,
   creatorId,
   creatorName,
   onCreator,
@@ -1331,8 +1483,8 @@ export function AgencyInsightsPanel({
   tip,
   index = 1,
 }: {
-  period: AgencyPeriod;
-  onPeriod: (period: AgencyPeriod) => void;
+  selection: AgencySelection;
+  onSelection: (selection: AgencySelection) => void;
   creatorId: string | null;
   creatorName?: string;
   onCreator?: ((creatorId: string) => void) | undefined;
@@ -1341,8 +1493,8 @@ export function AgencyInsightsPanel({
   tip: FloatingTip;
   index?: number;
 }): JSX.Element | null {
-  const query = useAgencyInsights(period, creatorId);
-  const control = <AgencyPeriodControl period={period} onChange={onPeriod} />;
+  const query = useAgencyInsights(selection, creatorId);
+  const control = <PeriodBar selection={selection} insights={query.data ?? null} onChange={onSelection} />;
   const oneCreator = creatorId !== null;
   const title = oneCreator ? `Les chiffres de ${creatorName ?? 'la créatrice'}` : 'L’agence en chiffres';
 
@@ -1351,13 +1503,10 @@ export function AgencyInsightsPanel({
     return (
       <Section title={title} sub="lus dans le registre des ventes" index={index} control={control}>
         {query.isError ? (
-          <ServerSilent
-            text="Les chiffres reviennent dès qu’il répond."
-            onRetry={() => void query.refetch()}
-          />
+          <Failure onRetry={() => void query.refetch()} />
         ) : (
           // The shape of the figures, so nothing jumps when they come (ADM-21): the lead and its four tiles of money,
-          // the card of where the money goes, the four tiles of fans and sales.
+          // the card of where the money goes, the two tiles of the sales.
           <div
             className="ins-figures-stack"
             aria-label="Chargement des chiffres"
@@ -1373,8 +1522,8 @@ export function AgencyInsightsPanel({
               </div>
             </div>
             <div className="db-loading nv-plate ins-loading--split" />
-            <div className="ins-tiles">
-              {Array.from({ length: 4 }, (_, i) => (
+            <div className="ins-tiles ins-tiles--pair">
+              {Array.from({ length: 2 }, (_, i) => (
                 <div key={i} className="db-loading nv-plate ins-tile ins-loading--tile" />
               ))}
             </div>
@@ -1402,90 +1551,90 @@ export function AgencyInsightsPanel({
       </Section>
     );
   }
-  // While another period loads the last one stays, dimmed, and says its own period, never the one asked.
-  const shown = insights.period;
+  // While other days load the last ones stay, dimmed, and say their own days, never the ones asked.
   const several = !oneCreator && insights.creators.length >= 2;
   const kinds = kindSlices(insights.kinds);
-  const sellers = sellerSlices(insights.sellers);
   let at = index;
   const next = (): number => {
     at += 1;
     return at;
   };
   return (
-    <div className="ins-body" aria-busy={query.isPlaceholderData}>
-      <Section
-        title={title}
-        sub={`${AGAINST[shown]}, lus dans le registre des ventes`}
-        index={at}
-        control={control}
-      >
-        <Figures insights={insights} period={shown} several={several} tip={tip} />
-        {insights.dollarsLeftOut ? (
-          <p className="ins-note" role="note">
-            Des ventes en dollars sont laissées de côté : aucun taux de change n’est encore connu (Équipe ›
-            Paie).
-          </p>
-        ) : null}
-        {insights.refundsWithoutSale > 0 ? (
-          <p className="ins-note" role="note">
-            {insights.refundsWithoutSale === 1
-              ? 'Un remboursement de la période porte sur une vente plus ancienne que le registre : il n’est compté dans aucun chiffre.'
-              : `${String(insights.refundsWithoutSale)} remboursements de la période portent sur des ventes plus anciennes que le registre : ils ne sont comptés dans aucun chiffre.`}
-          </p>
-        ) : null}
-      </Section>
-
-      <Section
-        title="Chiffre d’affaires"
-        sub={shown === 'day' ? `${DAILY_SUB.day}, ${zoneLabel(insights.timeZone)}` : DAILY_SUB[shown]}
-        index={next()}
-      >
-        <Daily key={insights.period} insights={insights} tip={tip} />
-      </Section>
-
-      <Section
-        title="Les abonnés"
-        sub="lus chaque heure dans les statistiques de Reveal, jamais de l’argent"
-        index={next()}
-      >
-        <Subscribers insights={insights} tip={tip} />
-      </Section>
-
-      <div className="ins-pair nv-enter" style={{ '--nv-i': next() }}>
-        <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" tip={tip} />
-        <Ring title="Qui vend" slices={sellers} notes={SELLER_NOTES} tip={tip} />
-      </div>
-
-      <Section
-        title="Qui a vendu"
-        sub="chaque chatteur, l’agent et le reste, le plus gros chiffre d’abord"
-        index={next()}
-      >
-        <Sellers insights={insights} tip={tip} />
-      </Section>
-
-      {several ? (
-        <Section title="Les créatrices" sub="côte à côte ; un clic ouvre la sienne" index={next()}>
-          <Creators insights={insights} onCreator={onCreator} tip={tip} />
+    <Comparable.Provider value={comparable(insights)}>
+      <div className="ins-body" aria-busy={query.isPlaceholderData}>
+        <Section
+          title={title}
+          sub={`${readName(insights)}, ${againstText(insights)}, lus dans le registre des ventes`}
+          index={at}
+          control={control}
+        >
+          <Figures insights={insights} several={several} tip={tip} />
+          {insights.dollarsLeftOut ? (
+            <p className="ins-note" role="note">
+              Des ventes en dollars sont laissées de côté : aucun taux de change n’est encore connu (Équipe ›
+              Paie).
+            </p>
+          ) : null}
+          {insights.refundsWithoutSale > 0 ? (
+            <p className="ins-note" role="note">
+              {insights.refundsWithoutSale === 1
+                ? 'Un remboursement de la période porte sur une vente plus ancienne que le registre : il n’est compté dans aucun chiffre.'
+                : `${String(insights.refundsWithoutSale)} remboursements de la période portent sur des ventes plus anciennes que le registre : ils ne sont comptés dans aucun chiffre.`}
+            </p>
+          ) : null}
         </Section>
-      ) : null}
 
-      <Section
-        title="Quand ça vend"
-        sub={`jour de la semaine et heure de chaque vente, ${zoneLabel(insights.timeZone)}`}
-        index={next()}
-      >
-        <Hours insights={insights} tip={tip} />
-      </Section>
+        <Section title="Chiffre d’affaires" sub={dailySub(insights)} index={next()}>
+          <Daily key={`${insights.from}:${insights.to}`} insights={insights} tip={tip} />
+        </Section>
 
-      <Section
-        title="Les fans qui paient"
-        sub="un fan compte une fois par compte de créatrice, jamais nommé ici"
-        index={next()}
-      >
-        <Fans insights={insights} />
-      </Section>
-    </div>
+        <Section
+          title="Les abonnés"
+          sub="lus chaque heure dans les statistiques de Reveal, jamais de l’argent"
+          index={next()}
+        >
+          {/* The subscribers' comparison follows their own rule (ADR 0081 § 4), not the register's first day. */}
+          <Comparable.Provider value>
+            <Subscribers insights={insights} tip={tip} />
+          </Comparable.Provider>
+        </Section>
+
+        {/* « Qui vend » said the ranking's amounts a second time: one card now, the ranking (recette visuelle 16/11,
+            PIL-02). */}
+        <div className="nv-enter" style={{ '--nv-i': next() }}>
+          <Ring title="D’où vient l’argent" slices={kinds} tipFor="other" tip={tip} />
+        </div>
+
+        <Section
+          title="Qui a vendu"
+          sub="chaque chatteur et l’agent, le plus gros chiffre d’abord ; les ventes sans vendeur en dessous"
+          index={next()}
+        >
+          <Sellers insights={insights} tip={tip} />
+        </Section>
+
+        {several ? (
+          <Section title="Les créatrices" sub="côte à côte ; un clic ouvre la sienne" index={next()}>
+            <Creators insights={insights} onCreator={onCreator} tip={tip} />
+          </Section>
+        ) : null}
+
+        <Section
+          title="Quand ça vend"
+          sub={`jour de la semaine et heure de chaque vente, ${zoneLabel(insights.timeZone)}`}
+          index={next()}
+        >
+          <Hours insights={insights} tip={tip} />
+        </Section>
+
+        <Section
+          title="Les fans qui paient"
+          sub="un fan compte une fois par compte de créatrice, jamais nommé ici"
+          index={next()}
+        >
+          <Fans insights={insights} />
+        </Section>
+      </div>
+    </Comparable.Provider>
   );
 }

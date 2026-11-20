@@ -8,12 +8,12 @@
 .td-suivi__count {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
+  min-height: var(--nv-pill-count);
   margin-left: var(--nv-space-2);
   padding: 0 var(--nv-space-2);
   border-radius: var(--nv-radius-full);
   background: color-mix(in srgb, currentColor 18%, transparent);
-  font-size: var(--nv-text-footnote);
+  font-size: var(--nv-text-caption);
   font-weight: 650;
 }
 .td-urgent {
@@ -28,5 +28,5 @@
 
 /* The lines sit at the panel head's inset, like every other list in a panel. */
 .td-todo > .td-todo__list {
-  padding: 4px 24px 22px;
+  padding: 4px var(--nv-plate-pad) var(--nv-plate-pad);
 }

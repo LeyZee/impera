@@ -1,4 +1,3 @@
-import type { AgencyPeriod } from '@impera/contracts';
 import type { JSX } from 'react';
 
 import { AgencyStrip } from '../AgencyStrip';
@@ -12,22 +11,25 @@ import { useDashboard } from '../useDashboard';
 import '../dashboard.css';
 
 import { AgencyInsightsPanel } from './AgencyInsights';
+import type { AgencySelection } from './period';
+
+import { PageHeader } from '@/shell/layout';
 
 /**
  * The Dashboard of the owner and of an active manager, before any creator is chosen (ADR 0078): « Toute l'agence »
- * checked in front of the creators' chips, what waits on the agency, then the agency's figures. A creator's chip opens
- * her Dashboard, her figures first and her agent under them.
+ * checked in front of the creators' chips, the agency's figures, then what waits on the agency. A creator's chip opens
+ * her Dashboard, her agent first and her figures under it.
  */
 export function AgencyPage({
-  period,
-  onPeriod,
+  selection,
+  onSelection,
   onCreator,
   forOwner,
   reviewsReports,
   canAddCreator,
 }: {
-  period: AgencyPeriod;
-  onPeriod: (period: AgencyPeriod) => void;
+  selection: AgencySelection;
+  onSelection: (selection: AgencySelection) => void;
   onCreator: (creatorId: string) => void;
   /** The owner also reads the daily export and the invoices' paperwork, and links the registers. */
   forOwner: boolean;
@@ -43,23 +45,25 @@ export function AgencyPage({
   if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
   return (
     <div className="db">
+      {/* The screen's title, as on every other one (recette visuelle 16/11, PIL-04): the rest of the Dashboard as it was. */}
+      <PageHeader title="Dashboard" />
       <header className="db-top nv-enter">
         <CreatorPicker onChoose={onCreator} agency={{ selected: true, onChoose: () => undefined }} />
       </header>
-      <BackupBanner enabled={forOwner} />
-      <PaperworkBanner enabled={forOwner} />
-      <ReportsBanner enabled={reviewsReports} />
-      {view.status === 'live' ? (
-        <AgencyStrip agency={view.data.agency} onAgencyView opensSettings={forOwner} />
-      ) : null}
+      {/* The figures first, then what the agency runs: the export, the invoices, the reports, the day's AI budget
+          (recette visuelle 16/11, PIL-04). */}
       <AgencyInsightsPanel
-        period={period}
-        onPeriod={onPeriod}
+        selection={selection}
+        onSelection={onSelection}
         creatorId={null}
         onCreator={onCreator}
         canOpenSettings={forOwner}
         tip={tip}
       />
+      <BackupBanner enabled={forOwner} />
+      <PaperworkBanner enabled={forOwner} />
+      <ReportsBanner enabled={reviewsReports} />
+      {view.status === 'live' ? <AgencyStrip agency={view.data.agency} opensSettings={forOwner} /> : null}
       {tip.element}
     </div>
   );

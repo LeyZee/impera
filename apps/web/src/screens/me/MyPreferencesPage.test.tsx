@@ -76,6 +76,8 @@ describe('Moi › Préférences (D-03)', () => {
       '/notifications',
     );
     expect(screen.getByRole('link', { name: 'Préférences' }).getAttribute('href')).toBe('/moi/preferences');
+    // The address of the account under its name, beside the way out (recette visuelle 16/11, CRE-20).
+    expect(screen.getByText(THEO_ME.email)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Se déconnecter' }));
     expect(onSignOut).toHaveBeenCalledOnce();
   });

@@ -130,7 +130,7 @@ describe('Playground', () => {
     expect(await screen.findByText('Le serveur ne répond pas')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Essayer avec des réponses écrites à l’avance' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
-    expect(await screen.findByRole('heading', { name: 'Entraîner' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chatting' })).toBeTruthy();
     await waitFor(() => {
       expect(screen.getByText('Fan fictif')).toBeTruthy();
     });
@@ -191,6 +191,25 @@ describe('Playground', () => {
     // His message leaves the box as he sends it and shows in the thread, before the server sends it back.
     expect(screen.getByText('T’es trop belle')).toBeTruthy();
     expect(box).toHaveProperty('value', '');
+  });
+
+  it('says the server does not answer on a bare 503, and names Grok only when the server says so (V-ETA-06)', async () => {
+    answer = (method, path) => (method === 'GET' && path === '/v1/playground' ? json(503, null) : undefined);
+    open();
+    const title = await screen.findByText('Le serveur ne répond pas');
+    expect(title.classList.contains('is-warn')).toBe(true);
+    expect(screen.queryByText(/Grok/)).toBeNull();
+    expect(screen.getByText('Réessaie dans un instant.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
+    cleanup();
+    answer = (method, path) =>
+      method === 'GET' && path === '/v1/playground' ? failure(503, 'llm_unavailable') : undefined;
+    open();
+    expect(await screen.findByText('Grok ne répond pas')).toBeTruthy();
+    expect(screen.getByText('Ajoute ou vérifie sa clé dans Réglages › Modèles IA.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ouvrir Modèles IA' }).getAttribute('href')).toBe(
+      '/reglages/modeles-ia',
+    );
   });
 
   it('names the fan by his first name only, without repeating the fan type in the header', async () => {
@@ -298,7 +317,9 @@ describe('Playground', () => {
     expect(screen.queryByText('Proposée, à noter')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer' }));
     expect(
-      await screen.findByText('Rangée en Exemple de voix : elle rejoint les exemples donnés à la voix.'),
+      await screen.findByText(
+        'Rangée en Exemple de voix : elle sert au Playground, pas encore aux vrais fans.',
+      ),
     ).toBeTruthy();
   });
 });

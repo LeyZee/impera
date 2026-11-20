@@ -473,6 +473,57 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     }
   });
 
+  it('holds no shift on a creator taken off its member’s list: planners are told, nobody is on it (recette EQU-01)', async () => {
+    const { member: iris } = await addMember({
+      email: 'iris@example.test',
+      displayName: 'Iris',
+      teamRole: 'chatter',
+      creatorIds: [anna, ines],
+    });
+    const created = await call(
+      'POST',
+      '/scheduling/shifts',
+      owner,
+      shiftBody(iris.id, anna, annaAccount, minutesFromNow(-30), minutesFromNow(90)),
+    );
+    expect(created.statusCode, created.body).toBe(201);
+    const underWay = ShiftSchema.parse(created.json());
+    const from = minutesFromNow(-120);
+    const to = minutesFromNow(240);
+    const onDuty = async () =>
+      OnDutyListSchema.parse((await call('GET', '/scheduling/on-duty', owner)).json()).onDuty.map(
+        (row) => row.shiftId,
+      );
+    const handedTo = async () =>
+      (await app.modules.scheduling.onShift(anna, new Date())).map((row) => row.memberId);
+    expect(await onDuty()).toContain(underWay.id);
+    expect(await handedTo()).toContain(iris.id);
+    // Anna taken off her list, as Membres › Modifier does it: Inès stays.
+    await test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [ines] })
+      .where(eq(schema.user.id, iris.userId));
+    try {
+      for (const cookie of [owner, noraCookie]) {
+        const read = await planning(cookie, from, to);
+        // Her shift stays on the planning, and the planners learn that nobody holds it.
+        expect(read.shifts.map((shift) => shift.id)).toContain(underWay.id);
+        expect(read.withoutAccess).toEqual([{ memberId: iris.id, creatorId: anna }]);
+        expect(read.away).toEqual([]);
+      }
+      // A member never reads a colleague's creators.
+      expect((await planning(basileCookie, from, to)).withoutAccess).toEqual([]);
+      // Nobody is « en poste » on it, and no handover of a sale goes to her (EQ-13).
+      expect(await onDuty()).not.toContain(underWay.id);
+      expect(await handedTo()).not.toContain(iris.id);
+    } finally {
+      await test.admin.db
+        .update(schema.shifts)
+        .set({ cancelledAt: new Date() })
+        .where(eq(schema.shifts.id, underWay.id));
+    }
+  });
+
   it('moves a shift before it starts, and cancels it once', async () => {
     const later = new Date(new Date(theoTomorrow.startsAt).getTime() - HOUR);
     const moved = await call('PATCH', `/scheduling/shifts/${theoTomorrow.id}`, owner, {

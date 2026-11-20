@@ -20,11 +20,13 @@ import {
   contentsOf,
   dropName,
   droppedOn,
+  dueNow,
   dueOf,
   fileLine,
   isInterrupted,
   matchResumed,
   onTheirWay,
+  pickedHeadRefusal,
   outLine,
   published,
   mayWithdrawHere,
@@ -43,8 +45,8 @@ import { lookAgainAtHerCase } from '@/rewards/api';
 import { dayOf, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 import './content.css';
 
@@ -60,9 +62,15 @@ interface Opened {
  */
 export function ContentPage({
   onOpenScript,
+  asked: askedId = null,
+  onAsked,
 }: {
   /** Her script, card by card (SC-02 lot b2). */
   onOpenScript: (dropId: ContentDropId) => void;
+  /** A request to open the sheet on, from Aujourd'hui's « Déposer » (`?demande=`, recette visuelle 16/11, CRE-01). */
+  asked?: string | null;
+  /** The sheet opened on it: the address forgets it, so that « retour » does not open it again. */
+  onAsked?: () => void;
 }): JSX.Element {
   const content = useContent();
   const client = useQueryClient();
@@ -93,13 +101,27 @@ export function ContentPage({
   };
 
   const asked = content.data === undefined ? [] : toShoot(content.data.requests, content.data.drops);
+  // The first thing due, late or for today, carries the screen's one neon (recette visuelle 16/11, CRE-13).
+  const first = dueNow(asked, today)[0];
+  const firstKey = first === undefined ? null : first.kind === 'script' ? first.drop.id : first.request.id;
+
+  // Aujourd'hui's « Déposer »: the sheet opens on its request once Contenu is read, then the address forgets it.
+  const requests = content.data?.requests;
+  useEffect(() => {
+    if (askedId === null || requests === undefined) return;
+    const request = requests.find((one) => one.id === askedId && one.state === 'open' && one.dropId === null);
+    // A script asked with its version is begun card by card, from its own card: the page shows it.
+    if (request !== undefined && !(request.category === 'script' && request.structureVersionId !== null))
+      setOpened({ category: request.category, request });
+    onAsked?.();
+  }, [askedId, requests, onAsked]);
   const moving = content.data === undefined ? [] : onTheirWay(content.data.drops);
   const out = content.data === undefined ? [] : published(content.data.drops);
 
   const onTheWay =
     moving.length === 0 ? null : (
       <section className="ct-section" aria-labelledby="ct-moving">
-        <h2 id="ct-moving" className="ct-section__title">
+        <h2 id="ct-moving" className="nv-h2 ct-section__title">
           En route
         </h2>
         <ul className="ct-list">
@@ -118,15 +140,16 @@ export function ContentPage({
     );
 
   return (
-    <Page className="ct-page">
+    <Page className="ct-page" width="narrow">
       <PageHeader title="Contenu" lead="Ce qu’on te demande, et ce que tu envoies." />
       {content.isError ? (
-        <ServerSilent
-          text="Ton contenu n’a pas pu être lu. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void content.refetch();
           }}
-        />
+        >
+          Rien ici n’est à jour en attendant.
+        </Failure>
       ) : content.data === undefined ? (
         <div className="ct-skeleton" aria-hidden="true">
           <i />
@@ -137,7 +160,7 @@ export function ContentPage({
         <div className="ct-sections nv-enter">
           {asked.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-asked">
-              <h2 id="ct-asked" className="ct-section__title">
+              <h2 id="ct-asked" className="nv-h2 ct-section__title">
                 À tourner
               </h2>
               <ul className="ct-list">
@@ -145,6 +168,7 @@ export function ContentPage({
                   item.kind === 'script' ? (
                     <StartedScriptCard
                       key={item.drop.id}
+                      first={item.drop.id === firstKey}
                       drop={item.drop}
                       request={item.request}
                       today={today}
@@ -154,6 +178,7 @@ export function ContentPage({
                   ) : (
                     <RequestCard
                       key={item.request.id}
+                      first={item.request.id === firstKey}
                       request={item.request}
                       today={today}
                       onDrop={() => {
@@ -174,12 +199,13 @@ export function ContentPage({
           {routeFirst(moving) ? onTheWay : null}
 
           <section className="ct-section" aria-labelledby="ct-drop">
-            <h2 id="ct-drop" className="ct-section__title">
-              Déposer
+            {/* Not « Déposer », the word of every request's button above: these tiles send without a request (CRE-13). */}
+            <h2 id="ct-drop" className="nv-h2 ct-section__title">
+              Envoyer autre chose
             </h2>
             {DROP_OUTPUTS.map((output) => (
               <div key={output.name} className="ct-output">
-                {DROP_OUTPUTS.length > 1 ? <h3 className="ct-output__name">{output.name}</h3> : null}
+                {DROP_OUTPUTS.length > 1 ? <h3 className="nv-h3 ct-output__name">{output.name}</h3> : null}
                 <div className="ct-tiles">
                   {output.categories.map((category) => (
                     <button
@@ -206,7 +232,7 @@ export function ContentPage({
 
           {out.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-out">
-              <h2 id="ct-out" className="ct-section__title">
+              <h2 id="ct-out" className="nv-h2 ct-section__title">
                 Publié
               </h2>
               <ul className="ct-list ct-list--quiet">
@@ -263,13 +289,23 @@ export function ContentPage({
   );
 }
 
+/** « Pour aujourd’hui » in ink and bold, a late day in amber, the others quiet (recette visuelle 16/11, CRE-13). */
+const dueClass = (
+  due: { readonly text: string; readonly late: boolean },
+  request: ContentRequest,
+  today: string,
+) => (due.late ? 'ct-due ct-due--late' : request.dueOn === today ? 'ct-due ct-due--today' : 'ct-due');
+
 function RequestCard({
+  first,
   request,
   today,
   onDrop,
   onRefuse,
   onOpenScript,
 }: {
+  /** The first thing due: its button is the screen's neon. */
+  first: boolean;
   request: ContentRequest;
   today: string;
   onDrop: () => void;
@@ -291,43 +327,54 @@ function RequestCard({
         </span>
         <span className="ct-card__titles">
           <span className="ct-card__name">{DROP_CATEGORY_LABELS[request.category]}</span>
-          <span className={due.late ? 'ct-due ct-due--late' : 'ct-due'}>
+          <span className={dueClass(due, request, today)}>
             {moment === null ? due.text : `${due.text} · ${moment}`}
           </span>
         </span>
       </div>
       <p className="ct-card__why">{request.reason}</p>
-      <div className="ct-card__foot">
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onRefuse}>
-          Je ne peux pas
-        </button>
-        {scripted ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              setFailed(null);
-              // Its id drawn once: a tap replayed after a cut network answers the same script.
-              startScriptDrop({ id: dropId, requestId: request.id })
-                .then((script) => {
-                  onOpenScript(script.drop.id);
-                })
-                .catch(() => {
-                  setFailed('Ton script n’a pas pu s’ouvrir : réessaie dans un instant.');
-                  setBusy(false);
-                });
-            }}
-          >
-            Commencer
+      {request.dropId === null ? (
+        <div className="ct-card__foot">
+          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm ct-card__cant" onClick={onRefuse}>
+            Je ne peux pas
           </button>
-        ) : (
-          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onDrop}>
-            Déposer
-          </button>
-        )}
-      </div>
+          {scripted ? (
+            <button
+              type="button"
+              className={`nv-btn ${first ? 'nv-btn--neon' : 'nv-btn--soft'} nv-btn--sm`}
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                setFailed(null);
+                // Its id drawn once: a tap replayed after a cut network answers the same script.
+                startScriptDrop({ id: dropId, requestId: request.id })
+                  .then((script) => {
+                    onOpenScript(script.drop.id);
+                  })
+                  .catch(() => {
+                    setFailed('Ton script n’a pas pu s’ouvrir : réessaie dans un instant.');
+                    setBusy(false);
+                  });
+              }}
+            >
+              Commencer
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`nv-btn ${first ? 'nv-btn--neon' : 'nv-btn--soft'} nv-btn--sm`}
+              onClick={onDrop}
+            >
+              Déposer
+            </button>
+          )}
+        </div>
+      ) : (
+        // Her drop for it still goes up (recette CRE-12): no second drop, she finishes the one on its way.
+        <p className="ct-card__meta">
+          Ton dépôt est en route. S’il s’arrête, reprends-le dans «&nbsp;En route&nbsp;».
+        </p>
+      )}
       {failed === null ? null : (
         <p className="ct-card__blocked" role="alert">
           {failed}
@@ -342,12 +389,15 @@ function RequestCard({
  * how far she is and « Continuer ». « Retirer » lives in the script itself, away from « Continuer ».
  */
 function StartedScriptCard({
+  first,
   drop,
   request,
   today,
   sends,
   onOpenScript,
 }: {
+  /** The first thing due: « Continuer » is the screen's neon. */
+  first: boolean;
   drop: ContentDrop;
   request: ContentRequest | null;
   today: string;
@@ -376,8 +426,8 @@ function StartedScriptCard({
               ? DROP_CATEGORY_LABELS[drop.category]
               : `${DROP_CATEGORY_LABELS[drop.category]} · ${script.data.name}`}
           </span>
-          {due === null ? null : (
-            <span className={due.late ? 'ct-due ct-due--late' : 'ct-due'}>
+          {due === null || request === null ? null : (
+            <span className={dueClass(due, request, today)}>
               {moment === null ? due.text : `${due.text} · ${moment}`}
             </span>
           )}
@@ -404,7 +454,7 @@ function StartedScriptCard({
       <div className="ct-card__foot">
         <button
           type="button"
-          className="nv-btn nv-btn--soft nv-btn--sm"
+          className={`nv-btn ${first ? 'nv-btn--neon' : 'nv-btn--soft'} nv-btn--sm`}
           onClick={() => {
             onOpenScript(drop.id);
           }}
@@ -436,6 +486,8 @@ function DropCard({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [unmatched, setUnmatched] = useState(0);
+  // A file picked again whose first bytes are not what it was declared as (recette CRE-12): never sent, said here.
+  const [notIt, setNotIt] = useState<string | null>(null);
   const tone = stateTone(drop);
   const refused = refusedOf(drop);
   const sending = drop.files.some((file) => {
@@ -503,7 +555,15 @@ function DropCard({
               event.target.value = '';
               const { pairs, unmatched: left } = matchResumed(interrupted, picked);
               setUnmatched(left);
-              for (const pair of pairs) void queueSend(drop.id, pair.fileId, pair.file, onSettled);
+              setNotIt(null);
+              for (const pair of pairs) {
+                const mime = interrupted.find((file) => file.id === pair.fileId)?.mime;
+                if (mime === undefined) continue;
+                void pickedHeadRefusal(pair.file, mime).then((refusal) => {
+                  if (refusal === null) void queueSend(drop.id, pair.fileId, pair.file, onSettled);
+                  else setNotIt(refusal);
+                });
+              }
             }}
           />
           {unmatched === 0 ? null : (
@@ -513,6 +573,7 @@ function DropCard({
                 : `${String(unmatched)} fichiers choisis ne sont pas de ce dépôt : choisis ceux que tu avais envoyés.`}
             </p>
           )}
+          {notIt === null ? null : <p className="ct-file__hint">{notIt}</p>}
         </div>
       )}
       {drop.state === 'blocked' && drop.blockedReason !== null ? (

@@ -102,6 +102,8 @@ function serve(
     removals?: readonly unknown[];
     setups?: readonly unknown[];
     presets?: readonly unknown[];
+    /** The trace of Théo's zone: the newest page, then the one before `before`. */
+    zones?: readonly { readonly changes: readonly unknown[]; readonly nextBefore: string | null }[];
   } = {},
 ): Posted[] {
   const posted: Posted[] = [];
@@ -142,7 +144,13 @@ function serve(
       else if (path === '/v1/dashboard/setup/members' && routes.setups !== undefined)
         reply = { status: 200, body: { members: routes.setups } };
       else if (path.endsWith('/notes')) reply = { status: 200, body: { notes: [] } };
-      else if (path === `/v1/team/members/${THEO.id}`) reply = { status: 200, body: THEO };
+      else if (path === `/v1/team/members/${THEO.id}/time-zones` && routes.zones !== undefined) {
+        const before = new URL(input, 'http://localhost').searchParams.get('before');
+        const page = routes.zones.findIndex(
+          (one, i) => i > 0 && routes.zones?.[i - 1]?.nextBefore === before,
+        );
+        reply = { status: 200, body: before === null ? routes.zones[0] : routes.zones[page] };
+      } else if (path === `/v1/team/members/${THEO.id}`) reply = { status: 200, body: THEO };
       else reply = { status: 404 };
       return Promise.resolve(new Response(JSON.stringify(reply.body ?? null), { status: reply.status }));
     }),
@@ -226,7 +234,9 @@ describe('Équipe › Membres', () => {
   it('lists the chatters at work first, folds those who left, and counts each tab', async () => {
     serve();
     renderPage();
-    await screen.findByText('2 actifs · 1 absent');
+    await screen.findByRole('list', { name: 'Chatteurs' });
+    // A sentence under the title, as on the other tabs: who is active is counted in the capsule (GES-21).
+    expect(screen.getByText('Qui travaille pour l’agence, à quel taux, sur quels comptes.')).toBeDefined();
     expect(names('Chatteurs')).toEqual(['Théo', 'Basile']);
     expect(within(screen.getByRole('radio', { name: /Chatteurs/u })).getByText('2')).toBeDefined();
     expect(within(screen.getByRole('radio', { name: /Managers/u })).getByText('1')).toBeDefined();
@@ -284,6 +294,45 @@ describe('Équipe › Membres', () => {
     await waitFor(() => {
       expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
     });
+  });
+
+  it('shows the owner where his phone took a member’s hours, a page at a time (recette CHT-01)', async () => {
+    const change = (n: number, from: string, to: string, at: string) => ({ id: id(70 + n), from, to, at });
+    serve({
+      zones: [
+        {
+          changes: [change(1, 'Africa/Porto-Novo', 'Europe/Paris', '2026-11-16T16:02:00.000Z')],
+          nextBefore: id(71),
+        },
+        {
+          changes: [change(2, 'Europe/Paris', 'Africa/Porto-Novo', '2026-11-01T09:30:00.000Z')],
+          nextBefore: null,
+        },
+      ],
+    });
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    const block = await within(sheet).findByRole('region', { name: 'Fuseau du téléphone' });
+    expect(within(block).getByText(/sa paie reste à l’heure de l’agence/u)).toBeDefined();
+    const rows = () =>
+      within(block)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent);
+    expect(rows()).toEqual([expect.stringMatching(/^Porto-Novoà Paris16 nov\. à \d{1,2}\u00a0h\u00a002$/u)]);
+    fireEvent.click(within(block).getByRole('button', { name: 'Changements plus anciens' }));
+    await waitFor(() => {
+      expect(rows()).toHaveLength(2);
+    });
+    expect(rows()[1]).toMatch(/^Parisà Porto-Novo1er nov\. à \d{1,2}\u00a0h\u00a030$/u);
+    expect(within(block).queryByRole('button', { name: 'Changements plus anciens' })).toBeNull();
+  });
+
+  it('shows no zone block while the phone never moved it, nor to a manager', async () => {
+    serve({ zones: [{ changes: [], nextBefore: null }] });
+    renderPage(`/equipe/membres?membre=${THEO.id}`);
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    await within(sheet).findByText('Lues par toi et les managers, jamais par Théo.');
+    expect(within(sheet).queryByRole('region', { name: 'Fuseau du téléphone' })).toBeNull();
   });
 
   it('says in words that a member has no rate yet, never with a dash drawn as a figure', async () => {
@@ -427,7 +476,7 @@ describe('Équipe › Membres', () => {
     serve({ members: { status: 503 } });
     renderPage();
     expect(
-      await screen.findByText('Le serveur ne répond pas : l’équipe n’a pas pu être lue.', undefined, {
+      await screen.findByText('Le serveur ne répond pas', undefined, {
         timeout: 4000,
       }),
     ).toBeDefined();
@@ -597,6 +646,46 @@ describe('changing a member once added (EQ-10)', () => {
     expect(posted).toEqual([
       { path: `/v1/team/members/${THEO.id}`, body: { displayName: 'Théo M.', creatorIds: [] } },
     ]);
+  });
+
+  it('says the shifts left on a creator taken off his list before saving, and takes her off all the same (recette EQU-01)', async () => {
+    const at = (hours: number): string => new Date(Date.now() + hours * 3_600_000).toISOString();
+    const shift = (n: number, from: number, memberId: string = THEO.id): unknown => ({
+      id: id(60 + n),
+      creatorId: LEA.id,
+      platformAccountId: id(50),
+      memberId,
+      startsAt: at(from),
+      endsAt: at(from + 6),
+      templateId: null,
+      stoppedAt: null,
+    });
+    // One under way, one tomorrow, one gone by and Basile's: two left on his name.
+    const posted = serve({
+      shifts: [shift(1, -2), shift(2, 24), shift(3, -30), shift(4, 48, BASILE.id)],
+      post: () => ({ status: 200, body: { ...THEO, creatorIds: [] } }),
+    });
+    fireEvent.click(within(await sheet()).getByRole('button', { name: 'Modifier' }));
+    const panel = await screen.findByRole('dialog', { name: 'Modifier Théo' });
+    expect(within(panel).queryByText(/restent à son nom/u)).toBeNull();
+    fireEvent.click(within(panel).getByRole('button', { name: 'Léa', pressed: true }));
+    const left = await within(panel).findByRole('status');
+    expect(left.textContent).toContain(
+      '1 shift en cours et 1 à venir sur Léa restent à son nom. Sans Léa dans ses créatrices, personne ne les tiendra et le planning les montre à pourvoir : donne-les à un autre membre ou annule-les.',
+    );
+    expect(within(left).getByRole('link', { name: 'Voir ses shifts' }).getAttribute('href')).toBe(
+      `/equipe/planning?membre=${THEO.id}`,
+    );
+    // Léa back on his list: nothing to say.
+    fireEvent.click(within(panel).getByRole('button', { name: 'Léa', pressed: false }));
+    expect(within(panel).queryByRole('status')).toBeNull();
+    // Taken off again and saved: the access goes at once, the shifts are the planning's to give.
+    fireEvent.click(within(panel).getByRole('button', { name: 'Léa', pressed: true }));
+    fireEvent.click(within(panel).getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(posted).toEqual([{ path: `/v1/team/members/${THEO.id}`, body: { creatorIds: [] } }]);
   });
 
   it('asks for the password and the code before a change of a member, then sends the same change again (EQ-15)', async () => {
@@ -933,12 +1022,59 @@ describe('a link from the sheet', () => {
       within(list)
         .getAllByRole('button')
         .find((row) => row.querySelector('.nv-convo__name')?.textContent === name)
-        ?.querySelector('.nv-convo__side')?.textContent ?? 'none';
+        ?.querySelector('.tm-row__pills')?.textContent ?? '';
     expect(side('Théo')).toBe('');
     expect(side('Basile')).toBe('En congé');
     expect(side('Mialy')).toBe('Invité');
     expect(side('Koffi')).toBe('Lien expiré');
-    expect(screen.getByText('3 actifs · 1 absent · 1 invitation en attente · 1 lien expiré')).toBeDefined();
+  });
+
+  it('says a status under the name and the country in words, without a flag (GES-21)', async () => {
+    serve();
+    renderPage();
+    const list = await screen.findByRole('list', { name: 'Chatteurs' });
+    const basile = within(list)
+      .getAllByRole('button')
+      .find((row) => row.querySelector('.nv-convo__name')?.textContent === 'Basile');
+    const main = basile?.querySelector('.nv-convo__main');
+    // Name, then his pill, then the line of his country, rate and creators, which keeps the row's width.
+    expect([...(main?.children ?? [])].map((one) => one.className)).toEqual([
+      'nv-convo__name tm-name',
+      'tm-row__pills',
+      'nv-convo__preview',
+    ]);
+    expect(basile?.querySelector('.nv-convo__side')).toBeNull();
+    expect(list.textContent).not.toMatch(/\p{Regional_Indicator}/u);
+    expect(main?.querySelector('.nv-convo__preview')?.textContent).toMatch(/^Bénin · /u);
+  });
+
+  it('opens the first member on a wide screen, and leaves the hint once his sheet is closed (GES-21)', async () => {
+    serve();
+    const router = renderPage();
+    const sheet = await screen.findByRole('region', { name: 'Théo' });
+    // The address stays the list's: nothing was chosen.
+    expect(router.state.location.search).toEqual({});
+    expect(
+      within(screen.getByRole('list', { name: 'Chatteurs' }))
+        .getAllByRole('button')
+        .find((row) => row.getAttribute('aria-current') === 'true')?.textContent,
+    ).toContain('Théo');
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Fermer la fiche' }));
+    await screen.findByText('Aucune fiche ouverte');
+    expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
+  });
+
+  it('keeps the hint on a narrower screen: nothing opens by itself (GES-21)', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: !query.includes('1280px'),
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    serve();
+    renderPage();
+    await screen.findByRole('list', { name: 'Chatteurs' });
+    expect(screen.getByText('Aucune fiche ouverte')).toBeDefined();
+    expect(screen.queryByRole('region', { name: 'Théo' })).toBeNull();
   });
 
   it('says the member’s city and hour under the name, never an IANA zone (EQ-07, EQ-08)', async () => {
@@ -1001,7 +1137,7 @@ describe('a member removed from a platform (ADR 0076 § 5)', () => {
       within(list)
         .getAllByRole('button')
         .find((row) => row.querySelector('.nv-convo__name')?.textContent === name)
-        ?.querySelector('.nv-convo__side')?.textContent ?? 'none';
+        ?.querySelector('.tm-row__pills')?.textContent ?? '';
     await waitFor(() => {
       expect(side('Théo')).toBe('Retiré de Reveal');
     });

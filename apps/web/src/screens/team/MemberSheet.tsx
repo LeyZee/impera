@@ -5,7 +5,7 @@ import { useState, type JSX } from 'react';
 
 import { EditMemberPanel, RatePanel, StatusPanel } from './EditMember';
 import { ShareLink } from './ShareLink';
-import { addNote, useNotes, useRates } from './api';
+import { addNote, useNotes, useRates, useTimeZoneChanges } from './api';
 import {
   creatorNames,
   deadline,
@@ -17,6 +17,7 @@ import {
   rateAhead,
   removalLine,
   ROLE_LABELS,
+  zoneChangeAt,
 } from './model';
 import { Avatar, StatusPill } from './parts';
 
@@ -85,7 +86,7 @@ export function MemberSheet({
       <header className="tm-sheet__head">
         <Avatar member={member} large />
         <div className="tm-sheet__who">
-          <h2>{member.displayName}</h2>
+          <h2 className="nv-h2">{member.displayName}</h2>
           <p>
             {member.firstName} {member.lastName} · {ROLE_LABELS[member.teamRole]}
             {arrivedDays >= 0 && arrivedDays < NEW_DAYS ? <span className="tm-new">Nouveau</span> : null}
@@ -256,7 +257,7 @@ export function MemberSheet({
           id={memberAccessId(member.id)}
           tabIndex={-1}
         >
-          <h3>Accès</h3>
+          <h3 className="nv-h3">Accès</h3>
           <p className="tm-hint">
             {access.kind === 'signed-in'
               ? `Son mot de passe est choisi. S’il l’oublie, ${canManage ? 'crée-lui' : 'le propriétaire peut lui créer'} un lien pour en choisir un nouveau.`
@@ -289,6 +290,9 @@ export function MemberSheet({
         </section>
       )}
 
+      {/* Where his phone took his hours (recette CHT-01): the owner's alone, a zone says where someone is. */}
+      {canManage && !isSelf ? <ZoneTrace memberId={member.id} name={member.displayName} /> : null}
+
       {/* The owner and a manager do not play: they read his rank, streak and trophies here (ADR 0104 § 20). */}
       {member.teamRole === 'chatter' && !gone && !isSelf ? (
         <MemberGameBlock memberId={member.id} name={member.displayName} />
@@ -299,6 +303,53 @@ export function MemberSheet({
       {editing === 'member' ? <EditMemberPanel member={member} creators={creators} onClose={close} /> : null}
       {editing === 'rate' ? <RatePanel member={member} presets={presets} onClose={close} /> : null}
       {editing === 'status' ? <StatusPanel member={member} onClose={close} /> : null}
+    </section>
+  );
+}
+
+/**
+ * The changes his phone made to his zone, newest first: from where to where, and when, in the reader's hour. Nothing
+ * while it never moved: the record keeps the zone of his arrival. His pay stays on the agency's hour.
+ */
+function ZoneTrace({ memberId, name }: { memberId: string; name: string }): JSX.Element | null {
+  const trace = useTimeZoneChanges(memberId, true);
+  const changes = trace.data?.pages.flatMap((page) => page.changes) ?? [];
+  if (changes.length === 0) return null;
+  return (
+    <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Fuseau du téléphone">
+      <h3 className="nv-h3">Fuseau du téléphone</h3>
+      <p className="tm-hint">
+        Sa fiche prend le fuseau du téléphone de {name} à chaque ouverture de l’appli : ses heures s’y
+        affichent, sa paie reste à l’heure de l’agence.
+      </p>
+      <ul className="tm-zones">
+        {changes.map((change, i) => (
+          <li key={change.id} className="nv-enter" style={{ '--nv-i': i + 1 }}>
+            <span className="tm-zones__move">
+              {cityOf(change.from)}
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 8h9M9 4.5 12.5 8 9 11.5" />
+              </svg>
+              <span className="tm-zones__sr">à </span>
+              {cityOf(change.to)}
+            </span>
+            <span className="tm-zones__at nv-num">{zoneChangeAt(change.at)}</span>
+          </li>
+        ))}
+      </ul>
+      {trace.hasNextPage ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--plain nv-btn--sm tm-self-start"
+          disabled={trace.isFetchingNextPage}
+          aria-busy={trace.isFetchingNextPage}
+          onClick={() => {
+            void trace.fetchNextPage();
+          }}
+        >
+          {trace.isFetchingNextPage ? 'Lecture…' : 'Changements plus anciens'}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -334,7 +385,7 @@ function Notes({ memberId, name }: { memberId: string; name: string }): JSX.Elem
   const list = notes.data ?? [];
   return (
     <section className="tm-block nv-enter" style={{ '--nv-i': 5 }} aria-label="Notes internes">
-      <h3>Notes internes</h3>
+      <h3 className="nv-h3">Notes internes</h3>
       <p className="tm-hint">Lues par toi et les managers, jamais par {name}.</p>
       {notes.isError ? (
         <p className="tm-warn">Les notes n’ont pas pu être lues.</p>

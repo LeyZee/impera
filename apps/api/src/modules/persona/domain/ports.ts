@@ -1,10 +1,13 @@
 import type {
+  AgentHourExceptionsView,
   AgentHours,
   AgentHoursView,
   ArchivedCreator,
   CopilotSwitches,
   CreatorId,
   CreatorSummary,
+  DayRange,
+  LocalDate,
   NewCreator,
 } from '@impera/contracts';
 
@@ -62,4 +65,22 @@ export interface CreatorDirectory {
     change: Partial<CopilotSwitches>,
     userId: string,
   ): Promise<CopilotSwitches | null>;
+}
+
+/**
+ * Her dated exceptions (ADR 0148 § 3), one per date of her clock, closed to her own account. Each change is audited
+ * with the owner who made it; a date already past refuses (`AgentHourExceptionPast`). `null` when she does not exist.
+ */
+export interface AgentHourExceptions {
+  /** From her today on, the earliest first. */
+  list(creatorId: CreatorId): Promise<AgentHourExceptionsView | null>;
+  /** Writes the ranges of that date, replacing what it had. */
+  set(
+    creatorId: CreatorId,
+    date: LocalDate,
+    ranges: readonly DayRange[],
+    userId: string,
+  ): Promise<AgentHourExceptionsView | null>;
+  /** Gives the date back to her week type; nothing to remove is not an error. */
+  remove(creatorId: CreatorId, date: LocalDate, userId: string): Promise<AgentHourExceptionsView | null>;
 }

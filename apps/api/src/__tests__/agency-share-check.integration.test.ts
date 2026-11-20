@@ -7,7 +7,7 @@ import {
   previousPayPeriod,
   SalesLineIdSchema,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, inArray, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -148,18 +148,18 @@ describe('agency percentages against her part on the register (CRM-04 d3)', () =
     expect(await test.admin.db.select().from(schema.creatorAgencyRates)).toEqual(rates);
   });
 
-  it('publishes a change of her share from one fortnight to the next once, with both shares (ADR 0054 § 5)', async () => {
+  it('publishes no change while a fortnight has a few euros of net, then a change once, with both shares (ADR 0054 § 5, PAY-04)', async () => {
     const changes = () =>
       test.admin.db
         .select()
         .from(schema.domainEvents)
         .where(eq(schema.domainEvents.type, 'agency_share_changed'));
     expect(await changes()).toEqual([]);
-    // A sale of the fortnight before, 2,00 € for the agency and 6,00 € for her: 25 % of the net, where the
-    // fortnight just over reads 37,5 %.
     const before = previousPayPeriod(from);
     const [line] = await test.admin.db.select().from(schema.platformSales).limit(1);
     if (line === undefined) throw new Error('no sale read');
+    // A sale of the fortnight before, 2,00 € for the agency and 6,00 € for her: 25 % of an 8,00 € net, against
+    // 37,5 % of 16,00 € just over. Both below the floor: a few cents of rounding, no alert.
     await test.admin.db.insert(schema.platformSales).values({
       ...line,
       id: newId(SalesLineIdSchema),
@@ -168,6 +168,28 @@ describe('agency percentages against her part on the register (CRM-04 d3)', () =
       agencyMinor: 200,
       creatorMinor: 600,
     });
+    expect(await run()).toBe(0);
+    // A third sale just over: 24,00 € of net, the floor reached on this side only. Still no alert.
+    await test.admin.db.insert(schema.platformSales).values({
+      ...line,
+      id: newId(SalesLineIdSchema),
+      platformSaleId: 'sale_share_03',
+      occurredAt: new Date(`${from}T12:00:00.000Z`),
+    });
+    expect(await run()).toBe(0);
+    // The register only adds lines: a second sale before, 12,00 € of net at 25 %, brings that fortnight to 20,00 €.
+    await test.admin.db.insert(schema.platformSales).values({
+      ...line,
+      id: newId(SalesLineIdSchema),
+      platformSaleId: 'sale_share_0b',
+      occurredAt: new Date(`${before}T11:00:00.000Z`),
+      grossInclVatMinor: 1_440,
+      grossExclVatMinor: 1_200,
+      netMinor: 1_200,
+      agencyMinor: 300,
+      creatorMinor: 900,
+    });
+    // The gap of the fortnight was published already: the change alone is new.
     expect(await run()).toBe(1);
     expect(await run()).toBe(0);
     const events = await changes();
@@ -183,5 +205,24 @@ describe('agency percentages against her part on the register (CRM-04 d3)', () =
       agencyBps: 3750,
     });
     expect(JSON.stringify(events[0]?.payload)).not.toMatch(/chatter|fan|seller|member|Minor/iu);
+  });
+
+  it('tells the owner of each alert once, on her devices, never an amount (PAY-04)', async () => {
+    const told = () =>
+      test.admin.db
+        .select()
+        .from(schema.notificationDeliveries)
+        .where(eq(schema.notificationDeliveries.reason, 'agency_share'));
+    const alerts = await test.admin.db
+      .select({ id: schema.domainEvents.id })
+      .from(schema.domainEvents)
+      .where(inArray(schema.domainEvents.type, ['agency_share_mismatch', 'agency_share_changed']));
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    const rows = await told();
+    expect(rows.map((row) => row.objectKey).toSorted()).toEqual(alerts.map((alert) => alert.id).toSorted());
+    expect(rows.every((row) => row.userId === ownerId)).toBe(true);
+    // A run again rings nothing twice.
+    await run();
+    expect(await told()).toHaveLength(rows.length);
   });
 });

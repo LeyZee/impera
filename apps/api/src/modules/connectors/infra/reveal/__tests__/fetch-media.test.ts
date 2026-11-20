@@ -87,6 +87,24 @@ describe('RevealApiConnector.fetchMedia against FakeReveal (ADR 0113)', () => {
     expect(Number(stdout.trim())).toBeGreaterThan(1.5);
   });
 
+  it('sends no header to a host that is not the videos host (ADR 0113 § 2)', async () => {
+    const headers: (Readonly<Record<string, string>> | undefined)[] = [];
+    const watch: FileTransport = {
+      lookup: fake.fileTransport.lookup,
+      get: (url, signal, pinned, sent) => {
+        headers.push(sent);
+        return fake.fileTransport.get(url, signal, pinned);
+      },
+    };
+    const video = pick('video');
+    await connect(watch).fetchMedia(video.ref, {
+      folderRef: video.folder?.ref ?? null,
+      path: join(dir, 'plain'),
+    });
+    expect(headers.length).toBeGreaterThan(1);
+    expect(headers.every((sent) => sent === undefined)).toBe(true);
+  });
+
   it('reads the folder again once when the link is no longer signed, and only once', async () => {
     const photo = pick('image');
     const target = { folderRef: photo.folder?.ref ?? null, path: join(dir, 'again') };

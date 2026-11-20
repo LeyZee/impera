@@ -62,6 +62,17 @@ export interface UsageInput {
   readonly spentSinceUsd: Readonly<Partial<Record<AiCreditProvider, number>>>;
   /** Each provider's first refusal for lack of credits or quota since it last answered (`UsageReader.quotaRefusedAt`). */
   readonly quotaRefusedAt: Readonly<Partial<Record<AiCreditProvider, Date | null>>>;
+  /** ElevenLabs' month as its last check read it (ADR 0091 § 7); null while it is not connected. */
+  readonly voice: VoiceQuotaReading | null;
+}
+
+/** ElevenLabs' characters of the month, from the providers module. */
+export interface VoiceQuotaReading {
+  readonly used: number;
+  readonly limit: number;
+  readonly resetsAt: Date | null;
+  readonly plan: 'free' | 'paid' | null;
+  readonly readAt: Date;
 }
 
 /** Full days the average spend is taken over, at most. */
@@ -380,5 +391,15 @@ export function aiUsage(input: UsageInput): AiUsage {
     },
     lastCallAt: input.lastCallAt?.toISOString() ?? null,
     credits,
+    voice:
+      input.voice === null
+        ? null
+        : {
+            used: input.voice.used,
+            limit: input.voice.limit,
+            resetsAt: input.voice.resetsAt?.toISOString() ?? null,
+            plan: input.voice.plan,
+            readAt: input.voice.readAt.toISOString(),
+          },
   };
 }

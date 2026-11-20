@@ -85,6 +85,7 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
       text: step.text,
       priceMinor: step.priceMinor,
       currency: step.currency,
+      discount: step.discount,
       media: [...step.media],
       previewMedia: [...step.previewMedia],
       complete: step.complete,
