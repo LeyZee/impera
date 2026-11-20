@@ -39,14 +39,17 @@ export function StatusPill({ member }: { member: TeamMember }): JSX.Element {
 export function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: ReactNode;
 }): JSX.Element {
   return (
-    <Empty plate title={title} action={children}>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
       {text}
     </Empty>
   );

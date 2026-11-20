@@ -14,6 +14,7 @@ import type {
   PlatformStepDiscount,
   PreparedScriptContent,
   PreparedScriptId,
+  PreparedScriptMoment,
   PreparedScriptState,
   ScriptCadenceOutcome,
   ScriptIdentityAuthor,
@@ -287,6 +288,8 @@ export interface StoredPlatformScript {
   readonly branches: readonly BranchSetting[];
   /** Every identity written for it, whatever the version (SC-04 lot c8); the domain picks the current one. */
   readonly identities: readonly StoredScriptIdentity[];
+  /** Ours when an import recognised it as the copy of a script prepared in Impera (ADR 0161); `null` otherwise. */
+  readonly ours: OurCopy | null;
 }
 
 /** An identity of a native script as the base keeps it (`script_identities`). */
@@ -394,29 +397,17 @@ export interface ScriptIdentifier {
   >;
 }
 
-/** What a person of the agency does to an identity, given the script as it is now in the same transaction. */
-export type IdentityReview =
-  | { readonly kind: 'validate'; readonly identityId: ScriptIdentityId }
-  | { readonly kind: 'correct'; readonly content: ScriptIdentityContent };
-
 /** The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4). */
 export type DescriptionReview =
   | { readonly kind: 'validate'; readonly descriptionIds: readonly string[] }
   | { readonly kind: 'correct'; readonly descriptionId: string; readonly detailed: string };
 
 /**
- * The agency's validation and correction of an identity (SC-04 lot c8, ADR 0030 § 3), in the person's transaction,
- * under her RLS and his scope, audited. `currentHash` reads the version of the script as the same transaction sees
- * it: an identity of another version is `stale`.
+ * The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4), in the person's
+ * transaction, under her RLS and his scope, audited. Its identity is no longer reviewed by hand: the agent offers only
+ * the scripts written in Impera (ADR 0161).
  */
 export interface ScriptIdentityReviewStore {
-  review(
-    creatorId: CreatorId,
-    scriptId: string,
-    review: IdentityReview,
-    userId: string,
-    currentHash: (script: StoredPlatformScript) => string,
-  ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'>;
   /**
    * The descriptions of its media validated as shown, or one rewritten by hand and validated (ADR 0099 § 4), in the
    * same way: a description that is not the one a media of this script is shown with now is `stale`, one that waits
@@ -510,4 +501,18 @@ export interface PreparedScriptStore {
     },
     userId: string,
   ): Promise<UpdatePreparedOutcome>;
+}
+
+/**
+ * The script of ours a native script is the recognised copy of (ADR 0161 § 5): what the agent offers it on. Its
+ * description and moment are ours, written by a person in the editor; its steps in order, each branch with the price we
+ * set, are what the agent checks the copy still matches before offering it.
+ */
+export interface OurCopy {
+  readonly preparedScriptId: PreparedScriptId;
+  readonly description: string;
+  readonly moment: PreparedScriptMoment;
+  readonly steps: readonly {
+    readonly branches: readonly { readonly priceMinor: number; readonly currency: Currency }[];
+  }[];
 }

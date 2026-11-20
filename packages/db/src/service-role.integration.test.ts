@@ -35,6 +35,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   content_ideas: ['update'],
   content_requests: ['insert'],
   contractor_document_purges: ['insert'],
+  // Plus the draft it refreshes (plan, computed_at, updated_at, ADR 0140 § 2): a column right, not a table's.
+  creator_weeks: ['insert'],
   creators: ['update'],
   domain_events: ['insert'],
   exchange_rates: ['insert'],
@@ -56,8 +58,6 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   password_reset_links: ['insert', 'update'],
   pay_period_blocks: ['insert', 'update', 'delete'],
   pay_periods: ['insert'],
-  platform_chatter_daily_stats: ['insert', 'update'],
-  platform_daily_stats: ['insert', 'update'],
   platform_script_step_media: ['insert', 'delete'],
   script_identities: ['insert'],
   platform_script_steps: ['insert', 'delete'],

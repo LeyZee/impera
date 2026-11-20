@@ -19,7 +19,6 @@ import type {
   BranchInput,
   DescriptionReview,
   DiscountedPlatformScript,
-  IdentityReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
   SetBranchesOutcome,
@@ -181,6 +180,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     gaps,
     proposable: script.active && gaps.length === 0,
     identity,
+    ours: script.ours,
   };
 }
 
@@ -235,21 +235,6 @@ export async function accountPlatformScriptsForJob(
   platformAccountId: PlatformAccountId,
 ): Promise<readonly PlatformScriptView[]> {
   return (await deps.store.ofAccountForJob(creatorId, platformAccountId)).map(viewOf);
-}
-
-/**
- * The agency validates the identity shown for the script's current version, or writes one by hand (SC-04 lot c8, ADR
- * 0030 § 3): the owner and the active managers of her list. An identity of another version is `stale`.
- */
-export async function reviewScriptIdentity(
-  deps: { readonly store: ScriptIdentityReviewStore },
-  reader: PlatformScriptsReader,
-  creatorId: CreatorId,
-  scriptId: string,
-  review: IdentityReview,
-): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'> {
-  if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
-  return deps.store.review(creatorId, scriptId, review, reader.userId, currentInputHash);
 }
 
 /**

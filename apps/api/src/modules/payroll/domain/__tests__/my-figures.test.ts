@@ -22,6 +22,12 @@ const line = (
   currency,
   netMinor,
   occurredAt: at === null ? null : new Date(at),
+  saleType: 'ppv',
+});
+
+const typed = (saleType: FigureLine['saleType'], netMinor: number, period = P_NOV_1): FigureLine => ({
+  ...line(period, '2026-11-03T20:00:00.000Z', netMinor),
+  saleType,
 });
 
 const figures = (lines: readonly FigureLine[], memberZone = PARIS) =>
@@ -171,5 +177,33 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     expect(read.records.bestPeriod).toEqual({ period: P_NOV_1, currency: 'EUR', netMinor: 33_000 });
     // Un rapport donne un total, pas l'heure d'une vente : la grille ne lit que la vente relevée.
     expect(read.hours).toMatchObject({ sales: 1, cells: [{ weekday: 2, hour: 21, sales: 1 }] });
+  });
+
+  it('dit d’où vient le net de la quinzaine par type de vente, un remboursement retiré de son type (ADR 0104 § 6)', () => {
+    const read = figures([
+      typed('ppv', 5_000),
+      typed('ppv', 3_000),
+      typed('ppv', -1_000),
+      typed('tip', 2_000),
+      // La quinzaine d'avant n'y entre pas.
+      typed('subscription', 9_000, P_OCT_2),
+    ]);
+    expect(read.kinds).toEqual({
+      untyped: 0,
+      items: [
+        { type: 'ppv', sales: 2, nets: [{ currency: 'EUR', netMinor: 7_000 }] },
+        { type: 'tip', sales: 1, nets: [{ currency: 'EUR', netMinor: 2_000 }] },
+      ],
+    });
+  });
+
+  it('compte à part une vente dont le relevé n’a pas gardé le type, jamais comme un zéro', () => {
+    // Le remboursement d'une vente sans type n'est pas une vente à compter.
+    const read = figures([typed('ppv', 5_000), typed(null, 4_000), typed(null, 1_000), typed(null, -500)]);
+    expect(read.kinds).toEqual({
+      untyped: 2,
+      items: [{ type: 'ppv', sales: 1, nets: [{ currency: 'EUR', netMinor: 5_000 }] }],
+    });
+    expect(figures([]).kinds).toEqual({ untyped: 0, items: [] });
   });
 });

@@ -1365,6 +1365,24 @@ body {
 .se-moment__opt[aria-checked='true'] svg {
   color: var(--nv-sale);
 }
+/* Day and night: the sun and the moon side by side, tight. */
+.se-moment__both {
+  display: inline-flex;
+  gap: 1px;
+}
+/* On a phone the three choices keep to one line: less air around each. */
+@media (max-width: 480px) {
+  .se-moment {
+    gap: 0;
+  }
+  .se-moment__label {
+    margin-right: 2px;
+  }
+  .se-moment__opt {
+    gap: 4px;
+    padding: 0 8px 0 6px;
+  }
+}
 
 /* Barre du script : titre + Construire | Performances */
 .se-edbar {

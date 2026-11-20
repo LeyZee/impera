@@ -2,7 +2,7 @@ import type {
   BranchCondition,
   CopyDifference,
   Currency,
-  PlatformScriptMoment,
+  PreparedScriptMoment,
   PreparedBranch,
   PreparedScriptContent,
   PreparedScriptGap,
@@ -38,7 +38,7 @@ export const emptyStep = (): PreparedStep => ({ key: newKey(), rhythm: 0, branch
 export const newContent = (
   name: string,
   description: string,
-  moment: PlatformScriptMoment,
+  moment: PreparedScriptMoment,
 ): PreparedScriptContent => ({
   name: name.trim(),
   description: description.trim(),
@@ -310,7 +310,8 @@ export function stateLabel(view: PreparedScriptView): {
   return { text: view.gaps.length === 1 ? '1 manque' : `${String(view.gaps.length)} manques`, tone: 'warn' };
 }
 
-export const momentLabel = (moment: PlatformScriptMoment): string => (moment === 'day' ? 'Jour' : 'Nuit');
+export const momentLabel = (moment: PreparedScriptMoment): string =>
+  moment === 'day' ? 'Jour' : moment === 'night' ? 'Nuit' : 'Jour et nuit';
 
 /** What changes in a script, one gesture at a time: each returns a new content, the old one untouched. */
 export function withStep(

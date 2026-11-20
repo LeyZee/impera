@@ -21,7 +21,15 @@ export interface PlaygroundEngine {
   applyPreset(presetId: string): PlaygroundState;
   reset(): PlaygroundState;
   send(text: string, media: readonly PlaygroundMedia[]): Promise<PlaygroundAnswer>;
-  rate(verdict: Verdict, destination?: Destination): Promise<PlaygroundRatingResult>;
+  /**
+   * `mayFileExamples` false (a manager, ADR 0092 § 8): a correction is never suggested as a voice example; it stays a
+   * note that counts in the rate.
+   */
+  rate(
+    verdict: Verdict,
+    destination?: Destination,
+    mayFileExamples?: boolean,
+  ): Promise<PlaygroundRatingResult>;
   branch(fanMessageNumber: number): Promise<PlaygroundState>;
   compare(voiceModel: string): Promise<PlaygroundComparison>;
   patchSituation(patch: PlaygroundSituationPatch): PlaygroundState;
@@ -46,6 +54,23 @@ export interface PlaygroundEngine {
 class PlaygroundError extends DomainError {
   protected constructor(code: PlaygroundErrorCode, message: string) {
     super(code, message);
+  }
+}
+
+/** A manager names a creator off his list (ADR 0092 § 8). */
+export class PlaygroundCreatorForbidden extends PlaygroundError {
+  constructor() {
+    super('creator_forbidden', 'Créatrice hors de ta liste');
+  }
+}
+
+/** Her bank is the owner's to fill and empty: a manager notes and corrects (Charles, 20/11). */
+export class VoiceBankOwnerOnly extends PlaygroundError {
+  constructor() {
+    super(
+      'voice_bank_owner_forbidden',
+      'Seul le propriétaire range une correction en Exemple de voix ou en retire un.',
+    );
   }
 }
 

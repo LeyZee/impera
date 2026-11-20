@@ -274,6 +274,25 @@ export const AgencyInsightsSchema = z.strictObject({
     /** What a paying fan spent on average, in cents; null without one. */
     averagePerPayingMinor: cents.nullable(),
   }),
+  /**
+   * The period's refunds one by one, the latest first (ADR 0092 § 4): those the totals take off (on their sale's day)
+   * and those whose sale is older than the register (on their own day, `delayDays` null). Read by whoever reads the
+   * sellers, never by the MCP (ADR 0144): it names the chatter of each sale. Never a fan.
+   */
+  refundList: z.array(
+    z.strictObject({
+      /** When the fan was refunded. */
+      refundedAt: z.iso.datetime(),
+      creatorId: CreatorIdSchema,
+      kind: AgencySaleKindSchema,
+      /** What the fan got back, VAT included, in euro cents; null for dollars while no rate is known. */
+      amountMinor: count.nullable(),
+      /** Who sold the sale refunded, as « Qui a vendu » says it. */
+      seller: DashboardSalesSellerSchema,
+      /** Whole days from the sale to its refund; null when the sale is not in the register. */
+      delayDays: count.nullable(),
+    }),
+  ),
   /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
   refundsWithoutSale: count,
   /** The zone of the platform's days and hours (IANA), the one every day and hour here is read in. */

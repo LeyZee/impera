@@ -32,11 +32,16 @@ export interface BackupBanner {
   readonly restore: string | null;
 }
 
-/** « 26 octobre à 03:12 », in the reader's time zone. */
+/** « 26 octobre à 3 h 12 », in the reader's time zone: the app's one way to write an hour. */
 function when(iso: string, timeZone: string | undefined): string {
-  const at = new Date(iso);
-  const clock = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone }).format(at);
-  return `${day(iso, timeZone)} à ${clock}`;
+  const parts = new Intl.DateTimeFormat('fr-FR', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone,
+  }).formatToParts(new Date(iso));
+  const of = (type: 'hour' | 'minute'): string => parts.find((part) => part.type === type)?.value ?? '';
+  return `${day(iso, timeZone)} à ${of('hour')}\u00a0h\u00a0${of('minute')}`;
 }
 
 /** « 12 juillet », « 1er août », in the reader's time zone. */
