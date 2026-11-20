@@ -15,6 +15,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/contractors': 6,
   'modules/conversations': 1,
   'modules/creator-tasks': 1,
+  // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.
+  'modules/custom-orders': 1,
   'modules/fans': 1,
   'modules/invoicing': 12,
   'modules/mcp': 1,
