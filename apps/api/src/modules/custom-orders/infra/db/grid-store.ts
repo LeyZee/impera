@@ -7,7 +7,7 @@ import {
   type CustomPriceGrid,
   type CustomPriceGridView,
 } from '@impera/contracts';
-import { eq, schema, sql, withAdmin, withTenantMember, type Database, type Transaction } from '@impera/db';
+import { eq, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import type { CustomPriceActor, CustomPriceGridStore } from '../../domain/ports';
 
@@ -54,10 +54,11 @@ const sameGrid = (a: CustomPriceGrid, b: CustomPriceGrid): boolean =>
 
 /**
  * Her grid (ADR 0159 § C). Read as the signed-in account under her RLS, where only the owner's scope sees a row; the
- * right is read in the base, never from the session. Written as the service role after that check, under a lock per
- * creator, one version on top of the one the screen read.
+ * right is read in the base, never from the session. Written in that same transaction, by the application role under
+ * the `owner_insert` policy (no service role: nothing crosses creators), under a lock per creator, one version on top
+ * of the one the screen read.
  */
-export function createDrizzleCustomPriceGridStore(db: Database, adminDb: Database): CustomPriceGridStore {
+export function createDrizzleCustomPriceGridStore(db: Database): CustomPriceGridStore {
   /** The owner's right on an existing creator, then `fn` under her RLS; null for anyone else or no such creator. */
   const asOwner = <T>(
     creatorId: CreatorId,
@@ -75,10 +76,8 @@ export function createDrizzleCustomPriceGridStore(db: Database, adminDb: Databas
     read: (creatorId, actor) =>
       asOwner(creatorId, actor, async (tx) => viewOf(creatorId, await latest(tx, creatorId))),
 
-    save: async (creatorId, baseVersion, grid, actor) => {
-      const allowed = await asOwner(creatorId, actor, () => Promise.resolve(true));
-      if (allowed === null) return null;
-      return withAdmin(adminDb, async (tx) => {
+    save: (creatorId, baseVersion, grid, actor) =>
+      asOwner(creatorId, actor, async (tx) => {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${`custom_price_grids:${creatorId}`}, 0))`,
         );
@@ -118,7 +117,6 @@ export function createDrizzleCustomPriceGridStore(db: Database, adminDb: Databas
           },
         });
         return { kind: 'saved', view: viewOf(creatorId, row) };
-      });
-    },
+      }),
   };
 }

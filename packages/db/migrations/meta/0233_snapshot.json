@@ -18372,6 +18372,13 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"custom_price_grids\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"custom_price_grids\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
         }
       },
       "checkConstraints": {

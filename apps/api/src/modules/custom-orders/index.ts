@@ -15,11 +15,10 @@ export interface CustomOrdersDeps {
   /** Application role: the owner reads her grid under her RLS. */
   readonly db: Database;
   /** Service role: the table has no write policy, a save goes through it after the owner's check. */
-  readonly adminDb: Database;
   readonly requireRole: RequireRole;
 }
 
 export function createCustomOrdersModule(deps: CustomOrdersDeps): CustomOrdersModule {
-  const store = createDrizzleCustomPriceGridStore(deps.db, deps.adminDb);
+  const store = createDrizzleCustomPriceGridStore(deps.db);
   return { name: 'custom-orders', routes: createCustomPriceRoutes(store, deps.requireRole) };
 }

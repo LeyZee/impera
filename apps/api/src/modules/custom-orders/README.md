@@ -23,6 +23,6 @@ Un prix par format (fixe, ou à la minute avec un minimum pour un appel ou une v
 
 ## Règles tenues par le code
 
-- Écriture par `withAdmin` seul, après le contrôle du propriétaire lu en base, sous un verrou par créatrice.
+- Écriture dans la même transaction `withTenantMember` que le contrôle du propriétaire lu en base (politique `owner_insert`), sous un verrou par créatrice ; le rôle de service ne fait que lire.
 - L'audit (`custom_price_grid.save`) note la version, le nombre de formats proposés et de suppléments, jamais un prix : les prix sont une méthode de l'agence.
 - Aucun prix réel dans le dépôt, les tests ni les fixtures (ADR 0010) : le propriétaire saisit tout dans le CRM.

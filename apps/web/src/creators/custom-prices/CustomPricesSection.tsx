@@ -1,18 +1,16 @@
 import {
   CUSTOM_SUPPLEMENTS_MAX,
   isPerMinute,
-  quoteCustomOrder,
   type CreatorId,
   type CustomFormat,
-  type CustomPriceGrid,
   type CustomPriceGridView,
-  type CustomQuoteLine,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type JSX } from 'react';
 
 import { SaveBar, useOnScreen } from '../SaveBar';
 
+import { Calculator } from './Calculator';
 import {
   CUSTOM_PRICES_ERRORS,
   customPricesErrorKind,
@@ -24,13 +22,9 @@ import {
 import {
   changesBetween,
   draftOf,
-  euros,
   FORMAT_HINTS,
   FORMAT_LABELS,
-  lineName,
-  minutesOf,
   newSupplement,
-  quoteSentence,
   readDraft,
   savedLine,
   type DraftProblems,
@@ -38,6 +32,7 @@ import {
   type GridDraft,
   type SupplementDraft,
 } from './model';
+import { Card, Offered, UnitInput } from './parts';
 import './custom-prices.css';
 
 import { SignInAgain } from '@/settings/services/PasswordPrompt';
@@ -326,105 +321,6 @@ function GridSheet({
   );
 }
 
-function Card({ title, lead, children }: { title: string; lead: string; children: ReactNode }): JSX.Element {
-  const id = useId();
-  return (
-    <div className="nv-plate ps-panel smp-card" role="group" aria-labelledby={id}>
-      <div className="smp-card__head">
-        <h3 className="nv-h2 smp-card__title" id={id}>
-          {title}
-        </h3>
-        <p className="ps-muted">{lead}</p>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/** A number typed in a field with its unit inside, at its end (€, €/min, %, min). */
-function UnitInput({
-  label,
-  value,
-  unit,
-  problem,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  problem: string | undefined;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}): JSX.Element {
-  const id = useId();
-  return (
-    <div className="smp-unit">
-      <label className="smp-unit__label" htmlFor={id}>
-        {label}
-      </label>
-      <div className="smp-unit__box">
-        <input
-          id={id}
-          className="nv-glass nv-field__control ps-input smp-unit__input"
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder="—"
-          value={value}
-          disabled={disabled}
-          aria-invalid={problem !== undefined}
-          aria-describedby={problem === undefined ? undefined : `${id}-error`}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        />
-        <span className="smp-unit__sign" aria-hidden="true">
-          {unit}
-        </span>
-      </div>
-      {problem === undefined ? null : (
-        <p className="ps-error smp-unit__error" id={`${id}-error`}>
-          {problem}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** « Elle le fait » : the design system's switch, never a bare checkbox. */
-function Offered({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled: boolean;
-  onChange: (checked: boolean) => void;
-}): JSX.Element {
-  const id = useId();
-  return (
-    <div className="smp-offered">
-      <input
-        id={id}
-        type="checkbox"
-        role="switch"
-        className="nv-switch"
-        checked={checked}
-        disabled={disabled}
-        aria-label={`${label} : elle le fait`}
-        onChange={(event) => {
-          onChange(event.target.checked);
-        }}
-      />
-      <label htmlFor={id} className="smp-offered__text" aria-hidden="true">
-        {checked ? 'Elle le fait' : 'Jamais'}
-      </label>
-    </div>
-  );
-}
-
 function FormatRow({
   line,
   problems,
@@ -541,11 +437,16 @@ function SupplementRow({
           value={line.label}
           disabled={disabled}
           aria-invalid={nameProblem !== undefined}
+          aria-describedby={nameProblem === undefined ? undefined : `${nameId}-error`}
           onChange={(event) => {
             onChange({ label: event.target.value });
           }}
         />
-        {nameProblem === undefined ? null : <p className="ps-error">{nameProblem}</p>}
+        {nameProblem === undefined ? null : (
+          <p className="ps-error" id={`${nameId}-error`}>
+            {nameProblem}
+          </p>
+        )}
       </div>
       {line.offered ? (
         <UnitInput
@@ -579,124 +480,5 @@ function SupplementRow({
         Retirer
       </button>
     </li>
-  );
-}
-
-/** A line of the sum, as she will read it: « Vidéo pour lui 100 € », « <supplement> +50 % 50 € ». */
-function lineText(grid: CustomPriceGrid, line: CustomQuoteLine): { name: string; amount: string } {
-  if (line.kind === 'format')
-    return {
-      name:
-        line.minutes === undefined
-          ? FORMAT_LABELS[line.format]
-          : `${FORMAT_LABELS[line.format]}, ${String(line.minutes)} min`,
-      amount: euros(line.amountMinor),
-    };
-  if (line.kind === 'extra_minutes')
-    return { name: `${String(line.minutes)} min en plus`, amount: `+${euros(line.amountMinor)}` };
-  return {
-    name: `${lineName(grid, line.id)} +${String(line.percent)} %`,
-    amount: `+${euros(line.amountMinor)}`,
-  };
-}
-
-/** Try the grid: a format, supplements, minutes when they count; the price the same sum as the server's. */
-function Calculator({ grid, stale }: { grid: CustomPriceGrid; stale: boolean }): JSX.Element {
-  const id = useId();
-  const [format, setFormat] = useState<CustomFormat>('video');
-  const [picked, setPicked] = useState<readonly string[]>([]);
-  const [minutesText, setMinutesText] = useState('');
-  const minutes = minutesOf(minutesText);
-  const minutesCount = isPerMinute(format) || format === 'video';
-  const ask = {
-    format,
-    supplements: picked.filter((one) => grid.supplements.some((line) => line.id === one)),
-    ...(minutesCount && typeof minutes === 'number' ? { minutes } : {}),
-  };
-  const quote = quoteCustomOrder(grid, ask);
-  return (
-    <Card
-      title="Calculateur"
-      lead="Essaie ta grille : choisis un format et des suppléments, le prix s’affiche tel que le code le calculera."
-    >
-      {stale ? (
-        <p className="ps-muted" role="status">
-          Une ligne à corriger : le calcul lit la grille enregistrée.
-        </p>
-      ) : null}
-      <div className="smp-calc">
-        <div className="smp-calc__inputs">
-          <p className="nv-eyebrow" id={`${id}-format`}>
-            Format
-          </p>
-          <div className="ps-chips" role="radiogroup" aria-labelledby={`${id}-format`}>
-            {grid.formats.map((line) => (
-              <button
-                key={line.format}
-                type="button"
-                role="radio"
-                className="nv-chip"
-                aria-checked={format === line.format}
-                onClick={() => {
-                  setFormat(line.format);
-                }}
-              >
-                {FORMAT_LABELS[line.format]}
-              </button>
-            ))}
-          </div>
-          <p className="nv-eyebrow" id={`${id}-supplements`}>
-            Suppléments
-          </p>
-          <div className="ps-chips" role="group" aria-labelledby={`${id}-supplements`}>
-            {grid.supplements.map((line) => (
-              <button
-                key={line.id}
-                type="button"
-                className="nv-chip"
-                aria-pressed={picked.includes(line.id)}
-                onClick={() => {
-                  setPicked((current) =>
-                    current.includes(line.id)
-                      ? current.filter((one) => one !== line.id)
-                      : [...current, line.id],
-                  );
-                }}
-              >
-                {line.label}
-              </button>
-            ))}
-          </div>
-          {minutesCount ? (
-            <UnitInput
-              label={format === 'video' ? 'Durée de la vidéo' : 'Durée'}
-              value={minutesText}
-              unit="min"
-              problem={minutes === 'invalid' ? 'De 1 à 240 minutes.' : undefined}
-              disabled={false}
-              onChange={setMinutesText}
-            />
-          ) : null}
-        </div>
-        <div className="nv-glass smp-calc__result" aria-live="polite" data-kind={quote.kind}>
-          <p className="nv-eyebrow">Prix proposé</p>
-          <p className="smp-calc__total">{quote.kind === 'price' ? euros(quote.totalMinor) : '—'}</p>
-          <p className="ps-muted">{quoteSentence(grid, quote)}</p>
-          {quote.kind === 'price' ? (
-            <ul className="smp-calc__lines">
-              {quote.lines.map((line, index) => {
-                const shown = lineText(grid, line);
-                return (
-                  <li key={index} className="smp-calc__line">
-                    <span>{shown.name}</span>
-                    <span className="smp-calc__amount">{shown.amount}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-        </div>
-      </div>
-    </Card>
   );
 }

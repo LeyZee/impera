@@ -17,11 +17,11 @@ async function failure(promise: Promise<unknown>): Promise<string> {
 }
 
 /**
- * Her grid of custom prices (ADR 0159 § C): the owner's alone. The server writes it as the service role; the owner
- * reads the creator at hand; a manager, a chatter and her own account read nothing; nobody writes it as the
- * application role. Invented people and creators, and no price: the grid stored here is an empty object (ADR 0010).
+ * Her grid of custom prices (ADR 0159 § C): the owner's alone. The owner reads and adds a version for the creator at
+ * hand, under her RLS; a manager, a chatter and her own account read and write nothing; the service role only reads.
+ * Invented people and creators, and no price: the grid stored here is an empty object (ADR 0010).
  */
-describe('her custom price grid (ADR 0159): the owner reads, the server writes', () => {
+describe('her custom price grid (ADR 0159): the owner reads and writes, nobody else', () => {
   let test: TestDb;
   const owner = newId(UserIdSchema);
   const manager = newId(UserIdSchema);
@@ -72,8 +72,8 @@ describe('her custom price grid (ADR 0159): the owner reads, the server writes',
         creatorIds: [nora],
       });
     });
-    // The server's write: the service role, as the module does after the owner's check.
-    await withAdmin(test.service.db, (tx) =>
+    // Seeded by the superuser, outside every policy.
+    await withAdmin(test.admin.db, (tx) =>
       tx.insert(s.customPriceGrids).values([
         { creatorId: nora, version: 1, grid: {}, createdBy: owner },
         { creatorId: ines, version: 1, grid: {}, createdBy: owner },
@@ -99,6 +99,13 @@ describe('her custom price grid (ADR 0159): the owner reads, the server writes',
     expect(await versionsSeen(nora, chatter)).toEqual([]);
   });
 
+  const insertAs = (creatorId: string, userId: string, version: number) =>
+    failure(
+      withTenantMember(test.app.db, creatorId, userId, (tx) =>
+        tx.insert(s.customPriceGrids).values({ creatorId: nora, version, grid: {}, createdBy: userId }),
+      ),
+    );
+
   it('her own account reads nothing and writes nothing', async () => {
     expect(
       await withCreatorAccount(test.app.db, noraUser, (tx) => tx.select().from(s.customPriceGrids)),
@@ -109,14 +116,34 @@ describe('her custom price grid (ADR 0159): the owner reads, the server writes',
           tx.insert(s.customPriceGrids).values({ creatorId: nora, version: 2, grid: {} }),
         ),
       ),
-    ).toMatch(/permission denied/u);
+    ).toMatch(/row-level security/u);
   });
 
-  it('the application role never writes it, even for the owner', async () => {
+  it('a manager and a chatter write nothing, nor the owner for another creator than the one at hand', async () => {
+    expect(await insertAs(nora, manager, 2)).toMatch(/row-level security/u);
+    expect(await insertAs(nora, chatter, 2)).toMatch(/row-level security/u);
+    expect(await insertAs(ines, owner, 2)).toMatch(/row-level security/u);
+  });
+
+  it('the owner adds a version for the creator at hand, and never changes nor deletes one', async () => {
+    expect(await insertAs(nora, owner, 2)).toBe('no error');
     expect(
       await failure(
         withTenantMember(test.app.db, nora, owner, (tx) =>
-          tx.insert(s.customPriceGrids).values({ creatorId: nora, version: 2, grid: {} }),
+          tx.update(s.customPriceGrids).set({ grid: { changed: true } }),
+        ),
+      ),
+    ).toMatch(/permission denied/u);
+    expect(
+      await failure(withTenantMember(test.app.db, nora, owner, (tx) => tx.delete(s.customPriceGrids))),
+    ).toMatch(/permission denied/u);
+  });
+
+  it('the service role only reads it', async () => {
+    expect(
+      await failure(
+        withAdmin(test.service.db, (tx) =>
+          tx.insert(s.customPriceGrids).values({ creatorId: nora, version: 9, grid: {} }),
         ),
       ),
     ).toMatch(/permission denied/u);
@@ -125,7 +152,7 @@ describe('her custom price grid (ADR 0159): the owner reads, the server writes',
   it('refuses a version under 1, a grid that is not an object, and a version saved twice', async () => {
     const insert = (version: number, grid: unknown) =>
       failure(
-        withAdmin(test.service.db, (tx) =>
+        withAdmin(test.admin.db, (tx) =>
           tx.insert(s.customPriceGrids).values({ creatorId: nora, version, grid }),
         ),
       );

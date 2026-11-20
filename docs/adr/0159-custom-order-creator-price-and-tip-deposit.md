@@ -90,7 +90,7 @@ Jusque-là, l'ADR 0090 s'applique telle quelle : aucune commande ne se perd, ell
 
 - L'IA vend du sur-mesure, mais seulement au prix dit par un humain, après un oui de la créatrice. Le code la retient à chaque étape.
 - Migration additive : états et événements de commande, rôles `custom` et `gift`, rattachement d'un média à un fan. RLS forcée, `GRANT SELECT TO impera_service`.
-- Grille (lot fait le 20/11) : table versionnée `custom_price_grids` (migration 0233, lecture propriétaire seul, écriture par le rôle de service), module `custom-orders` (`GET`/`PUT /v1/creators/:creatorId/custom-prices`), calcul pur `quoteCustomOrder` dans les contrats, écran « Sur mesure » avec calculateur.
+- Grille (lot fait le 20/11) : table versionnée `custom_price_grids` (migration 0233, lecture et ajout d’une version par le propriétaire seul, sous la RLS de la créatrice ; le rôle de service ne fait que lire), module `custom-orders` (`GET`/`PUT /v1/creators/:creatorId/custom-prices`), calcul pur `quoteCustomOrder` dans les contrats, écran « Sur mesure » avec calculateur.
 - Glossaire : « Acompte », « Dossier Perso », « Cadeau », « Relais de preuve », « Grille sur mesure », « Supplément ».
 - Évals : demande avec oui, avec non, sans réponse ; pourboire juste, trop bas, spontané ; demande de pourboire hors commande ; vidéo perso proposée à un autre fan (refusée) ; type et niveau lus pour chaque type ; appel payé puis passé à un humain, sans nom de compte ni heure dans sa réponse ; cadeau trop tôt ; preuve demandée deux fois.
 - Dépend de : l'agent voit les achats et les pourboires (une vente ou un pourboire rattaché au fan réveille déjà la conversation ; la mise à jour d'un média déjà lu devenu payé est en cours au fil Agent) ; la garde d'écriture ouverte pour le compte.

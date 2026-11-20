@@ -8,8 +8,8 @@ import { creators } from './tenancy';
 /*
  * Her grid of custom prices (ADR 0159 § C): one row per save, never changed, the latest version is the grid in force.
  * The owner's alone: he reads it under her RLS with the owner's scope; a manager, a chatter and her own account read
- * nothing. Written by the server alone (service role, after the role check): no write policy. The grid's shape is the
- * contract's (`CustomPriceGridSchema`), parsed on the way in and on the way out.
+ * nothing. Written by the owner alone, under her RLS too (`owner_insert`), never changed nor deleted. The grid's shape
+ * is the contract's (`CustomPriceGridSchema`), parsed on the way in and on the way out.
  */
 
 const currentCreator: SQL = sql`nullif(current_setting('app.creator_id', true), '')::uuid`;
@@ -34,6 +34,10 @@ export const customPriceGrids = pgTable(
     pgPolicy('owner_read', {
       for: 'select',
       using: sql`${currentScope} = 'owner' and ${t.creatorId} = ${currentCreator}`,
+    }),
+    pgPolicy('owner_insert', {
+      for: 'insert',
+      withCheck: sql`${currentScope} = 'owner' and ${t.creatorId} = ${currentCreator}`,
     }),
   ],
 );
