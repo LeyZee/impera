@@ -69,6 +69,7 @@ function script(ref: string, steps: readonly HerStep[], over: Partial<HerScript>
     warnings: [],
     gaps: [],
     proposable: true,
+    ours: null,
     identity: {
       id: newId(ScriptIdentityIdSchema),
       inputHash: 'hash',
