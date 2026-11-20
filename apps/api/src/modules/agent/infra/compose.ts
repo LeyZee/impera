@@ -62,6 +62,7 @@ import {
   type OfferBlock,
   type OfferContext,
 } from '../domain/policy';
+import { refusalMove, type RefusalMove } from '../domain/refusal';
 import {
   paidWaiting,
   permittedScripts,
@@ -354,6 +355,25 @@ function followUpBrief(followUp: FollowUpTurn): Brief {
     replyBrief: `Il ne lui a rien répondu depuis ${String(hours)} h. Elle lui écrit un petit message léger qui rebondit sur ce dont ils parlaient ou prend de ses nouvelles, sans reproche, sans rien proposer de payant, sans parler de prix.${spirit}`,
     toneHints: [NO_OPENING_HINT, 'court, une seule bulle'],
   };
+}
+
+/**
+ * Her move after he refused a paid step (ADR 0156 § 3), decided by code: never a price nor a new offer, never a
+ * reproach. The sulk is playful, the méthode's and Charles's (16/11): what she feels, never his fault.
+ */
+const REFUSAL_HINTS: Readonly<Record<RefusalMove, string>> = {
+  ask_why:
+    'il vient de dire non à ce qu’elle lui proposait : elle le prend bien, sans reproche, et lui demande avec curiosité ce qui ne lui a pas plu, sans prix ni nouvelle proposition',
+  insist:
+    'elle insiste un tout petit peu, une seule fois, avec légèreté, en rebondissant sur ce qu’il a dit, sans prix, sans pression ni reproche',
+  sulk: 'elle boude un peu pour jouer, une bulle courte, un brin vexée, jamais de reproche ni de culpabilisation, puis elle passe à autre chose',
+};
+
+/** Her answers since the run ended: which move of the refusal comes next. */
+function herAnswersSince(history: readonly ConversationTurn[], since: Date | null): number {
+  if (since === null) return 0;
+  return history.filter((turn) => turn.from === 'creator' && turn.at !== undefined && turn.at >= since)
+    .length;
 }
 
 /** What the voice writes when she waited for him once and he has not written since (P3-11), set by code. */
@@ -786,6 +806,26 @@ export async function composeTurn(
           ),
         )
       : [];
+  // He just said no to her paid step: she asks why, insists once, sulks once at most, then lets go (ADR 0156 § 3).
+  const refusal =
+    care ||
+    scripts === undefined ||
+    input.offer === undefined ||
+    scriptStep !== undefined ||
+    customOrder !== undefined ||
+    objectionReply !== undefined ||
+    trap.replyBrief !== undefined ||
+    sexualization?.kind === 'steer_back'
+      ? null
+      : scripts.decision.kind === 'after_refusal'
+        ? 'ask_why'
+        : refusalMove({
+            now: input.situation.now,
+            run: input.scripts?.latest ?? null,
+            herAnswersSince: herAnswersSince(input.history, input.scripts?.latest?.endedAt ?? null),
+            flags: input.offer.flags,
+            care,
+          });
   // He comes back after the session cooled, her paid step unopened: one light reminder, never a sale (ADR 0156 § 1).
   const reminds =
     !care &&
@@ -799,7 +839,12 @@ export async function composeTurn(
     ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
     : {
         ...answered,
-        toneHints: [...answered.toneHints, ...paced, ...(reminds ? [UNOPENED_STEP_HINT] : [])],
+        toneHints: [
+          ...answered.toneHints,
+          ...paced,
+          ...(reminds ? [UNOPENED_STEP_HINT] : []),
+          ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
+        ],
       };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined

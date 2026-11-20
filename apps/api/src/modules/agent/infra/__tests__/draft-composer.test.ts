@@ -2356,6 +2356,10 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       { type: 'script_step_refused', stepIndex: 0 },
       { type: 'script_ended' },
     ]);
+    // Her first answer after his no asks what did not please him (ADR 0156 § 3).
+    expect(
+      seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('ce qui ne lui a pas plu')),
+    ).toBe(true);
 
     const handoff = composer(
       { brief: { ...refused, action: 'handoff' } },
@@ -2366,6 +2370,56 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     const held = await handoff.draftComposer.compose({ ...INPUT, scriptRun: waiting });
     expect(held.kind).toBe('held');
     expect(held.scriptRun?.moved?.run.status).toBe('refused');
+  });
+
+  it('insists once after his no, then sulks once, then lets go; never with a fragile fan (ADR 0156 § 3)', async () => {
+    const refused: Brief = { ...BRIEF, scriptReply: 'refused' };
+    const first = await composer(
+      { brief: refused },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    ).draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    const run = first.scriptRun?.moved?.run;
+    if (run === undefined) throw new Error('no refused run');
+    const answers = (count: number): AgentComposeInput => ({
+      ...INPUT,
+      now: new Date(INPUT.now.getTime() + (count + 1) * 120_000),
+      scriptRun: run,
+      history: [
+        ...INPUT.history,
+        ...Array.from({ length: count }, (_, i) => [
+          {
+            direction: 'outbound' as const,
+            text: 'Ah bon ?',
+            at: new Date(INPUT.now.getTime() + (i * 2 + 1) * 60_000),
+          },
+          {
+            direction: 'inbound' as const,
+            text: 'Bof',
+            at: new Date(INPUT.now.getTime() + (i * 2 + 2) * 60_000),
+          },
+        ]).flat(),
+      ],
+    });
+    const hintsAfter = async (count: number, flags: FanFlags) => {
+      const { draftComposer, seen } = composer(
+        { brief: BRIEF },
+        undefined,
+        limitsOf(flags).limits,
+        deps(sent),
+      );
+      await draftComposer.compose(answers(count));
+      return seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    };
+    expect((await hintsAfter(1, ADULT)).some((hint) => hint.includes('insiste un tout petit peu'))).toBe(
+      true,
+    );
+    expect((await hintsAfter(2, ADULT)).some((hint) => hint.includes('boude un peu'))).toBe(true);
+    const after = await hintsAfter(3, ADULT);
+    expect(after.some((hint) => hint.includes('insiste') || hint.includes('boude'))).toBe(false);
+    const fragile = await hintsAfter(1, { ...ADULT, fragile: true });
+    expect(fragile.some((hint) => hint.includes('insiste'))).toBe(false);
   });
 
   it('pauses the step he left unopened when he comes back cold, and teases him once (ADR 0156 § 1)', async () => {
