@@ -1437,6 +1437,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Apart from the line under « Fan fictif » as two bubbles are apart. */
+  margin-top: var(--nv-space-2);
   padding: 10px 14px;
   border-radius: 16px;
   background: linear-gradient(150deg, var(--nv-glass-fill-strong), var(--nv-glass-fill));
@@ -1461,16 +1463,25 @@
 .pg-script__s.is-bought_out {
   color: var(--nv-success);
 }
+/* The path from edge to edge: the first dot under the title, the last under the state. */
 .pg-script__path {
+  position: relative;
   display: flex;
-  gap: 4px;
+  justify-content: space-between;
   margin: 0;
   padding: 0;
   list-style: none;
 }
+.pg-script__path::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 7px;
+  right: 7px;
+  height: 2px;
+  background: var(--nv-hairline);
+}
 .pg-script__step {
-  position: relative;
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1478,31 +1489,39 @@
   font-size: 11px;
   color: var(--nv-ink-faint);
 }
-/* The path between two steps: a line from one dot to the next. */
-.pg-script__step + .pg-script__step::before {
-  content: '';
-  position: absolute;
-  top: 5px;
-  right: 50%;
-  width: 100%;
-  height: 2px;
-  background: var(--nv-hairline);
+.pg-script__step:first-child {
+  align-items: flex-start;
+}
+.pg-script__step:last-child {
+  align-items: flex-end;
 }
 .pg-script__dot {
   position: relative;
   z-index: 1;
-  width: 12px;
-  height: 12px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--nv-glass-fill-strong);
   box-shadow: inset 0 0 0 2px var(--nv-hairline);
 }
-.pg-script__step.is-sent .pg-script__dot {
-  box-shadow: inset 0 0 0 2px var(--nv-sale);
+.pg-script__dot svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: var(--nv-on-neon);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .pg-script__step.is-done .pg-script__dot {
   background: var(--nv-ink-muted);
   box-shadow: none;
+}
+.pg-script__step.is-sent .pg-script__dot {
+  background: var(--nv-sale);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--nv-sale) 55%, transparent);
 }
 .pg-script__step.is-bought .pg-script__dot {
   background: var(--nv-success);

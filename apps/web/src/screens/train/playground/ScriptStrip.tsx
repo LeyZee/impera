@@ -28,6 +28,16 @@ const stepTone = (step: Step): string =>
           ? 'is-sent'
           : 'is-done';
 
+/** The word under a step: its kind or its price, and its state once he decided (« 12 € · achetée »). */
+const stepWord = (step: Step): string => {
+  const what = step.priceCents === null ? KIND_LABELS[step.kind] : money(step.priceCents);
+  return step.outcome === 'bought'
+    ? `${what} · achetée`
+    : step.outcome === 'refused'
+      ? `${what} · refusée`
+      : what;
+};
+
 const stepTitle = (step: Step, index: number): string => {
   const what = `${String(index + 1)}. ${KIND_LABELS[step.kind]}${
     step.priceCents === null ? '' : ` · ${money(step.priceCents)}`
@@ -64,10 +74,22 @@ export function ScriptStrip({
       </p>
       <ol className="pg-script__path">
         {run.steps.map((step, index) => (
-          <li key={index} className={`pg-script__step ${stepTone(step)}`} title={stepTitle(step, index)}>
-            <span className="pg-script__dot" aria-hidden="true" />
-            <span className="pg-script__l">
-              {step.priceCents === null ? KIND_LABELS[step.kind] : money(step.priceCents)}
+          // Each step says its state in words, never by its colour alone (avis Design, 20/11).
+          <li
+            key={index}
+            className={`pg-script__step ${stepTone(step)}`}
+            title={stepTitle(step, index)}
+            aria-label={stepTitle(step, index)}
+          >
+            <span className="pg-script__dot" aria-hidden="true">
+              {step.outcome === 'bought' ? (
+                <svg viewBox="0 0 12 12" focusable="false">
+                  <path d="M3 6.2 5.1 8.3 9 4" />
+                </svg>
+              ) : null}
+            </span>
+            <span className="pg-script__l" aria-hidden="true">
+              {stepWord(step)}
             </span>
           </li>
         ))}
