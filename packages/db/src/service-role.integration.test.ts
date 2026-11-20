@@ -60,6 +60,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   script_identities: ['insert'],
   platform_script_steps: ['insert', 'delete'],
   platform_scripts: ['insert', 'update'],
+  // The import marks a script in preparation it recognised (ADR 0112 § 23): never creates nor deletes one.
+  prepared_scripts: ['update'],
   provider_credentials: ['insert', 'update', 'delete'],
   push_server_keys: ['insert'],
   push_subscriptions: ['insert', 'update'],

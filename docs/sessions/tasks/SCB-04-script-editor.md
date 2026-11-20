@@ -1,0 +1,24 @@
+# SCB-04 Éditeur des scripts à branches
+Statut : in_progress (lot 1 serveur, 19/11/2026)
+Phase : scripts (ADR 0112, amendement du 19/11, §§ 20-26)
+Dépend de : SCB-01 (#814), onglet Scripts de la fiche créatrice (ADR 0149) pour l'écran
+Branche : claude/project-thread-moagsx
+
+## Objectif
+L'agence écrit un script à branches dans Impera, voit ce qui lui manque, le rend « prêt à copier », le recopie à la main dans Reveal ; l'import suivant le reconnaît et lui transfère conditions, messages et rythme. Une vue Performances dit ce que chaque script rapporte.
+
+## Contexte à lire
+ADR 0112 (§§ 13, 14, 20-26), ADR 0145 (coffre), ADR 0149 (fiche créatrice), module `scripts` (README), fiche SCB-01.
+
+## À faire
+- [x] Lot 1 serveur : table `prepared_scripts` (migration 0229, RLS forcée, fermée au compte de la créatrice), manques et refus comptés à chaque lecture, avertissements de prix, états `editing` → `ready_to_copy` → `matched`, routes `…/prepared-scripts` (création idempotente, enregistrement sur révision, prêt à copier sans manque), journal d'audit.
+- [ ] Lot 2 : reconnaissance à l'import (correspondance exacte nom, étapes, branches par rang, médias, prix), transfert des réglages, `scriptRef` reçu, script fermé.
+- [ ] Lot 3 : écran (onglet Scripts, vues « À copier dans Reveal » et « Structures », éditeur), après l'ADR 0149 sur `main`.
+- [ ] Lot 4 : vue Performances (lecture serveur puis écran).
+
+## Critères d'acceptation
+- Domaine en unitaire ; intégration : création rejouée, conflit, compte refusé, révision périmée, manques → 422, script fermé, isolation (chatteur, compte de la créatrice, manager hors liste) ; balayages d'isolation, d'authentification et d'origine verts.
+- Aucune donnée réelle ; aucune méthode, aucun seuil d'agence dans le dépôt.
+
+## Hors périmètre
+Écriture d'un script chez Reveal (jamais), choix de la branche par l'agent (lot 2 du moteur), `script_writer`.

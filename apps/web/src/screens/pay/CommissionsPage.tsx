@@ -58,6 +58,7 @@ import {
   periodTitle,
   signedAmountText,
 } from '@/reports/model';
+import { GameGauge } from '@/rewards/GameGauge';
 import { Medal } from '@/rewards/Medal';
 import { MyRankCard } from '@/rewards/MyRankCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
@@ -315,7 +316,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                     <Loading rows={1} />
                   )
                 ) : (
-                  <Performance period={nowData} account={nowNames.account} />
+                  <Performance period={nowData} account={nowNames.account} userId={user.id} />
                 )}
               </Panel>
             ) : null}
@@ -479,9 +480,11 @@ function plainPerformance(period: PayrollPeriod): boolean {
 function Performance({
   period,
   account,
+  userId,
 }: {
   period: PayrollPeriod;
   account: (platformAccountId: string) => PlanningAccount | null;
+  userId: string;
 }): JSX.Element {
   const statement = period.statements[0];
   const net = statement?.netMinor ?? 0;
@@ -507,6 +510,8 @@ function Performance({
           statement={statement}
           account={account}
           lastDay={payPeriodLastDay(period.period)}
+          userId={userId}
+          period={period.period}
         />
       )}
       {goal === null ? null : <GoalShare goal={goal} period={period} />}
@@ -536,12 +541,17 @@ function TierLeft({
   statement,
   account,
   lastDay,
+  userId,
+  period,
 }: {
   net: number;
   tiers: readonly BonusTier[];
   statement: CommissionStatement | undefined;
   account: (platformAccountId: string) => PlanningAccount | null;
   lastDay: string;
+  /** Whose gauge it is and of which fortnight: where it last stood is kept per account, per tier. */
+  userId: string;
+  period: string;
 }): JSX.Element | null {
   const { reached, next } = tierProgress(net, tiers);
   if (next === null && reached !== null)
@@ -568,7 +578,12 @@ function TierLeft({
       <p className="py-left__title nv-num">
         Palier {next.label} : encore {amountText(left, 'EUR')} de net
       </p>
-      <Gauge value={gaugePercent(net - from, next.thresholdMinor - from)} mark={null} />
+      <GameGauge
+        userId={userId}
+        name="tier"
+        scope={`${period}:${String(next.thresholdMinor)}`}
+        percent={gaugePercent(net - from, next.thresholdMinor - from)}
+      />
       <div className="py-gaugelabels nv-num">
         <span className="py-gaugelabels__tier">
           {reached === null ? null : <TierMedalMark tiers={tiers} tier={reached} earned size={24} />}
