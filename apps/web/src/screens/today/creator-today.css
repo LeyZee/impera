@@ -1,0 +1,51 @@
+/*
+ * Her Aujourd'hui (CR-02): « À envoyer », what the agency asked her to send that is due today or late (recette
+ * visuelle 16/11, CRE-01). Two lines at most, the late day in amber, and the page's one neon to drop the first.
+ */
+.sc-send {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.sc-send__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-send__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nv-space-1) var(--nv-space-2);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.sc-send__line b {
+  font-weight: 600;
+}
+.sc-send__due {
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.sc-send__due--late {
+  color: var(--nv-warning);
+}
+.sc-send__more {
+  margin: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-send__go {
+  align-self: flex-start;
+}
+@media (max-width: 720px) {
+  .sc-send__go {
+    height: 44px;
+  }
+}

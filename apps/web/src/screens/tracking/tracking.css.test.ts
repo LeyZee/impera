@@ -17,11 +17,12 @@ describe('a conversation in a narrow list (recette 07/11, EXT-02)', () => {
     expect(narrow).toMatch(/\.tr-groups \.tr-row\.nv-convo > \.nv-convo__side \{\s*grid-column: 2;/u);
   });
 
-  it('cuts a creator’s long name before the pseudo, with « … »', () => {
+  it('sends a creator’s name that does not fit under the pseudo, whole, never cut beside it (PIL-10)', () => {
     const narrow = /@container \(max-width: 480px\) \{([\s\S]*?)\n\}/u.exec(css)?.[1] ?? '';
+    expect(narrow).toMatch(/\.tr-groups \.tr-row__name \{\s*flex-wrap: wrap;/u);
     expect(narrow).toMatch(/\.tr-groups \.tr-row__pseudo \{\s*flex: 0 0 auto;/u);
     expect(narrow).toMatch(
-      /\.tr-groups \.tr-row__creator \{[^}]*display: block;[^}]*flex: 0 1 auto;[^}]*text-overflow: ellipsis/u,
+      /\.tr-groups \.tr-row__creator \{[^}]*display: block;[^}]*flex: 0 0 auto;[^}]*max-width: 100%;/u,
     );
   });
 });

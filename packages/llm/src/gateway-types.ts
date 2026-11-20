@@ -48,6 +48,11 @@ export interface ConversationTurn {
    * shown in brackets before his block, never inside it.
    */
   readonly timeNote?: string;
+  /**
+   * What an automation of the platform wrote, or what his message answers (ADR 0110), written by code: on his turn,
+   * shown in brackets before his block; on hers, read into « le moment » by the agent, never shown in her turn.
+   */
+  readonly originNote?: string;
 }
 
 export interface VideoFrame {

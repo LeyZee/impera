@@ -72,6 +72,12 @@ const CRON_JOBS: readonly CronJob[] = [
   // whether it is morning somewhere; the purge drops the deliveries past their retention.
   // The minute's scan is a safety net: one try, the next minute is its retry (the trigger's own scan keeps the
   // contract's 25).
+  // The alerts of each creator's tab (ADR 0150 lot 2): each minute re-reads the last half hour, an event rings once.
+  {
+    task: 'alerts.route',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['alerts.route'] },
+  },
   {
     task: 'telegram.scan',
     match: '* * * * *',
@@ -124,13 +130,6 @@ const CRON_JOBS: readonly CronJob[] = [
     task: 'content_drops.thumbnail_backlog',
     match: '50 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['content_drops.thumbnail_backlog'] },
-  },
-  // Her platform's vault (ADR 0113 § 5): the accounts whose media still wait for a description get their run again,
-  // one put off by a spent budget keeping its time. No backfill: the next run finds them.
-  {
-    task: 'media.describe_vault_backlog',
-    match: '55 * * * *',
-    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['media.describe_vault_backlog'] },
   },
   // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
   // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.

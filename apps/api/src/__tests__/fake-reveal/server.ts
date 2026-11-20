@@ -1081,6 +1081,23 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
 
   /* ------------------------------------------------ Model and scripts ------------------------------------------- */
 
+  // The openers Reveal offers a new fan (ADR 0110), their kinds in Reveal's order; automatic reply off.
+  app.get('/models/:id/say-hello', (request) => {
+    world.checkModel(IdParams.parse(request.params).id);
+    const hooks = world.state.model.hooks ?? [];
+    const kinds = ['flirt', 'friendly', 'personal'];
+    return out('models.sayHello', {
+      enabled: hooks.length > 0,
+      autoReplyEnabled: false,
+      autoReplyDelaySeconds: null,
+      openers: hooks.map((fanText, index) => ({
+        kind: kinds[index % kinds.length] ?? 'personal',
+        fanText,
+        replyText: null,
+      })),
+    });
+  });
+
   app.get('/models/:id', (request) => {
     world.checkModel(IdParams.parse(request.params).id);
     const model = world.state.model;
@@ -1094,7 +1111,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
       displayName: model.displayName,
       description: 'Description de test',
       commission: AGENCY_PERCENTAGE,
-      welcomeMessage: 'Bienvenue de test',
+      welcomeMessage: model.welcomeMessage ?? 'Bienvenue de test',
       welcomeMessageDelaySeconds: 0,
       welcomeSkipIfFanWritesFirst: true,
       agencyId: 'agency_test',
@@ -1118,7 +1135,7 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
       inboxCount: 1,
       selectedInboxes: [],
       creatorNote: model.creatorNote,
-      expirationReminderMessage: 'Rappel de test',
+      expirationReminderMessage: model.expirationReminderMessage ?? 'Rappel de test',
       expirationReminderDaysBefore: 2,
     });
   });

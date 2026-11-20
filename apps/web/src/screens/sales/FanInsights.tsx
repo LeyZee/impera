@@ -292,15 +292,18 @@ function SpendingCard({
             </span>
           </div>
           <div className="fi-basket">
-            <span className="fi-basket__label">Panier moyen sur 30 jours</span>
+            {/* One line of notice, not three: what the basket is and how it is counted (recette visuelle 16/11, CRE-19). */}
+            <span className="fi-basket__label">Panier moyen d’un fan qui a payé, sur 30 jours</span>
             {spending.averageBasketMinor === null ? (
               <span className="fi-basket__none">Pas encore assez de fans payants pour le dire.</span>
             ) : (
-              <b className="fi-basket__value">
-                <Count value={spending.averageBasketMinor} format={euros} />
-              </b>
+              <>
+                <b className="fi-basket__value">
+                  <Count value={spending.averageBasketMinor} format={euros} />
+                </b>
+                <span className="fi-basket__note">TVA comprise, avant parts</span>
+              </>
             )}
-            <span className="fi-basket__note">Par fan qui a payé, TVA comprise, avant parts.</span>
           </div>
         </div>
         <BarsInline cases={spending.cases} labels={TIER_LABELS} />
@@ -469,6 +472,10 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
   );
 }
 
+/** The three counts are one figure: rounded to ten, all alike, and none under the threshold. */
+const sameCounts = (fans: CreatorFanInsights['fans']): boolean =>
+  fans.total !== null && fans.newLast30Days === fans.total && fans.wroteLast7Days === fans.total;
+
 /**
  * The panel: three numbers, then a card per question that has enough fans, and for those that wait, what they wait
  * for (recette CRE-04). Under ten fans in all, one short sentence and nothing else. `silent`: the page says once that
@@ -514,11 +521,21 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
       title={<>Qui sont tes fans</>}
     >
       <PanelSection>
-        <div className="fi-stats">
-          <Stat value={data.fans.total} label="fans en tout" />
-          <Stat value={data.fans.newLast30Days} label="nouveaux sur 30 jours" />
-          <Stat value={data.fans.wroteLast7Days} label="t’ont écrit cette semaine" />
-        </div>
+        {sameCounts(data.fans) ? (
+          // Three tiles that say « ≈ 20 » three times say it once (recette visuelle 16/11, CRE-02).
+          <div className="fi-stats fi-stats--one">
+            <Stat
+              value={data.fans.total}
+              label="fans en tout, à peu près autant de nouveaux sur 30 jours et à t’avoir écrit cette semaine"
+            />
+          </div>
+        ) : (
+          <div className="fi-stats">
+            <Stat value={data.fans.total} label="fans en tout" />
+            <Stat value={data.fans.newLast30Days} label="nouveaux sur 30 jours" />
+            <Stat value={data.fans.wroteLast7Days} label="t’ont écrit cette semaine" />
+          </div>
+        )}
         <div className="fi-grid">
           {age.status === 'enough' ? (
             <RingCard

@@ -1,6 +1,5 @@
 import {
   AuditEntryIdSchema,
-  CreatorSettingsSchema,
   JOB_MAX_ATTEMPTS,
   newId,
   SCRIPT_IDENTITY_SCHEMA_VERSION,
@@ -50,14 +49,14 @@ async function enqueueIdentity(
 
 /**
  * The identity job's reads and writes (SC-04 lot c8), as the service role: out of any person, one script at a time.
- * Her switch is read in `creators.settings`, out of RLS, as the drops' descriptions read it (ADR 0083 § 9).
+ * No switch: a script is told once each of its media has a description a person validated (ADR 0145 § 5, 17/11).
  */
 export function createDrizzleScriptIdentityJobStore(adminDb: Database): ScriptIdentityJobStore {
   return {
     target: (creatorId, scriptId) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
-          .select({ script: platformScripts, settings: creators.settings })
+          .select({ script: platformScripts })
           .from(platformScripts)
           .innerJoin(creators, eq(creators.id, platformScripts.creatorId))
           .where(
@@ -87,7 +86,6 @@ export function createDrizzleScriptIdentityJobStore(adminDb: Database): ScriptId
                 .where(and(inArray(mediaDescriptions.id, ids), eq(mediaDescriptions.creatorId, creatorId)));
         return {
           script,
-          describes: CreatorSettingsSchema.parse(row.settings).describeDrops,
           descriptions: new Map(
             texts.flatMap((text) => (text.detailed === null ? [] : [[text.id, text.detailed] as const])),
           ),
@@ -127,7 +125,6 @@ export function createDrizzleScriptIdentityJobStore(adminDb: Database): ScriptId
               from platform_scripts s
               join creators c on c.id = s.creator_id
              where s.active and c.archived_at is null
-               and (c.settings->>'describeDrops')::boolean is true
              order by (select max(i.created_at) from script_identities i where i.platform_script_id = s.id)
                         asc nulls first, s.id
              limit ${SCRIPTS_PER_RUN}

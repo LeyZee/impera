@@ -7,6 +7,7 @@ import type {
   EventId,
   SystemAlertCode,
   AgentHours,
+  DatedRanges,
   ConversationDetail,
   ConversationEventView,
   ConversationHolder,
@@ -42,6 +43,7 @@ import type {
   MessageAuthor,
   MessageDirection,
   MessageId,
+  MessageOrigin,
   MessageView,
   Money,
   OutboundMedia,
@@ -93,6 +95,8 @@ interface NewMessage {
   readonly draftId: DraftId | null;
   /** The media the platform listed on it; empty for what we send. */
   readonly platformMedia: readonly ExternalMedia[];
+  /** Which automation of the platform wrote it, or a fan's reply to a story (ADR 0110); absent otherwise. */
+  readonly origin?: MessageOrigin;
 }
 
 export interface Draft {
@@ -261,6 +265,11 @@ interface EventWriter {
   /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
   /**
+   * Whether the team already knows no script is left for him (ADR 0150 § 9): a `scripts_exhausted` with no
+   * `script_started` since. The episode lives in his journal, never in memory.
+   */
+  scriptsExhaustedSaid(conversationId: ConversationId): Promise<boolean>;
+  /**
    * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
    * `takeover_started` since), and the replies of her objection bank he already received.
    */
@@ -306,9 +315,19 @@ interface KillSwitches {
    * creator does not exist (nothing to change).
    */
   lockCreator(): Promise<boolean>;
-  isOn(): Promise<{ readonly global: boolean; readonly creator: boolean }>;
-  /** Stamped by the database clock once the lock is held, so the later change is always the latest row. */
-  setCreator(entry: { active: boolean; reason: string; setBy: string }): Promise<void>;
+  /** She is archived (ADR 0071 § 2): her Arrêt is the code's, never a pause. */
+  archived(): Promise<boolean>;
+  /** `creatorUntil`: her switch is a pause that lifts itself then (ADR 0148 § 1); `null` otherwise. */
+  isOn(): Promise<{
+    readonly global: boolean;
+    readonly creator: boolean;
+    readonly creatorUntil: Date | null;
+  }>;
+  /**
+   * Stamped by the database clock once the lock is held, so the later change is always the latest row. `until` makes
+   * an Arrêt a pause: on until then, off after, without another row.
+   */
+  setCreator(entry: { active: boolean; reason: string; setBy: string; until?: Date }): Promise<void>;
 }
 
 /**
@@ -454,11 +473,17 @@ export interface GuardReadContext {
 }
 
 /**
- * Her hours (P3-14) and the clock they are read on (`creators.timezone`), implemented by `persona`: the defaults when
- * none is stored. `null` when she does not exist.
+ * Her hours (P3-14), her dated exceptions from her today on (ADR 0148 § 3) and the clock they are read on
+ * (`creators.timezone`), implemented by `persona`: the defaults when none is stored. `null` when she does not exist.
  */
 export interface ReplyHours {
-  of(creatorId: CreatorId): Promise<{ readonly hours: AgentHours; readonly timeZone: string } | null>;
+  of(creatorId: CreatorId): Promise<HerHours | null>;
+}
+
+export interface HerHours {
+  readonly hours: AgentHours;
+  readonly timeZone: string;
+  readonly exceptions: DatedRanges;
 }
 
 /** The fan as `conversations` needs it; implemented by the `fans` module. */
@@ -555,6 +580,8 @@ interface HistoryMessage {
    * alone (vision obligatoire). `kind` from the platform; locked when it sits behind a price.
    */
   readonly media: readonly HistoryMedia[];
+  /** Which automation of the platform wrote it, or a fan's reply to a story (ADR 0110); null otherwise. */
+  readonly origin: MessageOrigin | null;
 }
 
 interface FanStats {
@@ -614,6 +641,8 @@ export interface ComposeInput {
   readonly desire?: { readonly score: number; readonly at: Date };
   /** Her hours (P3-14) as stored; absent, the defaults. They set her night and when a follow-up may go out. */
   readonly hours?: AgentHours;
+  /** Her dated exceptions (ADR 0148 § 3), from her today on: a date that has one follows its ranges alone. */
+  readonly exceptions?: DatedRanges;
   /** A custom order of his already waits for the team (ADR 0090 § A). */
   readonly customOrderOpen?: boolean;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
@@ -701,6 +730,8 @@ export type ComposeResult =
       readonly alerts?: readonly ComposedAlert[];
       /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
       readonly customOrderOpened?: true;
+      /** A script would open for him and none is left: one `scripts_exhausted` per episode (ADR 0150 § 9). */
+      readonly scriptsExhausted?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;
@@ -727,6 +758,7 @@ export type ComposeResult =
       readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
       readonly customOrderOpened?: true;
+      readonly scriptsExhausted?: true;
       /** His run moved by his message and Reveal only: no step goes without a draft. */
       readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
       readonly care?: ComposedCare;

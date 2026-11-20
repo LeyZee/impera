@@ -422,11 +422,20 @@ const MONTHS = [
 const daysBetween = (today: string, day: string): number =>
   Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS);
 
-/** « Pour aujourd’hui », « Pour demain », « Pour jeudi », « Pour le 12 nov. », « En retard depuis lundi ». */
 /** « le 3 nov. », with its year when it is not this year's (recette MED-10: « le 1 janv. » said no year). */
 export function namedDay(day: string, today: string): string {
   const date = new Date(`${day}T00:00:00Z`);
   const named = `le ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
+  return day.slice(0, 4) === today.slice(0, 4) ? named : `${named} ${day.slice(0, 4)}`;
+}
+
+/** « Pour aujourd’hui », « Pour demain », « Pour jeudi », « Pour le 12 nov. », « En retard depuis dim. 8 nov. ». */
+const WEEKDAYS_SHORT = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'] as const;
+
+/** « dim. 8 nov. », with its year when it is not this year's: the day a request was due, never only its weekday. */
+function lateDay(day: string, today: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  const named = `${WEEKDAYS_SHORT[date.getUTCDay()] ?? ''} ${String(date.getUTCDate())} ${MONTHS[date.getUTCMonth()] ?? ''}`;
   return day.slice(0, 4) === today.slice(0, 4) ? named : `${named} ${day.slice(0, 4)}`;
 }
 
@@ -435,12 +444,20 @@ export function dueOf(dueOn: string, today: string): { readonly text: string; re
   const date = new Date(`${dueOn}T00:00:00Z`);
   const weekday = WEEKDAYS[date.getUTCDay()] ?? '';
   const named = namedDay(dueOn, today);
-  if (days < 0) return { text: `En retard depuis ${days >= -6 ? weekday : named}`, late: true };
+  // Late, always its date: « depuis dimanche » read on a Sunday said which one? (recette visuelle 16/11, CRE-13).
+  if (days < 0) return { text: `En retard depuis ${lateDay(dueOn, today)}`, late: true };
   if (days === 0) return { text: 'Pour aujourd’hui', late: false };
   if (days === 1) return { text: 'Pour demain', late: false };
   if (days <= 6) return { text: `Pour ${weekday}`, late: false };
   return { text: `Pour ${named}`, late: false };
 }
+
+/**
+ * What is due from her now (recette visuelle 16/11, CRE-01, CRE-13): « À tourner » cut at today, late first. Her
+ * morning page names these; Contenu lights the first one's button.
+ */
+export const dueNow = (items: readonly ToShoot[], today: string): ToShoot[] =>
+  items.filter((item) => item.request !== null && item.request.dueOn <= today);
 
 /** « Aujourd’hui », « Hier », « Lundi », « 12 nov. »: when she dropped it, in her own time. */
 export function droppedOn(createdAt: string, today: string, zone: string): string {

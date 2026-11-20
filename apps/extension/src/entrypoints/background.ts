@@ -3,6 +3,7 @@ import {
   CreatorIdSchema,
   WatchSessionIdSchema,
   type CreatorId,
+  type PlatformAccountId,
   type TrendReadingsBatch,
 } from '@impera/contracts';
 import { browser, type Browser } from 'wxt/browser';
@@ -339,6 +340,18 @@ export default defineBackground(() => {
 
   /* ---- The owner's « Sync » of a Reveal session (P2-01) ---- */
 
+  /**
+   * The model the CRM keeps for this account (`modelId`, the session's owner), asked at each reading: the tab is then
+   * read for that creator. Null before the first « Sync », or when the CRM does not answer.
+   */
+  async function crmModel(accountId: PlatformAccountId): Promise<string | null> {
+    const token = await readLink();
+    if (token === null) return null;
+    const answer = await fetchSyncableAccounts(await crmOrigin(), token).catch(() => null);
+    if (answer?.kind !== 'ok') return null;
+    return answer.value.accounts.find((account) => account.id === accountId)?.modelId ?? null;
+  }
+
   async function revealAccounts(): Promise<RevealAccounts> {
     const token = await readLink();
     if (token === null) return { state: 'none', accounts: [] };
@@ -354,6 +367,8 @@ export default defineBackground(() => {
               creatorName,
               sessionState,
               sessionUpdatedAt,
+              // The CRM does not list the end of a session yet: the card says it after a « Sync » only.
+              sessionExpiresAt: null,
             }),
           ),
         };
@@ -456,6 +471,8 @@ export default defineBackground(() => {
       }
       case 'popup/unlink':
         await forgetLink();
+        // The models of past syncs go with the link that made them (avis de Sécurité sur #841).
+        await browser.storage.local.remove(MODELS_KEY);
         return { ok: true };
       case 'popup/reveal-accounts':
         return revealAccounts();
@@ -468,12 +485,13 @@ export default defineBackground(() => {
         return readReveal(
           {
             readLink,
-            capture: () =>
-              captureSession(revealTap, message.tabId, {
+            capture: (expected) =>
+              captureSession(revealTap, message.tabId, expected, {
                 userAgent: navigator.userAgent,
                 now: () => new Date(),
               }),
-            lastModel: async (accountId) => (await revealModels())[accountId] ?? null,
+            expectedModel: async (accountId) =>
+              (await crmModel(accountId)) ?? (await revealModels())[accountId] ?? null,
           },
           held,
           message.accountId,

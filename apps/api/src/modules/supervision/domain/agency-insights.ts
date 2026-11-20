@@ -458,10 +458,14 @@ export function agencyInsights(input: {
     totals: { current: figuresOf(total.current, rate), previous: figuresOf(total.previous, rate) },
     days: daysBetween(range.from, range.to).map((day) => {
       const found = byDay.get(day);
-      if (found === undefined) return { day, revenueMinor: 0, byCreator: [], byKind: [] };
+      if (found === undefined)
+        return { day, revenueMinor: 0, agencyMinor: 0, creatorMinor: 0, byCreator: [], byKind: [] };
+      const all = figuresOf(found.all, rate);
       return {
         day,
-        revenueMinor: figuresOf(found.all, rate).revenueMinor,
+        revenueMinor: all.revenueMinor,
+        agencyMinor: all.agencyMinor,
+        creatorMinor: all.creatorMinor,
         byCreator: creators
           .map((creator) => ({
             creatorId: creator.creatorId,

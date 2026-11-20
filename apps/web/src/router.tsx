@@ -6,7 +6,7 @@ import {
   redirect,
   type RouterHistory,
 } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { useEffect, type JSX } from 'react';
 
 import { followCreator } from './agent/followed';
 import { CreatorsPage } from './creators/CreatorsPage';
@@ -36,6 +36,7 @@ import {
   periodOf,
 } from './screens/dashboard/logic';
 import { FansPage } from './screens/fans/FansPage';
+import { HerProfilePage } from './screens/me/HerProfilePage';
 import { MyCalendarLinkPage } from './screens/me/MyCalendarLinkPage';
 import { MyFilePage } from './screens/me/MyFilePage';
 import { MyLinksPage } from './screens/me/MyLinksPage';
@@ -397,13 +398,21 @@ const sales = createRoute({
 const content = createRoute({
   getParentRoute: () => rootRoute,
   path: '/contenu',
+  // `?demande=`: Aujourd'hui's « Déposer » opens the sheet on that request (recette visuelle 16/11, CRE-01).
+  validateSearch: (search: Record<string, unknown>): { readonly demande?: string } => {
+    const { demande } = search;
+    return typeof demande === 'string' && /^[0-9a-f-]{36}$/iu.test(demande) ? { demande } : {};
+  },
   component: function Content() {
     const { user } = rootRoute.useRouteContext();
     const navigate = content.useNavigate();
+    const { demande } = content.useSearch();
     return (
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+          asked={demande ?? null}
+          onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
       </>
@@ -710,20 +719,21 @@ const me = createRoute({ getParentRoute: () => rootRoute, path: '/moi' });
 const meIndex = createRoute({
   getParentRoute: () => me,
   path: '/',
-  beforeLoad: ({ context }) => {
-    // A team member's Moi opens on his profile; the file, a task of once in a while, is the next tab (CHAT-30).
+  beforeLoad: () => {
+    // Everyone's Moi opens on a short profile: a team member's file, a task of once in a while, is the next tab
+    // (CHAT-30); a creator's persona, the longest page of the app, too (recette visuelle 16/11, CRE-03).
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: context.user.role === 'creator' ? '/moi/persona' : '/moi/profil', replace: true });
+    throw redirect({ to: '/moi/profil', replace: true });
   },
 });
 /**
- * A creator's Moi holds her persona and her security (ADR 0042 § 8): a team member's screens (his file, his invoices,
- * his calendar of shifts) send her to her persona, as her persona sends anyone else to his profile.
+ * A creator's Moi holds her profile, her persona and her security (ADR 0042 § 8, CRE-03): a team member's screens (his
+ * file, his invoices, his calendar of shifts) send her to her profile, as her persona sends anyone else to his.
  */
 const creatorAway = ({ context }: { context: RouterContext }): void => {
   if (context.user.role === 'creator') {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/moi/persona', replace: true, state: { notice: NOT_YOURS } });
+    throw redirect({ to: '/moi/profil', replace: true, state: { notice: NOT_YOURS } });
   }
 };
 const mePersona = createRoute({
@@ -752,10 +762,10 @@ const meLinks = createRoute({
 const meProfile = createRoute({
   getParentRoute: () => me,
   path: '/profil',
-  beforeLoad: creatorAway,
-  component: function MyProfile() {
+  // Its return type is written: inferred from a choice on the context, it made the route tree's types circular.
+  component: function MyProfile(): JSX.Element {
     const { user } = rootRoute.useRouteContext();
-    return <MyProfilePage user={user} />;
+    return user.role === 'creator' ? <HerProfilePage user={user} /> : <MyProfilePage user={user} />;
   },
 });
 // Moi › Trophées (ADR 0108): the chatter's trophy case, or the creator's; anyone else is sent to his profile.

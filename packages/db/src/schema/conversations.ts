@@ -8,6 +8,7 @@ import {
   DraftStatusSchema,
   EVENT_TYPES,
   MessageAuthorSchema,
+  MessageOriginSchema,
   MessageDirectionSchema,
   SCRIPT_RUN_STATUSES,
   type ExternalMedia,
@@ -239,6 +240,8 @@ export const messages = pgTable(
      * engine must know a fan sent a photo even before the media module stores it (`media_ids`). Data, never a URL.
      */
     platformMedia: jsonb('platform_media').$type<ExternalMedia[]>().notNull().default([]),
+    /** Which automation of the platform wrote it, or which kind of fan message it is (ADR 0110); null otherwise. */
+    origin: enumText('origin'),
     priceMinor: integer('price_minor'),
     currency: char('currency', { length: 3 }),
     isPaid: boolean('is_paid').notNull().default(false),
@@ -249,6 +252,7 @@ export const messages = pgTable(
   (t) => [
     enumCheck('messages', t.direction, MessageDirectionSchema.options),
     enumCheck('messages', t.author, MessageAuthorSchema.options),
+    enumCheck('messages', t.origin, MessageOriginSchema.options),
     enumCheck('messages', t.currency, CurrencySchema.options),
     // A price is what a fan pays, never a credit (the connectors' contracts already refuse one below zero).
     check('messages_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),

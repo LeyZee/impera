@@ -7,12 +7,12 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useFloatingTip } from '../parts';
 
-import { AgencyInsightsPanel } from './AgencyInsights';
+import { AgencyInsightsPanel, readingOf, sparkValues } from './AgencyInsights';
 import { AGENCY_WEEK, LINA } from './fixture';
 
 const reads: string[] = [];
@@ -227,8 +227,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
       if (box === null) throw new Error(label);
       return box;
     };
-    expect(tile('Part de l’agence').textContent).toContain('40 % du net');
-    expect(tile('Part des créatrices').textContent).toContain('60 % du net');
+    expect(tile('Part de l’agence').textContent).toContain('40\u00a0% du net');
+    expect(tile('Part des créatrices').textContent).toContain('60\u00a0% du net');
     const vat = tile('TVA en plus sur les virements').textContent;
     expect(vat).toContain('118,14');
     expect(vat).toContain('estimation');
@@ -376,6 +376,32 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     });
   });
 
+  it('gives the revenue tile its tip too, to the cent against the period before (ADR 0106 § 12, PAY-16)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const label = await screen.findByText('Chiffre d’affaires', { selector: '.nv-figure__label' });
+    // On the figure, not the whole card: the curve under it keeps its own reading of a day.
+    const lead = label.closest('.nv-figure');
+    if (!(lead instanceof HTMLElement)) throw new Error('lead');
+    expect(lead.closest('.ins-lead')?.hasAttribute('tabindex')).toBe(false);
+    expect(lead.tabIndex).toBe(0);
+    fireEvent.pointerDown(lead, { pointerType: 'touch' });
+    const tipText = (): string => document.querySelector('.nv-tip.is-on')?.textContent ?? '';
+    await vi.waitFor(() => {
+      expect(tipText()).toContain('Période d’avant');
+    });
+    expect(tipText()).toContain('Montant');
+    expect(tipText()).not.toContain('Part du chiffre d’affaires');
+  });
+
+  it('names as many biggest fans as there are, never « 10 » for three (PAY-16)', async () => {
+    serve(200, { ...AGENCY_WEEK, fans: { ...AGENCY_WEEK.fans, paying: 3, topTenShare: 100 } });
+    show();
+    expect(await screen.findByText(/Les 3 fans qui dépensent le plus font/u)).toBeTruthy();
+    expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
+    expect(screen.getByRole('img', { name: '100 % fait par les 3 plus gros fans' })).toBeTruthy();
+  });
+
   it('shows nothing to an account whose scope is its own', async () => {
     serve(403, { error: 'creator_forbidden' });
     show(null, false);
@@ -499,7 +525,7 @@ describe('the days read and their comparison (ADR 0146)', () => {
     expect(screen.getByText('vs semaine précédente')).toBeTruthy();
   });
 
-  it('draws the curve with its comparison and gives both amounts of a day on hover', async () => {
+  it('draws the curve with its comparison and reads a day in the lead’s note, in place, with no floating tip', async () => {
     serve(200, AGENCY_WEEK);
     show();
     await screen.findByRole('heading', { name: /D’où vient l’argent/u });
@@ -507,28 +533,131 @@ describe('the days read and their comparison (ADR 0146)', () => {
     if (plot === null) throw new Error('curve');
     expect(plot.querySelector('.ins-curve__compared')).not.toBeNull();
     const layer = plot.querySelector('.ins-curve__hits');
-    if (layer === null) throw new Error('layer');
-    // To the far right: the last day.
+    const note = document.querySelector('.ins-lead__note');
+    if (layer === null || note === null) throw new Error('layer');
+    const [rest, read] = Array.from(note.children);
+    expect(rest?.textContent).toMatch(/\(1\s560\s€\)/u);
+    expect(rest?.getAttribute('aria-hidden')).toBe('false');
+    // To the far right: the last day, its revenue and the day compared, on the sentence's line (every media query
+    // matches here, a phone's: the day without its weekday, shortened rather than cut).
     fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
-    const bubble = await screen.findByRole('tooltip');
-    // Every media query matches here, a phone's: the compact tip, amounts and the day compared only.
-    expect(bubble.textContent).toMatch(/270\s€ · 30 oct\./u);
-    expect(bubble.textContent).not.toContain('Chiffre d’affaires');
+    expect(read?.textContent).toMatch(/^6 nov\. : 320\s€, contre 270\s€ le 30 oct\.$/u);
+    expect(read?.getAttribute('aria-hidden')).toBe('false');
+    // The sentence keeps its place, hidden: nothing moves.
+    expect(rest?.getAttribute('aria-hidden')).toBe('true');
     expect(plot.querySelector('.ins-curve__hair')).not.toBeNull();
-    // A wide screen: each amount with its label.
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn(() => ({
-        matches: false,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-      })),
+    expect(document.querySelector('.nv-tip.is-on')).toBeNull();
+    // Off the curve, the sentence comes back.
+    fireEvent.pointerLeave(layer, { pointerType: 'mouse' });
+    expect(read?.textContent).toBe('');
+    expect(rest?.getAttribute('aria-hidden')).toBe('false');
+    expect(plot.querySelector('.ins-curve__hair')).toBeNull();
+    // A finger reads the same way, and the day stays when the finger lifts, until a tap off the curve.
+    fireEvent.pointerDown(layer, { clientX: 10, clientY: 10, pointerType: 'touch' });
+    fireEvent.pointerLeave(layer, { pointerType: 'touch' });
+    expect(read?.textContent).toContain('6 nov. : 320');
+    fireEvent.pointerDown(document.body, { pointerType: 'touch' });
+    expect(read?.textContent).toBe('');
+  });
+
+  it('gives the pill the day’s change while a day is read, the period’s again after, none for a day with nothing compared', async () => {
+    // The last day falls below its day compared (320 € against 400 €) while the week rises (+18 %).
+    const previousDays = AGENCY_WEEK.previousDays.map((one, i) =>
+      i === 6 ? { ...one, revenueMinor: 40_000 } : one,
     );
-    fireEvent.pointerMove(layer, { clientX: 12, clientY: 10 });
-    await waitFor(() => {
-      expect(screen.getByRole('tooltip').textContent).toContain('Comparé, 30 oct.');
-    });
-    expect(screen.getByRole('tooltip').textContent).toContain('Chiffre d’affaires');
+    serve(200, { ...AGENCY_WEEK, previousDays });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const layer = document.querySelector('.ins-curve__hits');
+    const pill = document.querySelector('.ins-lead__pill');
+    if (layer === null || pill === null) throw new Error('pill');
+    const [period, day] = Array.from(pill.children);
+    expect(period?.textContent).toMatch(/^\+18\s%$/u);
+    expect(period?.querySelector('.nv-delta--better')).not.toBeNull();
+    expect(period?.getAttribute('aria-hidden')).toBe('false');
+    // The last day read: its own change, amber, the period's kept in place, hidden.
+    fireEvent.pointerMove(layer, { clientX: 10, clientY: 10 });
+    expect(day?.textContent).toMatch(/^−20\s%$/u);
+    expect(day?.querySelector('.nv-delta--worse')).not.toBeNull();
+    expect(day?.getAttribute('aria-hidden')).toBe('false');
+    expect(period?.getAttribute('aria-hidden')).toBe('true');
+    // Off the curve: the period's change again.
+    fireEvent.pointerLeave(layer, { pointerType: 'mouse' });
+    expect(day?.textContent).toBe('');
+    expect(period?.getAttribute('aria-hidden')).toBe('false');
+    cleanup();
+    // A day with nothing compared: no pill, its place kept (the period's, hidden).
+    serve(200, { ...AGENCY_WEEK, previousDays: AGENCY_WEEK.previousDays.slice(0, 6) });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const again = document.querySelector('.ins-curve__hits');
+    if (again === null) throw new Error('layer');
+    fireEvent.pointerMove(again, { clientX: 10, clientY: 10 });
+    const [kept, none] = Array.from(document.querySelector('.ins-lead__pill')?.children ?? []);
+    expect(none?.textContent).toBe('');
+    expect(kept?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('.ins-lead__note')?.textContent).toContain('6 nov. : 320');
+  });
+
+  it('reads a day with nothing compared as its revenue alone, and a phone’s day without its weekday', () => {
+    expect(
+      readingOf({ key: 'x', title: 'mar. 10 nov.', brief: '10 nov.', cents: 15_300, compared: null }, true),
+    ).toMatch(/^10 nov\. : 153\s€$/u);
+    expect(
+      readingOf({ key: 'x', title: 'mar. 10 nov.', brief: '10 nov.', cents: 15_300, compared: null }),
+    ).toMatch(/^mar\. 10 nov\. : 153\s€$/u);
+    expect(
+      readingOf({
+        key: 'x',
+        title: 'mar. 10 nov.',
+        brief: '10 nov.',
+        cents: 15_300,
+        compared: { title: '10 oct.', cents: 26_860 },
+      }),
+    ).toMatch(/^mar\. 10 nov\. : 153\s€, contre 268,60\s€ le 10 oct\.$/u);
+  });
+
+  it('colours the curve by the trend: green above the period compared, amber below, never red (lot couleurs)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
+    cleanup();
+    const lower = {
+      ...AGENCY_WEEK.totals,
+      current: {
+        ...AGENCY_WEEK.totals.current,
+        revenueMinor: AGENCY_WEEK.totals.previous.revenueMinor - 1_000,
+      },
+    };
+    serve(200, { ...AGENCY_WEEK, totals: lower });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--down')).toBe(true);
+    // Nothing to compare with: green, as the « n % » says nothing worse.
+    cleanup();
+    serve(200, { ...AGENCY_WEEK, totals: lower, registerSince: '2026-11-02' });
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    expect(document.querySelector('.ins-curve')?.classList.contains('ins-curve--up')).toBe(true);
+  });
+
+  it('draws one small curve, under the net, in the trend’s colour, hidden from readers (Charles 19/11)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    await screen.findByRole('heading', { name: /D’où vient l’argent/u });
+    const sparks = [...document.querySelectorAll('.ins-spark')];
+    expect(sparks.map((one) => one.getAttribute('class'))).toEqual(['ins-spark ins-spark--up']);
+    for (const one of sparks) expect(one.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws no small curve for one day read hour by hour', () => {
+    expect(sparkValues({ ...AGENCY_WEEK, to: AGENCY_WEEK.from }, (day) => day.agencyMinor)).toBeNull();
+    expect(sparkValues(AGENCY_WEEK, (day) => day.agencyMinor)).toHaveLength(7);
+    // From the register's first day, as the lead curve.
+    expect(
+      sparkValues({ ...AGENCY_WEEK, registerSince: '2026-11-02' }, (day) => day.agencyMinor),
+    ).toHaveLength(5);
   });
 
   it('shows no percentage when the register starts after the days compared, and says so (§ 4)', async () => {

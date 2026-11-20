@@ -114,6 +114,12 @@ describe('LevelInsignia (ADR 0104 § 16)', () => {
     expect(revealWordsOf({ kind: 'level:12' }, period, [])).toBeNull();
   });
 
+  it('says the threshold just passed when the case carries it', () => {
+    const period = PayPeriodSchema.parse('2026-11-01');
+    const words = revealWordsOf({ kind: 'level:3', basis: { minor: 500_000, currency: 'EUR' } }, period, []);
+    expect(words?.text.replace(/\s/gu, ' ')).toBe('Ton net depuis ton arrivée vient de passer 5 000 €.');
+  });
+
   it('no longer promises that a rank is kept for ever (ADR 0118 § 5)', () => {
     const period = PayPeriodSchema.parse('2026-11-01');
     for (const kind of ['level:1', 'level:4']) {

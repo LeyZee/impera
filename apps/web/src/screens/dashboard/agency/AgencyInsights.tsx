@@ -4,6 +4,8 @@ import { Link } from '@tanstack/react-router';
 import {
   createContext,
   useContext,
+  useEffect,
+  useId,
   useRef,
   useState,
   type JSX,
@@ -34,6 +36,7 @@ import {
   moneyParts,
   moneyShares,
   moneyTip,
+  percentText,
   sharesOf,
   type MoneyPart,
   OTHER,
@@ -48,6 +51,7 @@ import {
   signedCount,
   slotLabel,
   STACKS,
+  topFansWords,
   WEEKDAYS,
   WEEKDAYS_SHORT,
   zoneLabel,
@@ -98,15 +102,12 @@ function Delta({
   return <span className={`nv-delta${tone}`}>{deltaText(change)}</span>;
 }
 
-/** Under 640px the curve's tip is the compact one. */
-function narrowTip(): boolean {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
-}
-
 /** One point of the curve: its label, its revenue, and the compared day's when the register holds it. */
 interface CurvePoint {
   readonly key: string;
   readonly title: string;
+  /** The same moment without its weekday, « 10 nov. », for a phone's line. */
+  readonly brief: string;
   readonly cents: number;
   readonly compared: { readonly title: string; readonly cents: number } | null;
 }
@@ -116,29 +117,35 @@ interface CurvePoint {
  * (the line no longer sinks to the right), each with the day compared, aligned day for day, when the register holds
  * that day (the compared line stops where the register begins, never falls to zero); one day read hour by hour.
  */
+/** The first day the curves draw (ADR 0146 § 5): the register's first day when it falls in the period, else the first. */
+function firstDrawn(insights: AgencyInsights): number {
+  const since = insights.registerSince;
+  if (since === null || since <= insights.from) return 0;
+  return Math.max(
+    0,
+    insights.days.findIndex((one) => one.day >= since),
+  );
+}
+
 export function curvePoints(insights: AgencyInsights): CurvePoint[] {
   if (insights.from === insights.to) {
     return insights.hourly.map((hour) => ({
       key: String(hour.hour),
       title: hoursLabel(hour.hour),
+      brief: hoursLabel(hour.hour),
       cents: hour.revenueMinor,
       compared: null,
     }));
   }
   const since = insights.registerSince;
-  const first =
-    since === null || since <= insights.from
-      ? 0
-      : Math.max(
-          0,
-          insights.days.findIndex((one) => one.day >= since),
-        );
+  const first = firstDrawn(insights);
   const today = insights.span.today;
   return insights.days.slice(first).map((one, i) => {
     const before = insights.previousDays[i + first];
     return {
       key: one.day,
       title: dayLabel(one.day),
+      brief: shortDay(one.day),
       cents: one.revenueMinor,
       compared:
         before === undefined || (since !== null && before.day < since)
@@ -149,12 +156,56 @@ export function curvePoints(insights: AgencyInsights): CurvePoint[] {
 }
 
 /**
- * The revenue day by day under the lead figure, the comparison as a discreet dashed line behind, aligned day for day.
- * A hairline and a dot follow the pointer or the finger to the nearest day, and the tip gives the date, then both
- * amounts with their strokes (dataviz: one tip, every series). The subtitle says the days compared: no legend.
+ * What the lead's note says while a day of the curve is read (relecture Design 19/11): the day, its revenue, and the
+ * day compared when the register holds it, « mar. 10 nov. : 153 €, contre 268,60 € le 10 oct. ». No floating tip on
+ * this curve: the note under the figure reads the day in place, the curve keeps all its height.
  */
-function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }): JSX.Element | null {
+export function readingOf(point: CurvePoint, brief = false): string {
+  // A phone's line has no room for the weekday: shortened, never cut (relecture Design 19/11).
+  const day = `${brief ? point.brief : point.title} : ${euros(point.cents)}`;
+  return point.compared === null
+    ? day
+    : `${day}, contre ${euros(point.compared.cents)} le ${point.compared.title}`;
+}
+
+/**
+ * The revenue day by day under the lead figure, the comparison as a discreet dashed line behind, aligned day for day.
+ * A hairline and a dot follow the pointer or the finger to the nearest day, and the lead's note reads that day in place
+ * (`onRead`), back to its sentence when the pointer leaves. The curve takes the card's free height, 96px at least.
+ */
+function RevenueCurve({
+  insights,
+  tone,
+  onRead,
+}: {
+  insights: AgencyInsights;
+  /** Above the period compared or nothing to compare with, or below it: the same word as the « n % » beside. */
+  tone: Trend;
+  /** The day read, as the note says it, or null when the pointer or the finger leaves the curve. */
+  onRead: (point: CurvePoint | null) => void;
+}): JSX.Element | null {
   const [hover, setHover] = useState<number | null>(null);
+  const fill = useId();
+  const layer = useRef<HTMLDivElement>(null);
+  // A finger has no hover: the day a tap reads stays until a tap off the curve or a scroll puts the sentence back.
+  const reading = hover !== null;
+  useEffect(() => {
+    if (!reading) return undefined;
+    const done = (): void => {
+      setHover(null);
+      onRead(null);
+    };
+    const onDown = (event: PointerEvent): void => {
+      if (event.target instanceof Node && layer.current?.contains(event.target) === true) return;
+      done();
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    addEventListener('scroll', done, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      removeEventListener('scroll', done, { capture: true });
+    };
+  }, [reading, onRead]);
   const points = curvePoints(insights);
   if (points.length < 2 || points.every((one) => one.cents === 0 && (one.compared?.cents ?? 0) === 0))
     return null;
@@ -179,41 +230,16 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
     last === undefined || line[0] === undefined
       ? ''
       : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(line[0].x)},${String(frame.height)} Z`;
-  const pick = (event: ReactPointerEvent<HTMLDivElement>): { index: number; x: number } => {
+  const read = (event: ReactPointerEvent<HTMLDivElement>): void => {
     const box = event.currentTarget.getBoundingClientRect();
     const at = Math.round(((event.clientX - box.left) / Math.max(1, box.width)) * (points.length - 1));
     const index = Math.min(points.length - 1, Math.max(0, Number.isFinite(at) ? at : 0));
     setHover(index);
-    return { index, x: box.left + ((line[index]?.x ?? 0) / frame.width) * box.width };
-  };
-  const tipAt = ({ index, x }: { index: number; x: number }): ReturnType<FloatingTip['bind']> => {
     const one = points[index];
-    if (one === undefined) return tip.bind({ title: '' });
-    return tip.bind(
-      {
-        title: one.title,
-        // A phone's tip says only the amounts and the day compared: the labels took half the curve (recette DSH-04).
-        rows: narrowTip()
-          ? [
-              [euros(one.cents), ''],
-              ...(one.compared === null
-                ? []
-                : [[`${euros(one.compared.cents)} · ${one.compared.title}`, ''] as const]),
-            ]
-          : [
-              ['Chiffre d’affaires', euros(one.cents)],
-              ...(one.compared === null
-                ? []
-                : [[`Comparé, ${one.compared.title}`, euros(one.compared.cents)] as const]),
-            ],
-        rowKeys: one.compared === null ? ['solid'] : ['solid', 'dashed'],
-        compact: narrowTip(),
-      },
-      { marker: x },
-    );
+    onRead(one ?? null);
   };
   return (
-    <div className="ins-curve">
+    <div className={`ins-curve ins-curve--${tone}`}>
       <div
         className="ins-curve__plot"
         role="img"
@@ -225,7 +251,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
           aria-hidden="true"
         >
           <defs>
-            <linearGradient id="ins-curve-fill" x1="0" x2="0" y1="0" y2="1">
+            <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0" className="ins-curve__fill-top" />
               <stop offset="1" className="ins-curve__fill-bottom" />
             </linearGradient>
@@ -233,7 +259,7 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
           {behind.length > 1 ? (
             <path className="ins-curve__compared" d={linePath(behind)} vectorEffect="non-scaling-stroke" />
           ) : null}
-          <path className="ins-curve__area" d={area} fill="url(#ins-curve-fill)" />
+          <path className="ins-curve__area" d={area} fill={`url(#${fill})`} />
           <path className="ins-curve__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
         </svg>
         {lit === undefined ? null : (
@@ -258,19 +284,74 @@ function RevenueCurve({ insights, tip }: { insights: AgencyInsights; tip: Floati
         <div
           className="ins-curve__hits"
           aria-hidden="true"
-          onPointerMove={(event) => {
-            tipAt(pick(event)).onPointerMove(event);
-          }}
-          onPointerDown={(event) => {
-            tipAt(pick(event)).onPointerDown(event);
-          }}
+          onPointerMove={read}
+          onPointerDown={read}
+          ref={layer}
           onPointerLeave={(event) => {
+            if (event.pointerType !== 'mouse') return;
             setHover(null);
-            tip.bind({ title: '' }).onPointerLeave(event);
+            onRead(null);
           }}
         />
       </div>
     </div>
+  );
+}
+
+/** A curve's colour against the period compared: green above it (or nothing to compare with), amber below. */
+type Trend = 'up' | 'down';
+
+function trendOf(current: number, previous: number, compared: boolean): Trend {
+  const change = compared ? changeOf(current, previous) : null;
+  return change !== null && change < 0 ? 'down' : 'up';
+}
+
+/**
+ * A tile's small curve: the same days as the lead curve, from the register's first day, nothing for one day read hour
+ * by hour (its parts are not kept by the hour) nor for fewer than two days. Values only; the tile says the figure.
+ */
+export function sparkValues(
+  insights: AgencyInsights,
+  pick: (day: AgencyInsights['days'][number]) => number,
+): number[] | null {
+  if (insights.from === insights.to) return null;
+  const values = insights.days.slice(firstDrawn(insights)).map(pick);
+  return values.length < 2 || values.every((one) => one === 0) ? null : values;
+}
+
+/**
+ * The small curve at the net's foot (lot couleurs, 17/11; under the net only, Charles 19/11: the parts drew the same
+ * shape again): 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour. Decorative: the tile's figure and its « n % » say it,
+ * so it is hidden from assistive technologies.
+ */
+function Spark({ values, tone }: { values: readonly number[]; tone: Trend }): JSX.Element {
+  const fill = useId();
+  const frame = { width: 200, height: 32, padTop: 3, padBottom: 2 };
+  const low = Math.min(0, ...values);
+  const high = Math.max(1, ...values);
+  const line = chartPoints(values, frame, { min: low, max: high });
+  const first = line[0];
+  const last = line.at(-1);
+  const area =
+    first === undefined || last === undefined
+      ? ''
+      : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(first.x)},${String(frame.height)} Z`;
+  return (
+    <svg
+      className={`ins-spark ins-spark--${tone}`}
+      viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" className="ins-spark__fill-top" />
+          <stop offset="1" className="ins-spark__fill-bottom" />
+        </linearGradient>
+      </defs>
+      <path className="ins-spark__area" d={area} fill={`url(#${fill})`} />
+      <path className="ins-spark__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }
 
@@ -284,6 +365,8 @@ interface Tile {
   readonly part?: MoneyPart['key'];
   /** A money tile explains itself on hover, focus or a tap (ADR 0106 § 12). */
   readonly tip?: ReturnType<typeof moneyTip>;
+  /** Its small curve, day by day, and its colour. */
+  readonly spark?: { readonly values: readonly number[]; readonly tone: Trend };
 }
 
 function Tiles({
@@ -326,6 +409,11 @@ function Tiles({
             )}
           </dd>
           {tile.note === '' ? null : <dd className="ins-tile__note">{tile.note}</dd>}
+          {tile.spark === undefined ? null : (
+            <dd className="ins-tile__spark">
+              <Spark values={tile.spark.values} tone={tile.spark.tone} />
+            </dd>
+          )}
         </div>
       ))}
     </dl>
@@ -441,8 +529,19 @@ function Figures({
   // The two parts' shares of the net are rounded together, to 100 %, as in « Où va l'argent ».
   const shares = moneyShares(current);
   const ofNet = (key: 'creator' | 'agency'): string =>
-    current.netMinor > 0 ? `${String(shares.ofNet[key])} % du net` : 'aucun net sur la période';
+    current.netMinor > 0 ? `${percentText(shares.ofNet[key])} du net` : 'aucun net sur la période';
   const creatorLabel = several ? 'Part des créatrices' : 'Part de la créatrice';
+  const compared = comparable(insights);
+  // The day read on the curve: the note and its pill say that day while it is read (relecture Design 19/11).
+  const [read, setRead] = useState<CurvePoint | null>(null);
+  const narrow = useNarrow();
+  const sparkOf = (
+    pick: (day: AgencyInsights['days'][number]) => number,
+    tone: Trend,
+  ): Pick<Tile, 'spark'> => {
+    const values = sparkValues(insights, pick);
+    return values === null ? {} : { spark: { values, tone } };
+  };
   const tipOf = (
     title: string,
     cents: number,
@@ -465,26 +564,17 @@ function Figures({
       value: euros(current.netMinor),
       note: `après ${euros(fansVat)} de TVA des fans et ${euros(commission)} de commission de la plateforme`,
       delta: [current.netMinor, previous.netMinor],
+      // The net is the two parts (ADR 0106 § 4): its curve is their sum, in the trend's colour as the lead's.
+      ...sparkOf(
+        (day) => day.agencyMinor + day.creatorMinor,
+        trendOf(current.netMinor, previous.netMinor, compared),
+      ),
       tip: tipOf(
         'Net',
         current.netMinor,
         previous.netMinor,
         null,
         'Ce qui reste après la TVA des fans et la commission de la plateforme : la part de l’agence et celle des créatrices.',
-      ),
-    },
-    {
-      label: 'Part de l’agence',
-      value: euros(current.agencyMinor),
-      note: ofNet('agency'),
-      delta: [current.agencyMinor, previous.agencyMinor],
-      part: 'agency',
-      tip: tipOf(
-        'Part de l’agence',
-        current.agencyMinor,
-        previous.agencyMinor,
-        'agency',
-        'Ce que la plateforme verse à l’agence, son propre chiffre.',
       ),
     },
     {
@@ -501,6 +591,20 @@ function Figures({
         several
           ? 'Ce que la plateforme leur verse, son propre chiffre.'
           : 'Ce que la plateforme lui verse, son propre chiffre.',
+      ),
+    },
+    {
+      label: 'Part de l’agence',
+      value: euros(current.agencyMinor),
+      note: ofNet('agency'),
+      delta: [current.agencyMinor, previous.agencyMinor],
+      part: 'agency',
+      tip: tipOf(
+        'Part de l’agence',
+        current.agencyMinor,
+        previous.agencyMinor,
+        'agency',
+        'Ce que la plateforme verse à l’agence, son propre chiffre.',
       ),
     },
     {
@@ -546,7 +650,24 @@ function Figures({
     <div className="ins-figures-stack">
       <div className="ins-figures">
         <div className="nv-plate ins-lead nv-enter" style={{ '--nv-i': 1 }}>
-          <div className="nv-figure">
+          {/* A money tile, so its tip too (ADR 0106 § 12, PAY-16): to the cent, against the period before. On the
+              figure alone, never the whole card: the curve under it reads its own days. */}
+          <div
+            className="nv-figure"
+            tabIndex={0}
+            {...tip.bind(
+              moneyTip({
+                title: 'Chiffre d’affaires',
+                cents: current.revenueMinor,
+                previousCents: previous.revenueMinor,
+                // The whole itself: no share of it to say.
+                revenueMinor: 0,
+                netMinor: null,
+                text: 'Ce que les fans ont payé, TVA comprise, avant la commission de la plateforme.',
+              }),
+              { around: true },
+            )}
+          >
             <span className="nv-figure__label">Chiffre d’affaires</span>
             <CountUp
               className="nv-figure__value ins-lead__value"
@@ -554,12 +675,33 @@ function Figures({
               format={formatEuros}
             />
             <span className="nv-figure__note">
-              <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
-              <span>{leadNote(insights)}</span>
+              {/* The day read on the curve takes the period's place, its pill and its sentence each over theirs, kept in
+                  place hidden, so nothing moves; a day with nothing compared has no pill, its place kept. */}
+              <span className="ins-lead__pill">
+                <span aria-hidden={read !== null}>
+                  <Delta current={current.revenueMinor} previous={previous.revenueMinor} />
+                </span>
+                <span aria-hidden={read === null}>
+                  {read?.compared == null ? null : (
+                    <Delta current={read.cents} previous={read.compared.cents} />
+                  )}
+                </span>
+              </span>
+              <span className="ins-lead__note">
+                <span aria-hidden={read !== null}>{leadNote(insights)}</span>
+                {/* Said to screen readers as it changes, the curve itself being a picture to them. */}
+                <span aria-hidden={read === null} aria-live="polite">
+                  {read === null ? '' : readingOf(read, narrow)}
+                </span>
+              </span>
             </span>
             <span className="ins-lead__sub">ce que les fans ont payé, TVA comprise</span>
           </div>
-          <RevenueCurve insights={insights} tip={tip} />
+          <RevenueCurve
+            insights={insights}
+            tone={trendOf(current.revenueMinor, previous.revenueMinor, compared)}
+            onRead={setRead}
+          />
         </div>
         <Tiles tiles={money} from={2} label="L’argent" tip={tip} />
       </div>
@@ -614,6 +756,10 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
           : columns.length <= 31
             ? 5
             : 15;
+  // The last day's label ends at the card's edge; on a phone the one before it, a few columns away, would run into it.
+  const last = columns.length - 1;
+  const labelled = (i: number): boolean =>
+    i % every === 0 && !(narrow && i !== last && last % every === 0 && every > 1 && last - i <= every);
   const used = STACKS.filter((_, s) => columns.some((column) => (column.parts[s] ?? 0) > 0));
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const step =
@@ -695,7 +841,7 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
                 )}
               </span>
               <span className="ins-col__label" aria-hidden="true">
-                {i % every === 0 ? column.label : ''}
+                {labelled(i) ? column.label : ''}
               </span>
             </button>
           ))}
@@ -1110,13 +1256,15 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   if (fans.paying === 0) return <p className="nv-plate ins-empty">Aucun fan n’a payé sur la période.</p>;
   const newShare = shareOf(fans.newPaying, fans.paying);
   const top = fans.topTenShare ?? 0;
+  // Ten at most: with fewer paying fans, the count they are (PAY-16, « Les 10 fans » for 3).
+  const biggest = topFansWords(fans.paying);
   return (
     <div className="nv-plate ins-fans">
       <div className="ins-fans__meter">
         <p className="ins-fans__lead">
-          Les 10 fans qui dépensent le plus font <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
+          {biggest.lead} <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
         </p>
-        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par les 10 plus gros fans`}>
+        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par ${biggest.short}`}>
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
         <p className="ins-fans__hint">

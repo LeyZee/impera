@@ -1,3 +1,4 @@
+export * from './agent-hours';
 export * from './alerts';
 export * from './auth';
 export * from './calibration';
