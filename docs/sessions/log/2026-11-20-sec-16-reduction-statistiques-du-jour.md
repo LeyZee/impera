@@ -1,0 +1,7 @@
+# 2026-11-20 — SEC-16, première réduction : statistiques du jour (ADR 0087, lot c) — en cours
+Fait : `withTenantJob` dans `packages/db` (une créatrice, une tâche nommée, `app.job`) ; les photos `platform_daily_stats` et `platform_chatter_daily_stats` s'écrivent sous le rôle applicatif, une créatrice et une transaction à la fois ; migration 0235 (politiques de la tâche, insertion et mise à jour des seuls compteurs pour le rôle applicatif, écriture retirée au rôle de service) ; plafond des connecteurs 36 → 35 ; data-model.md.
+Pas fait : le registre des ventes et les comptes des connecteurs, puis les autres modules (fiche SEC-16).
+Décisions : aucune nouvelle ; c'est le lot c de l'ADR 0087. La forme (`app.job`) a été proposée au fil Bilan, propriétaire de la base.
+Découvertes : la lecture complète n'est plus datée dans la même transaction que les jours ; elle l'est après, donc une lecture coupée est refaite en entier à l'heure suivante (rejouable). `forEachTenant` reste à écrire avec la première tâche qui parcourt toutes les créatrices. Les tests d'intégration laissent leurs bases `test_*` derrière eux quand une exécution est coupée : plus de 1 600 bases ont rempli le disque d'un poste de travail.
+Candidats à suppression : aucun.
+Vérifié : `daily-stats.integration.test.ts` ✓ (la tâche écrit dans sa créatrice seulement, aucun compte n'écrit, le rôle de service non plus) ; droits du rôle de service ✓ ; plafond ✓.

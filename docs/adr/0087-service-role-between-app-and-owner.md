@@ -46,3 +46,15 @@ Sur le PC de Charles, le lot a demande une étape de plus au prochain « lance l
 - **Ne rien changer tant qu'il n'y a qu'une créatrice.** Le risque sur la structure et sur le journal d'audit existe déjà avec une seule.
 - **Supprimer `withAdmin` et tout écrire en politiques de lignes d'un coup.** 186 appels dans 16 modules : un chantier de plusieurs semaines qui toucherait la paie et les ventes au moment où elles se vérifient sur de vrais chiffres.
 - **Un rôle par module.** Plus fin, mais seize connexions et seize jeux de droits à tenir pour une équipe de cette taille ; le lot c donne l'essentiel du gain sans cette charge.
+
+## Avenant du 20/11/2026 (proposé, en attente du mot de Charles) : la porte des tâches d'une créatrice
+
+Le lot c demande qu'un accès passe par `withTenant` « avec une politique de lignes écrite pour lui ». Pour une tâche de fond qui écrit les lignes d'une créatrice, cette politique ne doit rien ouvrir aux sessions de compte. D'où une porte nommée.
+
+1. **`withTenantJob(db, creatorId, job, fn)`** (`packages/db`) ouvre une transaction sous le rôle applicatif, pose la créatrice (`app.creator_id`) et le nom de la tâche (`app.job`), tous deux pour la seule transaction. Le nom vient d'une liste fermée (`TenantJobSchema`, contracts) ; tout autre est refusé.
+2. **Les politiques d'une tâche exigent les deux** : la ligne est de la créatrice de la transaction, et le nom est celui de la tâche. Les autres portes (`withTenant`, `withMember`, `withTenantMember`, `withCreatorAccount`) vident `app.job` : aucune session de compte ne passe ces politiques.
+3. **Le rôle applicatif reçoit le droit que la tâche utilise, pas plus** (insertion, mise à jour des seules colonnes qu'elle réécrit), et **le rôle de service perd son droit d'écriture** sur les tables sorties, dans la même migration.
+4. **Première tâche : `daily_stats`** (statistiques du jour, migration 0235). Une tâche nouvelle ajoute son nom à la liste, ses politiques et ses tests d'isolation à deux créatrices dans la même PR, relue par le fil Sécurité et par le propriétaire de la base.
+
+Ce que ça change : une erreur dans une tâche ne peut plus écrire chez une autre créatrice que celle de sa transaction, et le rôle qui traverse les créatrices écrit moins de tables. Ce que ça ne change pas : le niveau de confiance. Comme pour `app.creator_id`, seul notre code pose ces réglages ; un code qui poserait `app.job` à la main passerait la politique, pour une seule créatrice à la fois. La liste fermée, la porte unique et la relecture sont la garde.
+
