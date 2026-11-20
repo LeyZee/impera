@@ -188,19 +188,8 @@ describe('offerSignals', () => {
       offerSignals({ intent: 'flirt', sentiment: 'positive', desireSignals: ['asks_about_her_body'] })
         .fanSexualizes,
     ).toBe(false);
-  });
-
-  it('keeps a compliment where he says what he feels a flirt, braked only by explicit words (Charles, 20/11)', () => {
     expect(
       offerSignals({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['states_desire'] }).fanSexualizes,
-    ).toBe(false);
-    expect(
-      offerSignals({ intent: 'flirt', sentiment: 'aroused', desireSignals: ['explicit_language'] })
-        .fanSexualizes,
-    ).toBe(true);
-    expect(
-      offerSignals({ intent: 'small_talk', sentiment: 'aroused', desireSignals: ['states_desire'] })
-        .fanSexualizes,
     ).toBe(true);
   });
 });

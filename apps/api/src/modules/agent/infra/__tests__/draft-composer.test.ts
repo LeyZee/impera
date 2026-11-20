@@ -1564,12 +1564,12 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
   });
 
   it('takes an insistent compliment as one, and writes a brake on it again (Charles, 20/11)', async () => {
-    // « tu es trop belle !!! » read as a fan who says what he feels: still a flirt, welcomed.
+    // « tu es trop belle !!! » read as a flirt in a good mood (her « Pourquoi », 20/11): welcomed.
     const INSISTENT: Brief = {
       ...BRIEF,
       intent: 'flirt',
-      sentiment: 'aroused',
-      desireSignals: ['body_compliment', 'states_desire'],
+      sentiment: 'positive',
+      desireSignals: ['body_compliment'],
     };
     const { draftComposer, seen } = composer(
       {
