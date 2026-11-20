@@ -87,7 +87,7 @@ describe('« Ses scripts dans Reveal »: what keeps each one from being offered'
   });
 
   it('counts her active scripts ready to offer', () => {
-    expect(revealSummary([])).toBe('Aucun script dans Reveal');
+    expect(revealSummary([])).toBe('Aucun de nos scripts recopié dans Reveal');
     expect(
       revealSummary([
         revealScriptOf(1),

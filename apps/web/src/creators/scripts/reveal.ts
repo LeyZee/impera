@@ -2,6 +2,7 @@ import type {
   MediaDescriptionId,
   PlatformMediaDescriptionView,
   PlatformScriptViewDto,
+  PreparedScriptView,
   ScriptEnergy,
 } from '@impera/contracts';
 
@@ -158,9 +159,22 @@ export function revealStanding(script: PlatformScriptViewDto): RevealStanding {
 }
 
 /** The head's line: how many of her active scripts the agent can offer. */
+/**
+ * Only the copies of our scripts (Charles, 20/11): a native script of hers counts here once an import recognised it as
+ * the copy of a script prepared in Impera. Her other Reveal scripts are never offered, imported or validated here: they
+ * only help recognise a copy.
+ */
+export function ourCopies(
+  natives: readonly PlatformScriptViewDto[],
+  prepared: readonly Pick<PreparedScriptView, 'matchedPlatformScriptId'>[],
+): PlatformScriptViewDto[] {
+  const ours = new Set(prepared.flatMap((script) => script.matchedPlatformScriptId ?? []));
+  return natives.filter((script) => ours.has(script.id));
+}
+
 export function revealSummary(scripts: readonly PlatformScriptViewDto[]): string {
   const active = scripts.filter((script) => script.active);
-  if (active.length === 0) return 'Aucun script dans Reveal';
+  if (active.length === 0) return 'Aucun de nos scripts recopié dans Reveal';
   const ready = active.filter((script) => script.proposable).length;
   const toDo = active.filter((script) => revealStanding(script).tone === 'todo').length;
   const head = `${String(ready)} prêt${ready > 1 ? 's' : ''} à proposer sur ${String(active.length)}`;
