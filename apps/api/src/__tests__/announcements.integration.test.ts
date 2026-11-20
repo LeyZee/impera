@@ -283,4 +283,40 @@ describe('announcements to the team (EQ-12)', () => {
       update_reads: false,
     });
   });
+
+  it('hides from a manager what is addressed to a creator off his list, but never his own', async () => {
+    const toInes = await write(ownerCookie, 'Annonce inventée pour Inès', ines);
+    expect(await find(manager.cookie, toInes.id)).toBeUndefined();
+    const said = async (method: 'GET' | 'POST', url: string) => {
+      const response = await call(method, url, manager.cookie);
+      const { code, message } = ApiErrorSchema.parse(response.json()).error;
+      return { status: response.statusCode, code, message };
+    };
+    const unknown = newId(CreatorIdSchema);
+    for (const [method, path] of [
+      ['GET', 'readers'],
+      ['POST', 'read'],
+      ['POST', 'withdraw'],
+    ] as const) {
+      expect(await said(method, `/v1/team/announcements/${toInes.id}/${path}`)).toEqual(
+        await said(method, `/v1/team/announcements/${unknown}/${path}`),
+      );
+    }
+    expect((await said('GET', `/v1/team/announcements/${toInes.id}/readers`)).status).toBe(404);
+
+    // His own stays his when his list changes: still read, still withdrawn by him.
+    const moved = await person('manager', [nora]);
+    const own = await write(moved.cookie, 'Annonce inventée avant un changement de liste', nora);
+    await test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [ines] })
+      .where(eq(schema.user.id, moved.userId));
+    const again = await signIn(server, `manager-${String(people)}@example.test`, PASSWORD);
+    expect((await find(again, own.id))?.mine).toBe(true);
+    expect((await call('POST', `/v1/team/announcements/${own.id}/withdraw`, again)).statusCode).toBe(204);
+    // Those to the whole team, and the owner's view of all, are unchanged.
+    const all = await write(ownerCookie, 'À toute l’équipe, inventé encore', null);
+    expect(await find(manager.cookie, all.id)).toBeDefined();
+    expect(await find(ownerCookie, toInes.id)).toBeDefined();
+  });
 });

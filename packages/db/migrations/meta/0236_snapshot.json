@@ -1,5 +1,5 @@
 {
-  "id": "883614b9-d312-4d77-b0ec-3e0a42d77283",
+  "id": "ee61deab-a576-411f-b250-adeb002ba0d6",
   "prevId": "a113feff-22d3-449a-9ae6-6ce6d23b5360",
   "version": "7",
   "dialect": "postgresql",
@@ -20569,7 +20569,7 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from announcements a where a.id = \"announcement_reads\".\"announcement_id\")) or exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
         },
         "member_insert": {
           "name": "member_insert",
@@ -20691,7 +20691,7 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or (nullif(current_setting('app.team_scope', true), '') = 'self' and \"announcements\".\"withdrawn_at\" is null and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids))))"
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids)) or \"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), ''))) or (nullif(current_setting('app.team_scope', true), '') = 'self' and \"announcements\".\"withdrawn_at\" is null and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids))))"
         },
         "team_insert": {
           "name": "team_insert",

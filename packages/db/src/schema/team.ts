@@ -348,8 +348,9 @@ const onOwnList = (creatorId: AnyColumn): SQL =>
 
 /**
  * Annonces (EQ-12): the owner or an active manager writes to the whole team (`creator_id` null) or to the members of
- * one creator, a manager only to a creator of his own list. The owner and the active managers read them all; a member
- * reads those addressed to him while they stand. Withdrawn by the owner or by its author, never deleted nor edited:
+ * one creator, a manager only to a creator of his own list. The owner reads them all; an active manager those to the
+ * whole team, to a creator of his own list, and his own (so that he can still withdraw it when his list changes); a
+ * member reads those addressed to him while they stand. Withdrawn by the owner or by its author, never deleted nor edited:
  * the app may only set `withdrawn_at` and `withdrawn_by` (column grant, migration). Closed to a creator's account.
  */
 export const announcements = pgTable(
@@ -371,7 +372,7 @@ export const announcements = pgTable(
     index('announcements_created_idx').on(t.createdAt),
     pgPolicy('team_read', {
       for: 'select',
-      using: sql`${readsTeam} or (${currentScope} = 'self' and ${t.withdrawnAt} is null and (${t.creatorId} is null or ${onOwnList(t.creatorId)}))`,
+      using: sql`${isOwner} or (${isManager} and (${t.creatorId} is null or ${onOwnList(t.creatorId)} or ${t.authorUserId} = ${currentUser})) or (${currentScope} = 'self' and ${t.withdrawnAt} is null and (${t.creatorId} is null or ${onOwnList(t.creatorId)}))`,
     }),
     pgPolicy('team_insert', {
       for: 'insert',
@@ -388,8 +389,8 @@ export const announcements = pgTable(
 
 /**
  * « Lu » (EQ-12): a member's own, once per announcement, at the moment he says it; only for an announcement he may
- * read (the insert's check reads `announcements` under its own policy). Read by himself, the owner and the active
- * managers; never changed nor deleted.
+ * read (the insert's check reads `announcements` under its own policy). Read by himself, the owner, and an active
+ * manager for the announcements he may read (through their policy); never changed nor deleted.
  */
 export const announcementReads = pgTable(
   'announcement_reads',
@@ -407,7 +408,7 @@ export const announcementReads = pgTable(
     index('announcement_reads_member_idx').on(t.memberId),
     pgPolicy('member_read', {
       for: 'select',
-      using: sql`${readsTeam} or exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser})`,
+      using: sql`${isOwner} or (${isManager} and exists (select 1 from announcements a where a.id = ${t.announcementId})) or exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser})`,
     }),
     pgPolicy('member_insert', {
       for: 'insert',
