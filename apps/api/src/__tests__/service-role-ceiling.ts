@@ -16,6 +16,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/conversations': 1,
   'modules/creator-tasks': 1,
   'modules/creator-week': 2,
+  // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.
+  'modules/custom-orders': 1,
   'modules/fans': 1,
   'modules/invoicing': 12,
   'modules/mcp': 1,
@@ -36,5 +38,5 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   wiring: 7,
 };
 
-/** The whole on 20/11/2026, when the ceiling reached main (264), raised once to 269 by her week (CR-16): the sum of the units never goes above it again. */
-export const SERVICE_ROLE_TOTAL_AT_START = 269;
+/** The whole on 20/11/2026, when the ceiling reached main (264), raised to 269 by her week (CR-16), then to 270 by the agent's read of her custom price grid (ADR 0159): the sum of the units never goes above it again. */
+export const SERVICE_ROLE_TOTAL_AT_START = 270;
