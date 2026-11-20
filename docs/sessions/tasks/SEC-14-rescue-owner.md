@@ -1,5 +1,5 @@
 # SEC-14 Un compte propriétaire de secours
-Statut : in_progress
+Statut : done
 Phase : exploitation
 Dépend de : SEC-02, SEC-04, EQ-10, EQ-18
 Branche : claude/project-thread-bfbfaz (fil « Corriger les failles de l'audit sécurité »)
