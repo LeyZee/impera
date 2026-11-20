@@ -69,6 +69,7 @@ import { wireAgent } from './wiring/agent';
 import { wireAiBudget } from './wiring/ai-budget';
 import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
+import { wireAudit } from './wiring/audit';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
 import { wireContentDrops } from './wiring/content-drops';
@@ -479,6 +480,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const audit = wireAudit(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
   // ElevenLabs bills characters, not money: its month comes from its own check (ADR 0091 § 7).
   const aiUsage = wireAiUsage(shared, llm, () => providers.module.voiceQuota());
@@ -689,6 +691,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
+      ...audit.routes,
       ...rewards.routes,
       ...aiUsage.routes,
       ...aiBudget.routes(llm),

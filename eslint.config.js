@@ -26,6 +26,8 @@ const MODULE_DEPENDENCIES = {
   telegram: [],
   team: [],
   backups: [],
+  // EQ-18: the owner's journal reads `audit_log` and the names it shows; it imports no module.
+  audit: [],
   // ADR 0091: reads the gateway's journal and keeps the credits ledger; imports no module.
   'ai-usage': [],
   // Choix de Charles 12/11: the owner's caps the gateway reads (`ai_budget_settings`); imports no module.
