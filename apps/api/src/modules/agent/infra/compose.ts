@@ -53,6 +53,7 @@ import {
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
+import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
 import {
   NO_SALE_RISKS,
@@ -71,6 +72,7 @@ import {
 import { scriptTurn, type ScriptTurn } from '../domain/script-turn';
 import {
   declaredAdultAge,
+  checkWelcome,
   sexualizationDecision,
   type SexualizationDecision,
   type SexualizationLimits,
@@ -261,6 +263,8 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
   price_outside_offer: 'elle écrivait un prix',
   no_commitment: 'elle s’engageait sur sa demande',
   care_breach: 'elle n’était pas assez douce pour ce moment',
+  unwarranted_brake:
+    'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
   media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
 };
@@ -315,10 +319,11 @@ const STEER_BACK_BRIEF: Readonly<Record<'age_unconfirmed' | 'too_early', string>
   age_unconfirmed:
     'Il va trop vite : elle ralentit avec douceur et humour, sans rien d’explicite ni de sous-entendu, sans reproche, et ramène la conversation sur lui ; si ça vient naturellement, elle lui demande son âge.',
 };
-const NO_OPENING_HINT = 'aucune allusion sexuelle, elle n’ouvre pas ce terrain';
+const NO_OPENING_HINT =
+  'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis';
 /** He compliments or flirts, nothing sexual: she welcomes it, never dodges it (Charles, 16/11). */
 const FLIRT_HINT =
-  'il la complimente ou flirte : elle le reçoit avec plaisir, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part';
+  'il la complimente ou flirte : elle le reçoit avec plaisir, l’assume et le remercie, taquine, et flirte avec lui en retour, sans allusion sexuelle de sa part ; jamais elle ne le freine ni ne lui dit qu’il va trop vite ou trop fort';
 
 // She asked his age already in this conversation: « t'as quel âge ? », « tu as quel âge », « et ton âge ? ».
 const ASKED_AGE = /\b(?:quel age|ton age|age as[- ]tu|age t'?as)\b/u;
@@ -452,7 +457,17 @@ const datedOf = (turn: ConversationTurn) => ({
 
 /** « Le moment », with what code reads of the last exchanges' times (audit du naturel, A2). */
 function describeMoment(situation: Situation, history: readonly ConversationTurn[]): string {
-  return [describeSituation(situation), ...timingLines(history.map(datedOf), situation.now)].join('\n');
+  // Her messages an automation wrote (ADR 0110 § 3): said once here, never as a bracket in her own turn.
+  const automated = new Set(
+    history.flatMap((turn) =>
+      turn.from === 'creator' && turn.originNote !== undefined ? [turn.originNote] : [],
+    ),
+  );
+  return [
+    describeSituation(situation),
+    ...timingLines(history.map(datedOf), situation.now),
+    ...automated,
+  ].join('\n');
 }
 
 /** Each message of his after a silence carries the time that passed, written by code on her clock. */
@@ -470,7 +485,7 @@ function earlierFanTexts(history: readonly ConversationTurn[]): string[] {
   while (end > 0 && history[end - 1]?.from === 'fan') end -= 1;
   return history
     .slice(0, end)
-    .filter((turn) => turn.from === 'fan')
+    .filter((turn) => turn.from === 'fan' && !isOpener(turn))
     .map((turn) => turn.text);
 }
 
@@ -761,7 +776,11 @@ export async function composeTurn(
     sexualization?.kind !== 'steer_back'
       ? paceHints(
           input.fanText,
-          previousTurnsOf(input.history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text }))),
+          previousTurnsOf(
+            input.history
+              .filter((turn) => !isOpener(turn))
+              .map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
+          ),
         )
       : [];
   const voiceBrief: Brief = asking
@@ -821,6 +840,9 @@ export async function composeTurn(
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),
+      // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
+      // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
+      ...(sexualization?.kind === 'no_opening' && !care ? checkWelcome(written) : []),
     ];
     return { voice, written, violations };
   };

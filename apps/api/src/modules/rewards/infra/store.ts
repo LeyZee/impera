@@ -81,6 +81,7 @@ async function gainsAndStreakOf(
       scopeKey: rewardGains.scopeKey,
       earnedAt: rewardGains.earnedAt,
       revealedAt: rewardGains.revealedAt,
+      basisMinor: rewardGains.basisMinor,
     })
     .from(rewardGains)
     .where(and(eq(rewardGains.userId, userId), holds))

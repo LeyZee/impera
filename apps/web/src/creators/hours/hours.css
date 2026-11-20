@@ -293,3 +293,209 @@
   position: absolute;
   inset: -3px 0;
 }
+
+/*
+ * « Jours modifiés » (ADR 0148 § 3, avis Design 19/11): a line a day, the whole line opens it, « Rétablir » an icon
+ * button on its right; the editor under it, days in a grid of two weeks under L M M J V S D. Ghost buttons' labels sit
+ * on the card's edges; icon buttons are 44 px to the finger.
+ */
+.hr-days__list {
+  display: grid;
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hr-days__item {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.hr-days__row {
+  appearance: none;
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--nv-space-3);
+  min-height: 44px;
+  margin: 0 0 0 calc(-1 * var(--nv-space-3));
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.hr-days__row:hover:not(:disabled),
+.hr-days__row[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--nv-ink) 6%, transparent);
+}
+.hr-days__row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.hr-days__date {
+  font-weight: 600;
+}
+.hr-days__ranges {
+  color: var(--nv-agent);
+}
+.hr-days__off {
+  color: var(--nv-ink-muted);
+}
+
+/* Icon buttons of the panel: quiet, 44 px to the finger, the glyph on the card's edge. */
+.nv-iconbtn.hr-days__icon {
+  width: 44px;
+  height: 44px;
+  color: var(--nv-ink-muted);
+  background: transparent;
+  box-shadow: none;
+}
+.nv-iconbtn.hr-days__icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nv-iconbtn.hr-days__icon:hover:not(:disabled) {
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--nv-ink) 8%, transparent);
+}
+.nv-iconbtn.hr-days__icon:disabled {
+  background: transparent;
+  opacity: 0.35;
+  cursor: default;
+}
+.hr-days__item > .hr-days__icon {
+  margin-inline-end: -13px;
+}
+.hr-days__icon-gap {
+  width: 44px;
+}
+
+/* A ghost button's label on the card's edge, as the texts above it. */
+.hr-days .hr-days__ghost {
+  align-self: flex-start;
+  margin-inline-start: calc(-1 * var(--nv-space-4));
+}
+.hr-days__foot .hr-days__ghost {
+  align-self: center;
+  margin-inline-start: 0;
+}
+
+.hr-days__editor,
+.hr-days__ranges-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.hr-days__editor {
+  padding-top: var(--nv-space-4);
+  border-top: 1px solid var(--nv-hairline);
+}
+
+/* One range: « de », its start, « à », its end, a fixed column for « minuit », the cross. */
+.hr-days__range {
+  display: grid;
+  grid-template-columns: auto 120px auto 120px 7ch 44px;
+  justify-content: start;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.hr-days__range .hr-time {
+  width: 100%;
+  min-width: 0;
+}
+
+.hr-grid {
+  display: grid;
+  gap: var(--nv-space-2);
+  max-width: 420px;
+}
+.hr-grid__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hr-grid__span {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.hr-grid__nav {
+  display: flex;
+  margin-inline-end: -13px;
+}
+.hr-grid__days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.hr-grid__weekday {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  text-align: center;
+}
+.hr-grid__day {
+  appearance: none;
+  position: relative;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: transparent;
+  color: var(--nv-ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.hr-grid__day:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--nv-ink) 6%, transparent);
+}
+.hr-grid__day:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.hr-grid__day:disabled {
+  color: var(--nv-ink-faint);
+  cursor: default;
+}
+/* Today, quietly: its number in the AI's violet. */
+.hr-grid__day[data-today] {
+  color: var(--nv-agent);
+  font-weight: 600;
+}
+/* The one mark of the pick: a full fill, as Segment's. */
+.hr-grid__day[aria-pressed='true'] {
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  font-weight: 600;
+}
+[data-theme='light'] .hr-grid__day[aria-pressed='true'] {
+  background: var(--nv-fill-soft);
+}
+/* A day with a change of its own: a violet dot under its number. */
+.hr-grid__day[data-kept]::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-agent);
+}
+
+.hr-days__beyond {
+  margin: 0;
+  color: var(--nv-warning);
+}
+.hr-days__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}

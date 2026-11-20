@@ -134,7 +134,7 @@ export function createFollowUpJob({ uow, clock, fans, composer, followUps, reply
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       followUp: { step: payload.step, steps, silentSince: anchor },
-      ...(hours !== null && { hours: hours.hours }),
+      ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 

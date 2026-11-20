@@ -40,4 +40,12 @@ describe('computeHealth', () => {
     const badHour = [call(30, 'unavailable'), call(20, 'ok'), call(10, 'unavailable'), call(5, 'ok')];
     expect(voiceHealth([call(400, 'ok'), ...badHour])?.state).toBe('degraded');
   });
+
+  it('leaves the replies to Instagram comments out: the health is the fans’ chatting (ADR 0122)', () => {
+    const comment = (minutesAgo: number): LlmCallRecord => ({
+      ...call(minutesAgo, 'unavailable'),
+      purpose: 'instagram_comment',
+    });
+    expect(voiceHealth([comment(30), comment(20), comment(10), call(5, 'ok')])?.state).toBe('ok');
+  });
 });

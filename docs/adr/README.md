@@ -130,7 +130,7 @@ Date : AAAA-MM-JJ
 | 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
-| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) |
+| 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) ; amendement du 19/11 (créer un script à l’écran, le recopier dans Reveal) accepted, précise 0149 |
 | 0113 | Les fichiers du coffre : lus le temps de la description, jamais gardés | accepted (précise 0018, 0030 § 3 et § 4, 0099 § 4, § 5 et § 7) |
 | 0117 | L'agent écrit le prénom du membre et le canevas de la note client | accepted (précise 0018 § 1 et 0085 § 11) |
 | 0118 | Les rapports validés nourrissent le jeu du chatteur, et un gain que le net corrigé ne justifie plus est repris | accepted (précise 0104 § 12 à § 16 et 0108 ; amende 0104 § 15 et § 16) |
@@ -152,8 +152,9 @@ Date : AAAA-MM-JJ
 | 0140 | La semaine de la créatrice : deux jours de tournage qu'elle choisit, une livraison le dimanche, un agenda que le code remplit | accepted (précise 0042 §§ 3-5, 0055 §§ 4-5, 0056 § 2, 0126, 0136, 0137, 0120, 0082) |
 | 0143 | Ses pratiques et savoir-faire, et ses comptes : l'agent en parle juste, sans rien inventer, et oriente le fan vers le bon compte | accepted (précise 0079, 0021, 0088, 0126, P4-01) |
 | 0144 | Le MCP suit le CRM de novembre : coffre, branches, Playground, copilote, semaine de la créatrice, trophées et liens, en lecture seule | accepted (précise 0105 § 4) |
-| 0145 | Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed à nous, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) |
+| 0145 | Les dossiers du coffre ont un rôle : un dossier par script, une réserve Mass DM et une réserve Feed à nous, le code lit le rôle et jamais le nom | accepted (amende 0099 § 2 ; précise 0056 §§ 5 et 7, 0113 § 5, 0018, 0136, 0137) ; avenant du § 5 accepté le 17/11 (import au choix, description sur sélection, plus d’interrupteur des descriptions ; amende 0113 § 5 et 0083 § 9) |
 | 0146 | Le Dashboard de l'agence se lit par jour, semaine, mois ou période choisie, et se compare à la période qu'on choisit | accepted (précise 0078 § 3 et § 5) |
+| 0148 | L'IA d'une créatrice : un interrupteur qui dit l'état en clair, une pause rapide, et ses heures à elle dessinées sur une frise | accepted (précise P3-14, 0126 §§ 13 et 17, 0019, 0024, 0149) |
 | 0149 | La fiche d'une créatrice en sept onglets : tout ce qui la concerne au même endroit, la section Scripts du menu retirée | accepted (amende 0134 §§ 1, 3, 4, 7 ; précise 0042 § 7, 0099, 0112, 0137, 0145, 0148) |
 | 0150 | Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine | accepted (précise P4-01, 0020, 0042 § 7, 0091, 0128 § C, 0143 § 13) |
 | 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |

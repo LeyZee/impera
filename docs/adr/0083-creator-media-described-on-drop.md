@@ -37,7 +37,7 @@ La description de 1 à 4 phrases suffit à réagir au média d'un fan. Elle est 
 
 8. **Données.** Les descriptions sont des données de la base, sous la politique de la créatrice (`media_descriptions`, ADR 0030) ; aucun média ni aucune description réelle n'entre dans le dépôt, les tests et les évaluations utilisent des médias inventés. Le budget IA du jour (20 €) s'applique : une description en attente de budget est reprise le lendemain, jamais abandonnée.
 
-9. **Avant la clé de vision.** Tout se code et se teste avec l'IA scriptée du bac à sable (ADR 0075). Au branchement de la clé, on vérifie sur quelques vrais médias, hors dépôt, que le modèle de vision accepte le contenu adulte et respecte les § 3 et 4, avant d'activer les descriptions pour une créatrice.
+9. **Avant la clé de vision.** Tout se code et se teste avec l'IA scriptée du bac à sable (ADR 0075). Au branchement de la clé, on vérifie sur quelques vrais médias, hors dépôt, que le modèle de vision accepte le contenu adulte et respecte les § 3 et 4, avant d'activer les descriptions pour une créatrice. *Avenant du 17/11/2026 (ADR 0145 § 5, choix de Charles) : l'interrupteur des descriptions par créatrice disparaît ; un dépôt est décrit à son arrivée, et le coffre Reveal seulement sur une sélection confirmée.*
 
 ## Conséquences
 

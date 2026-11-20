@@ -42,6 +42,7 @@ function fakeGateway(
     describeTrendCaptures: () => Promise.reject(new Error('not used')),
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
+    instagramComment: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
@@ -509,6 +510,21 @@ describe('playground session, the offer policy and the cursor', () => {
     await session(voiceInputs, true).handleFanMessage('T’es trop bonne');
     expect(voiceInputs[0]?.brief.action).toBe('reply');
     expect(voiceInputs[0]?.brief.replyBrief).toContain('ralentit');
+  });
+
+  it('does not ask a simulated fan she knows for his age again (audit du 16/11, H6)', async () => {
+    const voiceInputs: VoiceInput[] = [];
+    const playground = session(voiceInputs, true);
+    playground.confirmAge(new Date('2026-10-14T20:00:00Z'));
+    const turn = await playground.handleFanMessage('T’es trop bonne');
+    expect(turn.cursor?.reason).not.toBe('age_unconfirmed');
+    expect(voiceInputs[0]?.brief.replyBrief ?? '').not.toContain('ralentit');
+    // Back to a new fan: his age is unknown again.
+    playground.reset();
+    playground.confirmAge(null);
+    const voiceAfter: VoiceInput[] = [];
+    await session(voiceAfter, true).handleFanMessage('T’es trop bonne');
+    expect(voiceAfter[0]?.brief.replyBrief).toContain('ralentit');
   });
 
   it('offers only once his desire score reaches hers, as it builds message after message (P3-12)', async () => {

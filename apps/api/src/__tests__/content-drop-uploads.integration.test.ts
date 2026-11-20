@@ -544,7 +544,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
     ]);
   });
 
-  it('describes a new photo of hers once her switch is on, once, and holds back another person (ADR 0083)', async () => {
+  it('describes a new photo of hers on arrival, once, and holds back another person (ADR 0083, ADR 0145 § 5)', async () => {
     const one = await dropOne('nora', jpegOf(MB, 30, 40, 0x5a));
     await sendWhole(one);
     await receive();
@@ -582,17 +582,14 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
         .from(schema.mediaDescriptions)
         .where(eq(schema.mediaDescriptions.mediaAssetId, mediaAssetId));
 
-    // Her switch off (ADR 0083 § 9): the vision AI is never called.
+    // No switch (17/11): the drop is the choice, the vision AI describes it on arrival. The photos the tests above
+    // dropped were queued too: their runs are left out, this test reads this photo's alone.
+    await test.admin.db.execute(sql`
+      delete from graphile_worker._private_jobs j using graphile_worker._private_tasks t
+       where t.id = j.task_id and t.identifier = 'content_drops.describe_file'
+         and j.key <> ${`content_drops.describe_file:${mediaAssetId}`}`);
     seen.length = 0;
-    await describe();
-    expect(seen).toEqual([]);
     expect(await descriptions()).toEqual([]);
-
-    await test.admin.db
-      .update(schema.creators)
-      .set({ settings: { describeDrops: true } })
-      .where(eq(schema.creators.id, nora));
-    await again();
     await describe();
     expect(seen).toHaveLength(1);
     expect(seen[0]?.context).toEqual({ category: 'Feed · Séance boudoir', step: null });
@@ -662,10 +659,6 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
       expect(answer.statusCode, answer.body).toBe(200);
       return DropDescriptionsReviewSchema.parse(answer.json());
     };
-    await test.admin.db
-      .update(schema.creators)
-      .set({ settings: { describeDrops: true } })
-      .where(eq(schema.creators.id, nora));
     vision.fails = true;
 
     // A failed try is counted on the medium, and the job is tried again.

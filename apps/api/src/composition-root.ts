@@ -383,6 +383,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     vision: options.dropVision ?? llm.gateway,
     files: connectors.module.vaultFiles,
     drops: contentDrops.module,
+    budget: () => llm.gateway.health().budget,
   });
   const scripts = wireScripts(shared, {
     persona: persona.module,
@@ -636,6 +637,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...redirectLinks.routes,
       ...creatorTasks.routes,
       ...contentDrops.routes,
+      ...vaultDescriptions.routes,
       ...contractors.routes,
       ...payroll.routes,
       ...invoicing.routes,

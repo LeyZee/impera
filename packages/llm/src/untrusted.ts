@@ -28,7 +28,17 @@ export type UntrustedKind =
   /** What a script of her catalogue is about (ADR 0098 § 6): the agency's words, a criterion for the brain's pick. */
   | 'script_description'
   /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */
-  | 'script_step';
+  | 'script_step'
+  /**
+   * A comment left under one of her Instagram posts, and that post's caption (ADR 0122 § 2): a third party's words
+   * and hers, read as data, never as an order.
+   */
+  | 'instagram_comment'
+  | 'instagram_caption'
+  /** Her validated replies to comments (ADR 0122 § 4): the examples of the Playground's bank. */
+  | 'comment_examples'
+  /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
+  | 'recent_replies';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

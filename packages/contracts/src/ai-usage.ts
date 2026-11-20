@@ -15,9 +15,18 @@ export type AiUsageProvider = z.infer<typeof AiUsageProviderSchema>;
 
 /**
  * What the money went to, the way the screen names it: the four roles of the gateway (ADR 0009), the trend watch
- * apart (ADR 0060 § 7) and the owner's « Essai réel » of a service apart (ADR 0091 § 7), whatever role they used.
+ * apart (ADR 0060 § 7) and the owner's « Essai réel » of a service apart (ADR 0091 § 7), whatever role they used, and
+ * the replies to her Instagram comments apart (ADR 0122).
  */
-export const AiUsageUseSchema = z.enum(['voice', 'brain', 'sense', 'judge', 'trend_watch', 'probe']);
+export const AiUsageUseSchema = z.enum([
+  'voice',
+  'brain',
+  'sense',
+  'judge',
+  'trend_watch',
+  'probe',
+  'instagram_comment',
+]);
 export type AiUsageUse = z.infer<typeof AiUsageUseSchema>;
 
 const eur = z.number().nonnegative();
