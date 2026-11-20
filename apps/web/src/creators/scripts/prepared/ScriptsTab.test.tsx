@@ -2,10 +2,13 @@
 import { CreatePreparedScriptBodySchema, SavePreparedScriptBodySchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SAVE_AFTER_MS } from './PreparedEditor';
+import { PreparedScriptsView } from './PreparedScriptsView';
 import { ScriptsTab } from './ScriptsTab';
+import { ScriptsToCopyView } from './ScriptsToCopyView';
 import { CHOICES, CONTENT, CREATOR, SCRIPT, VAULT, viewOf } from './fixtures';
 
 interface Reply {
@@ -40,14 +43,16 @@ const vaultRoutes = {
   [`GET /creators/${CREATOR}/vault/choices`]: () => ({ status: 200, body: CHOICES }),
 };
 
-function show(): void {
+function show(
+  screenOf: JSX.Element = <ScriptsTab creatorId={CREATOR} creatorName="Lina" sent={<p>Scripts envoyés</p>} />,
+): void {
   vi.stubGlobal(
     'matchMedia',
     vi.fn(() => ({ matches: true })),
   );
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ScriptsTab creatorId={CREATOR} creatorName="Lina" sent={<p>Scripts envoyés</p>} />
+      {screenOf}
     </QueryClientProvider>,
   );
 }
@@ -241,5 +246,51 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
       expect(writeText).toHaveBeenCalledWith(CONTENT.name);
     });
     expect(await screen.findByRole('button', { name: '✓ Copié' })).toBeDefined();
+  });
+
+  it('opens a script ready to copy back in « Scripts », in its editor', async () => {
+    serve({
+      ...vaultRoutes,
+      [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf({ state: 'ready_to_copy' })] }),
+    });
+    show();
+    fireEvent.click(await screen.findByRole('tab', { name: /À copier dans Reveal/u }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
+    expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
+    expect(screen.getByRole('tab', { name: 'Scripts', selected: true })).toBeDefined();
+  });
+});
+
+describe('Créatrices › Scripts, each view standing alone (for the creator sheet)', () => {
+  it('« Scripts » lists her scripts, and opens at once the script it is given', async () => {
+    serve({ ...vaultRoutes, [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf()] }) });
+    const onCopy = vi.fn();
+    show(<PreparedScriptsView creatorId={CREATOR} creatorName="Lina" onCopy={onCopy} />);
+    expect(await screen.findByRole('button', { name: /Soirée inventée/u })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Nouveau script/u })).toBeDefined();
+    expect(screen.queryByRole('tab')).toBeNull();
+    cleanup();
+    show(<PreparedScriptsView creatorId={CREATOR} creatorName="Lina" opening={viewOf()} onCopy={onCopy} />);
+    expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
+  });
+
+  it('« À copier dans Reveal » shows what is ready, then what she sent, and hands back a script to open', async () => {
+    serve({
+      ...vaultRoutes,
+      [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf({ state: 'ready_to_copy' })] }),
+    });
+    const onOpen = vi.fn();
+    show(
+      <ScriptsToCopyView
+        creatorId={CREATOR}
+        creatorName="Lina"
+        sent={<p>Scripts envoyés</p>}
+        onOpen={onOpen}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ state: 'ready_to_copy' }));
+    expect(screen.getByText('Scripts envoyés')).toBeDefined();
+    expect(screen.queryByRole('tab')).toBeNull();
   });
 });
