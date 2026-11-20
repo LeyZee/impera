@@ -203,7 +203,7 @@ const CRON_JOBS: readonly CronJob[] = [
   // a fan having written in the 24 hours before; one event per account and créneau. No backfill: the next run looks back.
   {
     task: 'scheduling.check_uncovered',
-    match: '1-59/5 * * * *',
+    match: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.check_uncovered'] },
   },
   // The member of a shift ended without its report is reminded on his phone (ADR 0077): 15 minutes after its end, then
