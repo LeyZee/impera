@@ -253,48 +253,5 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
         await identify();
         return 'corrected';
       }),
-
-    review: (creatorId: CreatorId, scriptId, review, userId, currentHash) =>
-      withTenantMember(db, creatorId, userId, async (tx, scope) => {
-        const script = await reviewed(tx, scope, creatorId, scriptId, userId);
-        if (script === null) return 'not_found';
-        const inputHash = currentHash(script);
-        const audit = (action: string, identityId: string) =>
-          tx.insert(auditLog).values({
-            id: newId(AuditEntryIdSchema),
-            userId,
-            action,
-            entity: 'platform_script',
-            entityId: scriptId,
-            details: { identityId, creatorId },
-          });
-
-        if (review.kind === 'validate') {
-          const identity = script.identities.find((each) => each.id === review.identityId);
-          if (identity?.inputHash !== inputHash) return 'stale';
-          if (identity.validatedAt !== null) return 'already';
-          await tx
-            .update(scriptIdentities)
-            .set({ validatedBy: userId, validatedAt: sql`now()` })
-            .where(and(eq(scriptIdentities.id, identity.id), sql`${scriptIdentities.validatedAt} is null`));
-          await audit('script_identity.validated', identity.id);
-          return 'validated';
-        }
-
-        const id = newId(ScriptIdentityIdSchema);
-        await tx.insert(scriptIdentities).values({
-          id,
-          creatorId,
-          platformScriptId: scriptId,
-          inputHash,
-          schemaVersion: SCRIPT_IDENTITY_SCHEMA_VERSION,
-          content: review.content,
-          author: 'human',
-          validatedBy: userId,
-          validatedAt: sql`now()`,
-        });
-        await audit('script_identity.corrected', id);
-        return 'corrected';
-      }),
   };
 }
