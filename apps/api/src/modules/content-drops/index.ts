@@ -31,7 +31,7 @@ import type {
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
-import { createDrizzleDescribeSwitch, createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
+import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
@@ -76,8 +76,8 @@ export interface ContentDropsModule {
      */
     summarizeScript(dropId: string, correlationId: string): Promise<SummarizeOutcome>;
     /**
-     * `content_drops.describe_backlog` (ADR 0083 § 2, § 9): each hour, and for one creator when her switch is turned
-     * on, what waits for the vision or the brain enqueued again. Counts, for the log.
+     * `content_drops.describe_backlog` (ADR 0083 § 2): each hour, what of her drops waits for the vision or the brain
+     * enqueued again. Counts, for the log.
      */
     describeBacklog(
       creatorId: string | null,
@@ -173,7 +173,6 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       agency,
       storage,
       { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
-      createDrizzleDescribeSwitch(deps.adminDb),
       createDrizzleDescriptionReview(deps.db),
       deps.requireRole,
       clock,
