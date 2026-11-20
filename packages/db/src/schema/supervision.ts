@@ -44,6 +44,11 @@ export const killSwitches = pgTable(
     scopeId: uuid('scope_id'),
     creatorId: uuid('creator_id').references(() => creators.id),
     active: boolean('active').notNull(),
+    /**
+     * A pause (ADR 0148 § 1): the switch is on until this instant, then reads as off without a new row. `null` for a
+     * switch lifted by hand. Every reader takes `active and (active_until is null or active_until > now())`.
+     */
+    activeUntil: timestampTz('active_until'),
     reason: text('reason').notNull(),
     setBy: text('set_by').notNull(),
     setAt: timestampTz('set_at').notNull().defaultNow(),

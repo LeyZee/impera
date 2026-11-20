@@ -221,6 +221,10 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       // A fifth of the agency's part (ADR 0106 § 6).
       agencyTransferVatMinor: 300,
     });
+    // The days carry the two parts for the tiles' small curves, adding up to the period's to the cent.
+    const days = result.days.map((one) => [one.agencyMinor, one.creatorMinor]);
+    expect(days.reduce((sum, [agency = 0]) => sum + agency, 0)).toBe(result.totals.current.agencyMinor);
+    expect(days.reduce((sum, [, creator = 0]) => sum + creator, 0)).toBe(result.totals.current.creatorMinor);
     expect(result.kinds.map((one) => [one.kind, one.revenueMinor])).toEqual([['ppv', 6000]]);
     expect(result.sellers.map((one) => [one.seller, one.revenueMinor])).toEqual([
       [{ kind: 'agent' }, 3000],
@@ -288,7 +292,15 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
   });
 
   it('gives an active manager his creators’ figures, and nothing to a reader whose scope is his own (ADR 0043 § 7)', async () => {
-    expect((await agency('manager')).totals.current.revenueMinor).toBe(6000);
+    const manager = await agency('manager');
+    expect(manager.totals.current.revenueMinor).toBe(6000);
+    // He reads the parts in the totals, so day by day too; the others read neither (403 below).
+    expect(manager.days.map((one) => [one.day, one.agencyMinor, one.creatorMinor])).toEqual(
+      (await agency('owner')).days.map((one) => [one.day, one.agencyMinor, one.creatorMinor]),
+    );
+    expect(manager.days.reduce((sum, one) => sum + one.agencyMinor, 0)).toBe(
+      manager.totals.current.agencyMinor,
+    );
     // Not even the totals: taking his own sales off them would give him the others'.
     expect((await get('operator')).statusCode).toBe(403);
     expect((await get('chatter')).statusCode).toBe(403);

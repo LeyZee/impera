@@ -95,7 +95,7 @@ export const MarkableCreatorsSchema = z.strictObject({
 export type MarkableCreators = z.infer<typeof MarkableCreatorsSchema>;
 
 export const LinkSavedSchema = z.strictObject({
-  state: z.enum(['linked', 'refused', 'unreachable', 'malformed']),
+  state: z.enum(['linked', 'refused', 'busy', 'unreachable', 'malformed']),
 });
 export type LinkSaved = z.infer<typeof LinkSavedSchema>;
 
@@ -106,7 +106,7 @@ export type Marked = z.infer<typeof MarkedSchema>;
 
 /** The Reveal accounts the owner's « Sync » may fill (P2-01); `not-owner`: the link is a manager's or a chatter's. */
 export const RevealAccountsSchema = z.strictObject({
-  state: z.enum(['ok', 'none', 'revoked', 'not-owner', 'unreachable']),
+  state: z.enum(['ok', 'none', 'revoked', 'not-owner', 'busy', 'unreachable']),
   accounts: z.array(
     z.strictObject({
       id: PlatformAccountIdSchema,
@@ -162,6 +162,7 @@ export const RevealSyncedSchema = z.discriminatedUnion('state', [
       'other-model',
       'other-member',
       'refused',
+      'busy',
       'unreachable',
     ]),
   }),

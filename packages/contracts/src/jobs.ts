@@ -737,6 +737,14 @@ export function reopenJobKey(creatorId: string): string {
   return `conversation.reopen:${creatorId}`;
 }
 
+/**
+ * The reopening at the end of her pause (ADR 0148 § 1): a key of its own, so that her hours, which move
+ * `reopenJobKey`, never move it, and a new pause replaces it.
+ */
+export function pauseEndJobKey(creatorId: string): string {
+  return `conversation.reopen:pause:${creatorId}`;
+}
+
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {
   return `account:${platformAccountId}`;
 }

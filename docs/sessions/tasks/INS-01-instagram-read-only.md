@@ -1,5 +1,5 @@
 # INS-01 Instagram en lecture seule : branchement, relevés des médias et des stories
-Statut : todo (le faux, les contrats et le domaine s'écrivent tout de suite ; l'essai réel attend le compte professionnel de la créatrice et l'application Meta de l'agence)
+Statut : in progress (lot a : contrats, domaine et faux ; l'essai réel attend le compte professionnel de la créatrice et l'application Meta de l'agence)
 Phase : Instagram (ADR 0120)
 Dépend de : ADR 0120 acceptée
 Branche : task/ins-01-instagram-read-only
@@ -12,12 +12,12 @@ Le compte Instagram d'une créatrice se branche avec les seuls droits de lecture
 ADR 0120 § 1 et § 2, ADR 0057 § 1 et § 2, ADR 0016, ADR 0082 § 1, `docs/architecture/connectors.md`, `docs/playbooks/add-a-connector.md`, la documentation officielle de l'API Instagram au moment du lot.
 
 ## À faire
-- [ ] Contrats Zod : média, relevé, story en ligne ; drapeaux de capacité du port (lecture, publication).
-- [ ] `FakeInstagram` (lecture), puis l'adaptateur officiel ; aucune méthode d'écriture dans ce lot.
+- [x] Contrats Zod : média, relevé, story en ligne ; drapeaux de capacité du port (lecture, publication). (lot a)
+- [ ] `FakeInstagramInsights` (lecture ; fait au lot a), puis l'adaptateur officiel ; aucune méthode d'écriture dans ce lot.
 - [ ] Branchement dans Réglages › Créatrices par la connexion officielle, droits de lecture seulement ; jeton scellé ; renouvellement par un job ; expiration en ambre.
 - [ ] Table des relevés : unique par média et par âge, FORCE RLS, `GRANT SELECT … TO impera_service`.
 - [ ] Job de nuit rejouable, et relevé une heure après une publication connue.
-- [ ] Âge d'un relevé = palier : première lecture faite après cet âge, heure réelle de la lecture gardée (ADR 0120 § 2).
+- [x] Âge d'un relevé = palier : première lecture faite après cet âge, heure réelle de la lecture gardée (ADR 0120 § 2).
 - [ ] Quota d'appels de Meta par compte et par heure : à l'approche du quota, le job s'arrête en ambre et reprend plus tard, sans jamais boucler.
 - [ ] Hôtes de sortie écrits dans l'adaptateur, jamais tirés d'un réglage (ADR 0120 § 3, ADR 0113 § 2).
 - [ ] Des nombres seulement : jamais le texte ni le nom d'un commentateur.
@@ -37,3 +37,7 @@ ADR 0120 § 1 et § 2, ADR 0057 § 1 et § 2, ADR 0016, ADR 0082 § 1, `docs/arc
 La publication (PUB-02), le retour sur un Reel et l'entonnoir (lot suivant), les commentaires.
 
 ## Notes de session
+- 20/11/2026, lot a : `packages/contracts/src/instagram-insights.ts`, `connectors/domain/instagram-insights.ts` (port en lecture, `grantOf`, paliers, plan d'une nuit borné par le quota, état du jeton, alerte de deux nuits ratées), `FakeInstagramInsights`. Le faux de lecture est une classe à part de `FakeInstagram` (commentaires, INS-04) : les deux ports n'ont pas les mêmes drapeaux. Aucune table, route ni appel à Meta.
+- Lots suivants : b = table des relevés et job de nuit contre le faux (migration, FORCE RLS, GRANT SELECT) ; c = branchement dans Réglages (secret de l'application scellé, retour de connexion à usage unique, débranchement ; relu par Sécurité) ; d = adaptateur officiel, hôtes écrits dans le code, documentation de Meta relue au moment du lot, essai réel sur le mot de Charles.
+- Le quota : `callsLeft` garde une marge sous la limite horaire ; la limite elle-même et la façon dont Meta la donne se lisent dans sa documentation au lot d, rien n'est supposé ici.
+- À trancher avant le lot de branchement (remarque de Sécurité) : Meta rend en général les droits cumulés du compte pour l'application. Après le second consentement (publication), puis celui des commentaires (ADR 0122), un renouvellement du consentement de lecture verra revenir des droits « non demandés par ce consentement ». La comparaison devra se faire avec « demandés par ce consentement ou déjà consentis chez nous et enregistrés », et un seul module devra tenir l'union des trois listes (lecture, publication, commentaires). Aujourd'hui `grantOf` tient la liste fermée lecture et publication et refuse tout le reste.

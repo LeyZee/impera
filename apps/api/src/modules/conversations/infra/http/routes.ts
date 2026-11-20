@@ -354,10 +354,16 @@ export function createConversationRoutes(
       '/agent/mode',
       { ...act, schema: { body: SetAgentModeBodySchema, response: { 200: AgentModeResultSchema } } },
       async (request, reply) => {
-        const { creatorId, mode } = request.body;
+        const { creatorId, mode, until } = request.body;
         const { userId } = actorFor(request, creatorId);
         await confirmAutomatic(request, reply, mode);
-        return commands.setAgentMode({ creatorId, userId, mode, correlationId: request.id });
+        return commands.setAgentMode({
+          creatorId,
+          userId,
+          mode,
+          correlationId: request.id,
+          ...(until === undefined ? {} : { until: new Date(until) }),
+        });
       },
     );
 

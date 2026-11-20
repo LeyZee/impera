@@ -4,6 +4,7 @@ import {
   type CreatorId,
   type CreatorOverview,
   type CreatorOverviewRequests,
+  type ResumeMode,
   type TeamMemberId,
 } from '@impera/contracts';
 
@@ -33,12 +34,22 @@ export function creatorOverview(input: {
 }): CreatorOverview {
   const { creatorId, facts, now, sales, rate, onShift } = input;
   const mode = modeOf(facts);
-  if (facts.scope === 'self') return { creatorId, mode, sales: null, onShift: null, requests: null };
+  // Her switch in words (ADR 0148 § 1): a pause only while her own Arrêt holds.
+  const resumesAs: ResumeMode = facts.autoConversations > 0 ? 'auto' : 'copilot';
+  const agent = {
+    pausedUntil: facts.switches.creator ? (facts.pausedUntil?.toISOString() ?? null) : null,
+    globalStop: facts.switches.global,
+    hoursNow: facts.hoursNow,
+    resumesAs,
+  };
+  if (facts.scope === 'self')
+    return { creatorId, mode, ...agent, sales: null, onShift: null, requests: null };
   // Her card keeps the totals only: a stopped reading is named on her Dashboard's panel (AGT-11).
   const panel = sales === undefined ? null : revealSalesPanel({ ...sales, rate, names: null, feeds: [] });
   return {
     creatorId,
     mode,
+    ...agent,
     sales:
       panel === null
         ? null

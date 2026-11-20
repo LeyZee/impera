@@ -1,6 +1,7 @@
 import type { Me, ShiftChallenge } from '@impera/contracts';
 import type { JSX } from 'react';
 
+import { GameGauge } from './GameGauge';
 import { playsTheGame, useMyShiftChallenge } from './api';
 import './rewards.css';
 
@@ -43,17 +44,14 @@ export function ShiftChallengeCard({
         <p className="rw-challenge__figures nv-num">
           <b>{amountText(Math.max(0, netMinor), currency)}</b> sur {amountText(targetMinor, currency)} de net
         </p>
-        <div
-          className="nv-gauge rw-challenge__gauge"
-          role="progressbar"
-          aria-label="Avancée du défi"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          style={{ '--nv-gauge-value': `${String(percent)}%` }}
-        >
-          <span className="nv-gauge__fill" />
-        </div>
+        <GameGauge
+          userId={user.id}
+          name="challenge"
+          scope={challenge.shiftStartsAt}
+          percent={percent}
+          label="Avancée du défi"
+          className="rw-challenge__gauge"
+        />
         <p className="rw-challenge__note">
           {met
             ? `Tu as dépassé ton ${weekday} habituel sur ce créneau.`

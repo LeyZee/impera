@@ -8,7 +8,6 @@ import {
   queueNameFor,
   replyOpenAt,
   reopenJobKey,
-  type AgentHours,
   type AlertTrigger,
   type EventBody,
   type HandoffCause,
@@ -28,6 +27,7 @@ import type {
   FanDirectory,
   HoldReason,
   JobLogger,
+  HerHours,
   ReplyHours,
   StoredScriptRun,
   Transaction,
@@ -309,12 +309,9 @@ async function deferReply(
  * shift is not bound by her hours, but answers in Reveal (ADR 0025): a draft of the agent at 4:00 would serve nobody,
  * and her hours exist so that she does not answer at 4:00. `null` when she may answer now.
  */
-function closedUntil(
-  her: { readonly hours: AgentHours; readonly timeZone: string } | null,
-  now: Date,
-): Date | null {
-  if (her === null || replyOpenAt(her.hours, her.timeZone, now)) return null;
-  const opening = nextReplyOpening(her.hours, her.timeZone, now);
+function closedUntil(her: HerHours | null, now: Date): Date | null {
+  if (her === null || replyOpenAt(her.hours, her.timeZone, now, her.exceptions)) return null;
+  const opening = nextReplyOpening(her.hours, her.timeZone, now, her.exceptions);
   // Her hours always have an active slot (the contract); stored hours that had none never put a job off to now.
   return opening.getTime() > now.getTime() ? opening : null;
 }
@@ -436,7 +433,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       history: read.history,
       fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       ...(waitedFor !== null && { waited: 1 }),
-      ...(hours !== null && { hours: hours.hours }),
+      ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
       ...(read.conversation.desireScore !== null &&
         read.conversation.desireAt !== null && {
           desire: { score: read.conversation.desireScore, at: read.conversation.desireAt },

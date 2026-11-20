@@ -269,6 +269,8 @@ function seededFor(path: string, name: string): Seeded | undefined {
 /** Filler for a parameter beside B's creator: any value, the creator's guard answers first. */
 function filler(name: string): string {
   if (name === 'day') return '2026-11-06';
+  // A date of her clock far ahead: a past one is refused before the guard could prove anything.
+  if (name === 'date') return '2099-01-01';
   if (name === 'slotKey' || name === 'segmentKey') return 'a';
   if (name === 'field') return 'first_name';
   return '00000000-0000-4000-8000-000000000000';
