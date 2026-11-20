@@ -88,19 +88,25 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
                      where has_function_privilege(r, p.oid, 'EXECUTE') order by r) as roles
          from pg_proc p
         where p.pronamespace = 'public'::regnamespace
+          and p.prorettype <> 'trigger'::regtype
           and not exists (select 1 from pg_depend d
                            where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e')
         order by p.proname`,
     );
-    // A new function goes here with the roles its migration grants it to.
+    // A new function goes here with the roles its migration grants it to. Trigger functions are left out: firing a
+    // trigger checks no EXECUTE, and the test above already keeps them out of reach of the host's roles.
     expect(Object.fromEntries(callers.rows.map((row) => [row.name, row.roles]))).toEqual({
       calendar_agent: ['nirvana_app'],
       calendar_reader_scope: [],
       calendar_shifts: ['nirvana_app'],
       enqueue_job: ['impera_service', 'nirvana_app'],
       follow_own_time_zone: ['nirvana_app'],
-      // A trigger's function: PUBLIC could call it before 0231, so our two roles still can.
-      reward_gains_taken_back_stays: ['impera_service', 'nirvana_app'],
+      // Open to PUBLIC before 0231: our two roles keep them, nobody else.
+      member_documents_open: ['impera_service', 'nirvana_app'],
+      next_pay_period: ['impera_service', 'nirvana_app'],
+      pay_period_closed: ['impera_service', 'nirvana_app'],
+      pay_period_of: ['impera_service', 'nirvana_app'],
+      pay_period_settled: ['impera_service', 'nirvana_app'],
     });
   });
 
