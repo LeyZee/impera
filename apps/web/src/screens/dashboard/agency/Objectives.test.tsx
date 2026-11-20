@@ -55,6 +55,9 @@ describe('objectiveVerdict', () => {
     expect(short?.tone).toBe('down');
     expect(short?.text).toBe('À ce rythme : environ 600\u00a0€, il manquerait environ 400\u00a0€');
     expect(
+      objectiveVerdict({ objectiveMinor: 100_000, revenueMinor: 49_900, projectedMinor: 99_800 })?.text,
+    ).toBe('À ce rythme : environ 1\u202f000\u00a0€, il manquerait moins de 10\u00a0€');
+    expect(
       objectiveVerdict({ objectiveMinor: 100_000, revenueMinor: 100_000, projectedMinor: null }),
     ).toEqual({
       tone: 'up',

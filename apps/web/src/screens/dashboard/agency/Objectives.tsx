@@ -20,6 +20,11 @@ export function aboutEuros(cents: number): string {
   return `environ ${(Math.round(cents / 1000) * 10).toLocaleString('fr-FR')}\u00a0€`;
 }
 
+/** A shortfall: rounded like a projection, but never « environ 0 € » when it is a few euros. */
+function gapEuros(cents: number): string {
+  return cents < 500 ? 'moins de 10\u00a0€' : aboutEuros(cents);
+}
+
 /**
  * How a row stands against its objective (ADR 0092 § 6): on its way or short at this pace, reached or missed once the
  * month is over; nothing to say without an objective.
@@ -37,7 +42,7 @@ export function objectiveVerdict(
     ? { tone: 'up', text: `À ce rythme : ${aboutEuros(row.projectedMinor)} à la fin du mois` }
     : {
         tone: 'down',
-        text: `À ce rythme : ${aboutEuros(row.projectedMinor)}, il manquerait ${aboutEuros(row.objectiveMinor - row.projectedMinor)}`,
+        text: `À ce rythme : ${aboutEuros(row.projectedMinor)}, il manquerait ${gapEuros(row.objectiveMinor - row.projectedMinor)}`,
       };
 }
 
