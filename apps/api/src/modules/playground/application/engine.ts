@@ -21,13 +21,27 @@ export interface PlaygroundEngine {
   applyPreset(presetId: string): PlaygroundState;
   reset(): PlaygroundState;
   send(text: string, media: readonly PlaygroundMedia[]): Promise<PlaygroundAnswer>;
-  rate(verdict: Verdict, destination?: Destination): Promise<PlaygroundRatingResult>;
+  /**
+   * `mayFileExamples` false (a manager, ADR 0092 § 8): a correction is never suggested as a voice example; it stays a
+   * note that counts in the rate.
+   */
+  rate(
+    verdict: Verdict,
+    destination?: Destination,
+    mayFileExamples?: boolean,
+  ): Promise<PlaygroundRatingResult>;
   branch(fanMessageNumber: number): Promise<PlaygroundState>;
   compare(voiceModel: string): Promise<PlaygroundComparison>;
   patchSituation(patch: PlaygroundSituationPatch): PlaygroundState;
   advance(hours: number): PlaygroundState;
   setNotes(notes: readonly string[]): PlaygroundState;
   sendCreatorMedia(media: PlaygroundMedia, isLocked: boolean): PlaygroundState;
+  /** « Payer (fictif) » on the paid step of a trial script waiting for him (ADR 0103 § 16); nothing reaches Reveal. */
+  buyScriptStep(): PlaygroundState;
+  /** « Refuser » the paid step waiting: an explicit refusal, the script stops there. */
+  refuseScriptStep(): PlaygroundState;
+  /** Reads her catalogue now, as his next message would: the screen says at once whether she has a script to sell. */
+  readScripts(): Promise<void>;
   /** The owner marks his desire score after his n-th message (ADR 0103 § 6); kept for a creator's version only. */
   markDesire(
     fanMessageNumber: number,
@@ -40,6 +54,23 @@ export interface PlaygroundEngine {
 class PlaygroundError extends DomainError {
   protected constructor(code: PlaygroundErrorCode, message: string) {
     super(code, message);
+  }
+}
+
+/** A manager names a creator off his list (ADR 0092 § 8). */
+export class PlaygroundCreatorForbidden extends PlaygroundError {
+  constructor() {
+    super('creator_forbidden', 'Créatrice hors de ta liste');
+  }
+}
+
+/** Her bank is the owner's to fill and empty: a manager notes and corrects (Charles, 20/11). */
+export class VoiceBankOwnerOnly extends PlaygroundError {
+  constructor() {
+    super(
+      'voice_bank_owner_forbidden',
+      'Seul le propriétaire range une correction en Exemple de voix ou en retire un.',
+    );
   }
 }
 
@@ -78,6 +109,20 @@ export class AnswerInProgress extends PlaygroundError {
 export class BlockedAnswer extends PlaygroundError {
   constructor() {
     super('blocked_answer_conflict', 'Réponse bloquée par les gardes : corrige-la ou rejette-la.');
+  }
+}
+
+/** « Payer (fictif) » or « Refuser » with no paid step waiting for him (already decided, or the script ended). */
+export class ScriptStepNotWaiting extends PlaygroundError {
+  constructor() {
+    super('script_step_not_waiting_conflict', 'Aucune étape payante n’attend de réponse.');
+  }
+}
+
+/** « Payer (fictif) » once a possible minor or his distress froze his sales: production would never sell then. */
+export class ScriptSalesFrozen extends PlaygroundError {
+  constructor() {
+    super('script_sales_frozen_conflict', 'Ventes gelées pour ce fan : aucun achat, même fictif.');
   }
 }
 

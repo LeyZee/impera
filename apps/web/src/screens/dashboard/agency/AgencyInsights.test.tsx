@@ -402,6 +402,49 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(screen.getByRole('img', { name: '100 % fait par les 3 plus gros fans' })).toBeTruthy();
   });
 
+  it('draws no conclusion from too few sales, and keeps every figure (ADR 0092 § 5)', async () => {
+    const current = { ...AGENCY_WEEK.totals.current, sales: 4 };
+    serve(200, { ...AGENCY_WEEK, totals: { ...AGENCY_WEEK.totals, current } });
+    show();
+    const map = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    // The slot, the peak and the concentration are not written; the sentence that says why is, twice.
+    expect(screen.queryByText(/Le créneau qui rapporte le plus/u)).toBeNull();
+    expect(screen.queryByText(/concentré|Bien réparti/u)).toBeNull();
+    expect(screen.getAllByText('Pas encore assez de ventes pour conclure.')).toHaveLength(2);
+    // The figures stay: the map, the meter, the paying and new payers.
+    expect(within(map).getAllByRole('button')).toHaveLength(7 * 24);
+    expect(screen.getByText(/Les 10 fans qui dépensent le plus/u).textContent).toContain('58');
+    expect(screen.getByText('Nouveaux payeurs')).toBeTruthy();
+  });
+
+  it('draws no conclusion before the registers hold enough days of the period (ADR 0092 § 5)', async () => {
+    serve(200, { ...AGENCY_WEEK, registerSince: '2026-11-04' });
+    show();
+    await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    expect(screen.queryByText(/Le créneau qui rapporte le plus/u)).toBeNull();
+    // Too little hindsight is said as such, not as too few sales (Charles, 20/11).
+    expect(screen.getAllByText('Pas encore assez de recul pour conclure.')).toHaveLength(2);
+    expect(screen.queryByText('Pas encore assez de ventes pour conclure.')).toBeNull();
+  });
+
+  it('lights the best slot in one hue, and greys the map while it cannot conclude', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const map = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    const plate = map.closest('.ins-hours');
+    expect(plate?.hasAttribute('data-pending')).toBe(false);
+    // One ring over the slot's three hours, every day of the week.
+    expect(map.querySelectorAll('.ins-heat__best')).toHaveLength(1);
+    cleanup();
+    const current = { ...AGENCY_WEEK.totals.current, sales: 4 };
+    serve(200, { ...AGENCY_WEEK, totals: { ...AGENCY_WEEK.totals, current } });
+    show();
+    const grey = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
+    expect(grey.closest('.ins-hours')?.hasAttribute('data-pending')).toBe(true);
+    expect(document.querySelector('.ins-fans')?.hasAttribute('data-pending')).toBe(true);
+    expect(grey.querySelectorAll('.ins-heat__best')).toHaveLength(0);
+  });
+
   it('shows nothing to an account whose scope is its own', async () => {
     serve(403, { error: 'creator_forbidden' });
     show(null, false);

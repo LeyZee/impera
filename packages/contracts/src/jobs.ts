@@ -65,6 +65,7 @@ export const JOB_NAMES = [
   'scheduling.check_reports',
   'scheduling.remind_reports',
   'team.apply_roles',
+  'owners.watch',
   'payroll.recalculate',
   'payroll.recalculate_open',
   'payroll.fetch_exchange_rates',
@@ -147,6 +148,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'team.apply_roles': 'Rôles de l’équipe',
+  'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
   'payroll.fetch_exchange_rates': 'Taux de change du jour',
@@ -335,6 +337,12 @@ export const JOB_PAYLOADS = {
   'scheduling.remind_reports': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
+  /**
+   * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
+   * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a
+   * notification is unique per event and account.
+   */
+  'owners.watch': z.object({}),
   /**
    * The drafts of `period` computed again (EQ-04, ADR 0032), and those of the team's first open period when `period`
    * is closed: a report validated after its period's closing counts there. Enqueued by what changes a period's inputs,
@@ -629,6 +637,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
   'team.apply_roles': 1,
+  // Every minute: the next run is the retry.
+  'owners.watch': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
   'payroll.recalculate': 5,
   'payroll.recalculate_open': 1,
@@ -769,3 +779,11 @@ export const RESUME_SPACING_SECONDS = 15;
 export function resumeRunAt(index: number, now: Date): Date {
   return new Date(now.getTime() + index * RESUME_SPACING_SECONDS * 1_000);
 }
+
+/**
+ * The background jobs that write a creator's rows under the app role, one creator at a time (ADR 0087, avenant du
+ * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
+ * (`withTenantJob`) refuses any other.
+ */
+export const TenantJobSchema = z.enum(['daily_stats']);
+export type TenantJob = z.infer<typeof TenantJobSchema>;

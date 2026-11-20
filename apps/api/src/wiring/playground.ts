@@ -9,7 +9,9 @@ import {
   startPlaygroundModule,
   type PlaygroundModule,
 } from '../modules/playground';
+import type { ScriptsModule } from '../modules/scripts';
 
+import { createPlaygroundScripts } from './playground-scripts';
 import type { Routes, Shared } from './shared';
 
 export interface WiredPlayground {
@@ -24,6 +26,8 @@ export async function wirePlayground(
     readonly llm: AppLlm;
     readonly persona: PersonaModule;
     readonly activePersona: ActivePersonaSource;
+    /** Her native scripts: one of her versions played sells from them, as production would (ADR 0103 § 15). */
+    readonly scripts: ScriptsModule;
     /** The persona file and the training folder, from the repository root (`composition-root.ts`). */
     readonly personaPath: string;
     readonly trainingDir: string;
@@ -47,6 +51,7 @@ export async function wirePlayground(
         activePersona: deps.activePersona,
         personaVersion: (creatorId, versionId) => deps.persona.versions.version(creatorId, versionId),
         desireMarks: createDbDesireMarkStore(shared.db),
+        herScripts: createPlaygroundScripts(deps.scripts.reads),
         // Her bank, read as her drafts read it (ADR 0102 § 2).
         voiceExamplesOf: createDbVoiceExampleBank(shared.db),
         bank: createDbVoiceBankStore(shared.db),
@@ -62,5 +67,8 @@ export async function wirePlayground(
         logger.warn({ err: error }, 'playground not started: persona unreadable');
         return null;
       });
-  return { module, routes: module === null ? [] : [module.routes({ guard: requireRole('owner') })] };
+  return {
+    module,
+    routes: module === null ? [] : [module.routes({ guard: requireRole('owner', 'operator') })],
+  };
 }

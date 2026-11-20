@@ -3,6 +3,7 @@ import {
   AlertTestResultSchema,
   ApiErrorSchema,
   DesireMarksQuerySchema,
+  DomainError,
   DesireMarksSchema,
   PlaygroundAdvanceBodySchema,
   PlaygroundAnswerSchema,
@@ -33,14 +34,48 @@ import {
   type AlertTester,
 } from '../../agent/index';
 import type { DesireMarkStore } from '../application/desire-marks';
-import { LlmUnavailable, type PlaygroundEngine } from '../application/engine';
+import {
+  LlmUnavailable,
+  PlaygroundCreatorForbidden,
+  VoiceBankOwnerOnly,
+  type PlaygroundEngine,
+} from '../application/engine';
 import type { PlaygroundService } from '../application/playground-service';
 
 import type { VoiceBankView } from './bank';
 
 export interface PlaygroundRoutesOptions {
-  /** `requireRole('owner')` for now (coordinator, 17/10); Messa (`creator`) later. */
+  /**
+   * `requireRole('owner', 'operator')`: the owner, and an operator the routes then keep to an active manager
+   * (ADR 0092 § 8); Messa (`creator`) later.
+   */
   readonly guard: preValidationAsyncHookHandler;
+}
+
+/**
+ * Who trains (ADR 0092 § 8): the owner, every creator; an active manager (an operator whose scope is the agency), the
+ * creators of his list only, without « Réglages › Alertes », without filing to her bank or withdrawing from it.
+ */
+type TrainerRight =
+  { readonly kind: 'owner' } | { readonly kind: 'manager'; readonly creatorIds: readonly string[] };
+
+function trainerOf(request: FastifyRequest): TrainerRight {
+  const { user } = request;
+  if (user === null) throw new Error('playground route reached without a session');
+  if (user.role === 'owner') return { kind: 'owner' };
+  if (user.role === 'operator' && request.membership?.teamScope === 'agency')
+    return { kind: 'manager', creatorIds: user.creatorIds };
+  throw new DomainError('role_forbidden', 'Réservé au propriétaire et aux managers actifs');
+}
+
+/** A manager reaches the creators of his list alone; the owner, every one. */
+function ensureCreator(trainer: TrainerRight, creatorId: string): void {
+  if (trainer.kind === 'manager' && !trainer.creatorIds.includes(creatorId))
+    throw new PlaygroundCreatorForbidden();
+}
+
+function ensureOwner(trainer: TrainerRight): void {
+  if (trainer.kind !== 'owner') throw new VoiceBankOwnerOnly();
 }
 
 const state = { 200: PlaygroundStateSchema };
@@ -61,11 +96,24 @@ export function createPlaygroundRoutes(
 ): FastifyPluginAsyncZod {
   return (app) => {
     app.addHook('preValidation', options.guard);
+    // After the guard has set the user: anyone else than the owner or an active manager stops here.
+    app.addHook('preHandler', (request, _reply, done) => {
+      try {
+        trainerOf(request);
+        done();
+      } catch (error) {
+        done(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
 
     const engineOf = (request: FastifyRequest): PlaygroundEngine => {
       // The guard has set the user; a route reached without one is a wiring error, not a user error.
       if (request.user === null) throw new Error('playground route reached without a session');
-      return service.forUser(request.user.id);
+      const trainer = trainerOf(request);
+      return service.forUser(
+        request.user.id,
+        (creatorId) => trainer.kind === 'owner' || trainer.creatorIds.includes(creatorId),
+      );
     };
     const unavailable = (request: FastifyRequest, error: LlmUnavailable) => ({
       error: { code: error.code, message: error.message, details: {}, requestId: request.id },
@@ -86,9 +134,10 @@ export function createPlaygroundRoutes(
       async (request) => {
         if (request.user === null) throw new Error('playground route reached without a session');
         const { body } = request;
+        if (body.kind === 'version') ensureCreator(trainerOf(request), body.creatorId);
         const choice =
           body.kind === 'invented' ? null : { creatorId: body.creatorId, versionId: body.versionId };
-        return (await service.choose(request.user.id, choice)).state();
+        return (await service.choose({ userId: request.user.id, role: request.user.role }, choice)).state();
       },
     );
 
@@ -115,7 +164,15 @@ export function createPlaygroundRoutes(
     app.post(
       '/playground/rating',
       { schema: { body: PlaygroundRatingBodySchema, response: { 200: PlaygroundRatingResultSchema } } },
-      (request) => engineOf(request).rate(request.body.verdict, request.body.destination),
+      (request) => {
+        const trainer = trainerOf(request);
+        if (request.body.destination === 'voice_example') ensureOwner(trainer);
+        return engineOf(request).rate(
+          request.body.verdict,
+          request.body.destination,
+          trainer.kind === 'owner',
+        );
+      },
     );
 
     app.post(
@@ -164,6 +221,14 @@ export function createPlaygroundRoutes(
       },
     );
 
+    // ADR 0103 § 16: he buys or refuses the paid step of a trial script, fictively; nothing reaches Reveal.
+    app.post('/playground/script/buy', { schema: { response: state } }, (request) =>
+      engineOf(request).buyScriptStep(),
+    );
+    app.post('/playground/script/refuse', { schema: { response: state } }, (request) =>
+      engineOf(request).refuseScriptStep(),
+    );
+
     // ADR 0103 § 6: the owner marks his desire score after one of his messages.
     app.post(
       '/playground/desire-marks',
@@ -184,6 +249,7 @@ export function createPlaygroundRoutes(
       '/playground/desire-marks',
       { schema: { querystring: DesireMarksQuerySchema, response: { 200: DesireMarksSchema } } },
       async (request) => {
+        ensureCreator(trainerOf(request), request.query.creatorId);
         const marks = await desireMarks.list(request.query.creatorId, MARKS_SHOWN);
         return {
           weightsNow: DESIRE_WEIGHTS_VERSION,
@@ -208,12 +274,16 @@ export function createPlaygroundRoutes(
       app.get(
         '/playground/bank',
         { schema: { querystring: VoiceBankQuerySchema, response: { 200: VoiceBankSchema } } },
-        (request) => bank.list(request.query.creatorId, request.query.versionId),
+        (request) => {
+          ensureCreator(trainerOf(request), request.query.creatorId);
+          return bank.list(request.query.creatorId, request.query.versionId);
+        },
       );
       app.post(
         '/playground/bank/withdraw',
         { schema: { body: VoiceBankWithdrawBodySchema, response: { 200: VoiceBankSchema } } },
         async (request) => {
+          ensureOwner(trainerOf(request));
           const { creatorId, versionId, id } = request.body;
           await bank.withdraw(creatorId, id);
           return bank.list(creatorId, versionId);
@@ -225,7 +295,12 @@ export function createPlaygroundRoutes(
     app.post(
       '/alerts/test',
       { schema: { body: AlertTestBodySchema, response: { 200: AlertTestResultSchema } } },
-      (request) => alertTester.test(request.body),
+      (request) => {
+        // Réglages are the owner's (ADR 0092 § 8: a manager changes none of her settings).
+        if (trainerOf(request).kind !== 'owner')
+          throw new DomainError('role_forbidden', 'Réservé au propriétaire');
+        return alertTester.test(request.body);
+      },
     );
 
     return Promise.resolve();

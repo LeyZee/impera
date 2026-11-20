@@ -1,0 +1,7 @@
+# 2026-11-20 — « Ma progression » sur Aujourd'hui du chatteur — done
+Fait : une carte « Ma progression » sur Aujourd'hui du chatteur (navigation, lot 1), dans l'esprit d'un jeu après un premier jet refusé : son rang, une barre vers le rang suivant qui se remplit à l'arrivée depuis la dernière valeur vue (le chiffre compte avec elle, « +N % depuis ta dernière visite »), trois paliers, l'insigne du rang à atteindre au bout, sa série en cours avec son record, et « À ta portée » : trois objectifs au plus, le plus proche en premier, « Presque » à partir de 80 %. À la demande de Charles, la barre est en feu : une traînée de flammes derrière la tête, une torche et des étincelles, en mouvement ; les objectifs reprennent le dessin des insignes de rang ; au survol, une lueur suit le pointeur, des braises montent et l'insigne s'éclaire (captures : lot `aujourdhui-progression-4`, validé). Survols et animations par les aides du design system, tout s'arrête avec « Réduire les animations », aucun fait dit par le seul mouvement. Toute la carte mène à Moi › Trophées. Aucun montant, aucun classement, rien au hasard (ADR 0104 § 17 à § 19). Rien ne s'affiche sans rien à dire, ni pour qui ne joue pas. Elle lit le même coffre que les autres cartes du jeu, sans route ni contrat nouveaux.
+Pas fait : rien.
+Décisions : aucune ADR touchée.
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : tests de la carte et d'Aujourd'hui, pnpm check.

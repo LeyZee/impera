@@ -172,12 +172,17 @@ describe('the rail of each role', () => {
     expect(screen.getByText('Créatrice')).toBeDefined();
   });
 
-  it('keeps a manager out of Entraîner and Réglages', async () => {
+  it('keeps a manager out of Réglages, and opens him Entraîner without her channel’s posts (ADR 0092 § 8)', async () => {
     const router = renderApp(manager, '/reglages/modeles-ia');
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    cleanup();
+    const canal = renderApp(manager, '/entrainer/canal');
+    await waitFor(() => {
+      expect(canal.state.location.pathname).toBe('/entrainer/playground');
+    });
   });
 });
 

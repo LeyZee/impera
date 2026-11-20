@@ -97,6 +97,8 @@ export { activePersonaForModels, type ActivePersonaSource } from './infra/active
 /** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
 export type { ScriptSource } from './infra/draft-composer';
 export type { PlatformScriptView as AgentScriptView, ScriptHistoryView } from './domain/script-run';
+/** @public The playground plays trial scripts by the same rules (ADR 0103 § 15-17): its fictive purchase and refusal. */
+export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/script-run';
 
 /** @public Her persona and guards for a post of her Telegram channel (ADR 0080 § 5), the `telegram` port. */
 export { channelWriterPersona } from './infra/channel-persona';

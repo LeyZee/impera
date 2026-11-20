@@ -1,5 +1,5 @@
 {
-  "id": "7cac06ee-d741-4523-94d8-b6f9f48b46d6",
+  "id": "0e7cb61f-a75c-402a-ac83-abee3986266d",
   "prevId": "bca79bac-f324-496e-b456-91ad59b743d4",
   "version": "7",
   "dialect": "postgresql",
@@ -9723,7 +9723,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change')"
         }
       },
       "isRLSEnabled": false
@@ -18294,105 +18294,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.custom_price_grids": {
-      "name": "custom_price_grids",
-      "schema": "",
-      "columns": {
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "grid": {
-          "name": "grid",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "custom_price_grids_creator_id_creators_id_fk": {
-          "name": "custom_price_grids_creator_id_creators_id_fk",
-          "tableFrom": "custom_price_grids",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "custom_price_grids_created_by_user_id_fk": {
-          "name": "custom_price_grids_created_by_user_id_fk",
-          "tableFrom": "custom_price_grids",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "custom_price_grids_pkey": {
-          "name": "custom_price_grids_pkey",
-          "columns": ["creator_id", "version"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
-        "owner_read": {
-          "name": "owner_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"custom_price_grids\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "owner_insert": {
-          "name": "owner_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"custom_price_grids\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        }
-      },
-      "checkConstraints": {
-        "custom_price_grids_version_check": {
-          "name": "custom_price_grids_version_check",
-          "value": "\"custom_price_grids\".\"version\" >= 1"
-        },
-        "custom_price_grids_grid_check": {
-          "name": "custom_price_grids_grid_check",
-          "value": "jsonb_typeof(\"custom_price_grids\".\"grid\") = 'object'"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.platform_script_branches": {
       "name": "platform_script_branches",
       "schema": "",
@@ -21061,6 +20962,115 @@
         "member_roles_team_role_check": {
           "name": "member_roles_team_role_check",
           "value": "\"member_roles\".\"team_role\" in ('chatter', 'manager')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.owner_removals": {
+      "name": "owner_removals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "target_user_id": {
+          "name": "target_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "effective_at": {
+          "name": "effective_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "owner_removals_waiting_unique": {
+          "name": "owner_removals_waiting_unique",
+          "columns": [
+            {
+              "expression": "target_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"owner_removals\".\"cancelled_at\" is null and \"owner_removals\".\"applied_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "owner_removals_target_user_id_user_id_fk": {
+          "name": "owner_removals_target_user_id_user_id_fk",
+          "tableFrom": "owner_removals",
+          "tableTo": "user",
+          "columnsFrom": ["target_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "owner_removals_requested_by_user_id_fk": {
+          "name": "owner_removals_requested_by_user_id_fk",
+          "tableFrom": "owner_removals",
+          "tableTo": "user",
+          "columnsFrom": ["requested_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "owner_removals_notice_check": {
+          "name": "owner_removals_notice_check",
+          "value": "\"owner_removals\".\"effective_at\" >= \"owner_removals\".\"requested_at\" + interval '72 hours'"
+        },
+        "owner_removals_not_self_check": {
+          "name": "owner_removals_not_self_check",
+          "value": "\"owner_removals\".\"target_user_id\" <> \"owner_removals\".\"requested_by\""
+        },
+        "owner_removals_one_end_check": {
+          "name": "owner_removals_one_end_check",
+          "value": "\"owner_removals\".\"cancelled_at\" is null or \"owner_removals\".\"applied_at\" is null"
+        },
+        "owner_removals_applied_check": {
+          "name": "owner_removals_applied_check",
+          "value": "\"owner_removals\".\"applied_at\" is null or \"owner_removals\".\"applied_at\" >= \"owner_removals\".\"effective_at\""
         }
       },
       "isRLSEnabled": false

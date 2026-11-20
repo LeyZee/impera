@@ -3,7 +3,7 @@
 Ce que le fan commande en dehors des scripts : une vidéo, une photo, une réaction, un appel, une visio. Premier lot : la **grille des prix sur mesure** de chaque créatrice. La prise de commande par l'IA viendra dans les lots suivants de l'ADR 0159.
 
 - **Peut dépendre de** : aucun module (feuille).
-- **Tables possédées** : `custom_price_grids` (migration 0233).
+- **Tables possédées** : `custom_price_grids` (migration 0236).
 - **Jobs émis** : aucun.
 
 ## La grille

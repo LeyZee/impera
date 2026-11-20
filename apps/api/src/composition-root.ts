@@ -21,7 +21,7 @@ import {
 import { publishBudgetThreshold } from './budget-events';
 import type { Config } from './config';
 import { cronKnownSince } from './crontab';
-import { assertDatabaseRoles } from './database-roles';
+import { assertDatabaseRoles, assertNoForeignAccess } from './database-roles';
 import { createInvitationLinkRoutes } from './invitation-links';
 import { createJobQueue, defineTask, type JobQueue } from './jobs';
 import { createAppLlm } from './llm';
@@ -57,6 +57,7 @@ import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
+import { applyOwnerRemovalsUnscoped, createOwnersRoutes, relayOwnerAlertsUnscoped } from './owners';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
@@ -257,9 +258,25 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
   const sandbox = sandboxOf(config);
   if (sandbox !== null) installSandboxGuard(sandbox, logger);
-  const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
-  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, { ...POOL_OPTIONS, max: 5 });
-  const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
+  const db = createDbClient(config.DATABASE_URL, { ...POOL_OPTIONS, max: config.DATABASE_POOL_MAX });
+  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, {
+    ...POOL_OPTIONS,
+    max: config.DATABASE_SERVICE_POOL_MAX,
+  });
+  const rateLimitDb = createDbClient(config.DATABASE_URL, {
+    ...RATE_LIMIT_POOL_OPTIONS,
+    max: config.RATE_LIMIT_POOL_MAX,
+  });
+  // The connections this process may hold, for the budget of the pooler (ADR 0152 § 2, deploy.md).
+  logger.info(
+    {
+      app: config.DATABASE_POOL_MAX,
+      service: config.DATABASE_SERVICE_POOL_MAX,
+      rateLimit: config.RATE_LIMIT_POOL_MAX,
+      total: config.DATABASE_POOL_MAX + config.DATABASE_SERVICE_POOL_MAX + config.RATE_LIMIT_POOL_MAX,
+    },
+    'database connection budget of this process',
+  );
   // A client losing its connection must not crash the process; the next query reconnects.
   for (const [role, pool] of [
     ['app', db.pool],
@@ -275,6 +292,14 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // A role that silences RLS (or skips it), or a service role that could change a structure, must stop the process.
   try {
     await assertDatabaseRoles(db.db, adminDb.db);
+    await assertNoForeignAccess(adminDb.db, config.NODE_ENV === 'production', {
+      warn: (message) => {
+        logger.warn(message);
+      },
+      info: (message) => {
+        logger.info(message);
+      },
+    });
   } catch (error) {
     await Promise.all([db.close(), adminDb.close(), rateLimitDb.close()]);
     throw error;
@@ -421,6 +446,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
+    scripts: scripts.module,
     personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
@@ -538,6 +564,25 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,
+    // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
+    // never waits for push: with push off the alerts reach Telegram only.
+    'owners.watch': defineTask(
+      'owners.watch',
+      JOB_PAYLOADS['owners.watch'],
+      logger,
+      async (_payload, context) => {
+        const removals = await applyOwnerRemovalsUnscoped(adminDb.db);
+        if (removals.applied > 0 || removals.lapsed > 0) {
+          context.logger.warn(removals, 'owners: removals past their notice');
+        }
+        const notify = notifications.module.notify;
+        if (notify === null) return;
+        await relayOwnerAlertsUnscoped(adminDb.db, {
+          notify,
+          agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+        });
+      },
+    ),
     // ADR 0150 lot 2: each alert of a creator's tab, to the roles it reaches; nothing while push is off.
     'alerts.route': defineTask(
       'alerts.route',
@@ -605,6 +650,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         passwordBreaches,
         privateChat: telegram.module?.privateChat ?? null,
       }),
+      createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),
       createSecuritySettingsRoutes({
         auth,
         db: db.db,

@@ -10,6 +10,7 @@ import {
 } from './fan-availability';
 import { CreatorIdSchema, DesireMarkIdSchema, PersonaVersionIdSchema } from './ids';
 import { MediaDescriptionSchema } from './media';
+import { ScriptRunStatusSchema, ScriptStepKindSchema, ScriptStepOutcomeSchema } from './script-runs';
 
 /**
  * Entraîner > Playground (P3-06): the training screen talks to the calibration engine of P3-05 through
@@ -133,11 +134,41 @@ export const PlaygroundDesireSchema = z.object({
 });
 export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
 
+/**
+ * A step of a trial script she sent in the playground (ADR 0103 § 16), on its media: offered, or paid and waiting for
+ * « Payer (fictif) » or « Refuser », then bought or refused; `closed` when the run ended without him deciding (his two
+ * messages about something else, a cooled session). Fictive from end to end: nothing reaches Reveal or the figures.
+ */
+export const PlaygroundScriptStepSchema = z.object({
+  /** Her own script, read as production reads it, or a trial one (ADR 0103 § 15). */
+  source: z.enum(['hers', 'trial']),
+  scriptRef: z.string(),
+  stepIndex: z.number().int().nonnegative(),
+  kind: ScriptStepKindSchema,
+  priceCents: z.number().int().positive().nullable(),
+  state: z.enum(['offered', 'waiting', 'bought', 'refused', 'closed']),
+});
+export type PlaygroundScriptStep = z.infer<typeof PlaygroundScriptStepSchema>;
+
 export const PlaygroundTurnSchema = z.object({
   index: z.number().int().nonnegative(),
   from: z.enum(['fan', 'creator']),
   text: z.string(),
-  media: z.array(z.object({ description: MediaDescriptionSchema, isLocked: z.boolean() })).exactOptional(),
+  media: z
+    .array(
+      z.object({
+        description: MediaDescriptionSchema,
+        isLocked: z.boolean(),
+        /** A step of a script: what « Payer (fictif) » and « Refuser » act on. */
+        scriptStep: PlaygroundScriptStepSchema.exactOptional(),
+        /**
+         * The media of a step as the platform sends it: its ref in her vault (the screen draws its picture from there,
+         * blurred until he bought it), and whether it is the bundle's teaser, shown before he buys.
+         */
+        scriptMedia: z.object({ ref: z.string().min(1).max(200), teaser: z.boolean() }).exactOptional(),
+      }),
+    )
+    .exactOptional(),
   /** On his messages the brain read: his desire score after it. */
   desire: PlaygroundDesireSchema.exactOptional(),
 });
@@ -229,6 +260,31 @@ export const PlaygroundRateSchema = z.object({
 });
 export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
 
+/**
+ * The trial script under way or last played (ADR 0103 § 15-17): its steps, what each became, and what he paid in
+ * fictive sales this session. Invented scripts, played by the same rules as production; nothing leaves the playground.
+ */
+export const PlaygroundScriptRunSchema = z.object({
+  scriptRef: z.string(),
+  /** Its name as the agency reads it in Reveal, or the trial script's. */
+  name: z.string(),
+  source: z.enum(['hers', 'trial']),
+  description: z.string(),
+  moment: z.enum(['day', 'night']).nullable(),
+  status: ScriptRunStatusSchema,
+  steps: z
+    .array(
+      z.object({
+        kind: ScriptStepKindSchema,
+        priceCents: z.number().int().positive().nullable(),
+        /** `null`: not sent yet. */
+        outcome: ScriptStepOutcomeSchema.nullable(),
+      }),
+    )
+    .max(30),
+});
+export type PlaygroundScriptRun = z.infer<typeof PlaygroundScriptRunSchema>;
+
 export const PlaygroundStateSchema = z.object({
   /**
    * While an answer is being written: the brain's reading of his message, as soon as it has read it, so the screen
@@ -265,6 +321,19 @@ export const PlaygroundStateSchema = z.object({
   voice: z.object({ reachable: z.boolean() }),
   /** The last answer, until it is rated. */
   pending: PlaygroundAnswerSchema.nullable(),
+  /**
+   * The scripts she sells from (ADR 0103 § 15-17): hers with one of her versions played, the trial ones otherwise; the
+   * run under way or last played, and his fictive purchases.
+   */
+  scripts: z.object({
+    source: z.enum(['hers', 'trial']),
+    /** Why none of hers can be played now, in French: she sells nothing, as production would not. */
+    unavailable: z.object({ code: z.string(), label: z.string() }).nullable(),
+    run: PlaygroundScriptRunSchema.nullable(),
+    fictiveSpentCents: z.number().int().nonnegative(),
+    /** A possible minor or his distress froze his sales: « Payer (fictif) » is refused, as production never sells then. */
+    salesFrozen: z.boolean(),
+  }),
 });
 export type PlaygroundState = z.infer<typeof PlaygroundStateSchema>;
 
@@ -436,6 +505,12 @@ export const PLAYGROUND_ERROR_CODES = [
   'time_zone_invalid',
   'playground_persona_not_found',
   'desire_mark_invented_persona_conflict',
+  'script_step_not_waiting_conflict',
+  'script_sales_frozen_conflict',
   'voice_example_not_found',
+  /** 403: a manager names a creator off his list (ADR 0092 § 8). */
+  'creator_forbidden',
+  /** 403: a manager files a voice example or withdraws one: the owner's alone (Charles, 20/11). */
+  'voice_bank_owner_forbidden',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

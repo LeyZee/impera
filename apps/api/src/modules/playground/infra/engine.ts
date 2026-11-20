@@ -43,12 +43,15 @@ import {
   NothingToCompare,
   NothingToRate,
   PresetNotFound,
+  ScriptSalesFrozen,
+  ScriptStepNotWaiting,
   TimeZoneInvalid,
   VoiceModelInvalid,
   type PlaygroundEngine,
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
 import {
+  catalogueLabel,
   cursorLabel,
   gateMissingLabel,
   guardLabel,
@@ -58,10 +61,12 @@ import {
 } from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
+import type { Catalogue } from './catalogue';
 import {
   createPlaygroundSession,
   type PlaygroundAvailabilityReading,
   type PlaygroundDesireReading,
+  type PlaygroundSession,
   type PlaygroundTurn,
 } from './session';
 
@@ -96,6 +101,8 @@ export interface EngineDeps {
   readonly now?: () => Date;
   /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
   readonly desireMarks: DesireMarkStore;
+  /** Her own scripts, with one of her versions played (ADR 0103 § 15); the trial scripts without. */
+  readonly herScripts?: () => Promise<Catalogue>;
 }
 
 /** One rating, in the shape the training store keeps (shared with the terminal playground). */
@@ -236,6 +243,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     objectionReplies: deps.persona.objectionReplies,
     ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
     ...(deps.now !== undefined && { now: deps.now }),
+    ...(deps.herScripts !== undefined && { herScripts: deps.herScripts }),
   });
   let presetId: string | null = null;
   let isRated = true;
@@ -306,7 +314,16 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
           from: turn.from,
           text: turn.text,
           ...(turn.media !== undefined && {
-            media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
+            media: turn.media.map((m, at) => {
+              const step = session.trialStepOf(turn);
+              const shown = session.stepMediaOf(turn)?.[at];
+              return {
+                description: m.description,
+                isLocked: m.isLocked ?? false,
+                ...(step !== undefined && { scriptStep: step }),
+                ...(shown !== undefined && { scriptMedia: shown }),
+              };
+            }),
           }),
           ...(reading !== undefined && { desire: toDesire(reading, marks.get(n)) }),
         };
@@ -317,6 +334,16 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       sessionCostEur: sessionCostUsd / deps.usdPerEur,
       voice: { reachable: isVoiceReachable() },
       pending: lastExchange !== undefined && !isRated ? toAnswer(lastExchange.turn, deps.usdPerEur) : null,
+      scripts: {
+        source: session.catalogue.source,
+        unavailable:
+          session.catalogue.unavailable === null
+            ? null
+            : { code: session.catalogue.unavailable, label: catalogueLabel(session.catalogue.unavailable) },
+        run: scriptRunView(session.scriptRun),
+        fictiveSpentCents: session.fictiveSpentCents,
+        salesFrozen: session.salesFrozen,
+      },
     };
   };
 
@@ -371,7 +398,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
     send: (text, media) => exclusive(() => sendDescribed(text, media.map(completeMedia))),
 
-    rate: (verdict, override) =>
+    rate: (verdict, override, mayFileExamples = true) =>
       exclusive(async () => {
         const exchange = session.lastExchange;
         if (exchange === undefined || isRated) throw new NothingToRate();
@@ -379,8 +406,10 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         // wait decided by the risk policy is itself the answer: the trainer says it was right (AGE-01).
         const decided = exchange.turn.handoff !== undefined || exchange.turn.hold !== undefined;
         if (verdict.kind === 'validated' && exchange.turn.isBlocked && !decided) throw new BlockedAnswer();
-        const destination =
+        const suggested =
           verdict.kind === 'validated' ? undefined : (override ?? suggestDestination(verdict));
+        // A manager's correction is a note, never a voice example: her bank is the owner's (Charles, 20/11).
+        const destination = !mayFileExamples && suggested === 'voice_example' ? undefined : suggested;
         // A correction that trips a hard guard stays a correction, out of her bank, and the screen says why (§ 4).
         const blockedBy =
           verdict.kind === 'corrected' && destination === 'voice_example'
@@ -519,5 +548,42 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       session.sendCreatorMedia(completeMedia(media), isLocked);
       return state();
     },
+
+    buyScriptStep() {
+      idle();
+      const bought = session.buyStep();
+      if (bought === 'nothing_waiting') throw new ScriptStepNotWaiting();
+      if (bought === 'sales_frozen') throw new ScriptSalesFrozen();
+      return state();
+    },
+
+    refuseScriptStep() {
+      idle();
+      if (session.refuseStep() === 'nothing_waiting') throw new ScriptStepNotWaiting();
+      return state();
+    },
+
+    readScripts() {
+      return session.readCatalogue();
+    },
+  };
+}
+
+/** The trial script for the screen: each step of it, sent or not yet, and what it became. */
+function scriptRunView(played: PlaygroundSession['scriptRun']): PlaygroundState['scripts']['run'] {
+  if (played === null) return null;
+  const { run, script, name, source } = played;
+  return {
+    scriptRef: script.scriptRef,
+    name,
+    source,
+    description: script.description,
+    moment: script.moment,
+    status: run.status,
+    steps: script.steps.map((step, index) => ({
+      kind: step.kind,
+      priceCents: step.priceMinor,
+      outcome: run.steps.find((sent) => sent.stepIndex === index)?.outcome ?? null,
+    })),
   };
 }

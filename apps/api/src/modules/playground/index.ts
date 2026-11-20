@@ -30,8 +30,9 @@ import {
 
 import { createMemoryDesireMarkStore, type DesireMarkStore } from './application/desire-marks';
 import { PlaygroundPersonaNotFound } from './application/engine';
-import { createPlaygroundService } from './application/playground-service';
+import { createPlaygroundService, type Trainer } from './application/playground-service';
 import { createVoiceBankView } from './infra/bank';
+import type { Catalogue, HerScriptsSource } from './infra/catalogue';
 import { importRatings, type RatingImport, type VoiceBankStore } from './infra/db/rating-store';
 import { createPlaygroundEngine } from './infra/engine';
 import { createPlaygroundGateway, createVoiceVariant, type PlaygroundGatewayDeps } from './infra/gateways';
@@ -43,6 +44,7 @@ export { createPlaygroundGateway, createVoiceVariant } from './infra/gateways';
 export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
 export { createDbDesireMarkStore } from './infra/db/desire-mark-store';
+export type { HerCatalogue, HerScriptsSource, PlaygroundScript, ShownMedia } from './infra/catalogue';
 export {
   createDbCalibrationStore,
   createDbVoiceBankStore,
@@ -95,6 +97,8 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
   readonly gatewayForVoice?: (voiceModel: string) => LlmGateway | undefined;
   /** The owner's marks on the desire score (ADR 0103 § 6), in `desire_marks`; in memory without a database. */
   readonly desireMarks?: DesireMarkStore;
+  /** Her own scripts (ADR 0103 § 15), sold from when one of her versions is played; the trial scripts without. */
+  readonly herScripts?: HerScriptsSource;
   /**
    * Her bank of examples, read as her drafts read it (ADR 0102 § 2): what the trainer sees is what a fan receives.
    * Absent (no database): chosen from the ratings kept in memory.
@@ -104,6 +108,19 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
   readonly bank?: VoiceBankStore;
 }
 
+/** Her catalogue as a session reads it: hers, or why none of hers can be played. */
+const herCatalogue =
+  (source: HerScriptsSource, creatorId: string, trainer: Trainer) => async (): Promise<Catalogue> => {
+    const read = await source(creatorId, trainer);
+    return read.kind === 'ready'
+      ? {
+          source: 'hers',
+          scripts: read.scripts,
+          unavailable: read.scripts.length === 0 ? 'none_ready' : null,
+        }
+      : { source: 'hers', scripts: [], unavailable: read.reason };
+  };
+
 export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   const gateway = deps.gateway ?? createPlaygroundGateway(deps);
   const version = {
@@ -112,7 +129,12 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   };
   const now = deps.now ?? (() => new Date());
   const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
-  const engineFor = (persona: PersonaForModels, played?: PlayedVersion, examples?: readonly VoiceExample[]) =>
+  const engineFor = (
+    persona: PersonaForModels,
+    played?: PlayedVersion,
+    trainer?: Trainer,
+    examples?: readonly VoiceExample[],
+  ) =>
     createPlaygroundEngine({
       gateway,
       gatewayForVoice: deps.gatewayForVoice ?? ((model) => createVoiceVariant(deps, model)),
@@ -124,6 +146,12 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       usdPerEur: DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur,
       desireMarks,
       ...(played !== undefined && { played }),
+      // Her own scripts when one of her versions is played, read as the trainer reads them; the trial ones otherwise.
+      ...(played !== undefined &&
+        trainer !== undefined &&
+        deps.herScripts !== undefined && {
+          herScripts: herCatalogue(deps.herScripts, played.creatorId, trainer),
+        }),
       ...(examples !== undefined && { voiceExamples: examples }),
       ...(deps.creatorId !== undefined && { creatorId: deps.creatorId }),
       ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
@@ -131,7 +159,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
     });
   const service = createPlaygroundService({
     invented: () => engineFor(deps.persona),
-    ofVersion: async ({ creatorId, versionId }) => {
+    ofVersion: async ({ creatorId, versionId }, trainer) => {
       const stored = (await deps.personaVersion?.(creatorId, versionId)) ?? null;
       if (stored === null) throw new PlaygroundPersonaNotFound();
       // Read as her drafts read her active one: her name for a placeholder first name, her day for her age.
@@ -140,7 +168,9 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       const bank = await deps.voiceExamplesOf?.(creatorId);
       const examples =
         bank === undefined ? undefined : pickVoiceExamples(bank, guardSettingsOf(persona), bank.length);
-      return engineFor(persona, { creatorId, versionId, version: stored.version }, examples);
+      const engine = engineFor(persona, { creatorId, versionId, version: stored.version }, trainer, examples);
+      await engine.readScripts();
+      return engine;
     },
   });
   const alertTester = createAlertTester({
@@ -183,6 +213,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly activePersona: ActivePersonaSource;
   readonly personaVersion?: PersonaVersionSource;
   readonly desireMarks?: DesireMarkStore;
+  readonly herScripts?: HerScriptsSource;
   readonly voiceExamplesOf?: NonNullable<PlaygroundDeps['voiceExamplesOf']>;
   readonly bank?: VoiceBankStore;
 }

@@ -1223,8 +1223,29 @@
     {
       "idx": 174,
       "version": "7",
-      "when": 1795186458700,
-      "tag": "0233_custom_price_grids",
+      "when": 1795184590723,
+      "tag": "0233_owner_removals",
+      "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1795188224839,
+      "tag": "0234_our_functions_for_our_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 176,
+      "version": "7",
+      "when": 1795196459311,
+      "tag": "0235_daily_stats_job_writes",
+      "breakpoints": true
+    },
+    {
+      "idx": 177,
+      "version": "7",
+      "when": 1795196519311,
+      "tag": "0236_custom_price_grids",
       "breakpoints": true
     }
   ]

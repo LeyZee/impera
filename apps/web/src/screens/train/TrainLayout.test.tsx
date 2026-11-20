@@ -68,4 +68,26 @@ describe('Entraîner header', () => {
     expect(screen.queryByRole('link', { name: 'Corrections' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Tests' })).toBeNull();
   });
+
+  it('opens a manager the chat alone, without her channel’s posts nor any tab bar (ADR 0092 § 8)', async () => {
+    const manager: Me = {
+      ...owner,
+      id: 'u2',
+      role: 'operator',
+      team: { role: 'manager', status: 'active' },
+      teamScope: 'agency',
+    };
+    const router = createAppRouter(
+      { user: manager, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: ['/entrainer/playground'] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chatting' })).toBeTruthy();
+    expect(screen.queryByRole('navigation', { name: 'Entraîner' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Post du canal' })).toBeNull();
+  });
 });
