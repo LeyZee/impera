@@ -10,7 +10,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/ai-usage': 9,
   'modules/alerts': 1,
   'modules/backups': 1,
-  'modules/connectors': 36,
+  'modules/connectors': 35,
   'modules/content-drops': 29,
   'modules/contractors': 6,
   'modules/conversations': 1,
