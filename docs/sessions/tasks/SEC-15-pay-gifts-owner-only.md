@@ -20,7 +20,7 @@ Appliquer la règle de Charles sur l'argent : seul le propriétaire donne une pr
 - [x] Politiques de la base resserrées par une migration nouvelle (`owner_insert`, `owner_cancel` sur `bonuses` ; `owner_insert` sur `pay_adjustments`) ; les malus ne changent pas. Numéro de migration fixé au tour de fusion.
 - [x] Tests : intégration des routes par rôle, politiques de la base par rôle, correction d'une contestation acceptée toujours écrite par le propriétaire.
 - [x] Écran : un manager ne voit que « Ajouter un malus », ni « Annuler » sur une prime, ni « Ajuster » sur un relevé.
-- [ ] Captures de l'écran du manager validées par Charles avant la fusion.
+- [x] Captures de l’écran du manager validées par Charles le 20/11 (lot « paie-droits-manager »).
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
