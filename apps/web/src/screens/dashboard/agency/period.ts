@@ -263,8 +263,12 @@ export const comparable = (insights: Pick<AgencyInsights, 'registerSince' | 'pre
 export const CONCLUDE_MIN_SALES = 30;
 export const CONCLUDE_MIN_REGISTER_DAYS = 7;
 
-/** What the screen writes instead of a conclusion it cannot draw yet; the figures stay (ADR 0092 § 5). */
+/**
+ * What the screen writes instead of a conclusion it cannot draw yet; the figures stay (ADR 0092 § 5). Too few sales
+ * and a register too young are said apart (Charles, 20/11).
+ */
 export const TOO_FEW_TO_CONCLUDE = 'Pas encore assez de ventes pour conclure.';
+export const TOO_YOUNG_TO_CONCLUDE = 'Pas encore assez de recul pour conclure.';
 
 /**
  * The days of the period the registers covered: from the later of its first day and the registers' first line to the
@@ -285,8 +289,19 @@ export function registerDays(
  */
 export const canConclude = (
   insights: Pick<AgencyInsights, 'from' | 'to' | 'registerSince' | 'span' | 'totals'>,
-): boolean =>
-  insights.totals.current.sales >= CONCLUDE_MIN_SALES && registerDays(insights) >= CONCLUDE_MIN_REGISTER_DAYS;
+): boolean => conclusionWait(insights) === null;
+
+/**
+ * Why no conclusion is drawn yet, as the screen writes it, or null when one may be: a register too young first (it is
+ * also why the sales are few), then too few sales.
+ */
+export function conclusionWait(
+  insights: Pick<AgencyInsights, 'from' | 'to' | 'registerSince' | 'span' | 'totals'>,
+): string | null {
+  if (registerDays(insights) < CONCLUDE_MIN_REGISTER_DAYS) return TOO_YOUNG_TO_CONCLUDE;
+  if (insights.totals.current.sales < CONCLUDE_MIN_SALES) return TOO_FEW_TO_CONCLUDE;
+  return null;
+}
 
 /** The query string of `GET /v1/dashboard/agency` for a selection. */
 export function selectionQuery(selection: AgencySelection): Record<string, string> {

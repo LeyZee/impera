@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   againstText,
   canConclude,
+  conclusionWait,
   CONCLUDE_MIN_REGISTER_DAYS,
   CONCLUDE_MIN_SALES,
   isDay,
@@ -16,6 +17,8 @@ import {
   registerDays,
   selectionQuery,
   spanText,
+  TOO_FEW_TO_CONCLUDE,
+  TOO_YOUNG_TO_CONCLUDE,
   withCompare,
 } from './period';
 
@@ -170,5 +173,14 @@ describe('no conclusion on too few sales (ADR 0092 § 5)', () => {
     expect(canConclude(read(young))).toBe(false);
     // A single day never holds enough days of register, however many sales.
     expect(canConclude(read({ ...week, from: TODAY, sales: CONCLUDE_MIN_SALES * 10 }))).toBe(false);
+  });
+
+  it('says why: too little hindsight first, then too few sales', () => {
+    const week = { from: '2026-11-10', to: '2026-11-16', registerSince: '2026-09-01' };
+    expect(conclusionWait(read({ ...week, sales: CONCLUDE_MIN_SALES }))).toBeNull();
+    expect(conclusionWait(read({ ...week, sales: 1 }))).toBe(TOO_FEW_TO_CONCLUDE);
+    expect(conclusionWait(read({ ...week, registerSince: '2026-11-15', sales: 1 }))).toBe(
+      TOO_YOUNG_TO_CONCLUDE,
+    );
   });
 });
