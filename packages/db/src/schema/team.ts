@@ -302,3 +302,37 @@ export const passwordResetLinks = pgTable(
     index('password_reset_links_user_created_idx').on(t.userId, t.createdAt),
   ],
 );
+
+/**
+ * The removal of an owner by the other (ADR 0096 § 2): asked, it waits 72 hours, and the owner it is about can cancel
+ * it meanwhile; past its notice the job applies it. One waiting per owner. Never deleted: the history of who asked,
+ * who cancelled and when stays. Read and written by the admin role only (RLS forced, no policy, revoked from
+ * `nirvana_app`), like the links above.
+ */
+export const ownerRemovals = pgTable(
+  'owner_removals',
+  {
+    id: id(),
+    targetUserId: text('target_user_id')
+      .notNull()
+      .references(() => user.id),
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => user.id),
+    requestedAt: timestampTz('requested_at').notNull().defaultNow(),
+    effectiveAt: timestampTz('effective_at').notNull(),
+    cancelledAt: timestampTz('cancelled_at'),
+    appliedAt: timestampTz('applied_at'),
+  },
+  (t) => [
+    // The notice is the rule itself: a row that would take effect sooner cannot be written, whatever the code.
+    check('owner_removals_notice_check', sql`${t.effectiveAt} >= ${t.requestedAt} + interval '72 hours'`),
+    check('owner_removals_not_self_check', sql`${t.targetUserId} <> ${t.requestedBy}`),
+    check('owner_removals_one_end_check', sql`${t.cancelledAt} is null or ${t.appliedAt} is null`),
+    // Never applied before its notice ended.
+    check('owner_removals_applied_check', sql`${t.appliedAt} is null or ${t.appliedAt} >= ${t.effectiveAt}`),
+    uniqueIndex('owner_removals_waiting_unique')
+      .on(t.targetUserId)
+      .where(sql`${t.cancelledAt} is null and ${t.appliedAt} is null`),
+  ],
+);

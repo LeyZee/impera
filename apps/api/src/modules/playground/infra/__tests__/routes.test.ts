@@ -26,8 +26,8 @@ import { parse } from 'yaml';
 import { testConfig } from '../../../../__tests__/support/config';
 import { createLogger } from '../../../../logger';
 import { buildServer } from '../../../../server';
-import type { CalibrationRecord, CalibrationStore } from '../../../agent/index';
-import { createPlaygroundModule } from '../../index';
+import type { CalibrationRecord, CalibrationStore, VoiceExample } from '../../../agent/index';
+import { createPlaygroundModule, type HerScriptsSource } from '../../index';
 
 const BRIEF: Brief = {
   intent: 'small_talk',
@@ -76,6 +76,8 @@ function health(hasKey: boolean): HealthReport {
 interface GatewayControl {
   hasKey: boolean;
   hold?: Promise<void>;
+  /** The sheets the voice was given, when the test reads them. */
+  sheets?: string[];
 }
 
 function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true }): LlmGateway {
@@ -91,7 +93,8 @@ function gateway(voice: VoiceOutput, control: GatewayControl = { hasKey: true })
     readCard: () => Promise.reject(new Error('not used')),
     promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
     brain: () => Promise.resolve({ ok: true, value: { output: BRIEF, meta: META } }),
-    voice: async () => {
+    voice: async (input) => {
+      control.sheets?.push(input.personaSheet);
       await control.hold;
       return { ok: true, value: { output: voice, meta: META } };
     },
@@ -135,7 +138,13 @@ const MIA = CreatorIdSchema.parse('0199f2a0-0000-7000-8000-0000000000c1');
 const DRAFT = PersonaVersionIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e3');
 
 async function server(
-  options: { voice?: VoiceOutput; control?: GatewayControl; creatorId?: string | null } = {},
+  options: {
+    voice?: VoiceOutput;
+    control?: GatewayControl;
+    creatorId?: string | null;
+    herScripts?: HerScriptsSource;
+    voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
+  } = {},
 ) {
   const records: CalibrationRecord[] = [];
   const stored: CalibrationRecord[] = [];
@@ -178,6 +187,8 @@ async function server(
     gatewayForVoice: (model) => (model === 'mistral-large-4' ? gateway({ bubbles: ['Hey toi'] }) : undefined),
     now: () => new Date('2026-10-17T10:00:00Z'),
     ...(options.creatorId !== undefined && { creatorId: () => Promise.resolve(options.creatorId ?? null) }),
+    ...(options.herScripts !== undefined && { herScripts: options.herScripts }),
+    ...(options.voiceExamplesOf !== undefined && { voiceExamplesOf: options.voiceExamplesOf }),
   });
   const config = testConfig();
   const app = await buildServer({
@@ -194,6 +205,48 @@ async function server(
 }
 
 describe('/v1/playground', () => {
+  it('keeps a correction a hard guard stops as a correction, out of her bank, and says which guard (ADR 0102 § 4)', async () => {
+    const { post, stored } = await server();
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    await post('/messages', { text: 'Salut' });
+    const rated = await post('/rating', {
+      verdict: { kind: 'corrected', text: 'Je suis une IA' },
+      destination: 'voice_example',
+    });
+    const result = PlaygroundRatingResultSchema.parse(rated.json());
+    expect(result.exampleBlockedBy?.map((v) => v.severity)).toContain('blocking');
+    expect(result.exampleBlockedBy?.[0]?.label).not.toBe('');
+    expect(stored.at(-1)).toMatchObject({ destination: 'voice_example', exampleBlocked: true });
+
+    await post('/messages', { text: 'Et toi ?' });
+    const fine = PlaygroundRatingResultSchema.parse(
+      (await post('/rating', { verdict: { kind: 'corrected', text: 'Coucou toi ✨' } })).json(),
+    );
+    expect(fine.exampleBlockedBy).toBeUndefined();
+    expect(stored.at(-1)?.exampleBlocked).toBeUndefined();
+  });
+
+  it('gives her version the examples of her bank, chosen as her drafts choose them (ADR 0102 § 2)', async () => {
+    const control: GatewayControl = { hasKey: true, sheets: [] };
+    const asked: string[] = [];
+    const { post } = await server({
+      control,
+      voiceExamplesOf: (creatorId) => {
+        asked.push(creatorId);
+        return Promise.resolve([
+          { id: 'e2', text: 'Hey toi, exemple de sa banque' },
+          { id: 'e1', text: 'Je suis une IA' },
+        ]);
+      },
+    });
+    await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
+    await post('/messages', { text: 'Salut' });
+    // Her one bank, whichever version is played (ADR 0102 § 1).
+    expect(asked).toEqual([MIA]);
+    expect(control.sheets?.at(-1)).toContain('Hey toi, exemple de sa banque');
+    expect(control.sheets?.at(-1)).not.toContain('Je suis une IA');
+  });
+
   it('is closed to anyone without the owner session', async () => {
     const { app } = await server();
     expect((await app.inject({ method: 'GET', url: '/v1/playground' })).statusCode).toBe(403);
@@ -246,6 +299,25 @@ describe('/v1/playground', () => {
 
     const back = stateOf(await post('/persona', { kind: 'invented' }));
     expect(back.persona).toEqual({ name: 'Lina', played: null });
+  });
+
+  it('reads her own scripts with one of her versions, and says at once why the trial ones play instead (ADR 0103 § 15)', async () => {
+    const asked: [string, string][] = [];
+    const { post } = await server({
+      herScripts: (creatorId, userId) => {
+        asked.push([creatorId, userId]);
+        return Promise.resolve({ kind: 'none', reason: 'none_ready' });
+      },
+    });
+    const hers = stateOf(await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT }));
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.[0]).toBe(MIA);
+    expect(hers.scripts).toMatchObject({ source: 'trial', unavailable: { code: 'none_ready' }, run: null });
+    expect(hers.scripts.unavailable?.label).toBe('Aucun de ses scripts n’est prêt');
+    // The invented persona plays the trial scripts, and never reads hers.
+    const back = stateOf(await post('/persona', { kind: 'invented' }));
+    expect(back.scripts).toMatchObject({ source: 'trial', unavailable: null });
+    expect(asked).toHaveLength(1);
   });
 
   it('answers, rates once, and counts the rate', async () => {
@@ -490,6 +562,22 @@ describe('/v1/playground', () => {
     expect((await first).statusCode).toBe(200);
     const answered = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
     expect(answered.reading).toBeUndefined();
+  });
+
+  it('answers « Payer (fictif) » and « Refuser » only while a paid step of a trial script waits (ADR 0103 § 16)', async () => {
+    const { app, headers, post } = await server();
+    const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(state.scripts).toEqual({
+      source: 'trial',
+      unavailable: null,
+      run: null,
+      fictiveSpentCents: 0,
+      salesFrozen: false,
+    });
+    const buy = await post('/script/buy');
+    expect(buy.statusCode).toBe(409);
+    expect(codeOf(buy)).toBe('script_step_not_waiting_conflict');
+    expect(codeOf(await post('/script/refuse'))).toBe('script_step_not_waiting_conflict');
   });
 
   it('has nothing to compare after a handoff', async () => {
