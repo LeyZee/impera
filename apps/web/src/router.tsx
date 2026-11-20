@@ -70,6 +70,7 @@ import {
   SettingsLayout,
   TelegramPage,
 } from './screens/settings/SettingsLayout';
+import { AnnouncementsPage } from './screens/team/AnnouncementsPage';
 import { MemberFilePage } from './screens/team/MemberFilePage';
 import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
@@ -551,6 +552,16 @@ const teamMembers = createRoute({
 });
 
 // Reveal's team reviewed (ADR 0076), the owner's and an active manager's: anyone else is sent back to the members.
+/** Équipe › Annonces (EQ-12): the owner's and the managers', who see Équipe; the server refuses anyone else. */
+const teamAnnouncements = createRoute({
+  getParentRoute: () => team,
+  path: '/annonces',
+  component: function TeamAnnouncements() {
+    const { user } = rootRoute.useRouteContext();
+    return <AnnouncementsPage owner={user.role === 'owner'} />;
+  },
+});
+
 const teamReveal = createRoute({
   getParentRoute: () => team,
   path: '/reveal',
@@ -1142,7 +1153,15 @@ const routeTree = rootRoute.addChildren([
   content,
   contentScript,
   myPlanning,
-  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile, teamReveal]),
+  team.addChildren([
+    teamIndex,
+    teamPlanning,
+    teamReports,
+    teamMembers,
+    teamMemberFile,
+    teamAnnouncements,
+    teamReveal,
+  ]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
   me.addChildren([
