@@ -148,12 +148,15 @@ describe('Commissions › Mes chiffres (CHF-01, ADR 0104 § A)', () => {
     const rows = [...document.querySelectorAll('.mf-kind')].map((row) => row.textContent.replace(NBSP, ' '));
     expect(rows).toEqual(['PPV en privé60 €75 %', 'Tips20 €25 %']);
     expect(text()).toContain('2 ventes pas encore comptées par type');
+    expect(document.querySelector('.mf-donut__middle')?.textContent.replace(NBSP, ' ')).toBe(
+      '80 €de net réparti',
+    );
     // A slice lit by the keyboard shows in the middle of the ring.
     const [first] = screen.getAllByRole('button', { name: /PPV en privé/u });
     first?.focus();
     await waitFor(() => {
       expect(document.querySelector('.mf-donut__middle')?.textContent.replace(NBSP, ' ')).toBe(
-        '75 %PPV en privé',
+        '75 %PPV en privé2 ventes',
       );
     });
   });

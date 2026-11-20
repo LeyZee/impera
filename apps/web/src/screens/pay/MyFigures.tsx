@@ -37,7 +37,7 @@ import { amountText, periodLine } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
 import { cityOf, dayNumber, longDay } from '@/scheduling/time';
-import { arcs, OTHER_KINDS_NOTE, sharesOf } from '@/screens/dashboard/agency/view';
+import { arcs, sharesOf } from '@/screens/dashboard/agency/view';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
 import { Panel } from '@/shell/layout';
 
@@ -442,18 +442,11 @@ function Hours({
 
 /**
  * « D'où vient mon argent » (§ 6): the net of the fortnight under way by what was sold, in the Dashboard's ring. A
- * slice lit by the pointer, the keyboard or a tap shows in the middle; at rest the middle says the total. A sale whose
- * statement kept no type yet is said « pas encore comptée », never drawn as a zero.
+ * slice lit by the pointer, the keyboard or a tap shows in the middle with its count of sales, no tip over the legend
+ * (avis Design 20/11); at rest the middle says the total, « réparti » while some sales wait for their type. A sale
+ * whose statement kept no type yet is said « pas encore comptée », never drawn as a zero.
  */
-function Money({
-  figures,
-  currency,
-  tip,
-}: {
-  figures: MyFigures;
-  currency: Currency;
-  tip: FloatingTip;
-}): JSX.Element {
+function Money({ figures, currency }: { figures: MyFigures; currency: Currency }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
   // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
   const pressedBy = useRef<string | null>(null);
@@ -524,27 +517,19 @@ function Money({
                     <b className="mf-donut__value nv-num" data-long={totalText.length > 7}>
                       {totalText}
                     </b>
-                    <span className="mf-donut__sub">de net</span>
+                    <span className="mf-donut__sub">{untyped > 0 ? 'de net réparti' : 'de net'}</span>
                   </>
                 ) : (
                   <>
                     <b className="mf-donut__value nv-num">{String(shares[lit ?? 0] ?? 0)}&nbsp;%</b>
                     <span className="mf-donut__sub">{litSlice.label}</span>
+                    <span className="mf-donut__sub">{counted(litSlice.sales, 'vente', 'ventes')}</span>
                   </>
                 )}
               </span>
             </div>
             <ul className="mf-kinds">
               {slices.map((slice, i) => {
-                const told = tip.bind({
-                  title: slice.label,
-                  rows: [
-                    ['Net', amountText(slice.cents, currency)],
-                    ['Ventes', counted(slice.sales, 'vente', 'ventes')],
-                    ['Part de ton net', `${String(shares[i] ?? 0)}\u00a0%`],
-                  ],
-                  ...(slice.key === 'other' && { text: OTHER_KINDS_NOTE }),
-                });
                 return (
                   <li key={slice.key}>
                     <button
@@ -556,23 +541,16 @@ function Money({
                       onPointerEnter={(event) => {
                         if (event.pointerType === 'mouse') setLit(i);
                       }}
-                      onPointerMove={told.onPointerMove}
                       onPointerLeave={(event) => {
-                        told.onPointerLeave(event);
                         if (event.pointerType === 'mouse') setLit(null);
                       }}
                       onPointerDown={(event) => {
-                        told.onPointerDown(event);
                         pressedBy.current = event.pointerType;
                       }}
-                      onFocus={(event) => {
-                        if (pressedBy.current === null) {
-                          told.onFocus(event);
-                          setLit(i);
-                        }
+                      onFocus={() => {
+                        if (pressedBy.current === null) setLit(i);
                       }}
                       onBlur={() => {
-                        told.onBlur();
                         pressedBy.current = null;
                         setLit(null);
                       }}
@@ -752,7 +730,7 @@ export function MyFiguresAside(): JSX.Element | null {
   return (
     <>
       {records ? <Records figures={figures} tip={tip} /> : null}
-      {money ? <Money figures={figures} currency={currency} tip={tip} /> : null}
+      {money ? <Money figures={figures} currency={currency} /> : null}
       {hours ? <Hours figures={figures} currency={currency} tip={tip} /> : null}
       {tip.element}
     </>
