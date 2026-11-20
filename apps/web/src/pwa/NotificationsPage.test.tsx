@@ -218,28 +218,44 @@ describe('Notifications, when it rings', () => {
     const calls = serve();
     deviceIs('unsupported');
     renderPage(true);
-    const gains = await screen.findByRole('switch', { name: 'Tes gains : activées' });
+    const gains = await screen.findByRole('switch', { name: /^Tes gains/u });
+    expect(gains).toHaveProperty('checked', true);
     expect(screen.getByText('Toi seule vois ces choix ; l’agence ne les voit pas.')).toBeTruthy();
     fireEvent.click(gains);
-    expect(await screen.findByText('Tes gains : coupées.')).toBeTruthy();
+    expect(await screen.findByText('Tes gains : coupés.')).toBeTruthy();
     expect(
       calls.find((call) => call.method === 'PUT' && call.url === '/v1/notifications/kinds')?.body,
     ).toEqual({
       ...ALL_ON,
       earnings: false,
     });
-    expect(screen.getByRole('switch', { name: 'Tes gains : coupées' })).toHaveProperty('checked', false);
+    expect(screen.getByRole('switch', { name: /^Tes gains/u })).toHaveProperty('checked', false);
+  });
+
+  it.each([
+    [/^Demandes de l’agence/u, 'Demandes de l’agence : coupées.', 'Demandes de l’agence : activées.'],
+    [/^Ta semaine à valider/u, 'Ta semaine à valider : coupée.', 'Ta semaine à valider : activée.'],
+    [/^Tes gains/u, 'Tes gains : coupés.', 'Tes gains : activés.'],
+    [/^Tes lives/u, 'Tes lives : coupés.', 'Tes lives : activés.'],
+  ])('says each sort off and back on in its own agreement (%s)', async (name, off, on) => {
+    serve();
+    deviceIs('unsupported');
+    renderPage(true);
+    fireEvent.click(await screen.findByRole('switch', { name }));
+    expect(await screen.findByText(off)).toBeTruthy();
+    fireEvent.click(screen.getByRole('switch', { name }));
+    expect(await screen.findByText(on)).toBeTruthy();
   });
 
   it('puts a sort back and says so when the save is refused', async () => {
     serve(200, 503);
     deviceIs('unsupported');
     renderPage(true);
-    fireEvent.click(await screen.findByRole('switch', { name: 'Tes lives : activées' }));
+    fireEvent.click(await screen.findByRole('switch', { name: /^Tes lives/u }));
     expect((await screen.findByText('Pas enregistré. Réessaie dans un instant.')).getAttribute('role')).toBe(
       'alert',
     );
-    expect(screen.getByRole('switch', { name: 'Tes lives : activées' })).toHaveProperty('checked', true);
+    expect(screen.getByRole('switch', { name: /^Tes lives/u })).toHaveProperty('checked', true);
   });
 
   it('shows no sorts to the team, whose alerts are set by the owner', async () => {

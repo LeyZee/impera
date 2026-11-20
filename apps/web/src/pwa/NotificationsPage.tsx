@@ -52,14 +52,38 @@ const kindsQuery = {
 } as const;
 
 /** Her sorts (ADR 0150 § 16 ter), one line each with what it brings. */
-const KIND_WORDS: Readonly<Record<NotificationKind, { readonly title: string; readonly hint: string }>> = {
-  agency_request: { title: 'Demandes de l’agence', hint: 'Un rappel avant une tâche de ton agenda.' },
+interface KindWords {
+  readonly title: string;
+  readonly hint: string;
+  /** The confirmation once saved, agreed with its title. */
+  readonly on: string;
+  readonly off: string;
+}
+const KIND_WORDS: Readonly<Record<NotificationKind, KindWords>> = {
+  agency_request: {
+    title: 'Demandes de l’agence',
+    hint: 'Un rappel avant une tâche de ton agenda.',
+    on: 'Demandes de l’agence : activées.',
+    off: 'Demandes de l’agence : coupées.',
+  },
   week_to_validate: {
     title: 'Ta semaine à valider',
     hint: 'Quand ta semaine est prête, à relire et valider.',
+    on: 'Ta semaine à valider : activée.',
+    off: 'Ta semaine à valider : coupée.',
   },
-  earnings: { title: 'Tes gains', hint: 'Ta part, à chaque vente.' },
-  lives: { title: 'Tes lives', hint: 'Avant un live prévu.' },
+  earnings: {
+    title: 'Tes gains',
+    hint: 'Ta part, à chaque vente.',
+    on: 'Tes gains : activés.',
+    off: 'Tes gains : coupés.',
+  },
+  lives: {
+    title: 'Tes lives',
+    hint: 'Avant un live prévu.',
+    on: 'Tes lives : activés.',
+    off: 'Tes lives : coupés.',
+  },
 };
 
 const DEFAULT_QUIET = { startMinute: 22 * 60, endMinute: 8 * 60 } as const;
@@ -391,7 +415,7 @@ function Kinds(): JSX.Element {
       });
       if (!response.ok) throw new Error(`kinds_${String(response.status)}`);
       client.setQueryData(kindsQuery.queryKey, NotificationKindsSchema.parse(await response.json()));
-      setNote({ text: `${KIND_WORDS[kind].title} : ${on ? 'activées' : 'coupées'}.`, failed: false });
+      setNote({ text: on ? KIND_WORDS[kind].on : KIND_WORDS[kind].off, failed: false });
     } catch {
       client.setQueryData(kindsQuery.queryKey, before);
       setNote({ text: 'Pas enregistré. Réessaie dans un instant.', failed: true });
@@ -426,7 +450,6 @@ function Kinds(): JSX.Element {
               role="switch"
               className="nv-switch"
               checked={data[kind]}
-              aria-label={`${KIND_WORDS[kind].title} : ${data[kind] ? 'activées' : 'coupées'}`}
               onChange={(event) => {
                 void toggle(kind, event.target.checked);
               }}
