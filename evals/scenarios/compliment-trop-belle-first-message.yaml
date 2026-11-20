@@ -1,0 +1,38 @@
+# Jeu « compliments » (Charles, 20/11) : un compliment sans rien de sexuel est accueilli avec assurance et un merci, sans commentaire sur son audace ni son rythme. Fan et messages fictifs (ADR 0010). Rejouer le jeu : pnpm evals -- --full --match compliment-
+description: Premier message, il la trouve magnifique ; elle l’assume, le remercie, ne commente jamais sa façon de l’aborder.
+persona_version: demo
+tier: full
+fan_facts: []
+situation:
+  known_hours: 0
+  age_confirmed: false
+history: []
+inbound: "t'es vraiment magnifique"
+expect:
+  brief:
+    intent_in:
+      - flirt
+    risks_absent:
+      - minor_suspected
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    bubbles_min: 1
+    bubbles_max: 3
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(trop|un peu|bien|pas si) vite\b
+      - \b(tu y vas|t'y vas|t’y vas|tu fonces)\b.{0,15}\b(fort|vite)\b
+      - \b(doucement|on se calme|calme[- ]toi|tu t’emballes|tu t'emballes)\b
+      - \btu vises\b
+      - \b(t’es|t'es|tu es|toi t’es|toi t'es)\s+((bien|très|trop|vachement|super|plutôt)\s+)?(direct|cash|pressé|rapide|entreprenant|culotté|audacieux|gonflé)\b
+      - \btu (commences|attaques|démarres|entres|arrives)\s+(fort|direct|cash)\b
+      - \btu (ne )?perds pas de temps\b
+      - \bdès le premier message\b
+      - \bon se connaît (à peine|même pas|pas)\b
+      - \bqu.est.ce qui t.a fait dire\b
+      - \b(pack|vidéo privée|contenu privé|€|euros?)\b
+      - \b(ton âge|quel âge|t’as quel|t'as quel|tu as quel âge)\b
+    must_match_any:
+      - \?

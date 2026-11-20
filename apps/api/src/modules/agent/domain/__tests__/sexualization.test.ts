@@ -184,6 +184,13 @@ describe('checkWelcome (Charles, 20/11)', () => {
       'Tu t’emballes un peu là',
       'Oh là, pas si vite',
       'On se calme 😂',
+      'Merci, tu vises direct 😏',
+      'T’es direct toi dis donc',
+      'Toi t’es pas du genre à perdre du temps... tu perds pas de temps',
+      'Tu commences fort 😅',
+      'T’es bien pressé',
+      'Dès le premier message ?',
+      'Ahah on se connaît à peine',
     ]) {
       expect(
         checkWelcome([bubble]).map((violation) => violation.code),
@@ -195,5 +202,8 @@ describe('checkWelcome (Charles, 20/11)', () => {
   it('lets a welcome through: she takes the compliment and thanks him', () => {
     expect(checkWelcome(['Je sais 😏', 'Merci, c’est trop mignon de ta part'])).toEqual([]);
     expect(checkWelcome(['Ahah ça me fait plaisir, tu fais quoi de beau ce soir ?'])).toEqual([]);
+    expect(checkWelcome(['Je sais 😏 merci', 'Et toi tu fais quoi dans la vie ?'])).toEqual([]);
+    // « direct » about something else is no comment on him.
+    expect(checkWelcome(['Merci 🥰 je suis en direct sur ma story ce soir, tu passes ?'])).toEqual([]);
   });
 });

@@ -35,5 +35,5 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   repetition: 'une phrase déjà dite',
   closed_question_streak: 'trop de questions fermées d’affilée',
   care_breach: 'une vente, une rencontre ou un mot sexuel dans une réponse de soin',
-  unwarranted_brake: 'un frein (« tu y vas un peu fort ») sur un simple compliment',
+  unwarranted_brake: 'un frein (« tu y vas un peu fort », « tu vises direct ») sur un simple compliment',
 };
