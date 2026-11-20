@@ -237,6 +237,8 @@ jobs:
   # Apart from the e2e, so that each night says both (« nightly vert », 06/11): without the xAI key the evals are
   # skipped, said in the run's summary and as a warning, and the night stays green; with it, both fail without
   # something to measure, and a failure turns the night red.
+  # Rhythm and caps chosen by Charles (OPS-21, 20/11): one draw on a night after a change of the AI, the whole pass
+  # (three draws) on Sunday and by hand, nothing on a quiet night. Fictional demo persona only: the log is public.
   nightly-evals:
     name: Nightly evals smoke
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -253,22 +255,46 @@ jobs:
           echo "Le secret \`LLM_XAI_API_KEY\` n'est pas posé : \`pnpm probe\` et \`pnpm evals\` n'ont pas tourné, rien n'a été mesuré." >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: env.HAS_XAI_KEY == 'true'
+        with: { fetch-depth: 0 } # the plan reads the last day's commits
+      - name: Plan de la nuit
+        id: plan
+        if: env.HAS_XAI_KEY == 'true'
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # What makes the AI answer: its code, its prompts, the persona, and the evals themselves. 26 h, not 24:
+          # GitHub may start a scheduled run late, and a commit read twice costs less than one never measured.
+          changed=$(git log --since='26 hours ago' --format=%h -- \
+            packages/llm apps/api/src/modules/agent apps/api/src/modules/persona apps/api/src/modules/conversations \
+            'packages/contracts/src/persona*' personas evals apps/api/src/scripts/evals.ts apps/api/src/scripts/evals)
+          if [ "$EVENT" = workflow_dispatch ] || [ "$(date -u +%u)" = 7 ]; then
+            { echo "run=true"; echo "draws=3"; echo "cap=4"; } >> "$GITHUB_OUTPUT"
+            echo "### Passe complète : 3 tirages, plafond 4 €" >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$changed" ]; then
+            { echo "run=true"; echo "draws=1"; echo "cap=1.5"; } >> "$GITHUB_OUTPUT"
+            echo "### L'IA a changé depuis hier : 1 tirage, plafond 1,50 €" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "### Évaluations non jouées : rien n'a changé dans l'IA depuis hier, rien n'a été dépensé" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
-        if: env.HAS_XAI_KEY == 'true'
+        if: steps.plan.outputs.run == 'true'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
-        if: env.HAS_XAI_KEY == 'true'
+        if: steps.plan.outputs.run == 'true'
         with: { node-version-file: .nvmrc, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-        if: env.HAS_XAI_KEY == 'true'
+        if: steps.plan.outputs.run == 'true'
       - run: pnpm build
-        if: env.HAS_XAI_KEY == 'true'
+        if: steps.plan.outputs.run == 'true'
       - run: pnpm probe
-        if: env.HAS_XAI_KEY == 'true'
+        if: steps.plan.outputs.run == 'true'
         env:
           LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
           LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}
-      - run: pnpm evals
-        if: env.HAS_XAI_KEY == 'true'
+      - run: pnpm evals -- --draws "$DRAWS" --cap-eur "$CAP"
+        if: steps.plan.outputs.run == 'true'
         env:
+          DRAWS: ${{ steps.plan.outputs.draws }}
+          CAP: ${{ steps.plan.outputs.cap }}
           LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
           LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}

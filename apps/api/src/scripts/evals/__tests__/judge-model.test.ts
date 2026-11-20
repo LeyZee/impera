@@ -1,7 +1,7 @@
 import { DEFAULT_LLM_CONFIG } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
-import { EVALS_JUDGE_TIMEOUT_MS, evalsConfig } from '../judge-model';
+import { EVALS_CAP_EUR, EVALS_JUDGE_TIMEOUT_MS, evalsCapOf, evalsConfig } from '../judge-model';
 
 describe('evalsConfig', () => {
   it('moves the judge off the voice’s provider when another key exists', () => {
@@ -31,5 +31,20 @@ describe('evalsConfig', () => {
       expect(config.roles.brain).toEqual(DEFAULT_LLM_CONFIG.roles.brain);
     }
     expect(DEFAULT_LLM_CONFIG.roles.judge.timeoutMs).toBe(60_000);
+  });
+});
+
+describe('evalsCapOf', () => {
+  it('keeps the full cap without --cap-eur, and lowers it with one (OPS-21)', () => {
+    expect(evalsCapOf(undefined)).toBe(EVALS_CAP_EUR);
+    expect(evalsCapOf('1.5')).toBe(1.5);
+    expect(evalsCapOf('4')).toBe(4);
+    expect(evalsCapOf(String(EVALS_CAP_EUR))).toBe(EVALS_CAP_EUR);
+  });
+
+  it('refuses a cap above the run’s own, at or below zero, or not a number', () => {
+    for (const arg of ['6.01', '20', '0', '-1', '', ' ', 'abc', 'Infinity', 'NaN']) {
+      expect(evalsCapOf(arg)).toBeNull();
+    }
   });
 });
