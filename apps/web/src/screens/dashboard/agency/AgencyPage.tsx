@@ -1,10 +1,8 @@
 import type { JSX } from 'react';
 
 import { AgencyStrip } from '../AgencyStrip';
-import { BackupBanner } from '../BackupBanner';
 import { NoCreator } from '../DashboardPage';
-import { PaperworkBanner } from '../PaperworkBanner';
-import { ReportsBanner } from '../ReportsBanner';
+import { TodoCard } from '../TodoCard';
 import { useFloatingTip } from '../parts';
 import { useDashboard } from '../useDashboard';
 import '../dashboard.css';
@@ -16,7 +14,7 @@ import { PageHeader } from '@/shell/layout';
 
 /**
  * The Dashboard of the owner and of an active manager while the menu's selector is on « Toutes » (ADR 0078, ADR 0134
- * § 3): the agency's figures, then what waits on the agency. A creator chosen in the selector, or her line here, opens
+ * § 3): what waits on the reader first (« À faire », pilotage 12/11 W3), then the agency's figures. A creator chosen in the selector, or her line here, opens
  * her Dashboard, her agent first and her figures under it.
  */
 export function AgencyPage({
@@ -46,8 +44,9 @@ export function AgencyPage({
     <div className="db">
       {/* The screen's title, as on every other one (recette visuelle 16/11, PIL-04): the rest of the Dashboard as it was. */}
       <PageHeader title="Dashboard" />
-      {/* The figures first, then what the agency runs: the export, the invoices, the reports, the day's AI budget
-          (recette visuelle 16/11, PIL-04). */}
+      {/* What waits on the reader, in one card and before the figures, as « Aujourd'hui » does for the team (W3):
+          nothing when nothing waits, so the figures stay first on a quiet day. Then the day's AI budget (PIL-04). */}
+      <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} />
       <AgencyInsightsPanel
         selection={selection}
         onSelection={onSelection}
@@ -56,9 +55,6 @@ export function AgencyPage({
         canOpenSettings={forOwner}
         tip={tip}
       />
-      <BackupBanner enabled={forOwner} />
-      <PaperworkBanner enabled={forOwner} />
-      <ReportsBanner enabled={reviewsReports} />
       {view.status === 'live' ? <AgencyStrip agency={view.data.agency} opensSettings={forOwner} /> : null}
       {tip.element}
     </div>

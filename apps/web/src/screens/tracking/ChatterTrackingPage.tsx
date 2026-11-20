@@ -10,6 +10,7 @@ import { accessOpen, type MyAwayStatus } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import { addDays, dayOf, longDay, rangeAt, readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { ChatArt } from '@/shell/art/EmptyArt';
 import { Panel } from '@/shell/layout';
 import { Empty } from '@/shell/states';
 
@@ -104,6 +105,7 @@ function NothingListed(): JSX.Element {
   return (
     <Empty
       plate
+      art={<ChatArt />}
       title="Aucune conversation pour l’instant"
       action={
         <Link to="/aujourdhui" className="nv-btn nv-btn--soft">
