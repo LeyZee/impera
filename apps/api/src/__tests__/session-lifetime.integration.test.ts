@@ -54,12 +54,19 @@ describe('session lifetime by role (SEC-17)', () => {
         )
       ).rows[0],
     );
-  /** One session for the account, freshly signed in: earlier ones are dropped so each test reads its own row. */
+  /**
+   * One session for the account, freshly signed in: every other is dropped so each test reads its own row (the first
+   * sign-in, which activates the code, leaves one more behind).
+   */
   const freshSession = async (account: { email: string; password: string }) => {
+    const cookie = await signIn(server, account.email, account.password);
+    const token = /session_token=([^.;]+)\./.exec(cookie)?.[1];
+    if (token === undefined) throw new Error(`no session cookie for ${account.email}`);
     await test.admin.db.execute(
-      sql`delete from "session" where user_id = (select id from "user" where email = ${account.email})`,
+      sql`delete from "session"
+          where user_id = (select id from "user" where email = ${account.email}) and token <> ${token}`,
     );
-    return signIn(server, account.email, account.password);
+    return cookie;
   };
   /** Its last refresh `idle` ago and its expiry `expiresIn` ahead (both Postgres intervals), its creation `age` ago. */
   const setTimes = (email: string, times: { idle: string; expiresIn: string; age?: string }) =>
@@ -104,10 +111,11 @@ describe('session lifetime by role (SEC-17)', () => {
         joinedOn: '2026-10-01',
       });
     }
+    const creatorId = (await app.modules.persona.creators.create({ displayName: 'Anna' })).id;
     const creator = await createOwner(app.auth, app.db.db, CREATOR);
     await test.admin.db
       .update(schema.user)
-      .set({ role: 'creator', creatorIds: [] })
+      .set({ role: 'creator', creatorIds: [creatorId] })
       .where(eq(schema.user.id, creator.userId));
   });
 
