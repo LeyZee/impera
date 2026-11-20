@@ -44,6 +44,9 @@ describe('assertSameCrm (avis Sécurité et Bilan du 20/11)', () => {
     expect(() => {
       assertSameCrm('https://crm.exemple.fr', 'https://crm.exemple.fr/');
     }).not.toThrow();
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', 'https://CRM.exemple.fr:443');
+    }).not.toThrow();
   });
 
   it('has nothing to compare when either address is missing', () => {
@@ -62,6 +65,7 @@ describe('assertSameCrm (avis Sécurité et Bilan du 20/11)', () => {
     ['another site', 'https://autre.exemple.fr'],
     ['plain HTTP', 'http://crm.exemple.fr'],
     ['another port', 'https://crm.exemple.fr:8443'],
+    ['no address', 'crm.exemple.fr'],
   ])('fails the build when WEB_ORIGIN is %s', (_, webOrigin) => {
     expect(() => {
       assertSameCrm('https://crm.exemple.fr', webOrigin);
