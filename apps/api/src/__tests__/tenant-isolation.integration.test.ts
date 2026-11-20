@@ -72,18 +72,6 @@ const bodiesFor = (
   'POST /v1/creators/:creatorId/drops/:id/summary/validate': {
     summaryId: '00000000-0000-4000-8000-000000000000',
   },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/validate': {
-    identityId: '00000000-0000-4000-8000-000000000000',
-  },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/correct': {
-    content: {
-      ambiance: 'Ambiance inventée',
-      energy: 'soft',
-      setting: 'Décor inventé',
-      useWhen: ['Situation inventée'],
-      avoidWhen: [],
-    },
-  },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
