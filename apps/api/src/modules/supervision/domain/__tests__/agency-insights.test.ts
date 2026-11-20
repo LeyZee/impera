@@ -67,6 +67,7 @@ function creator(
     totals: { from: RANGE.previousFrom, to: RANGE.to, rows: [...rows], refundsWithoutSale: 0 },
     hours: [],
     fans: [],
+    refunds: [],
     refundsWithoutSale: 0,
     registerSince: null,
     stats: [],
@@ -604,5 +605,64 @@ describe('subscribersOf (ADR 0081)', () => {
   it('passes the contract', () => {
     const result = insights([creator(LINA, 'Lina', [row()], { stats: every(4, 6) })]);
     expect(AgencyInsightsSchema.parse(result).subscribers?.current.daysRead).toBe(3);
+  });
+});
+
+describe('the refunds one by one (ADR 0092 § 4)', () => {
+  const refund = (patch: Partial<AgencyCreatorRead['refunds'][number]> = {}) => ({
+    saleType: 'ppv' as const,
+    currency: 'EUR' as const,
+    grossInclVatMinor: 1200,
+    refundedAt: new Date('2026-11-06T10:00:00Z'),
+    saleOccurredAt: new Date('2026-11-04T09:00:00Z'),
+    seller: theo,
+    ...patch,
+  });
+
+  it('lists every creator’s refunds, the latest first, the seller named and the whole days since the sale', () => {
+    const read = insights([
+      creator(LINA, 'Lina Test', [], {
+        refunds: [
+          refund(),
+          refund({ saleType: 'subscription', refundedAt: new Date('2026-11-04T09:30:00Z') }),
+        ],
+      }),
+      creator(MAYA, 'Maya Démo', [], {
+        refunds: [
+          refund({
+            seller: { kind: 'agent' },
+            refundedAt: new Date('2026-11-05T12:00:00Z'),
+            saleOccurredAt: null,
+          }),
+        ],
+      }),
+    ]);
+    expect(read.refundList).toEqual([
+      {
+        refundedAt: '2026-11-06T10:00:00.000Z',
+        creatorId: LINA,
+        kind: 'ppv',
+        amountMinor: 1200,
+        seller: { kind: 'member', memberId: THEO, name: 'Théo' },
+        delayDays: 2,
+      },
+      {
+        refundedAt: '2026-11-05T12:00:00.000Z',
+        creatorId: MAYA,
+        kind: 'ppv',
+        amountMinor: 1200,
+        seller: { kind: 'agent' },
+        delayDays: null,
+      },
+      expect.objectContaining({ creatorId: LINA, kind: 'subscriptions', delayDays: 0 }),
+    ]);
+  });
+
+  it('converts a dollar refund at the rate, and says none without one', () => {
+    const lines = [
+      creator(LINA, 'Lina Test', [], { refunds: [refund({ currency: 'USD', grossInclVatMinor: 1000 })] }),
+    ];
+    expect(insights(lines).refundList[0]?.amountMinor).toBeNull();
+    expect(insights(lines, { day: '2026-11-01', rateMicros: 900_000 }).refundList[0]?.amountMinor).toBe(900);
   });
 });

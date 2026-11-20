@@ -5,7 +5,11 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { readAgencyInsights, type AgencyReader } from './application/agency-reads';
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';
-import { createAgencyInsightsReader, type DailyStatsOf } from './infra/views/agency-insights-reader';
+import {
+  createAgencyInsightsReader,
+  type DailyStatsOf,
+  type RefundListOf,
+} from './infra/views/agency-insights-reader';
 import { createCreatorsOverviewReader } from './infra/views/creators-overview-reader';
 import { createDashboardReader } from './infra/views/dashboard-reader';
 import { createRevealSalesReader, type SalesTotalsOf } from './infra/views/reveal-sales-reader';
@@ -48,6 +52,8 @@ export interface SupervisionDeps extends Omit<
   readonly salesTimeZone: (platform: Platform) => string | null;
   /** The connectors' snapshot of the platforms' daily statistics (ADR 0081), read under the caller's RLS. */
   readonly dailyStatsOf: DailyStatsOf;
+  /** The connectors' refunds one by one (ADR 0092 § 4), for the agency's list. */
+  readonly refundListOf: RefundListOf;
 }
 
 export function createSupervisionModule(deps: SupervisionDeps): SupervisionModule {
@@ -56,6 +62,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
     deps.salesTotalsOf,
     deps.salesTimeZone,
     deps.dailyStatsOf,
+    deps.refundListOf,
   );
   const agencyTimeZone = deps.salesTimeZone('reveal') ?? 'Europe/Paris';
   return {

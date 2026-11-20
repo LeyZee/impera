@@ -445,6 +445,47 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(grey.querySelectorAll('.ins-heat__best')).toHaveLength(0);
   });
 
+  it('lists the refunds one by one, filtered by creator and by the sale’s chatter (ADR 0092 § 4)', async () => {
+    serve(200, AGENCY_WEEK);
+    show();
+    const table = await screen.findByRole('table');
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(1 + 3);
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Date', 'Créatrice', 'Type', 'Montant', 'Chatteur de la vente', 'Délai depuis la vente']);
+    const [, first, second, third] = rows.map((row) => row.textContent);
+    expect(first).toContain('6 nov.');
+    expect(first).toContain('14\u00a0h\u00a005');
+    expect(first).toContain('Lina Test');
+    expect(first).toContain('PPV en privé');
+    expect(first).toContain('25,00');
+    expect(first).toContain('Théo');
+    expect(first).toContain('2 jours après');
+    expect(second).toContain('le jour même');
+    expect(second).toContain('Sans chatteur');
+    expect(third).toContain('vente hors registre');
+    expect(third).toContain('Agent IA');
+    expect(third).toContain('—');
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Créatrice' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Maya Démo' }));
+    expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(1 + 1);
+    fireEvent.click(screen.getByRole('combobox', { name: 'Chatteur de la vente' }));
+    fireEvent.click(await screen.findByRole('option', { name: 'Théo' }));
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.getByText('Aucun remboursement pour ce choix.')).toBeTruthy();
+  });
+
+  it('shows no refunds card on a period without one', async () => {
+    serve(200, { ...AGENCY_WEEK, refundList: [] });
+    show();
+    await screen.findByRole('heading', { name: /Les fans qui paient/u });
+    expect(screen.queryByRole('heading', { name: /Les remboursements/u })).toBeNull();
+  });
+
   it('shows nothing to an account whose scope is its own', async () => {
     serve(403, { error: 'creator_forbidden' });
     show(null, false);
