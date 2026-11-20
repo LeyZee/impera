@@ -171,6 +171,28 @@ const configSchema = z
       }
     }
   })
+  .superRefine((config, context) => {
+    // ADR 0152 § 2: a base reached over the network is reached in TLS whose certificate is checked, never in clear
+    // nor on a certificate taken on trust. A base on this machine or behind a service name of the compose (the CI,
+    // a rehearsal) is not on the network.
+    if (config.NODE_ENV !== 'production') return;
+    const urls = {
+      DATABASE_URL: config.DATABASE_URL,
+      DATABASE_SERVICE_URL: config.DATABASE_SERVICE_URL,
+      ...(config.DATABASE_ADMIN_URL === undefined ? {} : { DATABASE_ADMIN_URL: config.DATABASE_ADMIN_URL }),
+    };
+    for (const [field, value] of Object.entries(urls)) {
+      const url = new URL(value);
+      if (!isNetworkDatabaseHost(url.hostname)) continue;
+      if (url.searchParams.get('sslmode') !== 'verify-full') {
+        context.addIssue({
+          code: 'custom',
+          message: `${field} reaches a remote base: it must end with sslmode=verify-full (ADR 0152 § 2, deploy.md)`,
+          path: [field],
+        });
+      }
+    }
+  })
   .refine((config) => config.NODE_ENV !== 'production' || config.PASSWORD_BREACH_CHECK === 'on', {
     message: 'PASSWORD_BREACH_CHECK=off is for development only (ADR 0046 § 4)',
     path: ['PASSWORD_BREACH_CHECK'],
@@ -336,6 +358,16 @@ export function ownerDatabaseUrl(config: Config): string {
 }
 
 /** Parses the environment; throws with every invalid variable listed when the configuration is wrong. */
+/**
+ * True when a base at this host is reached over the network: neither this machine nor a service name of the compose
+ * (a name without a dot, such as `postgres`).
+ */
+function isNetworkDatabaseHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host === '::1' || host.startsWith('127.')) return false;
+  return host.includes('.') || host.includes(':');
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const renamed = Object.keys(env).filter((name) => name.startsWith(OLD_PREFIX));
   if (renamed.length > 0) {

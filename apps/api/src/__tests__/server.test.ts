@@ -567,6 +567,47 @@ describe('loadConfig', () => {
       SESSION_ENCRYPTION_KEYS: 'k1:' + 'b'.repeat(44),
     };
 
+    it('refuses in production a remote base reached without a checked certificate (ADR 0152 § 2)', () => {
+      const remote = (role: string, query: string) =>
+        `postgres://${role}:test@pooler.db.example.test:5432/postgres${query}`;
+      const verified = {
+        DATABASE_URL: remote('nirvana_app', '?sslmode=verify-full'),
+        DATABASE_SERVICE_URL: remote('impera_service', '?sslmode=verify-full'),
+        DATABASE_ADMIN_URL: remote('nirvana_admin', '?sslmode=verify-full&sslrootcert=/run/ca.crt'),
+      };
+      expect(() => testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY, ...verified })).not.toThrow();
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          ...verified,
+          DATABASE_SERVICE_URL: remote('impera_service', '?sslmode=require'),
+        }),
+      ).toThrow(/DATABASE_SERVICE_URL reaches a remote base: it must end with sslmode=verify-full/u);
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          ...verified,
+          DATABASE_ADMIN_URL: remote('nirvana_admin', ''),
+        }),
+      ).toThrow(/DATABASE_ADMIN_URL reaches a remote base/u);
+      // A base on this machine, or behind a service name of the compose, is not on the network; nor is any outside
+      // production.
+      expect(() => testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY })).not.toThrow();
+      expect(() =>
+        testConfig({
+          ...PRODUCTION,
+          ...PRIMARY,
+          ...COPY,
+          DATABASE_URL: 'postgres://nirvana_app:test@postgres:5432/impera',
+        }),
+      ).not.toThrow();
+      expect(() => testConfig({ DATABASE_URL: remote('nirvana_app', '') })).not.toThrow();
+    });
+
     it('takes both buckets whole, or none outside production, never half of one', () => {
       expect(() => testConfig({ ...PRIMARY, ...COPY })).not.toThrow();
       expect(() => testConfig()).not.toThrow();
