@@ -10,7 +10,7 @@ import {
 
 import { amountText, signedAmountText } from '@/reports/model';
 import { platformName } from '@/scheduling/model';
-import { clockAt, longDay } from '@/scheduling/time';
+import { clockAt, longDay, withFirstOfMonth } from '@/scheduling/time';
 
 /**
  * Commissions › « Mes ventes lues » (CRM-03 lot b4c, ADR 0050 § 10), without React: what a line of the member's own
@@ -40,9 +40,14 @@ export function mySaleWhen(
     : when;
 }
 
-/** « 5 mai »: the day of the sale a late refund takes back, in the reader's zone. */
+/**
+ * « 5 mai », « 1er mai »: the day of the sale a late refund takes back, in the reader's zone, its number and month
+ * held together so a phone never parts them.
+ */
 const saleDayOf = (at: string, timeZone: string): string =>
-  new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone }).format(new Date(at));
+  withFirstOfMonth(
+    new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone }).formatToParts(new Date(at)),
+  ).replace(' ', NBSP);
 
 /** The line's net, signed: a refund takes off. */
 export const mySaleAmount = (sale: Pick<MySale, 'netMinor' | 'currency'>): string =>
