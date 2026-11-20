@@ -36,5 +36,6 @@ Chaque réponse passe sous les gardes `no_commitment` (ni oui, ni prix, ni déla
 
 - Écriture dans la même transaction `withTenantMember` que le contrôle du propriétaire lu en base (politique `owner_insert`), sous un verrou par créatrice ; le rôle de service ne fait que lire.
 - Le tour de l’agent lit la grille en vigueur par `gridOf` (rôle de service, lecture seule, une créatrice à la fois) : seul le prix calculé en sort, jamais la grille dans un prompt.
+- Les commandes du fan : `orders.openFor` et `orders.record`, appelés par le tour de l’agent dans sa propre transaction (`withTenant`). Une commande ouverte par fan au plus ; un message déjà enregistré ne change rien ; un refus ferme la commande (`cancelled`). Table `custom_orders` (migration 0239), fermée au compte de la créatrice.
 - L'audit (`custom_price_grid.save`) note la version, le nombre de formats proposés et de suppléments, jamais un prix : les prix sont une méthode de l'agence.
 - Aucun prix réel dans le dépôt, les tests ni les fixtures (ADR 0010) : le propriétaire saisit tout dans le CRM.
