@@ -143,6 +143,11 @@ export interface ComposeTurnInput {
    */
   readonly waited?: boolean;
   /**
+   * Her hours close in a few minutes (`herDayEndsSoon`, ADR 0158 § A 7): her answer is a goodbye for the day, and no
+   * step starts that would be cut off.
+   */
+  readonly herDayEnds?: boolean;
+  /**
    * His desire score (P3-12): as stored, what code measured on his last messages, and whether his age was taken
    * back. Absent, he starts from 0 with nothing measured.
    */
@@ -369,6 +374,8 @@ const FAREWELL_HINTS = {
   says_goodnight:
     'il va se coucher : elle lui souhaite bonne nuit à sa façon, en une seule bulle, tendre ou taquine, sans question ni rien proposer',
   away: 'il doit y aller : elle le laisse filer à sa façon, en une seule bulle, sans question ni rien proposer, contente de le retrouver plus tard',
+  her_day_ends:
+    'sa journée à elle se termine, elle doit y aller : elle lui répond puis lui dit au revoir à sa façon, en une seule bulle, sans rien proposer, contente de le retrouver plus tard',
 } as const;
 
 function farewellOf(signals: readonly string[] | undefined): keyof typeof FAREWELL_HINTS | null {
@@ -817,6 +824,8 @@ export async function composeTurn(
           mayAct:
             !care &&
             !heCame &&
+            // Her hours close in a few minutes: a step now would be cut off (ADR 0158 § A 7).
+            input.herDayEnds !== true &&
             brief !== undefined &&
             trap.replyBrief === undefined &&
             customOrder === undefined &&
@@ -945,7 +954,9 @@ export async function composeTurn(
   const complaint = saleTrouble?.kind === 'answer' && saleTrouble.trouble === 'purchase_complaint';
   // He leaves: a goodbye, unless she brings or helps him open a step (his own words then lead).
   const farewell =
-    scriptStep === undefined && waitingStep === undefined ? farewellOf(brief?.desireSignals) : null;
+    scriptStep === undefined && waitingStep === undefined
+      ? (farewellOf(brief?.desireSignals) ?? (input.herDayEnds === true ? 'her_day_ends' : null))
+      : null;
   const voiceBrief: Brief =
     heCame && !care
       ? {

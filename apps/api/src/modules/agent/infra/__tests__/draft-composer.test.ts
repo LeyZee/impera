@@ -2269,6 +2269,34 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(bare.kind === 'held' ? bare.detail : []).toContain('media_not_sent');
   });
 
+  it('says goodbye for the day in her last minutes, and starts no step that would be cut off (ADR 0158 § A 7)', async () => {
+    // Saturday 17/10, 12:00 in Paris: her slot ends at 12:10.
+    const closing: AgentComposeInput = {
+      ...free(INPUT),
+      hours: {
+        reply: {
+          mode: 'slots',
+          slots: [{ day: 6, startMinute: 10 * 60, endMinute: 12 * 60 + 10, enabled: true }],
+        },
+        followUpQuiet: { startMinute: 23 * 60, endMinute: 9 * 60 },
+        night: { startMinute: 22 * 60, endMinute: 7 * 60 },
+      },
+    };
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(closing);
+
+    const voice = seen.voiceInputs?.[0];
+    expect(voice?.scriptStep).toBeUndefined();
+    expect(voice?.maxBubbles).toBe(1);
+    expect(voice?.brief.toneHints.some((hint) => hint.includes('sa journée à elle se termine'))).toBe(true);
+    expect(result.kind === 'draft' ? result.scriptRun : 'held').toBeUndefined();
+  });
+
   it('opens nothing right after he came: she shares the moment, no step, no offer (ADR 0156 § 6)', async () => {
     const came: Brief = { ...HOT, desireSignals: ['just_came'] };
     const { draftComposer, seen } = composer(

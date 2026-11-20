@@ -32,6 +32,7 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
+import { herDayEndsSoon } from '../domain/day-end';
 import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
 import {
@@ -1041,6 +1042,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const offer = await offerInput(withHer, input, stop.flags);
       const scripts = await scriptsInput(deps, input);
       const waited = (input.waited ?? 0) >= 1;
+      const timeZone = await deps.timeZoneOf(input.creatorId);
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
         fanText: ownText,
@@ -1058,13 +1060,15 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         situation: {
           now: input.now,
-          timeZone: await deps.timeZoneOf(input.creatorId),
+          timeZone,
           relationshipStartedAt: input.fan.firstMessageAt ?? input.now,
           spentCents: input.fan.spentMinor,
           ...(input.hours !== undefined && { night: input.hours.night }),
         },
         trace: { creatorId: input.creatorId, conversationId: input.conversationId, draftId: input.draftId },
         ...(waited && { waited }),
+        ...(input.hours !== undefined &&
+          herDayEndsSoon(input.hours, timeZone, input.now, input.exceptions) && { herDayEnds: true }),
         desire: {
           ...(input.desire !== undefined && { previous: input.desire }),
           measured: measureDesire(
