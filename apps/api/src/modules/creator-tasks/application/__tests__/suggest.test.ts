@@ -6,7 +6,7 @@ import {
   type AgencySuggestion,
   type CreateSuggestionBody,
 } from '@impera/contracts';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GuardedShoot, ShootGuardFault } from '../../domain/ports';
 import { suggestTask } from '../suggest';
@@ -78,6 +78,15 @@ function fakes(fault: ShootGuardFault | null) {
 const now = new Date('2026-11-08T12:00:00Z');
 
 describe('a shoot suggested by hand (ADR 0082 § 3)', () => {
+  // The body's day is checked against the clock (a year back at most, CREA-14): frozen at `now`, never today's date.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('is never read by the guards without a drop category, as before', async () => {
     const { deps, read, written } = fakes({ reason: 'limit', field: 'title' });
     await suggestTask(deps, 'c', 'u', body(), now);

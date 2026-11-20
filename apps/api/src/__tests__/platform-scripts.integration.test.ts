@@ -12,6 +12,7 @@ import {
   PlatformScriptViewSchema,
   PreparedScriptContentSchema,
   PreparedScriptIdSchema,
+  ScriptIdentityIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type DescriptionReviewReason,
@@ -762,91 +763,58 @@ describe('the native scripts imported from the platform', () => {
     expect(view).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
   });
 
-  it('lets an active manager of her list validate it, once, and the script becomes proposable', async () => {
+  it('no longer lets anyone validate or write an identity by hand: both routes are gone (ADR 0161 § 2)', async () => {
     const view = await ownerView('sequence_4');
     if (view?.identity == null) throw new Error('identified');
-    const url = `/v1/creators/${nora}/platform-scripts/${view.id}/identity/validate`;
-    // A chatter, her own account, a creator who is not on his list: never.
-    expect((await post('chatter', url, { identityId: view.identity.id })).statusCode).toBe(404);
-    expect((await post('nora', url, { identityId: view.identity.id })).statusCode).toBe(403);
-    expect(
-      (
-        await post('manager', `/v1/creators/${ines}/platform-scripts/${view.id}/identity/validate`, {
-          identityId: view.identity.id,
-        })
-      ).statusCode,
-    ).toBe(403);
-    const response = await post('manager', url, { identityId: view.identity.id });
-    expect(response.statusCode).toBe(200);
-    const validated = PlatformScriptViewSchema.parse(response.json());
-    expect(validated).toMatchObject({
-      gaps: [],
-      proposable: true,
-      identity: { id: view.identity.id, moment: 'night' },
-    });
-    expect(validated.identity?.validatedAt).not.toBeNull();
-    // Validated again: nothing changes, nothing is written twice.
-    const again = PlatformScriptViewSchema.parse(
-      (await post('owner', url, { identityId: view.identity.id })).json(),
-    );
-    expect(again.identity?.validatedAt).toBe(validated.identity?.validatedAt);
+    const base = `/v1/creators/${nora}/platform-scripts/${view.id}/identity`;
+    expect((await post('owner', `${base}/validate`, { identityId: view.identity.id })).statusCode).toBe(404);
+    expect((await post('owner', `${base}/correct`, { content: IDENTITY })).statusCode).toBe(404);
+    expect((await ownerView('sequence_4'))?.identity?.validatedAt).toBeNull();
     const audit = await test.admin.db
-      .select({ userId: schema.auditLog.userId, action: schema.auditLog.action })
+      .select({ action: schema.auditLog.action })
       .from(schema.auditLog)
       .where(eq(schema.auditLog.entityId, view.id));
-    expect(audit).toEqual([{ userId: ids.manager, action: 'script_identity.validated' }]);
-    // The list reads the same, through its route.
-    const listed = await server.inject({
-      method: 'GET',
-      url: `/v1/creators/${nora}/platform-scripts`,
-      headers: { cookie: await signIn(server, 'manager@example.test', PASSWORD) },
-    });
-    expect(listed.statusCode).toBe(200);
-    expect(
-      z
-        .array(PlatformScriptViewSchema)
-        .parse(listed.json())
-        .find((each) => each.ref === 'sequence_4')?.proposable,
-    ).toBe(true);
+    expect(audit).toEqual([]);
   });
 
-  it('holds a validated identity to its version: a description corrected asks for a new one, the old is stale', async () => {
+  it('holds an identity to its version: a description corrected asks for a new one', async () => {
     const before = await ownerView('sequence_4');
-    if (before?.identity == null) throw new Error('validated');
+    if (before?.identity == null) throw new Error('identified');
     // The description of the first photo corrected and validated anew: another version of the script.
     await described('media_10', 'image', 'Une description corrigée, inventée.');
     const after = await ownerView('sequence_4');
     expect(after?.identity).toBeNull();
     expect(after).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
-    const url = `/v1/creators/${nora}/platform-scripts/${before.id}/identity/validate`;
-    const stale = await post('owner', url, { identityId: before.identity.id });
-    expect([stale.statusCode, stale.json<{ error: { code: string } }>().error.code]).toEqual([
-      409,
-      'script_identity_stale_conflict',
-    ]);
-    // Written by hand for the version of now: validated by whoever writes it.
-    const corrected = await post(
-      'owner',
-      `/v1/creators/${nora}/platform-scripts/${before.id}/identity/correct`,
-      {
-        content: { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' },
-      },
-    );
-    expect(corrected.statusCode).toBe(200);
-    expect(PlatformScriptViewSchema.parse(corrected.json())).toMatchObject({
+    expect(await identify('sequence_4')).toBe('identified');
+    // An identity a hand of the team wrote before the routes left (rows kept, ADR 0161 § 3), stood up here by the
+    // administrator for the tests that follow: a row is written once, already validated, for the brain's version. It
+    // stands for its version, the brain leaves it alone.
+    const current = await ownerView('sequence_4');
+    if (current?.identity == null) throw new Error('identified again');
+    const [brain] = await test.admin.db
+      .select({
+        inputHash: schema.scriptIdentities.inputHash,
+        schemaVersion: schema.scriptIdentities.schemaVersion,
+      })
+      .from(schema.scriptIdentities)
+      .where(eq(schema.scriptIdentities.id, current.identity.id));
+    if (brain === undefined) throw new Error('brain identity row');
+    await test.admin.db.insert(schema.scriptIdentities).values({
+      id: newId(ScriptIdentityIdSchema),
+      creatorId: nora,
+      platformScriptId: current.id,
+      inputHash: brain.inputHash,
+      schemaVersion: brain.schemaVersion,
+      content: { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' },
+      author: 'human',
+      validatedBy: ids.owner,
+      validatedAt: new Date(),
+    });
+    expect(await ownerView('sequence_4')).toMatchObject({
       proposable: true,
       identity: { author: 'human', content: { ambiance: 'douce et lente', energy: 'soft' } },
     });
-    // A hand's identity stands for its version: the brain leaves it alone.
     expect(await identify('sequence_4')).toBe('already');
-    // A body outside the schema is refused before anything is read.
-    expect(
-      (
-        await post('owner', `/v1/creators/${nora}/platform-scripts/${before.id}/identity/correct`, {
-          content: { ...IDENTITY, energy: 'wild' },
-        })
-      ).statusCode,
-    ).toBe(400);
   });
 
   it('keeps the identities closed to her account and written by the job or a hand of the team only', async () => {

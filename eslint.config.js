@@ -26,6 +26,8 @@ const MODULE_DEPENDENCIES = {
   telegram: [],
   team: [],
   backups: [],
+  // EQ-18: the owner's journal reads `audit_log` and the names it shows; it imports no module.
+  audit: [],
   // ADR 0091: reads the gateway's journal and keeps the credits ledger; imports no module.
   'ai-usage': [],
   // Choix de Charles 12/11: the owner's caps the gateway reads (`ai_budget_settings`); imports no module.
@@ -51,6 +53,9 @@ const MODULE_DEPENDENCIES = {
   'instagram-comments': [],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
   'creator-tasks': ['scheduling'],
+  // ADR 0140: her week, computed out of her agenda and written in it through its own door (`week`, § 22); her stock
+  // and drops are read through what the composition root plugs, never their tables.
+  'creator-week': ['scheduling', 'creator-tasks'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs

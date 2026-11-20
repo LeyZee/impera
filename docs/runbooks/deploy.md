@@ -177,7 +177,8 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `PLAYGROUND_PERSONA_PATH` | facultatif : chemin **dans le conteneur** de la persona du playground (§ 1.5) ; démo sans lui. Les brouillons, les gardes et « À apprendre » ne le lisent pas |
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |
 | `S3_*` | § 4.4 ; sans elles, la créatrice ne peut pas envoyer de fichier (l'envoi répond « réessaie dans un moment ») |
-| `SENTRY_DSN`, `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
+| `SENTRY_DSN` | **obligatoire** : le DSN du projet Sentry de la région UE (`https://<clé>@<hôte>.de.sentry.io/<projet>`), créé par Charles ; sans lui l'API et le worker refusent de démarrer. Ce qui part et ce qui ne part jamais : `operations.md` § Observabilité |
+| `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
 
 Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des variables en production : elles se collent dans Réglages › Modèles IA › Services (ADR 0016). Les deux clés de chiffrement se gardent aussi hors du serveur (gestionnaire de mots de passe) : les perdre rend illisibles les sessions et les clés stockées.
 

@@ -42,6 +42,7 @@ import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
+import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
@@ -57,6 +58,8 @@ import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
+import { createClientErrorRoutes } from './observability/client-errors';
+import { INERT_ERROR_REPORTER, type ErrorReporter } from './observability/error-reporter';
 import { applyOwnerRemovalsUnscoped, createOwnersRoutes, relayOwnerAlertsUnscoped } from './owners';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { createPasswordResetRoutes } from './password-reset';
@@ -69,6 +72,7 @@ import { wireAgent } from './wiring/agent';
 import { wireAiBudget } from './wiring/ai-budget';
 import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
+import { wireAudit } from './wiring/audit';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
 import { wireContentDrops } from './wiring/content-drops';
@@ -76,6 +80,7 @@ import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
+import { wireCreatorWeek } from './wiring/creator-week';
 import { wireCustomOrders } from './wiring/custom-orders';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
@@ -109,6 +114,8 @@ interface Modules {
   readonly media: MediaModule;
   readonly notifications: NotificationsModule;
   readonly creatorTasks: CreatorTasksModule;
+  /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
+  readonly creatorWeek: CreatorWeekModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -150,6 +157,8 @@ export interface App {
    * own with a statement timeout. The worker builds it unused: its pool opens no connection until a first request.
    */
   readonly rateLimitStore: FastifyRateLimitStoreCtor;
+  /** Where production errors go (OPS-18): the server's 5xx, the worker's failed jobs, the dashboard's reports. */
+  readonly errorReporter: ErrorReporter;
   /** Closes the queue and the pools; the server and the worker are stopped before. */
   shutdown(): Promise<void>;
 }
@@ -235,6 +244,8 @@ export interface AppOptions {
   readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
+  /** The entry points give the one they started (`startErrorReporting`); inert otherwise (tests, scripts). */
+  readonly errorReporter?: ErrorReporter;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -313,6 +324,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const requireRole = createRequireRole(auth, db.db, shiftCreators);
   const passwordBreaches = options.passwordBreaches ?? breachCheckOf(config, logger);
+  const errorReporter = options.errorReporter ?? INERT_ERROR_REPORTER;
   const shared: Shared = {
     config,
     logger,
@@ -386,6 +398,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     notifications: notifications.module,
     persona: persona.module,
   });
+  const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,
@@ -482,6 +495,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const audit = wireAudit(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
   // ElevenLabs bills characters, not money: its month comes from its own check (ADR 0091 § 7).
   const aiUsage = wireAiUsage(shared, llm, () => providers.module.voiceQuota());
@@ -538,6 +552,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media: media.module,
     notifications: notifications.module,
     creatorTasks: creatorTasks.module,
+    creatorWeek: creatorWeek.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -564,6 +579,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
+    ...creatorWeek.tasks,
     ...trends.tasks,
     // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
     // never waits for push: with push off the alerts reach Telegram only.
@@ -651,6 +667,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         passwordBreaches,
         privateChat: telegram.module?.privateChat ?? null,
       }),
+      createClientErrorRoutes({ requireRole, reporter: errorReporter }),
       createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),
       createSecuritySettingsRoutes({
         auth,
@@ -686,6 +703,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...redirectLinks.routes,
       ...customOrders.routes,
       ...creatorTasks.routes,
+      ...creatorWeek.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,
       ...contractors.routes,
@@ -693,6 +711,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
+      ...audit.routes,
       ...rewards.routes,
       ...aiUsage.routes,
       ...aiBudget.routes(llm),
@@ -707,6 +726,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),
     rateLimitStore: postgresRateLimitStore({ db: rateLimitDb.db, logger }),
+    errorReporter,
     async shutdown() {
       modules.providers.stop();
       llmLog.stop();
