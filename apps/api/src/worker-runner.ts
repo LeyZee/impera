@@ -47,6 +47,15 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
   events.on('pool:create', ({ workerPool }) => {
     poolId ??= workerPool.id;
   });
+  // Each failed attempt goes to Sentry (OPS-18) by its task and its attempt, never its payload: what a person wrote
+  // can be in it (`placedJob`, logger.ts).
+  events.on('job:failed', ({ job, error }) => {
+    app.errorReporter.captureException(error, {
+      service: 'worker',
+      task: job.task_identifier,
+      attempt: job.attempts,
+    });
+  });
   const runner: Runner = await run({
     pgPool: app.adminDb.pool,
     taskList: app.tasks,
