@@ -85,6 +85,7 @@ export {
   type JudgeSituation,
   type VoiceInput,
   type VoiceScriptStep,
+  type VoiceWaitingStep,
 } from './gateway';
 export type { HealthReport, HealthState, ProviderHealth, RoleHealth } from './health';
 export { loadPrompt } from './prompts';

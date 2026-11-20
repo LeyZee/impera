@@ -13,6 +13,7 @@ export const BRIEF_INTENTS = [
   'media_reaction',
   'asks_for_media',
   'price_objection',
+  'payment_help',
   'asks_if_bot',
   'asks_to_meet',
   'asks_personal_contact',

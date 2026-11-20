@@ -66,6 +66,7 @@ import { refusalMove, type RefusalMove } from '../domain/refusal';
 import {
   paidWaiting,
   permittedScripts,
+  scriptStepsHeld,
   type PlatformScriptView,
   type ScriptHistoryView,
   type ScriptRun,
@@ -341,6 +342,27 @@ const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
 const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
+/** He asks how to pay for her step waiting (ADR 0156 § 4): she helps him plainly, the price in the voice's block. */
+const PAYMENT_HELP_HINT =
+  'il veut ouvrir ce qu’elle lui a envoyé et ne sait pas comment : elle l’aide simplement et gentiment, avec le prix exact du bloc, sans le presser ni rien proposer d’autre';
+
+/**
+ * The paid step waiting for him, as the voice reads it to help him open it (ADR 0156 § 4): its exact price and what
+ * it holds. Never when its price changed on the catalogue (he would pay another one), nor once no sale is allowed.
+ */
+function waitingStepOf(turn: ScriptTurn, catalogue: readonly PlatformScriptView[], scriptRef: string | null) {
+  const { decision } = turn;
+  if (decision.kind !== 'wait' || !('step' in decision) || turn.priceMismatch !== null) return undefined;
+  const { priceMinor, stepIndex } = decision.step;
+  if (priceMinor === null) return undefined;
+  const step = catalogue.find((script) => script.scriptRef === scriptRef)?.steps[stepIndex];
+  return {
+    // Reveal sells in euros: the catalogue's minor units are cents.
+    price: { amountMinor: priceMinor, currency: 'EUR' as const },
+    mediaSheet: step?.mediaSheet ?? null,
+  };
+}
+
 /** What the voice writes for a follow-up: decided by code, never by the brain (CLAUDE.md rule 3). */
 function followUpBrief(followUp: FollowUpTurn): Brief {
   const hours = Math.max(1, Math.round(followUp.silentHours));
@@ -463,9 +485,14 @@ export function withExamples(sheet: string, examples: readonly string[]): string
  * What her guards read the draft against (P3-13): a draft carries a media only through the step of her script that
  * leaves with it (ADR 0098), and her last turns are in the history.
  */
-export function guardContextOf(history: readonly ConversationTurn[], hasMedia = false): GuardContext {
+export function guardContextOf(
+  history: readonly ConversationTurn[],
+  hasMedia = false,
+  allowedPriceMinor?: number,
+): GuardContext {
   return {
     hasMedia,
+    ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
@@ -835,6 +862,20 @@ export async function composeTurn(
     objectionReply === undefined &&
     trap.replyBrief === undefined &&
     sexualization?.kind !== 'steer_back';
+  // He asks how to pay for her step waiting: the voice sees its exact price and what it holds (ADR 0156 § 4). Every
+  // stop of a sale holds: no help to buy for a fan nobody may sell to.
+  const waitingStep =
+    brief?.intent !== 'payment_help' ||
+    care ||
+    scripts === undefined ||
+    input.scripts === undefined ||
+    input.offer === undefined ||
+    scriptStepsHeld(input.offer.flags, care) ||
+    !offerDecision({ ...input.offer, desire: heat, fanAsksForPaid: true, risks: brief.risks }).allowed ||
+    customOrder !== undefined ||
+    trap.replyBrief !== undefined
+      ? undefined
+      : waitingStepOf(scripts, input.scripts.catalogue, input.scripts.latest?.scriptRef ?? null);
   const voiceBrief: Brief = asking
     ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
     : {
@@ -843,6 +884,7 @@ export async function composeTurn(
           ...answered.toneHints,
           ...paced,
           ...(reminds ? [UNOPENED_STEP_HINT] : []),
+          ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
           ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
         ],
       };
@@ -885,7 +927,10 @@ export async function composeTurn(
     maxBubbles: budget,
     ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
     ...(scriptStep !== undefined && { scriptStep }),
+    ...(waitingStep !== undefined && { waitingStep }),
   };
+  // The one price she may write: the paid step she brings, or the one waiting he asks how to open (ADR 0156 § 4).
+  const allowedPriceMinor = scriptStep?.price?.amountMinor ?? waitingStep?.price.amountMinor;
   // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »). Checked as kept:
   // the guards read the bubbles that leave.
   const attempt = async (asked: VoiceInput) => {
@@ -895,7 +940,7 @@ export async function composeTurn(
       ...checkVoiceOutput(
         written,
         persona.guardSettings,
-        guardContextOf(input.history, stepSendsMedia(scripts)),
+        guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor),
       ),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),

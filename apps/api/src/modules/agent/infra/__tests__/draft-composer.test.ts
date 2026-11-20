@@ -2434,6 +2434,36 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
   });
 
+  it('helps him open her step waiting: its exact price passes, any other is held (ADR 0156 § 4)', async () => {
+    const asks: Brief = { ...BRIEF, intent: 'payment_help', scriptReply: 'answers_step' };
+    const helped = (bubbles: string[], flags: FanFlags = ADULT) => {
+      const { draftComposer, seen } = composer(
+        { brief: asks, voice: { bubbles } },
+        undefined,
+        limitsOf(flags).limits,
+        deps(sent),
+      );
+      return { result: draftComposer.compose({ ...INPUT, scriptRun: waiting }), seen };
+    };
+    const exact = helped(['C’est 15 € mon cœur, touche la photo floutée 😘']);
+    expect(await exact.result).toMatchObject({ kind: 'draft' });
+    expect(exact.seen.voiceInputs?.[0]?.waitingStep).toEqual({
+      price: { amountMinor: 1_500, currency: 'EUR' },
+      mediaSheet: null,
+    });
+    expect(
+      exact.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('ne sait pas comment')),
+    ).toBe(true);
+    // Another sum is never hers to say, not even beside the right one.
+    const other = await helped(['C’est 15 €, ou 10 € pour toi 😘']).result;
+    expect(other.kind === 'held' ? other.detail : []).toContain('price_outside_offer');
+    // A fan nobody may sell to gets no help to buy, and no price.
+    const fragile = helped(['C’est 15 € mon cœur'], { ...ADULT, fragile: true });
+    const held = await fragile.result;
+    expect(fragile.seen.voiceInputs?.[0]?.waitingStep).toBeUndefined();
+    expect(held.kind === 'held' ? held.detail : []).toContain('price_outside_offer');
+  });
+
   it('tells the team when the step waiting no longer has the price she said', async () => {
     const repriced: ScriptSource = {
       ...sent,
