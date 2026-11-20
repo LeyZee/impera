@@ -49,6 +49,16 @@ describe('what a grant of Meta lets the account do (ADR 0120 § 1)', () => {
     });
   });
 
+  it('holds the closed list itself: a right outside it is refused even when asked and granted', () => {
+    const withMessages = [...read, 'instagram_business_manage_messages'];
+    expect(grantOf(withMessages, withMessages)).toEqual({ accepted: false, reason: 'asked_outside_list' });
+    expect(grantOf(withMessages, read)).toEqual({ accepted: false, reason: 'asked_outside_list' });
+    expect(grantOf(read, [...read, 'instagram_business_manage_comments'])).toEqual({
+      accepted: false,
+      reason: 'unexpected_scope',
+    });
+  });
+
   it('refuses a grant without the rights to read', () => {
     expect(grantOf(read, ['instagram_business_basic'])).toEqual({
       accepted: false,

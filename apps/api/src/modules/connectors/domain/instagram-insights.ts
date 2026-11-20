@@ -33,15 +33,29 @@ export interface InstagramInsightsPort {
 
 export type MetaGrant =
   | { readonly accepted: true; readonly capabilities: InstagramAccountCapabilities }
-  | { readonly accepted: false; readonly reason: 'unexpected_scope' | 'read_scope_missing' };
+  | {
+      readonly accepted: false;
+      readonly reason: 'asked_outside_list' | 'unexpected_scope' | 'read_scope_missing';
+    };
+
+/** Every right this connector may ever ask of Meta: the closed lists of the contracts, and nothing else. */
+const ADMITTED_SCOPES: readonly string[] = [...META_READ_SCOPES, ...META_PUBLISH_SCOPES];
 
 /**
  * What a grant lets the account do (§ 1). `asked` is what this consent asked for, `granted` what Meta says it gave,
  * read again after the exchange. A right granted that was not asked refuses the whole connection; so does a missing
  * right to read. The flag to publish needs the right to have been asked by this consent and granted.
+ *
+ * The closed list is held here, not by the caller: a consent that asks for a right outside the list is refused
+ * whatever Meta answers, and a right granted outside the list refuses the connection whatever was asked.
  */
 export function grantOf(asked: readonly string[], granted: readonly string[]): MetaGrant {
-  if (granted.some((scope) => !asked.includes(scope))) return { accepted: false, reason: 'unexpected_scope' };
+  if (asked.some((scope) => !ADMITTED_SCOPES.includes(scope))) {
+    return { accepted: false, reason: 'asked_outside_list' };
+  }
+  if (granted.some((scope) => !ADMITTED_SCOPES.includes(scope) || !asked.includes(scope))) {
+    return { accepted: false, reason: 'unexpected_scope' };
+  }
   if (META_READ_SCOPES.some((scope) => !granted.includes(scope))) {
     return { accepted: false, reason: 'read_scope_missing' };
   }
