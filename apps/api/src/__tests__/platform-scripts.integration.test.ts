@@ -10,6 +10,8 @@ import {
   PLATFORM_SCRIPT_STEPS_MAX,
   PlatformAccountIdSchema,
   PlatformScriptViewSchema,
+  PreparedScriptContentSchema,
+  PreparedScriptIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type PlatformAccountId,
@@ -230,7 +232,7 @@ describe('the native scripts imported from the platform', () => {
   it('imports each sequence with its steps in the platform’s order and its prices as they are', async () => {
     await vaultSync();
     const run = await importOf(noraAccount, nora, new Date('2026-11-14T10:00:00Z'));
-    expect(run).toEqual({ outcome: 'imported', added: 4, changed: 0, gone: 0, refused: 0 });
+    expect(run).toEqual({ outcome: 'imported', added: 4, changed: 0, gone: 0, refused: 0, recognised: 0 });
     // Inès's account has no session: left as it was; an account named with another creator is not read.
     expect(await importOf(inesAccount, ines, new Date('2026-11-14T10:00:00Z'))).toEqual({
       outcome: 'skipped',
@@ -272,7 +274,7 @@ describe('the native scripts imported from the platform', () => {
 
   it('changes nothing when nothing changed, rewrites a changed script, deactivates a gone one', async () => {
     const again = await importOf(noraAccount, nora, new Date('2026-11-14T11:00:00Z'));
-    expect(again).toEqual({ outcome: 'imported', added: 0, changed: 0, gone: 0, refused: 0 });
+    expect(again).toEqual({ outcome: 'imported', added: 0, changed: 0, gone: 0, refused: 0, recognised: 0 });
     await scenario([
       { type: 'script_changed', scriptId: 'script_1_3', priceCents: 4_500 },
       { type: 'sequence_removed', sequenceId: 'sequence_2' },
@@ -280,7 +282,7 @@ describe('the native scripts imported from the platform', () => {
     const at = new Date('2026-11-14T12:00:00Z');
     const run = await importOf(noraAccount, nora, at);
     // Sequence 2's steps stay on the platform as loose steps: three scripts of one step each.
-    expect(run).toEqual({ outcome: 'imported', added: 3, changed: 1, gone: 1, refused: 0 });
+    expect(run).toEqual({ outcome: 'imported', added: 3, changed: 1, gone: 1, refused: 0, recognised: 0 });
     const rows = await scriptRows();
     const gone = rows.find((row) => row.platformScriptRef === 'sequence_2');
     expect([gone?.active, gone?.deactivatedAt?.toISOString()]).toEqual([false, at.toISOString()]);
@@ -852,5 +854,105 @@ describe('the native scripts imported from the platform', () => {
     expect((await ownerView('sequence_4'))?.gaps).not.toContain('step_discounted');
     expect((await stepsOf())?.every(([, discount]) => discount === null)).toBe(true);
     expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual([]);
+  });
+
+  it('recognises a script copied into Reveal by hand once everything matches, and closes it (ADR 0112 § 23)', async () => {
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.platformScripts)
+      .where(eq(schema.platformScripts.platformScriptRef, 'sequence_1'));
+    if (row === undefined) throw new Error('imported');
+    const steps = await test.admin.db
+      .select()
+      .from(schema.platformScriptSteps)
+      .where(eq(schema.platformScriptSteps.platformScriptId, row.id))
+      .orderBy(schema.platformScriptSteps.position);
+    const sold = await test.admin.db
+      .select()
+      .from(schema.platformScriptStepMedia)
+      .where(
+        and(
+          eq(schema.platformScriptStepMedia.platformScriptId, row.id),
+          eq(schema.platformScriptStepMedia.role, 'sold'),
+        ),
+      );
+    let n = 0;
+    const uuid = () => `00000000-0000-4000-8000-${String((n += 1)).padStart(12, '0')}`;
+    // What the agency wrote in Impera, then copied by hand: the same name, steps, media and prices.
+    const content = PreparedScriptContentSchema.parse({
+      name: row.name,
+      description: 'Un script inventé, recopié à la main.',
+      moment: 'night',
+      steps: steps.map((step) => ({
+        key: uuid(),
+        rhythm: 3,
+        branches: [
+          {
+            key: uuid(),
+            condition: null,
+            teaser: '',
+            offerText: 'Texte inventé',
+            media: sold
+              .filter((media) => media.position === step.position)
+              .map((media) => ({ ref: media.platformMediaRef })),
+            afterMedia: { justAfter: '', unread: '', readNotBought: '' },
+            priceMinor: step.priceMinor,
+            currency: step.currency,
+          },
+        ],
+      })),
+    });
+    const ready = async (priceShift: number) => {
+      const id = newId(PreparedScriptIdSchema);
+      const [first, ...rest] = content.steps;
+      if (first === undefined) throw new Error('steps');
+      const shifted = {
+        ...content,
+        steps: [
+          {
+            ...first,
+            branches: first.branches.map((b) => ({ ...b, priceMinor: b.priceMinor + priceShift })),
+          },
+          ...rest,
+        ],
+      };
+      await test.admin.db.insert(schema.preparedScripts).values({
+        id,
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        state: 'ready_to_copy',
+        content: shifted,
+        createdBy: ids.manager,
+        updatedBy: ids.manager,
+      });
+      return id;
+    };
+    // One copied with another price on its first step: never tied; the exact one is.
+    const differs = await ready(100);
+    const exact = await ready(0);
+    const run = await importOf(noraAccount, nora, new Date('2026-11-16T10:00:00Z'));
+    expect(run).toMatchObject({ outcome: 'imported', recognised: 1 });
+    const prepared = await test.admin.db
+      .select({
+        id: schema.preparedScripts.id,
+        state: schema.preparedScripts.state,
+        matched: schema.preparedScripts.matchedPlatformScriptId,
+      })
+      .from(schema.preparedScripts)
+      .where(eq(schema.preparedScripts.platformAccountId, noraAccount));
+    expect(prepared.find((each) => each.id === exact)).toMatchObject({ state: 'matched', matched: row.id });
+    expect(prepared.find((each) => each.id === differs)).toMatchObject({
+      state: 'ready_to_copy',
+      matched: null,
+    });
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action, userId: schema.auditLog.userId })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, exact));
+    expect(audit).toEqual([{ action: 'prepared_script.matched', userId: null }]);
+    // A native script is tied once: the next import ties nothing more.
+    expect(await importOf(noraAccount, nora, new Date('2026-11-16T11:00:00Z'))).toMatchObject({
+      recognised: 0,
+    });
   });
 });

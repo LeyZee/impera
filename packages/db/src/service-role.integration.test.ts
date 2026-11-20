@@ -59,6 +59,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   platform_script_step_media: ['insert', 'delete'],
   script_identities: ['insert'],
   platform_script_steps: ['insert', 'delete'],
+  // The recognition passes the agency's order and conditions to the native script a copy became (ADR 0112 § 23).
+  platform_script_branches: ['insert'],
   platform_scripts: ['insert', 'update'],
   // The import marks a script in preparation it recognised (ADR 0112 § 23): never creates nor deletes one.
   prepared_scripts: ['update'],

@@ -1,4 +1,5 @@
 import type {
+  CopyDifference,
   CreatePreparedScriptBody,
   CreatorId,
   PreparedScriptContent,
@@ -14,6 +15,7 @@ import type {
   StoredPreparedScript,
 } from '../domain/ports';
 import { preparedScriptGaps, preparedScriptWarnings, preparedTransition } from '../domain/prepared-scripts';
+import { copyDifferences } from '../domain/recognition';
 
 /**
  * Scripts in preparation (ADR 0112 §§ 20-22): created, saved and made « prêt à copier » by the owner and the active
@@ -21,9 +23,11 @@ import { preparedScriptGaps, preparedScriptWarnings, preparedTransition } from '
  * persona changed, changes them without a save.
  */
 
-export interface PreparedScriptView extends Omit<StoredPreparedScript, 'vault'> {
+export interface PreparedScriptView extends Omit<StoredPreparedScript, 'vault' | 'natives'> {
   readonly gaps: readonly PreparedScriptGap[];
   readonly warnings: readonly PreparedScriptWarning[];
+  /** « Prêt à copier » only: what differs from Reveal for now (ADR 0112 § 23); `null` otherwise. */
+  readonly copyDifferences: readonly CopyDifference[] | null;
 }
 
 interface Deps {
@@ -32,11 +36,12 @@ interface Deps {
 }
 
 function viewOf(script: StoredPreparedScript, limits: Awaited<ReturnType<LimitsOf>>): PreparedScriptView {
-  const { vault, ...rest } = script;
+  const { vault, natives, ...rest } = script;
   return {
     ...rest,
     gaps: preparedScriptGaps(script.content, vault, limits),
     warnings: preparedScriptWarnings(script.content),
+    copyDifferences: natives === null ? null : copyDifferences(script.content, natives),
   };
 }
 

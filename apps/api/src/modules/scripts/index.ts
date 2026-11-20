@@ -45,6 +45,7 @@ import {
   createDrizzlePlatformScriptReadStore,
 } from './infra/db/platform-script-store';
 import { createDrizzlePreparedScriptStore } from './infra/db/prepared-store';
+import { createDrizzlePreparedRecognitionStore } from './infra/db/recognition-store';
 import { createDrizzleScriptStructureStore } from './infra/db/structure-store';
 import { createFrozenVersionReader, createRequestFreezer } from './infra/db/version-reader';
 import { createPlatformScriptRoutes } from './infra/http/platform-script-routes';
@@ -269,6 +270,7 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
           {
             store: platformImports,
             source: platform.source,
+            recognition: createDrizzlePreparedRecognitionStore(deps.adminDb),
             askIdentities: (creatorId, scriptIds, correlationId) =>
               identities.enqueue(creatorId, scriptIds, correlationId),
           },
