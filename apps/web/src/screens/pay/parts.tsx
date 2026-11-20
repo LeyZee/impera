@@ -255,13 +255,16 @@ export function Empty({
   whisper,
   text,
   action,
+  art,
 }: {
   whisper: string;
   text: string;
   action?: ReactNode;
+  /** A picture above the sentence, when the whole screen is empty. */
+  art?: ReactNode;
 }): JSX.Element {
   return (
-    <StateEmpty title={whisper} action={action}>
+    <StateEmpty title={whisper} action={action} art={art}>
       {text}
     </StateEmpty>
   );

@@ -17,7 +17,7 @@ Elle se concentre sur la création : sa semaine arrive préparée, en trois ou q
 
 ### Lot 1 (serveur)
 - [x] Contrats `creator-week.ts` : besoins, plan, vues du propriétaire et d'elle, refus.
-- [x] Migration 0235 : `creator_weeks` (brouillon, validation par le propriétaire seul), `creator_shoot_items` (lignes d'un jour de tournage, sa coche seule), `creator_suggestions.week_role`.
+- [x] Migration 0237 : `creator_weeks` (brouillon, validation par le propriétaire seul), `creator_shoot_items` (lignes d'un jour de tournage, sa coche seule), `creator_suggestions.week_role`.
 - [x] Règles pures : besoins (scripts, feed, stories), charge plafonnée et report, jours de tournage, échéance, semaine à calculer.
 - [x] Job `creator_week.plan` chaque heure : le brouillon de la semaine d'après dès le dimanche 18 h dans son fuseau, rafraîchi jusqu'à la validation, rejouable.
 - [x] Validation par le propriétaire : ses « Jour de tournage » et « Livrer ma semaine » dans son agenda, sous des identifiants rejouables.
@@ -28,7 +28,7 @@ Elle se concentre sur la création : sa semaine arrive préparée, en trois ou q
 - [x] Chez le propriétaire, dans Créatrices › Agenda : relire, déplacer un jour ou une ligne, retirer, valider ; ce qui passe à la semaine d'après.
 
 - [ ] Captures de recette (Nuit/Jour, PC/téléphone, données inventées) et avis Design avant fusion.
-- [ ] À notre tour de fusion : ramener main, plafond du rôle de service (`modules/creator-week` et `wiring`) relevé avec sa raison ici, renuméroter la migration.
+- [x] À notre tour de fusion (train 4, 20/11) : main ramené, migration renumérotée en 0237 (après 0236 de la grille sur mesure), plafond du rôle de service relevé : `modules/creator-week` 2 (lecture et écriture du brouillon par le job du dimanche, qui passe sur toutes les créatrices), `wiring` +3 (stock, jours de tournage et disponibilités lus par le job pour une créatrice dont il n'a pas la session) ; total 264 → 269. Ces accès sont ceux que Sécurité a relus sur d85d2dd.
 
 ### Lot 2 bis (retours de Charles du 20/11)
 - [x] Son rythme : 3 séances boudoir (Mass DM et photos « cadeaux » sur leur fiche, un média de Mass DM demandé par séance), une vidéo du jour, une story par jour, un script toutes les deux semaines (avenant à l'ADR 0140).

@@ -1,5 +1,5 @@
 # OPS-19 Mise en service sur le VPS Hostinger et la base Supabase
-Statut : in_progress (lot a en revue)
+Statut : in_progress (lot a fusionné, #897 ; lot b fusionné, #914 ; avenant « même projet » en revue ; lot c avec Charles)
 Phase : exploitation
 Dépend de : ADR 0152 (acceptée le 20/11/2026), ADR 0027, 0028, 0037, 0067, 0087 ; OPS-01, OPS-02
 Branche : claude/project-thread-nnqahk
@@ -21,12 +21,14 @@ ADR 0152, `docs/runbooks/deploy.md`, `docs/architecture/operations.md`, `docker-
 - [x] Limite de CPU du service `worker` dans `docker-compose.prod.yml` (`WORKER_CPUS`, 1 par défaut).
 - [ ] Version de Postgres : un projet Supabase neuf est en 17 (vu le 20/11). Le passage à 17 du dev, de la CI, de Testcontainers et de l'image `backup` a sa propre fiche, OPS-20.
 ### Lot b : le runbook
-- [ ] `deploy.md` réécrit pour Hostinger (SSH par clé, compte nommé, pare-feu Hostinger, mises à jour automatiques), Coolify (tableau de bord par tunnel SSH, double authentification, aucun aperçu de PR, aucun webhook public : déploiement déclenché par Charles ou par interrogation du dépôt) et Supabase (organisation à part, plan payant, région UE, services hors Postgres coupés, restrictions réseau, pooler en mode session, création des trois rôles avec le rôle `postgres` puis plus jamais, vérification `pg_roles`).
-- [ ] `operations.md` : Neon retiré, budget de connexions écrit.
-- [ ] Étapes Supabase propres à notre base : `btree_gist` créée par `postgres` dans le schéma `extensions` avant le premier `migrate` (la migration 0021 ne fixe pas de schéma et passe alors sans rien faire), `lock-down.sql` joué après le premier `migrate` et après chaque mise à jour de Supabase, mot de passe de `postgres` hors de toute variable et changé après la mise en service.
-- [ ] Surveillance extérieure de `/health` et `/ready`, du disque et des connexions SSH refusées : outil choisi et étapes écrites.
+- [x] `deploy.md` réécrit pour Hostinger (SSH par clé, compte nommé, pare-feu Hostinger, mises à jour automatiques), Coolify (tableau de bord par tunnel SSH, double authentification, aucun aperçu de PR, aucun webhook public : déploiement déclenché par Charles ou par interrogation du dépôt) et Supabase (organisation à part, plan payant, région UE, services hors Postgres coupés, restrictions réseau, pooler en mode session, création des trois rôles avec le rôle `postgres` puis plus jamais, vérification `pg_roles`).
+- [x] `operations.md` : Neon retiré, budget de connexions écrit. `restore.md` suit (sauvegarde du jour de Supabase, nouveau projet pour § B).
+- [x] Étapes Supabase propres à notre base : `btree_gist` créée par `postgres` dans le schéma `extensions` avant le premier `migrate` (la migration 0021 ne fixe pas de schéma et passe alors sans rien faire), `lock-down.sql` joué après le premier `migrate` et après chaque mise à jour de Supabase, mot de passe de `postgres` hors de toute variable et changé après la mise en service.
+- [x] Surveillance extérieure, du disque et des connexions SSH refusées : outil choisi et étapes écrites (`deploy.md` § 1.6). `/health` et `/ready` ne sont pas exposés par nginx : seul `/healthz` est surveillé du dehors.
+- [x] Refus au démarrage, en production, d'une base distante sans `sslmode=verify-full` (`config.ts`, testé) ; le certificat de Supabase est monté dans les conteneurs.
 ### Lot c : la mise en service, avec Charles au clavier
-- [ ] Charles commande le VPS, choisit l'adresse définitive, crée le projet Supabase, saisit les secrets.
+- [x] Avenant à l'ADR 0152 (§ 9) : la production est le projet Supabase des essais, vidé à la mise en ligne ; `deploy.md` § 1.1 (plus aucun outil sur le compte, base repartie de zéro sur son mot, clés régénérées, réseau v4 et v6), `operations.md`, `restore.md`.
+- [ ] Charles commande le VPS, choisit l'adresse définitive, coupe l'accès des outils à son compte Supabase, saisit les secrets.
 - [ ] Vérifications du runbook jouées sur le vrai serveur (rôles, budget de connexions, `TRUST_PROXY_HOPS`, journal du proxy sans chemins).
 - [ ] Restauration de l'export chiffré jouée de bout en bout avant l'ouverture (ADR 0028).
 

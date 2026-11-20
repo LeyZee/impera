@@ -508,5 +508,9 @@ export const PLAYGROUND_ERROR_CODES = [
   'script_step_not_waiting_conflict',
   'script_sales_frozen_conflict',
   'voice_example_not_found',
+  /** 403: a manager names a creator off his list (ADR 0092 § 8). */
+  'creator_forbidden',
+  /** 403: a manager files a voice example or withdraws one: the owner's alone (Charles, 20/11). */
+  'voice_bank_owner_forbidden',
 ] as const;
 export type PlaygroundErrorCode = (typeof PLAYGROUND_ERROR_CODES)[number];

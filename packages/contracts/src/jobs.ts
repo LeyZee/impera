@@ -788,3 +788,11 @@ export const RESUME_SPACING_SECONDS = 15;
 export function resumeRunAt(index: number, now: Date): Date {
   return new Date(now.getTime() + index * RESUME_SPACING_SECONDS * 1_000);
 }
+
+/**
+ * The background jobs that write a creator's rows under the app role, one creator at a time (ADR 0087, avenant du
+ * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
+ * (`withTenantJob`) refuses any other.
+ */
+export const TenantJobSchema = z.enum(['daily_stats']);
+export type TenantJob = z.infer<typeof TenantJobSchema>;

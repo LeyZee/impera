@@ -11,6 +11,7 @@ export {
   withCreatorAccount,
   withMember,
   withTenant,
+  withTenantJob,
   withTenantMember,
   type Database,
   type DbClient,

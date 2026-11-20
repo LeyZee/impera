@@ -5,6 +5,7 @@ import { MeNav } from './MeNav';
 import { useMyLinks } from './links-api';
 
 import { middleCut, PLACEMENT_LABELS, sameWords } from '@/creators/links/model';
+import { LinkArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader } from '@/shell/layout';
 import { Empty, Failure } from '@/shell/states';
 
@@ -107,7 +108,7 @@ export function MyLinksPage(): JSX.Element {
           </ul>
         )
       ) : links.length === 0 ? (
-        <Empty plate title="Pas encore de lien">
+        <Empty plate art={<LinkArt />} title="Pas encore de lien">
           Ton agence n’a pas encore placé de lien pour toi. Dès qu’elle le fait, il apparaît ici.
         </Empty>
       ) : (

@@ -299,12 +299,12 @@ export function scriptPaths(content: PreparedScriptContent): {
   return { shown, count };
 }
 
-/** « 2 manques », « Prêt à copier », « Reconnu dans Reveal »: a script's state on its row. */
+/** « 2 manques », « Prêt à copier », « Dans Reveal »: a script's state on its row. */
 export function stateLabel(view: PreparedScriptView): {
   readonly text: string;
   readonly tone: 'warn' | 'copy' | 'on' | 'plain';
 } {
-  if (view.state === 'matched') return { text: 'Reconnu dans Reveal', tone: 'on' };
+  if (view.state === 'matched') return { text: 'Dans Reveal', tone: 'on' };
   if (view.state === 'ready_to_copy') return { text: 'À copier dans Reveal', tone: 'copy' };
   if (view.gaps.length === 0) return { text: 'Rien ne manque', tone: 'plain' };
   return { text: view.gaps.length === 1 ? '1 manque' : `${String(view.gaps.length)} manques`, tone: 'warn' };

@@ -119,7 +119,8 @@ export interface ScriptsModule {
     platformScript(creatorId: CreatorId, scriptId: string): Promise<PlatformScriptView | null>;
     /**
      * Her native scripts on one account, by the ids of the conversation the agent answers: what it decides a script on
-     * for that fan (ADR 0098), the proposable ones and the others (their steps tell what he already received).
+     * for that fan (ADR 0098), the proposable ones and the others (their steps tell what he already received). Each
+     * carries `ours`, the script of ours it is the recognised copy of (ADR 0161 § 5): only those may be offered.
      */
     accountScripts(
       creatorId: CreatorId,

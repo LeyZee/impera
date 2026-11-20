@@ -1,5 +1,5 @@
 {
-  "id": "56fcb536-a91c-468b-8c97-76198f17c030",
+  "id": "de3bc53e-dc67-45a8-b016-24d2d8dbcf61",
   "prevId": "5a93cf70-f7b1-4594-8b61-be37b5f07593",
   "version": "7",
   "dialect": "postgresql",
@@ -3912,225 +3912,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.creator_shoot_items": {
-      "name": "creator_shoot_items",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "suggestion_id": {
-          "name": "suggestion_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "need": {
-          "name": "need",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sheet": {
-          "name": "sheet",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "count": {
-          "name": "count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "request_id": {
-          "name": "request_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "done_at": {
-          "name": "done_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "done_by": {
-          "name": "done_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "creator_shoot_items_creator_idx": {
-          "name": "creator_shoot_items_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "creator_shoot_items_creator_id_creators_id_fk": {
-          "name": "creator_shoot_items_creator_id_creators_id_fk",
-          "tableFrom": "creator_shoot_items",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_shoot_items_done_by_user_id_fk": {
-          "name": "creator_shoot_items_done_by_user_id_fk",
-          "tableFrom": "creator_shoot_items",
-          "tableTo": "user",
-          "columnsFrom": ["done_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_shoot_items_created_by_user_id_fk": {
-          "name": "creator_shoot_items_created_by_user_id_fk",
-          "tableFrom": "creator_shoot_items",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_shoot_items_suggestion_fk": {
-          "name": "creator_shoot_items_suggestion_fk",
-          "tableFrom": "creator_shoot_items",
-          "tableTo": "creator_suggestions",
-          "columnsFrom": ["suggestion_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_shoot_items_request_fk": {
-          "name": "creator_shoot_items_request_fk",
-          "tableFrom": "creator_shoot_items",
-          "tableTo": "content_requests",
-          "columnsFrom": ["request_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "creator_shoot_items_position_unique": {
-          "name": "creator_shoot_items_position_unique",
-          "nullsNotDistinct": false,
-          "columns": ["suggestion_id", "position"]
-        }
-      },
-      "policies": {
-        "creator_read": {
-          "name": "creator_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_shoot_items\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_tick": {
-          "name": "creator_tick",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_shoot_items\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and exists (\n        select 1 from creator_suggestions s\n         where s.id = \"creator_shoot_items\".\"suggestion_id\" and s.creator_id = \"creator_shoot_items\".\"creator_id\" and s.state = 'accepted'\n      )",
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_shoot_items\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (\"creator_shoot_items\".\"done_by\" is null or \"creator_shoot_items\".\"done_by\" = nullif(current_setting('app.user_id', true), ''))"
-        },
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_shoot_items\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "team_insert": {
-          "name": "team_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_shoot_items\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_shoot_items\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_shoot_items\".\"done_at\" is null\n        and exists (\n          select 1 from creator_suggestions s\n           where s.id = \"creator_shoot_items\".\"suggestion_id\" and s.creator_id = \"creator_shoot_items\".\"creator_id\" and s.week_role = 'shoot_day'\n             and s.state = 'suggested'\n        )"
-        }
-      },
-      "checkConstraints": {
-        "creator_shoot_items_need_check": {
-          "name": "creator_shoot_items_need_check",
-          "value": "\"creator_shoot_items\".\"need\" in ('script', 'feed_shoot', 'feed_video', 'mass_dm', 'idea', 'reveal_story')"
-        },
-        "creator_shoot_items_label_check": {
-          "name": "creator_shoot_items_label_check",
-          "value": "char_length(\"creator_shoot_items\".\"label\") between 1 and 120"
-        },
-        "creator_shoot_items_sheet_check": {
-          "name": "creator_shoot_items_sheet_check",
-          "value": "\"creator_shoot_items\".\"sheet\" is null or char_length(\"creator_shoot_items\".\"sheet\") between 1 and 600"
-        },
-        "creator_shoot_items_count_check": {
-          "name": "creator_shoot_items_count_check",
-          "value": "\"creator_shoot_items\".\"count\" between 1 and 50"
-        },
-        "creator_shoot_items_position_check": {
-          "name": "creator_shoot_items_position_check",
-          "value": "\"creator_shoot_items\".\"position\" between 0 and 19"
-        },
-        "creator_shoot_items_request_check": {
-          "name": "creator_shoot_items_request_check",
-          "value": "\"creator_shoot_items\".\"request_id\" is null or \"creator_shoot_items\".\"need\" = 'script'"
-        },
-        "creator_shoot_items_done_check": {
-          "name": "creator_shoot_items_done_check",
-          "value": "(\"creator_shoot_items\".\"done_at\" is null) = (\"creator_shoot_items\".\"done_by\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.creator_suggestions": {
       "name": "creator_suggestions",
       "schema": "",
@@ -4224,12 +4005,6 @@
           "type": "date",
           "primaryKey": false,
           "notNull": true
-        },
-        "week_role": {
-          "name": "week_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "state": {
           "name": "state",
@@ -4371,7 +4146,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_suggestions\".\"origin\" = 'agency' and \"creator_suggestions\".\"created_by\" = nullif(current_setting('app.user_id', true), '')\n        and (\"creator_suggestions\".\"week_role\" is null or nullif(current_setting('app.team_scope', true), '') = 'owner')"
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_suggestions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_suggestions\".\"origin\" = 'agency' and \"creator_suggestions\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
         }
       },
       "checkConstraints": {
@@ -4390,14 +4165,6 @@
         "creator_suggestions_state_check": {
           "name": "creator_suggestions_state_check",
           "value": "\"creator_suggestions\".\"state\" in ('suggested', 'accepted', 'declined')"
-        },
-        "creator_suggestions_week_role_check": {
-          "name": "creator_suggestions_week_role_check",
-          "value": "\"creator_suggestions\".\"week_role\" in ('shoot_day', 'delivery')"
-        },
-        "creator_suggestions_week_role_shape_check": {
-          "name": "creator_suggestions_week_role_shape_check",
-          "value": "\"creator_suggestions\".\"week_role\" is null or (\"creator_suggestions\".\"kind\" = 'day' and \"creator_suggestions\".\"category\" = 'shoot')"
         },
         "creator_suggestions_when_check": {
           "name": "creator_suggestions_when_check",
@@ -4852,140 +4619,6 @@
         "creator_tasks_essential_check": {
           "name": "creator_tasks_essential_check",
           "value": "not \"creator_tasks\".\"essential\" or (\"creator_tasks\".\"kind\" = 'routine' and \"creator_tasks\".\"suggestion_id\" is not null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.creator_weeks": {
-      "name": "creator_weeks",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "week": {
-          "name": "week",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'draft'"
-        },
-        "plan": {
-          "name": "plan",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "computed_at": {
-          "name": "computed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "validated_by": {
-          "name": "validated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "validated_at": {
-          "name": "validated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "creator_weeks_creator_id_creators_id_fk": {
-          "name": "creator_weeks_creator_id_creators_id_fk",
-          "tableFrom": "creator_weeks",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_weeks_validated_by_user_id_fk": {
-          "name": "creator_weeks_validated_by_user_id_fk",
-          "tableFrom": "creator_weeks",
-          "tableTo": "user",
-          "columnsFrom": ["validated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "creator_weeks_creator_week_unique": {
-          "name": "creator_weeks_creator_week_unique",
-          "nullsNotDistinct": false,
-          "columns": ["creator_id", "week"]
-        }
-      },
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_weeks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "owner_validate": {
-          "name": "owner_validate",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_weeks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_weeks\".\"state\" = 'draft'",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_weeks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_weeks\".\"state\" = 'validated' and \"creator_weeks\".\"validated_by\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "creator_weeks_state_check": {
-          "name": "creator_weeks_state_check",
-          "value": "\"creator_weeks\".\"state\" in ('draft', 'validated')"
-        },
-        "creator_weeks_week_check": {
-          "name": "creator_weeks_week_check",
-          "value": "extract(isodow from \"creator_weeks\".\"week\") = 1"
-        },
-        "creator_weeks_plan_check": {
-          "name": "creator_weeks_plan_check",
-          "value": "jsonb_typeof(\"creator_weeks\".\"plan\") = 'object'"
-        },
-        "creator_weeks_validation_check": {
-          "name": "creator_weeks_validation_check",
-          "value": "(\"creator_weeks\".\"state\" = 'validated') = (\"creator_weeks\".\"validated_at\" is not null)\n        and (\"creator_weeks\".\"validated_at\" is null) = (\"creator_weeks\".\"validated_by\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -14752,6 +14385,28 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_chatter_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'",
+          "withCheck": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
         }
       },
       "checkConstraints": {
@@ -14906,6 +14561,28 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'",
+          "withCheck": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
         }
       },
       "checkConstraints": {

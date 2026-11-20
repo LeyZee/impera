@@ -2,7 +2,7 @@ import { CreatorIdSchema, PersonaVersionIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { AnswerInProgress, PlaygroundPersonaNotFound, type PlaygroundEngine } from '../engine';
-import { createPlaygroundService } from '../playground-service';
+import { createPlaygroundService, type Trainer } from '../playground-service';
 
 const unused = (): never => {
   throw new Error('not used');
@@ -27,6 +27,8 @@ function engine(reset: () => never = unused): PlaygroundEngine {
     readScripts: unused,
   };
 }
+
+const owner = (userId: string): Trainer => ({ userId, role: 'owner' });
 
 describe('playground service', () => {
   it('keeps one playground per user', () => {
@@ -58,25 +60,25 @@ describe('playground service', () => {
         first = false;
         return made;
       },
-      ofVersion: (choice, userId) => {
+      ofVersion: (choice, trainer) => {
         chosen.push(choice);
-        expect(['b', 'c']).toContain(userId);
+        expect(['b', 'c']).toContain(trainer.userId);
         if (choice.versionId !== V2) return Promise.reject(new PlaygroundPersonaNotFound());
         return Promise.resolve(engine());
       },
     });
     const busyOne = service.forUser('a');
-    await expect(service.choose('a', { creatorId: MIA, versionId: V2 })).rejects.toBeInstanceOf(
+    await expect(service.choose(owner('a'), { creatorId: MIA, versionId: V2 })).rejects.toBeInstanceOf(
       AnswerInProgress,
     );
     expect(service.forUser('a')).toBe(busyOne);
     expect(chosen).toEqual([]);
 
     // A user with no playground yet chooses straight away.
-    const hers = await service.choose('b', { creatorId: MIA, versionId: V2 });
+    const hers = await service.choose(owner('b'), { creatorId: MIA, versionId: V2 });
     expect(service.forUser('b')).toBe(hers);
     const unknown = PersonaVersionIdSchema.parse('0199f2a0-0000-7000-8000-0000000000e9');
-    await expect(service.choose('c', { creatorId: MIA, versionId: unknown })).rejects.toBeInstanceOf(
+    await expect(service.choose(owner('c'), { creatorId: MIA, versionId: unknown })).rejects.toBeInstanceOf(
       PlaygroundPersonaNotFound,
     );
   });

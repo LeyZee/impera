@@ -35,6 +35,7 @@ import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useAlerts } from '@/settings/alerts/api';
 import { Select } from '@/shell/Select';
+import { BellArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
 import { Empty, Failure } from '@/shell/states';
@@ -118,6 +119,7 @@ export function AlertHistoryPage({
         <Skeleton />
       ) : creators.length === 0 ? (
         <Notice
+          art={<BellArt />}
           title="Aucune créatrice pour l’instant"
           text="Ses alertes arrivent ici dès qu’une créatrice t’est confiée."
         />
@@ -507,14 +509,17 @@ function Skeleton({ bare = false }: { bare?: boolean }): JSX.Element {
 function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Empty plate title={title} action={children}>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
       {text}
     </Empty>
   );

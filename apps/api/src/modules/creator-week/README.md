@@ -4,7 +4,7 @@ Chaque dimanche à 18 h dans son fuseau, le code calcule sa **semaine** suivante
 
 **Peut dépendre de.** `creator-tasks`, par son `index.ts` (la porte `week` et `accept`, ADR 0140 § 22) et `scheduling`, par son `pure.ts`. Le stock, les scripts demandés et ce qui est arrivé de sa livraison (`content-drops`), ses jours de tournage et ses dispos (`creator-tasks`) lui sont branchés par le composition root (`wiring/creator-week.ts`) : il ne lit aucune table d'un autre module.
 
-**État.** Lot 1 : règles pures, contrats (`packages/contracts`, `creator-week.ts`), tables et RLS (migration 0235), job `creator_week.plan`, routes. Les écrans viennent au lot 2 ; les réglages par créatrice, le rappel du matin, le rappel au propriétaire du dimanche soir, la Relance, les idées et les mesures au lot 3.
+**État.** Lot 1 : règles pures, contrats (`packages/contracts`, `creator-week.ts`), tables et RLS (migration 0237), job `creator_week.plan`, routes. Les écrans viennent au lot 2 ; les réglages par créatrice, le rappel du matin, le rappel au propriétaire du dimanche soir, la Relance, les idées et les mesures au lot 3.
 
 ## Ce que le code calcule (règles pures, `domain/plan.ts`)
 
@@ -13,7 +13,7 @@ Chaque dimanche à 18 h dans son fuseau, le code calcule sa **semaine** suivante
 - **Ses jours** (§ 1) : ceux qu'elle a gardés la semaine d'avant, tels qu'elle les a déplacés ; sinon les jours de ses dispos les plus longues ; sinon mercredi et samedi. Jamais plus que le nombre demandé.
 - **Les réglages** (`WEEK_DEFAULTS`, fixés par bon sens le 20/11) : 2 jours de 4 h ; un script 1 h 30, une séance 45 min, une vidéo 30 min, une story 10 min ; échéance le dimanche à 23 h.
 
-## Qui lit, qui écrit (migration 0235)
+## Qui lit, qui écrit (migration 0237)
 
 - **Le job** (`withAdmin`) écrit le brouillon (`creator_weeks`, un par créatrice et lundi), et le rafraîchit chaque heure du dimanche soir sur le stock de l'heure tant qu'il n'est pas validé ; une semaine validée n'est jamais touchée. Une créatrice dont la semaine ne se calcule pas n'arrête pas les autres, et rien n'est proposé pour elle.
 - **Le propriétaire** valide, à son nom (politique `owner_validate`) ; **un manager actif** lit ; un chatteur ne lit rien ; **elle** ne lit jamais le brouillon.
