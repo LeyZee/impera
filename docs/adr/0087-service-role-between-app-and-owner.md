@@ -47,7 +47,9 @@ Sur le PC de Charles, le lot a demande une étape de plus au prochain « lance l
 - **Supprimer `withAdmin` et tout écrire en politiques de lignes d'un coup.** 186 appels dans 16 modules : un chantier de plusieurs semaines qui toucherait la paie et les ventes au moment où elles se vérifient sur de vrais chiffres.
 - **Un rôle par module.** Plus fin, mais seize connexions et seize jeux de droits à tenir pour une équipe de cette taille ; le lot c donne l'essentiel du gain sans cette charge.
 
-## Avenant du 20/11/2026 (proposé, en attente du mot de Charles) : la porte des tâches d'une créatrice
+## Avenant du 20/11/2026 : la porte des tâches d'une créatrice
+
+Statut : accepté (oui de Charles le 20/11/2026, 18 h 07 UTC, carte de décision du fil « Corriger les failles de l'audit sécurité »).
 
 Le lot c demande qu'un accès passe par `withTenant` « avec une politique de lignes écrite pour lui ». Pour une tâche de fond qui écrit les lignes d'une créatrice, cette politique ne doit rien ouvrir aux sessions de compte. D'où une porte nommée.
 
