@@ -100,7 +100,8 @@ export function awayTitle(away: Away): string {
   return AWAY_TITLES[away];
 }
 
-type ShortcutIcon = 'dashboard' | 'today' | 'tracking' | 'team' | 'creators' | 'planning' | 'pay' | 'me';
+type ShortcutIcon =
+  'dashboard' | 'today' | 'tracking' | 'train' | 'team' | 'creators' | 'planning' | 'pay' | 'me' | 'settings';
 
 export interface Shortcut {
   readonly path: string;
@@ -114,7 +115,7 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/aujourdhui': 'today',
   '/agenda': 'planning',
   '/suivi': 'tracking',
-  '/entrainer': 'tracking',
+  '/entrainer': 'train',
   '/planning': 'planning',
   '/commissions': 'pay',
   '/ventes': 'pay',
@@ -124,13 +125,18 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/paie': 'pay',
   '/creatrices': 'creators',
   '/moi': 'me',
-  '/reglages': 'me',
+  '/reglages': 'settings',
 };
+
+/** The icon of a section, the CRM menu's own (apps/web/src/shell/nav.ts): Entraîner a target, Réglages a gear. */
+export function shortcutIconOf(section: CrmSection): ShortcutIcon {
+  return ICONS[section];
+}
 
 export function shortcutsFor(kind: Kind): readonly Shortcut[] {
   return CRM_RAILS[kind].shortcuts.map((section) => ({
     path: section,
     label: CRM_SECTION_LABELS[section],
-    icon: ICONS[section],
+    icon: shortcutIconOf(section),
   }));
 }
