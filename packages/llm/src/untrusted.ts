@@ -37,6 +37,8 @@ export type UntrustedKind =
   | 'instagram_caption'
   /** Her validated replies to comments (ADR 0122 § 4): the examples of the Playground's bank. */
   | 'comment_examples'
+  /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
+  | 'profile_bio'
   /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
   | 'recent_replies';
 

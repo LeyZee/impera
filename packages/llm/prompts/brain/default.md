@@ -1,5 +1,5 @@
 ---
-version: 1.20.0
+version: 1.21.0
 role: brain
 model_hint: grok-4.7
 output_schema: Brief
@@ -10,6 +10,8 @@ Tu analyses une conversation privée entre {{creator_name}}, créatrice de conte
 
 # Elle
 {{persona_sheet}}
+
+{{profile_bio}}
 
 # Ce que tu produis
 

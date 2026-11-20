@@ -19,4 +19,8 @@ describe('periodic jobs', () => {
       expect(item.options.maxAttempts, task).toBe(expected);
     }
   });
+
+  it('no longer asks the identities of her native scripts each hour: the agent reads ours (ADR 0161 § 5)', () => {
+    expect(parsedCronJobs().map((item) => item.task)).not.toContain('scripts.identify_backlog');
+  });
 });
