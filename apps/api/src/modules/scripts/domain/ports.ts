@@ -366,8 +366,6 @@ export interface ScriptIdentityJobStore {
    * identity first, queued for the job, which decides. Gives how many.
    */
   enqueueBacklog(correlationId: string): Promise<number>;
-  /** Queues the job for these scripts of hers, now. */
-  enqueue(creatorId: CreatorId, scriptIds: readonly string[], correlationId: string): Promise<void>;
 }
 
 /** The brain that writes an identity (`brain/script-identity`, `llm`, wired by the composition root). */
@@ -411,14 +409,13 @@ export interface ScriptIdentityReviewStore {
   /**
    * The descriptions of its media validated as shown, or one rewritten by hand and validated (ADR 0099 § 4), in the
    * same way: a description that is not the one a media of this script is shown with now is `stale`, one that waits
-   * for a person named with others `alone`. Each write asks the script's identity again (`scripts.identify_platform_script`).
+   * for a person named with others `alone`. No identity is asked after it any more (ADR 0161 § 5).
    */
   describe(
     creatorId: CreatorId,
     scriptId: string,
     review: DescriptionReview,
     userId: string,
-    correlationId: string,
   ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'>;
 }
 

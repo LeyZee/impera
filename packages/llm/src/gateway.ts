@@ -23,6 +23,7 @@ import {
   judgeSituationBlock,
   notesBlock,
   customOrderBlock,
+  profileBioBlock,
   scriptsBlock,
   toMessages,
 } from './conversation-messages';
@@ -206,6 +207,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(prompts.brain, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         alerts: alertsBlock(input.alerts ?? []),
         scripts: scriptsBlock(input.scripts ?? [], input.scriptStepWaiting === true),
         custom_order: customOrderBlock(input.customOrder),
@@ -227,6 +229,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(prompts.voice, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
         brief: describeBrief(input.brief, input.objectionReply, input.scriptStep, input.maxBubbles),
@@ -246,6 +249,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(judgePrompt, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         // What the agent saw (his age, his flags, the last offer): safety is read against it, not guessed.
         situation: judgeSituationBlock(input.situation),

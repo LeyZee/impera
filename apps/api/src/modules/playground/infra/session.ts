@@ -201,6 +201,8 @@ export interface PlaygroundDeps {
   readonly gateway: LlmGateway;
   readonly creatorName: string;
   readonly personaSheet: string;
+  /** Her bio on her platform profile, as real fans read it (ADR 0154 § 7); absent: the invented persona has none. */
+  readonly profileBio?: string | null;
   readonly guardSettings: GuardSettings;
   /** False: her answer is shown as one message, as the fan would get it (`behavior.split_messages`). */
   readonly splitMessages?: boolean;
@@ -649,6 +651,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         {
           creatorName: deps.creatorName,
           personaSheet,
+          ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
           ...(voiceExamples.length > 0 && { voiceExamples }),
@@ -732,6 +735,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         {
           creatorName: deps.creatorName,
           personaSheet,
+          ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
           guardSettings: deps.guardSettings,
           ...(deps.splitMessages !== undefined && { splitMessages: deps.splitMessages }),
           ...(voiceExamples.length > 0 && { voiceExamples }),

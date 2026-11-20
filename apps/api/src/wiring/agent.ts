@@ -96,6 +96,8 @@ export function wireAgent(
       scripts: createAgentScriptSource(scriptReads),
       lastOfferAt: createLastOfferAt(scriptReads),
       gridOf: (creatorId) => deps.customOrders.gridOf(CreatorIdSchema.parse(creatorId)),
+      // Her bio on her platform profile, as the poll last read it (ADR 0154): beside her persona, it wins where they differ.
+      profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),
       timeZoneOf: async (creatorId) => {
         const [creator] = await persona.creators.list([CreatorIdSchema.parse(creatorId)]);
         return creator?.timezone ?? DEFAULT_LLM_CONFIG.dailyBudget.timeZone;

@@ -99,6 +99,11 @@ export interface ComposerPersona {
   /** False: her answer goes out as one message (`behavior.split_messages`). Absent: as the voice wrote it. */
   readonly splitMessages?: boolean;
   /**
+   * Her bio on her platform profile, as last read (ADR 0154): beside her sheet, read as data, it wins where they
+   * differ. Absent or empty: no section.
+   */
+  readonly profileBio?: string | null;
+  /**
    * Her bank's examples her hard guards let through, newest first (ADR 0102, `pickVoiceExamples`): each turn gives the
    * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
    */
@@ -621,6 +626,8 @@ export async function composeTurn(
     };
   }
   const notes = screenNotes(input.fanNotes);
+  // Her bio is the platform's text: a line of it shaped like an order never reaches a prompt (ADR 0154 § 3).
+  const bio = screenNotes(persona.profileBio ?? '');
   // Her examples for this fan, as his age allows (ADR 0102): a follow-up carries no age, so nothing explicit.
   const examples = examplesForTurn(
     persona.voiceExamples ?? [],
@@ -634,6 +641,7 @@ export async function composeTurn(
       persona.personaSheet,
       examples.map((e) => e.text),
     ),
+    ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
     history: withTimeNotes(input.history, input.situation.timeZone),

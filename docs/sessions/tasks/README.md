@@ -203,3 +203,4 @@ Branche : task/<id>-<slug>
 | CRE-05 | « Mot de passe oublié » sans Telegram : le lien que le propriétaire crée | exploitation | done | SEC-05, EQ-10, CR-02, ADR 0068 |
 | FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |
 | IA-01 | L'IA d'une créatrice : interrupteur avec pause, heures en frise, exceptions datées, vue agence | agent | in_progress | ADR 0148, P3-14 |
+| BIO-01 | L'IA connaît la bio de la créatrice sur la plateforme | agent | done | ADR 0154 |

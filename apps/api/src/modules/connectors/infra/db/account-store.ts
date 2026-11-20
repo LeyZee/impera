@@ -45,6 +45,7 @@ function toAccount(row: typeof schema.platformAccounts.$inferSelect): ConnectorA
     platform: PlatformSchema.parse(row.platform),
     sessionState: SessionStateSchema.parse(row.sessionState),
     lastPollAt: row.lastPollAt,
+    profileBioReadAt: row.profileBioReadAt,
     consecutiveErrors: row.consecutiveErrors,
     pausedUntil: row.pausedUntil,
     // A bad configuration falls back to the defaults rather than stopping the account.
@@ -225,6 +226,31 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           .update(schema.platformAccounts)
           .set({ lastPollAt: at, consecutiveErrors: 0, pausedUntil: null })
           .where(byId(id));
+      }),
+
+    recordProfileBio: (creatorId, id, bio, at) =>
+      withTenant(db, creatorId, async (tx) => {
+        await tx
+          .update(schema.platformAccounts)
+          .set({ profileBio: bio, profileBioReadAt: at })
+          .where(byId(id));
+      }),
+
+    profileBioOf: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const [row] = await tx
+          .select({ bio: schema.platformAccounts.profileBio })
+          .from(schema.platformAccounts)
+          .where(
+            and(
+              eq(schema.platformAccounts.creatorId, creatorId),
+              sql`${schema.platformAccounts.profileBioReadAt} is not null`,
+            ),
+          )
+          .orderBy(sql`${schema.platformAccounts.profileBioReadAt} desc`)
+          .limit(1);
+        const bio = row?.bio?.trim() ?? '';
+        return bio === '' ? null : bio;
       }),
 
     recordFailure: (creatorId, id, state) =>

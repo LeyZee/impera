@@ -1,5 +1,6 @@
 import {
   PlatformAccountIdSchema,
+  type CreatorId,
   type ConnectionService,
   type ConnectionSignal,
   type JobPayload,
@@ -220,6 +221,11 @@ export interface ConnectorsModule {
    */
   readonly platformReads: PlatformReads;
   /**
+   * Her bio on her platform profile as the poll last read it (ADR 0154), for the agent beside her persona; `null`:
+   * none. Read from the base, never from the platform at draft time.
+   */
+  readonly profileBioOf: (creatorId: CreatorId) => Promise<string | null>;
+  /**
    * One vault file read to a path of the caller's (ADR 0113), for `media.describe_vault`: through the resolver, behind
    * `mediaDownload`, never a write. What became of it, typed; the file is the caller's to remove.
    */
@@ -424,6 +430,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       }),
     vault: vaultReads,
     platformReads: createPlatformReads({ accounts, resolver, clock }),
+    profileBioOf: (creatorId) => accounts.profileBioOf(creatorId),
     vaultFiles: createVaultFiles({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),

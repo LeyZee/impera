@@ -132,6 +132,13 @@ export type FanNote = z.infer<typeof FanNoteSchema>;
 export const CreatorNoteSchema = z.object({ text: z.string().min(1) });
 export type CreatorNote = z.infer<typeof CreatorNoteSchema>;
 
+/**
+ * Her public profile on the platform (`getCreatorProfile`, ADR 0154): her bio as every subscriber could read it before
+ * writing to her; empty when she has none. Read only: Impera never writes it.
+ */
+export const CreatorProfileSchema = z.object({ bio: z.string() });
+export type CreatorProfile = z.infer<typeof CreatorProfileSchema>;
+
 /** One bundle the fan was offered in the conversation, bought or not. */
 const PpvOfferSchema = z.object({
   ref: ExternalRefSchema,
@@ -304,6 +311,8 @@ export const ConnectorCapabilitiesSchema = z.object({
   mediaDownload: z.boolean(),
   /** `readVaultPreview`: a vault media's small picture read on demand, never kept (ADR 0138). */
   vaultPreview: z.boolean(),
+  /** `getCreatorProfile`: her public profile as every subscriber reads it, read only (ADR 0154). */
+  creatorProfile: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 
