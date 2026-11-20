@@ -53,6 +53,7 @@ import {
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
+import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
 import {
   NO_SALE_RISKS,
@@ -456,7 +457,17 @@ const datedOf = (turn: ConversationTurn) => ({
 
 /** « Le moment », with what code reads of the last exchanges' times (audit du naturel, A2). */
 function describeMoment(situation: Situation, history: readonly ConversationTurn[]): string {
-  return [describeSituation(situation), ...timingLines(history.map(datedOf), situation.now)].join('\n');
+  // Her messages an automation wrote (ADR 0110 § 3): said once here, never as a bracket in her own turn.
+  const automated = new Set(
+    history.flatMap((turn) =>
+      turn.from === 'creator' && turn.originNote !== undefined ? [turn.originNote] : [],
+    ),
+  );
+  return [
+    describeSituation(situation),
+    ...timingLines(history.map(datedOf), situation.now),
+    ...automated,
+  ].join('\n');
 }
 
 /** Each message of his after a silence carries the time that passed, written by code on her clock. */
@@ -474,7 +485,7 @@ function earlierFanTexts(history: readonly ConversationTurn[]): string[] {
   while (end > 0 && history[end - 1]?.from === 'fan') end -= 1;
   return history
     .slice(0, end)
-    .filter((turn) => turn.from === 'fan')
+    .filter((turn) => turn.from === 'fan' && !isOpener(turn))
     .map((turn) => turn.text);
 }
 
@@ -765,7 +776,11 @@ export async function composeTurn(
     sexualization?.kind !== 'steer_back'
       ? paceHints(
           input.fanText,
-          previousTurnsOf(input.history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text }))),
+          previousTurnsOf(
+            input.history
+              .filter((turn) => !isOpener(turn))
+              .map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
+          ),
         )
       : [];
   const voiceBrief: Brief = asking

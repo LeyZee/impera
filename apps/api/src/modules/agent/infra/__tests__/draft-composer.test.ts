@@ -606,6 +606,38 @@ describe('createDraftComposer', () => {
     );
   });
 
+  it('tells the models what an automation wrote: his opener, his reply to a story, her welcome (ADR 0110)', async () => {
+    const { draftComposer, seen } = composer();
+    const input: AgentComposeInput = {
+      ...INPUT,
+      history: [
+        {
+          direction: 'outbound',
+          text: 'Bienvenue toi',
+          at: new Date('2026-10-17T09:00:00Z'),
+          origin: 'welcome',
+        },
+        {
+          direction: 'inbound',
+          text: 'Salut, ton profil',
+          at: new Date('2026-10-17T09:58:00Z'),
+          origin: 'hook',
+        },
+        { direction: 'inbound', text: '', at: new Date('2026-10-17T09:59:00Z'), origin: 'story_reply' },
+        { direction: 'inbound', text: 'Tu fais quoi', at: new Date('2026-10-17T09:59:30Z'), origin: null },
+      ],
+    };
+    expect(await draftComposer.compose(input)).toMatchObject({ kind: 'draft' });
+    const brain = seen.brainInputs?.[0];
+    const notes = brain?.history.map((t) => t.originNote) ?? [];
+    expect(notes[0]).toContain('bienvenue automatique');
+    expect(notes[1]).toContain('pas ses mots');
+    expect(notes[2]).toContain('stories');
+    expect(notes[3]).toBeUndefined();
+    expect(brain?.situation).toContain('Ta bienvenue automatique');
+    expect(seen.voiceInputs?.[0]?.situation).toContain('Ta bienvenue automatique');
+  });
+
   it('puts each description on the message that carried it', async () => {
     const { draftComposer, seen } = composer({}, sightOf({ 'm-1': PHOTO }).sight);
     const input: AgentComposeInput = {
@@ -1320,6 +1352,21 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     expect(written(seen)?.action).toBe('reply');
   });
 
+  it('measures nothing of an opener he chose: his desire reads his own words only (ADR 0110 § 1)', async () => {
+    const opener = {
+      direction: 'inbound' as const,
+      text: 'Hello, ton profil m’a vraiment donné envie de venir te parler, j’adore ce que tu fais',
+      at: new Date('2026-10-17T09:57:00Z'),
+      origin: 'hook' as const,
+    };
+    const plain = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
+    const withOpener = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
+    const expected = (await plain.draftComposer.compose(INPUT)).desire;
+    expect(
+      (await withOpener.draftComposer.compose({ ...INPUT, history: [opener, ...INPUT.history] })).desire,
+    ).toEqual(expected);
+  });
+
   it('gives no score before his first one: `before` is null', async () => {
     const { draftComposer } = composer({ brief: OFFER }, undefined, limitsOf(ADULT).limits, policy);
     expect((await draftComposer.compose(INPUT)).desire).toMatchObject({ before: null, score: 34 });
@@ -1563,6 +1610,22 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     );
   });
 
+  it('never confirms an age an opener he chose carries: not his words (ADR 0110 § 1)', async () => {
+    const AGE: Brief = {
+      ...HOT,
+      factsProposed: [{ category: 'identity', key: 'age', value: '25', kind: 'declared', confidence: 0.95 }],
+    };
+    const limits = limitsOf({});
+    const { draftComposer } = composer({ brief: AGE }, undefined, limits.limits, cursor);
+    await draftComposer.compose({
+      ...dayOld,
+      history: [
+        { direction: 'inbound', text: 'J’ai 25 ans', at: new Date('2026-10-17T09:59:00Z'), origin: 'hook' },
+      ],
+    });
+    expect(limits.confirmed).toEqual([]);
+  });
+
   it('takes an insistent compliment as one, and writes a brake on it again (Charles, 20/11)', async () => {
     // « tu es trop belle !!! » read as a flirt in a good mood (her « Pourquoi », 20/11): welcomed.
     const INSISTENT: Brief = {
@@ -1728,6 +1791,32 @@ describe('createDraftComposer, a follow-up on his silence (P3-10)', () => {
       detail: ['follow_up_outside_hours'],
       costUsd: 0,
       retryAt: new Date('2026-10-18T12:00:00Z'),
+    });
+    expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('waits 6 h after her reminder before expiry went out to him (ADR 0110 § 6)', async () => {
+    const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
+    const reminder = new Date('2026-10-17T08:00:00Z');
+    expect(
+      await draftComposer.compose({
+        ...FOLLOW_UP,
+        history: [
+          ...FOLLOW_UP.history,
+          {
+            direction: 'outbound',
+            text: 'Ton abonnement finit bientôt',
+            at: reminder,
+            origin: 'expiration_reminder',
+          },
+        ],
+      }),
+    ).toEqual({
+      kind: 'held',
+      reason: 'no_reply',
+      detail: ['follow_up_after_automation'],
+      costUsd: 0,
+      retryAt: new Date('2026-10-17T14:00:00Z'),
     });
     expect(seen.voiceCalls).toBe(0);
   });
