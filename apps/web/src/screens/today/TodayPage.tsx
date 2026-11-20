@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
+import { AnnouncementsCard } from './AnnouncementsCard';
 import { TodoCard } from './TodoCard';
 import './today.css';
 
@@ -51,7 +52,7 @@ import { Failure } from '@/shell/states';
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
  * rapport » as it ends; then the reports left to do and the period's, then the next shift. Read in the chatter's own
  * time, his record's as on Planning (recette EXT-10). What waits on his invoices follows (EQ-06 lot 8d). The goal and
- * the announcements come with their own cards.
+ * the announcements he has not read (EQ-12) come with their own cards.
  */
 export function TodayPage({ user }: { user: Me }): JSX.Element {
   const mine = useMyShifts();
@@ -169,6 +170,7 @@ function Day({
         <MyAwayCard status={away} />
       )}
       {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
+      {user.team === null ? null : <AnnouncementsCard zone={zone} today={today} />}
       {away === null ? <ShiftChallengeCard user={user} zone={zone} /> : null}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}

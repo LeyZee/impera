@@ -32,6 +32,7 @@ const media = (ref: string, described = true) => ({
   imported: true,
   mediaAssetId: null,
   described,
+  description: null,
 });
 
 function step(position: number, ref: string, priceMinor: number, sold: readonly string[] = []): HerStep {

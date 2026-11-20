@@ -477,3 +477,291 @@
     flex: none;
   }
 }
+
+/*
+ * « Ses scripts dans Reveal » (ADR 0099 § 4, SC-04 lot c8): one card, a row per script with the one thing it lacks
+ * and its pill; a script to review opens under its row, its descriptions to read or its identity to validate.
+ */
+.rx {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: var(--nv-plate-pad);
+}
+.rx-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rx-head > p {
+  margin: 0;
+}
+.rx-list {
+  margin: 0 calc(-1 * var(--nv-space-2));
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rx-item {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--nv-radius-md);
+}
+.rx-item[data-open] {
+  background: var(--nv-fill-soft);
+}
+.rx-row {
+  --rx-name-line: 24px;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  width: 100%;
+  margin: 0;
+  padding: var(--nv-space-3) var(--nv-space-2);
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+button.rx-row {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+button.rx-row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .rx-item:not([data-open]) button.rx-row:hover {
+    background: var(--nv-fill-soft);
+  }
+}
+.rx-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rx-row__end {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.rx-row__name {
+  line-height: var(--rx-name-line);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.rx-row__line {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink);
+}
+.rx-row__line[data-tone='wait'],
+.rx-row__line[data-tone='ok'] {
+  color: var(--nv-ink-muted);
+}
+.rx-row__line[data-tone='warn'] {
+  color: var(--nv-warning);
+}
+.rx-row__meta {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.rx-row__state {
+  flex: none;
+  margin-left: 0;
+}
+.rx-row__state[data-tone='wait']::before,
+.rx-row__state[data-tone='todo']::before {
+  background: var(--nv-ink-faint);
+}
+.rx-row__state[data-tone='todo'] {
+  color: var(--nv-ink-muted);
+}
+.rx-row__state[data-tone='review'] {
+  color: var(--nv-ink);
+}
+.rx-row__state[data-tone='review']::before {
+  background: var(--nv-ink);
+}
+.rx-row__chev {
+  flex: none;
+  display: inline-flex;
+  width: 14px;
+  color: var(--nv-ink-faint);
+  transition: transform var(--nv-dur-fast) ease;
+}
+.rx-row__chev svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rx-item[data-open] .rx-row__chev {
+  transform: rotate(90deg);
+}
+
+.rx-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: 0 var(--nv-space-2) var(--nv-space-4);
+}
+.rx-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  min-height: 32px;
+}
+.rx-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rx-sheet__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+.rx-sheet__title {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+
+.rx-media {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rx-medium {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-surface-raised);
+}
+.rx-thumb {
+  position: relative;
+  flex: none;
+  width: 72px;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--nv-radius-sm);
+  overflow: hidden;
+}
+.rx-thumb .vx-preview,
+.rx-thumb .vx-sharp {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rx-medium__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rx-medium__where {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.rx-medium__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+/* A plain button first in the line starts where the text above starts. */
+.rx-medium__actions > .nv-btn--plain:first-child {
+  margin-inline-start: calc(-1 * var(--nv-space-4));
+}
+
+.rx-identity {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--nv-space-5);
+  row-gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-surface-raised);
+}
+.rx-identity__row {
+  display: contents;
+}
+.rx-identity dt {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink-muted);
+}
+.rx-identity dd {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  overflow-wrap: anywhere;
+}
+.rx-cues {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rx-identity-form {
+  gap: var(--nv-space-3);
+}
+.rx-identity-form > p {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  /* The pill and the chevron on the name's line. */
+  .rx-row__end {
+    align-self: flex-start;
+    height: var(--rx-name-line);
+  }
+  .rx-medium {
+    padding: var(--nv-space-3) var(--nv-space-3) var(--nv-space-2);
+  }
+  .rx-thumb {
+    width: 52px;
+  }
+  .rx-identity {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 4px;
+  }
+  .rx-identity dd + dt,
+  .rx-identity__row + .rx-identity__row dt {
+    margin-top: var(--nv-space-2);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rx-row__chev {
+    transition: none;
+  }
+}

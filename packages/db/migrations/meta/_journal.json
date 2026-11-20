@@ -1212,6 +1212,13 @@
       "when": 1795176013417,
       "tag": "0231_shift_check_in",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1795200955542,
+      "tag": "0232_team_announcements",
+      "breakpoints": true
     }
   ]
 }

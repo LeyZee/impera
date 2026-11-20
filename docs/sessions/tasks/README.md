@@ -164,6 +164,7 @@ Branche : task/<id>-<slug>
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
 | OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
+| OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | todo | ADR 0152, OPS-01, OPS-02 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
