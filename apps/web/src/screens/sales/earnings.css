@@ -1,5 +1,17 @@
 /* « Ta part » (CR-04): her part over a period, in large, and each sale with her part of it. Tokens only. */
 
+/* The title keeps its one line: the period's choice goes under it when the card is narrow. */
+.vt-earn > .nv-panel__head {
+  flex-wrap: wrap;
+}
+.vt-earn > .nv-panel__head > :first-child {
+  flex: 1 0 auto;
+}
+.vt-earn > .nv-panel__sec {
+  gap: 0;
+  padding-bottom: var(--nv-plate-pad);
+}
+
 .vt-earn__head {
   display: flex;
   flex-wrap: wrap;
@@ -75,6 +87,7 @@
 @media (max-width: 40rem) {
   .vt-earn__line {
     grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 2px;
   }
   .vt-earn__when {
     grid-column: 1 / -1;

@@ -16,7 +16,7 @@ import './earnings.css';
 import { clockAt, dayOf, longDay } from '@/scheduling/time';
 import '@/scheduling/scheduling.css';
 import { useNow } from '@/scheduling/useNow';
-import { Panel } from '@/shell/layout';
+import { Panel, PanelSection } from '@/shell/layout';
 import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /** Her sales are counted on Reveal's days, in Paris: the same days as her figures on Reveal. */
@@ -65,58 +65,60 @@ export function EarningsCard(): JSX.Element {
       title="Ta part"
       actions={<PeriodChoice period={period} onPick={choose} />}
     >
-      <div className="vt-earn__head">
-        <div className="sc-week" role="group" aria-label="Période">
-          <button
-            type="button"
-            className="sc-arrow"
-            aria-label="Période précédente"
-            title="Période précédente"
-            onClick={() => {
-              setDay(stepDay(read, -1));
-            }}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m10 3.5-4.5 4.5 4.5 4.5" />
-            </svg>
-          </button>
-          <p className="sc-week__label nv-swap" key={`${read.period}${read.from}`} aria-live="polite">
-            {periodName(read, today)}
-          </p>
-          <button
-            type="button"
-            className="sc-arrow"
-            aria-label="Période suivante"
-            title="Période suivante"
-            disabled={read.latest}
-            onClick={() => {
-              setDay(stepDay(read, 1));
-            }}
-          >
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="m6 3.5 4.5 4.5-4.5 4.5" />
-            </svg>
-          </button>
-          {read.latest ? null : (
+      <PanelSection>
+        <div className="vt-earn__head">
+          <div className="sc-week" role="group" aria-label="Période">
             <button
               type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm sc-week__back nv-swap"
+              className="sc-arrow"
+              aria-label="Période précédente"
+              title="Période précédente"
               onClick={() => {
-                setDay(null);
+                setDay(stepDay(read, -1));
               }}
             >
-              Revenir à aujourd’hui
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m10 3.5-4.5 4.5 4.5 4.5" />
+              </svg>
             </button>
-          )}
+            <p className="sc-week__label nv-swap" key={`${read.period}${read.from}`} aria-live="polite">
+              {periodName(read, today)}
+            </p>
+            <button
+              type="button"
+              className="sc-arrow"
+              aria-label="Période suivante"
+              title="Période suivante"
+              disabled={read.latest}
+              onClick={() => {
+                setDay(stepDay(read, 1));
+              }}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="m6 3.5 4.5 4.5-4.5 4.5" />
+              </svg>
+            </button>
+            {read.latest ? null : (
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain nv-btn--sm sc-week__back nv-swap"
+                onClick={() => {
+                  setDay(null);
+                }}
+              >
+                Revenir à aujourd’hui
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-      <p className="vt-earn__part nv-num">{partOf(read)}</p>
-      <p className="vt-earn__meta">
-        {[countsOf(read), read.estimated ? 'estimé, la période n’est pas finie' : null, 'lu chez Reveal']
-          .filter((part) => part !== null)
-          .join(' · ')}
-      </p>
-      <Lines earnings={read} />
+        <p className="vt-earn__part nv-num">{partOf(read)}</p>
+        <p className="vt-earn__meta">
+          {[countsOf(read), read.estimated ? 'estimé, la période n’est pas finie' : null, 'lu chez Reveal']
+            .filter((part) => part !== null)
+            .join(' · ')}
+        </p>
+        <Lines earnings={read} />
+      </PanelSection>
     </Panel>
   );
 }

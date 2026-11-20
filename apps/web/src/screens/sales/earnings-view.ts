@@ -2,7 +2,7 @@ import type { CreatorEarnings, CreatorEarningsLine, EarningsPeriod, SaleType } f
 
 import { amountOf } from './view';
 
-import { addDays, dayMonth, longDay } from '@/scheduling/time';
+import { addDays, longDay } from '@/scheduling/time';
 
 /*
  * « Ta part » in words (CR-04): her part over a period, the period's name, and each sale. Only her part is ever
@@ -28,6 +28,8 @@ export const SALE_TYPE_WORDS: Readonly<Record<SaleType, string>> = {
   other: 'Autre vente',
 };
 
+/** « 15 oct. »: the end of a fortnight, which never leaves its month. */
+const DAY_MONTH = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const MONTH = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 /** « Aujourd’hui », « Hier », « mardi 3 novembre »; « 1er – 15 novembre »; « novembre 2026 ». */
@@ -38,7 +40,8 @@ export function periodName(earnings: Pick<CreatorEarnings, 'period' | 'from' | '
       if (earnings.from === addDays(today, -1)) return 'Hier';
       return longDay(earnings.from);
     case 'fortnight':
-      return `${dayMonth(earnings.from).split(' ')[0] ?? ''} – ${dayMonth(earnings.to)}`;
+      // « 1er – 15 oct. », « 16 – 31 oct. ».
+      return `${earnings.from.endsWith('-01') ? '1er' : String(Number(earnings.from.slice(8)))} – ${DAY_MONTH.format(new Date(`${earnings.to}T00:00:00Z`))}`;
     case 'month':
       return MONTH.format(new Date(`${earnings.from}T00:00:00Z`));
   }
