@@ -12,6 +12,7 @@ import {
   PlatformScriptViewSchema,
   PreparedScriptContentSchema,
   PreparedScriptIdSchema,
+  ScriptIdentityIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type DescriptionReviewReason,
@@ -786,18 +787,29 @@ describe('the native scripts imported from the platform', () => {
     expect(after).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
     expect(await identify('sequence_4')).toBe('identified');
     // An identity a hand of the team wrote before the routes left (rows kept, ADR 0161 § 3), stood up here by the
-    // administrator for the tests that follow: it stands for its version, the brain leaves it alone.
+    // administrator for the tests that follow: a row is written once, already validated, for the brain's version. It
+    // stands for its version, the brain leaves it alone.
     const current = await ownerView('sequence_4');
     if (current?.identity == null) throw new Error('identified again');
-    await test.admin.db
-      .update(schema.scriptIdentities)
-      .set({
-        author: 'human',
-        content: { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' },
-        validatedBy: ids.owner,
-        validatedAt: new Date(),
+    const [brain] = await test.admin.db
+      .select({
+        inputHash: schema.scriptIdentities.inputHash,
+        schemaVersion: schema.scriptIdentities.schemaVersion,
       })
+      .from(schema.scriptIdentities)
       .where(eq(schema.scriptIdentities.id, current.identity.id));
+    if (brain === undefined) throw new Error('brain identity row');
+    await test.admin.db.insert(schema.scriptIdentities).values({
+      id: newId(ScriptIdentityIdSchema),
+      creatorId: nora,
+      platformScriptId: current.id,
+      inputHash: brain.inputHash,
+      schemaVersion: brain.schemaVersion,
+      content: { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' },
+      author: 'human',
+      validatedBy: ids.owner,
+      validatedAt: new Date(),
+    });
     expect(await ownerView('sequence_4')).toMatchObject({
       proposable: true,
       identity: { author: 'human', content: { ambiance: 'douce et lente', energy: 'soft' } },
