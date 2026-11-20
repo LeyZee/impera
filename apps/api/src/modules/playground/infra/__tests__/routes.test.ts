@@ -491,6 +491,16 @@ describe('/v1/playground', () => {
     expect(answered.reading).toBeUndefined();
   });
 
+  it('answers « Payer (fictif) » and « Refuser » only while a paid step of a trial script waits (ADR 0103 § 16)', async () => {
+    const { app, headers, post } = await server();
+    const state = stateOf(await app.inject({ method: 'GET', url: '/v1/playground', headers }));
+    expect(state.scripts).toEqual({ run: null, fictiveSpentCents: 0 });
+    const buy = await post('/script/buy');
+    expect(buy.statusCode).toBe(409);
+    expect(codeOf(buy)).toBe('script_step_not_waiting_conflict');
+    expect(codeOf(await post('/script/refuse'))).toBe('script_step_not_waiting_conflict');
+  });
+
   it('has nothing to compare after a handoff', async () => {
     const { post } = await server();
     await post('/messages', {

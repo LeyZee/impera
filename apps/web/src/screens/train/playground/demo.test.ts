@@ -61,4 +61,24 @@ describe('demo client', () => {
     expect((await client.state()).situation.isNight).toBe(true);
     expect((await client.advance(12)).situation.isNight).toBe(false);
   });
+
+  it('plays its trial script with the fans who buy: teaser, paid step, fictive purchase (ADR 0103 § 16)', async () => {
+    const client = createDemoClient();
+    await client.choosePreset('chaud');
+    await client.send('Salut', []);
+    const teased = PlaygroundStateSchema.parse(await client.send('Encore', []));
+    const steps = teased.history.flatMap((turn) => turn.media ?? []).flatMap((m) => m.scriptStep ?? []);
+    expect(steps.map((step) => [step.kind, step.state])).toEqual([
+      ['free', 'offered'],
+      ['paid', 'waiting'],
+    ]);
+    const bought = PlaygroundStateSchema.parse(await client.answerScriptStep('buy'));
+    expect(bought.scripts.fictiveSpentCents).toBe(1200);
+    expect(bought.history.flatMap((turn) => turn.media ?? []).at(-1)?.isLocked).toBe(false);
+    const refused = PlaygroundStateSchema.parse(
+      await (await client.send('Wow', []), client.answerScriptStep('refuse')),
+    );
+    expect(refused.scripts.run?.status).toBe('refused');
+    expect(refused.scripts.fictiveSpentCents).toBe(1200);
+  });
 });

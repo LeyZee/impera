@@ -32,6 +32,7 @@ const STATE: PlaygroundState = {
   sessionCostEur: 1.5,
   voice: { reachable: true },
   pending: null,
+  scripts: { run: null, fictiveSpentCents: 0 },
 };
 
 /** Where the bar's router is, once a test has rendered it. */

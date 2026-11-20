@@ -49,7 +49,12 @@ export interface PlaygroundClient {
   setNotes(notes: readonly string[]): Promise<PlaygroundState>;
   setSpent(cents: number): Promise<PlaygroundState>;
   sendCreatorMedia(media: CreatorMedia): Promise<PlaygroundState>;
+  /** « Payer (fictif) » or « Refuser » the paid step of a trial script waiting for him (ADR 0103 § 16). */
+  answerScriptStep(answer: ScriptStepAnswer): Promise<PlaygroundState>;
 }
+
+/** What he does with the paid step waiting: buys it fictively, or says no. */
+export type ScriptStepAnswer = 'buy' | 'refuse';
 
 /** The voice the comparison asks for: the fallback of the voice role (ADR 0017), to see if it holds up. */
 export const COMPARE_MODEL = 'mistral-large-4';
@@ -143,5 +148,6 @@ export function createHttpClient(): PlaygroundClient {
     setNotes: (notes) => call(PlaygroundStateSchema, '/notes', 'PUT', { notes }),
     setSpent: (spentCents) => call(PlaygroundStateSchema, '/situation', 'PATCH', { spentCents }),
     sendCreatorMedia: (media) => call(PlaygroundStateSchema, '/creator-media', 'POST', media),
+    answerScriptStep: (answer) => call(PlaygroundStateSchema, `/script/${answer}`, 'POST'),
   };
 }

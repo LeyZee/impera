@@ -14,8 +14,10 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { DesireTag } from './Desire';
+import { ScriptStrip } from './ScriptStrip';
 import { MEDIA_KINDS } from './SetupPanel';
-import { bubblesOf } from './logic';
+import type { ScriptStepAnswer } from './client';
+import { bubblesOf, money } from './logic';
 import {
   DESTINATION_HINTS,
   DESTINATION_LABELS,
@@ -64,6 +66,8 @@ export interface ConversationProps {
   /** His score marked by the owner (ADR 0103 § 6); absent when this conversation cannot be marked. */
   readonly onMarkDesire?: ((fanMessageNumber: number, verdict: DesireMarkVerdict) => void) | undefined;
   readonly onSend: (text: string, media: Media[]) => Promise<boolean>;
+  /** He buys fictively, or refuses, the paid step of a trial script waiting for him (ADR 0103 § 16). */
+  readonly onScriptStep: (answer: ScriptStepAnswer) => void;
 }
 
 /** Index in the history of her answer still waiting for a rating (the engine keeps an answer that passed). */
@@ -90,6 +94,9 @@ export function Conversation(props: ConversationProps): JSX.Element {
   return (
     <div className="pg-thread nv-scroll" ref={threadRef}>
       <div className="nv-thread">
+        {state.scripts.run === null ? null : (
+          <ScriptStrip run={state.scripts.run} fictiveSpentCents={state.scripts.fictiveSpentCents} />
+        )}
         {state.history.length === 0 && pending === null && !writing ? (
           state.voice.reachable ? (
             <Empty
@@ -110,6 +117,8 @@ export function Conversation(props: ConversationProps): JSX.Element {
               turn={turn}
               canReplay={turn.from === 'fan' && !busy}
               isLastFan={index === lastFan}
+              busy={busy}
+              onScriptStep={props.onScriptStep}
               onReplay={() => {
                 props.onReplay(n);
               }}
@@ -198,9 +207,13 @@ function TurnView({
   isLastFan,
   onReplay,
   onMark,
+  busy,
+  onScriptStep,
 }: {
   turn: Turn;
   canReplay: boolean;
+  busy: boolean;
+  onScriptStep: (answer: ScriptStepAnswer) => void;
   /** On a phone only his last message offers to replay: a pill on every message is noise there. */
   isLastFan: boolean;
   onReplay: () => void;
@@ -219,7 +232,7 @@ function TurnView({
         </button>
       ) : null}
       {(turn.media ?? []).map((m, i) => (
-        <MediaCard key={i} media={m} from={turn.from} />
+        <MediaCard key={i} media={m} from={turn.from} busy={busy} onScriptStep={onScriptStep} />
       ))}
       {bubblesOf(turn.text).map((line, i) => (
         <div key={i} className={`nv-bubble nv-bubble--${turn.from}`}>
@@ -234,23 +247,73 @@ function TurnView({
 function MediaCard({
   media,
   from,
+  busy,
+  onScriptStep,
 }: {
   media: NonNullable<Turn['media']>[number];
   from: Turn['from'];
+  busy: boolean;
+  onScriptStep: (answer: ScriptStepAnswer) => void;
 }): JSX.Element {
-  const { description, isLocked } = media;
+  const { description, isLocked, scriptStep: step } = media;
   const flags = description.flags.map((f) => MEDIA_FLAG_LABELS[f] ?? f);
+  const price = step?.priceCents ?? null;
   return (
-    <div className={`pg-media ${isLocked ? 'is-locked' : ''} ${flags.length > 0 ? 'is-flagged' : ''}`}>
+    <div
+      className={`pg-media ${isLocked ? 'is-locked' : ''} ${flags.length > 0 ? 'is-flagged' : ''} ${
+        step === undefined ? '' : `is-step is-${step.state}`
+      }`}
+    >
       <span className="pg-media__k">
         {KIND_LABELS[description.kind]}{' '}
-        {from === 'fan' ? 'du fan' : isLocked ? 'payante, floutée' : 'offerte'}
+        {from === 'fan'
+          ? 'du fan'
+          : price !== null
+            ? `payante · ${money(price)}`
+            : isLocked
+              ? 'payante, floutée'
+              : 'offerte'}
         {flags.length > 0 ? ` · ${flags.join(', ')}` : ''}
+        {step === undefined ? null : <span className="pg-media__essai">Essai</span>}
       </span>
       <span className="pg-media__d">{description.factualDescription}</span>
+      {step === undefined || step.state === 'offered' ? null : step.state === 'waiting' ? (
+        <span className="pg-media__act">
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            disabled={busy}
+            title="Il dit non à cette étape : le script s’arrête là"
+            onClick={() => {
+              onScriptStep('refuse');
+            }}
+          >
+            Refuser
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--neon nv-btn--sm"
+            disabled={busy}
+            title="Achat fictif : rien ne part vers Reveal ni dans les chiffres"
+            onClick={() => {
+              onScriptStep('buy');
+            }}
+          >
+            Payer {price === null ? '' : money(price)} (fictif)
+          </button>
+        </span>
+      ) : (
+        <span className="pg-media__state">{STEP_STATE_LABELS[step.state]}</span>
+      )}
     </div>
   );
 }
+
+const STEP_STATE_LABELS = {
+  bought: 'Achetée, en fictif',
+  refused: 'Refusée',
+  closed: 'Sans réponse : le script s’est arrêté',
+} as const;
 
 /** She is writing: what a fan sees between two of her bubbles, and while the answer is being written. */
 function Typing(): JSX.Element {

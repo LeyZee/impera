@@ -33,8 +33,16 @@ import {
   type SexualizationLimits,
   type Situation,
   type TrapAssessment,
+  applyScriptRunEvent,
+  paidWaiting,
+  type AgentScriptView,
+  type ScriptHistoryView,
+  type ScriptRun,
 } from '../../agent/index';
 import { kycSlotWords } from '../domain/labels';
+import { completeMedia } from '../domain/media';
+
+import { TRIAL_SCRIPTS, trialScript } from './trial-scripts';
 
 export interface PlaygroundTurn {
   /** Safety flags on his media: a human would take over, nothing is written. */
@@ -110,6 +118,18 @@ interface VoiceComparison {
   readonly failure?: string;
 }
 
+/** A step of a trial script on the media she sent with it, and what became of it (ADR 0103 § 16). */
+interface TrialStep {
+  readonly scriptRef: string;
+  readonly stepIndex: number;
+  readonly kind: 'free' | 'paid' | 'bridge';
+  readonly priceCents: number | null;
+  readonly state: 'offered' | 'waiting' | 'bought' | 'refused' | 'closed';
+}
+
+/** What « Payer (fictif) » or « Refuser » did: nothing when no paid step waits for him. */
+type TrialStepAction = 'done' | 'nothing_waiting';
+
 export interface PlaygroundSession {
   /** His message, with the descriptions of the media he sends with it. */
   handleFanMessage(text: string, media?: readonly MediaDescription[]): Promise<PlaygroundTurn>;
@@ -130,6 +150,19 @@ export interface PlaygroundSession {
   followUp(): Promise<PlaygroundFollowUp>;
   setFanNotes(notes: readonly string[]): void;
   reset(): void;
+  /**
+   * He buys the paid step waiting, fictively (ADR 0103 § 16): the media unlocks, its price joins what he spent, and the
+   * script may go on at his next message. Nothing reaches Reveal, the sales or the figures.
+   */
+  buyStep(): TrialStepAction;
+  /** He refuses the paid step waiting: an explicit refusal, as the brain reads a clear no. */
+  refuseStep(): TrialStepAction;
+  /** The trial script under way or last played, with its script; `null` before the first. */
+  readonly scriptRun: { readonly run: ScriptRun; readonly script: AgentScriptView } | null;
+  /** What he paid in fictive purchases since the start, or the reset. */
+  readonly fictiveSpentCents: number;
+  /** The step of a trial script a media of hers carries, with what became of it. */
+  trialStepOf(turn: ConversationTurn): TrialStep | undefined;
   readonly history: readonly ConversationTurn[];
   readonly fanNotes: readonly string[];
   readonly situation: Situation;
@@ -223,6 +256,16 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   const availabilityBefore: (FanAvailabilityRecord | null)[] = [];
   // His score as each of his messages left it, shown under the message.
   const desireTrail: (PlaygroundDesireReading | undefined)[] = [];
+  // The trial scripts (ADR 0103 § 15-17): his run, and what Reveal's history would say he received and bought. The
+  // history is what `reconcileScriptRun` trusts, as production trusts Reveal's: a step joins it once written.
+  let scripts: TrialScripts = noScripts();
+  // Before each of his messages: a branch goes back to it.
+  const scriptsBefore: TrialScripts[] = [];
+  // The step each of her script media carries: the media turn is the one « Payer (fictif) » unlocks.
+  const stepTurns = new WeakMap<
+    ConversationTurn,
+    { readonly scriptRef: string; readonly stepIndex: number }
+  >();
   // When each turn was written, on the simulated clock: his reply speed counts in his score, as in production.
   const writtenAt = new WeakMap<ConversationTurn, Date>();
   const push = (turn: ConversationTurn): void => {
@@ -232,6 +275,56 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   // The history as composeTurn reads it, each turn with its time: the trainer sees the gaps he made with `advance`.
   const dated = (): ConversationTurn[] =>
     history.map((t) => ({ ...t, at: writtenAt.get(t) ?? situation.now }));
+  const historyView = (): ScriptHistoryView => ({
+    scripts: [...scripts.played].map(([scriptRef, played]) => ({
+      scriptRef,
+      sentStepIndexes: [...played.sent],
+      boughtStepIndexes: [...played.bought],
+    })),
+  });
+  /** His run moves: what each step became is kept, for the media that carry them once the run is over. */
+  const moveRun = (run: ScriptRun | null): void => {
+    if (run === null) return;
+    const outcomes = new Map(scripts.outcomes);
+    for (const step of run.steps) outcomes.set(stepKey(run.scriptRef, step.stepIndex), step.outcome);
+    scripts = { ...scripts, run, outcomes };
+  };
+  const played = (scriptRef: string): { sent: Set<number>; bought: Set<number> } => {
+    const known = scripts.played.get(scriptRef);
+    if (known !== undefined) return known;
+    const fresh = { sent: new Set<number>(), bought: new Set<number>() };
+    scripts.played.set(scriptRef, fresh);
+    return fresh;
+  };
+  /** The step she wrote: Reveal would now know it sent, and its media goes after her text, locked if paid. */
+  const sendStep = (script: AgentScriptView, stepIndex: number): void => {
+    played(script.scriptRef).sent.add(stepIndex);
+    const step = script.steps[stepIndex];
+    if (step?.mediaSheet === undefined) return;
+    const turn: ConversationTurn = {
+      from: 'creator',
+      text: '',
+      media: [
+        {
+          description: completeMedia({
+            kind: mediaKindOf(step.mediaSheet),
+            factualDescription: step.mediaSheet,
+          }),
+          isLocked: step.kind === 'paid',
+        },
+      ],
+    };
+    stepTurns.set(turn, { scriptRef: script.scriptRef, stepIndex });
+    push(turn);
+  };
+  /** The paid step waiting, its run and its script, or nothing. */
+  const waiting = () => {
+    const { run } = scripts;
+    const script = run === null ? undefined : trialScript(run.scriptRef);
+    const step = run === null ? undefined : paidWaiting(run);
+    return run === null || script === undefined || step === undefined ? undefined : { run, script, step };
+  };
+
   const offerAt = (now: Date): OfferInput | undefined =>
     deps.offerLimits === undefined
       ? undefined
@@ -286,7 +379,78 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       availability = null;
       availabilityBefore.length = 0;
       desireTrail.length = 0;
+      scripts = noScripts();
+      scriptsBefore.length = 0;
       situation = { ...situation, relationshipStartedAt: situation.now, spentCents: 0 };
+    },
+
+    get scriptRun() {
+      const { run } = scripts;
+      const script = run === null ? undefined : trialScript(run.scriptRef);
+      return run === null || script === undefined ? null : { run, script };
+    },
+
+    get fictiveSpentCents() {
+      return scripts.fictiveSpentCents;
+    },
+
+    trialStepOf(turn) {
+      const tag = stepTurns.get(turn);
+      const step = tag === undefined ? undefined : trialScript(tag.scriptRef)?.steps[tag.stepIndex];
+      if (tag === undefined || step === undefined) return undefined;
+      const outcome = scripts.outcomes.get(stepKey(tag.scriptRef, tag.stepIndex));
+      const open = waiting();
+      const state: TrialStep['state'] =
+        step.kind !== 'paid'
+          ? 'offered'
+          : outcome === 'bought' || outcome === 'refused'
+            ? outcome
+            : open?.run.scriptRef === tag.scriptRef && open.step.stepIndex === tag.stepIndex
+              ? 'waiting'
+              : 'closed';
+      return { ...tag, kind: step.kind, priceCents: step.priceMinor, state };
+    },
+
+    buyStep() {
+      const open = waiting();
+      if (open === undefined) return 'nothing_waiting';
+      const bought = applyScriptRunEvent(open.run, open.script, {
+        type: 'step_bought',
+        stepIndex: open.step.stepIndex,
+        at: situation.now,
+      });
+      if (!bought.ok) return 'nothing_waiting';
+      played(open.run.scriptRef).bought.add(open.step.stepIndex);
+      moveRun(bought.run);
+      const price = open.step.priceMinor ?? 0;
+      scripts = { ...scripts, fictiveSpentCents: scripts.fictiveSpentCents + price };
+      // His spending is what the brain reads of him: a fictive purchase counts there, never in the real figures.
+      situation = { ...situation, spentCents: situation.spentCents + price };
+      // The media he bought opens, as on Reveal: its turn is replaced, at the same time and with the same step.
+      const index = history.findLastIndex((t) => {
+        const tag = stepTurns.get(t);
+        return tag?.scriptRef === open.run.scriptRef && tag.stepIndex === open.step.stepIndex;
+      });
+      const turn = history[index];
+      if (turn !== undefined) {
+        const opened: ConversationTurn = {
+          ...turn,
+          media: (turn.media ?? []).map((m) => ({ ...m, isLocked: false })),
+        };
+        writtenAt.set(opened, writtenAt.get(turn) ?? situation.now);
+        stepTurns.set(opened, { scriptRef: open.run.scriptRef, stepIndex: open.step.stepIndex });
+        history.splice(index, 1, opened);
+      }
+      return 'done';
+    },
+
+    refuseStep() {
+      const open = waiting();
+      if (open === undefined) return 'nothing_waiting';
+      const refused = applyScriptRunEvent(open.run, open.script, { type: 'refused', at: situation.now });
+      if (!refused.ok) return 'nothing_waiting';
+      moveRun(refused.run);
+      return 'done';
     },
 
     setSituation(patch) {
@@ -329,6 +493,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       availability = availabilityBefore[fanMessageNumber - 1] ?? null;
       availabilityBefore.length = fanMessageNumber - 1;
       desireTrail.length = fanMessageNumber - 1;
+      const before = scriptsBefore[fanMessageNumber - 1];
+      if (before !== undefined) {
+        // What he paid fictively after that message is given back with the rest.
+        const refund = scripts.fictiveSpentCents - before.fictiveSpentCents;
+        situation = { ...situation, spentCents: Math.max(0, situation.spentCents - refund) };
+        scripts = before;
+      }
+      scriptsBefore.length = fanMessageNumber - 1;
       lastExchange = undefined;
       return { text: turn.text, media: (turn.media ?? []).map((m) => m.description) };
     },
@@ -414,6 +586,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       desireBefore.push(desire);
       availabilityBefore.push(availability);
       desireTrail.push(undefined);
+      scriptsBefore.push(copyScripts(scripts));
       push({ from: 'fan', text, media: media.map((description) => ({ description })) });
       const moment: RatedMoment = {
         history: dated(),
@@ -461,6 +634,14 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           fanNotes: moment.fanNotes,
           situation,
           ...(offer !== undefined && { offer }),
+          // The trial scripts, read as her catalogue and Reveal's history would be (ADR 0103 § 15): the same decision.
+          scripts: {
+            conversationRef: 'playground',
+            catalogue: TRIAL_SCRIPTS,
+            history: historyView(),
+            latest: scripts.run,
+            countsHisMessage: true,
+          },
           // No chatter in the playground: a custom order is answered committing to nothing, as with nobody on shift.
           customOrder: {
             chatterOnShift: false,
@@ -524,6 +705,24 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       // In-memory fan notes until the fans module stores facts (P3-02).
       for (const fact of withoutOrders(composed.brief?.factsProposed ?? [])) fanNotes.push(fanNote(fact));
       if (!composed.isBlocked) push({ from: 'creator', text: composed.bubbles.join('\n') });
+      // His run as production keeps it (draft-composer `withScripts`): a step written is sent, with its media after
+      // her text; nothing written, the run follows his message only.
+      const turnOfScripts = composed.scripts;
+      if (turnOfScripts !== undefined) {
+        const { decision } = turnOfScripts;
+        const stepGoes =
+          !composed.isBlocked &&
+          turnOfScripts.script !== null &&
+          (decision.kind === 'start' || decision.kind === 'send_step');
+        if (stepGoes) {
+          moveRun(turnOfScripts.opened?.run ?? turnOfScripts.moved?.run ?? null);
+          sendStep(turnOfScripts.script, decision.step.stepIndex);
+        } else if (composed.isBlocked) {
+          moveRun(turnOfScripts.followed?.run ?? null);
+        } else {
+          moveRun(turnOfScripts.moved?.run ?? turnOfScripts.followed?.run ?? null);
+        }
+      }
       const read = composed.desireRead;
       const reading: PlaygroundDesireReading | undefined =
         read === undefined
@@ -566,7 +765,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
             ...(composed.sexualization.kind === 'steer_back' && { reason: composed.sexualization.reason }),
           },
         }),
-        ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
+        ...(composed.offerRefused !== undefined && {
+          offerRefused: scriptRefusal(composed.offerRefused, composed.scripts?.decision),
+        }),
         ...(hold !== undefined && { hold }),
       };
       lastExchange = {
@@ -578,4 +779,58 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       return turn;
     },
   };
+}
+
+/** The trial scripts' state in one session (ADR 0103 § 15-17). */
+interface TrialScripts {
+  readonly run: ScriptRun | null;
+  /** By script: the steps Reveal would say he received and bought. */
+  readonly played: Map<string, { sent: Set<number>; bought: Set<number> }>;
+  /** What each step sent became, by `script:index`, kept once its run is over. */
+  readonly outcomes: ReadonlyMap<string, ScriptRun['steps'][number]['outcome']>;
+  readonly fictiveSpentCents: number;
+}
+
+const noScripts = (): TrialScripts => ({
+  run: null,
+  played: new Map(),
+  outcomes: new Map(),
+  fictiveSpentCents: 0,
+});
+
+const copyScripts = (scripts: TrialScripts): TrialScripts => ({
+  ...scripts,
+  played: new Map(
+    [...scripts.played].map(([ref, p]) => [ref, { sent: new Set(p.sent), bought: new Set(p.bought) }]),
+  ),
+  outcomes: new Map(scripts.outcomes),
+});
+
+const stepKey = (scriptRef: string, stepIndex: number): string => `${scriptRef}:${String(stepIndex)}`;
+
+/** A trial media sheet says what it is: « vidéo » in it, a video; otherwise a photo. */
+const mediaKindOf = (sheet: string): 'image' | 'video' => (/vid[ée]o/i.test(sheet) ? 'video' : 'image');
+
+/**
+ * With her scripts read, the brain's offer is refused as `no_script_step`: the trainer reads why no step went instead,
+ * from the scripts' own decision (the gate, the policy, a step waiting, a refusal).
+ */
+function scriptRefusal(
+  refused: string,
+  decision: NonNullable<Awaited<ReturnType<typeof composeTurn>>['scripts']>['decision'] | undefined,
+): string {
+  if (refused !== 'no_script_step' || decision === undefined) return refused;
+  switch (decision.kind) {
+    case 'none':
+      return decision.reason;
+    case 'wait':
+      return 'reason' in decision ? decision.reason : 'step_waiting';
+    case 'after_refusal':
+      return 'after_refusal';
+    case 'end':
+      return 'script_ended';
+    case 'start':
+    case 'send_step':
+      return refused;
+  }
 }

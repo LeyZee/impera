@@ -41,6 +41,7 @@ import {
   NothingToCompare,
   NothingToRate,
   PresetNotFound,
+  ScriptStepNotWaiting,
   TimeZoneInvalid,
   VoiceModelInvalid,
   type PlaygroundEngine,
@@ -60,6 +61,7 @@ import {
   createPlaygroundSession,
   type PlaygroundAvailabilityReading,
   type PlaygroundDesireReading,
+  type PlaygroundSession,
   type PlaygroundTurn,
 } from './session';
 
@@ -296,7 +298,14 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
           from: turn.from,
           text: turn.text,
           ...(turn.media !== undefined && {
-            media: turn.media.map((m) => ({ description: m.description, isLocked: m.isLocked ?? false })),
+            media: turn.media.map((m) => {
+              const step = session.trialStepOf(turn);
+              return {
+                description: m.description,
+                isLocked: m.isLocked ?? false,
+                ...(step !== undefined && { scriptStep: step }),
+              };
+            }),
           }),
           ...(reading !== undefined && { desire: toDesire(reading, marks.get(n)) }),
         };
@@ -307,6 +316,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       sessionCostEur: sessionCostUsd / deps.usdPerEur,
       voice: { reachable: isVoiceReachable() },
       pending: lastExchange !== undefined && !isRated ? toAnswer(lastExchange.turn, deps.usdPerEur) : null,
+      scripts: { run: scriptRunView(session.scriptRun), fictiveSpentCents: session.fictiveSpentCents },
     };
   };
 
@@ -489,5 +499,34 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       session.sendCreatorMedia(completeMedia(media), isLocked);
       return state();
     },
+
+    buyScriptStep() {
+      idle();
+      if (session.buyStep() === 'nothing_waiting') throw new ScriptStepNotWaiting();
+      return state();
+    },
+
+    refuseScriptStep() {
+      idle();
+      if (session.refuseStep() === 'nothing_waiting') throw new ScriptStepNotWaiting();
+      return state();
+    },
+  };
+}
+
+/** The trial script for the screen: each step of it, sent or not yet, and what it became. */
+function scriptRunView(played: PlaygroundSession['scriptRun']): PlaygroundState['scripts']['run'] {
+  if (played === null) return null;
+  const { run, script } = played;
+  return {
+    scriptRef: script.scriptRef,
+    description: script.description,
+    moment: script.moment,
+    status: run.status,
+    steps: script.steps.map((step, index) => ({
+      kind: step.kind,
+      priceCents: step.priceMinor,
+      outcome: run.steps.find((sent) => sent.stepIndex === index)?.outcome ?? null,
+    })),
   };
 }
