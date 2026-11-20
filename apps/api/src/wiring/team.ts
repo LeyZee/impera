@@ -35,6 +35,8 @@ export function wireTeam(
     creators: {
       existing: async (ids) => new Set((await deps.persona.creators.list(ids)).map((creator) => creator.id)),
     },
+    creatorNames: async (ids) =>
+      new Map((await deps.persona.creators.list(ids)).map((creator) => [creator.id, creator.displayName])),
     // The links' table is read through `withAdmin` only (EQ-10): the module gets this function, never the table.
     invitationLinks: { live: (memberIds) => liveInvitationLinksUnscoped(adminDb, memberIds) },
     enqueuePayRecalculation,
@@ -53,6 +55,6 @@ export function wireTeam(
         },
       ),
     },
-    routes: [module.routes(requireRole, shared.recentLogin)],
+    routes: [module.routes(requireRole, shared.recentLogin), module.announcementRoutes(requireRole)],
   };
 }

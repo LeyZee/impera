@@ -79,6 +79,10 @@ export type TeamMemberId = z.infer<typeof TeamMemberIdSchema>;
 export const TeamMemberNoteIdSchema = uuid.brand<'TeamMemberNoteId'>();
 export type TeamMemberNoteId = z.infer<typeof TeamMemberNoteIdSchema>;
 
+/** An announcement to the team (EQ-12): see `announcements.ts`. */
+export const AnnouncementIdSchema = uuid.brand<'AnnouncementId'>();
+export type AnnouncementId = z.infer<typeof AnnouncementIdSchema>;
+
 export const CommissionPresetIdSchema = uuid.brand<'CommissionPresetId'>();
 export type CommissionPresetId = z.infer<typeof CommissionPresetIdSchema>;
 
