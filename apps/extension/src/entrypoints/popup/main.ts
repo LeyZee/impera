@@ -136,9 +136,10 @@ async function gesture(run: () => Promise<WatchNotice | null>): Promise<void> {
   await redrawWatch();
 }
 
-const LINK_NOTICES: Readonly<Record<'refused' | 'unreachable' | 'malformed', string>> = {
+const LINK_NOTICES: Readonly<Record<'refused' | 'busy' | 'unreachable' | 'malformed', string>> = {
   malformed: 'Ce n’est pas un code de liaison : copie-le en entier depuis le CRM.',
   refused: 'Le CRM ne reconnaît pas ce code : il a été délié ou remplacé. Crées-en un nouveau dans Sécurité.',
+  busy: 'Trop d’essais d’un coup : attends une minute, puis réessaie.',
   unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
 };
 

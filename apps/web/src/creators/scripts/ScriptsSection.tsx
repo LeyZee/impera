@@ -102,7 +102,7 @@ export function ScriptsSection({
   return (
     <section className="ps-page aa-page sx-page" aria-label={`Scripts de ${creatorName}`}>
       {/* Her Reveal vault first, at the top of the tab: what her scripts are built from, and the owner's sync (Charles,
-          16/11). « Ses scripts » follows in one piece, its head and its list together. */}
+          16/11). « Scripts envoyés par … » follows in one piece, its head and its list together. */}
       <VaultPage
         creatorId={creatorId}
         creatorName={creatorName}
@@ -113,10 +113,10 @@ export function ScriptsSection({
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <p className="ps-title">Ses scripts</p>
+            <p className="ps-title">Scripts envoyés par {creatorName}</p>
             <p className="ps-muted">
-              Les scripts envoyés par {creatorName}, le plus récent d’abord. Télécharge l’archive, recopie-la
-              dans Reveal en suivant la fiche, puis confirme la copie.
+              Le plus récent d’abord. Télécharge l’archive, recopie-la dans Reveal en suivant la fiche, puis
+              confirme la copie.
             </p>
           </div>
         </div>

@@ -10,6 +10,7 @@ import {
   initialsOf,
   kindLabel,
   kindOf,
+  shortcutIconOf,
   shortcutsFor,
   watchesInstagram,
 } from './who';
@@ -106,6 +107,14 @@ describe('who is signed in', () => {
     for (const kind of ['owner', 'manager', 'chatter', 'operator', 'creator'] as const) {
       expect(shortcutsFor(kind).length).toBeLessThanOrEqual(4);
     }
+  });
+
+  // Avis Design du 19/11 sur #872: Entraîner wore Suivi's icon and Réglages Moi's.
+  it('draws Entraîner and Réglages with their own icons, as the CRM menu does', () => {
+    expect(shortcutIconOf('/entrainer')).toBe('train');
+    expect(shortcutIconOf('/reglages')).toBe('settings');
+    expect(shortcutIconOf('/suivi')).toBe('tracking');
+    expect(shortcutIconOf('/moi')).toBe('me');
   });
 });
 

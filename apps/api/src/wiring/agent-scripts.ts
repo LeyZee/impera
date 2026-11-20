@@ -2,7 +2,6 @@ import {
   CreatorIdSchema,
   FanIdSchema,
   PlatformAccountIdSchema,
-  type ScriptEnergy,
   type SentScriptStep,
 } from '@impera/contracts';
 
@@ -14,37 +13,50 @@ import type { ScriptsModule } from '../modules/scripts';
 /** A native script of hers as the `scripts` module reads it for a job. */
 type HerScript = Awaited<ReturnType<ScriptsModule['forJobs']['accountScripts']>>[number];
 
-const ENERGY: Record<ScriptEnergy, string> = {
-  soft: 'douce tout du long',
-  rising: 'qui monte',
-  intense: 'intense dès le début',
-};
-
-/** What the brain picks a script on (ADR 0098 § 6): its validated identity, in the agency's words. */
-function descriptionOf(identity: NonNullable<HerScript['identity']>): string {
-  const { ambiance, energy, setting, useWhen, avoidWhen } = identity.content;
-  return [
-    `Ambiance : ${ambiance}, ${ENERGY[energy]}.`,
-    `Décor : ${setting}.`,
-    `À utiliser quand : ${useWhen.join(' ; ')}.`,
-    ...(avoidWhen.length === 0 ? [] : [`À éviter quand : ${avoidWhen.join(' ; ')}.`]),
-  ].join('\n');
+/**
+ * The copy on Reveal still says what we prepared (ADR 0161 § 5): the same steps, one branch each, at our price and
+ * currency. Changed on Reveal after it was recognised, it is no longer offered: nothing goes at a price not ours.
+ */
+function stillOurs(script: HerScript, ours: NonNullable<HerScript['ours']>): boolean {
+  return (
+    ours.steps.length === script.steps.length &&
+    script.steps.every((step, index) => {
+      const branches = ours.steps[index]?.branches ?? [];
+      const [branch] = branches;
+      return (
+        branches.length === step.branches &&
+        branch?.priceMinor === step.priceMinor &&
+        branch.currency === step.currency
+      );
+    })
+  );
 }
 
 /**
- * A native script as the agent decides on it (ADR 0098), or `null` when it may not be offered: not proposable (the
- * gaps of P6-01, its identity not validated, a branch unset), or with a step of several branches. The branch engine
- * (ADR 0112, lot 2) reads those; until then a script with branches is never offered, whatever its settings.
+ * Active and with no gap of P6-01 but its identity: a recognised copy has no identity to validate, ours stands for it
+ * (ADR 0161 § 5), and no screen asks one any more (§ 2). Every other gap still keeps it from being offered.
+ */
+function playable(script: HerScript): boolean {
+  return script.active && script.gaps.every((gap) => gap === 'identity_not_validated');
+}
+
+/**
+ * A native script as the agent decides on it (ADR 0098), or `null` when it may not be offered (ADR 0161 § 4): only
+ * the recognised copy of a script we prepared, still the same on Reveal, with our description and moment. A native
+ * script of no script of ours is never offered, whatever identity it carries (those rows are ignored, § 5). Neither is
+ * one with another gap of P6-01, or with a step of several branches: the branch engine (ADR 0112, lot 2) reads those.
  * A step is paid when the platform prices it, offered when it sends a media for free, and a bridge when it is text.
  */
 export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
-  if (!script.proposable || script.identity?.validatedAt == null) return null;
+  const { ours } = script;
+  if (ours === null || !playable(script)) return null;
   if (script.steps.some((step) => step.branches > 1)) return null;
+  if (!stillOurs(script, ours)) return null;
   const media = script.steps.flatMap((step) => [...step.media, ...step.previewMedia]);
   return {
     scriptRef: script.ref,
-    moment: script.moment,
-    description: descriptionOf(script.identity),
+    moment: ours.moment,
+    description: ours.description,
     steps: script.steps.map((step) => ({
       stepRef: step.ref,
       kind: step.priceMinor > 0 ? 'paid' : step.media.length > 0 ? 'free' : 'bridge',
@@ -52,8 +64,9 @@ export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
       mediaRefs: step.media.map((each) => each.ref),
     })),
     mediaValidated: media.every((each) => each.described),
+    // Written by a human in the editor and checked against her active persona (ADR 0112 § 14).
     descriptionValidated: true,
-    // Her persona's limits are checked by the agency when it validates the identity, and by the guards on each bubble.
+    // Her persona's limits are checked on our script in the editor, and by the guards on each bubble.
     touchesLimits: false,
   };
 }

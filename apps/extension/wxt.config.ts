@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { defineConfig } from 'wxt';
 
-import { builtInCrmOf } from './src/lib/built-in-crm';
+import { assertSameCrm, builtInCrmOf } from './src/lib/built-in-crm';
 
 /** The manifest's `key`: the public key's DER in base64, read from its PEM file (a public key, not a secret). */
 function manifestKey(): string {
@@ -14,6 +14,8 @@ function manifestKey(): string {
 // A hosted build knows its CRM (ADR 0067, second amendement): the image passes the deployment's official address, the
 // build refuses a bad one, and the browser grants that site alone at the install. Without it, nothing changes.
 const builtInCrm = builtInCrmOf(process.env['EXTENSION_CRM_ORIGIN']);
+// The image also passes the CRM's own address: both must name the same site (apps/web/Dockerfile).
+assertSameCrm(builtInCrm, process.env['WEB_ORIGIN']);
 
 // Manifest V3 (ADR 0066). Reveal over HTTPS only: a session captured on plain HTTP could be read on the way (audit de
 // sécurité du 02/11, M3). The CRM on this computer (localhost) is readable from the install; a deployed CRM asks the

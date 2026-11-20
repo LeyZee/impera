@@ -1,5 +1,6 @@
 import {
   DestinationSchema,
+  type CreatorId,
   type DesireMarkVerdict,
   type Destination,
   type PlaygroundAnswer as Answer,
@@ -13,8 +14,12 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState, type JSX } from 'react';
 
+import { Bundle } from './Bundle';
 import { DesireTag } from './Desire';
+import { ScriptStrip } from './ScriptStrip';
 import { MEDIA_KINDS } from './SetupPanel';
+import { bundleStepOf } from './bundle-step';
+import type { ScriptStepAnswer } from './client';
 import { bubblesOf } from './logic';
 import {
   DESTINATION_HINTS,
@@ -29,6 +34,7 @@ import {
   type Turn,
   unansweredReason,
 } from './model';
+import { useTrainsAsOwner } from './trainer';
 
 const KIND_LABELS: Readonly<Record<MediaKind, string>> = { image: 'Photo', video: 'Vidéo', audio: 'Vocal' };
 
@@ -64,6 +70,8 @@ export interface ConversationProps {
   /** His score marked by the owner (ADR 0103 § 6); absent when this conversation cannot be marked. */
   readonly onMarkDesire?: ((fanMessageNumber: number, verdict: DesireMarkVerdict) => void) | undefined;
   readonly onSend: (text: string, media: Media[]) => Promise<boolean>;
+  /** He buys fictively, or refuses, the paid step of a trial script waiting for him (ADR 0103 § 16). */
+  readonly onScriptStep: (answer: ScriptStepAnswer) => void;
 }
 
 /** Index in the history of her answer still waiting for a rating (the engine keeps an answer that passed). */
@@ -90,6 +98,7 @@ export function Conversation(props: ConversationProps): JSX.Element {
   return (
     <div className="pg-thread nv-scroll" ref={threadRef}>
       <div className="nv-thread">
+        <ScriptStrip scripts={state.scripts} creatorId={state.persona.played?.creatorId ?? null} />
         {state.history.length === 0 && pending === null && !writing ? (
           state.voice.reachable ? (
             <Empty
@@ -110,6 +119,10 @@ export function Conversation(props: ConversationProps): JSX.Element {
               turn={turn}
               canReplay={turn.from === 'fan' && !busy}
               isLastFan={index === lastFan}
+              busy={busy}
+              salesFrozen={state.scripts.salesFrozen}
+              onScriptStep={props.onScriptStep}
+              creatorId={state.persona.played?.creatorId ?? null}
               onReplay={() => {
                 props.onReplay(n);
               }}
@@ -181,13 +194,19 @@ function Empty({
 
 /** With no key nothing can be written: the empty state says so and leads to the setting, nothing invites a start. */
 function NoKey(): JSX.Element {
+  const asOwner = useTrainsAsOwner();
   return (
     <div className="pg-empty">
       <p className="pg-empty__t">Ajoute une clé pour que l’agent réponde</p>
       <p className="pg-empty__s">Aucune clé n’atteint le modèle de la voix : l’agent ne peut rien écrire.</p>
-      <Link to="/reglages/modeles-ia" className="nv-btn nv-btn--soft nv-btn--sm pg-empty__key">
-        Ouvrir Modèles IA
-      </Link>
+      {/* The keys are the owner's settings: a manager is told who adds one. */}
+      {asOwner ? (
+        <Link to="/reglages/modeles-ia" className="nv-btn nv-btn--soft nv-btn--sm pg-empty__key">
+          Ouvrir Modèles IA
+        </Link>
+      ) : (
+        <p className="pg-empty__s">Le propriétaire l’ajoute dans ses réglages.</p>
+      )}
     </div>
   );
 }
@@ -198,14 +217,24 @@ function TurnView({
   isLastFan,
   onReplay,
   onMark,
+  busy,
+  salesFrozen,
+  onScriptStep,
+  creatorId,
 }: {
   turn: Turn;
   canReplay: boolean;
+  busy: boolean;
+  salesFrozen: boolean;
+  onScriptStep: (answer: ScriptStepAnswer) => void;
   /** On a phone only his last message offers to replay: a pill on every message is noise there. */
   isLastFan: boolean;
   onReplay: () => void;
   onMark: ((verdict: DesireMarkVerdict) => void) | undefined;
+  /** Her creator, when one of her versions is played: the media of her scripts are drawn from her vault. */
+  creatorId: CreatorId | null;
 }): JSX.Element {
+  const step = bundleStepOf(turn.media);
   return (
     <div className={`pg-m pg-m--${turn.from}`}>
       {canReplay ? (
@@ -218,14 +247,29 @@ function TurnView({
           Rejouer d’ici
         </button>
       ) : null}
-      {(turn.media ?? []).map((m, i) => (
-        <MediaCard key={i} media={m} from={turn.from} />
-      ))}
-      {bubblesOf(turn.text).map((line, i) => (
-        <div key={i} className={`nv-bubble nv-bubble--${turn.from}`}>
-          {line}
-        </div>
-      ))}
+      {step !== undefined ? (
+        // A step of a script goes as one message, as on Reveal: its words and its whole bundle.
+        <Bundle
+          media={turn.media ?? []}
+          step={step}
+          text={turn.text}
+          creatorId={creatorId}
+          busy={busy}
+          salesFrozen={salesFrozen}
+          onScriptStep={onScriptStep}
+        />
+      ) : (
+        <>
+          {(turn.media ?? []).map((m, i) => (
+            <MediaCard key={i} media={m} from={turn.from} />
+          ))}
+          {bubblesOf(turn.text).map((line, i) => (
+            <div key={i} className={`nv-bubble nv-bubble--${turn.from}`}>
+              {line}
+            </div>
+          ))}
+        </>
+      )}
       {turn.desire === undefined ? null : <DesireTag desire={turn.desire} onMark={onMark} />}
     </div>
   );
@@ -565,12 +609,15 @@ function VerdictView({ verdict, state }: { verdict: Verdict; state: PlaygroundSt
 /** After a correction or a rejection: where the lesson goes. One destination is proposed. */
 export function LessonCard({
   destination,
+  destinations = DestinationSchema.options,
   busy,
   onDestination,
   onConfirm,
   onCancel,
 }: {
   destination: Destination;
+  /** What this trainer may choose: a manager files nothing in her bank (ADR 0092 § 8). */
+  destinations?: readonly Destination[];
   busy: boolean;
   onDestination: (d: Destination) => void;
   onConfirm: () => void;
@@ -583,7 +630,7 @@ export function LessonCard({
         <small>{DESTINATION_HINTS[destination]}</small>
       </span>
       <div className="pg-chips" role="radiogroup" aria-label="Destination">
-        {DestinationSchema.options.map((d) => (
+        {destinations.map((d) => (
           <button
             key={d}
             type="button"

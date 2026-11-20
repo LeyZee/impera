@@ -83,6 +83,8 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
     sections: [
       ['/', null],
       ['/suivi', 'chatting'],
+      // The Playground, on the creators of his list: he notes and corrects, the owner files (ADR 0092 § 8).
+      ['/entrainer', 'chatting'],
       // The tabs of her sheet a manager may open (ADR 0149 § 1); the others stay the owner's.
       ['/creatrices', 'agency'],
       ['/equipe', 'agency'],

@@ -1,8 +1,8 @@
 import { ApiErrorSchema } from '@impera/contracts';
 
 /**
- * A session closed elsewhere (« Fermer ses sessions », « Fermer les autres », a member who left) or past its 12 h or
- * 7 days answers 401 to the next call, whatever the screen (recette 05/11, SEC-01). The screens make their own calls
+ * A session closed elsewhere (« Fermer ses sessions », « Fermer les autres », a member who left) or idle too long or
+ * 7 days old answers 401 to the next call, whatever the screen (recette 05/11, SEC-01). The screens make their own calls
  * with `fetch` and each read that 401 its own way (« Injoignable », « Le serveur ne répond pas »): rather than teach
  * every one of them, the signed-in app watches the answers of `/v1` once, here, and goes back to the sign-in page.
  */

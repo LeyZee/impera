@@ -290,6 +290,15 @@ describe('the Reveal session card', () => {
     expect(actions.retry).toHaveBeenCalledOnce();
   });
 
+  // Retour PC du 20/11: a 429 read « Le CRM ne répond pas » while the CRM answered.
+  it('says the CRM counts too many tries instead of blaming an outage', () => {
+    const { card, actions } = sync({ state: 'busy', accounts: [] });
+    expect(card?.textContent).toContain('Trop d’essais d’un coup.');
+    expect(card?.textContent).not.toContain('ne répond pas');
+    card?.querySelector('button')?.click();
+    expect(actions.retry).toHaveBeenCalledOnce();
+  });
+
   it('writes the day and the hour', () => {
     expect(whenOf(new Date(2026, 10, 9, 8, 30))).toBe('le 09/11/2026 à 8 h 30');
     expect(untilOf(new Date(2026, 10, 15, 23, 0), NOW)).toBe('23 h 00');
@@ -309,6 +318,7 @@ describe('failureOf', () => {
       'other-model',
       'other-member',
       'refused',
+      'busy',
       'unreachable',
       'extension',
     ] as const;

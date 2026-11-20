@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { builtInCrmOf } from './built-in-crm';
+import { assertSameCrm, builtInCrmOf } from './built-in-crm';
 
 describe('builtInCrmOf (ADR 0067, second amendement)', () => {
   it('has no address without the variable: the welcome stays', () => {
@@ -33,5 +33,42 @@ describe('builtInCrmOf (ADR 0067, second amendement)', () => {
     ['a single label', 'https://crm'],
   ])('fails the build on %s', (_, raw) => {
     expect(() => builtInCrmOf(raw)).toThrow(/EXTENSION_CRM_ORIGIN refusée/u);
+  });
+});
+
+describe('assertSameCrm (avis Sécurité et Bilan du 20/11)', () => {
+  it('lets the build through when the two addresses name the same site, a final slash aside', () => {
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', 'https://crm.exemple.fr');
+    }).not.toThrow();
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', 'https://crm.exemple.fr/');
+    }).not.toThrow();
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', 'https://CRM.exemple.fr:443');
+    }).not.toThrow();
+  });
+
+  it('has nothing to compare when either address is missing', () => {
+    expect(() => {
+      assertSameCrm(null, 'http://127.0.0.1:8080');
+    }).not.toThrow();
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', undefined);
+    }).not.toThrow();
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', ' ');
+    }).not.toThrow();
+  });
+
+  it.each([
+    ['another site', 'https://autre.exemple.fr'],
+    ['plain HTTP', 'http://crm.exemple.fr'],
+    ['another port', 'https://crm.exemple.fr:8443'],
+    ['no address', 'crm.exemple.fr'],
+  ])('fails the build when WEB_ORIGIN is %s', (_, webOrigin) => {
+    expect(() => {
+      assertSameCrm('https://crm.exemple.fr', webOrigin);
+    }).toThrow(/WEB_ORIGIN/u);
   });
 });

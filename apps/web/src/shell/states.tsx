@@ -18,6 +18,7 @@ export function Empty({
   children,
   action,
   icon,
+  art,
   plate = false,
   className,
 }: {
@@ -29,6 +30,11 @@ export function Empty({
   action?: ReactNode;
   /** A pictogram above the sentence, in a round of glass (the compass of a page that leads nowhere). */
   icon?: ReactNode;
+  /**
+   * A picture above the sentence (`shell/art`), in place of the pictogram: for a screen that is empty as a whole, never
+   * for a line inside a card that holds other things.
+   */
+  art?: ReactNode;
   /** On a card of its own, when nothing else on the screen holds it. */
   plate?: boolean;
   className?: string;
@@ -37,7 +43,12 @@ export function Empty({
   const Title = plate ? 'h2' : 'p';
   const body = (
     <div className={cn('nv-empty', plate ? undefined : className)}>
-      {icon === undefined ? null : (
+      {art === undefined ? null : (
+        <span className="nv-empty__art" aria-hidden="true">
+          {art}
+        </span>
+      )}
+      {icon === undefined || art !== undefined ? null : (
         <span className="nv-empty__icon" aria-hidden="true">
           {icon}
         </span>

@@ -43,6 +43,7 @@ import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queu
 import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
+import { ChatArt, CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
 import { Empty, Failure } from '@/shell/states';
@@ -71,7 +72,10 @@ export function TrackingPage({
   selfScope = false,
   nothingListed,
   nav,
+  only = null,
 }: {
+  /** The creator the menu's selector is set on, or null for all of them (« Toutes », and every account without it). */
+  only?: string | null;
   /** The conversation open in the reader (`/suivi?conversation=<id>`), or null for the list alone. */
   selected: string | null;
   /** The creator the link names for it (`&creatrice=<id>`), read first when she is one of this account's. */
@@ -100,7 +104,10 @@ export function TrackingPage({
   nav?: ReactNode;
 }): JSX.Element {
   const creatorsQuery = useCreators();
-  const creators = creatorsQuery.data ?? [];
+  const listed = creatorsQuery.data ?? [];
+  // The menu's selector set on one creator (ADR 0134 § 3): Suivi reads her alone, as an account that has only her.
+  const narrowed = only !== null && listed.some((creator) => creator.id === only);
+  const creators = narrowed ? listed.filter((creator) => creator.id === only) : listed;
   const queries = useQueries({
     queries: creators.map((creator) => ({
       queryKey: ['conversations', creator.id],
@@ -156,7 +163,7 @@ export function TrackingPage({
     if (queue.isError) void queue.refetch();
   };
   // Each line of the queue carries its creator: its conversation opens with her id.
-  const todos = queue.data?.items ?? [];
+  const todos = (queue.data?.items ?? []).filter((todo) => !narrowed || todo.creatorId === only);
   // « Nothing for you » only once the queue answered: a queue in error or on its way may hide an urgency (relecture #538).
   const isQueueEmpty = queue.isSuccess && todos.length === 0;
   // The gravest first (the server's order): three lines keep the search and the list above the fold; the one open stays.
@@ -225,6 +232,7 @@ export function TrackingPage({
         </Panel>
       ) : creators.length === 0 && canAddCreator ? (
         <Notice
+          art={<CrownArt />}
           title="Aucune créatrice pour l’instant"
           text="Ajoute ta première créatrice : ses conversations arriveront ici dès que sa session Reveal sera reliée."
         >
@@ -243,6 +251,7 @@ export function TrackingPage({
         </>
       ) : creators.length === 0 && isQueueEmpty ? (
         <Notice
+          art={<ChatArt />}
           title="Rien pour toi pour l’instant"
           text="Les conversations des créatrices qui te sont confiées arrivent ici."
         />
@@ -395,7 +404,7 @@ export function TrackingPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <Empty title="Choisis une conversation à gauche.">
+              <Empty art={<ChatArt />} title="Choisis une conversation à gauche.">
                 Elle s’ouvre ici, avec son brouillon s’il y en a un.
               </Empty>
             </section>
@@ -704,14 +713,17 @@ function noticeOf(text: string | null): JSX.Element | null {
 function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Empty plate title={title} action={children}>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
       {text}
     </Empty>
   );
