@@ -1337,7 +1337,7 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
         before: 59,
         score: 93,
         signals: ['states_desire', 'intent:sexting', 'sentiment:aroused'],
-        weightsVersion: 'desire-3',
+        weightsVersion: 'desire-4',
       },
     });
     expect(written(seen)?.action).toBe('offer');
@@ -2267,6 +2267,29 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     ).draftComposer.compose(free(INPUT));
     expect(bare).toMatchObject({ kind: 'held' });
     expect(bare.kind === 'held' ? bare.detail : []).toContain('media_not_sent');
+  });
+
+  it('brings his score back to a client’s rest once he bought the last step, even unsaid (ADR 0156 § 6)', async () => {
+    const boughtIt: ScriptSource = {
+      ...PACK_SOURCE,
+      history: () =>
+        Promise.resolve({
+          scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0], boughtStepIndexes: [0] }],
+        }),
+    };
+    const { draftComposer } = composer(
+      { brief: { ...HOT, action: 'reply' } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(boughtIt),
+    );
+    const result = await draftComposer.compose({
+      ...free(INPUT),
+      scriptRun: waiting,
+      desire: { score: 90, at: new Date(INPUT.now.getTime() - 30 * 60_000) },
+    });
+    expect(result).toMatchObject({ desire: { score: 20 } });
+    expect(result.kind === 'draft' ? result.desire?.signals.at(-1) : null).toBe('rest_client');
   });
 
   it('opens nothing right after he came: she shares the moment, no step, no offer (ADR 0156 § 6)', async () => {
