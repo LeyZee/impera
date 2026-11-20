@@ -480,7 +480,7 @@ function RulesPanel({
               {source === 'detected' && entry.checkedPeriod !== null
                 ? 'Les ventes relevées peuvent partir de la quinzaine vérifiée, tant qu’aucune quinzaine n’est clôturée depuis.'
                 : source === 'detected'
-                  ? 'Pour partir d’une quinzaine déjà commencée, lance d’abord la vérification de fiabilité de cette quinzaine dans Réglages › Ventes.'
+                  ? 'Pour partir d’une quinzaine déjà commencée, lance d’abord la vérification de fiabilité de cette quinzaine dans Réglages › Plateformes.'
                   : first
                     ? 'Les premières règles d’un compte peuvent partir de la quinzaine en cours.'
                     : 'De nouvelles règles partent d’une quinzaine qui n’a pas commencé.'}

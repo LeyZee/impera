@@ -84,7 +84,7 @@ export function NightBanner({
         </p>
         <p className="tg-night__text">{banner.text}</p>
         {banner.action === null || opensSettings ? null : (
-          <p className="tg-night__text">Le propriétaire choisit ce groupe dans Réglages › Telegram.</p>
+          <p className="tg-night__text">Le propriétaire choisit ce groupe dans Réglages › Bots Telegram.</p>
         )}
       </div>
       {banner.action === null || !opensSettings ? null : (

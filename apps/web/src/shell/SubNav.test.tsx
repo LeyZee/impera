@@ -160,7 +160,7 @@ describe('SubNav', () => {
     expect(scrollBy).toHaveBeenLastCalledWith(expect.objectContaining({ left: 136 + 130 + 52 - 300 - 120 }));
   });
 
-  // Recette 11/11 (GES-04): Équipe › Reveal's tab comes with the server's answer; opened directly, it had no glass.
+  // Recette 11/11 (GES-04): Équipe › Comptes Reveal's tab comes with the server's answer; opened directly, it had no glass.
   it('puts its glass under the lit tab when that tab arrives after the others', async () => {
     const releves: SubNavItem = { to: '/paie/releves', label: 'Relevés' };
     renderNav([releves]);

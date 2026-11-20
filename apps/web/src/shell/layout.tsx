@@ -241,7 +241,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     }
     placeStill(nav, from, thumb);
     placeTabBarLens(nav, active, thumb);
-    // `tabs` too: a tab that arrives after the server's answer (Équipe › Reveal) can be the lit one, and the glass is
+    // `tabs` too: a tab that arrives after the server's answer (Équipe › Comptes Reveal) can be the lit one, and the glass is
     // placed once it is there (recette 11/11, GES-04).
   }, [pathname, lit, label, tabs]);
 

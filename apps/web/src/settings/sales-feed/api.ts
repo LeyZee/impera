@@ -129,7 +129,7 @@ export async function fetchOverview(platform: Platform): Promise<SalesFeedOvervi
 
 /**
  * How many models the platforms listed last with no link and not set aside (CRM-07 b2, ADR 0069 § 5): the count on
- * Réglages › Ventes. Read in the base, never at the platform; a failure shows no count rather than a wrong one.
+ * Réglages › Plateformes. Read in the base, never at the platform; a failure shows no count rather than a wrong one.
  */
 export async function fetchNewModels(): Promise<SalesFeedNewModels> {
   return parsed(await call('/new-models'), (body) => SalesFeedNewModelsSchema.parse(body));

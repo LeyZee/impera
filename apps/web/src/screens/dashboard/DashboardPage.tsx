@@ -371,7 +371,7 @@ function Loaded({
       {agentHero}
 
       {/* Who is warned of an urgency at night: part of her agent's state, said right under it. The night's alerts and
-          where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
+          where they go are the owner's to set (Réglages › Bots Telegram): anyone else reads it. */}
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
