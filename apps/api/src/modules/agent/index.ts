@@ -5,6 +5,7 @@ import type { FansModule } from '../fans';
 
 import { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
+import { pickVoiceExamples, type VoiceExample } from './infra/calibration-record';
 import { createCardReader, type AgentCardReader } from './infra/card-reader';
 import {
   createDraftComposer,
@@ -72,13 +73,15 @@ export {
   type Verdict,
 } from './domain/calibration';
 export {
+  pickVoiceExamples,
   replayableTests,
   voiceExamples,
   type CalibrationRecord,
+  type VoiceExample,
   type CalibrationStore,
   type RatedMoment,
 } from './infra/calibration-record';
-export { createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
+export { CalibrationRecordSchema, createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
 export {
   asSent,
   composeTurn,
@@ -94,6 +97,8 @@ export { activePersonaForModels, type ActivePersonaSource } from './infra/active
 /** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
 export type { ScriptSource } from './infra/draft-composer';
 export type { PlatformScriptView as AgentScriptView, ScriptHistoryView } from './domain/script-run';
+/** @public The playground plays trial scripts by the same rules (ADR 0103 § 15-17): its fictive purchase and refusal. */
+export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/script-run';
 
 /** @public Her persona and guards for a post of her Telegram channel (ADR 0080 § 5), the `telegram` port. */
 export { channelWriterPersona } from './infra/channel-persona';
@@ -144,20 +149,36 @@ export interface DraftComposerStartOptions {
   readonly scripts?: ScriptSource;
   /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
   readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
+  /**
+   * Her bank of examples, newest first, withdrawn ones left out (ADR 0102): the playground's corrections filed as her
+   * voice's examples, one bank whichever version they were made on. Without it, or unreadable, she writes from her
+   * sheet alone.
+   */
+  readonly voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
+  /** Her bank could not be read: she wrote from her sheet alone, the log says so. */
+  readonly onExamplesUnread?: (event: { readonly creatorId: string }) => void;
 }
 
 /**
- * Her fields for the composer, from her persona: her sheet as it is, her own sample replies in it (P5-01). The
- * playground's corrected answers never join it: they were written on its fictional persona, not hers (M13).
+ * Her fields for the composer, from her persona: her sheet, her own sample replies in it (P5-01), and the examples of
+ * her bank chosen as the playground chooses them (ADR 0102 § 2): what the owner sees there is what a fan receives.
  */
-function composerFields(persona: PersonaForModels, profileBio: string | null = null): ComposerPersonaFields {
+function composerFields(
+  persona: PersonaForModels,
+  bank: readonly VoiceExample[],
+  profileBio: string | null = null,
+): ComposerPersonaFields {
+  const guardSettings = guardSettingsOf(persona);
+  // Each turn takes the twelve this fan may read among them (`examplesForTurn`): his age decides the explicit ones.
+  const examples = pickVoiceExamples(bank, guardSettings, bank.length);
   return {
     persona: {
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
-      guardSettings: guardSettingsOf(persona),
+      guardSettings,
       splitMessages: persona.splitMessages,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
+      ...(examples.length > 0 && { voiceExamples: examples }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -166,6 +187,21 @@ function composerFields(persona: PersonaForModels, profileBio: string | null = n
     objectionReplies: persona.objectionReplies,
     ...(persona.versionId !== undefined && { personaVersionId: persona.versionId }),
   };
+}
+
+/** Her bank, for the version she writes with to choose from; none without a version, a reader, or when unreadable. */
+async function bankOf(
+  options: DraftComposerStartOptions,
+  creatorId: string,
+  personaVersionId: string | undefined,
+): Promise<readonly VoiceExample[]> {
+  if (personaVersionId === undefined || options.voiceExamplesOf === undefined) return [];
+  try {
+    return await options.voiceExamplesOf(creatorId);
+  } catch {
+    options.onExamplesUnread?.({ creatorId });
+    return [];
+  }
 }
 
 /**
@@ -179,7 +215,7 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
       const persona = await activePersonaForModels(options.activePersona, creatorId, now);
       if (persona === null) return null;
       const profileBio = await (options.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
-      return composerFields(persona, profileBio);
+      return composerFields(persona, await bankOf(options, creatorId, persona.versionId), profileBio);
     },
     timeZoneOf: options.timeZoneOf,
     voicePrompt: loadPrompt('voice').header.version,

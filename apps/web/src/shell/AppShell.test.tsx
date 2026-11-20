@@ -172,12 +172,17 @@ describe('the rail of each role', () => {
     expect(screen.getByText('Créatrice')).toBeDefined();
   });
 
-  it('keeps a manager out of Entraîner and Réglages', async () => {
+  it('keeps a manager out of Réglages, and opens him Entraîner without her channel’s posts (ADR 0092 § 8)', async () => {
     const router = renderApp(manager, '/reglages/modeles-ia');
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    cleanup();
+    const canal = renderApp(manager, '/entrainer/canal');
+    await waitFor(() => {
+      expect(canal.state.location.pathname).toBe('/entrainer/playground');
+    });
   });
 });
 
@@ -491,6 +496,27 @@ describe('Suivi › Alertes (P4-01, ADR 0134 § 5)', () => {
       expect(router.state.location.pathname).toBe('/suivi');
     });
     expect(screen.queryByRole('link', { name: 'Fans' })).toBeNull();
+  });
+
+  it('sends a chatter’s Moi › Calendrier to Planning, where « Dans mon téléphone » is, and leaves a manager’s (ADR 0134, lot 1)', async () => {
+    const mine = renderApp(chatter, '/moi/calendrier');
+    await waitFor(() => {
+      expect(mine.state.location.pathname).toBe('/planning');
+    });
+    cleanup();
+    const his = renderApp(manager, '/moi/calendrier');
+    await waitFor(() => {
+      expect(his.state.location.pathname).toBe('/moi/calendrier');
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Calendrier' })).toBeTruthy();
+  });
+
+  it('keeps under « Plus » the counts of the tabs it holds, for its dot (ADR 0134 § 8)', async () => {
+    renderApp(owner, '/suivi');
+    const more = await screen.findByRole('button', { name: /^Plus/u });
+    // Nothing waits in this test: the holder is there, empty, and « Plus » reads bare.
+    expect(more.querySelector('.nv-rail__under')).not.toBeNull();
+    expect(more.querySelector('.nv-rail__under .nv-count')).toBeNull();
   });
 
   it('closes the manager’s Agence before Moi, a tab of no family (ADR 0149 § 2)', async () => {

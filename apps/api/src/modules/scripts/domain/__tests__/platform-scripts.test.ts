@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   boundedPlatformScript,
+  descriptionRefusal,
   planPlatformScripts,
   platformScriptFingerprint,
   platformScriptGaps,
@@ -295,5 +296,26 @@ describe('the fingerprint of a native script', () => {
       steps: plain.steps.map((each, index) => ({ ...each, platformIndex: Math.min(index, 1) })),
     };
     expect(platformScriptFingerprint(branched)).not.toBe(platformScriptFingerprint(plain));
+  });
+});
+
+describe('the descriptions of a script’s media, validated as shown (ADR 0030 § 3, ADR 0099 § 4)', () => {
+  const shown = new Map([
+    ['d1', { reviewReasons: [], validated: false }],
+    ['d2', { reviewReasons: [], validated: false }],
+    ['d3', { reviewReasons: ['unsure'], validated: false }],
+    ['d4', { reviewReasons: ['flagged'], validated: true }],
+  ]);
+
+  it('takes those shown now, several at once, and one that waits for a reason only alone', () => {
+    expect(descriptionRefusal(['d1', 'd2'], shown)).toBeNull();
+    expect(descriptionRefusal(['d3'], shown)).toBeNull();
+    expect(descriptionRefusal(['d1', 'd3'], shown)).toBe('alone');
+    // Already validated, its reason no longer holds the others back.
+    expect(descriptionRefusal(['d1', 'd4'], shown)).toBeNull();
+  });
+
+  it('refuses one that is not shown for a media of the script now', () => {
+    expect(descriptionRefusal(['d1', 'old'], shown)).toBe('stale');
   });
 });

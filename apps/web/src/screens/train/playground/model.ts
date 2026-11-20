@@ -25,24 +25,42 @@ export const DESTINATION_LABELS: Readonly<Record<Destination, string>> = {
   test: 'Test',
 };
 /**
- * What each destination does today, honestly (Charles, 16/11) : production reads no correction until ADR 0102 is
- * coded, and nothing takes up a rule or replays a test on its own yet. These words change with that work.
+ * What each destination does today, honestly (Charles, 16/11) : her drafts read her examples of the version she
+ * writes with (ADR 0102), and nothing takes up a rule or replays a test on its own yet. These words change with that work.
  */
 export const DESTINATION_HINTS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Sert d’exemple à sa voix, au Playground seulement pour l’instant.',
+  voice_example: 'Sert d’exemple à sa voix, ici et avec ses vrais fans, sur cette version de sa persona.',
   rule: 'Gardée pour être relue. Elle ne change rien toute seule pour l’instant.',
   test: 'Gardé pour être rejoué à la main, pas encore automatiquement.',
 };
 /** Said once the lesson is filed: where it went and what it changes. */
 const DESTINATION_ACKS: Readonly<Record<Destination, string>> = {
-  voice_example: 'Rangée en Exemple de voix : elle sert au Playground, pas encore aux vrais fans.',
+  voice_example: 'Rangée en Exemple de voix : sa voix s’en sert, ici et avec ses vrais fans.',
   rule: 'Rangée en Règle : gardée pour être relue, elle ne change rien toute seule pour l’instant.',
   test: 'Rangée en Test : gardée pour être rejouée à la main.',
 };
 
-/** The line under the conversation once a lesson is filed; the demo saves nothing, and says so as its bar does. */
-export const filedAck = (destination: Destination, isDemo: boolean): string =>
-  isDemo ? 'Démo : rien n’est rangé pour de vrai.' : DESTINATION_ACKS[destination];
+/** A guard's label inside a sentence, after a colon: « elle dit être une IA ». */
+export const inSentence = (label: string): string => label.charAt(0).toLocaleLowerCase('fr') + label.slice(1);
+
+/** Whether the line under the conversation warns: a correction kept out of her bank (ADR 0102 § 4). */
+export const isFiledWarning = (destination: Destination, blockedBy: readonly string[]): boolean =>
+  destination === 'voice_example' && blockedBy.length > 0;
+
+/**
+ * The line under the conversation once a lesson is filed; the demo saves nothing, and says so as its bar does. A
+ * correction a hard guard stops stays a correction, out of her bank, and the line says which guard (ADR 0102 § 4).
+ */
+export const filedAck = (
+  destination: Destination,
+  isDemo: boolean,
+  blockedBy: readonly string[] = [],
+): string => {
+  if (isDemo) return 'Démo : rien n’est rangé pour de vrai.';
+  if (isFiledWarning(destination, blockedBy))
+    return `Gardée comme correction, mais pas dans sa banque : ${blockedBy.map(inSentence).join(', ')}.`;
+  return DESTINATION_ACKS[destination];
+};
 
 /**
  * Why an answer was rejected, kept in view while its destination is chosen: the reason first, since it decides where
@@ -71,9 +89,10 @@ const RULE_REASONS: readonly RejectReason[] = ['too_early_sexual', 'missed_sale'
  * The destination proposed for a lesson: the engine's own rule (calibration.ts, suggestDestination), shown before
  * the rating so the trainer can change it. The server keeps the one sent.
  */
-export function suggestedDestination(verdict: Verdict): Destination | undefined {
+export function suggestedDestination(verdict: Verdict, mayFileExamples = true): Destination | undefined {
   if (verdict.kind === 'validated') return undefined;
-  if (verdict.kind === 'corrected') return 'voice_example';
+  // A manager's correction is kept for the owner to read; she alone files it in her bank (ADR 0092 § 8).
+  if (verdict.kind === 'corrected') return mayFileExamples ? 'voice_example' : 'rule';
   return RULE_REASONS.includes(verdict.reason) ? 'rule' : 'test';
 }
 

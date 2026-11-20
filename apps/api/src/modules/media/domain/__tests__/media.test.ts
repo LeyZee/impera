@@ -23,7 +23,7 @@ describe('media domain', () => {
     expect(a).not.toBe(descriptionKey(new Uint8Array([1, 3]), scope));
     expect(a).not.toBe(descriptionKey(new Uint8Array([1, 2]), { ...scope, senseVersion: 'grok-4.7:abc' }));
     expect(a).not.toBe(descriptionKey(new Uint8Array([1, 2]), { ...scope, origin: 'creator' }));
-    expect(a).toMatch(/:1\.0\.0:fan:gemini-3\.8-flash:abc$/);
+    expect(a).toMatch(/:1\.1\.0:fan:gemini-3\.8-flash:abc$/);
   });
 
   it('converts what the vision API refuses: WebP, HEIC, huge files', () => {

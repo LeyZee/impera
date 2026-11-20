@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { salesFeedTimeZone } from '../sale-days';
 import {
+  refundsListed,
   refundsOfDay,
   ringsWhenRecorded,
   SALE_RING_WINDOW_MS,
@@ -199,5 +200,36 @@ describe('a day’s refunds by their own day (CRM-04, evening digest)', () => {
         }),
       ],
     });
+  });
+});
+
+describe('the refunds one by one (ADR 0092 § 4)', () => {
+  const refund = (id: string, at: string, saleAt: string | null) => ({
+    ...line({ platformSaleId: id, event: 'refund', occurredAt: new Date(at) }),
+    saleOccurredAt: saleAt === null ? null : new Date(saleAt),
+  });
+
+  it('keeps the refunds the totals take off, on their sale’s day or their own without one, the latest first', () => {
+    const listed = refundsListed(
+      [
+        { ...line({ platformSaleId: 'sale_1' }), saleOccurredAt: null },
+        // Sold in October, refunded in November: a refund of October.
+        refund('sale_1', '2026-11-03T10:00:00Z', '2026-10-20T10:00:00Z'),
+        // 22:30 UTC on the 30th of September is the 1st of October in Paris.
+        refund('sale_2', '2026-10-02T10:00:00Z', '2026-09-30T22:30:00Z'),
+        // Sold in September: not October's.
+        refund('sale_3', '2026-10-02T11:00:00Z', '2026-09-29T10:00:00Z'),
+        // Its sale older than the register: on its own day.
+        refund('sale_old', '2026-10-10T10:00:00Z', null),
+        refund('sale_nov', '2026-11-01T10:00:00Z', null),
+      ],
+      OCTOBER,
+    );
+    expect(listed.map((one) => [one.refundedAt.toISOString(), one.saleOccurredAt === null])).toEqual([
+      ['2026-11-03T10:00:00.000Z', false],
+      ['2026-10-10T10:00:00.000Z', true],
+      ['2026-10-02T10:00:00.000Z', false],
+    ]);
+    expect(listed[0]).toMatchObject({ grossInclVatMinor: 1200, seller: { kind: 'member', memberId: THEO } });
   });
 });

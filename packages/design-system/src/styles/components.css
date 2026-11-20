@@ -2911,6 +2911,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A face before the label, in the field and in the list: it never shrinks, the label is cut instead. */
+.nv-select__lead {
+  display: inline-flex;
+  flex: none;
+}
 .nv-select__value--empty {
   color: var(--nv-ink-faint);
 }

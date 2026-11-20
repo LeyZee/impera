@@ -162,6 +162,11 @@ const named = () => {
     folders: [folder('f1', 'Matin ☀️', 'day', [p1, p2, v1, gone]), folder(null, null, null, [])],
   });
 };
+/** Every folder of `viewOf()` ticked whole: all of it in Impera. */
+const whole = (refs: (string | null)[] = ['f1', 'f2', 'f3']): VaultChoicesView =>
+  choicesOf({
+    folders: refs.map((folderRef) => ({ platformAccountId: ACCOUNT, folderRef, imported: true })),
+  });
 const mediaChoice = (
   platformMediaId: string,
   imported: boolean,
@@ -169,232 +174,260 @@ const mediaChoice = (
   excerpt: string | null = null,
 ) => ({ platformAccountId: ACCOUNT, platformMediaId, imported, description, excerpt });
 
-describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
-  it('shows her vault as last read: when, what is imported and described, the folders with the root last', async () => {
+describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', () => {
+  it('shows only what is in Impera: the folders imported, what is described, the line of figures', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-16T12:00:00.000Z'));
-    serve([viewOf({ folders: [folder(null, null, null), ...viewOf().folders] })]);
+    const view = viewOf();
+    const f2 = view.folders[1];
+    if (f2 === undefined) throw new Error('no folder');
+    const f2Media = [media('video', false, { platformMediaId: 'in-f2' }), media('image')];
+    serve(
+      [viewOf({ folders: [view.folders[0] ?? f2, { ...f2, media: f2Media }, ...view.folders.slice(2)] })],
+      undefined,
+      {
+        choices: [
+          choicesOf({
+            folders: [{ platformAccountId: ACCOUNT, folderRef: 'f1', imported: true }],
+            media: [mediaChoice('in-f2', true, 'described', 'Inventée')],
+          }),
+        ],
+      },
+    );
     show(true);
     const card = await screen.findByRole('region', { name: 'Coffre Reveal de Lina' });
-    expect(await within(card).findByText('Synchronisé il y a 1 h')).toBeDefined();
-    // Nothing imported: one sentence says it, no line of figures, no empty gauge, never a plate per figure.
-    expect(await within(card).findByText(/Rien n’est encore importé/u)).toBeDefined();
-    expect(within(card).queryByText('Aucun média importé sur 6')).toBeNull();
-    expect(card.querySelectorAll('.vp-sum__meter, .nv-tile')).toHaveLength(0);
-    const rail = within(card).getByRole('navigation', { name: 'Ses dossiers' });
+    expect(await within(card).findByText('Reveal · Synchronisé il y a 1 h')).toBeDefined();
+    const rail = await within(card).findByRole('navigation', { name: 'Ses dossiers dans Impera' });
     const names = [...rail.querySelectorAll('.vp-folder__label')].map((name) => name.textContent);
-    // The root, first in Reveal's list, is an ordinary folder at the bottom: never « Tout ».
-    expect(names).toEqual(['Matin ☀️', 'Soirée 🌙', 'En vrac', 'Racine du coffre']);
-    expect(within(rail).getByText('Aucun importé sur 3')).toBeDefined();
-    // A folder named with neither ☀️ nor 🌙 says why on its row, readable without opening it.
-    expect(within(rail).getAllByText('Ni ☀️ ni 🌙 : à renommer dans Reveal')).toHaveLength(1);
-    // Nothing ticked at first, the root included.
-    const ticks = within(rail).getAllByRole('checkbox');
-    expect(ticks).toHaveLength(4);
-    expect(ticks.every((tick) => tick instanceof HTMLInputElement && !tick.checked)).toBe(true);
+    // « En vrac » has nothing in Impera: it waits in « Choisir dans Reveal ».
+    expect(names).toEqual(['Matin ☀️', 'Soirée 🌙']);
+    expect(within(rail).getByText('3 médias · aucun décrit')).toBeDefined();
+    expect(within(rail).getByText('1 média · 1 décrit')).toBeDefined();
+    expect(within(card).getByText('4 médias dans Impera · 1 décrit')).toBeDefined();
+    // No tick on the rail: what enters Impera is chosen in the window.
+    expect(within(rail).queryByRole('checkbox')).toBeNull();
+    expect(within(card).getByRole('button', { name: 'Choisir dans Reveal' })).toBeDefined();
   });
 
-  it('gives « Synchroniser » to the owner, and waits for the sync to go through', async () => {
-    const after = viewOf({ syncedAt: '2026-11-16T12:00:05.000Z' });
-    const calls = serve([viewOf(), viewOf(), after]);
+  it('says nothing is in Impera yet with one way in, and gives the manager the same words without it', async () => {
+    serve([viewOf()]);
     show(true);
-    const button = await screen.findByRole('button', { name: 'Synchroniser' });
-    fireEvent.click(button);
-    expect(
-      await screen.findByText('Impera relit son coffre dans Reveal : la carte se met à jour toute seule.'),
-    ).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Synchro en cours' })).toHaveProperty('disabled', true);
-    expect(said(calls, 'POST', SYNC)).toHaveLength(1);
-    expect(await screen.findByText('Coffre à jour.', {}, { timeout: 8_000 })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Synchroniser' })).toHaveProperty('disabled', false);
-  }, 10_000);
-
-  it('says so when no account of hers can be read, and when the sync did not go', async () => {
-    serve([viewOf()], { status: 200, body: { accounts: 0 } });
-    show(true);
-    fireEvent.click(await screen.findByRole('button', { name: 'Synchroniser' }));
-    expect(await screen.findByText(/Aucun compte Reveal lisible pour l’instant/u)).toBeDefined();
+    expect(await screen.findByText('Rien dans Impera pour l’instant')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Choisir dans Reveal' })).toBeDefined();
+    // Nothing of Reveal listed on the screen itself, and one way into the window.
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Choisir dans Reveal' })).toHaveLength(1);
     cleanup();
-    serve([viewOf()], { status: 503 });
-    show(true);
-    fireEvent.click(await screen.findByRole('button', { name: 'Synchroniser' }));
-    expect(await screen.findByText('La synchro n’a pas pu partir : réessaie dans un instant.')).toBeDefined();
-  });
-
-  it('shows the vault to a manager: no sync, no tick, no selection', async () => {
     const calls = serve([viewOf()]);
     show(false);
-    expect(await screen.findByRole('list', { name: 'Médias de Matin ☀️' })).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Synchroniser' })).toBeNull();
-    expect(screen.queryByRole('checkbox')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Sélectionner' })).toBeNull();
-    expect(screen.getByText('Seul le propriétaire synchronise, importe et fait décrire.')).toBeDefined();
+    expect(await screen.findByText(/Le propriétaire choisit dans le coffre Reveal de Lina/u)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Choisir dans Reveal' })).toBeNull();
+    expect(
+      screen.getByText('Seul le propriétaire choisit ce qui entre dans Impera et fait décrire.'),
+    ).toBeDefined();
     expect(calls.some((call) => call.method !== 'GET')).toBe(false);
   });
 
-  it('says a vault never read, an empty one, and one that does not load', async () => {
-    serve([viewOf({ folders: [], syncedAt: null })]);
+  it('opens « Choisir dans Reveal », reads Reveal again and says it while it reads', async () => {
+    const after = viewOf({ syncedAt: '2026-11-16T12:00:05.000Z' });
+    const calls = serve([viewOf(), viewOf(), after], undefined, { choices: [whole(['f1'])] });
     show(true);
-    expect(await screen.findByText('Première synchro à lancer')).toBeDefined();
-    expect(screen.getByText(/Rien n’entre dans Impera avant que tu le coches/u)).toBeDefined();
-    expect(screen.getByText('Jamais synchronisé')).toBeDefined();
-    cleanup();
-    serve([viewOf({ folders: [] })]);
-    show(true);
-    expect(await screen.findByText('Coffre vide')).toBeDefined();
-    cleanup();
-    serve([500, 500, viewOf()]);
-    show(true);
-    expect(await screen.findByText('Son coffre ne se charge pas')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
-    expect(await screen.findByRole('list', { name: 'Médias de Matin ☀️' })).toBeDefined();
-  });
-
-  it('marks a folder à classer, in the rail and once open', async () => {
-    serve([viewOf()]);
-    show(false, { folderId: 'f3', onFolder: () => undefined });
-    const rail = await screen.findByRole('navigation', { name: 'Ses dossiers' });
-    const row = within(rail).getByRole('button', { name: /En vrac/u });
-    expect(within(row).getByRole('img', { name: 'À classer' })).toBeDefined();
-    const title = await screen.findByRole('heading', { name: /En vrac/u });
-    expect(within(title).getByRole('img', { name: 'À classer' })).toBeDefined();
-  });
-
-  it('opens the first folder, its media in Reveal’s order, each a blurred preview; a folder of the rail opens', async () => {
-    serve([viewOf()]);
-    show(true);
-    const grid = await screen.findByRole('list', { name: 'Médias de Matin ☀️' });
-    const tiles = within(grid).getAllByRole('button');
-    expect(tiles.map((tile) => tile.getAttribute('aria-label'))).toEqual([
-      '1. Photo, non importé',
-      '2. Photo, non importé',
-      '3. Vidéo · 0:12, non importé',
-    ]);
-    const previews = [...grid.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
-    expect(previews).toHaveLength(3);
-    expect(previews.every((src) => src.startsWith('data:image/bmp;base64,'))).toBe(true);
-    const rail = screen.getByRole('navigation', { name: 'Ses dossiers' });
+    // Her choices read, the vault shows its rail and the head's button (not the empty start's).
+    await screen.findByRole('navigation', { name: 'Ses dossiers dans Impera' });
+    fireEvent.click(screen.getByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    expect(said(calls, 'POST', SYNC)).toHaveLength(1);
+    expect(within(dialog).getByText('Lecture de son coffre Reveal…')).toBeDefined();
+    const cards = within(dialog).getByRole('list', { name: 'Ses dossiers dans Reveal' });
     expect(
-      within(rail)
-        .getByRole('button', { name: /Matin ☀️/u })
-        .getAttribute('aria-current'),
-    ).toBe('true');
-    fireEvent.click(within(rail).getByRole('button', { name: /Soirée 🌙/u }));
-    expect(await screen.findByRole('list', { name: 'Médias de Soirée 🌙' })).toBeDefined();
-    expect(screen.queryByRole('list', { name: 'Médias de Matin ☀️' })).toBeNull();
+      within(cards)
+        .getAllByRole('checkbox')
+        .map((each) => each.getAttribute('aria-checked')),
+    ).toEqual(['true', 'false', 'false']);
+    expect(within(cards).getByText('Dans Impera')).toBeDefined();
+    expect(await within(dialog).findByText(/^Synchronisé/u, {}, { timeout: 8_000 })).toBeDefined();
+  }, 10_000);
+
+  it('says in the window when no account of hers can be read', async () => {
+    serve([viewOf()], { status: 200, body: { accounts: 0 } });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    expect(await within(dialog).findByText(/Aucun compte Reveal lisible pour l’instant/u)).toBeDefined();
   });
 
-  it('ticks a folder whole, says a folder imported in part with a dash, and unticks it', async () => {
-    const view = named();
-    const calls = serve([view], undefined, {
-      choices: [choicesOf({ media: [mediaChoice('p1', true)] })],
-      put: () =>
-        choicesOf({
-          folders: [{ platformAccountId: ACCOUNT, folderRef: 'f1', imported: true }],
-          media: ['p1', 'p2', 'v1'].map((id) => mediaChoice(id, true)),
-        }),
+  it('ticks folders as cards, writes nothing before « Importer », then imports only what was ticked', async () => {
+    const calls = serve([named()], undefined, {
+      put: () => whole(['f1']),
     });
     show(true);
-    const tick = await screen.findByRole('checkbox', { name: 'Importer tout Matin ☀️' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    const card = within(dialog).getByRole('checkbox', { name: /^Matin ☀️/u });
+    fireEvent.click(card);
+    expect(card.getAttribute('aria-checked')).toBe('true');
+    expect(said(calls, 'PUT', CHOICES)).toHaveLength(0);
+    expect(within(dialog).getByText('1 dossier coché')).toBeDefined();
+    expect(within(dialog).getByText('À importer')).toBeDefined();
+    // Ticked again: back as it was, nothing waits.
+    fireEvent.click(card);
+    expect(within(dialog).queryByText('1 dossier coché')).toBeNull();
+    fireEvent.click(card);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Importer 3 médias' }));
     await waitFor(() => {
-      expect(tick).toHaveProperty('indeterminate', true);
-    });
-    expect(tick.getAttribute('aria-checked')).toBe('mixed');
-    // Said once, on the rail; the grid says it by its groups.
-    expect(screen.getAllByText(/1 sur 3 importé$/u)).toHaveLength(1);
-    expect(screen.getByRole('heading', { name: 'Importés 1' })).toBeDefined();
-    expect(screen.getByRole('heading', { name: 'Dans Reveal seulement 2' })).toBeDefined();
-    fireEvent.click(tick);
-    await waitFor(() => {
-      expect(tick).toHaveProperty('checked', true);
+      expect(screen.queryByRole('dialog')).toBeNull();
     });
     expect(said(calls, 'PUT', CHOICES)).toEqual([
       { platformAccountId: ACCOUNT, folders: [{ folderRef: 'f1', imported: true }], media: [] },
     ]);
-    expect(tick).toHaveProperty('indeterminate', false);
-    expect(screen.getAllByText(/Les 3 importés$/u)).toHaveLength(1);
-    expect(screen.queryByRole('heading', { name: /Dans Reveal seulement/u })).toBeNull();
-    expect(screen.getByRole('button', { name: '1. Photo, importé' })).toBeDefined();
+    expect(
+      await screen.findByText(
+        '3 médias importés. Pour les faire décrire, ouvre un dossier et sélectionne-les.',
+      ),
+    ).toBeDefined();
+    expect(await screen.findByRole('list', { name: 'Médias de Matin ☀️' })).toBeDefined();
   });
 
-  it('says when a tick was not saved', async () => {
+  it('opens a folder in the window to tick its media one by one, the root last as « Médias hors dossier »', async () => {
+    const calls = serve([named()], undefined, { put: () => choicesOf({ media: [mediaChoice('p2', true)] }) });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    const names = [...dialog.querySelectorAll('.vk-card__name')].map((name) => name.textContent);
+    expect(names).toEqual(['Matin ☀️', 'Médias hors dossier']);
+    fireEvent.click(within(dialog).getByRole('button', { name: /Voir les médias/u }));
+    expect(within(dialog).getByText('0 sur 3 cochés')).toBeDefined();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: '2. Photo' }));
+    expect(within(dialog).getByText('1 sur 3 cochés')).toBeDefined();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Tous les dossiers' }));
+    expect(
+      within(dialog)
+        .getByRole('checkbox', { name: /^Matin ☀️/u })
+        .getAttribute('aria-checked'),
+    ).toBe('mixed');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Importer 1 média' }));
+    await waitFor(() => {
+      expect(said(calls, 'PUT', CHOICES)).toHaveLength(1);
+    });
+    // A folder in part: its whole tick off, then its media one by one.
+    expect(said(calls, 'PUT', CHOICES)[0]).toEqual({
+      platformAccountId: ACCOUNT,
+      folders: [{ folderRef: 'f1', imported: false }],
+      media: [{ platformMediaId: 'p2', imported: true }],
+    });
+  });
+
+  it('says in the window when the choice was not saved, and keeps it open', async () => {
     serve([named()], undefined, { put: () => 503 });
     show(true);
-    fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
-    fireEvent.click(screen.getByRole('button', { name: '1. Photo, non importé' }));
-    fireEvent.click(screen.getByRole('button', { name: /Importer/u }));
-    expect(await screen.findByRole('alert')).toHaveProperty(
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /^Matin ☀️/u }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Importer 3 médias' }));
+    expect(await within(dialog).findByRole('alert')).toHaveProperty(
       'textContent',
       'Le choix n’a pas été enregistré : le serveur ne répond pas. Réessaie dans un instant.',
     );
   });
 
-  it('selects media one by one, by a run with Shift, or all; imports and takes them out from the bar', async () => {
+  it('says what of a folder stayed in Reveal, and opens the window on it', async () => {
+    serve([named()], undefined, { choices: [choicesOf({ media: [mediaChoice('p1', true)] })] });
+    show(true);
+    expect(await screen.findByText('2 autres médias de ce dossier sont restés dans Reveal')).toBeDefined();
+    const grid = screen.getByRole('list', { name: 'Médias de Matin ☀️' });
+    expect(
+      within(grid)
+        .getAllByRole('button')
+        .map((tile) => tile.getAttribute('aria-label')),
+    ).toEqual(['1. Photo']);
+    fireEvent.click(screen.getByRole('button', { name: /Les choisir/u }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    expect(within(dialog).getByRole('heading', { name: 'Matin ☀️' })).toBeDefined();
+    expect(within(dialog).getByText('1 sur 3 cochés')).toBeDefined();
+  });
+
+  it('selects media one by one, by a run with Shift, or all; takes them out of Impera after saying what it keeps', async () => {
     const calls = serve([named()], undefined, {
-      put: () =>
-        choicesOf({ media: [mediaChoice('p1', true), mediaChoice('p2', true), mediaChoice('v1', true)] }),
+      choices: [whole(['f1'])],
+      put: () => choicesOf(),
     });
     show(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
     expect(screen.queryByRole('toolbar')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '1. Photo, non importé' }));
+    fireEvent.click(screen.getByRole('button', { name: '1. Photo' }));
     expect(screen.getByRole('toolbar').textContent).toContain('1 média sélectionné');
-    fireEvent.click(screen.getByRole('button', { name: '3. Vidéo · 0:12, non importé' }), { shiftKey: true });
+    fireEvent.click(screen.getByRole('button', { name: '3. Vidéo · 0:12' }), { shiftKey: true });
     expect(screen.getByText('3 médias sélectionnés')).toBeDefined();
     // A media Reveal removed is never picked.
-    fireEvent.click(screen.getByRole('button', { name: '4. Photo, non importé, retiré de Reveal' }));
+    fireEvent.click(screen.getByRole('button', { name: '4. Photo, retiré de Reveal' }));
     expect(screen.getByText('3 médias sélectionnés')).toBeDefined();
-    // Not imported yet: nothing to describe, so nothing to pay.
-    expect(screen.getByRole('button', { name: /Décrire par IA/u })).toHaveProperty('disabled', true);
-    fireEvent.click(screen.getByRole('button', { name: 'Importer 3' }));
-    // Nothing imported among them: nothing to take out.
+    // In Impera: the cost of describing them is on the button, 2 × 0.5 c€ + 1.5 c€ said 3 c€.
+    expect(screen.getByRole('button', { name: /Décrire 3 par IA ≈ 0,03\s€/u })).toHaveProperty(
+      'disabled',
+      false,
+    );
+    expect(screen.queryByRole('button', { name: /^Importer/u })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer d’Impera' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Retirer 3 médias d’Impera' });
+    expect(within(dialog).getByText('Rien ne bouge dans Reveal.')).toBeDefined();
+    expect(within(dialog).getByText(/Leurs descriptions sont gardées/u)).toBeDefined();
+    expect(said(calls, 'PUT', CHOICES)).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retirer' }));
     await waitFor(() => {
       expect(said(calls, 'PUT', CHOICES)).toHaveLength(1);
     });
-    expect(said(calls, 'PUT', CHOICES)[0]).toEqual({
-      platformAccountId: ACCOUNT,
-      folders: [],
-      media: ['p1', 'p2', 'v1'].map((platformMediaId) => ({ platformMediaId, imported: true })),
-    });
-    // Imported, still selected: the cost of describing them is on the button, 2 × 0.5 c€ + 1.5 c€ said 3 c€.
-    const describeButton = await screen.findByRole('button', { name: /Décrire \d+ par IA ≈ 0,03\s€/u });
-    expect(describeButton).toHaveProperty('disabled', false);
-    // All imported now: « Importer » leaves, « Retirer » carries the bar.
-    expect(screen.queryByRole('button', { name: /^Importer/u })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Retirer 3 d’Impera' }));
-    await waitFor(() => {
-      expect(said(calls, 'PUT', CHOICES)).toHaveLength(2);
-    });
-    expect(said(calls, 'PUT', CHOICES)[1]).toMatchObject({
+    expect(said(calls, 'PUT', CHOICES)[0]).toMatchObject({
       media: ['p1', 'p2', 'v1'].map((platformMediaId) => ({ platformMediaId, imported: false })),
     });
-    // « Tout sélectionner dans ce dossier », then again to undo; Échap leaves the selection.
+  });
+
+  it('selects all and none, and leaves the selection by Échap', async () => {
+    serve([named()], undefined, { choices: [whole(['f1'])] });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tout sélectionner dans ce dossier' }));
+    expect(screen.getByText('3 médias sélectionnés')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Tout désélectionner' }));
     expect(screen.queryByRole('toolbar')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Tout sélectionner dans ce dossier' }));
-    expect(screen.getByText('3 médias sélectionnés')).toBeDefined();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.getByRole('button', { name: 'Sélectionner' })).toBeDefined();
     expect(screen.queryByRole('toolbar')).toBeNull();
   });
 
+  it('says why nothing is to pay when the selection is described already', async () => {
+    serve([named()], undefined, {
+      choices: [choicesOf({ media: [mediaChoice('p1', true, 'described', 'Inventée')] })],
+    });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
+    fireEvent.click(screen.getByRole('button', { name: '1. Photo, décrit' }));
+    expect(screen.getByRole('button', { name: 'Décrire par IA' })).toHaveProperty('disabled', true);
+    expect(screen.getByText('Déjà décrits ou en cours de description : rien à payer.')).toBeDefined();
+  });
+
   it('describes by AI only after the count and the cost were shown, under one key, then says how far it went', async () => {
     const described = mediaChoice('p2', true, 'described', 'Une photo inventée');
-    const imported = choicesOf({ media: [mediaChoice('p1', true), described] });
+    const imported = choicesOf({
+      media: [mediaChoice('p1', true), described, mediaChoice('v1', true, 'asked')],
+    });
     const estimate: VaultDescribeAnswer = {
       status: 'estimate',
       count: 1,
       photos: 1,
       videos: 0,
       alreadyDescribed: 1,
-      alreadyAsked: 0,
-      notImported: 1,
+      alreadyAsked: 1,
+      notImported: 0,
       notDescribable: 0,
       costCents: 1,
       capLeftCents: 1_674,
     };
     const calls = serve([named()], undefined, {
-      choices: [imported, choicesOf({ media: [mediaChoice('p1', true, 'asked'), described] })],
+      choices: [
+        imported,
+        choicesOf({ media: [mediaChoice('p1', true, 'asked'), described, mediaChoice('v1', true, 'asked')] }),
+      ],
       describe: [estimate, { status: 'asked', count: 1 }],
     });
     show(true);
@@ -407,7 +440,6 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     expect(await within(dialog).findByText('≈ 0,01 €')).toBeDefined();
     expect(within(dialog).getByText('Reste du plafond du jour : 16,74 €')).toBeDefined();
     expect(within(dialog).getByText('1 déjà décrit, pas recompté')).toBeDefined();
-    expect(within(dialog).getByText('1 non importé : importe-le d’abord')).toBeDefined();
     const [first] = said(calls, 'POST', DESCRIBE);
     expect(first).toMatchObject({ platformMediaIds: ['p1', 'p2', 'v1'], confirm: null });
     fireEvent.click(within(dialog).getByRole('button', { name: /Décrire 1 · ≈ 0,01\s€/u }));
@@ -422,7 +454,7 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     expect(key).toEqual(expect.any(String));
     expect(second).toHaveProperty('idempotencyKey', key);
     expect(await screen.findByText('Descriptions : 0 sur 1')).toBeDefined();
-    expect(await screen.findByText('Description en cours')).toBeDefined();
+    expect((await screen.findAllByText('Description en cours')).length).toBeGreaterThan(0);
   });
 
   it('asks nothing when the count moved, shows the new one, and stops a run over the day’s cap', async () => {
@@ -444,7 +476,7 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     });
     show(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
-    fireEvent.click(await screen.findByRole('button', { name: '1. Photo, importé' }));
+    fireEvent.click(await screen.findByRole('button', { name: '1. Photo' }));
     fireEvent.click(screen.getByRole('button', { name: /^Décrire \d+ par IA/u }));
     const dialog = await screen.findByRole('dialog', { name: 'Décrire par IA' });
     fireEvent.click(await within(dialog).findByRole('button', { name: /Décrire 1/u }));
@@ -462,15 +494,16 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     });
     show(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
-    fireEvent.click(await screen.findByRole('button', { name: '1. Photo, importé' }));
+    fireEvent.click(await screen.findByRole('button', { name: '1. Photo' }));
     fireEvent.click(screen.getByRole('button', { name: /^Décrire \d+ par IA/u }));
     expect(await screen.findByText(/Le coût n’a pas pu être calculé : rien n’est lancé/u)).toBeDefined();
   });
 
-  it('filters by kind, the media not described and those not imported; a media left to the agency says it in amber', async () => {
+  it('filters by kind and the media not described; a media left to the agency says it in amber', async () => {
     serve([named()], undefined, {
       choices: [
         choicesOf({
+          folders: [{ platformAccountId: ACCOUNT, folderRef: 'f1', imported: true }],
           media: [mediaChoice('p1', true, 'described', 'Inventée'), mediaChoice('p2', true, 'to_agency')],
         }),
       ],
@@ -479,25 +512,19 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     const grid = await screen.findByRole('list', { name: 'Médias de Matin ☀️' });
     expect(await within(grid).findByText('Illisible par l’IA : à décrire par l’agence')).toBeDefined();
     const labels = () =>
-      within(grid)
-        .getAllByRole('button')
-        .map((tile) => tile.getAttribute('aria-label'));
+      [...document.querySelectorAll('.vp-grid .vp-tile')].map((tile) => tile.getAttribute('aria-label'));
+    // The one Reveal removed has its own group, titled.
+    expect(screen.getByRole('heading', { name: 'Retirés de Reveal 1' })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Vidéos' }));
-    expect(labels()).toEqual(['3. Vidéo · 0:12, non importé'.replace('3.', '1.')]);
+    expect(labels()).toEqual(['1. Vidéo · 0:12']);
     fireEvent.click(screen.getByRole('button', { name: 'Photos' }));
     expect(labels()).toHaveLength(4);
     fireEvent.click(screen.getByRole('button', { name: 'Non décrits' }));
     expect(labels()).toHaveLength(3);
-    fireEvent.click(screen.getByRole('button', { name: 'Non importés' }));
-    expect(labels()).toEqual(['1. Vidéo · 0:12, non importé', '2. Photo, non importé, retiré de Reveal']);
-    fireEvent.click(screen.getByRole('button', { name: 'Vidéos' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Photos' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Non importés' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Non décrits' }));
-    expect(labels()).toHaveLength(4);
+    expect(screen.queryByRole('button', { name: 'Non importés' })).toBeNull();
   });
 
-  it('opens the sheet of a media: what it is, imported or not, its description, Reveal’s text and range', async () => {
+  it('opens the sheet of a media: what it is, its description, Reveal’s text and range', async () => {
     const one = media('video', false, {
       platformMediaId: 'one',
       durationSeconds: 75,
@@ -510,18 +537,15 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     });
     show(true);
     expect(await screen.findByRole('heading', { name: 'Matin ☀️' })).toBeDefined();
-    // What the folder holds; how much is imported is said on the rail and by the grid's groups.
-    expect(await screen.findByText('1 vidéo · 1 retiré de Reveal')).toBeDefined();
-    const tile = await screen.findByRole('button', { name: '1. Vidéo · 1:15, importé, décrit' });
+    expect(screen.getAllByText('1 média · 1 décrit').length).toBeGreaterThan(0);
+    const tile = await screen.findByRole('button', { name: '1. Vidéo · 1:15, décrit' });
     expect(tile.querySelector('img')).toBeNull();
     fireEvent.click(tile);
     const sheet = screen.getByRole('dialog', { name: 'Vidéo · 1:15' });
     expect(within(sheet).getByText('Ajouté le 10 novembre 2026')).toBeDefined();
-    expect(within(sheet).getByText('Importé')).toBeDefined();
     expect(within(sheet).getByText('Une vidéo inventée')).toBeDefined();
     expect(within(sheet).getByText('Texte inventé du coffre')).toBeDefined();
     expect(within(sheet).getByText('10 € – 25 €')).toBeDefined();
-    expect(within(sheet).getByText('1 sur 2')).toBeDefined();
     fireEvent.keyDown(sheet, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -529,9 +553,11 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
   it('goes from one media to the next in the sheet, by its arrows and the keyboard’s', async () => {
     const one = media('image', false, { platformMediaId: 'one' });
     const two = media('audio', false, { platformMediaId: 'two', durationSeconds: 9 });
-    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [one, two])] })]);
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [one, two])] })], undefined, {
+      choices: [whole(['f1'])],
+    });
     show(true);
-    fireEvent.click(await screen.findByRole('button', { name: '1. Photo, non importé' }));
+    fireEvent.click(await screen.findByRole('button', { name: '1. Photo' }));
     expect(
       within(screen.getByRole('dialog'))
         .getByRole('button', { name: 'Média précédent' })
@@ -541,46 +567,45 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     const voice = screen.getByRole('dialog', { name: 'Vocal · 0:09' });
     expect(voice.querySelector('img')).toBeNull();
     expect(voice.querySelectorAll('.vx-voice__wave rect').length).toBe(28);
-    expect(within(voice).queryByText(/jamais gardée par Impera/u)).toBeNull();
     fireEvent.keyDown(window, { key: 'ArrowLeft' });
     expect(screen.getByRole('dialog', { name: 'Photo' })).toBeDefined();
   });
 
   it('follows the address when the page passes it: the folder named opens, « Dossiers » goes back', async () => {
-    serve([viewOf()]);
+    serve([viewOf()], undefined, { choices: [whole()] });
     const asked: (string | null)[] = [];
     show(true, { folderId: 'f2', onFolder: (id) => asked.push(id) });
     expect(await screen.findByRole('list', { name: 'Médias de Soirée 🌙' })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Dossiers' }));
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'Ses dossiers' })).getByRole('button', {
+      within(screen.getByRole('navigation', { name: 'Ses dossiers dans Impera' })).getByRole('button', {
         name: /Matin ☀️/u,
       }),
     );
     expect(asked).toEqual([null, 'f1']);
     cleanup();
-    serve([viewOf()]);
-    // A folder the last sync no longer lists: the first one, never an error.
+    serve([viewOf()], undefined, { choices: [whole()] });
+    // A folder the last sync no longer lists, or one not in Impera: the first one, never an error.
     show(true, { folderId: 'gone', onFolder: () => undefined });
     expect(await screen.findByRole('list', { name: 'Médias de Matin ☀️' })).toBeDefined();
   });
 
-  it('shows the sharp pictures by the rail’s « Flou des médias », on the pointer, in the sheet, and falls back to the blur (ADR 0138)', async () => {
+  it('shows the sharp pictures by the menu’s « Flou des médias », on the pointer, in the sheet, and falls back to the blur (ADR 0138)', async () => {
     const photo = media('image', false, { platformMediaId: 'photo_1' });
     const video = media('video', false, { platformMediaId: 'video_1' });
     const gone = media('image', true, { platformMediaId: 'gone_1' });
-    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [photo, video, gone])] })]);
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [photo, video, gone])] })], undefined, {
+      choices: [whole(['f1'])],
+    });
     show(true);
     const grid = await screen.findByRole('list', { name: 'Médias de Matin ☀️' });
     const sharp = () => [...grid.querySelectorAll('img.vx-sharp')].map((img) => img.getAttribute('src'));
     expect(sharp()).toEqual([]);
-    const tile = screen.getByRole('button', { name: '1. Photo, non importé' });
+    const tile = screen.getByRole('button', { name: '1. Photo' });
     fireEvent.pointerEnter(tile);
     expect(sharp()).toEqual([`/v1/creators/${CREATOR}/vault/media/photo_1/preview`]);
     fireEvent.pointerLeave(tile);
     expect(sharp()).toEqual([]);
-    // A folder has no « Voir net » of its own: the rail's « Flou des médias » sets it for every screen.
-    expect(screen.queryByRole('button', { name: 'Voir net' })).toBeNull();
     act(() => {
       setMediaBlur(false);
     });
@@ -608,14 +633,25 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     );
   });
 
-  it('while selecting, the pointer leaves the blur and the eye of one tile shows it sharp', async () => {
+  it('keeps the menu’s « Nets » while selecting (recette 20/11); blurred, the eye of one tile shows it sharp', async () => {
     const photo = media('image', false, { platformMediaId: 'photo_1' });
-    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [photo])] })]);
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [photo])] })], undefined, {
+      choices: [whole(['f1'])],
+    });
+    setMediaBlur(false);
     show(true);
-    fireEvent.click(await screen.findByRole('button', { name: 'Sélectionner' }));
-    const grid = screen.getByRole('list', { name: 'Médias de Matin ☀️' });
+    const grid = await screen.findByRole('list', { name: 'Médias de Matin ☀️' });
     const sharp = () => grid.querySelectorAll('img.vx-sharp').length;
-    fireEvent.pointerEnter(screen.getByRole('button', { name: '1. Photo, non importé' }));
+    expect(sharp()).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Sélectionner' }));
+    expect(sharp()).toBe(1);
+    // Sharp already: no eye to show it sharp.
+    expect(screen.queryByRole('button', { name: 'Voir net le média 1' })).toBeNull();
+    act(() => {
+      setMediaBlur(true);
+    });
+    expect(sharp()).toBe(0);
+    fireEvent.pointerEnter(screen.getByRole('button', { name: '1. Photo' }));
     expect(sharp()).toBe(0);
     fireEvent.click(screen.getByRole('button', { name: 'Voir net le média 1' }));
     expect(sharp()).toBe(1);
@@ -623,5 +659,18 @@ describe('« Son coffre Reveal » (ADR 0099, ADR 0145 § 5)', () => {
     expect(screen.queryByRole('toolbar')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Flouter le média 1' }));
     expect(sharp()).toBe(0);
+  });
+
+  it('follows « Flou des médias » in the window’s mosaics too', async () => {
+    serve([named()]);
+    setMediaBlur(false);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    expect(dialog.querySelectorAll('.vk-card img.vx-sharp').length).toBe(3);
+    act(() => {
+      setMediaBlur(true);
+    });
+    expect(dialog.querySelectorAll('.vk-card img.vx-sharp').length).toBe(0);
   });
 });

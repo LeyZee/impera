@@ -977,6 +977,8 @@
   display: contents;
 }
 .ins-heat__hour {
+  /* Air between the hours and the grid, so the best slot's ring never touches its label (Design, 20/11). */
+  padding-bottom: 6px;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   font-variant-numeric: tabular-nums;
@@ -998,10 +1000,31 @@
   border-radius: 3px;
   font: inherit;
   cursor: default;
-  background: color-mix(in srgb, var(--nv-data-1) calc(var(--_h) * 100%), var(--nv-fill-track));
+  /* One hue from pale to vivid (--nv-heat); the palest sale stays apart from an hour without any. */
+  --_ramp: var(--nv-heat);
+  background: color-mix(in srgb, var(--_ramp) calc(14% + var(--_h) * 86%), var(--nv-fill-track));
   transition:
     transform var(--nv-dur-fast) var(--nv-ease-spring),
     box-shadow var(--nv-dur-fast);
+}
+.ins-heat__cell[data-empty] {
+  background: var(--nv-fill-track);
+}
+/* The slot that brings in the most: one ring around its cells, lit, still (no animation). */
+.ins-heat__best {
+  z-index: 1;
+  margin: -4px;
+  border: 2px solid var(--nv-heat);
+  border-radius: 7px;
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--nv-heat) 55%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--nv-heat) 30%, transparent);
+  pointer-events: none;
+}
+/* Too few sales or too little hindsight: the map stays, grey and pale, nothing lit (colour says « fiable »). */
+.ins-hours[data-pending] .ins-heat__cell {
+  --_ramp: var(--nv-ink-faint);
+  opacity: 0.7;
 }
 .ins-heat__cell:focus-visible {
   outline: 2px solid var(--nv-focus);
@@ -1009,6 +1032,8 @@
 }
 .ins-heat__cell:hover,
 .ins-heat__cell:focus-visible {
+  position: relative;
+  z-index: 2;
   transform: scale(1.25);
   box-shadow: 0 0 0 2px var(--nv-void);
 }
@@ -1025,7 +1050,17 @@
   width: 96px;
   height: 8px;
   border-radius: var(--nv-radius-full);
-  background: linear-gradient(90deg, var(--nv-fill-track), var(--nv-data-1));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--_ramp) 14%, var(--nv-fill-track)),
+    var(--_ramp)
+  );
+}
+.ins-heat__scale {
+  --_ramp: var(--nv-heat);
+}
+.ins-hours[data-pending] .ins-heat__scale {
+  --_ramp: var(--nv-ink-faint);
 }
 
 /* ── The paying fans. */
@@ -1055,8 +1090,11 @@
 .ins-meter {
   height: 12px;
 }
-.ins-meter > span {
-  background: var(--nv-data-1);
+.ins-fans .ins-meter > span {
+  background: var(--nv-heat);
+}
+.ins-fans[data-pending] .ins-meter > span {
+  background: var(--nv-ink-faint);
 }
 .ins-fans__hint {
   margin: 0;
@@ -1558,5 +1596,110 @@
   .ins-col:hover .ins-col__stack,
   .ins-col:focus .ins-col__stack {
     transform: none;
+  }
+}
+
+/* ── The refunds one by one (ADR 0092 § 4): a quiet table on a computer, a card per refund on a phone. */
+.ins-refunds {
+  padding: var(--nv-plate-pad);
+}
+.ins-refunds__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.ins-refunds__select {
+  min-width: 200px;
+}
+.ins-refunds__none {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.ins-refunds__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-variant-numeric: tabular-nums;
+}
+.ins-refunds__table th {
+  padding: 0 12px 8px 0;
+  text-align: left;
+  font-size: var(--nv-text-caption);
+  font-weight: 500;
+  color: var(--nv-ink-faint);
+}
+.ins-refunds__table td {
+  padding: 10px 12px 10px 0;
+  border-top: 1px solid var(--nv-plate-edge);
+  color: var(--nv-ink);
+}
+.ins-refunds__table .ins-refunds__money {
+  text-align: right;
+  font-weight: 650;
+}
+.ins-refunds__table .ins-refunds__seller {
+  padding-left: 24px;
+}
+.ins-refunds__date,
+.ins-refunds__delay {
+  white-space: nowrap;
+}
+.ins-refunds__table .ins-refunds__delay {
+  color: var(--nv-ink-muted);
+}
+@media (max-width: 720px) {
+  .ins-refunds__select {
+    flex: 1 1 100%;
+  }
+  .ins-refunds__table thead {
+    display: none;
+  }
+  .ins-refunds__table,
+  .ins-refunds__table tbody {
+    display: block;
+  }
+  .ins-refunds__table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'date money'
+      'who delay'
+      'kind kind'
+      'seller seller';
+    gap: 2px 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--nv-plate-edge);
+  }
+  .ins-refunds__table td {
+    padding: 0;
+    border: 0;
+  }
+  .ins-refunds__table .ins-refunds__date {
+    grid-area: date;
+    color: var(--nv-ink-muted);
+  }
+  .ins-refunds__table .ins-refunds__money {
+    grid-area: money;
+  }
+  .ins-refunds__table .ins-refunds__who {
+    grid-area: who;
+    font-weight: 650;
+  }
+  .ins-refunds__table .ins-refunds__delay {
+    grid-area: delay;
+    text-align: right;
+  }
+  .ins-refunds__table .ins-refunds__kind {
+    grid-area: kind;
+  }
+  .ins-refunds__table .ins-refunds__seller {
+    grid-area: seller;
+    padding-left: 0;
+    color: var(--nv-ink-muted);
+  }
+  .ins-refunds__table .ins-refunds__seller[data-named]::before {
+    content: 'vendu par ';
   }
 }

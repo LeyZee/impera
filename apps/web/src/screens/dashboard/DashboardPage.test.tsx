@@ -705,9 +705,11 @@ describe('DashboardPage of the owner', () => {
     renderDashboard(true);
     expect(await screen.findByText(/^Aucune sauvegarde réussie depuis le 26 octobre/u)).toBeDefined();
     // Where the export is read and a restore test noted, one click away (DASH-19).
-    expect(screen.getByRole('link', { name: 'Voir les sauvegardes' }).getAttribute('href')).toBe(
-      '/reglages/sauvegardes',
-    );
+    expect(
+      screen
+        .getByRole('link', { name: /^Aucune sauvegarde réussie depuis le 26 octobre/u })
+        .getAttribute('href'),
+    ).toBe('/reglages/sauvegardes');
   });
 
   it('says when none was ever made, and nothing while they are on time', async () => {

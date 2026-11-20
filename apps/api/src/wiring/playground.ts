@@ -4,8 +4,17 @@ import type { AppLlm } from '../llm';
 import type { ActivePersonaSource } from '../modules/agent';
 import type { ConnectorsModule } from '../modules/connectors';
 import type { PersonaModule } from '../modules/persona';
-import { createDbDesireMarkStore, startPlaygroundModule, type PlaygroundModule } from '../modules/playground';
+import {
+  createDbCalibrationStore,
+  createDbDesireMarkStore,
+  createDbVoiceBankStore,
+  createDbVoiceExampleBank,
+  startPlaygroundModule,
+  type PlaygroundModule,
+} from '../modules/playground';
+import type { ScriptsModule } from '../modules/scripts';
 
+import { createPlaygroundScripts } from './playground-scripts';
 import type { Routes, Shared } from './shared';
 
 export interface WiredPlayground {
@@ -22,6 +31,8 @@ export async function wirePlayground(
     readonly activePersona: ActivePersonaSource;
     /** Her bio as the poll last read it (ADR 0154 § 7): her version played reads it as her real fans' drafts do. */
     readonly connectors: ConnectorsModule;
+    /** Her native scripts: one of her versions played sells from them, as production would (ADR 0103 § 15). */
+    readonly scripts: ScriptsModule;
     /** The persona file and the training folder, from the repository root (`composition-root.ts`). */
     readonly personaPath: string;
     readonly trainingDir: string;
@@ -46,9 +57,24 @@ export async function wirePlayground(
         personaVersion: (creatorId, versionId) => deps.persona.versions.version(creatorId, versionId),
         profileBioOf: (creatorId) => deps.connectors.profileBioOf(CreatorIdSchema.parse(creatorId)),
         desireMarks: createDbDesireMarkStore(shared.db),
+        herScripts: createPlaygroundScripts(deps.scripts.reads),
+        // Her bank, read as her drafts read it (ADR 0102 § 2).
+        voiceExamplesOf: createDbVoiceExampleBank(shared.db),
+        bank: createDbVoiceBankStore(shared.db),
+        // Her ratings live in the database with its backups (AGE-06); the old JSON lines are imported once, then renamed.
+        ratings: createDbCalibrationStore(shared.db, async () =>
+          (await deps.persona.creators.list('all')).map((creator) => creator.id),
+        ),
+        onImport: (result) => {
+          if (result.read > 0)
+            logger.info({ ratings: result }, 'playground ratings imported from the JSON lines');
+        },
       }).catch((error: unknown) => {
         logger.warn({ err: error }, 'playground not started: persona unreadable');
         return null;
       });
-  return { module, routes: module === null ? [] : [module.routes({ guard: requireRole('owner') })] };
+  return {
+    module,
+    routes: module === null ? [] : [module.routes({ guard: requireRole('owner', 'operator') })],
+  };
 }

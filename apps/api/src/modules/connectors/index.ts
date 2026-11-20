@@ -375,7 +375,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       await deps.publishConnectionState(service, signal, correlationId);
     },
     avatars,
-    dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
+    dailyStats: createDrizzleDailyStatsStore(deps.db, deps.adminDb),
   });
   const sender = createOutboundSender({ accounts, resolver, clock });
   const accountJobQueue = createDrizzleAccountJobs(deps.adminDb);

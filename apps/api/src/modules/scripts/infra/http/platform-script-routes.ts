@@ -1,11 +1,14 @@
 import {
+  CorrectPlatformScriptDescriptionBodySchema,
   CorrectScriptIdentityBodySchema,
   CreatorIdSchema,
   DomainError,
+  MediaDescriptionIdSchema,
   PlatformScriptIdSchema,
   PlatformScriptListSchema,
   PlatformScriptViewSchema,
   SetScriptBranchesBodySchema,
+  ValidatePlatformScriptDescriptionsBodySchema,
   ValidateScriptIdentityBodySchema,
   type CreatorId,
   type PlatformScriptViewDto,
@@ -17,12 +20,14 @@ import { z } from 'zod';
 
 import {
   creatorPlatformScripts,
+  reviewScriptDescriptions,
   reviewScriptIdentity,
   setScriptBranches,
   type PlatformScriptsReader,
   type PlatformScriptView,
 } from '../../application/platform-script-reads';
 import type {
+  DescriptionReview,
   IdentityReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
@@ -61,9 +66,45 @@ class ScriptIdentityStale extends DomainError {
   }
 }
 
+class ScriptDescriptionStale extends DomainError {
+  constructor() {
+    super(
+      'platform_script_description_stale_conflict' satisfies ScriptErrorCode,
+      'Une description a changé depuis ta lecture : recharge le script avant de la valider',
+    );
+  }
+}
+
+class ScriptDescriptionAlone extends DomainError {
+  constructor() {
+    super(
+      'platform_script_description_alone_conflict' satisfies ScriptErrorCode,
+      'Une description à vérifier se valide seule, après l’avoir relue',
+    );
+  }
+}
+
 function readerOf(user: { readonly id: string; readonly role: UserRole } | null): PlatformScriptsReader {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   return { userId: user.id, role: user.role };
+}
+
+type MediaView = PlatformScriptView['steps'][number]['media'][number];
+
+/** A media of a step as the wire carries it, with the description the agency reviews. */
+function mediaDtoOf(media: MediaView): PlatformScriptViewDto['steps'][number]['media'][number] {
+  return {
+    ...media,
+    description:
+      media.description === null
+        ? null
+        : {
+            id: MediaDescriptionIdSchema.parse(media.description.id),
+            detailed: media.description.detailed,
+            reviewReasons: [...media.description.reviewReasons],
+            validated: media.description.validated,
+          },
+  };
 }
 
 /** A native script as the wire carries it: dates in ISO, its identity with the script's moment (ADR 0098 § 6). */
@@ -86,8 +127,8 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
       priceMinor: step.priceMinor,
       currency: step.currency,
       discount: step.discount,
-      media: [...step.media],
-      previewMedia: [...step.previewMedia],
+      media: step.media.map(mediaDtoOf),
+      previewMedia: step.previewMedia.map(mediaDtoOf),
       complete: step.complete,
       condition: step.condition,
       branches: step.branches,
@@ -139,6 +180,27 @@ export function createPlatformScriptRoutes(
     return dtoOf(script);
   };
 
+  const described = async (
+    creatorId: CreatorId,
+    scriptId: string,
+    reader: PlatformScriptsReader,
+    review: DescriptionReview,
+    correlationId: string,
+  ): Promise<PlatformScriptViewDto> => {
+    const outcome = await reviewScriptDescriptions(
+      { store: reviews },
+      reader,
+      creatorId,
+      scriptId,
+      review,
+      correlationId,
+    );
+    if (outcome === 'not_found') throw new PlatformScriptNotFound();
+    if (outcome === 'stale') throw new ScriptDescriptionStale();
+    if (outcome === 'alone') throw new ScriptDescriptionAlone();
+    return one(creatorId, scriptId, reader);
+  };
+
   const one = async (creatorId: CreatorId, scriptId: string, reader: PlatformScriptsReader) => {
     const script = (await listed(creatorId, reader)).find((each) => each.id === scriptId);
     if (script === undefined) throw new PlatformScriptNotFound();
@@ -182,6 +244,49 @@ export function createPlatformScriptRoutes(
         schema: { params: CreatorParamsSchema, response: { 200: PlatformScriptListSchema } },
       },
       async (request) => (await listed(request.params.creatorId, readerOf(request.user))).map(dtoOf),
+    );
+
+    // The descriptions of its media as shown, validated as they are (ADR 0099 § 4): idempotent; each write asks the
+    // script's identity again, which is told only from validated descriptions.
+    app.post(
+      '/creators/:creatorId/platform-scripts/:scriptId/descriptions/validate',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: ScriptParamsSchema,
+          body: ValidatePlatformScriptDescriptionsBodySchema,
+          response: { 200: PlatformScriptViewSchema },
+        },
+      },
+      (request) =>
+        described(
+          request.params.creatorId,
+          request.params.scriptId,
+          readerOf(request.user),
+          { kind: 'validate', descriptionIds: request.body.descriptionIds },
+          request.id,
+        ),
+    );
+
+    // A description rewritten by hand from the one shown, validated by whoever writes it.
+    app.post(
+      '/creators/:creatorId/platform-scripts/:scriptId/descriptions/correct',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: ScriptParamsSchema,
+          body: CorrectPlatformScriptDescriptionBodySchema,
+          response: { 200: PlatformScriptViewSchema },
+        },
+      },
+      (request) =>
+        described(
+          request.params.creatorId,
+          request.params.scriptId,
+          readerOf(request.user),
+          { kind: 'correct', descriptionId: request.body.descriptionId, detailed: request.body.detailed },
+          request.id,
+        ),
     );
 
     // The identity shown, validated as it is: idempotent, a second validation changes nothing.

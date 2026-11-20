@@ -18,6 +18,7 @@ import type { ConnectorsModule } from '../modules/connectors';
 import type { BubbleGuard, CardReader, DraftComposer } from '../modules/conversations';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
+import { createDbVoiceExampleBank } from '../modules/playground';
 import type { SchedulingModule } from '../modules/scheduling';
 import type { ScriptsModule } from '../modules/scripts';
 
@@ -96,6 +97,11 @@ export function wireAgent(
       timeZoneOf: async (creatorId) => {
         const [creator] = await persona.creators.list([CreatorIdSchema.parse(creatorId)]);
         return creator?.timezone ?? DEFAULT_LLM_CONFIG.dailyBudget.timeZone;
+      },
+      // Her bank of examples, the playground's corrections, read as the playground reads them (ADR 0102 § 2).
+      voiceExamplesOf: createDbVoiceExampleBank(shared.db),
+      onExamplesUnread: (event) => {
+        logger.warn(event, 'voice examples unread: she wrote from her sheet alone');
       },
     });
   // Her follow-up delays only beside the agent's own composer, the one that writes what `conversation.follow_up`

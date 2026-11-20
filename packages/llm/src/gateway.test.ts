@@ -411,6 +411,37 @@ describe('LlmGateway', () => {
     expect(log.since(new Date(0)).map((r) => r.role)).toEqual(['judge']);
   });
 
+  it('sends top_p 1 to Mistral at temperature 0, which it requires, and to no one else', async () => {
+    const mistral = scripted([
+      { text: JSON.stringify({ scores: [{ criterion: 'safety', score: 1, reason: 'Rien à signaler.' }] }) },
+      { text: BUBBLES },
+    ]);
+    const xai = scripted([{ status: 500 }, { status: 500 }, { status: 500 }]);
+    const config = {
+      ...DEFAULT_LLM_CONFIG,
+      roles: {
+        ...DEFAULT_LLM_CONFIG.roles,
+        judge: { ...DEFAULT_LLM_CONFIG.roles.judge, provider: 'mistral' as const, model: 'mistral-large-4' },
+      },
+    };
+    const gateway = createLlmGateway({
+      config,
+      credentials: ALL_KEYS,
+      resolveModel: (ref: ModelRef) => (ref.provider === 'mistral' ? mistral : xai),
+      log: createInMemoryCallLog(),
+      now: () => new Date(),
+      sleep: () => Promise.resolve(),
+    });
+
+    await gateway.judge({ ...JUDGE_BASE, reply: ['Coucou toi'], criteria: ['safety'] });
+    await gateway.voice(INPUT);
+
+    expect(mistral.doGenerateCalls[0]).toMatchObject({ temperature: 0, topP: 1 });
+    // The voice's fallback writes at 0.9: no top_p of ours.
+    expect(mistral.doGenerateCalls[1]?.topP).toBeUndefined();
+    expect(xai.doGenerateCalls[0]?.topP).toBeUndefined();
+  });
+
   const SAFE = [{ criterion: 'safety', score: 1, reason: 'Rien à signaler.' }];
 
   it('gives the judge the situation the agent saw, in its own delimited block', async () => {

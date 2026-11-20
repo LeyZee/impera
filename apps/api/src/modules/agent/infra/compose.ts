@@ -80,6 +80,8 @@ import {
 import { describeSituation, isNight, type Situation } from '../domain/situation';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
 
+import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
+
 /** Who she is for the models: one persona, read by the composition root. */
 export interface ComposerPersona {
   readonly creatorName: string;
@@ -92,6 +94,26 @@ export interface ComposerPersona {
    * differ. Absent or empty: no section.
    */
   readonly profileBio?: string | null;
+  /**
+   * Her bank's examples her hard guards let through, newest first (ADR 0102, `pickVoiceExamples`): each turn gives the
+   * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
+   */
+  readonly voiceExamples?: readonly VoiceExample[];
+}
+
+/**
+ * The examples this fan's turn may carry (ADR 0102 § 2, § 4): an explicit one only once his adult age is confirmed and
+ * he did not ask for nothing explicit, as for her own words (P3-09); then the twelve most recent.
+ */
+function examplesForTurn(examples: readonly VoiceExample[], explicitAllowed: boolean): VoiceExample[] {
+  return examples
+    .filter((e) => explicitAllowed || checkExplicit([e.text]).length === 0)
+    .slice(0, VOICE_EXAMPLES_MAX);
+}
+
+/** A voice call names the examples of hers it received (ADR 0102 § 6); the brain's call, which writes nothing, does not. */
+function voiceTraced<T extends { readonly trace?: CallTrace }>(input: T, ids: readonly string[]): T {
+  return ids.length === 0 ? input : { ...input, trace: { ...input.trace, voiceExampleIds: ids } };
 }
 
 /** What the fan receives: her bubbles, or one message when she does not split hers. */
@@ -515,9 +537,10 @@ async function writeFollowUp(
   base: Omit<VoiceInput, 'brief'>,
   brief: Brief,
   droppedNotes: readonly string[],
+  exampleIds: readonly string[],
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
-  const voiceInput: VoiceInput = { ...base, brief, maxBubbles: 1 };
+  const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
@@ -577,10 +600,19 @@ export async function composeTurn(
   const notes = screenNotes(input.fanNotes);
   // Her bio is the platform's text: a line of it shaped like an order never reaches a prompt (ADR 0154 § 3).
   const bio = screenNotes(persona.profileBio ?? '');
+  // Her examples for this fan, as his age allows (ADR 0102): a follow-up carries no age, so nothing explicit.
+  const examples = examplesForTurn(
+    persona.voiceExamples ?? [],
+    input.sexualization?.ageConfirmed === true && !input.sexualization.noExplicit,
+  );
+  const exampleIds = examples.map((e) => e.id);
   // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
   const base = {
     creatorName: persona.creatorName,
-    personaSheet: persona.personaSheet,
+    personaSheet: withExamples(
+      persona.personaSheet,
+      examples.map((e) => e.text),
+    ),
     ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
@@ -588,7 +620,7 @@ export async function composeTurn(
     ...(input.trace !== undefined && { trace: input.trace }),
   };
   if (input.followUp !== undefined)
-    return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped);
+    return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped, exampleIds);
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   const choices = scriptChoices(input.scripts, input.situation);
@@ -827,13 +859,16 @@ export async function composeTurn(
     };
   }
   const budget = bubbleBudget(input.history);
-  const voiceInput: VoiceInput = {
-    ...base,
-    brief: voiceBrief,
-    maxBubbles: budget,
-    ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
-    ...(scriptStep !== undefined && { scriptStep }),
-  };
+  const voiceInput: VoiceInput = voiceTraced(
+    {
+      ...base,
+      brief: voiceBrief,
+      maxBubbles: budget,
+      ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
+      ...(scriptStep !== undefined && { scriptStep }),
+    },
+    exampleIds,
+  );
   // Past the budget, left out, never glued nor sent at once (Charles 16/11 : « trois rarement »). Checked as kept:
   // the guards read the bubbles that leave.
   const attempt = async (asked: VoiceInput) => {
