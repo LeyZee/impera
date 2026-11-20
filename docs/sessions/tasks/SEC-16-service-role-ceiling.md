@@ -37,3 +37,5 @@ Empêcher que les accès à la base par le rôle de service, qui traverse les cr
 Un accès nouveau passe par `withTenant` ou `withMember`, avec une politique de lignes écrite pour lui. S'il doit vraiment traverser les créatrices (une tâche sur toutes, une table que le rôle applicatif ne lit jamais), le plafond monte dans la même PR, la fiche de tâche dit pourquoi, et le fil Sécurité relit.
 
 ## Notes de session
+
+- 20/11/2026, limites connues du compte (relecture Bilan) : il reconnaît la connexion de service sous le nom `adminDb` ; passée sous un autre nom, une requête directe n'est pas comptée, donc on ne la renomme pas. Les commentaires sont retirés avant de compter : un `//` écrit dans une chaîne coupe la fin de sa ligne. Les deux sont à lever avec la réduction, quand le compte passera par l'arbre syntaxique.
