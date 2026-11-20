@@ -126,6 +126,7 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     const after = await readForeignAccess(test.service.db);
     expect(after.problems).toEqual([]);
     expect(after.hostReaders).toContain(HOST_READER);
+    expect(after.hostWriters).not.toContain(HOST_READER);
     await expect(assertNoForeignAccess(test.service.db, true, silent)).resolves.toBeUndefined();
     for (const role of PREDEFINED) {
       const reach = await root.query<{ public: boolean; queue: boolean }>(

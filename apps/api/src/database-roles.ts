@@ -97,12 +97,14 @@ const OUR_ROLES = ['nirvana_app', 'impera_service', 'nirvana_admin'];
 const OUR_SCHEMAS = ['public', 'graphile_worker'];
 /** Built-in roles that read, or write, every table of the base whatever its rights: only the host gives them. */
 const READ_ALL_ROLES = ['pg_read_all_data', 'pg_write_all_data'];
+const WRITE_ALL_ROLE = 'pg_write_all_data';
 
 const literalArray = (values: readonly string[]) => sql.raw(`array['${values.join("','")}']`);
 
 const ForeignAccessSchema = z.object({
   reachable: z.array(z.string()),
   hostReaders: z.array(z.string()),
+  hostWriters: z.array(z.string()),
   owners: z.array(z.string()),
   migrator: z.string().nullable(),
 });
@@ -116,6 +118,8 @@ export interface ForeignAccess {
    * risk written in ADR 0152 (Conséquences), and are only named in the log.
    */
   readonly hostReaders: readonly string[];
+  /** Those of them that may also write every table (`pg_write_all_data`): accepted too, but said louder. */
+  readonly hostWriters: readonly string[];
 }
 
 /**
@@ -159,6 +163,10 @@ export async function readForeignAccess(db: Database): Promise<ForeignAccess> {
                    and not exists (select 1 from readers r where r.oid = o.oid)
                  order by 1) as reachable,
           array(select r.rolname::text from readers r order by 1) as "hostReaders",
+          array(select r.rolname::text from readers r
+                 where exists (select 1 from pg_roles w
+                                where w.rolname = ${WRITE_ALL_ROLE} and pg_has_role(r.oid, w.oid, 'MEMBER'))
+                 order by 1) as "hostWriters",
           array(select distinct pg_get_userbyid(o.owner)::text
                   from objects o
                  where not exists (select 1 from pg_depend d
@@ -167,7 +175,7 @@ export async function readForeignAccess(db: Database): Promise<ForeignAccess> {
           (select pg_get_userbyid(c.relowner)::text from pg_class c
             where c.oid = to_regclass('drizzle.__drizzle_migrations')) as migrator`,
   );
-  const { reachable, hostReaders, owners, migrator } = ForeignAccessSchema.parse(result.rows[0]);
+  const { reachable, hostReaders, hostWriters, owners, migrator } = ForeignAccessSchema.parse(result.rows[0]);
   const problems: string[] = [];
   if (reachable.length > 0) {
     problems.push(
@@ -180,7 +188,7 @@ export async function readForeignAccess(db: Database): Promise<ForeignAccess> {
       `our schemas hold objects owned by ${strangers.join(', ')}: only the role that ran the migrations${migrator === null ? '' : ` (${migrator})`} creates them`,
     );
   }
-  return { problems, hostReaders };
+  return { problems, hostReaders, hostWriters };
 }
 
 /**
@@ -193,9 +201,12 @@ export async function assertNoForeignAccess(
   production: boolean,
   log: { readonly warn: (message: string) => void; readonly info: (message: string) => void },
 ): Promise<void> {
-  const { problems, hostReaders } = await readForeignAccess(db);
+  const { problems, hostReaders, hostWriters } = await readForeignAccess(db);
   if (hostReaders.length > 0) {
     log.info(`roles of the host that read every table (accepted, ADR 0152): ${hostReaders.join(', ')}`);
+  }
+  if (hostWriters.length > 0) {
+    log.warn(`roles of the host that may WRITE every table (accepted, ADR 0152): ${hostWriters.join(', ')}`);
   }
   if (problems.length === 0) return;
   const message = `Database not closed to other roles (docs/runbooks/deploy.md, ADR 0152 § 2): ${problems.join('; ')}`;
