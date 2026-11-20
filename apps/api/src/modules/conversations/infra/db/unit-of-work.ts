@@ -418,18 +418,28 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
                 'custom_order_opened',
                 'objection_reply_used',
                 'takeover_started',
+                'sale_trouble',
               ]),
             ),
           )
           .orderBy(schema.conversationEvents.seq);
         let customOrderOpen = false;
         const usedObjectionReplies: string[] = [];
-        for (const { body } of rows.map(toStoredEvent)) {
+        let paymentHelpAt: Date | null = null;
+        let complaintAt: Date | null = null;
+        for (const { body, at } of rows.map(toStoredEvent)) {
           if (body.type === 'custom_order_opened') customOrderOpen = true;
-          if (body.type === 'takeover_started') customOrderOpen = false;
           if (body.type === 'objection_reply_used') usedObjectionReplies.push(body.payload.replyId);
+          // A human took the conversation: what was open is theirs, and a trouble after them is a new one.
+          if (body.type === 'takeover_started') {
+            customOrderOpen = false;
+            paymentHelpAt = null;
+            complaintAt = null;
+          }
+          if (body.type === 'sale_trouble' && body.payload.kind === 'payment_help') paymentHelpAt = at;
+          if (body.type === 'sale_trouble' && body.payload.kind === 'purchase_complaint') complaintAt = at;
         }
-        return { customOrderOpen, usedObjectionReplies };
+        return { customOrderOpen, usedObjectionReplies, saleTrouble: { paymentHelpAt, complaintAt } };
       },
       async list(conversationId) {
         const rows = await tx

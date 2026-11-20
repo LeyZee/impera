@@ -369,6 +369,27 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     });
   });
 
+  it('journals the sale trouble she answered and gives it back dated on his next message (ADR 0156 § 4)', async () => {
+    const id = await fanWrites('c-trouble', 'Je clique où pour l’ouvrir ?');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Tu cliques sur la photo mon cœur 😇'],
+      softViolations: [],
+      costUsd: 0,
+      saleTrouble: 'payment_help',
+    };
+    await respond(id);
+    const trouble = (await events(id)).find((event) => event.type === 'sale_trouble');
+    expect(trouble?.payload).toEqual({ conversationId: id, kind: 'payment_help' });
+
+    await fanWrites('c-trouble', 'Ça marche pas');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    const seen = composer.inputs.at(-1)?.saleTrouble;
+    expect(seen?.paymentHelpAt).toBeInstanceOf(Date);
+    expect(seen?.complaintAt).toBeNull();
+  });
+
   it('says once per episode that no script is left for him, again after a script started (ADR 0150 § 9)', async () => {
     const id = await fanWrites('c-exhausted', 'Tu me montres ?');
     const exhausted = {

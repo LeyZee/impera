@@ -128,6 +128,17 @@ const ScenarioSchema = z
         availability: z.enum(['confirmed', 'unknown', 'no']).default('unknown'),
         /** A message of his sexualized a few minutes ago, in this session (the gate before a script). */
         sexualized: z.boolean().default(false),
+        /**
+         * When she last answered a sale that went wrong for him (ADR 0156 § 4 and § 7), in minutes before his message:
+         * the same trouble again soon after goes to a human.
+         */
+        sale_trouble_answered: z
+          .object({
+            payment_help_minutes_ago: z.int().nonnegative().optional(),
+            complaint_minutes_ago: z.int().nonnegative().optional(),
+          })
+          .strict()
+          .prefault({}),
       })
       .strict()
       .prefault({}),

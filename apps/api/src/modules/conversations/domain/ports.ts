@@ -49,6 +49,7 @@ import type {
   OutboundMedia,
   PlatformAccountId,
   SafetyEvent,
+  SaleTroubleKind,
   ScriptRunId,
   ScriptRunStatus,
   ScriptStepKind,
@@ -279,6 +280,14 @@ interface EventWriter {
 interface SalesState {
   readonly customOrderOpen: boolean;
   readonly usedObjectionReplies: readonly string[];
+  /** When she last answered each sale trouble (`sale_trouble`), since the last takeover; `null`: never. */
+  readonly saleTrouble: SaleTroubleSeen;
+}
+
+/** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7). */
+interface SaleTroubleSeen {
+  readonly paymentHelpAt: Date | null;
+  readonly complaintAt: Date | null;
 }
 
 interface JobOptions {
@@ -656,6 +665,8 @@ export interface ComposeInput {
    * help bubble already went out in this episode.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+  /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7); absent: never. */
+  readonly saleTrouble?: SaleTroubleSeen;
 }
 
 /** An event of a script run this message journals, in order (ADR 0098 § 2). */
@@ -732,6 +743,8 @@ export type ComposeResult =
       readonly customOrderOpened?: true;
       /** A script would open for him and none is left: one `scripts_exhausted` per episode (ADR 0150 § 9). */
       readonly scriptsExhausted?: true;
+      /** She answered a sale gone wrong: one `sale_trouble`, so that the same trouble again goes to a human. */
+      readonly saleTrouble?: SaleTroubleKind;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;

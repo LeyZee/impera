@@ -64,6 +64,13 @@ import {
 } from '../domain/policy';
 import { refusalMove, type RefusalMove } from '../domain/refusal';
 import {
+  complainsOfPurchase,
+  NO_SALE_TROUBLE,
+  saleTroubleOutcome,
+  type SaleTroubleOutcome,
+  type SaleTroubleSeen,
+} from '../domain/sale-trouble';
+import {
   paidWaiting,
   permittedScripts,
   scriptStepsHeld,
@@ -174,6 +181,11 @@ export interface ComposeTurnInput {
    * `offer` (her script threshold): the record follows his message and gates the first teaser.
    */
   readonly availability?: FanAvailabilityRecord | null;
+  /**
+   * A sale gone wrong (ADR 0156 § 4 and § 7): when she last answered each trouble for him, and whether he ever bought
+   * from her. Absent: never answered, nothing bought.
+   */
+  readonly saleTrouble?: { readonly seen: SaleTroubleSeen; readonly hasBought: boolean };
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -343,6 +355,13 @@ const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
 /**
+ * He complains about what he bought (ADR 0156 § 7, ADR 0158 § 48): she wants to understand, gives nothing for free,
+ * and sends him to Reveal for a refund. Said again soon after, a human answers.
+ */
+const PURCHASE_COMPLAINT_HINT =
+  'il se plaint de ce qu’il a acheté : elle lui demande gentiment ce qui ne lui a pas plu et ce qu’il aurait aimé, sans se justifier ni rien offrir en échange ; s’il veut être remboursé, il peut le demander à Reveal ; rien à vendre';
+
+/**
  * He says goodbye (ADR 0158 § A): goodnight, or he has to go. She answers with a goodbye, one bubble, in her
  * own way: no question that would keep him, nothing to sell. Her next follow-up waits (`farewellNotBefore`).
  */
@@ -475,6 +494,8 @@ export interface ComposedTurn {
   readonly availability?: { readonly record: FanAvailabilityRecord; readonly changed: boolean };
   /** The gate before the first teaser at this message: open, or the conditions missing (ADR 0103 § 11). */
   readonly scriptStart?: ScriptStart;
+  /** A sale gone wrong at this message: she answers it, or the same trouble again goes to a human (ADR 0156). */
+  readonly saleTrouble?: SaleTroubleOutcome;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -881,7 +902,7 @@ export async function composeTurn(
     sexualization?.kind !== 'steer_back';
   // He asks how to pay for her step waiting: the voice sees its exact price and what it holds (ADR 0156 § 4). Every
   // stop of a sale holds: no help to buy for a fan nobody may sell to.
-  const waitingStep =
+  const waitingStepFound =
     brief?.intent !== 'payment_help' ||
     care ||
     scripts === undefined ||
@@ -893,6 +914,23 @@ export async function composeTurn(
     trap.replyBrief !== undefined
       ? undefined
       : waitingStepOf(scripts, input.scripts.catalogue, input.scripts.latest?.scriptRef ?? null);
+  // A sale gone wrong (ADR 0156 § 4 and § 7): she answers it once; the same trouble again soon after goes to a human.
+  const troubleSeen = input.saleTrouble?.seen ?? NO_SALE_TROUBLE;
+  const saleTrouble: SaleTroubleOutcome | undefined =
+    waitingStepFound !== undefined
+      ? saleTroubleOutcome('payment_help', troubleSeen, input.situation.now)
+      : brief !== undefined &&
+          !care &&
+          complainsOfPurchase({
+            intent: brief.intent,
+            risks: brief.risks,
+            hasBought: input.saleTrouble?.hasBought === true,
+          })
+        ? saleTroubleOutcome('purchase_complaint', troubleSeen, input.situation.now)
+        : undefined;
+  // Still stuck after her help: a human answers, she does not explain the same thing twice.
+  const waitingStep = saleTrouble?.kind === 'handoff' ? undefined : waitingStepFound;
+  const complaint = saleTrouble?.kind === 'answer' && saleTrouble.trouble === 'purchase_complaint';
   // He leaves: a goodbye, unless she brings or helps him open a step (his own words then lead).
   const farewell =
     scriptStep === undefined && waitingStep === undefined ? farewellOf(brief?.desireSignals) : null;
@@ -908,6 +946,7 @@ export async function composeTurn(
               ...paced,
               ...(reminds ? [UNOPENED_STEP_HINT] : []),
               ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
+              ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
               ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
             ],
           };
@@ -920,9 +959,14 @@ export async function composeTurn(
         };
   const brainCostUsd = brain.ok ? (brain.value.meta.costUsd ?? 0) : 0;
   const brainLatencyMs = brain.ok ? brain.value.meta.latencyMs : 0;
-  if (input.skipVoice?.(brief) === true || customOrder?.kind === 'handoff') {
+  if (
+    input.skipVoice?.(brief) === true ||
+    customOrder?.kind === 'handoff' ||
+    saleTrouble?.kind === 'handoff'
+  ) {
     return {
       ...(customOrder !== undefined && { customOrder }),
+      ...(saleTrouble !== undefined && { saleTrouble }),
       ...(scripts !== undefined && { scripts }),
       ...availabilityOut(availability),
       ...(trap.isTrap && { trap }),
@@ -1007,6 +1051,7 @@ export async function composeTurn(
     ...(ageDeclared !== null && { ageDeclared }),
     ...(offerRefused !== undefined && !care && { offerRefused }),
     ...(care && { care: true }),
+    ...(saleTrouble !== undefined && { saleTrouble }),
     voiceBrief,
     voiceInput,
     bubbles,

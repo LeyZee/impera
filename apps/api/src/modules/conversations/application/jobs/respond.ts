@@ -447,6 +447,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       }),
       scriptRun: read.scriptRun?.run ?? null,
       fanAvailability: read.conversation.fanAvailability,
+      saleTrouble: read.sales.saleTrouble,
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -526,6 +527,15 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
       conversation = scripted.conversation;
       if (result.kind === 'draft') {
+        // She answered a sale gone wrong: the same trouble again soon after goes to a human (ADR 0156 § 4 and § 7).
+        if (result.saleTrouble !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'sale_trouble', payload: { conversationId: conversation.id, kind: result.saleTrouble } },
+            meta,
+          );
+        }
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {
           conversation = await appendEvent(

@@ -2484,6 +2484,51 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(held.kind === 'held' ? held.detail : []).toContain('price_outside_offer');
   });
 
+  it('hands him to a human when he is still stuck to pay soon after her help, never helps twice (ADR 0156 § 4)', async () => {
+    const asks: Brief = { ...BRIEF, intent: 'payment_help', scriptReply: 'answers_step' };
+    const { draftComposer, seen } = composer(
+      { brief: asks, voice: { bubbles: ['C’est 15 € mon cœur'] } },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(sent),
+    );
+    const first = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    expect(first).toMatchObject({ kind: 'draft', saleTrouble: 'payment_help' });
+    const again = await draftComposer.compose({
+      ...INPUT,
+      scriptRun: waiting,
+      saleTrouble: { paymentHelpAt: new Date(INPUT.now.getTime() - 20 * 60_000), complaintAt: null },
+    });
+    expect(again).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'sale_trouble',
+      detail: ['payment_help'],
+    });
+    // The voice wrote nothing the second time.
+    expect(seen.voiceInputs).toHaveLength(1);
+  });
+
+  it('answers his complaint about a purchase herself once, a human the second time (ADR 0156 § 7, 0158 § 48)', async () => {
+    const complains: Brief = { ...BRIEF, intent: 'complaint' };
+    const { draftComposer, seen } = composer({ brief: complains }, undefined, limitsOf(ADULT).limits);
+    const bought = { ...INPUT, fan: { ...INPUT.fan, spentMinor: 1_500 } };
+    const first = await draftComposer.compose(bought);
+    expect(first).toMatchObject({ kind: 'draft', saleTrouble: 'purchase_complaint' });
+    const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('ce qui ne lui a pas plu') && hint.includes('Reveal'))).toBe(
+      true,
+    );
+    const again = await draftComposer.compose({
+      ...bought,
+      saleTrouble: { paymentHelpAt: null, complaintAt: new Date(INPUT.now.getTime() - 3_600_000) },
+    });
+    expect(again).toMatchObject({ kind: 'held', cause: 'sale_trouble', detail: ['purchase_complaint'] });
+    // A complaint with nothing bought is no purchase complaint.
+    const nothing = await draftComposer.compose(INPUT);
+    expect(nothing.kind === 'draft' ? nothing.saleTrouble : 'held').toBeUndefined();
+  });
+
   it('tells the team when the step waiting no longer has the price she said', async () => {
     const repriced: ScriptSource = {
       ...sent,

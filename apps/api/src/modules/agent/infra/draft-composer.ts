@@ -48,6 +48,7 @@ import type { PickedObjectionReply } from '../domain/objections';
 import { originNote } from '../domain/origin';
 import type { OfferLimits } from '../domain/policy';
 import { safetySigns } from '../domain/safety-net';
+import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../domain/sale-trouble';
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
@@ -151,6 +152,8 @@ export interface AgentComposeInput {
    * whatever he writes, until a manager or the owner closes it. `helpGiven`: the help bubble already went out in it.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+  /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7), as the journal keeps it. */
+  readonly saleTrouble?: SaleTroubleSeen;
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -237,6 +240,8 @@ type AgentComposeResult = (
   readonly customOrderOpened?: true;
   /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
   readonly scriptsExhausted?: true;
+  /** She answered a sale gone wrong in this draft (`sale_trouble`, ADR 0156 § 4 and § 7): a human gets the next one. */
+  readonly saleTrouble?: SaleTroubleKind;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /**
@@ -530,6 +535,10 @@ function adultOnCard(
 
 const HANDOFF: Held = { kind: 'held', reason: 'handoff', detail: [], costUsd: 0 };
 
+/** A step of hers he bought, as his latest run records it (Reveal's history, ADR 0156 § 2). */
+const paidStepOf = (run: ScriptRun | null | undefined): boolean =>
+  run?.steps.some((step) => step.outcome === 'bought') === true;
+
 /**
  * The AI could not answer him with care (a refusal, a failure, no budget, a guard): never silence, a human writes to
  * him (ADR 0088 § 5 bis), the care mode stays open.
@@ -792,6 +801,8 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
   return {
     ...result,
     ...(opened && { customOrderOpened: true }),
+    ...(composed.saleTrouble?.kind === 'answer' &&
+      result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
   };
@@ -895,6 +906,9 @@ async function settle(
       costUsd,
     };
   // A custom order with a chatter on shift (ADR 0090 § A): they take it, the voice did not write.
+  // The same sale trouble again soon after her answer (ADR 0156 § 4 and § 7): a human answers, she did not write.
+  if (composed.saleTrouble?.kind === 'handoff')
+    return { ...HANDOFF, cause: 'sale_trouble', detail: [composed.saleTrouble.trouble], costUsd };
   if (composed.customOrder?.kind === 'handoff')
     return { ...HANDOFF, cause: 'custom_order', detail: ['custom_order'], costUsd };
   // He stated an adult age himself, or his card gives one: confirmed (Charles, 27/10 and 16/11), never once his age
@@ -1088,6 +1102,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
+        saleTrouble: {
+          seen: input.saleTrouble ?? NO_SALE_TROUBLE,
+          // He bought from her: Reveal's spending, or a step of hers recorded paid.
+          hasBought: input.fan.spentMinor > 0 || paidStepOf(input.scriptRun),
+        },
       });
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);

@@ -48,6 +48,7 @@ import {
   UNKNOWN_AVAILABILITY,
   type FanAvailabilityRecord,
   type PersonaForModels,
+  type SaleTroubleSeen,
 } from '../modules/agent/index';
 import { proposalsOfRead } from '../modules/fans/index';
 import { readSavedProviderKeys } from '../modules/providers/index';
@@ -243,6 +244,19 @@ async function readCard(scenario: CardScenario): Promise<{ failures: string[]; v
   };
 }
 
+/** When she last answered each sale trouble of his, as the scenario dates it before his message. */
+function saleTroubleSeenOf(
+  answered: Scenario['situation']['sale_trouble_answered'],
+  now: Date,
+): SaleTroubleSeen {
+  const before = (minutes: number | undefined): Date | null =>
+    minutes === undefined ? null : new Date(now.getTime() - minutes * 60_000);
+  return {
+    paymentHelpAt: before(answered.payment_help_minutes_ago),
+    complaintAt: before(answered.complaint_minutes_ago),
+  };
+}
+
 /** His availability as the scenario stores it, set five minutes before his message. */
 function availabilityOf(situation: Scenario['situation'], now: Date): FanAvailabilityRecord {
   const said = new Date(now.getTime() - 5 * 60_000);
@@ -369,12 +383,20 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       availability: availabilityOf(situation, now),
       // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
       ...(scenario.scripts !== undefined && { scripts: scriptsInputOf(scenario.scripts, now) }),
+      // A sale that went wrong for him (ADR 0156 § 4 and § 7): when she last answered it, and whether he bought.
+      saleTrouble: {
+        seen: saleTroubleSeenOf(situation.sale_trouble_answered, now),
+        hasBought:
+          situation.spent_euros > 0 ||
+          (scenario.scripts?.history.some((sent) => sent.bought.length > 0) ?? false),
+      },
     },
   );
   const { brief } = composed;
   const handoff =
     composed.handoff !== undefined ||
     composed.customOrder?.kind === 'handoff' ||
+    composed.saleTrouble?.kind === 'handoff' ||
     (brief !== undefined && holdDecision(brief).kind === 'handoff');
   const offer = composed.voiceBrief?.action === 'offer';
   const blocking = composed.violations.filter((v) => v.severity === 'blocking').map((v) => v.code);

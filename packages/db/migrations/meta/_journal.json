@@ -1205,6 +1205,13 @@
       "when": 1795162228784,
       "tag": "0230_recognise_prepared_scripts",
       "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "7",
+      "when": 1795191343745,
+      "tag": "0240_sale_trouble_event",
+      "breakpoints": true
     }
   ]
 }
