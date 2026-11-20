@@ -140,3 +140,43 @@ export function MomentChoice({
     </div>
   );
 }
+
+/**
+ * « Retirer l’étape », « Retirer la branche »: a grey button, red only in the inline confirmation it opens (red is kept
+ * for what is urgent).
+ */
+export function RemoveButton({ label, onConfirm }: { label: string; onConfirm: () => void }): JSX.Element {
+  const [asking, setAsking] = useState(false);
+  if (!asking)
+    return (
+      <button
+        type="button"
+        className="nv-btn nv-btn--plain nv-btn--sm se-flush"
+        onClick={() => {
+          setAsking(true);
+        }}
+      >
+        {label}
+      </button>
+    );
+  return (
+    <span className="se-confirm" role="group" aria-label={label}>
+      <button
+        type="button"
+        className="nv-btn nv-btn--soft nv-btn--sm nv-btn--destructive"
+        onClick={onConfirm}
+      >
+        {label}, sûr
+      </button>
+      <button
+        type="button"
+        className="nv-btn nv-btn--plain nv-btn--sm"
+        onClick={() => {
+          setAsking(false);
+        }}
+      >
+        Annuler
+      </button>
+    </span>
+  );
+}

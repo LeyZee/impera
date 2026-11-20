@@ -190,6 +190,20 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
     expect(await screen.findAllByText('A déjà dépensé 50 € ou plus chez elle')).not.toHaveLength(0);
   });
 
+  it('asks before removing a branch, and keeps it on « Annuler »', async () => {
+    serve({ ...vaultRoutes, [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf()] }) });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Soirée inventée/u }));
+    fireEvent.click(screen.getByRole('button', { name: /Étape 2/u }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retirer la branche' })[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.getAllByRole('button', { name: 'Retirer la branche' })).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retirer la branche' })[1]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Retirer la branche, sûr' }));
+    expect(screen.queryByRole('button', { name: 'Retirer la branche' })).toBeNull();
+    expect(screen.getByText('Modifications en cours')).toBeDefined();
+  });
+
   it('shows what a fan pays on each path', async () => {
     serve({ ...vaultRoutes, [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf()] }) });
     show();

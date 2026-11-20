@@ -112,7 +112,7 @@ function CopyScript({
         ) : null}
         <button
           type="button"
-          className="nv-btn nv-btn--plain nv-btn--sm se-copy__edit"
+          className="nv-btn nv-btn--plain nv-btn--sm se-flush se-copy__edit"
           onClick={() => {
             onOpen(view);
           }}

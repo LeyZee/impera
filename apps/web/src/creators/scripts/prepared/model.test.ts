@@ -27,7 +27,7 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
     expect(priceLabel(1250)).toBe('12,50 €');
   });
 
-  it('names each path after the last branch that is not the default, defaults first', () => {
+  it('names each path after the branches it takes that are not defaults, defaults first', () => {
     const paths = scriptPaths(CONTENT);
     expect(paths.count).toBe(2);
     expect(paths.shown.map((path) => [path.name, path.prices, path.totalMinor])).toEqual([
@@ -75,7 +75,11 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
     };
     const paths = scriptPaths(followers);
     expect(paths.count).toBe(3);
-    expect(paths.shown.map((path) => path.totalMinor)).toEqual([3200, 3500, 5500]);
+    expect(paths.shown.map((path) => [path.name, path.totalMinor])).toEqual([
+      ['Par défaut', 3200],
+      ['S’il aime le rouge', 3500],
+      ['S’il aime le rouge, puis branche 2 à l’étape 3', 5500],
+    ]);
   });
 
   it('says each gap where it is, and a limit as she wrote it', () => {

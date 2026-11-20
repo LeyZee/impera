@@ -28,7 +28,7 @@
 }
 .se-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr);
   gap: 20px;
   align-items: center;
   padding: 18px var(--nv-plate-pad);
@@ -79,6 +79,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+  text-align: right;
 }
 .se-pill {
   display: inline-flex;
@@ -163,6 +164,7 @@
 .se-row__price {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
 }
 
@@ -800,8 +802,15 @@
   box-shadow: var(--nv-shadow-float);
 }
 .se-actions__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
   color: var(--nv-ink-muted);
+}
+.se-actions__why {
+  color: var(--nv-warning);
+  font-weight: 600;
 }
 .se-actions__btns {
   display: flex;
@@ -1675,4 +1684,32 @@ body {
 }
 .se-skel {
   min-height: 120px;
+}
+
+/* A button without a plate starts on the content's edge, its padding outside it. */
+.se-flush {
+  margin-inline-start: calc(-1 * var(--nv-space-3));
+}
+.se-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* A phone: the paths before the bar, the bar last, above the floating capsule of tabs. */
+@media (max-width: 900px) {
+  .se-main {
+    display: contents;
+  }
+  .se-rail {
+    order: 1;
+  }
+  .se-actions {
+    order: 2;
+  }
+}
+@media (max-width: 820px) {
+  .se-actions {
+    bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
+  }
 }

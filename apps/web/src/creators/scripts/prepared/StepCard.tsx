@@ -13,7 +13,7 @@ import { useId, useState, type JSX, type ReactNode } from 'react';
 
 import { sellable, type EditorMedia } from './media';
 import { conditionLabel, parsePrice, priceLabel, priceText, stepKind } from './model';
-import { ChevronIcon, MediaTile } from './parts';
+import { ChevronIcon, MediaTile, RemoveButton } from './parts';
 
 /** What a step card asks of the editor: every change goes up as a new content, saved by the editor. */
 export interface StepActions {
@@ -173,7 +173,7 @@ export function StepCard({
               {step.branches.length < PREPARED_STEP_BRANCHES_MAX ? (
                 <button
                   type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
+                  className="nv-btn nv-btn--plain nv-btn--sm se-flush"
                   onClick={actions.onAddBranch}
                 >
                   ＋ Ajouter une branche
@@ -200,13 +200,7 @@ export function StepCard({
                 Descendre
               </button>
               {content.steps.length > 1 ? (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm nv-btn--destructive"
-                  onClick={actions.onRemove}
-                >
-                  Retirer l’étape
-                </button>
+                <RemoveButton label="Retirer l’étape" onConfirm={actions.onRemove} />
               ) : null}
             </span>
           </div>
@@ -430,15 +424,12 @@ function BranchCard({
           <span>€</span>
         </label>
         {count > 1 ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--plain nv-btn--sm nv-btn--destructive"
-            onClick={() => {
+          <RemoveButton
+            label="Retirer la branche"
+            onConfirm={() => {
               actions.onRemoveBranch(branch.key);
             }}
-          >
-            Retirer la branche
-          </button>
+          />
         ) : null}
       </div>
     </article>

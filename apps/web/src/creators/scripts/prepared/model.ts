@@ -198,6 +198,29 @@ export interface ScriptPath {
 /** Paths shown at most: past that, the rail says how many more there are. */
 export const PATHS_SHOWN = 8;
 
+/**
+ * A path named whole, after every branch taken that is not a default one: « Par défaut », or « Branche 2 à l’étape 2,
+ * puis s’il a parlé de la robe ». A condition said in words keeps its words; a branch kept for those who took another
+ * one is named by its place, since the branch it follows is already in the name.
+ */
+function pathName(content: PreparedScriptContent, taken: readonly PreparedBranch[]): string {
+  const parts = taken.flatMap((branch, step) => {
+    const condition = branch.condition;
+    if (condition === null || condition.kind === 'none') return [];
+    if (condition.kind === 'text' || condition.rule.kind === 'spent_at_least')
+      return [conditionLabel(condition, content).text];
+    const index = content.steps[step]?.branches.indexOf(branch) ?? 0;
+    return [`branche ${String(index + 1)} à l’étape ${String(step + 1)}`];
+  });
+  if (parts.length === 0) return 'Par défaut';
+  const said = parts.map((part, at) =>
+    at === 0
+      ? part.replace(/^./u, (first) => first.toUpperCase())
+      : part.replace(/^./u, (first) => first.toLowerCase()),
+  );
+  return said.join(', puis ');
+}
+
 const followed = (branch: PreparedBranch): string | null =>
   branch.condition?.kind === 'structured' && branch.condition.rule.kind === 'previous_branch'
     ? branch.condition.rule.stepRef
@@ -206,8 +229,7 @@ const followed = (branch: PreparedBranch): string | null =>
 /**
  * The paths a fan can take: one branch at each step, never a branch kept for those who took another branch before.
  * Counted step by step on the branches some later branch follows (four branches on ten steps would be a million to
- * walk), and only the first `PATHS_SHOWN` built, the default branches first, each named after the last branch taken
- * that is not a default one.
+ * walk), and only the first `PATHS_SHOWN` built, the default branches first, each named whole (`pathName`).
  */
 export function scriptPaths(content: PreparedScriptContent): {
   readonly shown: readonly ScriptPath[];
@@ -236,9 +258,8 @@ export function scriptPaths(content: PreparedScriptContent): {
     if (shown.length >= PATHS_SHOWN) return;
     const one = content.steps[step];
     if (one === undefined) {
-      const named = taken.findLast((branch) => branch.condition !== null && branch.condition.kind !== 'none');
       shown.push({
-        name: named === undefined ? 'Par défaut' : conditionLabel(named.condition, content).text,
+        name: pathName(content, taken),
         prices: taken.map((branch) => branch.priceMinor),
         totalMinor: taken.reduce((sum, branch) => sum + branch.priceMinor, 0),
       });

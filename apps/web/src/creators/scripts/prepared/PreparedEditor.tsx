@@ -326,6 +326,11 @@ export function PreparedEditor({
             <div className="se-actions">
               <span className="se-actions__state" role="status">
                 {saveLine}
+                {view.state === 'editing' && gaps.length > 0 ? (
+                  <span className="se-actions__why">
+                    {gaps.length === 1 ? 'Il manque 1 chose' : `Il manque ${String(gaps.length)} choses`}
+                  </span>
+                ) : null}
               </span>
               <span className="se-actions__btns">
                 {view.state === 'ready_to_copy' ? (
@@ -345,9 +350,8 @@ export function PreparedEditor({
                 ) : (
                   <button
                     type="button"
-                    className="nv-btn nv-btn--neon nv-btn--sm"
+                    className={`nv-btn nv-btn--sm ${gaps.length > 0 ? 'nv-btn--soft' : 'nv-btn--neon'}`}
                     disabled={busy || !settled || gaps.length > 0}
-                    title={gaps.length > 0 ? 'Il reste des manques' : undefined}
                     onClick={() => void toState('ready')}
                   >
                     <span className="se-lg">Prêt à copier dans Reveal</span>
