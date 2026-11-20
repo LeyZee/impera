@@ -13,6 +13,10 @@ Il demande aussi : une grille interne de prix que l'IA lit (cam à la minute…)
 
 ## Décision
 
+### Règle première : tout paiement passe par Reveal
+
+Charles (20/11, 15 h 48) : jamais un paiement hors de Reveal, même quand l'appel ou la visio se passe ailleurs. L'acompte, le solde, un appel, une visio, une rallonge : tout est payé dans Reveal (pourboire ou média payant), pour être compté. L'IA n'accepte, ne propose ni n'évoque aucun autre moyen de paiement (virement, carte, PayPal, crypto, carte cadeau, paiement sur Instagram…). Un fan qui en propose un reçoit un refus dans son personnage, et la commande ne passe à `deposit_paid` que sur un paiement vu dans Reveal. La garde « paiement hors plateforme » reste bloquante sur toute réponse de cette ADR.
+
 ### 0. Ce qui se commande
 
 Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pour lui, parfois des demandes très précises ou crues ; une photo (son prénom écrit sur elle…) ; sa réaction filmée à une photo intime qu'il envoie, ou une note donnée à cette photo ; un appel ; une visio, juste pour parler ou sexuelle.
@@ -26,7 +30,7 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 
 1. **Les états, dans le code** (`agent/domain/custom-order.ts`) : `asked` → `creator_yes` (avec prix) ou `creator_no` → `deposit_paid` → `delivered`, et `expired` / `cancelled`. Un appel ou une visio suit le § D (paiement entier d'avance). Chaque passage est un événement de conversation, idempotent.
 2. **`asked`.** L'IA répond avec la réponse d'attente actuelle, sous la garde `no_commitment`. La demande part à la créatrice : un résumé en une phrase de ce qu'il veut voir, écrit par le code à partir du brief, jamais son pseudo ni son texte brut. Tant que l'espace de la créatrice n'est pas en ligne, elle part au propriétaire, qui saisit la réponse.
-3. **`creator_yes`.** Seul un humain (la créatrice, ou le propriétaire pour elle) saisit le oui et le prix. Le modèle ne fixe jamais un prix. L'IA annonce le prix exact et demande un pourboire de la moitié pour prendre la commande. La garde `no_commitment` est levée pour ce prix-là seulement ; « jamais de négociation » s'applique.
+3. **`creator_yes`.** Seul un humain (la créatrice, ou le propriétaire pour elle) saisit le oui et le prix. Le modèle ne fixe jamais un prix. L'IA annonce le prix exact et demande un pourboire de la moitié pour prendre la commande. La garde `no_commitment` est levée pour ce prix-là seulement, et la garde `price_outside_offer` laisse passer ce seul montant (`GuardContext.allowedPriceMinor`) ; « jamais de négociation » s'applique.
 4. **Le pourboire n'est demandé qu'ici.** Une garde de voix bloque toute demande de pourboire hors d'une commande à l'état `creator_yes`. Un remerciement pour un pourboire spontané reste permis.
 5. **`deposit_paid`.** Le code reconnaît un pourboire de ce fan, d'au moins la moitié du prix, arrivé après l'annonce. Un montant plus bas ou ambigu passe à un humain.
 6. **`delivered`.** La créatrice dépose la vidéo dans un dossier de rôle `custom` (§ B). L'IA l'envoie comme média payant au prix restant, derrière la garde d'écriture.
@@ -49,7 +53,7 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 
 ### D. Appels et visios
 
-16. **Payés en entier d'avance**, sur Reveal, par pourboire : la durée achetée fois le prix à la minute. Pas d'acompte de moitié ici : le paiement vient d'abord (Charles, 20/11).
+16. **Payés en entier d'avance, et toujours dans Reveal**, même si l'appel ou la visio se passe ailleurs (règle première), par pourboire : la durée achetée fois le prix à la minute. Pas d'acompte de moitié ici : le paiement vient d'abord (Charles, 20/11).
 17. **L'appel ou la visio se passe sur Instagram, et c'est la créatrice qui le passe elle-même.** Aucune automatisation Instagram (ADR 0057). L'IA vend et prévient, rien de plus : elle n'écrit jamais un nom de compte, un lien ni une heure (les gardes « coordonnées » et « paiement hors plateforme » restent actives sur sa voix). Une fois le paiement reçu, la commande passe à un humain (créatrice ou propriétaire), qui donne le moyen de contact et cale l'heure.
 18. Le temps non utilisé n'est pas rendu par l'IA ; un dépassement se paie avant, jamais après. Un litige va à un humain.
 
@@ -81,7 +85,7 @@ Jusque-là, l'ADR 0090 s'applique telle quelle : aucune commande ne se perd, ell
 - Migration additive : états et événements de commande, rôles `custom` et `gift`, rattachement d'un média à un fan. RLS forcée, `GRANT SELECT TO impera_service`.
 - Glossaire : « Acompte », « Dossier Perso », « Cadeau », « Relais de preuve ».
 - Évals : demande avec oui, avec non, sans réponse ; pourboire juste, trop bas, spontané ; demande de pourboire hors commande ; vidéo perso proposée à un autre fan (refusée) ; type et niveau lus pour chaque type ; appel payé puis passé à un humain, sans nom de compte ni heure dans sa réponse ; cadeau trop tôt ; preuve demandée deux fois.
-- Dépend de : l'agent voit les achats et les pourboires (correction en cours au fil Agent) ; la garde d'écriture ouverte pour le compte.
+- Dépend de : l'agent voit les achats et les pourboires (une vente ou un pourboire rattaché au fan réveille déjà la conversation ; la mise à jour d'un média déjà lu devenu payé est en cours au fil Agent) ; la garde d'écriture ouverte pour le compte.
 
 ## Alternatives rejetées
 
