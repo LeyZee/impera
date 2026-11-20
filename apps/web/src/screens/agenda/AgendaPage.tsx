@@ -285,7 +285,7 @@ export function AgendaPage({
                 setRepliesShown(!repliesShown);
               }}
             >
-              <NavIcon name="team" />
+              <NavIcon name="people" />
               {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
             </button>
           )}
