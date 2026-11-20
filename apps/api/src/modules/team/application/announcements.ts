@@ -13,7 +13,7 @@ import type { Actor, CreatorNames } from '../domain/ports';
 import type { AnnouncementStore, StoredAnnouncement } from '../infra/announcement-store';
 
 /** What Aujourd'hui and Équipe › Annonces show: the latest ones, older ones being of no use to a shift. */
-export const ANNOUNCEMENTS_SHOWN = 30;
+const ANNOUNCEMENTS_SHOWN = 30;
 
 /** Annonces (EQ-12): the store's reads with each creator's name, as the screens say who it is addressed to. */
 export interface AnnouncementService {

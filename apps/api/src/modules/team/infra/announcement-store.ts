@@ -27,7 +27,7 @@ import type { Actor } from '../domain/ports';
 const { announcements, announcementReads, auditLog, teamMembers, user } = schema;
 
 /** How many of an announcement's members have read it: the owner's and the managers' view. */
-export interface ReadCount {
+interface ReadCount {
   readonly read: number;
   readonly of: number;
 }
