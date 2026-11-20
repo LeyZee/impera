@@ -63,6 +63,22 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
     expect(opened.rows[0]?.count).toBe(0);
   });
 
+  it('opens no function a later migration creates to PUBLIC: the default of the migrations role is closed', async () => {
+    await test.admin.db.execute(
+      sql`create function public.made_later() returns int language sql as 'select 1'`,
+    );
+    try {
+      const rights = await root.query<{ anon: boolean; app: boolean }>(
+        `select has_function_privilege('anon', 'public.made_later()', 'EXECUTE') as anon,
+                has_function_privilege('nirvana_app', 'public.made_later()', 'EXECUTE') as app`,
+      );
+      // Its migration grants it to whom it serves; nobody gets it by default.
+      expect(rights.rows[0]).toEqual({ anon: false, app: false });
+    } finally {
+      await test.admin.db.execute(sql`drop function public.made_later()`);
+    }
+  });
+
   it('gives each function of ours exactly the callers it serves, so a wider grant turns this red', async () => {
     const callers = await root.query<{ name: string; roles: string[] }>(
       `select p.proname as name,

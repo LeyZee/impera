@@ -4,6 +4,8 @@
 -- A function PUBLIC could call keeps exactly the callers Impera had: `nirvana_app` and `impera_service`. A function
 -- already closed to PUBLIC keeps its own grants, untouched. A function to come gets no default grant: its migration
 -- grants it to whom it serves, as before. Functions an extension owns are not ours and keep their rights.
+-- The default is changed for the role that runs the migrations, in this base, without `IN SCHEMA`: rights by schema
+-- only add to the global ones, so `IN SCHEMA public` could not take back EXECUTE, which PUBLIC has globally.
 DO $$
 DECLARE
   fn regprocedure;
@@ -21,4 +23,4 @@ BEGIN
   END LOOP;
 END
 $$;--> statement-breakpoint
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
