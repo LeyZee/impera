@@ -77,7 +77,8 @@ const TAB_VIEWS: Partial<
     label: 'Vue de ses scripts',
     views: [
       ['scripts', 'Scripts'],
-      ['copy', 'À copier dans Reveal'],
+      // Short, so four views share a phone's width; the view itself says « dans Reveal ».
+      ['copy', 'À copier'],
       ['structures', 'Structures'],
       ['custom', 'Sur mesure'],
     ],

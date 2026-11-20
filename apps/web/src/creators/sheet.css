@@ -39,6 +39,10 @@
   .cr-views .nv-seg__opt {
     flex: 1 1 0;
     min-width: 0;
-    padding: 0 var(--nv-space-2);
+    padding: 0 var(--nv-space-1);
+    /* Four views on a narrow phone: a name too long is cut, never laid over its neighbour. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

@@ -9,6 +9,7 @@ import demoYaml from '../../../../personas/demo/v0.3.0.yaml?raw';
 import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
+import { viewOf } from './scripts/prepared/fixtures';
 
 /** A version stored at format 2: the draft is the version itself, nothing moved (ADR 0079 § 5). */
 const asDraft = (persona: PersonaV2) => ({ draft: persona, moved: [] });
@@ -451,10 +452,15 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
     ).toEqual(['Coffre', 'Dépôts']);
-    // Structures are the owner's: Scripts has one view for a manager, and no selector.
+    // Structures and her made-to-measure prices are the owner's: a manager has her scripts and what is to copy.
     router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
+    expect(
+      within(await screen.findByRole('radiogroup', { name: 'Vue de ses scripts' }))
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['Scripts', 'À copier']);
+    router.history.push(`/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
     await screen.findByText('Scripts envoyés par Anna');
-    expect(screen.queryByRole('radiogroup')).toBeNull();
     // The addresses of before the seven tabs lead to their view (ADR 0149 § 5).
     router.history.push(`/creatrices?onglet=idees&creatrice=${ANNA.id}`);
     expect(await screen.findByText('Ses idées du jour')).toBeDefined();
@@ -500,7 +506,7 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
       within(selector)
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['À copier dans Reveal', 'Structures']);
+    ).toEqual(['Scripts', 'À copier', 'Structures', 'Sur mesure']);
     fireEvent.click(within(selector).getByRole('radio', { name: 'Structures' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({
@@ -514,6 +520,33 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
     expect(screen.getByRole('heading', { level: 1, name: 'Anna' })).toBeDefined();
     expect(screen.queryByRole('heading', { level: 1, name: 'Structures de script' })).toBeNull();
+  });
+
+  it('opens in « Scripts » a script picked in « À copier dans Reveal », and forgets it once « Scripts » is left', async () => {
+    await serve([ANNA]);
+    const served = vi.mocked(fetch).getMockImplementation();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url === `/v1/creators/${ANNA.id}/prepared-scripts`
+          ? Promise.resolve(
+              new Response(JSON.stringify([viewOf({ state: 'ready_to_copy' })]), { status: 200 }),
+            )
+          : (served?.(url, init) ?? Promise.resolve(new Response('{}', { status: 404 }))),
+      ),
+    );
+    const router = renderAt(owner, `/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
+    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'scripts', creatrice: ANNA.id });
+    });
+    // The editor, with its way back to the list.
+    expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
+    // Another tab, then « Scripts » again: the list, not that script.
+    router.history.push(`/creatrices?onglet=agenda&creatrice=${ANNA.id}`);
+    await screen.findByText('Son agenda');
+    router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
+    expect(await screen.findByRole('button', { name: /Nouveau script/u })).toBeDefined();
   });
 
   it('reopens her sheet from the menu on the tab left open last on this device', async () => {

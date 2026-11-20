@@ -26,6 +26,7 @@ describe('the sheets of a creator a member opens', () => {
       'vault',
       'content',
       'scripts',
+      'copy',
       'agenda',
       'ideas',
       'requests',
@@ -46,7 +47,10 @@ describe('the seven tabs of her sheet in the address (ADR 0149 § 5)', () => {
     expect(creatorsSearch('hours', creatrice)).toEqual({ onglet: 'ia', creatrice });
     expect(creatorsSearch('vault', creatrice)).toEqual({ onglet: 'medias', creatrice });
     expect(creatorsSearch('content', creatrice)).toEqual({ onglet: 'medias', vue: 'depots', creatrice });
+    expect(creatorsSearch('scripts', creatrice)).toEqual({ onglet: 'scripts', creatrice });
+    expect(creatorsSearch('copy', creatrice)).toEqual({ onglet: 'scripts', vue: 'a-copier', creatrice });
     expect(creatorsSearch('structures', null)).toEqual({ onglet: 'scripts', vue: 'structures' });
+    expect(creatorsSearch('custom', creatrice)).toEqual({ onglet: 'scripts', vue: 'sur-mesure', creatrice });
     expect(creatorsSearch('requests', creatrice)).toEqual({ onglet: 'agenda', vue: 'demandes', creatrice });
     expect(creatorsSearch('alerts', creatrice)).toEqual({ onglet: 'alertes', creatrice });
   });
@@ -65,7 +69,9 @@ describe('the seven tabs of her sheet in the address (ADR 0149 § 5)', () => {
       'vault',
       'content',
       'scripts',
+      'copy',
       'structures',
+      'custom',
       'agenda',
       'ideas',
       'requests',
@@ -104,6 +110,12 @@ describe('the addresses of the tabs before the seven (ADR 0149 § 5)', () => {
     expect(legacyCreatorsSearch({ onglet: 'telegram', creatrice })?.hash).toBe('telegram');
     expect(legacyCreatorsSearch({ onglet: 'acces', creatrice })?.hash).toBe('acces');
     expect(legacyCreatorsSearch({ onglet: 'profil', creatrice })?.hash).toBe('profil');
+  });
+
+  it('leads her made-to-measure prices to their view of Scripts', () => {
+    expect(legacyCreatorsSearch({ onglet: 'sur-mesure', creatrice })).toEqual({
+      search: { onglet: 'scripts', vue: 'sur-mesure', creatrice },
+    });
   });
 
   it('leads Scripts with a folder to that folder of her vault in Médias', () => {
