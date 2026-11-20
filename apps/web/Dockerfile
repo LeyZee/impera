@@ -24,7 +24,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store,sharing=locked \
 ARG EXTENSION_CRM_ORIGIN=""
 # The CRM's own address: when both are given, the extension's build checks they name the same site.
 ARG WEB_ORIGIN=""
-RUN VITE_EXTENSION_CRM_ORIGIN="$EXTENSION_CRM_ORIGIN" pnpm turbo run build --filter=@impera/web
+# The commit the bundle is built from (OPS-18): the release its error reports carry, the API's own. `dev` when empty.
+ARG RELEASE=""
+RUN VITE_EXTENSION_CRM_ORIGIN="$EXTENSION_CRM_ORIGIN" VITE_RELEASE="$RELEASE" pnpm turbo run build --filter=@impera/web
 # The extension the team downloads from the guide (/aide/extension, ADR 0067): built with the CRM, so both ship together.
 RUN EXTENSION_CRM_ORIGIN="$EXTENSION_CRM_ORIGIN" WEB_ORIGIN="$WEB_ORIGIN" pnpm --filter @impera/extension zip \
  && mkdir -p apps/web/dist/extension \

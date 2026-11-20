@@ -57,6 +57,8 @@ import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
+import { createClientErrorRoutes } from './observability/client-errors';
+import { INERT_ERROR_REPORTER, type ErrorReporter } from './observability/error-reporter';
 import { applyOwnerRemovalsUnscoped, createOwnersRoutes, relayOwnerAlertsUnscoped } from './owners';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { createPasswordResetRoutes } from './password-reset';
@@ -150,6 +152,8 @@ export interface App {
    * own with a statement timeout. The worker builds it unused: its pool opens no connection until a first request.
    */
   readonly rateLimitStore: FastifyRateLimitStoreCtor;
+  /** Where production errors go (OPS-18): the server's 5xx, the worker's failed jobs, the dashboard's reports. */
+  readonly errorReporter: ErrorReporter;
   /** Closes the queue and the pools; the server and the worker are stopped before. */
   shutdown(): Promise<void>;
 }
@@ -235,6 +239,8 @@ export interface AppOptions {
   readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
+  /** The entry points give the one they started (`startErrorReporting`); inert otherwise (tests, scripts). */
+  readonly errorReporter?: ErrorReporter;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -313,6 +319,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const requireRole = createRequireRole(auth, db.db, shiftCreators);
   const passwordBreaches = options.passwordBreaches ?? breachCheckOf(config, logger);
+  const errorReporter = options.errorReporter ?? INERT_ERROR_REPORTER;
   const shared: Shared = {
     config,
     logger,
@@ -650,6 +657,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         passwordBreaches,
         privateChat: telegram.module?.privateChat ?? null,
       }),
+      createClientErrorRoutes({ requireRole, reporter: errorReporter }),
       createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),
       createSecuritySettingsRoutes({
         auth,
@@ -706,6 +714,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),
     rateLimitStore: postgresRateLimitStore({ db: rateLimitDb.db, logger }),
+    errorReporter,
     async shutdown() {
       modules.providers.stop();
       llmLog.stop();
