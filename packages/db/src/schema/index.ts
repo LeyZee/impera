@@ -8,6 +8,7 @@ export * from './creator-tasks';
 export * from './credentials';
 export * from './events';
 export * from './fans';
+export * from './instagram';
 export * from './invoices';
 export * from './llm';
 export * from './mcp';

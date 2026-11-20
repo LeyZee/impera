@@ -57,14 +57,17 @@ export const SnapshotAgeSchema = z.enum(SNAPSHOT_AGES);
 export type SnapshotAge = z.infer<typeof SnapshotAgeSchema>;
 
 /**
- * A reading kept (`media_insight_snapshot`): one per media and per age. The age is a step: the first reading made
- * after it, with the real instant of the reading beside.
+ * A reading kept (`media_insight_snapshot`): one per media and per age. An age is a step with a window, from the age
+ * to the next step: a reading made inside the window fills it, with the real instant of the reading beside. A step
+ * whose window passed without a reading is kept missed: `numbers` is null, and no later figure ever enters it
+ * (ADR 0120 § 2, amendment of 20/11/2026).
  */
 export const MediaInsightSnapshotSchema = z.strictObject({
   mediaRef: InstagramMediaRefSchema,
   age: SnapshotAgeSchema,
+  /** When the step was read, or when it was found missed. */
   readAt: z.iso.datetime(),
-  numbers: MediaInsightNumbersSchema,
+  numbers: MediaInsightNumbersSchema.nullable(),
 });
 export type MediaInsightSnapshot = z.infer<typeof MediaInsightSnapshotSchema>;
 
