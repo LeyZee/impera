@@ -33,7 +33,8 @@ Elle se concentre sur la création : sa semaine arrive préparée, en trois ou q
 ### Lot 2 bis (retours de Charles du 20/11)
 - [x] Son rythme : 3 séances boudoir (Mass DM et photos « cadeaux » sur leur fiche, un média de Mass DM demandé par séance), une vidéo du jour, une story par jour, un script toutes les deux semaines (avenant à l'ADR 0140).
 - [x] Sa carte relue au téléphone : le prochain tournage en grand, les autres jours repliés, une couleur par type de contenu qu'elle change elle-même (gardée sur son appareil), le début de chaque fiche visible.
-- [ ] Sa journée Instagram (2 posts, 1 Reel d'essai, au moins 4 stories dont une avec appel à l'action) et Telegram (2 posts écrits, le soir la vidéo du jour) : listes à cocher, minimum vital du jour en avant, jamais de publication à sa place. Lot à part.
+- [x] Sa journée (second avenant) : « Ma journée » au-dessus de sa semaine, l'essentiel du jour d'abord (story Reveal, vidéo du jour, story qui mène à Reveal), le bonus Instagram et Telegram ensuite ; une coche par post, gardée dans `creator_day_ticks` (migration 0238), le jour même ou le lendemain ; jamais de publication à sa place.
+- [ ] Captures de « Ma journée » validées par Charles avant fusion.
 
 ### Lot 3
 - [ ] Réglages par créatrice (nombre de jours, capacité, durées, échéance) ; le rappel du matin d'un jour de tournage ; la veille et le jour de l'échéance ; le propriétaire prévenu le dimanche soir qu'une semaine attend ; la livraison en retard en ambre côté agence.

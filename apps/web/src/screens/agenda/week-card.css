@@ -52,6 +52,12 @@
 .wk-card [data-need='idea'] {
   --wk-c: var(--wk-idea, var(--wk-sw-citron));
 }
+.wk-card [data-need='instagram'] {
+  --wk-c: var(--wk-instagram, var(--wk-sw-lilas));
+}
+.wk-card [data-need='telegram'] {
+  --wk-c: var(--wk-telegram, var(--wk-sw-citron));
+}
 @keyframes wk-in {
   from {
     opacity: 0;
@@ -665,6 +671,142 @@
 @media (max-width: 640px) {
   .wk-drop {
     align-self: stretch;
+  }
+}
+/* ── Ma journée (ADR 0140, second avenant): the essentials lead, the rest is a bonus, never in red ── */
+.dy-mark__sun {
+  fill: color-mix(in srgb, var(--ag-c) 55%, transparent);
+  stroke: var(--ag-c);
+  stroke-width: 1.4;
+}
+.dy-mark__rays {
+  fill: none;
+  stroke: var(--ag-c);
+  stroke-width: 1.6;
+  transform-origin: 12px 12px;
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring-bouncy);
+}
+.dy-card:hover .dy-mark__rays {
+  transform: rotate(22.5deg);
+}
+.dy-card:hover .wk-mark {
+  transform: none;
+}
+.dy-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.dy-part--lead {
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ag-c) 45%, transparent);
+  background: color-mix(in srgb, var(--ag-c) 6%, transparent);
+}
+.dy-part--lead[data-full] {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--nv-success) 45%, transparent);
+  background: color-mix(in srgb, var(--nv-success) 7%, transparent);
+}
+.dy-part__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.dy-part__title {
+  flex: 1;
+  font-size: var(--nv-text-body);
+  font-weight: 650;
+}
+.dy-part--lead .dy-part__title {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-title-2);
+  line-height: 1.15;
+}
+.dy-part__hint {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.dy-part__fold {
+  list-style: none;
+  min-height: var(--nv-target-min);
+  margin: calc(-1 * var(--nv-space-2)) 0;
+  border-radius: var(--nv-radius-sm);
+  cursor: pointer;
+}
+.dy-part__fold::-webkit-details-marker {
+  display: none;
+}
+.dy-part__fold:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.dy-part--bonus[open] > .dy-part__fold .wk-line__chevron {
+  transform: rotate(90deg);
+}
+.dy-part--bonus[open] {
+  gap: var(--nv-space-3);
+}
+.dy-settled {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-success);
+}
+.dy-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.dy-group__name {
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--nv-ink-muted);
+}
+/* One mark per post: one ring for a line of one, a row of smaller rings for a line of several. */
+.dy-marks {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  margin-top: 3px;
+}
+.dy-marks[data-many] .dy-tick {
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+}
+.dy-marks[data-many] .dy-tick::before {
+  inset: -5px;
+}
+/* On a phone, a line of several marks puts them under its words: the words keep their width. */
+@media (max-width: 640px) {
+  .dy-line:has(.dy-marks[data-many]) {
+    flex-wrap: wrap;
+    row-gap: var(--nv-space-2);
+  }
+  .dy-marks[data-many] {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    margin-top: 0;
+    padding-right: 2px;
+  }
+}
+.dy-line[data-done] .dy-tick {
+  animation: dy-pop var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+@keyframes dy-pop {
+  50% {
+    transform: scale(1.12);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dy-mark__rays,
+  .dy-line[data-done] .dy-tick {
+    transition: none;
+    animation: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
