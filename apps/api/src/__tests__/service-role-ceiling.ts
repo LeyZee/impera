@@ -9,6 +9,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/ai-budget': 2,
   'modules/ai-usage': 9,
   'modules/alerts': 1,
+  'modules/audit': 3,
   'modules/backups': 1,
   'modules/connectors': 36,
   'modules/content-drops': 29,
@@ -35,5 +36,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   wiring: 4,
 };
 
-/** The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. */
-export const SERVICE_ROLE_TOTAL_AT_START = 265;
+/**
+ * The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. Raised once
+ * since: 268 with the audit journal (EQ-18), which reads `audit_log`, out of RLS by design, for the owner alone (+3).
+ */
+export const SERVICE_ROLE_TOTAL_AT_START = 268;
