@@ -12,30 +12,62 @@ const today = {
   to: '2026-11-03',
   estimated: true,
   latest: true,
-  totals: [{ currency: 'EUR', creatorMinor: 2450, sales: 2, refunds: 1 }],
+  totals: [
+    {
+      currency: 'EUR',
+      sales: 2,
+      refunds: 1,
+      grossInclVatMinor: 6000,
+      grossExclVatMinor: 5000,
+      netMinor: 4000,
+      agencyMinor: 1550,
+      creatorMinor: 2450,
+      shareOfNetBp: 6125,
+      agencyShareOfNetBp: 3875,
+      shareOfPaidBp: 4083,
+    },
+  ],
   lines: [
     {
       occurredAt: '2026-11-03T11:40:00.000Z',
+      saleDay: '2026-11-02',
       event: 'refund',
       saleType: 'ppv',
       currency: 'EUR',
+      grossInclVatMinor: 1200,
+      grossExclVatMinor: 1000,
+      netMinor: 800,
+      agencyMinor: 200,
       creatorMinor: 600,
+      shareOfNetBp: 7500,
       fanName: null,
     },
     {
       occurredAt: '2026-11-03T10:05:00.000Z',
+      saleDay: '2026-11-03',
       event: 'sale',
       saleType: 'ppv',
       currency: 'EUR',
+      grossInclVatMinor: 6000,
+      grossExclVatMinor: 5000,
+      netMinor: 4000,
+      agencyMinor: 1550,
       creatorMinor: 2450,
+      shareOfNetBp: 6125,
       fanName: 'loup_bleu',
     },
     {
       occurredAt: '2026-11-03T08:00:00.000Z',
+      saleDay: '2026-11-03',
       event: 'sale',
       saleType: 'tip',
       currency: 'EUR',
+      grossInclVatMinor: 1200,
+      grossExclVatMinor: 1000,
+      netMinor: 800,
+      agencyMinor: 200,
       creatorMinor: 600,
+      shareOfNetBp: 7500,
       fanName: null,
     },
   ],
@@ -89,25 +121,44 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('« Ta part », her Ventes (CR-04)', () => {
-  it('says her part of today in large, estimated and read on Reveal, and each sale with her part only', async () => {
+describe('« Ta part », her Ventes (CR-04, ADR 0157)', () => {
+  it('says her part of today in large, where her fans’ money went, and each sale with what it paid', async () => {
     serve();
     show();
-    const card = (await screen.findByText(/^24,50\s€$/u)).closest('section');
+    const card = (
+      await screen.findByText(/^24,50\s€$/u, { selector: '.vt-earn__part' })
+    ).closest<HTMLElement>('.vt-earn');
     if (card === null) throw new Error('no card');
     const plain = (text: string | null): string => (text ?? '').replace(/\s/gu, ' ');
     expect(plain(card.textContent)).toContain('Aujourd’hui');
     expect(plain(card.textContent)).toContain(
       '2 ventes · 1 remboursement · estimé, période en cours · lu chez Reveal',
     );
-    const lines = within(card)
-      .getAllByRole('listitem')
-      .map((line) => plain(line.textContent));
-    expect(lines).toEqual([
-      '12 h 40Remboursement−6 €',
-      '11 h 05Message débloquéloup_bleu+24,50 €',
-      '9 hPourboire+6 €',
+    expect(plain(card.textContent)).toContain('61,3 % du net');
+    expect(plain(card.textContent)).toContain('Sur 100 € payés par tes fans, 40,83 € pour toi.');
+    const path = within(card).getByRole('region', { name: 'Où va l’argent' });
+    expect(
+      within(path)
+        .getAllByRole('term')
+        .map((term) => plain(term.textContent)),
+    ).toEqual(['Payé par tes fans', 'TVA', 'Reveal', 'Agence38,8 % du net', 'Toi61,3 % du net']);
+    expect(
+      within(path)
+        .getAllByRole('definition')
+        .map((amount) => plain(amount.textContent)),
+    ).toEqual(['60 €', '−10 €', '−10 €', '−15,50 €', '24,50 €']);
+    const rows = within(card).getAllByRole('button', { expanded: false });
+    expect(rows.map((row) => plain(row.textContent))).toEqual([
+      '12 h 40Remboursementd’une vente du 2 nov.rendu 12 €−6 €',
+      '11 h 05Message débloquéloup_bleupayé 60 €+24,50 €',
+      '9 hPourboirepayé 12 €+6 €',
     ]);
+    // A sale unfolds its own path, her share of its net beside her part.
+    fireEvent.click(rows[1] ?? card);
+    const detail = within(card).getByRole('button', { expanded: true }).closest('li');
+    expect(plain(detail?.querySelector('ul')?.textContent ?? '')).toBe(
+      'TVA10 €Reveal10 €Agence15,50 €Toi24,50 € · 61,3 % du net',
+    );
     // No later period while today is the current one.
     expect(screen.getByRole('button', { name: 'Période suivante' }).hasAttribute('disabled')).toBe(true);
   });

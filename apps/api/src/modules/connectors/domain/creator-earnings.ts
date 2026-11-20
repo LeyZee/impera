@@ -66,7 +66,10 @@ export function creatorEarnings(
     readonly names: ReadonlyMap<FanId, string>;
   },
 ): CreatorEarnings {
-  const sums = new Map<string, Omit<CreatorEarningsTotal, 'shareOfNetBp' | 'shareOfPaidBp'>>();
+  const sums = new Map<
+    string,
+    Omit<CreatorEarningsTotal, 'shareOfNetBp' | 'agencyShareOfNetBp' | 'shareOfPaidBp'>
+  >();
   for (const row of sales.rows) {
     const before = sums.get(row.currency);
     sums.set(row.currency, {
@@ -83,6 +86,7 @@ export function creatorEarnings(
   const totals: CreatorEarningsTotal[] = [...sums.values()].map((sum) => ({
     ...sum,
     shareOfNetBp: shareBp(sum.creatorMinor, sum.netMinor),
+    agencyShareOfNetBp: shareBp(sum.agencyMinor, sum.netMinor),
     shareOfPaidBp: shareBp(sum.creatorMinor, sum.grossInclVatMinor),
   }));
   const lines: CreatorEarningsLine[] = [...sales.lines]

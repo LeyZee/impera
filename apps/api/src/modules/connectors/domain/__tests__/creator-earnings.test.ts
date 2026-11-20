@@ -94,6 +94,7 @@ describe('her Ventes (CR-04)', () => {
         agencyMinor: 700,
         creatorMinor: 1400,
         shareOfNetBp: 6667,
+        agencyShareOfNetBp: 3333,
         shareOfPaidBp: 5000,
       },
       {
@@ -106,6 +107,7 @@ describe('her Ventes (CR-04)', () => {
         agencyMinor: 150,
         creatorMinor: 300,
         shareOfNetBp: 6667,
+        agencyShareOfNetBp: 3333,
         shareOfPaidBp: 5000,
       },
     ]);
@@ -144,6 +146,7 @@ describe('her Ventes (CR-04)', () => {
     ]);
     expect(Object.keys(read.totals[0] ?? {}).sort()).toEqual([
       'agencyMinor',
+      'agencyShareOfNetBp',
       'creatorMinor',
       'currency',
       'grossExclVatMinor',

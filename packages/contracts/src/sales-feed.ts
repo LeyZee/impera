@@ -811,6 +811,8 @@ export const CreatorEarningsTotalSchema = z.strictObject({
   creatorMinor: z.number().int(),
   /** Her part over the net. */
   shareOfNetBp: BasisPointsSchema,
+  /** The agency's part over the net. */
+  agencyShareOfNetBp: BasisPointsSchema,
   /** Her part over what her fans paid, VAT included. */
   shareOfPaidBp: BasisPointsSchema,
 });

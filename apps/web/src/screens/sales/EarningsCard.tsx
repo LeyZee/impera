@@ -1,14 +1,25 @@
-import { EARNINGS_PERIODS, type CreatorEarnings, type EarningsPeriod } from '@impera/contracts';
-import { useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import {
+  EARNINGS_PERIODS,
+  type CreatorEarnings,
+  type CreatorEarningsLine,
+  type CreatorEarningsTotal,
+  type EarningsPeriod,
+} from '@impera/contracts';
+import { useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
 import { useCreatorEarnings } from './api';
 import {
   countsOf,
   lineAmount,
   partOf,
+  pathOf,
+  per100,
   PERIOD_LABELS,
   periodName,
+  refundOf,
   SALE_TYPE_WORDS,
+  shareText,
+  stepAmount,
   stepDay,
 } from './earnings-view';
 import './earnings.css';
@@ -34,9 +45,10 @@ const dayOfSale = (at: string): string => SALE_DAY.format(new Date(at));
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 /**
- * « Ta part » (CR-04, Charles: « elle voit sa part seulement »): what she earns over a day, a fortnight or a month,
- * read from Reveal, and each sale with her part of it. Never what the fan paid, the agency's share nor who sold: the
- * server sends none of it. While the period runs, the amount is « estimé ».
+ * « Ta part » (CR-04, ADR 0157, Charles: « transparence à fond »): what she earns over a day, a fortnight or a month,
+ * read from Reveal, with the whole path of her sales (what her fans paid, the VAT, Reveal, the agency, her) and her
+ * share, then each sale, whose own path unfolds. Never who sold: the server sends none of it. While the period runs,
+ * the amounts are « estimés ».
  */
 export function EarningsCard(): JSX.Element {
   const [period, setPeriod] = useState<EarningsPeriod>('day');
@@ -120,12 +132,22 @@ export function EarningsCard(): JSX.Element {
             )}
           </div>
         </div>
-        <p className="vt-earn__part nv-num">{partOf(read)}</p>
+        <div className="vt-earn__hero">
+          <p className="vt-earn__part nv-num">{partOf(read)}</p>
+          {read.totals.length === 1 &&
+          read.totals[0] !== undefined &&
+          read.totals[0].shareOfNetBp !== null ? (
+            <span className="vt-earn__share nv-num">{shareText(read.totals[0].shareOfNetBp)} du net</span>
+          ) : null}
+        </div>
         <p className="vt-earn__meta">
           {[countsOf(read), read.estimated ? 'estimé, période en cours' : null, 'lu chez Reveal']
             .filter((part) => part !== null)
             .join(' · ')}
         </p>
+        {read.totals.map((total) => (
+          <Path key={total.currency} total={total} several={read.totals.length > 1} />
+        ))}
         <Lines earnings={read} />
       </PanelSection>
     </Panel>
@@ -184,7 +206,61 @@ function PeriodChoice({
   );
 }
 
-/** Each sale of the period, the newest first: when, what, the fan when Impera knows him, and her part of it. */
+/**
+ * Where the money of her fans went over the period, in one currency: a bar cut where it went (the VAT and Reveal in the
+ * neutral fold, the agency blue, her rose, as on the Dashboard), then each step with its amount, the agency's and hers
+ * with their share of the net. The bar is drawn only over money that came in.
+ */
+function Path({ total, several }: { total: CreatorEarningsTotal; several: boolean }): JSX.Element {
+  const steps = pathOf(total);
+  const sentence = per100(total);
+  const drawn = total.grossInclVatMinor > 0 && steps.every((step) => step.minor >= 0);
+  return (
+    <section
+      className="vt-path"
+      aria-label={several ? `Où va l’argent, en ${total.currency}` : 'Où va l’argent'}
+    >
+      {sentence === null ? null : <p className="vt-path__lead">{sentence}</p>}
+      {drawn ? (
+        <div className="vt-path__bar" aria-hidden="true">
+          {steps.map((step) => (
+            <span
+              key={step.part}
+              className="vt-path__seg"
+              data-part={step.part}
+              style={{ flexGrow: step.minor }}
+            />
+          ))}
+        </div>
+      ) : null}
+      <dl className="vt-path__steps">
+        <div className="vt-path__row is-paid">
+          <dt>Payé par tes fans</dt>
+          <dd className="nv-num">{stepAmount(total.grossInclVatMinor, total.currency)}</dd>
+        </div>
+        {steps.map((step) => (
+          <div key={step.part} className="vt-path__row" data-part={step.part}>
+            <dt>
+              <span className="vt-path__key" aria-hidden="true" />
+              {step.label}
+              {step.part === 'agency' || step.part === 'creator' ? (
+                <span className="vt-path__pct nv-num">
+                  {shareText(step.part === 'creator' ? total.shareOfNetBp : total.agencyShareOfNetBp)} du net
+                </span>
+              ) : null}
+            </dt>
+            <dd className="nv-num">
+              {step.part === 'creator' ? '' : '−'}
+              {stepAmount(step.minor, total.currency)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** Each sale of the period, the newest first: when, what, the fan when Impera knows him, what he paid and her part. */
 function Lines({ earnings }: { earnings: CreatorEarnings }): JSX.Element {
   if (earnings.lines.length === 0) {
     return <p className="vt-earn__none">Aucune vente sur cette période.</p>;
@@ -194,20 +270,7 @@ function Lines({ earnings }: { earnings: CreatorEarnings }): JSX.Element {
     <>
       <ul className={many ? 'vt-earn__lines is-dated' : 'vt-earn__lines'}>
         {earnings.lines.map((line, index) => (
-          <li
-            key={`${line.occurredAt}-${String(index)}`}
-            className={line.event === 'refund' ? 'vt-earn__line is-refund' : 'vt-earn__line'}
-          >
-            <span className="vt-earn__when nv-num">
-              {many ? `${dayOfSale(line.occurredAt)} · ` : ''}
-              {clockAt(line.occurredAt, SALES_ZONE)}
-            </span>
-            <span className="vt-earn__what">
-              <b>{line.event === 'refund' ? 'Remboursement' : SALE_TYPE_WORDS[line.saleType]}</b>
-              {line.fanName === null ? null : <span className="vt-earn__fan">{line.fanName}</span>}
-            </span>
-            <span className="vt-earn__amount nv-num">{lineAmount(line)}</span>
-          </li>
+          <Line key={`${line.occurredAt}-${String(index)}`} line={line} dated={many} />
         ))}
       </ul>
       {earnings.linesOmitted === 0 ? null : (
@@ -216,5 +279,60 @@ function Lines({ earnings }: { earnings: CreatorEarnings }): JSX.Element {
         </p>
       )}
     </>
+  );
+}
+
+/** One sale: a press unfolds its own path, its share of the net beside her part. */
+function Line({ line, dated }: { line: CreatorEarningsLine; dated: boolean }): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const detail = useId();
+  const refund = line.event === 'refund';
+  const from = refundOf(line, dayOf(line.occurredAt, SALES_ZONE));
+  return (
+    <li className={refund ? 'vt-earn__line is-refund' : 'vt-earn__line'}>
+      <button
+        type="button"
+        className="vt-earn__row"
+        aria-expanded={open}
+        aria-controls={detail}
+        onClick={() => {
+          setOpen((before) => !before);
+        }}
+      >
+        <span className="vt-earn__when nv-num">
+          {dated ? `${dayOfSale(line.occurredAt)} · ` : ''}
+          {clockAt(line.occurredAt, SALES_ZONE)}
+        </span>
+        <span className="vt-earn__what">
+          <b>{refund ? 'Remboursement' : SALE_TYPE_WORDS[line.saleType]}</b>
+          {from === null ? null : <span className="vt-earn__fan">{from}</span>}
+          {line.fanName === null ? null : <span className="vt-earn__fan">{line.fanName}</span>}
+        </span>
+        <span className="vt-earn__paid nv-num">
+          {refund ? 'rendu ' : 'payé '}
+          {stepAmount(line.grossInclVatMinor, line.currency)}
+        </span>
+        <span className="vt-earn__amount nv-num">{lineAmount(line)}</span>
+        <svg className="vt-earn__chev" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m4.5 6 3.5 3.5L11.5 6" />
+        </svg>
+      </button>
+      {open ? (
+        <ul id={detail} className="vt-earn__detail nv-swap">
+          {pathOf(line).map((step) => (
+            <li key={step.part} data-part={step.part}>
+              <span className="vt-path__key" aria-hidden="true" />
+              {step.label}
+              <span className="nv-num">
+                {stepAmount(step.minor, line.currency)}
+                {step.part === 'creator' && line.shareOfNetBp !== null
+                  ? ` · ${shareText(line.shareOfNetBp)} du net`
+                  : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
   );
 }
