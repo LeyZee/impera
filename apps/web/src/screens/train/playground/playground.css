@@ -1740,6 +1740,7 @@
 .pg-script__why {
   margin: 0;
   font-size: var(--nv-text-caption);
+  line-height: 17px;
   color: var(--nv-warning);
 }
 @media (prefers-reduced-motion: reduce) {
