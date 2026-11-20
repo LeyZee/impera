@@ -390,6 +390,19 @@ describe('maskQuoted (Sécurité on #895)', () => {
     expect(maskQuoted("l'élément est introuvable")).toBe("l'élément est introuvable");
   });
 
+  it('closes an apostrophe segment only where no letter or digit follows, as French writes (Sécurité on cf32be38)', () => {
+    expect(maskQuoted("received 'je t'aime fort' from the model")).toBe("received '[texte]' from the model");
+    expect(maskQuoted('received ‘j’ai envie de toi’ from the model')).toBe(
+      'received ‘[texte]’ from the model',
+    );
+    expect(maskQuoted("received 'aujourd'hui'")).toBe("received '[texte]'");
+    expect(maskQuoted("received 'je t'aime fort")).toBe("received '[texte]");
+    expect(maskQuoted("unknown option 'foo'")).toBe("unknown option 'foo'");
+    expect(maskQuoted("Cannot read properties of null (reading 'x')")).toBe(
+      "Cannot read properties of null (reading 'x')",
+    );
+  });
+
   it('masks the value of a Postgres duplicate key', () => {
     expect(
       maskQuoted(
@@ -405,6 +418,8 @@ describe('maskQuoted (Sécurité on #895)', () => {
       'a'.repeat(10_000),
       '"'.repeat(10_000),
       `'a`.repeat(5_000),
+      `'a'b`.repeat(2_500),
+      `‘a’b`.repeat(2_500),
       '=('.repeat(5_000),
       'x@'.repeat(5_000),
       'http'.repeat(2_500),

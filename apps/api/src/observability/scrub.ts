@@ -58,8 +58,21 @@ const IDENTIFIER = /^[\p{L}\p{N}_$.-]{1,40}$/u;
  * What an error quotes is masked (Sécurité on #895): `JSON.parse` quotes the start of what it was given (a model's
  * answer, a connector's body), a library quotes the value it refused, in the browser too, and that can be a fan's
  * sentence. Every segment between quotes becomes `[texte]` unless it is one identifier; a quote never closed masks to the
- * end; Postgres's `Key (column)=(value)` loses its value. An apostrophe inside a word (`l'élément`) opens nothing.
+ * end; Postgres's `Key (column)=(value)` loses its value. An apostrophe inside a word (`l'élément`) opens nothing,
+ * and closes nothing either: `'` and `’` close a segment only where no letter or digit follows them, so
+ * `'je t'aime fort'` is masked whole (French puts apostrophes inside what is quoted).
  */
+/** Closes like an apostrophe: the one followed by a letter or a digit is inside a word (`t'aime`, `j’ai`). */
+const APOSTROPHES: ReadonlySet<string> = new Set(["'", '’']);
+
+/** Where the segment opened before `from` closes, or -1: linear, never going back. */
+function closingIndex(text: string, closing: string, from: number): number {
+  let end = text.indexOf(closing, from);
+  if (!APOSTROPHES.has(closing)) return end;
+  while (end >= 0 && /[\p{L}\p{N}]/u.test(text.charAt(end + 1))) end = text.indexOf(closing, end + 1);
+  return end;
+}
+
 export function maskQuoted(text: string): string {
   let out = '';
   let index = 0;
@@ -81,7 +94,7 @@ export function maskQuoted(text: string): string {
       index += 1;
       continue;
     }
-    const end = text.indexOf(closing, index + 1);
+    const end = closingIndex(text, closing, index + 1);
     if (end < 0) return `${out}${char}${QUOTED_PLACEHOLDER}`;
     const quoted = text.slice(index + 1, end);
     out += `${char}${IDENTIFIER.test(quoted) ? quoted : QUOTED_PLACEHOLDER}${closing}`;
