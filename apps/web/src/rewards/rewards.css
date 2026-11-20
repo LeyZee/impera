@@ -1309,6 +1309,262 @@
     transform: translateX(100%);
   }
 }
+/* ── The finish: what makes the card a game's. Decoration only, all of it stops with « Réduire les animations ». ── */
+
+/* The light under the pointer, and the embers that rise while it is on the card. */
+.rw-quest__body {
+  position: relative;
+}
+.rw-quest__spot {
+  position: absolute;
+  inset: calc(var(--nv-plate-pad) * -3) calc(var(--nv-plate-pad) * -1) 0;
+  pointer-events: none;
+  background: radial-gradient(
+    260px circle at var(--rw-quest-x, 50%) var(--rw-quest-y, 50%),
+    color-mix(in srgb, var(--rw-fire-mid) 16%, transparent),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity var(--nv-dur-slow);
+}
+.rw-quest__embers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--nv-dur-slow);
+}
+.rw-quest__embers i {
+  position: absolute;
+  bottom: -6px;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rw-fire-hot);
+  box-shadow: 0 0 6px var(--rw-fire-mid);
+  animation: rw-quest-ember calc(var(--nv-dur-ceremony) + var(--_i, 0) * 260ms) linear infinite;
+  animation-delay: calc(var(--_i, 0) * -410ms);
+  animation-play-state: paused;
+}
+@keyframes rw-quest-ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(1);
+  }
+  15% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc((var(--_i, 0) - 3) * 9px), -190px) scale(0.3);
+  }
+}
+
+/* The rank: it lands with a spring, a ring leaves it, a slow fire turns behind it. */
+.rw-quest__insignia {
+  position: relative;
+  animation: rw-quest-land var(--nv-dur-morph) var(--nv-ease-spring-bouncy) both;
+}
+.rw-quest__insignia > svg {
+  position: relative;
+}
+@keyframes rw-quest-land {
+  from {
+    opacity: 0;
+    transform: scale(0.5) rotate(-18deg);
+  }
+}
+.rw-quest__insignia::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 2px var(--rw-fire-hot);
+  opacity: 0;
+  animation: rw-quest-ring var(--nv-dur-data) var(--nv-ease-out) var(--nv-dur-base) both;
+}
+@keyframes rw-quest-ring {
+  from {
+    opacity: 0.8;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+.rw-quest__halo {
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    var(--rw-fire-hot) 18%,
+    transparent 38%,
+    var(--rw-fire-mid) 62%,
+    transparent 82%
+  );
+  filter: blur(9px);
+  opacity: 0.45;
+  transition: opacity var(--nv-dur-slow);
+  animation: rw-quest-turn calc(var(--nv-dur-ambient) / 2) linear infinite;
+}
+@keyframes rw-quest-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* The figure burns like the bar it reads. */
+.rw-quest__percent {
+  background: linear-gradient(100deg, var(--rw-fire-deep), var(--rw-fire-mid) 70%, var(--rw-fire-hot));
+  background-clip: text;
+  color: transparent;
+}
+
+/* The fire takes: the flames rise once the bar has started, the flame at its head springs up. */
+.rw-quest__fire {
+  transform-origin: 50% 100%;
+  transition:
+    width var(--nv-dur-data) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.rw-quest__trail {
+  animation: rw-quest-take var(--nv-dur-progress) var(--nv-ease-out) var(--nv-dur-fast) both;
+}
+@keyframes rw-quest-take {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+    transform-origin: 50% 100%;
+  }
+}
+
+/* A step the fire crosses on this arrival flashes as it is reached. */
+.rw-quest__mark[data-crossed='true'] {
+  animation: rw-quest-cross var(--nv-dur-slow) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-dur-data) * var(--_d, 0) * 0.55);
+}
+@keyframes rw-quest-cross {
+  0% {
+    background: var(--nv-ink-faint);
+    opacity: 0.5;
+  }
+  35% {
+    background: var(--rw-fire-core);
+    opacity: 1;
+    transform: scale(2.4, 2.2);
+    box-shadow: 0 0 14px 3px var(--rw-fire-hot);
+  }
+}
+
+/* The rank ahead calls: a ring breathes around it. */
+.rw-quest__end {
+  position: relative;
+  border-radius: var(--nv-radius-full);
+}
+.rw-quest__end::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1.5px var(--rw-fire-glow);
+  animation: rw-quest-call var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
+}
+@keyframes rw-quest-call {
+  from {
+    opacity: 0.2;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 0.9;
+    transform: scale(1.1);
+  }
+}
+
+/* The goal about to be reached: a light runs round its edge. */
+.rw-quest__goal {
+  position: relative;
+}
+.rw-quest__goal[data-near='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, var(--rw-fire-core) 50%, transparent 65%) 130% 0 / 300%
+    100% no-repeat;
+  mask:
+    linear-gradient(black, black) content-box exclude,
+    linear-gradient(black, black);
+  animation: rw-quest-edge calc(var(--nv-dur-ceremony) * 1.2) var(--nv-ease-in-out) infinite;
+}
+@keyframes rw-quest-edge {
+  to {
+    background-position: -60% 0;
+  }
+}
+
+@media (hover: hover) {
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__spot,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__embers {
+    opacity: 1;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__embers i {
+    animation-play-state: running;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__halo {
+    opacity: 0.9;
+  }
+  /* The fire flares under the pointer. */
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fire {
+    transform: scaleY(1.45);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fill {
+    box-shadow: 0 0 26px 4px var(--rw-fire-glow);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fire b {
+    animation-duration: calc(var(--nv-dur-breathe) * 0.5);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__end {
+    transform: scale(1.2) rotate(8deg);
+    color: var(--rw-fire-mid);
+    filter: drop-shadow(0 0 8px var(--rw-fire-glow));
+  }
+  /* The goals rise one after the other, the nearest first. */
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal {
+    transform: translateY(-3px);
+    transition-delay: calc((var(--nv-i, 2) - 2) * 60ms);
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal > svg {
+    color: var(--rw-fire-mid);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rw-quest__spot,
+  .rw-quest__embers,
+  .rw-quest__insignia::after,
+  .rw-quest__end::after,
+  .rw-quest__goal[data-near='true']::after {
+    display: none;
+  }
+  .rw-quest__insignia,
+  .rw-quest__halo,
+  .rw-quest__trail,
+  .rw-quest__mark[data-crossed='true'] {
+    animation: none;
+  }
+  .rw-quest__fire {
+    transition: none;
+  }
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__fire,
+  .rw-quest:has(.sc-card-link:hover) .rw-quest__goal {
+    transform: none;
+  }
+}
 @media (max-width: 520px) {
   .rw-quest__name {
     font-size: var(--nv-text-title-2);

@@ -20,6 +20,9 @@ const still = (): boolean =>
 
 const percentText = (value: number): string => `${String(Math.round(value))} %`;
 
+/** Where the embers of the card rise from, in hundredths of its width. */
+const EMBERS = [6, 17, 29, 41, 52, 64, 73, 85, 94] as const;
+
 /** The steps of the way, lit once the bar has passed them. */
 const MARKS = [25, 50, 75] as const;
 
@@ -113,7 +116,12 @@ function RankBar({
               key={mark}
               className="rw-quest__mark"
               data-passed={percent >= mark}
-              style={{ left: `${String(mark)}%` }}
+              // A step the bar crosses on this arrival flashes as the fire reaches it.
+              data-crossed={from < mark && percent >= mark}
+              style={{
+                left: `${String(mark)}%`,
+                '--_d': percent > from ? (mark - from) / (percent - from) : 0,
+              }}
             />
           ))}
         </div>
@@ -163,6 +171,22 @@ function GoalRow({ goal, index }: { goal: Goal; index: number }): JSX.Element {
  */
 export function MyProgressCard({ user }: { user: Me }): JSX.Element | null {
   const trophyCase = useMyTrophyCase(playsTheGame(user)).data;
+  const body = useRef<HTMLDivElement>(null);
+  const shown = trophyCase !== undefined;
+  // The card's light follows the pointer: where it is goes to the styles, nothing else is read from it.
+  useEffect(() => {
+    const card = body.current?.closest<HTMLElement>('.rw-quest');
+    if (card === null || card === undefined) return undefined;
+    const follow = (event: PointerEvent): void => {
+      const box = card.getBoundingClientRect();
+      card.style.setProperty('--rw-quest-x', `${String(event.clientX - box.left)}px`);
+      card.style.setProperty('--rw-quest-y', `${String(event.clientY - box.top)}px`);
+    };
+    card.addEventListener('pointermove', follow);
+    return () => {
+      card.removeEventListener('pointermove', follow);
+    };
+  }, [shown]);
   if (trophyCase === undefined) return null;
   const { level } = trophyCase;
   const nextLevel = trophyCase.nextLevel ?? null;
@@ -174,10 +198,18 @@ export function MyProgressCard({ user }: { user: Me }): JSX.Element | null {
   return (
     <Panel className="rw-quest sc-linked nv-enter" eyebrow="Ma progression">
       <Link to="/moi/trophees" className="sc-card-link" aria-label="Voir mes trophées" />
-      <div className="rw-quest__body">
+      <div className="rw-quest__body" ref={body}>
+        {/* Drawn only: the light that follows the pointer, the embers that rise under it. */}
+        <span className="rw-quest__spot" aria-hidden="true" />
+        <span className="rw-quest__embers" aria-hidden="true">
+          {EMBERS.map((at) => (
+            <i key={at} style={{ left: `${String(at)}%`, '--_i': at % 7 }} />
+          ))}
+        </span>
         <div className="rw-quest__head">
           {ranked ? (
             <span className="rw-quest__insignia">
+              <span className="rw-quest__halo" aria-hidden="true" />
               <LevelInsignia rank={level?.rank ?? 1} earned={level !== null} size={64} />
             </span>
           ) : null}
