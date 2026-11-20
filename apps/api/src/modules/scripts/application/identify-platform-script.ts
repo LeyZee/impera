@@ -15,9 +15,10 @@ export type IdentifyOutcome =
   | 'identified'
   /** This version has one validated, by hand, or by the brain with the prompt of now. */
   | 'already'
-  /** Her switch is off: the brain writes nothing for her. */
-  | 'off'
-  /** A photo or a video has no validated description yet: the hourly backlog asks again. */
+  /**
+   * A media not chosen for the CRM (ADR 0145 § 5), no media at all, or a photo or a video without a validated
+   * description yet: nothing is paid, the hourly backlog asks again.
+   */
   | 'waiting'
   /**
    * Branches (ADR 0112): its prompt reads the steps one after the other, so the agency writes such an identity by hand
@@ -47,9 +48,12 @@ export async function identifyPlatformScript(
 ): Promise<IdentifyOutcome> {
   const target = await deps.store.target(request.creatorId, request.platformScriptId);
   if (target === null) return 'gone';
-  if (!target.describes) return 'off';
   const { script, descriptions } = target;
   if (hasBranches(script.steps)) return 'branched';
+  // Only a script whose every media the owner chose for the CRM (ADR 0145 § 5): nothing is told of what is not in it,
+  // and a script without any media is never told of itself, with no gesture of hers (its identity is written by hand).
+  const media = script.steps.flatMap((step) => [...step.media, ...step.previewMedia]);
+  if (media.length === 0 || media.some((each) => each.vault?.imported !== true)) return 'waiting';
   const source = identitySourceOf(script);
   if (!identityReady(source)) return 'waiting';
   const inputHash = identityInputHash(source);

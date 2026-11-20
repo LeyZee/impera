@@ -195,10 +195,12 @@ describe('the price warnings of P6-01, never a refusal', () => {
 });
 
 describe('what keeps a native script from being proposable', () => {
-  const inVault = { kind: 'image' as const, inVault: true, described: true };
+  const inVault = { kind: 'image' as const, inVault: true, imported: true, described: true };
   const step = (
     _platformIndex: number,
-    ...media: (typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; described: boolean })[]
+    ...media: (
+      typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; imported: boolean; described: boolean }
+    )[]
   ) => ({ discounted: false, media });
 
   it('needs each media in the vault and described, and the identity validated', () => {
@@ -207,8 +209,8 @@ describe('what keeps a native script from being proposable', () => {
     expect(
       platformScriptGaps(
         [
-          step(0, inVault, { kind: 'image', inVault: false, described: false }),
-          step(1, { kind: 'image', inVault: true, described: false }),
+          step(0, inVault, { kind: 'image', inVault: false, imported: false, described: false }),
+          step(1, { kind: 'image', inVault: true, imported: true, described: false }),
         ],
         true,
         [],
@@ -216,9 +218,31 @@ describe('what keeps a native script from being proposable', () => {
     ).toEqual(['media_absent', 'media_not_described']);
   });
 
+  it('never offers a script whose media is in the vault but not imported into the CRM (ADR 0145 § 5)', () => {
+    expect(
+      platformScriptGaps(
+        [step(0, inVault, { kind: 'image', inVault: true, imported: false, described: true })],
+        true,
+        [],
+      ),
+    ).toEqual(['media_not_imported']);
+    // A voice note too: the agent does not see what is not in the CRM.
+    expect(
+      platformScriptGaps(
+        [step(0, { kind: 'audio', inVault: true, imported: false, described: false })],
+        true,
+        [],
+      ),
+    ).toEqual(['media_not_imported']);
+  });
+
   it('never waits for a voice note to be described: the vision never hears one', () => {
     expect(
-      platformScriptGaps([step(0, { kind: 'audio', inVault: true, described: false })], true, []),
+      platformScriptGaps(
+        [step(0, { kind: 'audio', inVault: true, imported: true, described: false })],
+        true,
+        [],
+      ),
     ).toEqual([]);
   });
 

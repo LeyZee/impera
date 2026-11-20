@@ -199,6 +199,8 @@ interface VaultLink {
    * identity is written from (SC-04 lot c8); `null` while there is none.
    */
   readonly descriptionId: string | null;
+  /** Chosen for the CRM, by its own tick or its folder's (ADR 0145 § 5): `false`, the agent does not see it. */
+  readonly imported: boolean;
 }
 
 /** A media of a step, by the platform's id of the vault media. */
@@ -301,8 +303,6 @@ export interface DiscountedPlatformScript {
 /** What the identity job reads of a script, as the service role. */
 export interface IdentityTarget {
   readonly script: StoredPlatformScript;
-  /** Her descriptions switch (`creators.settings.describeDrops`): off, the brain writes nothing for her. */
-  readonly describes: boolean;
   /** The `detailed` text of each validated description its media name, by row. */
   readonly descriptions: ReadonlyMap<string, string>;
 }
