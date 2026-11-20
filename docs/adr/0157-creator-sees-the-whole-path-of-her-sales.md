@@ -1,6 +1,6 @@
 # 0157. « Ta part » montre tout le chemin de ses ventes : ce que ses fans ont payé, la TVA, Reveal, l'agence et elle, avec son pourcentage
 
-Statut : proposed (choix de Charles du 20/11/2026, 14 h 36, heure de Paris, « Tout le chemin de ses ventes », carte de décision du fil Équipe, après sa remarque de 14 h 34 sur la première version de « Ta part »)
+Statut : accepted (Charles, 20/11/2026, 14 h 36, heure de Paris : « Tout le chemin de ses ventes » sur la carte de décision du fil Équipe, dont la conséquence disait « Payé par les fans, TVA, part de Reveal, part de l'agence, sa part et son pourcentage, sur SES ventes. Rien sur les chatteurs ni les autres créatrices. » ; après sa remarque de 14 h 34 sur la première version de « Ta part »)
 Date : 2026-11-20
 Remplace : dans la fiche CR-04 et le contrat `CreatorEarnings`, la règle « elle voit sa part seulement » (décision de Charles du 17/11, reprise le 20/11 dans la première version de « Ta part »).
 Amende : l'ADR 0054 § 4, « Elle est montrée là où est le pourcentage, au propriétaire seul » (§ 3 ci-dessous).
@@ -14,7 +14,7 @@ Le 20/11, Charles ne la valide pas : il veut un écran plus joli et plus intuiti
 
 L'ADR 0042 § 6 prévoyait déjà ce parcours ligne par ligne. L'ADR 0054 a gardé chaque montant tel que Reveal le donne, et réservé la part constatée de l'agence au propriétaire. Le registre des ventes de Reveal porte, pour chaque vente, le prix payé, le hors-taxes, le net, la part de l'agence et celle du modèle : tout le chemin se lit sans rien recalculer.
 
-Sur sa carte de décision, Charles a choisi « Tout le chemin de ses ventes » plutôt que « Total, agence et elle » ou « Sa part et son pourcentage ».
+Sur sa carte de décision, Charles a choisi « Tout le chemin de ses ventes » plutôt que « Total, agence et sa part » ou « Sa part seulement ».
 
 ## Décision
 
@@ -54,8 +54,20 @@ Sur sa carte de décision, Charles a choisi « Tout le chemin de ses ventes » p
 
 - Elle lit ses ventes par la vue `creator_sales`, qui n'a pas le vendeur (ADR 0054 § 3). Cette vue porte déjà les colonnes du chemin (prix payé, hors-taxes, net, part de l'agence, sa part) : **aucune migration**, aucun droit de base nouveau. Seule la réponse de l'API, qui ne laissait sortir que sa part, s'élargit au chemin.
 - Les politiques de lignes ne changent pas : elle lit ses comptes et rien d'autre.
-- Le contrat de « Ta part » reste strict : ni vendeur, ni commission, ni champ d'équipe ne peut passer.
-- Sécurité relit ce droit de lecture avant le code.
+- La route de « Ta part » ne lit que cette vue : jamais `platform_sales` ni une table de la paie.
+- Le contrat de « Ta part » reste strict : ni vendeur, ni source (IA ou humain), ni shift, ni identifiant de membre, même indirect, ne peut passer.
+
+### 6. Ce qui le garantit
+
+- **Le pourcentage est calculé par le serveur, sur des sommes** : sa part divisée par le net, remboursements et annulations compris. Un net nul ou une part inconnue donne un tiret, jamais une valeur déduite.
+- **Le pourcentage d'une vente ne désigne pas le vendeur.** Reveal partage chaque vente entre le modèle et l'agence selon le partage du modèle, sans savoir qui a vendu : la part de l'agence ne varie pas selon le chatteur. Si un jour elle variait selon le vendeur, le pourcentage par vente disparaîtrait de l'écran.
+- **Tests** :
+  - la liste exacte des clés de la réponse, pour une vente et pour une période, est figée ;
+  - une créatrice ne lit rien d'une autre, ni d'un compte archivé, et un compte partagé entre plusieurs créatrices reste refusé comme aujourd'hui ;
+  - l'équipe et le propriétaire n'entrent pas par cette route ;
+  - aucun de ces montants n'est écrit dans les journaux ni envoyé au suivi d'erreurs.
+- **Toute autre porte** qui servirait ces chiffres (export, agent connecté) suit le même contrat. Aujourd'hui il n'y en a aucune.
+- Sécurité a relu ce droit de lecture avant le code (fil Sécurité, 20/11/2026).
 
 ## Conséquences
 
@@ -66,10 +78,10 @@ Positives :
 
 Négatives, à surveiller :
 - Elle voit ce que prend l'agence vente par vente. C'est voulu (Charles, « transparence à fond »), mais une question sur le partage arrivera plus vite à l'agence.
-- Un écart entre le pourcentage constaté et le pourcentage convenu se verra chez elle avant d'être expliqué. L'alerte d'écart de l'ADR 0054 § 5 prévient le propriétaire au même moment.
+- **En voyant son pourcentage constaté, elle peut constater elle-même un écart avec ce qui était convenu.** C'est la conséquence du choix de Charles, pas une fuite. Elle le verra parfois avant que l'agence l'ait expliqué ; l'alerte d'écart de l'ADR 0054 § 5 prévient le propriétaire au même moment.
 
 ## Alternatives rejetées
 
-- **Total, agence et elle**, sans la TVA ni la part de Reveal : le net « disparaît » entre le prix payé et les deux parts, et la question « où est passé le reste ? » reste ouverte.
-- **Sa part et son pourcentage seulement** : pas de chiffre global, ce que Charles a demandé.
+- **Total, agence et sa part**, sans la TVA ni la part de Reveal : le net « disparaît » entre le prix payé et les deux parts, et la question « où est passé le reste ? » reste ouverte.
+- **Sa part seulement** (sa part et son pourcentage) : pas de chiffre global, ce que Charles a demandé.
 - **Calculer le chemin avec la TVA et le pourcentage convenu** : deux chiffres pour une même vente, le nôtre et celui de Reveal (ADR 0054, alternatives).
