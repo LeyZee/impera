@@ -263,7 +263,7 @@ export function AgendaPage({
       ) : (
         <>
           {/* Her week of shooting, once the agency sent it: above the views, on every one of them (ADR 0140). */}
-          <WeekCard monday={monday} zone={agenda.timeZone} />
+          <WeekCard monday={monday} zone={agenda.timeZone} today={herToday} />
           <Views
             agenda={agenda}
             view={seen}

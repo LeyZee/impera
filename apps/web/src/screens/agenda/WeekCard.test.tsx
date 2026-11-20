@@ -71,7 +71,7 @@ function serve(read: unknown): { method: string; url: string; body: unknown }[] 
 const show = () =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <WeekCard monday={MONDAY} zone="Europe/Paris" />
+      <WeekCard monday={MONDAY} zone="Europe/Paris" today="2026-11-24" />
     </QueryClientProvider>,
   );
 
@@ -95,7 +95,11 @@ describe('her week of shooting', () => {
     show();
     const accept = await screen.findByRole('button', { name: 'Accepter ma semaine' });
     expect(screen.queryByRole('button', { name: /Cocher/ })).toBeNull();
-    expect(screen.getByText(/À livrer avant dimanche 29/)).toBeTruthy();
+    const steps = screen.getByRole('list', { name: 'Ta semaine en trois étapes' });
+    expect(steps.textContent).toContain('Tournemer. 25');
+    expect(steps.textContent).toContain('Dépose8 sur 9');
+    expect(steps.textContent).toMatch(/Avantdim\. 29, 23.h/);
+    expect(screen.getByText('Demain')).toBeTruthy();
     fireEvent.click(accept);
     await waitFor(() => {
       expect(sent).toEqual([
@@ -119,6 +123,6 @@ describe('her week of shooting', () => {
     });
     expect(screen.getByText('1 / 2', { selector: '.wk-day__count' })).toBeTruthy();
     expect(screen.getByText('7 / 7')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Déposer' }).getAttribute('href')).toBe('/contenu');
+    expect(screen.getByRole('link', { name: 'Déposer mes contenus' }).getAttribute('href')).toBe('/contenu');
   });
 });
