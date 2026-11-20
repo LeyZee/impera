@@ -9,13 +9,14 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
-  agesDue,
   callsLeft,
   dayHasStory,
   grantOf,
   planReadings,
+  readingBudget,
   readingFailureAlert,
   snapshotsOf,
+  stepsDue,
   tokenState,
 } from '../instagram-insights';
 
@@ -72,41 +73,62 @@ describe('what a grant of Meta lets the account do (ADR 0120 § 1)', () => {
   });
 });
 
-describe('the readings kept by age (ADR 0120 § 2)', () => {
-  it('keeps nothing before the first age', () => {
-    expect(agesDue(published, after(0.5), [])).toEqual([]);
+describe('the readings kept by age, and the steps missed (ADR 0120 § 2, amendment of 20/11/2026)', () => {
+  const media = { ref: ref('m1'), publishedAt: published.toISOString() };
+
+  it('owes nothing before the first age', () => {
+    expect(stepsDue(published, after(0.5), [])).toEqual({ fill: null, missed: [] });
   });
 
-  it('keeps an age at the first reading made after it', () => {
-    expect(agesDue(published, after(1), [])).toEqual(['1h']);
-    expect(agesDue(published, after(30), ['1h'])).toEqual(['24h']);
-    expect(agesDue(published, after(24 * 7), ['1h', '24h', '48h'])).toEqual(['7d']);
+  it('fills the step whose window holds the age of the media, and one step at most', () => {
+    expect(stepsDue(published, after(1), [])).toEqual({ fill: '1h', missed: [] });
+    expect(stepsDue(published, after(23.9), [])).toEqual({ fill: '1h', missed: [] });
+    expect(stepsDue(published, after(30), ['1h'])).toEqual({ fill: '24h', missed: [] });
+    expect(stepsDue(published, after(24 * 7), ['1h', '24h', '48h'])).toEqual({ fill: '7d', missed: [] });
   });
 
-  it('never replaces an age already kept: a later reading, or a job replayed, writes nothing', () => {
-    expect(agesDue(published, after(30), ['1h', '24h'])).toEqual([]);
-    expect(
-      snapshotsOf({ ref: ref('m1'), publishedAt: published.toISOString() }, numbers, after(30), [
-        '1h',
-        '24h',
-      ]),
-    ).toEqual([]);
-  });
-
-  it('keeps the real instant of a late reading beside every age it fills', () => {
-    const readAt = after(60);
-    expect(
-      snapshotsOf({ ref: ref('m1'), publishedAt: published.toISOString() }, numbers, readAt, ['1h']),
-    ).toEqual([
-      { mediaRef: 'm1', age: '24h', readAt: readAt.toISOString(), numbers },
-      { mediaRef: 'm1', age: '48h', readAt: readAt.toISOString(), numbers },
+  it('marks missed a step whose window passed without a reading: a late figure never enters it', () => {
+    expect(stepsDue(published, after(24), [])).toEqual({ fill: '24h', missed: ['1h'] });
+    expect(stepsDue(published, after(24 * 3), ['1h'])).toEqual({ fill: '48h', missed: ['24h'] });
+    const late = after(24 * 3);
+    expect(snapshotsOf(media, numbers, late, [])).toEqual([
+      { mediaRef: 'm1', age: '1h', readAt: late.toISOString(), numbers: null },
+      { mediaRef: 'm1', age: '24h', readAt: late.toISOString(), numbers: null },
+      { mediaRef: 'm1', age: '48h', readAt: late.toISOString(), numbers },
     ]);
+  });
+
+  it('does not fill seven days at exactly fourteen: every step is missed, and nothing is left to read', () => {
+    expect(stepsDue(published, after(24 * 14 - 0.1), ['1h', '24h', '48h'])).toEqual({
+      fill: '7d',
+      missed: [],
+    });
+    expect(stepsDue(published, after(24 * 14), ['1h', '24h', '48h'])).toEqual({ fill: null, missed: ['7d'] });
+    expect(stepsDue(published, after(24 * 400), [])).toEqual({
+      fill: null,
+      missed: ['1h', '24h', '48h', '7d'],
+    });
+  });
+
+  it('never replaces a step already kept, read or missed: a job replayed writes nothing', () => {
+    expect(stepsDue(published, after(30), ['1h', '24h'])).toEqual({ fill: null, missed: [] });
+    expect(snapshotsOf(media, numbers, after(30), ['1h', '24h'])).toEqual([]);
+    expect(snapshotsOf(media, numbers, after(24 * 400), ['1h', '24h', '48h', '7d'])).toEqual([]);
+  });
+
+  it('keeps only the missed steps when there was no reading, and leaves the open step due', () => {
+    const at = after(30);
+    expect(snapshotsOf(media, null, at, [])).toEqual([
+      { mediaRef: 'm1', age: '1h', readAt: at.toISOString(), numbers: null },
+    ]);
+    expect(stepsDue(published, at, ['1h'])).toEqual({ fill: '24h', missed: [] });
   });
 });
 
 describe('the plan of a run under the quota of Meta (ADR 0120 § 2)', () => {
   const media = [
     { ref: ref('old'), publishedAt: after(-24 * 30).toISOString() },
+    { ref: ref('week'), publishedAt: after(-24 * 8).toISOString() },
     { ref: ref('recent'), publishedAt: after(-2).toISOString() },
     { ref: ref('done'), publishedAt: after(-24 * 30).toISOString() },
     { ref: ref('fresh'), publishedAt: after(-0.5).toISOString() },
@@ -114,14 +136,24 @@ describe('the plan of a run under the quota of Meta (ADR 0120 § 2)', () => {
   const kept = (one: InstagramMediaRef): readonly SnapshotAge[] =>
     one === 'done' ? ['1h', '24h', '48h', '7d'] : [];
 
-  it('reads only the media with an age due, the most recent first', () => {
-    expect(planReadings(media, kept, published, 10)).toEqual({ toRead: ['recent', 'old'], deferred: 0 });
+  it('reads only the media with a step to fill now, the most recent first', () => {
+    expect(planReadings(media, kept, published, 10)).toEqual({ toRead: ['recent', 'week'], deferred: 0 });
+  });
+
+  it('spends no call on a media that only has missed steps', () => {
+    expect(planReadings(media, kept, published, 10).toRead).not.toContain('old');
   });
 
   it('stops at the budget and says what waits, without ever looping', () => {
     expect(planReadings(media, kept, published, 1)).toEqual({ toRead: ['recent'], deferred: 1 });
     expect(planReadings(media, kept, published, 0)).toEqual({ toRead: [], deferred: 2 });
     expect(planReadings(media, kept, published, -3)).toEqual({ toRead: [], deferred: 2 });
+  });
+
+  it('pays the listings before the readings', () => {
+    expect(readingBudget(10, 2, true)).toBe(7);
+    expect(readingBudget(10, 0, false)).toBe(10);
+    expect(readingBudget(2, 3, true)).toBe(0);
   });
 
   it('leaves a margin under the hourly limit', () => {
