@@ -9,7 +9,12 @@ import {
 import { sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
-import { shiftDay, type AgencyCreatorRead, type StatsDay } from '../../domain/agency-insights';
+import {
+  shiftDay,
+  type AgencyCreatorRead,
+  type RefundRead,
+  type StatsDay,
+} from '../../domain/agency-insights';
 
 import type { SalesTotalsOf } from './reveal-sales-reader';
 
@@ -21,6 +26,15 @@ export type DailyStatsOf = (
   tx: Transaction,
   range: { readonly from: string; readonly to: string },
 ) => Promise<readonly StatsDay[]>;
+
+/**
+ * The connectors' `salesFeedTotals.refundListOf` (ADR 0092 § 4), given by the composition root: the refunds the totals
+ * of the days take off, one by one, read in the caller's transaction.
+ */
+export type RefundListOf = (
+  tx: Transaction,
+  query: { readonly creatorId: CreatorId; readonly from: string; readonly to: string },
+) => Promise<readonly RefundRead[]>;
 
 /** What the route reads of one creator: nothing out of the account's team scope, nothing before a register is linked. */
 type AgencyCreatorAnswer =
@@ -80,6 +94,7 @@ export function createAgencyInsightsReader(
   totalsOf: SalesTotalsOf,
   timeZoneOf: (platform: Platform) => string | null,
   statsOf: DailyStatsOf,
+  refundListOf: RefundListOf,
 ): AgencyInsightsReader {
   return {
     read: (creatorId, userId, range) =>
@@ -99,6 +114,7 @@ export function createAgencyInsightsReader(
         );
         if (creator === undefined) return { kind: 'not_linked' };
         const totals = await totalsOf(tx, { creatorId, from: range.previousFrom, to: range.to });
+        const refunds = await refundListOf(tx, { creatorId, from: range.from, to: range.to });
         // The period's instants: from the first day's midnight to the midnight after today, in the platform's zone.
         const start = sql`((${range.from}::date)::timestamp at time zone ${zone})`;
         const end = sql`((${range.to}::date + 1)::timestamp at time zone ${zone})`;
@@ -204,6 +220,7 @@ export function createAgencyInsightsReader(
               previous: row.previous,
               seenBefore: row.seen_before,
             })),
+            refunds,
             refundsWithoutSale: orphans?.refunds ?? 0,
             registerSince: first?.since ?? null,
             stats,

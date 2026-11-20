@@ -37,6 +37,7 @@ import {
   dayStacks,
   deltaText,
   euros,
+  exactEuros,
   heatOf,
   hourLabel,
   hoursLabel,
@@ -51,6 +52,11 @@ import {
   OTHER_KINDS_NOTE,
   ppvRate,
   readAtLabel,
+  REFUND_KIND,
+  refundDateLabel,
+  refundDelayLabel,
+  refundsKept,
+  sellerKeyOf,
   SELLER_NOTES,
   sellerRanking,
   shareOf,
@@ -68,6 +74,7 @@ import {
 import './agency.css';
 
 import { initialOf } from '@/lib/utils';
+import { Select, type SelectOption } from '@/shell/Select';
 import { Failure } from '@/shell/states';
 
 /*
@@ -1277,6 +1284,105 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   );
 }
 
+const ALL = 'all';
+
+/** A seller as « Qui a vendu » names him. */
+const sellerLabel = (seller: AgencyInsights['refundList'][number]['seller']): string =>
+  seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind];
+
+/**
+ * The period's refunds one by one (ADR 0092 § 4): when, whose, what, how much, who sold it and how long after the sale.
+ * Read only; filtered by creator and by the sale's chatter, each filter shown only when it has a choice to make.
+ */
+function Refunds({ insights }: { insights: AgencyInsights }): JSX.Element {
+  const [creatorId, setCreatorId] = useState<string>(ALL);
+  const [seller, setSeller] = useState<string>(ALL);
+  const list = insights.refundList;
+  const names = new Map(insights.creators.map((one) => [one.creatorId, one.name] as const));
+  const creatorChoices: SelectOption<string>[] = [
+    { value: ALL, label: 'Toutes les créatrices' },
+    ...insights.creators
+      .filter((one) => list.some((refund) => refund.creatorId === one.creatorId))
+      .map((one) => ({ value: one.creatorId, label: one.name })),
+  ];
+  const sellers = new Map(list.map((one) => [sellerKeyOf(one.seller), sellerLabel(one.seller)] as const));
+  const sellerChoices: SelectOption<string>[] = [
+    { value: ALL, label: 'Tous les chatteurs' },
+    ...[...sellers].map(([value, label]) => ({ value, label })),
+  ];
+  const kept = refundsKept(list, creatorId, seller);
+  const several = insights.creators.length > 1;
+  return (
+    <div className="nv-plate ins-refunds">
+      {creatorChoices.length > 2 || sellerChoices.length > 2 ? (
+        <div className="ins-refunds__filters">
+          {several && creatorChoices.length > 2 ? (
+            <Select
+              className="ins-refunds__select"
+              ariaLabel="Créatrice"
+              listWidth="options"
+              search="never"
+              value={creatorId}
+              options={creatorChoices}
+              onChange={setCreatorId}
+            />
+          ) : null}
+          {sellerChoices.length > 2 ? (
+            <Select
+              className="ins-refunds__select"
+              ariaLabel="Chatteur de la vente"
+              listWidth="options"
+              search="never"
+              value={seller}
+              options={sellerChoices}
+              onChange={setSeller}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {kept.length === 0 ? (
+        <p className="ins-refunds__none">Aucun remboursement pour ce choix.</p>
+      ) : (
+        <table className="ins-refunds__table">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              {several ? <th scope="col">Créatrice</th> : null}
+              <th scope="col">Type</th>
+              <th scope="col" className="ins-refunds__money">
+                Montant
+              </th>
+              <th scope="col" className="ins-refunds__seller">
+                Chatteur de la vente
+              </th>
+              <th scope="col">Délai depuis la vente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {kept.map((one, i) => (
+              <tr key={`${one.refundedAt}-${String(i)}`}>
+                <td className="ins-refunds__date">{refundDateLabel(one.refundedAt, insights.timeZone)}</td>
+                {several ? <td className="ins-refunds__who">{names.get(one.creatorId) ?? '—'}</td> : null}
+                <td className="ins-refunds__kind">{REFUND_KIND[one.kind]}</td>
+                <td className="ins-refunds__money">
+                  {one.amountMinor === null ? '—' : exactEuros(one.amountMinor)}
+                </td>
+                <td
+                  className="ins-refunds__seller"
+                  data-named={one.seller.kind === 'member' || one.seller.kind === 'agent' ? '' : undefined}
+                >
+                  {sellerLabel(one.seller)}
+                </td>
+                <td className="ins-refunds__delay">{refundDelayLabel(one.delayDays)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 /** The paying fans: how many, how many new, and how much the ten biggest weigh. */
 function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   const { fans } = insights;
@@ -1791,6 +1897,12 @@ export function AgencyInsightsPanel({
         >
           <Fans insights={insights} />
         </Section>
+
+        {insights.refundList.length > 0 ? (
+          <Section title="Les remboursements" sub="un par un, lus dans le registre des ventes" index={next()}>
+            <Refunds insights={insights} />
+          </Section>
+        ) : null}
       </div>
     </Comparable.Provider>
   );
