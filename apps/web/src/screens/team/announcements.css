@@ -169,3 +169,11 @@
   font-weight: 600;
   color: var(--nv-warning);
 }
+
+/* Équipe › Annonces: the composer and « Envoyées » in the page's one body row, each at its own height. */
+.an-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  align-self: start;
+}

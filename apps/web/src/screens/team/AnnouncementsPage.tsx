@@ -41,26 +41,29 @@ export function AnnouncementsPage({ owner }: { owner: boolean }): JSX.Element {
         lead="Un mot à toute l’équipe ou aux membres d’une créatrice, lu dans leur Aujourd’hui."
         tabs={<TeamNav />}
       />
-      <Composer />
-      {announcements.isError ? (
-        <Failure
-          onRetry={() => {
-            void announcements.refetch();
-          }}
-        />
-      ) : announcements.data === undefined ? null : (
-        <Panel className="an-card nv-enter" title="Envoyées">
-          {announcements.data.length === 0 ? (
-            <p className="an-none">Aucune annonce pour l’instant.</p>
-          ) : (
-            <ul className="an-list">
-              {announcements.data.map((one) => (
-                <Sent key={one.id} announcement={one} zone={zone} today={today} owner={owner} />
-              ))}
-            </ul>
-          )}
-        </Panel>
-      )}
+      {/* The page's body is one row: its two cards keep their own height, « Envoyées » right under the composer. */}
+      <div className="an-page">
+        <Composer />
+        {announcements.isError ? (
+          <Failure
+            onRetry={() => {
+              void announcements.refetch();
+            }}
+          />
+        ) : announcements.data === undefined ? null : (
+          <Panel className="an-card nv-enter" title="Envoyées">
+            {announcements.data.length === 0 ? (
+              <p className="an-none">Aucune annonce pour l’instant.</p>
+            ) : (
+              <ul className="an-list">
+                {announcements.data.map((one) => (
+                  <Sent key={one.id} announcement={one} zone={zone} today={today} owner={owner} />
+                ))}
+              </ul>
+            )}
+          </Panel>
+        )}
+      </div>
     </Page>
   );
 }
