@@ -42,7 +42,8 @@ import {
 import { kycSlotWords } from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
-import { TRIAL_SCRIPTS, trialScript } from './trial-scripts';
+import type { Catalogue, CatalogueUnavailable, PlaygroundScript, ShownMedia } from './catalogue';
+import { TRIAL_CATALOGUE } from './trial-scripts';
 
 export interface PlaygroundTurn {
   /** Safety flags on his media: a human would take over, nothing is written. */
@@ -118,8 +119,10 @@ interface VoiceComparison {
   readonly failure?: string;
 }
 
-/** A step of a trial script on the media she sent with it, and what became of it (ADR 0103 § 16). */
+/** A step of a script on the media she sent with it, and what became of it (ADR 0103 § 16). */
 interface TrialStep {
+  /** Her own script, or a trial one. */
+  readonly source: Catalogue['source'];
   readonly scriptRef: string;
   readonly stepIndex: number;
   readonly kind: 'free' | 'paid' | 'bridge';
@@ -159,8 +162,13 @@ export interface PlaygroundSession {
   buyStep(): TrialStepAction;
   /** He refuses the paid step waiting: an explicit refusal, as the brain reads a clear no. */
   refuseStep(): TrialStepAction;
-  /** The trial script under way or last played, with its script; `null` before the first. */
-  readonly scriptRun: { readonly run: ScriptRun; readonly script: AgentScriptView } | null;
+  /** The script under way or last played, with its script; `null` before the first. */
+  readonly scriptRun: {
+    readonly run: ScriptRun;
+    readonly script: AgentScriptView;
+    readonly name: string;
+    readonly source: Catalogue['source'];
+  } | null;
   /** What he paid in fictive purchases since the start, or the reset. */
   readonly fictiveSpentCents: number;
   /**
@@ -168,8 +176,19 @@ export interface PlaygroundSession {
    * refused, so the playground never shows a sale production would not make. Lifted by a reset or a branch before it.
    */
   readonly salesFrozen: boolean;
-  /** The step of a trial script a media of hers carries, with what became of it. */
+  /** The step of a script a media of hers carries, with what became of it. */
   trialStepOf(turn: ConversationTurn): TrialStep | undefined;
+  /** Each media of a step she sent: its ref in her vault (or the trial's), and whether it is the bundle's teaser. */
+  stepMediaOf(
+    turn: ConversationTurn,
+  ): readonly { readonly ref: string; readonly teaser: boolean }[] | undefined;
+  /** Where her scripts come from now, and why none of hers can be played. */
+  readonly catalogue: {
+    readonly source: Catalogue['source'];
+    readonly unavailable: CatalogueUnavailable | null;
+  };
+  /** Reads her catalogue again, as each of his messages does: the screen says at once whether she has one to sell. */
+  readCatalogue(): Promise<void>;
   readonly history: readonly ConversationTurn[];
   readonly fanNotes: readonly string[];
   readonly situation: Situation;
@@ -200,6 +219,11 @@ export interface PlaygroundDeps {
   readonly followUps?: { readonly delaysHours: readonly number[]; readonly spirit: string | null };
   /** Her replies to a price objection (ADR 0090 § B): picked as for a real fan, never twice in a session. */
   readonly objectionReplies?: ObjectionReplies;
+  /**
+   * Her own catalogue, read again at each of his messages as production does (one of her versions played). Absent:
+   * the trial scripts. A read that fails sells nothing, as in production, and says why.
+   */
+  readonly herScripts?: () => Promise<Catalogue>;
 }
 
 /** A fact the brain proposed, as the screen and the brain read it back: in French, never a code (recette 12/11). */
@@ -266,6 +290,36 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
   // The trial scripts (ADR 0103 § 15-17): his run, and what Reveal's history would say he received and bought. The
   // history is what `reconcileScriptRun` trusts, as production trusts Reveal's: a step joins it once written.
   let scripts: TrialScripts = noScripts();
+  // Where the scripts come from now, and every script seen in this session by its ref: a media she sent keeps its
+  // step once her catalogue changed.
+  let catalogue: Catalogue =
+    deps.herScripts === undefined
+      ? { source: 'trial', scripts: TRIAL_CATALOGUE, unavailable: null }
+      : { source: 'hers', scripts: [], unavailable: null };
+  const known = new Map<
+    string,
+    { readonly script: PlaygroundScript; readonly source: Catalogue['source'] }
+  >();
+  const learn = (read: Catalogue): void => {
+    catalogue = read;
+    for (const script of read.scripts) known.set(script.view.scriptRef, { script, source: read.source });
+  };
+  learn(catalogue);
+  const readCatalogue = async (): Promise<void> => {
+    if (deps.herScripts === undefined) return;
+    try {
+      learn(await deps.herScripts());
+    } catch {
+      // As production: a catalogue that cannot be read sells nothing.
+      learn({ source: 'hers', scripts: [], unavailable: 'unreadable' });
+    }
+  };
+  const scriptOf = (scriptRef: string): AgentScriptView | undefined => known.get(scriptRef)?.script.view;
+  // The media of each step she sent, by turn: their refs, for the screen to draw them from her vault.
+  const stepMedia = new WeakMap<
+    ConversationTurn,
+    readonly { readonly ref: string; readonly teaser: boolean }[]
+  >();
   // Before each of his messages: a branch goes back to it.
   const scriptsBefore: TrialScripts[] = [];
   // The step each of her script media carries: the media turn is the one « Payer (fictif) » unlocks.
@@ -303,31 +357,41 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
     scripts.played.set(scriptRef, fresh);
     return fresh;
   };
-  /** The step she wrote: Reveal would now know it sent, and its media goes after her text, locked if paid. */
+  /**
+   * The step she wrote: the platform would now know it sent. Its message goes after her text as the platform sends it:
+   * the step's own words, the teaser shown, and its media, locked while it is paid.
+   */
   const sendStep = (script: AgentScriptView, stepIndex: number): void => {
     played(script.scriptRef).sent.add(stepIndex);
     const step = script.steps[stepIndex];
-    if (step?.mediaSheet === undefined) return;
+    const shown = known.get(script.scriptRef)?.script.steps[stepIndex];
+    if (step === undefined || shown === undefined) return;
+    const bundle = [
+      ...shown.teaser.map((media) => ({ media, teaser: true })),
+      ...shown.media.map((media) => ({ media, teaser: false })),
+    ];
+    if (bundle.length === 0 && shown.text === '') return;
     const turn: ConversationTurn = {
       from: 'creator',
-      text: '',
-      media: [
-        {
-          description: completeMedia({
-            kind: mediaKindOf(step.mediaSheet),
-            factualDescription: step.mediaSheet,
-          }),
-          isLocked: step.kind === 'paid',
-        },
-      ],
+      text: shown.text,
+      ...(bundle.length > 0 && {
+        media: bundle.map(({ media, teaser }) => ({
+          description: completeMedia({ kind: media.kind, factualDescription: factualOf(media) }),
+          isLocked: step.kind === 'paid' && !teaser,
+        })),
+      }),
     };
     stepTurns.set(turn, { scriptRef: script.scriptRef, stepIndex });
+    stepMedia.set(
+      turn,
+      bundle.map(({ media, teaser }) => ({ ref: media.ref, teaser })),
+    );
     push(turn);
   };
   /** The paid step waiting, its run and its script, or nothing. */
   const waiting = () => {
     const { run } = scripts;
-    const script = run === null ? undefined : trialScript(run.scriptRef);
+    const script = run === null ? undefined : scriptOf(run.scriptRef);
     const step = run === null ? undefined : paidWaiting(run);
     return run === null || script === undefined || step === undefined ? undefined : { run, script, step };
   };
@@ -393,8 +457,20 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
 
     get scriptRun() {
       const { run } = scripts;
-      const script = run === null ? undefined : trialScript(run.scriptRef);
-      return run === null || script === undefined ? null : { run, script };
+      const seen = run === null ? undefined : known.get(run.scriptRef);
+      return run === null || seen === undefined
+        ? null
+        : { run, script: seen.script.view, name: seen.script.name, source: seen.source };
+    },
+
+    get catalogue() {
+      return { source: catalogue.source, unavailable: catalogue.unavailable };
+    },
+
+    readCatalogue,
+
+    stepMediaOf(turn) {
+      return stepMedia.get(turn);
     },
 
     get fictiveSpentCents() {
@@ -407,8 +483,9 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
 
     trialStepOf(turn) {
       const tag = stepTurns.get(turn);
-      const step = tag === undefined ? undefined : trialScript(tag.scriptRef)?.steps[tag.stepIndex];
-      if (tag === undefined || step === undefined) return undefined;
+      const seen = tag === undefined ? undefined : known.get(tag.scriptRef);
+      const step = tag === undefined ? undefined : seen?.script.view.steps[tag.stepIndex];
+      if (tag === undefined || seen === undefined || step === undefined) return undefined;
       const outcome = scripts.outcomes.get(stepKey(tag.scriptRef, tag.stepIndex));
       const open = waiting();
       const state: TrialStep['state'] =
@@ -419,7 +496,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
             : open?.run.scriptRef === tag.scriptRef && open.step.stepIndex === tag.stepIndex
               ? 'waiting'
               : 'closed';
-      return { ...tag, kind: step.kind, priceCents: step.priceMinor, state };
+      return { ...tag, source: seen.source, kind: step.kind, priceCents: step.priceMinor, state };
     },
 
     buyStep() {
@@ -451,6 +528,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
         };
         writtenAt.set(opened, writtenAt.get(turn) ?? situation.now);
         stepTurns.set(opened, { scriptRef: open.run.scriptRef, stepIndex: open.step.stepIndex });
+        const media = stepMedia.get(turn);
+        if (media !== undefined) stepMedia.set(opened, media);
         history.splice(index, 1, opened);
       }
       return 'done';
@@ -604,6 +683,8 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
       desireTrail.push(undefined);
       scriptsBefore.push(copyScripts(scripts));
       push({ from: 'fan', text, media: media.map((description) => ({ description })) });
+      // Her catalogue as it is now, as production reads it at each message.
+      await readCatalogue();
       const moment: RatedMoment = {
         history: dated(),
         fanNotes: fanNotes.join('\n'),
@@ -651,10 +732,11 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           fanNotes: moment.fanNotes,
           situation,
           ...(offer !== undefined && { offer }),
-          // The trial scripts, read as her catalogue and Reveal's history would be (ADR 0103 § 15): the same decision.
+          // Her scripts or the trial ones, read as production reads her catalogue and Reveal's history (ADR 0103 § 15):
+          // the same decision.
           scripts: {
             conversationRef: 'playground',
-            catalogue: TRIAL_SCRIPTS,
+            catalogue: catalogue.scripts.map((script) => script.view),
             history: historyView(),
             latest: scripts.run,
             countsHisMessage: true,
@@ -828,8 +910,11 @@ const copyScripts = (scripts: TrialScripts): TrialScripts => ({
 
 const stepKey = (scriptRef: string, stepIndex: number): string => `${scriptRef}:${String(stepIndex)}`;
 
-/** A trial media sheet says what it is: « vidéo » in it, a video; otherwise a photo. */
-const mediaKindOf = (sheet: string): 'image' | 'video' => (/vid[ée]o/i.test(sheet) ? 'video' : 'image');
+/** What the brain reads of a media she sent: its description, cut to what a media description holds. */
+const factualOf = (media: ShownMedia): string => {
+  const written = media.description?.trim() ?? '';
+  return written === '' ? 'Un média de son script, sans description.' : written.slice(0, 800);
+};
 
 /**
  * With her scripts read, the brain's offer is refused as `no_script_step`: the trainer reads why no step went instead,

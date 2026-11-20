@@ -140,6 +140,8 @@ export type PlaygroundDesire = z.infer<typeof PlaygroundDesireSchema>;
  * messages about something else, a cooled session). Fictive from end to end: nothing reaches Reveal or the figures.
  */
 export const PlaygroundScriptStepSchema = z.object({
+  /** Her own script, read as production reads it, or a trial one (ADR 0103 § 15). */
+  source: z.enum(['hers', 'trial']),
   scriptRef: z.string(),
   stepIndex: z.number().int().nonnegative(),
   kind: ScriptStepKindSchema,
@@ -157,8 +159,13 @@ export const PlaygroundTurnSchema = z.object({
       z.object({
         description: MediaDescriptionSchema,
         isLocked: z.boolean(),
-        /** A step of a trial script: what « Payer (fictif) » and « Refuser » act on. */
+        /** A step of a script: what « Payer (fictif) » and « Refuser » act on. */
         scriptStep: PlaygroundScriptStepSchema.exactOptional(),
+        /**
+         * The media of a step as the platform sends it: its ref in her vault (the screen draws its picture from there,
+         * blurred until he bought it), and whether it is the bundle's teaser, shown before he buys.
+         */
+        scriptMedia: z.object({ ref: z.string().min(1).max(200), teaser: z.boolean() }).exactOptional(),
       }),
     )
     .exactOptional(),
@@ -258,6 +265,9 @@ export type PlaygroundRate = z.infer<typeof PlaygroundRateSchema>;
  */
 export const PlaygroundScriptRunSchema = z.object({
   scriptRef: z.string(),
+  /** Its name as the agency reads it in Reveal, or the trial script's. */
+  name: z.string(),
+  source: z.enum(['hers', 'trial']),
   description: z.string(),
   moment: z.enum(['day', 'night']).nullable(),
   status: ScriptRunStatusSchema,
@@ -310,8 +320,14 @@ export const PlaygroundStateSchema = z.object({
   voice: z.object({ reachable: z.boolean() }),
   /** The last answer, until it is rated. */
   pending: PlaygroundAnswerSchema.nullable(),
-  /** The trial scripts (ADR 0103 § 15-17): the run under way or last played, and his fictive purchases. */
+  /**
+   * The scripts she sells from (ADR 0103 § 15-17): hers with one of her versions played, the trial ones otherwise; the
+   * run under way or last played, and his fictive purchases.
+   */
   scripts: z.object({
+    source: z.enum(['hers', 'trial']),
+    /** Why none of hers can be played now, in French: she sells nothing, as production would not. */
+    unavailable: z.object({ code: z.string(), label: z.string() }).nullable(),
     run: PlaygroundScriptRunSchema.nullable(),
     fictiveSpentCents: z.number().int().nonnegative(),
     /** A possible minor or his distress froze his sales: « Payer (fictif) » is refused, as production never sells then. */

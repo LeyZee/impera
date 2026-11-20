@@ -86,6 +86,20 @@ export function offerRefusalLabel(code: string): string {
   return OFFER_REFUSAL_LABELS[code] ?? code;
 }
 
+/** Why none of her scripts can be played in the playground (ADR 0103 § 15), as production would sell none either. */
+const CATALOGUE_LABELS: Readonly<Record<string, string>> = {
+  no_script: 'Aucun script Reveal importé pour elle',
+  none_ready:
+    'Aucun de ses scripts n’est prêt : identité ou descriptions à valider dans « Ses scripts dans Reveal »',
+  several_accounts:
+    'Elle a des scripts sur plusieurs comptes Reveal : le Playground ne sait pas lequel jouer',
+  unreadable: 'Ses scripts n’ont pas pu être lus : aucune vente, comme en réel',
+};
+
+export function catalogueLabel(code: string): string {
+  return CATALOGUE_LABELS[code] ?? code;
+}
+
 /**
  * What the gate still misses, naming only what he has not said (Design, lot disponible): under « il est seul », the
  * gate says he has not said he has time, never « seul et libre » again.

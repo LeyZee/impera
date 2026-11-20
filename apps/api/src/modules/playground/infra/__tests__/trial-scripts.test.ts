@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TRIAL_SCRIPTS, trialScript } from '../trial-scripts';
+import { TRIAL_CATALOGUE, TRIAL_SCRIPTS } from '../trial-scripts';
 
 describe('trial scripts (ADR 0103 § 15-17)', () => {
   it('has one script for her day and one for her night, each with an offered step, a paid one and media', () => {
@@ -19,10 +19,28 @@ describe('trial scripts (ADR 0103 § 15-17)', () => {
     }
   });
 
-  it('names each step once, and finds a script by its ref only', () => {
+  it('shows each step as the platform sends it: its media are the ones the agent reads, a bridge sends none', () => {
+    for (const { view, steps } of TRIAL_CATALOGUE) {
+      expect(steps).toHaveLength(view.steps.length);
+      view.steps.forEach((step, index) => {
+        expect(steps[index]?.media.map((media) => media.ref)).toEqual(step.mediaRefs);
+        if (step.kind === 'bridge') expect(steps[index]?.media).toEqual([]);
+      });
+    }
+    // Sold by bundle: at least one paid step sends several media, and one shows a teaser before he buys.
+    const paid = TRIAL_CATALOGUE.flatMap(({ view, steps }) =>
+      steps.filter((_, index) => view.steps[index]?.kind === 'paid'),
+    );
+    expect(paid.some((step) => step.media.length > 1)).toBe(true);
+    expect(paid.some((step) => step.teaser.length > 0)).toBe(true);
+  });
+
+  it('names each step and each media once', () => {
     const refs = TRIAL_SCRIPTS.flatMap((script) => script.steps.map((step) => step.stepRef));
     expect(new Set(refs).size).toBe(refs.length);
-    expect(trialScript('essai-jour')?.moment).toBe('day');
-    expect(trialScript('autre')).toBeUndefined();
+    const media = TRIAL_CATALOGUE.flatMap(({ steps }) =>
+      steps.flatMap((step) => [...step.teaser, ...step.media].map((each) => each.ref)),
+    );
+    expect(new Set(media).size).toBe(media.length);
   });
 });

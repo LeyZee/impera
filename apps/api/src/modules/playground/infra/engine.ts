@@ -49,6 +49,7 @@ import {
 } from '../application/engine';
 import { FAN_PRESETS, findPreset } from '../domain/fan-presets';
 import {
+  catalogueLabel,
   cursorLabel,
   gateMissingLabel,
   guardLabel,
@@ -58,6 +59,7 @@ import {
 } from '../domain/labels';
 import { completeMedia } from '../domain/media';
 
+import type { Catalogue } from './catalogue';
 import {
   createPlaygroundSession,
   type PlaygroundAvailabilityReading,
@@ -92,6 +94,8 @@ export interface EngineDeps {
   readonly now?: () => Date;
   /** Where the owner's marks on the desire score are kept (ADR 0103 § 6). */
   readonly desireMarks: DesireMarkStore;
+  /** Her own scripts, with one of her versions played (ADR 0103 § 15); the trial scripts without. */
+  readonly herScripts?: () => Promise<Catalogue>;
 }
 
 /** One rating, in the shape the training store keeps (shared with the terminal playground). */
@@ -229,6 +233,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     objectionReplies: deps.persona.objectionReplies,
     ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
     ...(deps.now !== undefined && { now: deps.now }),
+    ...(deps.herScripts !== undefined && { herScripts: deps.herScripts }),
   });
   let presetId: string | null = null;
   let isRated = true;
@@ -299,12 +304,14 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
           from: turn.from,
           text: turn.text,
           ...(turn.media !== undefined && {
-            media: turn.media.map((m) => {
+            media: turn.media.map((m, at) => {
               const step = session.trialStepOf(turn);
+              const shown = session.stepMediaOf(turn)?.[at];
               return {
                 description: m.description,
                 isLocked: m.isLocked ?? false,
                 ...(step !== undefined && { scriptStep: step }),
+                ...(shown !== undefined && { scriptMedia: shown }),
               };
             }),
           }),
@@ -318,6 +325,11 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       voice: { reachable: isVoiceReachable() },
       pending: lastExchange !== undefined && !isRated ? toAnswer(lastExchange.turn, deps.usdPerEur) : null,
       scripts: {
+        source: session.catalogue.source,
+        unavailable:
+          session.catalogue.unavailable === null
+            ? null
+            : { code: session.catalogue.unavailable, label: catalogueLabel(session.catalogue.unavailable) },
         run: scriptRunView(session.scriptRun),
         fictiveSpentCents: session.fictiveSpentCents,
         salesFrozen: session.salesFrozen,
@@ -519,15 +531,21 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
       if (session.refuseStep() === 'nothing_waiting') throw new ScriptStepNotWaiting();
       return state();
     },
+
+    readScripts() {
+      return session.readCatalogue();
+    },
   };
 }
 
 /** The trial script for the screen: each step of it, sent or not yet, and what it became. */
 function scriptRunView(played: PlaygroundSession['scriptRun']): PlaygroundState['scripts']['run'] {
   if (played === null) return null;
-  const { run, script } = played;
+  const { run, script, name, source } = played;
   return {
     scriptRef: script.scriptRef,
+    name,
+    source,
     description: script.description,
     moment: script.moment,
     status: run.status,

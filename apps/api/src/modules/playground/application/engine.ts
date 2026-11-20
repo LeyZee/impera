@@ -32,6 +32,8 @@ export interface PlaygroundEngine {
   buyScriptStep(): PlaygroundState;
   /** « Refuser » the paid step waiting: an explicit refusal, the script stops there. */
   refuseScriptStep(): PlaygroundState;
+  /** Reads her catalogue now, as his next message would: the screen says at once whether she has a script to sell. */
+  readScripts(): Promise<void>;
   /** The owner marks his desire score after his n-th message (ADR 0103 § 6); kept for a creator's version only. */
   markDesire(
     fanMessageNumber: number,

@@ -21,6 +21,7 @@ import {
 import { createMemoryDesireMarkStore, type DesireMarkStore } from './application/desire-marks';
 import { PlaygroundPersonaNotFound } from './application/engine';
 import { createPlaygroundService } from './application/playground-service';
+import type { Catalogue, HerScriptsSource } from './infra/catalogue';
 import { createPlaygroundEngine } from './infra/engine';
 import { createPlaygroundGateway, createVoiceVariant, type PlaygroundGatewayDeps } from './infra/gateways';
 import { createPlaygroundRoutes, type PlaygroundRoutesOptions } from './infra/routes';
@@ -31,6 +32,7 @@ export { createPlaygroundGateway, createVoiceVariant } from './infra/gateways';
 export { readPersonaFile, withExamples } from '../agent/index';
 export { createPlaygroundSession, type PlaygroundFollowUp, type PlaygroundTurn } from './infra/session';
 export { createDbDesireMarkStore } from './infra/db/desire-mark-store';
+export type { HerCatalogue, HerScriptsSource, PlaygroundScript, ShownMedia } from './infra/catalogue';
 export type { DesireMarkRecord } from './application/desire-marks';
 
 /** One of her stored versions with her name, as `persona.versions.version` answers it (matched by shape). */
@@ -77,7 +79,22 @@ export interface PlaygroundDeps extends PlaygroundGatewayDeps {
   readonly gatewayForVoice?: (voiceModel: string) => LlmGateway | undefined;
   /** The owner's marks on the desire score (ADR 0103 § 6), in `desire_marks`; in memory without a database. */
   readonly desireMarks?: DesireMarkStore;
+  /** Her own scripts (ADR 0103 § 15), sold from when one of her versions is played; the trial scripts without. */
+  readonly herScripts?: HerScriptsSource;
 }
+
+/** Her catalogue as a session reads it: hers, or why none of hers can be played. */
+const herCatalogue =
+  (source: HerScriptsSource, creatorId: string, userId: string) => async (): Promise<Catalogue> => {
+    const read = await source(creatorId, userId);
+    return read.kind === 'ready'
+      ? {
+          source: 'hers',
+          scripts: read.scripts,
+          unavailable: read.scripts.length === 0 ? 'none_ready' : null,
+        }
+      : { source: 'hers', scripts: [], unavailable: read.reason };
+  };
 
 export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   const gateway = deps.gateway ?? createPlaygroundGateway(deps);
@@ -87,7 +104,7 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
   };
   const now = deps.now ?? (() => new Date());
   const desireMarks = deps.desireMarks ?? createMemoryDesireMarkStore();
-  const engineFor = (persona: PersonaForModels, played?: PlayedVersion) =>
+  const engineFor = (persona: PersonaForModels, played?: PlayedVersion, userId?: string) =>
     createPlaygroundEngine({
       gateway,
       gatewayForVoice: deps.gatewayForVoice ?? ((model) => createVoiceVariant(deps, model)),
@@ -99,19 +116,27 @@ export function createPlaygroundModule(deps: PlaygroundDeps): PlaygroundModule {
       usdPerEur: DEFAULT_LLM_CONFIG.dailyBudget.usdPerEur,
       desireMarks,
       ...(played !== undefined && { played }),
+      // Her own scripts when one of her versions is played, read as the trainer reads them; the trial ones otherwise.
+      ...(played !== undefined &&
+        userId !== undefined &&
+        deps.herScripts !== undefined && {
+          herScripts: herCatalogue(deps.herScripts, played.creatorId, userId),
+        }),
       ...(deps.creatorId !== undefined && { creatorId: deps.creatorId }),
       ...(deps.timeZone !== undefined && { timeZone: deps.timeZone }),
       ...(deps.now !== undefined && { now: deps.now }),
     });
   const service = createPlaygroundService({
     invented: () => engineFor(deps.persona),
-    ofVersion: async ({ creatorId, versionId }) => {
+    ofVersion: async ({ creatorId, versionId }, userId) => {
       const stored = (await deps.personaVersion?.(creatorId, versionId)) ?? null;
       if (stored === null) throw new PlaygroundPersonaNotFound();
       // Read as her drafts read her active one: her name for a placeholder first name, her day for her age.
       const persona = await activePersonaForModels(() => Promise.resolve(stored), creatorId, now());
       if (persona === null) throw new PlaygroundPersonaNotFound();
-      return engineFor(persona, { creatorId, versionId, version: stored.version });
+      const engine = engineFor(persona, { creatorId, versionId, version: stored.version }, userId);
+      await engine.readScripts();
+      return engine;
     },
   });
   const alertTester = createAlertTester({
@@ -134,6 +159,7 @@ export interface PlaygroundStartOptions extends PlaygroundGatewayDeps {
   readonly activePersona: ActivePersonaSource;
   readonly personaVersion?: PersonaVersionSource;
   readonly desireMarks?: DesireMarkStore;
+  readonly herScripts?: HerScriptsSource;
 }
 
 /** Reads the persona and the ratings kept so far, then builds the module. Throws when the persona is unreadable. */

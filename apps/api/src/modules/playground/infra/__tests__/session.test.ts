@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_GUARD_SETTINGS } from '../../../agent/index';
 import { guardSettingsOf, readPersonaFile } from '../../../agent/index';
+import type { Catalogue } from '../catalogue';
 import { createPlaygroundSession } from '../session';
+import { TRIAL_CATALOGUE } from '../trial-scripts';
 
 const BRIEF: Brief = {
   intent: 'kyc_answer',
@@ -661,8 +663,9 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
     desireSignals: ['alone', 'free_now'],
   };
   /** At 22 h in Paris, his age said, the teaser sent, then the paid step: what « Payer » and « Refuser » act on. */
-  async function atPaidStep(brief: Brief = HOT) {
+  async function atPaidStep(brief: Brief = HOT, herScripts?: () => Promise<Catalogue>) {
     const playground = createPlaygroundSession({
+      ...(herScripts !== undefined && { herScripts }),
       gateway: fakeGateway({ bubbles: ['Mmh toi 😏'] }, [], [], brief),
       creatorName: 'Lina',
       personaSheet: 'fiche',
@@ -677,10 +680,20 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
   const lastMedia = (playground: Awaited<ReturnType<typeof atPaidStep>>) =>
     playground.history.findLast((turn) => turn.media !== undefined);
 
-  it('sends each step’s media after her text: the teaser open, the paid step locked and waiting', async () => {
+  it('sends each step as the platform does after her text: its words, the teaser open, the bundle locked', async () => {
     const playground = await atPaidStep();
     const media = playground.history.filter((turn) => turn.media !== undefined && turn.from === 'creator');
-    expect(media.map((turn) => turn.media?.[0]?.isLocked)).toEqual([false, true]);
+    expect(media.map((turn) => turn.media?.map((m) => m.isLocked))).toEqual([[false], [false, true, true]]);
+    expect(media.map((turn) => turn.text)).toEqual(['Enfin rentrée 😌', 'Juste entre nous']);
+    expect(media.map((turn) => playground.stepMediaOf(turn))).toEqual([
+      [{ ref: 'essai-media-8', teaser: false }],
+      [
+        { ref: 'essai-media-9', teaser: true },
+        { ref: 'essai-media-10', teaser: false },
+        { ref: 'essai-media-11', teaser: false },
+      ],
+    ]);
+    expect(playground.catalogue).toEqual({ source: 'trial', unavailable: null });
     expect(media.map((turn) => playground.trialStepOf(turn)?.state)).toEqual(['offered', 'waiting']);
     const paid = lastMedia(playground);
     expect(paid === undefined ? undefined : playground.trialStepOf(paid)).toMatchObject({
@@ -693,7 +706,7 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
     const playground = await atPaidStep();
     expect(playground.buyStep()).toBe('done');
     const bought = lastMedia(playground);
-    expect(bought?.media?.[0]?.isLocked).toBe(false);
+    expect(bought?.media?.map((m) => m.isLocked)).toEqual([false, false, false]);
     expect(bought === undefined ? undefined : playground.trialStepOf(bought)?.state).toBe('bought');
     expect(playground.situation.spentCents).toBe(1200);
     expect(playground.fictiveSpentCents).toBe(1200);
@@ -748,6 +761,43 @@ describe('playground session, a fictive sale (ADR 0103 § 15-17)', () => {
     expect(playground.fictiveSpentCents).toBe(0);
     playground.reset();
     expect(playground.scriptRun).toBeNull();
+  });
+
+  describe('with one of her versions played, her own scripts (ADR 0103 § 15)', () => {
+    // An invented script standing for one of hers: her catalogue as the composition root reads it.
+    const night = TRIAL_CATALOGUE[1];
+    const hers = night === undefined ? [] : [{ ...night, name: 'Script inventé · nuit' }];
+
+    it('sells from her catalogue, read again at each of his messages, by the same rules', async () => {
+      let reads = 0;
+      const playground = await atPaidStep(HOT, () => {
+        reads += 1;
+        return Promise.resolve({ source: 'hers', scripts: hers, unavailable: null });
+      });
+      expect(reads).toBe(3);
+      expect(playground.catalogue).toEqual({ source: 'hers', unavailable: null });
+      expect(playground.scriptRun).toMatchObject({ source: 'hers', name: 'Script inventé · nuit' });
+      const paid = lastMedia(playground);
+      expect(paid === undefined ? undefined : playground.trialStepOf(paid)).toMatchObject({
+        source: 'hers',
+        kind: 'paid',
+        state: 'waiting',
+      });
+      expect(playground.buyStep()).toBe('done');
+    });
+
+    it('sells nothing when none of hers is ready or her scripts cannot be read, and says why', async () => {
+      const none = await atPaidStep(HOT, () =>
+        Promise.resolve({ source: 'hers', scripts: [], unavailable: 'none_ready' }),
+      );
+      expect(none.history.some((turn) => turn.from === 'creator' && turn.media !== undefined)).toBe(false);
+      expect(none.catalogue).toEqual({ source: 'hers', unavailable: 'none_ready' });
+      expect(none.scriptRun).toBeNull();
+
+      const failing = await atPaidStep(HOT, () => Promise.reject(new Error('base injoignable')));
+      expect(failing.history.some((turn) => turn.from === 'creator' && turn.media !== undefined)).toBe(false);
+      expect(failing.catalogue).toEqual({ source: 'hers', unavailable: 'unreadable' });
+    });
   });
 });
 
