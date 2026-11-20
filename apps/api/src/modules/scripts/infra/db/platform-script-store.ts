@@ -2,6 +2,7 @@ import {
   BranchConditionSchema,
   CreatorIdSchema,
   CurrencySchema,
+  DescriptionReviewReasonSchema,
   MediaSlotKindSchema,
   newId,
   PlatformAccountIdSchema,
@@ -187,14 +188,19 @@ const LinkRowSchema = z.object({
   media_asset_id: z.uuid().nullable(),
   description_id: z.uuid().nullable(),
   imported: z.boolean(),
+  shown_id: z.uuid().nullable(),
+  shown_detailed: z.string().nullable(),
+  shown_reasons: z.array(DescriptionReviewReasonSchema).nullable(),
+  shown_validated: z.boolean().nullable(),
 });
 
 /**
  * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
  * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
  * not in the vault. `description_id`: the latest description of its media a human validated (ADR 0083), with its
- * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5). Keyed by
- * account and platform id.
+ * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5); `shown`,
+ * the description the agency reviews (the latest validated, else the latest written with a `detailed` text: never the
+ * platform's own, which has none, ADR 0099 § 4). Keyed by account and platform id.
  */
 async function vaultLinksOf(
   tx: Transaction,
@@ -216,8 +222,15 @@ async function vaultLinksOf(
         where md.media_asset_id = l.media_asset_id and md.validated_at is not null and md.content ? 'detailed'
         order by md.validated_at desc, md.created_at desc, md.id desc
         limit 1) as description_id,
-      ${schema.vaultImported({ account: sql`l.platform_account_id`, media: sql`l.platform_media_id`, folder: sql`l.folder_ref` })} as imported
+      ${schema.vaultImported({ account: sql`l.platform_account_id`, media: sql`l.platform_media_id`, folder: sql`l.folder_ref` })} as imported,
+      s.id as shown_id, s.content ->> 'detailed' as shown_detailed, s.review_reasons as shown_reasons,
+      s.validated_at is not null as shown_validated
     from ${schema.mediaPlatformRefs} l
+    left join lateral (
+      select md.id, md.content, md.review_reasons, md.validated_at from ${schema.mediaDescriptions} md
+        where md.media_asset_id = l.media_asset_id and md.content ? 'detailed'
+        order by md.validated_at is not null desc, md.validated_at desc nulls last, md.created_at desc, md.id desc
+        limit 1) s on true
     where l.platform_account_id in (${accounts})
       and l.platform_media_id in (${refs})
       and l.removed_at is null`);
@@ -227,7 +240,20 @@ async function vaultLinksOf(
       .parse(result.rows)
       .map((row) => [
         `${row.platform_account_id}:${row.platform_media_id}`,
-        { mediaAssetId: row.media_asset_id, descriptionId: row.description_id, imported: row.imported },
+        {
+          mediaAssetId: row.media_asset_id,
+          descriptionId: row.description_id,
+          imported: row.imported,
+          shown:
+            row.shown_id === null || row.shown_detailed === null
+              ? null
+              : {
+                  id: row.shown_id,
+                  detailed: row.shown_detailed,
+                  reviewReasons: row.shown_reasons ?? [],
+                  validated: row.shown_validated === true,
+                },
+        },
       ]),
   );
 }
