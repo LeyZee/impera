@@ -804,6 +804,66 @@
   color: var(--nv-ink);
 }
 
+/* ───────────── Ma progression, sur Aujourd'hui (ADR 0134) ───────────── */
+
+.rw-progress__body {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-4);
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+.rw-progress__body > svg {
+  flex: none;
+}
+.rw-progress__main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.rw-progress__name {
+  margin: 0;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-title-2);
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-progress__line {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.rw-progress__line b {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.rw-progress__go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+}
+.rw-progress__go svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (max-width: 520px) {
+  /* The words leave; the arrow alone says the card opens. */
+  .rw-progress__go {
+    font-size: 0;
+    gap: 0;
+  }
+}
+
 /* ───────────── Rangs des chatteurs, réglage du propriétaire ───────────── */
 
 .rw-levels__list {
