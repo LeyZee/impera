@@ -23,7 +23,7 @@ const RowSchema = z.object({ updated_at: z.coerce.date(), expires_at: z.coerce.d
 const HOUR = 60 * 60 * 1000;
 
 /**
- * How long a session lives by role (SEC-17): the owner 48 h without activity, every other role 12 h, all 7 days at
+ * How long a session lives by role (SEC-17): the owner and the creator 48 h without activity, every other role 12 h, all 7 days at
  * most; never a recent sign-in. Times are moved in the base, as Better Auth reads its own clock: `updated_at` is the
  * last refresh, `expires_at` what Better Auth wrote then (48 h later; 12 h for a row written before SEC-17).
  */
@@ -125,17 +125,19 @@ describe('session lifetime by role (SEC-17)', () => {
     await test.close();
   });
 
-  it('keeps an owner session idle 47 hours, ends one idle 49 hours', async () => {
-    const cookie = await freshSession(OWNER);
-    await setTimes(OWNER.email, { idle: '47 hours', expiresIn: '1 hour' });
-    expect((await me(cookie)).statusCode).toBe(200);
-    // Used again: refreshed for another 48 hours.
-    const refreshed = await sessionRow(OWNER.email);
-    expect(refreshed.expires_at.getTime() - Date.now()).toBeGreaterThan(47 * HOUR);
+  it('keeps an owner or a creator session idle 47 hours, ends one idle 49 hours', async () => {
+    for (const account of [OWNER, CREATOR]) {
+      const cookie = await freshSession(account);
+      await setTimes(account.email, { idle: '47 hours', expiresIn: '1 hour' });
+      expect(await dashboardSession(cookie)).toBe('signed_in');
+      // Used again: refreshed for another 48 hours.
+      const refreshed = await sessionRow(account.email);
+      expect(refreshed.expires_at.getTime() - Date.now()).toBeGreaterThan(47 * HOUR);
 
-    await setTimes(OWNER.email, { idle: '49 hours', expiresIn: '-1 hour' });
-    expect((await me(cookie)).statusCode).toBe(401);
-    expect(await sessionCount(OWNER.email)).toBe(0);
+      await setTimes(account.email, { idle: '49 hours', expiresIn: '-1 hour' });
+      expect(await dashboardSession(cookie)).toBe('signed_out');
+      expect(await sessionCount(account.email)).toBe(0);
+    }
   });
 
   it('ends an owner session 7 days after its creation, even used a minute ago', async () => {
@@ -147,8 +149,8 @@ describe('session lifetime by role (SEC-17)', () => {
     expect(await sessionCount(OWNER.email)).toBe(0);
   });
 
-  it('keeps a manager, a chatter or a creator idle 11 hours, and closes one idle 13 hours', async () => {
-    for (const account of [MANAGER, CHATTER, CREATOR]) {
+  it('keeps a manager or a chatter idle 11 hours, and closes one idle 13 hours', async () => {
+    for (const account of [MANAGER, CHATTER]) {
       const cookie = await freshSession(account);
       await setTimes(account.email, { idle: '11 hours', expiresIn: '37 hours' });
       expect(await dashboardSession(cookie)).toBe('signed_in');

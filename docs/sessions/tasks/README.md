@@ -179,7 +179,7 @@ Branche : task/<id>-<slug>
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
 | SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | in_progress | SEC-02, SEC-04, EQ-10, EQ-18 |
-| SEC-17 | Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire, 12 h pour les autres, 7 jours au plus | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
+| SEC-17 | Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire et la créatrice, 12 h pour les autres, 7 jours au plus | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |

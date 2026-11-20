@@ -1,4 +1,4 @@
-# 0160. Durée des sessions selon le rôle : le propriétaire tient 48 heures sans activité, les autres 12 heures
+# 0160. Durée des sessions selon le rôle : le propriétaire et la créatrice tiennent 48 heures sans activité, les autres 12 heures
 
 Statut : accepted (« ok sessions » de Charles, 20/11/2026)
 Date : 2026-11-20
@@ -16,8 +16,8 @@ Avis de Sécurité (20/11) :
 
 ## Décision
 
-1. **Le propriétaire** : sa session se ferme après **48 heures sans activité**, et dans tous les cas **7 jours** après sa création.
-2. **Tous les autres rôles** (manager, chatteur, créatrice, et tout rôle illisible) : **12 heures sans activité**, avec la même limite de 7 jours. La créatrice peut passer à la durée longue sur décision de Charles. Le code garde la liste des rôles à durée longue en un seul endroit (`apps/api/src/session-lifetime.ts`).
+1. **Le propriétaire et la créatrice** : leur session se ferme après **48 heures sans activité**, et dans tous les cas **7 jours** après sa création. La créatrice y est passée sur décision de Charles (20/11/2026, 19 h 17) : elle ne lit que ses propres données, sur son propre téléphone, et une reconnexion quotidienne la ferait décrocher.
+2. **Tous les autres rôles** (manager, chatteur, et tout rôle illisible) : **12 heures sans activité**, avec la même limite de 7 jours. Le code garde la liste des rôles à durée longue en un seul endroit (`apps/api/src/session-lifetime.ts`).
 3. **« Sans activité » veut dire sans activité réelle.** Le cookie est renouvelé à l'usage, et la limite est tenue par le serveur à chaque lecture de session. Ça vaut aussi sur les routes de Better Auth qu'aucun de nos contrôles ne garde. Une session échue est supprimée en base, pas seulement refusée.
 4. **Inchangé** :
    - les gestes sensibles demandent un mot de passe et un code donnés depuis moins de 10 minutes (ADR 0046 § 3) ; une session longue ne compte jamais comme une connexion récente ;
@@ -28,5 +28,6 @@ Avis de Sécurité (20/11) :
 
 - Charles se reconnecte au plus une fois par semaine sur son poste, et au plus tard après deux jours sans y toucher.
 - Au pire, une session de propriétaire volée donne deux jours de lecture sur un appareil abandonné, et aucun geste sensible.
-- Managers, chatteurs et créatrices gagnent un vrai « 12 heures sans activité » : ils ne sont plus coupés en plein shift 12 heures après leur connexion.
+- La créatrice se reconnecte au plus une fois par semaine sur son téléphone, et au plus tard après deux jours sans ouvrir l'application.
+- Managers et chatteurs gagnent un vrai « 12 heures sans activité » : ils ne sont plus coupés en plein shift 12 heures après leur connexion.
 - Écarté : 7 jours pour les chatteurs (voir l'avis de Sécurité) ; une durée longue réservée aux appareils reconnus (un chantier à part, possible plus tard).

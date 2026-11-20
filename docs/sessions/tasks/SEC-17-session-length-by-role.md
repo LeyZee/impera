@@ -1,4 +1,4 @@
-# SEC-17 Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire, 12 h pour les autres, 7 jours au plus
+# SEC-17 Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire et la créatrice, 12 h pour les autres, 7 jours au plus
 Statut : in_progress
 Phase : exploitation
 Dépend de : ADR 0046, ADR 0160, SEC-03
@@ -23,19 +23,18 @@ La session du propriétaire tient 48 heures sans activité, celle de tous les au
 - [x] Les sessions ouvertes avant le changement (expiration à 12 h) restent valables et passent aux nouvelles durées à leur prolongation.
 - [x] `security.md` § 6 et les commentaires du code mis à jour.
 - [ ] Suites d'intégration lancées avec Docker (écrites et typées, pas lancées : Docker absent de la session).
-- [ ] Décision sur la durée de la créatrice (aujourd'hui courte) ; l'allonger revient à ajouter `creator` à `LONG_IDLE_ROLES`.
+- [x] Durée de la créatrice : longue, comme le propriétaire (Charles, 20/11/2026) ; `creator` ajouté à `LONG_IDLE_ROLES`.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
 
-- Unitaire (`session-lifetime.test.ts`) : propriétaire 47 h gardée, 49 h finie ; opérateur, créatrice et rôle inconnu 11 h gardée, 13 h finie ; toute session finie à 7 jours et 1 minute, même utilisée.
-- Intégration (`session-lifetime.integration.test.ts`) : les mêmes seuils sur le vrai chemin (manager, chatteur, créatrice ; ligne supprimée) ; une session finie n'est pas ranimée par une route que Better Auth lit lui-même ; une ligne d'avant le changement reste valable ; le cookie est renouvelé (`Max-Age=172800`) ; une session du propriétaire de 6 jours, utilisée sans arrêt, ne passe pas `requireRecentLogin` ; une session finie disparaît de la liste des sessions.
+- Unitaire (`session-lifetime.test.ts`) : propriétaire et créatrice 47 h gardée, 49 h finie ; opérateur et rôle inconnu 11 h gardée, 13 h finie ; toute session finie à 7 jours et 1 minute, même utilisée.
+- Intégration (`session-lifetime.integration.test.ts`) : les mêmes seuils sur le vrai chemin (propriétaire et créatrice à 48 h, manager et chatteur à 12 h ; ligne supprimée) ; une session finie n'est pas ranimée par une route que Better Auth lit lui-même ; une ligne d'avant le changement reste valable ; le cookie est renouvelé (`Max-Age=172800`) ; une session du propriétaire de 6 jours, utilisée sans arrêt, ne passe pas `requireRecentLogin` ; une session finie disparaît de la liste des sessions.
 - Inchangés et toujours verts : changement de mot de passe, remise à zéro du code et départ ferment toutes les sessions (`invitation-links`, `second-factor`, `ops`, `team-members`).
 - `pnpm check`, `pnpm test`, les suites d'intégration et la CI verts.
 
 ## Hors périmètre
 
 - Modifier l'ADR 0046 (acceptée).
-- La durée de la créatrice (décision attendue).
 
 ## Notes de session (rempli par la session : décisions, surprises, fiches créées)
 

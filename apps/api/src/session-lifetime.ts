@@ -10,13 +10,14 @@ import { UserRoleSchema, type UserRole } from '@impera/contracts';
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** Without activity, the session of every role but those of `LONG_IDLE_ROLES` ends after 12 hours. */
 export const SHORT_IDLE_MS = 12 * 60 * 60 * 1000;
-/** Without activity, the session of a role of `LONG_IDLE_ROLES` ends after 48 hours (the owner's choice, 20/11/2026). */
+/** Without activity, the session of a role of `LONG_IDLE_ROLES` ends after 48 hours (Charles's choice, 20/11/2026). */
 export const LONG_IDLE_MS = 48 * 60 * 60 * 1000;
 /**
- * The roles whose sessions get the long idle. The owner only: the creator's stays short until it is decided (SEC-17),
- * and adding her here is the whole change.
+ * The roles whose sessions get the long idle: the owner, and the creator, who reads only her own data on her phone
+ * (Charles, 20/11/2026). Operators (managers, chatters) keep the short one: they read the fans' conversations, at
+ * times on a shared device.
  */
-export const LONG_IDLE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['owner']);
+export const LONG_IDLE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['owner', 'creator']);
 
 /** The idle limit of a session of this role; a role that does not validate gets the short one. */
 export function idleLimitMs(role: unknown): number {
