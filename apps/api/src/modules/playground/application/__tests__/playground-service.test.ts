@@ -22,6 +22,9 @@ function engine(reset: () => never = unused): PlaygroundEngine {
     setNotes: unused,
     sendCreatorMedia: unused,
     markDesire: unused,
+    buyScriptStep: unused,
+    refuseScriptStep: unused,
+    readScripts: unused,
   };
 }
 
@@ -55,8 +58,9 @@ describe('playground service', () => {
         first = false;
         return made;
       },
-      ofVersion: (choice) => {
+      ofVersion: (choice, userId) => {
         chosen.push(choice);
+        expect(['b', 'c']).toContain(userId);
         if (choice.versionId !== V2) return Promise.reject(new PlaygroundPersonaNotFound());
         return Promise.resolve(engine());
       },

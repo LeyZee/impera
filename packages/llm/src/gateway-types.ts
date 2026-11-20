@@ -95,6 +95,8 @@ export interface CallTrace {
    * Absent is `chatting`, which only the daily cap stops.
    */
   readonly purpose?: LlmPurpose;
+  /** A voice call only: the ids of her examples it received (ADR 0102 § 6), to know which correction weighed. */
+  readonly voiceExampleIds?: readonly string[];
 }
 
 export interface SenseInput {

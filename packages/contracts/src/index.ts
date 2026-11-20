@@ -68,6 +68,7 @@ export * from './prepared-scripts';
 export * from './script-runs';
 export * from './script-starters';
 export * from './scheduling';
+export * from './owners';
 export * from './passkeys';
 export * from './password-reset';
 export * from './security';
