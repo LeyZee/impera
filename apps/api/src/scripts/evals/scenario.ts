@@ -60,6 +60,10 @@ const ScriptsSchema = z
       })
       .strict()
       .optional(),
+    /** Runs he left before the latest one, a paid step waiting (Charles 20/11): one or more makes her vexed. */
+    earlier_left: z.int().nonnegative().default(0),
+    /** How many times she already teased him about the latest run, when he left it. */
+    teased: z.int().nonnegative().default(0),
     /** What Reveal says: per script, the step indexes sent and bought. */
     history: z
       .array(
@@ -200,6 +204,8 @@ const ScenarioSchema = z
             custom_order: z.enum(['none', 'handoff', 'reply']).optional(),
             /** The reply of her objection bank given to the voice, by id; `null`: none (ADR 0090 § B). */
             objection_reply: ObjectionReplyIdSchema.nullable().optional(),
+            /** Her tease about the run he left (Charles 20/11): `none`, she does not tease him. */
+            abandon_tease: z.enum(['none', 'first', 'again']).optional(),
             /** What code decided with her scripts (ADR 0098 § 4), among these. */
             script_in: z
               .array(z.enum(['none', 'start', 'send_step', 'wait', 'after_refusal', 'end']))

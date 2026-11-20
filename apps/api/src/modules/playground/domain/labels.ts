@@ -61,6 +61,7 @@ const OFFER_REFUSAL_LABELS: Readonly<Record<string, string>> = {
   availability_unconfirmed: 'Il n’a pas dit être seul et libre',
   no_script_step: 'Aucune étape de script à envoyer',
   he_came: 'Il vient de jouir : rien à vendre juste après',
+  abandon_tease: 'Il est parti en plein script : elle le taquine d’abord',
 };
 
 /** What the cursor decided on going sexual (agent/domain/sexualization.ts `SexualizationDecision`). */

@@ -270,6 +270,8 @@ interface EventWriter {
    * `script_started` since. The episode lives in his journal, never in memory.
    */
   scriptsExhaustedSaid(conversationId: ConversationId): Promise<boolean>;
+  /** How many times she teased him about a run he left (`script_abandon_teased`, Charles 20/11). */
+  abandonTeases(conversationId: ConversationId, scriptRunId: ScriptRunId): Promise<number>;
   /**
    * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
    * `takeover_started` since), and the replies of her objection bank he already received.
@@ -429,6 +431,8 @@ interface ScriptRunRepository {
   open(conversationId: ConversationId, run: ScriptRunState): Promise<StoredScriptRun | null>;
   /** Saves a run; `false` when it was no longer open (another turn closed it). */
   save(stored: StoredScriptRun): Promise<boolean>;
+  /** His runs that went cold (`stalled`), latest first: a run he left there makes her tease him (Charles 20/11). */
+  stalled(conversationId: ConversationId): Promise<StoredScriptRun[]>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -658,6 +662,8 @@ export interface ComposeInput {
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
+  /** His runs before `scriptRun` that went cold, and her teases about `scriptRun` when he left it (Charles 20/11). */
+  readonly scriptAbandon?: { readonly earlier: readonly ScriptRunState[]; readonly teased: number };
   /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
@@ -745,6 +751,8 @@ export type ComposeResult =
       readonly scriptsExhausted?: true;
       /** She answered a sale gone wrong: one `sale_trouble`, so that the same trouble again goes to a human. */
       readonly saleTrouble?: SaleTroubleKind;
+      /** She teased him about the run he left: one `script_abandon_teased` on that run (Charles 20/11). */
+      readonly abandonTeased?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;

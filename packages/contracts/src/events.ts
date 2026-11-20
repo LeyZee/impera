@@ -266,6 +266,7 @@ export const EVENT_TYPES = [
   'script_ended',
   'scripts_exhausted',
   'sale_trouble',
+  'script_abandon_teased',
   'offer_proposed',
   'session_state_changed',
   'budget_threshold_crossed',
@@ -470,6 +471,11 @@ export const EVENT_PAYLOADS = {
     conversationId: ConversationIdSchema,
     kind: z.enum(SALE_TROUBLE_KINDS),
   }),
+  /**
+   * He left in the middle of a script, a paid step still waiting (ADR 0158, Charles 20/11), and she teased him about
+   * it once on a hot message of his: one per tease, on the run he left, so that she never says it more than due.
+   */
+  script_abandon_teased: scriptPayload,
   /**
    * Something sold outside the scripts was put forward by the agent (ADR 0150 §§ 12–14): what she offers around her
    * practice (`practice_offer`, ADR 0143 § 10). `custom_order` and `service_request` are read from their own events.
@@ -804,6 +810,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('script_ended'),
   typedEvent('scripts_exhausted'),
   typedEvent('sale_trouble'),
+  typedEvent('script_abandon_teased'),
   typedEvent('offer_proposed'),
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),

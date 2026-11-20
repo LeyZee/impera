@@ -23,6 +23,8 @@ export interface Outcome {
   readonly customOrder: 'none' | 'handoff' | 'reply';
   /** The id of the reply of her objection bank the voice was given, or null (ADR 0090 § B). */
   readonly objectionReply: string | null;
+  /** She teased him about the run he left, and how (Charles 20/11); absent: she did not. */
+  readonly abandonTease?: 'first' | 'again';
   /** What code decided with her scripts (ADR 0098), and the step when one goes; absent without scripts. */
   readonly script?: {
     readonly decision: 'none' | 'start' | 'send_step' | 'wait' | 'after_refusal' | 'end';
@@ -91,6 +93,10 @@ export function checkScenario(scenario: Scenario, outcome: Outcome): string[] {
   }
   if (decision?.custom_order !== undefined && decision.custom_order !== outcome.customOrder) {
     failures.push(`sur-mesure : ${outcome.customOrder}, attendu ${decision.custom_order}`);
+  }
+  const teased = outcome.abandonTease ?? 'none';
+  if (decision?.abandon_tease !== undefined && decision.abandon_tease !== teased) {
+    failures.push(`pique d’abandon : ${teased}, attendue ${decision.abandon_tease}`);
   }
   if (decision?.objection_reply !== undefined && decision.objection_reply !== outcome.objectionReply) {
     failures.push(

@@ -541,6 +541,70 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     expect(composer.inputs.at(-1)?.scriptRun).toMatchObject({ status: 'refused' });
   });
 
+  it('gives back the runs he left and journals her tease on the run he left (Charles 20/11)', async () => {
+    const id = await fanWrites('c-left', 'Tu me montres ?');
+    const at = new Date('2026-11-12T21:00:00Z');
+    const step = { stepIndex: 0, kind: 'paid' as const, priceMinor: 1_500, sentAt: at, at };
+    const opened = {
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [{ ...step, outcome: 'sent' as const }],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    };
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['J’ai quelque chose pour toi 😏'],
+      softViolations: [],
+      costUsd: 0,
+      scriptRun: {
+        opened: {
+          run: opened,
+          events: [{ type: 'script_started' }, { type: 'script_step_sent', stepIndex: 0 }],
+        },
+      },
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)).not.toHaveProperty('scriptAbandon');
+
+    // He went cold with the step waiting: the run is one he left.
+    const left = { ...opened, status: 'stalled' as const, endedAt: at };
+    await fanWrites('c-left', 'Salut toi');
+    composer.next = {
+      kind: 'held',
+      reason: 'no_reply',
+      detail: [],
+      costUsd: 0,
+      scriptRun: { moved: { run: left, events: [{ type: 'script_ended' }] } },
+    };
+    await respond(id);
+
+    await fanWrites('c-left', 'Tu me manques');
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['Tu m’as laissée en plan toi 😏'],
+      softViolations: [],
+      costUsd: 0,
+      abandonTeased: true,
+    };
+    await respond(id);
+    expect(composer.inputs.at(-1)).toMatchObject({
+      scriptRun: { status: 'stalled' },
+      scriptAbandon: { earlier: [], teased: 0 },
+    });
+    const teased = (await events(id)).filter((event) => event.type === 'script_abandon_teased');
+    const ended = (await events(id)).find((event) => event.type === 'script_ended');
+    expect(teased.map((event) => event.payload)).toEqual([
+      { scriptRunId: z.object({ scriptRunId: z.uuid() }).parse(ended?.payload).scriptRunId },
+    ]);
+
+    await fanWrites('c-left', 'Encore');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)).toMatchObject({ scriptAbandon: { earlier: [], teased: 1 } });
+  });
+
   it('writes nothing more to the fan while a human is awaited, whatever the fan sends', async () => {
     const id = await fanWrites('c-awaited', 'Je vais pas bien');
     composer.next = { kind: 'held', reason: 'handoff', cause: 'distress', detail: ['distress'], costUsd: 0 };

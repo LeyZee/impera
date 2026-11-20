@@ -418,6 +418,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
     customOrder: composed.customOrder?.kind ?? 'none',
     objectionReply: composed.objectionReply?.replyId ?? null,
+    ...(composed.abandonTeased !== undefined && { abandonTease: composed.abandonTeased }),
     ...(composed.scripts !== undefined && { script: scriptOutcome(composed.scripts.decision) }),
     bubbles: composed.bubbles,
     blocking,

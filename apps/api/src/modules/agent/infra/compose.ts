@@ -18,6 +18,7 @@ import type {
 } from '@impera/llm';
 import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
+import { abandonTease, type AbandonTease } from '../domain/abandon';
 import {
   asksAvailability,
   availabilityChanged,
@@ -205,6 +206,10 @@ export interface ScriptsInput {
   readonly latest: ScriptRun | null;
   /** False on a second pass over the same message: it was already counted against the step waiting. */
   readonly countsHisMessage: boolean;
+  /** His runs before `latest` that went cold: a run he left there makes her vexed (Charles 20/11). Absent: none. */
+  readonly earlier?: readonly ScriptRun[];
+  /** How many times she already teased him about `latest`, a run he left. Absent: never. */
+  readonly teased?: number;
 }
 
 /** The scripts the brain may pick from, by the short ids it answers with (`s1`…). */
@@ -272,7 +277,8 @@ export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks
  * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
  * of a script decided (she offers only what a script sends, ADR 0098).
  */
-type OfferRefusal = OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step' | 'he_came';
+type OfferRefusal =
+  OfferBlock | ScriptStartBlock | 'no_offer_context' | 'no_script_step' | 'he_came' | 'abandon_tease';
 
 /** Why her first answer was refused, as the voice reads it once more (M1): the fault, never the words she wrote. */
 const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
@@ -391,6 +397,18 @@ function farewellOf(signals: readonly string[] | undefined): keyof typeof FAREWE
  * He just came (ADR 0156 § 6): she shares the moment with him, tender and proud, and the evening's sale stops there.
  * His run pauses; no step, no offer, no question that would start the game again.
  */
+/**
+ * He left in the middle of a script, a paid step waiting, and comes back hot (Charles 20/11): she teases him about it
+ * before any game starts again, on a kind background. The first time, playful and once; after a second run he left,
+ * frankly vexed: he has to earn it back. Never a reproach about money, never a guilt trip that hurts.
+ */
+const ABANDON_HINTS: Record<AbandonTease, string> = {
+  first:
+    'la dernière fois il est parti en plein jeu sans finir : elle le taquine une fois, joueuse, en le faisant un peu culpabiliser (« tu m’as laissée en plan… »), puis répond à son message ; rien à vendre sur ce message, jamais un mot sur l’argent',
+  again:
+    'il est encore parti en plein jeu sans finir, ce n’est pas la première fois : elle est franchement vexée, le pique et lui fait comprendre qu’il va devoir se rattraper avant qu’elle se remette dans le jeu, en restant au fond tendre ; rien à vendre sur ce message, jamais un mot sur l’argent',
+};
+
 const HE_CAME_HINT =
   'il vient de jouir : elle savoure ce moment avec lui, tendre, fière et complice, en une ou deux bulles ; rien à vendre, aucune nouvelle demande, pas de question pour relancer le jeu';
 
@@ -512,6 +530,8 @@ export interface ComposedTurn {
   readonly scriptStart?: ScriptStart;
   /** A sale gone wrong at this message: she answers it, or the same trouble again goes to a human (ADR 0156). */
   readonly saleTrouble?: SaleTroubleOutcome;
+  /** She teased him about the run he left (Charles 20/11): one `script_abandon_teased`, counted against what is due. */
+  readonly abandonTeased?: AbandonTease;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -797,6 +817,18 @@ export async function composeTurn(
       ? undefined
       : scriptStartGate(availability, heat, threshold);
   const heCame = brief?.desireSignals?.includes('just_came') === true;
+  // He left in the middle of a script and comes back hot: she teases him first, and no step goes on this message.
+  const tease =
+    input.scripts === undefined || input.offer === undefined || brief === undefined || heCame
+      ? null
+      : abandonTease({
+          now: input.situation.now,
+          latest: input.scripts.latest,
+          earlier: input.scripts.earlier ?? [],
+          teased: input.scripts.teased ?? 0,
+          hot: heat >= input.offer.limits.minDesire,
+          held: scriptStepsHeld(input.offer.flags, care) || input.offer.flags.ageDisputed !== undefined,
+        });
   // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
   const scripts =
     input.scripts === undefined || input.offer === undefined
@@ -827,6 +859,7 @@ export async function composeTurn(
           mayAct:
             !care &&
             !heCame &&
+            tease === null &&
             // Her hours close in a few minutes: a step now would be cut off (ADR 0158 § A 7).
             input.herDayEnds !== true &&
             brief !== undefined &&
@@ -850,11 +883,13 @@ export async function composeTurn(
       ? undefined
       : heCame
         ? 'he_came'
-        : input.scripts !== undefined && input.offer !== undefined
-          ? 'no_script_step'
-          : scriptStart !== undefined && !scriptStart.open
-            ? (scriptStart.missing[0] ?? 'availability_unconfirmed')
-            : offerRefusal(cursored, input.offer, heat);
+        : tease !== null
+          ? 'abandon_tease'
+          : input.scripts !== undefined && input.offer !== undefined
+            ? 'no_script_step'
+            : scriptStart !== undefined && !scriptStart.open
+              ? (scriptStart.missing[0] ?? 'availability_unconfirmed')
+              : offerRefusal(cursored, input.offer, heat);
   const decidedBrief: Brief =
     scriptStep === undefined
       ? cursored
@@ -967,6 +1002,9 @@ export async function composeTurn(
     scriptStep === undefined && waitingStep === undefined
       ? (farewellOf(brief?.desireSignals) ?? (input.herDayEnds === true ? 'her_day_ends' : null))
       : null;
+  // Her tease is said only where nothing else leads her answer (a goodbye, her question, his trouble with a sale).
+  const teases =
+    tease !== null && farewell === null && !asking && waitingStep === undefined && !complaint ? tease : null;
   const voiceBrief: Brief =
     heCame && !care
       ? {
@@ -990,6 +1028,7 @@ export async function composeTurn(
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
+                ...(teases === null ? [] : [ABANDON_HINTS[teases]]),
               ],
             };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
@@ -1094,6 +1133,8 @@ export async function composeTurn(
     ...(offerRefused !== undefined && !care && { offerRefused }),
     ...(care && { care: true }),
     ...(saleTrouble !== undefined && { saleTrouble }),
+    // Teased only if the voice wrote it: a tease never written is still due.
+    ...(teases !== null && voice.ok && { abandonTeased: teases }),
     voiceBrief,
     voiceInput,
     bubbles,

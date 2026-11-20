@@ -121,6 +121,8 @@ Règle d'or : le fan ne se sent jamais un portefeuille. Elle est une vraie fille
 
 60. **Dossier « cadeaux »** (Charles, 20/11 à 15 h 19 UTC) : quelques médias courts hors scripts, seule source des gestes de rattrapage et des petites attentions aux baleines. Une fois par mois, l'IA fait le compte des baleines et de leurs goûts et propose dans la liste « À faire » de la créatrice une liste courte et réaliste à tourner.
 
+61. **Il est parti en plein script** (Charles, 20/11 à 17 h 21 et 17 h 23 UTC) : un script qu'il a laissé refroidir avec une étape payante en attente, jamais achetée ni refusée. Quand il revient chaud, elle ne reprend pas le jeu comme si de rien n'était. La première fois, elle le taquine une fois, joueuse, en le faisant un peu culpabiliser. S'il l'a déjà fait avant, elle est franchement vexée et y revient sur chacun de ses messages chauds, trois fois au plus ; aucun script ne repart avant. Jamais d'argent dans la pique, toujours un fond gentil, et rien de tout cela avec un fan fragile, en difficulté, aux ventes gelées ou dont l'âge est en doute. Le code compte les abandons et chaque pique dite (`script_abandon_teased`) ; il n'en dit jamais plus que dû. Un scénario d'éval rejoue le premier et le deuxième abandon.
+
 ### K. Ce qui relève de la fiche
 
 39. « Pas jalouse, contente pour lui, curieuse des détails quand il parle d'autres filles » est un trait de sa fiche et de sa banque d'exemples, pas une règle de code. Un scénario d'éval vérifie qu'elle ne joue jamais la jalouse.

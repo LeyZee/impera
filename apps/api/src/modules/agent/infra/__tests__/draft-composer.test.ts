@@ -2297,6 +2297,77 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(result.kind === 'draft' ? result.scriptRun : 'held').toBeUndefined();
   });
 
+  it('teases him when he comes back hot after leaving a script, once, then vexed after a second time (Charles 20/11)', async () => {
+    const twoPacks: ScriptSource = {
+      catalogue: async () => {
+        const [pack] = await PACK_SOURCE.catalogue('creator-1', 'account-1');
+        return pack === undefined
+          ? []
+          : [pack, { ...pack, scriptRef: 'script-deux', description: 'Deuxième pack' }];
+      },
+      // He was sent the first one and left it: only the second may open.
+      history: (...args) => sent.history(...args),
+    };
+    // Yesterday: past her cooldown between two scripts.
+    const yesterday = new Date(INPUT.now.getTime() - 24 * 3_600_000);
+    const left = {
+      ...waiting,
+      status: 'stalled' as const,
+      steps: waiting.steps.map((step) => ({ ...step, sentAt: yesterday, at: yesterday })),
+      startedAt: yesterday,
+      endedAt: yesterday,
+    };
+    const hot = {
+      brief: { ...HOT, scriptPick: 's1' },
+      voice: { bubbles: ['Tu m’as laissée en plan toi 😏'] },
+    };
+    const turn = async (scriptAbandon: NonNullable<AgentComposeInput['scriptAbandon']>) => {
+      const { draftComposer, seen } = composer(hot, undefined, limitsOf(ADULT).limits, deps(twoPacks));
+      const result = await draftComposer.compose({ ...free(INPUT), scriptRun: left, scriptAbandon });
+      return { result, voice: seen.voiceInputs?.[0] };
+    };
+
+    const first = await turn({ earlier: [], teased: 0 });
+    expect(first.voice?.scriptStep).toBeUndefined();
+    expect(first.voice?.brief.toneHints.some((hint) => hint.includes('le taquine une fois'))).toBe(true);
+    expect(first.result).toMatchObject({ kind: 'draft', abandonTeased: true });
+    expect(first.result.kind === 'draft' ? first.result.scriptRun?.opened : 'held').toBeUndefined();
+
+    // Said once: the game may start again.
+    const after = await turn({ earlier: [], teased: 1 });
+    expect(after.result).toMatchObject({ kind: 'draft', scriptRun: { step: { scriptRef: 'script-deux' } } });
+    expect(after.result.kind === 'draft' ? after.result.abandonTeased : 'held').toBeUndefined();
+
+    // He left one before: vexed, three times, and no script before.
+    const again = await turn({ earlier: [left], teased: 2 });
+    expect(again.voice?.scriptStep).toBeUndefined();
+    expect(again.voice?.brief.toneHints.some((hint) => hint.includes('franchement vexée'))).toBe(true);
+    expect(again.result).toMatchObject({ kind: 'draft', abandonTeased: true });
+    const done = await turn({ earlier: [left], teased: 3 });
+    expect(done.result).toMatchObject({ kind: 'draft', scriptRun: { step: { scriptRef: 'script-deux' } } });
+  });
+
+  it('never teases a fragile fan about the script he left (Charles 20/11)', async () => {
+    const left = {
+      ...waiting,
+      status: 'stalled' as const,
+      endedAt: new Date(INPUT.now.getTime() - 3_600_000),
+    };
+    const { draftComposer, seen } = composer(
+      { brief: HOT },
+      undefined,
+      limitsOf({ ...ADULT, fragile: true }).limits,
+      deps(sent),
+    );
+    const result = await draftComposer.compose({
+      ...free(INPUT),
+      scriptRun: left,
+      scriptAbandon: { earlier: [left], teased: 0 },
+    });
+    expect(seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('vexée'))).toBe(false);
+    expect(result.kind === 'draft' ? result.abandonTeased : undefined).toBeUndefined();
+  });
+
   it('brings his score back to a client’s rest once he bought the last step, even unsaid (ADR 0156 § 6)', async () => {
     const boughtIt: ScriptSource = {
       ...PACK_SOURCE,

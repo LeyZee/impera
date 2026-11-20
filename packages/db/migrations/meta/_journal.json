@@ -1212,6 +1212,13 @@
       "when": 1795191343745,
       "tag": "0240_sale_trouble_event",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1795196843696,
+      "tag": "0241_script_abandon_teased_event",
+      "breakpoints": true
     }
   ]
 }

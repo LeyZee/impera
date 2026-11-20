@@ -1,0 +1,4 @@
+# 2026-11-20 — ADR 0158 § 61 : il est parti en plein script, elle le taquine — in progress
+Fait : `abandonTease` (domaine) lit un abandon (script refroidi avec une étape payante en attente, ni achetée ni refusée) et dit, quand il revient chaud, si elle le taquine : une fois au premier abandon, trois fois au plus s'il l'a déjà fait ; aucune étape ne part sur un message où elle le taquine. Jamais avec un fan en soin, fragile, aux ventes gelées, à ne pas contacter ou dont l'âge est contesté. Chaque pique dite est journalisée (`script_abandon_teased`, migration 0241 à renuméroter à son tour) et relue au message suivant ; `script_runs.stalled` donne les abandons d'avant. Tests du domaine, du composeur, du dépôt et de `respond` ; deux scénarios d'éval (premier et deuxième abandon), non lancés.
+Pas fait : passe d'éval payante (attend le mot de Charles avec le coût).
+Découvertes : aucune.

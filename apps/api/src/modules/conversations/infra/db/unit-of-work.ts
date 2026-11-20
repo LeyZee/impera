@@ -407,6 +407,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .limit(1);
         return last?.type === 'scripts_exhausted';
       },
+      async abandonTeases(conversationId, scriptRunId) {
+        const rows = await tx
+          .select()
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              eq(schema.conversationEvents.type, 'script_abandon_teased'),
+            ),
+          );
+        return rows
+          .map(toStoredEvent)
+          .filter(
+            ({ body }) => body.type === 'script_abandon_teased' && body.payload.scriptRunId === scriptRunId,
+          ).length;
+      },
       async salesState(conversationId) {
         const rows = await tx
           .select()

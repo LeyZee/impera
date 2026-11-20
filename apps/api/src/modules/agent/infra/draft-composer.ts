@@ -146,6 +146,11 @@ export interface AgentComposeInput {
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRun | null;
+  /**
+   * His runs before `scriptRun` that went cold, and how many times she teased him about `scriptRun` when he left it
+   * (Charles 20/11). Absent: none, never.
+   */
+  readonly scriptAbandon?: { readonly earlier: readonly ScriptRun[]; readonly teased: number };
   /** His availability as the conversation keeps it (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
@@ -243,6 +248,8 @@ type AgentComposeResult = (
   readonly scriptsExhausted?: true;
   /** She answered a sale gone wrong in this draft (`sale_trouble`, ADR 0156 § 4 and § 7): a human gets the next one. */
   readonly saleTrouble?: SaleTroubleKind;
+  /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
+  readonly abandonTeased?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /**
@@ -371,6 +378,10 @@ async function scriptsInput(deps: DraftComposerDeps, input: AgentComposeInput): 
     history: null,
     latest: input.scriptRun ?? null,
     countsHisMessage: (input.waited ?? 0) === 0,
+    ...(input.scriptAbandon !== undefined && {
+      earlier: input.scriptAbandon.earlier,
+      teased: input.scriptAbandon.teased,
+    }),
   };
   if (deps.scripts === undefined || platformAccountId === undefined || platformConversationId === undefined)
     return closed;
@@ -804,6 +815,7 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
     ...(opened && { customOrderOpened: true }),
     ...(composed.saleTrouble?.kind === 'answer' &&
       result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
+    ...(composed.abandonTeased !== undefined && result.kind === 'draft' && { abandonTeased: true }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
   };
