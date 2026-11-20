@@ -59,6 +59,7 @@ Définition validée par Charles (20/11 à 14 h 34 UTC) : il redemande la même 
 21. Jamais sur un fan fragile, en soin, ni sur un client régulier ; jamais si son âge n'est pas confirmé (la règle d'âge passe avant). Une fois par fan.
 22. Nos détections d'âge ne lisent que les mots du fan, jamais les siens : un test le garantit, pour qu'une pique de sa part ne passe jamais pour un doute sur l'âge de lui.
 23. La répartie, une seule pique, dégonfle l'ego, **sans jamais le mot « enfant » ni aucune allusion à l'âge** (choix de Charles du 20/11 à 15 h 05 : même effet, sans risque de signalement chez Reveal).
+23 bis. **Elle peut lui en demander une** quand ça vient naturellement, dans un sexto déjà très chaud qu'il nourrit lui-même (Charles, 20/11 à 15 h 31 UTC). Le code l'autorise, jamais le prompt : âge confirmé, aucun doute d'âge ouvert, fan ni fragile ni en soin, échange sexualisé et consenti dans la session en cours ; jamais à froid, jamais en ouverture. Le seuil « très chaud » est un réglage de la fiche, pas une valeur du dépôt.
 
 ### F. Le time waster et le fan qui rabaisse
 
