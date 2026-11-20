@@ -9,7 +9,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
-import { ShootBrief } from './ShootBrief';
 import { NOT_SENT, type Outcome } from './api';
 import { acceptWeek, readWeekAgain, tickShootItem, useCreatorWeek } from './week-api';
 import { dueWords, hasWeek, leftToDrop, NEED_WORDS, progressOf } from './week-model';
@@ -169,10 +168,22 @@ function ShootDay({
                 </svg>
               </span>
             )}
-            <div className="wk-line__body">
-              <span className="wk-line__label">{item.label}</span>
-              {item.sheet === null ? null : <ShootBrief brief={item.sheet} folded />}
-            </div>
+            {item.sheet === null ? (
+              <div className="wk-line__body">
+                <span className="wk-line__label">{item.label}</span>
+              </div>
+            ) : (
+              // The whole line opens its shooting sheet; the tick stays its own target.
+              <details className="wk-line__body wk-line__sheet">
+                <summary className="wk-line__summary">
+                  <span className="wk-line__label">{item.label}</span>
+                  <svg className="wk-line__chevron" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="m6 3 5 5-5 5" />
+                  </svg>
+                </summary>
+                <p className="wk-line__text">{item.sheet}</p>
+              </details>
+            )}
           </li>
         ))}
       </ul>

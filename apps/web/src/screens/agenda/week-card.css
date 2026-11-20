@@ -166,15 +166,57 @@
   margin-top: 1px;
 }
 .wk-line__body {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 0;
+}
+.wk-line__body:not(details) {
   padding-top: 3px;
 }
 .wk-line__label {
   font-size: var(--nv-text-body);
   transition: color var(--nv-dur-base) var(--nv-ease-out);
+}
+/* The line itself is the way to its sheet: a chevron at its end that turns when open. */
+.wk-line__summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  min-height: var(--nv-target-min);
+  margin-top: -9px;
+  padding-right: 4px;
+  border-radius: var(--nv-radius-sm);
+  cursor: pointer;
+}
+.wk-line__summary::-webkit-details-marker {
+  display: none;
+}
+.wk-line__summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.wk-line__chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-base) var(--nv-ease-out);
+}
+.wk-line__sheet[open] .wk-line__chevron {
+  transform: rotate(90deg);
+}
+.wk-line__text {
+  margin: 0 0 var(--nv-space-1);
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  white-space: pre-line;
 }
 .wk-line[data-done] .wk-line__label {
   color: var(--nv-ink-muted);

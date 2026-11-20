@@ -39,14 +39,15 @@
   font-weight: 650;
   font-size: var(--nv-text-headline);
 }
+/* « À relire »: amber, a gesture awaited; never red, which says an emergency. */
 .wp-state {
   flex: none;
   padding: 3px 10px;
   border-radius: 999px;
   font-size: var(--nv-text-caption);
   font-weight: 650;
-  background: color-mix(in srgb, var(--ag-c) 18%, transparent);
-  color: var(--ag-c);
+  background: color-mix(in srgb, var(--nv-warning) 18%, transparent);
+  color: var(--nv-warning);
 }
 .wp-state[data-state='validated'] {
   background: color-mix(in srgb, var(--nv-success) 16%, transparent);
@@ -54,6 +55,9 @@
 }
 .wp-facts {
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
@@ -139,10 +143,101 @@
   color: var(--nv-ink-muted);
 }
 .wp-move {
-  min-width: 112px;
+  position: relative;
+  display: inline-flex;
 }
-.wp-remove {
+/* A compact icon button: 36 px drawn, 44 px to the touch. */
+.wp-icon {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--nv-ink-muted);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  transition:
+    color var(--nv-dur-base) var(--nv-ease-out),
+    transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.wp-icon::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.wp-icon:hover,
+.wp-icon[aria-expanded='true'] {
+  color: var(--nv-ink);
+}
+.wp-icon:active {
+  transform: scale(0.9);
+}
+.wp-icon:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.wp-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wp-menu.nv-glass {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: var(--nv-radius-md);
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(165deg, var(--nv-glass-fill-strong) 0%, var(--nv-glass-fill) 62%),
+    color-mix(in srgb, var(--nv-surface-raised) 92%, transparent);
+  animation: wp-pop var(--nv-dur-fast) var(--nv-ease-out);
+}
+@keyframes wp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.wp-menu button {
+  appearance: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink);
+  background: transparent;
+  border-radius: var(--nv-radius-sm);
+  padding: 0 12px;
+  min-height: var(--nv-target-min);
+  cursor: pointer;
+}
+.wp-menu button:hover,
+.wp-menu button:focus-visible {
+  background: var(--nv-fill-track);
+  outline: none;
+}
+.wp-day:has(.wp-menu) {
+  z-index: 2;
+  position: relative;
+}
+/* Its text on the content's left edge, as the day and the tags above it. */
+.wp-remove.nv-btn {
   align-self: flex-start;
+  padding-inline: 0;
 }
 .wp-deferred {
   background: color-mix(in srgb, var(--nv-ink) 3%, transparent);
@@ -159,11 +254,7 @@
   gap: var(--nv-space-2);
 }
 @media (max-width: 520px) {
-  .wp-line {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .wp-move {
-    grid-column: 2 / -1;
-    justify-self: end;
+  .wp-line__label {
+    white-space: normal;
   }
 }

@@ -1,6 +1,6 @@
 import { type AgencyCreatorWeek, type CreatorId, type WeekNeed, type WeekPlan } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { creatorWeekKey, useAgencyCreatorWeek, validateCreatorWeek, VALIDATE_ERRORS } from './api';
 import {
@@ -16,8 +16,8 @@ import {
 import './week-plan.css';
 
 import { suggestionsKey } from '@/creators/agenda/api';
-import { dayOf, lengthOf, longDay, shortDay } from '@/scheduling/time';
-import { Select, type SelectOption } from '@/shell/Select';
+import { dayOf, lengthOf, longDay } from '@/scheduling/time';
+import { Select } from '@/shell/Select';
 import { Failure } from '@/shell/states';
 
 const NEED_LABELS: Readonly<Record<WeekNeed, string>> = {
@@ -30,6 +30,107 @@ const NEED_LABELS: Readonly<Record<WeekNeed, string>> = {
 };
 
 const DEFERRED = 'deferred';
+
+/** « Mercredi 25 novembre »: a day, capitalised everywhere on this card. */
+const dayWords = (day: string): string => {
+  const words = longDay(day);
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+interface MoveTarget {
+  readonly key: string;
+  readonly label: string;
+}
+
+/**
+ * A line's « Déplacer »: a compact button at the end of the line that opens its menu (another day, the week after).
+ * Focus goes to the first item; arrows move, Escape, Tab or a click elsewhere close it and give focus back.
+ */
+function MoveMenu({
+  label,
+  targets,
+  onMove,
+}: {
+  label: string;
+  targets: readonly MoveTarget[];
+  onMove: (key: string) => void;
+}): JSX.Element {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    menu.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus();
+    const away = (event: PointerEvent): void => {
+      const target = event.target;
+      if (target instanceof Node && (menu.current?.contains(target) ?? false)) return;
+      if (target instanceof Node && (button.current?.contains(target) ?? false)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', away);
+    return () => {
+      document.removeEventListener('pointerdown', away);
+    };
+  }, [open]);
+  const close = (): void => {
+    setOpen(false);
+    button.current?.focus();
+  };
+  return (
+    <span className="wp-move">
+      <button
+        ref={button}
+        type="button"
+        className="wp-icon"
+        aria-label={`Déplacer ${label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Déplacer"
+        onClick={() => {
+          setOpen(!open);
+        }}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M2.5 8h11M10.5 5l3 3-3 3M5.5 5l-3 3 3 3" />
+        </svg>
+      </button>
+      {open ? (
+        <div
+          ref={menu}
+          className="wp-menu nv-glass nv-glass--thick"
+          role="menu"
+          aria-label={`Déplacer ${label}`}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' || event.key === 'Tab') {
+              event.preventDefault();
+              close();
+              return;
+            }
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+            event.preventDefault();
+            const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [])];
+            const at = items.findIndex((item) => item === document.activeElement);
+            items[(at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+          }}
+        >
+          {targets.map((target) => (
+            <button
+              key={target.key}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close();
+                onMove(target.key);
+              }}
+            >
+              {target.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </span>
+  );
+}
 
 /**
  * Créatrices › Agenda, her week of shooting (ADR 0140 § 3): the week the code computed on Sunday evening, which the owner
@@ -126,15 +227,17 @@ function Plan({
         </span>
       </header>
       <p className="wp-facts nv-num">
-        Stock : {plan.stock.feed} publications feed, {plan.stock.stories} stories · Livraison avant{' '}
-        {longDay(dayOf(plan.dueAt, timezone))}, 23 h
+        <span>
+          Stock : {plan.stock.feed} publications feed, {plan.stock.stories} stories
+        </span>
+        <span>Livraison avant {longDay(dayOf(plan.dueAt, timezone))}, 23 h</span>
       </p>
       <div className="wp-days">
         {plan.shootDays.map((day) => {
           const others = plan.shootDays.filter((other) => other.day !== day.day);
-          const lineTargets: SelectOption<string>[] = [
-            ...others.map((other) => ({ value: other.day, label: `Vers ${shortDay(other.day)}` })),
-            { value: DEFERRED, label: 'Semaine suivante' },
+          const lineTargets: readonly MoveTarget[] = [
+            ...others.map((other) => ({ key: other.day, label: `Vers ${dayWords(other.day)}` })),
+            { key: DEFERRED, label: 'À la semaine suivante' },
           ];
           const over = overloaded(day, plan);
           return (
@@ -146,13 +249,13 @@ function Plan({
                     ariaLabel={`Jour de tournage du ${longDay(day.day)}`}
                     options={[day.day, ...freeDays(plan, read.week, day.day).filter((one) => one !== day.day)]
                       .sort()
-                      .map((one) => ({ value: one, label: longDay(one) }))}
+                      .map((one) => ({ value: one, label: dayWords(one) }))}
                     onChange={(to) => {
                       setPlan(moveDay(plan, day.day, to));
                     }}
                   />
                 ) : (
-                  <b className="wp-day__date">{longDay(day.day)}</b>
+                  <b className="wp-day__date">{dayWords(day.day)}</b>
                 )}
                 <span className="wp-load nv-num" data-over={over || undefined}>
                   {lengthOf(loadOf(day) * 60_000)} sur {lengthOf(plan.capacityMinutes * 60_000)}
@@ -171,15 +274,10 @@ function Plan({
                     <span className="wp-line__label">{item.label}</span>
                     <span className="wp-line__min nv-num">{lengthOf(item.minutes * 60_000)}</span>
                     {editable ? (
-                      <Select
-                        className="wp-move"
-                        value=""
-                        placeholder="Déplacer"
-                        ariaLabel={`Déplacer ${item.label}`}
-                        options={lineTargets}
-                        listWidth="options"
-                        search="never"
-                        onChange={(to) => {
+                      <MoveMenu
+                        label={item.label}
+                        targets={lineTargets}
+                        onMove={(to) => {
                           setPlan(moveLine(plan, day.day, index, to === DEFERRED ? 'deferred' : { day: to }));
                         }}
                       />
@@ -216,12 +314,16 @@ function Plan({
                 {editable ? (
                   <button
                     type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm"
+                    className="wp-icon"
+                    aria-label={`Remettre ${item.label}`}
+                    title="Remettre dans la semaine"
                     onClick={() => {
                       setPlan(restoreLine(plan, index));
                     }}
                   >
-                    Remettre
+                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M5.5 4 3 6.5 5.5 9M3 6.5h6.5a3.5 3.5 0 0 1 0 7H7" />
+                    </svg>
                   </button>
                 ) : null}
               </li>

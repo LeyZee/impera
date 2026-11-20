@@ -87,7 +87,7 @@ describe('her week, as the owner reads it', () => {
     if (saturday === undefined) throw new Error('two days expected');
     fireEvent.click(saturday);
     expect(screen.getByText('Reporté à la semaine suivante')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Remettre' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Remettre/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Valider et envoyer' }));
     await waitFor(() => {
       expect(posts).toHaveLength(1);
@@ -100,6 +100,18 @@ describe('her week, as the owner reads it', () => {
       'Vidéo A',
     ]);
     expect(await screen.findByText('Validée')).toBeTruthy();
+  });
+
+  it('moves a line through its compact menu, to the week after, and puts it back', async () => {
+    serve(computed);
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Déplacer Vidéo A' }));
+    expect(screen.getByRole('menuitem', { name: 'Vers Mercredi 25 novembre' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'À la semaine suivante' }));
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.getByText('Reporté à la semaine suivante')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remettre Vidéo A' }));
+    expect(screen.queryByText('Reporté à la semaine suivante')).toBeNull();
   });
 
   it('lets a manager read it, never validate it', async () => {

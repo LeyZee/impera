@@ -52,11 +52,13 @@ async function computeWeek(
 /**
  * `creator_week.plan`, each hour (ADR 0140 § 2, § 19): for each creator whose Sunday 18 h has passed, the week after
  * computed as a draft for the owner, refreshed each hour on the stock of now until he validates it. Replayable: one
- * week per creator, a validated week is never touched. One creator that fails does not stop the others.
+ * week per creator, a validated week is never touched. One creator that fails does not stop the others; all of them failing
+ * throws the last error.
  */
 export async function planWeeks(deps: PlanWeeksDeps, now: Date): Promise<PlanWeeksRun> {
   const outcomes: Partial<Record<DraftOutcome, number>> = {};
   const failed: string[] = [];
+  let last: unknown = null;
   for (const creator of await deps.drafts.creators()) {
     const week = weekToPlan(now, creator.timeZone);
     if (week === null) continue;
@@ -64,9 +66,12 @@ export async function planWeeks(deps: PlanWeeksDeps, now: Date): Promise<PlanWee
       const plan = await computeWeek(deps, creator.creatorId, creator.timeZone, week);
       const outcome = await deps.drafts.saveDraft(creator.creatorId, week, plan, now);
       outcomes[outcome] = (outcomes[outcome] ?? 0) + 1;
-    } catch {
+    } catch (error) {
       failed.push(creator.creatorId);
+      last = error;
     }
   }
+  // Every creator failed: a broken job, not one creator's data; thrown so that the worker logs it and retries.
+  if (failed.length > 0 && Object.keys(outcomes).length === 0) throw last;
   return { outcomes, failed };
 }
