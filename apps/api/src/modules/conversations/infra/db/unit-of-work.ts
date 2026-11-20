@@ -131,6 +131,20 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
                 sql`${schema.messages.platformMedia} = '[]'::jsonb`,
               ),
             );
+        // A paid step he bought since (ADR 0156 § 2): the synced copy says it is paid, so it is, with its media as
+        // the platform now shows them. Only from locked to paid, never back: a later copy cannot unbuy it.
+        if (message.direction === 'outbound' && message.isPaid)
+          await tx
+            .update(schema.messages)
+            .set({ isPaid: true, platformMedia: [...message.platformMedia] })
+            .where(
+              and(
+                eq(schema.messages.platformAccountId, message.platformAccountId),
+                eq(schema.messages.platformMessageId, message.platformMessageId),
+                eq(schema.messages.direction, 'outbound'),
+                eq(schema.messages.isPaid, false),
+              ),
+            );
         return false;
       },
       async countForDraft(draftId) {
