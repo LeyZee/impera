@@ -56,7 +56,7 @@ describe('ArchivedCreators (ADR 0071 § 2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rouvrir' }));
     expect(await screen.findByRole('status')).toHaveProperty(
       'textContent',
-      'Rouverte : Nora. Son agent reste à l’arrêt : relance-le depuis le Dashboard. Son espace se rouvre avec un nouveau lien, dans l’onglet Accès.',
+      'Rouverte : Nora. Son agent reste à l’arrêt : relance-le depuis le Dashboard. Son espace se rouvre avec un nouveau lien, dans l’onglet Compte de sa fiche.',
     );
     expect(onRestored).toHaveBeenCalledWith(NORA.id);
   });

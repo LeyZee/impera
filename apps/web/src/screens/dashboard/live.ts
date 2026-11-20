@@ -159,7 +159,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
         ['Conversations suivies', String(reveal.conversations)],
       ],
       alarm: late ? 'La messagerie Reveal n’est plus lue' : 'La messagerie Reveal est déconnectée',
-      // « Messagerie »: the sales key is another link, Réglages › Ventes may show Reveal linked (choix de Charles 12/11).
+      // « Messagerie »: the sales key is another link, Réglages › Plateformes may show Reveal linked (choix de Charles 12/11).
       brief: `Messagerie Reveal ${late ? 'lue en retard' : reveal.connected ? 'connectée' : unlinked ? 'pas encore reliée' : 'déconnectée'}`,
     },
     {
@@ -314,7 +314,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
       ? ' L’IA qui écrit attend aussi sa clé.'
       : ' L’IA qui écrit ne répond pas non plus.';
   if (unlinked) {
-    // The sales key and the messaging session are two links: Réglages › Ventes may show Reveal linked while the
+    // The sales key and the messaging session are two links: Réglages › Plateformes may show Reveal linked while the
     // agent reads nothing yet, so the page names the one missing (recette socle 11/11, point 4 ; choix de Charles 12/11).
     const salesLinked = api.revealSales === null ? '' : 'Les ventes Reveal, elles, remontent déjà. ';
     return {
@@ -481,7 +481,7 @@ function sellerOf(line: ApiSellerLine): RevealSeller {
     kind: seller.kind,
     name: seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind],
     // A chatter of the platform nobody linked yet: his sales count for no one until the owner links him (ADR 0050 § 5).
-    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Équipe › Reveal` : counts,
+    line: seller.kind === 'unlinked' ? `${counts} · à relier dans Équipe › Comptes Reveal` : counts,
     revenue: euros(line.revenueMinor),
     net: euros(line.netMinor),
     agency: euros(line.agencyMinor),

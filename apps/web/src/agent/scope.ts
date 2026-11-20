@@ -31,6 +31,9 @@ function read(): string | null {
   }
 }
 
+/** The id the selector is set on as stored, `null` for « Toutes »: for a guard, outside React. */
+export const scopedCreatorId = (): string | null => stored();
+
 /** Sets the selector on `creatorId`, or on « Toutes » with `null`, for every screen that reads it. */
 export function scopeTo(creatorId: string | null): void {
   const value = creatorId ?? ALL;

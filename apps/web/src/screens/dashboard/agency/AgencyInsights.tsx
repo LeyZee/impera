@@ -1751,7 +1751,7 @@ export function AgencyInsightsPanel({
   creatorId: string | null;
   creatorName?: string;
   onCreator?: ((creatorId: string) => void) | undefined;
-  /** The owner links the registers (Réglages › Ventes): the empty screen leads there. */
+  /** The owner links the registers (Réglages › Plateformes): the empty screen leads there. */
   canOpenSettings: boolean;
   tip: FloatingTip;
   index?: number;
@@ -1807,7 +1807,7 @@ export function AgencyInsightsPanel({
           </p>
           {canOpenSettings ? (
             <Link to="/reglages/ventes" className="nv-btn nv-btn--soft">
-              Relier dans Réglages › Ventes
+              Relier dans Réglages › Plateformes
             </Link>
           ) : null}
         </div>

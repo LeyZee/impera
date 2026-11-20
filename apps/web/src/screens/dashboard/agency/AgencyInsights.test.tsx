@@ -111,7 +111,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(within(card).queryByText('ventes')).toBeNull();
   });
 
-  it('says a chatter nobody linked under his line, in the screen’s tip, and leads to Équipe › Reveal (ADM-06)', async () => {
+  it('says a chatter nobody linked under his line, in the screen’s tip, and leads to Équipe › Comptes Reveal (ADM-06)', async () => {
     const unlinked = {
       seller: { kind: 'unlinked' },
       revenueMinor: 37_200,
@@ -136,7 +136,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     act(() => {
       row.focus();
     });
-    expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Reveal');
+    expect(screen.getByRole('tooltip').textContent).toContain('Équipe › Comptes Reveal');
   });
 
   it('ranks the sellers first, the sales of no seller at the bottom, unranked and under a rule (PIL-03)', async () => {
@@ -306,7 +306,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     serve(200, { ...AGENCY_WEEK, creators: [], byCreator: [], sellers: [], kinds: [] });
     show();
     expect(await screen.findByText(/Aucune créatrice n’est encore reliée/u)).toBeTruthy();
-    expect(screen.getByRole('link', { name: /Réglages › Ventes/u })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Réglages › Plateformes/u })).toBeTruthy();
     expect(screen.queryByText('Chiffre d’affaires')).toBeNull();
   });
 

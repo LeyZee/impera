@@ -86,7 +86,7 @@ let gate: Promise<void> | null;
 /** The agency's settings answer a server error (recette EQP-05). */
 let settingsDown: boolean;
 let team: readonly TeamMember[];
-/** The platform's team as Équipe › Reveal reads it (ADR 0076); `'down'` answers a refused list. */
+/** The platform's team as Équipe › Comptes Reveal reads it (ADR 0076); `'down'` answers a refused list. */
 let revealTeam: { platformChatterId: string; firstName: string; lastName: string }[] | 'down';
 
 function serve(): void {
@@ -1399,7 +1399,7 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
         'Vente du mercredi 28 octobre à 22 h · chatteur non relié · Camille Essai',
       );
     });
-    expect(text(unlinked)).toContain('relie-le dans Équipe › Reveal');
+    expect(text(unlinked)).toContain('relie-le dans Équipe › Comptes Reveal');
     expect(within(unlinked).queryByRole('button', { name: /^Compter/u })).toBeNull();
 
     const excluded = card(list, /^Écartée$/u);

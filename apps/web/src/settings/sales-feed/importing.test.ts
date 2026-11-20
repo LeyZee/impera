@@ -126,7 +126,7 @@ describe('the review of the import (CRM-07)', () => {
   });
 });
 
-describe('the count of new creators on Réglages › Ventes (CRM-07 b2)', () => {
+describe('the count of new creators on Réglages › Plateformes (CRM-07 b2)', () => {
   it('says nothing when none waits', () => {
     expect(newModelsLabel({ total: 0, byPlatform: [] })).toBeNull();
   });

@@ -1,7 +1,7 @@
 import type { TelegramTopic } from '@impera/contracts';
 
 /**
- * The tabs of Réglages › Telegram, one per kind of message, plus the bots and the owner's own private chat (SEC-05 lot 2). The keywords are a line of the alerts
+ * The tabs of Réglages › Bots Telegram, one per kind of message, plus the bots and the owner's own private chat (SEC-05 lot 2). The keywords are a line of the alerts
  * tab: their words live in the Persona, so the only setting here is the group (REG-14, recette du 29/10).
  */
 export type TelegramTab = 'alerts' | 'sales' | 'validations' | 'bots' | 'private';

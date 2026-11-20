@@ -19,7 +19,7 @@ const NBSP = ' ';
 
 /** What keeps her posts from going out, in amber, with what to do. */
 export const WARNING_TEXT: Readonly<Record<ChannelWarning, string>> = {
-  no_bot: 'Aucun bot Telegram n’est branché : crée-le dans Réglages › Telegram.',
+  no_bot: 'Aucun bot Telegram n’est branché : crée-le dans Réglages › Bots Telegram.',
   no_channel: 'Aucun canal choisi : ajoute le bot comme administrateur de son canal, puis choisis-le ici.',
   channel_gone: 'Le bot n’est plus dans son canal : remets-le administrateur.',
   bot_cannot_post:

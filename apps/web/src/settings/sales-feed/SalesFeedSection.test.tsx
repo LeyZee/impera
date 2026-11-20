@@ -134,7 +134,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Réglages › Ventes', () => {
+describe('Réglages › Plateformes', () => {
   it('offers to connect the key, and nothing else, while there is none', async () => {
     const none = status({ state: 'not_connected', capabilities: [], lastReadAt: null, message: 'Sans clé.' });
     serve({
@@ -342,7 +342,7 @@ describe('Réglages › Ventes', () => {
     expect(put?.[1]?.body).toBe(JSON.stringify({ platformAccountId: ACCOUNT_LUNE }));
   });
 
-  it('sends the team’s links to Équipe › Reveal, with what waits there (ADR 0076)', async () => {
+  it('sends the team’s links to Équipe › Comptes Reveal, with what waits there (ADR 0076)', async () => {
     serve({
       [`GET ${BASE}`]: ok({ feeds: [status()] }),
       [`GET ${BASE}/reveal`]: ok(overview()),
@@ -352,9 +352,9 @@ describe('Réglages › Ventes', () => {
     const plate = await screen.findByRole('region', { name: 'Équipe Reveal' });
     expect(await within(plate).findByText('2 nouveaux chatteurs sur Reveal.')).toBeTruthy();
     expect(within(plate).getByText('1 retiré de Reveal, toujours dans l’équipe.')).toBeTruthy();
-    expect(within(plate).getByRole('link', { name: 'Ouvrir Équipe › Reveal' }).getAttribute('href')).toBe(
-      '/equipe/reveal',
-    );
+    expect(
+      within(plate).getByRole('link', { name: 'Ouvrir Équipe › Comptes Reveal' }).getAttribute('href'),
+    ).toBe('/equipe/reveal');
     // The old list of links is gone from here: one place to link, the same for the owner and his managers.
     expect(screen.queryByRole('combobox', { name: 'Lien de Ana Test' })).toBeNull();
   });

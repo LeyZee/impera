@@ -69,6 +69,7 @@ describe('layoutRail, once every screen exists', () => {
       '/creatrices',
       '/equipe',
       '/paie',
+      '/trafic',
       '/reglages',
     ]);
     expect(order('manager')).toEqual([
@@ -78,6 +79,7 @@ describe('layoutRail, once every screen exists', () => {
       '/creatrices',
       '/equipe',
       '/paie',
+      '/trafic',
       '/moi',
     ]);
     expect(order('chatter')).toEqual(['/aujourdhui', '/suivi', '/planning', '/commissions', '/moi']);
@@ -86,20 +88,20 @@ describe('layoutRail, once every screen exists', () => {
   it('titles both families of the owner, and puts on « Plus » what his phone has no room for', () => {
     const layout = layoutRail('owner', all);
     expect([...layout.headed]).toEqual(['chatting', 'agency']);
-    expect([...layout.more]).toEqual(['/entrainer', '/paie', '/reglages']);
+    expect([...layout.more]).toEqual(['/entrainer', '/paie', '/trafic', '/reglages']);
   });
 
   it('keeps five tabs on the bar, without « Plus », for the chatter', () => {
     expect(layoutRail('chatter', all).more.size).toBe(0);
   });
 
-  it('puts Entraîner, Paie and Moi on the manager’s « Plus », his bar keeping Créatrices and Équipe (ADR 0149 § 2)', () => {
-    expect([...layoutRail('manager', all).more]).toEqual(['/entrainer', '/paie', '/moi']);
+  it('puts Entraîner, Paie, Trafic and Moi on the manager’s « Plus », his bar keeping Créatrices and Équipe (ADR 0149 § 2)', () => {
+    expect([...layoutRail('manager', all).more]).toEqual(['/entrainer', '/paie', '/trafic', '/moi']);
   });
 
   it('fills the bar from the phone order, then the rail order, when only Équipe is new', () => {
     const layout = layoutRail('owner', (section) => section !== '/creatrices' && section !== '/moi');
-    expect([...layout.more]).toEqual(['/paie', '/reglages']);
+    expect([...layout.more]).toEqual(['/paie', '/trafic', '/reglages']);
     expect([...layout.headed]).toEqual(['chatting', 'agency']);
   });
 });
@@ -113,6 +115,7 @@ describe('railOf, with the screens of today', () => {
       'Créatrices',
       'Équipe',
       'Paie',
+      'Trafic',
       'Réglages',
     ]);
     // An operator without a team row keeps today's rail: no Équipe.
@@ -129,6 +132,7 @@ describe('railOf, with the screens of today', () => {
       'Créatrices',
       'Équipe',
       'Paie',
+      'Trafic',
       'Moi',
     ]);
     expect(labels(chatter)).toEqual(['Aujourd’hui', 'Suivi', 'Planning', 'Commissions', 'Moi']);
@@ -148,7 +152,7 @@ describe('railOf, with the screens of today', () => {
     const rail = railOf(owner);
     expect([...rail.headed]).toEqual(['chatting', 'agency']);
     // The bar keeps Dashboard, Suivi, Équipe and Paie (ADR 0024): Fans and Entraîner go under « Plus » with the rest.
-    expect([...rail.more]).toEqual(['/entrainer', '/paie', '/reglages']);
+    expect([...rail.more]).toEqual(['/entrainer', '/paie', '/trafic', '/reglages']);
   });
 
   it('titles nothing for an operator, whose Suivi and Créatrices are alone, and needs no « Plus »', () => {

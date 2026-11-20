@@ -9,9 +9,10 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { cleanup, render, screen } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { StructuresPage } from './StructuresPage';
+import { StructuresPage, StructuresView } from './StructuresPage';
 import { stackSummary } from './model';
 
 function serve(): void {
@@ -29,10 +30,10 @@ function serve(): void {
   );
 }
 
-function renderPage(): void {
+function renderPage(component: () => JSX.Element = StructuresPage): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const rootRoute = createRootRoute();
-  const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component: StructuresPage });
+  const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component });
   const router = createRouter({
     routeTree: rootRoute.addChildren([page]),
     history: createMemoryHistory({ initialEntries: ['/'] }),
@@ -58,5 +59,14 @@ describe('Structures, the library', () => {
     const summary = stackSummary(starter.body.segments);
     expect(summary).toMatch(/ponts? ·/u);
     expect(await screen.findByText(new RegExp(`· ${summary}$`, 'u'))).toBeDefined();
+  });
+
+  it('is a view of a creator’s sheet without a page of its own, « Nouvelle structure » beside its views (ADR 0149 § 1)', async () => {
+    serve();
+    renderPage(StructuresView);
+    const views = await screen.findByRole('radiogroup', { name: 'Vue des structures' });
+    expect(views.parentElement?.querySelector('button.nv-btn')?.textContent).toBe('Nouvelle structure');
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+    expect(screen.queryByRole('link', { name: '← Créatrices' })).toBeNull();
   });
 });

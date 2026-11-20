@@ -6,7 +6,7 @@ import type {
   SalesFeedStatus,
 } from '@impera/contracts';
 
-/** Small view rules of Réglages › Ventes, kept out of the components so they are tested. */
+/** Small view rules of Réglages › Plateformes, kept out of the components so they are tested. */
 
 /**
  * The dot of a feed, with the Services page's colours: red when reading stopped (the key must be connected again),
