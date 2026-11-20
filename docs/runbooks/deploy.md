@@ -178,6 +178,7 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |
 | `S3_*` | § 4.4 ; sans elles, la créatrice ne peut pas envoyer de fichier (l'envoi répond « réessaie dans un moment ») |
 | `SENTRY_DSN` | **obligatoire** : le DSN du projet Sentry de la région UE (`https://<clé>@<hôte>.de.sentry.io/<projet>`), créé par Charles ; sans lui l'API et le worker refusent de démarrer. Ce qui part et ce qui ne part jamais : `operations.md` § Observabilité |
+| `LINK_SERVICE_ORIGIN` | facultatif : l'origine du service de redirection lu par le connecteur de liens, `https://<domaine>` et rien après, saisie par Charles dans Coolify et jamais écrite dans le dépôt. Vide : le connecteur de liens est éteint, rien d'autre ne casse. Présente mais invalide (port, chemin, adresse IP, `localhost`, identifiants) : l'API et le worker refusent de démarrer (ADR 0120 § 3) |
 | `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
 
 Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des variables en production : elles se collent dans Réglages › Modèles IA › Services (ADR 0016). Les deux clés de chiffrement se gardent aussi hors du serveur (gestionnaire de mots de passe) : les perdre rend illisibles les sessions et les clés stockées.
