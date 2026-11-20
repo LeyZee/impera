@@ -917,7 +917,79 @@
   }
 }
 
+/* ───────────── Nothing in Impera yet: the vault's picture, its title, one neon ───────────── */
+
+.vp-empty-start .nv-empty__icon {
+  width: 132px;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.vp-art {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.vp-art__chest,
+.vp-art__lid {
+  fill: var(--nv-glass-fill-strong);
+  stroke: var(--nv-ink);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.vp-art__band {
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.4;
+}
+.vp-art__lock {
+  fill: var(--nv-neon);
+}
+.vp-art__card {
+  fill: var(--nv-surface-raised);
+  stroke: var(--nv-ink-muted);
+  stroke-width: 1.4;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: vp-float 3.6s var(--nv-ease-in-out) infinite;
+}
+.vp-art__card--a {
+  transform: rotate(-12deg);
+  animation-delay: -1.2s;
+}
+.vp-art__card--b {
+  fill: color-mix(in srgb, var(--nv-neon) 22%, var(--nv-surface-raised));
+  stroke: var(--nv-neon);
+}
+.vp-art__card--c {
+  transform: rotate(12deg);
+  animation-delay: -2.4s;
+}
+.vp-art__spark {
+  fill: var(--nv-agent);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: vp-twinkle 2.8s var(--nv-ease-in-out) infinite;
+}
+.vp-art__glow {
+  opacity: 0.5;
+}
+@keyframes vp-float {
+  50% {
+    translate: 0 -4px;
+  }
+}
+@keyframes vp-twinkle {
+  50% {
+    scale: 0.7;
+    opacity: 0.6;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .vp-art__card,
+  .vp-art__spark,
   .vp-folder,
   .vp-pane,
   .vp-cell,

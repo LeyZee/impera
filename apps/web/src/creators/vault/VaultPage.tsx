@@ -72,6 +72,7 @@ import {
   SelectIcon,
   Sharp,
   SparkIcon,
+  VaultArt,
   VoiceFace,
 } from './parts';
 import { appliedLine, draftChanges, draftSummary, pickKey, type PickDraft } from './picker';
@@ -257,13 +258,14 @@ export function VaultPage({
       return (
         <Empty
           className="vp-empty-start"
-          icon={<FolderIcon />}
+          icon={<VaultArt />}
           title="Rien dans Impera pour l’instant"
           action={
             isOwner ? (
+              // The screen's only action while it is empty: neon here, soft in the head once the vault holds something.
               <button
                 type="button"
-                className="nv-btn nv-btn--soft"
+                className="nv-btn nv-btn--neon"
                 onClick={() => {
                   choose(null);
                 }}

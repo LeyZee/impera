@@ -299,3 +299,31 @@ export function CloseIcon(): JSX.Element {
     </svg>
   );
 }
+
+/** The vault's picture, when nothing of hers is in Impera yet: a chest, three media rising out of it, a spark. */
+export function VaultArt(): JSX.Element {
+  return (
+    <svg className="vp-art" viewBox="0 0 120 96" aria-hidden="true">
+      <defs>
+        <linearGradient id="vp-art-glow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="var(--nv-neon)" stopOpacity="0.55" />
+          <stop offset="1" stopColor="var(--nv-neon)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path className="vp-art__glow" d="M30 56 L60 14 L90 56 Z" fill="url(#vp-art-glow)" />
+      <g>
+        <rect className="vp-art__card vp-art__card--a" x="34" y="26" width="18" height="24" rx="4" />
+        <rect className="vp-art__card vp-art__card--b" x="51" y="16" width="18" height="24" rx="4" />
+        <rect className="vp-art__card vp-art__card--c" x="68" y="26" width="18" height="24" rx="4" />
+      </g>
+      <path
+        className="vp-art__spark"
+        d="M60 4c.5 3 1.5 4 4.5 4.5-3 .5-4 1.5-4.5 4.5-.5-3-1.5-4-4.5-4.5 3-.5 4-1.5 4.5-4.5Z"
+      />
+      <path className="vp-art__lid" d="M24 52h72l-6-8H30Z" />
+      <rect className="vp-art__chest" x="24" y="52" width="72" height="34" rx="6" />
+      <path className="vp-art__band" d="M24 64h72" />
+      <rect className="vp-art__lock" x="55" y="60" width="10" height="9" rx="2.5" />
+    </svg>
+  );
+}
