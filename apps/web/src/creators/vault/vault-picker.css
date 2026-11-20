@@ -1,0 +1,537 @@
+/*
+ * « Choisir dans Reveal » (VaultPicker.tsx): the shell's Dialog made wide on a computer and whole-screen on a phone,
+ * her folders as cards, a folder's media to tick one by one, and SaveBar at its foot. Built on vault.css (previews, the
+ * sharp picture, a voice note's wave).
+ */
+
+.tm-dialog.vk {
+  --vk-ease: var(--nv-ease-out);
+  --vk-on-media-edge: rgba(255, 255, 255, 0.9);
+  --vk-on-media-veil: rgba(12, 10, 16, 0.42);
+  --vk-on-media-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  max-width: 1080px;
+  height: min(860px, calc(100% - 8px));
+}
+.vk .tm-dialog__scroll {
+  gap: var(--nv-space-4);
+  padding-bottom: 0;
+}
+
+/* ───────────── Under the title: when Reveal was read, and how much it holds ───────────── */
+
+.vk-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  flex-wrap: wrap;
+  margin-top: calc(-1 * var(--nv-space-2));
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.vk-status__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.vk-status__when .vx-sync__icon {
+  width: 14px;
+  height: 14px;
+}
+.vk-status__count {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.vk-read {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-warning);
+}
+.vk-failed {
+  margin: 0;
+}
+
+/* ───────────── Her folders as cards ───────────── */
+
+.vk-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  gap: var(--nv-space-4);
+  margin: 0;
+  padding: 2px 2px var(--nv-space-4);
+  list-style: none;
+}
+.vk-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  animation: nv-rise var(--nv-dur-slow) var(--nv-ease-spring) both;
+  animation-delay: calc(var(--vk-order, 0) * 28ms);
+}
+.vk-card__tick-area {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.vk-card__tick-area:focus-visible {
+  outline: none;
+}
+.vk-card__tick-area:focus-visible .vk-card__mosaic {
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-focus);
+}
+
+/* Four previews in a square, or fewer as large as they can: one fills it, two side by side, three with one tall. */
+.vk-card__mosaic {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  aspect-ratio: 1;
+  border-radius: var(--nv-radius-lg);
+  overflow: hidden;
+  background: var(--nv-glass-fill-strong);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-base) var(--vk-ease);
+}
+.vk-card__mosaic[data-count='1'] .vk-card__cell {
+  grid-area: 1 / 1 / 3 / 3;
+}
+.vk-card__mosaic[data-count='2'] .vk-card__cell {
+  grid-row: 1 / 3;
+}
+.vk-card__mosaic[data-count='3'] .vk-card__cell:first-child {
+  grid-row: 1 / 3;
+}
+.vk-card__cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.vk-card__cell .vx-preview,
+.vk-card__cell .vx-sharp,
+.vk-card__cell .vx-voice {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.vk-card__empty {
+  grid-area: 1 / 1 / 3 / 3;
+  display: grid;
+  place-items: center;
+  color: var(--nv-ink-faint);
+}
+.vk-card__empty svg {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .vk-card__tick-area:hover .vk-card__mosaic {
+    transform: translateY(-3px);
+    box-shadow:
+      inset 0 0 0 1px var(--nv-hairline),
+      var(--nv-shadow-float);
+  }
+}
+/* Ticked, the card says it twice: its round tick filled, and a ring of ink around its pictures. */
+.vk-card[data-pick='all'] .vk-card__mosaic,
+.vk-card[data-pick='some'] .vk-card__mosaic {
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-ink);
+}
+.vk-card__tick-area:active .vk-card__mosaic {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+.vk-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  padding: 0 2px;
+}
+.vk-card__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.vk-card__line {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+}
+.vk-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 0 0 2px;
+}
+.vk-card__where {
+  display: inline-flex;
+  align-items: center;
+  /* As tall as the pill, said or not: the ways into the folders line up from one column to the next. */
+  height: var(--nv-pill-info);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+}
+.vk-card__where[data-where] {
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--nv-select);
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.vk-card__open {
+  appearance: none;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  margin: 0;
+  padding: 0 6px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--vk-ease),
+    color var(--nv-dur-fast) var(--vk-ease);
+}
+.vk-card__open svg,
+.vk-back__chev svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .vk-card__open:hover {
+    background: var(--nv-plate-hover);
+    color: var(--nv-ink);
+  }
+}
+.vk-card__open:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.vk-card--ghost {
+  animation: none;
+}
+.vk-card__ghost-line {
+  height: 14px;
+  width: 70%;
+  border-radius: 6px;
+}
+
+/* ───────────── The round tick, drawn over the pictures: empty, a dash for a part, a check for all ───────────── */
+
+.vk-tick {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  left: 10px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--vk-on-media-veil);
+  /* A constant veil and a white ring: the same empty tick on a light picture as on a dark one. */
+  box-shadow:
+    inset 0 0 0 2px var(--vk-on-media-edge),
+    var(--vk-on-media-shadow);
+  transition:
+    background-color var(--nv-dur-fast) var(--vk-ease),
+    transform var(--nv-dur-slow) var(--nv-ease-spring-bouncy);
+}
+.vk-tick::after {
+  content: '';
+  width: 11px;
+  height: 6px;
+  margin-top: -3px;
+  border-left: 2.2px solid var(--nv-void);
+  border-bottom: 2.2px solid var(--nv-void);
+  transform: rotate(-45deg) scale(0);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring-bouncy);
+}
+.vk-tick[data-state='all'],
+.vk-tick[data-state='some'] {
+  background: var(--nv-ink);
+  box-shadow: var(--vk-on-media-shadow);
+  transform: scale(1.08);
+}
+.vk-tick[data-state='all']::after {
+  transform: rotate(-45deg) scale(1);
+}
+.vk-tick[data-state='some']::after {
+  width: 11px;
+  height: 0;
+  margin: 0;
+  border-left: 0;
+  transform: none;
+}
+
+/* ───────────── A folder open: its media to tick one by one ───────────── */
+
+.vk-folder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding-bottom: var(--nv-space-4);
+  animation: vk-enter var(--nv-dur-base) var(--vk-ease) both;
+}
+@keyframes vk-enter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+.vk-folder__head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--nv-space-3);
+  flex-wrap: wrap;
+}
+.vk-back {
+  appearance: none;
+  flex: 0 0 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  cursor: pointer;
+  justify-content: flex-start;
+}
+.vk-back:hover {
+  color: var(--nv-ink);
+}
+.vk-back:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.vk-back__chev {
+  display: grid;
+  transform: rotate(180deg);
+}
+.vk-folder__title {
+  flex: 1;
+  min-width: 0;
+}
+.vk-folder__name {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vk-folder__line {
+  margin: 2px 0 0;
+}
+.vk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+.vk-media {
+  min-width: 0;
+}
+.vk-media__tile {
+  appearance: none;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nv-radius-md);
+  overflow: hidden;
+  background: var(--nv-glass-fill-strong);
+  cursor: pointer;
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    box-shadow var(--nv-dur-base) var(--vk-ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.vk-media__tile .vx-preview,
+.vk-media__tile .vx-sharp,
+.vk-media__tile .vx-voice {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.vk-media__tile .vk-tick {
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+}
+.vk-media__tile:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-focus);
+}
+.vk-media[data-on] .vk-media__tile {
+  transform: scale(0.94);
+  box-shadow:
+    0 0 0 2px var(--nv-void),
+    0 0 0 4px var(--nv-ink);
+}
+@media (hover: hover) {
+  .vk-media:not([data-on]) .vk-media__tile:hover {
+    transform: translateY(-2px);
+  }
+}
+.vk-more {
+  align-self: center;
+}
+.vk-empty {
+  margin: var(--nv-space-6) 0;
+}
+
+/* SaveBar, at the window's foot, whatever the height of what it shows: no bar of tabs to clear, opaque so no card
+   reads through it, and a room under the grid so the last cards clear it. */
+.vk .tm-dialog__scroll::after {
+  content: '';
+  flex: 1 0 0;
+  order: 1;
+}
+.vk .nv-glass.cr-savebar {
+  order: 2;
+  bottom: var(--nv-space-4);
+  margin: var(--nv-space-2) 0 var(--nv-space-4);
+  background: var(--nv-surface-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 0 0 1px var(--nv-hairline),
+    var(--nv-shadow-float);
+}
+
+/* ───────────── A phone: the window takes the screen ───────────── */
+
+@media (max-width: 700px) {
+  .tm-scrim:has(.vk) {
+    padding: 0;
+  }
+  .tm-dialog.vk {
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+  }
+  .vk .tm-dialog__scroll {
+    padding: calc(var(--nv-space-4) + env(safe-area-inset-top, 0px)) var(--nv-space-4) 0;
+  }
+  .vk-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--nv-space-4) var(--nv-space-3);
+  }
+  .vk-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  /* Two cards a row: where it stands on its own line, the way into it under it, never cut. */
+  .vk-card__foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .vk-card__open {
+    margin-left: -8px;
+  }
+  /* Inside the window « Tout annuler » stays: what waits is short enough to leave it room. */
+  .vk .cr-savebar .cr-savebar__reset {
+    display: inline-flex;
+    padding-inline: 8px;
+  }
+  .vk .cr-savebar__text {
+    font-size: var(--nv-text-footnote);
+  }
+  /* What waits on its own line, read whole; the two buttons under it, the main one at the thumb. */
+  .vk .nv-glass.cr-savebar {
+    --_radius: var(--nv-radius-lg);
+    bottom: calc(var(--nv-space-3) + env(safe-area-inset-bottom, 0px));
+    flex-wrap: wrap;
+    row-gap: var(--nv-space-2);
+  }
+  .vk .cr-savebar__text {
+    flex: 1 0 calc(100% - 40px);
+  }
+  .vk .cr-savebar__actions {
+    flex: 1 0 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vk-card,
+  .vk-folder {
+    animation: none;
+  }
+  .vk-card__mosaic,
+  .vk-media__tile,
+  .vk-tick,
+  .vk-tick::after {
+    transition: none;
+  }
+  .vk-card__tick-area:hover .vk-card__mosaic,
+  .vk-media[data-on] .vk-media__tile,
+  .vk-media:not([data-on]) .vk-media__tile:hover {
+    transform: none;
+  }
+}

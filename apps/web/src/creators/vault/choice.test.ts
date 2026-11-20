@@ -17,11 +17,13 @@ import {
   descriptionLine,
   filteredMedia,
   folderCount,
-  importLine,
+  folderInLine,
+  importedFolders,
   mediaGroups,
   progressLine,
   railFolders,
   rangeSelected,
+  restLine,
   selectedLine,
   summaryLine,
   toggled,
@@ -100,25 +102,60 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
     expect(folderCount(ticked, empty).tick).toBe('all');
   });
 
-  it('says how much of a folder is imported', () => {
-    expect(importLine({ listed: 0, imported: 0 })).toBe('Vide');
-    expect(importLine({ listed: 12, imported: 0 })).toBe('Aucun importé sur 12');
-    expect(importLine({ listed: 12, imported: 1 })).toBe('1 sur 12 importé');
-    expect(importLine({ listed: 12, imported: 3 })).toBe('3 sur 12 importés');
-    expect(importLine({ listed: 12, imported: 12 })).toBe('Les 12 importés');
-    expect(importLine({ listed: 1, imported: 1 })).toBe('Importé');
+  it('says a folder in Impera by what it holds and what is described, and what stayed in Reveal', () => {
+    expect(folderInLine({ imported: 0, described: 0 })).toBe('Vide');
+    expect(folderInLine({ imported: 1, described: 0 })).toBe('1 média · aucun décrit');
+    expect(folderInLine({ imported: 12, described: 3 })).toBe('12 médias · 3 décrits');
+    expect(folderInLine({ imported: 12, described: 1 })).toBe('12 médias · 1 décrit');
+    expect(restLine({ listed: 12, imported: 12 })).toBeNull();
+    expect(restLine({ listed: 12, imported: 11 })).toBe('1 autre média de ce dossier est resté dans Reveal');
+    expect(restLine({ listed: 12, imported: 4 })).toBe(
+      '8 autres médias de ce dossier sont restés dans Reveal',
+    );
   });
 
-  it('filters by kind, by description and by import, the filters adding up', () => {
-    const f1 = folder('f1', [media('p1'), media('p2'), media('v1', 'video'), media('n1', 'audio')]);
-    const index = choiceIndex(choices({ media: [chosen('p1', true, 'described'), chosen('v1', true)] }));
+  it('lists only the folders with something in Impera, or ticked whole while empty', () => {
+    const whole = folder('whole', [media('a')]);
+    const part = folder('part', [media('b'), media('c')]);
+    const none = folder('none', [media('d')]);
+    const empty = folder('empty', []);
+    const index = choiceIndex(
+      choices({
+        folders: [
+          { platformAccountId: ACCOUNT, folderRef: 'whole', imported: true },
+          { platformAccountId: ACCOUNT, folderRef: 'empty', imported: true },
+        ],
+        media: [chosen('c', true)],
+      }),
+    );
+    expect(importedFolders([whole, part, none, empty], index).map((each) => each.folderRef)).toEqual([
+      'whole',
+      'part',
+      'empty',
+    ]);
+    expect(importedFolders([whole, part, none], choiceIndex(undefined))).toEqual([]);
+  });
+
+  it('shows what is in Impera only, filtered by kind and by description, the filters adding up', () => {
+    const f1 = folder('f1', [
+      media('p1'),
+      media('p2'),
+      media('v1', 'video'),
+      media('n1', 'audio'),
+      media('out'),
+    ]);
+    const index = choiceIndex(
+      choices({
+        media: [chosen('p1', true, 'described'), chosen('p2', true), chosen('v1', true), chosen('n1', true)],
+      }),
+    );
     const ids = (filters: Parameters<typeof filteredMedia>[2]) =>
       filteredMedia(f1, index, filters).map((each) => each.platformMediaId);
     expect(ids(new Set())).toEqual(['p1', 'p2', 'v1', 'n1']);
     expect(ids(new Set(['photos']))).toEqual(['p1', 'p2']);
     expect(ids(new Set(['photos', 'videos']))).toEqual(['p1', 'p2', 'v1']);
     expect(ids(new Set(['undescribed']))).toEqual(['p2', 'v1', 'n1']);
-    expect(ids(new Set(['photos', 'unimported']))).toEqual(['p2']);
+    expect(ids(new Set(['photos', 'undescribed']))).toEqual(['p2']);
   });
 
   it('selects one, a run with Shift in the order shown, all and none', () => {
@@ -186,23 +223,17 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
     expect(progressLine({ done: 2, total: 2 })).toBe('2 médias décrits');
   });
 
-  it('groups the grid once, imported first, then Reveal only, then gone, each in the platform’s order', () => {
-    const f1 = folder('f1', [media('a'), media('b'), media('c'), media('gone', 'image', true)]);
-    const index = choiceIndex(choices({ media: [chosen('c', true), chosen('gone', true)] }));
-    const groups = mediaGroups(f1, index, f1.media).map((group) => [
-      group.key,
-      group.media.map((each) => each.platformMediaId),
-    ]);
-    expect(groups).toEqual([
-      ['in', ['c']],
-      ['out', ['a', 'b']],
+  it('groups the grid once, still in Reveal first, then gone, each in the platform’s order', () => {
+    const shown = [media('a'), media('gone', 'image', true), media('c')];
+    expect(
+      mediaGroups(shown).map((group) => [group.key, group.media.map((each) => each.platformMediaId)]),
+    ).toEqual([
+      ['in', ['a', 'c']],
       ['gone', ['gone']],
     ]);
-    expect(mediaGroups(f1, choiceIndex(undefined), [media('a')]).map((group) => group.key)).toEqual(['out']);
-    expect(summaryLine({ listed: 40, imported: 0, described: 0 })).toBe('Aucun média importé sur 40');
-    expect(summaryLine({ listed: 40, imported: 16, described: 5 })).toBe(
-      '16 importés sur 40 · 5 décrits sur 16',
-    );
-    expect(summaryLine({ listed: 40, imported: 1, described: 0 })).toBe('1 importé sur 40 · aucun décrit');
+    expect(mediaGroups([media('a')]).map((group) => group.key)).toEqual(['in']);
+    expect(summaryLine({ imported: 0, described: 0 })).toBe('0 média dans Impera · aucun décrit');
+    expect(summaryLine({ imported: 16, described: 5 })).toBe('16 médias dans Impera · 5 décrits');
+    expect(summaryLine({ imported: 1, described: 1 })).toBe('1 média dans Impera · 1 décrit');
   });
 });
