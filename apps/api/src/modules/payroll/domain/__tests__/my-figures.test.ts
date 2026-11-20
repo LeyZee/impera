@@ -198,7 +198,8 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
   });
 
   it('compte à part une vente dont le relevé n’a pas gardé le type, jamais comme un zéro', () => {
-    const read = figures([typed('ppv', 5_000), typed(null, 4_000), typed(null, 1_000)]);
+    // Le remboursement d'une vente sans type n'est pas une vente à compter.
+    const read = figures([typed('ppv', 5_000), typed(null, 4_000), typed(null, 1_000), typed(null, -500)]);
     expect(read.kinds).toEqual({
       untyped: 2,
       items: [{ type: 'ppv', sales: 1, nets: [{ currency: 'EUR', netMinor: 5_000 }] }],

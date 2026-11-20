@@ -84,13 +84,14 @@ function daysOf(
 
 /**
  * Where the net of `lines` comes from, by what was sold (ADR 0104 § 6): a refund lowers the net of its own type and
- * is no sale of its count. A line whose statement kept no type is counted apart, never as a zero of any type.
+ * is no sale of its count. A sale whose statement kept no type is counted apart, never as a zero of any type; its
+ * refund is no sale there either.
  */
 function kindsOf(lines: readonly FigureLine[]): MyFigures['kinds'] {
   const groups = new Map<SaleType, FigureLine[]>();
   let untyped = 0;
   for (const line of lines) {
-    if (line.saleType === null) untyped += 1;
+    if (line.saleType === null) untyped += line.event === 'sale' ? 1 : 0;
     else groups.set(line.saleType, [...(groups.get(line.saleType) ?? []), line]);
   }
   return {
