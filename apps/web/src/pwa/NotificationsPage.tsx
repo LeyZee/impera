@@ -1,4 +1,11 @@
-import { NotificationPreferencesSchema, type NotificationPreferences } from '@impera/contracts';
+import {
+  NOTIFICATION_KINDS,
+  NotificationKindsSchema,
+  NotificationPreferencesSchema,
+  type NotificationKind,
+  type NotificationKinds,
+  type NotificationPreferences,
+} from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useState, type JSX } from 'react';
@@ -33,6 +40,51 @@ const preferencesQuery = {
     return NotificationPreferencesSchema.parse(await response.json());
   },
 } as const;
+
+const KINDS_URL = '/v1/notifications/kinds';
+const kindsQuery = {
+  queryKey: ['notifications', 'kinds'],
+  queryFn: async (): Promise<NotificationKinds> => {
+    const response = await fetch(KINDS_URL, { credentials: 'include' });
+    if (!response.ok) throw new Error(`kinds_${String(response.status)}`);
+    return NotificationKindsSchema.parse(await response.json());
+  },
+} as const;
+
+/** Her sorts (ADR 0150 § 16 ter), one line each with what it brings. */
+interface KindWords {
+  readonly title: string;
+  readonly hint: string;
+  /** The confirmation once saved, agreed with its title. */
+  readonly on: string;
+  readonly off: string;
+}
+const KIND_WORDS: Readonly<Record<NotificationKind, KindWords>> = {
+  agency_request: {
+    title: 'Demandes de l’agence',
+    hint: 'Un rappel avant une tâche de ton agenda.',
+    on: 'Demandes de l’agence : activées.',
+    off: 'Demandes de l’agence : coupées.',
+  },
+  week_to_validate: {
+    title: 'Ta semaine à valider',
+    hint: 'Quand ta semaine est prête, à relire et valider.',
+    on: 'Ta semaine à valider : activée.',
+    off: 'Ta semaine à valider : coupée.',
+  },
+  earnings: {
+    title: 'Tes gains',
+    hint: 'Ta part, à chaque vente.',
+    on: 'Tes gains : activés.',
+    off: 'Tes gains : coupés.',
+  },
+  lives: {
+    title: 'Tes lives',
+    hint: 'Avant un live prévu.',
+    on: 'Tes lives : activés.',
+    off: 'Tes lives : coupés.',
+  },
+};
 
 const DEFAULT_QUIET = { startMinute: 22 * 60, endMinute: 8 * 60 } as const;
 const QUIET_OFF = { startMinute: 0, endMinute: 0 } as const;
@@ -339,6 +391,89 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
   );
 }
 
+/**
+ * What she receives, sort by sort (ADR 0150 § 16 ter): each switch saves at once; a refused save puts it back and says
+ * so. The agency never sees these choices.
+ */
+function Kinds(): JSX.Element {
+  const client = useQueryClient();
+  const kinds = useQuery(kindsQuery);
+  const [note, setNote] = useState<{ readonly text: string; readonly failed: boolean } | null>(null);
+
+  const toggle = async (kind: NotificationKind, on: boolean): Promise<void> => {
+    const before = kinds.data;
+    if (before === undefined) return;
+    const next = { ...before, [kind]: on };
+    client.setQueryData(kindsQuery.queryKey, next);
+    setNote(null);
+    try {
+      const response = await fetch(KINDS_URL, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(NotificationKindsSchema.parse(next)),
+      });
+      if (!response.ok) throw new Error(`kinds_${String(response.status)}`);
+      client.setQueryData(kindsQuery.queryKey, NotificationKindsSchema.parse(await response.json()));
+      setNote({ text: on ? KIND_WORDS[kind].on : KIND_WORDS[kind].off, failed: false });
+    } catch {
+      client.setQueryData(kindsQuery.queryKey, before);
+      setNote({ text: 'Pas enregistré. Réessaie dans un instant.', failed: true });
+    }
+  };
+
+  if (kinds.data === undefined) {
+    return kinds.isError ? (
+      <Failure
+        onRetry={() => {
+          void kinds.refetch();
+        }}
+      />
+    ) : (
+      <Skeleton label="Chargement de ce que tu reçois…">
+        <SkeletonCard lines={4} />
+      </Skeleton>
+    );
+  }
+  const data = kinds.data;
+  return (
+    <Panel title="Ce que tu reçois">
+      <PanelSection>
+        <span className="nv-notif__hint">Toi seule vois ces choix ; l’agence ne les voit pas.</span>
+      </PanelSection>
+      {NOTIFICATION_KINDS.map((kind) => (
+        <PanelSection key={kind}>
+          <label className="nv-notif__row">
+            <span className="nv-notif__label">
+              <strong>{KIND_WORDS[kind].title}</strong>
+              <span className="nv-notif__hint">{KIND_WORDS[kind].hint}</span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="nv-switch"
+              checked={data[kind]}
+              onChange={(event) => {
+                void toggle(kind, event.target.checked);
+              }}
+            />
+          </label>
+        </PanelSection>
+      ))}
+      {note === null ? null : (
+        <PanelSection className="nv-notif__save">
+          <span
+            className={note.failed ? 'nv-notif__error' : 'nv-notif__hint'}
+            role={note.failed ? 'alert' : 'status'}
+          >
+            {note.text}
+          </span>
+        </PanelSection>
+      )}
+    </Panel>
+  );
+}
+
 export function NotificationsPage({ creator = false }: { creator?: boolean }): JSX.Element {
   const preferences = useQuery(preferencesQuery);
   return (
@@ -366,6 +501,7 @@ export function NotificationsPage({ creator = false }: { creator?: boolean }): J
         ) : (
           <QuietHours key={JSON.stringify(preferences.data)} saved={preferences.data} creator={creator} />
         )}
+        {creator ? <Kinds /> : null}
       </div>
     </Page>
   );

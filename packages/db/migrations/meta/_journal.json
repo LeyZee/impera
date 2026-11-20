@@ -1233,6 +1233,13 @@
       "when": 1795188224839,
       "tag": "0234_our_functions_for_our_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 176,
+      "version": "7",
+      "when": 1795200722703,
+      "tag": "0235_notification_kinds_and_uncovered_account",
+      "breakpoints": true
     }
   ]
 }

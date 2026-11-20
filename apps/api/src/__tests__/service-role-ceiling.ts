@@ -24,7 +24,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/providers': 7,
   'modules/redirect-links': 2,
   'modules/rewards': 7,
-  'modules/scheduling': 28,
+  'modules/scheduling': 29,
   'modules/scripts': 20,
   'modules/supervision': 2,
   'modules/team': 1,
@@ -35,5 +35,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   wiring: 4,
 };
 
-/** The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. */
-export const SERVICE_ROLE_TOTAL_AT_START = 265;
+/**
+ * The whole on 20/11/2026, when the ceiling reached main: the sum of the units never goes above it again. Raised once
+ * since: 266 with « compte sans personne » (ADR 0094 § 1), whose job reads every creator's planning, agent and last fan
+ * message to publish one event per account and créneau (scheduling, +1).
+ */
+export const SERVICE_ROLE_TOTAL_AT_START = 266;
