@@ -25,4 +25,5 @@ CREATE POLICY "creator_closed" ON "creator_revenue_objectives" AS RESTRICTIVE FO
 ALTER TABLE "creator_revenue_objectives" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 -- From nothing, whatever the default privileges gave.
 REVOKE ALL ON "creator_revenue_objectives" FROM nirvana_app;--> statement-breakpoint
+REVOKE ALL ON "creator_revenue_objectives" FROM impera_service;--> statement-breakpoint
 GRANT SELECT, INSERT, UPDATE, DELETE ON "creator_revenue_objectives" TO nirvana_app;
