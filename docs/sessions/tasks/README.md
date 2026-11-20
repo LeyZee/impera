@@ -182,6 +182,7 @@ Branche : task/<id>-<slug>
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
 | SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | done | SEC-02, SEC-04, EQ-10, EQ-18 |
 | SEC-16 | Le rôle de service cesse de grandir : test de plafond par module, puis réduction (ADR 0087, lots b et c) | exploitation | en cours | SEC-10, ADR 0087 |
+| SEC-17 | Durée d'une session selon le rôle : propriétaire 48 h sans activité et 7 jours, créatrice 7 jours et 30 jours, les autres 12 h et 7 jours | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |

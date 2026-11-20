@@ -50,7 +50,7 @@ export function App(): JSX.Element {
   const [linkPage, setLinkPage] = useState(() => linkPageOf(window.location.pathname));
   // A sign-out the server did not make: the session stays open, and the page says so instead of doing nothing.
   const [signOutFailed, setSignOutFailed] = useState(false);
-  // The session ended while the app was open (closed elsewhere, past its 12 h or 7 days): the sign-in page says so.
+  // The session ended while the app was open (closed elsewhere, idle too long or 7 days old): the sign-in page says so.
   const [hasEnded, setHasEnded] = useState(false);
   // A new password just chosen from the « mot de passe oublié » link: the sign-in page says so (SEC-05 lot 3).
   // Holds the account's address, so the sign-in page has it filled in.
