@@ -1,4 +1,5 @@
 import type { AgentScriptView } from '../../agent/index';
+import type { Trainer } from '../application/playground-service';
 
 /**
  * The scripts the playground sells from (ADR 0103 § 15-17): her own, read as production reads them, when one of her
@@ -42,7 +43,7 @@ export type HerCatalogue =
  * `scripts` module with the same filter as the agent's (`agentScriptViewOf`). Read again at each of his messages, as
  * production reads her catalogue again at each message.
  */
-export type HerScriptsSource = (creatorId: string, userId: string) => Promise<HerCatalogue>;
+export type HerScriptsSource = (creatorId: string, trainer: Trainer) => Promise<HerCatalogue>;
 
 /** The scripts a session sells from now: hers (and why there is none) or the trial ones. */
 export interface Catalogue {

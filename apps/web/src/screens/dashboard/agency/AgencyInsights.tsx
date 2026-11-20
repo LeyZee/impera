@@ -17,7 +17,15 @@ import { CountUp, Section, type FloatingTip } from '../parts';
 
 import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
-import { againstText, comparable, readName, shortDate, spanText, type AgencySelection } from './period';
+import {
+  againstText,
+  conclusionWait,
+  comparable,
+  readName,
+  shortDate,
+  spanText,
+  type AgencySelection,
+} from './period';
 import { useNarrow } from './useNarrow';
 import {
   arcs,
@@ -1163,6 +1171,7 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   if (peak === null || slot === null)
     return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
   const at = focus ?? { day: peak.day, hour: peak.hour };
+  const wait = conclusionWait(insights);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const moves: Readonly<Record<string, readonly [number, number]>> = {
       ArrowRight: [0, 1],
@@ -1185,15 +1194,20 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
       ?.focus();
   };
   return (
-    <div className="nv-plate ins-hours">
-      <p className="ins-hours__lead">
-        Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
-        chiffre d’affaires. Le pic :{' '}
-        <b className="ins-nowrap">
-          {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
-        </b>
-        .
-      </p>
+    <div className="nv-plate ins-hours" data-pending={wait === null ? undefined : ''}>
+      {/* The map stays, grey; the sentence that reads it waits for enough sales and hindsight (ADR 0092 § 5). */}
+      {wait === null ? (
+        <p className="ins-hours__lead">
+          Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
+          chiffre d’affaires. Le pic :{' '}
+          <b className="ins-nowrap">
+            {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
+          </b>
+          .
+        </p>
+      ) : (
+        <p className="ins-hours__lead">{wait}</p>
+      )}
       <div
         className="ins-heat"
         role="group"
@@ -1209,7 +1223,7 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
         ))}
         {insights.hours.map((row, day) => (
           <div key={WEEKDAYS[day]} className="ins-heat__row" role="presentation">
-            <span className="ins-heat__day" aria-hidden="true">
+            <span className="ins-heat__day" aria-hidden="true" style={{ gridArea: `${String(day + 2)} / 1` }}>
               {WEEKDAYS_SHORT[day]}
             </span>
             {row.map((cents, hour) => {
@@ -1226,7 +1240,9 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
                   type="button"
                   key={hour}
                   className="ins-heat__cell"
-                  style={{ '--_h': heatOf(cents, max) }}
+                  // Every cell placed, so the best slot's ring lies over them without moving one.
+                  style={{ '--_h': heatOf(cents, max), gridArea: `${String(day + 2)} / ${String(hour + 2)}` }}
+                  data-empty={cents > 0 ? undefined : ''}
                   data-cell={`${String(day)}-${String(hour)}`}
                   tabIndex={day === at.day && hour === at.hour ? 0 : -1}
                   aria-label={`${when} : ${euros(cents)}`}
@@ -1240,6 +1256,17 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
             })}
           </div>
         ))}
+        {/* The slot that brings in the most, ringed as one block over its three hours of every day. */}
+        {wait === null && (
+          <span
+            className="ins-heat__best"
+            aria-hidden="true"
+            style={{
+              gridColumn: `${String(slot.from + 2)} / span 3`,
+              gridRow: `2 / span ${String(insights.hours.length)}`,
+            }}
+          />
+        )}
       </div>
       <div className="ins-heat__scale" aria-hidden="true">
         <span>moins</span>
@@ -1258,8 +1285,9 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   const top = fans.topTenShare ?? 0;
   // Ten at most: with fewer paying fans, the count they are (PAY-16, « Les 10 fans » for 3).
   const biggest = topFansWords(fans.paying);
+  const wait = conclusionWait(insights);
   return (
-    <div className="nv-plate ins-fans">
+    <div className="nv-plate ins-fans" data-pending={wait === null ? undefined : ''}>
       <div className="ins-fans__meter">
         <p className="ins-fans__lead">
           {biggest.lead} <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
@@ -1268,11 +1296,13 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
         <p className="ins-fans__hint">
-          {top >= 60
-            ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
-            : top >= 35
-              ? 'Assez concentré : quelques gros fans portent une bonne part des ventes.'
-              : 'Bien réparti : les ventes ne dépendent pas de quelques fans.'}
+          {/* The meter and its share stay, grey; what they mean waits for enough sales and hindsight (ADR 0092 § 5). */}
+          {wait ??
+            (top >= 60
+              ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
+              : top >= 35
+                ? 'Assez concentré : quelques gros fans portent une bonne part des ventes.'
+                : 'Bien réparti : les ventes ne dépendent pas de quelques fans.')}
         </p>
       </div>
       <dl className="ins-fans__figures">

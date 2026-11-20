@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   againstText,
+  canConclude,
+  conclusionWait,
+  CONCLUDE_MIN_REGISTER_DAYS,
+  CONCLUDE_MIN_SALES,
   isDay,
   compareChoices,
   comparable,
@@ -10,8 +14,11 @@ import {
   neighbours,
   periodChoices,
   readName,
+  registerDays,
   selectionQuery,
   spanText,
+  TOO_FEW_TO_CONCLUDE,
+  TOO_YOUNG_TO_CONCLUDE,
   withCompare,
 } from './period';
 
@@ -116,5 +123,64 @@ describe('the agency’s days (ADR 0146)', () => {
       to: '2026-10-19',
       compareAt: '2026-09-01',
     });
+  });
+});
+
+describe('no conclusion on too few sales (ADR 0092 § 5)', () => {
+  const figures = (sales: number) => ({
+    revenueMinor: 0,
+    revenueExclVatMinor: 0,
+    netMinor: 0,
+    agencyMinor: 0,
+    creatorMinor: 0,
+    agencyTransferVatMinor: 0,
+    sales,
+    refunds: 0,
+  });
+  const read = (input: { from: string; to: string; registerSince: string | null; sales: number }) => ({
+    from: input.from,
+    to: input.to,
+    registerSince: input.registerSince,
+    span: span('custom'),
+    totals: { current: figures(input.sales), previous: figures(0) },
+  });
+
+  it('counts the days of the period the registers covered, up to today', () => {
+    expect(
+      registerDays(read({ from: '2026-11-10', to: '2026-11-16', registerSince: '2026-09-01', sales: 0 })),
+    ).toBe(7);
+    expect(
+      registerDays(read({ from: '2026-11-10', to: '2026-11-16', registerSince: '2026-11-14', sales: 0 })),
+    ).toBe(3);
+    // A month asked past today counts the days up to today only.
+    expect(
+      registerDays(read({ from: '2026-11-01', to: '2026-11-30', registerSince: '2026-09-01', sales: 0 })),
+    ).toBe(16);
+    expect(registerDays(read({ from: '2026-11-10', to: '2026-11-16', registerSince: null, sales: 0 }))).toBe(
+      0,
+    );
+    expect(
+      registerDays(read({ from: '2026-11-10', to: '2026-11-12', registerSince: '2026-11-15', sales: 0 })),
+    ).toBe(0);
+  });
+
+  it('concludes only with enough sales and enough days of register, both', () => {
+    const week = { from: '2026-11-10', to: '2026-11-16', registerSince: '2026-09-01' };
+    expect(canConclude(read({ ...week, sales: CONCLUDE_MIN_SALES }))).toBe(true);
+    expect(canConclude(read({ ...week, sales: CONCLUDE_MIN_SALES - 1 }))).toBe(false);
+    const young = { ...week, registerSince: '2026-11-11', sales: CONCLUDE_MIN_SALES * 10 };
+    expect(registerDays(read(young))).toBe(CONCLUDE_MIN_REGISTER_DAYS - 1);
+    expect(canConclude(read(young))).toBe(false);
+    // A single day never holds enough days of register, however many sales.
+    expect(canConclude(read({ ...week, from: TODAY, sales: CONCLUDE_MIN_SALES * 10 }))).toBe(false);
+  });
+
+  it('says why: too little hindsight first, then too few sales', () => {
+    const week = { from: '2026-11-10', to: '2026-11-16', registerSince: '2026-09-01' };
+    expect(conclusionWait(read({ ...week, sales: CONCLUDE_MIN_SALES }))).toBeNull();
+    expect(conclusionWait(read({ ...week, sales: 1 }))).toBe(TOO_FEW_TO_CONCLUDE);
+    expect(conclusionWait(read({ ...week, registerSince: '2026-11-15', sales: 1 }))).toBe(
+      TOO_YOUNG_TO_CONCLUDE,
+    );
   });
 });
