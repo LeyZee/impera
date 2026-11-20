@@ -88,6 +88,65 @@ const Regex = z.string().refine((source) => {
   }
 }, 'not a valid regular expression');
 
+/** What one answer of hers must show: the brain's read, code's decisions, her words. */
+const ExpectSchema = z
+  .object({
+    brief: z
+      .object({
+        risks_contain: z.array(Risk).optional(),
+        risks_absent: z.array(Risk).optional(),
+        intent_in: z.array(Intent).min(1).optional(),
+        action_in: z.array(Action).min(1).optional(),
+        /** Signals of his heat the brain must read in his message (P3-12). */
+        desire_signals_contain: z.array(DesireSignal).min(1).optional(),
+        /** Exactly the alerts of `alerts` the brain must see, by name (P4-01); `[]`: none. */
+        alerts_seen: z.array(AlertName).optional(),
+        /** What he opposes to a price, among these (ADR 0090 § B). */
+        objection_in: z.array(ObjectionKindSchema).min(1).optional(),
+        /** What his message does with the step waiting, among these (ADR 0098 § 9); `none`: nothing. */
+        script_reply_in: z
+          .array(z.enum([...SCRIPT_REPLIES, 'none']))
+          .min(1)
+          .optional(),
+      })
+      .strict()
+      .optional(),
+    decision: z
+      .object({
+        handoff: z.boolean().optional(),
+        offer: z.boolean().optional(),
+        /** His desire band after this message, among these (P3-12). */
+        desire_band_in: z.array(DesireBandSchema).min(1).optional(),
+        /** What code did with a custom order (ADR 0090 § A): `none` when he asked for none. */
+        custom_order: z.enum(['none', 'handoff', 'reply']).optional(),
+        /** The reply of her objection bank given to the voice, by id; `null`: none (ADR 0090 § B). */
+        objection_reply: ObjectionReplyIdSchema.nullable().optional(),
+        /** What code decided with her scripts (ADR 0098 § 4), among these. */
+        script_in: z
+          .array(z.enum(['none', 'start', 'send_step', 'wait', 'after_refusal', 'end']))
+          .min(1)
+          .optional(),
+        /** The step decided, by its index, and of which script (`start`, `send_step`). */
+        script_step: z.object({ script: ScriptRef, index: z.int().nonnegative() }).strict().optional(),
+      })
+      .strict()
+      .optional(),
+    voice: z
+      .object({
+        bubbles_max: z.number().int().nonnegative().optional(),
+        bubbles_min: z.number().int().positive().optional(),
+        /** Case-insensitive patterns her answer must not contain. */
+        must_not_match: z.array(Regex).optional(),
+        /** At least one of these must appear (a question, a callback…). */
+        must_match_any: z.array(Regex).optional(),
+        /** Criteria the judge scores, beyond the tier's own: per-scenario minima. */
+        judge: z.partialRecord(JudgeCriterionSchema, z.number().min(0).max(1)).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 /**
  * One eval scenario (`evals/{scenarios,adversarial,regression}/*.yaml`, playbook `write-an-eval.md`). Fictional fan,
  * fictional messages (ADR 0010); the persona is the demo one unless a version is given.
@@ -157,63 +216,25 @@ const ScenarioSchema = z
      * scenario like `minutes_ago` in the history.
      */
     inbound_minutes_ago: z.number().int().nonnegative().optional(),
-    expect: z
-      .object({
-        brief: z
+    expect: ExpectSchema,
+    /**
+     * The rest of the conversation, replayed on the same path (passes de test du 20/11): each message of his after her
+     * last answer, the time that passed, what Reveal says happened meanwhile, and what her answer must show.
+     */
+    then: z
+      .array(
+        z
           .object({
-            risks_contain: z.array(Risk).optional(),
-            risks_absent: z.array(Risk).optional(),
-            intent_in: z.array(Intent).min(1).optional(),
-            action_in: z.array(Action).min(1).optional(),
-            /** Signals of his heat the brain must read in his message (P3-12). */
-            desire_signals_contain: z.array(DesireSignal).min(1).optional(),
-            /** Exactly the alerts of `alerts` the brain must see, by name (P4-01); `[]`: none. */
-            alerts_seen: z.array(AlertName).optional(),
-            /** What he opposes to a price, among these (ADR 0090 § B). */
-            objection_in: z.array(ObjectionKindSchema).min(1).optional(),
-            /** What his message does with the step waiting, among these (ADR 0098 § 9); `none`: nothing. */
-            script_reply_in: z
-              .array(z.enum([...SCRIPT_REPLIES, 'none']))
-              .min(1)
-              .optional(),
+            after_minutes: z.number().nonnegative().default(2),
+            /** `buys_step`: he bought the last paid step she sent, as Reveal's history says. */
+            event: z.enum(['buys_step']).optional(),
+            inbound: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
+            expect: ExpectSchema.prefault({}),
           })
-          .strict()
-          .optional(),
-        decision: z
-          .object({
-            handoff: z.boolean().optional(),
-            offer: z.boolean().optional(),
-            /** His desire band after this message, among these (P3-12). */
-            desire_band_in: z.array(DesireBandSchema).min(1).optional(),
-            /** What code did with a custom order (ADR 0090 § A): `none` when he asked for none. */
-            custom_order: z.enum(['none', 'handoff', 'reply']).optional(),
-            /** The reply of her objection bank given to the voice, by id; `null`: none (ADR 0090 § B). */
-            objection_reply: ObjectionReplyIdSchema.nullable().optional(),
-            /** What code decided with her scripts (ADR 0098 § 4), among these. */
-            script_in: z
-              .array(z.enum(['none', 'start', 'send_step', 'wait', 'after_refusal', 'end']))
-              .min(1)
-              .optional(),
-            /** The step decided, by its index, and of which script (`start`, `send_step`). */
-            script_step: z.object({ script: ScriptRef, index: z.int().nonnegative() }).strict().optional(),
-          })
-          .strict()
-          .optional(),
-        voice: z
-          .object({
-            bubbles_max: z.number().int().nonnegative().optional(),
-            bubbles_min: z.number().int().positive().optional(),
-            /** Case-insensitive patterns her answer must not contain. */
-            must_not_match: z.array(Regex).optional(),
-            /** At least one of these must appear (a question, a callback…). */
-            must_match_any: z.array(Regex).optional(),
-            /** Criteria the judge scores, beyond the tier's own: per-scenario minima. */
-            judge: z.partialRecord(JudgeCriterionSchema, z.number().min(0).max(1)).optional(),
-          })
-          .strict()
-          .optional(),
-      })
-      .strict(),
+          .strict(),
+      )
+      .max(40)
+      .default([]),
   })
   .strict();
 export type Scenario = z.infer<typeof ScenarioSchema>;
