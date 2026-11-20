@@ -532,14 +532,32 @@ describe('the native scripts imported from the platform', () => {
     expect((await post('owner', `${base}/correct`, { descriptionId: first, detailed: ' ' })).statusCode).toBe(
       400,
     );
+    // The trail says who lifted which reason, the text never.
     const audit = await test.admin.db
-      .select({ userId: schema.auditLog.userId, action: schema.auditLog.action })
+      .select({
+        userId: schema.auditLog.userId,
+        action: schema.auditLog.action,
+        details: schema.auditLog.details,
+      })
       .from(schema.auditLog)
       .where(eq(schema.auditLog.entityId, before.id))
       .orderBy(schema.auditLog.createdAt);
     expect(audit).toEqual([
-      { userId: ids.manager, action: 'media_description.validated' },
-      { userId: ids.owner, action: 'media_description.corrected' },
+      {
+        userId: ids.manager,
+        action: 'media_description.validated',
+        details: { descriptionIds: [first], lifted: [], creatorId: nora },
+      },
+      {
+        userId: ids.owner,
+        action: 'media_description.corrected',
+        details: {
+          from: unsure,
+          to: after?.description?.id,
+          lifted: [{ descriptionId: unsure, reasons: ['unsure'] }],
+          creatorId: nora,
+        },
+      },
     ]);
     // Its identity is asked again from what is validated now: one waiting job for the script.
     const jobs = z.array(z.object({ key: z.string() })).parse(

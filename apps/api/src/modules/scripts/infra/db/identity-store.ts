@@ -210,7 +210,12 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
                 sql`${mediaDescriptions.validatedAt} is null`,
               ),
             );
-          await audit('media_description.validated', { descriptionIds: open });
+          // A reason lifted by a person (a doubt, a safety flag) stays in the trail, with who lifted it.
+          const lifted = open.flatMap((id) => {
+            const reasons = shown.get(id)?.reviewReasons ?? [];
+            return reasons.length === 0 ? [] : [{ descriptionId: id, reasons }];
+          });
+          await audit('media_description.validated', { descriptionIds: open, lifted });
           await identify();
           return 'validated';
         }
@@ -239,7 +244,12 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
           validatedBy: userId,
           validatedAt: sql`now()`,
         });
-        await audit('media_description.corrected', { from: base.id, to: id });
+        await audit('media_description.corrected', {
+          from: base.id,
+          to: id,
+          lifted:
+            base.reviewReasons.length === 0 ? [] : [{ descriptionId: base.id, reasons: base.reviewReasons }],
+        });
         await identify();
         return 'corrected';
       }),
