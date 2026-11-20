@@ -98,6 +98,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .orderBy(sql`${schema.conversations.lastInboundAt} asc nulls last`, schema.conversations.id);
         return rows.map((row) => ConversationIdSchema.parse(row.id));
       },
+      async idOfFan(platformAccountId, platformFanId) {
+        const [row] = await tx
+          .select({ id: schema.conversations.id })
+          .from(schema.conversations)
+          .innerJoin(schema.fans, eq(schema.fans.id, schema.conversations.fanId))
+          .where(
+            and(
+              eq(schema.fans.platformAccountId, platformAccountId),
+              eq(schema.fans.platformFanId, platformFanId),
+              eq(schema.conversations.platformAccountId, platformAccountId),
+            ),
+          )
+          .orderBy(sql`${schema.conversations.lastInboundAt} desc nulls last`, schema.conversations.id)
+          .limit(1);
+        return row === undefined ? null : ConversationIdSchema.parse(row.id);
+      },
       async isHeldBy(id, userId) {
         const [row] = await tx
           .select({ id: schema.conversations.id })
@@ -129,6 +145,20 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
                 eq(schema.messages.direction, 'outbound'),
                 eq(schema.messages.text, ''),
                 sql`${schema.messages.platformMedia} = '[]'::jsonb`,
+              ),
+            );
+        // A paid step he bought since (ADR 0156 § 2): the synced copy says it is paid, so it is, with its media as
+        // the platform now shows them. Only from locked to paid, never back: a later copy cannot unbuy it.
+        if (message.direction === 'outbound' && message.isPaid)
+          await tx
+            .update(schema.messages)
+            .set({ isPaid: true, platformMedia: [...message.platformMedia] })
+            .where(
+              and(
+                eq(schema.messages.platformAccountId, message.platformAccountId),
+                eq(schema.messages.platformMessageId, message.platformMessageId),
+                eq(schema.messages.direction, 'outbound'),
+                eq(schema.messages.isPaid, false),
               ),
             );
         return false;
@@ -287,6 +317,14 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .orderBy(schema.drafts.createdAt)
           .for('update');
         return rows.map(toDraft);
+      },
+      async existsWithKey(idempotencyKey) {
+        const [row] = await tx
+          .select({ id: schema.drafts.id })
+          .from(schema.drafts)
+          .where(eq(schema.drafts.idempotencyKey, idempotencyKey))
+          .limit(1);
+        return row !== undefined;
       },
       async insert({ bubbles, softViolations, voice, personaVersionId, facts, scriptStep, ...draft }) {
         await tx.insert(schema.drafts).values({

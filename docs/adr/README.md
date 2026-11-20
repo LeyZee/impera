@@ -161,4 +161,5 @@ Date : AAAA-MM-JJ
 | 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |
 | 0152 | Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs | accepted (remplace 0027 sur le lieu et 0005 sur la base de production ; précise 0028, 0037, 0067, 0087) |
 | 0153 | Le chatteur voit, pendant son shift, une fiche courte de la créatrice : qui elle est, comment elle écrit, ce qu'elle ne fait jamais | accepted (précise 0025, 0022, 0149) |
+| 0156 | Après une étape payante, elle continue de chatter : achat vu et aftercare, refus dans l'ordre, étape oubliée, aide au paiement, relances de vente | accepted (précise 0103, 0088, P6-02) |
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |

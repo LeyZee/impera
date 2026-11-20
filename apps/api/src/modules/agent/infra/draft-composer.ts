@@ -1,4 +1,5 @@
 import type {
+  AfterSaleType,
   AgentHours,
   DatedRanges,
   AlertTrigger,
@@ -137,6 +138,15 @@ export interface AgentComposeInput {
     readonly steps: number;
     /** His last message: the silence it follows up on. */
     readonly silentSince: Date;
+  };
+  /**
+   * Her word after a sale of his (ADR 0156 § 2): a step he bought or a tip, not an answer to a message of his. Written
+   * like a follow-up, at the hours a follow-up may go out.
+   */
+  readonly aftercare?: {
+    readonly saleType: AfterSaleType;
+    /** When he paid. */
+    readonly occurredAt: Date;
   };
   /** A custom order of his already waits for the team (ADR 0090 § A): she does not open another. */
   readonly customOrderOpen?: boolean;
@@ -667,28 +677,37 @@ const NOT_FOLLOWED_UP = (detail: string, costUsd = 0): Held => ({
   costUsd,
 });
 
+/** A turn of hers that answers nothing of his: a follow-up on his silence, or her word after a sale of his. */
+type QuietTurn =
+  | { readonly kind: 'follow_up'; readonly step: number; readonly steps: number; readonly silentSince: Date }
+  | { readonly kind: 'aftercare'; readonly saleType: AfterSaleType };
+
 /**
- * A follow-up on his silence (P3-10): his limits read first, then `followUpDecision`, then the voice and every
- * guard. A silent fan is no emergency: whatever stops it (limits unknown, no model, no budget) writes nothing and
- * alerts nobody; only a blocking guard hands it to a human, as for an answer.
+ * A follow-up on his silence (P3-10), or her word after a sale of his (ADR 0156 § 2): his limits read first, then
+ * `followUpDecision` (a word after a sale goes out at the hours a follow-up may, never to a fan nobody may write to, in
+ * distress or whose age is in doubt), then the voice and every guard. Neither is an emergency: whatever stops it
+ * (limits unknown, no model, no budget) writes nothing and alerts nobody; only a blocking guard hands it to a human,
+ * as for an answer.
  */
-async function followUp(
+async function quietTurn(
   deps: DraftComposerDeps,
   input: AgentComposeInput,
-  asked: NonNullable<AgentComposeInput['followUp']>,
+  turn: QuietTurn,
 ): Promise<AgentComposeResult> {
+  const prefix = turn.kind;
   // His limits unknown, nothing is written to him: never a message to a fan who may have been stopped.
-  if (deps.limits === undefined) return NOT_FOLLOWED_UP('follow_up_limits_unknown');
+  if (deps.limits === undefined) return NOT_FOLLOWED_UP(`${prefix}_limits_unknown`);
   let flags: FanFlags;
   try {
     flags = await deps.limits.flags(input.creatorId, input.fanId);
   } catch {
-    return NOT_FOLLOWED_UP('follow_up_limits_unreadable');
+    return NOT_FOLLOWED_UP(`${prefix}_limits_unreadable`);
   }
   const timeZone = await deps.timeZoneOf(input.creatorId);
   const decision = followUpDecision({
-    step: asked.step,
-    steps: asked.steps,
+    // Her word after a sale is one message: the first and only step.
+    step: turn.kind === 'follow_up' ? turn.step : 0,
+    steps: turn.kind === 'follow_up' ? turn.steps : 1,
     flags,
     now: input.now,
     timeZone,
@@ -698,10 +717,10 @@ async function followUp(
   });
   if (decision.kind === 'skip') return NOT_FOLLOWED_UP(decision.reason);
   if (decision.kind === 'later') return { ...NOT_FOLLOWED_UP(decision.reason), retryAt: decision.at };
-  // Without her active persona, nothing is written to a silent fan: no alert either, he is no emergency.
+  // Without her active persona, nothing is written: no alert either, he is no emergency.
   const her = await herPersona(deps, input);
-  if ('missing' in her) return NOT_FOLLOWED_UP(`follow_up_${her.missing}`);
-  if (voiceUnavailable(deps.gateway)) return NOT_FOLLOWED_UP('follow_up_no_voice');
+  if ('missing' in her) return NOT_FOLLOWED_UP(`${prefix}_${her.missing}`);
+  if (voiceUnavailable(deps.gateway)) return NOT_FOLLOWED_UP(`${prefix}_no_voice`);
   const composed = await composeTurn(deps.gateway, her.deps.persona, {
     history: input.history.map((m) => ({
       from: m.direction === 'inbound' ? 'fan' : 'creator',
@@ -720,10 +739,20 @@ async function followUp(
       ...(input.hours !== undefined && { night: input.hours.night }),
     },
     trace: { creatorId: input.creatorId, conversationId: input.conversationId, draftId: input.draftId },
-    followUp: {
-      silentHours: (input.now.getTime() - asked.silentSince.getTime()) / 3_600_000,
-      spirit: her.deps.followUpSpirit ?? null,
-    },
+    ...(turn.kind === 'follow_up'
+      ? {
+          followUp: {
+            silentHours: (input.now.getTime() - turn.silentSince.getTime()) / 3_600_000,
+            spirit: her.deps.followUpSpirit ?? null,
+          },
+        }
+      : {
+          aftercare: {
+            saleType: turn.saleType,
+            // A step bought while his run is open: the script goes on, so does the moment (Charles, 20/11).
+            scriptGoesOn: turn.saleType === 'ppv' && input.scriptRun?.status === 'open',
+          },
+        }),
   });
   const { costUsd } = composed;
   if (composed.droppedNotes !== undefined) {
@@ -947,7 +976,10 @@ async function settle(
 export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer {
   return {
     async compose(input) {
-      if (input.followUp !== undefined) return followUp(deps, input, input.followUp);
+      if (input.followUp !== undefined)
+        return quietTurn(deps, input, { kind: 'follow_up', ...input.followUp });
+      if (input.aftercare !== undefined)
+        return quietTurn(deps, input, { kind: 'aftercare', saleType: input.aftercare.saleType });
       const stop = await stopped(deps.limits, input);
       if ('held' in stop) return stop.held;
       const lastAnswer = input.history.findLastIndex((m) => m.direction === 'outbound');

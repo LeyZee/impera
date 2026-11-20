@@ -1951,6 +1951,98 @@ describe('createDraftComposer, a follow-up on his silence (P3-10)', () => {
   });
 });
 
+describe('createDraftComposer, her word after a sale of his (ADR 0156 § 2)', () => {
+  // He opened her step at 11:40 UTC; nothing of his since: her thanks, at 13:40 her time.
+  const AFTERCARE: AgentComposeInput = {
+    ...INPUT,
+    history: [
+      { direction: 'inbound', text: 'Montre moi', at: new Date('2026-10-17T11:30:00Z') },
+      { direction: 'outbound', text: 'Rien que pour toi 😏', at: new Date('2026-10-17T11:31:00Z') },
+    ],
+    aftercare: { saleType: 'ppv', occurredAt: new Date('2026-10-17T11:40:00Z') },
+  };
+
+  it('thanks him tenderly, with no brain call and nothing to buy', async () => {
+    const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
+    expect(await draftComposer.compose(AFTERCARE)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Coucou toi ✨'],
+    });
+    expect(seen.brainInputs).toHaveLength(0);
+    expect(seen.voiceInputs?.[0]?.maxBubbles).toBe(1);
+    const brief = seen.voiceInputs?.[0]?.brief;
+    expect(brief?.replyBrief).toContain('Il vient d’ouvrir ce qu’elle lui a envoyé.');
+    expect(brief?.replyBrief).toContain('sans rien proposer de payant');
+    expect(brief?.replyBrief).not.toMatch(/€|\d/u);
+  });
+
+  it('stays in the moment when he bought a step in the middle of her script; tender at its end (Charles, 20/11)', async () => {
+    const at = new Date('2026-10-17T11:35:00Z');
+    const open = {
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [
+        { stepIndex: 0, kind: 'paid' as const, outcome: 'sent' as const, priceMinor: 1_500, sentAt: at, at },
+      ],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    };
+    const briefOf = async (scriptRun: NonNullable<AgentComposeInput['scriptRun']>) => {
+      const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
+      await draftComposer.compose({ ...AFTERCARE, scriptRun });
+      return seen.voiceInputs?.[0]?.brief;
+    };
+    const going = await briefOf(open);
+    expect(going?.replyBrief).toContain('si ça lui a plu');
+    expect(going?.replyBrief).toContain('sans rien proposer de payant');
+    const ended = await briefOf({ ...open, status: 'bought_out', endedAt: at });
+    expect(ended?.replyBrief).toContain('petit mot tendre');
+  });
+
+  it('thanks him for a tip in its own words', async () => {
+    const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
+    await draftComposer.compose({
+      ...AFTERCARE,
+      aftercare: { saleType: 'tip', occurredAt: new Date('2026-10-17T11:40:00Z') },
+    });
+    expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('Il vient de lui laisser un pourboire.');
+  });
+
+  it('writes nothing to a fan whose age is in doubt, in distress or nobody may write to', async () => {
+    const disputed: FanFlags = { ageDisputed: { since: '2026-10-16T09:00:00Z', by: 'policy' } };
+    for (const [flags, detail] of [
+      [disputed, 'follow_up_age_disputed'],
+      [{ doNotContact: true }, 'follow_up_do_not_contact'],
+    ] as const) {
+      const { draftComposer, seen } = composer({}, undefined, limitsOf(flags).limits);
+      expect(await draftComposer.compose(AFTERCARE)).toEqual({
+        kind: 'held',
+        reason: 'no_reply',
+        detail: [detail],
+        costUsd: 0,
+      });
+      expect(seen.voiceCalls).toBe(0);
+    }
+    expect(await composer().draftComposer.compose(AFTERCARE)).toMatchObject({
+      reason: 'no_reply',
+      detail: ['aftercare_limits_unknown'],
+    });
+  });
+
+  it('waits for 9:00 her time when he paid in her night', async () => {
+    const { draftComposer, seen } = composer({}, undefined, limitsOf({}).limits);
+    expect(await draftComposer.compose({ ...AFTERCARE, now: new Date('2026-10-17T23:30:00Z') })).toEqual({
+      kind: 'held',
+      reason: 'no_reply',
+      detail: ['follow_up_quiet_hours'],
+      costUsd: 0,
+      retryAt: new Date('2026-10-18T07:00:00Z'),
+    });
+    expect(seen.voiceCalls).toBe(0);
+  });
+});
+
 describe('createDraftComposer, her active persona (recette G4, ADR 0022)', () => {
   const NORA: ComposerPersonaFields = {
     persona: {

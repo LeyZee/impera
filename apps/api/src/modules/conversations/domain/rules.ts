@@ -109,6 +109,11 @@ export function followUpIdempotencyKey(conversationId: string, anchor: Date, ste
   return `follow_up:${conversationId}:${String(anchor.getTime())}:${String(step)}`;
 }
 
+/** One word after a sale, whatever the replays (ADR 0156 § 2): keyed by the sale's line. */
+export function aftercareIdempotencyKey(saleId: string): string {
+  return `aftercare:${saleId}`;
+}
+
 const MINUTE_MS = 60_000;
 const DEFERRED_RESPOND_MIN_MINUTES = 5;
 const DEFERRED_RESPOND_MAX_MINUTES = 25;
