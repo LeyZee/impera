@@ -33,15 +33,23 @@ function stillOurs(script: HerScript, ours: NonNullable<HerScript['ours']>): boo
 }
 
 /**
+ * Active and with no gap of P6-01 but its identity: a recognised copy has no identity to validate, ours stands for it
+ * (ADR 0161 § 5), and no screen asks one any more (§ 2). Every other gap still keeps it from being offered.
+ */
+function playable(script: HerScript): boolean {
+  return script.active && script.gaps.every((gap) => gap === 'identity_not_validated');
+}
+
+/**
  * A native script as the agent decides on it (ADR 0098), or `null` when it may not be offered (ADR 0161 § 4): only
  * the recognised copy of a script we prepared, still the same on Reveal, with our description and moment. A native
  * script of no script of ours is never offered, whatever identity it carries (those rows are ignored, § 5). Neither is
- * one with a gap of P6-01, or with a step of several branches: the branch engine (ADR 0112, lot 2) reads those.
+ * one with another gap of P6-01, or with a step of several branches: the branch engine (ADR 0112, lot 2) reads those.
  * A step is paid when the platform prices it, offered when it sends a media for free, and a bridge when it is text.
  */
 export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
   const { ours } = script;
-  if (ours === null || !script.proposable) return null;
+  if (ours === null || !playable(script)) return null;
   if (script.steps.some((step) => step.branches > 1)) return null;
   if (!stillOurs(script, ours)) return null;
   const media = script.steps.flatMap((step) => [...step.media, ...step.previewMedia]);

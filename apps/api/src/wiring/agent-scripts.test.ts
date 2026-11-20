@@ -125,6 +125,16 @@ describe('her native scripts as the agent decides on them (ADR 0098)', () => {
     ).not.toBeNull();
   });
 
+  it('offers a recognised copy whose own identity was never validated: ours stands for it (ADR 0161 § 5)', () => {
+    const unvalidated = script('seq-1c', linearSteps, {
+      ours: oursOf(linearSteps),
+      identity: null,
+      gaps: ['identity_not_validated'],
+      proposable: false,
+    });
+    expect(agentScriptViewOf(unvalidated)?.scriptRef).toBe('seq-1c');
+  });
+
   it('never offers a native script that is not the recognised copy of ours, even with a validated identity (ADR 0161 § 4)', () => {
     expect(agentScriptViewOf(script('seq-native', linearSteps))).toBeNull();
   });
@@ -140,9 +150,15 @@ describe('her native scripts as the agent decides on them (ADR 0098)', () => {
     expect(agentScriptViewOf(script('seq-9', inDollars, { ours }))).toBeNull();
   });
 
-  it('never offers a copy that is not proposable or has a step of several branches', () => {
+  it('never offers a copy with a gap, inactive, or with a step of several branches', () => {
+    const ours = oursOf(linearSteps);
     expect(
-      agentScriptViewOf(script('seq-2', linearSteps, { proposable: false, ours: oursOf(linearSteps) })),
+      agentScriptViewOf(
+        script('seq-2', linearSteps, { gaps: ['media_not_described'], proposable: false, ours }),
+      ),
+    ).toBeNull();
+    expect(
+      agentScriptViewOf(script('seq-2b', linearSteps, { active: false, proposable: false, ours })),
     ).toBeNull();
     const branchedSteps = [step(0, 'step-x', 0), { ...step(1, 'step-y', 900), branches: 2 }];
     expect(agentScriptViewOf(script('seq-4', branchedSteps, { ours: oursOf(branchedSteps) }))).toBeNull();
