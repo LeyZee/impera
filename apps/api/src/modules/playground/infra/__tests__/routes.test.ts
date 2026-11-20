@@ -142,7 +142,7 @@ async function server(
     voice?: VoiceOutput;
     control?: GatewayControl;
     creatorId?: string | null;
-    voiceExamplesOf?: (creatorId: string, versionId: string) => Promise<readonly VoiceExample[]>;
+    voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
   } = {},
 ) {
   const records: CalibrationRecord[] = [];
@@ -229,8 +229,8 @@ describe('/v1/playground', () => {
     const asked: string[] = [];
     const { post } = await server({
       control,
-      voiceExamplesOf: (creatorId, versionId) => {
-        asked.push(`${creatorId}/${versionId}`);
+      voiceExamplesOf: (creatorId) => {
+        asked.push(creatorId);
         return Promise.resolve([
           { id: 'e2', text: 'Hey toi, exemple de sa banque' },
           { id: 'e1', text: 'Je suis une IA' },
@@ -239,7 +239,8 @@ describe('/v1/playground', () => {
     });
     await post('/persona', { kind: 'version', creatorId: MIA, versionId: DRAFT });
     await post('/messages', { text: 'Salut' });
-    expect(asked).toEqual([`${MIA}/${DRAFT}`]);
+    // Her one bank, whichever version is played (ADR 0102 § 1).
+    expect(asked).toEqual([MIA]);
     expect(control.sheets?.at(-1)).toContain('Hey toi, exemple de sa banque');
     expect(control.sheets?.at(-1)).not.toContain('Je suis une IA');
   });

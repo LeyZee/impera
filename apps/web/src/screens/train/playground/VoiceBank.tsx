@@ -6,7 +6,7 @@ import { inSentence } from './model';
 import type { Playground } from './usePlayground';
 
 /*
- * « Sa banque » (ADR 0102 § 5): her corrections filed as voice examples, for the version played. The twelve her voice
+ * « Sa banque » (ADR 0102 § 5): her corrections filed as voice examples, on any of her versions: one bank per creator (§ 1). The twelve her voice
  * reads now are read in her real drafts too; « Retirer » takes one out everywhere, kept for history.
  */
 
@@ -75,8 +75,8 @@ export function VoiceBankFold({ state, pg }: { state: PlaygroundState; pg: Playg
       </summary>
       <div className="nv-disclosure__body">
         <p className="pg-hint">
-          Tes corrections rangées en Exemple de voix, pour cette version. Les douze plus récentes que ses
-          gardes laissent passer sont lues par sa voix, ici et avec ses vrais fans.
+          Tes corrections rangées en Exemple de voix, toutes versions confondues. Les douze plus récentes que
+          ses gardes laissent passer sont lues par sa voix, ici et avec ses vrais fans.
         </p>
         {withdrawnAt === state.rate.rated ? (
           <p className="pg-bank__done" role="status">

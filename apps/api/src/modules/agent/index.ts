@@ -143,13 +143,11 @@ export interface DraftComposerStartOptions {
   /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
   readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
   /**
-   * Her bank of examples for a version of her persona, newest first, withdrawn ones left out (ADR 0102): the
-   * playground's corrections filed as her voice's examples. Without it, or unreadable, she writes from her sheet alone.
+   * Her bank of examples, newest first, withdrawn ones left out (ADR 0102): the playground's corrections filed as her
+   * voice's examples, one bank whichever version they were made on. Without it, or unreadable, she writes from her
+   * sheet alone.
    */
-  readonly voiceExamplesOf?: (
-    creatorId: string,
-    personaVersionId: string,
-  ) => Promise<readonly VoiceExample[]>;
+  readonly voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
   /** Her bank could not be read: she wrote from her sheet alone, the log says so. */
   readonly onExamplesUnread?: (event: { readonly creatorId: string }) => void;
 }
@@ -179,7 +177,7 @@ function composerFields(persona: PersonaForModels, bank: readonly VoiceExample[]
   };
 }
 
-/** Her bank for the version she writes with; none without a version, without a reader, or when it cannot be read. */
+/** Her bank, for the version she writes with to choose from; none without a version, a reader, or when unreadable. */
 async function bankOf(
   options: DraftComposerStartOptions,
   creatorId: string,
@@ -187,7 +185,7 @@ async function bankOf(
 ): Promise<readonly VoiceExample[]> {
   if (personaVersionId === undefined || options.voiceExamplesOf === undefined) return [];
   try {
-    return await options.voiceExamplesOf(creatorId, personaVersionId);
+    return await options.voiceExamplesOf(creatorId);
   } catch {
     options.onExamplesUnread?.({ creatorId });
     return [];

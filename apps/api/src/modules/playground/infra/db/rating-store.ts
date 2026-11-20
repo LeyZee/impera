@@ -118,14 +118,15 @@ export function createDbCalibrationStore(
 const BANK_READ = 48;
 
 /**
- * Her bank for one version of her persona, newest first (ADR 0102 § 1, § 2): her corrections filed as voice examples
- * and still `active`, in her tenant only. Withdrawn or blocked ones never leave. The agent chooses among them with her
- * guards (`pickVoiceExamples`), as the playground does.
+ * Her bank, newest first (ADR 0102 § 1, § 2): her corrections filed as voice examples and still `active`, in her
+ * tenant only, whichever of her versions they were made on: one bank per creator, so activating a version keeps it and
+ * a correction made on a draft serves the version in force. Withdrawn or blocked ones never leave. The version that
+ * writes chooses among them with its own guards (`pickVoiceExamples`), as the playground does.
  */
 export function createDbVoiceExampleBank(
   db: Database,
-): (creatorId: string, personaVersionId: string) => Promise<readonly VoiceExample[]> {
-  return async (creatorId, personaVersionId) => {
+): (creatorId: string) => Promise<readonly VoiceExample[]> {
+  return async (creatorId) => {
     const rows = await withTenant(db, creatorId, (tx) =>
       tx
         .select({ id: schema.calibrationRatings.id, verdict: schema.calibrationRatings.verdict })
@@ -133,7 +134,6 @@ export function createDbVoiceExampleBank(
         .where(
           and(
             eq(schema.calibrationRatings.creatorId, creatorId),
-            eq(schema.calibrationRatings.personaVersionId, personaVersionId),
             eq(schema.calibrationRatings.exampleState, 'active'),
           ),
         )
@@ -160,8 +160,8 @@ export interface BankEntry {
 
 /** Her bank as the owner sees it and empties it (ADR 0102 § 5). */
 export interface VoiceBankStore {
-  /** Her examples of one version, active or blocked, newest first. */
-  list(creatorId: string, personaVersionId: string): Promise<readonly BankEntry[]>;
+  /** Her examples, whichever of her versions they were made on, active or blocked, newest first (ADR 0102 § 1). */
+  list(creatorId: string): Promise<readonly BankEntry[]>;
   /** Out of her bank everywhere, kept for history; false when it is not in her bank. */
   withdraw(creatorId: string, id: string, at: Date): Promise<boolean>;
 }
@@ -172,7 +172,7 @@ const BANK_LISTED = 100;
 export function createDbVoiceBankStore(db: Database): VoiceBankStore {
   const ratings = schema.calibrationRatings;
   return {
-    async list(creatorId, personaVersionId) {
+    async list(creatorId) {
       const rows = await withTenant(db, creatorId, (tx) =>
         tx
           .select({
@@ -183,13 +183,7 @@ export function createDbVoiceBankStore(db: Database): VoiceBankStore {
             state: ratings.exampleState,
           })
           .from(ratings)
-          .where(
-            and(
-              eq(ratings.creatorId, creatorId),
-              eq(ratings.personaVersionId, personaVersionId),
-              inArray(ratings.exampleState, ['active', 'blocked']),
-            ),
-          )
+          .where(and(eq(ratings.creatorId, creatorId), inArray(ratings.exampleState, ['active', 'blocked'])))
           .orderBy(sql`${ratings.ratedAt} desc`)
           .limit(BANK_LISTED),
       );

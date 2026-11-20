@@ -6,7 +6,7 @@ import { guardLabel } from '../domain/labels';
 
 import type { VoiceBankStore } from './db/rating-store';
 
-/** Her bank as Entraîner shows it and empties it (ADR 0102 § 5). */
+/** Her bank as Entraîner shows it and empties it (ADR 0102 § 5): one per creator, judged by the version chosen's guards. */
 export interface VoiceBankView {
   list(creatorId: string, versionId: string): Promise<VoiceBank>;
   withdraw(creatorId: string, id: string): Promise<void>;
@@ -26,7 +26,7 @@ export function createVoiceBankView(deps: {
     async list(creatorId, versionId) {
       const guards = await deps.guardsOf(creatorId, versionId);
       if (guards === null) return { examples: [] };
-      const entries = await deps.store.list(creatorId, versionId);
+      const entries = await deps.store.list(creatorId);
       const read = new Set(
         pickVoiceExamples(
           entries.filter((e) => e.state === 'active'),

@@ -55,6 +55,15 @@ describe('playground ratings in the database (ADR 0103, AGE-06)', () => {
     await test.close();
   });
 
+  /** A creator of her own for a test, so the bank it reads holds only what that test files. */
+  async function creator(name: string): Promise<CreatorId> {
+    const id = newId(CreatorIdSchema);
+    await test.admin.db
+      .insert(schema.creators)
+      .values({ id, nameKey: id, displayName: name, timezone: 'Europe/Paris' });
+    return id;
+  }
+
   it('imports the JSON lines once, reads each creator’s back in order, and keeps a withdrawn example out of her bank', async () => {
     const lines = [
       record('a', nora, 5),
@@ -111,19 +120,20 @@ describe('playground ratings in the database (ADR 0103, AGE-06)', () => {
   });
 
   it('files a blocked correction out of her bank, lists her bank, and withdraws an example everywhere (ADR 0102 § 4, § 5)', async () => {
+    const ema = await creator('Ema Roux');
     const versionId = newId(PersonaVersionIdSchema);
     await test.admin.db.insert(schema.personaVersions).values({
       id: versionId,
-      creatorId: nora,
+      creatorId: ema,
       version: 'bank',
       sourcePath: 'personas/example.yaml',
       content: {},
       contentHash: 'bank',
     });
-    const table = createDbCalibrationStore(test.app.db, () => Promise.resolve([nora]));
-    const kept = { ...record('k', nora, 20), id: newId(CreatorIdSchema), personaVersionId: versionId };
+    const table = createDbCalibrationStore(test.app.db, () => Promise.resolve([ema]));
+    const kept = { ...record('k', ema, 20), id: newId(CreatorIdSchema), personaVersionId: versionId };
     const stopped = {
-      ...record('s', nora, 21),
+      ...record('s', ema, 21),
       id: newId(CreatorIdSchema),
       personaVersionId: versionId,
       verdict: { kind: 'corrected' as const, text: 'Je suis une IA' },
@@ -134,32 +144,76 @@ describe('playground ratings in the database (ADR 0103, AGE-06)', () => {
 
     const bank = createDbVoiceBankStore(test.app.db);
     const examplesOf = createDbVoiceExampleBank(test.app.db);
-    expect((await bank.list(nora, versionId)).map((e) => [e.id, e.state])).toEqual([
+    expect((await bank.list(ema)).map((e) => [e.id, e.state])).toEqual([
       [stopped.id, 'blocked'],
       [kept.id, 'active'],
     ]);
     // Her drafts read the active one only.
-    expect((await examplesOf(nora, versionId)).map((e) => e.id)).toEqual([kept.id]);
+    expect((await examplesOf(ema)).map((e) => e.id)).toEqual([kept.id]);
     expect((await table.list()).find((r) => r.id === stopped.id)?.exampleBlocked).toBe(true);
 
     // Another creator cannot withdraw it; hers can, once.
     expect(await bank.withdraw(lina, kept.id, new Date())).toBe(false);
-    expect(await bank.withdraw(nora, kept.id, new Date())).toBe(true);
-    expect(await bank.withdraw(nora, kept.id, new Date())).toBe(false);
-    expect(await examplesOf(nora, versionId)).toEqual([]);
-    expect((await bank.list(nora, versionId)).map((e) => e.id)).toEqual([stopped.id]);
+    expect(await bank.withdraw(ema, kept.id, new Date())).toBe(true);
+    expect(await bank.withdraw(ema, kept.id, new Date())).toBe(false);
+    expect(await examplesOf(ema)).toEqual([]);
+    expect((await bank.list(ema)).map((e) => e.id)).toEqual([stopped.id]);
     // Kept for history, out of her bank.
     const [row] = await test.admin.db
       .select()
       .from(schema.calibrationRatings)
       .where(eq(schema.calibrationRatings.id, kept.id));
     expect(row?.exampleState).toBe('withdrawn');
-    // Nothing else changes: the table stays append-only.
+    // Nothing else changes: the table stays append-only, and a withdrawal is for good.
     await expect(
       test.admin.db
         .update(schema.calibrationRatings)
         .set({ fanMessage: 'autre' })
         .where(eq(schema.calibrationRatings.id, kept.id)),
+    ).rejects.toThrow();
+    await expect(
+      test.admin.db
+        .update(schema.calibrationRatings)
+        .set({ exampleState: 'active', exampleStateAt: new Date() })
+        .where(eq(schema.calibrationRatings.id, kept.id)),
+    ).rejects.toThrow();
+  });
+
+  it('keeps one bank per creator, whichever of her versions an example was made on (ADR 0102 § 1)', async () => {
+    const zoe = await creator('Zoé Marin');
+    const [inForce, draft] = [newId(PersonaVersionIdSchema), newId(PersonaVersionIdSchema)];
+    await test.admin.db.insert(schema.personaVersions).values(
+      [inForce, draft].map((id, i) => ({
+        id,
+        creatorId: zoe,
+        version: `one-bank-${String(i)}`,
+        sourcePath: 'personas/example.yaml',
+        content: {},
+        contentHash: `one-bank-${String(i)}`,
+      })),
+    );
+    const table = createDbCalibrationStore(test.app.db, () => Promise.resolve([zoe]));
+    const onForce = { ...record('f', zoe, 30), id: newId(CreatorIdSchema), personaVersionId: inForce };
+    const onDraft = { ...record('d', zoe, 31), id: newId(CreatorIdSchema), personaVersionId: draft };
+    await table.append(onForce);
+    await table.append(onDraft);
+
+    // A correction made on her draft serves the version in force, and activating the draft keeps the other.
+    const examplesOf = createDbVoiceExampleBank(test.app.db);
+    expect((await examplesOf(zoe)).map((e) => e.id)).toEqual([onDraft.id, onForce.id]);
+    expect((await createDbVoiceBankStore(test.app.db).list(zoe)).map((e) => e.id)).toEqual([
+      onDraft.id,
+      onForce.id,
+    ]);
+    // Never another creator's.
+    expect((await examplesOf(nora)).map((e) => e.id)).not.toContain(onForce.id);
+
+    // An active example is never blocked afterwards: only « Retirer » takes it out.
+    await expect(
+      test.admin.db
+        .update(schema.calibrationRatings)
+        .set({ exampleState: 'blocked', exampleStateAt: new Date() })
+        .where(eq(schema.calibrationRatings.id, onForce.id)),
     ).rejects.toThrow();
   });
 });
