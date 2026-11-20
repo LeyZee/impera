@@ -153,18 +153,18 @@ export async function readForeignAccess(db: Database): Promise<ForeignAccess> {
                           where b.rolname = any(${literalArray(READ_ALL_ROLES)}) and pg_has_role(o.oid, b.oid, 'MEMBER'))
         )
         select
-          array(select o.rolname || ' on ' || s.nspname
+          array(select o.rolname::text || ' on ' || s.nspname::text
                   from others o cross join schemas s
                  where has_schema_privilege(o.oid, s.oid, 'USAGE')
                    and not exists (select 1 from readers r where r.oid = o.oid)
                  order by 1) as reachable,
-          array(select r.rolname from readers r order by 1) as "hostReaders",
-          array(select distinct pg_get_userbyid(o.owner)
+          array(select r.rolname::text from readers r order by 1) as "hostReaders",
+          array(select distinct pg_get_userbyid(o.owner)::text
                   from objects o
                  where not exists (select 1 from pg_depend d
                                     where d.classid = o.catalog and d.objid = o.oid and d.deptype = 'e')
                  order by 1) as owners,
-          (select pg_get_userbyid(c.relowner) from pg_class c
+          (select pg_get_userbyid(c.relowner)::text from pg_class c
             where c.oid = to_regclass('drizzle.__drizzle_migrations')) as migrator`,
   );
   const { reachable, hostReaders, owners, migrator } = ForeignAccessSchema.parse(result.rows[0]);
