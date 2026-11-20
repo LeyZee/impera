@@ -12,6 +12,12 @@
   padding-bottom: var(--nv-plate-pad);
 }
 
+.vt-earn .sc-week {
+  flex-wrap: wrap;
+}
+.vt-earn .sc-week__label {
+  white-space: nowrap;
+}
 .vt-earn__head {
   display: flex;
   flex-wrap: wrap;
@@ -42,7 +48,7 @@
 }
 .vt-earn__line {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 4.5em minmax(0, 1fr) auto;
   gap: var(--nv-space-3);
   align-items: baseline;
   padding: var(--nv-space-2);
@@ -52,7 +58,11 @@
 .vt-earn__line:hover {
   background: var(--nv-plate-hover);
 }
+.vt-earn__lines.is-dated .vt-earn__line {
+  grid-template-columns: 11.5em minmax(0, 1fr) auto;
+}
 .vt-earn__when {
+  font-variant-numeric: tabular-nums;
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-faint);
   white-space: nowrap;
@@ -73,10 +83,14 @@
   white-space: nowrap;
 }
 .vt-earn__amount {
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   white-space: nowrap;
 }
+/* A refund reads as one, the whole line muted: never as a sale. */
+.vt-earn__line.is-refund .vt-earn__what b,
 .vt-earn__line.is-refund .vt-earn__amount {
+  font-weight: 500;
   color: var(--nv-ink-muted);
 }
 .vt-earn__none {
@@ -85,9 +99,17 @@
   color: var(--nv-ink-faint);
 }
 @media (max-width: 40rem) {
-  .vt-earn__line {
+  .vt-earn__line,
+  .vt-earn__lines.is-dated .vt-earn__line {
     grid-template-columns: minmax(0, 1fr) auto;
     row-gap: 2px;
+  }
+  /* « Revenir à aujourd’hui » on its own line under the arrows. */
+  .vt-earn .sc-week__back {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    /* Its padding pulled back, as a way back in an eyebrow: its text starts under the arrows. */
+    margin-left: calc(-1 * var(--nv-space-4));
   }
   .vt-earn__when {
     grid-column: 1 / -1;

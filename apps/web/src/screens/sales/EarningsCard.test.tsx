@@ -98,7 +98,7 @@ describe('« Ta part », her Ventes (CR-04)', () => {
     const plain = (text: string | null): string => (text ?? '').replace(/\s/gu, ' ');
     expect(plain(card.textContent)).toContain('Aujourd’hui');
     expect(plain(card.textContent)).toContain(
-      '2 ventes · 1 remboursement · estimé, la période n’est pas finie · lu chez Reveal',
+      '2 ventes · 1 remboursement · estimé, période en cours · lu chez Reveal',
     );
     const lines = within(card)
       .getAllByRole('listitem')

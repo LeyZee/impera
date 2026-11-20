@@ -13,7 +13,7 @@ import {
 } from './earnings-view';
 import './earnings.css';
 
-import { clockAt, dayOf, longDay } from '@/scheduling/time';
+import { clockAt, dayOf } from '@/scheduling/time';
 import '@/scheduling/scheduling.css';
 import { useNow } from '@/scheduling/useNow';
 import { Panel, PanelSection } from '@/shell/layout';
@@ -21,6 +21,15 @@ import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /** Her sales are counted on Reveal's days, in Paris: the same days as her figures on Reveal. */
 const SALES_ZONE = 'Europe/Paris';
+
+/** « ven. 20 nov. »: a sale's day, short, so every line's label starts at the same place. */
+const SALE_DAY = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  timeZone: SALES_ZONE,
+});
+const dayOfSale = (at: string): string => SALE_DAY.format(new Date(at));
 
 const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
@@ -113,7 +122,7 @@ export function EarningsCard(): JSX.Element {
         </div>
         <p className="vt-earn__part nv-num">{partOf(read)}</p>
         <p className="vt-earn__meta">
-          {[countsOf(read), read.estimated ? 'estimé, la période n’est pas finie' : null, 'lu chez Reveal']
+          {[countsOf(read), read.estimated ? 'estimé, période en cours' : null, 'lu chez Reveal']
             .filter((part) => part !== null)
             .join(' · ')}
         </p>
@@ -183,14 +192,14 @@ function Lines({ earnings }: { earnings: CreatorEarnings }): JSX.Element {
   const many = earnings.period !== 'day';
   return (
     <>
-      <ul className="vt-earn__lines">
+      <ul className={many ? 'vt-earn__lines is-dated' : 'vt-earn__lines'}>
         {earnings.lines.map((line, index) => (
           <li
             key={`${line.occurredAt}-${String(index)}`}
             className={line.event === 'refund' ? 'vt-earn__line is-refund' : 'vt-earn__line'}
           >
             <span className="vt-earn__when nv-num">
-              {many ? `${longDay(dayOf(line.occurredAt, SALES_ZONE))}, ` : ''}
+              {many ? `${dayOfSale(line.occurredAt)} · ` : ''}
               {clockAt(line.occurredAt, SALES_ZONE)}
             </span>
             <span className="vt-earn__what">
