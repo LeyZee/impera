@@ -21,11 +21,13 @@ const CREATOR = { email: 'creator@example.test', name: 'Creator', password: 'hor
 const SessionStateSchema = z.object({ state: z.string() });
 const RowSchema = z.object({ updated_at: z.coerce.date(), expires_at: z.coerce.date() });
 const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 
 /**
- * How long a session lives by role (SEC-17): the owner and the creator 48 h without activity, every other role 12 h, all 7 days at
- * most; never a recent sign-in. Times are moved in the base, as Better Auth reads its own clock: `updated_at` is the
- * last refresh, `expires_at` what Better Auth wrote then (48 h later; 12 h for a row written before SEC-17).
+ * How long a session lives by role (SEC-17, ADR 0160): the owner 48 h without activity and 7 days at most, the creator
+ * 7 days without activity and 30 days at most, every other role 12 h and 7 days; never a recent sign-in. Times are moved
+ * in the base, as Better Auth reads its own clock: `updated_at` is the last refresh, `expires_at` what Better Auth wrote
+ * then (7 days later; 12 h for a row written before SEC-17).
  */
 describe('session lifetime by role (SEC-17)', () => {
   let test: TestDb;
@@ -125,28 +127,46 @@ describe('session lifetime by role (SEC-17)', () => {
     await test.close();
   });
 
-  it('keeps an owner or a creator session idle 47 hours, ends one idle 49 hours', async () => {
-    for (const account of [OWNER, CREATOR]) {
-      const cookie = await freshSession(account);
-      await setTimes(account.email, { idle: '47 hours', expiresIn: '1 hour' });
-      expect(await dashboardSession(cookie)).toBe('signed_in');
-      // Used again: refreshed for another 48 hours.
-      const refreshed = await sessionRow(account.email);
-      expect(refreshed.expires_at.getTime() - Date.now()).toBeGreaterThan(47 * HOUR);
+  it('keeps an owner session idle 47 hours, ends one idle 49 hours', async () => {
+    const cookie = await freshSession(OWNER);
+    await setTimes(OWNER.email, { idle: '47 hours', expiresIn: '1 hour' });
+    expect((await me(cookie)).statusCode).toBe(200);
+    // Used again: refreshed for another 7 days on Better Auth's side, his 48 hours held by ours.
+    const refreshed = await sessionRow(OWNER.email);
+    expect(refreshed.expires_at.getTime() - Date.now()).toBeGreaterThan(6 * DAY);
 
-      await setTimes(account.email, { idle: '49 hours', expiresIn: '-1 hour' });
-      expect(await dashboardSession(cookie)).toBe('signed_out');
-      expect(await sessionCount(account.email)).toBe(0);
-    }
+    await setTimes(OWNER.email, { idle: '49 hours', expiresIn: '5 days' });
+    expect((await me(cookie)).statusCode).toBe(401);
+    expect(await sessionCount(OWNER.email)).toBe(0);
+  });
+
+  it('keeps a creator session idle 6 days and 23 hours, ends one idle 7 days and an hour', async () => {
+    const cookie = await freshSession(CREATOR);
+    await setTimes(CREATOR.email, { idle: '6 days 23 hours', expiresIn: '1 hour', age: '10 days' });
+    expect(await dashboardSession(cookie)).toBe('signed_in');
+    expect(Date.now() - (await sessionRow(CREATOR.email)).updated_at.getTime()).toBeLessThan(HOUR);
+
+    await setTimes(CREATOR.email, { idle: '7 days 1 hour', expiresIn: '1 hour', age: '10 days' });
+    expect(await dashboardSession(cookie)).toBe('signed_out');
+    expect(await sessionCount(CREATOR.email)).toBe(0);
   });
 
   it('ends an owner session 7 days after its creation, even used a minute ago', async () => {
     const cookie = await freshSession(OWNER);
-    await setTimes(OWNER.email, { idle: '1 minute', expiresIn: '47 hours', age: '6 days 23 hours' });
+    await setTimes(OWNER.email, { idle: '1 minute', expiresIn: '6 days', age: '6 days 23 hours' });
     expect((await me(cookie)).statusCode).toBe(200);
-    await setTimes(OWNER.email, { idle: '1 minute', expiresIn: '47 hours', age: '7 days 1 minute' });
+    await setTimes(OWNER.email, { idle: '1 minute', expiresIn: '6 days', age: '7 days 1 minute' });
     expect((await me(cookie)).statusCode).toBe(401);
     expect(await sessionCount(OWNER.email)).toBe(0);
+  });
+
+  it('ends a creator session 30 days after its creation, even used a minute ago', async () => {
+    const cookie = await freshSession(CREATOR);
+    await setTimes(CREATOR.email, { idle: '1 minute', expiresIn: '6 days', age: '29 days 23 hours' });
+    expect(await dashboardSession(cookie)).toBe('signed_in');
+    await setTimes(CREATOR.email, { idle: '1 minute', expiresIn: '6 days', age: '30 days 1 minute' });
+    expect(await dashboardSession(cookie)).toBe('signed_out');
+    expect(await sessionCount(CREATOR.email)).toBe(0);
   });
 
   it('keeps a manager or a chatter idle 11 hours, and closes one idle 13 hours', async () => {
@@ -185,12 +205,12 @@ describe('session lifetime by role (SEC-17)', () => {
     expect((await sessionRow(MANAGER.email)).expires_at.getTime() - Date.now()).toBeGreaterThan(47 * HOUR);
   });
 
-  it('renews the cookie with the session, so a browser keeps a session in use past 48 hours', async () => {
+  it('renews the cookie with the session, so a browser keeps a session in use past its first days', async () => {
     const cookie = await freshSession(OWNER);
     await setTimes(OWNER.email, { idle: '2 hours', expiresIn: '46 hours', age: '3 days' });
     const response = await me(cookie);
     expect(response.statusCode).toBe(200);
-    expect(String(response.headers['set-cookie'])).toMatch(/session_token=[^;]+;.*Max-Age=172800/);
+    expect(String(response.headers['set-cookie'])).toMatch(/session_token=[^;]+;.*Max-Age=604800/);
     // Not due again within the hour: no cookie.
     expect((await me(cookie)).headers['set-cookie']).toBeUndefined();
   });

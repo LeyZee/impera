@@ -53,13 +53,7 @@ import {
 import { isOwnerAccount } from './owners';
 import { passkeysOf } from './passkeys';
 import { recordRefusal } from './security-alerts';
-import {
-  idleLimitMs,
-  LONG_IDLE_MS,
-  LONG_IDLE_ROLES,
-  SESSION_MAX_AGE_MS,
-  SHORT_IDLE_MS,
-} from './session-lifetime';
+import { LONG_LIFETIMES, lifetimeOf, SHORT_LIFETIME, type SessionLifetime } from './session-lifetime';
 
 /**
  * Réglages › Sécurité (ADR 0046 § 7, SEC-04): each person sees and closes their own sessions and gets new backup
@@ -161,11 +155,14 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
     return { userId: request.user.id, role: request.user.role, sessionId: current.session.id };
   };
 
-  /** The idle limit in seconds of a session of the account `u`, as `idleLimitMs` says it (an unknown role: short). */
-  const accountIdleSeconds = sql`case when u.role in (${sql.join(
-    [...LONG_IDLE_ROLES].map((long) => sql`${long}`),
-    sql`, `,
-  )}) then ${LONG_IDLE_MS / 1000}::int else ${SHORT_IDLE_MS / 1000}::int end`;
+  /** A limit in seconds of a session of the account `u`, as `lifetimeOf` says it (an unknown role: short). */
+  const accountSeconds = (limit: keyof SessionLifetime) =>
+    sql`case ${sql.join(
+      Object.entries(LONG_LIFETIMES).map(
+        ([role, lifetime]) => sql`when u.role = ${role} then ${lifetime[limit] / 1000}::int`,
+      ),
+      sql` `,
+    )} else ${SHORT_LIFETIME[limit] / 1000}::int end`;
 
   return (app) => {
     app.get(
@@ -183,14 +180,14 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
               updatedAt: schema.session.updatedAt,
             })
             .from(schema.session)
-            // Alive only: a session past its 7 days (ADR 0046 § 6) or idle past its role's limit (SEC-17) is refused
+            // Alive only: a session past its role's age limit (ADR 0046 § 6) or idle past its limit (SEC-17) is refused
             // at its next request, never shown.
             .where(
               and(
                 eq(schema.session.userId, userId),
                 sql`${schema.session.expiresAt} > now()`,
-                sql`${schema.session.createdAt} > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})`,
-                sql`${schema.session.updatedAt} > now() - make_interval(secs => ${idleLimitMs(role) / 1000})`,
+                sql`${schema.session.createdAt} > now() - make_interval(secs => ${lifetimeOf(role).maxAgeMs / 1000})`,
+                sql`${schema.session.updatedAt} > now() - make_interval(secs => ${lifetimeOf(role).idleMs / 1000})`,
               ),
             )
             .orderBy(sql`${schema.session.updatedAt} desc`),
@@ -369,8 +366,8 @@ export function createSecuritySettingsRoutes(deps: SecuritySettingsDeps): Fastif
               (select count(*)::int from passkey p where p.user_id = u.id) as passkeys
             from "user" u
             left join session s on s.user_id = u.id and s.expires_at > now()
-              and s.created_at > now() - make_interval(secs => ${SESSION_MAX_AGE_MS / 1000})
-              and s.updated_at > now() - make_interval(secs => ${accountIdleSeconds})
+              and s.created_at > now() - make_interval(secs => ${accountSeconds('maxAgeMs')})
+              and s.updated_at > now() - make_interval(secs => ${accountSeconds('idleMs')})
             where not exists (select 1 from team_members m where m.user_id = u.id and m.status = 'left')
             group by u.id
             order by (u.role = 'owner') desc, u.name`),

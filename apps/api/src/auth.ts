@@ -63,7 +63,7 @@ import {
 import type { PasswordBreachCheck } from './password-breaches';
 import { forgetCount } from './rate-limit-store';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
-import { LONG_IDLE_MS, sessionEnd } from './session-lifetime';
+import { LONGEST_IDLE_MS, sessionEnd } from './session-lifetime';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -75,11 +75,11 @@ declare module 'fastify' {
 }
 
 /**
- * Better Auth's own lifetime of a session without activity is the longest a role gets (48 h, `session-lifetime.ts`);
- * the shorter one of the other roles is ours to apply (`refuseEndedRefresh`, `sessionOf`). Refreshed at most once an
- * hour while in use.
+ * Better Auth's own lifetime of a session without activity is the longest a role gets (the creator's 7 days,
+ * `session-lifetime.ts`); the shorter ones of the other roles are ours to apply (`refuseEndedRefresh`, `sessionOf`).
+ * Refreshed at most once an hour while in use.
  */
-const SESSION_SECONDS = LONG_IDLE_MS / 1000;
+const SESSION_SECONDS = LONGEST_IDLE_MS / 1000;
 const SESSION_REFRESH_SECONDS = 60 * 60;
 /**
  * Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit, wide enough for a team behind one
@@ -550,7 +550,7 @@ async function readSession(auth: Auth, db: Database, request: FastifyRequest, re
       headers: authHeaders(request),
       returnHeaders: true,
     });
-    // A refresh renews the cookie too (its `Max-Age` is the 48 h of `SESSION_SECONDS`): without it, the browser would
+    // A refresh renews the cookie too (its `Max-Age` is `SESSION_SECONDS`): without it, the browser would
     // drop a session in use 48 h after its sign-in, whatever its role allows.
     const cookies = headers.getSetCookie();
     if (reply !== undefined && response !== null && cookies.length > 0)
