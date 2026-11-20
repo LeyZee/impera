@@ -463,7 +463,9 @@ describe('createDraftComposer', () => {
     const brief = seen.voiceInputs?.[0]?.brief;
     expect(brief?.action).toBe('reply');
     expect(brief?.replyBrief).toContain('s’il est revenu');
-    expect(brief?.toneHints).toContain('aucune allusion sexuelle, elle n’ouvre pas ce terrain');
+    expect(brief?.toneHints).toContain(
+      'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis',
+    );
   });
 
   it('hands him to a chatter when his card gives an age under 18 (recette AGE-13)', async () => {
@@ -1359,7 +1361,9 @@ describe('createDraftComposer, his desire score (P3-12)', () => {
     const CALM: Brief = { ...BRIEF, desireSignals: ['cold_reply'] };
     const { draftComposer, seen } = composer({ brief: CALM }, undefined, limitsOf(ADULT).limits, policy);
     await draftComposer.compose(stored(45, 3));
-    expect(written(seen)?.toneHints).toContain('aucune allusion sexuelle, elle n’ouvre pas ce terrain');
+    expect(written(seen)?.toneHints).toContain(
+      'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis',
+    );
   });
 });
 
@@ -1394,7 +1398,9 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
   it('does not open it herself before her delay', async () => {
     const { draftComposer, seen } = composer({}, undefined, limitsOf(ADULT).limits, cursor);
     await draftComposer.compose(dayOld);
-    expect(written(seen)?.toneHints).toContain('aucune allusion sexuelle, elle n’ouvre pas ce terrain');
+    expect(written(seen)?.toneHints).toContain(
+      'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis',
+    );
   });
 
   it('blocks explicit words while his age is not confirmed', async () => {
@@ -1656,7 +1662,9 @@ describe('createDraftComposer, a follow-up on his silence (P3-10)', () => {
     expect(brief?.action).toBe('reply');
     expect(brief?.replyBrief).toContain('depuis 12 h');
     expect(brief?.replyBrief).toContain('sans rien proposer de payant');
-    expect(brief?.toneHints).toContain('aucune allusion sexuelle, elle n’ouvre pas ce terrain');
+    expect(brief?.toneHints).toContain(
+      'aucune allusion sexuelle de sa part, elle n’ouvre pas ce terrain ; le flirt et la complicité restent permis',
+    );
   });
 
   it('never writes to a fan nobody may write to, nor without his limits: no alert either', async () => {

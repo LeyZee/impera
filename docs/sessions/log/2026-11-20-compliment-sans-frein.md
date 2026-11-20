@@ -4,4 +4,5 @@ Pas fait : rien.
 Décisions : aucune ADR touchée.
 Découvertes : aucune.
 Candidats à suppression : aucun.
-Vérifié : tests du module agent et de llm, pnpm check.
+Ajouté ensuite : NO_OPENING_HINT laisse le flirt permis (piste de Bilan) ; éval fictive compliment-insistent-first-message (accueil sans frein, puis une question).
+Vérifié : tests du module agent, des évals et de llm, pnpm check.
