@@ -201,7 +201,7 @@ describe('SubNav', () => {
   it('brings the lit tab into view when a view of the same screen is chosen', async () => {
     const views = (lit: string): readonly SubNavItem[] => [
       { to: '/paie/quinzaine', search: { onglet: 'agenda' }, label: 'Agenda', current: lit === 'Agenda' },
-      { to: '/paie/quinzaine', search: { onglet: 'profil' }, label: 'Profil', current: lit === 'Profil' },
+      { to: '/paie/quinzaine', search: { onglet: 'compte' }, label: 'Profil', current: lit === 'Profil' },
     ];
     renderNav(views('Agenda'));
     const last = await screen.findByRole('link', { name: 'Profil' });

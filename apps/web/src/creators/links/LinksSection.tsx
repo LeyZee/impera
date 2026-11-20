@@ -92,8 +92,9 @@ export function LinksSection({
           Ses liens
         </h3>
         <p className="ps-lead">
-          Chaque lien a un endroit et une phrase d’usage : c’est ce que {creatorName} lit dans « Mes liens »,
-          avec un bouton pour le copier. Un lien éteint ou sans endroit ne lui est pas montré.
+          Chaque lien a un endroit et une phrase d’usage : c’est ce que {creatorName} lit dans{' '}
+          {'«\u00a0Mes liens\u00a0»'}, avec un bouton pour le copier. Un lien éteint ou sans endroit ne lui
+          est pas montré.
         </p>
         {links.length === 0 ? (
           <p className="ps-hint">

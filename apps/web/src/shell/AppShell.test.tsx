@@ -85,7 +85,16 @@ describe('the rail of each role', () => {
   it('gives the owner his tabs in the order of ADR 0024, under Chatting and Agence', async () => {
     renderApp(owner, '/');
     await screen.findByText('Chatting');
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Réglages']);
+    expect(tabs()).toEqual([
+      'Dashboard',
+      'Suivi',
+      'Entraîner',
+      'Créatrices',
+      'Équipe',
+      'Paie',
+      'Trafic',
+      'Réglages',
+    ]);
     expect(screen.getByText('Agence')).toBeDefined();
     // Eight places: the phone keeps four on its bar and folds the rest under « Plus ».
     expect(screen.getByRole('button', { name: 'Plus' })).toBeDefined();
@@ -177,7 +186,16 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    expect(tabs()).toEqual([
+      'Dashboard',
+      'Suivi',
+      'Entraîner',
+      'Créatrices',
+      'Équipe',
+      'Paie',
+      'Trafic',
+      'Moi',
+    ]);
     cleanup();
     const canal = renderApp(manager, '/entrainer/canal');
     await waitFor(() => {
