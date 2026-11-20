@@ -15,6 +15,10 @@ x-api-env: &api-env
   # Coolify's proxy, then the web container's nginx.
   TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-2}
   WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+  # Connections per process (ADR 0152 § 2): their sum over api and worker stays under the pooler's pool size.
+  DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+  DATABASE_SERVICE_POOL_MAX: ${DATABASE_SERVICE_POOL_MAX:-5}
+  RATE_LIMIT_POOL_MAX: ${RATE_LIMIT_POOL_MAX:-3}
   DATABASE_URL: ${DATABASE_URL:?}
   # The role the API and the worker cross creators with (ADR 0087): rows only, it owns nothing.
   DATABASE_SERVICE_URL: ${DATABASE_SERVICE_URL:?}
@@ -82,6 +86,9 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
     restart: unless-stopped
+    # ffmpeg runs here (ADR 0070): on a 2-vCPU server it may take one CPU at most, so the API stays responsive
+    # (ADR 0152 § 1).
+    cpus: ${WORKER_CPUS:-1}
     # A job in progress gets 25 s to finish after SIGTERM (operations.md).
     stop_grace_period: 30s
     healthcheck: { disable: true }

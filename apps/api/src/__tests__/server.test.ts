@@ -530,6 +530,25 @@ describe('loadConfig', () => {
     expect(testConfig({ IMPERA_INLINE_WORKER: '' }).IMPERA_INLINE_WORKER).toBe(false);
   });
 
+  it('sizes each database pool from its variable, the former sizes by default (ADR 0152 § 2)', () => {
+    const defaults = testConfig();
+    expect([
+      defaults.DATABASE_POOL_MAX,
+      defaults.DATABASE_SERVICE_POOL_MAX,
+      defaults.RATE_LIMIT_POOL_MAX,
+    ]).toEqual([10, 5, 3]);
+    const sized = testConfig({
+      DATABASE_POOL_MAX: '4',
+      DATABASE_SERVICE_POOL_MAX: '3',
+      RATE_LIMIT_POOL_MAX: '1',
+    });
+    expect([sized.DATABASE_POOL_MAX, sized.DATABASE_SERVICE_POOL_MAX, sized.RATE_LIMIT_POOL_MAX]).toEqual([
+      4, 3, 1,
+    ]);
+    expect(() => testConfig({ DATABASE_POOL_MAX: '0' })).toThrow(/DATABASE_POOL_MAX/);
+    expect(() => testConfig({ DATABASE_SERVICE_POOL_MAX: 'many' })).toThrow(/DATABASE_SERVICE_POOL_MAX/);
+  });
+
   describe('the invoices’ buckets (ADR 0037)', () => {
     /** A whole bucket, invented (ADR 0010): nothing here reaches a provider. */
     const bucket = (prefix: string, endpoint: string, name: string): NodeJS.ProcessEnv => ({

@@ -15,7 +15,8 @@ const SERVICE_ROLE = 'impera_service';
 
 /**
  * What the service role may do in the job queue's own schema: add, take and finish jobs, nothing on its structure,
- * and it only reads the queue's own list of migrations.
+ * and it only reads the queue's own list of migrations. Nobody else reaches it: not PUBLIC, so not the predefined
+ * roles of a managed host either (ADR 0152 § 2).
  * Said again at every run, since a new version of Graphile Worker may add a table or a function.
  */
 const JOB_QUEUE_GRANTS = sql.raw(`
@@ -24,6 +25,8 @@ const JOB_QUEUE_GRANTS = sql.raw(`
   grant usage, select on all sequences in schema graphile_worker to ${SERVICE_ROLE};
   grant execute on all functions in schema graphile_worker to ${SERVICE_ROLE};
   revoke insert, update, delete on graphile_worker.migrations from ${SERVICE_ROLE};
+  revoke all on schema graphile_worker from public;
+  revoke execute on all functions in schema graphile_worker from public;
 `);
 
 /**

@@ -73,6 +73,17 @@ const configSchema = z
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
     /** Jobs a worker runs at once; jobs of one conversation stay serial whatever this is (ADR 0006). */
     WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+    /**
+     * Connections each process may hold, pool by pool (ADR 0152 § 2). Behind Supabase's pooler in session mode every
+     * client connection holds a server one, so the sum over the API and the worker (plus `migrate` and `backup`) must
+     * stay under the pool size of the project's compute: the runbook writes that budget down. The defaults are the
+     * sizes used until now.
+     */
+    DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(10),
+    /** The service role's pool: `withAdmin` and the job queue, so the worker's Graphile Worker runs on it. */
+    DATABASE_SERVICE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
+    /** The rate limiter's own pool (ADR 0027 § 6), apart so a slow count never takes a connection of the modules. */
+    RATE_LIMIT_POOL_MAX: z.coerce.number().int().min(1).max(10).default(3),
     /** Development: run the worker inside the API process (`pnpm dev`). */
     IMPERA_INLINE_WORKER: flag,
     /**
