@@ -164,6 +164,14 @@ export function createPlaygroundRoutes(
       },
     );
 
+    // ADR 0103 § 16: he buys or refuses the paid step of a trial script, fictively; nothing reaches Reveal.
+    app.post('/playground/script/buy', { schema: { response: state } }, (request) =>
+      engineOf(request).buyScriptStep(),
+    );
+    app.post('/playground/script/refuse', { schema: { response: state } }, (request) =>
+      engineOf(request).refuseScriptStep(),
+    );
+
     // ADR 0103 § 6: the owner marks his desire score after one of his messages.
     app.post(
       '/playground/desire-marks',
