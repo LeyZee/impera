@@ -1,7 +1,7 @@
 # SEC-15 Durée d'une session selon le rôle : 48 h sans activité pour le propriétaire, 12 h pour les autres, 7 jours au plus
 Statut : in_progress
 Phase : exploitation
-Dépend de : ADR 0046, SEC-03
+Dépend de : ADR 0046, ADR 0160, SEC-03
 Branche : task/sec-session-length-by-role
 
 ## Objectif (1 phrase)
@@ -41,4 +41,4 @@ La session du propriétaire tient 48 heures sans activité, celle de tous les au
 
 - Better Auth prolonge la session (`updated_at` mis à maintenant) avant de la rendre : `sessionOf` seul verrait une session inactive depuis 13 h comme utilisée à l'instant. D'où le crochet `session.update.before`, qui lit la session que `getSession` vient de mettre dans son contexte (son `updated_at` d'avant, le rôle du compte), refuse la prolongation d'une session finie et la supprime ; Better Auth répond alors comme sans session (401 dans `auth.api.getSession`, `null` dans ses propres routes). Sans ce crochet, les options de connexion par clé d'accès, lues sans garde de notre part, prolongeraient une session finie. Comportement vérifié sur Better Auth 1.7.7 avec l'adaptateur mémoire.
 - Le cookie de session porte un `Max-Age` égal à `expiresIn`, posé à la connexion ; `sessionOf` passait par `auth.api.getSession` et jetait le `Set-Cookie` de la prolongation : le navigateur oubliait la session 12 h après la connexion, même utilisée. Le cookie est maintenant renouvelé par `requireRole` et `GET /v1/session`.
-- La durée de 48 h contredit le « 12 heures sans activité » de l'ADR 0046 § 6 pour le propriétaire ; l'ADR n'est pas modifiée (consigne), à acter par une ADR qui l'amende si Charles le veut.
+- La durée de 48 h amende le « 12 heures sans activité » de l'ADR 0046 § 6 pour le propriétaire : ADR 0160, proposée, à accepter par Charles.
