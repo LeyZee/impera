@@ -20,6 +20,7 @@ import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
 import { RequestsSection } from './requests/RequestsSection';
 import { ScriptsSection } from './scripts/ScriptsSection';
+import { ScriptsTab } from './scripts/prepared/ScriptsTab';
 import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
 
@@ -185,15 +186,23 @@ export function CreatorsPage({
       );
     }
     if (shown === 'scripts' && current !== undefined) {
+      // Two views (ADR 0149 § 1): her scripts in preparation and their editor, then what is to copy into Reveal, which
+      // ends on the screen that was here before (her vault and the scripts she sent).
       return (
-        <ScriptsSection
+        <ScriptsTab
           key={current.id}
           creatorId={current.id}
           creatorName={current.displayName}
-          timezone={current.timezone}
-          isOwner={isOwner}
-          folderId={folderId}
-          {...(onFolder === undefined ? {} : { onFolder })}
+          sent={
+            <ScriptsSection
+              creatorId={current.id}
+              creatorName={current.displayName}
+              timezone={current.timezone}
+              isOwner={isOwner}
+              folderId={folderId}
+              {...(onFolder === undefined ? {} : { onFolder })}
+            />
+          }
         />
       );
     }
