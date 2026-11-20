@@ -4,6 +4,16 @@ import { MISTRAL_FALLBACK_MODEL, type LlmConfig, type ModelRef, type ProviderCre
 export const EVALS_CAP_EUR = 6;
 
 /**
+ * The cap of one run: `--cap-eur` lowers it (the nightly CI passes 1.5 on a weekday and 4 on Sunday, OPS-21), never
+ * above `EVALS_CAP_EUR`. Absent, the run keeps the full cap; anything else than a number above 0 is refused.
+ */
+export function evalsCapOf(arg: string | undefined): number | null {
+  if (arg === undefined) return EVALS_CAP_EUR;
+  const cap = Number(arg.trim());
+  return arg.trim() !== '' && Number.isFinite(cap) && cap > 0 && cap <= EVALS_CAP_EUR ? cap : null;
+}
+
+/**
  * The judge's timeout in the evals: it scores nine criteria on a whole conversation and took 37 to 48 s on 11/11,
  * against 60 s (OPS-07). The evals only: the production roles keep their own.
  */

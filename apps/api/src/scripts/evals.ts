@@ -4,8 +4,9 @@
  * threshold (`evals/thresholds.json`). Nothing is sent. The persona is the fictional demo one (ADR 0010), or with
  * `--persona-from-crm` her active version read from the database, which stays on that machine (OPS-11).
  * Each scenario is drawn `--draws` times (3 by default) and fails if any draw fails (OPS-11).
- * Usage: `pnpm evals [--full] [--draws 3] [--file evals/adversarial/asks-if-bot.yaml] [--persona-from-crm
- * [--creator <id>]]` (the path from the repository root), with
+ * `--cap-eur` lowers the run's cap below `EVALS_CAP_EUR` (the nightly CI, OPS-21).
+ * Usage: `pnpm evals [--full] [--draws 3] [--cap-eur 1.5] [--file evals/adversarial/asks-if-bot.yaml]
+ * [--persona-from-crm [--creator <id>]]` (the path from the repository root), with
  * LLM_XAI_API_KEY in the environment, or `--key-from-crm`: the keys saved in Réglages › Modèles IA of the database
  * DATABASE_ADMIN_URL names, opened with CREDENTIALS_ENCRYPTION_KEYS (`readSavedProviderKeys`), kept in memory only.
  */
@@ -55,7 +56,7 @@ import { readSavedProviderKeys } from '../modules/providers/index';
 import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
-import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
+import { EVALS_CAP_EUR, evalsCapOf, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { scriptsInputOf } from './evals/scripts-input';
 import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
@@ -77,6 +78,7 @@ const { values } = parseArgs({
     'persona-from-crm': { type: 'boolean', default: false },
     creator: { type: 'string' },
     draws: { type: 'string', default: String(DEFAULT_DRAWS) },
+    'cap-eur': { type: 'string' },
   },
 });
 const drawsArg = z.coerce.number().int().min(1).max(5).safeParse(values.draws);
@@ -85,6 +87,11 @@ if (!drawsArg.success) {
   process.exit(1);
 }
 const draws = drawsArg.data;
+const capEur = evalsCapOf(values['cap-eur']);
+if (capEur === null) {
+  console.error(`evals --cap-eur : un montant en euros au-dessus de 0, ${String(EVALS_CAP_EUR)} au plus.`);
+  process.exit(1);
+}
 
 /** The admin database named in `.env`, on a connection that cannot write. */
 function readOnlyAdmin(flag: string, needsSealing: boolean): ReturnType<typeof createDbClient> {
@@ -210,7 +217,7 @@ const gateway = createLlmGateway({
   resolveModel: createModelResolver(credentials),
   log: createInMemoryCallLog(),
   // Its own cap: an eval run never eats into the fans' day, and stops at a few euros.
-  dailyCapEur: () => EVALS_CAP_EUR,
+  dailyCapEur: () => capEur,
 });
 console.log(
   `Juge : ${config.roles.judge.provider} ${config.roles.judge.model}` +
@@ -490,9 +497,12 @@ for (const path of files) {
 
 if (isCapReached) {
   console.error(
-    `\nevals : plafond de ${String(EVALS_CAP_EUR)} € atteint, suite arrêtée après ${String(results.length)} scénarios.`,
+    `\nevals : plafond de ${String(capEur)} € atteint, suite arrêtée après ${String(results.length)} scénarios.`,
   );
 }
+console.log(
+  `\nDépensé : ${gateway.health().budget.spentEur.toFixed(2)} € sur ${String(capEur)} € de plafond.`,
+);
 const report = judgeSuite(results, values.file === undefined ? tier : { ...tier, min_scenarios: 1 }, minima);
 const means = Object.entries(report.means);
 if (means.length > 0)

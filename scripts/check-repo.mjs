@@ -8,8 +8,8 @@
 //  4. No forbidden file names (*.bak, *.orig, *.copy, *-v2.*, *_final*, tmp/, old/): docs/conventions/hygiene.md.
 //  5. Every TODO/FIXME in code carries a task card id: `TODO(P2-03): ...` (docs/conventions/coding.md).
 //  6. Every `pnpm <script>` cited in the docs exists in the root package.json.
-//  7. The nightly-evals CI job still runs `pnpm probe` and `pnpm evals`, skipped only without the xAI key: removing
-//     the quality gate is an error.
+//  7. The nightly-evals CI job still runs `pnpm probe` and `pnpm evals`, skipped only without the xAI key or by its
+//     plan on a night the AI did not change (never on Sunday): removing the quality gate is an error.
 //  8. Every root script that delegates with `pnpm --filter <package> [run] <script>` reaches a package of the
 //     workspace that has that script, and every `tsx <file>` of a package script names a file that exists.
 //  9. The session journal is one file per session: docs/sessions/log/<date>-<slug>.md whose first line starts
@@ -228,8 +228,12 @@ if (!stagedOnly) {
   const rest = start === -1 ? '' : ci.slice(start + 1);
   const next = rest.slice(1).search(/\n {2}[a-z][\w-]*:/);
   const nightly = next === -1 ? rest : rest.slice(0, next + 1);
-  for (const command of ['pnpm probe', 'pnpm evals']) {
-    if (!new RegExp(`^ +- run: ${command}[ \\t]*$`, 'm').test(nightly))
+  // `pnpm evals` takes the draws and the cap of the night's plan (OPS-21), nothing else.
+  for (const [command, pattern] of [
+    ['pnpm probe', 'pnpm probe'],
+    ['pnpm evals', 'pnpm evals( -- --draws "\\$DRAWS" --cap-eur "\\$CAP")?'],
+  ]) {
+    if (!new RegExp(`^ +- run: ${pattern}[ \\t]*$`, 'm').test(nightly))
       errors.push(
         `.github/workflows/ci.yml: the nightly-evals job must run \`${command}\` (docs/playbooks/write-an-eval.md)`,
       );
@@ -238,8 +242,9 @@ if (!stagedOnly) {
     errors.push(
       '.github/workflows/ci.yml: the nightly-evals job must fail when the evals fail (no continue-on-error)',
     );
-  // The evals are skipped only when the xAI key is absent (« nightly vert », 06/11): the key read once from the secret,
-  // at the job's level, and no other condition on the job or its steps.
+  // The evals are skipped only when the xAI key is absent (« nightly vert », 06/11), or by the night's plan when the
+  // AI did not change since the day before (OPS-21, 20/11): the key read once from the secret, at the job's level, the
+  // plan's own output, and no other condition on the job or its steps.
   const keys = [...nightly.matchAll(/^\s*HAS_XAI_KEY:\s*(.*?)\s*$/gm)];
   if (
     keys.length !== 1 ||
@@ -252,17 +257,23 @@ if (!stagedOnly) {
     "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
     "env.HAS_XAI_KEY == 'true'",
     "env.HAS_XAI_KEY != 'true'",
+    "steps.plan.outputs.run == 'true'",
   ]);
+  // The plan skips a quiet weekday only: on Sunday, and when started by hand, the whole pass always runs.
+  if (!nightly.includes('if [ "$EVENT" = workflow_dispatch ] || [ "$(date -u +%u)" = 7 ]; then'))
+    errors.push(
+      '.github/workflows/ci.yml: the nightly-evals plan must run the whole pass on Sunday and by hand (OPS-21)',
+    );
   for (const [, condition] of nightly.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
     if (!allowed.has(condition ?? ''))
       errors.push(
         `.github/workflows/ci.yml: the nightly-evals job skips its evals only without the xAI key, not on \`${condition ?? ''}\``,
       );
-  // `pnpm probe` and `pnpm evals` run whenever the key is there: no condition but the key's own.
+  // `pnpm probe` and `pnpm evals` run whenever the key is there and the plan says so: no other condition.
   for (const step of nightly.split(/^(?= {6}- )/m))
-    if (/^ +(?:- )?run: pnpm (?:probe|evals)[ \t]*$/m.test(step))
+    if (/^ +(?:- )?run: pnpm (?:probe|evals)\b/m.test(step))
       for (const [, condition] of step.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
-        if (condition !== "env.HAS_XAI_KEY == 'true'")
+        if (condition !== "env.HAS_XAI_KEY == 'true'" && condition !== "steps.plan.outputs.run == 'true'")
           errors.push(
             `.github/workflows/ci.yml: the nightly-evals job runs \`pnpm probe\` and \`pnpm evals\` whenever the xAI key is set, not on \`${condition ?? ''}\``,
           );
