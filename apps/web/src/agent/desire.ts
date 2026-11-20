@@ -30,6 +30,7 @@ export const DESIRE_SIGNAL_LABELS: Readonly<Record<DesireSignal, string>> = {
   free_now: 'il a du temps',
   someone_nearby: 'quelqu’un à côté de lui',
   leaving_soon: 'il doit partir',
+  says_goodnight: 'il dit bonne nuit',
   'intent:flirt': 'il flirte',
   'intent:sexting': 'sexto',
   'intent:asks_for_media': 'il demande un média',

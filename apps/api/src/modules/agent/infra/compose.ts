@@ -342,6 +342,23 @@ const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
 const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
+/**
+ * He says goodbye (ADR 0158 § A): goodnight, or he has to go. She answers with a goodbye, one bubble, in her
+ * own way: no question that would keep him, nothing to sell. Her next follow-up waits (`farewellNotBefore`).
+ */
+const FAREWELL_HINTS = {
+  says_goodnight:
+    'il va se coucher : elle lui souhaite bonne nuit à sa façon, en une seule bulle, tendre ou taquine, sans question ni rien proposer',
+  away: 'il doit y aller : elle le laisse filer à sa façon, en une seule bulle, sans question ni rien proposer, contente de le retrouver plus tard',
+} as const;
+
+function farewellOf(signals: readonly string[] | undefined): keyof typeof FAREWELL_HINTS | null {
+  const read = signals ?? [];
+  if (read.includes('says_goodnight')) return 'says_goodnight';
+  // « Je suis au boulot » while he keeps writing is no goodbye: `busy_now` only spaces her follow-up.
+  return read.includes('leaving_soon') ? 'away' : null;
+}
+
 /** He asks how to pay for her step waiting (ADR 0156 § 4): she helps him plainly, the price in the voice's block. */
 const PAYMENT_HELP_HINT =
   'il veut ouvrir ce qu’elle lui a envoyé et ne sait pas comment : elle l’aide simplement et gentiment, avec le prix exact du bloc, sans le presser ni rien proposer d’autre';
@@ -876,18 +893,24 @@ export async function composeTurn(
     trap.replyBrief !== undefined
       ? undefined
       : waitingStepOf(scripts, input.scripts.catalogue, input.scripts.latest?.scriptRef ?? null);
-  const voiceBrief: Brief = asking
-    ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
-    : {
-        ...answered,
-        toneHints: [
-          ...answered.toneHints,
-          ...paced,
-          ...(reminds ? [UNOPENED_STEP_HINT] : []),
-          ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
-          ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
-        ],
-      };
+  // He leaves: a goodbye, unless she brings or helps him open a step (his own words then lead).
+  const farewell =
+    scriptStep === undefined && waitingStep === undefined ? farewellOf(brief?.desireSignals) : null;
+  const voiceBrief: Brief =
+    farewell !== null
+      ? { ...answered, toneHints: [...answered.toneHints, FAREWELL_HINTS[farewell]] }
+      : asking
+        ? { ...answered, toneHints: [...answered.toneHints, ASK_AVAILABILITY_HINT] }
+        : {
+            ...answered,
+            toneHints: [
+              ...answered.toneHints,
+              ...paced,
+              ...(reminds ? [UNOPENED_STEP_HINT] : []),
+              ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
+              ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
+            ],
+          };
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}
@@ -920,7 +943,7 @@ export async function composeTurn(
       isSkipped: true,
     };
   }
-  const budget = bubbleBudget(input.history);
+  const budget = farewell === null ? bubbleBudget(input.history) : 1;
   const voiceInput: VoiceInput = {
     ...base,
     brief: voiceBrief,

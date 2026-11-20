@@ -46,6 +46,7 @@ export const DESIRE_BRAIN_SIGNALS = [
   'free_now',
   'someone_nearby',
   'leaving_soon',
+  'says_goodnight',
 ] as const;
 
 /**

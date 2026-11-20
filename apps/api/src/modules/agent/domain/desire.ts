@@ -45,6 +45,8 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   free_now: 6,
   someone_nearby: -30,
   leaving_soon: -25,
+  // He goes to sleep (ADR 0158 § A): the evening is over.
+  says_goodnight: -30,
   // From the brief.
   'intent:flirt': 6,
   'intent:sexting': 12,

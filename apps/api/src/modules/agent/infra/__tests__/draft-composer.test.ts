@@ -2269,6 +2269,26 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(bare.kind === 'held' ? bare.detail : []).toContain('media_not_sent');
   });
 
+  it('says goodbye in one bubble when he says goodnight or leaves, never when he is only at work (ADR 0158 § A)', async () => {
+    const goodbye = async (signals: Brief['desireSignals']) => {
+      const { draftComposer, seen } = composer({ brief: { ...BRIEF, desireSignals: signals } });
+      await draftComposer.compose(INPUT);
+      const voice = seen.voiceInputs?.[0];
+      return { max: voice?.maxBubbles, hints: voice?.brief.toneHints ?? [] };
+    };
+    const night = await goodbye(['says_goodnight']);
+    expect(night.max).toBe(1);
+    expect(night.hints.some((hint) => hint.includes('bonne nuit') && hint.includes('sans question'))).toBe(
+      true,
+    );
+    const leaving = await goodbye(['leaving_soon']);
+    expect(leaving.max).toBe(1);
+    expect(leaving.hints.some((hint) => hint.includes('le laisse filer'))).toBe(true);
+    // « Je suis au boulot » while he keeps writing: she chats on.
+    const busy = await goodbye(['busy_now']);
+    expect(busy.hints.some((hint) => hint.includes('une seule bulle'))).toBe(false);
+  });
+
   it('sends no step in the care mode, hot, free and at her threshold: the care brief only (ADR 0088 § 2)', async () => {
     const { draftComposer, seen } = composer(
       { brief: HOT, voice: { bubbles: ['Je suis là pour toi 🤍'] } },
