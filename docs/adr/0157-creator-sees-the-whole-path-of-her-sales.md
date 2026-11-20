@@ -39,6 +39,7 @@ Sur sa carte de décision, Charles a choisi « Tout le chemin de ses ventes » p
 ### 3. Ses ventes une à une
 
 - Chaque vente de la période montre ce que le fan a payé et sa part.
+- Le fan y est nommé par le nom affiché de sa fiche chez elle, comme dans le reste de son espace, et seulement quand cette fiche est à elle ; jamais par l'identifiant de la plateforme.
 - D'un geste, elle déplie le chemin de cette vente : TVA, Reveal, agence, elle.
 - Un remboursement montre ce qu'il retire, et à quelle vente il se rattache.
 - L'ADR 0054 § 4 est amendé : la part de l'agence constatée **sur ses propres ventes** lui est montrée, dans « Ta part ». La part constatée par compte sur 30 jours et par quinzaine, son alerte d'écart et le pourcentage convenu restent au propriétaire seul, dans la fiche de la créatrice.
