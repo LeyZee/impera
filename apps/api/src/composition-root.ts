@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
 import { JOB_PAYLOADS } from '@impera/contracts';
-import { createDbClient, type Database, type DbClient } from '@impera/db';
+import { createDbClient, withAdmin, type Database, type DbClient } from '@impera/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import type { Task, TaskList } from 'graphile-worker';
@@ -30,6 +30,7 @@ import type { Logger } from './logger';
 import type { AccountingModule } from './modules/accounting';
 import type { AgentModule } from './modules/agent';
 import type { AlertsModule } from './modules/alerts';
+import { createAlertRouter } from './modules/alerts';
 import type { BackupsModule } from './modules/backups';
 import type {
   AvatarPorts,
@@ -535,6 +536,32 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...scripts.tasks,
     ...creatorTasks.tasks,
     ...trends.tasks,
+    // ADR 0150 lot 2: each alert of a creator's tab, to the roles it reaches; nothing while push is off.
+    'alerts.route': defineTask(
+      'alerts.route',
+      JOB_PAYLOADS['alerts.route'],
+      logger,
+      async (_payload, context) => {
+        const notify = notifications.module.notify;
+        if (notify === null) {
+          context.logger.warn('alerts: push is off, the alerts reach Telegram and the history only');
+          return;
+        }
+        const route = createAlertRouter({
+          adminDb: adminDb.db,
+          agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+          onShift: (creatorId, at) => scheduling.module.onShift(creatorId, at),
+          notify,
+          onLinesUnread: (creatorId, error) => {
+            context.logger.error({ err: error, creatorId }, 'alerts: her choices unread, the defaults apply');
+          },
+          onFailure: (step, error) => {
+            context.logger.error({ err: error, step }, 'alerts: a step failed, the others went on');
+          },
+        });
+        context.logger.info({ asked: await route(new Date()) }, 'alerts: routed');
+      },
+    ),
     'rate_limit.purge': defineTask(
       'rate_limit.purge',
       JOB_PAYLOADS['rate_limit.purge'],

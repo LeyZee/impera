@@ -387,6 +387,20 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .map(toStoredEvent)
           .flatMap(({ body }) => (body.type === 'alert_triggered' ? [body.payload.trigger] : []));
       },
+      async scriptsExhaustedSaid(conversationId) {
+        const [last] = await tx
+          .select({ type: schema.conversationEvents.type })
+          .from(schema.conversationEvents)
+          .where(
+            and(
+              eq(schema.conversationEvents.conversationId, conversationId),
+              inArray(schema.conversationEvents.type, ['scripts_exhausted', 'script_started']),
+            ),
+          )
+          .orderBy(sql`${schema.conversationEvents.seq} desc`)
+          .limit(1);
+        return last?.type === 'scripts_exhausted';
+      },
       async salesState(conversationId) {
         const rows = await tx
           .select()

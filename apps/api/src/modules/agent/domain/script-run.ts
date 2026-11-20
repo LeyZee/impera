@@ -381,7 +381,15 @@ export interface NextScriptStepInput {
 }
 
 type NoScriptReason =
-  OfferBlock | 'held' | 'no_history' | 'no_script' | 'no_pick' | 'cold_session' | 'price_mismatch';
+  | OfferBlock
+  | 'held'
+  | 'no_history'
+  | 'no_script'
+  /** Her catalogue has scripts and none is left for him now (ADR 0150 § 9): the team adds one. */
+  | 'scripts_exhausted'
+  | 'no_pick'
+  | 'cold_session'
+  | 'price_mismatch';
 
 export type ScriptStepDecision =
   | { readonly kind: 'none'; readonly reason: NoScriptReason }
@@ -480,7 +488,10 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
   }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   const permitted = permittedScripts(input.catalogue, { moment: input.moment, history });
-  if (permitted.length === 0) return { kind: 'none', reason: 'no_script' };
+  if (permitted.length === 0) {
+    // Only where a script would open now (gate open, desire at the threshold, no pause): ADR 0150 § 9.
+    return { kind: 'none', reason: input.catalogue.length === 0 ? 'no_script' : 'scripts_exhausted' };
+  }
   // The brain picks the one that fits him; the code checks it is one of them, or nothing opens (fail closed).
   const script = permitted.find((candidate) => candidate.scriptRef === input.brainPick);
   if (script === undefined) return { kind: 'none', reason: 'no_pick' };

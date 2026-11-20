@@ -261,6 +261,11 @@ interface EventWriter {
   /** What set off each `alert_triggered` after `since` (all of them when null), in `seq` order (P4-01). */
   alertsSince(conversationId: ConversationId, since: Date | null): Promise<readonly AlertTrigger[]>;
   /**
+   * Whether the team already knows no script is left for him (ADR 0150 § 9): a `scripts_exhausted` with no
+   * `script_started` since. The episode lives in his journal, never in memory.
+   */
+  scriptsExhaustedSaid(conversationId: ConversationId): Promise<boolean>;
+  /**
    * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
    * `takeover_started` since), and the replies of her objection bank he already received.
    */
@@ -701,6 +706,8 @@ export type ComposeResult =
       readonly alerts?: readonly ComposedAlert[];
       /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
       readonly customOrderOpened?: true;
+      /** A script would open for him and none is left: one `scripts_exhausted` per episode (ADR 0150 § 9). */
+      readonly scriptsExhausted?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;
@@ -727,6 +734,7 @@ export type ComposeResult =
       readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
       readonly customOrderOpened?: true;
+      readonly scriptsExhausted?: true;
       /** His run moved by his message and Reveal only: no step goes without a draft. */
       readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
       readonly care?: ComposedCare;

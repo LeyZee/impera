@@ -2735,6 +2735,10 @@
   gap: 14px;
   font-variant-numeric: tabular-nums;
 }
+.nv-tip__aside {
+  margin: 6px 0 0;
+  color: var(--nv-ink-faint);
+}
 .nv-tip__row > span {
   white-space: nowrap;
 }

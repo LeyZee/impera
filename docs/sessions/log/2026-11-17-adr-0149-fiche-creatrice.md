@@ -1,0 +1,4 @@
+# 2026-11-17 — ADR 0149 Fiche créatrice en sept onglets — accepted
+Fait : comparaison de la fiche créatrice avec la fiche modèle d'un outil concurrent décrite par Charles ; proposition d'une fiche en sept onglets (Persona, IA, Médias, Scripts, Agenda, Alertes, Compte) et retrait de la section Scripts de l'ADR 0134 ; distinction Alertes (agence) et Notifications (la créatrice) ; choix de Charles le 17/11 ; ADR 0149 rédigée, sans code.
+Reste : lots au fil Design (rail et barre de sous-onglets unique ; fiche en sept onglets et redirections ; Réglages) ; VaultPage (Médias), onglet IA (ADR 0148), éditeur de scripts (ADR 0112), alertes par créatrice et notifications de la créatrice dans leurs fils.
+Découvertes : l'éditeur de scripts à branches n'a aucun écran ; les barres de sous-onglets ne partagent pas de composant.

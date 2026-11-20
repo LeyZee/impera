@@ -77,9 +77,23 @@ describe('the rules of the panel', () => {
 });
 
 describe('Relier l’extension', () => {
+  // Recette du 16/11, EXT-02: the whole team links its extension, a chatter for his copilot gestures.
+  it('says what the link is for: the copilot for a chatter, the watch too for whom it is theirs', async () => {
+    serve({ 'GET ': [{ status: 200, body: { items: [] } }] });
+    render(<ExtensionLinksPanel watches={false} />);
+    expect(await screen.findByText('Aucun navigateur relié.')).toBeDefined();
+    expect(screen.getByText('Extension Impera')).toBeDefined();
+    const chatter = screen.getByText(/tes gestes du copilote comptent alors à ton nom/u).textContent;
+    expect(chatter).not.toContain('Instagram');
+    cleanup();
+    serve({ 'GET ': [{ status: 200, body: { items: [] } }] });
+    render(<ExtensionLinksPanel watches />);
+    expect(await screen.findByText(/relève les posts qui marchent/u)).toBeDefined();
+  });
+
   it('lists the linked browsers with when each last sent something', async () => {
     serve({ 'GET ': [{ status: 200, body: { items: [LINK_A, LINK_B] } }] });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     const list = await screen.findByRole('list', { name: 'Navigateurs reliés' });
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(2);
@@ -101,7 +115,7 @@ describe('Relier l’extension', () => {
         },
       ],
     });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     await screen.findByText('Aucun navigateur relié.');
     fireEvent.click(screen.getByRole('button', { name: 'Relier un navigateur' }));
     const field = screen.getByLabelText('Nom de ce navigateur');
@@ -122,7 +136,7 @@ describe('Relier l’extension', () => {
 
   it('says the three browsers are linked instead of offering a fourth', async () => {
     serve({ 'GET ': [{ status: 200, body: { items: [LINK_A, LINK_B, LINK_C] } }] });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     expect(await screen.findByText(/3 navigateurs sont reliés/u)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Relier un navigateur' })).toBeNull();
   });
@@ -132,7 +146,7 @@ describe('Relier l’extension', () => {
       'GET ': [{ status: 200, body: { items: [] } }],
       'POST ': [{ status: 409, body: apiError('extension_links_full_conflict') }],
     });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     fireEvent.click(await screen.findByRole('button', { name: 'Relier un navigateur' }));
     fireEvent.click(screen.getByRole('button', { name: 'Relier' }));
     expect(
@@ -152,7 +166,7 @@ describe('Relier l’extension', () => {
       ],
       'POST /v1/auth/reauthenticate': [{ status: 200, body: {} }],
     });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     fireEvent.click(await screen.findByRole('button', { name: 'Relier un navigateur' }));
     fireEvent.click(screen.getByRole('button', { name: 'Relier' }));
     expect(
@@ -185,7 +199,7 @@ describe('Relier l’extension', () => {
       ],
       [`DELETE /${LINK_A.id}`]: [{ status: 204 }],
     });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     const list = await screen.findByRole('list', { name: 'Navigateurs reliés' });
     const first = within(list).getAllByRole('listitem')[0];
     if (first === undefined) throw new Error('row expected');
@@ -208,7 +222,7 @@ describe('Relier l’extension', () => {
 
   it('says when the links cannot be read', async () => {
     serve({ 'GET ': [{ status: 500 }] });
-    render(<ExtensionLinksPanel />);
+    render(<ExtensionLinksPanel watches />);
     expect((await screen.findByRole('alert')).textContent).toBe(
       'Le serveur ne répond pas. Réessaie dans un instant.',
     );

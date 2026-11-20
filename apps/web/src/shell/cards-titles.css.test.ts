@@ -318,7 +318,10 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
     expect(found).toEqual([]);
   });
 
-  /** Instrument Serif: the empty states, a spoken line, the trophy's reveal and the name on its stage. */
+  /**
+   * Instrument Serif: the empty states, a spoken line, the trophy's reveal and the name on its stage. A member's rank
+   * on their file is that same name, said once (lot « fiche-jeu-hierarchie-2 », validated 16/11).
+   */
   const SERIF_KEPT: ReadonlySet<string> = new Set([
     '.nv-calm',
     '.nv-empty__title',
@@ -329,6 +332,7 @@ describe('section titles (T5: COH-05, GES-07, CRE-10, CRE-14, CHA-07, ETA-22)', 
     '.ag-reel__quote',
     '.rw-reveal__title',
     '.tc-hero__name',
+    '.rw-member__name',
   ]);
 
   it('keep Instrument Serif for the empty states, never for a title', () => {

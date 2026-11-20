@@ -1,4 +1,4 @@
-import { calendarDayAt, type Currency, type PayPeriod } from '@impera/contracts';
+import { calendarDayAt, type Currency, type PayPeriod, type PlatformAccountId } from '@impera/contracts';
 
 import { platformNetOfGross } from './commission-statements';
 import { mainCurrencyOf, type FigureLine } from './my-figures';
@@ -19,6 +19,7 @@ export interface TierReached {
  * the total validated in the currency declared, and what pay takes off a gross on that account for that period.
  */
 export interface ValidatedShift {
+  readonly platformAccountId: PlatformAccountId;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly period: PayPeriod;
@@ -30,21 +31,30 @@ export interface ValidatedShift {
 
 /**
  * The validated shifts as lines of the game's net (ADR 0118): each on the day its shift began (§ 2), at the net pay's
- * chain gives its total, in the currency declared. A shift with a sale read in its hours is left to the sales (§ 3):
- * nothing is counted twice. A total of zero or less brings no line.
+ * chain gives its total, in the currency declared. A shift with a sale read in its hours on its own account is left to
+ * the sales (§ 3): nothing is counted twice. A sale read on another account says nothing of this shift, so it leaves
+ * the report its line. A total of zero or less brings no line.
  */
 export function reportLines(shifts: readonly ValidatedShift[], lines: readonly FigureLine[]): FigureLine[] {
-  const read = lines.flatMap((line) => (line.occurredAt === null ? [] : [line.occurredAt.getTime()]));
+  const read = new Map<PlatformAccountId, number[]>();
+  for (const line of lines) {
+    if (line.occurredAt === null) continue;
+    read.set(line.platformAccountId, [
+      ...(read.get(line.platformAccountId) ?? []),
+      line.occurredAt.getTime(),
+    ]);
+  }
   return shifts.flatMap((shift) => {
     const from = shift.startsAt.getTime();
     const to = shift.endsAt.getTime();
-    if (read.some((at) => at >= from && at < to)) return [];
+    if ((read.get(shift.platformAccountId) ?? []).some((at) => at >= from && at < to)) return [];
     const netMinor = platformNetOfGross(shift);
     return netMinor <= 0
       ? []
       : [
           {
             period: shift.period,
+            platformAccountId: shift.platformAccountId,
             event: 'sale' as const,
             currency: shift.currency,
             netMinor,

@@ -55,6 +55,7 @@ export const JOB_NAMES = [
   'rewards.evaluate_creator',
   'ai_usage.check_credits',
   'notifications.recap',
+  'alerts.route',
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
@@ -136,6 +137,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'rewards.evaluate_creator': 'Gains de la créatrice après son geste',
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
+  'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
@@ -283,6 +285,11 @@ export const JOB_PAYLOADS = {
   'ai_usage.check_credits': z.object({}),
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
+  /**
+   * Each minute (crontab, ADR 0150 lot 2): the alerts of the outbox's recent window, to the roles each creator's tab
+   * chooses. Re-reading the window is harmless: a notification is once per account, reason and event.
+   */
+  'alerts.route': z.object({}),
   /**
    * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
    * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
@@ -606,6 +613,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Each hour: the next run is the retry; an alert is published once per episode.
   'ai_usage.check_credits': 1,
   'notifications.recap': 3,
+  // The next minute re-reads the window: one try is enough.
+  'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
   // Replayable: told once per task and start (`notification_deliveries`).

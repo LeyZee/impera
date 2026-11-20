@@ -6,6 +6,7 @@ import {
   UserIdSchema,
   type Currency,
   type PayPeriod,
+  type PlatformAccountId,
   type TeamMemberId,
   type UserId,
 } from '@impera/contracts';
@@ -26,6 +27,7 @@ const { rewardGains, rewardLevelSettings, rewardStreaks, teamMembers } = schema;
  * carries it from one door to the other.
  */
 interface ValidatedShift {
+  readonly platformAccountId: PlatformAccountId;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly period: PayPeriod;
@@ -79,6 +81,7 @@ async function gainsAndStreakOf(
       scopeKey: rewardGains.scopeKey,
       earnedAt: rewardGains.earnedAt,
       revealedAt: rewardGains.revealedAt,
+      basisMinor: rewardGains.basisMinor,
     })
     .from(rewardGains)
     .where(and(eq(rewardGains.userId, userId), holds))

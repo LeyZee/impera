@@ -1,6 +1,7 @@
 import '@impera/design-system/styles.css';
 import './popup.css';
 
+import type { PlatformAccountId } from '@impera/contracts';
 import { browser } from 'wxt/browser';
 
 import {
@@ -8,25 +9,27 @@ import {
   DEFAULT_CRM_ADDRESS,
   isGrantedAtInstall,
   permissionPatternOf,
+  shortAddress,
 } from '../../lib/crm-address';
-import { ADDRESS_KEY, storedOrigin } from '../../lib/crm-origin-store';
+import { ADDRESS_KEY, savedOrigin } from '../../lib/crm-origin-store';
 import { readCrmSession } from '../../lib/session';
 import { placeOf } from '../../lib/tab';
 import {
   LinkSavedSchema,
+  LinkStateSchema,
   MarkableCreatorsSchema,
   MarkedSchema,
   RevealAccountsSchema,
+  RevealReadSchema,
   RevealSyncedSchema,
   WatchStatusSchema,
   type FromPopup,
   type MarkableCreators,
-  type RevealSynced,
 } from '../../lib/watch/protocol';
 import { INSTAGRAM_PATTERN } from '../../lib/watch/watch-script';
-import { kindOf, watchesInstagram } from '../../lib/who';
+import { awayOf, kindOf, watchesInstagram } from '../../lib/who';
 
-import type { SyncView } from './reveal-view';
+import type { Confirm, CopilotView, LinkState, SyncOutcome, SyncView } from './reveal-view';
 import { accountPathOf, render, type Actions, type Screen } from './view';
 import type { WatchNotice, WatchView } from './watch-view';
 
@@ -49,6 +52,8 @@ const root = document.getElementById('app');
 if (root === null) throw new Error('popup: #app is missing');
 
 let origin = DEFAULT_CRM_ADDRESS;
+/** No address was ever saved: the welcome stays until one is (EXT-07). */
+let welcome = false;
 let screen: Screen = { kind: 'loading' };
 let previous: Screen = screen;
 
@@ -59,7 +64,12 @@ function show(next: Screen): void {
   render(
     root,
     screen,
-    { origin, version: browser.runtime.getManifest().version, hour: new Date().getHours() },
+    {
+      origin,
+      version: browser.runtime.getManifest().version,
+      hour: new Date().getHours(),
+      dev: import.meta.env.DEV,
+    },
     actions,
   );
 }
@@ -139,53 +149,131 @@ async function beginWatch(): Promise<WatchNotice | null> {
   return started ? null : { tone: 'amber', text: 'La veille ne démarre que sur un onglet instagram.com.' };
 }
 
-/* ---- The owner's « Sync » of the Reveal session (P2-01): the service worker reads, sends and forgets it. ---- */
+/* ---- The copilot's « Relier » (EXT-02): one link per extension, held by the service worker. ---- */
 
-let syncNotice: WatchNotice | null = null;
-let syncDraft = '';
+let copilotDraft = '';
+let copilotNotice: WatchNotice | null = null;
+
+async function linkStateNow(): Promise<LinkState> {
+  const parsed = LinkStateSchema.safeParse(await ask({ type: 'popup/link-state' }));
+  return parsed.success ? parsed.data.link : 'unknown';
+}
+
+async function copilotViewFor(): Promise<CopilotView> {
+  return { link: await linkStateNow(), draft: copilotDraft, notice: copilotNotice, busy };
+}
+
+/* ---- The owner's « Sync » of the Reveal session (P2-01): the service worker reads, holds, sends, forgets it. ---- */
+
+let syncOutcome: SyncOutcome | null = null;
+let syncPending: SyncView['pending'] = null;
+let syncConfirm: Confirm | null = null;
+/** The service worker forgets a session read after a minute: the confirmation goes with it. */
+let confirmTimer: ReturnType<typeof setTimeout> | undefined;
+const CONFIRM_MS = 60_000;
 
 async function syncViewFor(): Promise<SyncView> {
   const parsed = RevealAccountsSchema.safeParse(await ask({ type: 'popup/reveal-accounts' }));
   return {
     accounts: parsed.success ? parsed.data : { state: 'unreachable', accounts: [] },
-    notice: syncNotice,
-    busy,
-    draft: syncDraft,
+    outcome: syncOutcome,
+    pending: syncPending,
+    confirm: syncConfirm,
     now: new Date(),
+    crm: shortAddress(origin),
   };
 }
 
-async function redrawSync(): Promise<void> {
-  if (screen.kind !== 'signed_in' || screen.sync === null) return;
-  const sync = await syncViewFor();
+/** Draws the Reveal cards again as the service worker sees them now. */
+async function redrawReveal(): Promise<void> {
+  if (screen.kind !== 'signed_in' || screen.copilot === null) return;
+  const copilot = await copilotViewFor();
+  const sync = screen.sync === null ? null : await syncViewFor();
   const now = currentScreen();
-  if (now.kind === 'signed_in') show({ ...now, sync });
+  if (now.kind === 'signed_in') show({ ...now, copilot, sync });
 }
 
-async function syncGesture(run: () => Promise<WatchNotice | null>): Promise<void> {
-  busy = true;
-  syncNotice = null;
+/** Draws the session card at once, with what is known, while the service worker works. */
+function drawSync(): void {
   const now = currentScreen();
   if (now.kind === 'signed_in' && now.sync !== null)
-    show({ ...now, sync: { ...now.sync, busy: true, notice: null } });
-  syncNotice = await run().catch(() => ({ tone: 'amber' as const, text: 'Ça n’a pas marché : réessaie.' }));
-  busy = false;
-  await redrawSync();
+    show({
+      ...now,
+      sync: {
+        ...now.sync,
+        outcome: syncOutcome,
+        pending: syncPending,
+        confirm: syncConfirm,
+        now: new Date(),
+      },
+    });
 }
 
-const SYNC_NOTICES: Readonly<Record<Exclude<RevealSynced['state'], 'synced'>, string>> = {
-  'no-session': 'Aucune session lue : ouvre la messagerie de Reveal dans cet onglet, puis réessaie.',
-  unlinked: 'Relie d’abord l’extension avec le code de Sécurité.',
-  revoked: 'Cette liaison a été retirée dans le CRM : colle un nouveau code.',
-  'not-owner': 'Seul le propriétaire synchronise une session.',
-  'other-model': 'Cet onglet montre une autre créatrice que ce compte : ouvre la bonne dans Reveal.',
-  'other-member':
-    'Cet onglet est connecté avec un autre membre Reveal que le membre « bot » de ce compte : connecte-toi avec le membre « bot ».',
-  refused: 'Le CRM a refusé cette session : vérifie que l’onglet est bien connecté à Reveal.',
-  unreachable: 'Le CRM ne répond pas : réessaie dans un instant.',
-};
+function endConfirm(): void {
+  clearTimeout(confirmTimer);
+  syncConfirm = null;
+}
+
+/** Reads the session of the open tab for this account; the service worker holds it until the owner says. */
+async function readSession(accountId: PlatformAccountId): Promise<void> {
+  endConfirm();
+  syncOutcome = null;
+  syncPending = { accountId, phase: 'reading' };
+  drawSync();
+  const read =
+    tabId === undefined
+      ? null
+      : (RevealReadSchema.safeParse(await ask({ type: 'popup/reveal-read', tabId, accountId })).data ?? null);
+  syncPending = null;
+  // No answer here is the extension's own worker, never the CRM: reading the tab asks nothing of it.
+  if (read === null) syncOutcome = { kind: 'failed', accountId, failure: 'extension' };
+  else if (read.state !== 'held') syncOutcome = { kind: 'failed', accountId, failure: read.state };
+  else {
+    syncConfirm = { accountId, modelId: read.modelId, seen: read.seen };
+    confirmTimer = setTimeout(() => {
+      endConfirm();
+      syncOutcome = { kind: 'failed', accountId, failure: 'expired' };
+      drawSync();
+    }, CONFIRM_MS);
+  }
+  drawSync();
+}
+
+async function sendSession(): Promise<void> {
+  const confirm = syncConfirm;
+  if (confirm === null) return;
+  const { accountId } = confirm;
+  endConfirm();
+  syncPending = { accountId, phase: 'sending' };
+  drawSync();
+  const synced = RevealSyncedSchema.safeParse(await ask({ type: 'popup/reveal-send', accountId }));
+  syncPending = null;
+  // The worker answers « unreachable » itself when the CRM is silent; no answer at all is the worker's.
+  syncOutcome = !synced.success
+    ? { kind: 'failed', accountId, failure: 'extension' }
+    : synced.data.state === 'synced'
+      ? {
+          kind: 'synced',
+          accountId,
+          expiresAt: synced.data.expiresAt,
+          reconnectFirst: synced.data.reconnectFirst,
+          kept: synced.data.kept,
+        }
+      : { kind: 'failed', accountId, failure: synced.data.state };
+  await redrawReveal();
+}
+
+function cancelSession(): void {
+  endConfirm();
+  void ask({ type: 'popup/reveal-cancel' });
+  drawSync();
+}
 
 async function refresh(): Promise<void> {
+  if (welcome) {
+    show({ kind: 'address', draft: '', error: null, first: true });
+    return;
+  }
   show({ kind: 'loading' });
   if (!(await allowed(origin))) {
     show({ kind: 'permission' });
@@ -197,14 +285,18 @@ async function refresh(): Promise<void> {
     case 'signed_in': {
       const place = placeOf(tab.url, origin);
       const kind = kindOf(session.me);
-      // The watch is the owner's and the active managers' (ADR 0060 § 2): never a chatter's, nor a creator's here.
-      const watched = place === 'instagram' && watchesInstagram(kind);
-      // The « Sync » is the owner's alone (reveal-connector-spec.md § 2).
-      const syncs = place === 'reveal' && kind === 'owner';
+      // A member away from work has no copilot, no watch (EXT-10): the server refuses him anyway. The watch is the
+      // owner's alone (ADR 0024, amendement du 16/11); a manager on Instagram is shown no card, and no error.
+      const atWork = awayOf(session.me) === null;
+      const watched = atWork && place === 'instagram' && watchesInstagram(kind);
+      // The copilot is every member's but the creator's (EXT-09, ADR 0086 § 7); the « Sync » the owner's alone.
+      const copilot = atWork && place === 'reveal' && kind !== 'creator';
+      const syncs = copilot && kind === 'owner';
       show({
         kind: 'signed_in',
         me: session.me,
         place,
+        copilot: copilot ? await copilotViewFor() : null,
         watch: watched ? await watchViewFor() : null,
         sync: syncs ? await syncViewFor() : null,
       });
@@ -217,7 +309,9 @@ async function refresh(): Promise<void> {
       show({ kind: 'second_factor' });
       return;
     case 'server_down':
-      show({ kind: 'server_down' });
+    case 'not_crm':
+    case 'refused':
+      show({ kind: session.kind });
       return;
     case 'unreachable':
       show({ kind: 'unreachable' });
@@ -248,11 +342,13 @@ function saveAddress(value: string): void {
     show({
       kind: 'address',
       draft: value,
-      error: 'Une adresse en https, ou localhost sur ce PC (exemple : crm.exemple.fr).',
+      error: 'Une adresse en https, comme crm.exemple.fr.',
+      first: welcome,
     });
     return;
   }
   origin = next;
+  welcome = false;
   // Stored first, without waiting: the permission request must stay inside the click (user gesture).
   void browser.storage.local.set({ [ADDRESS_KEY]: next });
   if (isGrantedAtInstall(next)) {
@@ -308,7 +404,7 @@ const actions: Actions = {
       .then(() => refresh());
   },
   editAddress: () => {
-    show({ kind: 'address', draft: origin.replace(/^https?:\/\//u, ''), error: null });
+    show({ kind: 'address', draft: origin.replace(/^https?:\/\//u, ''), error: null, first: false });
   },
   saveAddress,
   resetAddress: () => {
@@ -361,32 +457,33 @@ const actions: Actions = {
       if (screen.kind === 'signed_in') void openCrm(accountPathOf(screen.me));
     },
   },
-  sync: {
+  copilot: {
     link: (code) => {
-      syncDraft = code;
-      void syncGesture(async () => {
+      copilotDraft = code;
+      void (async () => {
+        busy = true;
+        copilotNotice = null;
+        await redrawReveal();
         const saved = LinkSavedSchema.safeParse(await ask({ type: 'popup/link', token: code }));
-        if (!saved.success) return { tone: 'amber', text: LINK_NOTICES.unreachable };
-        if (saved.data.state !== 'linked') return { tone: 'amber', text: LINK_NOTICES[saved.data.state] };
-        syncDraft = '';
-        return { tone: 'quiet', text: 'Extension reliée : tu peux synchroniser.' };
-      });
+        copilotNotice = !saved.success
+          ? { tone: 'amber', text: LINK_NOTICES.unreachable }
+          : saved.data.state !== 'linked'
+            ? { tone: 'amber', text: LINK_NOTICES[saved.data.state] }
+            : { tone: 'quiet', text: 'Extension reliée : tes gestes du copilote comptent à ton nom.' };
+        if (saved.data?.state === 'linked') copilotDraft = '';
+        busy = false;
+        await redrawReveal();
+      })();
     },
-    sync: (accountId) => {
-      void syncGesture(async () => {
-        if (tabId === undefined) return { tone: 'amber', text: SYNC_NOTICES['no-session'] };
-        const synced = RevealSyncedSchema.safeParse(
-          await ask({ type: 'popup/reveal-sync', tabId, accountId }),
-        );
-        if (!synced.success) return { tone: 'amber', text: SYNC_NOTICES.unreachable };
-        if (synced.data.state === 'synced') return { tone: 'quiet', text: 'Session envoyée au CRM.' };
-        return { tone: 'amber', text: SYNC_NOTICES[synced.data.state] };
-      });
-    },
-    retry: () => void redrawSync(),
     openSecurity: () => {
       if (screen.kind === 'signed_in') void openCrm(accountPathOf(screen.me));
     },
+  },
+  sync: {
+    sync: (accountId) => void readSession(accountId),
+    send: () => void sendSession(),
+    cancel: cancelSession,
+    retry: () => void redrawReveal(),
   },
 };
 
@@ -395,7 +492,11 @@ setInterval(() => {
   if (!busy) void redrawWatch();
 }, 15_000);
 
-void storedOrigin().then((stored) => {
-  origin = stored;
+// The popup's port to the service worker: closing the popup closes it, and a session read and not sent is forgotten.
+browser.runtime.connect({ name: 'popup' });
+
+void savedOrigin().then((saved) => {
+  welcome = saved === null;
+  origin = saved ?? DEFAULT_CRM_ADDRESS;
   return refresh();
 });

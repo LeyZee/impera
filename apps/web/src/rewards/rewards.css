@@ -160,7 +160,8 @@
 }
 .rw-reveal__object {
   position: relative;
-  width: min(248px, 60vw);
+  /* Larger on a computer, where the stage is wide (Design, 16/11). */
+  width: clamp(min(248px, 60vw), 26vw, 340px);
   aspect-ratio: 1;
   margin-bottom: 18px;
   perspective: 900px;
@@ -227,10 +228,9 @@
 }
 .rw-reveal__kicker {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: #f0c46a;
   animation: rw-rise 450ms ease-out 500ms both;
 }
@@ -357,10 +357,197 @@
     width: 0;
   }
 }
+
+/*
+ * A rank is forged, not turned over (Charles, 16/11): the cold medallion, embers drawn into its heart, a flash as it
+ * lights at 900 ms (`FORGE_STRIKE` in forge-sound.ts), its fire rising, then the reveal's light and words, a beat
+ * later than for a medal. Settled within 2.5 s. Transform and opacity only.
+ */
+/* The forge's colours, named once: fixed like the gold of an earned object. */
+.rw-reveal {
+  --rw-forge-heat: #ffd27a;
+  --rw-forge-fire: #ff6a3a;
+  --rw-forge-spark: #fff4cc;
+  --rw-forge-gold: #ffc25a;
+  --rw-forge-trail: rgb(255 110 60 / 0.5);
+  --rw-forge-white: #fff;
+  --rw-forge-glare: rgb(255 200 96 / 0.75);
+}
+.rw-forge__cold,
+.rw-forge__core,
+.rw-forge__ember,
+.rw-forge__flash {
+  opacity: 0;
+  pointer-events: none;
+}
+.rw-reveal__art.rw-forge__cold {
+  animation: rw-forge-cold 1050ms ease-out both;
+}
+.rw-forge__core {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--rw-forge-heat) 0, var(--rw-forge-fire) 30%, transparent 68%);
+  animation: rw-forge-core 500ms ease-in 380ms both;
+}
+.rw-forge__ember {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* A head and a short trail: the head leads towards the heart. */
+  width: calc(var(--_s) * 4);
+  height: var(--_s);
+  margin: calc(var(--_s) / -2) 0 0 calc(var(--_s) / -2);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--rw-forge-spark) 0,
+    var(--rw-forge-gold) 22%,
+    var(--rw-forge-trail) 45%,
+    transparent 100%
+  );
+  transform-origin: calc(var(--_s) / 2) 50%;
+  filter: drop-shadow(0 0 6px var(--rw-forge-fire));
+  animation: rw-forge-ember 420ms cubic-bezier(0.55, 0, 1, 0.45) var(--_d) both;
+}
+.rw-forge__flash {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--rw-forge-white) 0,
+    var(--rw-forge-spark) 16%,
+    var(--rw-forge-glare) 34%,
+    transparent 60%
+  );
+  mix-blend-mode: screen;
+  animation: rw-forge-flash 120ms ease-out 880ms forwards;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__art:not(.rw-forge__cold) {
+  animation: rw-forge-lit 700ms var(--nv-ease-out) 850ms both;
+}
+.rw-reveal[data-forge='true'] .rw-level__fire {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: rw-forge-fire 650ms cubic-bezier(0.2, 1.3, 0.4, 1) 880ms both;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__halo {
+  animation-duration: 1500ms;
+  animation-delay: 950ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__rays {
+  animation-duration: 1500ms;
+  animation-delay: 950ms;
+}
+/* Hidden until their turn: the ring and the sparks start from full light, which must not wait on screen. */
+.rw-reveal[data-forge='true'] .rw-reveal__ring,
+.rw-reveal[data-forge='true'] .rw-reveal__spark {
+  animation-fill-mode: forwards;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__ring {
+  animation-delay: 1050ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__ring[data-late='true'] {
+  animation-delay: 1190ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__spark {
+  animation-delay: calc(var(--_d) + 850ms);
+}
+.rw-reveal[data-forge='true'] .rw-reveal__kicker {
+  animation-delay: 1350ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__title {
+  animation-delay: 1470ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__rule {
+  animation-delay: 1650ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__text {
+  animation-delay: 1770ms;
+}
+.rw-reveal[data-forge='true'] .rw-reveal__chip,
+.rw-reveal[data-forge='true'] .rw-reveal__close {
+  animation-delay: 1950ms;
+}
+@keyframes rw-forge-cold {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes rw-forge-core {
+  0% {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  85% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+@keyframes rw-forge-ember {
+  0% {
+    opacity: 0;
+    transform: translate(var(--_x), var(--_y)) rotate(var(--_a)) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(var(--_a)) scale(0.8);
+  }
+}
+@keyframes rw-forge-flash {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+@keyframes rw-forge-lit {
+  0% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  15% {
+    opacity: 1;
+  }
+}
+@keyframes rw-forge-fire {
+  0% {
+    transform: scale(0.3, 0.1);
+  }
+}
+/* « Réduire les animations »: the settled picture after a short fade, nothing moves (Design, 16/11). */
 @media (prefers-reduced-motion: reduce) {
-  .rw-reveal,
-  .rw-reveal * {
+  .rw-reveal *,
+  .rw-reveal[data-forge='true'] * {
     animation: none !important;
+  }
+  .rw-reveal {
+    animation: rw-fade 150ms ease-out both !important;
   }
 }
 
@@ -580,54 +767,99 @@
 
 /* ───────────── Jeu, sur la fiche d'un membre (ADR 0104 § 20) ───────────── */
 
-.rw-member__facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--nv-space-3);
-  margin: var(--nv-space-3) 0;
-}
-/* On a phone three facts do not fit side by side: one under the other, none left alone on its line. */
-@media (max-width: 480px) {
-  .rw-member__facts {
-    grid-template-columns: 1fr;
-  }
-}
-.rw-member__facts dt {
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.rw-member__facts dd {
-  margin: 2px 0 0;
-  font-weight: 600;
-  color: var(--nv-ink);
-}
+/* The member's game on their file: the rank first and large, two figures side by side, the trophies last. */
 .rw-member__rank {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--nv-space-3);
+  margin: var(--nv-space-3) 0;
 }
-.rw-member__trophies {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nv-space-2) var(--nv-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--nv-text-callout);
-  color: var(--nv-ink);
-}
-.rw-member__trophies li {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
+.rw-member__eyebrow,
+.rw-member__facts dt,
 .rw-member__label {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
+.rw-member__name {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-size: var(--nv-text-title-1);
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-member__name[data-none='true'] {
+  font-family: inherit;
+  font-size: var(--nv-text-body);
+  font-weight: 400;
+  line-height: inherit;
+  color: var(--nv-ink-muted);
+}
+.rw-member__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+  margin: 0 0 var(--nv-space-4);
+}
+.rw-member__facts > div {
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+.rw-member__facts dd {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+.rw-member__figure {
+  font-size: var(--nv-text-title-2);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--nv-ink);
+}
+.rw-member__figure[data-zero='true'] {
+  font-weight: 400;
+  color: var(--nv-ink-muted);
+}
+.rw-member__unit {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.rw-member__best {
+  display: block;
+}
+.rw-member__label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--nv-space-2);
+}
+.rw-member__trophies {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--nv-space-3) var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink);
+}
+.rw-member__trophies li {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .rw-member__trophies {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .rw-member__none {
   margin: 0;
+}
+.rw-member__foot {
+  margin: var(--nv-space-4) 0 0;
 }
 
 /* A creator's streak medal (ADR 0107 § 1): her days engraved in Arabic numerals, heavier than a trophy's digits. */
