@@ -64,7 +64,9 @@ describe('Propriétaires in Sécurité (ADR 0096)', () => {
     expect(remainingText('2026-11-23T10:00:00.000Z', now)).toBe('dans\u00a072\u00a0h');
     expect(remainingText('2026-11-20T10:40:00.000Z', now)).toBe('dans\u00a040\u00a0min');
     expect(remainingText('2026-11-20T09:00:00.000Z', now)).toBe('d’un instant à l’autre');
-    expect(effectiveText('2026-11-23T10:00:00.000Z')).toMatch(/^\p{L}+ 23 novembre à \d{2}:\d{2}$/u);
+    expect(effectiveText('2026-11-23T10:00:00.000Z')).toMatch(
+      /^\p{L}+ 23 novembre à \d{2}\u00a0h\u00a0\d{2}$/u,
+    );
   });
 
   it('makes a member the second owner, said back first, and names why another cannot be yet', async () => {
@@ -127,6 +129,9 @@ describe('Propriétaires in Sécurité (ADR 0096)', () => {
     const waiting = screen.getByRole('group', { name: 'Retrait en attente' });
     expect(waiting.textContent).toContain('Tu as demandé le retrait de Marc');
     expect(within(waiting).queryByRole('button', { name: 'Annuler le retrait' })).toBeNull();
+    // Who asked cannot take it back, and reads so; the owner it is about is marked in the list.
+    expect(waiting.textContent).toContain('tu ne peux pas revenir sur ta demande');
+    expect(screen.getByRole('list', { name: 'Propriétaires' }).textContent).toContain('retrait demandé');
     expect(screen.queryByRole('button', { name: 'Demander le retrait de Marc' })).toBeNull();
   });
 

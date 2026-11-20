@@ -545,7 +545,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       logger,
       async (_payload, context) => {
         const removals = await applyOwnerRemovalsUnscoped(adminDb.db);
-        if (removals.applied > 0 || removals.kept > 0) {
+        if (removals.applied > 0 || removals.lapsed > 0) {
           context.logger.warn(removals, 'owners: removals past their notice');
         }
         const notify = notifications.module.notify;

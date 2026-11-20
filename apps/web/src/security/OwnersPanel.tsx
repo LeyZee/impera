@@ -124,8 +124,8 @@ export function OwnersPanel(): JSX.Element {
             ) : (
               <p className="text-sm">
                 Tu as demandé le retrait de {nameOf(removal.targetUserId)}. Il prend effet{' '}
-                {effectiveText(removal.effectiveAt)} ({remainingText(removal.effectiveAt, new Date())}), sauf
-                s’il l’annule d’ici là.
+                {effectiveText(removal.effectiveAt)} ({remainingText(removal.effectiveAt, new Date())}). Lui
+                seul peut l’annuler d’ici là : tu ne peux pas revenir sur ta demande.
               </p>
             )}
             {removal.targetUserId !== you.userId || step?.act === 'cancel' ? null : (
@@ -156,6 +156,7 @@ export function OwnersPanel(): JSX.Element {
                 owner={owner}
                 index={index}
                 canRemove={!owner.you && removal === null}
+                removalAsked={removal?.targetUserId === owner.userId}
                 step={step}
                 confirming={confirming}
                 busy={busy}
@@ -219,7 +220,7 @@ export function OwnersPanel(): JSX.Element {
             )}
             <button
               type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm self-start"
+              className="nv-btn nv-btn--soft nv-btn--sm self-start"
               disabled={busy}
               onClick={() => {
                 setChoosing(false);
@@ -253,6 +254,7 @@ function OwnerRow({
   owner,
   index,
   canRemove,
+  removalAsked,
   step,
   confirming,
   busy,
@@ -260,7 +262,13 @@ function OwnerRow({
   onAsk,
   onRun,
   onClose,
-}: RowProps & { readonly owner: Owner; readonly index: number; readonly canRemove: boolean }): JSX.Element {
+}: RowProps & {
+  readonly owner: Owner;
+  readonly index: number;
+  readonly canRemove: boolean;
+  /** A removal of this owner waits for its notice: said beside the name, in the grey of « toi ». */
+  readonly removalAsked: boolean;
+}): JSX.Element {
   const mine = step?.act === 'remove' && step.userId === owner.userId ? step : null;
   return (
     <li className="nv-enter flex flex-col gap-3 py-3 first:pt-0" style={{ '--nv-i': index + 1 }}>
@@ -269,6 +277,9 @@ function OwnerRow({
           <span className="flex flex-wrap items-baseline gap-x-2 font-semibold">
             {owner.name}
             {owner.you ? <span className="text-sm font-normal text-[var(--nv-ink-muted)]">toi</span> : null}
+            {removalAsked ? (
+              <span className="text-sm font-normal text-[var(--nv-ink-muted)]">retrait demandé</span>
+            ) : null}
           </span>
           {/* Only what is worth saying: a code not active yet, keys that exist. */}
           <span className={`${MUTED} empty:hidden`}>
@@ -319,7 +330,7 @@ function OwnerRow({
             </button>
             <button
               type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
+              className="nv-btn nv-btn--soft nv-btn--sm"
               disabled={busy}
               onClick={onClose}
             >
@@ -391,7 +402,7 @@ function CandidateRow({
             </button>
             <button
               type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
+              className="nv-btn nv-btn--soft nv-btn--sm"
               disabled={busy}
               onClick={onClose}
             >

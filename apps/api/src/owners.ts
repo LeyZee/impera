@@ -357,7 +357,7 @@ function cancelOwnerRemoval(adminDb: Database, gesture: Gesture): Promise<void> 
 export function applyOwnerRemovalsUnscoped(
   adminDb: Database,
   at: Date = new Date(),
-): Promise<{ readonly applied: number; readonly kept: number }> {
+): Promise<{ readonly applied: number; readonly lapsed: number }> {
   return withAdmin(adminDb, async (tx) => {
     await lockOwners(tx);
     const due = await tx
@@ -366,13 +366,25 @@ export function applyOwnerRemovalsUnscoped(
       .where(and(waiting, sql`${schema.ownerRemovals.effectiveAt} <= ${at.toISOString()}::timestamptz`))
       .orderBy(schema.ownerRemovals.requestedAt);
     let applied = 0;
-    let kept = 0;
+    let lapsed = 0;
     for (const removal of due) {
       const owners = await ownerIds(tx);
       const stillOwner = owners.includes(removal.targetUserId);
       // Whoever asked must still be an owner when the notice ends: a removal never outlives the role that asked it.
+      // Closed rather than left waiting: a removal nobody can apply would block every later one of the same account.
       if (stillOwner && (owners.length < 2 || !owners.includes(removal.requestedBy))) {
-        kept += 1;
+        await tx
+          .update(schema.ownerRemovals)
+          .set({ cancelledAt: at })
+          .where(eq(schema.ownerRemovals.id, removal.id));
+        await audit(tx, {
+          userId: removal.requestedBy,
+          action: 'owner.removal_cancelled',
+          entityId: removal.targetUserId,
+          ip: null,
+          details: { removalId: removal.id, requestedBy: removal.requestedBy, via: 'owner:lapsed' },
+        });
+        lapsed += 1;
         continue;
       }
       await tx
@@ -414,7 +426,7 @@ export function applyOwnerRemovalsUnscoped(
         at,
       );
     }
-    return { applied, kept };
+    return { applied, lapsed };
   });
 }
 

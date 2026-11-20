@@ -80,12 +80,12 @@ export const CANDIDATE_REFUSALS: Readonly<Record<OwnerCandidateRefusal, string>>
   removal_pending: 'Un retrait attend la fin de son préavis',
 };
 
-/** « dimanche 23 novembre à 14:05 », in the reader's own zone: when a removal takes effect. */
+/** « dimanche 23 novembre à 14 h 05 », in the reader's own zone: when a removal takes effect. */
 export function effectiveText(at: string): string {
   const date = new Date(at);
   const day = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-  const time = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  return `${day} à ${time}`;
+  const two = (n: number): string => String(n).padStart(2, '0');
+  return `${day} à ${two(date.getHours())}\u00a0h\u00a0${two(date.getMinutes())}`;
 }
 
 /** « dans 71 h », « dans 40 min », « d’un instant à l’autre »: what is left of the notice. */

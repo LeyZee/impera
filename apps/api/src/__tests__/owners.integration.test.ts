@@ -238,7 +238,7 @@ describe('the owners (ADR 0096)', () => {
     // Before its notice ends, the job changes nothing, however often it runs.
     expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, new Date(start + 71 * HOUR_MS))).toEqual({
       applied: 0,
-      kept: 0,
+      lapsed: 0,
     });
     expect(await roleOf(b.userId)).toBe('owner');
 
@@ -250,7 +250,7 @@ describe('the owners (ADR 0096)', () => {
     // Cancelled, it is never applied, even long after.
     expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, new Date(start + 100 * HOUR_MS))).toEqual({
       applied: 0,
-      kept: 0,
+      lapsed: 0,
     });
     expect(await roleOf(b.userId)).toBe('owner');
 
@@ -258,8 +258,8 @@ describe('the owners (ADR 0096)', () => {
     const again = await request('POST', `/v1/settings/security/owners/${b.userId}/removal`, a.cookie);
     expect(again.statusCode, again.body).toBe(200);
     const due = new Date(Date.now() + 72 * HOUR_MS + 1000);
-    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 1, kept: 0 });
-    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 0, kept: 0 });
+    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 1, lapsed: 0 });
+    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 0, lapsed: 0 });
     expect(await roleOf(b.userId)).toBe('operator');
     expect(await roleOf(a.userId)).toBe('owner');
     // His sessions are closed; signed in again, he is a member of the team as before.
@@ -310,8 +310,16 @@ describe('the owners (ADR 0096)', () => {
     // Whoever asked is no longer an owner when the notice ends (the server's command): the other stays.
     await test.admin.db.update(schema.user).set({ role: 'operator' }).where(eq(schema.user.id, a.userId));
     const due = new Date(Date.now() + 73 * HOUR_MS);
-    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 0, kept: 1 });
+    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 0, lapsed: 1 });
     expect(await roleOf(b.userId)).toBe('owner');
+    // It is closed, not left waiting: nothing blocks a later removal, and the job has nothing more to read.
+    expect((await ownersOf(b.cookie)).removal).toBeNull();
+    expect(await applyOwnerRemovalsUnscoped(app.adminDb.db, due)).toEqual({ applied: 0, lapsed: 0 });
+    // An owner again, a removal can be asked anew: the rest reads a row that waits.
+    await test.admin.db.update(schema.user).set({ role: 'owner' }).where(eq(schema.user.id, a.userId));
+    expect(
+      (await request('POST', `/v1/settings/security/owners/${a.userId}/removal`, b.cookie)).statusCode,
+    ).toBe(200);
 
     // A row that would take effect sooner cannot be written, whatever the code; nor one applied before its notice.
     const shorter = app.adminDb.db.insert(schema.ownerRemovals).values({
