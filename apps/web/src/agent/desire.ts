@@ -45,6 +45,8 @@ export const DESIRE_SIGNAL_LABELS: Readonly<Record<DesireSignal, string>> = {
   minor_suspected: 'remise à zéro : mineur possible',
   age_disputed: 'remise à zéro : âge douteux',
   frozen: 'figée : vente arrêtée sur ce message',
+  rest_new: 'retour au calme après l’orgasme (nouveau fan)',
+  rest_client: 'retour au calme après l’orgasme (client)',
 };
 
 /** « il ramène vers l’intime, réponse longue, emoji suggestif ×2 »: a repeated code counts once per time. */

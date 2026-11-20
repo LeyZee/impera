@@ -72,6 +72,9 @@ export const DESIRE_SIGNALS = [
   'minor_suspected',
   'age_disputed',
   'frozen',
+  // He came (he says so, or he just bought the last step of a script): back to his rest level (ADR 0156 § 6).
+  'rest_new',
+  'rest_client',
 ] as const;
 export const DesireSignalSchema = z.enum(DESIRE_SIGNALS);
 export type DesireSignal = z.infer<typeof DesireSignalSchema>;

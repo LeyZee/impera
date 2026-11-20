@@ -33,8 +33,10 @@ import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
 import { checkNoCommitment, customOrderDecision, type CustomOrderDecision } from '../domain/custom-order';
 import {
   desireMoved,
+  desireRestOf,
   desireScore,
   NO_MEASURE,
+  restedDesire,
   type DesireMeasure,
   type DesireReading,
   type DesireState,
@@ -650,6 +652,7 @@ function desireOf(brief: Brief, input: ComposeTurnInput): DesireReading | undefi
     risks: brief.risks,
     ageDisputed: desire?.ageDisputed === true,
     now: input.situation.now,
+    hasBought: input.situation.spentCents > 0,
   });
 }
 
@@ -721,8 +724,8 @@ export async function composeTurn(
   // cursor decides from it, a trap's answer first.
   const ageDeclared = brief === undefined ? null : declaredAdultAge(brief.factsProposed, input.fanText);
   // His heat, counted by code from the brain's signals and what it measured (P3-12); read as stored once counted.
-  const desire = brief === undefined ? undefined : desireOf(brief, input);
-  const heat = desire?.score ?? desireNow(input.desire?.previous, input.situation.now);
+  const counted = brief === undefined ? undefined : desireOf(brief, input);
+  const heat = counted?.score ?? desireNow(input.desire?.previous, input.situation.now);
   const ageConfirmed = input.sexualization?.ageConfirmed === true || ageDeclared !== null;
   const noExplicit = input.sexualization?.noExplicit === true;
   const sexualization =
@@ -833,6 +836,13 @@ export async function composeTurn(
             sexualization?.kind !== 'steer_back',
         });
   const scriptStep = voiceStepOf(scripts);
+  // He just bought the last step of a script: whether he says so or not, he came, and his score comes back to his rest
+  // level (ADR 0156 § 6, Charles 20/11).
+  const boughtOut = [scripts?.moved, scripts?.followed].some(
+    (change) =>
+      change?.run.status === 'bought_out' && change.events.some((event) => event.type === 'script_ended'),
+  );
+  const desire = counted !== undefined && boughtOut ? restedDesire(counted, desireRestOf(true)) : counted;
   // The brain may suggest an offer, only the policy decides (CLAUDE.md rule 3): refused, she just answers. With her
   // scripts read, she offers only the step code decided.
   const offerRefused =
