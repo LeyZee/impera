@@ -659,6 +659,7 @@ describe('changing a member once added (EQ-10)', () => {
       endsAt: at(from + 6),
       templateId: null,
       stoppedAt: null,
+      checkedInAt: null,
     });
     // One under way, one tomorrow, one gone by and Basile's: two left on his name.
     const posted = serve({
@@ -885,6 +886,7 @@ describe('changing a member once added (EQ-10)', () => {
       endsAt: new Date(new Date(startsAt).getTime() + 6 * 3_600_000).toISOString(),
       templateId: null,
       stoppedAt: null,
+      checkedInAt: null,
     });
     const soon = (days: number): string => new Date(Date.now() + days * 86_400_000).toISOString();
     serve({

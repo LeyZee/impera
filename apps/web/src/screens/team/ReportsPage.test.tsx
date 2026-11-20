@@ -79,6 +79,7 @@ const shift = (n: number, memberId: string, day: number) => ({
   endsAt: `2026-10-${String(day)}T22:00:00.000Z`,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
 });
 const SHIFTS = [shift(1, THEO, 26), shift(2, BASILE, 26), shift(3, THEO, 25), shift(4, BASILE, 24)];
 

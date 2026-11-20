@@ -1,4 +1,5 @@
 import {
+  ApiErrorSchema,
   ConversationDetailSchema,
   ConversationSummarySchema,
   CreatorIdSchema,
@@ -8,6 +9,7 @@ import {
   newId,
   pageOf,
   PlatformAccountIdSchema,
+  ShiftCheckInSchema,
   ShiftIdSchema,
   TeamMemberIdSchema,
   TodosAcrossCreatorsSchema,
@@ -134,7 +136,7 @@ describe('access of a chatter during his shift (EQ-13)', () => {
     from: number,
     to: number,
     options: { creator?: typeof nora; cancelled?: boolean; stopped?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<string> {
     const creator = options.creator ?? nora;
     const accountId = newId(PlatformAccountIdSchema);
     await test.admin.db.insert(schema.platformAccounts).values({
@@ -145,8 +147,9 @@ describe('access of a chatter during his shift (EQ-13)', () => {
     });
     const base = Math.floor(Date.now() / MINUTE) * MINUTE;
     const endsAt = new Date(base + to * MINUTE);
+    const id = newId(ShiftIdSchema);
     await test.admin.db.insert(schema.shifts).values({
-      id: newId(ShiftIdSchema),
+      id,
       creatorId: creator.creatorId,
       platformAccountId: accountId,
       memberId: who.memberId,
@@ -157,6 +160,7 @@ describe('access of a chatter during his shift (EQ-13)', () => {
       createdBy: ownerId,
       updatedBy: ownerId,
     });
+    return id;
   }
 
   /** A chatter whose only shift is this one. */
@@ -328,6 +332,35 @@ describe('access of a chatter during his shift (EQ-13)', () => {
     } finally {
       ahead = 0;
     }
+  });
+
+  it('lets him take his own shift, once, and reads it back in his shifts; never another’s (EQ-12)', async () => {
+    const who = await member();
+    const colleague = await member();
+    const own = await shift(who, 5, 65);
+    const ahead = await shift(colleague, 120, 180);
+    const checkIn = (id: string, cookie: string) =>
+      call('POST', `/v1/scheduling/shifts/${id}/check-in`, cookie);
+    const code = (response: Awaited<ReturnType<typeof checkIn>>): unknown =>
+      ApiErrorSchema.parse(response.json()).error.code;
+
+    for (const cookie of [colleague.cookie, ownerCookie]) {
+      const refused = await checkIn(own, cookie);
+      expect(refused.statusCode).toBe(404);
+      expect(code(refused)).toBe('shift_not_found');
+    }
+    const first = await checkIn(own, who.cookie);
+    expect(first.statusCode).toBe(200);
+    const taken = ShiftCheckInSchema.parse(first.json());
+    expect(taken.shiftId).toBe(own);
+    const again = await checkIn(own, who.cookie);
+    expect(ShiftCheckInSchema.parse(again.json())).toEqual(taken);
+    const mine = MyShiftsSchema.parse((await call('GET', '/v1/scheduling/my-shifts', who.cookie)).json());
+    expect(mine.next?.checkedInAt).toBe(taken.checkedInAt);
+
+    const early = await checkIn(ahead, colleague.cookie);
+    expect(early.statusCode).toBe(409);
+    expect(code(early)).toBe('shift_check_in_early_conflict');
   });
 
   it('closes his window when it cannot be read, never answering an error', async () => {

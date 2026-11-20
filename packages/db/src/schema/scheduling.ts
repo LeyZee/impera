@@ -201,6 +201,11 @@ export const shifts = pgTable(
     cancelledAt: timestampTz('cancelled_at'),
     /** When a person stopped it under way: it ends at that minute, and the access window closes with it. */
     stoppedAt: timestampTz('stopped_at'),
+    /**
+     * When the member took it (« Je prends mon poste », EQ-12), or `null`. Written by `check_in_own_shift` alone
+     * (migration 0231), never by a column grant; cleared by the database when the shift changes member or start.
+     */
+    checkedInAt: timestampTz('checked_in_at'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),

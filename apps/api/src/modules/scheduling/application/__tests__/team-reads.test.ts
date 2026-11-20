@@ -51,6 +51,7 @@ const shift = (patch: Partial<StoredShift>): StoredShift => ({
   endsAt: new Date('2026-11-02T12:00:00Z'),
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
   ...patch,
 });
 

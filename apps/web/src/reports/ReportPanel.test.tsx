@@ -44,6 +44,7 @@ const shift = (shiftId: string, startsAt: string, endsAt: string) => ({
   endsAt,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
 });
 const ENDED = shift(SHIFT, '2026-10-27T18:00:00.000Z', '2026-10-27T23:55:00.000Z');
 const BEFORE = shift(OLDER, '2026-10-26T18:00:00.000Z', '2026-10-26T23:00:00.000Z');

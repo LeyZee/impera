@@ -33,6 +33,7 @@ export const toShiftDto = (shift: StoredShift): Shift => ({
   endsAt: shift.endsAt.toISOString(),
   templateId: shift.templateId,
   stoppedAt: shift.stoppedAt?.toISOString() ?? null,
+  checkedInAt: shift.checkedInAt?.toISOString() ?? null,
 });
 
 export const toPlanningMember = (member: NamedMember): PlanningMember => ({

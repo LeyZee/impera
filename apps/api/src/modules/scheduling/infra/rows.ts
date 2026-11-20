@@ -174,6 +174,7 @@ export const shiftColumns = {
   endsAt: shifts.endsAt,
   templateId: shifts.templateId,
   stoppedAt: shifts.stoppedAt,
+  checkedInAt: shifts.checkedInAt,
 };
 
 const StoredShiftSchema = z.object({
@@ -185,6 +186,7 @@ const StoredShiftSchema = z.object({
   endsAt: z.date(),
   templateId: ShiftTemplateIdSchema.nullable(),
   stoppedAt: z.date().nullable(),
+  checkedInAt: z.date().nullable(),
 });
 
 export const templateColumns = {

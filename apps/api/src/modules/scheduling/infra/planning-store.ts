@@ -89,6 +89,12 @@ import {
   toTemplate,
 } from './rows';
 
+/** One row of `check_in_own_shift`: the instant comes as text or a date depending on the driver's parsers. */
+const CheckInRowSchema = z.object({
+  outcome: z.enum(['checked_in', 'already', 'not_found', 'early', 'ended']),
+  taken_at: z.coerce.date().nullable(),
+});
+
 const {
   platformAccounts,
   schedulingSettings,
@@ -572,7 +578,7 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
           shift,
         );
         await audit(tx, actor, 'shift.create', { kind: 'shift', id: shift.id });
-        return { ...shift, templateId: null, stoppedAt: null };
+        return { ...shift, templateId: null, stoppedAt: null, checkedInAt: null };
       }),
 
     updateShift: async (actor, id, change, clock) => {
@@ -585,6 +591,20 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
         }
       }
     },
+
+    // The function holds the boundary (migration 0231): the session's account, his own shift, its window, its trace.
+    checkIn: (actor, id) =>
+      withMember(db, actor, async (tx) => {
+        const { rows } = await tx.execute(
+          sql`select outcome, taken_at from public.check_in_own_shift(${id}::uuid)`,
+        );
+        const answer = CheckInRowSchema.parse(rows[0]);
+        if (answer.outcome === 'checked_in' || answer.outcome === 'already') {
+          if (answer.taken_at === null) throw new Error('check-in without its instant');
+          return { kind: answer.outcome, at: answer.taken_at };
+        }
+        return { kind: answer.outcome };
+      }),
 
     cancelShift: (actor, id, clock) =>
       inCreatorOf(
