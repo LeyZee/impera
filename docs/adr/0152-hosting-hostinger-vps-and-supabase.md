@@ -1,6 +1,6 @@
 # 0152. Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs
 
-Statut : proposed
+Statut : accepted (Charles, 20/11/2026 12h55, heure de Paris, carte de décision, sur le texte relu par Bilan et Sécurité, e917a681)
 Date : 2026-11-20
 Remplace : l'ADR 0027 sur le lieu (le VPS Hetzner) et l'ADR 0005 sur la base de production (Neon). Le reste de ces deux ADR ne change pas.
 Précise : l'ADR 0028 (sauvegarde chiffrée), l'ADR 0037 (coffres des factures), l'ADR 0087 (trois rôles en base) et l'ADR 0067 (adresse du CRM intégrée à l'extension).
