@@ -1557,6 +1557,42 @@ describe('createDraftComposer, the sexualization cursor (P3-09)', () => {
     );
   });
 
+  it('takes an insistent compliment as one, and writes a brake on it again (Charles, 20/11)', async () => {
+    // « tu es trop belle !!! » read as a fan who says what he feels: still a flirt, welcomed.
+    const INSISTENT: Brief = {
+      ...BRIEF,
+      intent: 'flirt',
+      sentiment: 'aroused',
+      desireSignals: ['body_compliment', 'states_desire'],
+    };
+    const { draftComposer, seen } = composer(
+      {
+        brief: INSISTENT,
+        voice: { bubbles: ['Coucou toi ! Tu y vas un peu fort, non 😏'] },
+        voiceAfter: { bubbles: ['Je sais 😏 merci, c’est mignon'] },
+      },
+      undefined,
+      limitsOf({}).limits,
+      cursor,
+    );
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Je sais 😏 merci, c’est mignon'],
+    });
+    expect(written(seen)?.replyBrief).not.toContain('ralentit');
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('freinait');
+  });
+
+  it('lets her slow him down when the cursor steers him back', async () => {
+    const { draftComposer } = composer(
+      { brief: HOT, voice: { bubbles: ['Doucement toi 😅 tu fais quoi ce soir ?'] } },
+      undefined,
+      limitsOf({}).limits,
+      cursor,
+    );
+    expect((await draftComposer.compose(INPUT)).kind).toBe('draft');
+  });
+
   it('stays suggestive with a confirmed adult a human set to nothing explicit', async () => {
     const flags: FanFlags = { ...ADULT, noExplicit: true };
     const { draftComposer, seen } = composer(

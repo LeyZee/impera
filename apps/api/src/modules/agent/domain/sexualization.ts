@@ -1,5 +1,6 @@
 import { normalise } from '@impera/contracts';
 
+import type { GuardViolation } from './guards';
 import { safetySigns } from './safety-net';
 
 /**
@@ -221,4 +222,22 @@ export function declaredAdultAge(
     if (plainAge(text, years)) return years;
   }
   return null;
+}
+
+// A brake in her words: « tu y vas un peu fort », « doucement », « tu t'emballes », « on se calme », « pas si vite ».
+const BRAKE =
+  /\b(?:tu y vas|t'?y vas|tu vas|tu fonces)\b.{0,15}\b(?:fort|vite)\b|\b(?:trop|pas si|un peu|bien) vite\b|\bdoucement\b|\btu t'?emballes?\b|\bon se calme\b|\bcalme[- ]toi\b/u;
+
+/**
+ * She never slows down a fan who does not go there (Charles, 20/11): a compliment, even an insistent one, is welcomed,
+ * with a thank-you and a tease. Read when the cursor did not steer him back; blocking, so the voice writes it again.
+ */
+export function checkWelcome(bubbles: readonly string[]): GuardViolation[] {
+  const violations: GuardViolation[] = [];
+  bubbles.forEach((bubble, bubbleIndex) => {
+    const match = BRAKE.exec(normalise(bubble))?.[0];
+    if (match !== undefined)
+      violations.push({ code: 'unwarranted_brake', severity: 'blocking', bubbleIndex, match });
+  });
+  return violations;
 }
