@@ -30,12 +30,6 @@ interface ImportDeps {
   readonly source: PlatformScriptSource;
   /** Ties the scripts « prêt à copier » to the native scripts they became (ADR 0112 § 23). */
   readonly recognition: PreparedRecognitionStore;
-  /** Queues the identity of the scripts added or rewritten (SC-04 lot c8); the job decides whether to write one. */
-  readonly askIdentities: (
-    creatorId: CreatorId,
-    scriptIds: readonly string[],
-    correlationId: string,
-  ) => Promise<void>;
   /** Hears a recognition that failed, with its cause, for the log: the import stays written, the next one retries. */
   readonly onRecognitionFailed?: (error: unknown) => void;
 }
@@ -44,8 +38,8 @@ interface ImportDeps {
  * `scripts.import_platform_scripts` (ADR 0099 § 1 time 2, P6-01): one account's native scripts read from the platform
  * and mirrored, replayable. A script read for the first time is added; one changed on the platform, or back after it
  * was gone, is rewritten whole and active; one gone is deactivated, never deleted. A failed read throws and changes
- * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer. A script
- * added or rewritten has its identity asked again (SC-04 lot c8), after the import is written. A script « prêt à copier »
+ * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer. No identity
+ * is asked any more (ADR 0161 § 5): the agent reads ours on a recognised copy. A script « prêt à copier »
  * that a native script now matches in everything is then tied to it (ADR 0112 § 23).
  */
 export async function importPlatformScripts(
@@ -62,8 +56,7 @@ export async function importPlatformScripts(
   const listed = await deps.source(account);
   if (listed === null) return { outcome: 'skipped' };
   const plan = planPlatformScripts(await deps.store.known(account.id), listed);
-  const written = await deps.store.apply(account, plan, now);
-  if (written.length > 0) await deps.askIdentities(account.creatorId, written, request.correlationId);
+  await deps.store.apply(account, plan, now);
   // After the import is written, so that a script copied by hand since the last one is read first. A recognition that
   // fails (a tie written at the same moment by hand) never fails the import: the next one finds the script again.
   let recognised = 0;
