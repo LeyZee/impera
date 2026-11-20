@@ -754,15 +754,11 @@ describe('/v1/creator-space/content/script-drops', () => {
       });
     };
 
-    // Her switch off (§ 9): the brain is never called.
+    // No media described yet: the brain is never called.
     await summarize();
     expect(told).toEqual([]);
 
-    // On, a media not described yet: it waits.
-    await test.admin.db
-      .update(schema.creators)
-      .set({ settings: { describeDrops: true } })
-      .where(eq(schema.creators.id, nora));
+    // A media not described yet: it waits.
     for (const id of media.slice(0, 2)) await describe(id);
     await again();
     await summarize();
@@ -818,8 +814,7 @@ describe('/v1/creator-space/content/script-drops', () => {
     expect(written).toBeInstanceOf(Error);
   });
 
-  it('lets the owner alone turn her switch; turned on, what waits for a description is enqueued again (ADR 0083 § 2, § 9)', async () => {
-    const url = `/v1/creators/${nora}/drop-descriptions`;
+  it('asks again each hour what waits for a description, with no switch: the drop is the choice (ADR 0145 § 5)', async () => {
     const queued = async (task: string) => {
       const rows = await test.admin.db.execute(sql`
         select j.key from graphile_worker._private_jobs j
@@ -831,7 +826,7 @@ describe('/v1/creator-space/content/script-drops', () => {
         .map((row) => row.key ?? '')
         .sort();
     };
-    // The hourly run, for every creator whose switch is on.
+    // The hourly run, for every creator not archived.
     const hourly = () =>
       test.admin.db.execute(
         sql`select public.enqueue_job(task => 'content_drops.describe_backlog', payload => '{}'::jsonb)`,
@@ -842,31 +837,14 @@ describe('/v1/creator-space/content/script-drops', () => {
         taskList: { 'content_drops.describe_backlog': app.tasks['content_drops.describe_backlog'] },
       });
 
-    // Hers to read nowhere, the owner's alone.
-    expect((await call('GET', url, 'nora')).statusCode).toBe(403);
-    expect((await call('PUT', url, 'nora', { on: false })).statusCode).toBe(403);
-    expect((await call('GET', url, 'owner')).json()).toEqual({ on: true });
-    const missing = await call('GET', `/v1/creators/${newId(CreatorIdSchema)}/drop-descriptions`, 'owner');
-    expect([missing.statusCode, codeOf(missing.body).code]).toEqual([404, 'creator_not_found']);
+    // The switch and its route are gone (17/11): nothing to turn, by anyone.
+    const gone = await call('GET', `/v1/creators/${nora}/drop-descriptions`, 'owner');
+    expect(gone.statusCode).toBe(404);
+    expect(
+      (await call('PUT', `/v1/creators/${nora}/drop-descriptions`, 'owner', { on: false })).statusCode,
+    ).toBe(404);
 
-    // Off, then on again: audited each time; on, her backlog is asked at once.
-    expect((await call('PUT', url, 'owner', { on: false })).json()).toEqual({ on: false });
-    expect(await queued('content_drops.describe_backlog')).toEqual([]);
-    expect((await call('PUT', url, 'owner', { on: true })).json()).toEqual({ on: true });
-    expect((await call('PUT', url, 'owner', { on: true })).json()).toEqual({ on: true });
-    expect(await queued('content_drops.describe_backlog')).toEqual([
-      `content_drops.describe_backlog:${nora}`,
-    ]);
-    const audit = await test.admin.db
-      .select({ action: schema.auditLog.action })
-      .from(schema.auditLog)
-      .where(eq(schema.auditLog.entityId, nora))
-      .orderBy(schema.auditLog.createdAt);
-    expect(audit.map((row) => row.action)).toEqual([
-      'creator.describe_drops_off',
-      'creator.describe_drops_on',
-    ]);
-
+    await hourly();
     // Her media were described with another prompt than the gateway's of now: each one is asked again, once. Her
     // script told with the brain's prompt of now, after its last description, is left alone; the two others, never
     // told, are asked.

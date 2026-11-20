@@ -230,6 +230,12 @@ async function seedCreator(admin: Database, label: string) {
       reason: 'test',
       setBy: 'u',
     });
+    await tx.insert(s.agentHourExceptions).values({
+      id: newId(MessageIdSchema),
+      creatorId,
+      date: '2099-01-01',
+      ranges: [{ startMinute: 0, endMinute: 240 }],
+    });
   });
   return { creatorId, accountId, conversationId };
 }
@@ -256,6 +262,7 @@ const TENANT_TABLES = {
   notifications: s.notifications,
   creator_alert_routes: s.creatorAlertRoutes,
   kill_switches: s.killSwitches,
+  agent_hour_exceptions: s.agentHourExceptions,
 };
 
 describe('database (RLS, constraints, migrations)', () => {

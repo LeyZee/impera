@@ -293,8 +293,8 @@ async function rate(verdict: Verdict): Promise<void> {
   if (verdict.kind === 'corrected') session.replaceLastAnswer(verdict.text);
   const where = {
     voice_example: 'exemple de voix (repris à la prochaine session)',
-    rule: 'règle à valider par Charles, puis codée',
-    test: 'test rejoué à chaque changement (/tests)',
+    rule: 'règle gardée pour relecture, elle ne change rien seule',
+    test: 'test, à rejouer à la main (/tests)',
   } as const;
   console.log(dim(`  noté${destination === undefined ? '' : ` → ${where[destination]}`}`));
   console.log(`  ${statusLine()}`);
@@ -460,6 +460,7 @@ for (;;) {
       ),
       spentCents: preset.spentCents,
     });
+    session.confirmAge(preset.declaredAge === null ? null : session.situation.relationshipStartedAt);
     isRated = true;
     console.log(
       dim(`  ${preset.label} : teste ${preset.tests}. Idée de premier message : « ${preset.opening} »`),

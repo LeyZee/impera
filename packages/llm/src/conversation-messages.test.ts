@@ -23,6 +23,17 @@ describe('toMessages', () => {
     expect(messages[0]?.content).toBe('<fan_message>\ncoucou\n</fan_message>');
     expect(messages[1]).toEqual({ role: 'assistant', content: 'hello' });
   });
+
+  it('writes what his message is (an opener, a reply to a story) after the time, outside his block (ADR 0110)', () => {
+    const messages = toMessages([
+      { from: 'fan', text: 'coucou', timeNote: 'le lendemain', originNote: 'accroche toute faite' },
+      { from: 'creator', text: 'Bienvenue', originNote: 'bienvenue automatique' },
+    ]);
+    expect(messages[0]?.content).toBe(
+      '[le lendemain]\n[accroche toute faite]\n<fan_message>\ncoucou\n</fan_message>',
+    );
+    expect(messages[1]).toEqual({ role: 'assistant', content: 'Bienvenue' });
+  });
 });
 
 describe('describeBrief, the bubbles she may write', () => {

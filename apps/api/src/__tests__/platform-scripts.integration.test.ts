@@ -298,6 +298,15 @@ describe('the native scripts imported from the platform', () => {
 
   it('says where each media stands in the vault the sync left, and offers no script before its identity', async () => {
     const step = () => ownerView('sequence_1').then((view) => view?.steps[1]);
+    // Nothing of her vault is in the CRM before the owner ticks it (ADR 0145 § 5): the script says so.
+    expect((await ownerView('sequence_1'))?.gaps).toContain('media_not_imported');
+    expect((await step())?.media).toMatchObject([{ ref: 'media_02', inVault: true, imported: false }]);
+    // Every folder of her vault ticked whole, the root's included, as the owner does on the vault's screen.
+    await test.admin.db.execute(sql`
+      insert into vault_import_choices (id, creator_id, platform_account_id, scope, folder_ref, imported, chosen_by)
+      select gen_random_uuid(), r.creator_id, r.platform_account_id, 'folder', r.folder_ref, true, ${ids.owner}
+        from (select distinct creator_id, platform_account_id, folder_ref from media_platform_refs
+               where platform_account_id = ${noraAccount}) r`);
     // The preview of that step is gone from her vault since (the sync marks it removed, never deletes it).
     await test.admin.db
       .update(schema.mediaPlatformRefs)
@@ -310,10 +319,17 @@ describe('the native scripts imported from the platform', () => {
       );
     // Listed by the sync, its file not read yet; the preview no longer in her vault.
     expect((await step())?.media).toEqual([
-      { ref: 'media_02', kind: 'image', inVault: true, mediaAssetId: null, described: false },
+      { ref: 'media_02', kind: 'image', inVault: true, imported: true, mediaAssetId: null, described: false },
     ]);
     expect((await step())?.previewMedia).toEqual([
-      { ref: 'media_09', kind: 'video', inVault: false, mediaAssetId: null, described: false },
+      {
+        ref: 'media_09',
+        kind: 'video',
+        inVault: false,
+        imported: false,
+        mediaAssetId: null,
+        described: false,
+      },
     ]);
     expect((await step())?.complete).toBe(false);
     // Its file read and a description validated by a person: the link says so.
@@ -349,7 +365,7 @@ describe('the native scripts imported from the platform', () => {
         ),
       );
     expect((await step())?.media).toEqual([
-      { ref: 'media_02', kind: 'image', inVault: true, mediaAssetId: asset, described: true },
+      { ref: 'media_02', kind: 'image', inVault: true, imported: true, mediaAssetId: asset, described: true },
     ]);
     expect(await ownerView('sequence_1')).toMatchObject({
       gaps: ['media_absent', 'media_not_described', 'identity_not_validated'],
@@ -500,14 +516,6 @@ describe('the native scripts imported from the platform', () => {
       return scripts().jobs.identifyPlatformScript({ creatorId: nora, platformScriptId: view.id });
     });
 
-  const switchOn = (on: boolean) =>
-    test.admin.db
-      .update(schema.creators)
-      .set({
-        settings: sql`${schema.creators.settings} || jsonb_build_object('describeDrops', ${on}::boolean)`,
-      })
-      .where(eq(schema.creators.id, nora));
-
   const post = async (
     who: 'owner' | 'manager' | 'chatter' | 'nora',
     url: string,
@@ -521,10 +529,8 @@ describe('the native scripts imported from the platform', () => {
       payload,
     });
 
-  it('writes an identity once each photo and video of the script is described, under her switch, never a price', async () => {
+  it('writes an identity once each photo and video of the script is described, with no switch, never a price', async () => {
     // Sequence 4: a photo; a photo and a teaser video; a video and a teaser photo.
-    expect(await identify('sequence_4')).toBe('off');
-    await switchOn(true);
     expect(await identify('sequence_4')).toBe('waiting');
     for (const [ref, kind] of [
       ['media_10', 'image'],
@@ -688,9 +694,6 @@ describe('the native scripts imported from the platform', () => {
     expect(changed).toMatchObject({ proposable: true, identity: { author: 'human' } });
     const active = (await scriptRows()).filter((row) => row.active && row.creatorId === nora);
     expect(await scripts().jobs.identifyBacklog('test')).toBe(active.length);
-    await switchOn(false);
-    expect(await scripts().jobs.identifyBacklog('test')).toBe(0);
-    await switchOn(true);
   });
 
   it('keeps the branches of a step in one order, offered only once the agency set each condition (ADR 0112)', async () => {
