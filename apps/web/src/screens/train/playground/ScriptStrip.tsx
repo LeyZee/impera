@@ -66,7 +66,7 @@ export function ScriptStrip({
   creatorId,
 }: {
   scripts: PlaygroundState['scripts'];
-  /** Hers when one of her versions is played: the line leads to « Ses scripts dans Reveal ». */
+  /** Hers when one of her versions is played: the line leads to her Scripts tab. */
   creatorId: CreatorId | null;
 }): JSX.Element | null {
   const { run, unavailable, fictiveSpentCents } = scripts;
@@ -83,7 +83,7 @@ export function ScriptStrip({
               <>
                 {' '}
                 <Link to="/creatrices" search={creatorsSearch('scripts', creatorId)}>
-                  Ses scripts dans Reveal
+                  Ses scripts
                 </Link>
               </>
             )}

@@ -54,12 +54,12 @@ afterEach(() => {
 });
 
 describe('<ScriptStrip>, when none of her scripts can be played', () => {
-  it('says it in one short line and leads to « Ses scripts dans Reveal » (avis Design, groupes-medias-1)', async () => {
+  it('says it in one short line and leads to her scripts (avis Design, groupes-medias-1)', async () => {
     await show(unavailable('none_ready', 'Aucun de ses scripts n’est prêt'), MIA);
     expect(
       screen.getByText(/Aucun de ses scripts n’est prêt : les scripts d’essai jouent à la place\./),
     ).toBeTruthy();
-    const link = screen.getByRole('link', { name: 'Ses scripts dans Reveal' });
+    const link = screen.getByRole('link', { name: 'Ses scripts' });
     expect(link.getAttribute('href')).toContain('/creatrices');
     expect(link.getAttribute('href')).toContain(MIA);
   });
