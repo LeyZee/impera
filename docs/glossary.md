@@ -27,6 +27,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Juge | `judge` | Rôle LLM d'évaluation, jamais sur le chemin d'un vrai fan : évals, et retour aux recrues dans S'entraîner. |
 | Politique | `policy` | Règles déterministes en code appliquées entre le cerveau et la voix. |
 | Gardes | `guards` | Vérifications en code après la voix (dégoûts, répétition, longueur, argent, identité). |
+| Garde des lieux | `place_named` | Garde publique bloquante (ADR 0080 § 5.9) : un texte public (post du canal, réponse à un commentaire, légende) ne nomme jamais sa ville ni son « lieu de vie », lus dans sa persona active. |
 | Deuxième demande | `hedgeAfterMs` | La même demande envoyée une deuxième fois au modèle principal d'un rôle, en parallèle, quand la première n'a pas répondu après ce délai ; la première bonne réponse gagne et l'autre est journalisée avec son coût, marquée `loser` dans `llm_calls.hedge` (OPS-15). |
 | Budget de bulles | `bubbleBudget` | Le nombre de bulles qu'elle peut écrire à ce tour, fixé par le code : une par défaut, deux s'il a écrit deux messages ou un long, trois seulement s'il en a écrit trois ou plus. Les bulles partent l'une après l'autre, chacune après le temps de la taper (`bubbleDelays`). |
 | Propriétaire de secours | second `owner` (`owner_removals`, `/v1/settings/security/owners`) | Le second compte propriétaire de l'agence, fait d'un membre de l'équipe par le premier (ADR 0096) : mêmes droits, deux au plus. L'un ne retire l'autre qu'après un préavis de 72 h, annoncé aux deux, que le visé peut annuler. |
