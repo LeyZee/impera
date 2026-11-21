@@ -269,13 +269,25 @@ Un donut, une jauge ou une petite courbe se dessine de la même façon sur tous 
 | Une pastille de série | | `nv-key` (dans `nv-keys` pour une légende en ligne) | `--_c` |
 | Un avancement de 0 à 100 % | `<Meter>` | `nv-meter` | `--_c` (encre des données par défaut), hauteur |
 | La petite courbe d'une tuile | `<Spark>` | `nv-spark`, `--up` / `--down` | les valeurs, le sens |
+| Une série dans le temps, en colonnes | `<Columns>` | `nv-cols`, `__grid`, `__mark`, `__bars` ; `nv-col`, `__stack`, `__part` (`--hatched`), `__label` | les parts et leur couleur, les graduations, le repère (`mark`), la bulle de chaque colonne ; hauteur par `--nv-cols-height` |
 
 - **Donut** : les parts se dessinent l'une après l'autre (`dur-data`, 90 ms d'écart). Au survol, au focus ou au toucher d'une part ou de sa ligne de légende, la part sort de l'anneau (plus épaisse, un peu plus grande, éclairée de sa couleur), les autres passent à 35 %, la pastille de la ligne grossit et le milieu dit sa part. Au repos le milieu dit le total. `donutArcs(valeurs, rayon)` donne à chaque arc son tiret et son départ ; les pourcentages viennent de `sharesOf`, réglés ensemble pour faire 100.
 - **Légende** : une ligne par part, cible de 44 px au doigt sous 720 px ; la souris allume en entrant, le doigt allume ou éteint d'un toucher, le clavier allume au focus (`useLit`).
 - **Jauge** : `nv-meter` dit un avancement et s'élargit depuis son départ en `dur-data`. Une dépense qui peut dépasser un plafond garde `nv-gauge` (neutre, ambre, néon). La barre de feu de la quête du chatteur reste une pièce du jeu (`rw-quest`), pas une jauge de données.
 - **Petite courbe** : 1,5 px, ni axe ni point, remplissage à 12 % au plus, dessinée de gauche à droite par un masque en `dur-progress`.
-- **Mouvement réduit** : tout est dessiné d'emblée ; la part allumée ressort sans grandir.
-- **Pas encore remontés** (une seule utilisation aujourd'hui, à remonter au deuxième usage plutôt qu'à recopier) : la grande courbe à repère (`ins-curve`), les colonnes empilées (`ins-col`), le classement à barres (`ins-rank`), la carte des heures (`ins-heat`), toutes dans `screens/dashboard/agency/agency.css`. Un écran qui en a besoin demande au fil Design de les remonter.
+- **Colonnes** : une colonne par pas de temps, empilée de bas en haut dans l'ordre de la légende ; elles poussent depuis le bas en `dur-data`, l'une après l'autre. La colonne sous la souris, le doigt ou le clavier gonfle et les autres passent à 45 % ; une seule est dans l'ordre de tabulation, les flèches, Début et Fin passent de l'une à l'autre. `mark` trace un repère en pointillé (un objectif, une moyenne). Une part hachurée dit une autre nature que la part pleine (prévu, couvert, en cours). Cible de 44 px au doigt.
+- **Mouvement réduit** : tout est dessiné d'emblée ; la part ou la colonne allumée ressort sans grandir.
+- **Pas encore remontés** (une seule utilisation aujourd'hui, à remonter au deuxième usage plutôt qu'à recopier) : la grande courbe à repère (`ins-curve`), le classement à barres (`ins-rank`), la carte des heures (`ins-heat`), toutes dans `screens/dashboard/agency/agency.css`. Un écran qui en a besoin demande au fil Design de les remonter.
+
+### Ce qu'un écran de chiffres doit montrer (Charles, 21/11)
+
+Un écran de chiffres se comprend d'un coup d'œil, et il vit. Avant de le montrer :
+
+1. **La réponse en tête** : un chiffre ou une phrase en gros par carte ; le détail dessous, plus petit.
+2. **La couleur porte du sens** : une couleur de série par catégorie (`--nv-series-N`), la même d'un écran à l'autre pour la même chose. Rouge et ambre restent réservés à l'urgence et à l'avertissement.
+3. **Une série se dessine** : colonnes ou courbe pour ce qui change dans le temps, petite courbe au pied d'un chiffre qui a un historique, donut pour une part ou un objectif. Une liste de nombres n'est pas un graphique.
+4. **Tout graphique répond** au survol, au doigt et au clavier : la part sort, la colonne gonfle, une bulle donne le détail.
+5. **Tout se dessine en entrant**, avec les durées et les courbes du design system, jamais une durée écrite en dur.
 
 ## Copilote et raccourcis
 
