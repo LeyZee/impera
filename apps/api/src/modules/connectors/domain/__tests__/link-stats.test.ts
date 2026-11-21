@@ -8,13 +8,13 @@ const reading = (hour: string, pageviews: number, clicks: number): LinkHourReadi
   pageviews,
   clicks,
 });
-const at = (time: string) => new Date(`2026-11-16T${time}Z`);
+const robots = (hour: string, count: number) => ({ hour: `2026-11-16T${hour}:00:00.000Z`, robots: count });
 
 describe('the hours kept of a redirect link (ADR 0120 § 3)', () => {
   it('removes the robots of each hour and keeps their number beside', () => {
     const totals = hoursWithoutRobots(
       [reading('13', 10, 3), reading('14', 2, 0)],
-      [at('13:05:00'), at('13:59:59'), at('14:00:00')],
+      [robots('13', 2), robots('14', 1)],
     );
     expect(totals).toEqual([
       { hour: '2026-11-16T13:00:00.000Z', pageviews: 8, clicks: 3, robots: 2 },
@@ -24,7 +24,7 @@ describe('the hours kept of a redirect link (ADR 0120 § 3)', () => {
 
   it('never goes below zero, and keeps an hour that only robots visited', () => {
     expect(
-      hoursWithoutRobots([reading('13', 1, 0)], [at('13:01:00'), at('13:02:00'), at('15:30:00')]),
+      hoursWithoutRobots([reading('13', 1, 0)], [robots('13', 1), robots('13', 1), robots('15', 1)]),
     ).toEqual([
       { hour: '2026-11-16T13:00:00.000Z', pageviews: 0, clicks: 0, robots: 2 },
       { hour: '2026-11-16T15:00:00.000Z', pageviews: 0, clicks: 0, robots: 1 },
@@ -41,7 +41,7 @@ describe('the hours kept of a redirect link (ADR 0120 § 3)', () => {
 
   it('says the part of the visits that were robots', () => {
     expect(robotShare([])).toBe(0);
-    expect(robotShare(hoursWithoutRobots([reading('13', 4, 0)], [at('13:10:00')]))).toBe(0.25);
+    expect(robotShare(hoursWithoutRobots([reading('13', 4, 0)], [robots('13', 1)]))).toBe(0.25);
   });
 });
 
