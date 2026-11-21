@@ -96,8 +96,8 @@ export function createPostgresUsageReader(adminDb: Database): UsageReader {
       return z.object({ usd: z.coerce.number() }).parse(result.rows[0] ?? { usd: 0 }).usd;
     },
     async forecast(from, timeZone) {
-      // One read (ADR 0091 § 8): the calls by line of spend, the sales net of the platform (euro lines, a refund taken
-      // off its day), each with its creator's name. A call of no creator with no other purpose is the playground or a
+      // One read (ADR 0091 § 8): the calls by line of spend, the sales net of the platform (euro lines; a refund is
+      // taken off the day it happened, not its sale's day), each with its creator's name. A call of no creator with no other purpose is the playground or a
       // test.
       const result = await adminDb.execute(sql`
         with lined as (
