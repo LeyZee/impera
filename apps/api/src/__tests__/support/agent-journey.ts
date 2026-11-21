@@ -51,7 +51,7 @@ const APPROVER = UserIdSchema.parse('0199f2a0-0000-7000-8000-000000000003');
 const OWNER = { email: 'owner@recette.test', name: 'Owner', password: 'correct horse battery staple' };
 
 export class TestClock implements Clock {
-  current = T0;
+  constructor(public current: Date = T0) {}
   now(): Date {
     return this.current;
   }
@@ -92,6 +92,10 @@ export class RecordingSender implements OutboundSender {
 export interface JourneyOptions {
   /** Her active version; the demo persona otherwise. */
   readonly persona?: Persona;
+  /** The journey's first instant; `T0` otherwise. */
+  readonly start?: Date;
+  /** What the configuration adds (the session keys FakeReveal's connector needs). */
+  readonly config?: NodeJS.ProcessEnv;
   /** What the app is built with (FakeReveal's connectors, their clock). */
   readonly appOptions?: AppOptions;
   /** The platform account's handle, as FakeReveal's session names it. */
@@ -124,8 +128,8 @@ export interface Journey {
   readonly sender: RecordingSender;
   /** What the fake models answer from now on. */
   models(script: GatewayScript): void;
-  /** He writes in this thread of the platform; his conversation. */
-  fanWrites(thread: string, text: string): Promise<ConversationId>;
+  /** He writes in this thread of the platform (as this fan of the platform when given); his conversation. */
+  fanWrites(thread: string, text: string, platformFanId?: string): Promise<ConversationId>;
   /** `conversation.respond` a minute later, as the worker runs it. */
   respond(conversationId: ConversationId): Promise<void>;
   /** `conversation.send` of this draft, at this attempt. */
@@ -166,9 +170,13 @@ export interface DraftRow {
 
 export async function startJourney(options: JourneyOptions = {}): Promise<Journey> {
   const test = await createTestDb(inject('pgSuperuserUrl'));
-  const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
+  const config = testConfig({
+    DATABASE_URL: test.appUrl,
+    DATABASE_SERVICE_URL: test.serviceUrl,
+    ...options.config,
+  });
   const app = await createApp(config, createLogger(config), options.appOptions);
-  const clock = new TestClock();
+  const clock = new TestClock(options.start);
   const creatorId = (await app.modules.persona.creators.create({ displayName: 'Créatrice de test' })).id;
   const accountId = newId(PlatformAccountIdSchema);
   await test.admin.db.insert(schema.platformAccounts).values({
@@ -259,13 +267,13 @@ export async function startJourney(options: JourneyOptions = {}): Promise<Journe
       script = next;
       seen.voiceCalls = 0;
     },
-    async fanWrites(thread, text) {
+    async fanWrites(thread, text, platformFanId) {
       counter += 1;
       const { conversationId } = await conversations.ingestMessage({
         creatorId,
         platformAccountId: accountId,
         platformConversationId: thread,
-        platformFanId: `fan-${thread}`,
+        platformFanId: platformFanId ?? `fan-${thread}`,
         fanDisplayName: 'Fan de test',
         message: {
           ref: { platform: 'reveal', id: `journey-${String(counter)}` },
