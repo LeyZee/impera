@@ -185,11 +185,15 @@ export type PlatformStepDiscount = z.infer<typeof PlatformStepDiscountSchema>;
  * What the platform counts on a step since it exists, every seller together, never by day nor by fan (ADR 0129 § 12):
  * its sends, its packs paid and what they brought. Kept one row a day, so that a period reads as a difference.
  */
+/** The ceiling of a step's totals: the column's 32-bit integer, so that an aberrant value is set aside, never stored. */
+export const PLATFORM_STEP_TOTAL_MAX = 2_147_483_647;
+const stepTotal = z.number().int().min(0).max(PLATFORM_STEP_TOTAL_MAX);
+
 export const PlatformStepTotalsSchema = z.object({
-  sent: z.number().int().min(0),
-  purchased: z.number().int().min(0),
+  sent: stepTotal,
+  purchased: stepTotal,
   /** Minor units, VAT included, as the platform shows it. */
-  paidMinor: z.number().int().min(0),
+  paidMinor: stepTotal,
 });
 export type PlatformStepTotals = z.infer<typeof PlatformStepTotalsSchema>;
 

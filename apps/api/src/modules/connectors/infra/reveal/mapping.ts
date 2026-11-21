@@ -13,6 +13,7 @@ import {
   type PlatformMedia,
   type PlatformScript,
   type PlatformScriptStep,
+  PlatformStepTotalsSchema,
   type SentScriptStep,
   type VaultMedia,
 } from '@impera/contracts';
@@ -243,12 +244,20 @@ type StepSource = Pick<ScriptItem, 'medias' | 'teasingMedias'> & { readonly scri
  * The step's totals (ADR 0129 § 12), from its line of `scripts.list` read without a conversation: all three or none.
  * A step of a sequence carries none of its own; its line of the list does.
  */
-function totalsOf(line: ScriptItem | undefined): Pick<PlatformScriptStep, 'totals'> {
+/**
+ * A step's totals as the platform counts them, when it gives all three. A value out of range (negative, fractional or over
+ * the column) sets the step's totals aside rather than failing the whole import.
+ */
+export function totalsOf(
+  line: Pick<ScriptItem, 'sentCount' | 'paidBundlesCount' | 'paidBundlesTotalAmount'> | undefined,
+): Pick<PlatformScriptStep, 'totals'> {
   if (line === undefined) return {};
-  const { sentCount, paidBundlesCount, paidBundlesTotalAmount } = line;
-  if (sentCount === undefined || paidBundlesCount === undefined || paidBundlesTotalAmount === undefined)
-    return {};
-  return { totals: { sent: sentCount, purchased: paidBundlesCount, paidMinor: paidBundlesTotalAmount } };
+  const totals = PlatformStepTotalsSchema.safeParse({
+    sent: line.sentCount,
+    purchased: line.paidBundlesCount,
+    paidMinor: line.paidBundlesTotalAmount,
+  });
+  return totals.success ? { totals: totals.data } : {};
 }
 
 function stepOf(
