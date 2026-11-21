@@ -2,6 +2,7 @@ import {
   CREATOR_WEEK_NOT_FOUND,
   CREATOR_WEEK_PLAN_UNPROCESSABLE,
   CREATOR_WEEK_VALIDATED_CONFLICT,
+  DAY_ITEM_LATE_UNPROCESSABLE,
   DomainError,
 } from '@impera/contracts';
 
@@ -35,5 +36,12 @@ export class CreatorWeekForbidden extends DomainError {
         ? 'Sa semaine se lit par le propriétaire et les managers'
         : 'Seul le propriétaire valide la semaine',
     );
+  }
+}
+
+/** A line of her day ticked on a day other than today or yesterday, in her zone. */
+export class DayItemLate extends DomainError {
+  constructor() {
+    super(DAY_ITEM_LATE_UNPROCESSABLE, 'Ta journée se coche le jour même ou le lendemain');
   }
 }

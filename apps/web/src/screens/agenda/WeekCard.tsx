@@ -8,12 +8,13 @@ import {
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useState, type CSSProperties, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { NOT_SENT, type Outcome } from './api';
 import { acceptWeek, readWeekAgain, tickShootItem, useCreatorWeek } from './week-api';
-import { DEFAULT_COLORS, SWATCHES, SWATCH_WORDS, useWeekColors, type Swatch } from './week-colors';
+import { colorVars, useWeekColors } from './week-colors';
 import { dayWhen, dueIn, dueShort, hasWeek, leftToDrop, NEED_WORDS, nextDay, progressOf } from './week-model';
+import { Icon, Palette } from './week-parts';
 import './week-card.css';
 
 import { longDay } from '@/scheduling/time';
@@ -75,8 +76,7 @@ export function WeekCard({
     ]),
   ];
   // Her colours reach every line through one variable a kind.
-  const style: CSSProperties = {};
-  for (const need of kinds) style[`--wk-${need}`] = `var(--wk-sw-${palette.colors[need]})`;
+  const style = colorVars(kinds, palette.colors);
   return (
     <article className="wk-card nv-plate" data-cat="shoot" aria-labelledby="wk-title" style={style}>
       <header className="wk-head">
@@ -112,6 +112,7 @@ export function WeekCard({
       </header>
       {painting ? (
         <Palette
+          id="wk-palette"
           kinds={kinds}
           colors={palette.colors}
           onPaint={palette.paint}
@@ -164,124 +165,6 @@ function DueIn({ words }: { words: string }): JSX.Element {
     <span className="wk-due__in" data-late={words === 'passé' || undefined}>
       {words.charAt(0).toUpperCase() + words.slice(1)}
     </span>
-  );
-}
-
-/** Her colours, a row a kind: seven swatches, ours marked, one tap to change. Kept on this device. */
-function Palette({
-  kinds,
-  colors,
-  onPaint,
-  onReset,
-  onClose,
-}: {
-  kinds: readonly WeekNeed[];
-  colors: Readonly<Record<WeekNeed, Swatch>>;
-  onPaint: (need: WeekNeed, swatch: Swatch) => void;
-  onReset: () => void;
-  onClose: () => void;
-}): JSX.Element {
-  return (
-    <div
-      id="wk-palette"
-      className="wk-palette"
-      role="dialog"
-      aria-label="Tes couleurs"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onClose();
-      }}
-    >
-      <div className="wk-palette__top">
-        <p className="wk-palette__lead">Choisis la couleur de chaque type de contenu.</p>
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm" onClick={onClose}>
-          Fermer
-        </button>
-      </div>
-      <ul className="wk-palette__rows">
-        {kinds.map((need) => (
-          <li key={need} className="wk-palette__row">
-            <span className="wk-kind" data-need={need} aria-hidden="true">
-              <Icon name={need} />
-            </span>
-            <span className="wk-palette__word" id={`wk-pal-${need}`}>
-              {NEED_WORDS[need]}
-            </span>
-            <span className="wk-swatches" role="radiogroup" aria-labelledby={`wk-pal-${need}`}>
-              {SWATCHES.map((swatch) => (
-                <button
-                  key={swatch}
-                  type="button"
-                  role="radio"
-                  className="wk-swatch"
-                  data-swatch={swatch}
-                  aria-checked={colors[need] === swatch}
-                  aria-label={SWATCH_WORDS[swatch]}
-                  onClick={() => {
-                    onPaint(need, swatch);
-                  }}
-                />
-              ))}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {kinds.every((need) => colors[need] === DEFAULT_COLORS[need]) ? null : (
-        <button type="button" className="nv-btn nv-btn--plain nv-btn--sm wk-palette__reset" onClick={onReset}>
-          Remettre nos couleurs
-        </button>
-      )}
-    </div>
-  );
-}
-
-/** The small drawn marks of her week: one per kind of thing she shoots, never a stock icon. */
-function Icon({ name }: { name: WeekNeed | 'drop' }): JSX.Element {
-  return (
-    <svg className="wk-icon" viewBox="0 0 24 24" aria-hidden="true">
-      {name === 'feed_shoot' ? (
-        <>
-          <path
-            className="wk-icon__fill"
-            d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.2l1.4-2h5.8l1.4 2h2.2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"
-          />
-          <circle cx="12" cy="13" r="3.2" />
-        </>
-      ) : name === 'feed_video' ? (
-        <>
-          <rect className="wk-icon__fill" x="3.5" y="6" width="17" height="12" rx="2.5" />
-          <path className="wk-icon__ink" d="m10.5 9.5 4 2.5-4 2.5Z" />
-        </>
-      ) : name === 'reveal_story' ? (
-        <>
-          <rect className="wk-icon__fill" x="7" y="3" width="10" height="18" rx="2.5" />
-          <circle cx="12" cy="10" r="2.2" />
-          <path d="M9.5 16.5h5" />
-        </>
-      ) : name === 'script' ? (
-        <>
-          <path className="wk-icon__fill" d="M6 4h9l3 3v13H6Z" />
-          <path d="M9 11h6M9 14.5h6" />
-        </>
-      ) : name === 'idea' ? (
-        <>
-          <path
-            className="wk-icon__fill"
-            d="M12 3.5a5.5 5.5 0 0 0-3.2 10c.8.6 1.2 1.4 1.2 2.2h4c0-.8.4-1.6 1.2-2.2a5.5 5.5 0 0 0-3.2-10Z"
-          />
-          <path d="M10 19h4" />
-        </>
-      ) : name === 'mass_dm' ? (
-        <>
-          <rect className="wk-icon__fill" x="3.5" y="6" width="17" height="12" rx="2.5" />
-          <path d="m4.5 7.5 7.5 5.5 7.5-5.5" />
-        </>
-      ) : (
-        <>
-          <path className="wk-icon__fill" d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
-          <path d="M12 15V4.5M7.5 9 12 4.5 16.5 9" />
-        </>
-      )}
-    </svg>
   );
 }
 

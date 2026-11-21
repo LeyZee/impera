@@ -178,6 +178,8 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
   sha256: 'a logo of the agency',
   file: 'a calendar feed token, read without a session',
   field: 'a field of the fan’s card, a closed code (ADR 0085)',
+  day: 'a calendar day; the route reads the session’s own creator (her day, ADR 0140)',
+  item: 'a line of her own day, a closed code (ADR 0140)',
 };
 
 /**

@@ -24,7 +24,7 @@ export function useCreatorWeek(monday: string): UseQueryResult<CreatorWeek> {
   });
 }
 
-async function send(method: 'POST' | 'PUT', url: string, body: unknown): Promise<Outcome<null>> {
+export async function send(method: 'POST' | 'PUT', url: string, body: unknown): Promise<Outcome<null>> {
   let response: Response;
   try {
     response = await fetch(url, {
