@@ -120,14 +120,21 @@ export function revealLate(
 const GRAVE: ReadonlySet<WaitingConversation['kind']> = new Set(['minor', 'non_consent', 'distress']);
 
 /**
+ * A fan held because no model answered, once a voice model answers again (IA-07): the outage is over, his line says to
+ * give him back to the agent. It goes once nobody is held for it any more.
+ */
+const VOICE_BACK_WHY = 'L’IA répond de nouveau : rends la main à ces fans.';
+
+/**
  * « À traiter », the gravest first, then the longest waiting. On Arrêt (choix de Charles, 28/10) it keeps the grave
  * lines only: nothing leaves in her name, the chatters hold the hand in Reveal, but a possible minor, a question of
- * consent or a fan in distress still waits for a human. The other lines come back with the agent.
+ * consent or a fan in distress still waits for a human. The other lines come back with the agent. `voiceAnswers`: a
+ * voice model answers now (the gateway's health, `VoiceHealth`), so a fan held for an outage is told back (IA-07).
  */
 export function todos(
   waiting: readonly WaitingConversation[],
   now: Date,
-  agent: { readonly stopped: boolean } = { stopped: false },
+  agent: { readonly stopped: boolean; readonly voiceAnswers?: boolean } = { stopped: false },
 ): DashboardTodo[] {
   return waiting
     .filter((w) => !agent.stopped || GRAVE.has(w.kind))
@@ -135,18 +142,26 @@ export function todos(
       (a, b) =>
         Number(GRAVE.has(b.kind)) - Number(GRAVE.has(a.kind)) || a.since.getTime() - b.since.getTime(),
     )
-    .map((w) => ({
-      id: `${w.kind}-${w.conversationId}`,
-      tone: GRAVE.has(w.kind) ? 'bad' : 'warn',
-      kind: w.kind,
-      title: fanNameOf(w.fanName),
-      why: w.why ?? WHY[w.kind],
-      at: w.since.toISOString(),
-      waitingMinutes: Math.max(0, Math.floor((now.getTime() - w.since.getTime()) / MINUTE_MS)),
-      conversationId: ConversationIdSchema.parse(w.conversationId),
-      fanId: FanIdSchema.parse(w.fanId),
-    }));
+    .map((w) => {
+      const back = w.kind === 'llm_unavailable' && agent.voiceAnswers === true;
+      return {
+        id: `${w.kind}-${w.conversationId}`,
+        tone: GRAVE.has(w.kind) ? 'bad' : 'warn',
+        kind: w.kind,
+        title: fanNameOf(w.fanName),
+        why: back ? VOICE_BACK_WHY : (w.why ?? WHY[w.kind]),
+        at: w.since.toISOString(),
+        waitingMinutes: Math.max(0, Math.floor((now.getTime() - w.since.getTime()) / MINUTE_MS)),
+        conversationId: ConversationIdSchema.parse(w.conversationId),
+        fanId: FanIdSchema.parse(w.fanId),
+        ...(back && { voiceBack: true as const }),
+      };
+    });
 }
+
+/** A voice model answers and has a key (`VoiceHealth`): the outage lines may say so (IA-07). */
+const answers = (voice: VoiceHealth | undefined): boolean =>
+  voice !== undefined && voice.ok && !voice.keyMissing;
 
 /** One creator's « À traiter », as `todos` gave it. */
 export interface CreatorQueue {
@@ -156,11 +171,16 @@ export interface CreatorQueue {
 }
 
 /** Her « À traiter » as the Dashboard shows it: on Arrêt, the grave lines only (#296). */
-export function creatorQueue(creatorId: CreatorId, facts: DashboardFacts, now: Date): CreatorQueue {
+export function creatorQueue(
+  creatorId: CreatorId,
+  facts: DashboardFacts,
+  now: Date,
+  voice?: VoiceHealth,
+): CreatorQueue {
   return {
     creatorId,
     name: facts.creator.name,
-    todos: todos(facts.waiting, now, { stopped: modeOf(facts) === 'stop' }),
+    todos: todos(facts.waiting, now, { stopped: modeOf(facts) === 'stop', voiceAnswers: answers(voice) }),
   };
 }
 
@@ -299,7 +319,10 @@ export function assembleDashboard(input: {
       alertAt: input.budget.alertAtEur,
       costPerEuroSold: null,
     },
-    todos: todos(facts.waiting, window.now, { stopped: modeOf(facts) === 'stop' }),
+    todos: todos(facts.waiting, window.now, {
+      stopped: modeOf(facts) === 'stop',
+      voiceAnswers: answers(input.voice),
+    }),
     fans: facts.fans.map((fan) => ({
       id: FanIdSchema.parse(fan.id),
       name: fanNameOf(fan.name),

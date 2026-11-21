@@ -30,6 +30,8 @@ export function todoLabel(todo: DashboardTodo): string {
   if (todo.kind === 'send_failed') return 'Envoi échoué';
   if (todo.kind === 'unanswered') return 'Sans réponse';
   if (todo.kind === 'fragile_proposed') return 'Le marquer fragile ?';
+  // The outage is over (IA-07): never « IA indisponible » above « L’IA répond de nouveau ».
+  if (todo.kind === 'llm_unavailable' && todo.voiceBack === true) return 'IA de retour';
   return CAUSE_LABELS[todo.kind];
 }
 
