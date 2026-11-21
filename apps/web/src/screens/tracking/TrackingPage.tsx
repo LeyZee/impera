@@ -41,6 +41,7 @@ import './tracking.css';
 
 import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queue';
 import { useCreators } from '@/creators/api';
+import { creatorsOverviewQuery } from '@/creators/overview/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 import { ChatArt, CrownArt } from '@/shell/art/EmptyArt';
@@ -127,6 +128,9 @@ export function TrackingPage({
   const isStopped = (creatorId: string): boolean =>
     stoppedCreators.some((creator) => creator.id === creatorId);
   const stoppedNames = stoppedCreators.map((creator) => creator.displayName);
+  // The general stop, or only her AI cut (PRO1-12): unread, the stop is said as the general one, as before.
+  const overview = useQuery({ ...creatorsOverviewQuery, enabled: stoppedCreators.length > 0 });
+  const generalStop = overview.data === undefined || overview.data.some((card) => card.globalStop);
   // An unread stop is never silent: « Valider » may be refused without the screen having said why (relecture #597).
   const stopUnread = stops.some((stop) => stop.isError);
   // « À traiter » of every creator followed, not only the one the Dashboard shows (SUIVI-09).
@@ -204,6 +208,8 @@ export function TrackingPage({
       {offShift?.(lines.length > 0)}
       {stoppedNames.length === 0 ? null : (
         <StopBanner
+          general={generalStop}
+          stoppedNames={stoppedNames}
           names={creators.length > 1 ? stoppedNames : []}
           liftsStop={liftsStop}
           creatorId={stoppedCreators.length === 1 ? stoppedCreators[0]?.id : undefined}
@@ -748,10 +754,16 @@ function useNow(): Date {
  * do about it. `names` lists the creators it holds when Suivi shows several; empty for one creator, or all of them.
  */
 function StopBanner({
+  general,
+  stoppedNames,
   names,
   liftsStop,
   creatorId,
 }: {
+  /** The agency's general stop; otherwise only her AI is cut, and it is said so, never « arrêt d'urgence » (PRO1-12). */
+  general: boolean;
+  /** Every creator stopped, for a cut that is hers alone. */
+  stoppedNames: readonly string[];
   names: readonly string[];
   liftsStop: boolean;
   /** The one creator stopped: the link opens her Dashboard, where her stop is lifted. */
@@ -765,10 +777,16 @@ function StopBanner({
       <p className="tr-stop__in" role="status">
         <span className="nv-orb nv-tone--warn" aria-hidden="true" />
         <span>
-          <strong>L’arrêt d’urgence est actif{whom}.</strong>{' '}
+          <strong>
+            {general
+              ? `L’arrêt d’urgence est actif${whom}.`
+              : `L’IA est coupée pour ${stoppedNames.join(', ')}.`}
+          </strong>{' '}
           {liftsStop ? (
             <>
-              Rien ne part tant qu’il n’est pas levé sur le{' '}
+              {general
+                ? 'Rien ne part tant qu’il n’est pas levé sur le'
+                : 'Rien ne part tant qu’elle n’est pas rallumée sur le'}{' '}
               <Link to="/" search={dashboardSearch('day', creatorId)} className="tr-stop__link">
                 Dashboard
               </Link>

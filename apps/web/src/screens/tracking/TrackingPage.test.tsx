@@ -121,6 +121,8 @@ function serve(routes: {
   todos?: Reply | (() => Reply);
   /** The emergency stop holds her messages (recette CHAT-07); off when not given, unread when `'down'`. */
   stopped?: boolean | 'down';
+  /** The cards of Créatrices (`/v1/dashboard/creators`): whose AI is cut, whether the general stop holds. */
+  overview?: unknown;
 }): Posted[] {
   const posted: Posted[] = [];
   vi.stubGlobal(
@@ -157,6 +159,8 @@ function serve(routes: {
           routes.stopped === 'down'
             ? { status: 500 }
             : { status: 200, body: { stopped: routes.stopped ?? false } };
+      } else if (path === '/v1/dashboard/creators' && routes.overview !== undefined) {
+        reply = { status: 200, body: routes.overview };
       } else if (path === '/v1/conversations') {
         reply = { status: 200, body: routes.conversations?.[url.searchParams.get('creatorId') ?? ''] };
       } else if (path === '/v1/dashboard/todos') {
@@ -718,6 +722,22 @@ describe('the reader of Suivi', () => {
     expect(within(list).getByText('Arrêt actif')).toBeDefined();
     expect(within(list).queryByText('À valider')).toBeNull();
     expect(posted).toEqual([]);
+  });
+
+  it('says her AI is cut, never « arrêt d’urgence », when only her AI is off (PRO1-12)', async () => {
+    serve({
+      ...withDraft,
+      stopped: true,
+      detail: () => ({ status: 200, body: waiting() }),
+      overview: {
+        creators: [
+          { creatorId: LEA.id, mode: 'stop', globalStop: false, sales: null, onShift: null, requests: null },
+        ],
+      },
+    });
+    renderPage(OPEN);
+    expect(await screen.findByText('L’IA est coupée pour Léa.')).toBeDefined();
+    expect(screen.queryByText(/L’arrêt d’urgence est actif/u)).toBeNull();
   });
 
   it('says when the emergency stop could not be read, rather than nothing (relecture #597)', async () => {
