@@ -11,6 +11,7 @@ import {
   type GuardCode,
   type GuardContext,
 } from '../guards';
+import { checkPlaceNames } from '../place-names';
 import { checkWelcome } from '../sexualization';
 
 const codes = (bubbles: string[], context: GuardContext = {}): GuardCode[] =>
@@ -177,6 +178,7 @@ describe('voice guards (P3-13)', () => {
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
       ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),
+      ...checkPlaceNames(['Dimanche à Valbrume'], ['valbrume']).map((v) => v.code),
     ]);
     const known: readonly string[] = GUARD_CODES;
     expect([...emitted].filter((code) => !known.includes(code))).toEqual([]);

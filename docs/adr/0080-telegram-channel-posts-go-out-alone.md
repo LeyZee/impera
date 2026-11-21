@@ -76,6 +76,8 @@ Charles demande en plus :
    2. **Engagement :** une question, une anecdote ou un sondage, avec ou sans média, et sans lien. Le sondage (§ 5.7) devient un post d'Engagement, toujours au plus un par jour.
    3. Le playground propose le choix Principal ou Engagement, pour régler les deux (§ 7).
 
+9. **La garde des lieux** (amendement du 21/11/2026, validé par le fil Bilan) : un texte public ne nomme jamais un lieu où elle vit. Le code lit sa ville et son « lieu de vie » dans sa persona active ; les mots génériques (« appartement », « région », « centre »…) sont écartés, et ce qui reste est un nom de lieu. Un texte public qui en contient un, mot entier ou expression, sans tenir compte des accents ni des majuscules, même masqué par des chiffres, est bloqué avant toute publication (code `place_named`). La garde est commune à toutes les surfaces publiques qui passent par sa fiche publique : posts du canal Telegram, réponses aux commentaires Instagram (ADR 0122 § 2), légendes de Reel (ADR 0164 § 9). Son pays n'est pas lu. Un mot dérivé d'un nom de lieu n'est pas attrapé par le code ; le prompt reste chargé de ne nommer aucun lieu.
+
 ### 6. L'écran
 
 Réglages › Créatrices › \<créatrice\> › Canal Telegram, propriétaire seulement :
