@@ -822,5 +822,6 @@ export const TenantJobSchema = z.enum([
   'link_hours',
   'drop_media',
   'creator_decisions',
+  'ask_scripts',
 ]);
 export type TenantJob = z.infer<typeof TenantJobSchema>;
