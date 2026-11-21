@@ -49,3 +49,93 @@
     height: 44px;
   }
 }
+
+/*
+ * « À décider », hers: one question at a time on top of Aujourd'hui. Compact, the colour of the content as a dot,
+ * full-width answers a thumb reaches, « Plus tard » in plain. No neon here: « Déposer » keeps the page's one.
+ */
+.sc-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-plate-pad);
+}
+.sc-ask__head {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.sc-ask__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ag-c);
+}
+.sc-ask__eyebrow {
+  font-weight: 600;
+}
+.sc-ask__count {
+  margin-left: auto;
+}
+.sc-ask__question {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-title-3, 1.25rem);
+  font-weight: 600;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.sc-ask__context {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.sc-ask__buttons,
+.sc-ask__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-2);
+}
+.sc-ask__btn {
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+}
+.sc-ask__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-height: 44px;
+  padding: var(--nv-space-3);
+  border: 1px solid var(--nv-hairline);
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font: inherit;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  text-align: left;
+  cursor: pointer;
+}
+.sc-ask__row b {
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.sc-ask__row:active {
+  transform: scale(0.99);
+}
+.sc-ask__row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.sc-ask__later {
+  align-self: center;
+  min-height: 44px;
+  margin-bottom: calc(-1 * var(--nv-space-3));
+}
