@@ -20,6 +20,7 @@
 - `PUT /notifications/subscriptions` (204) : enregistre l'appareil. L'adresse doit être celle d'un service push connu (`isPushServiceUrl`) : le serveur n'appelle jamais une adresse choisie par un client.
 - `DELETE /notifications/subscriptions` (204) : oublie l'appareil, avant une déconnexion ou depuis Moi.
 - `GET` et `PUT /notifications/preferences`.
+- `GET /notifications/inbox` : « Tes notifications » (trou 9 de l'audit du 21/11), les 7 derniers jours du compte, 60 lignes au plus, sonnées ou gardées sans sonner (`quiet`). Lue même sans clé de chiffrement : une notification est enregistrée même sans appareil. Le récapitulatif de fin d'heures calmes ouvre `/notifications`.
 - `POST /notifications/test` : sonne tout de suite sur chaque appareil du compte. Sans appareil, 404 `push_subscription_not_found`.
 
 Sans `CREDENTIALS_ENCRYPTION_KEYS`, toutes les routes répondent 503 `service_unavailable`, et `deliver` est `null`.

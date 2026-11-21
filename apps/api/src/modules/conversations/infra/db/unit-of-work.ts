@@ -224,6 +224,14 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .where(eq(schema.messages.draftId, draftId));
         return row?.count ?? 0;
       },
+      async textsForDraft(draftId) {
+        const rows = await tx
+          .select({ text: schema.messages.text })
+          .from(schema.messages)
+          .where(eq(schema.messages.draftId, draftId))
+          .orderBy(schema.messages.platformCreatedAt, schema.messages.id);
+        return rows.map((row) => row.text);
+      },
       async history(conversationId, limit) {
         const rows = await tx
           .select()
@@ -374,11 +382,22 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .limit(1);
         return row !== undefined;
       },
-      async insert({ bubbles, softViolations, voice, personaVersionId, facts, scriptStep, ...draft }) {
+      async insert({
+        bubbles,
+        softViolations,
+        voice,
+        personaVersionId,
+        facts,
+        scriptStep,
+        copilot,
+        ...draft
+      }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
-          ...(scriptStep !== undefined && { policyTrace: toStoredPolicyTrace(scriptStep) }),
+          ...((scriptStep !== undefined || copilot !== undefined) && {
+            policyTrace: toStoredPolicyTrace({ scriptStep, copilot }),
+          }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
           guardTrace: { softViolations: [...(softViolations ?? [])] },

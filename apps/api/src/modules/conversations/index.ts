@@ -105,6 +105,8 @@ export interface ConversationsModule extends ConversationCommands {
     /** `conversation.after_sale` (ADR 0156 § 2): a step he bought or a tip wakes his conversation for her word after it. */
     afterSale(payload: JobPayload<'conversation.after_sale'>, logger: JobLogger): Promise<void>;
     reopen(payload: JobPayload<'conversation.reopen'>, logger: JobLogger): Promise<void>;
+    /** `conversation.settle_placed` (ADR 0086 § 5): a draft placed from the copilot panel, decided by what left. */
+    settlePlaced(payload: JobPayload<'conversation.settle_placed'>): Promise<void>;
     /** Each minute: what members who are no longer `active` still held is handed back (EQ-13). */
     releaseUnavailable(logger: JobLogger): Promise<void>;
   };
@@ -277,6 +279,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         ...(deps.replyHours === undefined ? {} : { replyHours: deps.replyHours }),
       }),
       reopen: createReopenJob({ uow, clock }),
+      settlePlaced: (payload) => commands.settlePlacedDraft(payload),
       releaseUnavailable: createReleaseUnavailableJob({
         uow,
         clock,

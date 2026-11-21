@@ -1,6 +1,7 @@
 import type { CreatorId } from '@impera/contracts';
 
 import { h } from '../../lib/dom';
+import { hourOf } from '../../lib/hour';
 import type { MarkableCreators, WatchStatus } from '../../lib/watch/protocol';
 
 import { button, card, goLink, part, pill, text, type PillKind } from './card';
@@ -34,11 +35,6 @@ export interface WatchActions {
   readonly end: () => void;
   readonly mark: (creatorId: CreatorId) => void;
   readonly openSecurity: () => void;
-}
-
-/** « 14 h 05 », the way the CRM writes an hour. */
-export function hourOf(at: Date): string {
-  return `${String(at.getHours())}\u00a0h\u00a0${String(at.getMinutes()).padStart(2, '0')}`;
 }
 
 /** « 1 min », « 12 min »: whole minutes since the start, at least one. */

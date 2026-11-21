@@ -82,6 +82,22 @@ const tabs = (): string[] =>
   ].map((tab) => tab.getAttribute('title') ?? '');
 
 describe('the rail of each role', () => {
+  it('plays the icon of a tab on every click, the one already open too (Charles, 21/11)', async () => {
+    // Motion allowed here: the suite's default (no matchMedia in jsdom) is a reduced motion, where nothing plays.
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    renderApp(owner, '/');
+    await screen.findByText('Chatting');
+    const tab = screen.getByRole('navigation', { name: 'Navigation' }).querySelector('[data-section="/"]');
+    const icon = tab?.querySelector('svg');
+    expect(icon?.classList.contains('is-playing')).toBe(false);
+    if (tab !== null) fireEvent.click(tab);
+    expect(icon?.classList.contains('is-playing')).toBe(true);
+  });
+
   it('gives the owner his tabs in the order of ADR 0024, under Chatting and Agence', async () => {
     renderApp(owner, '/');
     await screen.findByText('Chatting');

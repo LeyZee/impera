@@ -27,7 +27,6 @@ import {
   shortEuros,
   slotLabel,
   STACKS,
-  topFansWords,
   zoneLabel,
 } from './view';
 
@@ -215,16 +214,10 @@ describe('sharesOf', () => {
   });
 });
 
-describe('percentText and topFansWords (PAY-16)', () => {
+describe('percentText (PAY-16)', () => {
   it('says a share with its tenth only when it has one', () => {
     expect(percentText(37.5)).toBe('37,5\u00a0%');
     expect(percentText(62)).toBe('62\u00a0%');
-  });
-
-  it('names ten biggest fans at most, as many as there are below ten', () => {
-    expect(topFansWords(42).lead).toBe('Les 10 fans qui dépensent le plus font');
-    expect(topFansWords(3).lead).toBe('Les 3 fans qui dépensent le plus font');
-    expect(topFansWords(1)).toEqual({ lead: 'Le fan qui dépense le plus fait', short: 'le plus gros fan' });
   });
 });
 

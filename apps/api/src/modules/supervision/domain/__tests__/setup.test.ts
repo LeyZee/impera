@@ -13,6 +13,8 @@ const ready: CreatorSetupFacts = {
   accounts: 1,
   accountsWithPayRules: 1,
   hasActivePersona: true,
+  scripts: { day: 1, night: 2 },
+  hasCustomPrices: true,
   hasAgencyRate: true,
   hasLinkedReveal: true,
   access: 'used',
@@ -27,11 +29,13 @@ const stateOf = (steps: readonly { key: string; state: string }[], key: string):
   steps.find((step) => step.key === key)?.state;
 
 describe('creatorSetup', () => {
-  it('lists the ten steps in order, all done for a creator set up', () => {
+  it('lists the twelve steps in order, all done for a creator set up', () => {
     const steps = creatorSetup(ready);
     expect(steps.map((step) => step.key)).toEqual([
       'platform_account',
       'persona',
+      'scripts',
+      'custom_prices',
       'agency_rate',
       'access',
       'pay_rules',
@@ -44,11 +48,26 @@ describe('creatorSetup', () => {
     expect(isSetupComplete(steps)).toBe(true);
   });
 
+  it('wants a script the agent may offer by day and one by night, and her grid of custom prices', () => {
+    const scripts = (day: number, night: number) =>
+      creatorSetup({ ...ready, scripts: { day, night } }).find((step) => step.key === 'scripts');
+    expect(scripts(1, 0)).toEqual({
+      key: 'scripts',
+      state: 'todo',
+      note: { kind: 'scripts', day: 1, night: 0 },
+    });
+    expect(scripts(0, 3)?.state).toBe('todo');
+    expect(scripts(1, 1)?.state).toBe('done');
+    expect(stateOf(creatorSetup({ ...ready, hasCustomPrices: false }), 'custom_prices')).toBe('todo');
+  });
+
   it('leaves a creator made by hand, with nothing yet, with every step but her hours and her mode to do', () => {
     const steps = creatorSetup({
       accounts: 0,
       accountsWithPayRules: 0,
       hasActivePersona: false,
+      scripts: { day: 0, night: 0 },
+      hasCustomPrices: false,
       hasAgencyRate: false,
       hasLinkedReveal: false,
       access: 'none',
