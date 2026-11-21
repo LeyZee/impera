@@ -48,27 +48,41 @@ export const NO_SALE_RISKS: readonly string[] = [
   'dangerous_request',
   'real_abuse',
   'harassment',
+  'insult',
   'dispute',
 ];
 
 const HOUR_MS = 3_600_000;
+
+/**
+ * « Jamais deux scripts le même soir » (ADR 0158 § 42): his asking lifts the cooldown, but not within this span of the
+ * last script offered. The same span as the session of a refusal (`REFUSAL_SESSION_MS`).
+ */
+const SAME_EVENING_MS = 6 * HOUR_MS;
 
 export function offerDecision(context: OfferContext): OfferDecision {
   const { flags, limits } = context;
   if (flags.doNotContact === true) return { allowed: false, reason: 'do_not_contact' };
   if (context.risks.some((risk) => NO_SALE_RISKS.includes(risk))) return { allowed: false, reason: 'risk' };
   // Frozen because he said he cannot pay: that one lifts when he comes back to paid content himself, like `hasNoBudget`.
-  const noBudget = context.hasNoBudget || flags.salesFrozen?.reason === 'money_trouble';
+  // « À sec » until his pay (ADR 0158 § M 52): no sale while the brain still reads it, and no flag set on him.
+  const noBudget =
+    context.hasNoBudget ||
+    context.risks.includes('no_budget') ||
+    flags.salesFrozen?.reason === 'money_trouble';
   if (flags.salesFrozen !== undefined && !noBudget) return { allowed: false, reason: 'sales_frozen' };
   // A script is explicit content: never before he is confirmed an adult.
   if (flags.ageConfirmedAt === undefined) return { allowed: false, reason: 'age_unconfirmed' };
-  // He came back to paid content himself: no waiting on the cooldown or on his budget.
-  if (context.fanAsksForPaid) return { allowed: true };
+  const sinceLastOffer =
+    context.lastOfferAt === null ? null : context.now.getTime() - context.lastOfferAt.getTime();
+  // He came back to paid content himself: no waiting on the cooldown or on his budget, except the same evening.
+  if (context.fanAsksForPaid) {
+    return sinceLastOffer !== null && sinceLastOffer < SAME_EVENING_MS
+      ? { allowed: false, reason: 'cooldown' }
+      : { allowed: true };
+  }
   if (noBudget) return { allowed: false, reason: 'no_budget' };
-  if (
-    context.lastOfferAt !== null &&
-    context.now.getTime() - context.lastOfferAt.getTime() < limits.cooldownHours * HOUR_MS
-  ) {
+  if (sinceLastOffer !== null && sinceLastOffer < limits.cooldownHours * HOUR_MS) {
     return { allowed: false, reason: 'cooldown' };
   }
   // His heat replaces « he sexualizes now » (P3-12): a single flirty line is not a hot fan.

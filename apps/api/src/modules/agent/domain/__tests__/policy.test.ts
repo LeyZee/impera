@@ -72,9 +72,36 @@ describe('offerDecision', () => {
 
   it('lifts the cooldown, the no-budget stop and his score when he asks for paid content himself, never a risk', () => {
     const asks = { ...base, fanAsksForPaid: true, desire: 0 };
-    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(1) })).toEqual({ allowed: true });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(7) })).toEqual({ allowed: true });
     expect(offerDecision({ ...asks, hasNoBudget: true })).toEqual({ allowed: true });
     expect(offerDecision({ ...asks, risks: ['money_trouble'] })).toEqual({ allowed: false, reason: 'risk' });
+  });
+
+  it('never two scripts the same evening, even when he asks again (ADR 0158 § 42, eval passe-18)', () => {
+    // A big spender bought a whole script an hour and a half ago and asks for more: nothing new opens tonight.
+    const asks = { ...base, fanAsksForPaid: true, desire: 85 };
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(1.5) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(5.9) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(6) })).toEqual({ allowed: true });
+  });
+
+  it('sells nothing to a fan « à sec » until his pay, and lifts it when he asks himself (eval passe-11a)', () => {
+    // The brain reads `no_budget`, not `money_trouble`: no sale, and nothing frozen on him (`protectionFor`).
+    expect(offerDecision({ ...base, risks: ['no_budget'] })).toEqual({ allowed: false, reason: 'no_budget' });
+    expect(offerDecision({ ...base, risks: ['no_budget'], fanAsksForPaid: true })).toEqual({ allowed: true });
+  });
+
+  it('never sells to a fan who insults her, even when he asks (ADR 0158 § 18 and § 25)', () => {
+    expect(offerDecision({ ...base, risks: ['insult'], fanAsksForPaid: true })).toEqual({
+      allowed: false,
+      reason: 'risk',
+    });
   });
 });
 

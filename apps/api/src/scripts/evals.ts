@@ -303,8 +303,13 @@ function availabilityOf(situation: Scenario['situation'], now: Date): FanAvailab
 function scriptOutcome(
   decision: NonNullable<ComposedTurn['scripts']>['decision'],
 ): NonNullable<Outcome['script']> {
-  return decision.kind === 'start' || decision.kind === 'send_step'
-    ? { decision: decision.kind, step: { script: decision.step.scriptRef, index: decision.step.stepIndex } }
+  if (decision.kind === 'start' || decision.kind === 'send_step')
+    return {
+      decision: decision.kind,
+      step: { script: decision.step.scriptRef, index: decision.step.stepIndex },
+    };
+  return decision.kind === 'none' || (decision.kind === 'wait' && 'reason' in decision)
+    ? { decision: decision.kind, reason: decision.reason }
     : { decision: decision.kind };
 }
 

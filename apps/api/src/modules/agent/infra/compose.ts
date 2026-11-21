@@ -1150,7 +1150,14 @@ export async function composeTurn(
     input.scripts === undefined ||
     input.offer === undefined ||
     scriptStepsHeld(input.offer.flags, care) ||
-    !offerDecision({ ...input.offer, desire: heat, fanAsksForPaid: true, risks: brief.risks }).allowed ||
+    // The step waits in the run he is in: « never two scripts the same evening » is not about it (ADR 0158 § 42).
+    !offerDecision({
+      ...input.offer,
+      lastOfferAt: null,
+      desire: heat,
+      fanAsksForPaid: true,
+      risks: brief.risks,
+    }).allowed ||
     customOrder !== undefined ||
     trap.replyBrief !== undefined
       ? undefined
