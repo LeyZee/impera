@@ -1033,7 +1033,9 @@ function Sellers({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip
     <ol className="nv-plate ins-rank" aria-label="Classement de qui a vendu">
       {[...ranked, ...rest].map((one, i) => {
         const name = one.seller.kind === 'member' ? one.seller.name : SELLER_NAME[one.seller.kind];
-        const average = one.sales > 0 ? Math.round(one.revenueMinor / one.sales) : null;
+        // The revenue is net of refunds: it is shared by the sales that stayed, never by those refunded (PRO1-02).
+        const kept = one.sales - one.refunds;
+        const average = kept > 0 ? Math.round(one.revenueMinor / kept) : null;
         const isRanked = i < ranked.length;
         return (
           <li
