@@ -74,7 +74,8 @@ afterEach(() => {
 
 describe('her week, as the owner reads it', () => {
   it('says when it is not computed yet', async () => {
-    serve({ error: { code: 'creator_week_not_found', message: 'x' } }, 404);
+    // A week not computed yet is a normal answer, never a 404 (MAN-08, DS-14).
+    serve({ week: null });
     show(true);
     expect(await screen.findByText(/Pas encore préparée/)).toBeTruthy();
   });

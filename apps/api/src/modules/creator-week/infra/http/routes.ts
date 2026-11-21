@@ -23,7 +23,6 @@ import type { WeekAgendaStore } from '../../../creator-tasks';
 import { herDay } from '../../application/her-day';
 import { acceptWeek, herWeek } from '../../application/her-week';
 import { validateWeek } from '../../application/validate';
-import { CreatorWeekNotFound } from '../../domain/errors';
 import { mondayOf } from '../../domain/plan';
 import type { AcceptSuggestion, DayTickStore, WeekDraftStore, WeekFactsReader } from '../../domain/ports';
 
@@ -61,6 +60,9 @@ async function asCreator<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Her week, or `{ week: null }` while it is not computed yet. */
+const AgencyCreatorWeekReadSchema = z.union([AgencyCreatorWeekSchema, z.strictObject({ week: z.null() })]);
+
 const AcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
 
 /**
@@ -78,7 +80,7 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
       '/creators/:creatorId/weeks/:week',
       {
         preValidation: deps.requireRole('owner', 'operator'),
-        schema: { params: CreatorWeekParamsSchema, response: { 200: AgencyCreatorWeekSchema } },
+        schema: { params: CreatorWeekParamsSchema, response: { 200: AgencyCreatorWeekReadSchema } },
       },
       async (request) => {
         const week = await deps.drafts.read(
@@ -86,8 +88,8 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
           signedIn(request.user),
           mondayOf(request.params.week),
         );
-        if (week === null) throw new CreatorWeekNotFound();
-        return week;
+        // A week not computed yet is a normal case, never a 404 the browser logs as an error (MAN-08, DS-14).
+        return week ?? { week: null };
       },
     );
 

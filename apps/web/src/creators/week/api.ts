@@ -8,6 +8,7 @@ import {
   type WeekPlan,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { z } from 'zod';
 
 /*
  * `/v1/creators/:creatorId/weeks/:week` (ADR 0140), the owner's (an active manager reads): the week the code proposed,
@@ -17,7 +18,10 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 export const creatorWeekKey = (creatorId: CreatorId, week: string) =>
   ['creators', creatorId, 'week', week] as const;
 
-/** Her week starting on `week`; `null` while it is not computed yet (404). */
+/** Her week, or `{ week: null }` while it is not computed yet (MAN-08, DS-14). */
+const AgencyCreatorWeekReadSchema = z.union([AgencyCreatorWeekSchema, z.strictObject({ week: z.null() })]);
+
+/** Her week starting on `week`; `null` while it is not computed yet. */
 export function useAgencyCreatorWeek(
   creatorId: CreatorId,
   week: string,
@@ -26,9 +30,9 @@ export function useAgencyCreatorWeek(
     queryKey: creatorWeekKey(creatorId, week),
     queryFn: async () => {
       const response = await fetch(`/v1/creators/${creatorId}/weeks/${week}`, { credentials: 'include' });
-      if (response.status === 404) return null;
       if (!response.ok) throw new Error(`GET week: ${String(response.status)}`);
-      return AgencyCreatorWeekSchema.parse(await response.json());
+      const read = AgencyCreatorWeekReadSchema.parse(await response.json());
+      return read.week === null ? null : read;
     },
     retry: 1,
     retryDelay: 400,
