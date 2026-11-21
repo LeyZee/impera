@@ -547,6 +547,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Ce qu'elle ne fait plus | `creator_stop` | Une chose qu'elle dit ne plus faire, dans ses mots, depuis son Aujourd'hui. Le chatteur la lit avant sa fiche ; le propriétaire met la fiche à jour (l'IA lit la fiche). Elle peut la reprendre (« Je le refais »). |
 | L'essentiel du jour | (écran) | Le seul gros élément de l'Aujourd'hui de la créatrice : un anneau qui compte ce qu'on attend d'elle aujourd'hui, où que ce soit (ce qu'elle poste, ses tâches de l'agenda, ce qu'elle doit envoyer à l'agence). |
 | Où elle en est | `creator_progress` | Dans sa fiche › Agenda, pour le propriétaire et un manager actif : ses sept jours (l'essentiel coché sur demandé, le bonus à côté) et l'avancée de sa semaine validée (tournage, livraison). Lecture seule. |
+| Écrire à l’agence | `creator_message` | Sur son accueil : elle écrit à l’agence une question, une idée ou un souci ; le message arrive dans « À faire » du propriétaire (un manager actif le lit), qui répond une fois ; la réponse revient sur sa carte. Ses mots sont une donnée, jamais un prompt. |
 
 ## Noms à ne pas utiliser
 

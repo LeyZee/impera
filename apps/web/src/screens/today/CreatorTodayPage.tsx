@@ -5,6 +5,7 @@ import type { JSX } from 'react';
 import { DayHero } from './day-hero/DayHero';
 import { HerFigures } from './her-figures/HerFigures';
 import { HerLimits } from './her-limits/HerLimits';
+import { ToAgencyCard } from './to-agency/ToAgencyCard';
 
 import { useCreatorOnDuty } from '@/scheduling/api';
 import '@/scheduling/scheduling.css';
@@ -74,6 +75,7 @@ export function CreatorTodayPage(): JSX.Element {
         <HerDay now={now} today={today} quiet={down} />
         <HerFigures />
         <HerLimits today={today} />
+        <ToAgencyCard />
         <Fans now={now} today={today} />
       </div>
     </Page>
