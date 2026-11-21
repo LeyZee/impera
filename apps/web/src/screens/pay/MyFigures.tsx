@@ -1,6 +1,6 @@
 import type { BonusTier, CommissionStatement, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useRef, useState, type JSX } from 'react';
+import type { JSX } from 'react';
 
 import { useCurrentPeriod } from './data';
 import './my-figures.css';
@@ -37,8 +37,9 @@ import { amountText, periodLine } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
 import { cityOf, dayNumber, longDay } from '@/scheduling/time';
-import { arcs, sharesOf } from '@/screens/dashboard/agency/view';
+import { sharesOf } from '@/screens/dashboard/agency/view';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
+import { Donut, useLit } from '@/shell/figures/figures';
 import { Panel } from '@/shell/layout';
 
 /*
@@ -447,20 +448,13 @@ function Hours({
  * whose statement kept no type yet is said « pas encore comptée », never drawn as a zero.
  */
 function Money({ figures, currency }: { figures: MyFigures; currency: Currency }): JSX.Element {
-  const [lit, setLit] = useState<number | null>(null);
-  // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
-  const pressedBy = useRef<string | null>(null);
-  const radius = 52;
+  const { lit, setLit, row } = useLit();
   const slices = moneySlices(figures, currency);
   const total = slices.reduce((sum, slice) => sum + slice.cents, 0);
   // Settled together, so the legend adds up to 100 % where each share rounded alone could say 99 or 101.
   const shares = sharesOf(
     slices.map((slice) => slice.cents),
     total,
-  );
-  const geometry = arcs(
-    slices.map((slice) => slice.cents),
-    radius,
   );
   const litSlice = lit === null ? undefined : slices[lit];
   const untyped = figures.kinds.untyped;
@@ -478,93 +472,48 @@ function Money({ figures, currency }: { figures: MyFigures; currency: Currency }
           </p>
         ) : (
           <div className="mf-money">
-            <div
-              className="mf-donut"
-              data-lit={lit !== null}
-              role="img"
-              aria-label={`Ton net par type de vente : ${slices
+            <Donut
+              label={`Ton net par type de vente : ${slices
                 .map((slice, i) => `${slice.label} ${String(shares[i] ?? 0)} %`)
                 .join(', ')}`}
+              slices={slices.map((slice) => ({ key: slice.key, colour: slice.colour, value: slice.cents }))}
+              lit={lit}
+              onLit={setLit}
             >
-              <svg viewBox="0 0 132 132" aria-hidden="true">
-                <circle className="mf-donut__track" cx="66" cy="66" r={radius} />
-                {slices.map((slice, i) => {
-                  const arc = geometry[i];
-                  if (arc === undefined) return null;
-                  return (
-                    <circle
-                      key={slice.key}
-                      className="mf-donut__arc"
-                      data-on={lit === i}
-                      cx="66"
-                      cy="66"
-                      r={radius}
-                      style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
-                      strokeDashoffset={arc.offset}
-                      onPointerEnter={() => {
-                        setLit(i);
-                      }}
-                      onPointerLeave={(event) => {
-                        if (event.pointerType === 'mouse') setLit(null);
-                      }}
-                    />
-                  );
-                })}
-              </svg>
-              <span className="mf-donut__middle" aria-hidden="true">
-                {litSlice === undefined ? (
-                  <>
-                    <b className="mf-donut__value nv-num" data-long={totalText.length > 7}>
-                      {totalText}
-                    </b>
-                    <span className="mf-donut__sub">{untyped > 0 ? 'de net réparti' : 'de net'}</span>
-                  </>
-                ) : (
-                  <>
-                    <b className="mf-donut__value nv-num">{String(shares[lit ?? 0] ?? 0)}&nbsp;%</b>
-                    <span className="mf-donut__sub">{litSlice.label}</span>
-                    <span className="mf-donut__sub">{counted(litSlice.sales, 'vente', 'ventes')}</span>
-                  </>
-                )}
-              </span>
-            </div>
-            <ul className="mf-kinds">
+              {litSlice === undefined ? (
+                <>
+                  <b
+                    className={
+                      totalText.length > 7 ? 'nv-donut__value nv-num is-long' : 'nv-donut__value nv-num'
+                    }
+                  >
+                    {totalText}
+                  </b>
+                  <span className="nv-donut__sub">{untyped > 0 ? 'de net réparti' : 'de net'}</span>
+                </>
+              ) : (
+                <>
+                  <b className="nv-donut__value nv-num">{String(shares[lit ?? 0] ?? 0)}&nbsp;%</b>
+                  <span className="nv-donut__sub">{litSlice.label}</span>
+                  <span className="nv-donut__sub">{counted(litSlice.sales, 'vente', 'ventes')}</span>
+                </>
+              )}
+            </Donut>
+            <ul className="nv-breakdown mf-kinds">
               {slices.map((slice, i) => {
                 return (
                   <li key={slice.key}>
                     <button
                       type="button"
-                      className="mf-kind"
-                      data-on={lit === i}
-                      // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out
-                      // (`onClick`); the keyboard lights on focus.
-                      onPointerEnter={(event) => {
-                        if (event.pointerType === 'mouse') setLit(i);
-                      }}
-                      onPointerLeave={(event) => {
-                        if (event.pointerType === 'mouse') setLit(null);
-                      }}
-                      onPointerDown={(event) => {
-                        pressedBy.current = event.pointerType;
-                      }}
-                      onFocus={() => {
-                        if (pressedBy.current === null) setLit(i);
-                      }}
-                      onBlur={() => {
-                        pressedBy.current = null;
-                        setLit(null);
-                      }}
-                      onClick={() => {
-                        const by = pressedBy.current;
-                        pressedBy.current = null;
-                        if (by === 'mouse') setLit(i);
-                        else setLit(lit === i ? null : i);
-                      }}
+                      className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
+                      {...row(i)}
                     >
-                      <i className="mf-kind__key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                      <span className="mf-kind__label">{slice.label}</span>
-                      <span className="mf-kind__value nv-num">{roundAmountText(slice.cents, currency)}</span>
-                      <span className="mf-kind__share nv-num">{String(shares[i] ?? 0)}&nbsp;%</span>
+                      <span className="nv-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                      <span className="nv-breakdown__label">{slice.label}</span>
+                      <span className="nv-breakdown__value nv-num">
+                        {roundAmountText(slice.cents, currency)}
+                      </span>
+                      <span className="nv-breakdown__share nv-num">{String(shares[i] ?? 0)}&nbsp;%</span>
                     </button>
                   </li>
                 );

@@ -5,7 +5,7 @@ import type { DailyBudget } from './config';
 
 export type BudgetState = 'ok' | 'alert' | 'reached';
 
-/** Today's spend against the hard daily cap (Charles, 17/10: 20 € a day, alert at 80 %, day in Paris). */
+/** Today's spend against the hard daily cap (Charles, 17/10: 20 € a day, raised to 25 € on 21/11, alert at 80 %, day in Paris). */
 export interface BudgetStatus {
   /** Her calendar day in the budget's time zone, YYYY-MM-DD. */
   readonly day: string;

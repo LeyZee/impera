@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { REAUTHENTICATION_ERROR_CODE } from '@impera/contracts';
+import { AgencyRedirectLinkSchema, REAUTHENTICATION_ERROR_CODE } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -29,6 +29,7 @@ const STORY = {
   placement: 'story_daily',
   usageNote: 'À coller dans ta story du jour',
   enabled: true,
+  attached: false,
 };
 const OLD = {
   id: '0192f3a0-0000-7000-8000-0000000000e2',
@@ -38,6 +39,7 @@ const OLD = {
   placement: null,
   usageNote: '',
   enabled: true,
+  attached: false,
 };
 
 interface Write {
@@ -103,7 +105,7 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     await waitFor(() => {
       expect(writes).toHaveLength(1);
     });
-    const { id, ...rest } = STORY;
+    const { id, ...rest } = AgencyRedirectLinkSchema.omit({ attached: true }).parse(STORY);
     expect(writes[0]).toEqual({
       method: 'PUT',
       path: `/v1/creators/${CREATOR}/redirect-links/${id}`,
@@ -116,7 +118,11 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
       [],
       (write) =>
         new Response(
-          JSON.stringify({ ...z.record(z.string(), z.unknown()).parse(write.body), id: STORY.id }),
+          JSON.stringify({
+            ...z.record(z.string(), z.unknown()).parse(write.body),
+            id: STORY.id,
+            attached: false,
+          }),
         ),
     );
     renderSection();

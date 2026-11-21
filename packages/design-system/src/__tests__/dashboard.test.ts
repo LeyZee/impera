@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { funnelSteps, ringDash, tipPlacement } from '../index.js';
+import { donutArcs, funnelSteps, ringDash, tipPlacement } from '../index.js';
 
 describe('ringDash', () => {
   it('draws the share of the circumference', () => {
@@ -60,5 +60,26 @@ describe('tipPlacement', () => {
       left: 12,
       top: 12,
     });
+  });
+});
+
+describe('donutArcs', () => {
+  it('cuts the ring in arcs that follow each other, clockwise from the top', () => {
+    const [first, second] = donutArcs([1, 3], 10, 0);
+    const quarter = Math.round(((2 * Math.PI * 10) / 4) * 100) / 100;
+    expect(first).toEqual({ dash: `${String(quarter)} 62.83`, offset: 0 });
+    expect(second?.offset).toBe(-quarter);
+  });
+
+  it('leaves a gap between two arcs, none around an arc alone', () => {
+    const whole = Math.round(2 * Math.PI * 10 * 100) / 100;
+    expect(donutArcs([100], 10)[0]?.dash).toBe(`${String(whole)} ${String(whole)}`);
+    const [half] = donutArcs([50, 50], 10, 2);
+    expect(half?.dash.startsWith(String(Math.round((Math.PI * 10 - 2) * 100) / 100))).toBe(true);
+  });
+
+  it('draws nothing for an empty whole and counts a negative value for nothing', () => {
+    expect(donutArcs([0, 0], 10).map((arc) => arc.dash)).toEqual(['0 62.83', '0 62.83']);
+    expect(donutArcs([-5, 10], 10)[1]?.offset).toBe(0);
   });
 });

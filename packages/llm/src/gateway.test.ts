@@ -899,10 +899,10 @@ describe('trend watch budget (ADR 0060 § 7)', () => {
     expect(gateway.health().trendWatchBudget.state).toBe('ok');
   });
 
-  it('defaults the watch’s cap to 1 € inside the 20 €', () => {
+  it('defaults the watch’s cap to 1 € inside the 25 €', () => {
     const { gateway } = setup({ xai: scripted([]) });
     expect(gateway.health().trendWatchBudget).toMatchObject({ capEur: 1, spentEur: 0, state: 'ok' });
-    expect(gateway.health().budget.capEur).toBe(20);
+    expect(gateway.health().budget.capEur).toBe(25);
   });
 });
 
@@ -966,7 +966,7 @@ describe('health', () => {
     expect(voice).toMatchObject({ state: 'degraded', isOnFallback: true, hasKey: true, callsLastHour: 2 });
     expect(voice?.lastError?.outcome).toBe('auth');
     expect(report.costTodayUsd).toBeGreaterThan(0);
-    expect(report.budget).toMatchObject({ capEur: 20, alertAtEur: 16, state: 'ok' });
+    expect(report.budget).toMatchObject({ capEur: 25, alertAtEur: 20, state: 'ok' });
   });
 
   it('is down without any key, and never exposes a key', () => {
