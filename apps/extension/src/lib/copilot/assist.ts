@@ -196,6 +196,14 @@ export function stepDots(sale: CopilotSaleState): readonly StepDot[] {
   );
 }
 
+/** A line of the sale's detail: a value in words, or a list said one pill per element (Design 21/11). */
+export interface SaleRow {
+  readonly label: string;
+  readonly value: string | readonly string[];
+  /** An offer that waits for his answer, said with the band's hourglass. */
+  readonly waiting?: true;
+}
+
 /**
  * The detail under the sale line (§ 3): what the line does not say, each said once. The script and the next step are
  * on the line itself.
@@ -203,19 +211,19 @@ export function stepDots(sale: CopilotSaleState): readonly StepDot[] {
 export function saleRows(
   sale: CopilotSaleState,
   { withNext = false }: { readonly withNext?: boolean } = {},
-): { readonly label: string; readonly value: string }[] {
-  const rows: { label: string; value: string }[] = [];
+): SaleRow[] {
+  const rows: SaleRow[] = [];
   // When the line leaves it out (« Ne rien vendre »), the next step and its price are said here instead.
   if (withNext && sale.nextStep !== null)
     rows.push({
       label: 'Prochaine étape',
       value: `${step(sale.nextStep.name)} ${eurosOf(sale.nextStep.priceMinor)}`,
     });
-  if (sale.offerPending) rows.push({ label: 'Offre faite', value: 'Pas encore de réponse' });
-  if (sale.refusedSteps.length > 0)
-    rows.push({ label: 'Étapes refusées', value: sale.refusedSteps.map(step).join(', ') });
+  if (sale.offerPending) rows.push({ label: 'Offre faite', value: 'Pas encore de réponse', waiting: true });
+  // A pill per step and per objection: the pill bounds the name, no guillemets around it.
+  if (sale.refusedSteps.length > 0) rows.push({ label: 'Étapes refusées', value: sale.refusedSteps });
   if (sale.usedObjections.length > 0)
-    rows.push({ label: 'Objections déjà servies', value: sale.usedObjections.join(', ') });
+    rows.push({ label: 'Objections déjà servies', value: sale.usedObjections });
   if (sale.customOrderOpen) rows.push({ label: 'Commande perso', value: 'Ouverte' });
   return rows;
 }

@@ -2,8 +2,9 @@
  * The copilot side panel (ADR 0086). Design system tokens only; `cp-` is local to this page. Top to bottom, the order of
  * the chatter's questions (Design 16/11, lot 0141-3): who he is and whether one may write (the band), what to do and the
  * text (the core), then the sale line and him in brief, the rest folded. Colour says something or is not there (Design
- * 16/11, lot 0141-5): red for a limit that forbids the sale, amber for what holds it back, the neon for the sale only
- * (its notches, its step, its button), a tint of it for his desire. Nothing blinks.
+ * 16/11, lot 0141-5): red for a limit that forbids the sale, amber for what holds it back, the green of success for a
+ * good moment and what is acquired (Design 21/11: red is an emergency to Charles), the neon for the step in progress and
+ * the button, a tint of it for his desire. Nothing blinks.
  */
 
 html,
@@ -253,14 +254,15 @@ body {
   border-radius: var(--nv-radius-full);
   border: 1px solid var(--nv-ink-faint);
 }
-/* A met notch takes the text's colour; the neon is kept for « Bon moment » (Design 16/11, lot 0141-5). */
+/* A met notch takes the text's colour; a good moment takes the green of success, the same under the gesture and in the
+   sale's detail (Design 21/11). */
 .cp-notch[data-met='true'] {
   border: 0;
   background: currentColor;
 }
-.cp-moment[data-verdict='good'] .cp-notch[data-met='true'] {
-  background: var(--nv-neon);
-  box-shadow: 0 0 6px -1px var(--nv-aura-neon);
+.cp-moment[data-verdict='good'] .cp-notch[data-met='true'],
+.cp-condition[data-met='true'] .cp-notch {
+  background: var(--nv-trend-up);
 }
 .cp-move[data-tone='amber'] .cp-move__what,
 .cp-move[data-tone='amber'] .cp-move__cut {
@@ -855,6 +857,26 @@ body {
     transition: none;
   }
 }
+/* The gauge under the group's line (Design 21/11): fine, at the foot of the row, one colour per group. */
+.cp-group > summary {
+  position: relative;
+}
+.cp-group__meter {
+  position: absolute;
+  left: var(--nv-space-3);
+  right: var(--nv-space-3);
+  bottom: 5px;
+  height: 3px;
+}
+.cp-group__meter[data-group='him'] {
+  --_c: var(--nv-series-1);
+}
+.cp-group__meter[data-group='about_her'] {
+  --_c: var(--nv-series-2);
+}
+.cp-group__meter[data-group='intimate'] {
+  --_c: var(--nv-series-3);
+}
 .cp-group .cp-fields {
   padding: 0 var(--nv-space-3) var(--nv-space-1);
   border-top: 1px solid var(--nv-hairline);
@@ -950,4 +972,22 @@ body {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-faint);
+}
+/* « acquis »: a pill in the green of success (Design 21/11); « manque » stays a muted word. */
+.cp-acquired {
+  margin-left: auto;
+  background: color-mix(in srgb, var(--nv-trend-up) 16%, transparent);
+  color: var(--nv-trend-up-text);
+}
+/* Refused steps and objections served: one pill each. */
+.cp-pills {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* An offer that waits for his answer: the band's hourglass in front. */
+.cp-field__value[data-waiting='true'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
 }

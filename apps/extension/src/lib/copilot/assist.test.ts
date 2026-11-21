@@ -204,7 +204,11 @@ describe('what the agent computed, said to the chatter (ADR 0141, lot a)', () =>
       'Objections déjà servies',
       'Commande perso',
     ]);
-    expect(rows.find(({ label }) => label === 'Étapes refusées')?.value).toBe('«\u00a0Étape 2\u00a0»'); // What the line leaves out, the detail says: the next step first, quoted, with its price.
+    // One pill per element, the pill bounding the name (Design 21/11); the offer waits with the hourglass.
+    expect(rows.find(({ label }) => label === 'Étapes refusées')?.value).toEqual(['Étape 2']);
+    expect(rows.find(({ label }) => label === 'Objections déjà servies')?.value).toEqual(['C’est trop cher']);
+    expect(rows[0]).toEqual({ label: 'Offre faite', value: 'Pas encore de réponse', waiting: true });
+    // What the line leaves out, the detail says: the next step first, quoted, with its price.
     expect(saleRows(sale, { withNext: true })[0]).toEqual({
       label: 'Prochaine étape',
       value: '«\u00a0Étape 3\u00a0» 15\u00a0€',

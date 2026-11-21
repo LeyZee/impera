@@ -370,6 +370,13 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
       null,
     ]);
     expect(groups.every((g) => g.querySelector('summary .cp-group__chevron svg') !== null)).toBe(true);
+    // A fine gauge per group, filled to its share known (Design 21/11): « infirmier » is one field of « Lui ».
+    const meters = groups.map((g) =>
+      g.querySelector<HTMLElement>('summary .nv-meter.cp-group__meter > span'),
+    );
+    expect(meters.every((m) => m !== null)).toBe(true);
+    expect(meters[1]?.style.getPropertyValue('--_w')).toBe('0%');
+    expect(meters[0]?.style.getPropertyValue('--_w')).not.toBe('0%');
     expect(groups.map((g) => g.querySelector('.cp-group__title')?.textContent)).toEqual([
       'Lui',
       'Elle, vue par lui',
@@ -963,6 +970,12 @@ describe('what to do now, and where the sale stands (ADR 0141, lot a)', () => {
       'Étapes refusées',
       'Objections déjà servies',
     ]);
+    // One pill per refused step and per objection served (Design 21/11).
+    expect(
+      [...(fold?.querySelectorAll('.cp-pills') ?? [])].map((list) =>
+        [...list.querySelectorAll('.nv-tag')].map((n) => n.textContent),
+      ),
+    ).toEqual([['Étape 2 bis'], ['C’est trop cher']]);
     fold?.setAttribute('open', '');
     fold?.dispatchEvent(new Event('toggle'));
     expect(actions.toggleSale).toHaveBeenCalledWith(true);
@@ -1125,6 +1138,12 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
       'Il n’a pas encore pris le ton coquinmanque',
       'Il est dispoacquis',
     ]);
+    // « acquis » is a pill, in the green of success; « manque » a muted word (Design 21/11).
+    expect([...root.querySelectorAll('.cp-sale .cp-acquired')].map((n) => n.textContent)).toEqual([
+      'acquis',
+      'acquis',
+    ]);
+    expect(root.querySelector('.cp-sale .cp-condition__state')?.textContent).toBe('manque');
   });
 
   it('tints the desire badge by its band, never in red or amber', () => {

@@ -16,11 +16,23 @@ function rule(selector: string): string {
 }
 
 describe('the copilot panel stylesheet (Design 16/11, lot 0141-5)', () => {
-  it('fills a met notch in the text colour, and in the neon only under « Bon moment »', () => {
+  it('fills a met notch in the text colour, and in the green of success under « Bon moment » (Design 21/11)', () => {
     expect(rule(".cp-notch[data-met='true']")).toContain('background: currentColor');
     expect(rule(".cp-notch[data-met='true']")).not.toContain('--nv-neon');
-    expect(rule(".cp-moment[data-verdict='good'] .cp-notch[data-met='true']")).toContain('var(--nv-neon)');
+    // The same green under the gesture and in the sale's detail; never the neon, red to Charles.
+    const good = rule(
+      ".cp-moment[data-verdict='good'] .cp-notch[data-met='true'],\n.cp-condition[data-met='true'] .cp-notch",
+    );
+    expect(good).toContain('var(--nv-trend-up)');
+    expect(good).not.toContain('--nv-neon');
     expect(css).not.toContain("data-verdict='now'");
+  });
+
+  it('gives each group of the card its own colour of gauge', () => {
+    const colours = (['him', 'about_her', 'intimate'] as const).map((group) =>
+      rule(`.cp-group__meter[data-group='${group}']`),
+    );
+    expect(new Set(colours).size).toBe(3);
   });
 
   it('keeps the moment on one line, an ellipsis rather than a wrap', () => {

@@ -29,6 +29,7 @@ import {
   ESSENTIALS,
   groupChecks,
   groupLine,
+  groupShare,
   IDENTITY,
   IDENTITY_WORDS,
   identitySources,
@@ -500,6 +501,21 @@ function discoverFold(
   return details;
 }
 
+/**
+ * How far his card is filled in for a group (Design 21/11): a fine gauge of the design system under its line, one
+ * colour per group, that fills as it comes in. The count beside the title says it in words.
+ */
+function groupMeter(entries: FanCardView['fields'], group: FanCardGroup): HTMLElement {
+  const { known, total } = groupShare(entries, group);
+  const reached = h('span', {});
+  reached.style.setProperty('--_w', `${String(total === 0 ? 0 : Math.round((known / total) * 100))}%`);
+  return h(
+    'span',
+    { class: 'nv-meter cp-group__meter', 'data-group': group, 'aria-hidden': 'true' },
+    reached,
+  );
+}
+
 /** The groups « Lui », « Elle, vue par lui », « Intime », folded at the very bottom with their counts. */
 function groupFolds(
   card: FanCardView,
@@ -534,6 +550,7 @@ function groupFolds(
         ),
         // The fold says it opens (V-EXT-06).
         h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
+        groupMeter(card.fields, group),
       ),
       h(
         'ul',
@@ -711,7 +728,10 @@ function saleFold(
                   'aria-hidden': 'true',
                 }),
                 h('span', {}, conditionWords(condition)),
-                h('span', { class: 'cp-condition__state' }, condition.met ? 'acquis' : 'manque'),
+                // « acquis » in the green of success, a pill; « manque » stays a muted word (Design 21/11).
+                condition.met
+                  ? h('span', { class: 'nv-tag cp-acquired' }, 'acquis')
+                  : h('span', { class: 'cp-condition__state' }, 'manque'),
               ),
             ),
           ),
@@ -744,12 +764,25 @@ function saleFold(
               'Rien de refusé ni d’objection servie pour l’instant.',
             ),
           ]
-        : rows.map(({ label, value }) =>
+        : rows.map(({ label, value, waiting }) =>
             h(
               'li',
               { class: 'cp-field' },
               h('span', { class: 'cp-field__top' }, h('span', { class: 'cp-field__label' }, label)),
-              h('span', { class: 'cp-field__value' }, value),
+              typeof value === 'string'
+                ? h(
+                    'span',
+                    { class: 'cp-field__value', 'data-waiting': waiting === true ? 'true' : undefined },
+                    waiting === true
+                      ? h('span', { class: 'cp-line-icon', 'aria-hidden': 'true' }, icon('hourglass', 16))
+                      : null,
+                    value,
+                  )
+                : h(
+                    'ul',
+                    { class: 'nv-tags cp-pills' },
+                    ...value.map((item) => h('li', { class: 'nv-tag nv-tag--declared' }, item)),
+                  ),
             ),
           )),
     ),

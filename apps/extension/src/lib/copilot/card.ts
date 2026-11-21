@@ -91,11 +91,20 @@ export function sourceLine(value: FanCardValue, now: Date): string {
   return `${who}, ${ageOf(value.observedAt, now)}`;
 }
 
-/** « 4 sur 11 » for a group's folded line, on the fields it shows. */
-export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup): string {
+/** How many of a group's fields are known, among those it shows: its gauge fills to that share (Design 21/11). */
+export function groupShare(
+  entries: readonly FanCardEntry[],
+  group: FanCardGroup,
+): { readonly known: number; readonly total: number } {
   const specs = restOf(group);
   const known = specs.filter((spec) => entryOf(entries, spec.field).current !== null).length;
-  return `${String(known)} sur ${String(specs.length)}`;
+  return { known, total: specs.length };
+}
+
+/** « 4 sur 11 » for a group's folded line, on the fields it shows. */
+export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup): string {
+  const { known, total } = groupShare(entries, group);
+  return `${String(known)} sur ${String(total)}`;
 }
 
 /** How many fields of a group, among those it shows, wait for a chatter: said on its folded line (V-EXT-07). */
