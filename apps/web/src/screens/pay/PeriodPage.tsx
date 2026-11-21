@@ -1232,6 +1232,8 @@ function BlockNotice({
   }
   const count = block.reports.length;
   const toDecide = block.reports.filter((report) => awaitsDecision(report, now)).length;
+  // The reader's own (his shift, or a correction he made): waiting too, but for someone else (MAN-05, H-13).
+  const mine = block.reports.filter((report) => report.status === 'submitted' && !report.canReview).length;
   // A gap still waiting for its member cannot be validated yet, and holds the period too (ADR 0073 § 5): sending it
   // back frees the period, the report then counts on a later one once validated.
   const explaining = block.reports.filter((report) => gapWaits(report, now)).length;
@@ -1252,6 +1254,9 @@ function BlockNotice({
             {count === 1
               ? 'Un rapport de la quinzaine attend sa relecture'
               : `${String(count)} rapports de la quinzaine attendent leur relecture`}
+            {toDecide < count && mine > 0
+              ? `${count === 1 ? ', le tien' : `, dont ${String(mine)} à toi`} : un autre membre de l’agence ${mine === 1 ? 'le' : 'les'} relit`
+              : null}
           </p>
           <p className="rp-notice__text">
             {list} Tant {count === 1 ? 'qu’il attend' : 'qu’ils attendent'}, la quinzaine ne se clôt pas :{' '}

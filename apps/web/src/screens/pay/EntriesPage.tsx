@@ -355,7 +355,9 @@ function EntryItem({
           <Swatch color={member.color} />
           {member.name}
           <span className="py-member__role">{ENTRY_KIND_LABELS[row.kind]}</span>
-          {row.struck ? <Chip chip={{ label: 'Annulé', tone: 'neutral' }} /> : null}
+          {row.struck ? (
+            <Chip chip={{ label: row.kind === 'bonus' ? 'Annulée' : 'Annulé', tone: 'neutral' }} />
+          ) : null}
         </p>
         <p className="py-entry__why">
           « {row.reason} »{notes.length === 0 ? '' : ` · ${notes.join(' · ')}`}

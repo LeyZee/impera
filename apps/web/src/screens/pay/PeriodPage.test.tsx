@@ -539,12 +539,21 @@ describe('Paie › Quinzaine', () => {
       { ...report(3, IRIS.id), status: 'submitted', canReview: false },
     ];
     renderPage(IRIS_ME);
-    expect(await screen.findByText('3 rapports de la quinzaine attendent leur relecture')).toBeTruthy();
+    // The gap between the two is the manager's own, said in the title (recette MAN-05, H-13).
+    expect(
+      await screen.findByText(
+        '3 rapports de la quinzaine attendent leur relecture, dont 1 à toi : un autre membre de l’agence le relit',
+      ),
+    ).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Relire les 2 rapports' })).toBeTruthy();
     cleanup();
     reports = [{ ...report(3, IRIS.id), status: 'submitted', canReview: false }];
     renderPage(IRIS_ME);
-    expect(await screen.findByText('Un rapport de la quinzaine attend sa relecture')).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'Un rapport de la quinzaine attend sa relecture, le tien : un autre membre de l’agence le relit',
+      ),
+    ).toBeTruthy();
     const link = screen.getByRole('link', { name: 'Voir les rapports' });
     expect(link.className).not.toContain('nv-btn--neon');
   });

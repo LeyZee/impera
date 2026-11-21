@@ -152,8 +152,11 @@ function SessionsPanel(): JSX.Element {
             aria-label="Confirmer la fermeture"
           >
             <p className="text-sm">
-              Les {String(others)} autres sessions seront fermées, et tes autres appareils de confiance
-              oubliés : chacun redemandera ton mot de passe et ton code.
+              {others === 1
+                ? 'L’autre session sera fermée'
+                : `Les ${String(others)} autres sessions seront fermées`}
+              , et tes autres appareils de confiance oubliés : chacun redemandera ton mot de passe et ton
+              code.
             </p>
             <div className="flex flex-wrap gap-2">
               <button

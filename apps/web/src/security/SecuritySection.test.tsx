@@ -281,6 +281,15 @@ describe('SecuritySection (SEC-04)', () => {
     });
   });
 
+  it('says « l’autre session » when there is only one (recette PRO2-07)', async () => {
+    serve({ 'GET /auth/sessions': sessionsRoute(SESSIONS.slice(0, 2)) });
+    render(<SecuritySection />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Fermer toutes les autres' }));
+    expect(screen.getByRole('group').textContent).toContain(
+      'L’autre session sera fermée, et tes autres appareils',
+    );
+  });
+
   it('gives new backup codes against the password and a code, and says a refusal', async () => {
     const codes = Array.from({ length: 10 }, (_, index) => `code-${String(index).padStart(2, '0')}`);
     const calls = serve({
