@@ -47,9 +47,9 @@ describe('POST /v1/creators/:creatorId/redirect-links/detect', () => {
   };
 
   const atService: DetectedLink[] = [
-    detected('lnk_a', 'Nora story du jour', 'https://liens.example.test/nora-story'),
-    detected('lnk_b', 'Ines Telegram', 'https://liens.example.test/ines-tg'),
-    detected('lnk_c', 'Nora bio', 'https://liens.example.test/nora-bio'),
+    detected(`lnk_${'0'.repeat(23)}a`, 'Nora story du jour', 'https://liens.example.test/nora-story'),
+    detected(`lnk_${'0'.repeat(23)}b`, 'Ines Telegram', 'https://liens.example.test/ines-tg'),
+    detected(`lnk_${'0'.repeat(23)}c`, 'Nora bio', 'https://liens.example.test/nora-bio'),
   ];
 
   const readerOf = (): LinkServiceReader => ({
@@ -58,6 +58,8 @@ describe('POST /v1/creators/:creatorId/redirect-links/detect', () => {
       reads += 1;
       return outage === null ? Promise.resolve(atService) : Promise.reject(outage);
     },
+    readHours: () => Promise.resolve([]),
+    readRobotHours: () => Promise.resolve([]),
   });
 
   const call = (method: 'GET' | 'POST' | 'PUT', url: string, who: keyof typeof cookies, body?: object) =>
@@ -200,5 +202,126 @@ describe('POST /v1/creators/:creatorId/redirect-links/detect', () => {
     outage = new LinkServiceError('unauthorized');
     expect((await detect(ines)).json()).toMatchObject({ error: { details: { kind: 'unauthorized' } } });
     outage = null;
+  });
+
+  describe('POST /v1/creators/:creatorId/redirect-links/:linkId/attach', () => {
+    const REF = `lnk_${'0'.repeat(23)}c`;
+    const linkOf = (name: string, url: string) => ({
+      name,
+      url,
+      destination: '',
+      placement: 'other_network',
+      usageNote: '',
+      enabled: true,
+    });
+    const Link = z.object({ id: z.string(), attached: z.boolean() });
+    const links = async (creatorId: CreatorId) =>
+      z
+        .object({ links: z.array(Link.extend({ name: z.string() })) })
+        .parse((await call('GET', `/v1/creators/${creatorId}/redirect-links`, 'owner')).json()).links;
+    const attach = (creatorId: CreatorId, linkId: string, who: keyof typeof cookies = 'owner') =>
+      call('POST', `/v1/creators/${creatorId}/redirect-links/${linkId}/attach`, who);
+    const refOf = async (linkId: string) => {
+      const [row] = await test.admin.db
+        .select({ serviceRef: schema.redirectLinks.serviceRef })
+        .from(schema.redirectLinks)
+        .where(eq(schema.redirectLinks.id, linkId));
+      return row?.serviceRef ?? null;
+    };
+    let bio = '';
+
+    it('keeps the reference the service gives for the link’s own address, and never sends it back', async () => {
+      bio = (await links(nora)).find((one) => one.name === 'Ma bio')?.id ?? '';
+      expect(await refOf(bio)).toBeNull();
+      const response = await attach(nora, bio);
+      expect(response.statusCode, response.body).toBe(200);
+      expect(Link.parse(response.json()).attached).toBe(true);
+      expect(response.body).not.toContain(REF);
+      expect(await refOf(bio)).toBe(REF);
+      const listed = await call('GET', `/v1/creators/${nora}/redirect-links`, 'owner');
+      expect(listed.body).not.toContain(REF);
+      expect((await links(nora)).find((one) => one.id === bio)?.attached).toBe(true);
+    });
+
+    it('is the owner’s only, and asks nothing outside for anyone else', async () => {
+      const before = reads;
+      for (const who of ['manager', 'chatter', 'nora'] as const)
+        expect((await attach(nora, bio, who)).statusCode, who).toBe(403);
+      // A link of another creator is not found under this one.
+      expect((await attach(ines, bio)).statusCode).toBe(404);
+      expect(reads).toBe(before);
+    });
+
+    it('refuses a link the service does not have, and one already attached, without a name', async () => {
+      const unknown = await call(
+        'POST',
+        `/v1/creators/${nora}/redirect-links`,
+        'owner',
+        linkOf('Ailleurs', 'https://liens.example.test/inconnu'),
+      );
+      const unmatched = await attach(nora, Link.omit({ attached: true }).parse(unknown.json()).id);
+      expect(unmatched.statusCode).toBe(409);
+      expect(unmatched.json()).toMatchObject({ error: { code: 'redirect_link_unmatched_conflict' } });
+
+      // Inès is given the address of Nora's attached link: the link of the service stays Nora's.
+      const copy = await call(
+        'POST',
+        `/v1/creators/${ines}/redirect-links`,
+        'owner',
+        linkOf('Bio copiée', 'https://liens.example.test/nora-bio'),
+      );
+      const copyId = Link.omit({ attached: true }).parse(copy.json()).id;
+      const taken = await attach(ines, copyId);
+      expect(taken.statusCode).toBe(409);
+      expect(taken.json()).toMatchObject({ error: { code: 'redirect_link_attached_conflict' } });
+      expect(taken.body).not.toContain('Nora');
+      expect(await refOf(copyId)).toBeNull();
+    });
+
+    it('writes nothing when the service does not answer', async () => {
+      outage = new LinkServiceError('unavailable');
+      const story = await call(
+        'POST',
+        `/v1/creators/${nora}/redirect-links`,
+        'owner',
+        linkOf('Story', 'https://liens.example.test/nora-story'),
+      );
+      const storyId = Link.omit({ attached: true }).parse(story.json()).id;
+      const response = await attach(nora, storyId);
+      expect(response.statusCode).toBe(422);
+      expect(await refOf(storyId)).toBeNull();
+      outage = null;
+    });
+
+    it('detaches a link whose address changes, in the same write', async () => {
+      const moved = await call(
+        'PUT',
+        `/v1/creators/${nora}/redirect-links/${bio}`,
+        'owner',
+        linkOf('Ma bio', 'https://liens.example.test/nouvelle-bio'),
+      );
+      expect(moved.statusCode, moved.body).toBe(200);
+      expect(Link.parse(moved.json()).attached).toBe(false);
+      expect(await refOf(bio)).toBeNull();
+    });
+
+    it('keeps a link attached when anything but its address changes', async () => {
+      const back = await call(
+        'PUT',
+        `/v1/creators/${nora}/redirect-links/${bio}`,
+        'owner',
+        linkOf('Ma bio', 'https://liens.example.test/nora-bio'),
+      );
+      expect(back.statusCode).toBe(200);
+      expect((await attach(nora, bio)).statusCode).toBe(200);
+      const renamed = await call(
+        'PUT',
+        `/v1/creators/${nora}/redirect-links/${bio}`,
+        'owner',
+        linkOf('Ma bio Insta', 'https://liens.example.test/nora-bio/'),
+      );
+      expect(Link.parse(renamed.json()).attached).toBe(true);
+      expect(await refOf(bio)).toBe(REF);
+    });
   });
 });
