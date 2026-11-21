@@ -76,6 +76,17 @@ describe('agentStateOf (ADR 0148 § 1)', () => {
     expect(agentStateOf(withPersona(input(), false), PARIS, NOW).kind).toBe('idle');
   });
 
+  it('a Reveal session expired says so, never « IA active »; a pause or an Arrêt is still said (REV-05)', () => {
+    expect(agentStateOf(input({ sessionExpired: true }), PARIS, NOW)).toEqual({
+      kind: 'expired',
+      label: 'Session Reveal expirée',
+      detail: 'reconnecte-la depuis l’extension : rien n’est lu ni envoyé d’ici là',
+      tone: 'warn',
+    });
+    expect(agentStateOf(input({ mode: 'stop', sessionExpired: true }), PARIS, NOW).kind).toBe('off');
+    expect(agentStateOf(input({ sessionExpired: false }), PARIS, NOW).kind).toBe('on');
+  });
+
   it('a manager reads it from her card, without her « Mise en route » (PRO1-03)', () => {
     const card = CreatorOverviewSchema.parse({
       creatorId: '018f0000-0000-7000-8000-000000000001',

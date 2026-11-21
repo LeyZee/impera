@@ -72,6 +72,11 @@ export const CreatorOverviewSchema = z.object({
    * it, his scope his own too; `true` from a server that does not say it yet, its mode alone said then.
    */
   hasActivePersona: z.boolean().default(true),
+  /**
+   * A Reveal session of hers expired (REV-05): nothing is read nor sent for her until the extension captures it again.
+   * Absent from a server that does not say it yet, read as not expired.
+   */
+  sessionExpired: z.boolean().optional(),
   /** Null when no account is linked to the register, and for a reader whose scope is his own. */
   sales: CreatorOverviewSalesSchema.nullable(),
   /** Null for a reader whose scope is his own; empty when nobody is on shift. */

@@ -23,9 +23,14 @@ export interface AgentStateInput {
    * when the reader cannot know it (her « Mise en route » is the owner's alone): the mode alone is said then.
    */
   readonly hasActivePersona?: boolean;
+  /**
+   * Her Reveal session expired (REV-05): nothing is read nor sent until it is captured again from the extension, so
+   * « IA active » would be false. Absent from a server that does not say it yet.
+   */
+  readonly sessionExpired?: boolean | undefined;
 }
 
-export type AgentStateKind = 'on' | 'out' | 'idle' | 'paused' | 'off' | 'global';
+export type AgentStateKind = 'on' | 'out' | 'idle' | 'expired' | 'paused' | 'off' | 'global';
 
 export interface AgentState {
   readonly kind: AgentStateKind;
@@ -81,6 +86,14 @@ export function agentStateOf(input: AgentStateInput, zone: string, now: Date): A
       };
     }
     return { kind: 'off', label: 'IA coupée', detail: 'jusqu’à ce qu’on la rallume', tone: 'warn' };
+  }
+  if (input.sessionExpired === true) {
+    return {
+      kind: 'expired',
+      label: 'Session Reveal expirée',
+      detail: 'reconnecte-la depuis l’extension : rien n’est lu ni envoyé d’ici là',
+      tone: 'warn',
+    };
   }
   if (input.hasActivePersona === false) {
     return {
