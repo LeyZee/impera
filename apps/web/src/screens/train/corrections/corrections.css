@@ -1,0 +1,96 @@
+/* Entraîner › Corrections (trou béant 12): one plate per draft, why on top, before and after side by side. */
+.co-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.co-creator {
+  max-width: 320px;
+}
+.co-state,
+.co-lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.co-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px var(--nv-space-2);
+}
+/* 44 px to the finger (CR-01): the chip keeps its height, a transparent hit area reaches past it. */
+.co-reasons > .nv-chip::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+}
+.co-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.co-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.co-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.co-card__reason {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.co-card__meta {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.co-card__meta a {
+  color: var(--nv-ink-muted);
+}
+.co-card__note {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  overflow-wrap: anywhere;
+}
+.co-card__sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--nv-space-3);
+}
+.co-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.co-side__title {
+  margin: 0;
+}
+.co-side__bubble {
+  margin: 0;
+  color: var(--nv-ink);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.co-side__none {
+  margin: 0;
+  color: var(--nv-ink-faint);
+}
+/* On a phone the two sides stack, after under before, a hairline between them. */
+@media (max-width: 560px) {
+  .co-card__sides {
+    grid-template-columns: 1fr;
+  }
+  .co-side + .co-side {
+    padding-top: var(--nv-space-2);
+    border-top: 1px solid var(--nv-hairline);
+  }
+}

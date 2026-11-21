@@ -99,6 +99,7 @@ import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
 import { TrafficPage } from './screens/traffic/TrafficPage';
 import { ChannelPostPage } from './screens/train/ChannelPostPage';
+import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
@@ -1020,19 +1021,23 @@ const channelPost = createRoute({
   },
   component: ChannelPostPage,
 });
-/*
- * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
- * to an « à venir » page under its header (recette 05/11, PRO-25), and say so on arrival (recette visuelle 16/11,
- * PIL-17). Each comes back with its screen.
- */
+// Corrections (trou béant 12) are the owner's, like her channel's posts (ADR 0092 § 8): a manager finds the Playground.
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
-  beforeLoad: () => {
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/entrainer/playground', replace: true });
+    }
   },
+  component: CorrectionsPage,
 });
+/*
+ * Tests have no screen yet, hence no tab (ADR 0024): its address leads to the Playground rather than to an « à venir »
+ * page under its header (recette 05/11, PRO-25), and says so on arrival (recette visuelle 16/11, PIL-17). It comes back
+ * with its screen.
+ */
 const tests = createRoute({
   getParentRoute: () => train,
   path: '/tests',
