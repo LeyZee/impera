@@ -976,7 +976,7 @@ export function statementsCsv(
 }
 
 /**
- * Paie's address: the period Quinzaine shows when one was chosen, from Historique or its arrows, and the member whose
+ * Paie's address: the period Quinzaine shows when one was chosen, from Relevés or its arrows, and the member whose
  * statement opens on it, from his record in Équipe (EQ-11).
  */
 export interface PaySearch {

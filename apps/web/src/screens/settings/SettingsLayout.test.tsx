@@ -85,7 +85,7 @@ describe('Réglages’ list', () => {
 });
 
 describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
-  it('groups its sections in four titled groups: Connexions, IA, Argent, Sécurité (ADR 0134 § 6)', async () => {
+  it('groups its sections in four titled groups: Connexions, IA, Argent, Protection (ADR 0134 § 6, renamed 21/11)', async () => {
     const lines = await settingsTabs(owner);
     expect(lines).toEqual([
       'Plateformes',
@@ -103,7 +103,7 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
       'Connexions',
       'IA',
       'Argent',
-      'Sécurité',
+      'Protection',
     ]);
   });
 

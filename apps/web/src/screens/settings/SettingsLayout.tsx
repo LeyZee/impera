@@ -45,7 +45,7 @@ const item = (to: ScreenPath): SettingsItem => ({ to, label: screenLabel(to) });
  * credits (ADR 0091), the bots and groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what
  * each invoice prints (EQ-06), the backups (ADR 0028) and the security of every account (SEC-04).
  * A list, not nine tabs (recette visuelle 16/11, GES-04, decided on 16/11), in the four groups of ADR 0134 § 6:
- * Connexions (Plateformes, Bots Telegram), IA, Argent, Sécurité. The addresses keep their words (`/reglages/ventes`,
+ * Connexions (Plateformes, Bots Telegram), IA, Argent, Protection (« Sécurité » until 21/11, the name of its last screen). The addresses keep their words (`/reglages/ventes`,
  * `/reglages/telegram`): only what the screens are called changed.
  * Every section is the owner's, as the routes guard them: a section a role could not open would not be listed.
  */
@@ -54,7 +54,7 @@ const GROUPS: readonly SettingsGroup[] = [
   { title: 'IA', items: [item('/reglages/modeles-ia'), item('/reglages/consommation-ia')] },
   { title: 'Argent', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
   {
-    title: 'Sécurité',
+    title: 'Protection',
     items: [item('/reglages/alertes'), item('/reglages/sauvegardes'), item('/reglages/securite')],
   },
 ];

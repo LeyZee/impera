@@ -974,7 +974,9 @@ describe('an address of Entraîner with no screen yet', () => {
       await waitFor(() => {
         expect(router.state.location.pathname).toBe('/entrainer/playground');
       });
-      expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
+      expect(
+        await screen.findByText('Cet écran arrive bientôt : tu es sur Entraîner › Chatting.'),
+      ).toBeDefined();
     },
   );
 
@@ -984,7 +986,7 @@ describe('an address of Entraîner with no screen yet', () => {
       expect(router.state.location.pathname).toBe('/entrainer/playground');
     });
     await screen.findByRole('heading', { level: 1, name: 'Chatting' });
-    expect(screen.queryByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeNull();
+    expect(screen.queryByText('Cet écran arrive bientôt : tu es sur Entraîner › Chatting.')).toBeNull();
   });
 });
 
@@ -1074,7 +1076,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
     ['/equipe/membres', 'Équipe', 'Membres', 'wide', owner],
     // Équipe › Comptes Reveal: its tab comes with the server's counts, which this shell test never answers.
     ['/paie/quinzaine', 'Paie', 'Quinzaine', 'wide', owner],
-    ['/paie/releves', 'Paie', 'Historique', 'wide', owner],
+    ['/paie/releves', 'Paie', 'Relevés', 'wide', owner],
     ['/paie/primes-malus', 'Paie', 'Primes et malus', 'wide', owner],
     ['/paie/objectifs', 'Paie', 'Objectifs', 'wide', owner],
     ['/paie/factures', 'Paie', 'Factures', 'wide', owner],

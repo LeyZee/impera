@@ -210,7 +210,7 @@ const SCREENS = {
   '/equipe/membres': 'Membres',
   '/equipe/reveal': 'Comptes Reveal',
   '/paie/quinzaine': 'Quinzaine',
-  '/paie/releves': 'Historique',
+  '/paie/releves': 'Relevés',
   '/paie/primes-malus': 'Primes et malus',
   '/paie/objectifs': 'Objectifs',
   '/paie/factures': 'Factures',

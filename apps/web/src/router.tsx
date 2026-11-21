@@ -121,7 +121,7 @@ export interface RouterContext {
 export const NOT_YOURS = 'Cette page n’est pas dans ton espace.';
 
 /** What the shell says when an address of Entraîner has no screen yet and leads to the Playground (PIL-17). */
-export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur le Playground.';
+export const NOT_BUILT_YET = 'Cet écran arrive bientôt : tu es sur Entraîner › Chatting.';
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   // A section outside the account's rail sends it to its first tab (ADR 0024); the server's 403 stays the barrier.

@@ -95,7 +95,7 @@ describe('RateBar', () => {
     const named = await screen.findByText('Persona fictive : Elena');
     // Its rate calibrates the voice on this fictional persona, never on a creator's (ADR 0010).
     expect(named.getAttribute('title')).toBe(
-      'Ce taux calibre la voix sur la persona fictive du Playground, pas sur celle d’une créatrice.',
+      'Ce taux calibre la voix sur la persona fictive d’Entraîner, pas sur celle d’une créatrice.',
     );
     cleanup();
     renderBar({ ...STATE, voice: { reachable: false } });
