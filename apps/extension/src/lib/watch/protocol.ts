@@ -169,6 +169,22 @@ export const RevealSyncedSchema = z.discriminatedUnion('state', [
 ]);
 export type RevealSynced = z.infer<typeof RevealSyncedSchema>;
 
+/**
+ * What the sync at the opening of the popup left (ADR 0147): stored for that account, with its end, or `idle` when
+ * nothing was due, nothing was read, or the tab named no single account. Never a refusal in red: the button stays.
+ */
+export const RevealAutoSchema = z.discriminatedUnion('state', [
+  z.strictObject({
+    state: z.literal('synced'),
+    accountId: PlatformAccountIdSchema,
+    expiresAt: z.iso.datetime().nullable(),
+    reconnectFirst: z.boolean(),
+    kept: z.boolean(),
+  }),
+  z.strictObject({ state: z.literal('idle') }),
+]);
+export type RevealAuto = z.infer<typeof RevealAutoSchema>;
+
 /** Popup → service worker. The tab is always the one open when the popup opened. */
 export const FromPopupSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('popup/status'), tabId: z.number().int() }),
@@ -190,5 +206,7 @@ export const FromPopupSchema = z.discriminatedUnion('type', [
   /** The held session goes to the CRM, then is forgotten. */
   z.strictObject({ type: z.literal('popup/reveal-send'), accountId: PlatformAccountIdSchema }),
   z.strictObject({ type: z.literal('popup/reveal-cancel') }),
+  /** Once per opening of the popup, by the owner on a Reveal tab (ADR 0147 § 1, § 7). */
+  z.strictObject({ type: z.literal('popup/reveal-auto'), tabId: z.number().int() }),
 ]);
 export type FromPopup = z.infer<typeof FromPopupSchema>;

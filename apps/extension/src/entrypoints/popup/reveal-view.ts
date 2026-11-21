@@ -51,6 +51,8 @@ export type SyncOutcome =
       readonly expiresAt: string | null;
       readonly reconnectFirst: boolean;
       readonly kept: boolean;
+      /** Sent by the extension alone when the popup opened (ADR 0147 § 6): the owner sees it left without him. */
+      readonly auto: boolean;
     }
   | { readonly kind: 'failed'; readonly accountId: PlatformAccountId; readonly failure: SyncFailure };
 
@@ -273,7 +275,7 @@ function rowStateOf(account: Account, view: SyncView): RowState {
   const { tone, word } = STATES[account.sessionState];
   return {
     tone,
-    word,
+    word: synced?.auto === true ? 'Synchronisée à l’ouverture' : word,
     until: until !== null && until > view.now ? until : null,
     synced,
     failure: outcome?.kind === 'failed' ? outcome.failure : null,
