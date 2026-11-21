@@ -269,7 +269,12 @@ function QuietHours({ saved, creator }: { saved: NotificationPreferences; creato
                 <span className="nv-notif__hint">le lendemain</span>
               ) : null}
             </span>
-            {emptyRange ? (
+            {unreadable ? (
+              // An hour that does not read says how to write one, never only a grey « Enregistrer » (recette MOD-07).
+              <p className="nv-notif__error" role="alert">
+                Écris une heure, comme 23 h ou 23:30.
+              </p>
+            ) : emptyRange ? (
               <p className="nv-notif__error" role="alert">
                 {EMPTY_RANGE}
               </p>

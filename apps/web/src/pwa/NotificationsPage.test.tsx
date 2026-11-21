@@ -252,6 +252,8 @@ describe('Notifications, when it rings', () => {
     renderPage();
     fireEvent.change(await screen.findByLabelText('Fin des heures calmes'), { target: { value: '7h7h' } });
     expect(save()).toHaveProperty('disabled', true);
+    // Said, never only a grey « Enregistrer » (MOD-07).
+    expect(screen.getByRole('alert').textContent).toBe('Écris une heure, comme 23 h ou 23:30.');
   });
 });
 
