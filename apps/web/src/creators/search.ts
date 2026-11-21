@@ -10,7 +10,7 @@ import { useSyncExternalStore } from 'react';
 export interface CreatorsSearch {
   readonly onglet?: 'ia' | 'medias' | 'scripts' | 'agenda' | 'alertes' | 'compte';
   /** The view inside the tab; the tab's first view leaves it out. */
-  readonly vue?: 'depots' | 'a-copier' | 'structures' | 'sur-mesure' | 'idees' | 'demandes';
+  readonly vue?: 'depots' | 'impera' | 'a-copier' | 'structures' | 'sur-mesure' | 'idees' | 'demandes';
   readonly creatrice?: CreatorId;
   /**
    * The vault folder opened in Médias (`dossier`, its platform id, `racine` for the vault's root): one the last sync no
@@ -34,6 +34,7 @@ export type CreatorSheet =
   | 'hours'
   | 'vault'
   | 'content'
+  | 'stock'
   | 'scripts'
   | 'copy'
   | 'structures'
@@ -52,6 +53,7 @@ const TAB_OF: Readonly<Record<CreatorSheet, CreatorTabName>> = {
   hours: 'ai',
   vault: 'media',
   content: 'media',
+  stock: 'media',
   scripts: 'scripts',
   copy: 'scripts',
   structures: 'scripts',
@@ -81,6 +83,7 @@ const TAB_SLUGS = {
 /** The view a sheet is inside its tab, in the address; a tab's first view, and a tab of one page, have none. */
 const VIEW_SLUGS: Partial<Readonly<Record<CreatorSheet, NonNullable<CreatorsSearch['vue']>>>> = {
   content: 'depots',
+  stock: 'impera',
   copy: 'a-copier',
   structures: 'structures',
   custom: 'sur-mesure',
@@ -104,6 +107,7 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
   'hours',
   'vault',
   'content',
+  'stock',
   'scripts',
   'copy',
   'structures',
@@ -128,7 +132,7 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
   return user.teamScope === 'agency'
-    ? ['vault', 'content', 'scripts', 'copy', 'agenda', 'ideas', 'requests']
+    ? ['vault', 'content', 'stock', 'scripts', 'copy', 'agenda', 'ideas', 'requests']
     : ['persona'];
 }
 
@@ -144,7 +148,7 @@ const isTabSlug = (value: unknown): value is NonNullable<CreatorsSearch['onglet'
 const VIEWS_OF: Partial<
   Readonly<Record<NonNullable<CreatorsSearch['onglet']>, readonly NonNullable<CreatorsSearch['vue']>[]>>
 > = {
-  medias: ['depots'],
+  medias: ['depots', 'impera'],
   scripts: ['a-copier', 'structures', 'sur-mesure'],
   agenda: ['idees', 'demandes'],
 };
@@ -177,7 +181,7 @@ export function sheetOf(search: CreatorsSearch): CreatorSheet {
   const { onglet: tab, vue: view } = search;
   if (tab === undefined) return 'persona';
   if (tab === 'ia') return 'hours';
-  if (tab === 'medias') return view === 'depots' ? 'content' : 'vault';
+  if (tab === 'medias') return view === 'depots' ? 'content' : view === 'impera' ? 'stock' : 'vault';
   if (tab === 'scripts')
     return view === 'a-copier'
       ? 'copy'

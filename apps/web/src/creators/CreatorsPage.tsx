@@ -45,6 +45,7 @@ import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
+import { StockSection } from '@/stock/StockOverview';
 
 export type CreatorTab = CreatorSheet;
 
@@ -71,8 +72,10 @@ const TAB_VIEWS: Partial<
   media: {
     label: 'Vue de ses médias',
     views: [
-      ['vault', 'Coffre'],
+      // Two coffres (ADR 0162): Reveal's, synchronised, and Impera's, what she dropped by use.
+      ['vault', 'Coffre Reveal'],
       ['content', 'Dépôts'],
+      ['stock', 'Coffre Impera'],
     ],
   },
   scripts: {
@@ -349,6 +352,8 @@ export function CreatorsPage({
       );
     }
     if (shown === 'structures' && current !== undefined) return <StructuresView />;
+    if (shown === 'stock' && current !== undefined)
+      return <StockSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     if (shown === 'content' && current !== undefined) {
       return (
         <DropsSection

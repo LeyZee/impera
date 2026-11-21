@@ -451,7 +451,7 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(screen.getByRole('radiogroup', { name: 'Vue de ses médias' }))
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['Coffre', 'Dépôts']);
+    ).toEqual(['Coffre Reveal', 'Dépôts', 'Coffre Impera']);
     // Structures and her made-to-measure prices are the owner's: a manager has her scripts and what is to copy.
     router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
     expect(

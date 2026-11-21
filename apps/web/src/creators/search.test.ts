@@ -25,6 +25,7 @@ describe('the sheets of a creator a member opens', () => {
     expect(sheetsFor(member({ role: 'operator', teamScope: 'agency' }))).toEqual([
       'vault',
       'content',
+      'stock',
       'scripts',
       'copy',
       'agenda',
@@ -46,6 +47,7 @@ describe('the seven tabs of her sheet in the address (ADR 0149 § 5)', () => {
     expect(creatorsSearch('persona', creatrice)).toEqual({ creatrice });
     expect(creatorsSearch('hours', creatrice)).toEqual({ onglet: 'ia', creatrice });
     expect(creatorsSearch('vault', creatrice)).toEqual({ onglet: 'medias', creatrice });
+    expect(creatorsSearch('stock', creatrice)).toEqual({ onglet: 'medias', vue: 'impera', creatrice });
     expect(creatorsSearch('content', creatrice)).toEqual({ onglet: 'medias', vue: 'depots', creatrice });
     expect(creatorsSearch('scripts', creatrice)).toEqual({ onglet: 'scripts', creatrice });
     expect(creatorsSearch('copy', creatrice)).toEqual({ onglet: 'scripts', vue: 'a-copier', creatrice });
@@ -68,6 +70,7 @@ describe('the seven tabs of her sheet in the address (ADR 0149 § 5)', () => {
       'hours',
       'vault',
       'content',
+      'stock',
       'scripts',
       'copy',
       'structures',
@@ -185,6 +188,7 @@ describe('the vault folder in the address (`dossier`)', () => {
       dossier: 'racine',
     });
     expect(creatorsSearch('vault', creatrice)).toEqual({ onglet: 'medias', creatrice });
+    expect(creatorsSearch('stock', creatrice)).toEqual({ onglet: 'medias', vue: 'impera', creatrice });
     expect(creatorsSearch('agenda', creatrice, 'f1')).toEqual({ onglet: 'agenda', creatrice });
   });
 });

@@ -62,11 +62,14 @@ interface Opened {
  */
 export function ContentPage({
   onOpenScript,
+  onOpenStock,
   asked: askedId = null,
   onAsked,
 }: {
   /** Her script, card by card (SC-02 lot b2). */
   onOpenScript: (dropId: ContentDropId) => void;
+  /** Mon coffre (ADR 0162 § 5): what she dropped, by use. */
+  onOpenStock?: () => void;
   /** A request to open the sheet on, from Aujourd'hui's « Déposer » (`?demande=`, recette visuelle 16/11, CRE-01). */
   asked?: string | null;
   /** The sheet opened on it: the address forgets it, so that « retour » does not open it again. */
@@ -141,7 +144,17 @@ export function ContentPage({
 
   return (
     <Page className="ct-page" width="narrow">
-      <PageHeader title="Contenu" lead="Ce qu’on te demande, et ce que tu envoies." />
+      <PageHeader
+        title="Contenu"
+        lead="Ce qu’on te demande, et ce que tu envoies."
+        actions={
+          onOpenStock === undefined ? undefined : (
+            <button type="button" className="nv-btn nv-btn--sm nv-btn--soft" onClick={onOpenStock}>
+              Mon coffre
+            </button>
+          )
+        }
+      />
       {content.isError ? (
         <Failure
           onRetry={() => {
