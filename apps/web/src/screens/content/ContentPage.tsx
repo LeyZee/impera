@@ -10,10 +10,10 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
+import { CategoryIcon } from './CategoryIcon';
 import { DropSheet } from './DropSheet';
 import { CONTENT_KEY, refuseRequest, startScriptDrop, useContent, useScriptDrop, withdrawDrop } from './api';
 import {
-  CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   DROP_OUTPUTS,
   STATE_WORDS,
@@ -225,9 +225,7 @@ export function ContentPage({
                         setOpened({ category, request: null });
                       }}
                     >
-                      <span className="ct-tile__emoji" aria-hidden="true">
-                        {CATEGORY_EMOJIS[category]}
-                      </span>
+                      <CategoryIcon category={category} />
                       <span className="ct-tile__name">{DROP_CATEGORY_LABELS[category]}</span>
                       <span className="ct-tile__hint">{CATEGORY_HINTS[category]}</span>
                     </button>
@@ -247,7 +245,7 @@ export function ContentPage({
               <ul className="ct-list ct-list--quiet">
                 {out.map((drop) => (
                   <li key={drop.id} className="ct-out">
-                    <span aria-hidden="true">{CATEGORY_EMOJIS[drop.category]}</span>
+                    <CategoryIcon category={drop.category} size="sm" />
                     <span className="ct-out__name">{dropName(drop)}</span>
                     <span className="ct-out__meta nv-num">{outLine(drop, today, zone)}</span>
                   </li>
@@ -329,9 +327,7 @@ function RequestCard({
   return (
     <li className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[request.category]}
-        </span>
+        <CategoryIcon category={request.category} size="sm" />
         <span className="ct-card__titles">
           <span className="ct-card__name">{DROP_CATEGORY_LABELS[request.category]}</span>
           <span className={dueClass(due, request, today)}>
@@ -424,9 +420,7 @@ function StartedScriptCard({
   return (
     <li className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[drop.category]}
-        </span>
+        <CategoryIcon category={drop.category} size="sm" />
         <span className="ct-card__titles">
           <span className="ct-card__name">
             {script.data === undefined
@@ -516,9 +510,7 @@ function DropCard({
   return (
     <li ref={card} className="nv-plate ct-card">
       <div className="ct-card__head">
-        <span className="ct-card__emoji" aria-hidden="true">
-          {CATEGORY_EMOJIS[drop.category]}
-        </span>
+        <CategoryIcon category={drop.category} size="sm" />
         <span className="ct-card__name">{dropName(drop)}</span>
         <span className={`ct-state ct-state--${tone}`}>{STATE_WORDS[drop.state]}</span>
       </div>
@@ -724,7 +716,7 @@ function RefuseDialog({
   return (
     <Dialog
       title="Tu ne peux pas le tourner ?"
-      lead={`${CATEGORY_EMOJIS[request.category]} ${DROP_CATEGORY_LABELS[request.category]}`}
+      lead={DROP_CATEGORY_LABELS[request.category]}
       busy={busy}
       onClose={onClose}
     >

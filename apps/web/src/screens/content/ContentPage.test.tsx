@@ -105,6 +105,16 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(tiles).toHaveLength(4);
     expect(tiles.some((name) => name.includes('Script'))).toBe(false);
     expect(tiles.some((name) => name.includes('Insta'))).toBe(false);
+    // Each tile carries the Agenda's mark and colour of its kind, never an emoji (choice of 21/11).
+    const marks = [...document.querySelectorAll('.ct-tile .ct-kind')].map((mark) =>
+      mark.getAttribute('data-need'),
+    );
+    expect(marks).toEqual(['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm']);
+    expect(document.querySelector('.ct-tile .ct-kind svg.wk-icon')).not.toBeNull();
+    expect(
+      document.querySelector<HTMLElement>('.ct-tile .ct-kind')?.style.getPropertyValue('--wk-feed_shoot'),
+    ).toBe('var(--wk-sw-rose)');
+    expect(document.body.textContent).not.toMatch(/📸|🎬|✨|💌/u);
   });
 
   it('lists her requests, the nearest first, a late one in amber', async () => {

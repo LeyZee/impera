@@ -17,7 +17,6 @@ import { Thumb } from './Thumb';
 import { Refused, createDrop } from './api';
 import { durationOf } from './media-length';
 import {
-  CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   HEAVY_BYTES,
   UNKNOWN_TYPE,
@@ -149,7 +148,7 @@ export function DropSheet({
 
   return (
     <Dialog
-      title={`${CATEGORY_EMOJIS[category]} ${DROP_CATEGORY_LABELS[category]}`}
+      title={DROP_CATEGORY_LABELS[category]}
       lead={request === null ? CATEGORY_HINTS[category] : request.reason}
       busy={busy}
       className="ct-sheet"
