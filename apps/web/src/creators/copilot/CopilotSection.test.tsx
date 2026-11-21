@@ -49,7 +49,7 @@ afterEach(() => {
 });
 
 describe('Créatrices › IA › Copilote dans l’extension (trous béants, 21/11)', () => {
-  it('says first that her chatters write alone while the drafts are off, in amber', async () => {
+  it('says first that her chatters write alone while the drafts are off, in the neutral ink', async () => {
     serve({ fanCard: true, drafts: false });
     show();
     const line = await screen.findByText(

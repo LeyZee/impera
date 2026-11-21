@@ -15,10 +15,34 @@ import { NavIcon, type NavIconName } from '@/shell/NavIcon';
 
 type SwitchName = keyof CopilotSwitches;
 
+/**
+ * The fan's card: one figure on a card, in the stroke of the menu's icons (Design 21/11: three figures say « Équipe »,
+ * not one fan's card).
+ */
+function FanCardIcon(): JSX.Element {
+  return (
+    <svg
+      className="nav-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2.8" y="4.5" width="18.4" height="15" rx="3" />
+      <circle cx="8.8" cy="10.6" r="2.3" />
+      <path d="M5.4 16.2c.7-1.6 1.9-2.4 3.4-2.4s2.7.8 3.4 2.4" />
+      <path d="M14.6 10h3.6M14.6 13.6h2.6" />
+    </svg>
+  );
+}
+
 /** Each switch in the owner's words: what the chatter sees beside Reveal when it is on. */
 const SWITCHES: readonly {
   readonly name: SwitchName;
-  readonly icon: NavIconName;
+  readonly icon: NavIconName | 'card';
   readonly title: string;
   readonly does: string;
   /** Its state in words, agreed with its name: « Allumée » for the card, « Allumés » for the drafts. */
@@ -27,7 +51,7 @@ const SWITCHES: readonly {
 }[] = [
   {
     name: 'fanCard',
-    icon: 'people',
+    icon: 'card',
     title: 'Fiche du fan',
     does: 'Ce qu’on sait de lui, ses limites et ce qu’il reste à découvrir, à côté de la conversation.',
     on: 'Allumée',
@@ -134,7 +158,7 @@ export function CopilotSection({
           return (
             <li key={name} className="cc-row" data-on={on ? 'true' : 'false'}>
               <span className="cc-row__icon" data-switch={name}>
-                <NavIcon name={icon} />
+                {icon === 'card' ? <FanCardIcon /> : <NavIcon name={icon} />}
               </span>
               <div className="cc-row__words">
                 <p className="cc-row__title">

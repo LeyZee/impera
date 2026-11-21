@@ -1,7 +1,7 @@
 /*
  * Créatrices › IA › « Copilote dans l'extension » (ADR 0086 § 6). The answer on top (what her chatters get now), then a
- * row per switch with its icon, its state and what it shows. Green for a switch on, amber when the drafts are off: her
- * chatters then write alone. Tokens only.
+ * row per switch with its icon, its state and what it shows. Green when all is on; a switch off is her choice, said in
+ * the neutral ink, never in amber (Design 21/11). Tokens only.
  */
 .cc-card {
   padding: var(--nv-plate-pad);
@@ -64,7 +64,7 @@
   text-wrap: pretty;
 }
 .cc-headline[data-tone='off'] {
-  color: var(--nv-warning);
+  color: var(--nv-ink-muted);
 }
 .cc-muted {
   margin: 0;
@@ -84,7 +84,7 @@
 }
 .cc-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--nv-space-3);
   padding: var(--nv-space-3) var(--nv-space-2);
   border-radius: var(--nv-radius-md);
@@ -95,6 +95,10 @@
 }
 .cc-row__words {
   flex: 1;
+}
+/* The switch stays in the middle of its row; the icon sits on the title's line. */
+.cc-row .nv-switch {
+  align-self: center;
 }
 .cc-row__title {
   margin: 0;
@@ -148,5 +152,13 @@
   .cc-row,
   .cc-state::before {
     transition: none;
+  }
+}
+/* On a phone the state goes under the title on every row, never beside on one and under on the next (Design 21/11). */
+@media (max-width: 720px) {
+  .cc-row__title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
   }
 }
