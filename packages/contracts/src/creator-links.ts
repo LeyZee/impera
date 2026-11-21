@@ -127,3 +127,7 @@ export const LinkProposalSchema = z.strictObject({
   knownAs: RedirectLinkIdSchema.nullable(),
 });
 export type LinkProposal = z.infer<typeof LinkProposalSchema>;
+
+/** What « Détecter ses liens » answers: the proposals, to be confirmed one by one. Nothing was written. */
+export const LinkProposalsResponseSchema = z.strictObject({ proposals: z.array(LinkProposalSchema) });
+export type LinkProposalsResponse = z.infer<typeof LinkProposalsResponseSchema>;

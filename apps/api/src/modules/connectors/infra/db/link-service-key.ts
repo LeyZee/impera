@@ -87,3 +87,41 @@ export function createLinkServiceKeyStore(
     },
   };
 }
+
+/**
+ * After a rotation of CREDENTIALS_ENCRYPTION_KEYS, re-seals the key of the redirect service with the newest one
+ * (runbooks/rotate-secrets.md), as `resealSalesFeedKeys` does. With `dryRun`, only says whether it opens: nothing is
+ * written, nothing decrypted leaves this function. Re-running it is a no-op.
+ */
+export function resealLinkServiceKey(
+  adminDb: Database,
+  keys: readonly EncryptionKey[],
+  dryRun = false,
+): Promise<{ readonly total: number; readonly rewritten: number; readonly unreadable: readonly string[] }> {
+  const current = keys[0]?.version;
+  if (current === undefined) throw new Error('CREDENTIALS_ENCRYPTION_KEYS est vide');
+  return adminDb.transaction(async (tx) => {
+    const query = tx.select({ sealed: table.keyCiphertext }).from(table);
+    const [row] = dryRun ? await query : await query.for('update');
+    if (row === undefined) return { total: 0, rewritten: 0, unreadable: [] };
+    let key: string;
+    try {
+      key = decryptSecret(row.sealed, keys, CONTEXT);
+    } catch {
+      return { total: 1, rewritten: 0, unreadable: ['link_service'] };
+    }
+    if (dryRun || keyVersionOf(row.sealed) === current) return { total: 1, rewritten: 0, unreadable: [] };
+    const sealed = encryptSecret(key, keys, CONTEXT);
+    await tx.update(table).set({ keyCiphertext: sealed, keyVersion: keyVersionOf(sealed) });
+    await tx.insert(schema.auditLog).values({
+      id: newId(AuditEntryIdSchema),
+      userId: null,
+      ip: null,
+      action: 'link_service_key.reencrypted',
+      entity: 'link_service_credential',
+      entityId: null,
+      details: { rewritten: 1, keyVersion: current },
+    });
+    return { total: 1, rewritten: 1, unreadable: [] };
+  });
+}

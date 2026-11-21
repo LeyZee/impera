@@ -4,7 +4,7 @@ import { parseEncryptionKeys, schema, sql, eq } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 
-import { createLinkServiceKeyStore } from '../link-service-key';
+import { createLinkServiceKeyStore, resealLinkServiceKey } from '../link-service-key';
 
 const FAKE_KEY = 'FAKE-link-service-key-0000';
 const by = { userId: null, ip: null };
@@ -70,6 +70,33 @@ describe('link service key store', () => {
     await createLinkServiceKeyStore(test.service.db, keys).save(FAKE_KEY, new Date(), by);
     const found = await createLinkServiceKeyStore(test.service.db, newKey('v2')).find();
     expect(found?.key).toBeNull();
+  });
+
+  it('re-seals with the newest key, once, after which the old one can go', async () => {
+    const v2 = newKey('v2');
+    const both = [...v2, ...keys];
+    await createLinkServiceKeyStore(test.service.db, keys).save(FAKE_KEY, new Date(), by);
+    expect(await resealLinkServiceKey(test.service.db, both, true)).toEqual({
+      total: 1,
+      rewritten: 0,
+      unreadable: [],
+    });
+    expect(await resealLinkServiceKey(test.service.db, both)).toEqual({
+      total: 1,
+      rewritten: 1,
+      unreadable: [],
+    });
+    expect(await resealLinkServiceKey(test.service.db, both)).toEqual({
+      total: 1,
+      rewritten: 0,
+      unreadable: [],
+    });
+    expect((await createLinkServiceKeyStore(test.service.db, v2).find())?.key).toBe(FAKE_KEY);
+    expect(await resealLinkServiceKey(test.service.db, newKey('v3'), true)).toEqual({
+      total: 1,
+      rewritten: 0,
+      unreadable: ['link_service'],
+    });
   });
 
   it('does not open with another secret’s seal', async () => {

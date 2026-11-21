@@ -15,7 +15,7 @@ import type { OutboundSender } from '../conversations';
 
 import { createConnectorReads, type ConnectorReads } from './application/connector-reads';
 import { createDispatchJob } from './application/dispatch';
-import { createLinkServiceSettings } from './application/link-service';
+import { createLinkServiceSettings, type DetectedLinks } from './application/link-service';
 import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import {
@@ -47,7 +47,7 @@ import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
 import { createDrizzleConnectorReadsStore } from './infra/db/connector-reads-store';
 import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
-import { createLinkServiceKeyStore } from './infra/db/link-service-key';
+import { createLinkServiceKeyStore, resealLinkServiceKey } from './infra/db/link-service-key';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
   createSalesFeedJobs,
@@ -125,39 +125,41 @@ export {
   type RevealWireMessageItem,
 } from './infra/reveal/wire';
 
-function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
+function allReports(...reports: readonly ResealReport[]): ResealReport {
   return {
-    total: keys.total + webhooks.total,
-    rewritten: keys.rewritten + webhooks.rewritten,
-    unreadable: [...keys.unreadable, ...webhooks.unreadable],
+    total: reports.reduce((sum, report) => sum + report.total, 0),
+    rewritten: reports.reduce((sum, report) => sum + report.rewritten, 0),
+    unreadable: reports.flatMap((report) => report.unreadable),
   };
 }
 
 /**
- * `pnpm ops:reencrypt-credentials`: the sales feed keys and their webhooks' secrets re-sealed with the newest
- * CREDENTIALS_ENCRYPTION_KEYS.
+ * `pnpm ops:reencrypt-credentials`: the sales feed keys, their webhooks' secrets and the key of the redirect service
+ * re-sealed with the newest CREDENTIALS_ENCRYPTION_KEYS.
  */
 export async function resealSalesFeedCredentials(
   adminDb: Database,
   keys: readonly EncryptionKey[],
 ): Promise<ResealReport> {
-  return bothReports(
+  return allReports(
     await resealSalesFeedKeys(adminDb, keys),
     await resealSalesFeedWebhookSecrets(adminDb, keys),
+    await resealLinkServiceKey(adminDb, keys),
   );
 }
 
 /**
- * `pnpm ops:check-keys`: how many sales feed keys and webhook secrets the given encryption keys open, read only, no
- * call to Reveal.
+ * `pnpm ops:check-keys`: how many sales feed keys, webhook secrets and the key of the redirect service the given
+ * encryption keys open, read only, no call outside.
  */
 export async function checkSalesFeedKeys(
   adminDb: Database,
   keys: readonly EncryptionKey[],
 ): Promise<{ readonly total: number; readonly unreadable: readonly string[] }> {
-  const report = bothReports(
+  const report = allReports(
     await resealSalesFeedKeys(adminDb, keys, true),
     await resealSalesFeedWebhookSecrets(adminDb, keys, true),
+    await resealLinkServiceKey(adminDb, keys, true),
   );
   return { total: report.total, unreadable: report.unreadable };
 }
@@ -238,6 +240,11 @@ export interface ConnectorsModule {
   readonly vaultFiles: VaultFiles;
   /** `/v1/creators/:creatorId/avatar`, behind the guard given here (owner, operator, creator). */
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  /**
+   * Every link of the agency's account at the redirect service (ADR 0120 § 3), read now, for « Détecter ses liens »:
+   * for the owner alone, never stored here.
+   */
+  readonly detectedLinks: () => Promise<DetectedLinks>;
   /** `/v1/settings/link-service`, behind the guards given here: the agency's key of the redirect service. */
   readonly linkServiceRoutes: (options: LinkServiceRoutesOptions) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
@@ -456,6 +463,7 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
     vaultFiles: createVaultFiles({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     linkServiceRoutes: (options) => createLinkServiceRoutes(linkService, options),
+    detectedLinks: () => linkService.detectedLinks(),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),
     salesFeedStates: () => salesFeeds.list(),

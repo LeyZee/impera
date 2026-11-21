@@ -323,6 +323,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
   'link_service_key.connected': access('a branché la clé du service de redirection'),
   'link_service_key.replaced': access('a remplacé la clé du service de redirection'),
   'link_service_key.disconnected': access('a débranché la clé du service de redirection'),
+  'link_service_key.reencrypted': access('a rechiffré la clé du service de redirection'),
   'sales_feed_key.connected': action(
     'access',
     platformOnly,

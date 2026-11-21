@@ -4,6 +4,7 @@ import type { Database } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import type { DetectLinks } from './domain/ports';
 import { createDrizzleRedirectLinkStore } from './infra/db/link-store';
 import { createRedirectLinkRoutes, type RequireRole } from './infra/http/routes';
 
@@ -26,13 +27,15 @@ export interface RedirectLinksDeps {
   readonly requireRole: RequireRole;
   /** `requireRecentLogin` (ADR 0016), for the writes. */
   readonly recentLogin: preValidationAsyncHookHandler;
+  /** `connectors.detectedLinks`: the redirect service read now, for « Détecter ses liens ». */
+  readonly detectLinks: DetectLinks;
 }
 
 export function createRedirectLinksModule(deps: RedirectLinksDeps): RedirectLinksModule {
   const store = createDrizzleRedirectLinkStore(deps.db, deps.adminDb);
   return {
     name: 'redirect-links',
-    routes: createRedirectLinkRoutes(store, deps.requireRole, deps.recentLogin),
+    routes: createRedirectLinkRoutes(store, deps.requireRole, deps.recentLogin, deps.detectLinks),
     channelLinks: async (creatorId) => {
       const links = await store.enabledUnscoped(creatorId);
       return links === null
