@@ -22,18 +22,7 @@ import {
   type TeamRoleChange,
   type UserId,
 } from '@impera/contracts';
-import {
-  and,
-  eq,
-  inArray,
-  removePasskeys,
-  revokeSignIns,
-  schema,
-  sql,
-  withMember,
-  type Database,
-  type Transaction,
-} from '@impera/db';
+import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import {
@@ -65,6 +54,8 @@ import type {
   TeamInvites,
   TeamStore,
 } from '../domain/ports';
+
+import { leaveTeam, recordImmediateDeparture } from './leave';
 
 const {
   account,
@@ -355,18 +346,14 @@ export function createDrizzleTeamStore(
         const [holder] = await tx.select({ role: user.role }).from(user).where(eq(user.id, current.userId));
         if (holder?.role === 'owner') throw new OwnerProtected();
         const leaving = leavesTeam(current.status, status);
-        await tx
-          .update(teamMembers)
-          .set({ status, ...(leaving && { leftOn: today }), updatedAt: now() })
-          .where(eq(teamMembers.id, id));
         let sessionsEnded = 0;
         let passkeysRemoved = 0;
         if (leaving) {
-          await tx.update(user).set({ creatorIds: [], updatedAt: now() }).where(eq(user.id, current.userId));
-          // Its trusted devices too (ADR 0046 § 3), and its passkeys (ADR 0053 § 5): nothing of the account stays signed
-          // in, nothing lets it sign in again.
-          sessionsEnded = (await revokeSignIns(tx, current.userId)).sessions;
-          passkeysRemoved = await removePasskeys(tx, current.userId);
+          // « Parti » here is a departure applied at once (ADR 0166 § 1), written as one so that his space opens.
+          ({ sessionsEnded, passkeysRemoved } = await leaveTeam(tx, id, current.userId, today));
+          await recordImmediateDeparture(tx, actor, id);
+        } else {
+          await tx.update(teamMembers).set({ status, updatedAt: now() }).where(eq(teamMembers.id, id));
         }
         await audit(
           tx,

@@ -87,6 +87,7 @@ export * from './shift-feedback';
 export * from './shift-reports';
 export * from './team';
 export * from './team-members';
+export * from './team-departures';
 export * from './announcements';
 export * from './telegram';
 export * from './telegram-channel';

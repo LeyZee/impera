@@ -54,6 +54,15 @@ export function wireTeam(
           context.logger.info({ applied: await module.jobs.applyRoles() }, 'team: roles of the day applied');
         },
       ),
+      'team.member_departure': defineTask(
+        'team.member_departure',
+        JOB_PAYLOADS['team.member_departure'],
+        logger,
+        async (payload, context) => {
+          const applied = await module.jobs.applyDeparture(payload.departureId, payload.ownerId);
+          context.logger.info({ departureId: payload.departureId, applied }, 'team: departure at its hour');
+        },
+      ),
     },
     routes: [module.routes(requireRole, shared.recentLogin), module.announcementRoutes(requireRole)],
   };

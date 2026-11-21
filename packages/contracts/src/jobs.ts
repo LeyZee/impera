@@ -10,6 +10,7 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   CreatorTaskIdSchema,
+  MemberDepartureIdSchema,
   DraftIdSchema,
   EventIdSchema,
   FanIdSchema,
@@ -19,6 +20,7 @@ import {
   SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
@@ -71,6 +73,7 @@ export const JOB_NAMES = [
   'scheduling.check_reports',
   'scheduling.remind_reports',
   'team.apply_roles',
+  'team.member_departure',
   'owners.watch',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -155,6 +158,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'team.apply_roles': 'Rôles de l’équipe',
+  'team.member_departure': 'Départ d’un membre',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
@@ -362,6 +366,8 @@ export const JOB_PAYLOADS = {
   'scheduling.remind_reports': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
+  /** At the hour a departure ends (ADR 0166 § 2): applied once, replayed it does nothing more. */
+  'team.member_departure': z.object({ departureId: MemberDepartureIdSchema, ownerId: UserIdSchema }),
   /**
    * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
    * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a
@@ -657,6 +663,7 @@ export const JOB_MAX_ATTEMPTS = {
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
   'team.apply_roles': 1,
+  'team.member_departure': 5,
   // Every minute: the next run is the retry.
   'owners.watch': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.

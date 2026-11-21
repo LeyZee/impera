@@ -1359,6 +1359,13 @@
       "when": 1795278389200,
       "tag": "0252_script_step_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "7",
+      "when": 1795282738548,
+      "tag": "0259_member_departures",
+      "breakpoints": true
     }
   ]
 }
