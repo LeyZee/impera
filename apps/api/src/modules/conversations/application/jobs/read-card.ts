@@ -1,5 +1,6 @@
 import { FAN_CARD_READ_BATCH, jobKeyFor, type JobPayload } from '@impera/contracts';
 
+import { cardReadPlan, type CardReadPlan } from '../../domain/card-read-window';
 import type { CardReader, Clock, FanDirectory, JobLogger, UnitOfWork } from '../../domain/ports';
 
 export interface ReadCardDeps {
@@ -7,18 +8,20 @@ export interface ReadCardDeps {
   readonly clock: Clock;
   readonly fans: Pick<FanDirectory, 'cardLines' | 'proposeRead'>;
   readonly reader: CardReader;
+  /** What the full reading turns on (`FAN_CARD_FULL_READ`); absent, off: the last messages, nothing chained. */
+  readonly plan?: CardReadPlan;
 }
 
 /**
  * `fans.read_card` (ADR 0085 § 7): his messages not read yet, with the card as it is, go to the AI, and what it reads
  * is written by the `fans` module, which checks each value and lets a chatter's note stand (§ 6, § 8). Whoever answers
- * him, every message of his is read: the oldest not read first, a batch of `FAN_CARD_READ_BATCH.window` at a time, and
+ * him, every message of his is read. With the full reading on (`FAN_CARD_FULL_READ`): the oldest not read first, a batch of `FAN_CARD_READ_BATCH.window` at a time, and
  * while some are left the next read is chained at once under the same key (amendement du 21/11), so a long history,
- * caught up or not, is read to its end, once. Not read (budget at its alert, no model), nothing is marked and nothing
+ * caught up or not, is read to its end, once; off, the last messages only, as before. Not read (budget at its alert, no model), nothing is marked and nothing
  * is chained: the next message of his reads them with it. Replayed after a write, the same values are found already
  * there and nothing is written twice. Only field codes are logged, never a value (§ 10).
  */
-export function createReadCardJob({ uow, clock, fans, reader }: ReadCardDeps) {
+export function createReadCardJob({ uow, clock, fans, reader, plan = cardReadPlan(false) }: ReadCardDeps) {
   return async (payload: JobPayload<'fans.read_card'>, logger: JobLogger): Promise<void> => {
     const { creatorId, conversationId } = payload;
     const toRead = await uow.inTenant(creatorId, async (tx) => {
@@ -26,7 +29,7 @@ export function createReadCardJob({ uow, clock, fans, reader }: ReadCardDeps) {
       if (conversation === null) return null;
       return {
         fanId: conversation.fanId,
-        batch: await tx.cardReads.toRead(conversationId, FAN_CARD_READ_BATCH),
+        batch: await tx.cardReads.toRead(conversationId, FAN_CARD_READ_BATCH, plan.window),
       };
     });
     if (toRead === null) {
@@ -57,7 +60,7 @@ export function createReadCardJob({ uow, clock, fans, reader }: ReadCardDeps) {
     await uow.inTenant(creatorId, async (tx) => {
       await tx.cardReads.markRead(conversationId, through, clock.now());
       // What is left is read next, at once: the same key replaces a read put off by his last message.
-      if (left > 0)
+      if (plan.chain && left > 0)
         await tx.jobs.enqueue('fans.read_card', payload, {
           jobKey: jobKeyFor('fans.read_card', conversationId),
           runAt: clock.now(),

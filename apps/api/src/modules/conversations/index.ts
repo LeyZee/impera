@@ -14,6 +14,7 @@ import { createRereadCardJob, createRereadCardsJob } from './application/jobs/re
 import { createRespondJob } from './application/jobs/respond';
 import { createSendJob } from './application/jobs/send';
 import { createConversationReads, type ConversationReads } from './application/reads';
+import { cardReadPlan } from './domain/card-read-window';
 import type {
   AlertNames,
   BubbleGuard,
@@ -133,6 +134,11 @@ export interface ConversationsDeps {
    * the re-read never spends.
    */
   readonly cardRereadRoom?: CardRereadRoom;
+  /**
+   * The full reading of the fan cards (`FAN_CARD_FULL_READ`, ADR 0085 § 7, amendement du 21/11): whole history, chained
+   * reads, caught-up history, Monday re-read. Absent or false, the reading runs as before and spends nothing more.
+   */
+  readonly fanCardFullRead?: boolean;
   /** Her follow-up delays (P3-10, agent module's adapter); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
   /** Her typing rhythm between bubbles (agent module's adapter); without it, her bubbles leave one after the other. */
@@ -167,12 +173,14 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
     ...(deps.customOrders !== undefined && { customOrders: deps.customOrders }),
   });
   const clock = deps.clock ?? systemClock;
+  const cardRead = cardReadPlan(deps.fanCardFullRead === true);
   const commands = createConversationCommands({
     uow,
     clock,
     fans: deps.fans,
     voice: deps.voice,
     guard: deps.guard,
+    cardRead,
   });
   const reader = createDrizzleConversationReader(
     deps.db,
@@ -232,8 +240,13 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
               logger.info({}, 'read_card: no reader, the card waits for a chatter');
               return Promise.resolve();
             }
-          : createReadCardJob({ uow, clock, fans: deps.fans, reader: deps.cardReader }),
-      rereadCards: createRereadCardsJob({ uow, clock, scan: createDrizzleCardRereadScan(deps.adminDb) }),
+          : createReadCardJob({ uow, clock, fans: deps.fans, reader: deps.cardReader, plan: cardRead }),
+      rereadCards: createRereadCardsJob({
+        uow,
+        clock,
+        scan: createDrizzleCardRereadScan(deps.adminDb),
+        weekly: cardRead.weekly,
+      }),
       rereadCard:
         deps.cardReader === undefined
           ? (_payload, logger) => {
@@ -246,6 +259,7 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
               fans: deps.fans,
               reader: deps.cardReader,
               room: deps.cardRereadRoom ?? (() => false),
+              weekly: cardRead.weekly,
             }),
       followUp: createFollowUpJob({
         uow,

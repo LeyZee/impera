@@ -56,6 +56,7 @@ export function wireConversations(
     composer: agent.composer,
     cardReader: agent.cardReader,
     cardRereadRoom: deps.cardRereadRoom,
+    fanCardFullRead: shared.config.FAN_CARD_FULL_READ === 'on',
     ...(agent.followUps !== undefined && { followUps: agent.followUps }),
     typing: {
       delaysMs: bubbleDelays,

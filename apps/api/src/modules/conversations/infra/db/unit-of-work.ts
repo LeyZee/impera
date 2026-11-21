@@ -32,7 +32,12 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
-import { cardReadWindow, cardRereadWindow, type CardReadRow } from '../../domain/card-read-window';
+import {
+  cardReadLatestWindow,
+  cardReadWindow,
+  cardRereadWindow,
+  type CardReadRow,
+} from '../../domain/card-read-window';
 import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
@@ -286,12 +291,17 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           );
         return { unread: count?.unread ?? 0, lastReadAt: row?.lastReadAt ?? null };
       },
-      async toRead(conversationId, limits) {
+      async toRead(conversationId, limits, mode) {
         const [conversation] = await tx
           .select({ through: schema.conversations.cardReadThrough })
           .from(schema.conversations)
           .where(eq(schema.conversations.id, conversationId));
-        const window = cardReadWindow(await cardRows(conversationId), conversation?.through ?? null, limits);
+        const rows = await cardRows(conversationId);
+        const through = conversation?.through ?? null;
+        const window =
+          mode === 'oldest'
+            ? cardReadWindow(rows, through, limits)
+            : cardReadLatestWindow(rows, through, limits);
         if (window === null) return null;
         return {
           messages: await cardMessages(window.ids, window.newIds),

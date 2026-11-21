@@ -129,3 +129,44 @@ export function cardReadBatches<Id>(
     if (window.left === 0) return batches;
   }
 }
+
+/**
+ * The reading of his card as it ran before the full reading (`FAN_CARD_FULL_READ=off`): the conversation's last
+ * `window` messages, his not read yet new, `through` the newest of them. What lies before the window is marked read
+ * with it; nothing is chained (`left` is 0).
+ */
+export function cardReadLatestWindow<Id>(
+  rows: readonly CardReadRow<Id>[],
+  readThrough: Date | null,
+  limits: { readonly window: number },
+): CardReadWindow<Id> | null {
+  const last = rows.slice(-limits.window);
+  const fresh = last.filter(
+    (row) => row.fromFan && (readThrough === null || row.ingestedAt.getTime() > readThrough.getTime()),
+  );
+  if (fresh.length === 0) return null;
+  return {
+    ids: last.map((row) => row.id),
+    newIds: new Set(fresh.map((row) => row.id)),
+    through: new Date(Math.max(...fresh.map((row) => row.ingestedAt.getTime()))),
+    left: 0,
+  };
+}
+
+/** What the full reading switch turns on (ADR 0085 § 7, amendement du 21/11). */
+export interface CardReadPlan {
+  /** `oldest`: his oldest unread first (`cardReadWindow`); `latest`: the last messages only (`cardReadLatestWindow`). */
+  readonly window: 'oldest' | 'latest';
+  /** A read that leaves some of his unread chains the next at once. */
+  readonly chain: boolean;
+  /** Caught-up history queues a read. */
+  readonly readsCaughtUp: boolean;
+  /** The Monday re-read runs. */
+  readonly weekly: boolean;
+}
+
+export function cardReadPlan(fullRead: boolean): CardReadPlan {
+  return fullRead
+    ? { window: 'oldest', chain: true, readsCaughtUp: true, weekly: true }
+    : { window: 'latest', chain: false, readsCaughtUp: false, weekly: false };
+}

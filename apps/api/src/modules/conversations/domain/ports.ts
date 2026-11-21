@@ -405,6 +405,8 @@ interface CardReads {
   toRead(
     conversationId: ConversationId,
     limits: { readonly window: number; readonly context: number },
+    /** `latest`: the last messages only, as before the full reading (`cardReadLatestWindow`, `left` always 0). */
+    window: 'oldest' | 'latest',
   ): Promise<{
     readonly messages: readonly CardReadMessage[];
     readonly through: Date;

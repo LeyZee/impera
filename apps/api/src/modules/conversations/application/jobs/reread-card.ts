@@ -21,12 +21,22 @@ export function createRereadCardsJob({
   uow,
   clock,
   scan,
+  weekly,
 }: {
   readonly uow: UnitOfWork;
   readonly clock: Clock;
   readonly scan: CardRereadScan;
+  /** Off (`FAN_CARD_FULL_READ`), the Monday re-read enqueues nothing. */
+  readonly weekly: boolean;
 }) {
   return async (_payload: JobPayload<'fans.reread_cards'>, logger: JobLogger): Promise<void> => {
+    if (!weekly) {
+      logger.info(
+        {},
+        'reread_cards: the full reading of the fan cards is off (FAN_CARD_FULL_READ), nothing enqueued',
+      );
+      return;
+    }
     const now = clock.now();
     const active = await scan.active(new Date(now.getTime() - FAN_CARD_REREAD.activeDays * DAY_MS));
     for (const [index, { creatorId, conversationId }] of active.entries())
@@ -63,14 +73,21 @@ export function createRereadCardJob({
   fans,
   reader,
   room,
+  weekly,
 }: {
   readonly uow: UnitOfWork;
   readonly clock: Clock;
   readonly fans: Pick<FanDirectory, 'cardLines' | 'proposeRead'>;
   readonly reader: CardReader;
   readonly room: CardRereadRoom;
+  /** Off, a batch left in the queue from before reads nothing. */
+  readonly weekly: boolean;
 }) {
   return async (payload: JobPayload<'fans.reread_card'>, logger: JobLogger): Promise<void> => {
+    if (!weekly) {
+      logger.info({}, 'reread_card: the full reading of the fan cards is off (FAN_CARD_FULL_READ)');
+      return;
+    }
     const { creatorId, conversationId, after, startedAt } = payload;
     const now = clock.now();
     const later = (runAt: Date, next: JobPayload<'fans.reread_card'>) =>

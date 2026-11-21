@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   cardReadBatches,
+  cardReadLatestWindow,
+  cardReadPlan,
   cardReadWindow,
   cardRereadWindow,
   type CardReadRow,
@@ -129,5 +131,28 @@ describe('the first pass counted without a call', () => {
     const rows = conversation('cf'.repeat(15) + 'f'.repeat(25));
     expect(cardReadBatches(rows, null, LIMITS)).toBe(readAll(rows).batches.length);
     expect(cardReadBatches(rows, new Date(T0 + 1_000), LIMITS)).toBe(0);
+  });
+});
+
+describe('the full reading switch (FAN_CARD_FULL_READ)', () => {
+  it('off reads as before and spends nothing more; on turns everything on', () => {
+    expect(cardReadPlan(false)).toEqual({
+      window: 'latest',
+      chain: false,
+      readsCaughtUp: false,
+      weekly: false,
+    });
+    expect(cardReadPlan(true)).toEqual({ window: 'oldest', chain: true, readsCaughtUp: true, weekly: true });
+  });
+
+  it('off: the last messages only, his not read yet new, nothing left to chain', () => {
+    const rows = conversation('ff' + 'cf'.repeat(6));
+    const window = cardReadLatestWindow(rows, new Date(T0 + 3), LIMITS);
+
+    expect(window?.ids).toEqual(rows.slice(-10).map((row) => row.id));
+    expect([...(window?.newIds ?? [])]).toEqual(['m5', 'm7', 'm9', 'm11', 'm13']);
+    expect(window?.through).toEqual(new Date(T0 + 13));
+    expect(window?.left).toBe(0);
+    expect(cardReadLatestWindow(rows, new Date(T0 + 13), LIMITS)).toBeNull();
   });
 });
