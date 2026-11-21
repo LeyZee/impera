@@ -59,7 +59,13 @@ export async function readAgencyInsights(
   const reads: AgencyCreatorRead[] = [];
   let outOfScope = 0;
   for (const id of chosen) {
-    const answer = await deps.agency.read(id, reader.userId, range);
+    // A calendar month reads its revenue objectives too (ADR 0092 § 6).
+    const answer = await deps.agency.read(
+      id,
+      reader.userId,
+      range,
+      span.unit === 'month' ? range.from : null,
+    );
     if (answer.kind === 'out_of_scope') outOfScope += 1;
     if (answer.kind === 'read') reads.push(answer.read);
   }

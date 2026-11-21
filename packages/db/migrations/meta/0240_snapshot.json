@@ -1,5 +1,5 @@
 {
-  "id": "f5799246-3519-4064-8b22-ab8a5b95be94",
+  "id": "1f9f5a7b-234d-48fc-9582-7ed316863182",
   "prevId": "5aa8f6ca-b267-4da2-9513-446db8731c26",
   "version": "7",
   "dialect": "postgresql",
@@ -7971,57 +7971,6 @@
         }
       },
       "isRLSEnabled": false
-    },
-    "public.link_service_credentials": {
-      "name": "link_service_credentials",
-      "schema": "",
-      "columns": {
-        "singleton": {
-          "name": "singleton",
-          "type": "boolean",
-          "primaryKey": true,
-          "notNull": true,
-          "default": true
-        },
-        "key_ciphertext": {
-          "name": "key_ciphertext",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "key_version": {
-          "name": "key_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "link_service_credentials_singleton_check": {
-          "name": "link_service_credentials_singleton_check",
-          "value": "\"link_service_credentials\".\"singleton\""
-        }
-      },
-      "isRLSEnabled": true
     },
     "public.ai_budget_settings": {
       "name": "ai_budget_settings",
@@ -20616,6 +20565,134 @@
         "script_structures_archived_check": {
           "name": "script_structures_archived_check",
           "value": "\"script_structures\".\"archived_at\" is null or \"script_structures\".\"archived_at\" >= \"script_structures\".\"created_at\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_revenue_objectives": {
+      "name": "creator_revenue_objectives",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "set_by": {
+          "name": "set_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "creator_revenue_objectives_creator_id_creators_id_fk": {
+          "name": "creator_revenue_objectives_creator_id_creators_id_fk",
+          "tableFrom": "creator_revenue_objectives",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_revenue_objectives_set_by_user_id_fk": {
+          "name": "creator_revenue_objectives_set_by_user_id_fk",
+          "tableFrom": "creator_revenue_objectives",
+          "tableTo": "user",
+          "columnsFrom": ["set_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "creator_revenue_objectives_month_unique": {
+          "name": "creator_revenue_objectives_month_unique",
+          "nullsNotDistinct": false,
+          "columns": ["creator_id", "month"]
+        }
+      },
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"creator_revenue_objectives\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"creator_revenue_objectives\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_revenue_objectives\".\"set_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_update": {
+          "name": "owner_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"creator_revenue_objectives\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
+          "withCheck": "\"creator_revenue_objectives\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_revenue_objectives\".\"set_by\" = nullif(current_setting('app.user_id', true), '')"
+        },
+        "owner_delete": {
+          "name": "owner_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"creator_revenue_objectives\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "creator_revenue_objectives_month_check": {
+          "name": "creator_revenue_objectives_month_check",
+          "value": "extract(day from \"creator_revenue_objectives\".\"month\") = 1"
+        },
+        "creator_revenue_objectives_amount_check": {
+          "name": "creator_revenue_objectives_amount_check",
+          "value": "\"creator_revenue_objectives\".\"amount_minor\" between 1 and 100000000"
         }
       },
       "isRLSEnabled": false

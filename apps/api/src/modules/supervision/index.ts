@@ -4,6 +4,7 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { readAgencyInsights, type AgencyReader } from './application/agency-reads';
+import { createObjectivesStore } from './infra/db/objectives-store';
 import { createDashboardRoutes, type DashboardRouteDeps } from './infra/http/dashboard-routes';
 import {
   createAgencyInsightsReader,
@@ -36,7 +37,7 @@ export interface SupervisionModule {
 
 export interface SupervisionDeps extends Omit<
   DashboardRouteDeps,
-  'reader' | 'revealSales' | 'overview' | 'agency' | 'agencyTimeZone' | 'setup'
+  'reader' | 'revealSales' | 'overview' | 'agency' | 'agencyTimeZone' | 'setup' | 'objectives'
 > {
   /** Application role: the Dashboard reads in tenant transactions (RLS). */
   readonly db: Database;
@@ -73,6 +74,7 @@ export function createSupervisionModule(deps: SupervisionDeps): SupervisionModul
       revealSales: createRevealSalesReader(deps.db, deps.salesTotalsOf),
       agency,
       agencyTimeZone,
+      objectives: createObjectivesStore(deps.db),
       setup: createSetupReader(deps.adminDb, deps.telegramReach, deps.billingReadiness, agencyTimeZone),
       overview: createCreatorsOverviewReader(deps.db),
     }),

@@ -172,6 +172,7 @@ export const AGENCY_WEEK: AgencyInsights = AgencyInsightsSchema.parse({
     },
   ],
   refundsWithoutSale: 0,
+  objectives: null,
   timeZone: 'Europe/Paris',
   dollarsLeftOut: false,
   subscribers: {
