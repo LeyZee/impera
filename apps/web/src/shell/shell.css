@@ -820,6 +820,11 @@
 .nv-stage h1:focus:not(:focus-visible) {
   outline: none;
 }
+/* A title is not a control: on a direct arrival (no click yet) the browser counts the programmatic focus as visible
+   and would frame it. The heading is still where Tab starts and what a reader announces (H-15). */
+.nv-stage h1[tabindex='-1']:focus {
+  outline: none;
+}
 
 /*
  * Installed on an iPhone, the status bar is translucent and its clock always white (black-translucent): a dark band

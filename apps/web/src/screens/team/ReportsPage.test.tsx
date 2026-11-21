@@ -710,9 +710,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     open = [report(1, 0), report(2, 1)];
     renderPage();
     expect(
-      await screen.findByText(
-        'Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se valide à la main.',
-      ),
+      await screen.findByText('Les ventes de Reveal ne sont pas encore lues : rien n’est validé sans toi.'),
     ).toBeTruthy();
   });
 

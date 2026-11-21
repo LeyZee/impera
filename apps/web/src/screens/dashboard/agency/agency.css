@@ -1339,8 +1339,9 @@
   font-weight: 600;
   text-align: center;
 }
+/* Wide enough for « comparé au mois précédent » whole (H-09). */
 .ins-when__compare {
-  width: 13.5em;
+  width: 16em;
 }
 /* The comparison is a quieter choice than the period: no plate, muted ink until hovered or opened. */
 .ins-when__compare .nv-select__field {

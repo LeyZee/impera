@@ -184,11 +184,11 @@ export function periodChoices(
   });
 }
 
-/** « vs mois précédent »: the default comparison, named by its unit. */
+/** « comparé au mois précédent »: the default comparison, named by its unit. */
 export const PREVIOUS_LABEL: Readonly<Record<AgencyUnit, string>> = {
   day: 'vs veille',
   week: 'vs semaine précédente',
-  month: 'vs mois précédent',
+  month: 'comparé au mois précédent',
   custom: 'vs période précédente',
 };
 
