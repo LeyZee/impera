@@ -434,29 +434,6 @@ export function heatOf(cents: number, max: number): number {
   return max > 0 ? Math.round((cents / max) * 100) / 100 : 0;
 }
 
-/** An arc of a ring of `radius`: its dash and where it starts, clockwise from the top, a gap between arcs. */
-export function arcs(
-  values: readonly number[],
-  radius: number,
-  gap = 2,
-): { readonly dash: string; readonly offset: number }[] {
-  const circumference = 2 * Math.PI * radius;
-  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
-  const shown = values.filter((value) => value > 0).length;
-  const round = (n: number): number => Math.round(n * 100) / 100;
-  let start = 0;
-  return values.map((value) => {
-    const length = total > 0 ? (Math.max(0, value) / total) * circumference : 0;
-    const visible = shown > 1 ? Math.max(0, length - gap) : length;
-    const arc = {
-      dash: `${String(round(visible))} ${String(round(circumference))}`,
-      offset: start === 0 ? 0 : round(-start),
-    };
-    start += length;
-    return arc;
-  });
-}
-
 /** « heure de Paris » for the platform's zone: the city of an IANA zone, its last part. */
 export function zoneLabel(timeZone: string): string {
   const city = timeZone.split('/').pop()?.replaceAll('_', ' ') ?? timeZone;

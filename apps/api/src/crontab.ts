@@ -45,6 +45,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '7 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_daily_stats'] },
   },
+  // The hours of every attached redirect link (ADR 0120 § 3): a quarter past, so that the hour just over is read ten
+  // minutes after its end and closes. No backfill: the next hour reads the same window again.
+  {
+    task: 'connector.read_link_hours',
+    match: '15 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_link_hours'] },
+  },
   // The agency's percentage of each creator against her part read on the register (CRM-04 lot d3): the same days,
   // half an hour later, the fortnight just over in the agency's zone. No backfill: a missed run waits for the next
   // fortnight, and the event is published once per account and fortnight anyway.
@@ -146,7 +153,7 @@ const CRON_JOBS: readonly CronJob[] = [
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
   },
   // No hourly identity of her native scripts any more (ADR 0161 § 5): the agent offers only the recognised copy of a
-  // script of ours, with our description, and reads no identity. `scripts.identify_backlog` stays a task, asked by no one.
+  // script of ours, with our description, and reads no identity. The identity job and its tasks are gone (21/11/2026).
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   {
     task: 'fans.purge_facts',

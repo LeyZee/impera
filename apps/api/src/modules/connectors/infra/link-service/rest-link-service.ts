@@ -8,7 +8,7 @@ import {
 import { z } from 'zod';
 
 import { LinkServiceError, type LinkServiceReader } from '../../domain/link-service';
-import type { LinkRobotHour, LinkStatsConnector, LinkStatsRange } from '../../domain/link-stats';
+import type { LinkRobotHour, LinkStatsRange } from '../../domain/link-stats';
 import { isPrivateAddress, pinnedGet, systemLookup, type Lookup, type Pinned } from '../avatar/fetch-avatar';
 
 type FetchLike = (url: string, init: RequestInit, pinned: Pinned) => Promise<Response>;
@@ -139,7 +139,7 @@ export function createLinkServiceReader(options: {
   readonly key: string;
   readonly fetchLike?: FetchLike;
   readonly lookup?: Lookup;
-}): LinkServiceReader & LinkStatsConnector {
+}): LinkServiceReader {
   const { origin, key, fetchLike = pinnedGet, lookup = systemLookup } = options;
 
   async function get(path: string, query: Readonly<Record<string, string>> = {}): Promise<unknown> {

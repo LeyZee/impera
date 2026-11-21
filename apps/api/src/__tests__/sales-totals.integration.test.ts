@@ -1,5 +1,6 @@
 import {
   CreatorIdSchema,
+  CreatorEarningsSchema,
   CreatorSalesSchema,
   EVENT_PAYLOADS,
   JOB_PAYLOADS,
@@ -78,6 +79,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
   let memberId: TeamMemberId;
   let creatorUser: UserId;
   let jobLogger: ReturnType<typeof createLogger>;
+  const sink = new LogSink();
 
   const read = () => app.modules.connectors.jobs.readSales(jobLogger, 'test', true);
 
@@ -193,7 +195,7 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
       DATABASE_SERVICE_URL: test.serviceUrl,
       CREDENTIALS_ENCRYPTION_KEYS: `v1:${Buffer.alloc(32, 9).toString('base64')}`,
     });
-    const logger = createLogger(config, new LogSink());
+    const logger = createLogger(config, sink);
     jobLogger = logger;
     app = await createApp(config, logger, {
       salesFeeds: { reveal: revealSalesFeed(crm.fetch, FAKE_CRM_BASE_URL) },
@@ -504,5 +506,73 @@ describe('sales rung and totals (CRM-04 lot a)', () => {
           url: '/ventes',
         })),
     );
+  });
+
+  it('shows her the whole path of her sales on her Ventes, never the seller nor the team (CR-04, ADR 0157)', async () => {
+    const account = async (email: string, role: 'creator' | 'operator', creatorIds: CreatorId[]) => {
+      const { userId } = await createOwner(app.auth, app.db.db, {
+        email,
+        name: 'Compte',
+        password: OWNER.password,
+      });
+      await test.admin.db.update(schema.user).set({ role, creatorIds }).where(eq(schema.user.id, userId));
+      return { userId, cookie: await signIn(server, email, OWNER.password) };
+    };
+    const { userId, cookie } = await account('creatrice-ventes@example.test', 'creator', [creatorId]);
+    const earnings = (query: string, as = cookie) =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/creator-space/earnings?${query}`,
+        headers: { cookie: as, origin: DASHBOARD_ORIGIN },
+      });
+
+    const logged = sink.lines.length;
+    const month = await earnings('period=month&day=2026-10-15');
+    expect(month.statusCode).toBe(200);
+    const read = CreatorEarningsSchema.parse(month.json());
+    const mine = await withCreatorAccount(app.db.db, userId, (tx) => creatorSalesReads.salesOf(tx, OCTOBER));
+    const sum = (pick: (row: (typeof mine.rows)[number]) => number) =>
+      mine.rows.reduce((total, row) => total + pick(row), 0);
+    const total = (pick: (one: (typeof read.totals)[number]) => number) =>
+      read.totals.reduce((all, one) => all + pick(one), 0);
+    expect(read).toMatchObject({ period: 'month', from: '2026-10-01', to: '2026-10-31', estimated: false });
+    // Each step of the path as the register holds it, summed and never computed again.
+    expect(total((one) => one.grossInclVatMinor)).toBe(sum((row) => row.grossInclVatMinor));
+    expect(total((one) => one.grossExclVatMinor)).toBe(sum((row) => row.grossExclVatMinor));
+    expect(total((one) => one.netMinor)).toBe(sum((row) => row.netMinor));
+    expect(total((one) => one.agencyMinor)).toBe(sum((row) => row.agencyMinor));
+    expect(total((one) => one.creatorMinor)).toBe(sum((row) => row.creatorMinor));
+    expect(read.lines.length).toBe(mine.lines.length);
+    // Her fan by the name of his card in her creator; never the platform's id, the seller nor a member.
+    expect(new Set(read.lines.map((line) => line.fanName))).toEqual(new Set(['Fan test']));
+    expect(month.body).not.toMatch(/seller|chatter|member|agent|shift|source|member_test_01|fan_test_01/iu);
+    // None of her amounts in the logs.
+    const written = JSON.stringify(sink.lines.slice(logged));
+    for (const one of read.totals) {
+      for (const amount of [one.grossInclVatMinor, one.netMinor, one.agencyMinor, one.creatorMinor]) {
+        expect(written).not.toMatch(new RegExp(`[^0-9]${String(amount)}[^0-9]`, 'u'));
+      }
+    }
+
+    const fortnight = CreatorEarningsSchema.parse((await earnings('period=fortnight&day=2026-10-25')).json());
+    expect([fortnight.from, fortnight.to]).toEqual(['2026-10-16', '2026-10-31']);
+
+    // Another creator's own account reads none of hers.
+    const other = await account('autre-ventes@example.test', 'creator', [otherCreatorId]);
+    const theirs = CreatorEarningsSchema.parse(
+      (await earnings('period=month&day=2026-10-15', other.cookie)).json(),
+    );
+    expect([theirs.totals, theirs.lines]).toEqual([[], []]);
+
+    // An account of two creators cannot even be written: the base holds a creator's account to one.
+    await expect(
+      account('deux-ventes@example.test', 'creator', [creatorId, otherCreatorId]),
+    ).rejects.toThrow();
+    // A day ahead is refused; the owner and the team never read her door.
+    const team = await account('equipe-ventes@example.test', 'operator', [creatorId]);
+    expect((await earnings('period=day&day=2099-01-01')).statusCode).toBe(400);
+    for (const refused of [owner, team.cookie]) {
+      expect((await earnings('period=month', refused)).statusCode).toBe(403);
+    }
   });
 });

@@ -7,6 +7,7 @@ import type { MediaSlotKind } from '@impera/contracts';
  * to choose among the scripts the code allows (ADR 0098 § 6). It is written for one version of the script: its steps'
  * names and texts, their media and the validated description of each. A change of any of these asks for a new one; a
  * change of price does not (prices are never in it). Only a validated identity of the current version counts.
+ * No brain writes one any more (ADR 0161 § 5): the rows kept are still read, each for its version.
  */
 
 /** A media of a step, as the identity reads it: by the platform's id, and the validated description it is told with. */
@@ -45,24 +46,6 @@ export function identityInputHash(script: IdentitySource): string {
     ]),
   ]);
   return createHash('sha256').update(canonical).digest('hex');
-}
-
-/**
- * Every photo and video of the script has a validated description: the brain may write its identity. A voice note is
- * never described by the vision AI, so it does not hold it back.
- */
-export function identityReady(script: IdentitySource): boolean {
-  return script.steps
-    .flatMap((step) => [...step.media, ...step.previewMedia])
-    .every((media) => media.kind === 'audio' || media.descriptionId !== null);
-}
-
-/**
- * Two steps on the same platform rank: branches of one step that a human chooses between (Reveal's sequences), not
- * two steps one after the other. Such a script is never offered until the model of branched scripts exists (ADR 0112).
- */
-export function hasBranches(steps: readonly { readonly platformIndex: number }[]): boolean {
-  return new Set(steps.map((step) => step.platformIndex)).size < steps.length;
 }
 
 /** An identity as the base keeps it, for one version of the script (`inputHash`). */

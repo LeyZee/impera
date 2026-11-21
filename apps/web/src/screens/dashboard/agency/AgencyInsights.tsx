@@ -29,7 +29,6 @@ import {
 } from './period';
 import { useNarrow } from './useNarrow';
 import {
-  arcs,
   bestSlot,
   busiest,
   changeOf,
@@ -76,6 +75,7 @@ import './agency.css';
 
 import { initialOf } from '@/lib/utils';
 import { Select, type SelectOption } from '@/shell/Select';
+import { Columns, Donut, Meter, Spark } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -84,7 +84,6 @@ import { Failure } from '@/shell/states';
  * platform and never receives a fan. Colours follow the entity (a creator, a kind of sale), never its rank.
  */
 
-const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 /** « 20 % »: the transfers' VAT rate as the code holds it (ADR 0106 § 7), never written twice. */
 const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00a0%`;
 const formatEuros = (cents: number): string => euros(Math.round(cents));
@@ -333,42 +332,6 @@ export function sparkValues(
   if (insights.from === insights.to) return null;
   const values = insights.days.slice(firstDrawn(insights)).map(pick);
   return values.length < 2 || values.every((one) => one === 0) ? null : values;
-}
-
-/**
- * The small curve at the net's foot (lot couleurs, 17/11; under the net only, Charles 19/11: the parts drew the same
- * shape again): 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour. Decorative: the tile's figure and its « n % » say it,
- * so it is hidden from assistive technologies.
- */
-function Spark({ values, tone }: { values: readonly number[]; tone: Trend }): JSX.Element {
-  const fill = useId();
-  const frame = { width: 200, height: 32, padTop: 3, padBottom: 2 };
-  const low = Math.min(0, ...values);
-  const high = Math.max(1, ...values);
-  const line = chartPoints(values, frame, { min: low, max: high });
-  const first = line[0];
-  const last = line.at(-1);
-  const area =
-    first === undefined || last === undefined
-      ? ''
-      : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(first.x)},${String(frame.height)} Z`;
-  return (
-    <svg
-      className={`ins-spark ins-spark--${tone}`}
-      viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" className="ins-spark__fill-top" />
-          <stop offset="1" className="ins-spark__fill-bottom" />
-        </linearGradient>
-      </defs>
-      <path className="ins-spark__area" d={area} fill={`url(#${fill})`} />
-      <path className="ins-spark__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
 }
 
 interface Tile {
@@ -752,9 +715,6 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   // A long period on a phone reads week by week: ninety columns do not fit a thumb.
   const weekly = narrow && insights.days.length > 45;
   const columns = weekly ? byWeek(days) : days;
-  const [focus, setFocus] = useState(columns.length - 1);
-  const current = Math.min(Math.max(0, focus), columns.length - 1);
-  const bars = useRef<HTMLDivElement>(null);
   const max = Math.max(
     0,
     ...columns.map((column) => column.parts.reduce((sum, part) => sum + Math.max(0, part), 0)),
@@ -777,92 +737,47 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   const labelled = (i: number): boolean =>
     i % every === 0 && !(narrow && i !== last && last % every === 0 && every > 1 && last - i <= every);
   const used = STACKS.filter((_, s) => columns.some((column) => (column.parts[s] ?? 0) > 0));
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const step =
-      event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
-    if (step === undefined) return;
-    event.preventDefault();
-    const next = Math.min(Math.max(0, current + step), columns.length - 1);
-    setFocus(next);
-    bars.current?.querySelectorAll<HTMLButtonElement>('.ins-col')[next]?.focus();
-  };
   const span = today ? 'heure par heure' : weekly ? 'semaine par semaine' : 'jour par jour';
   return (
     <div className="nv-plate ins-daily">
       {used.length > 1 ? (
-        <ul className="ins-keys" aria-label="Légende">
+        <ul className="nv-keys" aria-label="Légende">
           {used.map((stack) => (
             <li key={stack.key}>
-              <span className="ins-key" style={{ '--_c': stack.colour }} aria-hidden="true" />
+              <span className="nv-key" style={{ '--_c': stack.colour }} aria-hidden="true" />
               {stack.label}
             </li>
           ))}
         </ul>
       ) : null}
-      <div className="ins-daily__plot">
-        <div className="ins-daily__grid" aria-hidden="true">
-          {ticks.map((value) => (
-            <span key={value} style={{ '--_y': `${String((value / top) * 100)}%` }}>
-              <i>{shortEuros(value)}</i>
-            </span>
-          ))}
-        </div>
-        <div
-          className="ins-daily__bars"
-          style={{ '--_n': columns.length }}
-          role="group"
-          aria-label={`Chiffre d’affaires ${span}, au plus ${euros(max)} : flèches pour passer d’une colonne à l’autre`}
-          ref={bars}
-          onKeyDown={onKeyDown}
-          onFocus={(event) => {
-            const at = Number(event.target.getAttribute('data-i'));
-            if (Number.isInteger(at)) setFocus(at);
-          }}
-        >
-          {columns.map((column, i) => (
-            <button
-              type="button"
-              key={column.key}
-              className="ins-col"
-              style={{ '--_i': i }}
-              tabIndex={i === current ? 0 : -1}
-              aria-label={`${column.title} : ${euros(column.total)}`}
-              data-i={i}
-              {...tip.bind(
-                {
-                  title: column.title,
-                  rows: [
-                    ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
-                      .filter(([, cents]) => cents !== 0)
-                      .map(([label, cents]) => [label, euros(cents)] as const),
-                    ['Total', euros(column.total)],
-                  ],
-                },
-                { above: true },
-              )}
-            >
-              <span className="ins-col__stack">
-                {column.parts.map((cents, s) =>
-                  cents <= 0 ? null : (
-                    <span
-                      // Bottom to top, in the legend's order.
-                      key={s}
-                      className="ins-col__part"
-                      style={{
-                        '--_c': STACKS[s]?.colour ?? OTHER,
-                        '--_h': `${String((cents / top) * 100)}%`,
-                      }}
-                    />
-                  ),
-                )}
-              </span>
-              <span className="ins-col__label" aria-hidden="true">
-                {labelled(i) ? column.label : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <Columns
+        label={`Chiffre d’affaires ${span}, au plus ${euros(max)} : flèches pour passer d’une colonne à l’autre`}
+        top={top}
+        ticks={ticks.map((value) => ({ value, text: shortEuros(value) }))}
+        columns={columns.map((column, i) => ({
+          key: column.key,
+          label: labelled(i) ? column.label : '',
+          says: `${column.title} : ${euros(column.total)}`,
+          // Bottom to top, in the legend's order.
+          parts: column.parts.map((cents, s) => ({
+            key: String(s),
+            colour: STACKS[s]?.colour ?? OTHER,
+            value: cents,
+          })),
+          handlers: tip.bind(
+            {
+              title: column.title,
+              rows: [
+                ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
+                  .filter(([, cents]) => cents !== 0)
+                  .map(([label, cents]) => [label, euros(cents)] as const),
+                ['Total', euros(column.total)],
+              ],
+            },
+            { above: true },
+          ),
+        }))}
+      />
     </div>
   );
 }
@@ -886,17 +801,12 @@ function Ring({
   const [lit, setLit] = useState<number | null>(null);
   // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
   const pressedBy = useRef<string | null>(null);
-  const radius = 52;
   const shown = slices.filter((slice) => slice.cents > 0);
   const total = shown.reduce((sum, slice) => sum + slice.cents, 0);
   // Settled together, so the legend adds up to 100 % where each share rounded alone could say 99 or 101.
   const shares = sharesOf(
     shown.map((slice) => slice.cents),
     total,
-  );
-  const geometry = arcs(
-    shown.map((slice) => slice.cents),
-    radius,
   );
   const litSlice = lit === null ? null : shown[lit];
   const litShare = lit === null ? 0 : (shares[lit] ?? 0);
@@ -906,53 +816,28 @@ function Ring({
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (
-        <div className="ins-ring-row">
-          <div
-            className={lit === null ? 'ins-ring' : 'ins-ring is-lit'}
-            role="img"
-            aria-label={`${title} : ${shown.map((s, i) => `${s.label} ${String(shares[i] ?? 0)} %`).join(', ')}`}
+        <div className="nv-donut-row">
+          <Donut
+            label={`${title} : ${shown.map((s, i) => `${s.label} ${String(shares[i] ?? 0)} %`).join(', ')}`}
+            slices={shown.map((slice) => ({ key: slice.key, colour: slice.colour, value: slice.cents }))}
+            lit={lit}
+            onLit={setLit}
           >
-            <svg viewBox="0 0 132 132" aria-hidden="true">
-              <circle className="ins-ring__track" cx="66" cy="66" r={radius} />
-              {shown.map((slice, i) => {
-                const arc = geometry[i];
-                if (arc === undefined) return null;
-                return (
-                  <circle
-                    key={slice.key}
-                    className={lit === i ? 'ins-ring__arc is-on' : 'ins-ring__arc'}
-                    cx="66"
-                    cy="66"
-                    r={radius}
-                    style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
-                    strokeDashoffset={arc.offset}
-                    onPointerEnter={() => {
-                      setLit(i);
-                    }}
-                    onPointerLeave={(event) => {
-                      if (event.pointerType === 'mouse') setLit(null);
-                    }}
-                  />
-                );
-              })}
-            </svg>
-            <span className="ins-ring__middle" aria-hidden="true">
-              {litSlice === null || litSlice === undefined ? (
-                <>
-                  <b className={euros(total).length > 7 ? 'ins-ring__value is-long' : 'ins-ring__value'}>
-                    {euros(total)}
-                  </b>
-                  <span className="ins-ring__sub">au total</span>
-                </>
-              ) : (
-                <>
-                  <b className="ins-ring__value">{String(litShare)}&nbsp;%</b>
-                  <span className="ins-ring__sub">{litSlice.label}</span>
-                </>
-              )}
-            </span>
-          </div>
-          <ul className="ins-legend">
+            {litSlice === null || litSlice === undefined ? (
+              <>
+                <b className={euros(total).length > 7 ? 'nv-donut__value is-long' : 'nv-donut__value'}>
+                  {euros(total)}
+                </b>
+                <span className="nv-donut__sub">au total</span>
+              </>
+            ) : (
+              <>
+                <b className="nv-donut__value">{String(litShare)}&nbsp;%</b>
+                <span className="nv-donut__sub">{litSlice.label}</span>
+              </>
+            )}
+          </Donut>
+          <ul className="nv-breakdown">
             {shown.map((slice, i) => {
               const help = slice.key === tipFor ? OTHER_KINDS_NOTE : undefined;
               const told = help === undefined ? null : tip.bind({ title: slice.label, text: help });
@@ -960,7 +845,7 @@ function Ring({
                 <li key={slice.key}>
                   <button
                     type="button"
-                    className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
+                    className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
                     // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out (`onClick`);
                     // the keyboard lights on focus. A tap's own entering and focus would light before its click undoes it.
                     onPointerEnter={(event) => {
@@ -993,10 +878,10 @@ function Ring({
                       else setLit(lit === i ? null : i);
                     }}
                   >
-                    <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                    <span className="ins-legend__label">{slice.label}</span>
-                    <span className="ins-legend__value">{euros(slice.cents)}</span>
-                    <span className="ins-legend__share">{String(shares[i] ?? 0)}&nbsp;%</span>
+                    <span className="nv-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                    <span className="nv-breakdown__label">{slice.label}</span>
+                    <span className="nv-breakdown__value">{euros(slice.cents)}</span>
+                    <span className="nv-breakdown__share">{String(shares[i] ?? 0)}&nbsp;%</span>
                     <Delta current={slice.cents} previous={slice.previousCents} />
                   </button>
                 </li>
@@ -1399,9 +1284,7 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
         <p className="ins-fans__lead">
           {biggest.lead} <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
         </p>
-        <span className="ins-meter" role="img" aria-label={`${String(top)} % fait par ${biggest.short}`}>
-          <span style={{ '--_w': `${String(top)}%` }} />
-        </span>
+        <Meter percent={top} label={`${String(top)} % fait par ${biggest.short}`} />
         <p className="ins-fans__hint">
           {/* The meter and its share stay, grey; what they mean waits for enough sales and hindsight (ADR 0092 § 5). */}
           {wait ??

@@ -6,6 +6,7 @@ import { monthLabel } from './period';
 import { shareOf } from './view';
 
 import { eurosInput, parseEuros } from '@/settings/billing/model';
+import { Meter } from '@/shell/figures/figures';
 
 type Objectives = NonNullable<AgencyInsights['objectives']>;
 type Row = Objectives['creators'][number];
@@ -142,9 +143,7 @@ function ObjectiveRow({
               : `${String(done)} % de l’objectif, ${String(pace)} % du mois passé`
           }
         >
-          <span className="ins-meter">
-            <span style={{ '--_w': `${String(Math.min(100, done))}%` }} />
-          </span>
+          <Meter percent={done} />
           {/* Where the month stands: ahead of it or behind, at a glance, whatever the colour (Design, 20/11). */}
           {pace === null ? null : <i className="ins-goal__pace" style={{ '--_p': `${String(pace)}%` }} />}
         </span>

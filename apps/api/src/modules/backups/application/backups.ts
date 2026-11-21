@@ -96,7 +96,7 @@ export async function requestBackupRun(
   return { created, request: toRunRequest(request) };
 }
 
-/** EQ-17's pay guard, through the composition root: is the restore proven for an action made now, at `at`? */
+/** Is the restore proven for an instant `at` (now)? A reminder only: it never blocks the pay (ADR 0028 § 6, 21/11). */
 export async function restoreTestFresh(deps: Pick<BackupsDeps, 'restoreTests'>, at: Date): Promise<boolean> {
   return isRestoreTestFresh(await deps.restoreTests.latest(), at);
 }

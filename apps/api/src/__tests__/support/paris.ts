@@ -1,3 +1,5 @@
+import { payPeriodAt } from '@impera/contracts';
+
 /** The planning's grid zone in the tests, and its calendar (never a change-of-time hour in the minutes used). */
 export const PARIS = 'Europe/Paris';
 
@@ -33,3 +35,32 @@ export function parisInstant(day: string, minute: number): Date {
 
 /** An instant as the routes take it, without milliseconds. */
 export const iso = (at: Date): string => at.toISOString().replace('.000Z', 'Z');
+
+/** This instant's midnight in Paris, in ms (the hours of a change of time are past at 3h, never in the first minute). */
+function parisMidnight(at: Date): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: PARIS,
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(at);
+  const part = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(parts.find((one) => one.type === type)?.value ?? 0);
+  const since = ((part('hour') * 60 + part('minute')) * 60 + part('second')) * 1000 + at.getMilliseconds();
+  return at.getTime() - since;
+}
+
+/**
+ * A minute ago, or a second after midnight when `at` is in the first minute of its day in Paris: an instant of today
+ * (and of the running fortnight, on a 1st or a 16th) for a route that reads the real clock.
+ */
+export const aMinuteAgoToday = (at: Date = new Date()): Date =>
+  new Date(Math.max(at.getTime() - MINUTE, parisMidnight(at) + 1000));
+
+/**
+ * 00:00:30 in Paris on the first day of the fortnight running at `at`: the first instant of a 1st or a 16th, a clock
+ * for tests that the turn of a fortnight must not break.
+ */
+export const fortnightDawn = (at: Date = new Date()): Date =>
+  new Date(parisInstant(payPeriodAt(at, PARIS), 0).getTime() + 30_000);

@@ -633,6 +633,7 @@ describe('CommissionsPage', () => {
         netMinor: 4_200,
         occurredAt: '2026-10-28T21:00:00.000Z',
         lateFrom: null,
+        saleOccurredAt: null,
         state: 'counted',
         signal: null,
         given: null,

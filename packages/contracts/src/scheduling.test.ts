@@ -308,7 +308,7 @@ describe('shifts and templates', () => {
         },
       ],
       members: [{ id: MEMBER, displayName: 'Théo', color: '#c2410c' }],
-      shifts: [{ ...shift, stoppedAt: null }],
+      shifts: [{ ...shift, stoppedAt: null, checkedInAt: null }],
       conflicts: [],
       away: [],
     };
@@ -330,6 +330,7 @@ describe('shifts and templates', () => {
     const mine = {
       ...shift,
       stoppedAt: null,
+      checkedInAt: null,
       creatorName: 'Nora Vidal',
       platform: 'reveal',
       handle: 'nora',
@@ -483,7 +484,13 @@ describe('swaps (ADR 0031)', () => {
           member: { id: COLLEAGUE, displayName: 'Basile', color: null, commissionBasisPoints: 1250 },
           freeThen: false,
           shifts: [
-            { ...shift, id: '0199f2a0-0000-7000-8000-0000000000f2', memberId: COLLEAGUE, stoppedAt: null },
+            {
+              ...shift,
+              id: '0199f2a0-0000-7000-8000-0000000000f2',
+              memberId: COLLEAGUE,
+              stoppedAt: null,
+              checkedInAt: null,
+            },
           ],
         },
       ],
@@ -512,7 +519,7 @@ describe('swaps (ADR 0031)', () => {
   it('lists the swaps with the shifts they name, as they are now', () => {
     const list = ShiftSwapListSchema.parse({
       swapRequests: [proposed],
-      shifts: [{ ...shift, stoppedAt: null }],
+      shifts: [{ ...shift, stoppedAt: null, checkedInAt: null }],
       accounts: [],
       members: [],
     });

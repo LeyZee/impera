@@ -21,7 +21,6 @@ import {
   TeamMemberIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
-import { PlatformScriptIdSchema } from './scripts';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
 
 /**
@@ -101,13 +100,12 @@ export const JOB_NAMES = [
   'content_drops.thumbnail_backlog',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
-  'scripts.identify_platform_script',
-  'scripts.identify_backlog',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
   'connector.copy_avatar',
   'connector.read_daily_stats',
+  'connector.read_link_hours',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -186,12 +184,11 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
   'scripts.import_platform_scripts': 'Import des scripts Reveal',
-  'scripts.identify_platform_script': 'Identité des scripts Reveal',
-  'scripts.identify_backlog': 'Rattrapage des identités de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
   'connector.read_daily_stats': 'Statistiques quotidiennes Reveal',
+  'connector.read_link_hours': 'Vues et clics des liens de redirection',
   'connector.copy_avatar': 'Copie de la photo d’une créatrice',
   'telegram.scan': 'Alertes Telegram',
   'telegram.flush_chat': 'Envoi des messages Telegram',
@@ -565,19 +562,6 @@ export const JOB_PAYLOADS = {
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
-  /**
-   * A native script's identity (SC-04 lot c8), written by the brain once each of its media has a validated description,
-   * under her descriptions switch. Asked after each import that adds or changes a script, and by the hourly backlog;
-   * replayable: the same texts and descriptions with the same prompt are left alone, and a validated identity is
-   * never written over.
-   */
-  'scripts.identify_platform_script': z.object({
-    creatorId: CreatorIdSchema,
-    platformScriptId: PlatformScriptIdSchema,
-    correlationId: z.string().min(1),
-  }),
-  /** Each hour: every active native script of a creator whose switch is on, asked again; the job decides. */
-  'scripts.identify_backlog': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -602,6 +586,11 @@ export const JOB_PAYLOADS = {
    * verified. Counters only, rewritten at each reading; no call once fewer than 100 of the day's 500 are left.
    */
   'connector.read_daily_stats': z.object({}),
+  /**
+   * Each hour (ADR 0120 § 3): the page views, clicks and robots of every redirect link its owner attached, hour by
+   * hour, one creator at a time. Totals only; an hour once closed is never written again.
+   */
+  'connector.read_link_hours': z.object({}),
   /**
    * The photo of a creator just imported from a platform (CRM-07 a2b, ADR 0069 § 3): read again from the platform's
    * model list, fetched, re-encoded and kept in the media bucket under `creators/<id>/avatar`. Replayable: the object
@@ -726,10 +715,6 @@ export const JOB_MAX_ATTEMPTS = {
   'scripts.ask_scripts': 1,
   // A platform that did not answer: a few tries; a failed read changes nothing for the account.
   'scripts.import_platform_scripts': 3,
-  // A brain that failed: a few tries; the budget spent waits for the hourly backlog.
-  'scripts.identify_platform_script': 3,
-  // Each hour: the next run is the retry.
-  'scripts.identify_backlog': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
@@ -740,6 +725,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.copy_avatar': 5,
   // Each hour: the next run is the retry, and a reading is replayable (each row written over).
   'connector.read_daily_stats': 1,
+  // Each hour as well: the next run is the retry, and an open hour is written over.
+  'connector.read_link_hours': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,

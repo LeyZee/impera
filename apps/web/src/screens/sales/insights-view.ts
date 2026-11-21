@@ -118,31 +118,6 @@ export function aboutLine(aboutFans: number): string {
   return `Environ ${String(aboutFans)} de tes fans l’ont dit`;
 }
 
-export interface Arc {
-  /** `stroke-dasharray` of the arc on a circle of radius `radius`. */
-  readonly dash: string;
-  /** `stroke-dashoffset`: where it starts, clockwise from the top once the ring is turned by −90°. */
-  readonly offset: number;
-}
-
-/** One arc per share, with a small gap between two arcs; a share of 100 is a full ring. */
-export function arcsOf(shares: readonly number[], radius: number, gap = 2.5): Arc[] {
-  const circumference = 2 * Math.PI * radius;
-  const round = (n: number) => Math.round(n * 100) / 100;
-  const shown = shares.filter((s) => s > 0).length;
-  let start = 0;
-  return shares.map((share) => {
-    const length = (share / 100) * circumference;
-    const visible = shown > 1 ? Math.max(0, length - gap) : length;
-    const arc = {
-      dash: `${String(round(visible))} ${String(round(circumference - visible))}`,
-      offset: start === 0 ? 0 : round(-start),
-    };
-    start += length;
-    return arc;
-  });
-}
-
 /** How strong a cell of « Quand ils écrivent » is, from 0 to 1 against the busiest one. */
 export function heatOf(share: number, busiest: number): number {
   if (busiest <= 0) return 0;

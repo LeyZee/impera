@@ -8,7 +8,7 @@
 //  4. No forbidden file names (*.bak, *.orig, *.copy, *-v2.*, *_final*, tmp/, old/): docs/conventions/hygiene.md.
 //  5. Every TODO/FIXME in code carries a task card id: `TODO(P2-03): ...` (docs/conventions/coding.md).
 //  6. Every `pnpm <script>` cited in the docs exists in the root package.json.
-//  7. The nightly-evals CI job still runs `pnpm probe` and `pnpm evals`, skipped only without the xAI key: removing
+//  7. The evals CI job still runs `pnpm probe` and `pnpm evals`, skipped only without the xAI key: removing
 //     the quality gate is an error.
 //  8. Every root script that delegates with `pnpm --filter <package> [run] <script>` reaches a package of the
 //     workspace that has that script, and every `tsx <file>` of a package script names a file that exists.
@@ -220,23 +220,23 @@ if (!stagedOnly) {
   }
 }
 
-// 7. The nightly quality gate stays in CI
+// 7. The quality gate of the AI stays in CI
 if (!stagedOnly) {
-  const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+  const ci = readFileSync(join(root, '.github/workflows/evals.yml'), 'utf8');
   // The nightly evals job only, up to the next job: an active step, alone on its line (no comment, no `|| true`).
-  const start = ci.indexOf('\n  nightly-evals:');
+  const start = ci.indexOf('\n  evals:');
   const rest = start === -1 ? '' : ci.slice(start + 1);
   const next = rest.slice(1).search(/\n {2}[a-z][\w-]*:/);
   const nightly = next === -1 ? rest : rest.slice(0, next + 1);
   for (const command of ['pnpm probe', 'pnpm evals']) {
     if (!new RegExp(`^ +- run: ${command}[ \\t]*$`, 'm').test(nightly))
       errors.push(
-        `.github/workflows/ci.yml: the nightly-evals job must run \`${command}\` (docs/playbooks/write-an-eval.md)`,
+        `.github/workflows/evals.yml: the evals job must run \`${command}\` (docs/playbooks/write-an-eval.md)`,
       );
   }
   if (/^\s*continue-on-error:\s*true/m.test(nightly))
     errors.push(
-      '.github/workflows/ci.yml: the nightly-evals job must fail when the evals fail (no continue-on-error)',
+      '.github/workflows/evals.yml: the evals job must fail when the evals fail (no continue-on-error)',
     );
   // The evals are skipped only when the xAI key is absent (« nightly vert », 06/11): the key read once from the secret,
   // at the job's level, and no other condition on the job or its steps.
@@ -246,17 +246,13 @@ if (!stagedOnly) {
     !/^ {6}HAS_XAI_KEY: \$\{\{ secrets\.LLM_XAI_API_KEY != '' \}\}[ \t]*$/m.test(nightly)
   )
     errors.push(
-      ".github/workflows/ci.yml: the nightly-evals job must read HAS_XAI_KEY once, from the secret, as `${{ secrets.LLM_XAI_API_KEY != '' }}`",
+      ".github/workflows/evals.yml: the evals job must read HAS_XAI_KEY once, from the secret, as `${{ secrets.LLM_XAI_API_KEY != '' }}`",
     );
-  const allowed = new Set([
-    "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
-    "env.HAS_XAI_KEY == 'true'",
-    "env.HAS_XAI_KEY != 'true'",
-  ]);
+  const allowed = new Set(["env.HAS_XAI_KEY == 'true'", "env.HAS_XAI_KEY != 'true'"]);
   for (const [, condition] of nightly.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
     if (!allowed.has(condition ?? ''))
       errors.push(
-        `.github/workflows/ci.yml: the nightly-evals job skips its evals only without the xAI key, not on \`${condition ?? ''}\``,
+        `.github/workflows/evals.yml: the evals job skips its evals only without the xAI key, not on \`${condition ?? ''}\``,
       );
   // `pnpm probe` and `pnpm evals` run whenever the key is there: no condition but the key's own.
   for (const step of nightly.split(/^(?= {6}- )/m))
@@ -264,7 +260,7 @@ if (!stagedOnly) {
       for (const [, condition] of step.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
         if (condition !== "env.HAS_XAI_KEY == 'true'")
           errors.push(
-            `.github/workflows/ci.yml: the nightly-evals job runs \`pnpm probe\` and \`pnpm evals\` whenever the xAI key is set, not on \`${condition ?? ''}\``,
+            `.github/workflows/evals.yml: the evals job runs \`pnpm probe\` and \`pnpm evals\` whenever the xAI key is set, not on \`${condition ?? ''}\``,
           );
 }
 

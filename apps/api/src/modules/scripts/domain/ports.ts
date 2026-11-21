@@ -345,61 +345,6 @@ export interface DiscountedPlatformScript {
   readonly since: Date;
 }
 
-/** What the identity job reads of a script, as the service role. */
-export interface IdentityTarget {
-  readonly script: StoredPlatformScript;
-  /** The `detailed` text of each validated description its media name, by row. */
-  readonly descriptions: ReadonlyMap<string, string>;
-}
-
-/** A brain's identity, for one version of the script. */
-export interface WrittenIdentity {
-  readonly inputHash: string;
-  readonly content: ScriptIdentityContent;
-  readonly model: string;
-  readonly promptHash: string;
-}
-
-/** The identity job's reads and writes (`scripts.identify_platform_script`), as the service role. */
-export interface ScriptIdentityJobStore {
-  /** Hers, active, and she is not archived; `null` otherwise. */
-  target(creatorId: CreatorId, scriptId: string): Promise<IdentityTarget | null>;
-  /** Kept once: the same version and prompt written again changes nothing. */
-  save(creatorId: CreatorId, scriptId: string, identity: WrittenIdentity): Promise<void>;
-  /**
-   * Each hour: every active native script of a creator whose switch is on and who is not archived, those with no
-   * identity first, queued for the job, which decides. Gives how many.
-   */
-  enqueueBacklog(correlationId: string): Promise<number>;
-}
-
-/** The brain that writes an identity (`brain/script-identity`, `llm`, wired by the composition root). */
-export interface ScriptIdentifier {
-  /** The prompt's version: an identity of another is written again. */
-  readonly promptHash: string;
-  identify(input: {
-    readonly creatorId: CreatorId;
-    readonly scriptName: string;
-    readonly steps: readonly {
-      readonly name: string;
-      readonly text: string;
-      readonly media: readonly {
-        readonly kind: MediaSlotKind;
-        readonly description: string | null;
-      }[];
-    }[];
-  }): Promise<
-    | {
-        readonly kind: 'identified';
-        readonly content: ScriptIdentityContent;
-        readonly model: string;
-        readonly promptHash: string;
-      }
-    | { readonly kind: 'budget' }
-    | { readonly kind: 'failed' }
-  >;
-}
-
 /** The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4). */
 export type DescriptionReview =
   | { readonly kind: 'validate'; readonly descriptionIds: readonly string[] }

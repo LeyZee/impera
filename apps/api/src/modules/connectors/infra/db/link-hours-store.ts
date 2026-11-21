@@ -1,5 +1,5 @@
 import { LinkRefSchema, newId } from '@impera/contracts';
-import { and, eq, inArray, schema, sql, withTenantJob, type Database } from '@impera/db';
+import { and, eq, inArray, schema, sql, withAdmin, withTenantJob, type Database } from '@impera/db';
 import { z } from 'zod';
 
 import type { LinkHourStore } from '../../domain/link-stats';
@@ -10,11 +10,30 @@ const LinkHourIdSchema = z.uuid().brand<'RedirectLinkHourId'>();
 
 /**
  * The hours kept of her redirect links (ADR 0120 § 3), a creator's rows: read and written under the app role, one
- * creator and one transaction at a time (`withTenantJob`, job `link_hours`), never by the service role. The base
+ * creator and one transaction at a time (`withTenantJob`, job `link_hours`), never by the service role, which only
+ * says which creators have a link to read. The base
  * lets the job change an open hour only and remove nothing: a closed hour stays as it was written.
  */
-export function createDrizzleLinkHourStore(db: Database): LinkHourStore {
+export function createDrizzleLinkHourStore(db: Database, adminDb: Database): LinkHourStore {
   return {
+    // Which creators have a link to read crosses them all: the service role, identifiers only. What is read of
+    // each, and every write, goes through her own door below.
+    creatorsToRead: () =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .selectDistinct({ creatorId: redirectLinks.creatorId })
+          .from(redirectLinks)
+          .where(
+            and(
+              sql`${redirectLinks.serviceRef} is not null`,
+              sql`${redirectLinks.placement} is not null`,
+              eq(redirectLinks.enabled, true),
+            ),
+          )
+          .orderBy(redirectLinks.creatorId);
+        return rows.map((row) => row.creatorId);
+      }),
+
     attachedLinks: (creatorId) =>
       withTenantJob(db, creatorId, 'link_hours', async (tx) => {
         const rows = await tx
@@ -22,6 +41,8 @@ export function createDrizzleLinkHourStore(db: Database): LinkHourStore {
           .from(redirectLinks)
           .where(
             and(
+              // The policy already keeps the job to her rows; said again here, as every job's store does.
+              eq(redirectLinks.creatorId, creatorId),
               sql`${redirectLinks.serviceRef} is not null`,
               sql`${redirectLinks.placement} is not null`,
               eq(redirectLinks.enabled, true),
@@ -34,12 +55,17 @@ export function createDrizzleLinkHourStore(db: Database): LinkHourStore {
     record: async (creatorId, linkId, hours, readAt) => {
       if (hours.length === 0) return 0;
       return withTenantJob(db, creatorId, 'link_hours', async (tx) => {
+        // One writer at a time per creator: an hour cannot close between the reading below and the write.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`link_hours:${creatorId}`}, 0))`,
+        );
         // A closed hour is not offered again: the job's update policy would refuse the whole statement on it.
         const closed = await tx
           .select({ hour: redirectLinkHours.hour })
           .from(redirectLinkHours)
           .where(
             and(
+              eq(redirectLinkHours.creatorId, creatorId),
               eq(redirectLinkHours.linkId, linkId),
               eq(redirectLinkHours.closed, true),
               inArray(
