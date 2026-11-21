@@ -23,6 +23,7 @@ import { RequestsSection } from './requests/RequestsSection';
 import { ScriptsSection } from './scripts/ScriptsSection';
 import { PreparedScriptsView } from './scripts/prepared/PreparedScriptsView';
 import { ScriptsToCopyView } from './scripts/prepared/ScriptsToCopyView';
+import { usePreparedScripts } from './scripts/prepared/api';
 import {
   CREATOR_TABS,
   accountCardId,
@@ -41,8 +42,9 @@ import { AgentSwitch } from '@/agent/AgentSwitch';
 import { canSwitch } from '@/agent/state';
 import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
+import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
-import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
 
@@ -221,12 +223,9 @@ export function CreatorsPage({
     if (!isOwner && creators.length === 0) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">Aucune créatrice ne t’est confiée</p>
-            <p className="ps-muted">
-              Le propriétaire choisit les créatrices de chaque compte. Demande-lui de t’en confier une.
-            </p>
-          </div>
+          <Empty plate art={<CrownArt />} title="Aucune créatrice ne t’est confiée">
+            Le propriétaire choisit les créatrices de chaque compte. Demande-lui de t’en confier une.
+          </Empty>
         </section>
       );
     }
@@ -489,10 +488,12 @@ export function CreatorsPage({
         ) : null}
         {switchShown && views.length > 1 ? (
           <div className="cr-views">
-            <Segment<CreatorSheet>
+            <ViewsSelector
               label={viewsLabel}
               value={shown}
-              options={views.map(([value, label]) => ({ value, label }))}
+              views={views}
+              // Scripts says how many of hers wait to be copied, on the view that holds them.
+              {...(shownTab === 'scripts' ? { readyOf: current.id } : {})}
               onChange={(sheet) =>
                 void navigate({ to: '/creatrices', search: creatorsSearch(sheet, selected) })
               }
@@ -504,6 +505,60 @@ export function CreatorsPage({
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
+  );
+}
+
+/** The views of the tab on screen; with `readyOf`, « À copier » carries the count of her scripts ready to copy. */
+function ViewsSelector({
+  label,
+  value,
+  views,
+  readyOf,
+  onChange,
+}: {
+  label: string;
+  value: CreatorSheet;
+  views: readonly (readonly [CreatorSheet, string])[];
+  readyOf?: CreatorId;
+  onChange: (sheet: CreatorSheet) => void;
+}): JSX.Element {
+  return readyOf === undefined ? (
+    <Segment<CreatorSheet>
+      label={label}
+      value={value}
+      options={views.map(([sheet, name]) => ({ value: sheet, label: name }))}
+      onChange={onChange}
+    />
+  ) : (
+    <ScriptsViewsSelector label={label} value={value} views={views} creatorId={readyOf} onChange={onChange} />
+  );
+}
+
+function ScriptsViewsSelector({
+  label,
+  value,
+  views,
+  creatorId,
+  onChange,
+}: {
+  label: string;
+  value: CreatorSheet;
+  views: readonly (readonly [CreatorSheet, string])[];
+  creatorId: CreatorId;
+  onChange: (sheet: CreatorSheet) => void;
+}): JSX.Element {
+  const scripts = usePreparedScripts(creatorId);
+  const ready = (scripts.data ?? []).filter((one) => one.state === 'ready_to_copy').length;
+  return (
+    <Segment<CreatorSheet>
+      label={label}
+      value={value}
+      options={views.map(([sheet, name]) => ({
+        value: sheet,
+        label: sheet === 'copy' && ready > 0 ? `${name} · ${String(ready)}` : name,
+      }))}
+      onChange={onChange}
+    />
   );
 }
 

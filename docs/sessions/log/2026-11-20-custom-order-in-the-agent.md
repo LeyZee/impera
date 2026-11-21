@@ -1,0 +1,7 @@
+# 2026-11-20 — ADR 0159 § A.2 : sa demande sur mesure dans l'agent, case par case — done (en attente du magasin)
+Fait : le cerveau lit sa demande dans des cases fermées (format, suppléments par leurs identifiants, minutes, précisions), jamais un prix (prompt du cerveau 1.21.0). La composition passe la lecture au tour de `custom-orders` (`customOrderTurn`) quand une commande est gardée : une case manquante à la fois, la fiche chez elle quand tout est là, refus doux quand sa grille dit qu'elle ne le fait pas ; doute sur l'âge, limites inconnues, ventes gelées ou « ne fait jamais » arrêtent tout avant (`customOrderStop`). Garde : aucun pourboire demandé. `conversations` lit la commande ouverte dans la première transaction du tour et garde le tour dans la transaction d'écriture, une fois par message du fan. Sans magasin branché, rien ne change (ADR 0090).
+Pas fait : brancher le magasin (`CustomOrdersModule.orders`) dans la racine de composition, une ligne (`customOrders: customOrders.module.orders` à `createConversationsModule`), dès que le lot du magasin du fil Demandes personnalisées est sur main.
+Décisions : `conversations` et `agent` dépendent de `custom-orders` (frontières, modules.md) ; `custom-orders/pure.ts` prête le type du tour (ADR 0051).
+Découvertes : aucune.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ; pnpm test ; tests du composeur (6 cas), des arrêts, de la garde ; test d'intégration du tour gardé (CI) ; 3 cas d'évaluation (questions, fiche prête, refus par la grille).

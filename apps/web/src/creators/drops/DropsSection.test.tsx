@@ -139,5 +139,6 @@ describe('Créatrices › Contenu (recette créatrice 1 et 6)', () => {
     serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SCRIPT] } }) });
     show();
     expect(await screen.findByText('Aucun dépôt')).toBeDefined();
+    expect(document.querySelector('.nv-empty__art svg')).not.toBeNull();
   });
 });

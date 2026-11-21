@@ -227,3 +227,26 @@ describe('judgeSuite', () => {
     ]);
   });
 });
+
+describe('custom-order-kept (ADR 0159 § A.2)', () => {
+  const gathering = readScenario(readFileSync(`${EVALS}scenarios/custom-order-kept-gathering.yaml`, 'utf8'));
+  const asked: Outcome = {
+    ...fine,
+    brief: { intent: 'asks_for_service', risks: [], action: 'reply' },
+    customOrder: 'reply',
+    bubbles: ['mmh et tu la vois durer combien ? 🙈'],
+  };
+
+  it('passes when the turn asks the next box', () => {
+    expect(checkScenario(gathering, { ...asked, customOrderEvent: 'custom_order_gathering' })).toEqual([]);
+  });
+
+  it('fails when the turn said nothing of his order, or sent the card too soon', () => {
+    expect(checkScenario(gathering, asked)).toEqual([
+      'demande sur mesure : none, attendu custom_order_gathering',
+    ]);
+    expect(checkScenario(gathering, { ...asked, customOrderEvent: 'custom_order_card_ready' })).toEqual([
+      'demande sur mesure : custom_order_card_ready, attendu custom_order_gathering',
+    ]);
+  });
+});

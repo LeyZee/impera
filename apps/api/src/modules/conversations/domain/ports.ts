@@ -46,6 +46,7 @@ import type {
   MessageOrigin,
   MessageView,
   Money,
+  OpenCustomOrder,
   OutboundMedia,
   PlatformAccountId,
   SafetyEvent,
@@ -60,6 +61,8 @@ import type {
   CopilotSwitches,
   Platform,
 } from '@impera/contracts';
+
+import type { CustomOrderTurn } from '../../custom-orders/pure';
 
 import type { AwayStatus } from './away';
 import type { ConversationProjection } from './projection';
@@ -385,6 +388,24 @@ export interface Transaction {
   readonly automatic: AutomaticEvidence;
   readonly audit: AuditTrail;
   readonly scriptRuns: ScriptRunRepository;
+  /** His custom order (ADR 0159), kept by the custom-orders module; absent, no store is wired. */
+  readonly customOrders?: CustomOrderJournal;
+}
+
+/** A turn that says something about his custom order. */
+export type KeptCustomOrderTurn = Exclude<CustomOrderTurn, { readonly kind: 'none' }>;
+
+/** His custom order under her tenant, in the turn's transactions (ADR 0159 § A.2): never across creators. */
+interface CustomOrderJournal {
+  /** His order still before her yes, or null. */
+  open(fanId: FanId): Promise<OpenCustomOrder | null>;
+  /** What the turn decided, kept once per message of his: the same message again changes nothing. */
+  record(entry: {
+    readonly fanId: FanId;
+    readonly inboundMessageId: string;
+    readonly turn: KeptCustomOrderTurn;
+    readonly at: Date;
+  }): Promise<void>;
 }
 
 /**
@@ -645,6 +666,11 @@ export interface ComposeInput {
   readonly exceptions?: DatedRanges;
   /** A custom order of his already waits for the team (ADR 0090 § A). */
   readonly customOrderOpen?: boolean;
+  /**
+   * His custom order as the custom-orders module keeps it (ADR 0159 § A.2), read in the turn's first transaction:
+   * `null`, none open. Absent, no store is wired and she answers as before (ADR 0090 § A).
+   */
+  readonly openCustomOrder?: OpenCustomOrder | null;
   /** The replies of her objection bank he already received (ADR 0090 § B). */
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
@@ -730,6 +756,8 @@ export type ComposeResult =
       readonly alerts?: readonly ComposedAlert[];
       /** His custom order now waits for the team: one `custom_order_opened` (ADR 0090 § A). */
       readonly customOrderOpened?: true;
+      /** The turn on his custom order (ADR 0159 § A.2): kept by the custom-orders store in the turn's transaction. */
+      readonly customOrderTurn?: KeptCustomOrderTurn;
       /** A script would open for him and none is left: one `scripts_exhausted` per episode (ADR 0150 § 9). */
       readonly scriptsExhausted?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
@@ -758,6 +786,7 @@ export type ComposeResult =
       readonly fanAvailability?: FanAvailabilityRecord;
       readonly alerts?: readonly ComposedAlert[];
       readonly customOrderOpened?: true;
+      readonly customOrderTurn?: KeptCustomOrderTurn;
       readonly scriptsExhausted?: true;
       /** His run moved by his message and Reveal only: no step goes without a draft. */
       readonly scriptRun?: Pick<ComposedScriptRun, 'moved'>;
