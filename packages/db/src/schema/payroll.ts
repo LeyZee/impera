@@ -318,6 +318,10 @@ const memberRead = (memberId: PgColumn): ReturnType<typeof pgPolicy> =>
 const agencyWrites = (memberId: PgColumn, by: PgColumn): SQL =>
   sql`${readsTeam} and ${by} = ${currentUser} and not ${isMine(memberId)}`;
 
+/** Written by the owner alone, never for themselves: what adds to a pay or corrects it (a bonus, an adjustment). */
+const ownerWrites = (memberId: PgColumn, by: PgColumn): SQL =>
+  sql`${isOwner} and ${by} = ${currentUser} and not ${isMine(memberId)}`;
+
 /** A manual bonus for a member and a period, cancelled (never deleted) while the period is open for the member. */
 export const bonuses = pgTable(
   'bonuses',
@@ -343,14 +347,14 @@ export const bonuses = pgTable(
     check('bonuses_cancellation_check', sql`(${t.cancelledAt} is null) = (${t.cancelledBy} is null)`),
     index('bonuses_member_period_idx').on(t.memberId, t.period),
     memberRead(t.memberId),
-    pgPolicy('agency_insert', {
+    pgPolicy('owner_insert', {
       for: 'insert',
-      withCheck: sql`${agencyWrites(t.memberId, t.createdBy)} and ${t.cancelledAt} is null`,
+      withCheck: sql`${ownerWrites(t.memberId, t.createdBy)} and ${t.cancelledAt} is null`,
     }),
-    pgPolicy('agency_cancel', {
+    pgPolicy('owner_cancel', {
       for: 'update',
-      using: sql`${readsTeam} and not ${isMine(t.memberId)} and ${t.cancelledAt} is null`,
-      withCheck: agencyWrites(t.memberId, t.cancelledBy),
+      using: sql`${isOwner} and not ${isMine(t.memberId)} and ${t.cancelledAt} is null`,
+      withCheck: ownerWrites(t.memberId, t.cancelledBy),
     }),
   ],
 );
@@ -600,7 +604,7 @@ export const payAdjustments = pgTable(
     check('pay_adjustments_reason_check', sql`char_length(${t.reason}) between 1 and 500`),
     index('pay_adjustments_member_period_idx').on(t.memberId, t.period),
     memberRead(t.memberId),
-    pgPolicy('agency_insert', { for: 'insert', withCheck: agencyWrites(t.memberId, t.createdBy) }),
+    pgPolicy('owner_insert', { for: 'insert', withCheck: ownerWrites(t.memberId, t.createdBy) }),
   ],
 );
 
