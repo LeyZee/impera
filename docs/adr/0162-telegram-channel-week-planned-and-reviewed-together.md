@@ -1,6 +1,6 @@
 # 0162. Canal Telegram : la semaine est planifiée d'avance, revue à deux, et rien ne laisse de trou
 
-Statut : proposed (demande de Charles du 21/11/2026, 13 h 20 heure de Paris, et ses réponses de 13 h 35, 13 h 41, 13 h 43 et 13 h 44, fil « Publier sur Telegram à sa place »)
+Statut : accepted (Charles, 21/11/2026 13 h 52 heure de Paris, « ok décision Telegram » ; demande du même jour, 13 h 20 heure de Paris, et ses réponses de 13 h 35, 13 h 41, 13 h 43 et 13 h 44, fil « Publier sur Telegram à sa place »)
 Date : 2026-11-21
 Précise : l'ADR 0080 (créneaux, aperçu, pool, lien, post principal et posts d'engagement), l'ADR 0136 § 5 (plan de la semaine) pour le seul canal Telegram, et l'ADR 0140 (« Ma journée » de la créatrice).
 Remplace : dans l'ADR 0080, § 1.1 à 1.3 (créneaux à heure fixe, 3 h d'écart) par les fenêtres du § 2 ci-dessous ; § 2.6 (validation au fil de l'eau) par la revue de la semaine du § 3 ; § 3.1 (« jamais publiés sur ce canal ») et § 3.4 (« jamais un média déjà publié reposté ») par le § 6 ; § 3.2 (la vidéo publique Reveal, une sur deux) par le § 5. Le reste de l'ADR 0080 tient.
