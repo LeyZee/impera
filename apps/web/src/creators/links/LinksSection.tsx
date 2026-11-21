@@ -461,18 +461,6 @@ function LinkDialog({
             {refusal}
           </p>
         )}
-        {reauth ? (
-          <PasswordPrompt
-            lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
-            onConfirmed={() => {
-              setReauth(false);
-              void save();
-            }}
-            onCancel={() => {
-              setReauth(false);
-            }}
-          />
-        ) : null}
         <div className="tm-dialog__foot">
           <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
             Annuler
@@ -482,6 +470,18 @@ function LinkDialog({
           </button>
         </div>
       </form>
+      {reauth ? (
+        <PasswordPrompt
+          lead="Pour changer un de ses liens, confirme ton mot de passe et ton code."
+          onConfirmed={() => {
+            setReauth(false);
+            void save();
+          }}
+          onCancel={() => {
+            setReauth(false);
+          }}
+        />
+      ) : null}
     </Dialog>
   );
 }

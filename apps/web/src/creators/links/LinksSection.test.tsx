@@ -225,6 +225,28 @@ describe('Créatrices › Liens (INS-03, ADR 0121 § 1)', () => {
     expect(screen.getByRole('switch').getAttribute('aria-label')).toBe(before);
     expect(writes).toHaveLength(1);
   });
+
+  it('asks the password and the code outside the dialog’s own form when saving needs it (PRO1-01)', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: { code: REAUTHENTICATION_ERROR_CODE, message: 'x', details: {}, requestId: 'r1' },
+          }),
+          { status: 403 },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifier le lien « Story du jour »' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }));
+    await within(dialog).findByText('Pour changer un de ses liens, confirme ton mot de passe et ton code.');
+    // A form inside a form is dropped by the browser: the prompt's own form must stand on its own.
+    const promptForm = within(dialog).getByLabelText('Mot de passe').closest('form');
+    expect(promptForm).not.toBeNull();
+    expect(promptForm?.parentElement?.closest('form') ?? null).toBeNull();
+  });
 });
 
 /* Invented links of an invented account: opaque references, an address that leads nowhere. */
