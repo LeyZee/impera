@@ -5,7 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { aboutEuros, objectivesSub, objectiveVerdict, ObjectivesCard, wholeEuros } from './Objectives';
+import {
+  aboutEuros,
+  objectiveEuros,
+  objectivesSub,
+  objectiveVerdict,
+  ObjectivesCard,
+  wholeEuros,
+} from './Objectives';
 import { AGENCY_WEEK, LINA, MAYA } from './fixture';
 
 // Invented figures only (ADR 0092 § 6): two invented creators, invented amounts.
@@ -72,6 +79,9 @@ describe('objectiveVerdict', () => {
 describe('the card’s figures', () => {
   it('says what is done in whole euros and a projection to ten euros', () => {
     expect(wholeEuros(161_880)).toBe('1\u202f619\u00a0€');
+    // An objective typed to the cent keeps it (PRO1-17).
+    expect(objectiveEuros(150_050)).toBe('1\u202f500,50\u00a0€');
+    expect(objectiveEuros(150_000)).toBe('1\u202f500\u00a0€');
     expect(aboutEuros(505_875)).toBe('environ 5\u202f060\u00a0€');
     expect(objectivesSub(OBJECTIVES)).toBe('Novembre 2026 · jour 15 sur 30 · interne à l’agence');
     expect(objectivesSub({ ...OBJECTIVES, daysGone: 30 })).toBe(

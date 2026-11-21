@@ -1331,6 +1331,27 @@
       "when": 1795269638355,
       "tag": "0248_team_announcements",
       "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1795269698355,
+      "tag": "0249_llm_purpose_media_telegram",
+      "breakpoints": true
+    },
+    {
+      "idx": 191,
+      "version": "7",
+      "when": 1795275869236,
+      "tag": "0250_creator_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 192,
+      "version": "7",
+      "when": 1795277087019,
+      "tag": "0251_pay_gifts_owner_only",
+      "breakpoints": true
     }
   ]
 }

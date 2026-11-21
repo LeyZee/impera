@@ -657,6 +657,8 @@ export interface ComposedTurn {
   readonly isSkipped?: boolean;
   /** Written in the care mode (ADR 0088): a human validates it, whatever her mode. */
   readonly care?: true;
+  /** A guard refused her first answer and the voice wrote it once more (M1): the copilot says why (ADR 0141 § 2). */
+  readonly rewritten?: true;
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
@@ -1323,5 +1325,6 @@ export async function composeTurn(
     latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),
     ...(voice.ok && { model: voice.value.meta.model }),
     isFallback: voice.ok && voice.value.meta.isFallback,
+    ...(retried !== undefined && { rewritten: true }),
   };
 }

@@ -59,6 +59,8 @@ export interface RedirectLinkStore {
     actor: RedirectLinkActor,
     creatorId: CreatorId,
     id: RedirectLinkId,
+    /** The address the service was read for: a link that no longer has it is not found. */
+    address: string,
     ref: LinkRef,
   ): Promise<StoredRedirectLink>;
 }

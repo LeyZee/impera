@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { AiUsageSchema, LlmCallIdSchema, newId } from '@impera/contracts';
-import { and, eq, schema } from '@impera/db';
+import {
+  AiUsageSchema,
+  CreatorIdSchema,
+  LlmCallIdSchema,
+  newId,
+  PlatformAccountIdSchema,
+} from '@impera/contracts';
+import { and, eq, schema, withAdmin } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -274,5 +280,60 @@ describe('/v1/settings/ai-usage', () => {
     const { body } = await read();
     expect(body?.uses.find((u) => u.use === 'probe')).toMatchObject({ calls: 1 });
     expect(body?.voice).toBeNull();
+  });
+
+  it('sums each line of spend and the sales of each creator for the forecast (ADR 0091 § 8)', async () => {
+    const creatorId = newId(CreatorIdSchema);
+    const accountId = newId(PlatformAccountIdSchema);
+    const yesterday = new Date(Date.now() - 86_400_000);
+    await withAdmin(test.admin.db, async (tx) => {
+      await tx
+        .insert(schema.creators)
+        .values({ id: creatorId, nameKey: creatorId, displayName: 'Anna', timezone: 'Europe/Paris' });
+      await tx
+        .insert(schema.platformAccounts)
+        .values({ id: accountId, creatorId, platform: 'reveal', handle: 'anna-demo' });
+      const line = {
+        creatorId,
+        platformAccountId: accountId,
+        platform: 'reveal',
+        platformSaleId: 'vente-inventee',
+        saleType: 'other',
+        status: 'paid',
+        occurredAt: yesterday,
+        platformModelId: 'modele-invente',
+        currency: 'EUR',
+        grossInclVatMinor: 12_000,
+        grossExclVatMinor: 10_000,
+        netMinor: 8_000,
+        agencyMinor: 4_000,
+        creatorMinor: 4_000,
+        position: '1',
+        inputsHash: 'hash-invente',
+      };
+      await tx.insert(schema.platformSales).values([
+        { ...line, id: randomUUID(), event: 'sale' },
+        {
+          ...line,
+          id: randomUUID(),
+          event: 'refund',
+          netMinor: 2_000,
+          agencyMinor: 1_000,
+          creatorMinor: 1_000,
+        },
+      ]);
+    });
+    await call({ creatorId, purpose: 'telegram', createdAt: yesterday });
+    await call({ creatorId, purpose: 'media', role: 'sense', createdAt: yesterday });
+    await call({ purpose: 'chatting', createdAt: yesterday });
+
+    const reader = createPostgresUsageReader(test.service.db);
+    const from = new Date(Date.now() - 3 * 86_400_000);
+    const { rows, sales, creatorNames } = await reader.forecast(from, 'Europe/Paris');
+    const hers = rows.filter((r) => r.creatorId === creatorId);
+    expect(hers.map((r) => r.line).sort()).toEqual(['media', 'telegram']);
+    expect(rows.find((r) => r.creatorId === null && r.line === 'playground')).toBeDefined();
+    expect(sales.filter((r) => r.creatorId === creatorId).reduce((sum, r) => sum + r.netEur, 0)).toBe(60);
+    expect(creatorNames.get(creatorId)).toBe('Anna');
   });
 });

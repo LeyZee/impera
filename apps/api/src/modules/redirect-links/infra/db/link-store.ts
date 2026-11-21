@@ -193,7 +193,7 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
       }),
     create: (actor, creatorId, values) => write(actor, creatorId, undefined, values),
     update: (actor, creatorId, id, values) => write(actor, creatorId, id, values),
-    attach: async (actor, creatorId, id, ref: LinkRef) => {
+    attach: async (actor, creatorId, id, address, ref: LinkRef) => {
       try {
         // The owner's own door: the policy `owner_attach` and the grant on this one column let it through.
         return await assertAgency(
@@ -204,7 +204,15 @@ export function createDrizzleRedirectLinkStore(db: Database, adminDb: Database):
             const [saved] = await tx
               .update(redirectLinks)
               .set({ serviceRef: ref, updatedAt: sql`now()` })
-              .where(and(eq(redirectLinks.id, id), eq(redirectLinks.creatorId, creatorId)))
+              // Only while the link still has the address the service was read for: an address changed in between
+              // is another link at the service, and this write then touches nothing.
+              .where(
+                and(
+                  eq(redirectLinks.id, id),
+                  eq(redirectLinks.creatorId, creatorId),
+                  eq(redirectLinks.url, address),
+                ),
+              )
               .returning(columns);
             if (saved === undefined) throw new RedirectLinkError('link_not_found');
             const link = toLink(saved);
