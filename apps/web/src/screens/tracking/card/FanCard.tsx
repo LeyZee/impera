@@ -8,6 +8,7 @@ import type {
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
+import { useFanFlags } from '../FanLimits';
 import { fanKycKey } from '../api';
 
 import { FanCardRefused, fanCardKey, setFanCardField, useFanCard } from './api';
@@ -39,6 +40,10 @@ type Write = (field: FanCardField, body: SetFanCardFieldBody) => Promise<boolean
  */
 export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string }): JSX.Element | null {
   const card = useFanCard(creatorId, fanId, true);
+  // His age confirmed by a human with no number on the card: « Son âge » says he is an adult (IA-12).
+  const flags = useFanFlags(creatorId, fanId);
+  const ageConfirmed =
+    flags.data?.flags.ageConfirmedAt !== undefined && flags.data.flags.ageDisputed === undefined;
   const client = useQueryClient();
   const [pending, setPending] = useState<FanCardField | null>(null);
   const [refusal, setRefusal] = useState<{ field: FanCardField; message: string } | null>(null);
@@ -81,6 +86,7 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
       pending={pending !== null}
       refusal={refusal?.field === spec.field ? refusal.message : null}
       write={write}
+      ageConfirmed={ageConfirmed}
     />
   );
 
@@ -132,6 +138,7 @@ function FieldRow({
   pending,
   refusal,
   write,
+  ageConfirmed,
 }: {
   spec: FanCardFieldSpec;
   entry: FanCardEntry;
@@ -139,6 +146,7 @@ function FieldRow({
   pending: boolean;
   refusal: string | null;
   write: Write;
+  ageConfirmed: boolean;
 }): JSX.Element {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
@@ -170,7 +178,11 @@ function FieldRow({
         {/* An empty field holds one line: what is not known yet is said beside its name, quietly. */}
         {current === null && !editing && !closed ? (
           <span className="tr-card__empty">
-            {spec.learning === 'observe' ? 'Pas encore deviné' : 'Pas encore su'}
+            {spec.field === 'age' && ageConfirmed
+              ? 'Majeur (confirmé)'
+              : spec.learning === 'observe'
+                ? 'Pas encore deviné'
+                : 'Pas encore su'}
           </span>
         ) : null}
         {editing || closed ? null : (
