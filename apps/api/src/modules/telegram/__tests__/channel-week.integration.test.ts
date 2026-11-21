@@ -166,6 +166,7 @@ describe('her channel’s week on Postgres', () => {
         {
           ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
           chatId: chatOf(title),
+          links: [link],
           channelLinkId: linkId,
           publishing: creatorId === nora,
         },
@@ -302,8 +303,8 @@ describe('her channel’s week on Postgres', () => {
     const lea_ = (await weekOf(lea, '2026-11-23')).posts.filter((post) => post.state === 'skipped');
     expect(lea_.length).toBeGreaterThan(0);
     expect(lea_.every((post) => post.reason?.includes('éteinte') === true)).toBe(true);
-    // A day later: her posts of the day left behind are skipped, never sent in a burst.
-    now = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    // Wednesday at midnight in Paris, after an outage: her posts left behind are skipped, never sent in a burst.
+    now = new Date('2026-11-25T23:00:00Z');
     await module.jobs.channelSend();
     expect(telegram.published.length).toBe(before);
     const late = (await weekOf(nora, '2026-11-23')).posts.filter(

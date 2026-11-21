@@ -261,11 +261,6 @@ async function sendOne(
 ): Promise<void> {
   const skip = (reason: string): Promise<boolean> =>
     deps.week.update(post.creatorId, post.id, { state: 'skipped', reason });
-  const closes = wallClockToInstant(post.day, post.window.until, timeZone).getTime() + LATE_MARGIN_MS;
-  if (now.getTime() > closes) {
-    await skip('Heure dépassée : il n’est pas parti en retard.');
-    return;
-  }
   const { record, config } = await channelConfigOf(deps, post.creatorId);
   if (record === null || record.archived || record.chatId === null) {
     await skip('Le canal n’est plus branché.');
@@ -273,6 +268,11 @@ async function sendOne(
   }
   if (!config.publishing) {
     await skip('La publication du canal est éteinte : rien n’est parti.');
+    return;
+  }
+  const closes = wallClockToInstant(post.day, post.window.until, timeZone).getTime() + LATE_MARGIN_MS;
+  if (now.getTime() > closes) {
+    await skip('Heure dépassée : il n’est pas parti en retard.');
     return;
   }
   if (!config.publishWithoutValidation && !post.locked) {
