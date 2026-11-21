@@ -28,7 +28,6 @@ import {
   CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   DROP_OUTPUTS,
-  STATE_WORDS,
   UNKNOWN_TYPE,
   acceptOfReplacing,
   contentsOf,
@@ -49,6 +48,7 @@ import {
   routeFirst,
   shotMomentOf,
   stateTone,
+  stateWord,
   toRedo,
   toReplaceOf,
   toShoot,
@@ -635,7 +635,7 @@ function DropCard({
           {CATEGORY_EMOJIS[drop.category]}
         </span>
         <span className="ct-card__name">{dropName(drop)}</span>
-        <span className={`ct-state ct-state--${tone}`}>{STATE_WORDS[drop.state]}</span>
+        <span className={`ct-state ct-state--${tone}`}>{stateWord(drop)}</span>
       </div>
       <p className="ct-card__meta nv-num">
         {when} · {drop.files.length === 0 ? 'Rien d’ajouté encore' : contentsOf(drop.files)}

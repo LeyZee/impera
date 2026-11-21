@@ -218,6 +218,10 @@ export function toReplaceOf(drop: ContentDrop): ContentDropFile[] {
   return drop.files.filter((file) => file.redo !== null || file.state === 'refused');
 }
 
+/** Its state as her card says it: « À refaire » while a medium of it waits for her replacement (trou 7 du 21/11). */
+export const stateWord = (drop: ContentDrop): string =>
+  toReplaceOf(drop).length > 0 ? 'À refaire' : STATE_WORDS[drop.state];
+
 /** Out, unless a medium of it waits for her: then it is back in « En route », where she replaces it. */
 const isOut = (drop: ContentDrop): boolean =>
   (drop.state === 'published' || drop.exportedAt !== null) && toReplaceOf(drop).length === 0;
@@ -281,7 +285,7 @@ export const STATE_WORDS: Readonly<Record<DropState, string>> = {
 
 /** The tone of a state's chip: amber only when she has something to do (relecture Extension). */
 export function stateTone(drop: ContentDrop): 'warn' | 'ok' | 'calm' {
-  if (drop.state === 'blocked') return 'warn';
+  if (drop.state === 'blocked' || toReplaceOf(drop).length > 0) return 'warn';
   if (drop.state === 'ready' || drop.state === 'scheduled' || drop.state === 'published') return 'ok';
   return 'calm';
 }
