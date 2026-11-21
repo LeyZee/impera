@@ -1,0 +1,300 @@
+/* « Ta part » (CR-04, ADR 0157): her part in large, where her fans' money went, and each sale with its own path. Tokens only. */
+
+/* The title keeps its one line: the period's choice goes under it when the card is narrow. */
+.vt-earn > .nv-panel__head {
+  flex-wrap: wrap;
+}
+.vt-earn > .nv-panel__head > :first-child {
+  flex: 1 0 auto;
+}
+.vt-earn > .nv-panel__sec {
+  gap: 0;
+  padding-bottom: var(--nv-plate-pad);
+}
+
+.vt-earn .sc-week {
+  flex-wrap: wrap;
+}
+.vt-earn .sc-week__label {
+  white-space: nowrap;
+}
+.vt-earn__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.vt-earn__hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nv-space-2) var(--nv-space-3);
+  margin-top: var(--nv-space-3);
+}
+.vt-earn__share {
+  padding: 2px 10px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in oklab, var(--nv-money-creator) 16%, transparent);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.vt-earn__part {
+  margin: 0;
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-large-title);
+  font-weight: 700;
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+}
+.vt-earn__meta {
+  margin: var(--nv-space-1) 0 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* « Tes ventes »: the design system's eyebrow, a breath above it after the path. */
+.vt-earn .vt-earn__label {
+  margin: var(--nv-space-6) 0 0;
+}
+.vt-earn__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: var(--nv-space-2) calc(var(--nv-space-2) * -1) 0;
+  padding: 0;
+  list-style: none;
+}
+.vt-earn__line {
+  border-radius: var(--nv-radius-md);
+  transition: background var(--nv-dur-fast);
+}
+.vt-earn__line:hover,
+.vt-earn__line:has([aria-expanded='true']) {
+  background: var(--nv-plate-hover);
+}
+.vt-earn__row {
+  display: grid;
+  grid-template-columns: 4.5em minmax(0, 1fr) auto auto 1em;
+  gap: var(--nv-space-3);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--nv-space-2);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vt-earn__row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.vt-earn__lines.is-dated .vt-earn__row {
+  grid-template-columns: 9em minmax(0, 1fr) auto auto 1em;
+}
+.vt-earn__paid {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+.vt-earn__chev {
+  align-self: center;
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+[aria-expanded='true'] > .vt-earn__chev {
+  transform: rotate(180deg);
+}
+/* A sale's own path, unfolded under it: four steps on one line, wrapping when narrow. */
+.vt-earn__detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-1) var(--nv-space-4);
+  margin: 0;
+  padding: 0 var(--nv-space-2) var(--nv-space-2);
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.vt-earn__detail li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vt-earn__detail .nv-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+
+/* ── Où va l'argent (ADR 0157 § 1): the Dashboard's colours of the money (ADR 0106 § 10), the VAT and Reveal two flat
+   greys of the neutral fold (no hatching: it would say « estimated »), each labelled; 2px between blocks, 4px corners. */
+.vt-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin-top: var(--nv-space-4);
+}
+.vt-path [data-part='vat'],
+.vt-earn__detail [data-part='vat'] {
+  --_c: var(--nv-series-other);
+}
+.vt-path [data-part='platform'],
+.vt-earn__detail [data-part='platform'] {
+  --_c: color-mix(in oklab, var(--nv-series-other) 50%, transparent);
+}
+.vt-path [data-part='agency'],
+.vt-earn__detail [data-part='agency'] {
+  --_c: var(--nv-money-agency);
+}
+.vt-path [data-part='creator'],
+.vt-earn__detail [data-part='creator'] {
+  --_c: var(--nv-money-creator);
+}
+.vt-path__lead {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink-muted);
+}
+.vt-path__bar {
+  display: flex;
+  gap: 2px;
+  height: 20px;
+}
+.vt-path__seg {
+  flex: 1 1 0;
+  min-width: 3px;
+  border-radius: 4px;
+  background: var(--_c);
+  transform-origin: left center;
+  animation: vt-path-grow var(--nv-dur-data) var(--nv-ease-out) both;
+}
+@keyframes vt-path-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.vt-path__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.vt-path__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  padding: 2px 0;
+}
+.vt-path__row dt {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 7px;
+  color: var(--nv-ink-muted);
+}
+.vt-path__row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.vt-path__row.is-paid,
+.vt-path__row[data-part='creator'] {
+  font-weight: 600;
+}
+.vt-path__row.is-paid dt,
+.vt-path__row[data-part='creator'] dt {
+  color: var(--nv-ink);
+}
+/* Her line closes the path: a hairline above it, as a total under a sum. */
+.vt-path__row[data-part='creator'] {
+  margin-top: var(--nv-space-1);
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.vt-path__key {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+}
+.vt-path__pct {
+  font-size: var(--nv-text-footnote);
+  font-weight: 400;
+  color: var(--nv-ink-faint);
+}
+.vt-earn__when {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+.vt-earn__what {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--nv-space-2);
+  min-width: 0;
+}
+.vt-earn__what b {
+  font-weight: 600;
+}
+.vt-earn__fan {
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vt-earn__amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* A refund reads as one, the whole line muted: never as a sale. */
+.vt-earn__line.is-refund .vt-earn__what b,
+.vt-earn__line.is-refund .vt-earn__amount {
+  font-weight: 500;
+  color: var(--nv-ink-muted);
+}
+.vt-earn__none {
+  margin: var(--nv-space-3) 0 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 40rem) {
+  .vt-earn__row,
+  .vt-earn__lines.is-dated .vt-earn__row {
+    grid-template-columns: minmax(0, 1fr) auto 1em;
+    row-gap: 2px;
+  }
+  .vt-earn__paid {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  /* « Revenir à aujourd’hui » on its own line under the arrows. */
+  .vt-earn .sc-week__back {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    /* Its padding pulled back, as a way back in an eyebrow: its text starts under the arrows. */
+    margin-left: calc(-1 * var(--nv-space-4));
+  }
+  .vt-earn__when {
+    grid-column: 1 / -1;
+  }
+  .vt-earn__chev {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}

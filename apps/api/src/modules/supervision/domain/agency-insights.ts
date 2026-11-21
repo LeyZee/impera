@@ -119,7 +119,7 @@ export function agencySpan(
 }
 
 /** The days from `from` to `to`, both included. */
-function daysBetween(from: string, to: string): string[] {
+export function daysBetween(from: string, to: string): string[] {
   const days: string[] = [];
   for (let at = Date.parse(`${from}T00:00:00Z`); at <= Date.parse(`${to}T00:00:00Z`); at += DAY_MS) {
     days.push(new Date(at).toISOString().slice(0, 10));
@@ -253,7 +253,7 @@ function add(into: Pot, row: SalesTotalsRow): void {
 }
 
 /** A signed dollar sum in euro cents, its magnitude converted at pay's rounding, its sign kept. */
-function toEur(usdMinor: number, rate: UsdRate | null): number {
+export function toEur(usdMinor: number, rate: UsdRate | null): number {
   if (rate === null || usdMinor === 0) return 0;
   const magnitude = usdToEurMinor(Math.abs(usdMinor), rate.rateMicros);
   return usdMinor < 0 ? -magnitude : magnitude;

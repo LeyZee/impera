@@ -24,6 +24,7 @@ import {
   LeaveRequestQuerySchema,
   LeaveRequestSchema,
   MyShiftsSchema,
+  ShiftCheckInSchema,
   OnDutyListSchema,
   PlanningQuerySchema,
   PlanningSchema,
@@ -297,6 +298,16 @@ export function createSchedulingRoutes(
         await scheduling.cancelShift(actorOf(request), request.params.shiftId);
         return reply.code(204).send();
       },
+    );
+
+    // « Je prends mon poste » (EQ-12): 200 with the instant, the first one again on a retry.
+    app.post(
+      '/scheduling/shifts/:shiftId/check-in',
+      {
+        preValidation: ownerOrMember,
+        schema: { params: ShiftParamsSchema, response: { 200: ShiftCheckInSchema } },
+      },
+      (request) => scheduling.checkIn(userOf(request), request.params.shiftId),
     );
 
     app.get(

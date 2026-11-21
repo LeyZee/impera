@@ -4,6 +4,7 @@ import type {
   CustomPriceGrid,
   DatedRanges,
   AlertTrigger,
+  CopilotTrace,
   FanFlags,
   HandoffCause,
   MediaDescription,
@@ -35,6 +36,7 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
+import { copilotTrace } from '../domain/copilot-trace';
 import { herDayEndsSoon } from '../domain/day-end';
 import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
@@ -271,6 +273,8 @@ type AgentComposeResult = (
   readonly abandonTeased?: true;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
+  /** What the code decided with the draft, as the copilot panel reads it (ADR 0141 lot a): kept with the draft. */
+  readonly copilot?: CopilotTrace;
   /**
    * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
    * draft, only what his message and Reveal changed: a step not written was not sent.
@@ -865,6 +869,34 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
   };
 }
 
+/** What her answer does with his custom order, as the copilot names the gesture (ADR 0141 § 1). */
+function customOrderMove(composed: ComposedTurn): 'decline' | 'wait' | undefined {
+  const turn = composed.customOrderTurn;
+  if (turn?.kind === 'reply' && turn.event?.type === 'custom_order_declined') return 'decline';
+  if (turn?.kind === 'reply' || composed.customOrder?.kind === 'reply') return 'wait';
+  return undefined;
+}
+
+/** The copilot's trace of a draft (ADR 0141 lot a), from what this turn already decided: no model, no new rule. */
+const copilotOf = (
+  composed: ComposedTurn,
+  scripts: { readonly catalogue: readonly PlatformScriptView[]; readonly latest: ScriptRun | null },
+): CopilotTrace => {
+  const customOrder = customOrderMove(composed);
+  return copilotTrace({
+    ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
+    ...(customOrder !== undefined && { customOrder }),
+    objectionAnswered: composed.objectionReply !== undefined,
+    ...(composed.scripts !== undefined && { scripts: composed.scripts }),
+    catalogue: scripts.catalogue,
+    latest: scripts.latest,
+    ...(composed.scriptStart !== undefined && { scriptStart: composed.scriptStart }),
+    ...(composed.desireRead !== undefined && { desireRead: composed.desireRead }),
+    care: composed.care === true,
+    rewritten: composed.rewritten === true,
+  });
+};
+
 /** A result with the notices of her alerts that went off, when there are any. */
 const withNotices = (result: AgentComposeResult, notices: readonly AlertNotice[]): AgentComposeResult =>
   notices.length === 0 ? result : { ...result, alerts: notices };
@@ -1190,9 +1222,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
+      const traced =
+        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(composed, scripts) } : settled;
       const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
       const withAvailability =
-        availability === undefined ? settled : { ...settled, fanAvailability: availability };
+        availability === undefined ? traced : { ...traced, fanAvailability: availability };
       if (composed.desire === undefined) return withAvailability;
       const { before, score, signals, weightsVersion } = composed.desire;
       return { ...withAvailability, desire: { before, score, signals, weightsVersion } };

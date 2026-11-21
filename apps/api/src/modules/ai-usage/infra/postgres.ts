@@ -3,6 +3,7 @@ import {
   AiCreditEntryKindSchema,
   AiCreditProviderSchema,
   AiUsageProviderSchema,
+  AiSpendLineSchema,
   AiUsageUseSchema,
   AuditEntryIdSchema,
   EventIdSchema,
@@ -40,6 +41,16 @@ const RowSchema = z.object({
   fallback: z.coerce.number().int().nonnegative(),
   input_tokens: z.coerce.number().int().nonnegative(),
   output_tokens: z.coerce.number().int().nonnegative(),
+});
+
+const ForecastReadSchema = z.object({
+  kind: z.enum(['call', 'sale']),
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+  line: AiSpendLineSchema.nullable(),
+  creator_id: z.uuid().nullable(),
+  amount: z.coerce.number(),
+  conversations: z.coerce.number().int().nonnegative(),
+  name: z.string().nullable(),
 });
 
 /** `llm_calls` with the owner role, as the gateway's journal reads it: all creators and the playground together. */
@@ -83,6 +94,61 @@ export function createPostgresUsageReader(adminDb: Database): UsageReader {
         select coalesce(sum(${billedUsd}), 0) as usd from llm_calls
         where provider = ${provider} and created_at > ${after.toISOString()}::timestamptz`);
       return z.object({ usd: z.coerce.number() }).parse(result.rows[0] ?? { usd: 0 }).usd;
+    },
+    async forecast(from, timeZone) {
+      // One read (ADR 0091 § 8): the calls by line of spend, the sales net of the platform (euro lines; a refund is
+      // taken off the day it happened, not its sale's day), each with its creator's name. A call of no creator with no other purpose is the playground or a
+      // test.
+      const result = await adminDb.execute(sql`
+        with lined as (
+          select to_char(created_at at time zone ${timeZone}, 'YYYY-MM-DD') as day, creator_id, conversation_id,
+                 ${billedUsd} as usd,
+                 case when purpose in ('trend_watch', 'instagram_comment') then 'instagram'
+                      when purpose = 'media' then 'media'
+                      when purpose = 'telegram' then 'telegram'
+                      when purpose = 'probe' then 'other'
+                      when role = 'judge' or creator_id is null then 'playground'
+                      else 'chatting' end as line
+          from llm_calls where created_at >= ${from.toISOString()}::timestamptz),
+        calls as (
+          select 'call' as kind, day, line, creator_id, sum(usd) as amount,
+                 count(distinct conversation_id) filter (where line = 'chatting') as conversations
+          from lined group by 2, 3, 4),
+        sold as (
+          select 'sale' as kind, to_char(occurred_at at time zone ${timeZone}, 'YYYY-MM-DD') as day, null as line,
+                 creator_id, sum(case when event = 'refund' then -net_minor else net_minor end)::numeric / 100 as amount,
+                 0 as conversations
+          from platform_sales
+          where occurred_at >= ${from.toISOString()}::timestamptz and currency = 'EUR'
+          group by 2, 4)
+        select both_.*, c.display_name as name
+        from (select * from calls union all select * from sold) both_
+        left join creators c on c.id = both_.creator_id`);
+      const parsed = z.array(ForecastReadSchema).parse(result.rows);
+      const names = new Map<string, string>();
+      for (const row of parsed)
+        if (row.creator_id !== null && row.name !== null) names.set(row.creator_id, row.name);
+      return {
+        rows: parsed.flatMap((row) =>
+          row.kind === 'call' && row.line !== null
+            ? [
+                {
+                  day: row.day,
+                  line: row.line,
+                  creatorId: row.creator_id,
+                  usd: Math.max(0, row.amount),
+                  conversations: row.conversations,
+                },
+              ]
+            : [],
+        ),
+        sales: parsed.flatMap((row) =>
+          row.kind === 'sale' && row.creator_id !== null
+            ? [{ day: row.day, creatorId: row.creator_id, netEur: row.amount }]
+            : [],
+        ),
+        creatorNames: names,
+      };
     },
     async quotaRefusedAt(provider) {
       // The provider's latest answered call bounds the episode; a refusal before it is over.

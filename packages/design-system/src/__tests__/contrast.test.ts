@@ -141,6 +141,48 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     },
   );
 
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])(
+    'content-%i, a category of content, stands out from void and from the raised plate',
+    (index) => {
+      const colour = token(theme, `content-${String(index)}`);
+      expect(contrast(colour, ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+      expect(contrast(colour, token(theme, 'surface-raised'))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    },
+  );
+
+  it.each(['data-1', 'warning', 'danger', 'success'])(
+    'the tick of a reached step reads on %s (nv-steps)',
+    (name) => {
+      expect(contrast(token(theme, 'void'), token(theme, name))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    },
+  );
+
+  it.each([
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((index) => `content-${String(index)}`),
+    ...['series-1', 'series-2', 'series-3', 'series-4', 'warning'],
+  ])('ink reads on a tag tinted with %s (nv-tag--tint, 16 %%)', (name) => {
+    const [r, g, b] = token(theme, name);
+    for (const bottom of [ground.void, ground.surfaceRaised, ground.glassOverAura]) {
+      expect(contrast(token(theme, 'ink'), over(bottom, [r, g, b, 0.16]))).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it('the ten categories of content are ten different colours', () => {
+    const all = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((index) => token(theme, `content-${String(index)}`));
+    expect(new Set(all).size).toBe(10);
+  });
+
+  it('a switch that is on stands out from void, and its thumb from it', () => {
+    expect(contrast(token(theme, 'switch-on'), ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    expect(contrast(token(theme, 'thumb'), token(theme, 'switch-on'))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
+
+  it('the edge of the field one writes in (ink at 50 %) stands out from its plate', () => {
+    const [r, g, b] = token(theme, 'ink');
+    const plate = over(ground.surfaceRaised, token(theme, 'plate-hover'));
+    expect(contrast(over(plate, [r, g, b, 0.5]), plate)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
+
   it('the focus ring stands out from void and from neon-solid', () => {
     expect(contrast(token(theme, 'focus'), token(theme, 'void'))).toBeGreaterThanOrEqual(AA_NON_TEXT);
     expect(contrast(token(theme, 'focus'), token(theme, 'surface-raised'))).toBeGreaterThanOrEqual(

@@ -7,6 +7,7 @@ import type {
   MediaSlotKind,
   SaveScriptStructureBody,
   PersonaLimits,
+  Platform,
   PlatformAccountId,
   PlatformScript,
   PlatformScriptId,
@@ -29,7 +30,7 @@ import type {
 } from '@impera/contracts';
 
 import type { BranchSetting } from './branches';
-import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
+import type { KnownPlatformScript, PlatformScriptsPlan, StepTotals } from './platform-scripts';
 import type { PreparedVaultMedia } from './prepared-scripts';
 import type { NativeScriptForMatch, PreparedForMatch, Recognition } from './recognition';
 
@@ -176,6 +177,17 @@ export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;
 interface ImportAccount {
   readonly id: PlatformAccountId;
   readonly creatorId: CreatorId;
+  readonly platform: Platform;
+}
+
+/**
+ * The platform's totals of the steps read by an import, for its day (ADR 0129 § 12): written with the plan, each over
+ * the row of the same day (the platform's last word); the days before stay as they were.
+ */
+export interface ImportTotals {
+  /** The platform's day of the read, `YYYY-MM-DD`. */
+  readonly day: string;
+  readonly steps: readonly StepTotals[];
 }
 
 /** The import's writes (`scripts.import_platform_scripts`, ADR 0099 § 1 time 2), as the service role. */
@@ -187,7 +199,12 @@ export interface PlatformScriptImportStore {
    * The whole plan in one transaction: a cut import leaves the account as it was. Gives the ids of the scripts added
    * or rewritten, whose identity is to write again.
    */
-  apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<readonly string[]>;
+  apply(
+    account: ImportAccount,
+    plan: PlatformScriptsPlan,
+    now: Date,
+    totals: ImportTotals | null,
+  ): Promise<readonly string[]>;
 }
 
 /**
@@ -338,61 +355,6 @@ export interface DiscountedPlatformScript {
   readonly steps: number;
   /** The import that wrote its current version, the one with the discount: since when it waits. */
   readonly since: Date;
-}
-
-/** What the identity job reads of a script, as the service role. */
-export interface IdentityTarget {
-  readonly script: StoredPlatformScript;
-  /** The `detailed` text of each validated description its media name, by row. */
-  readonly descriptions: ReadonlyMap<string, string>;
-}
-
-/** A brain's identity, for one version of the script. */
-export interface WrittenIdentity {
-  readonly inputHash: string;
-  readonly content: ScriptIdentityContent;
-  readonly model: string;
-  readonly promptHash: string;
-}
-
-/** The identity job's reads and writes (`scripts.identify_platform_script`), as the service role. */
-export interface ScriptIdentityJobStore {
-  /** Hers, active, and she is not archived; `null` otherwise. */
-  target(creatorId: CreatorId, scriptId: string): Promise<IdentityTarget | null>;
-  /** Kept once: the same version and prompt written again changes nothing. */
-  save(creatorId: CreatorId, scriptId: string, identity: WrittenIdentity): Promise<void>;
-  /**
-   * Each hour: every active native script of a creator whose switch is on and who is not archived, those with no
-   * identity first, queued for the job, which decides. Gives how many.
-   */
-  enqueueBacklog(correlationId: string): Promise<number>;
-}
-
-/** The brain that writes an identity (`brain/script-identity`, `llm`, wired by the composition root). */
-export interface ScriptIdentifier {
-  /** The prompt's version: an identity of another is written again. */
-  readonly promptHash: string;
-  identify(input: {
-    readonly creatorId: CreatorId;
-    readonly scriptName: string;
-    readonly steps: readonly {
-      readonly name: string;
-      readonly text: string;
-      readonly media: readonly {
-        readonly kind: MediaSlotKind;
-        readonly description: string | null;
-      }[];
-    }[];
-  }): Promise<
-    | {
-        readonly kind: 'identified';
-        readonly content: ScriptIdentityContent;
-        readonly model: string;
-        readonly promptHash: string;
-      }
-    | { readonly kind: 'budget' }
-    | { readonly kind: 'failed' }
-  >;
 }
 
 /** The agency's review of the descriptions of a native script's media (ADR 0030 § 3, ADR 0099 § 4). */

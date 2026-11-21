@@ -22,6 +22,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   foreignKey,
   index,
   integer,
@@ -396,10 +397,59 @@ export const platformScriptStepMedia = pgTable(
 );
 
 /**
+ * The platform's totals of a step, one row a day (ADR 0129 § 12): its sends, its packs paid and what they brought since
+ * the step exists, every seller together, as each import of her scripts reads them (`scripts.import_platform_scripts`,
+ * as the service role). The day is the platform's (Reveal's zone); a later read of the same day writes over it, the
+ * platform's last word. A period reads as the difference between two days. Keyed by the step's own id on the account,
+ * so that a step rewritten by the import keeps its days. Read by the agency like her scripts; closed to her account.
+ */
+export const platformScriptStepDaily = pgTable(
+  'platform_script_step_daily',
+  {
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    platformAccountId: uuid('platform_account_id')
+      .notNull()
+      .references(() => platformAccounts.id),
+    /** The step as the platform names it (`platform_script_steps.platform_step_ref`). */
+    platformStepRef: text('platform_step_ref').notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    sent: integer('sent').notNull(),
+    purchased: integer('purchased').notNull(),
+    /** Minor units, VAT included, as the platform shows it. */
+    paidMinor: integer('paid_minor').notNull(),
+    currency: enumText('currency').notNull(),
+    readAt: timestampTz('read_at').notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: 'platform_script_step_daily_pkey',
+      columns: [t.platformAccountId, t.platformStepRef, t.day],
+    }),
+    index('platform_script_step_daily_creator_day_idx').on(t.creatorId, t.day),
+    check(
+      'platform_script_step_daily_counts_check',
+      sql`${t.sent} >= 0 and ${t.purchased} >= 0 and ${t.paidMinor} >= 0`,
+    ),
+    check(
+      'platform_script_step_daily_ref_check',
+      sql`char_length(${t.platformStepRef}) <= ${sql.raw(String(PLATFORM_SCRIPT_REF_MAX))}`,
+    ),
+    enumCheck('platform_script_step_daily', t.currency, CurrencySchema.options),
+    pgPolicy('team_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and ${readsTeam}`,
+    }),
+    closedToCreator(),
+  ],
+);
+
+/**
  * A native script's identity (SC-04 lot c8, ADR 0056 § 6): what it is and when it fits (`ScriptIdentityContent`), for
  * the version of the script it was written from (`input_hash`: its steps' names and texts, their media and the
- * validated description of each, never a price). Written by the brain (`scripts.identify_platform_script`, as the
- * service role) or by hand by the agency, a new row each time, validated once by a person and never changed after
+ * validated description of each, never a price). Written by the brain (a job retired on 21/11/2026, ADR 0161 § 5)
+ * or by hand by the agency, a new row each time, validated once by a person and never changed after
  * (`script_identities_kept`). Under her RLS and the team's scopes, closed to her account; the brain never writes over a
  * validated identity of the same version.
  */
