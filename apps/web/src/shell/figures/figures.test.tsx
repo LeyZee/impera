@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { JSX } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { Columns, Donut, Meter, Ring, Spark, useLit } from './figures';
+import { Columns, Donut, Meter, Ring, Spark, Steps, useLit } from './figures';
 
 afterEach(cleanup);
 
@@ -228,5 +228,34 @@ describe('Meter with its objective, and Ring', () => {
     const empty = render(<Ring share={0} label="Rien" />).container;
     expect(empty.querySelector('.nv-ring__value')).toBeNull();
     expect(empty.querySelector('.nv-ring__track')).not.toBeNull();
+  });
+});
+
+describe('Steps', () => {
+  it('fills and ticks what is reached, marks the step it stands on, and leaves the rest hollow', () => {
+    const { container } = render(
+      <Steps
+        label="Incident : vu"
+        reached={1}
+        colour="var(--nv-warning)"
+        steps={[{ label: 'Envoyé' }, { label: 'Vu', when: 'à 16 h 46' }, { label: 'Réglé' }]}
+      />,
+    );
+    const list = screen.getByRole('list', { name: 'Incident : vu' });
+    expect(list.className).toBe('nv-steps');
+    expect(list.getAttribute('style')).toContain('--_c: var(--nv-warning)');
+    const steps = [...container.querySelectorAll('.nv-steps__step')];
+    expect(steps.map((one) => one.getAttribute('data-done'))).toEqual(['true', 'true', null]);
+    expect(steps.map((one) => one.getAttribute('aria-current'))).toEqual([null, 'step', null]);
+    expect(steps.map((one) => one.querySelectorAll('svg').length)).toEqual([1, 1, 0]);
+    expect(screen.getByText('à 16 h 46').className).toContain('nv-num');
+  });
+
+  it('ticks nothing before the first step is reached', () => {
+    const { container } = render(
+      <Steps label="Rien" reached={-1} steps={[{ label: 'A' }, { label: 'B' }]} />,
+    );
+    expect(container.querySelectorAll('[data-done]').length).toBe(0);
+    expect(container.querySelectorAll('[aria-current]').length).toBe(0);
   });
 });

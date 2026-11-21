@@ -345,6 +345,44 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
     expect((await preview('owner', 'media_02')).statusCode).toBe(404);
   });
 
+  it('keeps a media offered once as offered, even when Reveal stops saying so (ADR 0145 § 2)', async () => {
+    const offeredAt = async (id: string) =>
+      (
+        await test.admin.db
+          .select({ at: schema.mediaPlatformRefs.sentForFreeAt })
+          .from(schema.mediaPlatformRefs)
+          .where(eq(schema.mediaPlatformRefs.platformMediaId, id))
+      )[0]?.at;
+    const messages = fake.state().messages;
+    const [conversation] = fake.state().conversations;
+    if (conversation === undefined) throw new Error('fixture changed');
+    messages.push({
+      id: 'msg_offered_test',
+      conversationId: conversation.id,
+      direction: 'out',
+      content: 'Un cadeau inventé',
+      mediaIds: ['vault_new_0'],
+      bundle: null,
+      author: null,
+      scriptId: null,
+      isUnread: true,
+      createdAt: fake.state().now,
+    });
+    now = new Date(now.getTime() + 60_000);
+    await sync();
+    const first = now;
+    expect(await offeredAt('vault_new_0')).toEqual(first);
+    expect(await offeredAt('vault_new_1')).toBeNull();
+    // Reveal no longer says it (its message gone from the read): the mark stays, with its first date.
+    messages.splice(
+      messages.findIndex((m) => m.id === 'msg_offered_test'),
+      1,
+    );
+    now = new Date(now.getTime() + 60_000);
+    await sync();
+    expect(await offeredAt('vault_new_0')).toEqual(first);
+  });
+
   it('reads nothing of an archived creator', async () => {
     await test.admin.db
       .update(schema.creators)
