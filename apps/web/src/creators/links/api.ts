@@ -2,9 +2,13 @@ import {
   AgencyRedirectLinkSchema,
   AgencyRedirectLinksResponseSchema,
   ApiErrorSchema,
+  LinkProposalsResponseSchema,
+  LinkServiceRefusalBodySchema,
   REAUTHENTICATION_ERROR_CODE,
+  refusalOf,
   type AgencyRedirectLink,
   type AgencyRedirectLinkWrite,
+  type LinkProposal,
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -81,4 +85,42 @@ export async function saveRedirectLink(
     kind: 'refused',
     message: (error.success ? REFUSALS[error.data.error.code] : undefined) ?? UNAVAILABLE,
   };
+}
+
+export type DetectOutcome =
+  | { readonly kind: 'ok'; readonly proposals: readonly LinkProposal[] }
+  /** `needsKey`: no key of the redirect service yet, which Réglages › Plateformes settles. */
+  | { readonly kind: 'refused'; readonly message: string; readonly needsKey: boolean };
+
+/**
+ * « Détecter ses liens » (INS-02): the links of the agency's account at the redirect service, each with a name and a
+ * place proposed. Nothing is written by it: each link is added by the owner, one by one, with `saveRedirectLink`.
+ */
+export async function detectLinks(creatorId: string): Promise<DetectOutcome> {
+  const refused = (message: string, needsKey = false): DetectOutcome => ({
+    kind: 'refused',
+    message,
+    needsKey,
+  });
+  let response: Response;
+  try {
+    response = await fetch(`${path(creatorId)}/detect`, { method: 'POST', credentials: 'include' });
+  } catch {
+    return refused(UNAVAILABLE);
+  }
+  const body: unknown = await response.json().catch(() => null);
+  if (response.ok) {
+    const answer = LinkProposalsResponseSchema.safeParse(body);
+    return answer.success ? { kind: 'ok', proposals: answer.data.proposals } : refused(UNAVAILABLE);
+  }
+  if (response.status === 422) {
+    const refusal = LinkServiceRefusalBodySchema.safeParse(body);
+    if (!refusal.success) return refused(UNAVAILABLE);
+    const { kind, message } = refusalOf(refusal.data);
+    return refused(message, kind === 'not_connected' || kind === 'unauthorized');
+  }
+  if (response.status === 401) return refused('Ta session a expiré. Reconnecte-toi.');
+  if (response.status === 429) return refused('Trop d’essais. Attends une minute avant de réessayer.');
+  if (response.status === 403) return refused('Seul le propriétaire détecte les liens.');
+  return refused(UNAVAILABLE);
 }

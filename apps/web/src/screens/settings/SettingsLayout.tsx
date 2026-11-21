@@ -9,6 +9,7 @@ import { AiUsageSection } from '@/settings/ai-usage/AiUsageSection';
 import { AlertsSection } from '@/settings/alerts/AlertsSection';
 import { BackupsSection } from '@/settings/backups/BackupsSection';
 import { BillingSection } from '@/settings/billing/BillingSection';
+import { LinkServiceCard } from '@/settings/link-service/LinkServiceCard';
 import { PayRulesSection } from '@/settings/pay/PayRulesSection';
 import { SalesFeedSection } from '@/settings/sales-feed/SalesFeedSection';
 import { newModelsQuery } from '@/settings/sales-feed/api';
@@ -198,9 +199,17 @@ export function AiUsagePage(): JSX.Element {
   return <AiUsageSection />;
 }
 
-/** Réglages › Plateformes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01). */
+/**
+ * Réglages › Plateformes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01), then the
+ * key of the redirect service (INS-02).
+ */
 export function SalesFeedPage(): JSX.Element {
-  return <SalesFeedSection />;
+  return (
+    <div className="sv-page">
+      <SalesFeedSection />
+      <LinkServiceCard />
+    </div>
+  );
 }
 
 /** Réglages › Alertes: her own alerts and the system's, on each creator (P4-01). */

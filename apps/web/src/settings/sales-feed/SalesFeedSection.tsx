@@ -63,8 +63,8 @@ export function SalesFeedSection(): JSX.Element {
   return (
     <section className="sv-page">
       <p className="sv-lede">
-        Les ventes et les remboursements arrivent de la plateforme elle-même, sans session ouverte. La clé est
-        vérifiée chez la plateforme puis gardée chiffrée ; elle ne se relit pas, même ici.
+        Les clés des services reliés au CRM. Chacune est vérifiée auprès de son service puis gardée chiffrée ;
+        elle ne se relit pas, même ici.
       </p>
       {load.value.map((feed) => (
         <FeedPanel key={feed.platform} platform={feed.platform} />
