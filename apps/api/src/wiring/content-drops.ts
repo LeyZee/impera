@@ -74,7 +74,11 @@ export function wireContentDrops(
         JOB_PAYLOADS['content_drops.describe_file'],
         shared.logger,
         async (payload, context) => {
-          const outcome = await module.jobs.describeFile(payload.mediaAssetId, payload.correlationId);
+          const outcome = await module.jobs.describeFile(
+            payload.creatorId,
+            payload.mediaAssetId,
+            payload.correlationId,
+          );
           context.logger.info(
             { mediaAssetId: payload.mediaAssetId, outcome },
             'content drops: dropped media described',
@@ -106,7 +110,11 @@ export function wireContentDrops(
         JOB_PAYLOADS['content_drops.make_thumbnail'],
         shared.logger,
         async (payload, context) => {
-          const outcome = await module.jobs.makeThumbnail(payload.mediaAssetId, payload.correlationId);
+          const outcome = await module.jobs.makeThumbnail(
+            payload.creatorId,
+            payload.mediaAssetId,
+            payload.correlationId,
+          );
           context.logger.info(
             { mediaAssetId: payload.mediaAssetId, outcome },
             'content drops: reduced picture of a medium',

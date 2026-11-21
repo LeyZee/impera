@@ -29,7 +29,6 @@ import {
 } from './period';
 import { useNarrow } from './useNarrow';
 import {
-  arcs,
   bestSlot,
   busiest,
   changeOf,
@@ -75,6 +74,7 @@ import './agency.css';
 
 import { initialOf } from '@/lib/utils';
 import { Select, type SelectOption } from '@/shell/Select';
+import { Donut, Spark } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -339,42 +339,6 @@ export function sparkValues(
   if (insights.from === insights.to) return null;
   const values = insights.days.slice(firstDrawn(insights)).map(pick);
   return values.length < 2 || values.every((one) => one === 0) ? null : values;
-}
-
-/**
- * The small curve at the net's foot (lot couleurs, 17/11; under the net only, Charles 19/11: the parts drew the same
- * shape again): 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour. Decorative: the tile's figure and its « n % » say it,
- * so it is hidden from assistive technologies.
- */
-function Spark({ values, tone }: { values: readonly number[]; tone: Trend }): JSX.Element {
-  const fill = useId();
-  const frame = { width: 200, height: 32, padTop: 3, padBottom: 2 };
-  const low = Math.min(0, ...values);
-  const high = Math.max(1, ...values);
-  const line = chartPoints(values, frame, { min: low, max: high });
-  const first = line[0];
-  const last = line.at(-1);
-  const area =
-    first === undefined || last === undefined
-      ? ''
-      : `${linePath(line)} L${String(last.x)},${String(frame.height)} L${String(first.x)},${String(frame.height)} Z`;
-  return (
-    <svg
-      className={`ins-spark ins-spark--${tone}`}
-      viewBox={`0 0 ${String(frame.width)} ${String(frame.height)}`}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-    >
-      <defs>
-        <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" className="ins-spark__fill-top" />
-          <stop offset="1" className="ins-spark__fill-bottom" />
-        </linearGradient>
-      </defs>
-      <path className="ins-spark__area" d={area} fill={`url(#${fill})`} />
-      <path className="ins-spark__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
 }
 
 interface Tile {
@@ -796,10 +760,10 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   return (
     <div className="nv-plate ins-daily">
       {used.length > 1 ? (
-        <ul className="ins-keys" aria-label="Légende">
+        <ul className="nv-keys" aria-label="Légende">
           {used.map((stack) => (
             <li key={stack.key}>
-              <span className="ins-key" style={{ '--_c': stack.colour }} aria-hidden="true" />
+              <span className="nv-key" style={{ '--_c': stack.colour }} aria-hidden="true" />
               {stack.label}
             </li>
           ))}
@@ -895,17 +859,12 @@ export function Ring({
   const [lit, setLit] = useState<number | null>(null);
   // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
   const pressedBy = useRef<string | null>(null);
-  const radius = 52;
   const shown = slices.filter((slice) => slice.cents > 0);
   const total = shown.reduce((sum, slice) => sum + slice.cents, 0);
   // Settled together, so the legend adds up to 100 % where each share rounded alone could say 99 or 101.
   const shares = sharesOf(
     shown.map((slice) => slice.cents),
     total,
-  );
-  const geometry = arcs(
-    shown.map((slice) => slice.cents),
-    radius,
   );
   const litSlice = lit === null ? null : shown[lit];
   const litShare = lit === null ? 0 : (shares[lit] ?? 0);
@@ -918,53 +877,28 @@ export function Ring({
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (
-        <div className="ins-ring-row">
-          <div
-            className={lit === null ? 'ins-ring' : 'ins-ring is-lit'}
-            role="img"
-            aria-label={`${title} : ${shown.map((s, i) => `${s.label} ${String(shares[i] ?? 0)} %`).join(', ')}`}
+        <div className="nv-donut-row">
+          <Donut
+            label={`${title} : ${shown.map((s, i) => `${s.label} ${String(shares[i] ?? 0)} %`).join(', ')}`}
+            slices={shown.map((slice) => ({ key: slice.key, colour: slice.colour, value: slice.cents }))}
+            lit={lit}
+            onLit={setLit}
           >
-            <svg viewBox="0 0 132 132" aria-hidden="true">
-              <circle className="ins-ring__track" cx="66" cy="66" r={radius} />
-              {shown.map((slice, i) => {
-                const arc = geometry[i];
-                if (arc === undefined) return null;
-                return (
-                  <circle
-                    key={slice.key}
-                    className={lit === i ? 'ins-ring__arc is-on' : 'ins-ring__arc'}
-                    cx="66"
-                    cy="66"
-                    r={radius}
-                    style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
-                    strokeDashoffset={arc.offset}
-                    onPointerEnter={() => {
-                      setLit(i);
-                    }}
-                    onPointerLeave={(event) => {
-                      if (event.pointerType === 'mouse') setLit(null);
-                    }}
-                  />
-                );
-              })}
-            </svg>
-            <span className="ins-ring__middle" aria-hidden="true">
-              {litSlice === null || litSlice === undefined ? (
-                <>
-                  <b className={euros(total).length > 7 ? 'ins-ring__value is-long' : 'ins-ring__value'}>
-                    {euros(total)}
-                  </b>
-                  <span className="ins-ring__sub">au total</span>
-                </>
-              ) : (
-                <>
-                  <b className="ins-ring__value">{String(litShare)}&nbsp;%</b>
-                  <span className="ins-ring__sub">{litSlice.label}</span>
-                </>
-              )}
-            </span>
-          </div>
-          <ul className="ins-legend">
+            {litSlice === null || litSlice === undefined ? (
+              <>
+                <b className={euros(total).length > 7 ? 'nv-donut__value is-long' : 'nv-donut__value'}>
+                  {euros(total)}
+                </b>
+                <span className="nv-donut__sub">au total</span>
+              </>
+            ) : (
+              <>
+                <b className="nv-donut__value">{String(litShare)}&nbsp;%</b>
+                <span className="nv-donut__sub">{litSlice.label}</span>
+              </>
+            )}
+          </Donut>
+          <ul className="nv-breakdown">
             {shown.map((slice, i) => {
               const help = slice.key === tipFor ? OTHER_KINDS_NOTE : undefined;
               const told = help === undefined ? null : tip.bind({ title: slice.label, text: help });
@@ -972,7 +906,7 @@ export function Ring({
                 <li key={slice.key}>
                   <button
                     type="button"
-                    className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
+                    className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
                     // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out (`onClick`);
                     // the keyboard lights on focus. A tap's own entering and focus would light before its click undoes it.
                     onPointerEnter={(event) => {
@@ -1005,10 +939,10 @@ export function Ring({
                       else setLit(lit === i ? null : i);
                     }}
                   >
-                    <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                    <span className="ins-legend__label">{slice.label}</span>
-                    <span className="ins-legend__value">{euros(slice.cents)}</span>
-                    <span className="ins-legend__share">{String(shares[i] ?? 0)}&nbsp;%</span>
+                    <span className="nv-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                    <span className="nv-breakdown__label">{slice.label}</span>
+                    <span className="nv-breakdown__value">{euros(slice.cents)}</span>
+                    <span className="nv-breakdown__share">{String(shares[i] ?? 0)}&nbsp;%</span>
                     <Delta current={slice.cents} previous={slice.previousCents} />
                   </button>
                 </li>

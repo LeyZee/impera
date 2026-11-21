@@ -97,11 +97,11 @@ describe('/v1/settings/ai-budget', () => {
     const { status, body } = await read();
     expect(status).toBe(200);
     expect(body).toMatchObject({
-      dailyCapMinor: 2000,
+      dailyCapMinor: 2500,
       trendWatchCapMinor: 100,
-      defaults: { dailyCapMinor: 2000, trendWatchCapMinor: 100 },
+      defaults: { dailyCapMinor: 2500, trendWatchCapMinor: 100 },
       isCustom: { dailyCap: false, trendWatchCap: false },
-      alertAtMinor: 1600,
+      alertAtMinor: 2000,
       spentTodayMinor: 1000,
       trendWatchSpentTodayMinor: 0,
       state: 'ok',
@@ -161,10 +161,10 @@ describe('/v1/settings/ai-budget', () => {
   it('goes back to the defaults with null', async () => {
     const reset = await put({ dailyCapMinor: null, trendWatchCapMinor: null });
     expect(AiBudgetSchema.parse(reset.json())).toMatchObject({
-      dailyCapMinor: 2000,
+      dailyCapMinor: 2500,
       trendWatchCapMinor: 100,
       isCustom: { dailyCap: false, trendWatchCap: false },
     });
-    expect((await gatewayToday()).capEur).toBe(20);
+    expect((await gatewayToday()).capEur).toBe(25);
   });
 });

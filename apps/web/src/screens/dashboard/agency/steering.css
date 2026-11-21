@@ -72,12 +72,12 @@
   height: 9px;
   margin-inline-end: 8px;
   border-radius: 50%;
-  background: color-mix(in oklab, var(--_k, var(--nv-kind-2)) 32%, transparent);
+  background: color-mix(in oklab, var(--_k, var(--nv-series-2)) 35%, transparent);
   vertical-align: 1px;
 }
 /* The ghost arc's own colour: the dot in front of the line it draws. */
 .stg-key[data-tone='up'] {
-  --_k: var(--nv-trend-up);
+  --_k: var(--nv-series-1);
 }
 .stg-key[data-tone='down'] {
   --_k: var(--nv-trend-down);
@@ -95,71 +95,13 @@
 }
 
 .stg-gauge {
-  position: relative;
   flex: none;
-  width: 168px;
-  height: 168px;
-  --_c: var(--nv-kind-2);
+  --nv-donut-size: 184px;
 }
-.stg-gauge[data-tone='up'] {
-  --_c: var(--nv-trend-up);
-}
-.stg-gauge[data-tone='down'] {
-  --_c: var(--nv-trend-down);
-}
-.stg-gauge svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transform: rotate(-90deg);
-}
-.stg-gauge__track,
-.stg-gauge__ghost,
-.stg-gauge__arc {
-  fill: none;
-  stroke-width: 14;
-  stroke-linecap: round;
-}
-.stg-gauge__track {
-  stroke: var(--nv-fill-track);
-}
-.stg-gauge__ghost {
-  stroke: color-mix(in oklab, var(--_c) 32%, transparent);
-  stroke-dasharray: 0 999;
-  animation: stg-arc var(--nv-dur-data) var(--nv-ease-out) 260ms both;
-}
-.stg-gauge__arc {
-  stroke: var(--_c);
-  stroke-dasharray: 0 999;
-  animation: stg-arc var(--nv-dur-data) var(--nv-ease-out) 120ms both;
-}
-@keyframes stg-arc {
-  to {
-    stroke-dasharray: var(--_dash);
-  }
-}
-.stg-gauge__middle {
-  position: absolute;
-  inset: 26px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
-}
-.stg-gauge__value {
-  font-size: 30px;
-  line-height: 1.1;
-  font-weight: 680;
-  font-variant-numeric: tabular-nums;
-  color: var(--nv-ink);
-}
-.stg-gauge__sub {
-  margin-top: 4px;
-  font-size: var(--nv-text-caption);
-  color: var(--nv-ink-faint);
+/* Today's figure is the card's hero: bigger than a donut's usual middle. */
+.stg-gauge .stg-gauge__value {
+  font-size: var(--nv-text-title-1);
+  letter-spacing: var(--nv-text-title-1-tracking);
 }
 
 /* Thirty days as bars, the target a dashed line across. */
@@ -187,11 +129,14 @@
   border: 0;
   background: none;
   cursor: pointer;
-  --_c: var(--nv-data-1);
+  --_c: var(--nv-series-2);
 }
-/* One ink: the dashed line already says who falls short. */
+/* One colour per kind of day (Design, 21/11): held, missed; the dashed line is the target. */
+.stg-bars__day[data-held='true'] {
+  --_c: var(--nv-series-1);
+}
 .stg-bars__day[data-held='false'] {
-  --_c: var(--nv-fill-track);
+  --_c: var(--nv-series-3);
 }
 .stg-bars__bar {
   display: block;
@@ -205,9 +150,6 @@
   transition:
     filter var(--nv-dur-fast),
     transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-.stg-bars__day[data-today] {
-  --_c: var(--nv-data-1);
 }
 .stg-bars__day[data-today] .stg-bars__bar {
   background: repeating-linear-gradient(
@@ -236,23 +178,50 @@
 .stg-traffic {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
+  padding: var(--nv-plate-pad);
 }
 
-/* One ink down the path, the step that breaks in plain amber; no glow, its flag says it (Design, 21/11). */
+/* One colour per step (Design, 21/11); the step that breaks keeps its colour, its amber flag says it. */
 .stg-traffic .db-funnel .nv-funnel__step .nv-funnel__bar,
 .stg-traffic .db-funnel .nv-funnel__step:not(.nv-funnel__step--break) .nv-funnel__bar {
-  --_c: var(--nv-data-1);
+  --_c: var(--_step, var(--nv-data-1));
   background: var(--_c);
   opacity: 1;
   box-shadow: none;
 }
-.stg-traffic .db-funnel .nv-funnel__step.nv-funnel__step--break .nv-funnel__bar {
-  --_c: var(--nv-warning);
+.stg-traffic .db-funnel .nv-funnel__step:hover .nv-funnel__bar,
+.stg-traffic .db-funnel .nv-funnel__step:focus-visible .nv-funnel__bar {
+  box-shadow: 0 0 18px color-mix(in oklab, var(--_c) 40%, transparent);
+  filter: brightness(1.1);
 }
-.stg-traffic .db-funnel .nv-funnel__step:hover .nv-funnel__bar {
+.stg-traffic .db-funnel {
+  padding: 0;
+  background: none;
   box-shadow: none;
-  filter: brightness(1.08);
+  border: 0;
+}
+
+/* The answer first, big, the rest under it (Charles, 21/11). */
+.stg-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin: 0;
+}
+.stg-hero__figure {
+  font-size: var(--nv-text-large-title);
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.stg-hero__words {
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  color: var(--nv-ink-muted);
 }
 
 /* ── The fans it hangs on. */
@@ -285,9 +254,8 @@
   padding: 0;
 }
 /* No comparison on this ring, so no delta column: its amounts end on the card's right edge, with the figures. */
-.stg-dep__card .ins-legend__row {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  grid-template-areas: 'key label value share';
+.stg-dep__card {
+  --nv-breakdown-cols: auto minmax(0, 1fr) auto auto;
 }
 .stg-dep__figures {
   gap: 16px;
@@ -385,8 +353,7 @@
     text-align: center;
   }
   .stg-gauge {
-    width: 148px;
-    height: 148px;
+    --nv-donut-size: 168px;
   }
   .stg-bars {
     gap: 2px;
@@ -411,11 +378,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stg-gauge__arc,
-  .stg-gauge__ghost {
-    animation: none;
-    stroke-dasharray: var(--_dash);
-  }
   .stg-bars__bar,
   .stg-lapsed__list li {
     animation: none;

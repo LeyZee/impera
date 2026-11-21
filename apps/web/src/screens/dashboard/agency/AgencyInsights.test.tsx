@@ -107,8 +107,8 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show();
     const card = (await screen.findByRole('heading', { name: /D’où vient l’argent/u })).closest('article');
     if (card === null) throw new Error('card');
-    expect(card.querySelector('.ins-ring__value')?.textContent).toMatch(/€$/u);
-    expect(card.querySelector('.ins-ring__sub')?.textContent).toBe('au total');
+    expect(card.querySelector('.nv-donut__value')?.textContent).toMatch(/€$/u);
+    expect(card.querySelector('.nv-donut__sub')?.textContent).toBe('au total');
     expect(within(card).queryByText('ventes')).toBeNull();
   });
 
@@ -255,7 +255,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     const ring = await screen.findByRole('img', { name: /^D’où vient l’argent/u });
     const card = ring.closest('article');
     if (card === null) throw new Error('card');
-    const shares = Array.from(card.querySelectorAll('.ins-legend__share'), (one) =>
+    const shares = Array.from(card.querySelectorAll('.nv-breakdown__share'), (one) =>
       Number.parseInt(one.textContent, 10),
     );
     expect(shares).toEqual([34, 33, 33]);
@@ -725,8 +725,8 @@ describe('the days read and their comparison (ADR 0146)', () => {
     serve(200, AGENCY_WEEK);
     show();
     await screen.findByRole('heading', { name: /D’où vient l’argent/u });
-    const sparks = [...document.querySelectorAll('.ins-spark')];
-    expect(sparks.map((one) => one.getAttribute('class'))).toEqual(['ins-spark ins-spark--up']);
+    const sparks = [...document.querySelectorAll('.nv-spark')];
+    expect(sparks.map((one) => one.getAttribute('class'))).toEqual(['nv-spark nv-spark--up']);
     for (const one of sparks) expect(one.getAttribute('aria-hidden')).toBe('true');
   });
 

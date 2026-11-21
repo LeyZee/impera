@@ -18,6 +18,7 @@ import { TOO_FEW_TO_CONCLUDE } from './period';
 import { euros, exactEuros, shareOf, shortDay, type Slice } from './view';
 import './steering.css';
 
+import { Donut } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -34,43 +35,41 @@ const formatCount = (value: number): string => Math.round(value).toLocaleString(
 /** « Ça casse ici » needs enough fans in both windows to mean something (ADR 0092 § 5). */
 const FUNNEL_MIN_FIRST = 30;
 
-/** The gauge of the day: today's revenue towards the target, its projection as a lighter arc. */
+/**
+ * The gauge of the day, the design system's donut against the day's target: today's revenue in the tone of the day,
+ * the projection still to come as the same colour, lighter. Today's figure in its middle is the card's hero.
+ */
 function DayGauge({ daily }: { daily: SteeringDaily }): JSX.Element {
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
   const target = daily.targetMinor ?? Math.max(daily.averageMinor, daily.todayMinor, 1);
-  const done = Math.min(1, Math.max(0, daily.todayMinor / target));
-  const projected = daily.projectedMinor === null ? done : Math.min(1, daily.projectedMinor / target);
+  const done = Math.min(target, Math.max(0, daily.todayMinor));
+  const projected = Math.min(target, Math.max(done, daily.projectedMinor ?? done));
   const onTrack =
     daily.targetMinor !== null && (daily.projectedMinor ?? daily.todayMinor) >= daily.targetMinor;
-  const tone = daily.targetMinor === null ? 'neutral' : onTrack ? 'up' : 'down';
+  const colour =
+    daily.targetMinor === null
+      ? 'var(--nv-series-2)'
+      : onTrack
+        ? 'var(--nv-series-1)'
+        : 'var(--nv-trend-down)';
   return (
-    <div className="stg-gauge" data-tone={tone} aria-hidden="true">
-      <svg viewBox="0 0 132 132">
-        <circle className="stg-gauge__track" cx="66" cy="66" r={radius} />
-        {projected > done ? (
-          <circle
-            className="stg-gauge__ghost"
-            cx="66"
-            cy="66"
-            r={radius}
-            style={{ '--_dash': `${String(projected * circumference)} ${String(circumference)}` }}
-          />
-        ) : null}
-        <circle
-          className="stg-gauge__arc"
-          cx="66"
-          cy="66"
-          r={radius}
-          style={{ '--_dash': `${String(done * circumference)} ${String(circumference)}` }}
-        />
-      </svg>
-      <span className="stg-gauge__middle">
-        <CountUp className="stg-gauge__value" value={daily.todayMinor} format={formatEuros} />
-        <span className="stg-gauge__sub">
+    <div className="stg-gauge">
+      <Donut
+        label={`Aujourd’hui ${wholeEuros(daily.todayMinor)}${daily.targetMinor === null ? '' : ` sur ${wholeEuros(daily.targetMinor)}`}`}
+        of={target}
+        slices={[
+          { key: 'done', colour, value: done },
+          {
+            key: 'ahead',
+            colour: `color-mix(in oklab, ${colour} 35%, transparent)`,
+            value: projected - done,
+          },
+        ]}
+      >
+        <CountUp className="nv-donut__value stg-gauge__value" value={daily.todayMinor} format={formatEuros} />
+        <span className="nv-donut__sub">
           {daily.targetMinor === null ? 'aujourd’hui' : `sur ${wholeEuros(daily.targetMinor)}`}
         </span>
-      </span>
+      </Donut>
     </div>
   );
 }
@@ -197,8 +196,9 @@ function trafficSteps(traffic: SteeringTraffic): {
   readonly labels: readonly FunnelLabel[];
   readonly counts: readonly number[];
   readonly before: readonly number[];
+  readonly colours: readonly string[];
 } {
-  const steps: { label: FunnelLabel; now: number; then: number | null }[] = [];
+  const steps: { label: FunnelLabel; now: number; then: number | null; colour: string }[] = [];
   if (traffic.newSubscribers !== null)
     steps.push({
       label: {
@@ -208,6 +208,7 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.newSubscribers,
       then: traffic.previous.newSubscribers,
+      colour: 'var(--nv-series-2)',
     });
   if (traffic.wrote !== null)
     steps.push({
@@ -219,6 +220,7 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.wrote,
       then: traffic.previous.wrote,
+      colour: 'var(--nv-series-3)',
     });
   steps.push(
     {
@@ -230,6 +232,7 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.firstPurchase,
       then: traffic.previous.firstPurchase,
+      colour: 'var(--nv-series-4)',
     },
     {
       label: {
@@ -239,9 +242,11 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.regular,
       then: traffic.previous.regular,
+      colour: 'var(--nv-series-1)',
     },
   );
   return {
+    colours: steps.map((step) => step.colour),
     labels: steps.map((step) => step.label),
     counts: steps.map((step) => step.now),
     before: steps.map((step) => step.then ?? 0),
@@ -249,7 +254,7 @@ function trafficSteps(traffic: SteeringTraffic): {
 }
 
 function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: FloatingTip }): JSX.Element {
-  const { labels, counts, before } = trafficSteps(traffic);
+  const { labels, counts, before, colours } = trafficSteps(traffic);
   if (counts.every((count) => count === 0))
     return <p className="nv-plate ins-empty">Aucun abonné ni acheteur lu sur les 30 derniers jours.</p>;
   // A comparison only when both windows hold enough fans at the top: a « Ça casse ici » on three fans is noise.
@@ -257,11 +262,29 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
     (counts[0] ?? 0) >= FUNNEL_MIN_FIRST &&
     (before[0] ?? 0) >= FUNNEL_MIN_FIRST &&
     before.every((n) => n >= 0);
+  const top = counts[0] ?? 0;
+  const bought = traffic.firstPurchase;
+  // The answer first (Charles, 21/11: read at a glance): how many of the traffic end up paying.
+  const rate = top > 0 ? (bought / top) * 100 : null;
   return (
-    <div className="stg-traffic">
+    <div className="nv-plate stg-traffic">
+      <p className="stg-hero">
+        <b className="stg-hero__figure">
+          {rate === null
+            ? String(bought)
+            : `${rate.toLocaleString('fr-FR', { maximumFractionDigits: rate < 10 ? 1 : 0 })} %`}
+        </b>
+        <span className="stg-hero__words">
+          {rate === null
+            ? `fan${bought > 1 ? 's' : ''} ${bought > 1 ? 'ont' : 'a'} acheté pour la première fois`
+            : `des nouveaux abonnés achètent : ${String(bought)} sur ${top.toLocaleString('fr-FR')}`}
+        </span>
+      </p>
       <FunnelPanel
         labels={labels}
         counts={counts}
+        colours={colours}
+        soft
         {...(compared ? { before } : {})}
         breakNote="La plus forte baisse face aux 30 jours d’avant : c’est ici qu’il faut agir."
         tip={tip}
@@ -301,8 +324,8 @@ function DependencyCard({
   const names = new Map(steering.creators.map((one) => [one.creatorId, one.name] as const));
   const several = steering.creators.length >= 2;
   const slices: Slice[] = [
-    { key: 'one', label: 'Le plus gros fan', colour: 'var(--nv-kind-1)', cents: dependency.topOneMinor },
-    { key: 'four', label: 'Les 4 suivants', colour: 'var(--nv-kind-3)', cents: dependency.nextFourMinor },
+    { key: 'one', label: 'Le plus gros fan', colour: 'var(--nv-series-3)', cents: dependency.topOneMinor },
+    { key: 'four', label: 'Les 4 suivants', colour: 'var(--nv-series-2)', cents: dependency.nextFourMinor },
     { key: 'rest', label: 'Tous les autres', colour: 'var(--nv-series-other)', cents: dependency.restMinor },
   ].map((slice) => ({ ...slice, previousCents: slice.cents, sales: 0 }));
   const pending = dependency.sales < STEERING_PROFILE_MIN_SALES;
@@ -310,7 +333,14 @@ function DependencyCard({
     <div className="stg-dep">
       {/* One subject, one card (Design, 21/11): the sentence titles it, the ring on the left, the figures on the right. */}
       <article className="nv-plate stg-dep__card" data-pending={pending ? '' : undefined}>
-        <h3 className="nv-h3 stg-dep__lead">{spreadText(dependency)}</h3>
+        <div className="stg-hero">
+          <b className="stg-hero__figure">
+            {dependency.totalMinor > 0
+              ? `${String(shareOf(dependency.topOneMinor + dependency.nextFourMinor, dependency.totalMinor))} %`
+              : '—'}
+          </b>
+          <h3 className="nv-h3 stg-dep__lead">{spreadText(dependency)}</h3>
+        </div>
         <div className="stg-dep__body">
           {/* No comparison on this ring: its window is fixed, its slices say how the money spreads. */}
           <Comparable.Provider value={false}>

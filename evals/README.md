@@ -24,6 +24,6 @@ Persona en vigueur : `pnpm evals -- --key-from-crm --persona-from-crm` fait pass
 
 Juge : il note mieux ce qu'un autre modèle a écrit. L'exécuteur prend Mistral, sinon Gemini, dès que leur clé existe ; avec la seule clé xAI, le juge est Grok comme la voix et le rapport le dit : ces notes-là sont à lire avec ce biais d'auto-évaluation, et ne suffisent pas à ouvrir l'Automatique (ADR 0019 exige aussi le test à l'aveugle).
 
-Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 20 €/jour de l'agent ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
+Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 25 €/jour de l'agent (20 € jusqu'au 21/11, choix de Charles) ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
 
 Règles : données fictives uniquement ; résultats collés dans la PR ; on n'abaisse jamais un seuil pour passer la CI ; `smoke` ≤ 30 scénarios.
