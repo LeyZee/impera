@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MyPayoutCard, PayoutTo } from './PayoutCard';
+import { MyPayoutCard, PayoutLine, PayoutTo } from './PayoutCard';
 
 /* Invented people and numbers (ADR 0010). */
 const MEMBER = '0199f2a0-0000-7000-8000-000000000021';
@@ -18,6 +18,7 @@ const MOMO = {
 
 let stored: Record<string, unknown> | null;
 let reauthOnce: boolean;
+let listFails: boolean;
 const writes: { method: string; path: string; body: unknown }[] = [];
 
 function serve(): void {
@@ -57,6 +58,10 @@ function serve(): void {
           201,
         );
       }
+      if (url.pathname === '/v1/payroll/payout-destinations') {
+        if (listFails) return json(null, 500);
+        return json({ destinations: [{ memberId: MEMBER, method: null, changedAt: null }] });
+      }
       if (url.pathname === `/v1/payroll/contractors/${MEMBER}/payout-destination`) {
         return json({
           memberId: MEMBER,
@@ -80,6 +85,7 @@ const wrap = (node: ReactNode) =>
 beforeEach(() => {
   stored = null;
   reauthOnce = false;
+  listFails = false;
   writes.length = 0;
   serve();
 });
@@ -154,5 +160,15 @@ describe('Paie › « Marquer payé » : où le verser (ADR 0165)', () => {
     );
     expect(screen.getByText('Où le verser : pas encore rempli')).toBeTruthy();
     expect(screen.getByText(/tu ne peux pas le saisir pour lui/u)).toBeTruthy();
+  });
+
+  it('says a failed read with « Réessayer », never « pas encore rempli »', async () => {
+    listFails = true;
+    wrap(<PayoutLine memberId={MEMBER} memberName="Basile" zone="Europe/Paris" />);
+    expect(await screen.findByText('Où le verser : pas lu')).toBeTruthy();
+    expect(screen.queryByText('Où le verser : pas encore rempli')).toBe(null);
+    listFails = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+    expect(await screen.findByText('Où le verser : pas encore rempli')).toBeTruthy();
   });
 });

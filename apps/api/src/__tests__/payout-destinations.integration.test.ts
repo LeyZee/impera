@@ -36,6 +36,13 @@ const THEO_BANK: PayoutDetails = {
 /** Strings that must never leave the sealed block: not in the audit log, not in a list. */
 const SECRETS = ['Inventé', '22900000001', '00000001', 'ZZ001234', 'Banque imaginaire', 'Compte courant'];
 
+const LOU_CASH: PayoutDetails = {
+  method: 'cash_pickup',
+  beneficiary: 'Lou Inventée',
+  city: 'Ville fictive',
+  note: null,
+};
+
 describe('« Où te verser » : le membre écrit, le propriétaire révèle, un manager jamais (ADR 0165)', () => {
   let team: PayrollTeam;
   let theo: TeamMember;
@@ -264,6 +271,21 @@ describe('« Où te verser » : le membre écrit, le propriétaire révèle, un 
       (await team.call('GET', '/payroll/payout-destinations', team.owner)).json(),
     ).destinations.find((one) => one.memberId === theo.id);
     expect(after).toEqual(before);
+
+    // Lou's version in force opens with no key: Lou can still write it again, and reads it back.
+    const rewritten = await write(lou, louCookie, LOU_CASH);
+    expect(rewritten.statusCode, rewritten.body).toBe(201);
+    const read = await readOwn(lou, louCookie);
+    expect(read.statusCode, read.body).toBe(200);
+  });
+
+  it('refuses to check or re-seal on a connection that row-level security would leave blind', async () => {
+    await expect(checkPayoutDestinations(team.test.app.db, parseEncryptionKeys(KEYS))).rejects.toThrow(
+      /lacks BYPASSRLS/u,
+    );
+    await expect(resealPayoutDestinations(team.test.app.db, parseEncryptionKeys(KEYS))).rejects.toThrow(
+      /lacks BYPASSRLS/u,
+    );
   });
 });
 

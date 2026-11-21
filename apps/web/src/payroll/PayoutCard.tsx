@@ -9,7 +9,7 @@ import {
   type PayoutReceiveMethod,
   type PutPayoutDetailsBody,
 } from '@impera/contracts';
-import { useId, useState, type JSX, type SyntheticEvent } from 'react';
+import { useEffect, useId, useState, type JSX, type SyntheticEvent } from 'react';
 
 import {
   changedRecently,
@@ -19,6 +19,7 @@ import {
   RECEIVE_METHODS,
   revealPayout,
   useOwnPayout,
+  usePayoutList,
   useRefreshPayouts,
   writePayout,
   type PayoutOutcome,
@@ -459,6 +460,16 @@ export function PayoutTo({
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // « Copié » says the gesture worked, then gives the button back.
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [copied]);
 
   const reveal = (): void => {
     setBusy(true);
@@ -537,5 +548,37 @@ export function PayoutTo({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The owner's line in « Marquer payé »: nothing while the list is read; a failed read says so with « Réessayer », never
+ * « pas encore rempli », which would be a guess.
+ */
+export function PayoutLine({
+  memberId,
+  memberName,
+  zone,
+}: {
+  memberId: string;
+  memberName: string;
+  zone: string;
+}): JSX.Element | null {
+  const payouts = usePayoutList(true);
+  if (payouts.isPending) return null;
+  if (payouts.isError) {
+    return (
+      <Failure
+        inline
+        title="Où le verser : pas lu"
+        onRetry={() => {
+          void payouts.refetch();
+        }}
+      />
+    );
+  }
+  const summary = payouts.data.destinations.find((one) => one.memberId === memberId) ?? null;
+  return (
+    <PayoutTo memberId={memberId} memberName={memberName} summary={summary} zone={zone} now={new Date()} />
   );
 }

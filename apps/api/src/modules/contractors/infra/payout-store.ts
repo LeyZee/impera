@@ -162,10 +162,11 @@ export function createPayoutDestinationStore(
           sql`select pg_advisory_xact_lock(hashtextextended(${`payout_destination:${memberId}`}, 0))`,
         );
         const before = await versionsOf(tx, memberId);
-        if (
-          before.length > 0 &&
-          JSON.stringify(opened(memberId, before).details) === JSON.stringify(details)
-        ) {
+        // The same details again add nothing. A version in force no key opens any more counts as different: the
+        // member can always write his own again, it is the way out of an unreadable block.
+        const plain = before[0] === undefined ? null : opens(before[0], keys);
+        const current = plain === null ? null : PayoutDetailsSchema.safeParse(JSON.parse(plain));
+        if (current?.success === true && JSON.stringify(current.data) === JSON.stringify(details)) {
           return { destination: opened(memberId, before), created: false };
         }
         const since = new Date(now().getTime() - 86_400_000);
@@ -211,6 +212,17 @@ export function createPayoutDestinationStore(
 
 /** The newest version of each member, the one in force: older ones are history, unread once their key is retired. */
 async function newestVersions(ownerDb: Database): Promise<Row[]> {
+  // FORCE ROW LEVEL SECURITY binds the owner too: without BYPASSRLS it would read zero rows without an error, and a
+  // check or a rotation would look done. Refused instead (deploy.md § 1.1).
+  const result = await ownerDb.execute(
+    sql`select (rolsuper or rolbypassrls) as "bypasses" from pg_roles where rolname = current_user`,
+  );
+  const [role] = z.array(z.object({ bypasses: z.boolean() })).parse(result.rows);
+  if (role?.bypasses !== true) {
+    throw new Error(
+      'payout_destinations: the owner connection (DATABASE_ADMIN_URL) lacks BYPASSRLS, it would read no rows',
+    );
+  }
   return ownerDb
     .selectDistinctOn([payoutDestinations.memberId])
     .from(payoutDestinations)
