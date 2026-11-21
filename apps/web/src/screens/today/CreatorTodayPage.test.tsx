@@ -9,7 +9,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorTodayPage } from './CreatorTodayPage';
@@ -102,6 +102,50 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
     const go = screen.getByRole('link', { name: 'Déposer la première' });
     expect(go.className).toContain('nv-btn--neon');
     expect(go.getAttribute('href')).toMatch(/^\/contenu\?demande=/u);
+  });
+
+  it('puts what waits on her answer on top, and sends her answer (ADR 0162)', async () => {
+    const decision = {
+      id: '01936f00-0000-7000-8000-000000000001',
+      kind: 'publish_time',
+      category: 'post',
+      question: 'Je publie ton Reel à 18 h 30 ?',
+      context: 'C’est l’heure où tes abonnés sont le plus là.',
+      layout: 'buttons',
+      answers: [
+        { key: 'yes', label: 'Oui, à 18 h 30', text: null, noted: 'Je publie à 18 h 30.' },
+        { key: 'change', label: 'Changer l’heure', text: null, noted: 'On change l’heure.' },
+      ],
+      otherIdeasLeft: 0,
+    };
+    const sent: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url === '/v1/creator-space/decisions')
+          return Promise.resolve(Response.json({ decisions: sent.length === 0 ? [decision] : [] }));
+        if (url === `/v1/creator-space/decisions/${decision.id}/answer`) {
+          sent.push(typeof init?.body === 'string' ? init.body : '');
+          return Promise.resolve(Response.json({ noted: 'Je publie à 18 h 30.' }));
+        }
+        return Promise.resolve(
+          url === '/v1/creator-space/on-duty'
+            ? Response.json({ current: [], next: [] })
+            : new Response('null', { status: 404 }),
+        );
+      }),
+    );
+    show();
+    const question = await screen.findByRole('heading', { level: 2, name: decision.question });
+    const cards = [...document.querySelectorAll('.sc-today > *')];
+    expect(cards[0]?.contains(question)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Oui, à 18 h 30' }));
+    expect(await screen.findByText('Je publie à 18 h 30.')).toBeTruthy();
+    expect(sent).toEqual([JSON.stringify({ answer: 'yes' })]);
+    fireEvent.click(screen.getByRole('button', { name: 'Fermer' }));
+    await waitFor(() => {
+      expect(screen.queryByText('À décider')).toBeNull();
+    });
   });
 
   it('says nothing of her content while nothing is due', async () => {

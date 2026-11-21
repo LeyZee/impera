@@ -6,8 +6,6 @@ import type { DecisionAsking } from './domain/ports';
 import { createDrizzleDecisionAsking, createDrizzleDecisionStore } from './infra/db/decision-store';
 import { createDecisionRoutes, type RequireRole } from './infra/http/routes';
 
-export type { AskedDecision, DecisionAsking } from './domain/ports';
-
 export interface CreatorDecisionsModule {
   readonly name: 'creator-decisions';
   /** Mounted under `/v1`: her `/creator-space/decisions`, the owner's `/creators/:creatorId/decisions`. */

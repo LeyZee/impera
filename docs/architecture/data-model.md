@@ -631,6 +631,14 @@ redirect_link_hours      id, creator_id → creators, (link_id, creator_id) → 
                          remplacée tant qu'elle est ouverte, figée une fois close (politique de la tâche), jamais
                          supprimée ; lue par le propriétaire et un manager actif de sa liste, fermée à la créatrice
                          (ADR 0120 § 3, migration 0245)
+creator_decisions        id, creator_id → creators, kind, subject, category, question, context, layout, answers
+                         (jsonb, deux ou trois), other_ideas_left, state (open, answered, withdrawn), answer_key?,
+                         answered_at?, answered_by? → user, later_until?, expires_at ; unique (creator_id, kind,
+                         subject) : une question par sujet ; une réponse est entière ou absente ; écrite par le code
+                         qui demande sous `withTenantJob` (`creator_decisions`), qui ne peut ensuite que la retirer ;
+                         lue par la créatrice (les siennes) et par le propriétaire, qui y répondent une fois, tant
+                         qu'elle est ouverte ; le rôle applicatif n'écrit que les colonnes d'une réponse ; jamais
+                         lue par un manager ni un chatteur ; aucune suppression (ADR 0162, migration 0252)
 ```
 
 ## Commercial (phase 6, réservé)

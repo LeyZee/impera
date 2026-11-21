@@ -1,87 +1,107 @@
+import type { CreatorDecision, DecisionAnswer } from '@impera/contracts';
 import { useState, type JSX } from 'react';
-
-interface Answer {
-  id: string;
-  label: string;
-  text?: string;
-}
-
-/** One question put to her: what it is about, in one line, and two or three answers. */
-export interface DecisionCard {
-  id: string;
-  /** The colour of the content it is about, the agenda's (a dot, never a bar). */
-  category: 'shoot' | 'live' | 'post' | 'socials';
-  question: string;
-  context: string;
-  /** Three captions read in full: each answer is a row with its whole text. */
-  layout: 'buttons' | 'rows';
-  answers: readonly Answer[];
-  /** What she hears once she answered, by answer; the card leaves after it. */
-  noted?: Readonly<Record<string, string>>;
-  /** Other ideas can be asked for, this many times more. */
-  otherIdeasLeft?: number;
-}
 
 /** What she may ask of other ideas in one touch; her own words come beside them. */
 const HINTS = ['Plus courte', 'Plus drôle', 'Plus coquine', 'Avec une question', 'Parle du lieu'] as const;
 
+/** Three other answers for a decision, from what she asked for. */
+export type OtherIdeas = (
+  decision: CreatorDecision,
+  hints: readonly string[],
+  wish: string,
+) => Promise<readonly DecisionAnswer[]>;
+
 /**
- * « À décider », hers: one question at a time, on top of Aujourd'hui. The next one enters once she answered or put
- * the first aside; nothing shows when nothing waits. « Plus tard » is always there, said plainly.
+ * « À décider », hers (ADR 0162): one question at a time, on top of Aujourd'hui. The next one enters once she
+ * answered or put the first aside; nothing shows when nothing waits. « Plus tard » is always there, said plainly.
+ * The list is the server's: an answer kept leaves it, and the count goes on from what she already answered here.
  */
 export function DecisionStack({
-  cards,
+  decisions,
   onAnswer,
   onLater,
   onOtherIdeas,
 }: {
-  cards: readonly DecisionCard[];
-  onAnswer: (cardId: string, answerId: string) => void;
-  onLater: (cardId: string) => void;
-  /** Three other answers for a card, from what she asked for. */
-  onOtherIdeas: (cardId: string, hints: readonly string[], wish: string) => Promise<readonly Answer[]>;
+  decisions: readonly CreatorDecision[];
+  /** Keeps her answer; what she reads back. */
+  onAnswer: (decision: CreatorDecision, key: string) => Promise<string>;
+  onLater: (decision: CreatorDecision) => Promise<void>;
+  /** Absent while nothing proposes other ideas: the gesture then never shows. */
+  onOtherIdeas?: OtherIdeas;
 }): JSX.Element | null {
-  const [index, setIndex] = useState(0);
-  const [noted, setNoted] = useState<string | null>(null);
-  const card = cards[index];
-  if (card === undefined) return null;
-  const next = (): void => {
-    setNoted(null);
-    setIndex((at) => at + 1);
+  const [done, setDone] = useState(0);
+  const [noted, setNoted] = useState<{ readonly id: string; readonly text: string } | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // While she reads « C'est noté », the list may already have lost the question she answered.
+  const waiting = decisions.filter((decision) => decision.id !== noted?.id);
+  const [current] = waiting;
+  if (noted === null && current === undefined) return null;
+  const total = done + waiting.length + (noted === null ? 0 : 1);
+  const run = (gesture: () => Promise<void>): void => {
+    if (busy) return;
+    setBusy(true);
+    setFailed(false);
+    gesture()
+      .catch(() => {
+        setFailed(true);
+      })
+      .finally(() => {
+        setBusy(false);
+      });
   };
   return (
-    <section key={card.id} className="nv-plate nv-enter ag-scope" aria-labelledby="sc-ask-title">
-      <div className="sc-ask" data-cat={card.category}>
+    <section
+      key={noted?.id ?? current?.id}
+      className="nv-plate nv-enter ag-scope"
+      aria-labelledby="sc-ask-eyebrow"
+    >
+      <div className="sc-ask" data-cat={current?.category ?? 'post'} aria-busy={busy}>
         <header className="sc-ask__head">
           <span className="sc-ask__dot" aria-hidden="true" />
-          <span className="sc-ask__eyebrow">À décider</span>
-          {cards.length > 1 ? (
+          <span id="sc-ask-eyebrow" className="sc-ask__eyebrow">
+            À décider
+          </span>
+          {total > 1 ? (
             <span className="sc-ask__count nv-num">
-              {String(index + 1)} sur {String(cards.length)}
+              {String(done + 1)} sur {String(total)}
             </span>
           ) : null}
         </header>
-        {noted === null ? (
-          <Question
-            card={card}
-            onAnswer={(answerId) => {
-              onAnswer(card.id, answerId);
-              setNoted(card.noted?.[answerId] ?? 'C’est noté.');
-            }}
-            onLater={() => {
-              onLater(card.id);
-              next();
-            }}
-            onOtherIdeas={(hints, wish) => onOtherIdeas(card.id, hints, wish)}
-          />
-        ) : (
+        {noted !== null ? (
           <div className="sc-ask__noted nv-enter" role="status">
             <Check />
-            <p>{noted}</p>
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={next}>
-              {index + 1 < cards.length ? 'Suivante' : 'Fermer'}
+            <p>{noted.text}</p>
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              onClick={() => {
+                setDone((count) => count + 1);
+                setNoted(null);
+              }}
+            >
+              {waiting.length > 0 ? 'Suivante' : 'Fermer'}
             </button>
           </div>
+        ) : current === undefined ? null : (
+          <Question
+            decision={current}
+            failed={failed}
+            onAnswer={(key) => {
+              run(async () => {
+                setNoted({ id: current.id, text: await onAnswer(current, key) });
+              });
+            }}
+            onLater={() => {
+              run(() => onLater(current));
+            }}
+            {...(onOtherIdeas === undefined
+              ? {}
+              : {
+                  onOtherIdeas: (hints: readonly string[], wish: string) =>
+                    onOtherIdeas(current, hints, wish),
+                })}
+          />
         )}
       </div>
     </section>
@@ -89,39 +109,48 @@ export function DecisionStack({
 }
 
 function Question({
-  card,
+  decision,
+  failed,
   onAnswer,
   onLater,
   onOtherIdeas,
 }: {
-  card: DecisionCard;
-  onAnswer: (answerId: string) => void;
+  decision: CreatorDecision;
+  failed: boolean;
+  onAnswer: (key: string) => void;
   onLater: () => void;
-  onOtherIdeas: (hints: readonly string[], wish: string) => Promise<readonly Answer[]>;
+  onOtherIdeas?: (hints: readonly string[], wish: string) => Promise<readonly DecisionAnswer[]>;
 }): JSX.Element {
-  const [answers, setAnswers] = useState(card.answers);
-  const [left, setLeft] = useState(card.otherIdeasLeft ?? 0);
+  const [answers, setAnswers] = useState<readonly DecisionAnswer[]>(decision.answers);
+  const [left, setLeft] = useState(decision.otherIdeasLeft);
   const [asking, setAsking] = useState(false);
   const [thinking, setThinking] = useState(false);
+  const [missed, setMissed] = useState(false);
   const [hints, setHints] = useState<readonly string[]>([]);
   const [wish, setWish] = useState('');
   const ask = (): void => {
+    if (onOtherIdeas === undefined) return;
     setThinking(true);
     setAsking(false);
-    void onOtherIdeas(hints, wish).then((other) => {
-      setAnswers(other);
-      setLeft((count) => count - 1);
-      setHints([]);
-      setWish('');
-      setThinking(false);
-    });
+    setMissed(false);
+    onOtherIdeas(hints, wish)
+      .then((other) => {
+        setAnswers(other);
+        setLeft((count) => count - 1);
+        setHints([]);
+        setWish('');
+      })
+      .catch(() => {
+        setMissed(true);
+      })
+      .finally(() => {
+        setThinking(false);
+      });
   };
   return (
     <>
-      <h2 id="sc-ask-title" className="sc-ask__question">
-        {card.question}
-      </h2>
-      <p className="sc-ask__context">{card.context}</p>
+      <h2 className="sc-ask__question">{decision.question}</h2>
+      <p className="sc-ask__context">{decision.context}</p>
       {thinking ? (
         <div className="sc-ask__rows" role="status" aria-label="Je cherche trois autres idées…">
           {[0, 1, 2].map((at) => (
@@ -132,16 +161,16 @@ function Question({
           ))}
           <p className="sc-ask__thinking">Je cherche trois autres idées…</p>
         </div>
-      ) : card.layout === 'rows' ? (
+      ) : decision.layout === 'rows' ? (
         <div className="sc-ask__rows">
           {answers.map((answer, at) => (
             <button
-              key={answer.id}
+              key={answer.key}
               type="button"
               className="sc-ask__row nv-enter"
               style={{ '--nv-i': at }}
               onClick={() => {
-                onAnswer(answer.id);
+                onAnswer(answer.key);
               }}
             >
               <span className="sc-ask__style">{answer.label}</span>
@@ -166,11 +195,11 @@ function Question({
         <div className="sc-ask__buttons">
           {answers.map((answer) => (
             <button
-              key={answer.id}
+              key={answer.key}
               type="button"
               className="nv-btn nv-btn--soft sc-ask__btn"
               onClick={() => {
-                onAnswer(answer.id);
+                onAnswer(answer.key);
               }}
             >
               {answer.label}
@@ -178,6 +207,11 @@ function Question({
           ))}
         </div>
       )}
+      {failed || missed ? (
+        <p className="sc-ask__failed" role="alert">
+          Ça n’a pas marché. Réessaie dans un instant.
+        </p>
+      ) : null}
       {asking ? (
         <div className="sc-ask__wish nv-enter">
           <p className="sc-ask__wish-title">Qu’est-ce que tu voudrais ?</p>
@@ -216,7 +250,7 @@ function Question({
         </div>
       ) : null}
       <footer className="sc-ask__foot">
-        {left > 0 && !asking && !thinking ? (
+        {onOtherIdeas !== undefined && left > 0 && !asking && !thinking ? (
           <button
             type="button"
             className="nv-btn nv-btn--plain sc-ask__more"

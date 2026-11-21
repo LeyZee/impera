@@ -1,6 +1,10 @@
 import { DROP_CATEGORY_LABELS, type CreatorOnDuty } from '@impera/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
+
+import { DecisionStack } from './DecisionStack';
+import { answerDecision, DECISIONS_KEY, putDecisionAside, useDecisions } from './decisions-api';
 
 import { useCreatorOnDuty } from '@/scheduling/api';
 import '@/scheduling/scheduling.css';
@@ -58,11 +62,43 @@ export function CreatorTodayPage(): JSX.Element {
           />
         ) : null}
         {/* What she owes first: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
+        {/* What waits on her answer comes before anything else, one question at a time (ADR 0162). */}
+        <Decisions />
         <ToSend today={today} />
         <HerDay now={now} today={today} quiet={down} />
         <Fans now={now} today={today} />
       </div>
     </Page>
+  );
+}
+
+/**
+ * « À décider » (ADR 0162): what the agency's code asks her about a content of hers. Nothing while nothing waits, or
+ * while the server is silent: the page says that once, on top.
+ */
+function Decisions(): JSX.Element | null {
+  const decisions = useDecisions();
+  const client = useQueryClient();
+  if (decisions.data === undefined) return null;
+  const again = (): Promise<void> => client.invalidateQueries({ queryKey: DECISIONS_KEY });
+  return (
+    <DecisionStack
+      decisions={decisions.data}
+      onAnswer={async (decision, key) => {
+        try {
+          return await answerDecision(decision.id, key);
+        } finally {
+          void again();
+        }
+      }}
+      onLater={async (decision) => {
+        try {
+          await putDecisionAside(decision.id);
+        } finally {
+          await again();
+        }
+      }}
+    />
   );
 }
 
