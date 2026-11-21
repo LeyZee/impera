@@ -43,7 +43,7 @@ type Row = typeof payoutDestinations.$inferSelect;
  * The associated data a version is sealed with (ADR 0165 § 2): the member and the version, so that a block copied on
  * another member, or an old version replayed as the current one, does not open.
  */
-export const payoutContext = (memberId: string, versionId: string): string =>
+const payoutContext = (memberId: string, versionId: string): string =>
   `payout_destination:${memberId}:${versionId}`;
 
 export interface PayoutDestinationStore {
