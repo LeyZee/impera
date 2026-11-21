@@ -23,7 +23,8 @@ export interface DescribeDeps {
   readonly summaries: Pick<ScriptSummaryStore, 'enqueueFor'>;
   /**
    * Whoever waits for a medium to be described, told each time it is (again on a replay: the listener is replayable).
-   * It knows what it does with it; this module does not.
+   * It knows what it does with it; this module does not. It must stay short and replayable: it enqueues, and never
+   * calls a model here.
    */
   readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
   readonly versions: Pick<ScriptVersions, 'frozen'>;

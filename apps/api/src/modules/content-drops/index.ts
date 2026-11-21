@@ -162,7 +162,8 @@ export interface ContentDropsDeps {
   readonly brain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
   /**
    * Told each time a medium of hers is described, again on a replay (ADR 0164 § 9). Wired by the composition root;
-   * this module knows nothing of who listens.
+   * this module knows nothing of who listens. The listener stays short and replayable: it enqueues, and never calls
+   * a model here.
    */
   readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
