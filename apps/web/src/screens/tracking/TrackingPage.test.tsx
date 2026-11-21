@@ -820,7 +820,9 @@ describe('the reader of Suivi', () => {
       detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
     });
     renderPage(OPEN);
-    expect(await screen.findByText(/^Mode soin depuis/u)).toBeTruthy();
+    const since = await screen.findByText(/^Mode soin depuis/u);
+    // A state to know, in neutral glass: the amber stays for a person to act (recette du 21/11).
+    expect(since.closest('.tr-care')?.classList.contains('tr-hand--alert')).toBe(false);
     expect(screen.getByText(/rien ne lui est vendu/u)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Il va mieux' }));
     // Nothing goes on the first click: the second says what changes.

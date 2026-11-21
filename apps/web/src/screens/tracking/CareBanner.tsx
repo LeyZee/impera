@@ -39,7 +39,9 @@ export function CareBanner({
   };
 
   return (
-    <div className="tr-hand tr-hand--alert tr-care" role="status">
+    // Neutral glass, never the amber of « Personne n'a répondu » it may sit above: a state to know, not a task (recette
+    // du 21/11). Its words carry the weight.
+    <div className="tr-hand tr-care" role="status">
       <p>
         <strong>{careSinceText(since, new Date())}</strong>
         <span>

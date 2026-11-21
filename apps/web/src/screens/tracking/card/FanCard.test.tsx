@@ -132,8 +132,8 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
     });
     renderCard();
     const him = await group('Lui');
-    // The first name is among the essentials, unfolded on top: the group counts the fields it holds.
-    expect(within(him).getByText('1 sur 9')).toBeTruthy();
+    // The first name shows on top among the essentials, and still counts for his group (recette du 21/11).
+    expect(within(him).getByText('2 sur 13')).toBeTruthy();
     const name = field(await essentials(), /^Son prénom/u);
     expect(within(name).getByText('Marc')).toBeTruthy();
     expect(within(name).getByText('Dit par lui, il y a 3 jours')).toBeTruthy();

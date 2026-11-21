@@ -1031,7 +1031,10 @@ const corrections = createRoute({
       throw redirect({ to: '/entrainer/playground', replace: true });
     }
   },
-  component: CorrectionsPage,
+  component: function Corrections() {
+    const { user } = rootRoute.useRouteContext();
+    return <CorrectionsPage scoped={useScopedCreator(scopesCreators(user))} />;
+  },
 });
 /*
  * Tests have no screen yet, hence no tab (ADR 0024): its address leads to the Playground rather than to an « à venir »

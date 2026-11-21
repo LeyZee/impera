@@ -5,39 +5,66 @@ import {
   type DraftCorrectionReason,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
 import { correctionsError, useDraftCorrections } from './corrections/api';
 
 import { useCreators } from '@/creators/api';
-import { Select, type SelectOption } from '@/shell/Select';
+import { Select } from '@/shell/Select';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 import './corrections/corrections.css';
 
 /**
  * Entraîner › Corrections (trou béant 12, recette du 21/11): the drafts a human refused or retouched in her real
  * conversations, by reason, what the agent wrote beside what left. The owner's alone (ADR 0092 § 8). Read only: what
- * to change goes through the Playground and her persona.
+ * to change goes through the Playground and her persona. One creator at a time: the one the menu's selector is set on
+ * (ADR 0134 § 3), or on « Toutes » the one picked here, as Trafic does.
  */
-export function CorrectionsPage(): JSX.Element {
+export function CorrectionsPage({
+  scoped = null,
+}: {
+  /** The creator the menu's selector is set on, or null on « Toutes »: the page then asks which one. */
+  scoped?: string | null;
+}): JSX.Element {
   const creators = useCreators();
-  const [creatorId, setCreatorId] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
   const list = creators.data ?? [];
-  useEffect(() => {
-    const first = list[0];
-    if (creatorId === '' && first !== undefined) setCreatorId(first.id);
-  }, [creatorId, list]);
+  const creatorId = scoped ?? picked ?? list[0]?.id ?? null;
 
-  if (creators.isPending) return <p className="co-state">Chargement…</p>;
-  if (creators.isError) return <p className="co-state">{correctionsError(creators.error)}</p>;
-  if (list.length === 0) return <p className="co-state">Aucune créatrice : ajoute-la dans Créatrices.</p>;
-  const options: SelectOption<string>[] = list.map((one) => ({ value: one.id, label: one.displayName }));
+  if (creators.isPending)
+    return (
+      <Skeleton>
+        <SkeletonCard lines={4} />
+      </Skeleton>
+    );
+  if (creators.isError)
+    return (
+      <Failure
+        onRetry={() => {
+          void creators.refetch();
+        }}
+      />
+    );
+  if (creatorId === null)
+    return (
+      <Empty plate title="Aucune créatrice pour l’instant">
+        Ses brouillons corrigés arrivent ici dès qu’une créatrice est ajoutée dans Créatrices.
+      </Empty>
+    );
   return (
     <div className="co-page">
-      <div className="co-creator">
-        <Select<string> ariaLabel="Créatrice" value={creatorId} options={options} onChange={setCreatorId} />
-      </div>
-      {creatorId === '' ? null : <CreatorCorrections key={creatorId} creatorId={creatorId} />}
+      {scoped === null && list.length > 1 ? (
+        <div className="co-creator">
+          <Select<string>
+            ariaLabel="Créatrice"
+            value={creatorId}
+            options={list.map((one) => ({ value: one.id, label: one.displayName }))}
+            onChange={setPicked}
+          />
+        </div>
+      ) : null}
+      <CreatorCorrections key={creatorId} creatorId={creatorId} />
     </div>
   );
 }
@@ -46,14 +73,22 @@ function CreatorCorrections({ creatorId }: { creatorId: string }): JSX.Element {
   const corrections = useDraftCorrections(creatorId);
   const [reason, setReason] = useState<DraftCorrectionReason | null>(null);
 
-  if (corrections.isPending) return <p className="co-state">Chargement…</p>;
+  if (corrections.isPending)
+    return (
+      <Skeleton>
+        <SkeletonCard lines={4} />
+      </Skeleton>
+    );
   if (corrections.isError) return <p className="co-state">{correctionsError(corrections.error)}</p>;
   const view = corrections.data;
   if (view.items.length === 0) {
     return (
-      <p className="co-state">
-        Aucun brouillon refusé ni retouché depuis {String(DRAFT_CORRECTIONS_DAYS)} jours.
-      </p>
+      <Empty
+        plate
+        title={`Aucun brouillon refusé ni retouché depuis ${String(DRAFT_CORRECTIONS_DAYS)} jours`}
+      >
+        Chaque brouillon refusé ou retouché dans le Suivi ou le panneau copilote arrive ici, avec sa raison.
+      </Empty>
     );
   }
   const shown = reason === null ? view.items : view.items.filter((item) => item.reason === reason);

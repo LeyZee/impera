@@ -357,7 +357,11 @@
   background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
   color: var(--nv-ink);
 }
-/* His care mode (ADR 0088, trou béant 4): since when and what it means, then « Il va mieux », asked twice. */
+/* His care mode (ADR 0088, trou béant 4): since when and what it means, then « Il va mieux », asked twice. Neutral
+ * glass in ink, so that the amber of a person to act stays the only alarm on the conversation. */
+.tr-care {
+  color: var(--nv-ink);
+}
 .tr-care > p:first-child {
   display: flex;
   flex-direction: column;

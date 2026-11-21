@@ -112,12 +112,16 @@ export function entryOf(entries: readonly FanCardEntry[], field: FanCardField): 
   return entries.find((one) => one.field === field) ?? { field, current: null, toCheck: [] };
 }
 
-/** « 4 sur 9 », and how many wait for a chatter: the folded line of a group, on the fields it holds. */
+/**
+ * « 4 sur 12 », and how many wait for a chatter: the folded line of a group, on every field of the group, the
+ * essentials shown on top included (recette du 21/11: « 0 sur 9 » under a first name, an age and a town read as
+ * « nothing known »).
+ */
 export function groupLine(
   entries: readonly FanCardEntry[],
   group: FanCardGroup,
 ): { readonly filled: string; readonly toCheck: number } {
-  const specs = fieldsOf(group);
+  const specs = FAN_CARD_FIELDS.filter((spec) => spec.group === group);
   const known = specs.filter((spec) => entryOf(entries, spec.field).current !== null).length;
   const toCheck = specs.filter((spec) => entryOf(entries, spec.field).toCheck.length > 0).length;
   return { filled: `${String(known)} sur ${String(specs.length)}`, toCheck };

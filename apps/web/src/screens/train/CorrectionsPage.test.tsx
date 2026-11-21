@@ -50,11 +50,16 @@ const VIEW: DraftCorrectionsView = DraftCorrectionsViewSchema.parse({
   ],
 });
 
+const NORA = { id: creatorId, displayName: 'Nora', timezone: 'Europe/Paris' };
+const LINA = { id: id(2), displayName: 'Lina', timezone: 'Europe/Paris' };
+
 let corrections: DraftCorrectionsView;
+let creators: (typeof NORA)[];
 let asked: string[];
 
 beforeEach(() => {
   corrections = VIEW;
+  creators = [NORA];
   asked = [];
   vi.stubGlobal(
     'fetch',
@@ -62,12 +67,7 @@ beforeEach(() => {
       asked.push(input);
       if (input.startsWith('/v1/creators/') && input.endsWith('/draft-corrections'))
         return Promise.resolve(new Response(JSON.stringify(corrections), { status: 200 }));
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({ creators: [{ id: creatorId, displayName: 'Nora', timezone: 'Europe/Paris' }] }),
-          { status: 200 },
-        ),
-      );
+      return Promise.resolve(new Response(JSON.stringify({ creators }), { status: 200 }));
     }),
   );
 });
@@ -76,10 +76,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The page under a router: its fan links point at the Suivi. */
-function renderPage(): void {
+/** The page under a router, on the creator the menu's selector is set on (null for « Toutes »). */
+function renderPage(scoped: string | null = null): void {
   const root = createRootRoute();
-  const page = createRoute({ getParentRoute: () => root, path: '/', component: CorrectionsPage });
+  const page = createRoute({
+    getParentRoute: () => root,
+    path: '/',
+    component: () => <CorrectionsPage scoped={scoped} />,
+  });
   const suivi = createRoute({ getParentRoute: () => root, path: '/suivi' });
   const router = createRouter({
     routeTree: root.addChildren([page, suivi]),
@@ -121,9 +125,26 @@ describe('Entraîner › Corrections (trou béant 12)', () => {
     expect(screen.queryByText('Trop long')).toBeNull();
   });
 
-  it('says when nothing was corrected', async () => {
+  it('says when nothing was corrected, and where corrections come from', async () => {
     corrections = { ...VIEW, counts: [], items: [] };
     renderPage();
-    expect(await screen.findByText('Aucun brouillon refusé ni retouché depuis 30 jours.')).toBeTruthy();
+    expect(await screen.findByText('Aucun brouillon refusé ni retouché depuis 30 jours')).toBeTruthy();
+    expect(screen.getByText(/Chaque brouillon refusé ou retouché/u)).toBeTruthy();
+  });
+
+  it('follows the creator of the menu’s selector, without a picker of its own', async () => {
+    creators = [NORA, LINA];
+    renderPage(LINA.id);
+    await screen.findAllByRole('listitem');
+    expect(asked).toContain(`/v1/creators/${LINA.id}/draft-corrections`);
+    expect(screen.queryByRole('combobox', { name: 'Créatrice' })).toBeNull();
+  });
+
+  it('on « Toutes », asks which creator here, as Trafic does', async () => {
+    creators = [NORA, LINA];
+    renderPage(null);
+    await screen.findAllByRole('listitem');
+    expect(asked).toContain(`/v1/creators/${NORA.id}/draft-corrections`);
+    expect(screen.getByRole('combobox', { name: 'Créatrice' })).toBeTruthy();
   });
 });

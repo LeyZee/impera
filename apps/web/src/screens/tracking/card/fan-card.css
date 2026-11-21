@@ -49,13 +49,14 @@
     opacity: 0;
   }
   /* An unknown field says so at the edge, where « Ajouter » takes its place under the pointer. */
-  .tr-aside .tr-card__field:is(:hover, :focus-within) .tr-card__value.tr-card__other {
-    flex: 1;
-    min-width: 0;
-  }
-  .tr-card__empty {
+  .tr-aside .tr-card__field:is(:hover, :focus-within) .tr-card__empty {
     visibility: hidden;
   }
+}
+/* A line of « Autres » fills its row, so that « Retirer » ends on the edge like « Corriger » and « Ajouter ». */
+.tr-card__value.tr-card__other {
+  flex: 1;
+  min-width: 0;
 }
 .tr-card__hint {
   color: var(--nv-ink-faint);
