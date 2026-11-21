@@ -75,8 +75,8 @@ describe('the backup banner', () => {
 
   it('says when no restore test is recent, even with the export on time', () => {
     expect(backupBannerOf(status({ lastRestoreTest: null, restoreTestFresh: false }))).toEqual({
-      title: 'Aucun essai de restauration récent',
-      text: 'Aucun essai de restauration n’est encore noté. Il en faut un de moins de 90 jours pour valider une paie.',
+      title: 'Essai de restauration à faire',
+      text: 'Aucun essai de restauration n’est encore noté. Il en faut un tous les 90 jours : à refaire.',
       restore: null,
     });
     const old = {
@@ -88,7 +88,7 @@ describe('the backup banner', () => {
     expect(
       backupBannerOf(status({ lastRestoreTest: old, restoreTestFresh: false }), 'Europe/Paris')?.text,
     ).toBe(
-      'Le dernier essai de restauration date du 12 juillet. Il en faut un de moins de 90 jours pour valider une paie.',
+      'Le dernier essai de restauration date du 12 juillet. Il en faut un tous les 90 jours : à refaire.',
     );
   });
 
@@ -102,7 +102,7 @@ describe('the backup banner', () => {
     expect(
       backupBannerOf(status({ lastRestoreTest: missed, restoreTestFresh: false }), 'Europe/Paris')?.text,
     ).toBe(
-      'Le dernier essai de restauration, le 20 octobre, n’a pas retrouvé toutes les lignes. Il en faut un de moins de 90 jours pour valider une paie.',
+      'Le dernier essai de restauration, le 20 octobre, n’a pas retrouvé toutes les lignes. Il en faut un tous les 90 jours : à refaire.',
     );
   });
 
@@ -112,7 +112,7 @@ describe('the backup banner', () => {
     );
     expect(banner?.title).toMatch(/^Aucune sauvegarde réussie depuis/u);
     expect(banner?.restore).toBe(
-      'Aucun essai de restauration n’est encore noté. Il en faut un de moins de 90 jours pour valider une paie.',
+      'Aucun essai de restauration n’est encore noté. Il en faut un tous les 90 jours : à refaire.',
     );
     expect(backupBannerOf(status({ state: 'overdue' }))?.restore).toBeNull();
   });

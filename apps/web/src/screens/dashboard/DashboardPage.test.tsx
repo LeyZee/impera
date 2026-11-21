@@ -742,7 +742,7 @@ describe('DashboardPage of the owner', () => {
         : { status: 200, body: apiDashboard() },
     );
     renderDashboard(true);
-    expect(await screen.findByText('Aucun essai de restauration récent')).toBeDefined();
+    expect(await screen.findByText('Essai de restauration à faire')).toBeDefined();
   });
 
   it('is the owner’s alone: nobody else reads the exports', async () => {

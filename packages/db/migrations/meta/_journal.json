@@ -1349,8 +1349,15 @@
     {
       "idx": 192,
       "version": "7",
+      "when": 1795277087019,
+      "tag": "0251_pay_gifts_owner_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
       "when": 1795277565288,
-      "tag": "0251_vault_sent_for_free",
+      "tag": "0252_vault_sent_for_free",
       "breakpoints": true
     }
   ]
