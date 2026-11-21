@@ -1,6 +1,8 @@
 import {
   CREATOR_TASK_CATEGORIES,
   CREATOR_TASK_KINDS,
+  DAY_ITEMS,
+  DAY_TARGET_MAX,
   SUGGESTION_ORIGINS,
   SUGGESTION_STATES,
   WEEK_NEEDS,
@@ -17,6 +19,7 @@ import {
   jsonb,
   pgPolicy,
   pgTable,
+  primaryKey,
   text,
   unique,
   uuid,
@@ -402,5 +405,46 @@ export const creatorShootItems = pgTable(
              and s.state = 'suggested'
         )`,
     }),
+  ],
+);
+
+/**
+ * Her day (ADR 0140, second avenant of 20/11/2026): how many of a line of her day she did (`DAY_ITEMS`: her Reveal
+ * story, her Instagram posts…), one row a day and a line, written by her alone, today or yesterday in her zone (checked
+ * by the code). What a line asks is the code's, never stored. Read by her team; never deleted.
+ */
+export const creatorDayTicks = pgTable(
+  'creator_day_ticks',
+  {
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    day: date('day', { mode: 'string' }).notNull(),
+    item: enumText('item').notNull(),
+    done: integer('done').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    enumCheck('creator_day_ticks', t.item, DAY_ITEMS),
+    check('creator_day_ticks_done_check', sql`${t.done} between 0 and ${sql.raw(String(DAY_TARGET_MAX))}`),
+    primaryKey({ name: 'creator_day_ticks_pkey', columns: [t.creatorId, t.day, t.item] }),
+    pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
+    pgPolicy('creator_insert', {
+      for: 'insert',
+      withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('creator_update', {
+      for: 'update',
+      using: hers(t.creatorId),
+      withCheck: sql`${hers(t.creatorId)} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
   ],
 );

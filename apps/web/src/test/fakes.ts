@@ -48,6 +48,7 @@ export function apiDashboard(patch: Partial<ApiDashboard> = {}): ApiDashboard {
         identity_doubt: 0,
         persona_inactive: 0,
         custom_order: 0,
+        sale_trouble: 0,
       },
       telegramAlertsTonight: null,
     },

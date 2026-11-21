@@ -31,6 +31,8 @@ export const fans = pgTable(
   },
   (t) => [
     unique('fans_platform_fan_unique').on(t.platformAccountId, t.platformFanId),
+    // Lets a row of another table name his creator with him (`custom_orders`): never a fan of another creator.
+    unique('fans_id_creator_unique').on(t.id, t.creatorId),
     index('fans_creator_idx').on(t.creatorId),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),

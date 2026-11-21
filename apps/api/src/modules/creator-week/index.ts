@@ -6,6 +6,7 @@ import type { WeekAgendaStore } from '../creator-tasks';
 
 import { planWeeks, type PlanWeeksRun } from './application/plan-weeks';
 import type { AcceptSuggestion, WeekFactsReader } from './domain/ports';
+import { createDrizzleDayTickStore } from './infra/db/day-store';
 import { createDrizzleWeekDraftStore } from './infra/db/draft-store';
 import { createWeekRoutes, type RequireRole } from './infra/http/routes';
 
@@ -13,7 +14,7 @@ export type { WeekFactsReader } from './domain/ports';
 
 export interface CreatorWeekModule {
   readonly name: 'creator-week';
-  /** Mounted under `/v1`: the owner's `/creators/:creatorId/weeks/:week`, her `/creator-space/week` and its lines. */
+  /** Mounted under `/v1`: the owner's `/creators/:creatorId/weeks/:week`, her `/creator-space/week`, its lines, her day. */
   readonly routes: FastifyPluginAsyncZod;
   readonly jobs: {
     /** `creator_week.plan`, each hour: the week after computed as a draft for each creator whose Sunday 18 h passed. */
@@ -42,6 +43,7 @@ export function createCreatorWeekModule(deps: CreatorWeekDeps): CreatorWeekModul
     name: 'creator-week',
     routes: createWeekRoutes({
       drafts,
+      days: createDrizzleDayTickStore(deps.db),
       agenda: deps.agenda,
       accept: deps.accept,
       facts: deps.facts,

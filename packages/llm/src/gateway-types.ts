@@ -152,6 +152,15 @@ export interface BrainAlert {
   readonly phrase: string;
 }
 
+/**
+ * His custom request as the brain reads it (ADR 0159 § A.2): whether one of his is open, and the supplements of her
+ * grid it may name, each by the id it answers with and the name the owner gave it.
+ */
+export interface BrainCustomOrder {
+  readonly open: boolean;
+  readonly supplements: readonly { readonly id: string; readonly name: string }[];
+}
+
 /** A script she may open with him, as the brain reads it (ADR 0098 § 6): the id it answers with, what it is about. */
 export interface BrainScript {
   readonly id: string;
@@ -165,6 +174,8 @@ export interface BrainInput extends ConversationInput {
   readonly scripts?: readonly BrainScript[];
   /** A step of a script waits for his answer: the brain reads what his last message does with it (`scriptReply`). */
   readonly scriptStepWaiting?: boolean;
+  /** His custom request, for `customOrder`; absent, the brain reads one only when he asks for one, with no supplement. */
+  readonly customOrder?: BrainCustomOrder;
 }
 
 /**
@@ -179,6 +190,12 @@ export interface VoiceScriptStep {
   readonly mediaSheet: string | null;
 }
 
+/** A paid step sent to him and still locked, as the voice reads it to help him open it (ADR 0156 § 4). */
+export interface VoiceWaitingStep {
+  readonly price: Money;
+  readonly mediaSheet: string | null;
+}
+
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
   /**
@@ -188,6 +205,11 @@ export interface VoiceInput extends ConversationInput {
   readonly objectionReply?: string;
   /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
   readonly scriptStep?: VoiceScriptStep;
+  /**
+   * The paid step he was sent and has not opened, when he asks how to pay for it (ADR 0156 § 4): its exact price and
+   * what it holds, in a typed block after the brief. Absent, none.
+   */
+  readonly waitingStep?: VoiceWaitingStep;
   /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
   readonly maxBubbles?: number;
 }

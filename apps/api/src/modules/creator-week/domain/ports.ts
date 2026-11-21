@@ -1,4 +1,4 @@
-import type { AgencyCreatorWeek, CreatorTask, DropCategory, WeekPlan } from '@impera/contracts';
+import type { AgencyCreatorWeek, CreatorTask, DayItem, DropCategory, WeekPlan } from '@impera/contracts';
 
 import type { WeekFacts } from './plan';
 
@@ -62,3 +62,18 @@ export interface WeekFactsReader {
 
 /** Accepting one suggestion of hers by its own rules (ADR 0140 § 27). */
 export type AcceptSuggestion = (userId: string, suggestionId: string, now: Date) => Promise<CreatorTask>;
+
+/** What she did of each line of a day of hers, and her today, in her zone. */
+interface DayTicksRead {
+  readonly day: string;
+  readonly today: string;
+  readonly done: Partial<Readonly<Record<DayItem, number>>>;
+}
+
+/** `creator_day_ticks` (ADR 0140, second avenant): her day, read and ticked on her own account only. */
+export interface DayTickStore {
+  /** `day`, or today in her zone without it. */
+  read(userId: string, day: string | null, now: Date): Promise<DayTicksRead>;
+  /** How many of a line she did that day: today or yesterday in her zone, else `DayItemLate`; a replay changes nothing. */
+  write(userId: string, day: string, item: DayItem, done: number, now: Date): Promise<void>;
+}

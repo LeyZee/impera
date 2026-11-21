@@ -188,3 +188,62 @@ export const SHOOT_ITEM_NOT_FOUND = 'shoot_item_not_found';
 export const SHOOT_ITEM_LATE_UNPROCESSABLE = 'shoot_item_late_unprocessable';
 /** A line of a day she has not accepted: she accepts the day first. */
 export const SHOOT_ITEM_NOT_ACCEPTED_UNPROCESSABLE = 'shoot_item_not_accepted_unprocessable';
+
+/*
+ * Her day (ADR 0140, second avenant du 20/11/2026): what she posts each day, as lists to tick, never published for her. The
+ * essentials of the day lead (her story and her video on Reveal, her story that leads to Reveal on Instagram); the
+ * rest is a bonus, never in red. The rhythm is the code's (Charles, 20/11), the same for every creator until her own
+ * settings come.
+ */
+
+/** A line of her day, in the order she reads them: the essentials, then Instagram, then Telegram. */
+export const DAY_ITEMS = [
+  'reveal_story',
+  'reveal_video',
+  'insta_cta_story',
+  'insta_stories',
+  'insta_posts',
+  'insta_reel',
+  'telegram_posts',
+  'telegram_video',
+] as const;
+export const DayItemSchema = z.enum(DAY_ITEMS);
+export type DayItem = z.infer<typeof DayItemSchema>;
+
+export const DAY_PLATFORMS = ['reveal', 'instagram', 'telegram'] as const;
+export const DayPlatformSchema = z.enum(DAY_PLATFORMS);
+export type DayPlatform = z.infer<typeof DayPlatformSchema>;
+
+/** The most a line asks in a day: a count she taps up to. */
+export const DAY_TARGET_MAX = 10;
+
+export const DayLineSchema = z.strictObject({
+  item: DayItemSchema,
+  platform: DayPlatformSchema,
+  label: z.string().min(1).max(80),
+  /** What it is and why, in her words: a sentence or two. */
+  sheet: z.string().min(1).max(400),
+  target: z.number().int().min(1).max(DAY_TARGET_MAX),
+  done: z.number().int().min(0).max(DAY_TARGET_MAX),
+  /** One of the essentials of the day: shown first. */
+  essential: z.boolean(),
+});
+export type DayLine = z.infer<typeof DayLineSchema>;
+
+/** `GET /v1/creator-space/day?day=` (creator): her day, today in her zone without `day`. */
+export const CreatorDayQuerySchema = z.strictObject({ day: CalendarDaySchema.optional() });
+export const HerDaySchema = z.strictObject({
+  day: CalendarDaySchema,
+  /** Today in her zone: a day before yesterday is read, never ticked. */
+  today: CalendarDaySchema,
+  lines: z.array(DayLineSchema),
+});
+export type HerDay = z.infer<typeof HerDaySchema>;
+
+/** `PUT /v1/creator-space/day/:day/items/:item` (creator): how many of the line she did that day, from 0. Replayable. */
+export const DayItemParamsSchema = z.strictObject({ day: CalendarDaySchema, item: DayItemSchema });
+export const DayItemDoneBodySchema = z.strictObject({ done: z.number().int().min(0).max(DAY_TARGET_MAX) });
+export type DayItemDoneBody = z.infer<typeof DayItemDoneBodySchema>;
+
+/** A line of a day other than today or yesterday in her zone: her day does not change after the fact. */
+export const DAY_ITEM_LATE_UNPROCESSABLE = 'day_item_late_unprocessable';

@@ -8,6 +8,7 @@ import {
   type ConversationsDeps,
   type ConversationsModule,
 } from '../modules/conversations';
+import type { CustomOrdersModule } from '../modules/custom-orders';
 import type { FansModule } from '../modules/fans';
 import type { PersonaModule } from '../modules/persona';
 
@@ -32,6 +33,8 @@ export function wireConversations(
     readonly alerts: WiredAlerts['module'];
     readonly agent: WiredAgent;
     readonly media: WiredMedia;
+    /** His custom orders, kept for the agent's turn (ADR 0159 § A). */
+    readonly customOrders: CustomOrdersModule;
     /** The copilot panel's doors (ADR 0086): the person an extension link names, every creator for the owner. */
     readonly copilot: NonNullable<ConversationsDeps['copilot']>;
   },
@@ -71,6 +74,7 @@ export function wireConversations(
     alertNames: { ofCreator: (creatorId) => alerts.store.names(creatorId) },
     mediaDescriptions: deps.media.descriptions,
     copilot: deps.copilot,
+    customOrders: deps.customOrders.orders,
   });
   return {
     module,
@@ -92,6 +96,12 @@ export function wireConversations(
         JOB_PAYLOADS['conversation.follow_up'],
         logger,
         (payload, context) => module.jobs.followUp(payload, context.logger),
+      ),
+      'conversation.after_sale': defineTask(
+        'conversation.after_sale',
+        JOB_PAYLOADS['conversation.after_sale'],
+        logger,
+        (payload, context) => module.jobs.afterSale(payload, context.logger),
       ),
       'conversation.record_facts': defineTask(
         'conversation.record_facts',

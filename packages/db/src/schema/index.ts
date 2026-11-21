@@ -24,6 +24,7 @@ export * from './playground';
 export * from './sales-feed';
 export * from './scheduling';
 export * from './redirect-links';
+export * from './custom-orders';
 export * from './custom-prices';
 export * from './scripts';
 export * from './supervision';

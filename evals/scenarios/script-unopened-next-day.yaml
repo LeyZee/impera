@@ -1,0 +1,56 @@
+# Étape oubliée (ADR 0156 § 1) : il s’est endormi sans ouvrir l’étape payante et revient le lendemain avec un simple bonjour ; ce n’est pas un refus, elle le taquine une fois, sans prix. Fan, messages, script et prix fictifs (ADR 0010).
+description: >-
+  L’étape payante attend depuis la veille, il revient froid avec un bonjour ; le déroulé se met en pause, elle répond et glisse une taquinerie légère, sans rien vendre.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+  - 41 ans, confirmé
+situation:
+  availability: confirmed
+  sexualized: true
+  known_hours: 72
+  age_confirmed: true
+  local_time: '10:00'
+  desire: 10
+history:
+  - from: creator
+    text: Je t’ai préparé la suite, tu me dis 😇
+    minutes_ago: 660
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+  run:
+    script: soiree-demo
+    steps:
+      - index: 0
+        outcome: sent
+      - index: 1
+        outcome: sent
+    ignored_messages: 0
+  history:
+    - script: soiree-demo
+      sent: [0, 1]
+inbound: Salut toi, bien dormi ?
+expect:
+  decision:
+    handoff: false
+    offer: false
+    script_in:
+      - end
+  voice:
+    bubbles_max: 3
+    must_not_match:
+      - \b(une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \d+\s?(€|euros?)
+      - \b(dommage|tant pis|t’as pas voulu|t'as pas voulu)\b

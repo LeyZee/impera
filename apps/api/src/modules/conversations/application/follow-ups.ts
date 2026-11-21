@@ -1,7 +1,7 @@
 import { jobKeyFor, queueNameFor } from '@impera/contracts';
 
 import type { Conversation, EventMeta, Transaction } from '../domain/ports';
-import { nextFollowUp } from '../domain/rules';
+import { farewellNotBefore, nextFollowUp } from '../domain/rules';
 
 import { appendEvent } from './journal';
 
@@ -21,7 +21,13 @@ export async function scheduleFollowUp(
 ): Promise<void> {
   if (conversation.state !== 'idle') return;
   const anchor = conversation.lastInboundAt;
-  const slot = nextFollowUp(anchor, delaysHours, meta.at);
+  // He said goodbye on his last message: she lets him be, the follow-up comes at a believable moment (ADR 0158 § A).
+  const slot = nextFollowUp(
+    anchor,
+    delaysHours,
+    meta.at,
+    farewellNotBefore(conversation.fanAvailability, anchor),
+  );
   if (anchor === null || slot === null) return;
   await enqueueFollowUp(tx, conversation, { anchor, step: slot.step, runAt: slot.runAt }, meta);
 }

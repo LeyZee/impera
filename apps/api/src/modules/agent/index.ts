@@ -31,6 +31,7 @@ export { touchesTerm } from './domain/guards';
 export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision, type HoldDecision } from './domain/hold';
+export type { SaleTroubleSeen } from './domain/sale-trouble';
 export { withoutOrders } from './domain/injection';
 /** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
 export { safetySigns } from './domain/safety-net';
@@ -149,6 +150,8 @@ export interface DraftComposerStartOptions {
   readonly scripts?: ScriptSource;
   /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
   readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
+  /** Her grid of custom prices (`custom-orders`, ADR 0159 § C), read when his order is kept. */
+  readonly gridOf?: DraftComposerDeps['gridOf'];
   /**
    * Her bank of examples, newest first, withdrawn ones left out (ADR 0102): the playground's corrections filed as her
    * voice's examples, one bank whichever version they were made on. Without it, or unreadable, she writes from her
@@ -227,6 +230,7 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
     ...(options.scripts !== undefined && { scripts: options.scripts }),
     ...(options.lastOfferAt !== undefined && { lastOfferAt: options.lastOfferAt }),
+    ...(options.gridOf !== undefined && { gridOf: options.gridOf }),
   });
 }
 
