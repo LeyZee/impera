@@ -294,9 +294,14 @@ describe('Réglages › Bots Telegram, her own alerts (P4-01)', () => {
   it('routes « Alertes personnalisées » from the Alertes tab, as Réglages › Alertes links to', async () => {
     renderSection();
     const row = await screen.findByRole('group', { name: 'Groupes pour Alertes personnalisées' });
+    const reads = vi.mocked(fetchOverview).mock.calls.length;
     fireEvent.click(within(row).getByRole('checkbox', { name: /Équipe/ }));
     await waitFor(() => {
       expect(saveRoutes).toHaveBeenCalledWith(3, [{ creatorId: null, topic: 'custom', chatId }]);
+    });
+    // Saved, the page reads the server again: its health and the night's coverage follow (COUV-05).
+    await waitFor(() => {
+      expect(vi.mocked(fetchOverview).mock.calls.length).toBeGreaterThan(reads);
     });
   });
 
