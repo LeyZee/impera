@@ -34,7 +34,7 @@ export const CAPTION_HINT_LABELS: Readonly<Record<CaptionHint, string>> = {
   funnier: 'Plus drôle',
   flirtier: 'Plus coquine',
   with_question: 'Avec une question',
-  about_place: 'Parle du lieu',
+  about_place: 'Parle du décor',
 };
 
 /** Her own words beside the hints: one line, read as a data by the model, never as an instruction. */
