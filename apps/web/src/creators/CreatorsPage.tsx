@@ -15,6 +15,7 @@ import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
 import { useCreatorsOverview } from './overview/api';
+import { hasActivePersonaOf } from './overview/model';
 import { PersonaSection } from './persona/PersonaSection';
 import { Segment } from './persona/fields';
 import { ProfileSection } from './profile/ProfileSection';
@@ -39,9 +40,10 @@ import { VaultPage } from './vault/VaultPage';
 import './sheet.css';
 
 import { AgentSwitch } from '@/agent/AgentSwitch';
-import { canSwitch } from '@/agent/state';
+import { canSwitch, withPersona } from '@/agent/state';
 import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
+import { useCreatorSetups } from '@/setup/api';
 import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
@@ -571,14 +573,17 @@ function CreatorAgentSwitch({
   user: { readonly role: string; readonly teamScope: string | null };
 }): JSX.Element | null {
   const overview = useCreatorsOverview();
+  // Her persona is read from her « Mise en route », the owner's alone (PRO1-03).
+  const setups = useCreatorSetups(user.role === 'owner');
   const card = overview.data?.find((one) => one.creatorId === creator.id);
   if (card === undefined) return null;
+  const setup = setups.data?.find((one) => one.creatorId === creator.id);
   return (
     <AgentSwitch
       creatorId={creator.id}
       creatorName={creator.displayName}
       zone={creator.timezone}
-      state={card}
+      state={withPersona(card, hasActivePersonaOf(setup))}
       read={overview.dataUpdatedAt}
       variant="header"
       readOnly={!canSwitch(user)}

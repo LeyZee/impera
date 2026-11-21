@@ -13,10 +13,11 @@ import { CreatorFace } from '../CreatorFace';
 import { creatorsSearch, type CreatorSheet } from '../search';
 
 import { useCreatorsOverview } from './api';
-import { onShiftOf, requestOf, salesOf, todosOf, type Tone } from './model';
+import { hasActivePersonaOf, onShiftOf, requestOf, salesOf, todosOf, type Tone } from './model';
 import './list.css';
 
 import { AgentSwitch } from '@/agent/AgentSwitch';
+import { withPersona } from '@/agent/state';
 import { readerZone, dayOf } from '@/scheduling/time';
 import { todosAcrossQuery } from '@/screens/tracking/api';
 import { SetupLink } from '@/setup/SetupCard';
@@ -118,7 +119,7 @@ function CreatorCard({
           creatorId={creator.id}
           creatorName={creator.displayName}
           zone={creator.timezone}
-          state={card}
+          state={withPersona(card, hasActivePersonaOf(setup))}
           read={read}
           variant="card"
           readOnly={!switches}
