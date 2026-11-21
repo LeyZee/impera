@@ -1,0 +1,166 @@
+/* « À qui parler maintenant » (accueil du chatteur, Charles 21/11): one card, three groups, one line a fan. */
+
+.tt-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.tt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.tt-head .nv-h2 {
+  margin: 0;
+}
+.tt-hint,
+.tt-empty {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tt-empty {
+  margin: 0;
+}
+.tt-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.tt-group__title {
+  margin: var(--nv-space-2) 0 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tt-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tt-row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: 44px;
+  margin: 0 calc(-1 * var(--nv-space-2));
+  padding: var(--nv-space-2);
+  border-radius: var(--nv-radius-md);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 160ms var(--nv-ease-spring-smooth, ease);
+}
+.tt-row:hover {
+  background: color-mix(in srgb, var(--nv-ink) 5%, transparent);
+}
+.tt-tier {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.tt-tier[data-tier] {
+  --_tier: var(--nv-ink-muted);
+  background: color-mix(in srgb, var(--_tier) 16%, transparent);
+  color: color-mix(in srgb, var(--_tier) 80%, var(--nv-ink));
+}
+.tt-tier[data-tier='new'] {
+  --_tier: var(--nv-series-2);
+}
+.tt-tier[data-tier='payer'] {
+  --_tier: var(--nv-ink-muted);
+}
+.tt-tier[data-tier='good'] {
+  --_tier: var(--nv-series-1);
+}
+.tt-tier[data-tier='very_good'] {
+  --_tier: var(--nv-series-3);
+}
+.tt-tier[data-tier='whale'] {
+  --_tier: var(--nv-data-2);
+}
+.tt-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tt-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tt-standing,
+.tt-when {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tt-when {
+  white-space: nowrap;
+}
+.tt-when[data-long] {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.tt-held {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: 44px;
+  margin-top: var(--nv-space-2);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-danger) 11%, transparent);
+  color: inherit;
+  text-decoration: none;
+}
+.tt-held__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nv-danger);
+}
+.tt-held__text {
+  flex: 1;
+  font-size: var(--nv-text-footnote);
+}
+.tt-held__see {
+  color: var(--nv-danger);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+
+/* On a phone: the tier over the name, the wait under it, no button (the whole line opens). */
+@media (max-width: 640px) {
+  .tt-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--nv-space-1);
+  }
+  .tt-tier {
+    grid-column: 1 / -1;
+  }
+  .tt-tier:empty {
+    display: none;
+  }
+  .tt-go {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-row {
+    transition: none;
+  }
+}
