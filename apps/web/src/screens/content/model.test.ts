@@ -26,12 +26,13 @@ import {
   pickedHeadRefusal,
   published,
   mayWithdrawHere,
-  refusedOf,
+  linesOf,
   remainingOf,
   routeFirst,
   sameFile,
   shotMomentOf,
   stateTone,
+  stateWord,
   toRedo,
   toReplaceOf,
   toShoot,
@@ -191,10 +192,10 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
       refusal: '« Feed · Vidéo short » : la vidéo doit être verticale',
     });
     const kept = fileOf({ state: 'kept' });
-    expect(refusedOf(dropOf({ state: 'blocked', files: [refused] }))).toEqual([refused]);
-    expect(refusedOf(dropOf({ state: 'ready', files: [kept, refused] }))).toEqual([refused]);
-    expect(refusedOf(dropOf({ state: 'ready', files: [kept] }))).toEqual([]);
-    expect(refusedOf(dropOf({ state: 'uploading', files: [refused] }))).toEqual([]);
+    expect(linesOf(dropOf({ state: 'blocked', files: [refused] }))).toEqual([refused]);
+    expect(linesOf(dropOf({ state: 'ready', files: [kept, refused] }))).toEqual([refused]);
+    expect(linesOf(dropOf({ state: 'ready', files: [kept] }))).toEqual([]);
+    expect(linesOf(dropOf({ state: 'uploading', files: [refused] }))).toEqual([]);
   });
 
   it('offers « Retirer » on a drop she may withdraw, never on a script copied into Reveal (recette MED-08)', () => {
@@ -328,7 +329,30 @@ describe('Contenu: a medium to replace (trou 7 du 21/11)', () => {
     expect(published([script])).toEqual([]);
     expect(routeFirst([script])).toBe(true);
     expect(fileLine(asked, undefined)).toBe('Trop sombre');
-    expect(refusedOf(dropOf({ state: 'ready', files: [asked, kept] }))).toEqual([asked]);
+    expect(linesOf(dropOf({ state: 'ready', files: [asked, kept] }))).toEqual([asked]);
+  });
+
+  it('shows the one she sent in its place going up, the drop on her way until its receipt settles it', () => {
+    const sent = fileOf({ position: 0, state: 'awaiting' });
+    const script = dropOf({
+      category: 'script',
+      scriptNumber: 3,
+      requestId: requestOf({ category: 'script' }).id,
+      state: 'ready',
+      exportedAt: '2026-11-04T09:00:00.000Z',
+      files: [{ ...sent, slotKey: 'salon::0' }],
+    });
+    expect(toReplaceOf(script)).toEqual([]);
+    expect([stateWord(script), stateTone(script)]).toEqual(['En envoi', 'calm']);
+    expect(onTheirWay([script])).toEqual([script]);
+    expect(published([script])).toEqual([]);
+    expect(routeFirst([script])).toBe(true);
+    const preparing = dropOf({ state: 'blocked', files: [{ ...sent, state: 'received' }] });
+    expect([stateWord(preparing), stateTone(preparing)]).toEqual(['Reçu', 'calm']);
+    // Its line and the refused one's, on a settled drop.
+    expect(linesOf(dropOf({ state: 'ready', files: [sent, kept] }))).toEqual([sent]);
+    const settled = dropOf({ state: 'ready', files: [kept] });
+    expect([stateWord(settled), stateTone(settled)]).toEqual(['Prêt', 'ok']);
   });
 
   it('opens her gallery on the step’s kind in a script, on the category’s kinds otherwise', () => {

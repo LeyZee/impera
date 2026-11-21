@@ -399,6 +399,30 @@ export const contentDropFiles = pgTable(
       )`,
       withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
     }),
+    // She replaces in place a medium her team asked again, or one the cleaning refused (trou 7 du 21/11), in a drop
+    // received and not out (a script copied into Reveal still is): the old file set aside, once...
+    pgPolicy('creator_redo_replace', {
+      for: 'update',
+      using: sql`${hers(t.creatorId)} and ${t.replacedAt} is null
+        and (${t.redoSentence} is not null or ${t.state} = 'refused') and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      )`,
+      withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
+    }),
+    // ...and the new one at its place and step, awaiting its bytes. The receipt job settles the drop once it is in.
+    pgPolicy('creator_redo_insert', {
+      for: 'insert',
+      withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'awaiting' and ${t.replacedAt} is null
+        and ${t.redoSentence} is null and ${t.mediaAssetId} is null and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      ) and exists (
+        select 1 from content_drop_files old where old.drop_id = ${t.dropId} and old.creator_id = ${t.creatorId}
+          and old.position = ${t.position} and old.slot_key is not distinct from ${t.slotKey}
+          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')
+      )`,
+    }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
     pgPolicy('team_insert', {

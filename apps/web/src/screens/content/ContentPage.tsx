@@ -44,7 +44,7 @@ import {
   outLine,
   published,
   mayWithdrawHere,
-  refusedOf,
+  linesOf,
   routeFirst,
   shotMomentOf,
   stateTone,
@@ -567,7 +567,7 @@ function DropCard({
   // A file picked again whose first bytes are not what it was declared as (recette CRE-12): never sent, said here.
   const [notIt, setNotIt] = useState<string | null>(null);
   const tone = stateTone(drop);
-  const refused = refusedOf(drop);
+  const lines = linesOf(drop);
   const sending = drop.files.some((file) => {
     const live = sends.get(file.id);
     return (
@@ -708,12 +708,12 @@ function DropCard({
             <FileLine key={file.id} file={file} live={sends.get(file.id)} onReplace={replaceOn(file)} />
           ))}
         </ul>
-      ) : refused.length > 0 ? (
+      ) : lines.length > 0 ? (
         // Ready or blocked, each refused file keeps its line and its reason: she knows what to shoot again and why,
-        // never only « Aucun fichier n'a pu être gardé » (recette MED-03).
+        // never only « Aucun fichier n'a pu être gardé » (recette MED-03); the one she sent in its place shows its send.
         <ul className="ct-files">
-          {refused.map((file) => (
-            <FileLine key={file.id} file={file} live={undefined} onReplace={replaceOn(file)} />
+          {lines.map((file) => (
+            <FileLine key={file.id} file={file} live={sends.get(file.id)} onReplace={replaceOn(file)} />
           ))}
         </ul>
       ) : null}

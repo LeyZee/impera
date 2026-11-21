@@ -172,7 +172,7 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
             entityId: dropId,
             details: { files: drop.files.length, scriptNumber },
           });
-          await follow(tx, { ...row, state: 'uploading' }, now, correlationId);
+          await follow(tx, { ...row, state: 'uploading' }, null, now, correlationId);
           // Told once its media are described (ADR 0083 § 6): the job waits for the last description.
           await enqueueSummary(tx, { creatorId, dropId, correlationId }, null);
           const after = await readDrop(tx, dropId);

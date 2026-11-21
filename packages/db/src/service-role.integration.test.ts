@@ -30,9 +30,7 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   calendar_links: ['insert', 'update'],
   commission_statement_lines: ['insert'],
   commission_statements: ['insert', 'update'],
-  // Plus her replacement of a medium asked again (COF-02): the new file beside the old, in a drop that is no longer hers
-  // to fill, only the service role moves it back to « received ».
-  content_drop_files: ['insert', 'update'],
+  content_drop_files: ['update'],
   content_drops: ['update'],
   content_ideas: ['update'],
   content_requests: ['insert'],

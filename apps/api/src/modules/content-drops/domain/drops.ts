@@ -73,5 +73,11 @@ export function requestAnswer(drops: readonly RequestDrop[]): {
 /** Why a drop is blocked when the cleaning kept none of its files. */
 export const NOTHING_KEPT = 'Aucun fichier de ce dépôt n’a pu être gardé';
 
-/** A drop takes a file's bytes while it sends, while she fills her script, or once received for a replacement. */
-export const TAKES_BYTES_STATES: ReadonlySet<DropState> = new Set(['uploading', 'filling', 'received']);
+/** A drop takes a file's bytes while it sends, while she fills her script, or once settled for a replacement. */
+export const TAKES_BYTES_STATES: ReadonlySet<DropState> = new Set([
+  'uploading',
+  'filling',
+  'received',
+  'ready',
+  'blocked',
+]);

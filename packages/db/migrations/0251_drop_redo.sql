@@ -39,7 +39,6 @@ CREATE POLICY "team_redo" ON "content_drop_files" AS PERMISSIVE FOR UPDATE TO pu
           and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
       )) WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."replaced_at" is null);--> statement-breakpoint
 GRANT UPDATE ("redo_sentence", "redo_at", "redo_by") ON "content_drop_files" TO nirvana_app;--> statement-breakpoint
-GRANT INSERT ON "content_drop_files" TO impera_service;--> statement-breakpoint
 CREATE FUNCTION "guard_content_drop_file_redo"() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF current_setting('app.account_role', true) = 'creator'
@@ -54,7 +53,8 @@ CREATE TRIGGER "content_drop_files_redo_guarded" BEFORE UPDATE ON "content_drop_
   EXECUTE FUNCTION "guard_content_drop_file_redo"();
 --> statement-breakpoint
 -- A script copied into Reveal whose medium she replaced is to copy again (Charles, 21/11): the server's own role takes
--- its confirmation back, in that transaction only (`app.export_reset`); her account and her team never do.
+-- its confirmation back when the new medium's receipt settles it, in that transaction only (`app.export_reset`); her
+-- account and her team never do.
 CREATE OR REPLACE FUNCTION "guard_content_drop_export"() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW."exported_at" IS DISTINCT FROM OLD."exported_at" OR NEW."exported_by" IS DISTINCT FROM OLD."exported_by" THEN
@@ -72,3 +72,21 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+--> statement-breakpoint
+-- Her replacement, under her own account (relecture Sécurité): the old file's `replaced_at` from empty to set, on a
+-- medium asked again or refused; the new file only at the place and step of a replaced one of the same drop, waiting
+-- for its bytes. The drop does not move here: the receipt settles it.
+CREATE POLICY "creator_redo_replace" ON "content_drop_files" AS PERMISSIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) = 'creator' and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."replaced_at" is null
+        and ("content_drop_files"."redo_sentence" is not null or "content_drop_files"."state" = 'refused') and exists (
+        select 1 from content_drops d where d.id = "content_drop_files"."drop_id" and d.creator_id = "content_drop_files"."creator_id"
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      )) WITH CHECK (current_setting('app.account_role', true) = 'creator' and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."replaced_at" is not null);--> statement-breakpoint
+CREATE POLICY "creator_redo_insert" ON "content_drop_files" AS PERMISSIVE FOR INSERT TO public WITH CHECK (current_setting('app.account_role', true) = 'creator' and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."state" = 'awaiting' and "content_drop_files"."replaced_at" is null
+        and "content_drop_files"."redo_sentence" is null and "content_drop_files"."media_asset_id" is null and exists (
+        select 1 from content_drops d where d.id = "content_drop_files"."drop_id" and d.creator_id = "content_drop_files"."creator_id"
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      ) and exists (
+        select 1 from content_drop_files old where old.drop_id = "content_drop_files"."drop_id" and old.creator_id = "content_drop_files"."creator_id"
+          and old.position = "content_drop_files"."position" and old.slot_key is not distinct from "content_drop_files"."slot_key"
+          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')
+      ));

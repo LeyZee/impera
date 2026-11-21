@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import { createDrizzleReceiptStore } from '../modules/content-drops/infra/db/store';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
@@ -131,6 +132,38 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
   };
   const photo = (bytes = 2 * MB) => ({ id: newId(ContentDropFileIdSchema), mime: 'image/jpeg', bytes });
   const video = (bytes = 40 * MB) => ({ id: newId(ContentDropFileIdSchema), mime: 'video/mp4', bytes });
+  /** Its receipt, called by hand as the job would: an invented medium kept, or the file refused. */
+  const settle = async (fileId: string, outcome: 'kept' | 'refused') => {
+    const receipts = createDrizzleReceiptStore(test.service.db);
+    await receipts.settle(fileId, { state: 'received' }, new Date(), 'test');
+    const sha256 = randomUUID().replaceAll('-', '').padEnd(64, '0');
+    await receipts.settle(
+      fileId,
+      outcome === 'refused'
+        ? { state: 'refused', refusal: 'Photo illisible' }
+        : {
+            state: 'kept',
+            media: {
+              kind: 'image',
+              mime: 'image/jpeg',
+              bytes: MB,
+              sha256,
+              storageKey: `media/${nora}/${sha256}.jpg`,
+              durationMs: null,
+              uploaded: true,
+            },
+          },
+      new Date(),
+      'test',
+    );
+  };
+  const dropRow = async (dropId: string) => {
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, dropId));
+    return row;
+  };
 
   it('opens her content to her alone, and the agency’s side to the owner and a manager', async () => {
     expect(await content()).toEqual({ requests: [], drops: [], redone: [] });
@@ -496,7 +529,7 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     });
   });
 
-  it('« À refaire » on one medium: she replaces it where it is, the drop received again (trou 7 du 21/11)', async () => {
+  it('« À refaire » on one medium: she replaces it where it is, its receipt settles the drop again (trou 7 du 21/11)', async () => {
     const first = photo();
     const second = photo();
     const seance = { id: newId(ContentDropIdSchema), category: 'feed_shoot', files: [first, second] };
@@ -541,27 +574,41 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     const replaced = await replace(first.id, better);
     expect(replaced.statusCode, replaced.body).toBe(200);
     const drop = ContentDropSchema.parse(replaced.json());
-    expect(drop.state).toBe('received');
+    // The drop does not move: the receipt of the new file settles it.
+    expect(drop.state).toBe('ready');
     expect(drop.files.map((one) => [one.id, one.state, one.redo])).toEqual([
       [better.id, 'awaiting', null],
       [second.id, 'refused', null],
     ]);
+    // Its archive waits for the new medium too.
+    const waiting = await call('GET', `/v1/creators/${nora}/drops/${seance.id}/export`, 'owner');
+    expect(waiting.json()).toMatchObject({ error: { details: { reason: 'redo_pending' } } });
     // Replayed: the same drop. Another file under its id: a conflict.
     expect((await replace(first.id, better)).statusCode).toBe(200);
     expect((await replace(first.id, { ...better, bytes: better.bytes + 1 })).statusCode).toBe(409);
     // The refused one is hers to replace too; the new one, on its way, is not.
-    expect((await replace(second.id, photo())).statusCode).toBe(200);
+    const other = photo();
+    expect((await replace(second.id, other)).statusCode).toBe(200);
     expect((await replace(better.id, photo())).statusCode).toBe(409);
-    // Its bytes go up in a drop received again.
+    // Its bytes go up in a drop that stays ready meanwhile.
     const upload = await call(
       'POST',
       `/v1/creator-space/drops/${seance.id}/files/${better.id}/upload`,
       'nora',
     );
     expect(upload.statusCode, upload.body).not.toBe(409);
+    // Both refused again: blocked; one kept: ready again.
+    await settle(better.id, 'refused');
+    expect(await dropRow(seance.id)).toMatchObject({ state: 'ready' });
+    await settle(other.id, 'refused');
+    expect(await dropRow(seance.id)).toMatchObject({ state: 'blocked' });
+    const fresh = photo();
+    expect((await replace(other.id, fresh)).statusCode).toBe(200);
+    await settle(fresh.id, 'kept');
+    expect(await dropRow(seance.id)).toMatchObject({ state: 'ready', blockedReason: null });
   });
 
-  it('asks a medium of a script already copied into Reveal again: it is to copy again once replaced', async () => {
+  it('asks a medium of a script already copied into Reveal again: it is to copy again once its new one is kept', async () => {
     const reel = video();
     // An invented sent script, copied into Reveal, whose video the cleaning refused.
     const [owner] = await test.admin.db
@@ -620,7 +667,10 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
       again,
     );
     expect(r.statusCode, r.body).toBe(200);
-    expect(ContentDropSchema.parse(r.json())).toMatchObject({ state: 'received', exportedAt: null });
+    // Still copied while the new video is on its way; its receipt takes « Copié dans Reveal » off.
+    expect(ContentDropSchema.parse(r.json()).exportedAt).not.toBeNull();
+    await settle(again.id, 'kept');
+    expect(await dropRow(drop.id)).toMatchObject({ state: 'ready', exportedAt: null, exportedBy: null });
     // A drop of another kind, published, is out: never asked again.
     const story = { id: newId(ContentDropIdSchema), category: 'reveal_story', files: [video()] };
     expect((await call('POST', '/v1/creator-space/drops', 'nora', story)).statusCode).toBe(200);

@@ -28,10 +28,10 @@ Le rapport du 21/11 : un dépôt raté ne pouvait que disparaître de son écran
 ### Second temps : un seul média (demande de Charles par le fil Coffre, 21/11)
 
 - [x] Base : `content_drop_files.redo_sentence`, `redo_at`, `redo_by` ; politique `team_redo` (propriétaire, manager ; dépôt reçu, prêt ou bloqué, pas publié sauf un script) ; garde : jamais elle.
-- [x] Base : son remplacement par le rôle de service (`GRANT INSERT` sur `content_drop_files`, plafond relevé de 1) ; un script copié dans Reveal perd sa confirmation dans cette seule transaction (`app.export_reset`, jamais le rôle de l'appli).
-- [x] Serveur : `POST /v1/creators/:creatorId/drops/:id/files/:fileId/redo` (204) et `POST /v1/creator-space/drops/:id/files/:fileId/replace` (200, le dépôt) ; journal `content_drop_file.redo` et `content_drop_file.replace` ; l'archive refuse (`redo_pending`) tant qu'un média attend.
+- [x] Base : son remplacement sous son propre compte, par deux politiques (relecture Sécurité) : `creator_redo_replace` ne laisse passer `replaced_at` que de vide à rempli, sur un fichier demandé à refaire ou refusé ; `creator_redo_insert` n'accepte le nouveau fichier qu'à la place et à l'étape d'un fichier remplacé du même dépôt, en attente de ses octets. Le dépôt ne change pas d'état à ce moment-là : la réception du nouveau fichier (`follow`, rôle de service, déjà là) le remet prêt ou bloqué et, pour un script copié dans Reveal, retire « Copié dans Reveal » (`app.export_reset`, jamais le rôle de l'appli). Plafond du rôle de service inchangé.
+- [x] Serveur : `POST /v1/creators/:creatorId/drops/:id/files/:fileId/redo` (204) et `POST /v1/creator-space/drops/:id/files/:fileId/replace` (200, le dépôt) ; journal `content_drop_file.redo` et `content_drop_file.replace` ; l'archive refuse (`redo_pending`) tant qu'un média attend d'être remplacé ou que son remplaçant n'est pas reçu.
 - [x] Contrat : `ContentDropFile.redo`, `replacementRefusal`, `REDOABLE_DROP_STATES`.
-- [x] Web : `redoDropFile` (agence, pour l'écran du coffre), `replaceDropFile` puis `queueSend` ; carte de la créatrice : la phrase en ambre sur la ligne du média et « Remplacer » (aussi sur un fichier refusé).
+- [x] Web : `redoDropFile` (agence, pour l'écran du coffre), `replaceDropFile` puis `queueSend` ; carte de la créatrice : la phrase en ambre sur la ligne du média et « Remplacer » (aussi sur un fichier refusé) ; le remplaçant montre son envoi, la carte dit « En envoi » puis « Reçu » jusqu'à sa réception.
 - [x] Tests : contrat, base, intégration, écrans.
 - [ ] Captures de « Remplacer », avis Design.
 

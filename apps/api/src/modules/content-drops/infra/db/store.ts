@@ -525,10 +525,11 @@ async function redoFileIn(
 }
 
 /**
- * The file she sends in place of a medium the team asked again, or of one refused (trou 7 du 21/11), as the admin role
- * once her account found the drop hers: no policy lets her move a drop's state. The old file keeps its row out of every
- * view (its medium goes as a withdrawn drop's), the new one takes its place and slot and waits for its bytes; the drop
- * is received again until it is settled. The same file replayed answers the drop as it is.
+ * The file she sends in place of a medium the team asked again, or of one refused (trou 7 du 21/11), by her own
+ * policies (`creator_redo_replace`, `creator_redo_insert`, migration 0251): the old file keeps its row out of every view
+ * (its medium goes as a withdrawn drop's), the new one takes its place and slot and waits for its bytes. The drop does
+ * not move here: its receipt settles it again, and takes « Copié dans Reveal » off a script (`follow`). The same file
+ * replayed answers the drop as it is.
  */
 async function replaceFileIn(
   tx: Transaction,
@@ -539,7 +540,7 @@ async function replaceFileIn(
   body: ReplaceDropFileBody,
   now: Date,
 ): Promise<ContentDrop> {
-  const drop = await readDrop(tx, dropId, true);
+  const drop = await readDrop(tx, dropId);
   if (drop?.creatorId !== creatorId || drop.state === 'withdrawn') throw new ContentDropNotFound();
   const [old] = await tx
     .select()
@@ -565,6 +566,13 @@ async function replaceFileIn(
     body,
   );
   if (refusal !== null) throw new ContentDropFormatUnprocessable([{ fileId: body.id, sentence: refusal }]);
+  // Locked through her update policy: two replacements of one file run one after the other, the second finds it gone.
+  const [locked] = await tx
+    .select({ id: contentDropFiles.id })
+    .from(contentDropFiles)
+    .where(and(eq(contentDropFiles.id, old.id), sql`${contentDropFiles.replacedAt} is null`))
+    .for('update');
+  if (locked === undefined) throw new ContentDropFileNotFound();
   await tx
     .update(contentDropFiles)
     .set({ replacedAt: now, updatedAt: now })
@@ -581,13 +589,6 @@ async function replaceFileIn(
     minSeconds: old.minSeconds,
     maxSeconds: old.maxSeconds,
   });
-  // A script copied into Reveal is to copy again once its new medium is settled: « Copié dans Reveal » starts over,
-  // which only this transaction may say (`guard_content_drop_export`, migration 0251).
-  if (drop.exportedAt !== null) await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
-  await tx
-    .update(contentDrops)
-    .set({ state: 'received', blockedReason: null, exportedAt: null, exportedBy: null, updatedAt: now })
-    .where(eq(contentDrops.id, dropId));
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId,
@@ -596,21 +597,14 @@ async function replaceFileIn(
     entityId: old.id,
     details: { dropId, by: body.id },
   });
-  const row = await readDrop(tx, dropId);
-  if (row === undefined) throw new ContentDropNotFound();
-  return viewOf(tx, row);
+  return viewOf(tx, drop);
 }
 
-export function createDrizzleCreatorContentStore(db: Database, adminDb: Database): CreatorContentStore {
+export function createDrizzleCreatorContentStore(db: Database): CreatorContentStore {
   return {
     replaceFile: (userId, dropId, fileId, body, now) =>
-      withCreatorAccount(db, userId, async (tx) => {
-        // Hers, as her account reads it: a drop or a file of another creator is not found.
-        const seen = await readDrop(tx, dropId);
-        if (seen === undefined || seen.state === 'withdrawn') throw new ContentDropNotFound();
-        return seen.creatorId;
-      }).then((creatorId) =>
-        withAdmin(adminDb, (tx) => replaceFileIn(tx, creatorId, userId, dropId, fileId, body, now)),
+      withCreatorAccount(db, userId, (tx, creatorId) =>
+        replaceFileIn(tx, creatorId, userId, dropId, fileId, body, now),
       ),
     content: (userId) => withCreatorAccount(db, userId, (tx) => contentIn(tx, true)),
     drop: (userId, body) =>
@@ -706,7 +700,10 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
   };
 }
 
-/** Whether a live medium of the drop waits for her replacement (trou 7 du 21/11): its archive waits too. */
+/**
+ * Whether a live medium of the drop waits for her replacement, or the one she sent in its place is not settled yet (trou 7
+ * du 21/11): its archive waits too.
+ */
 async function redoPendingIn(tx: Transaction, dropId: string): Promise<boolean> {
   const [pending] = await tx
     .select({ id: contentDropFiles.id })
@@ -714,7 +711,9 @@ async function redoPendingIn(tx: Transaction, dropId: string): Promise<boolean> 
     .where(
       and(
         eq(contentDropFiles.dropId, dropId),
-        sql`${contentDropFiles.replacedAt} is null and ${contentDropFiles.redoSentence} is not null`,
+        // Asked again, or sent in its place and not settled yet: the archive would miss it.
+        sql`${contentDropFiles.replacedAt} is null
+          and (${contentDropFiles.redoSentence} is not null or ${contentDropFiles.state} in ('awaiting', 'received'))`,
       ),
     )
     .limit(1);
@@ -1185,12 +1184,14 @@ const CONVERSION_QUEUE = 'content_drops:convert';
 /**
  * The drop follows its live files, as the admin role, the drop locked by the caller: received with
  * `content_drop_received` once none waits for its bytes (and `content_drops.drop_received` for a drop answering a
- * request), then ready when every file is settled and one was kept, blocked when all were refused. A drop still being
- * filled (SC-02 lot b) moves only once she sends it.
+ * request), then ready when every file is settled and one was kept, blocked when all were refused; settled again the
+ * same way once the medium she sent in place of another (`settled`, the file the receipt just settled) is. A drop still
+ * being filled (SC-02 lot b) moves only once she sends it.
  */
 export async function follow(
   tx: Transaction,
   drop: DropRow,
+  settled: string | null,
   now: Date,
   correlationId: string,
 ): Promise<void> {
@@ -1222,17 +1223,51 @@ export async function follow(
         )`,
       );
   }
-  if (state === 'received' && !states.includes('awaiting') && !states.includes('received')) {
+  if (SETTLES_AGAIN.has(state) && !states.includes('awaiting') && !states.includes('received')) {
     const kept = states.some((one) => one === 'kept' || one === 'duplicate');
+    // A script copied into Reveal whose replaced medium is settled is to copy again: « Copié dans Reveal » starts over,
+    // which only the server's role may say (`guard_content_drop_export`, migration 0251).
+    const reset =
+      drop.exportedAt !== null &&
+      drop.category === 'script' &&
+      settled !== null &&
+      (await isReplacement(tx, settled));
+    if (reset) await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
     await tx
       .update(contentDrops)
-      .set(
-        kept
-          ? { state: 'ready', updatedAt: now }
-          : { state: 'blocked', blockedReason: NOTHING_KEPT, updatedAt: now },
-      )
+      .set({
+        ...(kept
+          ? { state: 'ready', blockedReason: null }
+          : { state: 'blocked', blockedReason: NOTHING_KEPT }),
+        ...(reset ? { exportedAt: null, exportedBy: null } : {}),
+        updatedAt: now,
+      })
       .where(eq(contentDrops.id, drop.id));
   }
+}
+
+/**
+ * The states a drop is settled from again once no file waits: received the first time, ready or blocked when she sent a
+ * medium in place of one (trou 7 du 21/11).
+ */
+const SETTLES_AGAIN: ReadonlySet<string> = new Set(['received', 'ready', 'blocked']);
+
+/** A file sent in place of another: the same drop holds a replaced file at its place. */
+async function isReplacement(tx: Transaction, fileId: string): Promise<boolean> {
+  const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
+  if (file === undefined) return false;
+  const [old] = await tx
+    .select({ id: contentDropFiles.id })
+    .from(contentDropFiles)
+    .where(
+      and(
+        eq(contentDropFiles.dropId, file.dropId),
+        eq(contentDropFiles.position, file.position),
+        sql`${contentDropFiles.replacedAt} is not null`,
+      ),
+    )
+    .limit(1);
+  return old !== undefined;
 }
 
 /**
@@ -1355,7 +1390,7 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
             .where(eq(contentDropFiles.id, fileId));
         }
 
-        await follow(tx, drop, now, correlationId);
+        await follow(tx, drop, fileId, now, correlationId);
       }),
 
     enqueue: (task, file, correlationId, runAt) =>

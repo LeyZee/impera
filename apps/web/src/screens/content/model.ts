@@ -218,13 +218,32 @@ export function toReplaceOf(drop: ContentDrop): ContentDropFile[] {
   return drop.files.filter((file) => file.redo !== null || file.state === 'refused');
 }
 
-/** Its state as her card says it: « À refaire » while a medium of it waits for her replacement (trou 7 du 21/11). */
-export const stateWord = (drop: ContentDrop): string =>
-  toReplaceOf(drop).length > 0 ? 'À refaire' : STATE_WORDS[drop.state];
+/**
+ * The media she sent in place of others (trou 7 du 21/11) still on their way in a settled drop: the drop keeps its state
+ * on the server until their receipt settles it again.
+ */
+const inFlightOf = (drop: ContentDrop): ContentDropFile[] =>
+  drop.state === 'ready' || drop.state === 'blocked'
+    ? drop.files.filter((file) => file.state === 'awaiting' || file.state === 'received')
+    : [];
 
-/** Out, unless a medium of it waits for her: then it is back in « En route », where she replaces it. */
+/**
+ * Its state as her card says it: « À refaire » while a medium of it waits for her replacement, then « En envoi » and
+ * « Reçu » while the one she sent goes up and is prepared (trou 7 du 21/11).
+ */
+export function stateWord(drop: ContentDrop): string {
+  if (toReplaceOf(drop).length > 0) return 'À refaire';
+  const moving = inFlightOf(drop);
+  if (moving.some((file) => file.state === 'awaiting')) return STATE_WORDS.uploading;
+  if (moving.length > 0) return STATE_WORDS.received;
+  return STATE_WORDS[drop.state];
+}
+
+/** Out, unless a medium of it waits for her or the one she sent is on its way: then it is in « En route ». */
 const isOut = (drop: ContentDrop): boolean =>
-  (drop.state === 'published' || drop.exportedAt !== null) && toReplaceOf(drop).length === 0;
+  (drop.state === 'published' || drop.exportedAt !== null) &&
+  toReplaceOf(drop).length === 0 &&
+  inFlightOf(drop).length === 0;
 
 /**
  * « En route »: what she dropped and is not out yet, newest first; a withdrawn drop leaves her screen, a script she is
@@ -285,7 +304,10 @@ export const STATE_WORDS: Readonly<Record<DropState, string>> = {
 
 /** The tone of a state's chip: amber only when she has something to do (relecture Extension). */
 export function stateTone(drop: ContentDrop): 'warn' | 'ok' | 'calm' {
-  if (drop.state === 'blocked' || toReplaceOf(drop).length > 0) return 'warn';
+  if (toReplaceOf(drop).length > 0) return 'warn';
+  // Her replacement on its way: nothing for her to do, whatever the drop was.
+  if (inFlightOf(drop).length > 0) return 'calm';
+  if (drop.state === 'blocked') return 'warn';
   if (drop.state === 'ready' || drop.state === 'scheduled' || drop.state === 'published') return 'ok';
   return 'calm';
 }
@@ -376,12 +398,19 @@ export function mayWithdrawHere(drop: ContentDrop): boolean {
 }
 
 /**
- * The files of a settled drop (ready or blocked) that were refused or asked again, in their order: each keeps its line
- * and its reason on her card (recette MED-03, trou 7 du 21/11). A replaced file is out of the drop and never shown.
+ * The files of a settled drop (ready or blocked) that keep a line on her card, in their order: refused or asked again,
+ * each with its reason (recette MED-03, trou 7 du 21/11), and the one she sent in place of another while it goes up and
+ * is prepared. A replaced file is out of the drop and never shown.
  */
-export function refusedOf(drop: ContentDrop): ContentDropFile[] {
+export function linesOf(drop: ContentDrop): ContentDropFile[] {
   if (drop.state !== 'ready' && drop.state !== 'blocked') return [];
-  return drop.files.filter((file) => file.state === 'refused' || file.redo !== null);
+  return drop.files.filter(
+    (file) =>
+      file.state === 'refused' ||
+      file.redo !== null ||
+      file.state === 'awaiting' ||
+      file.state === 'received',
+  );
 }
 
 const ACCEPT_BY_KIND: Readonly<Record<DropMediaKind, string>> = {

@@ -1716,6 +1716,21 @@
           "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'filling'\n      )",
           "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
         },
+        "creator_redo_replace": {
+          "name": "creator_redo_replace",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_sentence\" is not null or \"content_drop_files\".\"state\" = 'refused') and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
+        },
+        "creator_redo_insert": {
+          "name": "creator_redo_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and \"content_drop_files\".\"replaced_at\" is null\n        and \"content_drop_files\".\"redo_sentence\" is null and \"content_drop_files\".\"media_asset_id\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      ) and exists (\n        select 1 from content_drop_files old where old.drop_id = \"content_drop_files\".\"drop_id\" and old.creator_id = \"content_drop_files\".\"creator_id\"\n          and old.position = \"content_drop_files\".\"position\" and old.slot_key is not distinct from \"content_drop_files\".\"slot_key\"\n          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')\n      )"
+        },
         "team_read": {
           "name": "team_read",
           "as": "PERMISSIVE",

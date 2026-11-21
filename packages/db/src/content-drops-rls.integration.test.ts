@@ -395,6 +395,118 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
     expect(await stateOf(script.id)).toMatchObject({ exportedAt: null, exportedBy: null });
   });
 
+  it('she replaces a medium asked again or refused, in place, and nothing else; another creator never does', async () => {
+    const mine = drop(nora, noraUser);
+    const asked = file(nora, mine.id, 0);
+    const pending = file(nora, mine.id, 1);
+    await asNora(async (tx) => {
+      await tx.insert(s.contentDrops).values(mine);
+      await tx.insert(s.contentDropFiles).values([asked, pending]);
+    });
+    await withAdmin(test.admin.db, async (tx) => {
+      await tx.update(s.contentDrops).set({ state: 'ready' }).where(eq(s.contentDrops.id, mine.id));
+      await tx
+        .update(s.contentDropFiles)
+        .set({ state: 'refused', refusal: 'Photo illisible' })
+        .where(eq(s.contentDropFiles.id, asked.id));
+      await tx
+        .update(s.contentDropFiles)
+        .set({ state: 'received' })
+        .where(eq(s.contentDropFiles.id, pending.id));
+    });
+    const asInes = <T>(fn: Parameters<typeof withCreatorAccount<T>>[2]) =>
+      withCreatorAccount(test.app.db, inesUser, fn);
+    const markReplaced = (id: string) => (tx: Parameters<Parameters<typeof asNora>[0]>[0]) =>
+      tx
+        .update(s.contentDropFiles)
+        .set({ replacedAt: new Date() })
+        .where(eq(s.contentDropFiles.id, id))
+        .returning({ id: s.contentDropFiles.id });
+    const after = (position: number, values: Partial<typeof s.contentDropFiles.$inferInsert> = {}) => ({
+      ...file(nora, mine.id, position),
+      ...values,
+    });
+    const rowOf = async (id: string) => {
+      const [row] = await withAdmin(test.admin.db, (tx) =>
+        tx.select().from(s.contentDropFiles).where(eq(s.contentDropFiles.id, id)),
+      );
+      return row;
+    };
+
+    // Another creator: neither her file nor a file in her drop, under either name.
+    expect(await asInes(markReplaced(asked.id))).toEqual([]);
+    // Nothing is replaced in place of a file still there.
+    expect(await failure(asNora((tx) => tx.insert(s.contentDropFiles).values(after(0))))).toMatch(
+      /row-level security/u,
+    );
+    // A medium neither asked again nor refused is not hers to swap.
+    expect(await asNora(markReplaced(pending.id))).toEqual([]);
+    // Only `replaced_at`, and never back to empty.
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.update(s.contentDropFiles).set({ bytes: 1 }).where(eq(s.contentDropFiles.id, asked.id)),
+        ),
+      ),
+    ).toMatch(/permission denied/u);
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.update(s.contentDropFiles).set({ replacedAt: null }).where(eq(s.contentDropFiles.id, asked.id)),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
+    expect(await asNora(markReplaced(asked.id))).toEqual([{ id: asked.id }]);
+    expect(
+      await asNora((tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set({ replacedAt: null })
+          .where(eq(s.contentDropFiles.id, asked.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    expect((await rowOf(asked.id))?.replacedAt).not.toBeNull();
+
+    // The new one: at the old one's place and slot, waiting for its bytes, nothing settled on it.
+    for (const wrong of [
+      after(1),
+      after(0, { slotKey: 'salon::0' }),
+      after(0, { state: 'kept' }),
+      after(0, { redoSentence: 'Moi' }),
+      after(0, { replacedAt: new Date() }),
+    ])
+      expect(await failure(asNora((tx) => tx.insert(s.contentDropFiles).values(wrong)))).toMatch(
+        /row-level security|content_drop_files_redo_check/u,
+      );
+    expect(
+      await failure(asInes((tx) => tx.insert(s.contentDropFiles).values({ ...after(0), creatorId: ines }))),
+    ).toMatch(/row-level security/u);
+    expect(await failure(asInes((tx) => tx.insert(s.contentDropFiles).values(after(0))))).toMatch(
+      /row-level security/u,
+    );
+    const fresh = after(0);
+    await asNora((tx) => tx.insert(s.contentDropFiles).values(fresh));
+    expect(await rowOf(fresh.id)).toMatchObject({ state: 'awaiting', position: 0, replacedAt: null });
+    // The drop stays as it was: its receipt settles it.
+    expect(await stateOf(mine.id)).toMatchObject({ state: 'ready' });
+
+    // Out on her feed: nothing replaced any more.
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ exportedAt: new Date(), exportedBy: owner })
+        .where(eq(s.contentDrops.id, mine.id)),
+    );
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDropFiles)
+        .set({ state: 'refused', refusal: 'Photo illisible' })
+        .where(eq(s.contentDropFiles.id, fresh.id)),
+    );
+    expect(await asNora(markReplaced(fresh.id))).toEqual([]);
+  });
+
   it('she never withdraws a scheduled drop, never touches a file, never deletes', async () => {
     const mine = drop(nora, noraUser);
     await asNora(async (tx) => {
