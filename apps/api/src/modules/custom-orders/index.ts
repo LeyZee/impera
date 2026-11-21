@@ -15,7 +15,11 @@ export type {
   CustomOrderTurnInput,
 } from './domain/turn';
 import { createCustomPriceGridReader, createDrizzleCustomPriceGridStore } from './infra/db/grid-store';
+import { createDrizzleCustomOrderStore, type CustomOrderStore } from './infra/db/order-store';
 import { createCustomPriceRoutes, type RequireRole } from './infra/http/routes';
+
+/** @public His orders for the agent's turn: read and written in the turn's own transaction, under her RLS. */
+export type { CustomOrderRecord, CustomOrderStore } from './infra/db/order-store';
 
 export interface CustomOrdersModule {
   readonly name: 'custom-orders';
@@ -23,6 +27,8 @@ export interface CustomOrdersModule {
   readonly routes: FastifyPluginAsyncZod;
   /** Her grid in force for the agent's turn, read as the service role; null when never saved. */
   readonly gridOf: (creatorId: CreatorId) => Promise<CustomPriceGrid | null>;
+  /** His open order and what the turn decided about it (ADR 0159 § A), in the turn's transaction. */
+  readonly orders: CustomOrderStore;
 }
 
 export interface CustomOrdersDeps {
@@ -40,5 +46,6 @@ export function createCustomOrdersModule(deps: CustomOrdersDeps): CustomOrdersMo
     name: 'custom-orders',
     routes: createCustomPriceRoutes(store, deps.requireRole),
     gridOf: createCustomPriceGridReader(deps.adminDb),
+    orders: createDrizzleCustomOrderStore(),
   };
 }
