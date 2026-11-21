@@ -6,6 +6,7 @@ import {
   ContentDropIdSchema,
   type ContentDropId,
   type DropCategory,
+  type RedoneDrop,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
@@ -34,6 +35,7 @@ import {
   routeFirst,
   shotMomentOf,
   stateTone,
+  toRedo,
   toShoot,
   type LiveSend,
 } from './model';
@@ -101,6 +103,8 @@ export function ContentPage({
   };
 
   const asked = content.data === undefined ? [] : toShoot(content.data.requests, content.data.drops);
+  // What the agency sent back without a request (trou 7 du 21/11): above what is asked, she redoes it first.
+  const redo = content.data === undefined ? [] : toRedo(content.data.redone, content.data.drops);
   // The first thing due, late or for today, carries the screen's one neon (recette visuelle 16/11, CRE-13).
   const first = dueNow(asked, today)[0];
   const firstKey = first === undefined ? null : first.kind === 'script' ? first.drop.id : first.request.id;
@@ -158,12 +162,23 @@ export function ContentPage({
         </div>
       ) : (
         <div className="ct-sections nv-enter">
-          {asked.length === 0 ? null : (
+          {asked.length === 0 && redo.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-asked">
               <h2 id="ct-asked" className="nv-h2 ct-section__title">
                 À tourner
               </h2>
               <ul className="ct-list">
+                {redo.map((one, index) => (
+                  <RedoneCard
+                    key={one.dropId}
+                    // The screen's one neon goes to what is due first; without one, to the latest sent back.
+                    first={firstKey === null && index === 0}
+                    redone={one}
+                    onDrop={() => {
+                      setOpened({ category: one.category, request: null });
+                    }}
+                  />
+                ))}
                 {asked.map((item) =>
                   item.kind === 'script' ? (
                     <StartedScriptCard
@@ -333,6 +348,9 @@ function RequestCard({
         </span>
       </div>
       <p className="ct-card__why">{request.reason}</p>
+      {request.redo === null || request.dropId !== null ? null : (
+        <RedoNote sentence={request.redo.sentence} />
+      )}
       {request.dropId === null ? (
         <div className="ct-card__foot">
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm ct-card__cant" onClick={onRefuse}>
@@ -380,6 +398,51 @@ function RequestCard({
           {failed}
         </p>
       )}
+    </li>
+  );
+}
+
+/** The agency's « À refaire » on her card (trou 7 du 21/11): amber, she has something to do; its words as written. */
+function RedoNote({ sentence }: { sentence: string }): JSX.Element {
+  return (
+    <div className="ct-redo">
+      <span className="ct-redo__tag">À refaire</span>
+      <p className="ct-redo__why">{sentence}</p>
+    </div>
+  );
+}
+
+/** A drop of hers the agency sent back without a request (trou 7 du 21/11): what it was, why, and « Déposer » again. */
+function RedoneCard({
+  first,
+  redone,
+  onDrop,
+}: {
+  first: boolean;
+  redone: RedoneDrop;
+  onDrop: () => void;
+}): JSX.Element {
+  return (
+    <li className="nv-plate ct-card">
+      <div className="ct-card__head">
+        <span className="ct-card__emoji" aria-hidden="true">
+          {CATEGORY_EMOJIS[redone.category]}
+        </span>
+        <span className="ct-card__titles">
+          <span className="ct-card__name">{DROP_CATEGORY_LABELS[redone.category]}</span>
+          <span className="ct-due">Ton dernier envoi est revenu</span>
+        </span>
+      </div>
+      <RedoNote sentence={redone.redo.sentence} />
+      <div className="ct-card__foot">
+        <button
+          type="button"
+          className={`nv-btn ${first ? 'nv-btn--neon' : 'nv-btn--soft'} nv-btn--sm`}
+          onClick={onDrop}
+        >
+          Déposer à nouveau
+        </button>
+      </div>
     </li>
   );
 }

@@ -195,6 +195,12 @@ export const contentDrops = pgTable(
       .references(() => user.id),
     withdrawnBy: text('withdrawn_by').references(() => user.id),
     withdrawnAt: timestampTz('withdrawn_at'),
+    /**
+     * « À refaire » (trou 7 du 21/11): the agency's sentence when it withdrew the drop for her to do again. Her request
+     * opens again and her screen shows the sentence. Written by the team with the withdrawal, never by her
+     * (`guard_content_drop_redo`). Null for any other drop, withdrawn by her or not.
+     */
+    redoSentence: text('redo_sentence'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -208,7 +214,10 @@ export const contentDrops = pgTable(
     ),
     check(
       'content_drops_blocked_check',
-      sql`(${t.state} = 'blocked') = (${t.blockedReason} is not null)
+      // A withdrawn drop keeps why it was blocked (trou 7 du 21/11): she may withdraw it, and her guard never lets
+      // her clear the reason.
+      sql`(${t.state} <> 'blocked' or ${t.blockedReason} is not null)
+        and (${t.blockedReason} is null or ${t.state} in ('blocked', 'withdrawn'))
         and coalesce(char_length(${t.blockedReason}), 1) between 1 and 200`,
     ),
     check(
@@ -220,6 +229,10 @@ export const contentDrops = pgTable(
       'content_drops_withdrawn_check',
       sql`(${t.state} = 'withdrawn') = (${t.withdrawnAt} is not null)
         and (${t.withdrawnAt} is null) = (${t.withdrawnBy} is null)`,
+    ),
+    check(
+      'content_drops_redo_check',
+      sql`${t.redoSentence} is null or (${t.state} = 'withdrawn' and char_length(${t.redoSentence}) between 1 and 200)`,
     ),
     check('content_drops_script_check', sql`${t.category} <> 'script' or ${t.requestId} is not null`),
     check(

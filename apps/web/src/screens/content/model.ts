@@ -14,6 +14,7 @@ import {
   type DropMediaKind,
   type DropMime,
   type DropState,
+  type RedoneDrop,
 } from '@impera/contracts';
 
 import { MOMENT_EMOJIS, MOMENT_LABELS } from '@/creators/scripts/model';
@@ -185,6 +186,24 @@ export function openRequests(
   return requests
     .filter((request) => request.state === 'open' && (request.dropId === null || goingUp.has(request.dropId)))
     .toSorted((a, b) => a.dueOn.localeCompare(b.dueOn) || a.createdAt.localeCompare(b.createdAt));
+}
+
+/**
+ * What the agency asked her to redo without a request (trou 7 du 21/11), newest first: gone once she drops that
+ * category again after it was asked. The server keeps each 14 days.
+ */
+export function toRedo(redone: readonly RedoneDrop[], drops: readonly ContentDrop[]): RedoneDrop[] {
+  return redone
+    .filter(
+      (one) =>
+        !drops.some(
+          (drop) =>
+            drop.category === one.category &&
+            drop.state !== 'withdrawn' &&
+            Date.parse(drop.createdAt) > Date.parse(one.redo.at),
+        ),
+    )
+    .toSorted((a, b) => Date.parse(b.redo.at) - Date.parse(a.redo.at));
 }
 
 /** Out of her hands: published, or a script her team copied into Reveal (SC-03 c, recette créatrice 8). */

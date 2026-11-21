@@ -1,4 +1,9 @@
-import { DROP_CATEGORY_LABELS, NOT_WHAT_IT_SAYS } from '@impera/contracts';
+import {
+  ContentDropIdSchema,
+  DROP_CATEGORY_LABELS,
+  NOT_WHAT_IT_SAYS,
+  type RedoneDrop,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { dropOf, fileOf, fileWithHead, requestOf } from './fixtures';
@@ -26,6 +31,7 @@ import {
   sameFile,
   shotMomentOf,
   stateTone,
+  toRedo,
   toShoot,
   UNREADABLE_HERE,
   weightOf,
@@ -269,5 +275,28 @@ describe('Contenu: the rules of her screen (CR-06 d)', () => {
     expect(mediaLabel('audio', 65_000)).toBe('Vocal · 1 min 05');
     expect(mediaLabel(null, null)).toBe('Fichier');
     expect(lengthOf(200)).toBe('1 s');
+  });
+});
+
+describe('Contenu: what the agency sent back (trou 7 du 21/11)', () => {
+  const back = (category: RedoneDrop['category'], at: string, n: number): RedoneDrop => ({
+    dropId: ContentDropIdSchema.parse(`00000000-0000-4000-8000-9000000000${String(n).padStart(2, '0')}`),
+    category,
+    redo: { sentence: 'Trop sombre', at },
+  });
+
+  it('shows the latest first, and forgets one once she drops that category again', () => {
+    const story = back('reveal_story', '2026-11-05T10:00:00.000Z', 1);
+    const seance = back('feed_shoot', '2026-11-06T10:00:00.000Z', 2);
+    expect(toRedo([story, seance], [])).toEqual([seance, story]);
+    const before = dropOf({ category: 'reveal_story', createdAt: '2026-11-04T10:00:00.000Z' });
+    const gone = dropOf({
+      category: 'reveal_story',
+      state: 'withdrawn',
+      createdAt: '2026-11-07T10:00:00.000Z',
+    });
+    expect(toRedo([story], [before, gone])).toEqual([story]);
+    const again = dropOf({ category: 'reveal_story', createdAt: '2026-11-07T10:00:00.000Z' });
+    expect(toRedo([story, seance], [again])).toEqual([seance]);
   });
 });

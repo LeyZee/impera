@@ -17,6 +17,8 @@ import {
   DropStateSchema,
   kindOfMime,
   newId,
+  RedoneDropSchema,
+  REDONE_SHOWN_DAYS,
   type ContentDrop,
   type ContentRequest,
   type CreateContentDropBody,
@@ -41,7 +43,14 @@ import {
 } from '@impera/db';
 
 import type { SentDrop } from '../../domain/drop-export';
-import { dropRefusals, mayWithdraw, needsRequest } from '../../domain/drops';
+import {
+  dropRefusals,
+  mayWithdraw,
+  needsRequest,
+  NOTHING_KEPT,
+  requestAnswer,
+  type RequestDrop,
+} from '../../domain/drops';
 import {
   ContentDropExportUnprocessable,
   ContentDropFileNotFound,
@@ -149,7 +158,9 @@ function dropOf(row: DropRow, files: readonly FileRow[]): ContentDrop {
   });
 }
 
-function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
+const UNANSWERED = { dropId: null, redo: null } as const;
+
+function requestOf(row: RequestRow, answer: ReturnType<typeof requestAnswer>): ContentRequest {
   return ContentRequestSchema.parse({
     id: row.id,
     category: row.category,
@@ -161,7 +172,8 @@ function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
     origin: row.origin,
     state: row.state,
     refusalReason: row.refusalReason,
-    dropId,
+    dropId: answer.dropId,
+    redo: answer.redo === null ? null : { sentence: answer.redo.sentence, at: answer.redo.at.toISOString() },
     createdAt: row.createdAt.toISOString(),
   });
 }
@@ -215,21 +227,59 @@ async function contentIn(tx: Transaction, forCreator: boolean): Promise<CreatorC
     .from(contentRequests)
     .where(forCreator ? sql`${contentRequests.state} <> 'cancelled'` : sql`true`)
     .orderBy(contentRequests.dueOn, contentRequests.createdAt);
-  // The drop that answers each request, wherever it falls in the latest ones.
+  // The drops of each request, wherever they fall in the latest ones: the live one answers it, or the agency's
+  // « À refaire » on the last one withdrawn says why it is hers again (trou 7 du 21/11).
   const answers = await tx
-    .select({ id: contentDrops.id, requestId: contentDrops.requestId })
+    .select({
+      id: contentDrops.id,
+      requestId: contentDrops.requestId,
+      state: contentDrops.state,
+      blockedReason: contentDrops.blockedReason,
+      redoSentence: contentDrops.redoSentence,
+      withdrawnAt: contentDrops.withdrawnAt,
+      updatedAt: contentDrops.updatedAt,
+    })
     .from(contentDrops)
-    .where(sql`${contentDrops.requestId} is not null and ${contentDrops.state} <> 'withdrawn'`);
-  const answerOf = new Map(
-    answers.flatMap((row) => (row.requestId === null ? [] : [[row.requestId, row.id]])),
-  );
+    .where(sql`${contentDrops.requestId} is not null`);
+  const dropsOf = new Map<string, RequestDrop[]>();
+  for (const row of answers) {
+    if (row.requestId === null) continue;
+    const list = dropsOf.get(row.requestId) ?? [];
+    list.push({ ...row, state: DropStateSchema.parse(row.state) });
+    dropsOf.set(row.requestId, list);
+  }
+  // Her drops without a request the agency asked again lately: her screen says so, with its sentence.
+  const redone = await tx
+    .select({
+      id: contentDrops.id,
+      category: contentDrops.category,
+      redoSentence: contentDrops.redoSentence,
+      withdrawnAt: contentDrops.withdrawnAt,
+    })
+    .from(contentDrops)
+    .where(
+      sql`${contentDrops.requestId} is null and ${contentDrops.redoSentence} is not null
+        and ${contentDrops.withdrawnAt} > now() - make_interval(days => ${REDONE_SHOWN_DAYS})`,
+    )
+    .orderBy(sql`${contentDrops.withdrawnAt} desc`);
   const files = await filesOf(
     tx,
     drops.map((row) => row.id),
   );
   return {
-    requests: requests.map((row) => requestOf(row, answerOf.get(row.id) ?? null)),
+    requests: requests.map((row) => requestOf(row, requestAnswer(dropsOf.get(row.id) ?? []))),
     drops: drops.map((row) => dropOf(row, files)),
+    redone: redone.flatMap((row) =>
+      row.redoSentence === null || row.withdrawnAt === null
+        ? []
+        : [
+            RedoneDropSchema.parse({
+              dropId: row.id,
+              category: row.category,
+              redo: { sentence: row.redoSentence, at: row.withdrawnAt.toISOString() },
+            }),
+          ],
+    ),
   };
 }
 
@@ -274,6 +324,7 @@ async function dropIn(
     // Locked, so that her refusal and her drop never cross: the one that waits finds the other done.
     if (request.state !== 'open' || (await readRequest(tx, body.requestId, true)) === undefined)
       throw new ContentDropRequestUnprocessable();
+    await nothingKeptGivesWay(tx, userId, body.requestId);
   }
   try {
     await tx.insert(contentDrops).values({
@@ -308,16 +359,42 @@ async function dropIn(
   return viewOf(tx, row);
 }
 
+/**
+ * A drop of this request where nothing could be kept (blocked) no longer answers it (trou 7 du 21/11): her new drop for
+ * it withdraws it first, with nothing to erase but its trace. Locked; a drop the job moved meanwhile is left as it is.
+ */
+export async function nothingKeptGivesWay(tx: Transaction, userId: string, requestId: string): Promise<void> {
+  const [blocked] = await tx
+    .select({ id: contentDrops.id })
+    .from(contentDrops)
+    .where(and(eq(contentDrops.requestId, requestId), eq(contentDrops.state, 'blocked')))
+    .for('update');
+  if (blocked === undefined) return;
+  await tx
+    .update(contentDrops)
+    .set({ state: 'withdrawn', withdrawnAt: sql`now()`, withdrawnBy: userId, updatedAt: sql`now()` })
+    .where(and(eq(contentDrops.id, blocked.id), eq(contentDrops.state, 'blocked')));
+  await tx.insert(auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId,
+    action: 'content_drop.withdraw',
+    entity: 'content_drop',
+    entityId: blocked.id,
+    details: { by: 'replaced', reason: 'nothing_kept' },
+  });
+}
+
 async function withdrawIn(
   tx: Transaction,
   userId: string,
   dropId: string,
   by: 'creator' | 'agency',
   now: Date,
+  redo: string | null = null,
 ): Promise<void> {
   const seen = await readDrop(tx, dropId);
   if (seen === undefined) throw new ContentDropNotFound();
-  // Withdrawing twice is no error: her phone may replay it.
+  // Withdrawing twice is no error: her phone may replay it; « À refaire » replayed answers it too.
   if (seen.state === 'withdrawn') return;
   // A script the team copied into Reveal is out, as a published drop is (recette MED-08): withdrawn, its request would
   // reopen for her to shoot again and its originals would go within the hour.
@@ -329,15 +406,15 @@ async function withdrawIn(
     throw new ContentDropSettled();
   await tx
     .update(contentDrops)
-    .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, updatedAt: now })
+    .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, redoSentence: redo, updatedAt: now })
     .where(eq(contentDrops.id, dropId));
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId,
-    action: 'content_drop.withdraw',
+    action: redo === null ? 'content_drop.withdraw' : 'content_drop.redo',
     entity: 'content_drop',
     entityId: dropId,
-    details: { by },
+    details: redo === null ? { by } : { by, sentence: redo },
   });
 }
 
@@ -639,6 +716,9 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
     drop: (creatorId, userId, body) => asTeam(creatorId, userId, (tx) => dropIn(tx, creatorId, userId, body)),
     withdraw: (creatorId, userId, dropId, now) =>
       asTeam(creatorId, userId, (tx) => withdrawIn(tx, userId, dropId, 'agency', now)),
+
+    redo: (creatorId, userId, dropId, sentence, now) =>
+      asTeam(creatorId, userId, (tx) => withdrawIn(tx, userId, dropId, 'agency', now, sentence)),
     correct: (creatorId, userId, dropId, category: DropCategory, now) =>
       asTeam(creatorId, userId, async (tx) => {
         const seen = await readDrop(tx, dropId);
@@ -698,7 +778,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
             known.reason === body.reason &&
             known.structureId === body.structureId;
           if (!same) throw new ContentRequestIdConflict();
-          return requestOf(known, null);
+          return requestOf(known, UNANSWERED);
         }
         // Never for a day already past where she lives (recette MED-10): it would be late as it is born.
         const [creator] = await tx
@@ -744,7 +824,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         }
         const [row] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));
         if (row === undefined) throw new ContentRequestNotFound();
-        return requestOf(row, null);
+        return requestOf(row, UNANSWERED);
       }),
     cancel: (creatorId, userId, requestId, now) =>
       asTeam(creatorId, userId, async (tx) => {
@@ -824,7 +904,6 @@ async function scriptDropsIn(tx: Transaction): Promise<ScriptDropEntry[]> {
 }
 
 /** The drop's sentence when none of its files could be kept (ADR 0055 § 6: blocked, in amber, with its reason). */
-const NOTHING_KEPT = 'Aucun fichier de ce dépôt n’a pu être gardé';
 
 /** The states each outcome moves a file from: a file already past them is left as it is (a replayed job). */
 const MOVES_FROM: Readonly<Record<FileOutcome['state'], readonly DropFileState[]>> = {

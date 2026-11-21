@@ -52,6 +52,7 @@ function agencyWith(sent: SentScript): AgencyContentStore {
     drop: refuse('drop'),
     correct: refuse('correct'),
     withdraw: refuse('withdraw'),
+    redo: refuse('redo'),
     ask: refuse('ask'),
     cancel: refuse('cancel'),
     fileTarget: refuse('fileTarget'),

@@ -204,6 +204,78 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
     );
   });
 
+  it('only her team withdraws a drop with « À refaire », a sentence of 1 to 200 characters (trou 7 du 21/11)', async () => {
+    const mine = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(mine));
+    const withdrawn = { state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: noraUser } as const;
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ ...withdrawn, redoSentence: 'Je me le demande moi-même' })
+            .where(eq(s.contentDrops.id, mine.id)),
+        ),
+      ),
+    ).toMatch(/only her team asks a drop again/u);
+    // Never on a live drop, never empty.
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ redoSentence: 'Trop sombre' })
+            .where(eq(s.contentDrops.id, mine.id)),
+        ),
+      ),
+    ).toMatch(/content_drops_redo_check/u);
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ ...withdrawn, withdrawnBy: manager, redoSentence: '' })
+            .where(eq(s.contentDrops.id, mine.id)),
+        ),
+      ),
+    ).toMatch(/content_drops_redo_check/u);
+    await asTeam(manager, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({
+          ...withdrawn,
+          withdrawnBy: manager,
+          redoSentence: 'Trop sombre, refais-la avec plus de lumière',
+        })
+        .where(eq(s.contentDrops.id, mine.id)),
+    );
+    expect(await stateOf(mine.id)).toMatchObject({
+      state: 'withdrawn',
+      redoSentence: 'Trop sombre, refais-la avec plus de lumière',
+    });
+    // A blocked drop is withdrawn too, its reason kept: her guard never lets her clear it.
+    const blocked = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(blocked));
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'blocked', blockedReason: 'Aucun fichier gardé' })
+        .where(eq(s.contentDrops.id, blocked.id)),
+    );
+    await asNora((tx) => tx.update(s.contentDrops).set(withdrawn).where(eq(s.contentDrops.id, blocked.id)));
+    expect(await stateOf(blocked.id)).toMatchObject({
+      state: 'withdrawn',
+      blockedReason: 'Aucun fichier gardé',
+    });
+    // She never wipes it: refused, or her policy does not even reach a withdrawn drop.
+    await failure(
+      asNora((tx) =>
+        tx.update(s.contentDrops).set({ redoSentence: null }).where(eq(s.contentDrops.id, mine.id)),
+      ),
+    );
+    expect((await stateOf(mine.id))?.redoSentence).toBe('Trop sombre, refais-la avec plus de lumière');
+  });
+
   it('she never withdraws a scheduled drop, never touches a file, never deletes', async () => {
     const mine = drop(nora, noraUser);
     await asNora(async (tx) => {

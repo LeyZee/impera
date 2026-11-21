@@ -21,10 +21,11 @@ export const ASKABLE_CATEGORIES: readonly DropCategory[] = [
   'script',
 ];
 
-export type RequestStanding = 'todo' | 'shooting' | 'dropped' | 'refused' | 'cancelled';
+export type RequestStanding = 'todo' | 'redo' | 'shooting' | 'dropped' | 'refused' | 'cancelled';
 
 export const STANDING_LABELS: Readonly<Record<RequestStanding, string>> = {
   todo: 'À faire',
+  redo: 'À refaire',
   shooting: 'En tournage',
   dropped: 'Déposée',
   refused: 'Refusée',
@@ -45,7 +46,8 @@ export interface RequestRow {
 function standingOf(request: ContentRequest, drops: ReadonlyMap<string, ContentDrop>): RequestStanding {
   if (request.state === 'refused') return 'refused';
   if (request.state === 'cancelled') return 'cancelled';
-  if (request.dropId === null) return 'todo';
+  // Sent back by the team, or nothing of her drop kept (trou 7 du 21/11): asked of her again.
+  if (request.dropId === null) return request.redo === null ? 'todo' : 'redo';
   return drops.get(request.dropId)?.state === 'filling' ? 'shooting' : 'dropped';
 }
 
@@ -74,7 +76,7 @@ export function requestGroups(
           ? dueOf(request.dueOn, today)
           : { text: `Pour ${namedDay(request.dueOn, today)}`, late: false },
       structureName: request.structureId === null ? null : (names.get(request.structureId) ?? null),
-      cancellable: standing === 'todo',
+      cancellable: standing === 'todo' || standing === 'redo',
     };
   });
   return {

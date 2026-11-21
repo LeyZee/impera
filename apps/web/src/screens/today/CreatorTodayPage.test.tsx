@@ -35,7 +35,7 @@ const shift = (displayName: string, startsAt: string, endsAt: string) => ({
 const nb = (text: string): string =>
   text.replace(/(\d) (h|min)/gu, '$1\u00a0$2').replace(/h (\d)/gu, 'h\u00a0$1');
 
-function serve(body: unknown, status = 200, agenda: unknown = null, content: unknown = null): void {
+function serve(body: unknown, status = 200, agenda: unknown = null, content: object | null = null): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) =>
@@ -45,7 +45,7 @@ function serve(body: unknown, status = 200, agenda: unknown = null, content: unk
           : url.startsWith('/v1/creator-space/agenda?') && agenda !== null
             ? new Response(JSON.stringify(agenda), { status: 200 })
             : url === '/v1/creator-space/content' && content !== null
-              ? Response.json(content)
+              ? Response.json({ redone: [], ...content })
               : new Response('null', { status: 404 }),
       ),
     ),

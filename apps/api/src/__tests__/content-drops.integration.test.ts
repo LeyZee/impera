@@ -133,7 +133,7 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
   const video = (bytes = 40 * MB) => ({ id: newId(ContentDropFileIdSchema), mime: 'video/mp4', bytes });
 
   it('opens her content to her alone, and the agency’s side to the owner and a manager', async () => {
-    expect(await content()).toEqual({ requests: [], drops: [] });
+    expect(await content()).toEqual({ requests: [], drops: [], redone: [] });
     for (const who of ['owner', 'manager', 'chatter'] as const)
       expect((await call('GET', '/v1/creator-space/content', who)).statusCode).toBe(403);
     expect((await call('GET', `/v1/creators/${nora}/content`, 'manager')).statusCode).toBe(200);
@@ -379,6 +379,121 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
       (await call('GET', `/v1/creators/${nora}/content`, 'owner')).json(),
     );
     expect(agencySide.requests.find((one) => one.id === asked.id)?.state).toBe('cancelled');
+  });
+
+  it('« À refaire » sends her drop back with a sentence; her request opens again with it (trou 7 du 21/11)', async () => {
+    const asked = {
+      id: newId(ContentRequestIdSchema),
+      category: 'feed_shoot',
+      dueOn: DUE_ON,
+      reason: 'Une séance au salon pour le feed',
+    };
+    expect((await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', asked)).statusCode).toBe(
+      200,
+    );
+    const first = {
+      id: newId(ContentDropIdSchema),
+      category: 'feed_shoot',
+      requestId: asked.id,
+      files: [photo()],
+    };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', first)).statusCode).toBe(200);
+    const redo = (dropId: string, who: 'owner' | 'manager' | 'chatter' | 'nora', sentence: string) =>
+      call('POST', `/v1/creators/${nora}/drops/${dropId}/redo`, who, { sentence });
+    expect((await redo(first.id, 'chatter', 'Trop sombre')).statusCode).toBe(403);
+    expect((await redo(first.id, 'nora', 'Trop sombre')).statusCode).toBe(403);
+    expect((await redo(first.id, 'manager', '   ')).statusCode).toBe(400);
+    {
+      const r = await redo(first.id, 'manager', 'Trop sombre, refais-la avec plus de lumière');
+      expect(r.statusCode, r.body).toBe(204);
+    }
+    // Replayed, it answers the same and keeps the first sentence.
+    expect((await redo(first.id, 'manager', 'Autre chose')).statusCode).toBe(204);
+    const seen = (await content()).requests.find((one) => one.id === asked.id);
+    expect(seen).toMatchObject({
+      state: 'open',
+      dropId: null,
+      redo: { sentence: 'Trop sombre, refais-la avec plus de lumière' },
+    });
+    expect((await content()).drops.find((one) => one.id === first.id)?.state ?? 'withdrawn').toBe(
+      'withdrawn',
+    );
+    // She drops again: the sentence goes.
+    const again = {
+      id: newId(ContentDropIdSchema),
+      category: 'feed_shoot',
+      requestId: asked.id,
+      files: [photo()],
+    };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', again)).statusCode).toBe(200);
+    expect((await content()).requests.find((one) => one.id === asked.id)).toMatchObject({
+      dropId: again.id,
+      redo: null,
+    });
+    // Published, it is out: nothing to redo from here.
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'published' })
+      .where(eq(schema.contentDrops.id, again.id));
+    expect((await redo(again.id, 'owner', 'Trop tard')).json()).toMatchObject({
+      error: { code: 'content_drop_settled_conflict' },
+    });
+  });
+
+  it('shows her a drop sent back without a request, and lets a drop that kept nothing give way', async () => {
+    const story = { id: newId(ContentDropIdSchema), category: 'reveal_story', files: [video()] };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', story)).statusCode).toBe(200);
+    expect(
+      (await call('POST', `/v1/creators/${nora}/drops/${story.id}/redo`, 'owner', { sentence: 'C’est flou' }))
+        .statusCode,
+    ).toBe(204);
+    const back = (await content()).redone.find((one) => one.dropId === story.id);
+    expect([back?.category, back?.redo.sentence]).toEqual(['reveal_story', 'C’est flou']);
+    // Another creator never reads it.
+    expect((await content('ines')).redone).toEqual([]);
+
+    const asked = {
+      id: newId(ContentRequestIdSchema),
+      category: 'feed_video',
+      dueOn: DUE_ON,
+      reason: 'Une vidéo verticale pour le feed',
+    };
+    expect((await call('POST', `/v1/creators/${nora}/content-requests`, 'owner', asked)).statusCode).toBe(
+      200,
+    );
+    const lost = {
+      id: newId(ContentDropIdSchema),
+      category: 'feed_video',
+      requestId: asked.id,
+      files: [video()],
+    };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', lost)).statusCode).toBe(200);
+    // The cleaning kept none of its files: blocked, the request is hers to answer again.
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'blocked', blockedReason: 'Aucun fichier de ce dépôt n’a pu être gardé' })
+      .where(eq(schema.contentDrops.id, lost.id));
+    expect((await content()).requests.find((one) => one.id === asked.id)).toMatchObject({
+      dropId: null,
+      redo: { sentence: 'Aucun fichier de ce dépôt n’a pu être gardé' },
+    });
+    const again = {
+      id: newId(ContentDropIdSchema),
+      category: 'feed_video',
+      requestId: asked.id,
+      files: [video()],
+    };
+    const r = await call('POST', '/v1/creator-space/drops', 'nora', again);
+    expect(r.statusCode, r.body).toBe(200);
+    const [gone] = await test.admin.db
+      .select()
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, lost.id));
+    expect(gone?.state).toBe('withdrawn');
+    expect((await content()).requests.find((one) => one.id === asked.id)).toMatchObject({
+      dropId: again.id,
+      redo: null,
+    });
   });
 
   it('never lets her withdraw what is already scheduled; the agency drops for her', async () => {

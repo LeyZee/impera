@@ -121,6 +121,25 @@
   font-size: var(--nv-text-footnote);
   font-weight: 600;
 }
+.ct-redo {
+  display: grid;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-warning) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 38%, transparent);
+}
+.ct-redo__tag {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+.ct-redo__why {
+  margin: 0;
+  color: var(--nv-ink);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
 .ct-card__actions {
   display: flex;
   flex-wrap: wrap;

@@ -330,6 +330,11 @@ export interface AgencyContentStore {
   ): Promise<ContentDrop>;
   withdraw(creatorId: string, userId: string, dropId: string, now: Date): Promise<void>;
   /**
+   * « À refaire » (trou 7 du 21/11): withdrawn as `withdraw` does, with the agency's sentence for her; its request opens
+   * again. A drop already withdrawn answers, whatever its sentence.
+   */
+  redo(creatorId: string, userId: string, dropId: string, sentence: string, now: Date): Promise<void>;
+  /**
    * A script names a frozen version of its structure (SC-02 lot b): `freeze` gives it, once the structure is checked
    * usable for her and before the request is written; `null` refuses it like a structure out of reach.
    */

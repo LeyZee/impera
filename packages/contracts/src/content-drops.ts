@@ -477,7 +477,20 @@ export const ContentRequestStateSchema = z.enum(CONTENT_REQUEST_STATES);
 
 export const ContentRequestReasonSchema = z.string().trim().min(1).max(160);
 
-/** A request as read: `dropId` is the drop that satisfies it, `null` while nothing does. */
+/**
+ * « À refaire » (trou 7 du 21/11): what the agency said when it asked her to do a drop again, and when. Also said of a
+ * drop where nothing could be kept, with that reason: it no longer answers its request.
+ */
+export const DropRedoSchema = z.strictObject({
+  sentence: DropRefusalSchema,
+  at: z.iso.datetime({ offset: true }),
+});
+export type DropRedo = z.infer<typeof DropRedoSchema>;
+
+/**
+ * A request as read: `dropId` is the drop that satisfies it, `null` while nothing does. A drop where nothing could be
+ * kept satisfies nothing: her request is hers to drop again, and her new drop takes its place.
+ */
 export const ContentRequestSchema = z.strictObject({
   id: ContentRequestIdSchema,
   category: DropCategorySchema,
@@ -492,6 +505,11 @@ export const ContentRequestSchema = z.strictObject({
   state: ContentRequestStateSchema,
   refusalReason: DropRefusalSchema.nullable(),
   dropId: ContentDropIdSchema.nullable(),
+  /**
+   * Why it is hers to drop again, while nothing answers it: the agency's « À refaire » on her last drop for it, or the
+   * reason nothing of it could be kept. `null` otherwise.
+   */
+  redo: DropRedoSchema.nullable(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 export type ContentRequest = z.infer<typeof ContentRequestSchema>;
@@ -522,10 +540,31 @@ export const RefuseContentRequestBodySchema = z.strictObject({
 });
 
 /** `GET /v1/creator-space/content` and `GET /v1/creators/:creatorId/content`: her requests and her drops, newest first. */
+/** A drop of hers sent without a request that the agency asked her to do again (« À refaire »), for her screen. */
+export const RedoneDropSchema = z.strictObject({
+  dropId: ContentDropIdSchema,
+  category: DropCategorySchema,
+  redo: DropRedoSchema,
+});
+export type RedoneDrop = z.infer<typeof RedoneDropSchema>;
+
+/** How long her screen keeps a drop to do again without a request: past that, it is said by the agency again. */
+export const REDONE_SHOWN_DAYS = 14;
+
 export const CreatorContentSchema = z.strictObject({
   requests: z.array(ContentRequestSchema),
   drops: z.array(ContentDropSchema),
+  /** Her drops without a request the agency asked again in the last `REDONE_SHOWN_DAYS` days, newest first. */
+  redone: z.array(RedoneDropSchema),
 });
+
+/**
+ * `POST /v1/creators/:creatorId/drops/:id/redo` (owner, operator): « À refaire » with a sentence for her (trou 7 du
+ * 21/11). The drop is withdrawn as the agency withdraws one (not out yet: 409 `content_drop_settled_conflict`), its
+ * request opens again and her screen shows the sentence. Replayed on a drop already asked again, it answers.
+ */
+export const RedoDropBodySchema = z.strictObject({ sentence: DropSentenceSchema });
+export type RedoDropBody = z.infer<typeof RedoDropBodySchema>;
 export type CreatorContent = z.infer<typeof CreatorContentSchema>;
 
 export const CONTENT_DROP_NOT_FOUND = 'content_drop_not_found';

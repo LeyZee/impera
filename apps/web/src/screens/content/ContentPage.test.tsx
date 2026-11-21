@@ -38,7 +38,7 @@ interface Call {
   readonly body: unknown;
 }
 
-function serve(content: unknown, answers: Record<string, (body: unknown) => Response> = {}): Call[] {
+function serve(content: object, answers: Record<string, (body: unknown) => Response> = {}): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
     'fetch',
@@ -48,7 +48,8 @@ function serve(content: unknown, answers: Record<string, (body: unknown) => Resp
       calls.push({ url, method, body });
       const answer = answers[`${method} ${url}`];
       if (answer !== undefined) return Promise.resolve(answer(body));
-      if (url === '/v1/creator-space/content') return Promise.resolve(Response.json(content));
+      if (url === '/v1/creator-space/content')
+        return Promise.resolve(Response.json({ redone: [], ...content }));
       return Promise.resolve(new Response('null', { status: 404 }));
     }),
   );
@@ -138,6 +139,38 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     serve({ requests: [requestOf({ dueOn: '2026-11-05', reason: 'Une story pour ce soir' })], drops: [] });
     show();
     expect((await screen.findByText('Pour aujourd’hui')).className).toContain('ct-due--today');
+  });
+
+  it('shows her the team’s « À refaire » on her request, and a drop sent back without one (trou 7 du 21/11)', async () => {
+    const request = requestOf({
+      reason: 'La séance promise',
+      redo: { sentence: 'Trop sombre, refais-la avec plus de lumière', at: '2026-11-05T09:00:00.000Z' },
+    });
+    serve({
+      requests: [request],
+      drops: [],
+      redone: [
+        {
+          dropId: ContentDropIdSchema.parse('00000000-0000-4000-8000-0000000000dd'),
+          category: 'reveal_story',
+          redo: { sentence: 'C’est flou, refais-la plus nette', at: '2026-11-05T10:00:00.000Z' },
+        },
+      ],
+    });
+    show();
+    const section = (await screen.findByRole('heading', { name: 'À tourner' })).closest('section');
+    if (section === null) throw new Error('no section');
+    const cards = within(section).getAllByRole('listitem');
+    expect(cards).toHaveLength(2);
+    const [story, seance] = cards;
+    if (story === undefined || seance === undefined) throw new Error('no cards');
+    expect(within(story).getByText('Story Reveal')).toBeDefined();
+    expect(within(story).getByText('Ton dernier envoi est revenu')).toBeDefined();
+    expect(within(story).getByText('C’est flou, refais-la plus nette')).toBeDefined();
+    expect(within(seance).getByText('À refaire')).toBeDefined();
+    expect(within(seance).getByText('Trop sombre, refais-la avec plus de lumière')).toBeDefined();
+    fireEvent.click(within(story).getByRole('button', { name: 'Déposer à nouveau' }));
+    expect(await screen.findByRole('dialog')).toBeDefined();
   });
 
   it('opens the sheet on the request Aujourd’hui sent her to drop, then forgets it (CRE-01)', async () => {

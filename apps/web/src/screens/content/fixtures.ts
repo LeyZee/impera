@@ -31,6 +31,7 @@ export const requestOf = (fields: Partial<ContentRequest> = {}): ContentRequest 
     state: 'open',
     refusalReason: null,
     dropId: null,
+    redo: null,
     createdAt: '2026-11-04T09:00:00.000Z',
     ...fields,
   });

@@ -8,6 +8,7 @@ import {
   ContentRequestIdSchema,
   ContentRequestSchema,
   CorrectDropCategoryBodySchema,
+  RedoDropBodySchema,
   CorrectDropDescriptionBodySchema,
   CreateContentDropBodySchema,
   CreateContentRequestBodySchema,
@@ -299,6 +300,21 @@ export function createContentDropRoutes(
       { ...team, schema: { params: CreatorDropParamsSchema } },
       async (request, reply) => {
         await agency.withdraw(request.params.creatorId, signedIn(request.user), request.params.id, clock());
+        return reply.code(204).send();
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/redo',
+      { ...team, schema: { params: CreatorDropParamsSchema, body: RedoDropBodySchema } },
+      async (request, reply) => {
+        await agency.redo(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.body.sentence,
+          clock(),
+        );
         return reply.code(204).send();
       },
     );
