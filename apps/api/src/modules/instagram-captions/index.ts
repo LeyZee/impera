@@ -36,8 +36,6 @@ export interface InstagramCaptionsModule {
   };
 }
 
-export type { CaptionAsking, CaptionPersona, DescribedReel } from './domain/ports';
-
 export function createInstagramCaptionsModule(deps: InstagramCaptionsDeps): InstagramCaptionsModule {
   const clock = deps.clock ?? (() => new Date());
   const writer = createGatewayCaptionWriter(deps.gateway);

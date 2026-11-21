@@ -136,7 +136,7 @@ export interface ContentDropsModule {
 }
 
 /** A live drop and what the vision AI saw in its medium. */
-export interface DescribedDrop extends DropOfMedium {
+interface DescribedDrop extends DropOfMedium {
   readonly description: string;
 }
 

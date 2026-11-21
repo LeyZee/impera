@@ -54,11 +54,6 @@ export function captionSubject(dropId: string): string {
   return `drop:${dropId}`;
 }
 
-/** The answer key of a style, and the style of an answer key (`null`: not one of ours). */
-export function answerKeyOf(style: CaptionStyle): string {
-  return style;
-}
-
 /**
  * The decision card of a Reel's caption (captures « cartes-de-decision-2 »): three rows she reads in full, each with
  * its style, « D'autres idées » three times at most. The words are fixed here, never written by the model.
@@ -76,7 +71,8 @@ export function captionDecision(
     context: 'Trois idées écrites à partir de ta vidéo. Tu choisis, je m’occupe du reste.',
     layout: 'rows',
     answers: captions.map((caption) => ({
-      key: answerKeyOf(caption.style),
+      // The answer is named by its style: her choices, style by style, are read back under it.
+      key: caption.style,
       label: CAPTION_STYLE_LABELS[caption.style],
       text: caption.text,
       noted: 'C’est noté. Cette légende partira avec ton Reel.',
