@@ -945,8 +945,9 @@ const meInvoices = createRoute({
   beforeLoad: ({ context }) => {
     creatorAway({ context });
     if (context.user.teamScope !== 'agency') {
+      // His own page at another address, not someone else's: no notice (recette MED-10).
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-      throw redirect({ to: '/commissions/factures', replace: true, state: { notice: NOT_YOURS } });
+      throw redirect({ to: '/commissions/factures', replace: true });
     }
   },
   component: function MyOwnInvoices() {
