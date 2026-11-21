@@ -22,7 +22,17 @@ import {
   type ScriptReviewStep,
   type ScriptSummaryView,
 } from '@impera/contracts';
-import { and, eq, inArray, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  eq,
+  inArray,
+  schema,
+  sql,
+  withCreatorAccount,
+  withTenantMember,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 
 import {
   handDescription,
@@ -40,7 +50,7 @@ import {
   DropDescriptionReviewConflict,
   ScriptSummaryCorrectionUnprocessable,
 } from '../../domain/errors';
-import type { DescriptionReview, ReviewedFile } from '../../domain/ports';
+import type { CreatorDescriptionReview, DescriptionReview, ReviewedFile } from '../../domain/ports';
 
 import { enqueueDescription } from './description-queue';
 import { enqueueSummary } from './script-summary-store';
@@ -278,20 +288,48 @@ function correctedSummary(shown: ScriptDropSummary, written: ScriptDropSummary):
   return ordered;
 }
 
+/** Runs a review in a transaction bounded to one creator, and gives the body her id as the scope resolved it. */
+type ReviewScope = <T>(
+  creatorId: string,
+  userId: string,
+  run: (tx: Transaction, creatorId: string) => Promise<T>,
+) => Promise<T>;
+
 /** `withTenantMember` for the owner and an active manager (ADR 0030 § 3): a chatter is refused before any read. */
 export function createDrizzleDescriptionReview(db: Database): DescriptionReview {
-  const asTeam = <T>(creatorId: string, userId: string, run: (tx: Transaction) => Promise<T>): Promise<T> =>
+  return reviewIn((creatorId, userId, run) =>
     withTenantMember(db, creatorId, userId, (tx, scope) => {
       if (!readsTeam(scope)) throw new ContentDropForbidden();
-      return run(tx);
-    });
+      return run(tx, creatorId);
+    }),
+  );
+}
 
+/**
+ * Her own review (ADR 0162 § 4): she reads, validates and corrects the descriptions of her media, in her account and
+ * under her RLS, as the agency does; her creator is read in her account, never in the request. The other gestures
+ * (asking the vision again, writing by hand, the script's synthesis) stay the agency's.
+ */
+export function createDrizzleCreatorDescriptionReview(db: Database): CreatorDescriptionReview {
+  const review = reviewIn((_creatorId, userId, run) => withCreatorAccount(db, userId, run));
+  return {
+    read: (userId, dropId) => review.read('', userId, dropId),
+    validate: (userId, dropId, ids, now, correlationId) =>
+      review.validate('', userId, dropId, ids, now, correlationId),
+    correct: (userId, dropId, descriptionId, detailed, now, correlationId) =>
+      review.correct('', userId, dropId, descriptionId, detailed, now, correlationId),
+    file: (userId, dropId, fileId) => review.file('', userId, dropId, fileId),
+    opened: (userId, file, correlationId) => review.opened('', userId, file, correlationId),
+  };
+}
+
+function reviewIn(asTeam: ReviewScope): DescriptionReview {
   return {
     read: (creatorId, userId, dropId) =>
       asTeam(creatorId, userId, async (tx) => (await stateOf(tx, dropId)).review),
 
     validate: (creatorId, userId, dropId, descriptionIds, now, correlationId) =>
-      asTeam(creatorId, userId, async (tx) => {
+      asTeam(creatorId, userId, async (tx, creatorId) => {
         const state = await stateOf(tx, dropId);
         const named = namedRows(state, descriptionIds);
         const refusal = validationRefusal(named, (mediaAssetId) => state.shown.get(mediaAssetId) ?? null);
@@ -308,7 +346,7 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
       }),
 
     correct: (creatorId, userId, dropId, descriptionId, detailed, now, correlationId) =>
-      asTeam(creatorId, userId, async (tx) => {
+      asTeam(creatorId, userId, async (tx, creatorId) => {
         const state = await stateOf(tx, dropId);
         const [base] = namedRows(state, [descriptionId]);
         if (base === undefined) throw new ContentDropNotFound();
@@ -337,7 +375,7 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
       }),
 
     retryDescription: (creatorId, userId, dropId, fileId, correlationId) =>
-      asTeam(creatorId, userId, async (tx) => {
+      asTeam(creatorId, userId, async (tx, creatorId) => {
         const state = await stateOf(tx, dropId);
         const medium = state.review.media.find((one) => one.fileId === fileId);
         if (medium === undefined) throw new ContentDropNotFound();
@@ -352,7 +390,7 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
       }),
 
     writeDescription: (creatorId, userId, dropId, fileId, written, now, correlationId) =>
-      asTeam(creatorId, userId, async (tx) => {
+      asTeam(creatorId, userId, async (tx, creatorId) => {
         const state = await stateOf(tx, dropId);
         const medium = state.review.media.find((one) => one.fileId === fileId);
         if (medium === undefined) throw new ContentDropNotFound();
@@ -392,7 +430,7 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
       }),
 
     correctSummary: (creatorId, userId, dropId, summaryId, content, now) =>
-      asTeam(creatorId, userId, async (tx) => {
+      asTeam(creatorId, userId, async (tx, creatorId) => {
         const state = await stateOf(tx, dropId);
         const summary = state.review.summary;
         if (summary?.id !== summaryId || !summary.current || state.told === null)

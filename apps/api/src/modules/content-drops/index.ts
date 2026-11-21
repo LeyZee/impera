@@ -33,10 +33,14 @@ import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
 import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
-import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
+import {
+  createDrizzleCreatorDescriptionReview,
+  createDrizzleDescriptionReview,
+} from './infra/db/description-review-store';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import { createDrizzleScriptSummaryStore } from './infra/db/script-summary-store';
+import { createDrizzleStockStore } from './infra/db/stock-store';
 import {
   createDrizzleAgencyContentStore,
   createDrizzleCreatorContentStore,
@@ -48,6 +52,7 @@ import {
 } from './infra/db/store';
 import { createDrizzleThumbnailQueue } from './infra/db/thumbnail-queue';
 import { createContentDropRoutes, type RequireRole } from './infra/http/routes';
+import { createStockRoutes } from './infra/http/stock-routes';
 import { createGatewayScriptSummarizer } from './infra/script-summarizer';
 import { createS3DropStorage, type MediaBucketConfig } from './infra/storage/s3';
 
@@ -170,15 +175,29 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
     name: 'content-drops',
-    routes: createContentDropRoutes(
-      createDrizzleCreatorContentStore(deps.db),
-      agency,
-      storage,
-      { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
-      createDrizzleDescriptionReview(deps.db),
-      deps.requireRole,
-      clock,
-    ),
+    routes: async (app) => {
+      await app.register(
+        createContentDropRoutes(
+          createDrizzleCreatorContentStore(deps.db),
+          agency,
+          storage,
+          { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
+          createDrizzleDescriptionReview(deps.db),
+          deps.requireRole,
+          clock,
+        ),
+      );
+      // Coffre Impera (ADR 0162): her stock by use, and her own review of her media.
+      await app.register(
+        createStockRoutes(
+          createDrizzleStockStore(deps.db),
+          createDrizzleCreatorDescriptionReview(deps.db),
+          storage,
+          deps.requireRole,
+          clock,
+        ),
+      );
+    },
     jobs: {
       receiveFile: (fileId, correlationId) => receiveFile(receipt, fileId, clock(), correlationId),
       convertFile: (fileId, correlationId) =>

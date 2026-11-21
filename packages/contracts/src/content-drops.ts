@@ -35,6 +35,8 @@ export const DROP_CATEGORIES = [
   'instagram_reel',
   'instagram_post',
   'telegram_post',
+  // Cadeaux baleines (ADR 0162 § 2): short, unseen, never nude, given to the biggest fans, never sold afterwards.
+  'whale_gift',
 ] as const;
 export const DropCategorySchema = z.enum(DROP_CATEGORIES);
 export type DropCategory = z.infer<typeof DropCategorySchema>;
@@ -84,6 +86,7 @@ export const DROP_CATEGORY_LABELS: Readonly<Record<DropCategory, string>> = {
   instagram_reel: 'Reel Insta',
   instagram_post: 'Photo Insta',
   telegram_post: 'Telegram',
+  whale_gift: 'Cadeaux baleines',
 };
 
 export const DROP_MEDIA_KINDS = ['image', 'video', 'audio'] as const;
@@ -200,6 +203,14 @@ export const DROP_FORMAT_RULES: Readonly<Record<DropCategory, DropFormatRule>> =
     kinds: ['image', 'video'],
     vertical: false,
     maxVideoSeconds: 600,
+    maxAudioSeconds: null,
+    maxFiles: 10,
+  },
+  // Short on purpose (ADR 0162 § 2): an attention, never a script step.
+  whale_gift: {
+    kinds: ['image', 'video'],
+    vertical: false,
+    maxVideoSeconds: 60,
     maxAudioSeconds: null,
     maxFiles: 10,
   },

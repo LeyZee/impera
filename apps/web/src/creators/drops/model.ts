@@ -26,6 +26,7 @@ export const OUT_LABELS: Readonly<Record<OutCategory, string>> = {
   instagram_reel: 'Publié sur Instagram',
   instagram_post: 'Publié sur Instagram',
   telegram_post: 'Publié sur Telegram',
+  whale_gift: 'Rangé dans Reveal',
 };
 
 /** Where it goes out, as its confirmation asks it. */
@@ -38,6 +39,7 @@ export const OUT_PLACES: Readonly<Record<OutCategory, string>> = {
   instagram_reel: 'publié sur Instagram',
   instagram_post: 'publié sur Instagram',
   telegram_post: 'publié sur son canal Telegram',
+  whale_gift: 'rangé dans Reveal, dans le dossier des cadeaux',
 };
 
 export type DropStanding = 'checking' | 'blocked' | 'too_large' | 'to_publish' | 'out';

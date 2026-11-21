@@ -572,6 +572,31 @@ export interface DescriptionBacklog {
  * or an active manager (`withTenantMember`; a chatter is refused). Every write is stamped with the account that makes
  * it and audited; each answers the drop's review as it now stands.
  */
+/**
+ * Her own review of her media's descriptions (ADR 0162 § 4): read, validate as they are, correct the words. In her
+ * account; the other gestures of the review stay the agency's.
+ */
+export interface CreatorDescriptionReview {
+  read(userId: string, dropId: string): Promise<DropDescriptionsReview>;
+  validate(
+    userId: string,
+    dropId: string,
+    descriptionIds: readonly string[],
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  correct(
+    userId: string,
+    dropId: string,
+    descriptionId: string,
+    detailed: string,
+    now: Date,
+    correlationId: string,
+  ): Promise<DropDescriptionsReview>;
+  file(userId: string, dropId: string, fileId: string): Promise<ReviewedFile | null>;
+  opened(userId: string, file: ReviewedFile, correlationId: string): Promise<void>;
+}
+
 export interface DescriptionReview {
   read(creatorId: string, userId: string, dropId: string): Promise<DropDescriptionsReview>;
   /** These rows validated as they are; a row already validated stays as it was. */

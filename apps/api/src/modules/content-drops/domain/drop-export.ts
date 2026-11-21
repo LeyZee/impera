@@ -53,6 +53,7 @@ const FOLDERS: Readonly<Record<SentDrop['category'], string>> = {
   instagram_reel: 'reel-insta',
   instagram_post: 'photo-insta',
   telegram_post: 'telegram',
+  whale_gift: 'cadeau-baleine',
 };
 
 const KIND_NAMES: Readonly<Record<DropMediaKind, string>> = {
@@ -71,6 +72,7 @@ const OUTPUTS: Readonly<Record<SentDrop['category'], string>> = {
   instagram_reel: 'À publier en Reel sur Instagram.',
   instagram_post: 'À publier sur Instagram, dans cet ordre.',
   telegram_post: 'À publier sur son canal Telegram, dans cet ordre.',
+  whale_gift: 'À ranger dans Reveal, dossier des cadeaux : offert à un gros fan, jamais revendu.',
 };
 
 /** Whether her drop's media fit in one archive (a ZIP without ZIP64). */

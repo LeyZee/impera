@@ -19,6 +19,7 @@ export * from './client-errors';
 export * from './connector';
 export * from './connector-reads';
 export * from './content-drops';
+export * from './content-stock';
 export * from './file-sniff';
 export * from './conversations';
 export * from './copilot';

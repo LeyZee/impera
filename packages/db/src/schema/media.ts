@@ -24,6 +24,7 @@ import {
   unique,
   uniqueIndex,
   uuid,
+  type PgColumn,
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
@@ -34,6 +35,7 @@ import {
   enumCheck,
   enumText,
   id,
+  notCreatorAccount,
   tenantPolicy,
   timestampTz,
 } from './columns';
@@ -297,6 +299,14 @@ export function vaultImported(ref: {
     false)`;
 }
 
+const appUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
+
+/** A medium kept from one of her drops not withdrawn (ADR 0162 § 4): the only rows of hers she may review. */
+const herDroppedMedium = (t: { readonly creatorId: PgColumn; readonly mediaAssetId: PgColumn }): SQL =>
+  sql`exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
+       where f.media_asset_id = ${t.mediaAssetId} and d.creator_id = ${t.creatorId}
+         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate'))`;
+
 /**
  * A media of the vault the owner asked to describe (ADR 0145 § 5, amendment of 17/11), after the count and the cost
  * were shown: `media.describe_vault` takes only these. Once per media; `asked_key` is the gesture's, so a gesture
@@ -390,7 +400,23 @@ export const mediaDescriptions = pgTable(
       .on(t.mediaAssetId, t.promptHash)
       .where(sql`${t.author} = 'sense' and ${t.content} ? 'detailed'`),
     tenantPolicy(t.creatorId),
-    ...creatorReadsOnly(),
+    // She reads these rows, and since ADR 0162 § 4 she validates and corrects the description of a medium of her own
+    // drops, as the agency does: a human row validated by her account at its writing, or the two stamp columns of a
+    // row not validated yet (the column grant of migration 0152 and `refuse_description_change` hold the rest). The
+    // restrictive policies stay restrictive: nothing permissive can open more for her.
+    pgPolicy('creator_no_delete', { as: 'restrictive', for: 'delete', using: notCreatorAccount }),
+    pgPolicy('creator_no_insert', {
+      as: 'restrictive',
+      for: 'insert',
+      withCheck: sql`${notCreatorAccount} or (${t.author} = 'human' and ${t.model} = 'human'
+        and ${t.validatedBy} = ${appUser} and ${t.validatedAt} is not null and ${herDroppedMedium(t)})`,
+    }),
+    pgPolicy('creator_no_update', {
+      as: 'restrictive',
+      for: 'update',
+      using: sql`${notCreatorAccount} or (${t.validatedAt} is null and ${herDroppedMedium(t)})`,
+      withCheck: sql`${notCreatorAccount} or (${t.validatedBy} = ${appUser} and ${herDroppedMedium(t)})`,
+    }),
   ],
 );
 
