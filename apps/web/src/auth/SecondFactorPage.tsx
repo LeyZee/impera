@@ -243,7 +243,7 @@ function BackupCodes({ codes, onDone }: { codes: readonly string[]; onDone: () =
       <BackupCodesList codes={codes} />
       <label className="flex items-start gap-3 text-sm">
         <input
-          className="mt-1"
+          className="nv-check"
           type="checkbox"
           checked={kept}
           onChange={(event) => {

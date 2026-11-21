@@ -162,6 +162,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
               {VAT_CHOICES.map((choice) => (
                 <label key={choice.value} className="bf-choice">
                   <input
+                    className="nv-radio"
                     type="radio"
                     name={`${id}-vat`}
                     value={choice.value}
@@ -207,6 +208,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
             <div className="bf-choices">
               <label className="bf-choice">
                 <input
+                  className="nv-radio"
                   type="radio"
                   name={`${id}-withholding`}
                   checked={treaty}
@@ -223,6 +225,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
               </label>
               <label className="bf-choice">
                 <input
+                  className="nv-radio"
                   type="radio"
                   name={`${id}-withholding`}
                   checked={!treaty}
@@ -246,6 +249,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
                 return (
                   <label key={kind} className="bf-choice">
                     <input
+                      className="nv-check"
                       type="checkbox"
                       checked={draft.documents.includes(kind)}
                       disabled={locked}
@@ -266,6 +270,7 @@ export function RegimeDialog({ onClose }: { onClose: () => void }): JSX.Element 
               })}
               <label className="bf-choice">
                 <input
+                  className="nv-check"
                   type="checkbox"
                   checked={draft.taxIdRequired}
                   onChange={(event) => {
