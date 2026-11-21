@@ -395,4 +395,16 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     expect((await call('DELETE', `/v1/creators/${nora}/drops/${drop.id}`, 'manager')).statusCode).toBe(204);
     expect((await content()).drops.map((one) => one.id)).not.toContain(drop.id);
   });
+
+  it('lets her withdraw a blocked drop, which leaves her content (recette MED-01)', async () => {
+    const drop = { id: newId(ContentDropIdSchema), category: 'telegram_post', files: [video()] };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', drop)).statusCode).toBe(200);
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'blocked', blockedReason: 'La vidéo doit être verticale.' })
+      .where(eq(schema.contentDrops.id, drop.id));
+    const withdrawn = await call('DELETE', `/v1/creator-space/drops/${drop.id}`, 'nora');
+    expect(withdrawn.statusCode, withdrawn.body).toBe(204);
+    expect((await content()).drops.map((one) => one.id)).not.toContain(drop.id);
+  });
 });
