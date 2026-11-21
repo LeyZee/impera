@@ -455,6 +455,46 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     );
   });
 
+  // Choice of 21/11 (MOD-05): a day of a week still to accept is accepted with the week, nowhere else.
+  it('shows a day of her week still to accept without « Accepter » nor « Non merci » of its own', async () => {
+    const dated = CreatorSuggestionSchema.parse({
+      ...agendaOf().suggestions[0],
+      id: '01936f00-0000-7000-8000-000000000932',
+      when: { kind: 'day', day: WEDNESDAY },
+      title: 'Jour de tournage',
+    });
+    serve(() => true, SHIFTS, agendaOf({ suggestions: [dated] }));
+    const others = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) =>
+        url.startsWith('/v1/creator-space/week?')
+          ? Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  week: dated.week,
+                  toAccept: true,
+                  shootDays: [
+                    { suggestionId: dated.id, taskId: null, state: 'suggested', day: WEDNESDAY, items: [] },
+                  ],
+                  delivery: null,
+                }),
+                { status: 200 },
+              ),
+            )
+          : others(url, init),
+      ),
+    );
+    show();
+    expect(await screen.findByRole('button', { name: 'Accepter ma semaine' })).toBeDefined();
+    const region = screen.getByRole('region', { name: 'Proposé pour aujourd’hui' });
+    await waitFor(() => {
+      expect(region.textContent).toContain('tu l’acceptes avec « Accepter ma semaine »');
+    });
+    expect(within(region).queryByRole('button', { name: 'Accepter' })).toBeNull();
+    expect(within(region).queryByRole('button', { name: 'Non merci' })).toBeNull();
+  });
+
   it('writes a task without a purpose by its title alone: its category is the tag (CRE-19)', async () => {
     serve(() => true);
     show();
