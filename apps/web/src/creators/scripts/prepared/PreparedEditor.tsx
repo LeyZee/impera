@@ -10,7 +10,7 @@ import { useEffect, useId, useRef, useState, type JSX } from 'react';
 import { StepCard } from './StepCard';
 import { changePreparedState, savePrepared } from './api';
 import { ConditionDialog, MediaPicker } from './dialogs';
-import type { EditorMedia } from './media';
+import type { EditorMedia, PickerFolder } from './media';
 import {
   PATHS_SHOWN,
   branchAt,
@@ -60,7 +60,7 @@ export function PreparedEditor({
   creatorName: string;
   initial: PreparedScriptView;
   media: ReadonlyMap<string, EditorMedia>;
-  folders: readonly { readonly key: string; readonly name: string }[];
+  folders: readonly PickerFolder[];
   /** Each answer of the server, for the list to show the same. */
   onSaved: (view: PreparedScriptView) => void;
   /** Saved by someone else since: the list is read again and the editor starts from it. */
@@ -413,6 +413,7 @@ export function PreparedEditor({
           place={branchPlace(content, picking).replace(/^./u, (first) => first.toUpperCase())}
           folders={folders}
           media={media}
+          moment={content.moment}
           taken={picked.branch.media.map((one) => one.ref)}
           onClose={() => {
             setPicking(null);
