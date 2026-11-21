@@ -47,6 +47,7 @@ export const JOB_NAMES = [
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
+  'conversation.settle_placed',
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
@@ -131,6 +132,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
+  'conversation.settle_placed': 'Brouillons placés dans Reveal',
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
@@ -261,6 +263,11 @@ export const JOB_PAYLOADS = {
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
   /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
   'conversation.release_unavailable': z.object({}),
+  /**
+   * The window of a draft placed from the copilot panel closed (ADR 0086 § 5): what left of it decides its verdict,
+   * nothing left and it expires. One per draft (`settlePlacedJobKey`); a draft decided before is left as it is.
+   */
+  'conversation.settle_placed': conversationJob.extend({ draftId: DraftIdSchema }),
   'connector.dispatch': z.object({}),
   'connector.poll': z.object({
     creatorId: CreatorIdSchema,
@@ -558,7 +565,7 @@ export const JOB_PAYLOADS = {
   /**
    * The account's native scripts mirrored from the platform (ADR 0099 § 1 time 2): steps in the platform's order, prices
    * as they are, a script gone deactivated. Asked with each vault sync the owner asks, never by a cron for now;
-   * replayable, writes nothing when nothing changed.
+   * replayable, writes nothing when nothing changed but the day's totals of its steps (ADR 0129 § 12).
    */
   'scripts.import_platform_scripts': z.object({
     creatorId: CreatorIdSchema,
@@ -623,6 +630,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
   'conversation.release_unavailable': 1,
+  'conversation.settle_placed': 3,
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
@@ -774,6 +782,11 @@ export function reopenJobKey(creatorId: string): string {
  */
 export function pauseEndJobKey(creatorId: string): string {
   return `conversation.reopen:pause:${creatorId}`;
+}
+
+/** The one settling of a placed draft (ADR 0086 § 5): placed again, it is not scheduled twice. */
+export function settlePlacedJobKey(draftId: string): string {
+  return `conversation.settle_placed:${draftId}`;
 }
 
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {

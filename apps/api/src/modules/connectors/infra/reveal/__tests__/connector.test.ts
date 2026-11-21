@@ -355,6 +355,16 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     });
   });
 
+  it('carries the totals the platform counts on each step, sequence or loose (ADR 0129 § 12)', async () => {
+    const scripts = await connect(world()).listPlatformScripts();
+    // fan_02 bought the first two steps of sequence 1 and was sent the third; a step of a sequence takes its line's.
+    expect(scripts[0]?.steps.map((step) => [step.ref.id, step.totals])).toEqual([
+      ['script_1_1', { sent: 1, purchased: 1, paidMinor: 500 }],
+      ['script_1_2', { sent: 1, purchased: 1, paidMinor: 1_500 }],
+      ['script_1_3', { sent: 1, purchased: 0, paidMinor: 0 }],
+    ]);
+  });
+
   it('reads the steps already sent to a fan, and which were bought (ADR 0018 § 5)', async () => {
     const connector = connect(world());
     const ids = (steps: { stepRef: { id: string }; purchased: boolean }[]) =>

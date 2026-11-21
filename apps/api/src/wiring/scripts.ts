@@ -1,7 +1,7 @@
 import { JOB_PAYLOADS, ScriptStructureIdSchema, asPersonaV2 } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
-import { PlatformReadUnavailable, type ConnectorsModule } from '../modules/connectors';
+import { PlatformReadUnavailable, salesFeedTimeZone, type ConnectorsModule } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
 import type { PersonaModule } from '../modules/persona';
 import { createScriptsModule, type ScriptsModule } from '../modules/scripts';
@@ -61,6 +61,7 @@ export function wireScripts(
           throw error;
         }
       },
+      dayZone: salesFeedTimeZone,
     },
   });
   const now = deps.now ?? (() => new Date());

@@ -91,11 +91,20 @@ export function sourceLine(value: FanCardValue, now: Date): string {
   return `${who}, ${ageOf(value.observedAt, now)}`;
 }
 
-/** « 4 sur 11 » for a group's folded line, on the fields it shows. */
-export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup): string {
+/** How many of a group's fields are known, among those it shows: its gauge fills to that share (Design 21/11). */
+export function groupShare(
+  entries: readonly FanCardEntry[],
+  group: FanCardGroup,
+): { readonly known: number; readonly total: number } {
   const specs = restOf(group);
   const known = specs.filter((spec) => entryOf(entries, spec.field).current !== null).length;
-  return `${String(known)} sur ${String(specs.length)}`;
+  return { known, total: specs.length };
+}
+
+/** « 4 sur 11 » for a group's folded line, on the fields it shows. */
+export function groupLine(entries: readonly FanCardEntry[], group: FanCardGroup): string {
+  const { known, total } = groupShare(entries, group);
+  return `${String(known)} sur ${String(total)}`;
 }
 
 /** How many fields of a group, among those it shows, wait for a chatter: said on its folded line (V-EXT-07). */
@@ -124,7 +133,7 @@ export function identityText(field: IdentityField, items: readonly string[]): st
 }
 
 /** A label as it reads inside a sentence: its first letter in lower case. */
-export const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
+const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr-FR') + text.slice(1);
 
 /**
  * Where the identity line comes from, said once (EXT-04): one source when the three parts share it, else one line per
@@ -156,4 +165,36 @@ export function newestOf(entries: readonly FanCardEntry[]): string | null {
     if (current !== null && (newest === null || Date.parse(current.observedAt) > Date.parse(newest)))
       newest = current.observedAt;
   return newest;
+}
+
+/** What « N à découvrir » opens (Design 16/11, lot 0141-3): a title, and the fields not known yet under it. */
+export interface ToDiscover {
+  readonly title: string;
+  readonly labels: readonly string[];
+}
+
+/**
+ * What is not known of him yet, by place: the brief first, then each group. A field with a value or one waiting for a
+ * check is not to discover. What is masked while his age is contested is not named either (ADR 0141 § 9).
+ */
+export function toDiscover(entries: readonly FanCardEntry[], masked: boolean): readonly ToDiscover[] {
+  const unknown = (spec: FanCardFieldSpec): boolean => {
+    const entry = entryOf(entries, spec.field);
+    return entry.current === null && entry.toCheck.length === 0 && !(masked && spec.group === 'intimate');
+  };
+  const sections = [
+    {
+      title: 'En bref',
+      labels: ESSENTIALS.map(specOf)
+        .filter((spec): spec is FanCardFieldSpec => spec !== undefined && unknown(spec))
+        .map((spec) => lowerFirst(spec.label)),
+    },
+    ...PANEL_GROUPS.map(({ group, title }) => ({
+      title,
+      labels: restOf(group)
+        .filter(unknown)
+        .map((spec) => lowerFirst(spec.label)),
+    })),
+  ];
+  return sections.filter(({ labels }) => labels.length > 0);
 }

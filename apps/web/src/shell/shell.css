@@ -2359,3 +2359,226 @@ label.nv-notif__row {
   stroke-width: 1.6;
   stroke-dasharray: 3 3;
 }
+
+/* « Tes notifications » (trou 9 du 21/11): how many first, a bar of the five families, then each line by day. */
+.nv-inbox [data-family='money'] {
+  --nv-inbox-hue: var(--nv-sale);
+}
+.nv-inbox [data-family='day'] {
+  --nv-inbox-hue: var(--nv-series-1);
+}
+.nv-inbox [data-family='team'] {
+  --nv-inbox-hue: var(--nv-series-2);
+}
+.nv-inbox [data-family='alert'] {
+  --nv-inbox-hue: var(--nv-series-3);
+}
+.nv-inbox [data-family='safety'] {
+  --nv-inbox-hue: var(--nv-danger);
+}
+.nv-inbox__head {
+  display: grid;
+  gap: 12px;
+}
+.nv-inbox__answer {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.nv-inbox__big {
+  font-family: var(--nv-font-display);
+  font-size: var(--nv-text-large-title);
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
+  color: var(--nv-ink);
+}
+.nv-inbox__small {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-body);
+}
+.nv-inbox__bar {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--nv-fill-track);
+}
+.nv-inbox__seg {
+  flex-basis: 0;
+  min-width: 6px;
+  background: var(--nv-inbox-hue);
+  transform-origin: left center;
+  animation: nv-inbox-grow var(--nv-dur-slow) var(--nv-ease-out) backwards;
+  animation-delay: calc(var(--nv-i, 0) * 70ms);
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+@keyframes nv-inbox-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.nv-inbox__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-inbox__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__key[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--nv-inbox-hue) 22%, transparent);
+  color: var(--nv-ink);
+}
+.nv-inbox__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  color: var(--nv-inbox-hue);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--nv-inbox-hue) 55%, transparent));
+}
+.nv-inbox__icon .nav-icon {
+  width: 18px;
+  height: 18px;
+}
+.nv-inbox__item .nv-inbox__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nv-inbox-hue) 14%, transparent);
+}
+/* One family lit (legend hovered, touched or focused): the others step back, bar and lines alike. */
+.nv-inbox__body[data-lit] .nv-inbox__seg,
+.nv-inbox__body[data-lit] .nv-inbox__key,
+.nv-inbox__body[data-lit] .nv-inbox__item {
+  opacity: 0.32;
+}
+.nv-inbox__body[data-lit='money'] [data-family='money'],
+.nv-inbox__body[data-lit='day'] [data-family='day'],
+.nv-inbox__body[data-lit='team'] [data-family='team'],
+.nv-inbox__body[data-lit='alert'] [data-family='alert'],
+.nv-inbox__body[data-lit='safety'] [data-family='safety'] {
+  opacity: 1;
+}
+.nv-inbox__list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-inbox__list li {
+  animation: nv-shell-rise var(--nv-dur-base) var(--nv-ease-out) backwards;
+  animation-delay: calc(var(--nv-i, 0) * 40ms);
+}
+.nv-inbox__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--nv-target-min, 44px);
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: var(--nv-ink);
+  text-decoration: none;
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__item:hover,
+.nv-inbox__item:focus-visible {
+  background: var(--nv-plate-hover, var(--nv-fill-soft));
+  transform: translateX(2px);
+}
+.nv-inbox__text {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.nv-inbox__title {
+  max-width: 100%;
+  text-wrap: pretty;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.nv-inbox__tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font-size: 12px;
+}
+.nv-inbox__time {
+  flex: none;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+}
+/* A line opens its page: a chevron says so, and slides on hover. */
+.nv-inbox__go {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    stroke var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__item:hover .nv-inbox__go,
+.nv-inbox__item:focus-visible .nv-inbox__go {
+  stroke: var(--nv-ink);
+  transform: translateX(3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-inbox__seg,
+  .nv-inbox__list li {
+    animation: none;
+  }
+  .nv-inbox__item:hover {
+    transform: none;
+  }
+}
+/* The eyebrow sits right above the answer, no empty line between (avis Design du 21/11). */
+.nv-inbox > .nv-panel__head {
+  padding-bottom: 0;
+}
+.nv-inbox .nv-inbox__head {
+  padding-top: var(--nv-space-2, 8px);
+}
+.nv-inbox__big {
+  text-wrap: balance;
+}
+@media (max-width: 640px) {
+  .nv-inbox__big {
+    font-size: var(--nv-text-metric);
+    line-height: var(--nv-text-metric-leading);
+  }
+}

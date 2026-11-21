@@ -129,6 +129,8 @@ export function toDraft(row: typeof schema.drafts.$inferSelect): Draft {
     bubbles: row.bubbles,
     finalBubbles: row.finalBubbles,
     createdAt: row.createdAt,
+    placedAt: row.placedAt,
+    placedBy: row.placedBy === null ? null : UserIdSchema.parse(row.placedBy),
     facts: readFacts(row.brief),
     scriptStep: readScriptStep(row.policyTrace),
   };
