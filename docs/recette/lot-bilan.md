@@ -72,7 +72,7 @@ FakeReveal (API privée provisoire et API CRM) vit dans les tests : `apps/api/sr
 
 Pour chaque job de `apps/api/src/crontab.ts` : le lancer à la main sur le jeu de recette, le lancer deux fois (idempotence), le faire échouer (base coupée) et vérifier la reprise. Liste : `backups.check`, `connector.check_sales`, `connector.read_sales`, `connector.dispatch`, `content_drops.erase_originals`, `conversation.release_unavailable`, `fans.purge_facts`, `payroll.*` (9 jobs, avec Équipe), `providers.check_credentials`, `rate_limit.purge`, `scheduling.*` (3 jobs, avec Équipe), `scripts.ask_scripts` (avec Médias), `team.apply_roles`, `telegram.*` (6 jobs).
 
-## 7. Telegram (Réglages › Telegram), sans bot réel
+## 7. Telegram (Réglages › Bots Telegram), sans bot réel
 
 | # | Parcours | Attendu |
 |---|---|---|

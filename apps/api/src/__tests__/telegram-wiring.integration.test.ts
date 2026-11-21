@@ -56,7 +56,7 @@ describe('Telegram wired in the app', () => {
     expect(Object.keys(withKeys.tasks)).toEqual(expect.arrayContaining(telegramJobs));
   });
 
-  it('serves Réglages › Telegram to a signed-in owner only', async () => {
+  it('serves Réglages › Bots Telegram to a signed-in owner only', async () => {
     expect(withKeys.modules.telegram).not.toBeNull();
     const response = await server.inject({ method: 'GET', url: '/v1/settings/telegram' });
     expect(response.statusCode).toBe(401);

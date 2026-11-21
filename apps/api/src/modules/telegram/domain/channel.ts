@@ -169,7 +169,7 @@ function chatRefusal(chatId: TelegramChatId | null, context: ChannelContext): Ch
   if (context.routed.has(chatId)) {
     return {
       kind: 'chat_routed',
-      message: `« ${chat.title} » reçoit des alertes de l’agence : retire-le du routage dans Réglages › Telegram d’abord.`,
+      message: `« ${chat.title} » reçoit des alertes de l’agence : retire-le du routage dans Réglages › Bots Telegram d’abord.`,
     };
   }
   return null;

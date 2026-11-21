@@ -15,7 +15,7 @@ Les groupes Telegram reçoivent ce qui demande un humain (ADR 0020). Un message 
 
 ## Quand plus rien n'arrive
 
-1. Réglages › Telegram › Bots et groupes : l'état du bot et du groupe dit la cause, en une phrase.
+1. Réglages › Bots Telegram › Bots et groupes : l'état du bot et du groupe dit la cause, en une phrase.
 2. « Jeton refusé » : le jeton a été révoqué. Dans @BotFather, `/token` pour en obtenir un, puis « Remplacer le jeton ». Les messages en attente partent dans l'heure qui suit.
 3. « Utilisé ailleurs » : un autre programme lit le même bot. L'arrêter, ou créer un bot réservé à Impera.
 4. « Le bot ne peut plus écrire dans ce groupe » : le rajouter au groupe, puis « Envoyer un test ».

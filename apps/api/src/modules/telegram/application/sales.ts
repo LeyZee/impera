@@ -12,7 +12,7 @@ import type { BotsStore, Clock, DeliveriesStore, SalesDayReader } from '../domai
 import { eveningDigestText, saleSettingsFor } from '../domain/sales';
 import { eveningDigestOf } from '../domain/schedule';
 
-/** The sales topic of Réglages › Telegram and its evening digest (CRM-04 lot b). */
+/** The sales topic of Réglages › Bots Telegram and its evening digest (CRM-04 lot b). */
 
 /** The whole list, the entry for every creator first and always there (the defaults when none was saved). */
 export async function saleSettings(deps: { readonly bots: BotsStore }): Promise<TelegramSalesSettings> {

@@ -20,7 +20,9 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
   });
 
   it('says her rhythm, the switched-on slots only', () => {
-    expect(rhythmWords(DEFAULT_TELEGRAM_CHANNEL_CONFIG.slots)).toBe('19 h tous les jours');
+    expect(rhythmWords(DEFAULT_TELEGRAM_CHANNEL_CONFIG.slots)).toBe(
+      `9\u00a0h tous les jours · 13\u00a0h tous les jours · 18\u00a0h tous les jours`,
+    );
     expect(rhythmWords([{ minute: 600, role: ENGAGEMENT, days: [1], enabled: false }])).toBe(
       'Aucun post prévu',
     );
@@ -44,9 +46,9 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
     expect(issuesOf({ ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, slots: off }).has('slot:1')).toBe(false);
   });
 
-  it('offers a slot three hours after the last, across midnight', () => {
+  it('offers a slot two hours after the last, across midnight (ADR 0162 § 2)', () => {
     expect(nextSlot([])?.minute).toBe(1140);
-    expect(nextSlot([{ minute: 1320, role: ENGAGEMENT, days: [1], enabled: true }])?.minute).toBe(60);
+    expect(nextSlot([{ minute: 1320, role: ENGAGEMENT, days: [1], enabled: true }])?.minute).toBe(0);
   });
 
   it('never offers an hour already too close to another slot', () => {
@@ -56,15 +58,15 @@ describe('the channel’s screen words (ADR 0080 § 6)', () => {
       days: [1],
       enabled: true,
     }));
-    // 1 h + 3 h = 4 h is three hours from 1 h, and far from 19 h and 22 h.
-    expect(nextSlot(slots)?.minute).toBe(4 * 60);
+    // 1 h + 2 h = 3 h is two hours from 1 h, and far from 19 h and 22 h.
+    expect(nextSlot(slots)?.minute).toBe(3 * 60);
     const round = [1, 4, 7, 10, 13, 16, 19, 22].map((hour) => ({
       minute: hour * 60,
       role: ENGAGEMENT,
       days: [1],
       enabled: true,
     }));
-    expect(nextSlot(round)?.minute).toBe(60);
+    expect(nextSlot(round)?.minute).toBe(0);
   });
 
   it('refuses a bare domain in the words of the link', () => {

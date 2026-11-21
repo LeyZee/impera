@@ -27,7 +27,7 @@ class LinkNoBotUnprocessable extends DomainError {
   constructor() {
     super(
       TELEGRAM_LINK_NO_BOT_UNPROCESSABLE,
-      'Aucun bot Telegram n’est branché : il faut d’abord l’ajouter dans Réglages › Telegram',
+      'Aucun bot Telegram n’est branché : il faut d’abord l’ajouter dans Réglages › Bots Telegram',
     );
   }
 }

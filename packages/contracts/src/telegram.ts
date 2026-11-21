@@ -5,7 +5,7 @@ import { CreatorIdSchema } from './ids';
 import { pastedSecret } from './pasted-secret';
 
 /**
- * Telegram notifications managed from Réglages › Telegram (ADR 0020, task P3-07). A bot token never crosses the
+ * Telegram notifications managed from Réglages › Bots Telegram (ADR 0020, task P3-07). A bot token never crosses the
  * API outwards: only what Telegram says about the bot and the groups it sits in.
  */
 
@@ -245,5 +245,5 @@ export const TelegramLinkCodeSchema = z.object({
 });
 export type TelegramLinkCode = z.infer<typeof TelegramLinkCodeSchema>;
 
-/** No active bot can take the code yet (422): one is added first in Réglages › Telegram. */
+/** No active bot can take the code yet (422): one is added first in Réglages › Bots Telegram. */
 export const TELEGRAM_LINK_NO_BOT_UNPROCESSABLE = 'telegram_link_no_bot_unprocessable';

@@ -19,7 +19,7 @@ const CODE_LENGTH = 10;
 export const LINKED_TEXT =
   'C’est fait : ce chat recevra ton lien si tu oublies ton mot de passe Impera. Rien d’autre n’y passera.';
 export const EXPIRED_TEXT =
-  'Ce code ne marche plus. Demandes-en un nouveau dans Impera, Réglages › Telegram.';
+  'Ce code ne marche plus. Demandes-en un nouveau dans Impera, Réglages › Bots Telegram.';
 
 export interface PrivateLinkDeps {
   readonly bots: BotsStore;
