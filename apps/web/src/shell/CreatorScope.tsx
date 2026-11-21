@@ -20,7 +20,7 @@ export function scopesCreators(me: Pick<Me, 'role' | 'teamScope'>): boolean {
 }
 
 /** The screens the selector applies to: elsewhere it stays in the menu and only keeps the choice. */
-const SCOPED = ['/', '/creatrices', '/suivi', '/suivi/fans'] as const;
+const SCOPED = ['/', '/creatrices', '/suivi', '/suivi/fans', '/trafic'] as const;
 export function isScoped(pathname: string): boolean {
   return SCOPED.some((path) => path === pathname);
 }
@@ -32,7 +32,7 @@ function urgencies(count: number): string | undefined {
 
 /**
  * The creator selector (ADR 0134 § 3): at the head of the menu on a computer, at the head of the page on a phone. It
- * says which creator the Dashboard, Suivi, Fans and Créatrices show, « Toutes » for the agency's views, and keeps the
+ * says which creator the Dashboard, Suivi, Fans, Trafic and Créatrices show, « Toutes » for the agency's views, and keeps the
  * choice on the device. On Créatrices the choice opens her sheet, or the list. Nothing with no creator: there is nothing
  * to choose.
  */

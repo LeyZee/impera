@@ -6,8 +6,9 @@ import type {
   VaultMediaView,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from 'react';
 
+import { VaultPicker } from './VaultPicker';
 import {
   askVaultDescribe,
   askVaultSync,
@@ -32,10 +33,12 @@ import {
   descriptionLine,
   filteredMedia,
   folderCount,
-  importLine,
+  folderInLine,
+  importedFolders,
   mediaGroups,
   progressLine,
   railFolders,
+  restLine,
   rangeSelected,
   selectable,
   selectedLine,
@@ -50,18 +53,15 @@ import {
   durationLine,
   findFolder,
   folderIdOf,
-  folderLine,
   folderName,
   mediaKindLine,
   phaseAfterRead,
   phaseLine,
   polls,
   syncedLine,
-  vaultFigures,
   type SyncPhase,
 } from './model';
 import {
-  CheckIcon,
   ChevronIcon,
   CloseIcon,
   EyeIcon,
@@ -72,16 +72,17 @@ import {
   SelectIcon,
   Sharp,
   SparkIcon,
-  SyncIcon,
+  VaultArt,
   VoiceFace,
 } from './parts';
+import { appliedLine, draftChanges, draftSummary, pickKey, type PickDraft } from './picker';
 import './vault.css';
 import './vault-page.css';
 
 import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
 import { useMediaBlur } from '@/shell/media-blur';
-import { Failure } from '@/shell/states';
+import { Empty, Failure } from '@/shell/states';
 
 /** How often the choices are read again while descriptions asked from this page run; never past `PROGRESS_PATIENCE_MS`. */
 const PROGRESS_POLL_MS = 4_000;
@@ -98,15 +99,16 @@ const keyOf = (folder: Pick<VaultFolderView, 'platformAccountId' | 'folderRef'>)
   `${folder.platformAccountId}:${folder.folderRef ?? ''}`;
 
 /**
- * « Son coffre Reveal », by choice (ADR 0099 §§ 2-4, ADR 0145 § 5): her folders on the left, each with its import tick
- * (all, some, none: nothing at first, the root an ordinary folder at the bottom), the folder open on the right as a grid.
- * The owner picks media (« Sélectionner », Shift for a run, « Tout sélectionner dans ce dossier ») and, from the bar that
- * floats under the grid, imports them, has them described with the cost said on the button and again before anything
- * starts, or takes them out. An active manager reads, never picks nor syncs.
+ * « Son coffre » (ADR 0099 §§ 2-4, ADR 0145 § 5 and its avenant du 20/11): only what is in Impera, its folders on the
+ * left, the folder open on the right as a grid. « Synchroniser » reads Reveal again and opens « Choisir dans Reveal »
+ * (`VaultPicker`), where the owner ticks folders whole or media one by one; nothing in Reveal is shown here before it is
+ * chosen. In a folder, the owner picks media (« Sélectionner », Shift for a run, « Tout sélectionner dans ce dossier »)
+ * and, from the bar that floats under the grid, has them described with the cost said on the button and again before
+ * anything starts, or takes them out of Impera. An active manager reads, never picks nor syncs.
  *
- * The tiles are the platform's blur (ADR 0030 § 4), sharp on a gesture (ADR 0138): the pointer on one outside a
- * selection, « Voir net » for the folder, the eye in a tile's corner while selecting, its sheet. On a phone the folders
- * are a list, and a folder opened takes the screen with its way back.
+ * The pictures follow the menu's « Flou des médias » everywhere (ADR 0030 § 4, ADR 0138): sharp when it says « Nets »;
+ * blurred, sharp on a gesture (the pointer on one outside a selection, the eye in a tile's corner while selecting, its
+ * sheet). On a phone the folders are a list, and a folder opened takes the screen with its way back.
  */
 export function VaultPage({
   creatorId,
@@ -127,6 +129,10 @@ export function VaultPage({
   const [batch, setBatch] = useState<Batch | null>(null);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
+  /** « Choisir dans Reveal » open, on its folders or on one of them. */
+  const [picking, setPicking] = useState<{ readonly start: string | null } | null>(null);
+  /** What the window just changed, said once under the head. */
+  const [applied, setApplied] = useState<string | null>(null);
   const vault = useVault(creatorId, polls(phase) ? SYNC_POLL_MS : false);
   const now = useNow();
 
@@ -202,9 +208,45 @@ export function VaultPage({
 
   const running = phase.kind === 'asking' || phase.kind === 'waiting' || phase.kind === 'slow';
   const said = phaseLine(phase);
+  const inImpera = useMemo(() => importedFolders(folders, index), [folders, index]);
   const chosen = vault.data === undefined ? null : findFolder(vault.data, opened);
-  // On a computer a folder is always open, the first one when none is named; on a phone, the list until one is.
-  const shown = chosen ?? folders[0] ?? null;
+  // Only a folder in Impera opens here; on a computer one is always open, the first when none is named.
+  const shown =
+    (chosen === null ? undefined : inImpera.find((each) => keyOf(each) === keyOf(chosen))) ??
+    inImpera[0] ??
+    null;
+
+  /** « Choisir dans Reveal »: Reveal read again, and the window open on what it reads. */
+  const choose = (start: string | null): void => {
+    setPicking({ start });
+    setApplied(null);
+    if (!running) sync();
+  };
+
+  /** The window's draft, written in turns: the choices as they now stand, the window closed and what changed said. */
+  const apply = async (draft: PickDraft): Promise<void> => {
+    const summary = draftSummary(draft, index, folders);
+    setPending(true);
+    setFailed(false);
+    let last = null;
+    for (const each of draftChanges(draft, folders)) {
+      last = await putVaultChoices(creatorId, each);
+      if (last === null) break;
+    }
+    setPending(false);
+    if (last === null) {
+      setFailed(true);
+      return;
+    }
+    queryClient.setQueryData(vaultChoicesKey(creatorId), last);
+    setPicking(null);
+    setApplied(appliedLine(summary));
+    // The first folder that entered Impera opens, so what she just chose is what she sees.
+    const entered = folders.find(
+      (each) => draft.get(pickKey(each))?.kind !== 'none' && draft.has(pickKey(each)),
+    );
+    if (entered !== undefined) goTo(folderIdOf(entered));
+  };
 
   const body = (): JSX.Element => {
     if (vault.data === undefined) {
@@ -212,72 +254,62 @@ export function VaultPage({
         return <Failure inline title="Son coffre ne se charge pas" onRetry={() => void vault.refetch()} />;
       return <div className="ps-skeleton vx-skeleton vp-skeleton" aria-busy="true" />;
     }
-    if (vault.data.syncedAt === null && vault.data.folders.length === 0)
+    if (choices.data !== undefined && inImpera.length === 0)
       return (
-        <div className="vx-empty">
-          <p className="vx-empty__title">
-            {isOwner ? 'Première synchro à lancer' : 'En attente de la première synchro'}
-          </p>
-          <p className="ps-muted">
-            {isOwner
-              ? `Lance une première synchro : Impera lit le coffre Reveal de ${creatorName}, dossier par dossier, sans rien y changer. Rien n’entre dans Impera avant que tu le coches.`
-              : `Le propriétaire lance la première synchro : le coffre Reveal de ${creatorName} apparaîtra ici.`}
-          </p>
-        </div>
+        <Empty
+          className="vp-empty-start"
+          icon={<VaultArt />}
+          title="Rien dans Impera pour l’instant"
+          action={
+            isOwner ? (
+              // The screen's only action while it is empty: neon here, soft in the head once the vault holds something.
+              <button
+                type="button"
+                className="nv-btn nv-btn--neon"
+                onClick={() => {
+                  choose(null);
+                }}
+              >
+                Choisir dans Reveal
+              </button>
+            ) : undefined
+          }
+        >
+          {isOwner
+            ? 'Choisis dans son coffre Reveal les dossiers qui servent à construire ses scripts. Rien n’y change.'
+            : `Le propriétaire choisit dans le coffre Reveal de ${creatorName} ce qui entre dans Impera.`}
+        </Empty>
       );
-    if (vault.data.folders.length === 0 || shown === null)
-      return (
-        <div className="vx-empty">
-          <p className="vx-empty__title">Coffre vide</p>
-          <p className="ps-muted">Reveal n’a listé aucun média à la dernière synchro.</p>
-        </div>
-      );
-    const figures = vaultFigures(vault.data);
-    const chosenFigures = choiceFigures(vault.data, index);
-    const share = (value: number): number => (chosenFigures.listed === 0 ? 0 : value / chosenFigures.listed);
+    if (shown === null) return <div className="ps-skeleton vx-skeleton vp-skeleton" aria-busy="true" />;
+    const figures = choiceFigures(vault.data, index);
     return (
       <>
-        {/* Nothing imported yet: one sentence says it, no figures and no empty gauge. Then one line of figures, and a
-            gauge of what is imported across the card's width; described is said by the line alone. */}
-        {chosenFigures.imported === 0 && isOwner && choices.data !== undefined ? (
-          <p className="vx-note vp-first">
-            Rien n’est encore importé : coche un dossier entier, ou ouvre-le et sélectionne ses médias. Seuls
-            les médias importés servent aux scripts et à l’IA.
-          </p>
-        ) : (
-          <div className="vp-sum" data-chosen={chosen === null ? undefined : ''}>
-            <p className="vp-sum__line nv-num">{summaryLine(chosenFigures)}</p>
-            {chosenFigures.imported === 0 ? null : (
-              <span className="vp-sum__meter" aria-hidden="true">
-                <span className="vp-sum__in" style={{ '--vp-share': share(chosenFigures.imported) }} />
-              </span>
-            )}
-          </div>
-        )}
+        {/* One line of figures, and a gauge of what is described of what is in Impera, across the card's width. */}
+        <div className="vp-sum" data-chosen={chosen === null ? undefined : ''}>
+          <p className="vp-sum__line nv-num">{summaryLine(figures)}</p>
+          <span className="vp-sum__meter" aria-hidden="true">
+            <span
+              className="vp-sum__in"
+              style={{ '--vp-share': figures.imported === 0 ? 0 : figures.described / figures.imported }}
+            />
+          </span>
+        </div>
         <div className="vp-body" data-chosen={chosen === null ? undefined : ''}>
-          <nav className="vp-rail" aria-label="Ses dossiers">
+          <nav className="vp-rail" aria-label="Ses dossiers dans Impera">
             <p className="nv-eyebrow vp-rail__head">
               <span>Dossiers</span>
-              <span className="nv-num">{figures.folders}</span>
+              <span className="nv-num">{inImpera.length}</span>
             </p>
             <ul className="vp-rail__list">
-              {folders.map((folder) => (
+              {inImpera.map((folder) => (
                 <FolderRow
                   key={keyOf(folder)}
+                  creatorId={creatorId}
                   folder={folder}
                   count={folderCount(index, folder)}
                   open={keyOf(folder) === keyOf(shown)}
-                  isOwner={isOwner}
-                  busy={pending || choices.data === undefined}
                   onOpen={() => {
                     goTo(folderIdOf(folder));
-                  }}
-                  onTick={(imported) => {
-                    void change({
-                      platformAccountId: folder.platformAccountId,
-                      folders: [{ folderRef: folder.folderRef, imported }],
-                      media: [],
-                    });
                   }}
                 />
               ))}
@@ -291,12 +323,15 @@ export function VaultPage({
             isOwner={isOwner}
             ready={choices.data !== undefined}
             pending={pending}
-            failed={failed}
+            failed={failed && picking === null}
             progress={batch !== null && batch.folder === keyOf(shown) ? progress : null}
             onBack={() => {
               goTo(null);
             }}
             onChange={change}
+            onPickRest={() => {
+              choose(keyOf(shown));
+            }}
             onAsked={(ids) => {
               setBatch({ folder: keyOf(shown), ids, askedAt: Date.now() });
               void choices.refetch();
@@ -311,78 +346,88 @@ export function VaultPage({
     <section className="nv-plate vx-card vp" aria-label={`Coffre Reveal de ${creatorName}`}>
       <div className="vx-head">
         <div className="vx-head__who">
-          <p className="ps-title">Son coffre Reveal</p>
+          <p className="ps-title">Son coffre</p>
           <p className="ps-muted vx-synced">
-            {vault.data === undefined ? ' ' : syncedLine(vault.data.syncedAt, now)}
+            {vault.data === undefined ? ' ' : `Reveal · ${syncedLine(vault.data.syncedAt, now)}`}
           </p>
         </div>
-        {isOwner ? (
+        {isOwner && inImpera.length > 0 ? (
           <button
             type="button"
             className="nv-btn nv-btn--soft nv-btn--sm vx-sync"
-            disabled={running}
             aria-busy={running}
-            onClick={sync}
+            onClick={() => {
+              choose(null);
+            }}
           >
-            {running ? <span className="nv-dot nv-dot--live" aria-hidden="true" /> : <SyncIcon />}
-            {running ? 'Synchro en cours' : 'Synchroniser'}
+            {running ? <span className="nv-dot nv-dot--live" aria-hidden="true" /> : null}
+            Choisir dans Reveal
           </button>
         ) : null}
       </div>
       {!isOwner ? (
-        <p className="ps-muted vx-note">Seul le propriétaire synchronise, importe et fait décrire.</p>
+        <p className="ps-muted vx-note">
+          Seul le propriétaire choisit ce qui entre dans Impera et fait décrire.
+        </p>
       ) : null}
-      <p className={`vx-phase vx-phase--${said?.tone ?? 'muted'}`} role="status">
-        {said?.text ?? ''}
+      <p
+        className={`vx-phase vx-phase--${applied === null && picking === null ? (said?.tone ?? 'muted') : 'muted'}`}
+        role="status"
+      >
+        {applied ?? (picking === null ? (said?.text ?? '') : '')}
       </p>
       {body()}
+      {picking === null ? null : (
+        <VaultPicker
+          creatorId={creatorId}
+          folders={vault.data === undefined ? null : folders}
+          index={index}
+          syncedAt={vault.data?.syncedAt ?? null}
+          reading={running}
+          readLine={
+            phase.kind === 'none' || phase.kind === 'failed' || phase.kind === 'slow'
+              ? (said?.text ?? null)
+              : null
+          }
+          startFolder={picking.start}
+          now={now}
+          saving={pending}
+          failed={failed}
+          onApply={(draft) => {
+            void apply(draft);
+          }}
+          onClose={() => {
+            setPicking(null);
+            setFailed(false);
+          }}
+        />
+      )}
     </section>
   );
 }
 
 /**
- * One folder of the rail: its import tick for the owner (a dash when some of its media only are imported), then the
- * button that opens it, with its first preview, its name as Reveal gives it and how much of it is imported.
+ * One folder in Impera on the rail: the button that opens it, with its first preview, its name as Reveal gives it, and
+ * how much of it is in Impera and described.
  */
 function FolderRow({
+  creatorId,
   folder,
   count,
   open,
-  isOwner,
-  busy,
   onOpen,
-  onTick,
 }: {
+  creatorId: CreatorId;
   folder: VaultFolderView;
   count: FolderCount;
   open: boolean;
-  isOwner: boolean;
-  busy: boolean;
   onOpen: () => void;
-  onTick: (imported: boolean) => void;
 }): JSX.Element {
-  const tick = useRef<HTMLInputElement>(null);
   const name = folderName(folder);
   const first = folder.media.find((each) => !each.removed);
-  useLayoutEffect(() => {
-    if (tick.current !== null) tick.current.indeterminate = count.tick === 'some';
-  }, [count.tick]);
+  const blurred = useMediaBlur();
   return (
-    <li className="vp-folder" data-open={open ? '' : undefined} data-tick={count.tick}>
-      {isOwner ? (
-        <input
-          ref={tick}
-          type="checkbox"
-          className="nv-check vp-folder__tick"
-          aria-label={`Importer tout ${name}`}
-          checked={count.tick === 'all'}
-          aria-checked={count.tick === 'some' ? 'mixed' : count.tick === 'all'}
-          disabled={busy}
-          onChange={() => {
-            onTick(count.tick !== 'all');
-          }}
-        />
-      ) : null}
+    <li className="vp-folder" data-open={open ? '' : undefined}>
       <button
         type="button"
         className="vp-folder__open"
@@ -395,21 +440,17 @@ function FolderRow({
           ) : first.kind === 'audio' ? (
             <VoiceFace seed={first.platformMediaId} bars={7} />
           ) : (
-            <Preview hash={first.blurhash} />
+            <>
+              <Preview hash={first.blurhash} />
+              {blurred ? null : <Sharp creatorId={creatorId} media={first} />}
+            </>
           )}
         </span>
         <span className="vp-folder__text">
           <span className="vp-folder__name">
             <span className="vp-folder__label">{name}</span>
-            {/* Where the others carry their ☀️ or 🌙: a folder Reveal names with neither, to rename. */}
-            {folder.folderRef !== null && folder.moment === null ? (
-              <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" />
-            ) : null}
           </span>
-          <span className="vp-folder__line nv-num">{importLine(count)}</span>
-          {folder.folderRef !== null && folder.moment === null ? (
-            <span className="vp-folder__warn">Ni ☀️ ni 🌙 : à renommer dans Reveal</span>
-          ) : null}
+          <span className="vp-folder__line nv-num">{folderInLine(count)}</span>
         </span>
         <span className="vp-folder__chev" aria-hidden="true">
           <ChevronIcon />
@@ -446,6 +487,7 @@ function FolderPane({
   progress,
   onBack,
   onChange,
+  onPickRest,
   onAsked,
 }: {
   creatorId: CreatorId;
@@ -458,6 +500,8 @@ function FolderPane({
   progress: { readonly done: number; readonly total: number } | null;
   onBack: () => void;
   onChange: (change: VaultChoicesChange) => Promise<boolean>;
+  /** « Les choisir »: the window open on this folder, for what of it stayed in Reveal. */
+  onPickRest: () => void;
   onAsked: (ids: readonly string[]) => void;
 }): JSX.Element {
   const [filters, setFilters] = useState<ReadonlySet<VaultFilter>>(new Set());
@@ -467,12 +511,14 @@ function FolderPane({
   const [peeked, setPeeked] = useState<ReadonlySet<string>>(new Set());
   const [picked, setPicked] = useState<string | null>(null);
   const [describe, setDescribe] = useState<Describe | null>(null);
+  const [removing, setRemoving] = useState<readonly string[] | null>(null);
   const blurred = useMediaBlur();
   const name = folderName(folder);
   const title = useRef<HTMLHeadingElement>(null);
 
-  const unmarked = folder.folderRef !== null && folder.moment === null;
-  const groups = mediaGroups(folder, index, filteredMedia(folder, index, filters));
+  const count = folderCount(index, folder);
+  const rest = isOwner ? restLine(count) : null;
+  const groups = mediaGroups(filteredMedia(folder, index, filters));
   const shown = groups.flatMap((group) => group.media);
   const order = shown.filter(selectable).map((each) => each.platformMediaId);
   const every = order.length > 0 && order.every((id) => selected.has(id));
@@ -490,7 +536,7 @@ function FolderPane({
   useEffect(() => {
     if (!selecting) return;
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && picked === null && describe === null) {
+      if (event.key === 'Escape' && picked === null && describe === null && removing === null) {
         setSelecting(false);
         setSelected(new Set());
       }
@@ -499,7 +545,7 @@ function FolderPane({
     return () => {
       window.removeEventListener('keydown', onKey);
     };
-  }, [selecting, picked, describe]);
+  }, [selecting, picked, describe, removing]);
 
   const press = (each: VaultMediaView, event: MouseEvent<HTMLButtonElement>): void => {
     if (!selecting) {
@@ -518,20 +564,14 @@ function FolderPane({
   const ticked = [...selected].filter((id) =>
     folder.media.some((each) => each.platformMediaId === id && selectable(each)),
   );
-  // What « Importer » and « Retirer » would change: the media picked whose tick they would turn, said on the button.
-  const turned = (imported: boolean): string[] =>
-    ticked.filter((id) => {
-      const each = folder.media.find((media) => media.platformMediaId === id);
-      return each !== undefined && choiceOf(index, folder, each).imported !== imported;
-    });
-  const toImport = turned(true);
-  const toRemove = turned(false);
-  const tickAll = (ids: readonly string[], imported: boolean): void => {
-    void onChange({
+  const removeAll = async (ids: readonly string[]): Promise<void> => {
+    const done = await onChange({
       platformAccountId: folder.platformAccountId,
       folders: [],
-      media: ids.map((platformMediaId) => ({ platformMediaId, imported })),
+      media: ids.map((platformMediaId) => ({ platformMediaId, imported: false })),
     });
+    setRemoving(null);
+    if (done) setSelected(new Set());
   };
 
   const count1 = async (ids: readonly string[]): Promise<void> => {
@@ -580,12 +620,8 @@ function FolderPane({
         <div className="vp-pane__title">
           <h3 className="nv-h3 vp-pane__name" ref={title} tabIndex={-1}>
             <span>{name}</span>
-            {unmarked ? <span className="nv-dot nv-tone--warn" role="img" aria-label="À classer" /> : null}
           </h3>
-          {/* What it holds; how much of it is imported is said once, on the rail, and by the grid's groups. */}
-          <p className="ps-muted vp-pane__line nv-num">{folderLine(folder.media)}</p>
-          {/* The rail says it on the folder's row; on the phone the rail is gone once a folder is open. */}
-          {unmarked ? <p className="vp-pane__warn">Ni ☀️ ni 🌙 : à renommer dans Reveal</p> : null}
+          <p className="ps-muted vp-pane__line nv-num">{folderInLine(count)}</p>
         </div>
         <div className="vp-pane__actions">
           {isOwner && order.length > 0 ? (
@@ -607,7 +643,16 @@ function FolderPane({
           ) : null}
         </div>
       </div>
-      {folder.media.length === 0 ? null : (
+      {rest === null ? null : (
+        <div className="vp-rest">
+          <span className="vp-rest__text nv-num">{rest}</span>
+          <button type="button" className="nv-btn nv-btn--plain nv-btn--sm vp-rest__go" onClick={onPickRest}>
+            Les choisir
+            <ChevronIcon />
+          </button>
+        </div>
+      )}
+      {count.imported === 0 ? null : (
         <div className="vp-filters">
           <div className="vp-filters__chips" role="group" aria-label="Filtrer les médias">
             {VAULT_FILTERS.map((filter) => (
@@ -641,13 +686,14 @@ function FolderPane({
       {selecting ? (
         <p className="ps-muted vp-hint">
           Touche un média pour le cocher
-          <span className="vp-hint__mouse">, Maj et clic pour une suite</span>. L’œil montre une image nette.
+          <span className="vp-hint__mouse">, Maj et clic pour une suite</span>.
+          {blurred ? ' L’œil montre une image nette.' : null}
         </p>
       ) : null}
-      {folder.media.length === 0 ? (
+      {count.imported === 0 ? (
         <div className="vx-empty vp-empty">
           <p className="vx-empty__title">Dossier vide</p>
-          <p className="ps-muted">Reveal n’a listé aucun média dans ce dossier à la dernière synchro.</p>
+          <p className="ps-muted">Ce qu’elle y ajoutera dans Reveal entrera ici à la prochaine synchro.</p>
         </div>
       ) : shown.length === 0 ? (
         <div className="vx-empty vp-empty">
@@ -668,13 +714,16 @@ function FolderPane({
             const first = groups.slice(0, g).reduce((sum, each) => sum + each.media.length, 0);
             return (
               <li key={group.key} className="vp-group" data-group={group.key}>
-                <h4 className="vp-group__title nv-eyebrow" id={`vp-group-${group.key}`}>
-                  {GROUP_NAMES[group.key]}{' '}
-                  <span className="vp-group__count nv-num">{group.media.length}</span>
-                </h4>
+                {/* Alone, the group needs no title: everything shown is in Impera. */}
+                {groups.length === 1 ? null : (
+                  <h4 className="vp-group__title nv-eyebrow" id={`vp-group-${group.key}`}>
+                    {GROUP_NAMES[group.key]}{' '}
+                    <span className="vp-group__count nv-num">{group.media.length}</span>
+                  </h4>
+                )}
                 <ul
                   className="vp-grid"
-                  aria-labelledby={`vp-group-${group.key}`}
+                  aria-labelledby={groups.length === 1 ? undefined : `vp-group-${group.key}`}
                   data-selecting={selecting ? '' : undefined}
                 >
                   {group.media.map((each, at) => (
@@ -712,29 +761,20 @@ function FolderPane({
                   {selectedLine(selected.size)}
                 </span>
                 <span className="vp-bar__actions">
-                  {toImport.length === 0 ? null : (
-                    <button
-                      type="button"
-                      className="nv-btn nv-btn--neon nv-btn--sm vp-bar__import"
-                      disabled={pending}
-                      aria-busy={pending}
-                      onClick={() => {
-                        tickAll(toImport, true);
-                      }}
-                    >
-                      <CheckIcon />
-                      Importer {toImport.length}
-                    </button>
-                  )}
                   <button
                     type="button"
-                    className="nv-btn nv-btn--soft nv-btn--sm vp-describe"
+                    className="nv-btn nv-btn--plain nv-btn--sm vp-bar__remove"
+                    disabled={pending}
+                    onClick={() => {
+                      setRemoving(ticked);
+                    }}
+                  >
+                    Retirer d’Impera
+                  </button>
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--neon nv-btn--sm vp-describe"
                     disabled={pending || estimate.count === 0 || selected.size > DESCRIBE_AT_ONCE}
-                    title={
-                      estimate.count === 0
-                        ? 'Rien à décrire : importe d’abord, ou c’est déjà décrit.'
-                        : `${String(estimate.count)} à décrire, ≈ ${centsLine(estimate.costCents)}`
-                    }
                     onClick={() => {
                       void count1([...selected]);
                     }}
@@ -746,24 +786,11 @@ function FolderPane({
                       <span className="vp-describe__cost nv-num">≈ {centsLine(estimate.costCents)}</span>
                     ) : null}
                   </button>
-                  {toRemove.length === 0 ? null : (
-                    // Beside « Importer », a quiet way out; alone, it carries the bar's action.
-                    <button
-                      type="button"
-                      className={`nv-btn ${toImport.length === 0 ? 'nv-btn--soft' : 'nv-btn--plain'} nv-btn--sm vp-bar__remove`}
-                      disabled={pending}
-                      onClick={() => {
-                        tickAll(toRemove, false);
-                      }}
-                    >
-                      Retirer {toRemove.length} d’Impera
-                    </button>
-                  )}
                 </span>
               </div>
             ) : null}
-            {selecting && toRemove.length > 0 ? (
-              <p className="vp-bar__note">Retirer d’Impera ne supprime rien dans Reveal.</p>
+            {selecting && selected.size > 0 && estimate.count === 0 ? (
+              <p className="vp-bar__note">Déjà décrits ou en cours de description : rien à payer.</p>
             ) : null}
             {selected.size > DESCRIBE_AT_ONCE ? (
               <p className="vp-bar__note">
@@ -808,6 +835,18 @@ function FolderPane({
           }}
         />
       )}
+      {removing === null ? null : (
+        <RemoveDialog
+          count={removing.length}
+          busy={pending}
+          onConfirm={() => {
+            void removeAll(removing);
+          }}
+          onClose={() => {
+            setRemoving(null);
+          }}
+        />
+      )}
       {describe === null ? null : (
         <DescribeDialog
           describe={describe}
@@ -827,8 +866,8 @@ function FolderPane({
 }
 
 /**
- * A media of the grid: the platform's blur, sharp under the pointer outside a selection; a small ink tick once imported,
- * faded while it is not. While selecting, the whole tile ticks it and the eye in its corner shows it sharp. Under it,
+ * A media in Impera: the platform's blur, or sharp when the menu says « Nets »; blurred, sharp under the pointer outside
+ * a selection, and by the eye in its corner while selecting. While selecting, the whole tile ticks it. Under it,
  * where its description stands, two lines at most.
  */
 function MediaTile({
@@ -859,25 +898,23 @@ function MediaTile({
   const said = descriptionLine(choice);
   const pickable = selectable(media);
   const pictured = media.kind !== 'audio' && !media.removed;
-  const showSharp = selecting ? peeked : sharp || pointed;
+  // The menu's « Nets » holds everywhere, selecting included; blurred, a gesture shows one sharp.
+  const showSharp = sharp || (selecting ? peeked : pointed);
+  // Everything shown is in Impera: a tile says only what sets it apart.
   const state = [
-    choice.imported ? 'importé' : 'non importé',
     choice.description === 'described' ? 'décrit' : null,
     media.removed ? 'retiré de Reveal' : null,
   ]
     .filter((each) => each !== null)
     .join(', ');
   return (
-    <div
-      className={`vp-item${choice.imported ? ' vp-item--in' : ' vp-item--out'}`}
-      data-selected={selected ? '' : undefined}
-    >
+    <div className="vp-item" data-selected={selected ? '' : undefined}>
       <button
         type="button"
         className={`vx-tile vx-tile--${media.kind}${media.removed ? ' vx-tile--removed' : ''} vp-tile`}
         aria-pressed={selecting ? selected : undefined}
         aria-disabled={selecting && !pickable ? true : undefined}
-        aria-label={`${String(rank)}. ${what}, ${state}`}
+        aria-label={state === '' ? `${String(rank)}. ${what}` : `${String(rank)}. ${what}, ${state}`}
         onClick={onPress}
         onPointerEnter={() => {
           setPointed(true);
@@ -910,7 +947,7 @@ function MediaTile({
           </span>
         ) : null}
       </button>
-      {selecting && pictured ? (
+      {selecting && pictured && !sharp ? (
         <button
           type="button"
           className="vp-peek"
@@ -927,6 +964,55 @@ function MediaTile({
         {!choice.imported && choice.description === 'none' ? null : <span>{said.text}</span>}
       </p>
     </div>
+  );
+}
+
+/**
+ * « Retirer d'Impera », said before it is done: what leaves (the agent, the copilot and the scripts no longer see these
+ * media) and what stays (Reveal untouched, their descriptions kept for a later import).
+ */
+function RemoveDialog({
+  count,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  count: number;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}): JSX.Element {
+  const media = count === 1 ? 'ce média' : `ces ${String(count)} médias`;
+  return (
+    <Dialog
+      title={count === 1 ? 'Retirer 1 média d’Impera' : `Retirer ${String(count)} médias d’Impera`}
+      busy={busy}
+      className="vp-dialog"
+      onClose={onClose}
+    >
+      <div className="tm-dialog__body">
+        <ul className="vp-dialog__left vp-dialog__left--plain">
+          <li>L’IA, les scripts et les chatteurs ne verront plus {media}.</li>
+          <li>Rien ne bouge dans Reveal.</li>
+          <li>Leurs descriptions sont gardées : elles reviennent si tu les réimportes.</li>
+        </ul>
+        <div className="tm-dialog__foot">
+          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft"
+            data-autofocus=""
+            disabled={busy}
+            aria-busy={busy}
+            onClick={onConfirm}
+          >
+            {busy ? 'Retrait…' : 'Retirer'}
+          </button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 

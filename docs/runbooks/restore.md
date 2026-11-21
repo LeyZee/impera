@@ -16,14 +16,14 @@ Deux mécanismes (ADR 0152 § 2) : la **sauvegarde du jour de Supabase** (retour
 L'export (ADR 0028, service `backup`) est un tar chiffré par `age` : le dump `pg_dump --format=custom` (schéma et données de tous les schémas, sans les données de `session`, `verification` et `rate_limit_counters`) et un `manifest.json` (comptes de lignes au moment du dump, version de `pg_dump`). Il se restaure dans une base **vide**, sans rejouer les migrations.
 
 1. Kill switch global si l'ancienne base répond encore.
-2. Créer une base vierge : un nouveau projet Supabase, `deploy.md` § 1.1 étapes 1 à 5 (les trois rôles et `btree_gist`). À vérifier au premier essai sur Supabase : `pg_restore` dans un projet neuf, qui contient déjà les schémas de Supabase, ne doit toucher qu'aux nôtres. Puis, après la restauration, `lock-down.sql` (`deploy.md` § 1.4, étape 2).
+2. Créer une base vierge : un nouveau projet Supabase, `deploy.md` § 1.1 étapes 3 à 6 (services coupés, réseau, les trois rôles et `btree_gist`), dans une organisation sans aucun connecteur. À vérifier au premier essai sur Supabase : `pg_restore` dans un projet neuf, qui contient déjà les schémas de Supabase, ne doit toucher qu'aux nôtres. Puis, après la restauration, `lock-down.sql` (`deploy.md` § 1.4, étape 2).
 3. Sur le PC où se trouve la clé privée, récupérer le dernier export du bucket (clé d'accès en lecture seule), puis :
    `sh ops/db-export/restore-check.sh impera-<date>.tar.age impera-backup.key "<DATABASE_ADMIN_URL de la nouvelle base>"`.
    Le script déchiffre, restaure (`pg_restore --no-owner --single-transaction`), **vide la file `graphile_worker`** (aucun job d'avant le sinistre ne repart) et compare les comptes de lignes au manifeste.
 4. Le script a créé `nirvana_app` et `impera_service` sans connexion : leur donner un mot de passe neuf, dans l'éditeur SQL (`ALTER ROLE nirvana_app LOGIN PASSWORD '<mot de passe>';` puis `ALTER ROLE impera_service LOGIN PASSWORD '<un autre>' BYPASSRLS;`, et le `GRANT CONNECT` de `deploy.md` § 1.1), puis mettre `DATABASE_URL`, `DATABASE_SERVICE_URL` et `DATABASE_ADMIN_URL` à jour dans Coolify, avec les **mêmes** `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` qu'avant (copie gardée avec la clé privée), redéployer, `/ready`.
 5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.5 et A.6.
 
-Ce que la restauration par l'export perd en plus : l'heure de **prise de poste** des shifts (`shifts.checked_in_at`, migration 0235). Le déclencheur qui l'efface à chaque insertion joue aussi pendant le `COPY` de `pg_restore` : les shifts reviennent, sans l'heure où leur membre a pris son poste. Elle ne compte ni dans la paie ni dans l'attribution des ventes ; rien à refaire.
+Ce que la restauration par l'export perd en plus : l'heure de **prise de poste** des shifts (`shifts.checked_in_at`, migration 0247). Le déclencheur qui l'efface à chaque insertion joue aussi pendant le `COPY` de `pg_restore` : les shifts reviennent, sans l'heure où leur membre a pris son poste. Elle ne compte ni dans la paie ni dans l'attribution des ventes ; rien à refaire.
 
 ## C. Essai trimestriel (ADR 0028 § 6)
 

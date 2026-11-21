@@ -1,20 +1,20 @@
 import type { LinkHourReading, LinkHourTotal } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { hoursWithoutRobots, robotShare, storyLinkSilent } from '../link-stats';
+import { hoursOfWindow, hoursWithoutRobots, readingWindow, robotShare, storyLinkSilent } from '../link-stats';
 
 const reading = (hour: string, pageviews: number, clicks: number): LinkHourReading => ({
   hour: `2026-11-16T${hour}:00:00.000Z`,
   pageviews,
   clicks,
 });
-const at = (time: string) => new Date(`2026-11-16T${time}Z`);
+const robots = (hour: string, count: number) => ({ hour: `2026-11-16T${hour}:00:00.000Z`, robots: count });
 
 describe('the hours kept of a redirect link (ADR 0120 § 3)', () => {
   it('removes the robots of each hour and keeps their number beside', () => {
     const totals = hoursWithoutRobots(
       [reading('13', 10, 3), reading('14', 2, 0)],
-      [at('13:05:00'), at('13:59:59'), at('14:00:00')],
+      [robots('13', 2), robots('14', 1)],
     );
     expect(totals).toEqual([
       { hour: '2026-11-16T13:00:00.000Z', pageviews: 8, clicks: 3, robots: 2 },
@@ -24,7 +24,7 @@ describe('the hours kept of a redirect link (ADR 0120 § 3)', () => {
 
   it('never goes below zero, and keeps an hour that only robots visited', () => {
     expect(
-      hoursWithoutRobots([reading('13', 1, 0)], [at('13:01:00'), at('13:02:00'), at('15:30:00')]),
+      hoursWithoutRobots([reading('13', 1, 0)], [robots('13', 1), robots('13', 1), robots('15', 1)]),
     ).toEqual([
       { hour: '2026-11-16T13:00:00.000Z', pageviews: 0, clicks: 0, robots: 2 },
       { hour: '2026-11-16T15:00:00.000Z', pageviews: 0, clicks: 0, robots: 1 },
@@ -41,7 +41,7 @@ describe('the hours kept of a redirect link (ADR 0120 § 3)', () => {
 
   it('says the part of the visits that were robots', () => {
     expect(robotShare([])).toBe(0);
-    expect(robotShare(hoursWithoutRobots([reading('13', 4, 0)], [at('13:10:00')]))).toBe(0.25);
+    expect(robotShare(hoursWithoutRobots([reading('13', 4, 0)], [robots('13', 1)]))).toBe(0.25);
   });
 });
 
@@ -71,5 +71,29 @@ describe('a story link gone silent (ADR 0120 § 6)', () => {
 
   it('raises nothing with three days of history: the job reads at least eight days', () => {
     expect(storyLinkSilent(habit.slice(0, 3), now)).toBe(false);
+  });
+});
+
+describe('the window of one hourly reading (INS-02 lot e2)', () => {
+  const now = new Date('2026-11-16T13:20:00Z');
+
+  it('covers the hour under way and the 46 before it', () => {
+    const range = readingWindow(now);
+    expect(range.from.toISOString()).toBe('2026-11-14T15:00:00.000Z');
+    expect(range.to.toISOString()).toBe('2026-11-16T14:00:00.000Z');
+    expect(hoursOfWindow([], range, now)).toHaveLength(47);
+  });
+
+  it('keeps every hour, zero included, and closes the ones a reading follows by ten minutes', () => {
+    const range = { from: new Date('2026-11-16T11:00:00Z'), to: new Date('2026-11-16T14:00:00Z') };
+    const read = [{ hour: '2026-11-16T12:00:00.000Z', pageviews: 5, clicks: 2, robots: 1 }];
+    expect(hoursOfWindow(read, range, now)).toEqual([
+      { hour: '2026-11-16T11:00:00.000Z', pageviews: 0, clicks: 0, robots: 0, closed: true },
+      { hour: '2026-11-16T12:00:00.000Z', pageviews: 5, clicks: 2, robots: 1, closed: true },
+      { hour: '2026-11-16T13:00:00.000Z', pageviews: 0, clicks: 0, robots: 0, closed: false },
+    ]);
+    // Five minutes after its end an hour is still open: the service may still be counting it.
+    const early = hoursOfWindow(read, range, new Date('2026-11-16T13:05:00Z'));
+    expect(early.map((hour) => hour.closed)).toEqual([true, false, false]);
   });
 });

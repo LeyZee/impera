@@ -472,6 +472,9 @@ const currentCreator: SQL = sql`nullif(current_setting('app.creator_id', true), 
 const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), '')`;
 const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
 const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
+/** The hourly reading of the statistics, in the creator it writes (`withTenantJob(…, 'daily_stats', …)`). */
+const dailyStatsJob = (creatorId: AnyColumn): SQL =>
+  sql`${creatorId} = ${currentCreator} and nullif(current_setting('app.job', true), '') = 'daily_stats'`;
 
 /**
  * The platform's statistics of a creator account's day (ADR 0081): counters only, never an amount (the money stays
@@ -516,6 +519,15 @@ export const platformDailyStats = pgTable(
     pgPolicy('stats_read', {
       for: 'select',
       using: sql`${notCreatorAccount} and ${t.creatorId} = ${currentCreator} and (${currentScope} = 'owner' or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${t.creatorId} = any(u.creator_ids))))`,
+    }),
+    // The hourly reading writes her days under the app role, one creator at a time (`withTenantJob`, ADR 0087 lot c):
+    // an upsert reads the day it writes over, hence the read. No account's session sets `app.job`.
+    pgPolicy('job_read', { for: 'select', using: dailyStatsJob(t.creatorId) }),
+    pgPolicy('job_insert', { for: 'insert', withCheck: dailyStatsJob(t.creatorId) }),
+    pgPolicy('job_update', {
+      for: 'update',
+      using: dailyStatsJob(t.creatorId),
+      withCheck: dailyStatsJob(t.creatorId),
     }),
   ],
 );
@@ -565,6 +577,15 @@ export const platformChatterDailyStats = pgTable(
     pgPolicy('chatter_stats_read', {
       for: 'select',
       using: sql`${notCreatorAccount} and ${t.creatorId} = ${currentCreator} and (${currentScope} = 'owner' or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${t.creatorId} = any(u.creator_ids))))`,
+    }),
+    // The hourly reading writes her days under the app role, one creator at a time (`withTenantJob`, ADR 0087 lot c):
+    // an upsert reads the day it writes over, hence the read. No account's session sets `app.job`.
+    pgPolicy('job_read', { for: 'select', using: dailyStatsJob(t.creatorId) }),
+    pgPolicy('job_insert', { for: 'insert', withCheck: dailyStatsJob(t.creatorId) }),
+    pgPolicy('job_update', {
+      for: 'update',
+      using: dailyStatsJob(t.creatorId),
+      withCheck: dailyStatsJob(t.creatorId),
     }),
   ],
 );

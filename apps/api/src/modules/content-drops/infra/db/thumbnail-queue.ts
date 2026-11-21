@@ -1,5 +1,5 @@
 import { DropMediaKindSchema, JOB_MAX_ATTEMPTS } from '@impera/contracts';
-import { eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import { and, eq, schema, sql, withAdmin, withTenantJob, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import type { ThumbnailQueue } from '../../domain/ports';
@@ -32,11 +32,14 @@ export async function enqueueThumbnail(
   );
 }
 
-/** The picture job's reads and writes, as the owner role. */
-export function createDrizzleThumbnailQueue(adminDb: Database): ThumbnailQueue {
+/**
+ * The picture job's reads and writes, in the creator of its medium and under the app role (`withTenantJob`, ADR 0087
+ * lot c): a medium of another creator is not found. The hourly backlog alone reads every creator, as the service role.
+ */
+export function createDrizzleThumbnailQueue(db: Database, adminDb: Database): ThumbnailQueue {
   return {
-    target: (mediaAssetId) =>
-      withAdmin(adminDb, async (tx) => {
+    target: (creatorId, mediaAssetId) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         const [row] = await tx
           .select({
             creatorId: mediaAssets.creatorId,
@@ -48,7 +51,7 @@ export function createDrizzleThumbnailQueue(adminDb: Database): ThumbnailQueue {
             thumbnailedAt: mediaAssets.thumbnailedAt,
           })
           .from(mediaAssets)
-          .where(eq(mediaAssets.id, mediaAssetId));
+          .where(and(eq(mediaAssets.id, mediaAssetId), eq(mediaAssets.creatorId, creatorId)));
         if (row === undefined) return null;
         return {
           creatorId: row.creatorId,
@@ -61,8 +64,8 @@ export function createDrizzleThumbnailQueue(adminDb: Database): ThumbnailQueue {
         };
       }),
 
-    settle: (mediaAssetId, thumbnailKey, now) =>
-      withAdmin(adminDb, async (tx) => {
+    settle: (creatorId, mediaAssetId, thumbnailKey, now) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         await tx
           .update(mediaAssets)
           .set({ thumbnailKey, thumbnailedAt: now })
@@ -70,7 +73,9 @@ export function createDrizzleThumbnailQueue(adminDb: Database): ThumbnailQueue {
       }),
 
     later: (creatorId, mediaAssetId, correlationId, runAt) =>
-      withAdmin(adminDb, (tx) => enqueueThumbnail(tx, { creatorId, mediaAssetId, correlationId }, runAt)),
+      withTenantJob(db, creatorId, 'drop_media', (tx) =>
+        enqueueThumbnail(tx, { creatorId, mediaAssetId, correlationId }, runAt),
+      ),
 
     backlog: (correlationId) =>
       withAdmin(adminDb, async (tx) => {

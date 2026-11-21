@@ -169,7 +169,7 @@ export const foundTitle = (n: number, platform: string): string =>
     : `${count(n, 'créatrice trouvée', 'créatrices trouvées')} sur ${platform}`;
 
 /**
- * The count on Réglages › Ventes, in words (ADR 0069 § 5: « 1 nouvelle créatrice sur Reveal »): by platform, `null`
+ * The count on Réglages › Plateformes, in words (ADR 0069 § 5: « 1 nouvelle créatrice sur Reveal »): by platform, `null`
  * when none waits. Said on hover and to a screen reader; the tab shows the number.
  */
 export function newModelsLabel(newModels: SalesFeedNewModels): string | null {

@@ -30,6 +30,8 @@ export const DESIRE_SIGNAL_LABELS: Readonly<Record<DesireSignal, string>> = {
   free_now: 'il a du temps',
   someone_nearby: 'quelqu’un à côté de lui',
   leaving_soon: 'il doit partir',
+  says_goodnight: 'il dit bonne nuit',
+  just_came: 'il vient de jouir',
   'intent:flirt': 'il flirte',
   'intent:sexting': 'sexto',
   'intent:asks_for_media': 'il demande un média',
@@ -43,6 +45,8 @@ export const DESIRE_SIGNAL_LABELS: Readonly<Record<DesireSignal, string>> = {
   minor_suspected: 'remise à zéro : mineur possible',
   age_disputed: 'remise à zéro : âge douteux',
   frozen: 'figée : vente arrêtée sur ce message',
+  rest_new: 'retour au calme après l’orgasme (nouveau fan)',
+  rest_client: 'retour au calme après l’orgasme (client)',
 };
 
 /** « il ramène vers l’intime, réponse longue, emoji suggestif ×2 »: a repeated code counts once per time. */

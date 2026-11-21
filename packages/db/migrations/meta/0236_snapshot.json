@@ -1,6 +1,6 @@
 {
-  "id": "ee61deab-a576-411f-b250-adeb002ba0d6",
-  "prevId": "a113feff-22d3-449a-9ae6-6ce6d23b5360",
+  "id": "16cd6245-6698-47b7-8781-76f6206eae1d",
+  "prevId": "de3bc53e-dc67-45a8-b016-24d2d8dbcf61",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -14385,6 +14385,28 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_chatter_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'",
+          "withCheck": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
         }
       },
       "checkConstraints": {
@@ -14539,6 +14561,28 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'",
+          "withCheck": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
         }
       },
       "checkConstraints": {
@@ -17928,12 +17972,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "checked_in_at": {
-          "name": "checked_in_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -20493,239 +20531,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.announcement_reads": {
-      "name": "announcement_reads",
-      "schema": "",
-      "columns": {
-        "announcement_id": {
-          "name": "announcement_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "member_id": {
-          "name": "member_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "announcement_reads_member_idx": {
-          "name": "announcement_reads_member_idx",
-          "columns": [
-            {
-              "expression": "member_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "announcement_reads_announcement_id_announcements_id_fk": {
-          "name": "announcement_reads_announcement_id_announcements_id_fk",
-          "tableFrom": "announcement_reads",
-          "tableTo": "announcements",
-          "columnsFrom": ["announcement_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "announcement_reads_member_id_team_members_id_fk": {
-          "name": "announcement_reads_member_id_team_members_id_fk",
-          "tableFrom": "announcement_reads",
-          "tableTo": "team_members",
-          "columnsFrom": ["member_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "announcement_reads_announcement_id_member_id_pk": {
-          "name": "announcement_reads_announcement_id_member_id_pk",
-          "columns": ["announcement_id", "member_id"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "member_read": {
-          "name": "member_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from announcements a where a.id = \"announcement_reads\".\"announcement_id\")) or exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
-        },
-        "member_insert": {
-          "name": "member_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"announcement_reads\".\"read_at\" = now() and exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '') and m.status <> 'left') and exists (select 1 from announcements a where a.id = \"announcement_reads\".\"announcement_id\" and a.withdrawn_at is null)"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.announcements": {
-      "name": "announcements",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "author_user_id": {
-          "name": "author_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "withdrawn_at": {
-          "name": "withdrawn_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "withdrawn_by": {
-          "name": "withdrawn_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "announcements_created_idx": {
-          "name": "announcements_created_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "announcements_creator_id_creators_id_fk": {
-          "name": "announcements_creator_id_creators_id_fk",
-          "tableFrom": "announcements",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "announcements_author_user_id_user_id_fk": {
-          "name": "announcements_author_user_id_user_id_fk",
-          "tableFrom": "announcements",
-          "tableTo": "user",
-          "columnsFrom": ["author_user_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "announcements_withdrawn_by_user_id_fk": {
-          "name": "announcements_withdrawn_by_user_id_fk",
-          "tableFrom": "announcements",
-          "tableTo": "user",
-          "columnsFrom": ["withdrawn_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids)) or \"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), ''))) or (nullif(current_setting('app.team_scope', true), '') = 'self' and \"announcements\".\"withdrawn_at\" is null and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids))))"
-        },
-        "team_insert": {
-          "name": "team_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"withdrawn_at\" is null and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids)))))"
-        },
-        "team_withdraw": {
-          "name": "team_withdraw",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"announcements\".\"withdrawn_at\" is null",
-          "withCheck": "\"announcements\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '') and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and \"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), '')))"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "announcements_body_check": {
-          "name": "announcements_body_check",
-          "value": "char_length(\"announcements\".\"body\") between 1 and 1000"
-        },
-        "announcements_withdrawn_check": {
-          "name": "announcements_withdrawn_check",
-          "value": "(\"announcements\".\"withdrawn_at\" is null) = (\"announcements\".\"withdrawn_by\" is null)"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.commission_presets": {
@@ -23929,6 +23734,105 @@
         "trend_signals_reading_check": {
           "name": "trend_signals_reading_check",
           "value": "(\"trend_signals\".\"source\" = 'passive_capture') = (\"trend_signals\".\"reading_id\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.custom_price_grids": {
+      "name": "custom_price_grids",
+      "schema": "",
+      "columns": {
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grid": {
+          "name": "grid",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "custom_price_grids_creator_id_creators_id_fk": {
+          "name": "custom_price_grids_creator_id_creators_id_fk",
+          "tableFrom": "custom_price_grids",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "custom_price_grids_created_by_user_id_fk": {
+          "name": "custom_price_grids_created_by_user_id_fk",
+          "tableFrom": "custom_price_grids",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "custom_price_grids_pkey": {
+          "name": "custom_price_grids_pkey",
+          "columns": ["creator_id", "version"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "owner_read": {
+          "name": "owner_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"custom_price_grids\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "owner_insert": {
+          "name": "owner_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"custom_price_grids\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        }
+      },
+      "checkConstraints": {
+        "custom_price_grids_version_check": {
+          "name": "custom_price_grids_version_check",
+          "value": "\"custom_price_grids\".\"version\" >= 1"
+        },
+        "custom_price_grids_grid_check": {
+          "name": "custom_price_grids_grid_check",
+          "value": "jsonb_typeof(\"custom_price_grids\".\"grid\") = 'object'"
         }
       },
       "isRLSEnabled": false

@@ -77,6 +77,8 @@ export interface EngineDeps {
   /** The same gateway with another voice model, for a comparison; undefined for an unknown model. */
   readonly gatewayForVoice: (voiceModel: string) => LlmGateway | undefined;
   readonly persona: PersonaForModels;
+  /** Her bio on her platform profile when her own version is played (ADR 0154 § 7); absent: none. */
+  readonly profileBio?: string | null;
   readonly store: CalibrationStore;
   /** Every rating so far, shared by all the trainers: the rate measures the bot, not the person. */
   readonly records: CalibrationRecord[];
@@ -225,6 +227,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     gateway: deps.gateway,
     creatorName: deps.persona.creatorName,
     personaSheet: deps.persona.personaSheet,
+    ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
     // Her examples only when her own version is played: never the invented persona's, never another creator's.
@@ -398,7 +401,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
 
     send: (text, media) => exclusive(() => sendDescribed(text, media.map(completeMedia))),
 
-    rate: (verdict, override) =>
+    rate: (verdict, override, mayFileExamples = true) =>
       exclusive(async () => {
         const exchange = session.lastExchange;
         if (exchange === undefined || isRated) throw new NothingToRate();
@@ -406,8 +409,10 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
         // wait decided by the risk policy is itself the answer: the trainer says it was right (AGE-01).
         const decided = exchange.turn.handoff !== undefined || exchange.turn.hold !== undefined;
         if (verdict.kind === 'validated' && exchange.turn.isBlocked && !decided) throw new BlockedAnswer();
-        const destination =
+        const suggested =
           verdict.kind === 'validated' ? undefined : (override ?? suggestDestination(verdict));
+        // A manager's correction is a note, never a voice example: her bank is the owner's (Charles, 20/11).
+        const destination = !mayFileExamples && suggested === 'voice_example' ? undefined : suggested;
         // A correction that trips a hard guard stays a correction, out of her bank, and the screen says why (§ 4).
         const blockedBy =
           verdict.kind === 'corrected' && destination === 'voice_example'

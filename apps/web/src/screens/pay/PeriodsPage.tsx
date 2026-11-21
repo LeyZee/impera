@@ -22,6 +22,7 @@ import '@/reports/reports.css';
 import { amountText, periodTitle } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
+import { InvoiceArt } from '@/shell/art/EmptyArt';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { Failure } from '@/shell/states';
@@ -72,6 +73,7 @@ export function PeriodsPage({
             <Loading rows={4} />
           ) : items.length === 0 ? (
             <Empty
+              art={<InvoiceArt />}
               whisper="Aucune quinzaine pour l’instant."
               text="Une quinzaine apparaît ici dès qu’un rapport de fin de shift est validé : son relevé se calcule aussitôt."
             />

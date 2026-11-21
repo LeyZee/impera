@@ -47,7 +47,7 @@ const lineCount = (text: string): number =>
   text.split(/\r\n|\r|\n/u).filter((line) => line.trim() !== '').length;
 
 /**
- * The reliability check of Réglages › Ventes (CRM-02, ADR 0050 § 8): the owner picks days already over, adds the
+ * The reliability check of Réglages › Plateformes (CRM-02, ADR 0050 § 8): the owner picks days already over, adds the
  * dashboard's export if they have one (optional since § 8 was amended on 11/11/2026: Reveal's dashboard offers none),
  * and reads, to the cent, whether the register says what the platform's statistics, and the export if given, say. Nothing is written and no amount moves; the export is read for the answer and kept
  * nowhere, on the page or on the server.

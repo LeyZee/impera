@@ -296,7 +296,8 @@ export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
 export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>> = {
   member: 'Les ventes des membres de l’équipe, reliés à leur compte Reveal.',
   agent: 'Ce que l’agent a vendu seul, sur la clé de l’agence.',
-  unlinked: 'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Reveal).',
+  unlinked:
+    'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Comptes Reveal).',
   none: 'Une vente sans chatteur : un abonnement, un renouvellement, un tip spontané.',
 };
 
@@ -483,4 +484,49 @@ export function ppvRate(sent: number | null, purchased: number): number | null {
 export function signedCount(n: number): string {
   const text = Math.abs(n).toLocaleString('fr-FR');
   return n > 0 ? `+${text}` : n < 0 ? `−${text}` : '0';
+}
+
+/** A refund's kind, one sale's word (ADR 0092 § 4): the ring's names, the folded ones said each. */
+export const REFUND_KIND: Readonly<Record<AgencySaleKind, string>> = {
+  subscriptions: 'Abonnement',
+  ppv: 'PPV en privé',
+  mass_dm: 'Mass DM',
+  tips: 'Tip',
+  payment_links: 'Lien de paiement',
+  boudoir: 'Boudoir',
+  paid_messages: 'Message payant',
+  other: 'Autre vente',
+};
+
+/** How long after its sale a refund came: « le jour même », « 3 jours après »; none for a sale out of the register. */
+export function refundDelayLabel(days: number | null): string {
+  if (days === null) return 'vente hors registre';
+  if (days === 0) return 'le jour même';
+  return `${days.toLocaleString('fr-FR')} jour${days > 1 ? 's' : ''} après`;
+}
+
+/** When a refund came, always with its day: « 6 nov., 14 h 05 », in the platform's zone. */
+export function refundDateLabel(iso: string, timeZone: string): string {
+  const at = new Date(iso);
+  const time = at
+    .toLocaleTimeString('fr-FR', { timeZone, hour: 'numeric', minute: '2-digit' })
+    .replace(':', '\u00a0h\u00a0');
+  return `${at.toLocaleDateString('fr-FR', { timeZone, day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+/** A seller's key in the refunds' filter: a member by id, the others by kind. */
+export const sellerKeyOf = (seller: DashboardSalesSeller): string =>
+  seller.kind === 'member' ? `member:${seller.memberId}` : seller.kind;
+
+/** The refunds a filter keeps: one creator or all, one seller or all (`'all'`). */
+export function refundsKept(
+  list: AgencyInsights['refundList'],
+  creatorId: string,
+  seller: string,
+): AgencyInsights['refundList'] {
+  return list.filter(
+    (one) =>
+      (creatorId === 'all' || one.creatorId === creatorId) &&
+      (seller === 'all' || sellerKeyOf(one.seller) === seller),
+  );
 }

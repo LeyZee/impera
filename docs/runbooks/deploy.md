@@ -68,12 +68,38 @@ Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (
 
 ### 1.1 La base Supabase
 
-**L'organisation.** Charles crée une organisation Supabase **à part**, dont il est le seul membre, avec la double authentification. Aucun outil n'y a accès : ni jeton d'accès personnel, ni connecteur d'assistant (MCP), ni intégration (ADR 0152 § 2). Un connecteur qui existe déjà reste limité à une autre organisation ; Charles le vérifie dans Account → Access Tokens et dans les intégrations avant que la première donnée réelle n'entre.
+**Le projet.** La production est le projet Supabase que Charles a créé pour Impera et qui a servi aux essais (ADR 0152 § 9), sur son plan payant (un projet gratuit se met en pause et plafonne la base à 500 Mo), dans l'Union européenne. Charles est le seul membre de l'organisation, avec la double authentification. Le mot de passe du rôle `postgres` reste dans le gestionnaire de mots de passe et n'entre dans **aucune variable** de Coolify ni d'ailleurs.
 
-1. **Le projet** (Charles) : dans cette organisation, sur le plan payant (un projet gratuit se met en pause et plafonne la base à 500 Mo), région dans l'Union européenne (Paris de préférence). Le mot de passe de la base que Supabase demande à la création est celui du rôle `postgres` : sorti du gestionnaire de mots de passe, il n'entre dans **aucune variable** de Coolify ni d'ailleurs.
-2. **Ce qu'on n'utilise pas** : Project Settings → Data API, désactiver l'API de données (les clés `anon` et `service_role` ne servent alors à rien et ne sont copiées nulle part). Auth, Storage, Realtime et Edge Functions : rien n'est configuré, aucune clé n'est sortie du tableau de bord.
-3. **TLS et réseau** : Database → Settings → SSL Configuration, « Enforce SSL on incoming connections » **activé**, et télécharger le certificat (`prod-ca-…crt`, public). Database → Settings → Network Restrictions : n'autoriser que `<ip du serveur>/32` (et, le temps de la mise en service, l'adresse du PC de Charles, retirée ensuite). Les restrictions valent aussi pour le pooler.
-4. **Première vérification**, dans le SQL Editor (qui se connecte en `postgres`) :
+**0. La fin des essais : plus aucun outil sur le compte** (Charles, ADR 0152 § 9). C'est la première étape, avant toutes les autres : un connecteur encore branché relirait les clés régénérées à l'étape 2 et pourrait modifier les rôles créés à l'étape 6. Account → Access Tokens : supprimer tout jeton. Organisation → Integrations, et la liste des applications autorisées du compte (OAuth) : retirer tout connecteur d'assistant (MCP) et toute intégration ; le passer en lecture seule ne suffit pas. Un connecteur s'autorise pour toute une organisation : il ne se rebranche donc **plus jamais** sur celle-ci. Les essais qui doivent encore toucher ce projet (pooler, Postgres 17 de la fiche OPS-20) sont finis avant cette étape. Ensuite, tout le § 1.1 se joue par Charles seul, dans le SQL Editor et le tableau de bord ; un essai restant se fait depuis son PC ou le serveur, sans connecteur. Un essai qui a besoin de Supabase après la mise en ligne se fait dans un projet temporaire d'une **autre** organisation, supprimé ensuite.
+
+1. **Repartir d'une base vide** (Charles, dans le SQL Editor). Les essais ont laissé des rôles, des schémas et des tables. On ne les trie pas à la main : on les liste, puis on les efface en bloc, et les migrations repartent de zéro.
+
+   ```sql
+   select rolname from pg_roles where rolname in ('nirvana_admin', 'impera_service', 'nirvana_app');
+   select nspname from pg_namespace where nspname in ('drizzle', 'graphile_worker');
+   select tableowner, count(*) from pg_tables where schemaname = 'public' group by 1;
+   select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
+     and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e');
+   select count(*) from pg_type t where t.typnamespace = 'public'::regnamespace and t.typrelid = 0
+     and not exists (select 1 from pg_depend d where d.objid = t.oid and d.deptype = 'e');
+   select extname, extnamespace::regnamespace from pg_extension order by 1;
+   select pubname from pg_publication;
+   ```
+
+   La liste va dans le fil Hébergement. **Rien n'est supprimé sans le mot écrit de Charles.** Une fois ce mot donné, il joue lui-même, connecté en `postgres` :
+
+   ```sql
+   DROP OWNED BY nirvana_admin, impera_service, nirvana_app CASCADE;
+   DROP ROLE nirvana_admin, impera_service, nirvana_app;
+   ```
+
+   `DROP OWNED` emporte tout ce que nos rôles possèdent : nos tables de `public`, les schémas `drizzle` et `graphile_worker`, nos fonctions, et leurs droits. Les sept requêtes sont relancées. `DROP OWNED` n'emporte que ce que nos trois rôles possèdent : ce qu'un essai a créé connecté en `postgres` (une migration jouée par un outil, par exemple) reste. S'il reste un de nos schémas, une table, une fonction ou un type de `public`, ou une extension, un déclencheur ou une publication qui ne vient ni de Supabase ni de nos migrations, la liste repart dans le fil, et Charles les supprime sur le même mot écrit (`DROP SCHEMA drizzle, graphile_worker CASCADE`, puis les objets restants de `public` un par un), sans toucher aux schémas de Supabase. À la fin, aucun de nos rôles ni de nos schémas, aucune table, fonction ni type à nous dans `public`.
+
+   À constater pendant l'essai : chez Supabase, `postgres` n'est pas superutilisateur, et `DROP OWNED BY` un autre rôle demande d'en avoir les droits. Si c'est refusé, jouer d'abord `GRANT nirvana_admin, impera_service, nirvana_app TO postgres;`, puis recommencer. Les rôles sont recréés à neuf à l'étape 6, avec des mots de passe jamais utilisés en essai. Après le premier `migrate` (§ 1.4), le contrôle au démarrage refuse tout objet de nos schémas qui n'appartient pas à `nirvana_admin`.
+2. **Les restes des essais hors de la base** (Charles) : supprimer les branches Supabase, les fonctions Edge, leurs secrets et les notebooks SQL créés pendant les essais. Project Settings → API Keys : **régénérer** les clés (`anon`, `service_role`, clés publiables et secrètes) et le secret JWT, qui ont été visibles pendant les essais. Lire le journal d'audit de l'organisation (Organization → Audit Logs) : rien d'inattendu depuis la création du projet. Noter la rétention des sauvegardes de Supabase choisie ; les sauvegardes prises pendant les essais ne contiennent aucune donnée réelle, puisque les essais n'en utilisent jamais.
+3. **Ce qu'on n'utilise pas** : Project Settings → Data API, désactiver l'API de données (les clés `anon` et `service_role` ne servent alors à rien et ne sont copiées nulle part). Realtime : désactivé. Auth, Storage et Edge Functions : rien n'est configuré, aucune clé n'est sortie du tableau de bord.
+4. **TLS et réseau** : Database → Settings → SSL Configuration, « Enforce SSL on incoming connections » **activé**, et télécharger le certificat (`prod-ca-…crt`, public). Database → Settings → Network Restrictions : n'autoriser que l'adresse du serveur, en IPv4 (`<ip du serveur>/32`) et en IPv6 si le VPS en a une (`<ipv6 du serveur>/128`). Les restrictions valent pour la connexion directe comme pour le pooler. Le temps de la mise en service, ou d'une restauration (`restore.md`), Charles ajoute l'adresse de son PC, puis la retire dès la fin ; la liste revient alors à la seule adresse du serveur, et il le vérifie sur la même page.
+5. **Première vérification**, dans le SQL Editor (qui se connecte en `postgres`) :
 
    ```sql
    select rolsuper, rolcreaterole, rolbypassrls from pg_roles where rolname = current_user;
@@ -81,7 +107,7 @@ Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (
    ```
 
    Attendu : `f`, `t`, `t` (vu sur un projet de test le 20/11), et la version majeure de la fiche OPS-20. Si `postgres` ne peut pas créer de rôle `BYPASSRLS`, **on s'arrête et on revient à l'ADR 0152**.
-5. **Les trois rôles** (ADR 0087), toujours dans le SQL Editor, avec trois mots de passe sortis chacun de `openssl rand -base64 24`, jamais réutilisés, jamais les mêmes qu'en développement :
+6. **Les trois rôles** (ADR 0087), toujours dans le SQL Editor, avec trois mots de passe sortis chacun de `openssl rand -base64 24`, jamais réutilisés, jamais les mêmes qu'en développement :
 
    ```sql
    CREATE ROLE nirvana_admin  LOGIN PASSWORD '<mot de passe 1>' NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
@@ -95,15 +121,15 @@ Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (
    ```
 
    `CREATE ON DATABASE` laisse `nirvana_admin` créer le schéma de la file de jobs (`graphile_worker`) et celui du journal des migrations (`drizzle`). `btree_gist` est créée ici par `postgres` : la migration 0021 fait `CREATE EXTENSION IF NOT EXISTS btree_gist` sans pouvoir la créer elle-même, et passe alors sans rien faire. Le serveur et le worker refusent de démarrer si un rôle de connexion a trop de droits ou appartient à un rôle plus puissant (`postgres`), avec un message qui renvoie ici.
-6. **Les chaînes de connexion.** Project → Connect → **Session pooler** (port 5432), jamais le mode transaction (port 6543) : Graphile Worker a besoin de `LISTEN/NOTIFY`, que seul le mode session garde. La connexion directe n'existe qu'en IPv6, ce que Docker sous Coolify ne gère pas sans réglage. Le nom d'utilisateur prend la forme qu'impose le pooler, `<rôle>.<ref>` :
+7. **Les chaînes de connexion.** Project → Connect → **Session pooler** (port 5432), jamais le mode transaction (port 6543) : Graphile Worker a besoin de `LISTEN/NOTIFY`, que seul le mode session garde. La connexion directe n'existe qu'en IPv6, ce que Docker sous Coolify ne gère pas sans réglage. Le nom d'utilisateur prend la forme qu'impose le pooler, `<rôle>.<ref>` :
 
    ```
    postgres://nirvana_app.<ref>:<mot de passe 3>@<hôte du pooler>:5432/postgres?sslmode=verify-full&sslrootcert=/data/supabase-ca.crt
    ```
 
-   Même forme pour `DATABASE_SERVICE_URL` (`impera_service`) et `DATABASE_ADMIN_URL` (`nirvana_admin`). En production, l'API et le worker refusent une base distante sans `sslmode=verify-full` (`config.ts`). Le certificat de l'étape 3 se monte dans Coolify (§ 1.2, étape 4).
-7. **Vérifier chaque rôle par le pooler**, depuis le PC (si son adresse est autorisée) ou depuis le serveur : `psql "<chaîne du rôle>" -c "select current_user, rolsuper, rolbypassrls, rolcreaterole from pg_roles where rolname = current_user"`. Attendu : `nirvana_admin` à `f, t, f` ; `impera_service` à `f, t, f` ; `nirvana_app` à `f, f, f`.
-8. **Le budget de connexions.** En mode session, chaque connexion d'un de nos processus garde une connexion de Supavisor, le pooler de Supabase. Sa « Pool Size » (Database → Settings → Connection pooling) vaut **pour chaque couple rôle et base** : chacun de nos trois rôles a donc ce plafond à lui. S'y ajoute le plafond global de la taille de calcul (`max_connections`, affiché au même endroit), que partagent nos trois rôles et les services de Supabase. Chaque processus écrit son budget au démarrage (« database connection budget of this process » : `app` et `rateLimit` en `nirvana_app`, `service` en `impera_service`). Les trois règles :
+   Même forme pour `DATABASE_SERVICE_URL` (`impera_service`) et `DATABASE_ADMIN_URL` (`nirvana_admin`). En production, l'API et le worker refusent une base distante sans `sslmode=verify-full` (`config.ts`). Le certificat de l'étape 4 se monte dans Coolify (§ 1.2, étape 4).
+8. **Vérifier chaque rôle par le pooler**, depuis le PC (si son adresse est autorisée) ou depuis le serveur : `psql "<chaîne du rôle>" -c "select current_user, rolsuper, rolbypassrls, rolcreaterole from pg_roles where rolname = current_user"`. Attendu : `nirvana_admin` à `f, t, f` ; `impera_service` à `f, t, f` ; `nirvana_app` à `f, f, f`.
+9. **Le budget de connexions.** En mode session, chaque connexion d'un de nos processus garde une connexion de Supavisor, le pooler de Supabase. Sa « Pool Size » (Database → Settings → Connection pooling) vaut **pour chaque couple rôle et base** : chacun de nos trois rôles a donc ce plafond à lui. S'y ajoute le plafond global de la taille de calcul (`max_connections`, affiché au même endroit), que partagent nos trois rôles et les services de Supabase. Chaque processus écrit son budget au démarrage (« database connection budget of this process » : `app` et `rateLimit` en `nirvana_app`, `service` en `impera_service`). Les trois règles :
    - **`nirvana_app`** : (`DATABASE_POOL_MAX` + `RATE_LIMIT_POOL_MAX`) × 2 (`api` et `worker`) ≤ Pool Size. Défauts : (10 + 3) × 2 = 26.
    - **`impera_service`** : `DATABASE_SERVICE_POOL_MAX` de `api` + celui de `worker` ≤ Pool Size. Graphile Worker tourne sur le pool de service du worker : il lui faut `WORKER_CONCURRENCY` + 3 (une connexion par job en cours, une pour `LISTEN`, de la marge), d'où `WORKER_DATABASE_SERVICE_POOL_MAX`, 8 par défaut pour une concurrence de 5 (`docker-compose.prod.yml`). Défauts : 5 + 8 = 13.
    - **`nirvana_admin`** : `migrate` et `backup`, 2 chacun au plus, et le SQL Editor quand on s'en sert.
@@ -118,7 +144,7 @@ Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (
 1. Coolify → Projet « Impera » → Ressource → **Docker Compose**, depuis le dépôt GitHub `LeyZee/impera`, branche `main`, fichier `docker-compose.prod.yml`, avec une clé de déploiement en **lecture seule** limitée à ce dépôt (le dépôt est public : la clé ne sert qu'à ne pas dépendre d'un compte).
 2. Domaine : sur le service **`web` seulement**, port 8080 (`https://app.<domaine>`). Aucun domaine sur `api`, `worker`, `migrate`, `backup`. Le domaine définitif est choisi **avant** : il fixe les clés d'accès et l'adresse intégrée à l'extension.
 3. Cocher « Include Source Commit in Build » : `SOURCE_COMMIT` devient le tag de l'image et `RELEASE` (Sentry, battement du worker).
-4. **Le certificat de Supabase** : Storages → montage de fichier sur `api`, `worker`, `migrate` et `backup`, chemin `/data/supabase-ca.crt`, contenu = le fichier de § 1.1 étape 3 (public, ce n'est pas un secret).
+4. **Le certificat de Supabase** : Storages → montage de fichier sur `api`, `worker`, `migrate` et `backup`, chemin `/data/supabase-ca.crt`, contenu = le fichier de § 1.1 étape 4 (public, ce n'est pas un secret).
 5. **Pas de déploiement automatique sur webhook** : le tableau de bord de Coolify est fermé, aucun webhook public ne l'atteint. Charles déclenche chaque déploiement (Deploy), ou laisse Coolify interroger le dépôt s'il le propose. **Aucun déploiement d'aperçu pour les PR** (Preview Deployments désactivés) : le dépôt est public, et une PR d'un inconnu construite sur le serveur verrait les secrets du build.
 6. **Journal d'accès du proxy.** Le jeton d'un lien de calendrier est dans le chemin (`/v1/calendar-feed/<jeton>.ics`), et quiconque lit ce chemin lit les shifts de son titulaire. L'API ne le journalise pas, et le `nginx` de `web` non plus ; le Traefik de Coolify ne doit pas le garder non plus.
    - Coolify → Servers → le serveur : **laisser « Traffic analytics » désactivé**. Activé, Coolify écrit un journal d'accès JSON (`/traefik/access.log`, chemin, User-Agent et Referer gardés). Tant qu'il est actif, Coolify retire aussi toute option `--accesslog…` ajoutée à la main : on ne peut alors pas en ôter le chemin.
@@ -145,13 +171,15 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `CREDENTIALS_ENCRYPTION_KEYS` | `v1:` + une **autre** sortie de `openssl rand -base64 32` |
 | `AUTH_SECRET` | `openssl rand -base64 32` |
 | `AUTH_BASE_URL`, `WEB_ORIGIN` | l'URL publique du dashboard, la même pour les deux (`https://app.<domaine>`). Son domaine est celui des clés d'accès (ADR 0053) : le changer rend toutes les clés inutilisables ; chacun se reconnecte avec son mot de passe et son code, puis ajoute une nouvelle clé. `WEB_ORIGIN` est aussi l'adresse intégrée à l'extension que sert le guide (ADR 0067, second amendement) : l'image `web` la reçoit en argument de build ; la changer demande de reconstruire cette image, et chaque membre recharge l'extension téléchargée à nouveau. `EXTENSION_CRM_ORIGIN`, si elle est posée, la remplace pour l'extension et doit nommer le même site, sinon le build échoue ; vide, l'extension n'a pas d'adresse intégrée (la CI, servie en http) |
-| `DATABASE_POOL_MAX`, `DATABASE_SERVICE_POOL_MAX`, `RATE_LIMIT_POOL_MAX`, `WORKER_DATABASE_SERVICE_POOL_MAX` | le budget de § 1.1 étape 8 (défauts 10, 5 et 3 par processus ; 8 pour le pool de service du worker) |
+| `DATABASE_POOL_MAX`, `DATABASE_SERVICE_POOL_MAX`, `RATE_LIMIT_POOL_MAX`, `WORKER_DATABASE_SERVICE_POOL_MAX` | le budget de § 1.1 étape 9 (défauts 10, 5 et 3 par processus ; 8 pour le pool de service du worker) |
 | `WORKER_CPUS` | `1` (défaut) : le worker et son ffmpeg laissent un cœur à l'API sur les 2 du KVM 2 ; à revoir en conditions réelles |
 | `TRUST_PROXY_HOPS` | `2` (le proxy de Coolify, puis le nginx de `web`) ; défaut du compose, à vérifier sur le vrai serveur (§ 1.4) |
 | `PLAYGROUND_PERSONA_PATH` | facultatif : chemin **dans le conteneur** de la persona du playground (§ 1.5) ; démo sans lui. Les brouillons, les gardes et « À apprendre » ne le lisent pas |
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |
 | `S3_*` | § 4.4 ; sans elles, la créatrice ne peut pas envoyer de fichier (l'envoi répond « réessaie dans un moment ») |
-| `SENTRY_DSN`, `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
+| `SENTRY_DSN` | **obligatoire** : le DSN du projet Sentry de la région UE (`https://<clé>@<hôte>.de.sentry.io/<projet>`), créé par Charles ; sans lui l'API et le worker refusent de démarrer. Ce qui part et ce qui ne part jamais : `operations.md` § Observabilité |
+| `LINK_SERVICE_ORIGIN` | facultatif : l'origine du service de redirection lu par le connecteur de liens, `https://<domaine>` et rien après, saisie par Charles dans Coolify et jamais écrite dans le dépôt. Vide : le connecteur de liens est éteint, rien d'autre ne casse. Présente mais invalide (port, chemin, adresse IP, `localhost`, identifiants) : l'API et le worker refusent de démarrer (ADR 0120 § 3) |
+| `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
 
 Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des variables en production : elles se collent dans Réglages › Modèles IA › Services (ADR 0016). Les deux clés de chiffrement se gardent aussi hors du serveur (gestionnaire de mots de passe) : les perdre rend illisibles les sessions et les clés stockées.
 
@@ -162,7 +190,7 @@ Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des
 3. Vérifier :
    - `https://app.<domaine>/` affiche l'écran de connexion ;
    - Coolify → `api` → Terminal : `wget -qO- http://127.0.0.1:3000/ready` → `"status":"ready"` avec `database`, `migrations` et `worker` à `true` ;
-   - le budget de connexions (§ 1.1 étape 8) : la ligne « database connection budget of this process » de `api` et celle de `worker`, et dans Supabase → Database → Settings → Connection pooling, le nombre de connexions du pool reste sous sa taille ;
+   - le budget de connexions (§ 1.1 étape 9) : la ligne « database connection budget of this process » de `api` et celle de `worker`, et dans Supabase → Database → Settings → Connection pooling, le nombre de connexions du pool reste sous sa taille ;
    - `TRUST_PROXY_HOPS` : après la première connexion au dashboard (étape 5), dans le SQL Editor de Supabase, `select ip from audit_log order by created_at desc limit 1` donne l'adresse IP publique de Charles, et non celle d'un proxy (`10.x`, `172.x`, `192.168.x`). Sinon, corriger la valeur et redéployer avant d'inviter qui que ce soit ;
    - le journal du proxy (§ 1.2 étape 6, dernière vérification).
 4. Créer le compte propriétaire (pas d'inscription publique), Coolify → `api` → Terminal :

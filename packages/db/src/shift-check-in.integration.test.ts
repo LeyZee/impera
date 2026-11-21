@@ -35,11 +35,11 @@ const inMinutes = (minutes: number): Date =>
   new Date(Math.floor(Date.now() / MINUTE) * MINUTE + minutes * MINUTE);
 
 /**
- * `check_in_own_shift` (0235, EQ-12): « Je prends mon poste ». SECURITY DEFINER, so it holds its own boundary; called
+ * `check_in_own_shift` (0247, EQ-12): « Je prends mon poste ». SECURITY DEFINER, so it holds its own boundary; called
  * here the way the API calls it, on the application role. Each case has its own shifts, the planning keeping its past.
  * Invented people only (ADR 0010).
  */
-describe('a member takes his own shift, in its window (0235)', () => {
+describe('a member takes his own shift, in its window (0247)', () => {
   let test: TestDb;
   const owner = newId(UserIdSchema);
   const nora = { creatorId: newId(CreatorIdSchema) };

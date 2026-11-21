@@ -36,7 +36,7 @@ describe('Avatar', () => {
     expect(container.textContent).toBe('É');
   });
 
-  it('tells apart members whose names share a first word, as Équipe › Reveal does (GES-21)', () => {
+  it('tells apart members whose names share a first word, as Équipe › Comptes Reveal does (GES-21)', () => {
     const { container, rerender } = render(<Avatar member={member('Chatteur Un')} />);
     expect(container.textContent).toBe('CU');
     rerender(<Avatar member={member('Chatteur Deux')} />);

@@ -1,5 +1,5 @@
 {
-  "id": "a113feff-22d3-449a-9ae6-6ce6d23b5360",
+  "id": "de3bc53e-dc67-45a8-b016-24d2d8dbcf61",
   "prevId": "5a93cf70-f7b1-4594-8b61-be37b5f07593",
   "version": "7",
   "dialect": "postgresql",
@@ -14385,6 +14385,28 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_chatter_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'",
+          "withCheck": "\"platform_chatter_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
         }
       },
       "checkConstraints": {
@@ -14539,6 +14561,28 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"platform_daily_stats\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'",
+          "withCheck": "\"platform_daily_stats\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'daily_stats'"
         }
       },
       "checkConstraints": {
@@ -17924,12 +17968,6 @@
         },
         "stopped_at": {
           "name": "stopped_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "checked_in_at": {
-          "name": "checked_in_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

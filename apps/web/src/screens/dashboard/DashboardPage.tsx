@@ -4,14 +4,12 @@ import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
-import { BackupBanner } from './BackupBanner';
 import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
-import { PaperworkBanner } from './PaperworkBanner';
-import { ReportsBanner } from './ReportsBanner';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
+import { TodoCard } from './TodoCard';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
 import type { AgencySelection } from './agency/period';
@@ -373,7 +371,7 @@ function Loaded({
       {agentHero}
 
       {/* Who is warned of an urgency at night: part of her agent's state, said right under it. The night's alerts and
-          where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
+          where they go are the owner's to set (Réglages › Bots Telegram): anyone else reads it. */}
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
@@ -444,17 +442,9 @@ function Loaded({
           the reports are the agency's, said on its own view, not under each creator (PIL-04). The day's AI budget is
           never on this screen: on « Toute l'agence » for the owner and an active manager, in Réglages › Consommation IA,
           never to an operator who can set nothing of it (PIL-27). */}
-      {agency === undefined ? (
-        <>
-          <BackupBanner enabled={forOwner} />
-
-          {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
-          <PaperworkBanner enabled={forOwner} />
-
-          {/* The reports that wait on the agency, never left unseen in the queue (ADR 0073). */}
-          <ReportsBanner enabled={reviewsReports} />
-        </>
-      ) : null}
+      {/* The export, the invoices and the documents are the owner's to settle (OPS-02, EQ-06 lot 8d), the reports that
+          wait are their reviewer's (ADR 0073): one card, « À faire » (W3). */}
+      {agency === undefined ? <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} /> : null}
 
       {tip.element}
     </div>

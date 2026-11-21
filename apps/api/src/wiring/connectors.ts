@@ -1,11 +1,12 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
 import { parseEncryptionKeys, withAdmin } from '@impera/db';
 
-import { mediaBucket, secretOrNull } from '../config';
+import { linkServiceOriginOf, mediaBucket, secretOrNull } from '../config';
 import { createConnectionStatePublisher } from '../connection-state';
 import { defineTask } from '../jobs';
 import {
   createAvatarFetch,
+  createLinkServiceReader,
   createConnectorsModule,
   createS3AvatarStore,
   revealApiConnectors,
@@ -15,6 +16,7 @@ import {
   type ConnectorsDeps,
   type ConnectorsModule,
   type InviteFromPlatform,
+  type LinkServiceReader,
   type SalesFeedRegistry,
 } from '../modules/connectors';
 import { createFfmpegMediaTools, sniffMediaType } from '../modules/media';
@@ -45,6 +47,8 @@ export function wireConnectors(
     readonly registry?: ConnectorRegistry;
     /** Reveal's CRM API (ADR 0050) by default; FakeReveal's in the tests. */
     readonly salesFeeds?: SalesFeedRegistry;
+    /** The redirect service over HTTPS by default; a reader in memory in the tests. Never called without an address. */
+    readonly linkServiceReaderOf?: (key: string) => LinkServiceReader;
     /**
      * Each account whose vault sync the owner asked (fiche vault-sync), late bound: `scripts`, wired after this module,
      * queues the import of its native scripts behind it (ADR 0099 § 1 time 2).
@@ -61,6 +65,8 @@ export function wireConnectors(
   const { config, db, adminDb, logger, requireRole, recentLogin } = shared;
   const sessionKeys = secretOrNull(config.SESSION_ENCRYPTION_KEYS);
   const credentialKeys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
+  const linkServiceOrigin =
+    config.LINK_SERVICE_ORIGIN === undefined ? null : linkServiceOriginOf(config.LINK_SERVICE_ORIGIN);
   // Her photo, copied at her import (CRM-07 a2b): to the media bucket, re-encoded by ffmpeg as the drops are.
   const bucket = mediaBucket(config);
   const store = deps.avatars?.store ?? (bucket === null ? null : createS3AvatarStore(bucket));
@@ -93,6 +99,11 @@ export function wireConnectors(
       ? { publicBaseUrl: config.AUTH_BASE_URL }
       : { publicBaseUrl: `http://127.0.0.1:${String(config.PORT)}`, loopbackWebhooks: true }),
     // The automatic sales check compares the accounts the pay rules put on the platform's net (CRM-04 b3).
+    linkServiceReaderOf:
+      linkServiceOrigin === null
+        ? null
+        : (deps.linkServiceReaderOf ??
+          ((key) => createLinkServiceReader({ origin: linkServiceOrigin, key }))),
     detectedAccounts: (period) => withAdmin(adminDb, (tx) => salesCheckReads.detectedAccounts(tx, period)),
     // Reveal's register down or back (Telegram P3-12), told by the Telegram module.
     publishConnectionState: createConnectionStatePublisher(adminDb, deps.now),
@@ -171,6 +182,7 @@ export function wireConnectors(
     routes: [
       module.routes,
       module.salesFeedRoutes({ guard: requireRole('owner'), recentLogin }),
+      module.linkServiceRoutes({ guard: requireRole('owner'), recentLogin }),
       module.salesFeedTeamRoutes({
         guard: requireRole('owner', 'operator'),
         recentLogin,

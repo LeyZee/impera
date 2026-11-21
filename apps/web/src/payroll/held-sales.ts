@@ -150,7 +150,7 @@ export function heldReasonText(
       const unlinked = `Son chatteur sur ${platformName(sale.platform)} n’est relié à aucun membre`;
       const otherwise = refund ? 'Sinon, écarte-le.' : 'Sinon, écarte-la.';
       // Only the owner and an active manager read this list, and both link in Équipe (ADR 0076).
-      const where = `Équipe › ${platformName(sale.platform)}`;
+      const where = `Équipe › Comptes ${platformName(sale.platform)}`;
       return refund
         ? `${unlinked}\u00a0: relie-le dans ${where} et le remboursement se déduit seul. ${otherwise}`
         : `${unlinked}\u00a0: relie-le dans ${where} et la vente compte seule. ${otherwise}`;

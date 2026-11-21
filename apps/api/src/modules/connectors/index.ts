@@ -1,5 +1,6 @@
 import {
   PlatformAccountIdSchema,
+  type CreatorId,
   type ConnectionService,
   type ConnectionSignal,
   type JobPayload,
@@ -14,6 +15,7 @@ import type { OutboundSender } from '../conversations';
 
 import { createConnectorReads, type ConnectorReads } from './application/connector-reads';
 import { createDispatchJob } from './application/dispatch';
+import { createLinkServiceSettings, type DetectedLinks } from './application/link-service';
 import { createOutboundSender, type ConnectorWrites } from './application/outbound-sender';
 import { createPollJob } from './application/poll';
 import {
@@ -38,12 +40,14 @@ import {
 import { createVaultFiles, type VaultFiles } from './application/vault-files';
 import type { AvatarPorts } from './domain/avatar';
 import { connectionServiceOf } from './domain/connection-outage';
+import type { LinkServiceReader } from './domain/link-service';
 import type { Clock, ConnectorRegistry, IngestMessage, JobLogger } from './domain/ports';
 import type { SalesFeedFactory, SalesFeedRegistry } from './domain/sales-feed';
 import { createAvatarRecords } from './infra/avatar/avatar-records';
 import { createDrizzleAccountJobs, createDrizzleAccountStore } from './infra/db/account-store';
 import { createDrizzleConnectorReadsStore } from './infra/db/connector-reads-store';
 import { createDrizzleDailyStatsStore } from './infra/db/daily-stats-store';
+import { createLinkServiceKeyStore, resealLinkServiceKey } from './infra/db/link-service-key';
 import { createSalesFeedKeyStore, resealSalesFeedKeys, type ResealReport } from './infra/db/sales-feed-keys';
 import {
   createSalesFeedJobs,
@@ -59,6 +63,7 @@ import {
   createCreatorEarningsReader,
   createCreatorEarningsRoutes,
 } from './infra/http/creator-earnings-routes';
+import { createLinkServiceRoutes, type LinkServiceRoutesOptions } from './infra/http/link-service-routes';
 import { createConnectorRoutes } from './infra/http/routes';
 import { createSalesFeedDeliveryRoutes } from './infra/http/sales-feed-delivery-routes';
 import { createSalesFeedRoutes, type SalesFeedRoutesOptions } from './infra/http/sales-feed-routes';
@@ -74,6 +79,8 @@ import { createSessionVault } from './infra/session-vault';
 
 export type { AvatarPorts } from './domain/avatar';
 export { createAvatarFetch } from './infra/avatar/fetch-avatar';
+export { LinkServiceError, type LinkServiceReader } from './domain/link-service';
+export { createLinkServiceReader } from './infra/link-service/rest-link-service';
 export { createS3AvatarStore } from './infra/avatar/s3-avatar-store';
 export type { ConnectorRegistry } from './domain/ports';
 export type { SalesFeedRegistry } from './domain/sales-feed';
@@ -122,39 +129,41 @@ export {
   type RevealWireMessageItem,
 } from './infra/reveal/wire';
 
-function bothReports(keys: ResealReport, webhooks: ResealReport): ResealReport {
+function allReports(...reports: readonly ResealReport[]): ResealReport {
   return {
-    total: keys.total + webhooks.total,
-    rewritten: keys.rewritten + webhooks.rewritten,
-    unreadable: [...keys.unreadable, ...webhooks.unreadable],
+    total: reports.reduce((sum, report) => sum + report.total, 0),
+    rewritten: reports.reduce((sum, report) => sum + report.rewritten, 0),
+    unreadable: reports.flatMap((report) => report.unreadable),
   };
 }
 
 /**
- * `pnpm ops:reencrypt-credentials`: the sales feed keys and their webhooks' secrets re-sealed with the newest
- * CREDENTIALS_ENCRYPTION_KEYS.
+ * `pnpm ops:reencrypt-credentials`: the sales feed keys, their webhooks' secrets and the key of the redirect service
+ * re-sealed with the newest CREDENTIALS_ENCRYPTION_KEYS.
  */
 export async function resealSalesFeedCredentials(
   adminDb: Database,
   keys: readonly EncryptionKey[],
 ): Promise<ResealReport> {
-  return bothReports(
+  return allReports(
     await resealSalesFeedKeys(adminDb, keys),
     await resealSalesFeedWebhookSecrets(adminDb, keys),
+    await resealLinkServiceKey(adminDb, keys),
   );
 }
 
 /**
- * `pnpm ops:check-keys`: how many sales feed keys and webhook secrets the given encryption keys open, read only, no
- * call to Reveal.
+ * `pnpm ops:check-keys`: how many sales feed keys, webhook secrets and the key of the redirect service the given
+ * encryption keys open, read only, no call outside.
  */
 export async function checkSalesFeedKeys(
   adminDb: Database,
   keys: readonly EncryptionKey[],
 ): Promise<{ readonly total: number; readonly unreadable: readonly string[] }> {
-  const report = bothReports(
+  const report = allReports(
     await resealSalesFeedKeys(adminDb, keys, true),
     await resealSalesFeedWebhookSecrets(adminDb, keys, true),
+    await resealLinkServiceKey(adminDb, keys, true),
   );
   return { total: report.total, unreadable: report.unreadable };
 }
@@ -224,6 +233,11 @@ export interface ConnectorsModule {
    */
   readonly platformReads: PlatformReads;
   /**
+   * Her bio on her platform profile as the poll last read it (ADR 0154), for the agent beside her persona; `null`:
+   * none. Read from the base, never from the platform at draft time.
+   */
+  readonly profileBioOf: (creatorId: CreatorId) => Promise<string | null>;
+  /**
    * One vault file read to a path of the caller's (ADR 0113), for `media.describe_vault`: through the resolver, behind
    * `mediaDownload`, never a write. What became of it, typed; the file is the caller's to remove.
    */
@@ -232,6 +246,13 @@ export interface ConnectorsModule {
   readonly avatarRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
   /** `/v1/creator-space/earnings` (CR-04), behind the guard given here (creator): her part, read in her account. */
   readonly creatorEarningsRoutes: (guard: preValidationAsyncHookHandler) => FastifyPluginAsyncZod;
+  /**
+   * Every link of the agency's account at the redirect service (ADR 0120 § 3), read now, for « Détecter ses liens »:
+   * for the owner alone, never stored here.
+   */
+  readonly detectedLinks: () => Promise<DetectedLinks>;
+  /** `/v1/settings/link-service`, behind the guards given here: the agency's key of the redirect service. */
+  readonly linkServiceRoutes: (options: LinkServiceRoutesOptions) => FastifyPluginAsyncZod;
   /** `/v1/settings/sales-feeds`, behind the guards given here. */
   readonly salesFeedRoutes: (options: SalesFeedRoutesOptions) => FastifyPluginAsyncZod;
   /**
@@ -283,6 +304,11 @@ export interface ConnectorsDeps {
   readonly credentialKeys: readonly EncryptionKey[] | null;
   /** One factory per platform with a sales feed: Reveal's CRM API. */
   readonly salesFeeds: SalesFeedRegistry;
+  /**
+   * The redirect service read with a key (ADR 0120 § 3), bound by the composition root to the address the deployment
+   * gives; `null` or absent without one, and the link connector is off.
+   */
+  readonly linkServiceReaderOf?: ((key: string) => LinkServiceReader) | null;
   /**
    * Impera's public HTTPS address (AUTH_BASE_URL), where a platform posts its deliveries; `null` (development over
    * HTTP) and no webhook can be registered: the minute's reading alone brings the sales.
@@ -375,9 +401,18 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       await deps.publishConnectionState(service, signal, correlationId);
     },
     avatars,
-    dailyStats: createDrizzleDailyStatsStore(deps.adminDb),
+    dailyStats: createDrizzleDailyStatsStore(deps.db, deps.adminDb),
   });
   const sender = createOutboundSender({ accounts, resolver, clock });
+  const linkServiceReaderOf = deps.linkServiceReaderOf ?? null;
+  const linkService = createLinkServiceSettings({
+    keys:
+      deps.credentialKeys === null || linkServiceReaderOf === null
+        ? null
+        : createLinkServiceKeyStore(deps.adminDb, deps.credentialKeys),
+    readerOf: linkServiceReaderOf,
+    now: () => clock.now(),
+  });
   const accountJobQueue = createDrizzleAccountJobs(deps.adminDb);
   const vaultStore = createDrizzleVaultStore(deps.db);
   const vaultReads = createVaultReads(vaultStore);
@@ -430,10 +465,13 @@ export function createConnectorsModule(deps: ConnectorsDeps): ConnectorsModule {
       }),
     vault: vaultReads,
     platformReads: createPlatformReads({ accounts, resolver, clock }),
+    profileBioOf: (creatorId) => accounts.profileBioOf(creatorId),
     vaultFiles: createVaultFiles({ accounts, resolver, clock }),
     avatarRoutes: (guard) => createAvatarRoutes(avatars, guard),
     creatorEarningsRoutes: (guard) =>
       createCreatorEarningsRoutes(createCreatorEarningsReader(deps.db), guard, () => clock.now()),
+    linkServiceRoutes: (options) => createLinkServiceRoutes(linkService, options),
+    detectedLinks: () => linkService.detectedLinks(),
     salesFeedRoutes: (options) => createSalesFeedRoutes(salesFeeds, options),
     salesFeedTeamRoutes: (options) => createSalesFeedTeamRoutes(salesFeeds.team, options),
     salesFeedStates: () => salesFeeds.list(),

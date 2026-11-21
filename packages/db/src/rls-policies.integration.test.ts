@@ -44,9 +44,10 @@ const POLICY_EXCEPTIONS: Readonly<Record<string, string>> = {
 
 /**
  * Under RLS without a policy: only `withAdmin` reads them (ADR 0068; an owner's removal, ADR 0096; the creators' Telegram channels, ADR 0080; the
- * calls to a platform's statistics, ADR 0081).
+ * calls to a platform's statistics, ADR 0081; the agency's key of the redirect service, ADR 0120 § 3).
  */
 const CLOSED_TABLES = [
+  'link_service_credentials',
   'owner_removals',
   'password_reset_links',
   'sales_feed_stats_calls',

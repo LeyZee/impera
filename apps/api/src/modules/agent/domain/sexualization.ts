@@ -224,9 +224,27 @@ export function declaredAdultAge(
   return null;
 }
 
-// A brake in her words: « tu y vas un peu fort », « doucement », « tu t'emballes », « on se calme », « pas si vite ».
-const BRAKE =
-  /\b(?:tu y vas|t'?y vas|tu vas|tu fonces)\b.{0,15}\b(?:fort|vite)\b|\b(?:trop|pas si|un peu|bien) vite\b|\bdoucement\b|\btu t'?emballes?\b|\bon se calme\b|\bcalme[- ]toi\b/u;
+// A brake in her words: « tu y vas un peu fort », « doucement », « tu t'emballes », « on se calme », « pas si vite »;
+// or a word on how he came at her: « tu vises direct », « t'es direct toi », « tu perds pas de temps », « tu commences
+// fort », « t'es pressé », « dès le premier message » (Charles, 20/11).
+const BRAKE = new RegExp(
+  [
+    String.raw`\b(?:tu y vas|t'?y vas|tu vas|tu fonces)\b.{0,15}\b(?:fort|vite)\b`,
+    String.raw`\b(?:trop|pas si|un peu|bien) vite\b`,
+    String.raw`\bdoucement\b`,
+    String.raw`\btu t'?emballes?\b`,
+    String.raw`\bon se calme\b`,
+    String.raw`\bcalme[- ]toi\b`,
+    String.raw`\btu vises\b`,
+    String.raw`\b(?:t'?es|tu es|toi t'?es|t'?etais)\s+(?:(?:bien|tres|trop|vachement|super|plutot)\s+)?(?:direct|cash|presse|rapide|entreprenant|culotte|audacieux|gonfle)\b`,
+    String.raw`\b(?:direct|cash)\s+(?:toi|dis donc|hein|comme ca|des le)\b`,
+    String.raw`\btu (?:commences|attaques|demarres|entres|arrives)\s+(?:fort|direct|cash)\b`,
+    String.raw`\btu (?:ne )?perds pas de temps\b`,
+    String.raw`\bdes le premier message\b`,
+    String.raw`\bon se connait (?:a peine|meme pas|pas)\b`,
+  ].join('|'),
+  'u',
+);
 
 /**
  * She never slows down a fan who does not go there (Charles, 20/11): a compliment, even an insistent one, is welcomed,

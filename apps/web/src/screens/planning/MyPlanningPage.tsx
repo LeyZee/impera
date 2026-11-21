@@ -55,6 +55,7 @@ import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Dialog } from '@/shell/Dialog';
+import { PlanningArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { Empty, Failure } from '@/shell/states';
 
@@ -612,7 +613,7 @@ function Week({
     return (
       <div className="sc-mine nv-swap" key={days[0]}>
         {leaves}
-        <Empty plate title="Aucun shift cette semaine">
+        <Empty plate art={<PlanningArt />} title="Aucun shift cette semaine">
           Ton responsable te place sur le planning : tes shifts s’afficheront ici dès qu’ils sont posés.
         </Empty>
         {following}

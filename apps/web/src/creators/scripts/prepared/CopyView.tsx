@@ -5,6 +5,7 @@ import type { EditorMedia } from './media';
 import { conditionLabel, differenceText, priceLabel, priceText } from './model';
 import { MediaTile } from './parts';
 
+import { ScriptArt } from '@/shell/art/EmptyArt';
 import { Empty } from '@/shell/states';
 
 /**
@@ -26,7 +27,7 @@ export function CopyView({
   const ready = scripts.filter((view) => view.state === 'ready_to_copy');
   if (ready.length === 0)
     return (
-      <Empty plate title="Rien à recopier">
+      <Empty plate art={<ScriptArt />} title="Rien à recopier">
         Un script passe ici quand rien ne lui manque et que tu le dis « Prêt à copier dans Reveal ».
       </Empty>
     );

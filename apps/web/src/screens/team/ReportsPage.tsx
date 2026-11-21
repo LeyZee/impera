@@ -425,7 +425,7 @@ function ToValidate({
   now: Date;
   zone: string;
   nudging: Nudging;
-  /** The reader may open Équipe › Reveal, where a member is linked to his platform account. */
+  /** The reader may open Équipe › Comptes Reveal, where a member is linked to his platform account. */
   canLink: boolean;
   onSelect: (next: ReadonlySet<string>) => void;
   onValidate: () => void;

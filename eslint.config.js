@@ -15,10 +15,12 @@ import prettier from 'eslint-config-prettier';
 const MODULE_DEPENDENCIES = {
   // INS-04: `FakeInstagram` implements the comments port of `instagram-comments`, read through its index.
   connectors: ['conversations', 'instagram-comments'],
-  conversations: ['fans', 'persona', 'agent', 'media'],
+  // ADR 0159: the turn on his custom order goes from the composer to the custom-orders store, typed by its pure.ts.
+  conversations: ['fans', 'persona', 'agent', 'media', 'custom-orders'],
   fans: [],
   persona: [],
-  agent: ['fans', 'persona', 'media'],
+  // ADR 0159: her turn on a custom order is the custom-orders module's (`customOrderTurn`), read through its index.
+  agent: ['fans', 'persona', 'media', 'custom-orders'],
   media: [],
   supervision: ['conversations', 'fans'],
   playground: ['agent'],
@@ -26,6 +28,8 @@ const MODULE_DEPENDENCIES = {
   telegram: [],
   team: [],
   backups: [],
+  // EQ-18: the owner's journal reads `audit_log` and the names it shows; it imports no module.
+  audit: [],
   // ADR 0091: reads the gateway's journal and keeps the credits ledger; imports no module.
   'ai-usage': [],
   // Choix de Charles 12/11: the owner's caps the gateway reads (`ai_budget_settings`); imports no module.
@@ -45,10 +49,15 @@ const MODULE_DEPENDENCIES = {
   trends: ['agent', 'content-drops', 'creator-tasks'],
   // INS-03, ADR 0121 § 1: her redirect links, out of the Telegram channel's setting; a leaf, read through its index.
   'redirect-links': [],
+  // ADR 0159: custom orders, first lot her grid of custom prices; a leaf.
+  'custom-orders': [],
   // INS-04, ADR 0122: the comments under her Instagram posts. Lot a: pure rules and its port; imports no module.
   'instagram-comments': [],
   // CR-05: her agenda reads her days and her wall-clock time with the scheduling helpers (`scheduling/pure.ts`).
   'creator-tasks': ['scheduling'],
+  // ADR 0140: her week, computed out of her agenda and written in it through its own door (`week`, § 22); her stock
+  // and drops are read through what the composition root plugs, never their tables.
+  'creator-week': ['scheduling', 'creator-tasks'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs

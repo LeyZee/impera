@@ -30,6 +30,7 @@ import {
   storableError,
 } from './database-errors';
 import type { Logger } from './logger';
+import { INERT_ERROR_REPORTER, type ErrorReporter } from './observability/error-reporter';
 import type { Readiness } from './readiness';
 import { SANDBOX_HEADER } from './sandbox';
 import { useFrenchValidationMessages } from './validation-messages';
@@ -42,6 +43,8 @@ export interface ServerDeps {
   readonly readiness: () => Promise<Readiness>;
   /** Shared counters (ADR 0027); without it, each process counts in its own memory (tests). */
   readonly rateLimitStore?: FastifyRateLimitStoreCtor;
+  /** Where a 5xx goes (OPS-18); inert without it (tests) or without a DSN. */
+  readonly errorReporter?: ErrorReporter;
 }
 
 declare module 'fastify' {
@@ -181,6 +184,17 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     // The plugin throws a 429; the error handler below gives it the common body, `Retry-After` stays.
   });
 
+  // Every answer of 500 and above is sent to Sentry, through its scrubber: the route's template and the method, never the
+  // address, the query, the headers nor the body. A 4xx is the client's, never reported (OPS-18).
+  const reporter = deps.errorReporter ?? INERT_ERROR_REPORTER;
+  const report = (error: unknown, request: FastifyRequest): void => {
+    reporter.captureException(error, {
+      service: 'api',
+      method: request.method,
+      ...(request.routeOptions.url === undefined ? {} : { route: request.routeOptions.url }),
+    });
+  };
+
   server.setErrorHandler((error: FastifyError, request, reply) => {
     // The common body is written as is, whatever the route declares for that status: a route whose 422 is a refusal
     // (`details.kind`) must still answer another 422 of its module in French, never fail to serialize it into a
@@ -195,6 +209,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     }
     if (error instanceof DomainError) {
       const status = statusForCode(error.code);
+      if (status >= 500) report(error, request);
       if (status === 500) {
         request.log.error({ err: storableError(error) }, 'unmapped domain error');
         return reply.code(500).send(errorBody(request, 'internal_error', 'Erreur interne'));
@@ -208,6 +223,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     }
     if (error.statusCode === 503) {
       // A limiter that fails closed could not count (the store has logged why).
+      report(error, request);
       return reply
         .code(503)
         .send(
@@ -229,6 +245,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     }
     if (isDatabaseUnavailable(error)) {
       request.log.warn({ err: storableError(error) }, 'database unavailable');
+      report(error, request);
       return reply
         .code(503)
         .send(
@@ -245,6 +262,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
       return reply.code(404).send(errorBody(request, 'reference_not_found', 'Élément introuvable'));
     }
     request.log.error({ err: storableError(error) }, 'unhandled error');
+    report(error, request);
     return reply.code(500).send(errorBody(request, 'internal_error', 'Erreur interne'));
   });
 

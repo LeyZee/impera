@@ -1,6 +1,6 @@
 # Vocabulaire de description des médias (rôle `sense`)
 
-Version `1.0.0`. Schéma Zod : `packages/contracts/src/media.ts` (`MediaDescriptionSchema`), avec les champs en camelCase dans le code (`vocabularyVersion`, `factualDescription`…) ; le YAML ci-dessous garde les noms de la conception. Toute description en base porte sa version.
+Version `1.1.0` (la `1.0.0` reste lisible telle quelle). Schéma Zod : `packages/contracts/src/media.ts` (`MediaDescriptionSchema`), avec les champs en camelCase dans le code (`vocabularyVersion`, `factualDescription`…) ; le YAML ci-dessous garde les noms de la conception. Toute description en base porte sa version.
 
 ## Principes (hérités d'OnlyScript)
 
@@ -11,7 +11,7 @@ Version `1.0.0`. Schéma Zod : `packages/contracts/src/media.ts` (`MediaDescript
 ## Schéma
 
 ```yaml
-vocabulary_version: "1.0.0"
+vocabulary_version: "1.1.0"            # "1.0.0" accepté pour une description écrite avant
 kind: image | video | audio
 factual_description: string          # 1 à 4 phrases, français, factuel
 duration_s: number | null            # vidéo/audio
@@ -36,6 +36,23 @@ not_visible: boolean                 # rien d'exploitable (noir, flou, hors suje
 flags:                               # alertes de sécurité, décident d'un handoff
   - possible_minor | possible_non_consent | identifiable_third_party | weapon | drugs | self_harm
 ```
+
+### Média que la créatrice dépose (`DropMediaDescriptionSchema`, ADR 0083 § 2)
+
+En plus des champs ci-dessus : `detailed` (la description complète, en prose) et, depuis la `1.1.0`, sa tenue au départ du média (les premières secondes d'une vidéo), même si elle l'enlève ensuite.
+
+```yaml
+outfit:                              # null si on ne la voit pas ; absent d'une description 1.0.0 (inconnu)
+  style: lingerie | nightwear | evening | casual | sportswear | swimwear | costume | nothing | other
+  pieces:                            # chaque pièce vue, 10 au plus ; vide avec nothing
+    - type: lingerie_top | lingerie_bottom | bodysuit | garter_belt | stockings | dress | skirt | top | shirt
+        | sweater | jacket | trousers | shorts | swimsuit | robe | pyjamas | towel | heels | shoes | boots
+        | accessory | other
+      colours: [black | white | red | pink | purple | blue | green | yellow | orange | brown | beige | grey
+        | gold | silver | nude | transparent | multicolour]   # 1 à 3, la principale d'abord
+```
+
+Le moment (jour, nuit, polyvalent) n'est pas dans la description : un humain le fixe sur le script quand il est déposé.
 
 ## Usage
 

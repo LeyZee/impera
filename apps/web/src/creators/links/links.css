@@ -92,3 +92,73 @@
     min-height: 44px;
   }
 }
+
+/* « Ajouter un lien » and « Détecter ses liens », side by side; they wrap on a phone. */
+.cl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* What the redirect service lists: a block of its own under her links, never mixed with them. */
+.cl-detected {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--nv-ink) 10%, transparent);
+}
+.cl-detected__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cl-detected__title {
+  margin: 0;
+}
+/* The way to Réglages keeps its own width: a grid would stretch it across the plate. */
+.cl-detected > .nv-btn {
+  justify-self: start;
+}
+
+/* A proposal is not one of her links yet: a lighter line, a thin edge and no fill, its « Ajouter » beside its name. */
+.cl-row--found {
+  flex-wrap: nowrap;
+  padding: 10px 12px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.cl-row--found .cl-row__main {
+  flex: 1 1 0;
+}
+.cl-row--found .cl-row__name {
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .cl-row--found {
+    flex-wrap: wrap;
+  }
+  /* The name and « Ajouter » on one line, the proposed place under them: never a full-width button per line. */
+  .cl-row--found .cl-row__main {
+    flex-basis: calc(100% - 110px);
+  }
+  .cl-row--found > .nv-btn {
+    flex: 0 0 auto;
+    order: 1;
+  }
+  .cl-row--found > .nv-tag {
+    order: 2;
+  }
+}
+/* No key yet: amber, the dot of « à renseigner » and the words, in the regular weight. */
+.cl-detected__refusal {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-warning);
+}
+.cl-detected__refusal > .cl-row__dot {
+  flex: none;
+}
