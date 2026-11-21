@@ -1,4 +1,8 @@
-import { MediaDescriptionSchema, TrendCaptureDescriptionSchema } from '@impera/contracts';
+import {
+  MediaDescriptionSchema,
+  ScriptDropSummarySchema,
+  TrendCaptureDescriptionSchema,
+} from '@impera/contracts';
 import { BriefSchema, createInMemoryCallLog, VoiceOutputSchema, type LlmCallLog } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -147,6 +151,22 @@ describe('the scripted AI, through the real gateway', () => {
     const { llm } = gateway('xai-recette-refus-000000001');
     const result = await llm.gateway.brain(CONVERSATION);
     expect(result.ok).toBe(false);
+  });
+
+  it('tells a script step by step under its own keys, which the code takes (recette MED-13)', async () => {
+    const { llm } = gateway();
+    const media = [{ kind: 'image' as const, durationS: null, description: 'Une photo inventée.' }];
+    const result = await llm.gateway.summarizeScript({
+      scriptName: 'Script inventé',
+      moment: null,
+      steps: [
+        { step: 'intro:', code: 'E1', name: 'Intro', card: null, media },
+        { step: 'pont-2:B', code: 'E2B', name: 'Pont', card: null, media },
+      ],
+    });
+    if (!result.ok) throw new Error(`summary failed: ${JSON.stringify(result.error)}`);
+    const summary = ScriptDropSummarySchema.parse(result.value.output);
+    expect(summary.steps.map((one) => one.step)).toEqual(['intro:', 'pont-2:B']);
   });
 
   it('takes only the scripts it knows', async () => {
