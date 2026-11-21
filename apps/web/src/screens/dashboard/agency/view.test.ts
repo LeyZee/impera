@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { AGENCY_WEEK } from './fixture';
 import {
-  arcs,
   bestSlot,
   busiest,
   byWeek,
@@ -103,12 +102,6 @@ describe('the agency’s figures as the screen says them (ADR 0078)', () => {
     expect(hoursLabel(18)).toBe('18\u00a0h\u00a0–\u00a019\u00a0h');
     expect(hourLabel(0)).toBe('0\u00a0h');
     expect(busiest(Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0)))).toBeNull();
-  });
-
-  it('draws a ring whose arcs follow each other', () => {
-    const [first, second] = arcs([1, 3], 10, 0);
-    expect(first?.offset).toBe(0);
-    expect(second?.offset).toBeCloseTo(-15.71, 1);
   });
 });
 

@@ -23,6 +23,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { inventedLogo } from '../modules/invoicing/infra/__tests__/invented-logo';
 
 import { setUpInvoicing } from './support/invoicing';
+import { fortnightDawn } from './support/paris';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
 /** Periods of 2025: they have ended. */
@@ -33,6 +34,11 @@ const Q4 = PayPeriodSchema.parse('2025-06-16');
 const Q5 = PayPeriodSchema.parse('2025-07-01');
 const Q6 = PayPeriodSchema.parse('2025-07-16');
 const Q7 = PayPeriodSchema.parse('2025-08-01');
+/**
+ * Pay's clock, and the tests' today: 00:00:30 in Paris on the first day of the running fortnight, the first instant of a
+ * 1st or a 16th, so that the test and the server always read the same fortnight and the same day.
+ */
+const DAWN = fortnightDawn();
 
 describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 0032 et 0035)', () => {
   let team: PayrollTeam;
@@ -59,12 +65,12 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
   const holding = (keys: readonly string[]) => team.holding(keys);
   const memberPeriod = (member: TeamMember, period: PayPeriod) =>
     `payroll.member_period:${member.id}:${period}`;
-  const today = () => payPeriodAt(new Date(), 'Europe/Paris');
+  const today = () => payPeriodAt(DAWN, 'Europe/Paris');
 
   const audited = (action: string) => team.audited(action);
 
   beforeAll(async () => {
-    team = await startPayrollTeam(inject('pgSuperuserUrl'));
+    team = await startPayrollTeam(inject('pgSuperuserUrl'), { payrollClock: () => DAWN });
     ({ member: theo, cookie: theoCookie } = await team.addMember('theo@example.test', 'Théo'));
     ({ member: lea } = await team.addMember('lea@example.test', 'Léa'));
     ({ member: mona, cookie: monaCookie } = await team.addMember('mona@example.test', 'Mona', 'manager'));
@@ -325,7 +331,7 @@ describe('Équipe › Paie : primes, malus, ajustements et paiement (EQ-04, ADR 
     );
     // A transfer to come, one before the period began (a slip of the year), another amount, a method off the list
     // (0031's default ones included: WorldRemit only), no amount, an IBAN for a reference: nothing is written.
-    const later = calendarDayAt(new Date(Date.now() + 2 * 86_400_000), 'Europe/Paris');
+    const later = calendarDayAt(new Date(DAWN.getTime() + 2 * 86_400_000), 'Europe/Paris');
     expect(team.refusal(await pay(team.owner, { paidOn: later })).code).toBe(
       'payment_in_future_unprocessable',
     );

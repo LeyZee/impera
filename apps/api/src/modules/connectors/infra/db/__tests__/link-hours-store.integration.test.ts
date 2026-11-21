@@ -3,7 +3,7 @@ import { schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { readLinkHours } from '../../../application/link-hours';
+import { createReadLinkHoursJob, readLinkHours } from '../../../application/link-hours';
 import { LinkServiceError } from '../../../domain/link-service';
 import { FakeLinkStats } from '../../fake/FakeLinkStats';
 import { createDrizzleLinkHourStore } from '../link-hours-store';
@@ -61,7 +61,7 @@ describe('the hours of her redirect links, kept by the hourly reading', () => {
   });
 
   it('reads her attached links only, keeps every hour of the window, and replaces an open hour', async () => {
-    const store = createDrizzleLinkHourStore(test.app.db);
+    const store = createDrizzleLinkHourStore(test.app.db, test.admin.db);
     const stats = new FakeLinkStats()
       .seedHours(ref(1), [
         { hour: hour('11'), pageviews: 10, clicks: 3 },
@@ -77,7 +77,7 @@ describe('the hours of her redirect links, kept by the hourly reading', () => {
       hours: 47,
       deferred: 0,
       calls: 3,
-      failed: false,
+      failure: null,
       retryAfterSeconds: null,
     });
     // Her one attached link that is on and placed, and never a link of Inès.
@@ -104,22 +104,89 @@ describe('the hours of her redirect links, kept by the hourly reading', () => {
   });
 
   it('writes nothing and removes nothing when the service fails, and says how long it asked to wait', async () => {
-    const store = createDrizzleLinkHourStore(test.app.db);
+    const store = createDrizzleLinkHourStore(test.app.db, test.admin.db);
     const before = await kept(noraStory);
     const stats = new FakeLinkStats().failWith(new LinkServiceError('rate_limited', 42));
     const run = await readLinkHours(
       { stats, store },
       { creatorId: nora, now: at('14:30:00'), callsLeft: 30 },
     );
-    expect(run).toEqual({ links: 0, hours: 0, deferred: 1, calls: 2, failed: true, retryAfterSeconds: 42 });
+    expect(run).toEqual({
+      links: 0,
+      hours: 0,
+      deferred: 1,
+      calls: 2,
+      failure: 'rate_limited',
+      retryAfterSeconds: 42,
+    });
     expect(await kept(noraStory)).toEqual(before);
   });
 
   it('reads no link at all without the calls for a whole one', async () => {
-    const store = createDrizzleLinkHourStore(test.app.db);
+    const store = createDrizzleLinkHourStore(test.app.db, test.admin.db);
     const stats = new FakeLinkStats();
     const run = await readLinkHours({ stats, store }, { creatorId: nora, now: at('14:30:00'), callsLeft: 2 });
-    expect(run).toMatchObject({ links: 0, deferred: 1, calls: 0, failed: false });
+    expect(run).toMatchObject({ links: 0, deferred: 1, calls: 0, failure: null });
     expect(stats.calls).toEqual([]);
+  });
+
+  describe('the hourly pass over every creator', () => {
+    const logs: object[] = [];
+    const logger = {
+      info: (fields: object) => void logs.push(fields),
+      warn: (fields: object) => void logs.push(fields),
+    };
+    const keys = (key: string | null) => ({
+      find: () => Promise.resolve({ key, connectedAt: at('00:00:00') }),
+    });
+    const passOf = (stats: FakeLinkStats, more: { key?: string | null; store?: object } = {}) =>
+      createReadLinkHoursJob({
+        keys: keys(more.key === undefined ? 'cle-inventee' : more.key),
+        readerOf: () => stats,
+        store: { ...createDrizzleLinkHourStore(test.app.db, test.admin.db), ...more.store },
+        now: () => at('15:20:00'),
+      })(logger);
+
+    it('reads each creator with her own references, and keeps each series under her own link', async () => {
+      const stats = new FakeLinkStats()
+        .seedHours(ref(1), [{ hour: hour('14'), pageviews: 3, clicks: 1 }])
+        .seedHours(ref(4), [{ hour: hour('14'), pageviews: 50, clicks: 5 }]);
+      const pass = await passOf(stats);
+      expect(pass).toMatchObject({ outcome: 'done', creators: 2, links: 2, calls: 6, failedCreators: 0 });
+      expect(new Set(stats.calls.map((call) => call.link))).toEqual(new Set([ref(1), ref(4)]));
+      expect((await kept(inesStory)).at(-1)).toEqual([hour('14'), 50, 5, 0, true]);
+      expect((await kept(noraStory)).at(-1)).toEqual([hour('14'), 3, 1, 0, true]);
+      // Neither a key nor a reference in what is logged.
+      expect(JSON.stringify(logs)).not.toMatch(/cle-inventee|lnk_/u);
+    });
+
+    it('does nothing without a key that opens', async () => {
+      const stats = new FakeLinkStats();
+      expect((await passOf(stats, { key: null })).outcome).toBe('off');
+      expect(stats.calls).toEqual([]);
+    });
+
+    it('stops asking once the service limits it, and leaves the hours kept as they are', async () => {
+      const before = await kept(inesStory);
+      const stats = new FakeLinkStats().failWith(new LinkServiceError('rate_limited', 60));
+      const pass = await passOf(stats);
+      expect(pass).toMatchObject({ outcome: 'stopped', creators: 1, links: 0, calls: 2 });
+      expect(stats.calls).toHaveLength(1);
+      expect(await kept(inesStory)).toEqual(before);
+    });
+
+    it('goes on to the next creator when one fails on our side', async () => {
+      const real = createDrizzleLinkHourStore(test.app.db, test.admin.db);
+      const stats = new FakeLinkStats();
+      const pass = await passOf(stats, {
+        store: {
+          attachedLinks: (creatorId: string) =>
+            creatorId === nora
+              ? Promise.reject(new Error('base injoignable'))
+              : real.attachedLinks(creatorId),
+        },
+      });
+      expect(pass).toMatchObject({ outcome: 'done', creators: 1, links: 1, failedCreators: 1 });
+    });
   });
 });

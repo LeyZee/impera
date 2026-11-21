@@ -322,7 +322,9 @@
   background: var(--nv-glass-fill);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
+/* One line: the chevron must never fall alone to the next line (avis Design, téléphone 390 px). */
 .ag-streak {
+  white-space: nowrap;
   text-decoration: none;
   transition: background-color 0.15s ease;
 }
@@ -344,6 +346,8 @@
   margin: -6px 0;
 }
 .ag-streak__go {
+  /* The base styles make an svg a block: inline, it stays on the text's line. */
+  display: inline-block;
   flex: none;
   width: 12px;
   height: 12px;

@@ -20,6 +20,8 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import { linkProposals } from '../../domain/detection';
+import { RedirectLinkError } from '../../domain/errors';
+import { serviceLinkOf } from '../../domain/links';
 import type { DetectLinks, RedirectLinkActor, RedirectLinkStore } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
@@ -35,6 +37,8 @@ function actorOf(request: FastifyRequest): RedirectLinkActor {
  * store names a `createRateLimit` limiter by its bounds and refuses two of the same (`rate-limit-store.ts`).
  */
 const DETECTIONS_PER_MINUTE = 6;
+/** An attachment reads the service as a detection does; a bound of its own, for the same reason. */
+const ATTACHMENTS_PER_MINUTE = 8;
 
 /** The common 429 `rate_limited` (server.ts), as the plugin's own limits answer. */
 class OwnerLimitReached extends Error {
@@ -103,17 +107,22 @@ export function createRedirectLinkRoutes(
     );
 
     // Counted per owner and address, after the guard: a refused call never spends the owner's quota.
-    const limit = app.createRateLimit({
-      max: DETECTIONS_PER_MINUTE,
-      timeWindow: '1 minute',
-      keyGenerator: (request) => `redirect-links:detect:${request.user?.id ?? ''}:${limitKeyOf(request.ip)}`,
-    });
-    const detections: preValidationAsyncHookHandler = async (request, reply) => {
-      const attempt = await limit(request);
-      if (attempt.isAllowed || !attempt.isExceeded) return;
-      void reply.header('retry-after', attempt.ttlInSeconds);
-      throw new OwnerLimitReached();
+    const ownerLimit = (name: string, max: number): preValidationAsyncHookHandler => {
+      const limit = app.createRateLimit({
+        max,
+        timeWindow: '1 minute',
+        keyGenerator: (request) =>
+          `redirect-links:${name}:${request.user?.id ?? ''}:${limitKeyOf(request.ip)}`,
+      });
+      return async (request, reply) => {
+        const attempt = await limit(request);
+        if (attempt.isAllowed || !attempt.isExceeded) return;
+        void reply.header('retry-after', attempt.ttlInSeconds);
+        throw new OwnerLimitReached();
+      };
     };
+    const detections = ownerLimit('detect', DETECTIONS_PER_MINUTE);
+    const attachments = ownerLimit('attach', ATTACHMENTS_PER_MINUTE);
 
     /**
      * « Détecter ses liens » (INS-02, ADR 0120 § 3): the links of the agency's account at the redirect service, each
@@ -135,6 +144,35 @@ export function createRedirectLinkRoutes(
         const detected = await detectLinks();
         if (!detected.ok) throw new RefusalError(LINK_SERVICE_UNPROCESSABLE, detected.error);
         return { proposals: linkProposals(detected.links, existing) };
+      },
+    );
+
+    /**
+     * « Relier ce lien » (INS-02 lot e2, ADR 0120 § 3): the owner attaches a link of hers to its link at the redirect
+     * service, so that its hours are read. Nothing in the request names the service's link: the server reads the
+     * account now and keeps the reference of the one link that has exactly this address. No such link: refused,
+     * nothing written.
+     */
+    app.post(
+      '/creators/:creatorId/redirect-links/:linkId/attach',
+      {
+        preValidation: [requireRole('owner'), attachments],
+        schema: {
+          params: LinkParams,
+          response: { 200: AgencyRedirectLinkSchema, 422: LinkServiceRefusalBodySchema },
+        },
+      },
+      async (request) => {
+        const actor = actorOf(request);
+        const { creatorId, linkId } = request.params;
+        // Her links first: a creator the owner cannot read is refused before anything is asked outside.
+        const link = (await store.listForAgency(actor, creatorId)).find((one) => one.id === linkId);
+        if (link === undefined) throw new RedirectLinkError('link_not_found');
+        const detected = await detectLinks();
+        if (!detected.ok) throw new RefusalError(LINK_SERVICE_UNPROCESSABLE, detected.error);
+        const found = serviceLinkOf(link, detected.links);
+        if (found === null) throw new RedirectLinkError('not_at_service');
+        return store.attach(actor, creatorId, linkId, found.ref);
       },
     );
 

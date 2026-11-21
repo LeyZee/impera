@@ -26,8 +26,8 @@ export interface BackupsModule {
   readonly status: () => Promise<BackupStatus>;
   readonly jobs: { readonly check: () => Promise<BackupCheck> };
   /**
-   * EQ-17's pay guard, wired by the composition root on its port: the latest restore test found no mismatch and is
-   * at most RESTORE_TEST_FRESH_DAYS old at `at`. `at` is the instant of the guarded action (now), never a period's
+   * Whether the restore is proven (the Dashboard's reminder; it never blocks the pay, ADR 0028 § 6 as amended 21/11):
+   * the latest restore test found no mismatch and is at most RESTORE_TEST_FRESH_DAYS old at `at`. `at` is the instant of the guarded action (now), never a period's
    * date: a test made after a past `at` would still count.
    */
   readonly restoreTestFresh: (at: Date) => Promise<boolean>;

@@ -519,7 +519,41 @@ async function ownGifts(
   return gifts;
 }
 
-const toMySale = (line: MyLine): MySales['items'][number] => ({
+/**
+ * The instants of the member's own sales among `ids`, as their earlier statements keep them: what a late refund says
+ * it takes back (« remboursement d'une vente du 3 nov. »). Their own statements only, never the register.
+ */
+async function ownSaleInstants(
+  tx: Transaction,
+  memberId: TeamMemberId,
+  ids: ReadonlySet<string>,
+): Promise<Map<string, Date>> {
+  const found = new Map<string, Date>();
+  if (ids.size === 0) return found;
+  const rows = await tx
+    .select({ sales: commissionStatementLines.sales })
+    .from(commissionStatements)
+    .innerJoin(
+      commissionStatementLines,
+      and(
+        eq(commissionStatementLines.statementId, commissionStatements.id),
+        eq(commissionStatementLines.revision, commissionStatements.revision),
+      ),
+    )
+    .where(
+      and(eq(commissionStatements.memberId, memberId), eq(commissionStatementLines.base, 'platform_net')),
+    );
+  for (const row of rows) {
+    for (const one of z.array(StoredSaleSchema).parse(row.sales)) {
+      const key = `${one.platform}:${one.platformSaleId}`;
+      if (one.event === 'sale' && one.occurredAt != null && ids.has(key))
+        found.set(key, new Date(one.occurredAt));
+    }
+  }
+  return found;
+}
+
+const toMySale = (line: MyLine, saleInstants: ReadonlyMap<string, Date>): MySales['items'][number] => ({
   platform: line.platform,
   platformSaleId: line.platformSaleId,
   event: line.event,
@@ -528,6 +562,10 @@ const toMySale = (line: MyLine): MySales['items'][number] => ({
   netMinor: line.netMinor,
   occurredAt: line.occurredAt?.toISOString() ?? null,
   lateFrom: line.lateFrom,
+  saleOccurredAt:
+    line.event === 'refund' && line.lateFrom !== null
+      ? (saleInstants.get(`${line.platform}:${line.platformSaleId}`)?.toISOString() ?? null)
+      : null,
   state: line.state,
   signal:
     line.signal === null
@@ -595,11 +633,17 @@ export function createDrizzleSaleSignalStore(
           closed,
         });
         const page = pageOfLines(lines, after, query.limit);
+        const lateRefunds = new Set(
+          page.items
+            .filter((one) => one.event === 'refund' && one.lateFrom !== null)
+            .map((one) => `${one.platform}:${one.platformSaleId}`),
+        );
+        const saleInstants = await ownSaleInstants(tx, member, lateRefunds);
         return MySalesSchema.parse({
           period: query.period,
           closed,
           days: myDays(lines, timeZone),
-          items: page.items.map(toMySale),
+          items: page.items.map((one) => toMySale(one, saleInstants)),
           nextCursor: page.next === null ? null : encodeCursor(page.next),
         });
       }),

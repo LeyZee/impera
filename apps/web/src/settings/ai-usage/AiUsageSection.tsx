@@ -42,8 +42,9 @@ import '@/screens/dashboard/dashboard.css';
 import '@/screens/dashboard/agency/agency.css';
 import './ai-usage.css';
 
-import { arcs, OTHER } from '@/screens/dashboard/agency/view';
+import { OTHER } from '@/screens/dashboard/agency/view';
 import { CountUp, Section, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
+import { Columns, Donut } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -410,24 +411,12 @@ function Spend({
   tip: FloatingTip;
   span: Span;
 }): JSX.Element {
-  const [focus, setFocus] = useState(columns.length - 1);
-  const current = Math.min(Math.max(0, focus), columns.length - 1);
-  const bars = useRef<HTMLDivElement>(null);
   const max = Math.max(0, ...columns.map((column) => column.eur));
   const ticks = niceTicks(max, 3);
   const top = ticks[ticks.length - 1] ?? 1;
   const every = columns.length <= 8 ? 1 : columns.length <= 14 ? 3 : columns.length <= 24 ? 4 : 5;
   const used = PROVIDERS.filter((_, p) => columns.some((column) => (column.parts[p] ?? 0) > 0));
   const anyCovered = columns.some((column) => column.coveredEur > 0);
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const step =
-      event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
-    if (step === undefined) return;
-    event.preventDefault();
-    const next = Math.min(Math.max(0, current + step), columns.length - 1);
-    setFocus(next);
-    bars.current?.querySelectorAll<HTMLButtonElement>('.ins-col')[next]?.focus();
-  };
   if (max <= 0) {
     return (
       <div className="nv-plate ins-daily">
@@ -442,97 +431,59 @@ function Spend({
   return (
     <div className="nv-plate ins-daily">
       {used.length > 0 ? (
-        <ul className="ins-keys" aria-label="Légende">
+        <ul className="nv-keys" aria-label="Légende">
           {used.map((provider) => (
             <li key={provider.key}>
-              <span className="ins-key" style={{ '--_c': provider.colour }} aria-hidden="true" />
+              <span className="nv-key" style={{ '--_c': provider.colour }} aria-hidden="true" />
               {provider.label}
             </li>
           ))}
           {anyCovered ? (
             <li>
-              <span className="ins-key cia-key--covered" aria-hidden="true" />
+              <span className="nv-key cia-key--covered" aria-hidden="true" />
               Hachuré : couvert par l’abonnement
             </li>
           ) : null}
         </ul>
       ) : null}
-      <div className="ins-daily__plot">
-        <div className="ins-daily__grid" aria-hidden="true">
-          {ticks.map((value) => (
-            <span key={value} style={{ '--_y': `${String((value / top) * 100)}%` }}>
-              <i>{axisEur(value)}</i>
-            </span>
-          ))}
-        </div>
-        <div
-          className="ins-daily__bars"
-          style={{ '--_n': columns.length }}
-          role="group"
-          aria-label={`Dépense ${span === 'hours' ? 'heure par heure' : 'jour par jour'}, au plus ${eurText(max)} : flèches pour passer d’une colonne à l’autre`}
-          ref={bars}
-          onKeyDown={onKeyDown}
-          onFocus={(event) => {
-            const at = Number(event.target.getAttribute('data-i'));
-            if (Number.isInteger(at)) setFocus(at);
-          }}
-        >
-          {columns.map((column, i) => (
-            <button
-              type="button"
-              key={column.key}
-              className="ins-col"
-              style={{ '--_i': i }}
-              tabIndex={i === current ? 0 : -1}
-              aria-label={`${column.title} : ${eurText(column.eur)}${column.coveredEur > 0 ? ` dont ${eurText(column.coveredEur)} couverts par l’abonnement` : ''}, ${countText(column.calls)} appels`}
-              data-i={i}
-              {...tip.bind(
-                {
-                  title: column.title,
-                  rows: [
-                    ...PROVIDERS.map((provider, p) => [provider.label, column.parts[p] ?? 0] as const)
-                      .filter(([, eur]) => eur > 0)
-                      .map(([label, eur]) => [label, eurText(eur)] as const),
-                    ['Total', eurText(column.eur)],
-                    ...(column.coveredEur > 0
-                      ? [['dont abonnement', eurText(column.coveredEur)] as const]
-                      : []),
-                    ['Appels', countText(column.calls)],
-                  ],
-                },
-                // Beside the column, inside the card: over it, the tallest column's tip covered the span control.
-                { beside: true },
-              )}
-            >
-              <span className="ins-col__stack">
-                {column.parts.flatMap((eur, p) => {
-                  // What was paid, then on top, hatched, what the subscription covered (« ok 0091 chiffres »).
-                  const covered = Math.min(eur, column.covered[p] ?? 0);
-                  const colour = PROVIDERS[p]?.colour ?? OTHER;
-                  const key = PROVIDERS[p]?.key ?? String(p);
-                  return [
-                    { part: eur - covered, hatched: false },
-                    { part: covered, hatched: true },
-                  ]
-                    .filter(({ part }) => part > 0)
-                    .map(({ part, hatched }) => (
-                      <span
-                        key={`${key}${hatched ? ':covered' : ''}`}
-                        className={hatched ? 'ins-col__part cia-part--covered' : 'ins-col__part'}
-                        style={{ '--_c': colour, '--_h': `${String((part / top) * 100)}%` }}
-                      />
-                    ));
-                })}
-              </span>
-              <span className="ins-col__label" aria-hidden="true">
-                {(i % every === 0 && columns.length - 1 - i >= every) || i === columns.length - 1
-                  ? column.label
-                  : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <Columns
+        label={`Dépense ${span === 'hours' ? 'heure par heure' : 'jour par jour'}, au plus ${eurText(max)} : flèches pour passer d’une colonne à l’autre`}
+        top={top}
+        ticks={ticks.map((value) => ({ value, text: axisEur(value) }))}
+        columns={columns.map((column, i) => ({
+          key: column.key,
+          label:
+            (i % every === 0 && columns.length - 1 - i >= every) || i === columns.length - 1
+              ? column.label
+              : '',
+          says: `${column.title} : ${eurText(column.eur)}${column.coveredEur > 0 ? ` dont ${eurText(column.coveredEur)} couverts par l’abonnement` : ''}, ${countText(column.calls)} appels`,
+          parts: column.parts.flatMap((eur, p) => {
+            // What was paid, then on top, hatched, what the subscription covered (« ok 0091 chiffres »).
+            const covered = Math.min(eur, column.covered[p] ?? 0);
+            const colour = PROVIDERS[p]?.colour ?? OTHER;
+            const key = PROVIDERS[p]?.key ?? String(p);
+            return [
+              { key, colour, value: eur - covered },
+              { key: `${key}:covered`, colour, value: covered, hatched: true },
+            ];
+          }),
+          handlers: tip.bind(
+            {
+              title: column.title,
+              rows: [
+                ...PROVIDERS.map((provider, p) => [provider.label, column.parts[p] ?? 0] as const)
+                  .filter(([, eur]) => eur > 0)
+                  .map(([label, eur]) => [label, eurText(eur)] as const),
+                ['Total', eurText(column.eur)],
+                ...(column.coveredEur > 0 ? [['dont abonnement', eurText(column.coveredEur)] as const] : []),
+                ['Appels', countText(column.calls)],
+              ],
+            },
+            // Beside the column, inside the card: over it, the tallest column's tip covered the span control.
+            { beside: true },
+          ),
+        }))}
+      />
     </div>
   );
 }
@@ -550,12 +501,7 @@ function Ring({
   empty: string;
 }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
-  const radius = 52;
   const total = slices.reduce((sum, slice) => sum + slice.eur, 0);
-  const geometry = arcs(
-    slices.map((slice) => slice.eur),
-    radius,
-  );
   const litSlice = lit === null ? undefined : slices[lit];
   return (
     <article className="nv-plate ins-ring-card">
@@ -566,51 +512,26 @@ function Ring({
       {total <= 0 ? (
         <p className="ins-empty">{empty}</p>
       ) : (
-        <div className="ins-ring-row">
-          <div
-            className={lit === null ? 'ins-ring' : 'ins-ring is-lit'}
-            role="img"
-            aria-label={`${title} : ${slices.map((s) => `${s.label} ${String(shareOf(s.eur, total))} %`).join(', ')}`}
+        <div className="nv-donut-row">
+          <Donut
+            label={`${title} : ${slices.map((s) => `${s.label} ${String(shareOf(s.eur, total))} %`).join(', ')}`}
+            slices={slices.map((slice) => ({ key: slice.key, colour: slice.colour, value: slice.eur }))}
+            lit={lit}
+            onLit={setLit}
           >
-            <svg viewBox="0 0 132 132" aria-hidden="true">
-              <circle className="ins-ring__track" cx="66" cy="66" r={radius} />
-              {slices.map((slice, i) => {
-                const arc = geometry[i];
-                if (arc === undefined) return null;
-                return (
-                  <circle
-                    key={slice.key}
-                    className={lit === i ? 'ins-ring__arc is-on' : 'ins-ring__arc'}
-                    cx="66"
-                    cy="66"
-                    r={radius}
-                    style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
-                    strokeDashoffset={arc.offset}
-                    onPointerEnter={() => {
-                      setLit(i);
-                    }}
-                    onPointerLeave={(event) => {
-                      if (event.pointerType === 'mouse') setLit(null);
-                    }}
-                  />
-                );
-              })}
-            </svg>
-            <span className="ins-ring__middle" aria-hidden="true">
-              {litSlice === undefined ? (
-                <>
-                  <b className="ins-ring__value">{slices.length}</b>
-                  <span className="ins-ring__sub">{slices.length > 1 ? 'postes' : 'poste'}</span>
-                </>
-              ) : (
-                <>
-                  <b className="ins-ring__value">{String(shareOf(litSlice.eur, total))}&nbsp;%</b>
-                  <span className="ins-ring__sub">{litSlice.label}</span>
-                </>
-              )}
-            </span>
-          </div>
-          <ul className="ins-legend cia-legend">
+            {litSlice === undefined ? (
+              <>
+                <b className="nv-donut__value">{slices.length}</b>
+                <span className="nv-donut__sub">{slices.length > 1 ? 'postes' : 'poste'}</span>
+              </>
+            ) : (
+              <>
+                <b className="nv-donut__value">{String(shareOf(litSlice.eur, total))}&nbsp;%</b>
+                <span className="nv-donut__sub">{litSlice.label}</span>
+              </>
+            )}
+          </Donut>
+          <ul className="nv-breakdown cia-legend">
             {slices.map((slice, i) => {
               const bound = tip.bind({
                 title: slice.label,
@@ -624,7 +545,7 @@ function Ring({
                 <li key={slice.key}>
                   <button
                     type="button"
-                    className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
+                    className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
                     {...bound}
                     onPointerMove={(event) => {
                       if (event.pointerType === 'mouse') setLit(i);
@@ -643,10 +564,10 @@ function Ring({
                       bound.onBlur();
                     }}
                   >
-                    <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                    <span className="ins-legend__label">{slice.label}</span>
-                    <span className="ins-legend__value">{eurText(slice.eur)}</span>
-                    <span className="ins-legend__share">{String(shareOf(slice.eur, total))}&nbsp;%</span>
+                    <span className="nv-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                    <span className="nv-breakdown__label">{slice.label}</span>
+                    <span className="nv-breakdown__value">{eurText(slice.eur)}</span>
+                    <span className="nv-breakdown__share">{String(shareOf(slice.eur, total))}&nbsp;%</span>
                   </button>
                 </li>
               );

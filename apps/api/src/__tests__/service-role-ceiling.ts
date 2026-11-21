@@ -12,8 +12,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/audit': 3,
   'modules/backups': 1,
   // +3 for the agency's key of the redirect service (INS-02): a table closed to the app role, read, kept and removed
-  // through the owner's gesture; +1 for its re-sealing after a rotation of the encryption keys (ops command).
-  'modules/connectors': 39,
+  // through the owner's gesture; +1 for its re-sealing after a rotation of the encryption keys (ops command); +1 for
+  // the hourly reading of the links' hours, which asks which creators have an attached link (identifiers only).
+  'modules/connectors': 40,
   'modules/content-drops': 23,
   'modules/contractors': 6,
   'modules/conversations': 1,
@@ -31,7 +32,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/redirect-links': 2,
   'modules/rewards': 7,
   'modules/scheduling': 28,
-  'modules/scripts': 19,
+  'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,
   'modules/telegram': 10,

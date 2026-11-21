@@ -58,6 +58,7 @@ const shift = (n: number, patch: Partial<z.input<typeof ShiftSchema>>): Shift =>
     endsAt: '2026-10-27T11:00:00Z',
     templateId: null,
     stoppedAt: null,
+    checkedInAt: null,
     ...patch,
   });
 

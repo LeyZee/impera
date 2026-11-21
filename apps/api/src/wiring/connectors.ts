@@ -166,6 +166,12 @@ export function wireConnectors(
         logger,
         (_payload, context) => module.jobs.readDailyStats(context.logger, `job:${context.jobId}`),
       ),
+      'connector.read_link_hours': defineTask(
+        'connector.read_link_hours',
+        JOB_PAYLOADS['connector.read_link_hours'],
+        logger,
+        (_payload, context) => module.jobs.readLinkHours(context.logger),
+      ),
       'connector.copy_avatar': defineTask(
         'connector.copy_avatar',
         JOB_PAYLOADS['connector.copy_avatar'],
@@ -190,6 +196,7 @@ export function wireConnectors(
       }),
       module.salesFeedDeliveryRoutes,
       module.avatarRoutes(requireRole('owner', 'operator', 'creator')),
+      module.creatorEarningsRoutes(requireRole('creator')),
       module.vaultRoutes({ teamGuard: requireRole('owner', 'operator'), ownerGuard: requireRole('owner') }),
     ],
   };
