@@ -1,7 +1,7 @@
 import { FanIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { DONE_KEPT_MS, drawnKey, keepsDone } from './redraw';
+import { DONE_KEPT_MS, drawnKey, keepsDone, reconciledDone } from './redraw';
 import type { GestureDone, PanelScreen } from './view';
 
 const screen = (now: string, text = ''): PanelScreen => ({
@@ -17,6 +17,7 @@ const screen = (now: string, text = ''): PanelScreen => ({
     kind: 'ready',
     bubbles: ['coucou'],
     placed: false,
+    pending: true,
     mode: 'editing',
     text,
     reason: null,
@@ -49,5 +50,24 @@ describe('what makes the panel draw again', () => {
     expect(keepsDone(done({}), 0, DONE_KEPT_MS)).toBe(false);
     expect(keepsDone(done({ outcome: 'placed', copied: 1 }), 0, DONE_KEPT_MS * 10)).toBe(true);
     expect(keepsDone(done({ outcome: 'placed', copied: 2 }), 0, DONE_KEPT_MS)).toBe(false);
+  });
+
+  // EXT-02: the panel never said « Envoyé » after the chatter sent the draft.
+  it('says « Envoyé » once the CRM matched what left to the draft placed, a while only', () => {
+    const placed: GestureDone = {
+      outcome: 'placed',
+      bubbles: ['a', 'b'],
+      copied: 1,
+      copyFailed: false,
+      sent: 'sent',
+    };
+    const sent = reconciledDone(placed, 'draft-1', 'draft-1');
+    expect(sent).toEqual({ ...placed, sent: 'reconciled', copied: 2 });
+    if (sent === null) return;
+    expect(keepsDone(sent, 0, DONE_KEPT_MS)).toBe(false);
+    expect(reconciledDone(sent, 'draft-1', 'draft-1')).toBeNull();
+    expect(reconciledDone(placed, 'draft-1', 'draft-2')).toBeNull();
+    expect(reconciledDone(placed, 'draft-1', undefined)).toBeNull();
+    expect(reconciledDone({ ...placed, outcome: 'rejected' }, 'draft-1', 'draft-1')).toBeNull();
   });
 });

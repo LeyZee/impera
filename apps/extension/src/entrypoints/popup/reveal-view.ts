@@ -40,7 +40,8 @@ export interface Confirm {
  * `extension`: the extension's own worker did not answer the popup (a worker left over after a reload, retour PC du
  * 19/11): never said to be the CRM's fault.
  */
-export type SyncFailure = Exclude<RevealSynced['state'], 'synced'> | 'no-session' | 'several' | 'extension';
+export type SyncFailure =
+  Exclude<RevealSynced['state'], 'synced'> | 'no-session' | 'several' | 'extension' | 'other-account';
 
 /** What the last gesture left under its account: the session stored, or why not. */
 export type SyncOutcome =
@@ -51,7 +52,13 @@ export type SyncOutcome =
       readonly reconnectFirst: boolean;
       readonly kept: boolean;
     }
-  | { readonly kind: 'failed'; readonly accountId: PlatformAccountId; readonly failure: SyncFailure };
+  | {
+      readonly kind: 'failed';
+      readonly accountId: PlatformAccountId;
+      readonly failure: SyncFailure;
+      /** `other-account`: the account whose creator the tab shows (EXT-05). */
+      readonly other?: PlatformAccountId;
+    };
 
 export interface SyncView {
   readonly accounts: RevealAccounts;
@@ -153,8 +160,14 @@ const SHORT_TOKEN = 'Pour 24 h pleines : reconnecte-toi à Reveal, puis resynchr
 export function failureOf(
   failure: SyncFailure,
   crm: string,
+  shows?: string,
 ): { readonly cause: string; readonly gesture: string } {
   switch (failure) {
+    case 'other-account':
+      return {
+        cause: `Cet onglet montre ${shows ?? 'une autre créatrice du CRM'}.`,
+        gesture: 'Synchronise sa ligne à elle, ou ouvre la bonne créatrice dans Reveal, puis resynchronise.',
+      };
     case 'no-session':
       return {
         cause: 'Aucune session lue dans cet onglet.',
@@ -221,16 +234,17 @@ function shortWhenOf(at: Date): string {
   return `${at.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${hourOf(at)}`;
 }
 
-/** « 9 h 05 » today, « demain 9 h 05 », else the CRM's full day. */
+/** « jusqu’à 9 h 05 » today, « jusqu’à demain 9 h 05 », else « jusqu’au 28/11/2026 à 9 h 05 » (EXT-03). */
 export function untilOf(at: Date, now: Date): string {
   const days = Math.round(
     (new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime() -
       new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
       DAY_MS,
   );
-  if (days === 0) return hourOf(at);
-  if (days === 1) return `demain ${hourOf(at)}`;
-  return whenOf(at);
+  if (days === 0) return `jusqu’à ${hourOf(at)}`;
+  if (days === 1) return `jusqu’à demain ${hourOf(at)}`;
+  const day = at.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `jusqu’au ${day} à ${hourOf(at)}`;
 }
 
 function dot(tone: Tone, live: boolean): HTMLElement {
@@ -261,6 +275,8 @@ interface RowState {
   readonly until: Date | null;
   readonly synced: Extract<SyncOutcome, { kind: 'synced' }> | null;
   readonly failure: SyncFailure | null;
+  /** The creator the tab shows instead, by her name in the CRM (EXT-05). */
+  readonly shows: string | undefined;
   readonly phase: 'reading' | 'sending' | null;
 }
 
@@ -276,6 +292,10 @@ function rowStateOf(account: Account, view: SyncView): RowState {
     until: until !== null && until > view.now ? until : null,
     synced,
     failure: outcome?.kind === 'failed' ? outcome.failure : null,
+    shows:
+      outcome?.kind === 'failed'
+        ? view.accounts.accounts.find((other) => other.id === outcome.other)?.creatorName
+        : undefined,
     phase: view.pending?.accountId === account.id ? view.pending.phase : null,
   };
 }
@@ -300,7 +320,7 @@ function statusLine(account: Account, row: RowState, now: Date): HTMLElement {
     h('span', { class: `pp-sync__word pp-sync__word--${row.tone}` }, row.word),
     row.until === null || row.tone === 'red'
       ? null
-      : h('span', { class: 'pp-sync__until' }, `jusqu’à ${untilOf(row.until, now)}`),
+      : h('span', { class: 'pp-sync__until' }, untilOf(row.until, now)),
   );
   if (account.sessionUpdatedAt === null) return line;
   return withTip(line, {
@@ -316,7 +336,7 @@ function statusLine(account: Account, row: RowState, now: Date): HTMLElement {
 function adviceLine(row: RowState, crm: string): HTMLElement | null {
   if (row.phase !== null) return null;
   if (row.failure !== null) {
-    const { cause, gesture } = failureOf(row.failure, crm);
+    const { cause, gesture } = failureOf(row.failure, crm, row.shows);
     return h(
       'p',
       { class: 'pp-sync__fail', role: 'status' },
@@ -407,12 +427,6 @@ function confirmRows(account: Account, confirm: Confirm, actions: SyncActions): 
       h('span', { class: 'pp-sync__handle' }, `@${account.handle}`),
     ),
     sentence,
-    h(
-      'p',
-      { class: 'pp-hint' },
-      'Modèle lu dans l’onglet : ',
-      h('code', { class: 'pp-code' }, confirm.modelId),
-    ),
     h(
       'div',
       { class: 'pp-actions pp-actions--row' },

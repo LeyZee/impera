@@ -139,6 +139,8 @@ export type RevealSeen = z.infer<typeof RevealSeenSchema>;
 export const RevealReadSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('held'), modelId: z.string().min(1).max(64), seen: RevealSeenSchema }),
   z.strictObject({ state: z.enum(['no-session', 'unlinked', 'several']) }),
+  /** The tab shows the creator of that other account of the CRM: nothing is held (EXT-05). */
+  z.strictObject({ state: z.literal('other-account'), accountId: PlatformAccountIdSchema }),
 ]);
 export type RevealRead = z.infer<typeof RevealReadSchema>;
 

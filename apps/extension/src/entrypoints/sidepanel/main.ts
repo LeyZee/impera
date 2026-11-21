@@ -22,7 +22,7 @@ import { ADDRESS_KEY, BUILT_IN_CRM, storedOrigin } from '../../lib/crm-origin-st
 import { readCrmSession } from '../../lib/session';
 import { kindOf } from '../../lib/who';
 
-import { drawnKey, keepsDone } from './redraw';
+import { drawnKey, keepsDone, reconciledDone } from './redraw';
 import { render, type DraftPart, type GestureDone, type PanelScreen } from './view';
 
 /**
@@ -72,6 +72,8 @@ interface Gesture {
   readonly done: GestureDone | null;
   /** When the gesture was made: what it left stays a while after the draft leaves the CRM (EXT-23). */
   readonly doneAt: number;
+  /** What was sent to the CRM for it: sent again by « Compter ce geste » when it did not count (EXT-06). */
+  readonly body: CopilotVerdictBody | null;
 }
 let gesture: Gesture | null = null;
 let openGroups = new Set<FanCardGroup>();
@@ -89,8 +91,18 @@ async function count(draftId: DraftId, body: CopilotVerdictBody): Promise<void> 
   const message: FromPanel = { type: 'panel/verdict', draftId, body };
   const answer: unknown = await browser.runtime.sendMessage(message).catch(() => 'unreachable');
   const sent = VerdictSentSchema.safeParse(answer);
-  if (gesture?.draftId !== draftId || gesture.done === null) return;
+  if (gesture?.draftId !== draftId || gesture.done === null || gesture.done.sent === 'reconciled') return;
   setGesture({ ...gesture, done: { ...gesture.done, sent: sent.success ? sent.data : 'unreachable' } });
+}
+
+/** « Compter ce geste »: the gesture that did not count, sent again while its draft waits (EXT-06). */
+function recount(): void {
+  const done = gesture?.done;
+  if (gesture === null || done == null || gesture.body === null) return;
+  if (done.sent !== 'unlinked' && done.sent !== 'unreachable') return;
+  if (view?.state !== 'ready' || view.draft.draftId !== gesture.draftId) return;
+  setGesture({ ...gesture, done: { ...done, sent: 'sending' } });
+  void count(gesture.draftId, gesture.body);
 }
 
 const copy = (text: string): Promise<boolean> =>
@@ -116,13 +128,15 @@ async function place(edited: boolean): Promise<void> {
   const [first] = bubbles;
   if (first === undefined) return;
   const copyFailed = await copy(first);
+  const body: CopilotVerdictBody = { kind: 'placed', creatorId: view.conversation.creatorId, edited };
   setGesture({
     ...gesture,
     mode: 'idle',
     done: { outcome: 'placed', bubbles, copied: 1, copyFailed, sent: 'sending' },
     doneAt: Date.now(),
+    body,
   });
-  await count(draftId, { kind: 'placed', creatorId: view.conversation.creatorId, edited });
+  await count(draftId, body);
 }
 
 /** `a` again, after a placing: the next bubble. The gesture was counted once, with the first. */
@@ -147,6 +161,7 @@ const actions = {
   },
   place: (edited: boolean) => void place(edited),
   copyNext: () => void copyNext(),
+  recount,
   edit: () => {
     if (view?.state !== 'ready' || gesture?.done !== null || withheldOf(standing) !== null) return;
     setGesture({ ...gesture, mode: 'editing', text: view.draft.bubbles.join('\n') });
@@ -169,6 +184,12 @@ const actions = {
     if (view?.state !== 'ready' || gesture?.reason == null || gesture.done !== null) return;
     const { draftId, reason } = gesture;
     const trimmed = note.trim();
+    const body: CopilotVerdictBody = {
+      kind: 'rejected',
+      creatorId: view.conversation.creatorId,
+      reason,
+      ...(trimmed === '' ? {} : { note: trimmed.slice(0, 1000) }),
+    };
     setGesture({
       ...gesture,
       mode: 'idle',
@@ -180,13 +201,9 @@ const actions = {
         sent: 'sending',
       },
       doneAt: Date.now(),
+      body,
     });
-    void count(draftId, {
-      kind: 'rejected',
-      creatorId: view.conversation.creatorId,
-      reason,
-      ...(trimmed === '' ? {} : { note: trimmed.slice(0, 1000) }),
-    });
+    void count(draftId, body);
   },
   cancel: () => {
     if (gesture !== null) setGesture({ ...gesture, mode: 'idle', reason: null });
@@ -229,19 +246,42 @@ function leftPart(): DraftPart | null {
   const done = gesture?.done;
   if (gesture === null || done === null || done === undefined) return null;
   if (!keepsDone(done, gesture.doneAt, Date.now())) return null;
-  return { kind: 'ready', bubbles: done.bubbles, placed: true, mode: 'idle', text: '', reason: null, done };
+  return {
+    kind: 'ready',
+    bubbles: done.bubbles,
+    placed: true,
+    pending: false,
+    mode: 'idle',
+    text: '',
+    reason: null,
+    done,
+  };
 }
 
 function draftPart(): DraftPart {
+  if (view?.state === 'none' && gesture !== null) {
+    const reconciled = reconciledDone(gesture.done, gesture.draftId, view.sent?.draftId);
+    // Said from now, a while (EXT-23).
+    if (reconciled !== null) gesture = { ...gesture, done: reconciled, doneAt: Date.now() };
+  }
   if (view === null || view.state === 'off' || view.state === 'none') return leftPart() ?? { kind: 'hidden' };
   if (view.state === 'writing') return leftPart() ?? { kind: 'writing' };
   const { draft } = view;
   if (gesture?.draftId !== draft.draftId)
-    gesture = { draftId: draft.draftId, mode: 'idle', text: '', reason: null, done: null, doneAt: 0 };
+    gesture = {
+      draftId: draft.draftId,
+      mode: 'idle',
+      text: '',
+      reason: null,
+      done: null,
+      doneAt: 0,
+      body: null,
+    };
   return {
     kind: 'ready',
     bubbles: draft.bubbles,
     placed: draft.placedAt !== null,
+    pending: true,
     mode: gesture.mode,
     text: gesture.text,
     reason: gesture.reason,

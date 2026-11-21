@@ -115,6 +115,8 @@ export interface Draft {
   readonly facts: readonly DraftFact[];
   /** The step of her script the code decided with this draft (ADR 0098): it leaves after the bubbles. */
   readonly scriptStep: DraftScriptStep | null;
+  /** Put in the platform's field from the copilot panel (ADR 0086 § 4), by whom and when; null otherwise. */
+  readonly placed: { readonly by: UserId; readonly at: Date } | null;
 }
 
 /**
@@ -1033,6 +1035,8 @@ export interface CopilotRead {
     readonly createdAt: Date;
     readonly placedAt: Date | null;
   } | null;
+  /** The latest draft, when a chatter placed it and what left was reconciled with it (§ 5): « Envoyé ». */
+  readonly sent: { readonly draftId: DraftId; readonly at: Date } | null;
 }
 
 export interface CopilotReader {

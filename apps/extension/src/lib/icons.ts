@@ -78,8 +78,22 @@ const SHAPES = {
     ['path', { d: 'm6.34 17.66-1.41 1.41' }],
     ['path', { d: 'm19.07 4.93-1.41 1.41' }],
   ],
-  tracking: [['path', { d: 'M22 12h-4l-3 9L9 3l-3 9H2' }]],
-  // Entraîner and Réglages: the CRM menu's own drawings (apps/web/src/shell/NavIcon.tsx), a target and a gear.
+  // Suivi, Entraîner and Réglages: the CRM menu's own drawings (apps/web/src/shell/NavIcon.tsx), two bubbles of a
+  // conversation (EXT-08), a target and a gear.
+  tracking: [
+    [
+      'path',
+      {
+        d: 'M17 8.5h2a2.5 2.5 0 0 1 2.5 2.5v4.5A2.5 2.5 0 0 1 19 18h-.5v2.6L15.6 18h-3.1a2.5 2.5 0 0 1-2.3-1.5',
+      },
+    ],
+    [
+      'path',
+      {
+        d: 'M5 3.5h7A2.5 2.5 0 0 1 14.5 6v4.5A2.5 2.5 0 0 1 12 13H8.5l-3 2.8V13H5a2.5 2.5 0 0 1-2.5-2.5V6A2.5 2.5 0 0 1 5 3.5z',
+      },
+    ],
+  ],
   train: [
     ['circle', { cx: '12', cy: '12', r: '9.5' }],
     ['circle', { cx: '12', cy: '12', r: '5.2' }],

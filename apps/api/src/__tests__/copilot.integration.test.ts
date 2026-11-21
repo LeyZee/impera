@@ -422,6 +422,93 @@ describe('copilot panel (ADR 0086)', () => {
     expect([late.statusCode, codeOf(late)]).toEqual([409, 'copilot_draft_conflict']);
   });
 
+  it('reconciles a placed draft with what left: as is it is validated, retouched it is corrected (EXT-02)', async () => {
+    const onShift = await chatter({ from: -30, to: 60 });
+    const token = await linkOf(onShift.cookie);
+    let sends = 0;
+    /** What the chatter sent himself in Reveal, read back by the connector. */
+    const sendOnPlatform = async (name: string, text: string) => {
+      sends += 1;
+      await app.modules.conversations.ingestMessage({
+        creatorId: nora.creatorId,
+        platformAccountId: nora.accountId,
+        platformConversationId: `c-${name}`,
+        platformFanId: `f-${name}`,
+        fanDisplayName: name,
+        message: {
+          ref: { platform: 'reveal', id: `out-${name}-${String(sends)}` },
+          conversationRef: { platform: 'reveal', id: `c-${name}` },
+          direction: 'outbound',
+          text,
+          media: [],
+          priceMinor: null,
+          currency: null,
+          isPaid: false,
+          createdAt: new Date(Date.now() + sends).toISOString(),
+        },
+        correlationId: 'reconcile',
+      });
+    };
+    const decided = async (draftId: DraftId) => {
+      const [row] = await test.admin.db
+        .select({
+          status: schema.drafts.status,
+          decidedBy: schema.drafts.decidedBy,
+          finalBubbles: schema.drafts.finalBubbles,
+        })
+        .from(schema.drafts)
+        .where(eq(schema.drafts.id, draftId));
+      return row;
+    };
+    const stateOf = async (conversationId: ConversationId) => {
+      const [row] = await test.admin.db
+        .select({ state: schema.conversations.state })
+        .from(schema.conversations)
+        .where(eq(schema.conversations.id, conversationId));
+      return row?.state;
+    };
+
+    for (const [name, sent, verdict] of [
+      ['Lucas', [...FIXED_BUBBLES], { kind: 'validated' }],
+      ['Noah', ['Coucou toi', 'Tu fais quoi de beau ?'], { kind: 'corrected' }],
+    ] as const) {
+      const conversationId = await seed(nora, name);
+      const { draft } = await readyDraft(name, onShift.cookie);
+      await test.admin.db
+        .update(schema.drafts)
+        .set({ promptHashes: { voicePrompt: 'voice@test', voiceModel: 'model-test' } })
+        .where(eq(schema.drafts.id, draft.draftId));
+      const placed = { kind: 'placed', creatorId: nora.creatorId, edited: verdict.kind === 'corrected' };
+      expect((await gesture(draft.draftId, placed, token)).statusCode).toBe(200);
+
+      // One bubble at a time: the first leaves nothing decided, nor the conversation in human hands.
+      const [first, second] = sent;
+      await sendOnPlatform(name, first);
+      expect((await decided(draft.draftId))?.status).toBe('pending');
+      expect(await stateOf(conversationId)).toBe('awaiting_approval');
+      await sendOnPlatform(name, second);
+
+      expect(await decided(draft.draftId)).toEqual({
+        status: 'sent',
+        decidedBy: `human:${onShift.userId}`,
+        finalBubbles: verdict.kind === 'corrected' ? [...sent] : null,
+      });
+      expect(await stateOf(conversationId)).toBe('idle');
+      const ratings = await ratingsOf(draft.draftId);
+      expect(ratings).toHaveLength(1);
+      expect(ratings[0]).toMatchObject({
+        source: 'live',
+        verdictKind: verdict.kind,
+        ...(verdict.kind === 'corrected' && { verdict: { kind: 'corrected', text: sent.join('\n') } }),
+      });
+      // The panel says it left.
+      expect((await draftOf(name, onShift.cookie)).view).toMatchObject({
+        state: 'none',
+        sent: { draftId: draft.draftId },
+      });
+    }
+  });
+
   it('refuses a gesture off shift, on another creator, or on a draft she does not have', async () => {
     const owner = await linkOf(ownerCookie);
     const { draft } = await readyDraft('Julien', ownerCookie);

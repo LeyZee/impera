@@ -68,6 +68,21 @@ export function createDrizzleCopilotReader(db: Database): CopilotReader {
           )
           .orderBy(sql`${schema.drafts.createdAt} desc, ${schema.drafts.id} desc`)
           .limit(1);
+        // Without a pending draft, the latest one says whether what the chatter placed left (§ 5).
+        const [last] =
+          draft === undefined
+            ? await tx
+                .select({
+                  id: schema.drafts.id,
+                  status: schema.drafts.status,
+                  placedAt: schema.drafts.placedAt,
+                  decidedAt: schema.drafts.decidedAt,
+                })
+                .from(schema.drafts)
+                .where(eq(schema.drafts.conversationId, id))
+                .orderBy(sql`${schema.drafts.createdAt} desc, ${schema.drafts.id} desc`)
+                .limit(1)
+            : [];
         return {
           conversationId: id,
           fanId: FanIdSchema.parse(conversation.fanId),
@@ -82,6 +97,10 @@ export function createDrizzleCopilotReader(db: Database): CopilotReader {
                   createdAt: draft.createdAt,
                   placedAt: draft.placedAt,
                 },
+          sent:
+            last?.status === 'sent' && last.placedAt !== null && last.decidedAt !== null
+              ? { draftId: DraftIdSchema.parse(last.id), at: last.decidedAt }
+              : null,
         };
       }),
   };

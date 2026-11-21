@@ -20,6 +20,24 @@ const sent = EventBodySchema.parse({
 });
 
 describe('conversation projection', () => {
+  it('answers the fan with a placed draft reconciled with what left, no send to wait for (ADR 0086 § 5)', () => {
+    const decided = (type: 'draft_approved' | 'draft_edited', reconciled: boolean) =>
+      EventBodySchema.parse({
+        type,
+        payload: {
+          draftId: DRAFT,
+          status: type === 'draft_approved' ? 'approved' : 'edited',
+          decidedBy: USER,
+          ...(reconciled && { reconciled: true }),
+        },
+      });
+    const waiting = { ...INITIAL_PROJECTION, state: 'awaiting_approval' as const, lastInboundAt: at(1) };
+    expect(applyEvent(waiting, decided('draft_approved', true), at(2)).state).toBe('idle');
+    expect(applyEvent(waiting, decided('draft_edited', true), at(2)).state).toBe('idle');
+    // Approved in Suivi, it still leaves through the send job.
+    expect(applyEvent(waiting, decided('draft_approved', false), at(2)).state).toBe('sending');
+  });
+
   it('counts unread fan messages and resets them when an answer leaves', () => {
     const afterTwo = rebuildProjection([
       { body: inbound, at: at(1) },
