@@ -189,6 +189,8 @@ export interface CreatorOverviewFacts {
   readonly pausedUntil: DashboardFacts['pausedUntil'];
   readonly hoursNow: DashboardFacts['hoursNow'];
   readonly autoConversations: number;
+  /** One of her persona versions is active: without one her agent writes nothing (PRO1-03). */
+  readonly hasActivePersona: boolean;
   /** Her open requests with nothing dropped, the first due first; empty for a scope of one's own (RLS). */
   readonly requests: readonly { readonly category: DropCategory; readonly dueOn: string }[];
   /** Member id to display name (the team's, read by the owner and an active manager). */
