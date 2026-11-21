@@ -25,6 +25,8 @@ const URL_KEY = '/v1/settings/link-service/key';
 const readerOf = (key: string): LinkServiceReader => ({
   ping: () => (key === GOOD_KEY ? Promise.resolve() : Promise.reject(new LinkServiceError('unauthorized'))),
   listLinks: () => Promise.resolve([]),
+  readHours: () => Promise.resolve([]),
+  readRobotHours: () => Promise.resolve([]),
 });
 
 /** The agency's key of the redirect service through the real app (INS-02, ADR 0120 § 3). */
