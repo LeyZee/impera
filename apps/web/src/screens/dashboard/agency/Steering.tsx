@@ -240,7 +240,7 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.wrote,
       then: traffic.previous.wrote,
-      colour: 'var(--nv-series-3)',
+      colour: 'var(--nv-kind-3)',
     });
   steps.push(
     {
@@ -252,7 +252,7 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.firstPurchase,
       then: traffic.previous.firstPurchase,
-      colour: 'var(--nv-kind-2)',
+      colour: 'var(--nv-kind-1)',
     },
     {
       label: {
@@ -309,9 +309,7 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
         breakNote="La plus forte baisse face aux 30 jours d’avant : c’est ici qu’il faut agir."
         tip={tip}
       />
-      <p className="ins-note stg-traffic__scale">
-        Largeurs resserrées pour garder les petites étapes lisibles.
-      </p>
+      <p className="stg-traffic__scale">Largeurs resserrées pour garder les petites étapes lisibles.</p>
       {traffic.wrote === null ? (
         <p className="ins-note" role="note">
           L’étape « Ont écrit » apparaîtra quand Impera lira les conversations (session Reveal capturée).
@@ -360,7 +358,7 @@ function DependencyCard({
   const names = new Map(steering.creators.map((one) => [one.creatorId, one.name] as const));
   const several = steering.creators.length >= 2;
   const slices: Slice[] = [
-    { key: 'one', label: 'Le plus gros fan', colour: 'var(--nv-series-3)', cents: dependency.topOneMinor },
+    { key: 'one', label: 'Le plus gros fan', colour: 'var(--nv-kind-2)', cents: dependency.topOneMinor },
     { key: 'four', label: 'Les 4 suivants', colour: 'var(--nv-series-2)', cents: dependency.nextFourMinor },
     { key: 'rest', label: 'Tous les autres', colour: 'var(--nv-series-other)', cents: dependency.restMinor },
   ].map((slice) => ({ ...slice, previousCents: slice.cents, sales: 0 }));
@@ -430,11 +428,7 @@ function DependencyCard({
                     <Meter
                       percent={(fan.spentMinor / biggest) * 100}
                       colour={
-                        i === 0
-                          ? 'var(--nv-series-3)'
-                          : i < 5
-                            ? 'var(--nv-series-2)'
-                            : 'var(--nv-series-other)'
+                        i === 0 ? 'var(--nv-kind-2)' : i < 5 ? 'var(--nv-series-2)' : 'var(--nv-series-other)'
                       }
                     />
                   </span>
