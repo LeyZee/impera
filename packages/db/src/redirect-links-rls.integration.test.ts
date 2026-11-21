@@ -11,7 +11,7 @@ import {
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
-import { withAdmin, withCreatorAccount, withTenantMember } from './client';
+import { withAdmin, withCreatorAccount, withTenant, withTenantJob, withTenantMember } from './client';
 import * as s from './schema';
 import { createTestDb, type TestDb } from './test/test-db';
 
@@ -222,6 +222,141 @@ describe('her redirect links (INS-03): the server writes, she reads her own plac
       placement: null,
       usageNote: '',
       enabled: true,
+    });
+  });
+
+  describe('the reference of the redirect service and the hours kept (INS-02 lot e2)', () => {
+    const ref = (n: number) => `lnk_${String(n).padStart(24, '0')}`;
+    const attach = (userId: string, creatorId: string, linkId: string, serviceRef: string | null) =>
+      withTenantMember(test.app.db, creatorId, userId, (tx) =>
+        tx
+          .update(s.redirectLinks)
+          .set({ serviceRef })
+          .where(sql`${s.redirectLinks.id} = ${linkId}`)
+          .returning({ id: s.redirectLinks.id }),
+      );
+    const hourRow = (creatorId: string, linkId: string, hour: string, more: object = {}) => ({
+      id: newId(RedirectLinkIdSchema),
+      creatorId,
+      linkId,
+      hour: new Date(hour),
+      pageviews: 4,
+      clicks: 1,
+      robots: 0,
+      closed: false,
+      readAt: new Date(hour),
+      ...more,
+    });
+    const asJob = <T>(creatorId: string, fn: Parameters<typeof withTenantJob<T>>[3]) =>
+      withTenantJob(test.app.db, creatorId, 'link_hours', fn);
+
+    it('the owner attaches a link of the creator at hand, and nobody else does', async () => {
+      expect(await attach(owner, nora, noraDaily, ref(1))).toEqual([{ id: noraDaily }]);
+      // Placed on Nora, he does not write a link of Inès.
+      expect(await attach(owner, nora, inesDaily, ref(2))).toEqual([]);
+      expect(await attach(manager, nora, noraUnplaced, ref(3))).toEqual([]);
+      expect(await attach(chatter, nora, noraUnplaced, ref(3))).toEqual([]);
+      expect(
+        await failure(
+          withCreatorAccount(test.app.db, noraUser, (tx) =>
+            tx.update(s.redirectLinks).set({ serviceRef: ref(4) }),
+          ),
+        ),
+      ).toBe('no error');
+      const kept = await withAdmin(test.admin.db, (tx) =>
+        tx.select({ id: s.redirectLinks.id, serviceRef: s.redirectLinks.serviceRef }).from(s.redirectLinks),
+      );
+      expect(kept.filter((row) => row.serviceRef !== null)).toEqual([{ id: noraDaily, serviceRef: ref(1) }]);
+    });
+
+    it('the owner’s policy opens that column alone, one shape of reference, one creator per link of the service', async () => {
+      expect(
+        await failure(
+          withTenantMember(test.app.db, nora, owner, (tx) =>
+            tx.update(s.redirectLinks).set({ url: 'https://liens.example/ailleurs' }),
+          ),
+        ),
+      ).toMatch(/permission denied/u);
+      expect(await failure(attach(owner, nora, noraUnplaced, 'lnk_1&team_id=tm_2'))).toMatch(
+        /redirect_links_service_ref_check/u,
+      );
+      expect(await failure(attach(owner, ines, inesDaily, ref(1)))).toMatch(
+        /redirect_links_service_ref_unique/u,
+      );
+    });
+
+    it('the job reads her links and writes her hours, in her creator only', async () => {
+      const seen = await asJob(nora, (tx) => tx.select({ id: s.redirectLinks.id }).from(s.redirectLinks));
+      expect(idsSeen(seen)).toEqual([noraDaily, noraUnplaced, noraOff].sort());
+      await asJob(nora, (tx) =>
+        tx.insert(s.redirectLinkHours).values(hourRow(nora, noraDaily, '2026-11-16T13:00:00Z')),
+      );
+      expect(
+        await failure(
+          asJob(nora, (tx) =>
+            tx.insert(s.redirectLinkHours).values(hourRow(ines, inesDaily, '2026-11-16T13:00:00Z')),
+          ),
+        ),
+      ).toMatch(/row-level security/u);
+      // An hour cannot carry the creator of another link.
+      expect(
+        await failure(
+          asJob(nora, (tx) =>
+            tx.insert(s.redirectLinkHours).values(hourRow(nora, inesDaily, '2026-11-16T14:00:00Z')),
+          ),
+        ),
+      ).toMatch(/redirect_link_hours_link_creator_fk/u);
+      // Without the job's name, the same connection writes nothing.
+      expect(
+        await failure(
+          withTenant(test.app.db, nora, (tx) =>
+            tx.insert(s.redirectLinkHours).values(hourRow(nora, noraDaily, '2026-11-16T15:00:00Z')),
+          ),
+        ),
+      ).toMatch(/row-level security/u);
+    });
+
+    it('an open hour is replaced, a closed hour is frozen, and nobody removes one', async () => {
+      const set = (values: object) =>
+        asJob(nora, (tx) =>
+          tx.update(s.redirectLinkHours).set(values).returning({ pageviews: s.redirectLinkHours.pageviews }),
+        );
+      expect(await set({ pageviews: 9, closed: true, readAt: new Date('2026-11-16T14:10:00Z') })).toEqual([
+        { pageviews: 9 },
+      ]);
+      expect(await set({ pageviews: 99 })).toEqual([]);
+      expect(await failure(asJob(nora, (tx) => tx.delete(s.redirectLinkHours)))).toMatch(
+        /permission denied/u,
+      );
+      expect(
+        await failure(
+          asJob(nora, (tx) =>
+            tx
+              .insert(s.redirectLinkHours)
+              .values(hourRow(nora, noraDaily, '2026-11-16T16:00:00Z', { closed: true })),
+          ),
+        ),
+      ).toMatch(/redirect_link_hours_closed_check/u);
+      expect(
+        await failure(
+          asJob(nora, (tx) =>
+            tx.insert(s.redirectLinkHours).values(hourRow(nora, noraDaily, '2026-11-16T16:30:00Z')),
+          ),
+        ),
+      ).toMatch(/redirect_link_hours_hour_check/u);
+    });
+
+    it('the owner reads her hours; a chatter, her own account and another creator’s reading do not', async () => {
+      const count = async (run: Promise<{ id: string }[]>) => (await run).length;
+      const read = (tx: Parameters<Parameters<typeof withTenant>[2]>[0]) =>
+        tx.select({ id: s.redirectLinkHours.id }).from(s.redirectLinkHours);
+      expect(await count(withTenantMember(test.app.db, nora, owner, read))).toBe(1);
+      expect(await count(withTenantMember(test.app.db, ines, owner, read))).toBe(0);
+      expect(await count(withTenantMember(test.app.db, nora, chatter, read))).toBe(0);
+      // A manager without her on his list reads none of her hours.
+      expect(await count(withTenantMember(test.app.db, nora, manager, read))).toBe(0);
+      expect(await count(withCreatorAccount(test.app.db, noraUser, read))).toBe(0);
+      expect(await count(asJob(ines, read))).toBe(0);
     });
   });
 });

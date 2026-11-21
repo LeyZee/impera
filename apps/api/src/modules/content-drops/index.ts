@@ -70,7 +70,7 @@ export interface ContentDropsModule {
      * `content_drops.describe_file` (ADR 0083): a photo or a video she dropped, described by the vision AI with what
      * the drop says of it, kept for the agency to validate. What happened, for the log.
      */
-    describeFile(mediaAssetId: string, correlationId: string): Promise<DescribeOutcome>;
+    describeFile(creatorId: string, mediaAssetId: string, correlationId: string): Promise<DescribeOutcome>;
     /**
      * `content_drops.summarize_script` (ADR 0083 § 6): a script she sent, once each of its media is described, told
      * step by step and summed up by the brain, kept for the agency to validate. What happened, for the log.
@@ -88,7 +88,7 @@ export interface ContentDropsModule {
      * `content_drops.make_thumbnail` (ADR 0030 § 4, SC-04 lot c4): a photo or a video of her library gets its reduced
      * picture for the agency's screen. What happened, for the log.
      */
-    makeThumbnail(mediaAssetId: string, correlationId: string): Promise<ThumbnailOutcome>;
+    makeThumbnail(creatorId: string, mediaAssetId: string, correlationId: string): Promise<ThumbnailOutcome>;
     /** `content_drops.thumbnail_backlog`, each hour: the media never tried enqueued. How many. */
     thumbnailBacklog(correlationId: string): Promise<number>;
   };
@@ -171,7 +171,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scratchDir = deps.scratchDir ?? tmpdir();
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
   const summaries = createDrizzleScriptSummaryStore(deps.adminDb);
-  const thumbnails = createDrizzleThumbnailQueue(deps.adminDb);
+  const thumbnails = createDrizzleThumbnailQueue(deps.db, deps.adminDb);
   const agency = createDrizzleAgencyContentStore(deps.db);
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
@@ -190,19 +190,20 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       receiveFile: (fileId, correlationId) => receiveFile(receipt, fileId, clock(), correlationId),
       convertFile: (fileId, correlationId) =>
         receiveFile(receipt, fileId, clock(), correlationId, 'content_drops.convert_file'),
-      describeFile: async (mediaAssetId, correlationId) =>
+      describeFile: async (creatorId, mediaAssetId, correlationId) =>
         deps.describer === undefined
           ? 'off'
           : describeFile(
               {
                 storage,
-                queue: createDrizzleDescriptionQueue(deps.adminDb),
+                queue: createDrizzleDescriptionQueue(deps.db),
                 describer: deps.describer,
                 summaries,
                 versions: deps.scriptVersions,
                 scratchDir,
                 room: receipt.room,
               },
+              creatorId,
               mediaAssetId,
               clock(),
               correlationId,
@@ -233,9 +234,10 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
               creatorId,
               correlationId,
             ),
-      makeThumbnail: (mediaAssetId, correlationId) =>
+      makeThumbnail: (creatorId, mediaAssetId, correlationId) =>
         makeThumbnail(
           { storage, queue: thumbnails, thumbnailer: createThumbnailer(), scratchDir, room: receipt.room },
+          creatorId,
           mediaAssetId,
           clock(),
           correlationId,

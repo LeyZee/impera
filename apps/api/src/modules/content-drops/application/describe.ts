@@ -53,11 +53,12 @@ async function contextOf(deps: DescribeDeps, target: MediaToDescribe): Promise<D
  */
 export async function describeFile(
   deps: DescribeDeps,
+  creatorId: string,
   mediaAssetId: string,
   now: Date,
   correlationId: string,
 ): Promise<DescribeOutcome> {
-  const target = await deps.queue.target(mediaAssetId);
+  const target = await deps.queue.target(creatorId, mediaAssetId);
   if (target === null || target.erased) return 'gone';
   if (target.kind === 'audio') return 'not_described';
   if (await deps.describer.described(mediaAssetId)) {
@@ -90,7 +91,7 @@ export async function describeFile(
     if (outcome === 'failed') {
       // Counted on the medium, so that neither the job nor the hourly backlog asks it forever (recette créatrice, 2):
       // at the last try it is left to the agency, who asks again or writes it.
-      if ((await deps.queue.failed(mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
+      if ((await deps.queue.failed(target.creatorId, mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
       throw new DropDescriptionFailed(`media ${mediaAssetId}: every model failed`);
     }
     if (outcome === 'described') await deps.summaries.enqueueFor(mediaAssetId, correlationId);

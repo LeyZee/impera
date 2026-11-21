@@ -52,6 +52,13 @@ const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is 
 const readsTeam: SQL = sql`${notCreatorAccount} and ${currentScope} in ('owner', 'agency')`;
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
 const ofHerTeam = (creatorId: PgColumn): SQL => sql`${readsTeam} and ${creatorId} = ${currentCreator}`;
+/**
+ * The jobs on a medium she dropped (its reduced picture, its description), in her creator and under the app role
+ * (`withTenantJob(…, 'drop_media', …)`, ADR 0087 lot c): they read what the drop says of the medium, and write nothing
+ * here. No account's session sets `app.job`.
+ */
+const dropMediaJob = (creatorId: PgColumn): SQL =>
+  sql`${creatorId} = ${currentCreator} and nullif(current_setting('app.job', true), '') = 'drop_media'`;
 
 /**
  * What the agency asks of her (ADR 0055 § 4): a category, a day, a reason, and for a script its structure. Born by
@@ -126,6 +133,7 @@ export const contentRequests = pgTable(
       withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'refused'`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
     pgPolicy('team_insert', {
       for: 'insert',
       // A script asked of her is one of the library's, kept for no one else and not archived (Bilan, #506), and the
@@ -256,6 +264,7 @@ export const contentDrops = pgTable(
       withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'withdrawn' and ${t.withdrawnBy} = ${currentUser}`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
     tenantJobRead('telegram_channel_read', t.creatorId, 'telegram_channel'),
     pgPolicy('team_insert', {
       for: 'insert',
@@ -368,6 +377,7 @@ export const contentDropFiles = pgTable(
       withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
     tenantJobRead('telegram_channel_read', t.creatorId, 'telegram_channel'),
     pgPolicy('team_insert', {
       for: 'insert',

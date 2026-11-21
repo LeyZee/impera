@@ -1,6 +1,6 @@
 {
-  "id": "f8824a25-124d-4580-980b-9bdd48039881",
-  "prevId": "6ef2d4c6-b4ed-4a57-9999-3565fbeab7af",
+  "id": "95346882-6e20-469f-adac-b96f2400f8ee",
+  "prevId": "fe5e9db5-c935-4cc1-bd7a-4bb42af433cf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1696,6 +1696,13 @@
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
         },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media'"
+        },
         "telegram_channel_read": {
           "name": "telegram_channel_read",
           "as": "PERMISSIVE",
@@ -2018,6 +2025,13 @@
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
         },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"content_drops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media'"
+        },
         "telegram_channel_read": {
           "name": "telegram_channel_read",
           "as": "PERMISSIVE",
@@ -2296,6 +2310,13 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"content_requests\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media'"
         },
         "team_insert": {
           "name": "team_insert",
@@ -18957,6 +18978,177 @@
       },
       "isRLSEnabled": false
     },
+    "public.redirect_link_hours": {
+      "name": "redirect_link_hours",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "link_id": {
+          "name": "link_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hour": {
+          "name": "hour",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pageviews": {
+          "name": "pageviews",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "robots": {
+          "name": "robots",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closed": {
+          "name": "closed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "redirect_link_hours_creator_hour_idx": {
+          "name": "redirect_link_hours_creator_hour_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hour",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "redirect_link_hours_creator_id_creators_id_fk": {
+          "name": "redirect_link_hours_creator_id_creators_id_fk",
+          "tableFrom": "redirect_link_hours",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "redirect_link_hours_link_creator_fk": {
+          "name": "redirect_link_hours_link_creator_fk",
+          "tableFrom": "redirect_link_hours",
+          "tableTo": "redirect_links",
+          "columnsFrom": ["link_id", "creator_id"],
+          "columnsTo": ["id", "creator_id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "redirect_link_hours_link_hour_unique": {
+          "name": "redirect_link_hours_link_hour_unique",
+          "nullsNotDistinct": false,
+          "columns": ["link_id", "hour"]
+        }
+      },
+      "policies": {
+        "hours_read": {
+          "name": "hours_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"redirect_link_hours\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"redirect_link_hours\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"redirect_link_hours\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'link_hours'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"redirect_link_hours\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'link_hours'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"redirect_link_hours\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'link_hours' and not \"redirect_link_hours\".\"closed\"",
+          "withCheck": "\"redirect_link_hours\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'link_hours'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "redirect_link_hours_hour_check": {
+          "name": "redirect_link_hours_hour_check",
+          "value": "extract(epoch from \"redirect_link_hours\".\"hour\")::bigint % 3600 = 0"
+        },
+        "redirect_link_hours_counts_check": {
+          "name": "redirect_link_hours_counts_check",
+          "value": "\"redirect_link_hours\".\"pageviews\" >= 0 and \"redirect_link_hours\".\"clicks\" >= 0 and \"redirect_link_hours\".\"robots\" >= 0"
+        },
+        "redirect_link_hours_closed_check": {
+          "name": "redirect_link_hours_closed_check",
+          "value": "not \"redirect_link_hours\".\"closed\" or \"redirect_link_hours\".\"read_at\" >= \"redirect_link_hours\".\"hour\" + interval '1 hour'"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.redirect_links": {
       "name": "redirect_links",
       "schema": "",
@@ -19011,6 +19203,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "service_ref": {
+          "name": "service_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "updated_by": {
           "name": "updated_by",
@@ -19076,6 +19274,16 @@
           "name": "redirect_links_creator_name_unique",
           "nullsNotDistinct": false,
           "columns": ["creator_id", "name"]
+        },
+        "redirect_links_service_ref_unique": {
+          "name": "redirect_links_service_ref_unique",
+          "nullsNotDistinct": false,
+          "columns": ["service_ref"]
+        },
+        "redirect_links_id_creator_unique": {
+          "name": "redirect_links_id_creator_unique",
+          "nullsNotDistinct": false,
+          "columns": ["id", "creator_id"]
         }
       },
       "policies": {
@@ -19092,6 +19300,21 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "owner_attach": {
+          "name": "owner_attach",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"redirect_links\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'link_hours'"
         }
       },
       "checkConstraints": {
@@ -19114,6 +19337,10 @@
         "redirect_links_usage_note_check": {
           "name": "redirect_links_usage_note_check",
           "value": "char_length(\"redirect_links\".\"usage_note\") <= 120"
+        },
+        "redirect_links_service_ref_check": {
+          "name": "redirect_links_service_ref_check",
+          "value": "\"redirect_links\".\"service_ref\" is null or \"redirect_links\".\"service_ref\" ~ '^[a-z]{2,8}_[0-9a-f]{16,40}$'"
         }
       },
       "isRLSEnabled": false

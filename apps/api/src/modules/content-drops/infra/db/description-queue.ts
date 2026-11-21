@@ -1,5 +1,5 @@
 import { DropCategorySchema, DropMediaKindSchema, JOB_MAX_ATTEMPTS } from '@impera/contracts';
-import { and, eq, inArray, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import { and, eq, inArray, schema, sql, withTenantJob, type Database, type Transaction } from '@impera/db';
 
 import type { DescriptionQueue } from '../../domain/ports';
 
@@ -26,11 +26,14 @@ export async function enqueueDescription(
   );
 }
 
-/** The describing job's reads, as the owner role: a medium, her switch, and the first live file of a drop holding it. */
-export function createDrizzleDescriptionQueue(adminDb: Database): DescriptionQueue {
+/**
+ * The describing job's reads and its count of failures, in the creator of its medium and under the app role
+ * (`withTenantJob`, ADR 0087 lot c): a medium and the first live file of a drop holding it, hers only.
+ */
+export function createDrizzleDescriptionQueue(db: Database): DescriptionQueue {
   return {
-    target: (mediaAssetId) =>
-      withAdmin(adminDb, async (tx) => {
+    target: (creatorId, mediaAssetId) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         const [row] = await tx
           .select({
             creatorId: mediaAssets.creatorId,
@@ -50,6 +53,7 @@ export function createDrizzleDescriptionQueue(adminDb: Database): DescriptionQue
           .where(
             and(
               eq(mediaAssets.id, mediaAssetId),
+              eq(mediaAssets.creatorId, creatorId),
               inArray(contentDropFiles.state, ['kept', 'duplicate']),
               sql`${contentDropFiles.replacedAt} is null`,
               sql`${contentDrops.state} <> 'withdrawn'`,
@@ -73,9 +77,11 @@ export function createDrizzleDescriptionQueue(adminDb: Database): DescriptionQue
         };
       }),
     later: (creatorId, mediaAssetId, correlationId, runAt) =>
-      withAdmin(adminDb, (tx) => enqueueDescription(tx, { creatorId, mediaAssetId, correlationId }, runAt)),
-    failed: (mediaAssetId) =>
-      withAdmin(adminDb, async (tx) => {
+      withTenantJob(db, creatorId, 'drop_media', (tx) =>
+        enqueueDescription(tx, { creatorId, mediaAssetId, correlationId }, runAt),
+      ),
+    failed: (creatorId, mediaAssetId) =>
+      withTenantJob(db, creatorId, 'drop_media', async (tx) => {
         const [row] = await tx
           .update(mediaAssets)
           .set({ descriptionFailures: sql`${mediaAssets.descriptionFailures} + 1` })

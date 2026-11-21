@@ -11,6 +11,34 @@ export function ringDash(share: number, radius: number): string {
   return `${String(round(clamped * circumference))} ${String(round(circumference))}`;
 }
 
+export interface DonutArc {
+  /** `--_dash` of a `.nv-donut__arc` on a circle of the radius given. */
+  readonly dash: string;
+  /** Its `stroke-dashoffset`: where it starts, clockwise from the top once the ring is turned by −90°. */
+  readonly offset: number;
+}
+
+/**
+ * One arc of a `.nv-donut` per value, in order, a small gap between two arcs; a value alone takes the whole ring.
+ * The values are amounts or shares, whatever adds up to the whole; a negative one counts for nothing.
+ */
+export function donutArcs(values: readonly number[], radius: number, gap = 2): DonutArc[] {
+  const circumference = 2 * Math.PI * radius;
+  const total = values.reduce((sum, value) => sum + Math.max(0, value), 0);
+  const shown = values.filter((value) => value > 0).length;
+  let start = 0;
+  return values.map((value) => {
+    const length = total > 0 ? (Math.max(0, value) / total) * circumference : 0;
+    const visible = shown > 1 ? Math.max(0, length - gap) : length;
+    const arc = {
+      dash: `${String(round(visible))} ${String(round(circumference))}`,
+      offset: start === 0 ? 0 : round(-start),
+    };
+    start += length;
+    return arc;
+  });
+}
+
 export interface FunnelStep {
   readonly count: number;
   /** Bar width in % of the first step (`--nv-w` of `.nv-funnel__track`). */
