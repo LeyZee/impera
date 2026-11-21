@@ -114,30 +114,40 @@ const SHAPES = {
     ],
     ['circle', { cx: '12', cy: '12', r: '3' }],
   ],
+  // The CRM menu's own drawings (apps/web/src/shell/NavIcon.tsx, #991): the same shape for the same place.
   dashboard: [
-    ['rect', { width: '7', height: '9', x: '3', y: '3', rx: '1' }],
-    ['rect', { width: '7', height: '5', x: '14', y: '3', rx: '1' }],
-    ['rect', { width: '7', height: '9', x: '14', y: '12', rx: '1' }],
-    ['rect', { width: '7', height: '5', x: '3', y: '16', rx: '1' }],
+    ['path', { d: 'M3 20h18' }],
+    ['path', { d: 'M6 17v-5' }],
+    ['path', { d: 'M12 17V7' }],
+    ['path', { d: 'M18 17v-8' }],
   ],
   today: [
-    ['circle', { cx: '12', cy: '12', r: '4' }],
-    ['path', { d: 'M12 2v2' }],
-    ['path', { d: 'M12 20v2' }],
-    ['path', { d: 'm4.93 4.93 1.41 1.41' }],
-    ['path', { d: 'm17.66 17.66 1.41 1.41' }],
-    ['path', { d: 'M2 12h2' }],
-    ['path', { d: 'M20 12h2' }],
-    ['path', { d: 'm6.34 17.66-1.41 1.41' }],
-    ['path', { d: 'm19.07 4.93-1.41 1.41' }],
+    ['path', { d: 'M3.5 11 12 3.5l8.5 7.5' }],
+    ['path', { d: 'M5.5 9.6V19A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V9.6' }],
+    ['path', { d: 'M10 20.5v-5.2a2 2 0 0 1 4 0v5.2' }],
   ],
-  tracking: [['path', { d: 'M22 12h-4l-3 9L9 3l-3 9H2' }]],
-  // Entraîner and Réglages: the CRM menu's own drawings (apps/web/src/shell/NavIcon.tsx), a target and a gear.
+  tracking: [
+    [
+      'path',
+      {
+        d: 'M17 8.5h2a2.5 2.5 0 0 1 2.5 2.5v4.5A2.5 2.5 0 0 1 19 18h-.5v2.6L15.6 18h-3.1a2.5 2.5 0 0 1-2.3-1.5',
+      },
+    ],
+    [
+      'path',
+      {
+        d: 'M5 3.5h7A2.5 2.5 0 0 1 14.5 6v4.5A2.5 2.5 0 0 1 12 13H8.5l-3 2.8V13H5a2.5 2.5 0 0 1-2.5-2.5V6A2.5 2.5 0 0 1 5 3.5z',
+      },
+    ],
+  ],
   train: [
-    ['circle', { cx: '12', cy: '12', r: '9.5' }],
-    ['circle', { cx: '12', cy: '12', r: '5.2' }],
-    ['circle', { cx: '12', cy: '12', r: '1.4', fill: 'currentColor' }],
+    ['path', { d: 'M8.5 12h7' }],
+    ['rect', { x: '5', y: '7', width: '3.5', height: '10', rx: '1.6' }],
+    ['path', { d: 'M2.5 9.8v4.4' }],
+    ['rect', { x: '15.5', y: '7', width: '3.5', height: '10', rx: '1.6' }],
+    ['path', { d: 'M21.5 9.8v4.4' }],
   ],
+  // Réglages: the CRM menu's gear.
   settings: [
     ['circle', { cx: '12', cy: '12', r: '3' }],
     [
@@ -147,30 +157,34 @@ const SHAPES = {
       },
     ],
   ],
+  // Équipe: several people (the headset read as « support »; Charles, 21/11).
   team: [
-    ['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }],
-    ['circle', { cx: '9', cy: '7', r: '4' }],
-    ['path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }],
-    ['path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' }],
+    ['circle', { cx: '5', cy: '9.5', r: '2.2' }],
+    ['path', { d: 'M1.5 18.5v-.3c0-2 1.3-3.5 3.3-3.9' }],
+    ['circle', { cx: '12', cy: '8', r: '3' }],
+    ['path', { d: 'M6.5 19.5V19c0-2.8 2.4-5 5.5-5s5.5 2.2 5.5 5v.5' }],
+    ['circle', { cx: '19', cy: '9.5', r: '2.2' }],
+    ['path', { d: 'M22.5 18.5v-.3c0-2-1.3-3.5-3.3-3.9' }],
   ],
   creators: [
-    ['path', { d: 'M11.5 3.5 12 2l.5 1.5L14 4l-1.5.5L12 6l-.5-1.5L10 4z' }],
-    ['circle', { cx: '12', cy: '13', r: '3' }],
-    ['path', { d: 'M6 21a6 6 0 0 1 12 0' }],
+    ['circle', { cx: '9', cy: '8', r: '3.4' }],
+    ['path', { d: 'M2.5 19.5v-.6c0-3 2.5-5.4 6.5-5.4 1.3 0 2.5.3 3.5.7' }],
+    ['path', { d: 'm18 11.6 1.3 3.1 3.1 1.3-3.1 1.3-1.3 3.1-1.3-3.1-3.1-1.3 3.1-1.3z' }],
   ],
   planning: [
-    ['rect', { width: '18', height: '18', x: '3', y: '4', rx: '2' }],
-    ['path', { d: 'M16 2v4' }],
-    ['path', { d: 'M8 2v4' }],
-    ['path', { d: 'M3 10h18' }],
+    ['rect', { x: '3.5', y: '5', width: '17', height: '15.5', rx: '3' }],
+    ['path', { d: 'M3.5 10h17' }],
+    ['path', { d: 'M8 3v4M16 3v4' }],
+    ['circle', { cx: '15.5', cy: '15', r: '1.3', fill: 'currentColor' }],
   ],
   pay: [
-    ['path', { d: 'M22 7 13.5 15.5 8.5 10.5 2 17' }],
-    ['path', { d: 'M16 7h6v6' }],
+    ['circle', { cx: '12', cy: '12', r: '9' }],
+    ['path', { d: 'M15.4 8.7a4.2 4.2 0 1 0 0 6.6M7.2 10.9h5.6M7.2 13.1h5.6' }],
   ],
   me: [
-    ['circle', { cx: '12', cy: '8', r: '5' }],
-    ['path', { d: 'M20 21a8 8 0 0 0-16 0' }],
+    ['circle', { cx: '12', cy: '12', r: '9.5' }],
+    ['circle', { cx: '12', cy: '10', r: '3' }],
+    ['path', { d: 'M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1' }],
   ],
   pencil: [
     [
