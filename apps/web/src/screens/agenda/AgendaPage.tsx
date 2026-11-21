@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type JSX } from 'react';
 
 import { AddDialog, type AddPreset } from './AddDialog';
+import { DayCard } from './DayCard';
 import { DayView } from './DayView';
 import { FreshnessNote } from './FreshnessNote';
 import { MonthView } from './MonthView';
@@ -262,7 +263,9 @@ export function AgendaPage({
         )
       ) : (
         <>
-          {/* Her week of shooting, once the agency sent it: above the views, on every one of them (ADR 0140). */}
+          {/* Her day first, what she posts today; then her week of shooting, once the agency sent it: above the
+              views, on every one of them (ADR 0140). */}
+          <DayCard />
           <WeekCard monday={monday} zone={agenda.timeZone} today={herToday} />
           <Views
             agenda={agenda}

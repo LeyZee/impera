@@ -1,10 +1,14 @@
 import {
   AcceptCreatorWeekBodySchema,
   AgencyCreatorWeekSchema,
+  CreatorDayQuerySchema,
   CreatorWeekParamsSchema,
   CreatorWeekQuerySchema,
   CreatorWeekSchema,
+  DayItemDoneBodySchema,
+  DayItemParamsSchema,
   DomainError,
+  HerDaySchema,
   ShootItemDoneBodySchema,
   ShootItemParamsSchema,
   ValidateCreatorWeekBodySchema,
@@ -16,17 +20,19 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
 import type { WeekAgendaStore } from '../../../creator-tasks';
+import { herDay } from '../../application/her-day';
 import { acceptWeek, herWeek } from '../../application/her-week';
 import { validateWeek } from '../../application/validate';
 import { CreatorWeekNotFound } from '../../domain/errors';
 import { mondayOf } from '../../domain/plan';
-import type { AcceptSuggestion, WeekDraftStore, WeekFactsReader } from '../../domain/ports';
+import type { AcceptSuggestion, DayTickStore, WeekDraftStore, WeekFactsReader } from '../../domain/ports';
 
 /** The composition root's `requireRole`: 401 without a session, 403 with another role; sets `request.user`. */
 export type RequireRole = (...roles: UserRole[]) => preValidationAsyncHookHandler;
 
 export interface WeekRoutesDeps {
   readonly drafts: WeekDraftStore;
+  readonly days: DayTickStore;
   readonly agenda: WeekAgendaStore;
   readonly accept: AcceptSuggestion;
   readonly facts: Pick<WeekFactsReader, 'arrivals'>;
@@ -59,7 +65,8 @@ const AcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
 
 /**
  * Her week (ADR 0140): the owner's reading and validation under `/v1/creators/:creatorId/weeks/:week` (an active
- * manager reads), hers under `/v1/creator-space/week` and `/v1/creator-space/shoot-items/:id`. A week is named by her
+ * manager reads), hers under `/v1/creator-space/week` and `/v1/creator-space/shoot-items/:id`; her day under
+ * `/v1/creator-space/day`. A week is named by her
  * Monday: any day of it reads the same week. `now` is the server's clock.
  */
 export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
@@ -143,6 +150,30 @@ export function createWeekRoutes(deps: WeekRoutesDeps): FastifyPluginAsyncZod {
       async (request, reply) => {
         await asCreator(() =>
           deps.agenda.tickLine(signedIn(request.user), request.params.id, request.body.done, clock()),
+        );
+        return reply.code(204).send();
+      },
+    );
+
+    app.get(
+      '/creator-space/day',
+      { ...creatorOnly, schema: { querystring: CreatorDayQuerySchema, response: { 200: HerDaySchema } } },
+      (request) =>
+        asCreator(() => herDay(deps.days, signedIn(request.user), request.query.day ?? null, clock())),
+    );
+
+    app.put(
+      '/creator-space/day/:day/items/:item',
+      { ...creatorOnly, schema: { params: DayItemParamsSchema, body: DayItemDoneBodySchema } },
+      async (request, reply) => {
+        await asCreator(() =>
+          deps.days.write(
+            signedIn(request.user),
+            request.params.day,
+            request.params.item,
+            request.body.done,
+            clock(),
+          ),
         );
         return reply.code(204).send();
       },

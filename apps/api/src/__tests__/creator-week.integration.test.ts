@@ -6,6 +6,8 @@ import {
   ContentRequestIdSchema,
   CreatorIdSchema,
   CreatorWeekSchema,
+  DAY_ITEM_LATE_UNPROCESSABLE,
+  HerDaySchema,
   newId,
   TeamMemberIdSchema,
   type AgencyCreatorWeek,
@@ -432,5 +434,56 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     });
     expect(after?.lines.find((line) => line.need === 'reveal_story')?.received).toBe(0);
     expect(after?.delivered).toBe(false);
+  });
+  it('gives her her day to tick, today and yesterday only, kept to her own account', async () => {
+    const read = async (who: 'nora' | 'ines', day?: string) => {
+      const response = await call(
+        'GET',
+        `/v1/creator-space/day${day === undefined ? '' : `?day=${day}`}`,
+        who,
+      );
+      expect(response.statusCode).toBe(200);
+      return HerDaySchema.parse(response.json());
+    };
+    const fresh = await read('nora');
+    expect(fresh.day).toBe(today);
+    expect(fresh.today).toBe(today);
+    expect(fresh.lines.slice(0, 3).map((line) => line.item)).toEqual([
+      'reveal_story',
+      'reveal_video',
+      'insta_cta_story',
+    ]);
+    expect(fresh.lines.every((line) => line.done === 0)).toBe(true);
+
+    const tick = (who: 'nora' | 'ines' | 'owner', day: string, item: string, done: number) =>
+      call('PUT', `/v1/creator-space/day/${day}/items/${item}`, who, { done });
+    expect((await tick('nora', today, 'insta_posts', 1)).statusCode).toBe(204);
+    // A replay, then a tap too many: counted up to what the line asks.
+    expect((await tick('nora', today, 'insta_posts', 1)).statusCode).toBe(204);
+    expect((await tick('nora', today, 'telegram_posts', 9)).statusCode).toBe(204);
+    expect((await tick('nora', addDays(today, -1), 'reveal_story', 1)).statusCode).toBe(204);
+    const ticked = await read('nora');
+    expect(ticked.lines.find((line) => line.item === 'insta_posts')?.done).toBe(1);
+    expect(ticked.lines.find((line) => line.item === 'telegram_posts')?.done).toBe(2);
+    expect(
+      (await read('nora', addDays(today, -1))).lines.find((line) => line.item === 'reveal_story')?.done,
+    ).toBe(1);
+
+    const late = await tick('nora', addDays(today, -2), 'reveal_story', 1);
+    expect(late.statusCode).toBe(422);
+    expect(late.json()).toMatchObject({ error: { code: DAY_ITEM_LATE_UNPROCESSABLE } });
+    expect((await tick('nora', addDays(today, 1), 'reveal_story', 1)).statusCode).toBe(422);
+    expect((await tick('nora', today, 'tiktok', 1)).statusCode).toBe(400);
+    expect((await tick('nora', today, 'insta_posts', 11)).statusCode).toBe(400);
+
+    // Another creator reads her own day, never Nora's; the team reads it, never writes it here.
+    expect((await read('ines')).lines.every((line) => line.done === 0)).toBe(true);
+    expect((await call('GET', '/v1/creator-space/day', 'owner')).statusCode).toBe(403);
+    expect((await tick('owner', today, 'insta_posts', 1)).statusCode).toBe(403);
+    const seen = await withTenantMember(app.db.db, nora, managerUserId, (tx) =>
+      tx.select().from(schema.creatorDayTicks).where(eq(schema.creatorDayTicks.creatorId, nora)),
+    );
+    expect(seen).toHaveLength(3);
+    expect(seen.every((row) => row.createdBy === noraUserId && row.updatedBy === noraUserId)).toBe(true);
   });
 });
