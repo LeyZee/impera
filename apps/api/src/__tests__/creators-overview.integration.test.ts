@@ -247,6 +247,7 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
         pausedUntil: null,
         globalStop: false,
         hasActivePersona: false,
+        expiredSessions: [],
         hoursNow: { open: true, changesAt: null },
         resumesAs: 'copilot',
         sales: null,
