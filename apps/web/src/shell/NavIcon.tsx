@@ -107,7 +107,7 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   today: (
     <>
       <path className="nav-roof" d="M3.5 11 12 3.5l8.5 7.5" />
-      <path d="M5.5 9.6V19A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V9.6" />
+      <path className="nav-walls" d="M5.5 9.6V19A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V9.6" />
       <path className="nav-door" d="M10 20.5v-5.2a2 2 0 0 1 4 0v5.2" />
     </>
   ),

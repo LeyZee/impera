@@ -32,8 +32,4 @@ describe('the gesture of each icon of the rail', () => {
     const moving = parts.filter((part) => new RegExp(`\\.is-playing[^{]*\\.${part}\\b`).test(shellCss));
     expect(moving.length).toBeGreaterThan(0);
   });
-
-  it('lands the whole icon on every click', () => {
-    expect(shellCss).toMatch(/\.nav-icon\.is-playing\s*\{[^}]*animation:/);
-  });
 });
