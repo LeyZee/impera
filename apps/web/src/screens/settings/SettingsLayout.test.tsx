@@ -85,7 +85,7 @@ describe('Réglages’ list', () => {
 });
 
 describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
-  it('groups its sections in four titled groups: Connexions, IA, Argent, Sécurité (ADR 0134 § 6)', async () => {
+  it('groups its sections in titled groups: Connexions, IA, Argent, Sécurité (ADR 0134 § 6), then Aide (21/11)', async () => {
     const lines = await settingsTabs(owner);
     expect(lines).toEqual([
       'Plateformes',
@@ -97,6 +97,7 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
       'Alertes',
       'Sauvegardes',
       'Sécurité',
+      'Aide',
     ]);
     const nav = screen.getByRole('navigation', { name: 'Réglages' });
     expect([...nav.querySelectorAll('.rgl-list__group')].map((title) => title.textContent)).toEqual([
@@ -104,6 +105,7 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
       'IA',
       'Argent',
       'Sécurité',
+      'Aide',
     ]);
   });
 
@@ -126,7 +128,7 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
       vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
     );
     const lines = await settingsTabs(owner, '/reglages');
-    expect(lines).toHaveLength(9);
+    expect(lines).toHaveLength(10);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Réglages');
     expect(screen.queryByRole('link', { name: '← Réglages' })).toBeNull();
     expect(document.querySelector('.rgl-body')?.hasAttribute('data-open')).toBe(false);

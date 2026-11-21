@@ -1798,6 +1798,325 @@
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
 
+/* ───────────── Guide: a hard gesture, folded beside its screen and in Moi › Aide ─────────────
+   <details class="nv-guide" style="--_c: var(--nv-content-5)">: one colour per page (the person's), carried by the
+   icon tile, the step numbers and the open guide's rim. Steps say what to do, then « Tu dois voir » what proves it;
+   « À savoir » on a tile, « Jamais » in the danger colour, « Si ça coince » in amber. Validated by Charles, 21/11. */
+.nv-guide {
+  --_c: var(--nv-ink);
+  border-radius: var(--nv-radius-lg);
+  border: 1px solid var(--nv-plate-edge);
+  background: var(--nv-plate);
+  overflow: clip;
+  interpolate-size: allow-keywords;
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
+  transition:
+    border-color var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-slow) var(--nv-ease-out);
+}
+.nv-guide:hover {
+  border-color: color-mix(in srgb, var(--_c) 35%, var(--nv-plate-edge));
+}
+.nv-guide[open] {
+  border-color: color-mix(in srgb, var(--_c) 40%, transparent);
+  box-shadow: 0 20px 44px -30px color-mix(in srgb, var(--_c) 80%, transparent);
+}
+.nv-guide > summary {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto 28px;
+  gap: 14px;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 16px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide > summary::-webkit-details-marker {
+  display: none;
+}
+.nv-guide > summary:hover {
+  background: var(--nv-glass-fill);
+}
+.nv-guide > summary:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.nv-guide__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--_c);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 26%, transparent);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__icon svg {
+  width: 21px;
+  height: 21px;
+}
+.nv-guide > summary:hover .nv-guide__icon {
+  transform: rotate(-8deg) scale(1.08);
+}
+.nv-guide[open] .nv-guide__icon {
+  background: var(--_c);
+  color: var(--nv-void);
+  box-shadow: 0 8px 18px -8px var(--_c);
+}
+.nv-guide__head {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.nv-guide__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  font-weight: 600;
+}
+.nv-guide__sum {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+/* « Essentiel »: a small gold star, the only gold of the page. */
+.nv-guide__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  font-weight: 600;
+  color: var(--nv-content-6);
+  background: color-mix(in srgb, var(--nv-content-6) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-content-6) 28%, transparent);
+}
+.nv-guide__key svg {
+  width: 11px;
+  height: 11px;
+}
+.nv-guide__time {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
+.nv-guide__chev {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--nv-glass-fill);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__chev::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.7px solid var(--nv-ink-muted);
+  border-bottom: 1.7px solid var(--nv-ink-muted);
+  transform: rotate(45deg);
+}
+.nv-guide[open] .nv-guide__chev {
+  transform: rotate(180deg);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+}
+.nv-guide[open] .nv-guide__chev::after {
+  border-color: var(--_c);
+}
+.nv-guide::details-content {
+  block-size: 0;
+  overflow: clip;
+  transition:
+    block-size var(--nv-dur-base) var(--nv-ease-out),
+    content-visibility var(--nv-dur-base) allow-discrete;
+}
+.nv-guide[open]::details-content {
+  block-size: auto;
+}
+.nv-guide__body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 20px 22px 72px;
+}
+.nv-guide[open] .nv-guide__body > * {
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.nv-guide[open] .nv-guide__body > :nth-child(n + 4) {
+  animation-delay: 180ms;
+}
+.nv-guide__why {
+  margin: 0;
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+}
+.nv-guide__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.nv-guide__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
+}
+.nv-guide__chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--_t, var(--nv-success));
+}
+.nv-guide__chip--go {
+  --_t: var(--nv-trend-up);
+}
+.nv-guide__chip--warn {
+  --_t: var(--nv-warning);
+}
+.nv-guide__chip--danger {
+  --_t: var(--nv-danger);
+}
+/* The steps: numbered in the page's colour, linked by a thread; each proves itself with « Tu dois voir ». */
+.nv-guide__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  counter-reset: nv-guide-step;
+}
+.nv-guide__steps > li {
+  counter-increment: nv-guide-step;
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: var(--nv-radius-sm);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__steps > li:hover {
+  background: var(--nv-glass-fill);
+}
+.nv-guide__steps > li::before {
+  content: counter(nv-guide-step);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--_c);
+  background: color-mix(in srgb, var(--_c) 14%, transparent);
+  transition:
+    transform var(--nv-dur-slow) var(--nv-ease-spring),
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-guide__steps > li:hover::before {
+  background: var(--_c);
+  color: var(--nv-void);
+  transform: scale(1.08);
+}
+.nv-guide__steps > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 21px;
+  top: 40px;
+  bottom: -6px;
+  width: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--_c) 22%, transparent);
+}
+.nv-guide__do {
+  font-weight: 600;
+}
+.nv-guide__see {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.nv-guide__box {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.nv-guide__box h4 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.nv-guide__box ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.nv-guide__box--never {
+  background: color-mix(in srgb, var(--nv-danger) 9%, transparent);
+}
+.nv-guide__box--never h4 {
+  color: var(--nv-danger);
+}
+.nv-guide__box--stuck {
+  background: color-mix(in srgb, var(--nv-warning) 11%, transparent);
+}
+.nv-guide__box--stuck h4 {
+  color: var(--nv-warning);
+}
+@media (max-width: 560px) {
+  .nv-guide > summary {
+    grid-template-columns: 42px minmax(0, 1fr) 28px;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .nv-guide__time {
+    display: none;
+  }
+  .nv-guide__body {
+    padding: 4px 16px 18px;
+  }
+}
+
 /* ───────────── Charts ───────────── */
 
 /* A chart is drawn, never just shown: the line draws in (pathLength="1"), the area fades in after it,

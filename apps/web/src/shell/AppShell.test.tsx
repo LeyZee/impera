@@ -248,6 +248,7 @@ describe('Réglages › Sauvegardes', () => {
       'Alertes',
       'Sauvegardes',
       'Sécurité',
+      'Aide',
     ]);
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
