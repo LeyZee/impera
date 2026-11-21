@@ -816,5 +816,5 @@ export function resumeRunAt(index: number, now: Date): Date {
  * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
  * (`withTenantJob`) refuses any other.
  */
-export const TenantJobSchema = z.enum(['daily_stats', 'media_insights', 'link_hours']);
+export const TenantJobSchema = z.enum(['daily_stats', 'media_insights', 'link_hours', 'drop_media']);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

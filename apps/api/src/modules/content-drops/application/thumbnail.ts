@@ -29,11 +29,12 @@ export const thumbnailKeyOf = (creatorId: string, sha256: string): string =>
  */
 export async function makeThumbnail(
   deps: ThumbnailDeps,
+  creatorId: string,
   mediaAssetId: string,
   now: Date,
   correlationId: string,
 ): Promise<ThumbnailOutcome> {
-  const target = await deps.queue.target(mediaAssetId);
+  const target = await deps.queue.target(creatorId, mediaAssetId);
   if (target === null || target.erased) return 'gone';
   if (target.kind === 'audio') return 'not_pictured';
   if (target.tried) return 'already';
@@ -54,7 +55,7 @@ export async function makeThumbnail(
     const out = join(dir, 'thumbnail.jpg');
     if (!(await deps.storage.download(target.storageKey, path, target.bytes))) return 'gone';
     if (!(await deps.thumbnailer.make(path, target.kind, out))) {
-      await deps.queue.settle(mediaAssetId, null, now);
+      await deps.queue.settle(target.creatorId, mediaAssetId, null, now);
       return 'none';
     }
     const key = thumbnailKeyOf(target.creatorId, target.sha256);
@@ -62,7 +63,7 @@ export async function makeThumbnail(
       .update(await readFile(out))
       .digest('hex');
     await deps.storage.upload(key, out, 'image/jpeg', sha256);
-    await deps.queue.settle(mediaAssetId, key, now);
+    await deps.queue.settle(target.creatorId, mediaAssetId, key, now);
     return 'made';
   } finally {
     if (dir !== null) await rm(dir, { recursive: true, force: true });
