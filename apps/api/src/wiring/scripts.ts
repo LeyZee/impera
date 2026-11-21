@@ -1,5 +1,4 @@
 import { JOB_PAYLOADS, ScriptStructureIdSchema, asPersonaV2 } from '@impera/contracts';
-import type { LlmGateway } from '@impera/llm';
 
 import { defineTask } from '../jobs';
 import { PlatformReadUnavailable, type ConnectorsModule } from '../modules/connectors';
@@ -29,8 +28,6 @@ export function wireScripts(
     /** The platform's scripts of an account (fiche vault-sync, `platformReads`), for the import (ADR 0099 § 1 time 2). */
     readonly connectors: Pick<ConnectorsModule, 'platformReads'>;
     readonly cardFontsDir: string;
-    /** The brain that writes a native script's identity (SC-04 lot c8). */
-    readonly brain: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
     /** Tests only: another clock than the server's. */
     readonly now?: () => Date;
   },
@@ -42,7 +39,6 @@ export function wireScripts(
     adminDb: shared.adminDb,
     requireRole: shared.requireRole,
     cardFontsDir: deps.cardFontsDir,
-    brain: deps.brain,
     limitsOf: async (creatorId) => {
       const active = await deps.persona.versions.active(creatorId);
       // Her strict rules, wherever the format keeps them (ADR 0079 § 4).
@@ -97,27 +93,6 @@ export function wireScripts(
             { platformAccountId: payload.platformAccountId, ...run },
             'scripts: the native scripts imported',
           );
-        },
-      ),
-      'scripts.identify_platform_script': defineTask(
-        'scripts.identify_platform_script',
-        JOB_PAYLOADS['scripts.identify_platform_script'],
-        shared.logger,
-        async (payload, context) => {
-          const outcome = await module.jobs.identifyPlatformScript(payload);
-          context.logger.info(
-            { platformScriptId: payload.platformScriptId, outcome },
-            'scripts: a native script’s identity',
-          );
-        },
-      ),
-      'scripts.identify_backlog': defineTask(
-        'scripts.identify_backlog',
-        JOB_PAYLOADS['scripts.identify_backlog'],
-        shared.logger,
-        async (_payload, context) => {
-          const queued = await module.jobs.identifyBacklog(`job:${context.jobId}`);
-          context.logger.info({ queued }, 'scripts: native scripts whose identity may be due, enqueued');
         },
       ),
     },

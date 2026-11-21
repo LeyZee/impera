@@ -99,6 +99,8 @@ describe("the host's own roles reach nothing of Impera (ADR 0152 § 2)", () => {
       calendar_agent: ['nirvana_app'],
       calendar_reader_scope: [],
       calendar_shifts: ['nirvana_app'],
+      // A member checks in his own shift (0247).
+      check_in_own_shift: ['nirvana_app'],
       enqueue_job: ['impera_service', 'nirvana_app'],
       follow_own_time_zone: ['nirvana_app'],
       // Open to PUBLIC before 0234: our two roles keep them, nobody else.
