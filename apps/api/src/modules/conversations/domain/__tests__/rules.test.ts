@@ -1,3 +1,4 @@
+import type { FanAvailabilityRecord } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,6 +9,7 @@ import {
   DEFAULT_DEBOUNCE_SECONDS,
   deferredRespondAt,
   fanAwaitsAnswer,
+  farewellNotBefore,
   followUpIdempotencyKey,
   followUpRetry,
   nextFollowUp,
@@ -71,6 +73,31 @@ describe('conversation rules', () => {
     expect(nextFollowUp(AT, [], hours(1))).toBeNull();
     // He never wrote: she never writes first.
     expect(nextFollowUp(null, [12, 23], AT)).toBeNull();
+  });
+
+  it('lets him be after a goodbye on his last message: a night after goodnight, hours after he leaves (ADR 0158 § A)', () => {
+    const hours = (h: number) => later(h * 3_600);
+    const said = (signal: FanAvailabilityRecord['signal'], at: Date): FanAvailabilityRecord => ({
+      state: 'no',
+      signal,
+      at,
+      expiresAt: null,
+      seen: [],
+      sexualizedAt: null,
+      askedAt: null,
+      hotAt: null,
+    });
+    // Read on his last message, a minute after it.
+    expect(farewellNotBefore(said('says_goodnight', hours(0.02)), AT)).toEqual(hours(9.02));
+    expect(farewellNotBefore(said('leaving_soon', hours(0.02)), AT)).toEqual(hours(3.02));
+    expect(farewellNotBefore(said('busy_now', hours(0.02)), AT)).toEqual(hours(3.02));
+    // Someone beside him is no goodbye; a goodbye before he wrote again says nothing of now.
+    expect(farewellNotBefore(said('someone_nearby', hours(0.02)), AT)).toBeNull();
+    expect(farewellNotBefore(said('says_goodnight', hours(-1)), AT)).toBeNull();
+    expect(farewellNotBefore(null, AT)).toBeNull();
+    // The follow-up waits for it, never comes sooner than the persona's delay.
+    expect(nextFollowUp(AT, [2, 23], hours(0.1), hours(9))).toEqual({ step: 0, runAt: hours(9) });
+    expect(nextFollowUp(AT, [12, 23], hours(0.1), hours(9))).toEqual({ step: 0, runAt: hours(12) });
   });
 
   it('keys a follow-up draft by his silence and its step', () => {

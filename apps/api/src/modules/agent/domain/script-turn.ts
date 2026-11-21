@@ -37,6 +37,11 @@ export interface ScriptTurnInput extends Omit<NextScriptStepInput, 'latest'> {
   /** False on a second pass over the same message (a wait, a replay): it was already counted against the step. */
   readonly countsHisMessage: boolean;
   /**
+   * He says he just came (ADR 0156 § 6): his run pauses where it is. This message neither answers nor refuses the step
+   * waiting; when he comes back cold, the run ends `stalled` and her step is recalled once (§ 1).
+   */
+  readonly heCame?: boolean;
+  /**
    * False when something else answers this message (a trap, the cursor steering him back, a custom order, a brain
    * that failed): the run still follows his message and Reveal, but no step goes.
    */
@@ -103,8 +108,15 @@ function afterHisMessage(
   run: ScriptRun,
   script: PlatformScriptView,
   reply: ScriptReply | null,
+  hotSession: boolean,
   at: Date,
 ): ScriptRun {
+  // He comes back once the session cooled (asleep, gone, the next day) with the paid step still waiting: the run
+  // pauses there, never a refusal of his « salut » (ADR 0156 § 1). A clear no is still one.
+  if (!hotSession && reply !== 'refused' && paidWaiting(run) !== undefined) {
+    const cooled = applyScriptRunEvent(run, script, { type: 'session_cooled', at });
+    if (cooled.ok) return cooled.run;
+  }
   if (reply === 'refused') {
     const refused = applyScriptRunEvent(run, script, { type: 'refused', at });
     if (refused.ok) return refused.run;
@@ -130,9 +142,10 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
   let run = stored;
   if (run !== null && storedScript !== null && run.status === 'open') {
     run = reconcileScriptRun(run, storedScript, history, now);
-    // Paused while he is not free (ADR 0103 § 12): his message is neither an answer to the step nor a refusal.
-    if (input.countsHisMessage && input.availability !== 'no')
-      run = afterHisMessage(run, storedScript, input.reply, now);
+    // Paused while he is not free (ADR 0103 § 12) or right after he came (ADR 0156 § 6): his message is neither an
+    // answer to the step nor a refusal.
+    if (input.countsHisMessage && input.availability !== 'no' && input.heCame !== true)
+      run = afterHisMessage(run, storedScript, input.reply, input.hotSession, now);
   }
   const latest = run === null || storedScript === null ? null : { run, script: storedScript };
   const decided = nextScriptStep({ ...input, latest });

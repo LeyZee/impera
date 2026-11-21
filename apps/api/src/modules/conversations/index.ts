@@ -4,6 +4,7 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { createConversationCommands, type ConversationCommands } from './application/commands';
+import { createAfterSaleJob } from './application/jobs/after-sale';
 import { createFollowUpJob } from './application/jobs/follow-up';
 import { createReadCardJob } from './application/jobs/read-card';
 import { createRecordFactsJob } from './application/jobs/record-facts';
@@ -92,6 +93,8 @@ export interface ConversationsModule extends ConversationCommands {
     /** `fans.read_card` (ADR 0085 § 7): his new messages read for his card, whoever answers him. */
     readCard(payload: JobPayload<'fans.read_card'>, logger: JobLogger): Promise<void>;
     followUp(payload: JobPayload<'conversation.follow_up'>, logger: JobLogger): Promise<void>;
+    /** `conversation.after_sale` (ADR 0156 § 2): a step he bought or a tip wakes his conversation for her word after it. */
+    afterSale(payload: JobPayload<'conversation.after_sale'>, logger: JobLogger): Promise<void>;
     reopen(payload: JobPayload<'conversation.reopen'>, logger: JobLogger): Promise<void>;
     /** Each minute: what members who are no longer `active` still held is handed back (EQ-13). */
     releaseUnavailable(logger: JobLogger): Promise<void>;
@@ -223,6 +226,13 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         fans: deps.fans,
         ...(deps.composer === undefined ? {} : { composer: deps.composer }),
         ...(deps.followUps === undefined ? {} : { followUps: deps.followUps }),
+        ...(deps.replyHours === undefined ? {} : { replyHours: deps.replyHours }),
+      }),
+      afterSale: createAfterSaleJob({
+        uow,
+        clock,
+        fans: deps.fans,
+        ...(deps.composer === undefined ? {} : { composer: deps.composer }),
         ...(deps.replyHours === undefined ? {} : { replyHours: deps.replyHours }),
       }),
       reopen: createReopenJob({ uow, clock }),

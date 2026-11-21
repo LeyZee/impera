@@ -232,7 +232,13 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
-        brief: describeBrief(input.brief, input.objectionReply, input.scriptStep, input.maxBubbles),
+        brief: describeBrief(
+          input.brief,
+          input.objectionReply,
+          input.scriptStep,
+          input.maxBubbles,
+          input.waitingStep,
+        ),
         canary,
       });
       return run(

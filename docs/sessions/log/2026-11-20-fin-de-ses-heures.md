@@ -1,0 +1,4 @@
+# 2026-11-20 — ADR 0158 § A 7 : elle dit au revoir quand ses heures ferment — in progress
+Fait : `herDayEndsSoon` (domaine) : ses heures sont ouvertes et fermées dans vingt minutes (créneaux et exceptions datées compris) ; sa réponse devient alors un au revoir pour la journée, en une bulle, sans rien proposer, et aucune étape de script ne part (elle serait coupée). Une aide au paiement ou une étape qu'elle apporte passent avant l'au revoir, comme pour le bonne nuit. Tests du domaine et du composeur.
+Pas fait : scénario d'éval (le format ne porte pas encore ses heures) ; le délai de réponse tiré autour de `response_delay_minutes` attend l'envoi en Automatique, qui n'existe pas encore (ADR 0156 § 7) ; relances de vente « Réchauffer » (choix de Charles du 20/11, 17 h 18 UTC), au lot suivant.
+Découvertes : aucune.
