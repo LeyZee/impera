@@ -29,6 +29,7 @@ import {
 
 import { BackupCodesList } from '@/auth/BackupCodesList';
 import { CodeInput } from '@/auth/CodeInput';
+import { clearCodesUnconfirmed, codesUnconfirmed } from '@/auth/codes-pending';
 import { addPasskey, canUsePasskeys, gestureName } from '@/auth/passkeys';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Panel, PanelSection } from '@/shell/layout';
@@ -428,6 +429,8 @@ function PasskeysPanel(): JSX.Element {
 
 function BackupCodesPanel(): JSX.Element {
   const [step, setStep] = useState<'idle' | 'confirm' | 'shown'>('idle');
+  // The codes of the activation left without being said kept (COUV-08): new ones replace them.
+  const [unconfirmed, setUnconfirmed] = useState(codesUnconfirmed);
   const [codes, setCodes] = useState<readonly string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -453,6 +456,8 @@ function BackupCodesPanel(): JSX.Element {
     try {
       setCodes(await generateBackupCodes(given, typed));
       setStep('shown');
+      setUnconfirmed(false);
+      clearCodesUnconfirmed();
     } catch (failure) {
       if (code.current !== null) code.current.value = '';
       setError(messageOf(failure));
@@ -484,6 +489,12 @@ function BackupCodesPanel(): JSX.Element {
           </>
         ) : (
           <>
+            {unconfirmed ? (
+              <p className="text-sm text-[var(--nv-warning)]" role="status">
+                Tes codes de secours n’ont pas été confirmés à l’activation&nbsp;: crée-en de nouveaux et
+                garde-les.
+              </p>
+            ) : null}
             <p className={MUTED}>
               Chacun remplace une fois le code de ton application. Tu les as perdus, ou il t’en reste
               peu&nbsp;? Crée-en dix nouveaux&nbsp;: les anciens cesseront de marcher.
