@@ -15,7 +15,7 @@ Le chatteur ouvre son accueil et sait à qui parler maintenant ; la modèle ouvr
 - Paliers de dépense par créatrice (`GET`/`PUT /v1/creators/:id/fan-tiers`, propriétaire), 50/200/500 € par défaut ; palier et dépense du fan dans le copilote et l'extension.
 - Accueil du chatteur en deux colonnes : à qui parler et ses tâches à gauche, ses chiffres à droite ; « Elle, en trois lignes » dans l'en-tête de poste.
 - Accueil de la modèle : « L'essentiel du jour » en haut (un anneau qui additionne ce qu'elle poste, ses tâches du jour et ses envois dus), puis « Ma journée », ses envois, son agenda, trois chiffres de ses fans.
-- « Je serai absente » et « Je ne fais plus quelque chose » (module `creator-limits`, migration 0245) : écrits par elle, lus par son équipe en poste, montrés en premier dans « Elle, en trois lignes ».
+- « Je serai absente » et « Je ne fais plus quelque chose » (module `creator-limits`, migration 0247) : écrits par elle, lus par son équipe en poste, montrés en premier dans « Elle, en trois lignes ».
 
 ## Ce qui reste
 
