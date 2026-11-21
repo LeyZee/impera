@@ -410,7 +410,7 @@ const tracking = createRoute({
     };
     // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so; away, it says that (CHAT-09).
     return rail.kind === 'chatter' ? (
-      <ChatterTrackingPage {...props} away={myAwayOf(user)} />
+      <ChatterTrackingPage {...props} userId={user.id} away={myAwayOf(user)} />
     ) : (
       <TrackingPage {...props} only={scoped} nav={<SuiviNav fans={readsFans(user)} />} />
     );
