@@ -42,6 +42,7 @@ import type {
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
+import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './modules/creator-decisions';
 import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { CreatorWeekModule } from './modules/creator-week';
@@ -121,6 +122,8 @@ interface Modules {
   readonly creatorWeek: CreatorWeekModule;
   /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
   readonly creatorDecisions: CreatorDecisionsModule;
+  /** The captions proposed for her Reels (ADR 0164 § 9): its job, called by the tests. */
+  readonly instagramCaptions: InstagramCaptionsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -580,6 +583,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     creatorTasks: creatorTasks.module,
     creatorWeek: creatorWeek.module,
     creatorDecisions,
+    instagramCaptions: instagramCaptions.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
