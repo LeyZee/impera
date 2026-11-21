@@ -148,6 +148,16 @@ function Question({
               <span className="sc-ask__text">{answer.text}</span>
               <span className="sc-ask__pick" aria-hidden="true">
                 Choisir
+                <svg
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </span>
             </button>
           ))}
