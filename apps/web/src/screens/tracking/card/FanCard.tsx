@@ -2,6 +2,7 @@ import type {
   FanCardEntry,
   FanCardField,
   FanCardFieldSpec,
+  FanCardOther,
   FanCardValue,
   SetFanCardFieldBody,
 } from '@impera/contracts';
@@ -10,7 +11,7 @@ import { useState, type JSX } from 'react';
 
 import { fanKycKey } from '../api';
 
-import { FanCardRefused, fanCardKey, setFanCardField, useFanCard } from './api';
+import { FanCardRefused, fanCardKey, retractFanCardOther, setFanCardField, useFanCard } from './api';
 import {
   CARD_GROUPS,
   CLOSED_CHOICES,
@@ -56,6 +57,13 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
   }
   const view = card.data;
   const now = new Date();
+
+  const retract = async (factId: string): Promise<string | null> => {
+    const change = await retractFanCardOther(creatorId, fanId, { factId });
+    if (!change.ok) return change.message;
+    client.setQueryData(fanCardKey(creatorId, fanId), change.view);
+    return null;
+  };
 
   const write: Write = async (field, body) => {
     setPending(field);
@@ -113,10 +121,7 @@ export function FanCard({ creatorId, fanId }: { creatorId: string; fanId: string
           </summary>
           <ul className="tr-card__fields">
             {view.others.map((other) => (
-              <li key={`${other.key}-${other.observedAt}`} className="tr-card__field">
-                <p className="tr-card__value">{other.value}</p>
-                <p className="tr-card__source">{sourceLine({ ...other, notedByName: null }, now)}</p>
-              </li>
+              <OtherRow key={other.factId} other={other} now={now} retract={retract} />
             ))}
           </ul>
         </details>
@@ -352,5 +357,87 @@ function Quote({ value }: { value: FanCardValue }): JSX.Element | null {
     <span className="tr-card__quote">
       Il a écrit : <q>{value.sourceQuote}</q>
     </span>
+  );
+}
+
+/**
+ * A line of « Autres » (trou béant 17): what it says, who wrote it and when, and « Retirer » in two steps, since the
+ * agent stops reading it at once. Nothing is deleted: the history keeps it, in the name of who retracted it.
+ */
+function OtherRow({
+  other,
+  now,
+  retract,
+}: {
+  other: FanCardOther;
+  now: Date;
+  retract: (factId: string) => Promise<string | null>;
+}): JSX.Element {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const confirm = (): void => {
+    setBusy(true);
+    setRefusal(null);
+    void retract(other.factId).then((message) => {
+      setBusy(false);
+      // On success the line leaves the card with the new view; on a refusal it stays, with why.
+      if (message !== null) {
+        setRefusal(message);
+        setAsking(false);
+      }
+    });
+  };
+
+  return (
+    <li className="tr-card__field">
+      <div className="tr-card__head">
+        <p className="tr-card__value tr-card__other">{other.value}</p>
+        {asking ? null : (
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm"
+            onClick={() => {
+              setAsking(true);
+            }}
+          >
+            Retirer
+          </button>
+        )}
+      </div>
+      <p className="tr-card__source">{sourceLine(other, now)}</p>
+      {asking ? (
+        <div className="tr-card__edit">
+          <span className="tr-card__hint">
+            L’agent ne la lira plus. Elle reste dans l’historique, à ton nom.
+          </span>
+          <span className="tr-limit__actions">
+            <button
+              type="button"
+              className="nv-btn nv-btn--soft nv-btn--sm"
+              disabled={busy}
+              onClick={confirm}
+            >
+              Oui, retirer
+            </button>
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain nv-btn--sm"
+              disabled={busy}
+              onClick={() => {
+                setAsking(false);
+              }}
+            >
+              Garder
+            </button>
+          </span>
+        </div>
+      ) : null}
+      {refusal === null ? null : (
+        <p className="tr-card__refusal tr-warn" role="alert">
+          {refusal}
+        </p>
+      )}
+    </li>
   );
 }

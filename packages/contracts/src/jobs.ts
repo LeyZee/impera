@@ -19,6 +19,7 @@ import {
   SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
 import { PlatformScriptIdSchema } from './scripts';
@@ -253,6 +254,8 @@ export const JOB_PAYLOADS = {
         kind: z.literal('operator_note'),
         note: z.string().min(1).max(300),
         at: z.iso.datetime(),
+        /** Who left it, shown on his card (trou béant 17); absent from a job queued before 21/11. */
+        userId: UserIdSchema.optional(),
       }),
     ]),
   }),

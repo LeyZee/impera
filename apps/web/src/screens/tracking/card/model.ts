@@ -4,6 +4,7 @@ import {
   FAN_CARD_INTENSITY_LABELS,
   FAN_CARD_ITEMS_MAX,
   FAN_CARD_LEAD_LABELS,
+  FAN_CARD_OTHER_NOT_FOUND,
   FAN_CARD_VALUE_INVALID,
   FAN_CARD_VALUE_MAX,
   FAN_CARD_VALUE_UNPROCESSABLE,
@@ -161,6 +162,7 @@ export function cardError(status: number, body: unknown): string {
     return 'La fiche ne garde ni adresse, ni numéro, ni e‑mail, ni compte ailleurs : rien n’a été écrit.';
   if (code === FAN_CARD_VALUE_INVALID || status === 400)
     return 'Cette valeur ne va pas dans cette case : rien n’a été écrit.';
+  if (code === FAN_CARD_OTHER_NOT_FOUND) return 'Cette ligne n’est déjà plus sur sa fiche.';
   if (status === 404) return 'Ce fan n’existe plus.';
   if (status === 403) return 'Tu ne peux plus ouvrir ce fan : rien n’a été écrit.';
   if (status === 401) return 'Ta session a expiré : reconnecte-toi.';

@@ -143,6 +143,8 @@ export interface DraftFact {
   /** The fan's message it was read in. */
   readonly sourceMessageId: MessageId | null;
   readonly observedAt: Date;
+  /** The person who wrote it: a chatter's note left at the hand-back, when the job says who (trou béant 17). */
+  readonly notedBy?: UserId;
 }
 
 export interface DraftDecision {

@@ -11,7 +11,7 @@ import {
   type UserId,
 } from '@impera/contracts';
 
-import { FanCardValueInvalid, FanCardValueRefused } from './errors';
+import { FanCardOtherNotFound, FanCardValueInvalid, FanCardValueRefused } from './errors';
 import { fieldOfFact, isActive, saysSomething, SOURCE_RANK, type FactWrite, type StoredFact } from './facts';
 
 /**
@@ -161,10 +161,13 @@ interface CardEntry {
 }
 
 interface CardOther {
+  readonly factId: string;
   readonly key: string;
   readonly value: string;
   readonly source: FanCardSource;
   readonly observedAt: Date;
+  readonly notedBy: UserId | null;
+  readonly notedByName: string | null;
 }
 
 export interface Card {
@@ -202,6 +205,10 @@ export function quoteOf(text: string): string | null {
     .trimEnd()}…`;
 }
 
+/** A line of « Autres »: active, saying something, outside the fields. */
+const isOther = (fact: StoredFact, now: Date): boolean =>
+  isActive(fact, now) && saysSomething(fact) && fieldOfFact(fact) === null;
+
 const newestFirst = (a: StoredFact, b: StoredFact): number => b.observedAt.getTime() - a.observedAt.getTime();
 
 /**
@@ -227,13 +234,50 @@ export function cardOf(
     };
   });
   const others = active
-    .filter((fact) => isActive(fact, now) && saysSomething(fact) && fieldOfFact(fact) === null)
+    .filter((fact) => isOther(fact, now))
     .sort(newestFirst)
-    .map((fact): CardOther => ({
-      key: fact.key,
-      value: fact.value,
-      source: fact.category === 'operator_note' ? 'noted' : fact.kind,
-      observedAt: fact.observedAt,
-    }));
+    .map((fact): CardOther => {
+      const notedBy = fact.notedBy ?? null;
+      return {
+        factId: fact.id,
+        key: fact.key,
+        value: fact.value,
+        source: fact.category === 'operator_note' ? 'noted' : fact.kind,
+        observedAt: fact.observedAt,
+        notedBy,
+        notedByName: notedBy === null ? null : (names.get(notedBy) ?? null),
+      };
+    });
   return { fields, others };
+}
+
+/**
+ * A person takes a line of « Autres » off his card (trou béant 17), as a field is cleared (§ 6): an empty `noted` line
+ * in their name supersedes it, so the AI no longer reads it and the history keeps who retracted what. A line that is
+ * not one of his active « Autres » (a field, one retracted already, another fan's) is `FanCardOtherNotFound`.
+ */
+export function planOtherRetraction(
+  factId: string,
+  active: readonly StoredFact[],
+  author: UserId,
+  now: Date,
+): FactWrite[] {
+  const fact = active.find((one) => one.id === factId);
+  if (fact === undefined || !isOther(fact, now)) throw new FanCardOtherNotFound();
+  return [
+    {
+      fact: {
+        category: fact.category,
+        key: fact.key,
+        value: '',
+        kind: 'noted',
+        confidence: 1,
+        sourceMessageId: null,
+        observedAt: now,
+        expiresAt: null,
+        notedBy: author,
+      },
+      supersedes: fact.id,
+    },
+  ];
 }
