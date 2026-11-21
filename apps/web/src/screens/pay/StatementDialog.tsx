@@ -212,7 +212,8 @@ export function StatementDialog({
               setMode('pay');
             }}
             onAdjust={
-              own || statement.status === 'draft'
+              // An adjustment is the owner's alone (the server refuses a manager's).
+              !owner || own || statement.status === 'draft'
                 ? null
                 : () => {
                     setAdjusted(null);
@@ -289,7 +290,7 @@ function Foot({
   onClose: () => void;
   onValidate: () => void;
   onPay: () => void;
-  /** « Ajuster », on a statement validated or paid that is not the reader's. */
+  /** « Ajuster », for the owner, on a statement validated or paid that is not the reader's. */
   onAdjust: (() => void) | null;
 }): JSX.Element {
   const zone = statement.window.timeZone;
