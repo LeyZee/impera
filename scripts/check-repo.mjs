@@ -222,7 +222,7 @@ if (!stagedOnly) {
 
 // 7. The quality gate of the AI stays in CI
 if (!stagedOnly) {
-  const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+  const ci = readFileSync(join(root, '.github/workflows/evals.yml'), 'utf8');
   // The nightly evals job only, up to the next job: an active step, alone on its line (no comment, no `|| true`).
   const start = ci.indexOf('\n  evals:');
   const rest = start === -1 ? '' : ci.slice(start + 1);
@@ -231,12 +231,12 @@ if (!stagedOnly) {
   for (const command of ['pnpm probe', 'pnpm evals']) {
     if (!new RegExp(`^ +- run: ${command}[ \\t]*$`, 'm').test(nightly))
       errors.push(
-        `.github/workflows/ci.yml: the evals job must run \`${command}\` (docs/playbooks/write-an-eval.md)`,
+        `.github/workflows/evals.yml: the evals job must run \`${command}\` (docs/playbooks/write-an-eval.md)`,
       );
   }
   if (/^\s*continue-on-error:\s*true/m.test(nightly))
     errors.push(
-      '.github/workflows/ci.yml: the evals job must fail when the evals fail (no continue-on-error)',
+      '.github/workflows/evals.yml: the evals job must fail when the evals fail (no continue-on-error)',
     );
   // The evals are skipped only when the xAI key is absent (« nightly vert », 06/11): the key read once from the secret,
   // at the job's level, and no other condition on the job or its steps.
@@ -246,17 +246,13 @@ if (!stagedOnly) {
     !/^ {6}HAS_XAI_KEY: \$\{\{ secrets\.LLM_XAI_API_KEY != '' \}\}[ \t]*$/m.test(nightly)
   )
     errors.push(
-      ".github/workflows/ci.yml: the evals job must read HAS_XAI_KEY once, from the secret, as `${{ secrets.LLM_XAI_API_KEY != '' }}`",
+      ".github/workflows/evals.yml: the evals job must read HAS_XAI_KEY once, from the secret, as `${{ secrets.LLM_XAI_API_KEY != '' }}`",
     );
-  const allowed = new Set([
-    "always() && (github.event.schedule == '0 19 * * 0' || github.event_name == 'workflow_dispatch' || needs.evals-trigger.outputs.ai == 'true')",
-    "env.HAS_XAI_KEY == 'true'",
-    "env.HAS_XAI_KEY != 'true'",
-  ]);
+  const allowed = new Set(["env.HAS_XAI_KEY == 'true'", "env.HAS_XAI_KEY != 'true'"]);
   for (const [, condition] of nightly.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
     if (!allowed.has(condition ?? ''))
       errors.push(
-        `.github/workflows/ci.yml: the evals job skips its evals only without the xAI key, not on \`${condition ?? ''}\``,
+        `.github/workflows/evals.yml: the evals job skips its evals only without the xAI key, not on \`${condition ?? ''}\``,
       );
   // `pnpm probe` and `pnpm evals` run whenever the key is there: no condition but the key's own.
   for (const step of nightly.split(/^(?= {6}- )/m))
@@ -264,7 +260,7 @@ if (!stagedOnly) {
       for (const [, condition] of step.matchAll(/^\s*(?:- )?if:\s*(.*?)\s*$/gm))
         if (condition !== "env.HAS_XAI_KEY == 'true'")
           errors.push(
-            `.github/workflows/ci.yml: the evals job runs \`pnpm probe\` and \`pnpm evals\` whenever the xAI key is set, not on \`${condition ?? ''}\``,
+            `.github/workflows/evals.yml: the evals job runs \`pnpm probe\` and \`pnpm evals\` whenever the xAI key is set, not on \`${condition ?? ''}\``,
           );
 }
 
