@@ -30,3 +30,20 @@
 .td-todo > .td-todo__list {
   padding: 4px var(--nv-plate-pad) var(--nv-plate-pad);
 }
+
+/* A refused « Je prends mon poste », on its own line under all the actions: amber, never red (it is not an urgency). */
+.td-checkin__said {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+
+/* When a shift of today opens to « Je prends mon poste »: an information, in the grey of the sentences. */
+.td-checkin__when {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
