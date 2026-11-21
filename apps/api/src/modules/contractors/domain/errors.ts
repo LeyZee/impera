@@ -185,17 +185,6 @@ export class BillingRegimeNameConflict extends DomainError {
   }
 }
 
-/** A validation dated before the regime was written (COUV-11): the accountant validated a text that did not exist. */
-export class BillingRegimeValidationEarly extends DomainError {
-  constructor(createdOn: string) {
-    super(
-      'billing_regime_validation_early_unprocessable',
-      'La validation du comptable se note au plus tôt le jour où le régime a été écrit',
-      { details: { createdOn } },
-    );
-  }
-}
-
 /** The accountant's validation is recorded already, on another day: it is recorded once, never moved. */
 export class BillingRegimeValidated extends DomainError {
   constructor(validatedOn: string) {

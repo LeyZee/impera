@@ -16,7 +16,6 @@ import {
   BillingRegimeNotFound,
   BillingRegimeValidated,
   BillingRegimeValidationAhead,
-  BillingRegimeValidationEarly,
   ContractorRegimeIdConflict,
   PayrollForbidden,
   TeamMemberNotFound,
@@ -182,9 +181,6 @@ export function createDrizzlePayrollRegimeStore(
         const zone = await reads.agencyTimeZone(tx);
         const today = calendarDayAt(now(), zone);
         if (body.validatedOn > today) throw new BillingRegimeValidationAhead(body.validatedOn);
-        // Never before the regime was written: the accountant validated this text (COUV-11).
-        const createdOn = calendarDayAt(new Date(regime.createdAt), zone);
-        if (body.validatedOn < createdOn) throw new BillingRegimeValidationEarly(createdOn);
         await tx
           .insert(billingRegimeValidations)
           .values({ regimeId, validatedOn: body.validatedOn, recordedBy: actor.userId });

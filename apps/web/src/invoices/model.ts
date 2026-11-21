@@ -284,8 +284,6 @@ export function invoiceRefusalText(refusal: InvoiceRefusal): string {
       return 'La validation du comptable est déjà notée, à un autre jour : elle ne se note qu’une fois.';
     case 'billing_regime_validation_future_unprocessable':
       return 'La validation du comptable se note au plus tard aujourd’hui.';
-    case 'billing_regime_validation_early_unprocessable':
-      return 'La validation du comptable se note au plus tôt le jour où le régime a été écrit.';
     case 'contractor_document_invalid':
       return 'Ce fichier n’a pas été gardé : un PDF, un JPEG ou un PNG de 10 Mo au plus.';
     case 'contractor_document_issued_future_unprocessable':

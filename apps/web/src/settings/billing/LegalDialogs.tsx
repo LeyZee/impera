@@ -18,14 +18,13 @@ import {
   useRefreshPayroll,
   validateRegime,
 } from './api';
-import { regimeWrittenOn, textBodyOf, textDraftOf, type TextDraft } from './regimes';
+import { textBodyOf, textDraftOf, type TextDraft } from './regimes';
 
 import { ACCOUNT_HINTS, ACCOUNT_LABELS } from '@/accounting/model';
 import { TEXT_NAMES } from '@/contractors/model';
 import type { InvoiceRefusal } from '@/invoices/api';
 import { useConfirmedWrite } from '@/invoices/confirmed-write';
 import { invoiceRefusalText } from '@/invoices/model';
-import { useSchedulingSettings } from '@/reports/api';
 import { DayField } from '@/scheduling/DayField';
 import { fullDay } from '@/scheduling/time';
 import { BILLING_LEAD } from '@/settings/services/ConfirmAgain';
@@ -279,9 +278,7 @@ export function ValidateDialog({
   const [tried, setTried] = useState(false);
   const { busy, refusal, prompt, send } = useConfirmedWrite(BILLING_LEAD);
   const [dayUnreadable, setDayUnreadable] = useState(false);
-  // Never before the regime was written: the accountant validated this text (COUV-11).
-  const writtenOn = regimeWrittenOn(regime, useSchedulingSettings().data?.timeZone ?? null);
-  const ok = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day <= today && day >= writtenOn;
+  const ok = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day <= today;
 
   const submit = (event: SyntheticEvent): void => {
     event.preventDefault();
@@ -326,9 +323,7 @@ export function ValidateDialog({
               {tried && dayUnreadable
                 ? 'Un jour comme 28/10/2026, ou 28/10.'
                 : tried && !ok
-                  ? day < writtenOn
-                    ? `Au plus tôt le ${fullDay(writtenOn)}, le jour où ce régime a été écrit.`
-                    : `Au plus tard aujourd’hui, le ${fullDay(today)}.`
+                  ? `Au plus tard aujourd’hui, le ${fullDay(today)}.`
                   : 'Celui de son écrit ou de son courriel.'}
             </p>
           </div>
