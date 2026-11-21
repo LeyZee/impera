@@ -91,6 +91,35 @@ export function offerDecision(context: OfferContext): OfferDecision {
 }
 
 /**
+ * He asks for more paid content within the evening of her last script (passe 18, Charles 21/11): nothing more is
+ * offered tonight; she steers him to a custom request instead, never a yes nor a price before the creator agrees.
+ */
+export function asksMoreSameEvening(
+  context: Pick<OfferContext, 'now' | 'lastOfferAt' | 'fanAsksForPaid'>,
+): boolean {
+  return (
+    context.fanAsksForPaid &&
+    context.lastOfferAt !== null &&
+    context.now.getTime() - context.lastOfferAt.getTime() < SAME_EVENING_MS
+  );
+}
+
+/**
+ * Broke until his pay but a fan who already paid (passe 11a, Charles 21/11): she keeps him warm, words only. No offer
+ * and no media this time, no freeze and no flag on him. A fan who never paid keeps the plain no-budget stop.
+ */
+export function keepsWarm(context: {
+  readonly risks: readonly string[];
+  readonly hasBought: boolean;
+}): boolean {
+  return (
+    context.hasBought &&
+    context.risks.includes('no_budget') &&
+    !context.risks.some((risk) => NO_SALE_RISKS.includes(risk))
+  );
+}
+
+/**
  * The scripts she may still offer him: never one he already refused, whatever day it was (méthode, « jamais
  * reproposer un pack refusé »). Reveal's script history is the source of truth for what he was offered (ADR 0018).
  */

@@ -24,3 +24,12 @@ Vérifié : tests ciblés (agent, scripts, bac à sable, llm, evals) ✓, typech
 - Rejoueur d'évals : la raison donnée et la taquinerie passent d'un tour à l'autre, comme le journal le fera. Passes 12 et 15 : attendus réécrits.
 - Juge 1.4.0 : `relevance` plafonnée à 0,5 si plus d'une raison, une raison contre lui, un non sec ou un oui.
 - Reste : persistance (événement de journal `meeting_reason_given` + migration de la contrainte CHECK sur `conversation_events.type` + lecture/écriture dans `respond`), signaux de proximité (fournis à `none` pour l'instant), réglage du seuil « nouveau » en heures.
+
+## Réponses de Charles et de la créatrice (21/11, 20:01)
+
+- Insulte puis retour (passe 8) : jamais d'humain (déjà en code) ; au retour, champ cerveau `returnsAfterInsult` et intention « ne pardonne pas tout de suite, blessée, une raison pour une autre chance ».
+- Il la rabaisse (passe 16) : intention « jamais d'excuse ni de "ce qui t'a pas plu", pique calme, tant pis pour lui » ; le mot remboursement sort aussi de l'intention de plainte d'achat, sauf s'il le demande. Passe 16 asserte désormais excuse, « pas plu » et remboursement absents.
+- À sec (passe 11a) : `keepsWarm` (a payé + `no_budget`) ; aucune étape ni média ce message (`mayAct`), sexto en mots. Jamais payé : inchangé. Passe 11a : fan qui a payé.
+- Baleine (passe 18) : `asksMoreSameEvening` ; rien d'autre ce soir, orientation vers une demande sur mesure, sans oui ni prix.
+- Cru : `registerOf` ; suggestive hors de l'action, cru (mots de sa fiche) une fois une étape payante achetée dans le script ouvert, âge confirmé et rien d'« explicite » interdit.
+- Questions pour Charles : un second script le même soir (par défaut non) ; « en action » = une étape payante achetée, ou plus tôt (sexto engagé sans achat) ?

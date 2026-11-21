@@ -89,6 +89,8 @@ export const BriefSchema = z.object({
   customOrder: CustomOrderReadingSchema.optional(),
   /** He asks where or when her next party or outing is (Charles 21/11). Absent, he does not. */
   asksHerNextParty: z.boolean().optional(),
+  /** He comes back, or apologises, after insulting or belittling her earlier in the conversation (Charles 21/11). */
+  returnsAfterInsult: z.boolean().optional(),
   action: z.enum(['reply', 'offer', 'wait', 'follow_up', 'handoff']),
   replyBrief: z.string().min(1),
   toneHints: z.array(z.string()),
@@ -119,6 +121,7 @@ export const BriefFromModelSchema = BriefSchema.extend({
   scriptReply: z.enum(SCRIPT_REPLIES).nullish(),
   customOrder: CustomOrderReadingFromModelSchema.nullish(),
   asksHerNextParty: z.boolean().nullish(),
+  returnsAfterInsult: z.boolean().nullish(),
   toneHints: BriefSchema.shape.toneHints.nullable(),
   callback: z.string().nullish(),
   selfDisclosure: z.string().nullish(),

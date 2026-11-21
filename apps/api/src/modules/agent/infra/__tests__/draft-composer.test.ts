@@ -294,6 +294,53 @@ describe('createDraftComposer', () => {
     expect(teased).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'tease' } });
   });
 
+  it('answers an insult herself, never sorry, and makes him earn it when he comes back (passes 8 and 16, Charles 21/11)', async () => {
+    const insult: Brief = { ...BRIEF, intent: 'complaint', risks: ['insult'] };
+    const hurt = composer({ brief: insult });
+    expect(await hurt.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
+    const hints = hurt.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(
+      hints.some(
+        (hint) => hint.includes('ne s’excuse jamais') && hint.includes('jamais le mot remboursement'),
+      ),
+    ).toBe(true);
+
+    const back: Brief = { ...BRIEF, intent: 'other', returnsAfterInsult: true };
+    const after = composer({ brief: back });
+    await after.draftComposer.compose(INPUT);
+    expect(
+      after.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) =>
+        hint.includes('ne pardonne pas tout de suite'),
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps a broke fan who already paid warm with words only, a fan who never paid as before (passe 11a, Charles 21/11)', async () => {
+    const broke: Brief = { ...BRIEF, intent: 'sexting', risks: ['no_budget'] };
+    const payer = composer({ brief: broke });
+    await payer.draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, spentMinor: 2_000 } });
+    expect(
+      payer.seen.voiceInputs?.[0]?.brief.toneHints.some(
+        (hint) => hint.includes('au chaud') && hint.includes('aucun média'),
+      ),
+    ).toBe(true);
+
+    const never = composer({ brief: broke });
+    await never.draftComposer.compose(INPUT);
+    expect(never.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('au chaud'))).toBe(
+      false,
+    );
+  });
+
+  it('stays suggestive, never crude, outside the action (Charles 21/11)', async () => {
+    const flirt: Brief = { ...BRIEF, intent: 'flirt' };
+    const { draftComposer, seen } = composer({ brief: flirt });
+    await draftComposer.compose(INPUT);
+    expect(seen.voiceInputs?.[0]?.brief.toneHints).toContain(
+      'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
+    );
+  });
+
   it('says nothing of meeting when he does not ask', async () => {
     const draft = await composer({}).draftComposer.compose(INPUT);
     expect(draft).not.toHaveProperty('meetingAnswer');
@@ -1256,6 +1303,35 @@ describe('createDraftComposer, the offer policy', () => {
     const second = composer({ brief: broke }, undefined, limitsOf(ADULT).limits, policy(lastOffer));
     await second.draftComposer.compose(INPUT);
     expect(written(second.seen)?.replyBrief).not.toContain('mystère');
+  });
+
+  it('offers nothing more the evening he had his script, and steers him to a custom request (passe 18, Charles 21/11)', async () => {
+    const asks: Brief = { ...OFFER, intent: 'asks_for_media', sentiment: 'positive' };
+    const tonight = composer(
+      { brief: asks },
+      undefined,
+      limitsOf(ADULT).limits,
+      policy(new Date(INPUT.now.getTime() - 3 * 3_600_000)),
+    );
+    await tonight.draftComposer.compose(INPUT);
+    expect(written(tonight.seen)?.action).toBe('reply');
+    expect(
+      written(tonight.seen)?.toneHints.some(
+        (hint) => hint.includes('demande faite pour lui') && hint.includes('sans dire oui ni donner de prix'),
+      ),
+    ).toBe(true);
+
+    // The next day, his asking is a new evening: no steer.
+    const nextDay = composer(
+      { brief: asks },
+      undefined,
+      limitsOf(ADULT).limits,
+      policy(new Date(INPUT.now.getTime() - 20 * 3_600_000)),
+    );
+    await nextDay.draftComposer.compose(INPUT);
+    expect(written(nextDay.seen)?.toneHints.some((hint) => hint.includes('demande faite pour lui'))).toBe(
+      false,
+    );
   });
 
   it('offers nothing to a fan whose age is not confirmed, or frozen for money', async () => {

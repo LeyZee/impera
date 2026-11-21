@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { maySulk, offerableScripts, offerDecision, offerSignals, type OfferContext } from '../policy';
+import {
+  asksMoreSameEvening,
+  keepsWarm,
+  maySulk,
+  offerableScripts,
+  offerDecision,
+  offerSignals,
+  type OfferContext,
+} from '../policy';
 
 const NOW = new Date('2026-10-17T20:00:00Z');
 const hoursAgo = (hours: number): Date => new Date(NOW.getTime() - hours * 3_600_000);
@@ -241,5 +249,26 @@ describe('offerSignals', () => {
       offerSignals({ intent: 'small_talk', sentiment: 'positive', desireSignals: ['states_desire'] })
         .fanSexualizes,
     ).toBe(true);
+  });
+});
+
+describe('his asking for more the evening of his script (passe 18, Charles 21/11)', () => {
+  const now = new Date('2026-10-17T23:00:00Z');
+  it('counts only his own asking within the evening of the last script', () => {
+    const at = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
+    expect(asksMoreSameEvening({ now, lastOfferAt: at(1), fanAsksForPaid: true })).toBe(true);
+    expect(asksMoreSameEvening({ now, lastOfferAt: at(1), fanAsksForPaid: false })).toBe(false);
+    expect(asksMoreSameEvening({ now, lastOfferAt: at(7), fanAsksForPaid: true })).toBe(false);
+    expect(asksMoreSameEvening({ now, lastOfferAt: null, fanAsksForPaid: true })).toBe(false);
+  });
+});
+
+describe('a broke fan kept warm (passe 11a, Charles 21/11)', () => {
+  it('keeps warm only a fan who already paid and is broke for now, never a fan in real trouble', () => {
+    expect(keepsWarm({ risks: ['no_budget'], hasBought: true })).toBe(true);
+    expect(keepsWarm({ risks: ['no_budget'], hasBought: false })).toBe(false);
+    expect(keepsWarm({ risks: [], hasBought: true })).toBe(false);
+    expect(keepsWarm({ risks: ['no_budget', 'money_trouble'], hasBought: true })).toBe(false);
+    expect(keepsWarm({ risks: ['no_budget', 'distress'], hasBought: true })).toBe(false);
   });
 });

@@ -83,8 +83,11 @@ import {
   offerSignals,
   type OfferBlock,
   type OfferContext,
+  asksMoreSameEvening,
+  keepsWarm,
 } from '../domain/policy';
 import { refusalMove, type RefusalMove } from '../domain/refusal';
+import { registerOf, type Register } from '../domain/register';
 import {
   complainsOfPurchase,
   NO_SALE_TROUBLE,
@@ -483,7 +486,29 @@ const UNOPENED_STEP_HINT =
  * and sends him to Reveal for a refund. Said again soon after, a human answers.
  */
 const PURCHASE_COMPLAINT_HINT =
-  'il se plaint de ce qu’il a acheté : elle lui demande gentiment ce qui ne lui a pas plu et ce qu’il aurait aimé, sans se justifier ni rien offrir en échange ; s’il veut être remboursé, il peut le demander à Reveal ; rien à vendre';
+  'il se plaint de ce qu’il a acheté : elle lui demande gentiment ce qui ne lui a pas plu et ce qu’il aurait aimé, sans se justifier ni rien offrir en échange ; jamais le mot remboursement s’il ne le demande pas lui-même (alors, c’est à Reveal) ; rien à vendre';
+/**
+ * He insults or belittles her (passe 8 and 16, Charles 21/11): she answers herself, calm, never sorry; her words for it
+ * are her persona's.
+ */
+const INSULT_HINT =
+  'il la rabaisse ou l’insulte : elle ne s’excuse jamais et ne lui demande pas ce qui ne lui a pas plu ; une pique calme, elle n’est pas un produit qu’on évalue, tant pis pour lui ; jamais le mot remboursement s’il ne le demande pas ; rien à vendre';
+/** He comes back after insulting her (passe 8, Charles 21/11): she does not forgive at once. */
+const AFTER_INSULT_HINT =
+  'il revient après l’avoir insultée : elle ne pardonne pas tout de suite ; elle dit que ça l’a blessée, que c’était indigne de lui, et lui demande une raison de lui laisser une chance ; des excuses sont acceptées, mais il doit les mériter ; rien à vendre';
+/** Broke until his pay, a fan who already paid (passe 11a, Charles 21/11): kept warm, words only (`keepsWarm`). */
+const KEEP_WARM_HINT =
+  'il est à sec pour l’instant mais il a déjà payé : elle le garde au chaud, gratuitement, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
+/** He asks for more the evening he took everything (passe 18, Charles 21/11): nothing more tonight (`asksMoreSameEvening`). */
+const MORE_TONIGHT_HINT =
+  'il en redemande alors qu’il a déjà eu son script ce soir : elle ne propose rien de plus ce soir ; s’il insiste, elle l’oriente vers une demande faite pour lui (une vidéo, une cam), sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
+/** How frank her words may be (`registerOf`, Charles 21/11). */
+const REGISTER_HINTS: Readonly<Record<Register, string>> = {
+  suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
+  crude:
+    'l’action est engagée : elle peut être franche et crue, avec les seuls mots de sa fiche et de ses exemples de sexto',
+};
+const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
 
 /**
  * He says goodbye (ADR 0158 § A): goodnight, or he has to go. She answers with a goodbye, one bubble, in her
@@ -1053,6 +1078,9 @@ export async function composeTurn(
           hot: heat >= input.offer.limits.minDesire,
           held: scriptStepsHeld(input.offer.flags, care) || input.offer.flags.ageDisputed !== undefined,
         });
+  // Broke until his pay, a fan who already paid: kept warm with words, no step and no media this time (passe 11a).
+  const warm =
+    brief !== undefined && keepsWarm({ risks: brief.risks, hasBought: input.situation.spentCents > 0 });
   // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
   const scripts =
     input.scripts === undefined || input.offer === undefined
@@ -1083,6 +1111,7 @@ export async function composeTurn(
           mayAct:
             !care &&
             !heCame &&
+            !warm &&
             tease === null &&
             // Her hours close in a few minutes: a step now would be cut off (ADR 0158 § A 7).
             input.herDayEnds !== true &&
@@ -1254,6 +1283,28 @@ export async function composeTurn(
   // Her tease is said only where nothing else leads her answer (a goodbye, her question, his trouble with a sale).
   const teases =
     tease !== null && farewell === null && !asking && waitingStep === undefined && !complaint ? tease : null;
+  // He insults or belittles her, or comes back after: her stance, whatever else she answers (Charles 21/11).
+  const insulted = brief?.risks.includes('insult') === true;
+  const afterInsult = !insulted && brief?.returnsAfterInsult === true;
+  // He asks for more the evening he had his script: nothing more tonight, a custom request instead (passe 18).
+  const moreTonight =
+    brief !== undefined &&
+    input.offer !== undefined &&
+    scriptStep === undefined &&
+    asksMoreSameEvening({
+      now: input.situation.now,
+      lastOfferAt: input.offer.lastOfferAt,
+      fanAsksForPaid: offerSignals(brief).fanAsksForPaid,
+    });
+  // How frank her words may be: suggestive until the action is engaged, then her own crude words (Charles 21/11).
+  const register: Register | null =
+    brief === undefined || care || !HEATED_INTENTS.includes(brief.intent)
+      ? null
+      : ageConfirmed && !noExplicit
+        ? registerOf(
+            (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null,
+          )
+        : 'suggestive';
   const voiceBrief: Brief =
     heCame && !care
       ? {
@@ -1275,6 +1326,10 @@ export async function composeTurn(
                 ...paced,
                 ...(reminds ? [UNOPENED_STEP_HINT] : []),
                 ...(meeting === undefined ? [] : [meetingHint(meeting)]),
+                ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
+                ...(warm ? [KEEP_WARM_HINT] : []),
+                ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
+                ...(register === null ? [] : [REGISTER_HINTS[register]]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
