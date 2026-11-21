@@ -35,7 +35,8 @@ export function mediaLine(media: VaultFolderView['media']): string {
  * A folder « À classer »: named, but with neither ☀️ nor 🌙 in its name, so it does not say whether its media are of
  * the Day or the Night. The vault's root has no name to change: it is never one.
  */
-const unmarked = (folder: VaultFolderView): boolean => folder.folderRef !== null && folder.moment === null;
+const unmarked = (folder: Pick<VaultFolderView, 'folderRef' | 'moment'>): boolean =>
+  folder.folderRef !== null && folder.moment === null;
 
 /** The value of `dossier` in the address for a folder: its platform id, `racine` for the vault's root. */
 export const ROOT_FOLDER_ID = 'racine';
@@ -51,57 +52,20 @@ export function findFolder(view: VaultView, id: string | null): VaultFolderView 
   return view.folders.find((folder) => folderIdOf(folder) === id) ?? null;
 }
 
-/** A folder's name as the card shows it: Reveal's, or what stands for it. */
+/** A folder's name as every screen shows it: Reveal's, or what stands for it; the root « Hors dossier » (PRO1-11). */
 export const folderName = (folder: Pick<VaultFolderView, 'folderName' | 'folderRef'>): string =>
-  folder.folderName ?? (folder.folderRef === null ? 'Racine du coffre' : 'Dossier sans nom');
-
-/** One folder of her vault as the card shows it, in the platform's order, its name as Reveal gives it. */
-export interface FolderTile {
-  readonly id: string;
-  readonly key: string;
-  readonly name: string;
-  readonly moment: VaultFolderView['moment'];
-  readonly unmarked: boolean;
-  readonly line: string;
-  /** No longer listed by Reveal at the last sync, kept with their descriptions. */
-  readonly removed: number;
-  /** Its first media still listed, at most four, for the tile's cover: a voice note has no picture, only its wave. */
-  readonly cover: readonly CoverItem[];
-}
-
-export interface CoverItem {
-  readonly kind: VaultMediaView['kind'];
-  readonly hash: string | null;
-  readonly seed: string;
-}
+  folder.folderName ?? (folder.folderRef === null ? 'Hors dossier' : 'Dossier sans nom');
 
 /**
- * A tile's one line: the detail while it holds two kinds at most (« 6 photos · 2 vidéos »), the total beyond
- * (« 12 médias »), so it never runs out of room; the detail is in the folder.
+ * The pill of a folder's moment (PRO1-04): « ☀️ Jour », « 🌙 Nuit » from its name, « À classer » when it says neither;
+ * nothing for the vault's root, which has no name to change. `declared` when its name says it, `inferred` when not.
  */
-export function tileLine(media: VaultFolderView['media']): string {
-  const listed = media.filter((each) => !each.removed);
-  const kinds = new Set(listed.map((each) => each.kind)).size;
-  return kinds <= 2 ? mediaLine(media) : plural(listed.length, 'média', 'médias');
-}
-
-/** How many previews make a folder's cover. */
-const COVER = 4;
-
-export function folderTiles(view: VaultView): FolderTile[] {
-  return view.folders.map((folder) => ({
-    id: folderIdOf(folder),
-    key: `${folder.platformAccountId}:${folder.folderRef ?? ''}`,
-    name: folderName(folder),
-    moment: folder.moment,
-    unmarked: unmarked(folder),
-    line: tileLine(folder.media),
-    removed: folder.media.filter((each) => each.removed).length,
-    cover: folder.media
-      .filter((each) => !each.removed)
-      .slice(0, COVER)
-      .map((each) => ({ kind: each.kind, hash: each.blurhash, seed: each.platformMediaId })),
-  }));
+export function momentTag(
+  folder: Pick<VaultFolderView, 'folderRef' | 'moment'>,
+): { readonly label: string; readonly tone: 'declared' | 'inferred' } | null {
+  if (folder.moment === 'day') return { label: '☀️ Jour', tone: 'declared' };
+  if (folder.moment === 'night') return { label: '🌙 Nuit', tone: 'declared' };
+  return unmarked(folder) ? { label: 'À classer', tone: 'inferred' } : null;
 }
 
 /** « 1 retiré de Reveal », « 3 retirés de Reveal »; `null` when none. */

@@ -19,7 +19,6 @@ import {
   inImperaLine,
   mediaToggled,
   pickOf,
-  pickerFolderName,
   type PickDraft,
 } from './picker';
 
@@ -145,6 +144,5 @@ describe('« Choisir dans Reveal », the draft (ADR 0145 § 5, avenant du 20/11)
       [0, 500],
       [0, 200],
     ]);
-    expect(pickerFolderName(big)).toBe('Médias hors dossier');
   });
 });
