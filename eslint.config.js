@@ -58,6 +58,8 @@ const MODULE_DEPENDENCIES = {
   // ADR 0140: her week, computed out of her agenda and written in it through its own door (`week`, § 22); her stock
   // and drops are read through what the composition root plugs, never their tables.
   'creator-week': ['scheduling', 'creator-tasks'],
+  // Charles, 21/11: her absences and what she no longer does, told by her; reads her day with the scheduling helpers.
+  'creator-limits': ['scheduling'],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs

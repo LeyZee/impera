@@ -80,6 +80,7 @@ import { wireContentDrops } from './wiring/content-drops';
 import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
+import { wireCreatorLimits } from './wiring/creator-limits';
 import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireCreatorWeek } from './wiring/creator-week';
 import { wireCustomOrders } from './wiring/custom-orders';
@@ -403,6 +404,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
+  const creatorLimits = wireCreatorLimits(shared);
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,
@@ -707,6 +709,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scripts.routes,
       ...trends.routes,
       ...redirectLinks.routes,
+      ...creatorLimits.routes,
       ...customOrders.routes,
       ...creatorTasks.routes,
       ...creatorWeek.routes,
