@@ -1,6 +1,6 @@
 {
-  "id": "99ac946d-881a-43dd-9088-b408139c04b7",
-  "prevId": "0b8a7140-0755-49b7-9ea0-605843ada82f",
+  "id": "34ce9397-4742-4dc9-9c9a-c61d6aa224e6",
+  "prevId": "6356730c-75e4-4b53-9076-4603c2d73624",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -8879,7 +8879,7 @@
         },
         "llm_calls_purpose_check": {
           "name": "llm_calls_purpose_check",
-          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch', 'probe', 'instagram_comment')"
+          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch', 'probe', 'instagram_comment', 'media', 'telegram')"
         },
         "llm_calls_status_check": {
           "name": "llm_calls_status_check",

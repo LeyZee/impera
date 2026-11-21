@@ -23,7 +23,9 @@ const CREATORS = [
   { id: LEA, displayName: 'Léa', timezone: 'Europe/Paris' },
 ];
 
-const at = (minutesAgo: number): string => new Date(Date.now() - minutesAgo * 60_000).toISOString();
+/** The page's clock in every test: « il y a 5 min » holds however long the run takes. */
+const NOW = new Date('2026-11-21T15:00:00.000Z');
+const at = (minutesAgo: number): string => new Date(NOW.getTime() - minutesAgo * 60_000).toISOString();
 
 const trigger = (n: number, creatorId: string, minutesAgo: number, patch: Record<string, unknown> = {}) => ({
   id: `0192f3a0-0000-7000-8000-${String(n).padStart(12, '0')}`,
@@ -137,10 +139,13 @@ const lines = async (): Promise<HTMLElement[]> =>
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
 });
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 

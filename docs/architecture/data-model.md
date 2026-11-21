@@ -641,7 +641,7 @@ creator_decisions        id, creator_id → creators, kind, subject, category, q
                          qui demande sous `withTenantJob` (`creator_decisions`), qui ne peut ensuite que la retirer ;
                          lue par la créatrice (les siennes) et par le propriétaire, qui y répondent une fois, tant
                          qu'elle est ouverte ; le rôle applicatif n'écrit que les colonnes d'une réponse ; jamais
-                         lue par un manager ni un chatteur ; aucune suppression (ADR 0164, migration 0252)
+                         lue par un manager ni un chatteur ; aucune suppression (ADR 0164, migration 0250)
 ```
 
 ## Commercial (phase 6, réservé)

@@ -1,10 +1,20 @@
 import { chartPoints, donutArcs, linePath } from '@impera/design-system';
-import { useId, useRef, useState, type JSX, type PointerEvent, type ReactNode } from 'react';
+import {
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type JSX,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 
 /*
- * The figures every screen draws the same way (Charles, 21/11): the donut, its legend's lighting, the meter and the
- * small curve. Their look and their motion are the design system's (`nv-donut`, `nv-breakdown`, `nv-meter`,
- * `nv-spark`); a screen gives numbers, colours and words, never a class of its own for the drawing.
+ * The figures every screen draws the same way (Charles, 21/11): the donut, its legend's lighting, the meter, the
+ * small curve and the columns. Their look and their motion are the design system's (`nv-donut`, `nv-breakdown`,
+ * `nv-meter`, `nv-spark`, `nv-cols`); a screen gives numbers, colours and words, never a class of its own for the
+ * drawing.
  */
 
 /** The donut's box: 132 units wide, a ring of radius 52 and 14 thick, as `nv-donut` draws it. */
@@ -203,5 +213,128 @@ export function Spark({ values, tone }: { values: readonly number[]; tone: 'up' 
       <path className="nv-spark__area" d={area} fill={`url(#${fill})`} />
       <path className="nv-spark__line" d={linePath(line)} vectorEffect="non-scaling-stroke" />
     </svg>
+  );
+}
+
+export interface ColumnPart {
+  readonly key: string;
+  /** A CSS colour, a series token most often; the data's ink without one. */
+  readonly colour?: string;
+  readonly value: number;
+  /** Of another nature than the plain part: forecast, covered, still under way. */
+  readonly hatched?: boolean;
+}
+
+export interface Column {
+  readonly key: string;
+  /** Under the column; empty when this column carries no label. */
+  readonly label: string;
+  /** What the column says to a screen reader: its step and its figure. */
+  readonly says: string;
+  /** Bottom to top, in the legend's order. */
+  readonly parts: readonly ColumnPart[];
+  /** What the column does under the pointer: a tip's handlers most often. */
+  readonly handlers?: Pick<
+    ButtonHTMLAttributes<HTMLButtonElement>,
+    'onPointerMove' | 'onPointerDown' | 'onPointerLeave' | 'onFocus' | 'onBlur'
+  >;
+}
+
+const COLUMN_STEPS: Readonly<Record<string, 1 | -1>> = {
+  ArrowRight: 1,
+  ArrowDown: 1,
+  ArrowLeft: -1,
+  ArrowUp: -1,
+};
+
+/**
+ * Columns: a series in time, one stacked column per step over a grid of ticks. The column under the pointer, the
+ * finger or the keyboard swells and the others step back; one column is in the tab order, the arrows, Home and End
+ * move between them. `top` is the plot's top (the last tick most often); `mark` draws a reference line (an
+ * objective, an average) at its value.
+ */
+export function Columns({
+  label,
+  columns,
+  top,
+  ticks,
+  mark,
+}: {
+  /** What the plot says to a screen reader: what it counts, over what, and how to move in it. */
+  label: string;
+  columns: readonly Column[];
+  top: number;
+  ticks: readonly { readonly value: number; readonly text: string }[];
+  mark?: number;
+}): JSX.Element {
+  const [focus, setFocus] = useState(columns.length - 1);
+  const current = Math.min(Math.max(0, focus), columns.length - 1);
+  const bars = useRef<HTMLDivElement>(null);
+  const scale = top > 0 ? top : 1;
+  const share = (value: number): string => `${String((value / scale) * 100)}%`;
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const step =
+      event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : COLUMN_STEPS[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    const next = Math.min(Math.max(0, current + step), columns.length - 1);
+    setFocus(next);
+    bars.current?.querySelectorAll<HTMLButtonElement>('.nv-col')[next]?.focus();
+  };
+  return (
+    <div className="nv-cols">
+      <div className="nv-cols__grid" aria-hidden="true">
+        {ticks.map((tick) => (
+          <span key={tick.value} style={{ '--_y': share(tick.value) }}>
+            <i>{tick.text}</i>
+          </span>
+        ))}
+        {mark === undefined ? null : <span className="nv-cols__mark" style={{ '--_y': share(mark) }} />}
+      </div>
+      <div
+        className="nv-cols__bars"
+        style={{ '--_n': columns.length }}
+        role="group"
+        aria-label={label}
+        ref={bars}
+        onKeyDown={onKeyDown}
+        onFocus={(event) => {
+          const at = Number(event.target.getAttribute('data-i'));
+          if (Number.isInteger(at)) setFocus(at);
+        }}
+      >
+        {columns.map((column, i) => (
+          <button
+            type="button"
+            key={column.key}
+            className="nv-col"
+            style={{ '--_i': i }}
+            tabIndex={i === current ? 0 : -1}
+            aria-label={column.says}
+            data-i={i}
+            {...column.handlers}
+          >
+            <span className="nv-col__stack">
+              {column.parts.map((part) =>
+                part.value <= 0 ? null : (
+                  <span
+                    key={part.key}
+                    className={part.hatched === true ? 'nv-col__part nv-col__part--hatched' : 'nv-col__part'}
+                    style={
+                      part.colour === undefined
+                        ? { '--_h': share(part.value) }
+                        : { '--_c': part.colour, '--_h': share(part.value) }
+                    }
+                  />
+                ),
+              )}
+            </span>
+            <span className="nv-col__label" aria-hidden="true">
+              {column.label}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

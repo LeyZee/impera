@@ -5,11 +5,12 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 3 * * *' # nightly: e2e, and the evals smoke when the xAI key is set
+    - cron: '0 3 * * *' # nightly: e2e (the evals have their own workflow, evals.yml)
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # By event too: a merge on main cancels the previous push run, never a manual or nightly run of main (21/11).
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -262,42 +263,3 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test:e2e
-
-  # Apart from the e2e, so that each night says both (« nightly vert », 06/11): without the xAI key the evals are
-  # skipped, said in the run's summary and as a warning, and the night stays green; with it, both fail without
-  # something to measure, and a failure turns the night red.
-  nightly-evals:
-    name: Nightly evals smoke
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      HAS_XAI_KEY: ${{ secrets.LLM_XAI_API_KEY != '' }}
-    steps:
-      - name: Évaluations sautées, clé absente
-        if: env.HAS_XAI_KEY != 'true'
-        run: |
-          echo "::warning title=Évaluations sautées::Clé xAI absente : pnpm probe et pnpm evals n'ont pas tourné cette nuit."
-          echo "### Évaluations sautées, clé absente" >> "$GITHUB_STEP_SUMMARY"
-          echo "Le secret \`LLM_XAI_API_KEY\` n'est pas posé : \`pnpm probe\` et \`pnpm evals\` n'ont pas tourné, rien n'a été mesuré." >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: env.HAS_XAI_KEY == 'true'
-      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
-        if: env.HAS_XAI_KEY == 'true'
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
-        if: env.HAS_XAI_KEY == 'true'
-        with: { node-version-file: .nvmrc, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-        if: env.HAS_XAI_KEY == 'true'
-      - run: pnpm build
-        if: env.HAS_XAI_KEY == 'true'
-      - run: pnpm probe
-        if: env.HAS_XAI_KEY == 'true'
-        env:
-          LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
-          LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}
-      - run: pnpm evals
-        if: env.HAS_XAI_KEY == 'true'
-        env:
-          LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
-          LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}
