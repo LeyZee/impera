@@ -687,6 +687,30 @@ describe('the chatter’s Planning', () => {
     });
   });
 
+  it('marks « Déjà proposé » a colleague who already has this shift to answer (CHAT-06)', async () => {
+    serve({
+      swaps: [swap({ requesterId: THEO, targetMemberId: BASILE, shiftId: THURSDAY })],
+      candidates: {
+        candidates: [
+          { member: people[1], freeThen: true, shifts: [] },
+          { member: people[2], freeThen: true, shifts: [] },
+        ],
+        accounts: [account],
+      },
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: /^Échanger ton shift du jeudi 29 octobre/u }));
+    const panel = await screen.findByRole('dialog', { name: 'Proposer un échange' });
+    const basile = await within(panel).findByRole('radio', { name: /^Basile/u });
+    await waitFor(() => {
+      expect(text(basile)).toContain('Déjà proposé');
+    });
+    expect(basile.hasAttribute('disabled')).toBe(true);
+    const lou = within(panel).getByRole('radio', { name: /^Lou/u });
+    expect(text(lou)).toContain('Libre à ces heures');
+    expect(lou.hasAttribute('disabled')).toBe(false);
+  });
+
   it('lets a busy colleague take a shift only against theirs, and words a refusal without their shift', async () => {
     const theirs = shift(301, '2026-10-29T17:00:00Z', '2026-10-29T23:00:00Z', LOU);
     const written = serve(
