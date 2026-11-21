@@ -16,4 +16,5 @@ export const CAUSE_LABELS: Readonly<Record<HandoffCause, string>> = {
   identity_doubt: 'Doute sur la personne',
   persona_inactive: 'Pas de persona active pour cette créatrice',
   custom_order: 'Demande sur mesure',
+  sale_trouble: 'Vente qui coince',
 };

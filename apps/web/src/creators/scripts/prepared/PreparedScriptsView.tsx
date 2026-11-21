@@ -1,47 +1,39 @@
 import type { CreatorId, PreparedScriptView } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState, type JSX, type ReactNode } from 'react';
+import { useState, type JSX } from 'react';
 
-import { CopyView } from './CopyView';
 import { PreparedEditor } from './PreparedEditor';
 import { PreparedList } from './PreparedList';
-import { ViewTabs } from './ViewTabs';
 import { preparedKey, usePreparedScripts } from './api';
 import { NewScriptDialog } from './dialogs';
-import { editorMedia, pickerFolders, vaultAccounts } from './media';
+import { vaultAccounts } from './media';
+import { useEditorMedia } from './useEditorMedia';
 import './prepared.css';
 
-import { useVault, useVaultChoices } from '@/creators/vault/api';
 import { ScriptArt } from '@/shell/art/EmptyArt';
 import { Empty, Failure } from '@/shell/states';
 
-type View = 'scripts' | 'copy';
-
 /**
- * Créatrices › Scripts (ADR 0149 § 1, ADR 0112 §§ 20-24), the owner's and an active manager's: two views of one tab.
- * « Scripts », her scripts in preparation, « Nouveau script » and the editor; « À copier dans Reveal », what is ready to
- * copy by hand, then what she sent from her phone (`sent`, the screen that was here before).
+ * « Scripts » (ADR 0112 § 20), standing alone: her scripts in preparation, « Nouveau script » and the editor. `opening`
+ * is a script to open at once, given by the caller (from « À copier dans Reveal »); `onCopy` is called when the editor
+ * sends the person to copy it.
  */
-export function ScriptsTab({
+export function PreparedScriptsView({
   creatorId,
   creatorName,
-  sent,
+  opening = null,
+  onCopy,
 }: {
   creatorId: CreatorId;
   creatorName: string;
-  /** « À copier dans Reveal »'s second part: the scripts she sent, and her vault above them for now. */
-  sent: ReactNode;
+  opening?: PreparedScriptView | null;
+  onCopy: () => void;
 }): JSX.Element {
   const client = useQueryClient();
   const scripts = usePreparedScripts(creatorId);
-  const vault = useVault(creatorId, false);
-  const choices = useVaultChoices(creatorId, false);
-  const media = useMemo(() => editorMedia(vault.data, choices.data), [vault.data, choices.data]);
-  const folders = useMemo(() => pickerFolders(vault.data), [vault.data]);
-  const [view, setView] = useState<View>('scripts');
-  const [editing, setEditing] = useState<PreparedScriptView | null>(null);
+  const { vault, media, folders } = useEditorMedia(creatorId);
+  const [editing, setEditing] = useState<PreparedScriptView | null>(opening);
   const [creating, setCreating] = useState(false);
-  const ready = (scripts.data ?? []).filter((one) => one.state === 'ready_to_copy').length;
 
   const remember = (saved: PreparedScriptView): void => {
     client.setQueryData<readonly PreparedScriptView[]>(preparedKey(creatorId), (before) =>
@@ -51,10 +43,6 @@ export function ScriptsTab({
           ? before.map((one) => (one.id === saved.id ? saved : one))
           : [saved, ...before],
     );
-  };
-  const open = (one: PreparedScriptView): void => {
-    setEditing(one);
-    setView('scripts');
   };
 
   const list = (): JSX.Element => {
@@ -70,51 +58,25 @@ export function ScriptsTab({
           ensuite à la main dans Reveal.
         </Empty>
       );
-    return <PreparedList scripts={scripts.data} onOpen={open} />;
+    return <PreparedList scripts={scripts.data} onOpen={setEditing} />;
   };
 
   return (
     <section className="se-page" aria-label={`Scripts de ${creatorName}`}>
-      <div className="se-filters">
-        <ViewTabs<View>
-          label="Vue des scripts"
-          value={view}
-          onChange={(next) => {
-            setView(next);
-            setEditing(null);
-          }}
-          views={[
-            ['scripts', 'Scripts'],
-            [
-              'copy',
-              <>
-                <span className="se-lg">À copier dans Reveal</span>
-                <span className="se-sh">À copier</span>
-                {ready > 0 ? <span className="nv-count nv-subnav__count">{ready}</span> : null}
-              </>,
-            ],
-          ]}
-        />
-        {view === 'scripts' && editing === null ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--neon"
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            ＋ Nouveau script
-          </button>
-        ) : null}
-      </div>
-      {view === 'copy' ? (
+      {editing === null ? (
         <>
-          <CopyView creatorId={creatorId} scripts={scripts.data ?? []} media={media} onOpen={open} />
-          {sent}
-        </>
-      ) : editing === null ? (
-        <>
-          <h2 className="nv-h2">Ses scripts</h2>
+          <div className="se-filters">
+            <h2 className="nv-h2">Ses scripts</h2>
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon"
+              onClick={() => {
+                setCreating(true);
+              }}
+            >
+              ＋ Nouveau script
+            </button>
+          </div>
           {list()}
         </>
       ) : (
@@ -134,7 +96,7 @@ export function ScriptsTab({
           }}
           onCopy={() => {
             setEditing(null);
-            setView('copy');
+            onCopy();
           }}
           onBack={() => {
             setEditing(null);
@@ -145,7 +107,7 @@ export function ScriptsTab({
         <NewScriptDialog
           creatorId={creatorId}
           creatorName={creatorName}
-          accounts={vaultAccounts(vault.data)}
+          accounts={vaultAccounts(vault)}
           onClose={() => {
             setCreating(false);
           }}

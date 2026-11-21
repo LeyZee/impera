@@ -522,7 +522,7 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
     expect((await within(dialog).findByRole('alert')).textContent).toBe(
-      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Plateformes.',
     );
   });
 

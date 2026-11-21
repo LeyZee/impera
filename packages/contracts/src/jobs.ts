@@ -16,6 +16,7 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
 } from './ids';
@@ -28,6 +29,10 @@ import { TELEGRAM_JOB_PAYLOADS } from './telegram';
  * `conv:<conversationId>`; a poll runs on `account:<platformAccountId>`, one at a time per account.
  */
 
+/** The sales that wake his conversation for a word after it (ADR 0156 § 2): a step he bought, a tip. */
+export const AFTER_SALE_TYPES = ['ppv', 'tip'] as const;
+export type AfterSaleType = (typeof AFTER_SALE_TYPES)[number];
+
 const conversationJob = z.object({
   creatorId: CreatorIdSchema,
   conversationId: ConversationIdSchema,
@@ -38,6 +43,7 @@ export const JOB_NAMES = [
   'conversation.respond',
   'conversation.send',
   'conversation.follow_up',
+  'conversation.after_sale',
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
@@ -122,6 +128,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.respond': 'Réponse aux fans',
   'conversation.send': 'Envoi des messages',
   'conversation.follow_up': 'Relances des fans',
+  'conversation.after_sale': 'Mot d’après-achat',
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
@@ -217,6 +224,20 @@ export const JOB_PAYLOADS = {
   'conversation.follow_up': conversationJob.extend({
     anchorAt: z.iso.datetime(),
     step: z.number().int().min(0).max(4),
+  }),
+  /**
+   * A fresh sale of his woke his conversation (ADR 0156 § 2): a step he bought or a tip, recorded by the sales ledger in
+   * the transaction of its line under the key `conversation.after_sale:<saleId>`. The sale names his account and his
+   * platform id, not the conversation: the job finds it, and a fan nobody knows wakes nothing.
+   */
+  'conversation.after_sale': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    platformFanId: z.string().min(1),
+    saleId: SalesLineIdSchema,
+    saleType: z.enum(AFTER_SALE_TYPES),
+    occurredAt: z.iso.datetime(),
+    correlationId: z.string().min(1),
   }),
   /**
    * What she learnt about the fan becomes facts (P3-02): the facts the brief proposed for a draft a human approved,
@@ -605,6 +626,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.respond': 3,
   'conversation.send': 3,
   'conversation.follow_up': 3,
+  'conversation.after_sale': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
@@ -794,5 +816,5 @@ export function resumeRunAt(index: number, now: Date): Date {
  * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
  * (`withTenantJob`) refuses any other.
  */
-export const TenantJobSchema = z.enum(['daily_stats']);
+export const TenantJobSchema = z.enum(['daily_stats', 'media_insights']);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

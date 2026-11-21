@@ -1,4 +1,10 @@
-import type { ConversationState, DraftStatus, FanFlags } from '@impera/contracts';
+import type {
+  ConversationState,
+  DraftStatus,
+  FanAvailabilityRecord,
+  FanAvailabilitySignal,
+  FanFlags,
+} from '@impera/contracts';
 
 /** Default wait after the last fan message before answering, so that three messages get one answer. */
 export const DEFAULT_DEBOUNCE_SECONDS = 45;
@@ -97,16 +103,49 @@ export function nextFollowUp(
   anchor: Date | null,
   delaysHours: readonly number[],
   now: Date,
+  notBefore: Date | null = null,
 ): FollowUpSlot | null {
   if (anchor === null) return null;
   const step = delaysHours.findIndex((hours) => anchor.getTime() + hours * HOUR_MS > now.getTime());
   const hours = delaysHours[step];
-  return hours === undefined ? null : { step, runAt: new Date(anchor.getTime() + hours * HOUR_MS) };
+  if (hours === undefined) return null;
+  const due = anchor.getTime() + hours * HOUR_MS;
+  return { step, runAt: new Date(Math.max(due, notBefore?.getTime() ?? due)) };
+}
+
+/**
+ * How long she lets him be after he said goodbye (ADR 0158 § A): a night after a goodnight, a few hours after « je
+ * suis occupé » or « je dois y aller ». Her hours then put the follow-up in one of her slots.
+ */
+const FAREWELL_QUIET_HOURS: Readonly<Partial<Record<FanAvailabilitySignal, number>>> = {
+  says_goodnight: 9,
+  busy_now: 3,
+  leaving_soon: 3,
+};
+
+/**
+ * Not before when her next follow-up may go out, when his last message (`anchor`) said goodbye; `null` otherwise. The
+ * signal counts only when read on that message: one from before he wrote again says nothing of now.
+ */
+export function farewellNotBefore(
+  availability: FanAvailabilityRecord | null,
+  anchor: Date | null,
+): Date | null {
+  if (availability === null || anchor === null) return null;
+  const { signal, at } = availability;
+  const hours = signal === null ? undefined : FAREWELL_QUIET_HOURS[signal];
+  if (hours === undefined || at === null || at.getTime() < anchor.getTime()) return null;
+  return new Date(at.getTime() + hours * HOUR_MS);
 }
 
 /** One follow-up draft per silence and per step: a replayed job cannot write a second one. */
 export function followUpIdempotencyKey(conversationId: string, anchor: Date, step: number): string {
   return `follow_up:${conversationId}:${String(anchor.getTime())}:${String(step)}`;
+}
+
+/** One word after a sale, whatever the replays (ADR 0156 § 2): keyed by the sale's line. */
+export function aftercareIdempotencyKey(saleId: string): string {
+  return `aftercare:${saleId}`;
 }
 
 const MINUTE_MS = 60_000;

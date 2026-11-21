@@ -7,7 +7,7 @@ import {
   type CustomPriceGrid,
   type CustomPriceGridView,
 } from '@impera/contracts';
-import { eq, schema, sql, withTenantMember, type Database, type Transaction } from '@impera/db';
+import { eq, schema, sql, withAdmin, withTenantMember, type Database, type Transaction } from '@impera/db';
 
 import type { CustomPriceActor, CustomPriceGridStore } from '../../domain/ports';
 
@@ -119,4 +119,19 @@ export function createDrizzleCustomPriceGridStore(db: Database): CustomPriceGrid
         return { kind: 'saved', view: viewOf(creatorId, row) };
       }),
   };
+}
+
+/**
+ * Her grid in force, for the agent's turn (ADR 0159 § C, 15 bis): a job has no signed-in owner, so it reads as the
+ * service role, one creator at a time, read only. Null: never saved. Only the price computed from it ever leaves the
+ * server's code; the grid never enters a prompt.
+ */
+export function createCustomPriceGridReader(
+  adminDb: Database,
+): (creatorId: CreatorId) => Promise<CustomPriceGrid | null> {
+  return (creatorId) =>
+    withAdmin(adminDb, async (tx) => {
+      const row = await latest(tx, creatorId);
+      return row === undefined ? null : CustomPriceGridSchema.parse(row.grid);
+    });
 }

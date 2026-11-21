@@ -95,7 +95,6 @@ function harness(target: IdentityTarget | null, answer: Awaited<ReturnType<Scrip
       return Promise.resolve();
     },
     enqueueBacklog: () => Promise.resolve(0),
-    enqueue: () => Promise.resolve(),
   };
   const brain: ScriptIdentifier = {
     promptHash: 'prompt_now',

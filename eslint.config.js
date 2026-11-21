@@ -15,10 +15,12 @@ import prettier from 'eslint-config-prettier';
 const MODULE_DEPENDENCIES = {
   // INS-04: `FakeInstagram` implements the comments port of `instagram-comments`, read through its index.
   connectors: ['conversations', 'instagram-comments'],
-  conversations: ['fans', 'persona', 'agent', 'media'],
+  // ADR 0159: the turn on his custom order goes from the composer to the custom-orders store, typed by its pure.ts.
+  conversations: ['fans', 'persona', 'agent', 'media', 'custom-orders'],
   fans: [],
   persona: [],
-  agent: ['fans', 'persona', 'media'],
+  // ADR 0159: her turn on a custom order is the custom-orders module's (`customOrderTurn`), read through its index.
+  agent: ['fans', 'persona', 'media', 'custom-orders'],
   media: [],
   supervision: ['conversations', 'fans'],
   playground: ['agent'],
@@ -26,6 +28,8 @@ const MODULE_DEPENDENCIES = {
   telegram: [],
   team: [],
   backups: [],
+  // EQ-18: the owner's journal reads `audit_log` and the names it shows; it imports no module.
+  audit: [],
   // ADR 0091: reads the gateway's journal and keeps the credits ledger; imports no module.
   'ai-usage': [],
   // Choix de Charles 12/11: the owner's caps the gateway reads (`ai_budget_settings`); imports no module.

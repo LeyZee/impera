@@ -20,6 +20,7 @@ export const CRM_SECTIONS = [
   '/contenu',
   '/equipe',
   '/paie',
+  '/trafic',
   '/creatrices',
   '/moi',
   '/reglages',
@@ -39,6 +40,7 @@ export const CRM_SECTION_LABELS: Readonly<Record<CrmSection, string>> = {
   '/contenu': 'Contenu',
   '/equipe': 'Équipe',
   '/paie': 'Paie',
+  '/trafic': 'Trafic',
   '/creatrices': 'Créatrices',
   '/moi': 'Moi',
   '/reglages': 'Réglages',
@@ -74,6 +76,8 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
       ['/creatrices', 'agency'],
       ['/equipe', 'agency'],
       ['/paie', 'agency'],
+      // What brings fans: her redirect links first (ADR 0134 § 5, ADR 0149 § 2), out of her sheet's seven tabs.
+      ['/trafic', 'agency'],
     ],
     settings: true,
     phone: ['/', '/suivi', '/creatrices', '/equipe'],
@@ -89,6 +93,8 @@ export const CRM_RAILS: Readonly<Record<RailKind, RailPlan>> = {
       ['/creatrices', 'agency'],
       ['/equipe', 'agency'],
       ['/paie', 'agency'],
+      // The agency's screen, the owner's and the manager's (ADR 0121 § 4): a manager reads her links there.
+      ['/trafic', 'agency'],
       ['/moi', null],
     ],
     settings: false,

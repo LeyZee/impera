@@ -50,10 +50,10 @@ const CONTENT = `GET /creators/${CREATOR}/content`;
 const STRUCTURES = 'GET /script-structures';
 const CONFIRM = `POST /creators/${CREATOR}/drops/${SENT.id}/script-export/confirm`;
 
-function show(isOwner = false): void {
+function show(): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ScriptsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" isOwner={isOwner} />
+      <ScriptsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" />
     </QueryClientProvider>,
   );
 }
@@ -191,7 +191,7 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
 
   it('holds no switch of the descriptions: a drop is described on arrival (ADR 0145 § 5, 17/11)', async () => {
     serve(base);
-    show(true);
+    show();
     await screen.findByRole('listitem', { name: 'Soirée inventée' });
     expect(screen.queryByRole('switch')).toBeNull();
     expect(screen.queryByText(/onglet Contenu/u)).toBeNull();

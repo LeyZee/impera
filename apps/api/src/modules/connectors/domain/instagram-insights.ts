@@ -13,7 +13,8 @@ import {
 
 /**
  * Her Instagram account read only (ADR 0120 § 1 and § 2), pure: the port, what a grant of Meta lets the account do,
- * the readings kept by age, the plan of a night bounded by Meta's quota, and the amber alerts (§ 6).
+ * the readings kept by age and the steps missed, the plan of a night bounded by Meta's quota, and the amber alerts
+ * (§ 6).
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -72,28 +73,57 @@ const AGE_MS: Record<SnapshotAge, number> = {
   '7d': 7 * DAY_MS,
 };
 
-/**
- * The ages a reading made at `now` is kept at (§ 2): every age the media has passed and that has no reading yet. An
- * age already kept is never due again, so a later reading does not replace it and a job replayed writes nothing.
- */
-export function agesDue(publishedAt: Date, now: Date, kept: readonly SnapshotAge[]): SnapshotAge[] {
-  const age = now.getTime() - publishedAt.getTime();
-  return SNAPSHOT_AGES.filter((step) => age >= AGE_MS[step] && !kept.includes(step));
+/** Where the window of each step ends: at the next step, and at twice its age for the last one. */
+const WINDOW_END_MS: Record<SnapshotAge, number> = {
+  '1h': DAY_MS,
+  '24h': 2 * DAY_MS,
+  '48h': 7 * DAY_MS,
+  '7d': 14 * DAY_MS,
+};
+
+export interface StepsDue {
+  /** The step a reading made now fills: the one whose window holds the age of the media, when it is not kept yet. */
+  readonly fill: SnapshotAge | null;
+  /** The steps whose window passed without a reading: kept missed, without a number. */
+  readonly missed: readonly SnapshotAge[];
 }
 
-/** The readings to keep of one reading of a media: one per age due, each with the real instant of the reading. */
+/**
+ * What a media owes at `now` (§ 2, amendment of 20/11/2026). A reading fills one step at most: the one whose window,
+ * from its age to the next step, holds the age of the media. A step whose window is over and that has no reading is
+ * missed: a figure read later never enters it. A step already kept, read or missed, is never due again, so a job
+ * replayed writes nothing.
+ */
+export function stepsDue(publishedAt: Date, now: Date, kept: readonly SnapshotAge[]): StepsDue {
+  const age = now.getTime() - publishedAt.getTime();
+  const open = SNAPSHOT_AGES.filter((step) => !kept.includes(step));
+  return {
+    fill: open.find((step) => age >= AGE_MS[step] && age < WINDOW_END_MS[step]) ?? null,
+    missed: open.filter((step) => age >= WINDOW_END_MS[step]),
+  };
+}
+
+/**
+ * The rows to keep of a media at `at`: its missed steps, without a number, and the step the reading fills when
+ * `numbers` is given. Without a reading (`numbers` null: the media needed none, or the quota kept it for later) only
+ * the missed steps are kept, and the step still open stays due.
+ */
 export function snapshotsOf(
   media: Pick<InstagramMedia, 'ref' | 'publishedAt'>,
-  numbers: MediaInsightNumbers,
-  readAt: Date,
+  numbers: MediaInsightNumbers | null,
+  at: Date,
   kept: readonly SnapshotAge[],
 ): MediaInsightSnapshot[] {
-  return agesDue(new Date(media.publishedAt), readAt, kept).map((age) => ({
+  const due = stepsDue(new Date(media.publishedAt), at, kept);
+  const row = (age: SnapshotAge, read: MediaInsightNumbers | null): MediaInsightSnapshot => ({
     mediaRef: media.ref,
     age,
-    readAt: readAt.toISOString(),
-    numbers,
-  }));
+    readAt: at.toISOString(),
+    numbers: read,
+  });
+  const rows = due.missed.map((age) => row(age, null));
+  if (numbers !== null && due.fill !== null) rows.push(row(due.fill, numbers));
+  return rows;
 }
 
 /** The part of Meta's hourly quota at which a job stops and waits, 0 to 1: it never runs up to the limit. */
@@ -104,16 +134,25 @@ export function callsLeft(callsThisHour: number, hourlyLimit: number): number {
   return Math.max(0, Math.floor(hourlyLimit * QUOTA_CEILING) - callsThisHour);
 }
 
+/**
+ * The calls left for the readings of a run once its listings are paid: each page of `listMedia` and the one call of
+ * `listLiveStories` count against Meta's quota like a reading does.
+ */
+export function readingBudget(left: number, mediaPagesListed: number, storiesListed: boolean): number {
+  return Math.max(0, Math.floor(left) - mediaPagesListed - (storiesListed ? 1 : 0));
+}
+
 export interface ReadingPlan {
-  /** The media to read now, the most recent first: a young media is the one whose age is about to pass. */
+  /** The media to read now, the most recent first: a young media is the one whose window closes soonest. */
   readonly toRead: readonly InstagramMediaRef[];
-  /** The media with an age due that wait for a later run: more than zero puts the job in amber. */
+  /** The media with a step to fill that wait for a later run: more than zero puts the job in amber. */
   readonly deferred: number;
 }
 
 /**
- * The plan of one run (§ 2): only the media with an age due are read, one call each, and never more than `budget`
- * calls. What does not fit waits for a later run; the plan is a finite list, so a job never loops on the quota.
+ * The plan of one run (§ 2): only the media with a step to fill now are read, one call each, and never more than
+ * `budget` calls. What does not fit waits for a later run; the plan is a finite list, so a job never loops on the
+ * quota. A media that only has missed steps costs no call: `snapshotsOf` marks them without a reading.
  */
 export function planReadings(
   media: readonly Pick<InstagramMedia, 'ref' | 'publishedAt'>[],
@@ -122,11 +161,36 @@ export function planReadings(
   budget: number,
 ): ReadingPlan {
   const due = media
-    .filter((one) => agesDue(new Date(one.publishedAt), now, keptOf(one.ref)).length > 0)
+    .filter((one) => stepsDue(new Date(one.publishedAt), now, keptOf(one.ref)).fill !== null)
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
   const room = Math.max(0, Math.floor(budget));
   return { toRead: due.slice(0, room).map((one) => one.ref), deferred: Math.max(0, due.length - room) };
 }
+
+/** A media as the readings need it: its name, its kind and its hour, never its caption. */
+type ReadableMedia = Pick<InstagramMedia, 'ref' | 'kind' | 'publishedAt'>;
+
+/** A media with the steps already kept of it, read or missed. */
+export interface KeptMedia extends ReadableMedia {
+  readonly kept: readonly SnapshotAge[];
+}
+
+/** The rows to keep of one media after a run. */
+interface MediaSnapshots {
+  readonly media: ReadableMedia;
+  readonly snapshots: readonly MediaInsightSnapshot[];
+}
+
+/** Where the readings are kept, one creator at a time. A step kept is never written again. */
+export interface MediaInsightStore {
+  /** Her media published since `since`, and the older ones that still have a step open, with their steps kept. */
+  keptOf(creatorId: string, since: Date): Promise<readonly KeptMedia[]>;
+  /** Keeps the rows; a step already kept is left as it is. Answers how many rows were really added. */
+  record(creatorId: string, rows: readonly MediaSnapshots[]): Promise<number>;
+}
+
+/** How far back a run lists her media: the end of the last window. An older media has nothing left to read. */
+export const LISTING_WINDOW_MS = WINDOW_END_MS['7d'];
 
 /** Whether the day of `now`, cut at `dayStart`, has its story: one of her stories online was published since. */
 export function dayHasStory(stories: readonly Pick<LiveStory, 'publishedAt'>[], dayStart: Date): boolean {

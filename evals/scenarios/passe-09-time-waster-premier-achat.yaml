@@ -1,0 +1,110 @@
+# Passe de test du 20/11, conversation 9 : le time waster aimable, puis son premier achat. Fan, messages, scripts et prix fictifs (ADR 0010).
+# Fan connu depuis trois semaines, écrit tous les jours, n’a jamais rien ouvert. Tours : « coucou ma belle » ; « tu fais quoi ? » ; « tu me manques » ; il dit qu’il a peur de se faire avoir comme sur un autre site ; il demande à voir ; [achète] « ok t’avais raison » (le pourboire de la fiche est remplacé par un achat).
+# Attendu à la lecture : distante sans être sèche, aucune question ouverte au début ; elle saisit le frein dès qu’il le donne et le lève ; après l’achat, chaleur retrouvée en parlant de l’attention, pas de l’argent.
+# Code (non asserté) : le frein est noté dans la note du fan ; le rejoueur n’expose pas encore la note, à vérifier à la main. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+# Limite du format : `buys_step` n’achète que la dernière étape payante partie ; si aucune n’est partie quand il « demande à voir », l’achat ne change rien.
+description: 'Fan bavard qui n’a jamais rien ouvert : elle reste distante sans sécheresse, saisit sa peur de se faire avoir, la lève, et le retrouve avec chaleur après son premier achat.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Thierry (fictif)'
+  - 52 ans, confirmé
+situation:
+  known_hours: 504
+  age_confirmed: true
+  local_time: '21:00'
+  desire: 30
+  availability: confirmed
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme plus intime que la précédente.
+          media: Une courte vidéo en nuisette.
+        - kind: paid
+          price_euros: 35
+          instruction: Le présenter comme la fin de la soirée, la plus intime.
+          media: Une vidéo plus longue, la nuisette retirée.
+    - ref: matin-demo
+      moment: null
+      description: Un réveil paresseux sous la couette, joué à toute heure (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Un selfie au réveil, sous la couette.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite du réveil.
+          media: Des photos au saut du lit.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime du réveil.
+          media: Une courte vidéo sous la douche.
+inbound: Coucou ma belle
+expect:
+  decision:
+    handoff: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+then:
+  - after_minutes: 3
+    inbound: Tu fais quoi ?
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 3
+    inbound: Tu me manques tu sais
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 4
+    inbound: En vrai j’ose pas acheter, je me suis fait avoir sur un autre site, j’avais payé et c’était rien du tout
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 4
+    inbound: Bon ok… montre-moi alors, je te fais confiance
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 8
+    event: buys_step
+    inbound: Ok t’avais raison, c’était trop beau
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

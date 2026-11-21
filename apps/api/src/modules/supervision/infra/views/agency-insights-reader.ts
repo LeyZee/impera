@@ -53,6 +53,8 @@ export interface AgencyInsightsReader {
       readonly previousTo: string;
       readonly to: string;
     },
+    /** A calendar month's first day, to read her revenue objective for it (ADR 0092 § 6); null off a month. */
+    objectiveMonth?: string | null,
   ): Promise<AgencyCreatorAnswer>;
   /** Display names of the team, member id to name, read as `userId` through the first creator given. */
   memberNames(creatorId: CreatorId, userId: UserId): Promise<ReadonlyMap<string, string>>;
@@ -82,6 +84,7 @@ const FanSchema = z.array(
 const SinceSchema = z.array(z.object({ since: z.iso.date().nullable() }));
 const CountSchema = z.array(z.object({ refunds: z.coerce.number().int().nonnegative() }));
 const AccountSchema = z.array(z.object({ id: z.string() }));
+const ObjectiveSchema = z.array(z.object({ amount_minor: z.coerce.number().int().positive() }));
 const MemberSchema = z.array(z.object({ id: z.string(), display_name: z.string() }));
 
 /**
@@ -97,7 +100,7 @@ export function createAgencyInsightsReader(
   refundListOf: RefundListOf,
 ): AgencyInsightsReader {
   return {
-    read: (creatorId, userId, range) =>
+    read: (creatorId, userId, range, objectiveMonth = null) =>
       withTenantMember(db, creatorId, userId, async (tx, scope): Promise<AgencyCreatorAnswer> => {
         if (scope === 'self') return { kind: 'out_of_scope' };
         const linked = LinkedSchema.parse(
@@ -200,6 +203,16 @@ export function createAgencyInsightsReader(
         const stats = (await statsOf(tx, { from: shiftDay(range.previousFrom, -1), to: range.to })).filter(
           (line) => mine.has(line.platformAccountId),
         );
+        const [objective] =
+          objectiveMonth === null
+            ? []
+            : ObjectiveSchema.parse(
+                (
+                  await tx.execute(sql`
+                    select amount_minor from creator_revenue_objectives
+                     where creator_id = ${creatorId}::uuid and month = ${objectiveMonth}::date`)
+                ).rows,
+              );
         return {
           kind: 'read',
           read: {
@@ -222,6 +235,7 @@ export function createAgencyInsightsReader(
             })),
             refunds,
             refundsWithoutSale: orphans?.refunds ?? 0,
+            objectiveMinor: objective?.amount_minor ?? null,
             registerSince: first?.since ?? null,
             stats,
           },

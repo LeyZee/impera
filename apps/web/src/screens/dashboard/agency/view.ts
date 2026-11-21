@@ -296,7 +296,8 @@ export function kindSlices(kinds: AgencyInsights['kinds']): Slice[] {
 export const SELLER_NOTES: Readonly<Record<DashboardSalesSeller['kind'], string>> = {
   member: 'Les ventes des membres de l’équipe, reliés à leur compte Reveal.',
   agent: 'Ce que l’agent a vendu seul, sur la clé de l’agence.',
-  unlinked: 'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Reveal).',
+  unlinked:
+    'Un compte de chatteur Reveal que personne n’a encore relié à un membre (Équipe › Comptes Reveal).',
   none: 'Une vente sans chatteur : un abonnement, un renouvellement, un tip spontané.',
 };
 

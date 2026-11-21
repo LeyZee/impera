@@ -1,5 +1,5 @@
 {
-  "id": "33057f1d-c6bf-4188-8fc4-f1f4b7cd1b0c",
+  "id": "bbf3b840-d7d1-49d3-bca4-d7ffc9c1e64d",
   "prevId": "56fcb536-a91c-468b-8c97-76198f17c030",
   "version": "7",
   "dialect": "postgresql",
@@ -3912,141 +3912,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.creator_day_ticks": {
-      "name": "creator_day_ticks",
-      "schema": "",
-      "columns": {
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "day": {
-          "name": "day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "item": {
-          "name": "item",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "done": {
-          "name": "done",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "updated_by": {
-          "name": "updated_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "creator_day_ticks_creator_id_creators_id_fk": {
-          "name": "creator_day_ticks_creator_id_creators_id_fk",
-          "tableFrom": "creator_day_ticks",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_day_ticks_created_by_user_id_fk": {
-          "name": "creator_day_ticks_created_by_user_id_fk",
-          "tableFrom": "creator_day_ticks",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_day_ticks_updated_by_user_id_fk": {
-          "name": "creator_day_ticks_updated_by_user_id_fk",
-          "tableFrom": "creator_day_ticks",
-          "tableTo": "user",
-          "columnsFrom": ["updated_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "creator_day_ticks_pkey": {
-          "name": "creator_day_ticks_pkey",
-          "columns": ["creator_id", "day", "item"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "creator_read": {
-          "name": "creator_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_day_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_insert": {
-          "name": "creator_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_day_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_day_ticks\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_day_ticks\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
-        },
-        "creator_update": {
-          "name": "creator_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_day_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_day_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_day_ticks\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
-        },
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_day_ticks\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        }
-      },
-      "checkConstraints": {
-        "creator_day_ticks_item_check": {
-          "name": "creator_day_ticks_item_check",
-          "value": "\"creator_day_ticks\".\"item\" in ('reveal_story', 'reveal_video', 'insta_cta_story', 'insta_stories', 'insta_posts', 'insta_reel', 'telegram_posts', 'telegram_video')"
-        },
-        "creator_day_ticks_done_check": {
-          "name": "creator_day_ticks_done_check",
-          "value": "\"creator_day_ticks\".\"done\" between 0 and 10"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.creator_shoot_items": {
       "name": "creator_shoot_items",
       "schema": "",
@@ -5757,6 +5622,214 @@
         }
       },
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.media_insight_snapshots": {
+      "name": "media_insight_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_ref": {
+          "name": "media_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_kind": {
+          "name": "media_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "age": {
+          "name": "age",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "missed": {
+          "name": "missed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "views": {
+          "name": "views",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reach": {
+          "name": "reach",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "likes": {
+          "name": "likes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "comment_count": {
+          "name": "comment_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "shares": {
+          "name": "shares",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "saves": {
+          "name": "saves",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reposts": {
+          "name": "reposts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "skip_rate": {
+          "name": "skip_rate",
+          "type": "numeric(5, 4)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "media_insight_snapshots_creator_published_idx": {
+          "name": "media_insight_snapshots_creator_published_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "published_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "media_insight_snapshots_creator_id_creators_id_fk": {
+          "name": "media_insight_snapshots_creator_id_creators_id_fk",
+          "tableFrom": "media_insight_snapshots",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "media_insight_snapshots_step_unique": {
+          "name": "media_insight_snapshots_step_unique",
+          "nullsNotDistinct": false,
+          "columns": ["creator_id", "media_ref", "age"]
+        }
+      },
+      "policies": {
+        "insights_read": {
+          "name": "insights_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"media_insight_snapshots\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"media_insight_snapshots\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"media_insight_snapshots\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'media_insights'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"media_insight_snapshots\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'media_insights'"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "media_insight_snapshots_media_kind_check": {
+          "name": "media_insight_snapshots_media_kind_check",
+          "value": "\"media_insight_snapshots\".\"media_kind\" in ('reel', 'photo', 'carousel')"
+        },
+        "media_insight_snapshots_age_check": {
+          "name": "media_insight_snapshots_age_check",
+          "value": "\"media_insight_snapshots\".\"age\" in ('1h', '24h', '48h', '7d')"
+        },
+        "media_insight_snapshots_media_ref_check": {
+          "name": "media_insight_snapshots_media_ref_check",
+          "value": "char_length(\"media_insight_snapshots\".\"media_ref\") between 1 and 128"
+        },
+        "media_insight_snapshots_missed_check": {
+          "name": "media_insight_snapshots_missed_check",
+          "value": "case when \"media_insight_snapshots\".\"missed\" then num_nulls(\"media_insight_snapshots\".\"views\", \"media_insight_snapshots\".\"reach\", \"media_insight_snapshots\".\"likes\", \"media_insight_snapshots\".\"comment_count\", \"media_insight_snapshots\".\"shares\", \"media_insight_snapshots\".\"saves\", \"media_insight_snapshots\".\"reposts\", \"media_insight_snapshots\".\"skip_rate\") = 8 else num_nulls(\"media_insight_snapshots\".\"views\", \"media_insight_snapshots\".\"reach\", \"media_insight_snapshots\".\"likes\", \"media_insight_snapshots\".\"comment_count\", \"media_insight_snapshots\".\"shares\", \"media_insight_snapshots\".\"saves\") = 0 end"
+        },
+        "media_insight_snapshots_counts_check": {
+          "name": "media_insight_snapshots_counts_check",
+          "value": "coalesce(\"media_insight_snapshots\".\"views\", 0) >= 0 and coalesce(\"media_insight_snapshots\".\"reach\", 0) >= 0 and coalesce(\"media_insight_snapshots\".\"likes\", 0) >= 0 and coalesce(\"media_insight_snapshots\".\"comment_count\", 0) >= 0 and coalesce(\"media_insight_snapshots\".\"shares\", 0) >= 0 and coalesce(\"media_insight_snapshots\".\"saves\", 0) >= 0 and coalesce(\"media_insight_snapshots\".\"reposts\", 0) >= 0"
+        },
+        "media_insight_snapshots_skip_rate_check": {
+          "name": "media_insight_snapshots_skip_rate_check",
+          "value": "\"media_insight_snapshots\".\"skip_rate\" is null or (\"media_insight_snapshots\".\"media_kind\" = 'reel' and \"media_insight_snapshots\".\"skip_rate\" between 0 and 1)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.agency_logos": {

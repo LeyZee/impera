@@ -28,7 +28,7 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 
 ### A. La commande sur mesure
 
-1. **Les états, dans le code** (`agent/domain/custom-order.ts`) : `asked` → `creator_yes` (avec prix) ou `creator_no` → `deposit_paid` → `delivered`, et `expired` / `cancelled`. Un appel ou une visio suit le § D (paiement entier d'avance). Chaque passage est un événement de conversation, idempotent.
+1. **Les états, dans le code** (module `custom-orders`, `CUSTOM_ORDER_STATES` des contrats) : `gathering` (les détails se rassemblent, le « `asked` » du premier texte) → `awaiting_creator` (la fiche est partie) → `creator_yes` (avec prix) ou `creator_no` → `deposit_paid` → `delivered`, et `expired` / `cancelled`. Un appel ou une visio suit le § D (paiement entier d'avance). Chaque passage est un événement de conversation, idempotent.
 2. **`asked` : comprendre la demande en entier avant de la transmettre** (Charles, 20/11, 15 h 52 : « il faut que la modèle sache exactement quoi faire, la durée, la prestation et le prix »). L'IA ne dit ni oui ni non et ne donne aucun prix ; elle répond sous la garde `no_commitment`. Elle recueille les détails par deux ou trois questions joueuses dans la conversation, une à la fois, jamais en questionnaire. Le code tient la liste des informations obligatoires selon le format, le cerveau remplit les cases, le code dit ce qui manque :
    - toujours : ce qu'il veut voir, décrit précisément ; pour quand il le voudrait ; le prénom ou le mot à dire ou à écrire, s'il y en a un ;
    - photo : la pose, la tenue, le texte écrit, le nombre de photos ;
@@ -76,7 +76,11 @@ Précision de Charles (20/11, 15 h 44) : le plus souvent une vidéo tournée pou
 
 ## Mise en œuvre
 
-Rien n'est codé par cette ADR. Le code vient en petits lots, après la première vente réelle (décision de Charles du 20/11 : freiner les nouveaux écrans tant que le cœur n'est pas prouvé) :
+Le code vient en petits lots. Charles a levé l'attente de la première vente réelle le 20/11 à 15 h 29 (« code tout ce que je t'ai dit ») ; le partage avec le fil Agent : le module `custom-orders` porte la décision en code pur (états, détails par format, questions, fiche, prix de la grille, briefs, gardes), l'agent la branche dans son tour et fait lire au cerveau le format et les détails.
+
+0. Comprendre la demande en jouant (§ A.2, A.2 bis) : lecture du format, des suppléments et des détails (`CustomOrderReading`), une question légère à la fois, au plus trois, fiche complète à la créatrice ou incomplète au propriétaire, fan gardé au chaud (`customOrderTurn`).
+
+   Commande enregistrée (lot du 20/11 au soir) : table `custom_orders` (migration 0242), une commande ouverte par fan au plus (`gathering` ou `awaiting_creator`), écrite par le tour de l'agent sous la RLS de la créatrice (`withTenant`), jamais par le rôle de service ; le même message du fan ne compte qu'une fois ; le fan est lié à la créatrice de la commande par une clé étrangère composée. Le compte de la créatrice n'en lit rien avant le lot 1.
 
 1. Oui ou non et prix de la créatrice saisis sur la ligne « Demande sur mesure » d'« À traiter » ; annonce du prix et demande d'acompte ; pourboire reconnu ; garde « pourboire seulement ici » ; relais de preuve (§ F).
 2. Dossier `custom` rattaché au fan, livraison au prix restant (§ B, § A.6).

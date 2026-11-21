@@ -1,4 +1,10 @@
-import { ContentDropIdSchema, type CreatorSummary, type Me } from '@impera/contracts';
+import {
+  ContentDropIdSchema,
+  CreatorIdSchema,
+  type CreatorId,
+  type CreatorSummary,
+  type Me,
+} from '@impera/contracts';
 import {
   createRootRouteWithContext,
   createRoute,
@@ -9,11 +15,17 @@ import {
 import { useEffect, type JSX } from 'react';
 
 import { followCreator } from './agent/followed';
-import { scopeTo, scopedOf, useCreatorScope } from './agent/scope';
+import { scopeTo, scopedCreatorId, scopedOf, useCreatorScope } from './agent/scope';
 import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { useCreators } from './creators/api';
-import { creatorsSearch, parseCreatorsSearch, sheetOf, sheetsFor } from './creators/search';
+import {
+  creatorsSearch,
+  legacyCreatorsSearch,
+  parseCreatorsSearch,
+  sheetOf,
+  sheetsFor,
+} from './creators/search';
 import { parsePaySearch } from './payroll/model';
 import { ExtensionLinkPage } from './pwa/ExtensionLinkPage';
 import { ExtensionPage } from './pwa/ExtensionPage';
@@ -85,6 +97,7 @@ import { readsFans, SuiviNav } from './screens/tracking/SuiviNav';
 import { TrackingPage } from './screens/tracking/TrackingPage';
 import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
+import { TrafficPage } from './screens/traffic/TrafficPage';
 import { ChannelPostPage } from './screens/train/ChannelPostPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
@@ -238,6 +251,28 @@ const creators = createRoute({
   // the owner's and an active manager's, who opens nothing else: anyone lands on their first sheet, never on a page
   // the server would refuse.
   beforeLoad: ({ context, search, location }) => {
+    // An address of the tabs before the seven (ADR 0149 § 5) leads to where its screen lives now, the creator kept:
+    // her links to Trafic, the others to their tab, their view or their card of Compte.
+    const raw: Record<string, unknown> = location.search;
+    if (raw['onglet'] === 'liens') {
+      const creatrice = search.creatrice;
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({
+        to: '/trafic',
+        search: creatrice === undefined ? {} : { creatrice },
+        replace: true,
+      });
+    }
+    const legacy = legacyCreatorsSearch(raw);
+    if (legacy !== null) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({
+        to: '/creatrices',
+        search: legacy.search,
+        replace: true,
+        ...(legacy.hash === undefined ? {} : { hash: legacy.hash }),
+      });
+    }
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
     if (first !== undefined && !sheets.includes(sheetOf(search))) {
@@ -288,8 +323,41 @@ const scriptStructures = createRoute({
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
       throw redirect({ to: '/creatrices', replace: true, state: { notice: NOT_YOURS } });
     }
+    // With a creator chosen, the structures are a view of her sheet's Scripts (ADR 0149 § 5); on « Toutes » there is no
+    // sheet to open them in, and this page stays theirs.
+    const creator = CreatorIdSchema.safeParse(scopedCreatorId());
+    if (creator.success) {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({
+        to: '/creatrices',
+        search: creatorsSearch('structures', creator.data),
+        replace: true,
+      });
+    }
   },
   component: StructuresPage,
+});
+/**
+ * Agence › Trafic (ADR 0134 § 5, ADR 0149 § 2): what brings fans to a creator, her redirect links first. The owner's
+ * and an active manager's (ADR 0121 § 4); the root's guard sends anyone else to their first screen.
+ */
+const traffic = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/trafic',
+  validateSearch: (search: Record<string, unknown>): { readonly creatrice?: CreatorId } => {
+    const creator = CreatorIdSchema.safeParse(search['creatrice']);
+    return creator.success ? { creatrice: creator.data } : {};
+  },
+  component: function Traffic() {
+    const { user } = rootRoute.useRouteContext();
+    const { creatrice } = traffic.useSearch();
+    // A link that names a creator sets the selector on her, as on Suivi.
+    const chooses = scopesCreators(user);
+    useEffect(() => {
+      if (chooses && creatrice !== undefined) scopeTo(creatrice);
+    }, [chooses, creatrice]);
+    return <TrafficPage scoped={useScopedCreator(chooses)} canEdit={user.role === 'owner'} />;
+  },
 });
 // Suivi › Fans: every fan of a creator (ADR 0124), the owner's and an active manager's, a sub-tab of Suivi (ADR 0134
 // § 5). Anyone else is sent back to his own Suivi.
@@ -1199,6 +1267,7 @@ const routeTree = rootRoute.addChildren([
   train.addChildren([trainIndex, playground, channelPost, corrections, tests]),
   tracking,
   trackingAlerts,
+  traffic,
   fansList,
   fansOld,
   today,

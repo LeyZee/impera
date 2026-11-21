@@ -20,7 +20,6 @@ const run = (recognition: PreparedRecognitionStore, onRecognitionFailed?: (error
       store,
       source: () => Promise.resolve([]),
       recognition,
-      askIdentities: () => Promise.resolve(),
       ...(onRecognitionFailed === undefined ? {} : { onRecognitionFailed }),
     },
     { creatorId, platformAccountId, correlationId: 'test' },

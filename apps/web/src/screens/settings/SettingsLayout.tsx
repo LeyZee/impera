@@ -43,21 +43,23 @@ const item = (to: ScreenPath): SettingsItem => ({ to, label: screenLabel(to) });
  * everyone's, lives in the account's menu (NAV-03). The AI keys, the platforms' sales feeds (CRM-01), the AI spend and
  * credits (ADR 0091), the bots and groups (P3-03, P3-07), the alerts (P4-01), the accounts' pay rules (EQ-03), what
  * each invoice prints (EQ-06), the backups (ADR 0028) and the security of every account (SEC-04).
- * A list, not nine tabs (recette visuelle 16/11, GES-04, decided on 16/11): grouped by theme, in the order the tabs had.
+ * A list, not nine tabs (recette visuelle 16/11, GES-04, decided on 16/11), in the four groups of ADR 0134 § 6:
+ * Connexions (Plateformes, Bots Telegram), IA, Argent, Sécurité. The addresses keep their words (`/reglages/ventes`,
+ * `/reglages/telegram`): only what the screens are called changed.
  * Every section is the owner's, as the routes guard them: a section a role could not open would not be listed.
  */
 const GROUPS: readonly SettingsGroup[] = [
-  { title: 'Connexions', items: [item('/reglages/modeles-ia'), item('/reglages/ventes')] },
+  { title: 'Connexions', items: [item('/reglages/ventes'), item('/reglages/telegram')] },
+  { title: 'IA', items: [item('/reglages/modeles-ia'), item('/reglages/consommation-ia')] },
+  { title: 'Argent', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
   {
-    title: 'IA et alertes',
-    items: [item('/reglages/consommation-ia'), item('/reglages/alertes'), item('/reglages/telegram')],
+    title: 'Sécurité',
+    items: [item('/reglages/alertes'), item('/reglages/sauvegardes'), item('/reglages/securite')],
   },
-  { title: 'Paie et factures', items: [item('/reglages/regles-de-paie'), item('/reglages/facturation')] },
-  { title: 'Données et accès', items: [item('/reglages/sauvegardes'), item('/reglages/securite')] },
 ];
 
 /** The section Réglages opens on, on a computer: the list's first. */
-const FIRST: ScreenPath = '/reglages/modeles-ia';
+const FIRST: ScreenPath = '/reglages/ventes';
 
 /** The section open, by the address; `null` on Réglages itself, the list. */
 function openItem(pathname: string): SettingsItem | null {
@@ -196,7 +198,7 @@ export function AiUsagePage(): JSX.Element {
   return <AiUsageSection />;
 }
 
-/** Réglages › Ventes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01). */
+/** Réglages › Plateformes: the key of each platform's sales feed, its webhook and the owner's links (CRM-01). */
 export function SalesFeedPage(): JSX.Element {
   return <SalesFeedSection />;
 }
@@ -206,7 +208,7 @@ export function AlertsPage(): JSX.Element {
   return <AlertsSection />;
 }
 
-/** Réglages › Telegram: bots, groups and who gets which alert (fiche P3-07), the tab in the address. */
+/** Réglages › Bots Telegram: bots, groups and who gets which alert (fiche P3-07), the tab in the address. */
 export function TelegramPage({
   tab,
   onTab,

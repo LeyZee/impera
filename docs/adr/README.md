@@ -160,6 +160,10 @@ Date : AAAA-MM-JJ
 | 0150 | Les alertes de chaque créatrice : l'équipe décide, dans sa fiche, qui reçoit quoi et ce qui est en sourdine | accepted (précise P4-01, 0020, 0042 § 7, 0091, 0128 § C, 0143 § 13) |
 | 0151 | Les idées apprennent ses goûts et ce qui marche : profil de goûts tenu par le code, dosage valeur sûre, variation et nouveauté, mesure rapportée à son audience | accepted (précise 0060 §§ 3-6, 0120 § 2, 0140 ; amende 0060 § 4) |
 | 0152 | Hébergement : un VPS Hostinger avec Coolify, la base chez Supabase, les coffres de stockage chez d'autres fournisseurs | accepted (remplace 0027 sur le lieu et 0005 sur la base de production ; précise 0028, 0037, 0067, 0087) |
+| 0153 | Le chatteur voit, pendant son shift, une fiche courte de la créatrice : qui elle est, comment elle écrit, ce qu'elle ne fait jamais | accepted (précise 0025, 0022, 0149) |
+| 0154 | L'IA connaît la bio de la créatrice sur la plateforme : lue en lecture seule, gardée avec le compte, donnée à l'IA comme une donnée, la bio prime sur la fiche | accepted (précise 0110, 0018, 0079) |
+| 0156 | Après une étape payante, elle continue de chatter : achat vu et aftercare, refus dans l'ordre, étape oubliée, aide au paiement, relances de vente | accepted (précise 0103, 0088, P6-02) |
+| 0158 | Elle a du caractère et vend comme une fille : au revoir, bouderie, lassitude, répartie, mémoire datée, rythme d'un script | accepted (précise 0135, 0128, 0156 ; amende `protectionFor` pour l'insulte) |
 | 0159 | Une demande sur mesure passe par l'accord et le prix de la créatrice ; l'IA prend la commande avec un acompte par pourboire et livre depuis un dossier rattaché au fan | accepted (remplace 0090 § A points 1 et 2 ; précise 0145, 0150, 0135, 0018, 0021, 0088) |
 | 0160 | Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures | accepted (amende 0046 § 6) |
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |

@@ -28,6 +28,6 @@ Chaque dimanche à 18 h dans son fuseau, le code calcule sa **semaine** suivante
 - `POST /v1/creator-space/week/accept` (créatrice) : « Accepter ma semaine », chaque tâche par ses propres règles ; rejouable.
 - `PUT /v1/creator-space/shoot-items/:id` (créatrice) : une ligne tournée, ou reprise.
 - `GET /v1/creator-space/day?day=` (créatrice) : « Ma journée », aujourd'hui dans son fuseau sans `day` ; l'essentiel du jour d'abord, puis le bonus (`domain/day.ts`, `DAY_DEFAULTS`).
-- `PUT /v1/creator-space/day/:day/items/:item` (créatrice) : combien elle en a fait, de 0 à ce que la ligne demande (au-delà, compté jusqu'à la ligne) ; le jour même ou le lendemain, sinon 422 `day_item_late_unprocessable` ; rejouable. Sur son compte seul (`withCreatorAccount`), jamais par le rôle de service ; `creator_day_ticks` (migration 0238) se lit par son équipe.
+- `PUT /v1/creator-space/day/:day/items/:item` (créatrice) : combien elle en a fait, de 0 à ce que la ligne demande (au-delà, compté jusqu'à la ligne) ; le jour même ou le lendemain, sinon 422 `day_item_late_unprocessable` ; rejouable. Sur son compte seul (`withCreatorAccount`), jamais par le rôle de service ; `creator_day_ticks` (migration 0243) se lit par son équipe.
 
 Une semaine se nomme par son lundi ; n'importe quel jour de la semaine lit la même.

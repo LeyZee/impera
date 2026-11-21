@@ -33,7 +33,7 @@ type Load<T> =
   | { kind: 'ready'; value: T };
 
 /**
- * Réglages › Ventes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the creators to
+ * Réglages › Plateformes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the creators to
  * import from it (CRM-07, ADR 0069), the owner's links of its models and its team, and the reliability check (CRM-02,
  * § 8). Nothing on this page ever shows the
  * key, even masked.

@@ -6,7 +6,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "env": ["VITE_EXTENSION_CRM_ORIGIN", "EXTENSION_CRM_ORIGIN"],
+      "env": ["VITE_EXTENSION_CRM_ORIGIN", "EXTENSION_CRM_ORIGIN", "VITE_RELEASE"],
       "outputs": ["dist/**", ".output/**"]
     },
     "transit": {

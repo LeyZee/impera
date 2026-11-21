@@ -1434,19 +1434,6 @@ body {
   padding: 0;
   list-style: none;
 }
-.se-tabs {
-  position: relative;
-  display: flex;
-  min-width: 0;
-}
-.se-tabs__bar {
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.se-tabs__bar::-webkit-scrollbar {
-  display: none;
-}
 .se-step__head {
   appearance: none;
   width: 100%;

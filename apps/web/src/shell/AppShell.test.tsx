@@ -85,7 +85,16 @@ describe('the rail of each role', () => {
   it('gives the owner his tabs in the order of ADR 0024, under Chatting and Agence', async () => {
     renderApp(owner, '/');
     await screen.findByText('Chatting');
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Réglages']);
+    expect(tabs()).toEqual([
+      'Dashboard',
+      'Suivi',
+      'Entraîner',
+      'Créatrices',
+      'Équipe',
+      'Paie',
+      'Trafic',
+      'Réglages',
+    ]);
     expect(screen.getByText('Agence')).toBeDefined();
     // Eight places: the phone keeps four on its bar and folds the rest under « Plus ».
     expect(screen.getByRole('button', { name: 'Plus' })).toBeDefined();
@@ -177,7 +186,16 @@ describe('the rail of each role', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/');
     });
-    expect(tabs()).toEqual(['Dashboard', 'Suivi', 'Entraîner', 'Créatrices', 'Équipe', 'Paie', 'Moi']);
+    expect(tabs()).toEqual([
+      'Dashboard',
+      'Suivi',
+      'Entraîner',
+      'Créatrices',
+      'Équipe',
+      'Paie',
+      'Trafic',
+      'Moi',
+    ]);
     cleanup();
     const canal = renderApp(manager, '/entrainer/canal');
     await waitFor(() => {
@@ -202,16 +220,16 @@ describe('Réglages › Sauvegardes', () => {
     );
   });
 
-  it('is a tab of the owner, after Telegram, the pay rules and the billing (EQ-06), before Sécurité (SEC-04)', async () => {
+  it('is a line of the owner, in the group Sécurité, after Alertes and before Sécurité (SEC-04)', async () => {
     const router = renderApp(owner, '/reglages/sauvegardes');
     expect(await subTabs()).toEqual([
+      'Plateformes',
+      'Bots Telegram',
       'Modèles IA',
-      'Ventes',
       'Consommation IA',
-      'Alertes',
-      'Telegram',
       'Règles de paie',
       'Facturation',
+      'Alertes',
       'Sauvegardes',
       'Sécurité',
     ]);
@@ -1045,7 +1063,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
     ['/equipe/planning', 'Équipe', 'Planning', 'wide', owner],
     ['/equipe/rapports', 'Équipe', 'Rapports', 'wide', owner],
     ['/equipe/membres', 'Équipe', 'Membres', 'wide', owner],
-    // Équipe › Reveal: its tab comes with the server's counts, which this shell test never answers.
+    // Équipe › Comptes Reveal: its tab comes with the server's counts, which this shell test never answers.
     ['/paie/quinzaine', 'Paie', 'Quinzaine', 'wide', owner],
     ['/paie/releves', 'Paie', 'Historique', 'wide', owner],
     ['/paie/primes-malus', 'Paie', 'Primes et malus', 'wide', owner],
@@ -1096,10 +1114,10 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
   // Recette visuelle 16/11 (GES-04): Réglages is a list beside its section, not tabs; the header keeps the template.
   it.each([
     ['/reglages/modeles-ia', 'Modèles IA'],
-    ['/reglages/ventes', 'Ventes'],
+    ['/reglages/ventes', 'Plateformes'],
     ['/reglages/consommation-ia', 'Consommation IA'],
     ['/reglages/alertes', 'Alertes'],
-    ['/reglages/telegram', 'Telegram'],
+    ['/reglages/telegram', 'Bots Telegram'],
     ['/reglages/regles-de-paie', 'Règles de paie'],
     ['/reglages/facturation', 'Facturation'],
     ['/reglages/sauvegardes', 'Sauvegardes'],

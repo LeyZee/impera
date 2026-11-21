@@ -193,7 +193,7 @@ describe('where it goes on Telegram', () => {
       routing: coverage,
     });
 
-  it('reads the routing of Réglages › Telegram, creator by creator', () => {
+  it('reads the routing of Réglages › Bots Telegram, creator by creator', () => {
     expect(line([NORA.id])).toEqual({
       kind: 'sent',
       text: 'Part sur Telegram, dans « Alertes personnalisées »',
