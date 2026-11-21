@@ -38,6 +38,62 @@ export interface LinkStatsConnector {
   readRobotHours(link: LinkRef, range: LinkStatsRange): Promise<readonly LinkRobotHour[]>;
 }
 
+/** A link of hers the owner attached to the redirect service: ours, and how the service names it. */
+interface AttachedLink {
+  readonly id: string;
+  readonly ref: LinkRef;
+}
+
+/** One hour as it is kept: closed once a reading was made after its end, and then never written again. */
+export interface KeptLinkHour extends LinkHourTotal {
+  readonly closed: boolean;
+}
+
+/**
+ * The hours kept of her links (`redirect_link_hours`), one creator at a time. It is our table that says whose a
+ * link is, never an answer of the service: the references read here are hers, and each series goes to her link.
+ */
+export interface LinkHourStore {
+  /** Her links that are attached, on and placed: the ones the hourly reading reads. */
+  attachedLinks(creatorId: string): Promise<readonly AttachedLink[]>;
+  /** Keeps the hours of one link: an open hour is replaced, a closed hour is left as it is. The number written. */
+  record(creatorId: string, linkId: string, hours: readonly KeptLinkHour[], readAt: Date): Promise<number>;
+}
+
+/**
+ * The hours one reading covers: the hour under way and the 46 before it. The service counts by the hour over 48
+ * hours and its oldest hour may be cut by the window's edge: it is left out rather than kept short.
+ */
+const WINDOW_HOURS = 47;
+/** The service may count a recent visit late or twice for a few minutes: an hour closes on a reading made after. */
+const CLOSING_MARGIN_MS = 10 * 60 * 1000;
+/** What reading one link costs: its views, its clicks, its robots. */
+export const CALLS_PER_LINK = 3;
+
+export function readingWindow(now: Date): LinkStatsRange {
+  const open = Math.floor(now.getTime() / HOUR_MS) * HOUR_MS;
+  return { from: new Date(open - (WINDOW_HOURS - 1) * HOUR_MS), to: new Date(open + HOUR_MS) };
+}
+
+/**
+ * Every hour of `range` as it is kept after a reading made at `now`: the totals read, and zero for an hour the
+ * service counted nothing in. Zero is a figure: an hour that is absent from the base is an hour nobody read.
+ */
+export function hoursOfWindow(
+  totals: readonly LinkHourTotal[],
+  range: LinkStatsRange,
+  now: Date,
+): KeptLinkHour[] {
+  const read = new Map(totals.map((total) => [total.hour, total]));
+  const kept: KeptLinkHour[] = [];
+  for (let at = range.from.getTime(); at < range.to.getTime(); at += HOUR_MS) {
+    const hour = new Date(at).toISOString();
+    const total = read.get(hour) ?? { hour, pageviews: 0, clicks: 0, robots: 0 };
+    kept.push({ ...total, closed: now.getTime() >= at + HOUR_MS + CLOSING_MARGIN_MS });
+  }
+  return kept;
+}
+
 function hourStart(at: Date): string {
   return new Date(Math.floor(at.getTime() / HOUR_MS) * HOUR_MS).toISOString();
 }
