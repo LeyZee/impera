@@ -398,8 +398,8 @@ export const platformScriptStepMedia = pgTable(
 /**
  * A native script's identity (SC-04 lot c8, ADR 0056 § 6): what it is and when it fits (`ScriptIdentityContent`), for
  * the version of the script it was written from (`input_hash`: its steps' names and texts, their media and the
- * validated description of each, never a price). Written by the brain (`scripts.identify_platform_script`, as the
- * service role) or by hand by the agency, a new row each time, validated once by a person and never changed after
+ * validated description of each, never a price). Written by the brain (a job retired on 21/11/2026, ADR 0161 § 5)
+ * or by hand by the agency, a new row each time, validated once by a person and never changed after
  * (`script_identities_kept`). Under her RLS and the team's scopes, closed to her account; the brain never writes over a
  * validated identity of the same version.
  */
