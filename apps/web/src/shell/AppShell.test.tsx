@@ -299,6 +299,99 @@ describe('a page inside an open section that is not the account’s', () => {
   });
 });
 
+describe('the guards of Comptes Reveal, Mes liens, Trophées and her script, through the real router', () => {
+  const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
+  const operator: Me = { ...base, role: 'operator', team: null, teamScope: 'self' };
+  const onLeave: Me = { ...manager, team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' };
+
+  beforeEach(() => {
+    // Moi and Équipe carry a sub-nav, which watches its tabs' widths.
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  /** The account opens `path` and lands on `expected`, inside its own shell. */
+  async function landing(user: Me, path: string, expected: string): Promise<void> {
+    const router = renderApp(user, path);
+    await waitFor(() => {
+      expect(router.state.location.pathname, `${user.role} ${path}`).toBe(expected);
+    });
+    // A real screen of the account's own, never a dead end.
+    expect(await screen.findByRole('navigation', { name: 'Navigation' })).toBeDefined();
+  }
+
+  it('opens Comptes Reveal to the owner and an active manager; anyone else lands on his first tab, told why', async () => {
+    for (const user of [owner, manager]) {
+      await landing(user, '/equipe/reveal', '/equipe/reveal');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Comptes Reveal' })).toBeDefined();
+      cleanup();
+    }
+    // Équipe is not on their rail: the shell turns them away before the page's own guard is reached.
+    for (const [user, home] of [
+      [chatter, '/aujourdhui'],
+      [onLeave, '/aujourdhui'],
+      [operator, '/'],
+      [creator, '/aujourdhui'],
+    ] as const) {
+      await landing(user, '/equipe/reveal', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
+  it('keeps Mes liens hers: a member of the team lands on his profile, an account without Moi on its first tab', async () => {
+    await landing(creator, '/moi/liens', '/moi/liens');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Mes liens' })).toBeDefined();
+    cleanup();
+    for (const [user, home] of [
+      [manager, '/moi/profil'],
+      [chatter, '/moi/profil'],
+      [owner, '/'],
+      [operator, '/'],
+    ] as const) {
+      await landing(user, '/moi/liens', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
+  it('opens Trophées to a chatter and to her; a manager lands on his profile, told why', async () => {
+    for (const user of [chatter, creator]) {
+      await landing(user, '/moi/trophees', '/moi/trophees');
+      expect(await screen.findByRole('heading', { level: 1, name: 'Trophées' })).toBeDefined();
+      cleanup();
+    }
+    for (const [user, home] of [
+      [manager, '/moi/profil'],
+      [onLeave, '/moi/profil'],
+      [owner, '/'],
+    ] as const) {
+      await landing(user, '/moi/trophees', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+
+  it('sends her from a script address that names no drop back to Contenu, and keeps the team out of it', async () => {
+    await landing(creator, '/contenu/script/pas-un-depot', '/contenu');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Contenu' })).toBeDefined();
+    cleanup();
+    for (const [user, home] of [
+      [owner, '/'],
+      [chatter, '/aujourdhui'],
+    ] as const) {
+      await landing(user, '/contenu/script/0192f3a0-0000-7000-8000-0000000000d1', home);
+      expect(await screen.findByText('Cette page n’est pas dans ton espace.')).toBeDefined();
+      cleanup();
+    }
+  });
+});
+
 describe('« Plus » on the phone', () => {
   const item = (to: NavItem['to'], label: string, icon: NavItem['icon']): NavItem => ({
     to,

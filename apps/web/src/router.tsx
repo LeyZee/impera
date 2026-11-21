@@ -204,7 +204,7 @@ const dashboard = createRoute({
             onCreator={openCreator}
             forOwner={user.role === 'owner'}
             reviewsReports={canOpen(rail, '/equipe')}
-            canAddCreator={canOpen(rail, '/creatrices')}
+            canAddCreator={user.role === 'owner'}
           />
         );
       }
@@ -216,7 +216,7 @@ const dashboard = createRoute({
           forOwner={user.role === 'owner'}
           reviewsReports={canOpen(rail, '/equipe')}
           opensTracking={canOpen(rail, '/suivi')}
-          canAddCreator={canOpen(rail, '/creatrices')}
+          canAddCreator={user.role === 'owner'}
           asked={shown}
           agency={{
             selection,
@@ -237,7 +237,7 @@ const dashboard = createRoute({
         forOwner={false}
         reviewsReports={canOpen(rail, '/equipe')}
         opensTracking={canOpen(rail, '/suivi')}
-        canAddCreator={canOpen(rail, '/creatrices')}
+        canAddCreator={user.role === 'owner'}
         asked={search.creatrice}
         onLeave={() => void navigate({ search: dashboardSearch(periodOf(search)), replace: true })}
       />
@@ -406,7 +406,8 @@ const tracking = createRoute({
       selectedCreator: creatrice ?? null,
       onSelect: (id: string | null) => void navigate({ search: id === null ? {} : { conversation: id } }),
       canDecide: user.role !== 'creator',
-      canAddCreator: canOpen(rail, '/creatrices'),
+      // Only the owner adds a creator (Créatrices): no one else is asked to (DASH-13).
+      canAddCreator: user.role === 'owner',
       liftsStop: user.role === 'owner',
     };
     // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so; away, it says that (CHAT-09).

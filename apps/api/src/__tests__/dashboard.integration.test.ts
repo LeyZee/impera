@@ -412,7 +412,9 @@ describe('GET /v1/dashboard', () => {
     expect(running.todos.map((t) => t.kind)).toEqual(
       expect.arrayContaining(['minor', 'unanswered', 'send_failed']),
     );
-    const stopIs = (active: boolean) =>
+    // The latest row of her scope wins: the switch back on is dated a millisecond after the stop, never a real wait.
+    const stoppedAt = new Date();
+    const stopIs = (active: boolean, setAt: Date) =>
       test.admin.db.insert(schema.killSwitches).values({
         id: newId(KillSwitchIdSchema),
         scope: 'creator',
@@ -421,19 +423,17 @@ describe('GET /v1/dashboard', () => {
         active,
         reason: 'test',
         setBy: 'test',
-        // The latest row of her scope wins: one millisecond apart is enough.
-        setAt: new Date(),
+        setAt,
       });
 
     // Arrêt: Leo, who may be a minor, still waits for a human; the draft, the failed send and the net leave.
-    await stopIs(true);
+    await stopIs(true, stoppedAt);
     const stopped = await read();
     expect(stopped.mode).toBe('stop');
     expect(stopped.todos.map((t) => [t.title, t.kind, t.tone])).toEqual([['Leo', 'minor', 'bad']]);
 
     // Back on: every line comes back.
-    await new Promise((resolve) => setTimeout(resolve, 5));
-    await stopIs(false);
+    await stopIs(false, new Date(stoppedAt.getTime() + 1));
     expect((await read()).todos.map((t) => t.kind)).toEqual(running.todos.map((t) => t.kind));
   });
 

@@ -40,6 +40,11 @@ describe('GET /v1/creator-space/fan-insights', () => {
   const fans: FanId[] = [];
   const longAgo = new Date(Date.now() - 3 * DAY);
   const yesterday = new Date(Date.now() - 2 * DAY);
+  /**
+   * Written after the last midnight the request reads, even if a midnight in Paris passes between the seed and the
+   * request (the server reads the system clock): an hour ahead of the seed.
+   */
+  const writtenToday = new Date(Date.now() + 3_600_000);
 
   const get = (cookie: string) =>
     server.inject({
@@ -207,10 +212,10 @@ describe('GET /v1/creator-space/fan-insights', () => {
     await fact({ fanId: fan(3), key: 'age', value: '70', category: 'operator_note', observedAt: new Date() });
     await fact({ fanId: fan(3), key: 'situation', value: 'marié', category: 'commercial' });
     // Written today: counts from tomorrow only (§ 2).
-    await fact({ fanId: fan(12), key: 'age', value: '50', createdAt: new Date() });
+    await fact({ fanId: fan(12), key: 'age', value: '50', createdAt: writtenToday });
     // Superseded today: the old fact still counts.
     const old = await fact({ fanId: fan(4), key: 'location', value: 'Lyon' });
-    const today = await fact({ fanId: fan(4), key: 'location', value: 'Genève', createdAt: new Date() });
+    const today = await fact({ fanId: fan(4), key: 'location', value: 'Genève', createdAt: writtenToday });
     await test.admin.db
       .update(schema.fanFacts)
       .set({ supersededBy: today })
