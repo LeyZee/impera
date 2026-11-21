@@ -1,5 +1,5 @@
 {
-  "id": "ab9cd580-ae93-43c2-988b-fe71a8885365",
+  "id": "ecc4db4d-a490-4653-b5b1-388de2e75261",
   "prevId": "e8d386b2-4bce-45cf-8501-d3f9d7dc7880",
   "version": "7",
   "dialect": "postgresql",
@@ -2044,11 +2044,11 @@
       "checkConstraints": {
         "content_drops_category_check": {
           "name": "content_drops_category_check",
-          "value": "\"content_drops\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift')"
+          "value": "\"content_drops\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
-          "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift')"
+          "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
@@ -2323,7 +2323,7 @@
       "checkConstraints": {
         "content_requests_category_check": {
           "name": "content_requests_category_check",
-          "value": "\"content_requests\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift')"
+          "value": "\"content_requests\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_requests_origin_check": {
           "name": "content_requests_origin_check",
@@ -25152,7 +25152,7 @@
       "checkConstraints": {
         "content_ideas_category_check": {
           "name": "content_ideas_category_check",
-          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift')"
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_ideas_suggestion_check": {
           "name": "content_ideas_suggestion_check",

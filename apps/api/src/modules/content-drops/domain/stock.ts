@@ -34,6 +34,11 @@ export const STOCK_RULES: Readonly<Record<DropCategory, StockRule>> = {
   // Three playable scripts for the AI to speak (ADR 0145), and one ahead.
   script: { mode: 'count', unit: 'drop', target: 4 },
   whale_gift: { mode: 'count', unit: 'file', target: 3 },
+  // What the AI answers with in her real voice (Charles, 21/11): one beep, two proofs.
+  voice_beep: { mode: 'count', unit: 'file', target: 1 },
+  voice_real: { mode: 'count', unit: 'file', target: 2 },
+  // No stock asked yet (Charles, 21/11: « pas encore décidé »): shown, never lacking.
+  sale_video: { mode: 'bonus', unit: 'file' },
   instagram_post: { mode: 'days', unit: 'file', perDay: 2, targetDays: 3 },
   instagram_reel: { mode: 'days', unit: 'file', perDay: 1, targetDays: 3 },
   instagram_story: { mode: 'days', unit: 'file', perDay: 4, targetDays: 3 },
@@ -48,6 +53,9 @@ const STOCK_PLATFORM_OF: Readonly<Record<DropCategory, StockCategory['platform']
   mass_dm: 'reveal',
   script: 'reveal',
   whale_gift: 'reveal',
+  voice_beep: 'reveal',
+  voice_real: 'reveal',
+  sale_video: 'reveal',
   instagram_post: 'instagram',
   instagram_reel: 'instagram',
   instagram_story: 'instagram',
@@ -62,6 +70,9 @@ export const STOCK_ORDER: readonly DropCategory[] = [
   'mass_dm',
   'script',
   'whale_gift',
+  'sale_video',
+  'voice_beep',
+  'voice_real',
   'instagram_post',
   'instagram_reel',
   'instagram_story',

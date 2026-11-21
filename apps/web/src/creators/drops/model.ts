@@ -27,6 +27,9 @@ export const OUT_LABELS: Readonly<Record<OutCategory, string>> = {
   instagram_post: 'Publié sur Instagram',
   telegram_post: 'Publié sur Telegram',
   whale_gift: 'Rangé dans Reveal',
+  voice_beep: 'Rangé dans Reveal',
+  voice_real: 'Rangé dans Reveal',
+  sale_video: 'Rangé dans Reveal',
 };
 
 /** Where it goes out, as its confirmation asks it. */
@@ -40,6 +43,9 @@ export const OUT_PLACES: Readonly<Record<OutCategory, string>> = {
   instagram_post: 'publié sur Instagram',
   telegram_post: 'publié sur son canal Telegram',
   whale_gift: 'rangé dans Reveal, dans le dossier des cadeaux',
+  voice_beep: 'rangé dans Reveal, dans le dossier des vocaux de l’IA',
+  voice_real: 'rangé dans Reveal, dans le dossier des vocaux de l’IA',
+  sale_video: 'rangé dans Reveal, dans le dossier des vidéos à vendre',
 };
 
 export type DropStanding = 'checking' | 'blocked' | 'too_large' | 'to_publish' | 'out';

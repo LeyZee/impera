@@ -24,13 +24,16 @@ const content = (requests: unknown[], drops: unknown[] = []) =>
   CreatorContentSchema.parse({ requests, drops });
 
 describe('Créatrices › Demandes: what the screen says (MED-09)', () => {
-  it('offers what goes to Reveal, whale gifts included, and a script: six choices, as chips', () => {
+  it("offers what goes to Reveal, gifts, videos to sell and the AI's voices included, and a script", () => {
     expect(ASKABLE_CATEGORIES).toEqual([
       'feed_shoot',
       'feed_video',
       'reveal_story',
       'mass_dm',
       'whale_gift',
+      'sale_video',
+      'voice_beep',
+      'voice_real',
       'script',
     ]);
   });
