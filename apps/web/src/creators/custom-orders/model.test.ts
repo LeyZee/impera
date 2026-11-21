@@ -1,7 +1,7 @@
 import { CustomOrderViewSchema, type CustomOrderView } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { actionsOf, detailLines, headlineOf, priceLine, progressOf, proposedMinor, stepsOf } from './model';
+import { actionsOf, detailLines, headlineOf, priceLine, proposedMinor, stepsOf } from './model';
 
 /* An invented order with neutral values (ADR 0010). */
 const order = (over: Partial<CustomOrderView> = {}): CustomOrderView =>
@@ -35,19 +35,18 @@ const order = (over: Partial<CustomOrderView> = {}): CustomOrderView =>
 describe('a custom order as the screens say it', () => {
   it('a video waits on her: card done, then her yes, the deposit and delivery', () => {
     expect(stepsOf(order())).toEqual([
-      { label: 'Fiche complète', done: true },
+      { label: 'Demande', done: true },
       { label: 'Son oui', done: false },
       { label: 'Acompte', done: false },
       { label: 'Livrée', done: false },
     ]);
-    expect(progressOf(order())).toBe(25);
     expect(actionsOf(order())).toEqual([{ kind: 'decide' }]);
     expect(proposedMinor(order())).toBe(5000);
   });
 
   it('a photo takes no deposit: three steps, delivered next', () => {
     const yes = order({ state: 'creator_yes', format: 'photo', minutes: null, priceMinor: 2000 });
-    expect(stepsOf(yes).map((step) => step.label)).toEqual(['Fiche complète', 'Son oui', 'Livrée']);
+    expect(stepsOf(yes).map((step) => step.label)).toEqual(['Demande', 'Son oui', 'Livrée']);
     expect(priceLine(yes)).toBe('20 € à la livraison');
     expect(actionsOf(yes).map((action) => (action.kind === 'advance' ? action.to : action.kind))).toEqual([
       'delivered',
@@ -61,12 +60,14 @@ describe('a custom order as the screens say it', () => {
     );
     const call = order({ state: 'creator_yes', format: 'call', priceMinor: 3000, depositMinor: 3000 });
     expect(priceLine(call)).toBe('30 € payés d’avance');
-    expect(stepsOf(call).map((step) => step.label)).toEqual(['Fiche complète', 'Son oui', 'Payé', 'Livrée']);
+    expect(stepsOf(call).map((step) => step.label)).toEqual(['Demande', 'Son oui', 'Payé', 'Livrée']);
     expect(actionsOf(call)[0]).toMatchObject({ to: 'deposit_paid', label: 'Paiement reçu' });
   });
 
   it('a delivered order is full and closed; a refused one offers nothing', () => {
-    expect(progressOf(order({ state: 'delivered', priceMinor: 5000, depositMinor: 2500 }))).toBe(100);
+    expect(
+      stepsOf(order({ state: 'delivered', priceMinor: 5000, depositMinor: 2500 })).every((step) => step.done),
+    ).toBe(true);
     expect(actionsOf(order({ state: 'creator_no' }))).toEqual([]);
   });
 

@@ -89,19 +89,13 @@ export function stepsOf(order: CustomOrderView): OrderStep[] {
   };
   const reached = rank[order.state];
   const steps: { label: string; at: number }[] = [
-    { label: 'Fiche complète', at: 1 },
+    { label: 'Demande', at: 1 },
     { label: 'Son oui', at: 2 },
     // Paid in full before (a call, a video call): the step says « Payé », not a deposit.
     ...(takesDeposit(order) ? [{ label: paidInFull(order) ? 'Payé' : 'Acompte', at: 3 }] : []),
     { label: 'Livrée', at: 4 },
   ];
   return steps.map((step) => ({ label: step.label, done: reached >= step.at }));
-}
-
-/** How far along, from 0 to 100, for its meter. */
-export function progressOf(order: CustomOrderView): number {
-  const steps = stepsOf(order);
-  return Math.round((steps.filter((step) => step.done).length / steps.length) * 100);
 }
 
 /** What he asked, in a few words: « Vidéo pour lui · 3 min ». */

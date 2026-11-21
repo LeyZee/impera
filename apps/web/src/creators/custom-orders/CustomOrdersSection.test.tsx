@@ -75,7 +75,7 @@ describe('Créatrices › Sur mesure › Commandes en cours', () => {
     renderSection(true);
     const card = await screen.findByRole('article', { name: 'Basile' });
     expect(within(card).getByText('Attend sa réponse')).toBeTruthy();
-    expect(screen.getByText('Une demande attend la réponse de Nora.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '1 demande attend la réponse de Nora' })).toBeTruthy();
     fireEvent.click(within(card).getByRole('button', { name: 'Elle accepte à 50 €' }));
     await waitFor(() => {
       expect(posts).toEqual([
@@ -87,6 +87,8 @@ describe('Créatrices › Sur mesure › Commandes en cours', () => {
     });
     expect(await screen.findByText('50 € · acompte 25 €')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Acompte reçu' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Rien n’attend, 1 commande avance' })).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('2');
   });
 
   it('a manager reads the same card without a button', async () => {

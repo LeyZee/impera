@@ -16,7 +16,6 @@ import {
   detailLines,
   headlineOf,
   priceLine,
-  progressOf,
   proposedMinor,
   quoteLine,
   STATE_LABELS,
@@ -24,8 +23,6 @@ import {
   stepsOf,
   type OrderTone,
 } from './model';
-
-import { Meter } from '@/shell/figures/figures';
 
 import '../custom-prices/custom-prices.css';
 import './custom-orders.css';
@@ -58,6 +55,7 @@ export function OrderCard({
   const tone = STATE_TONES[order.state];
   const titleId = useId();
   const steps = stepsOf(order);
+  const done = steps.filter((step) => step.done).length;
   const price = priceLine(order);
   const details = detailLines(order);
   const named = order.supplements.map(supplementName);
@@ -82,22 +80,22 @@ export function OrderCard({
       </header>
       <p className="cso-card__what">{headlineOf(order)}</p>
 
-      <div className="cso-progress">
-        <Meter
-          percent={progressOf(order)}
-          colour={TONE_COLOURS[tone]}
-          label={`${String(steps.filter((step) => step.done).length)} étapes sur ${String(steps.length)}`}
-        />
-        <ol className="cso-steps">
-          {steps.map((step) => (
-            <li key={step.label} className="cso-step" data-done={step.done}>
-              <span className="cso-step__dot" aria-hidden="true" />
-              {step.label}
-              <span className="sr-only">{step.done ? ' : fait' : ' : à venir'}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
+      {/* Equal segments, full once reached, each word centred under its own (Design, as #992 draws steps). */}
+      <ol
+        className="cso-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={steps.length}
+        aria-valuenow={done}
+        aria-valuetext={`${String(done)} étapes sur ${String(steps.length)}`}
+      >
+        {steps.map((step) => (
+          <li key={step.label} className="cso-track__step" data-done={step.done ? 'true' : undefined}>
+            <span className="cso-track__seg" aria-hidden="true" />
+            <span className="cso-track__word">{step.label}</span>
+          </li>
+        ))}
+      </ol>
 
       {supplements.length === 0 && details.length === 0 ? null : (
         <dl className="cso-details">
@@ -160,7 +158,7 @@ function Actions({ creatorId, order }: { creatorId: CreatorId; order: CustomOrde
         action.kind === 'decide' ? (
           <div key="decide" className="cso-decide">
             <label className="cso-decide__label" htmlFor={fieldId}>
-              Elle accepte à
+              Son prix
             </label>
             <div className="smp-unit cso-decide__box">
               <div className="smp-unit__box">

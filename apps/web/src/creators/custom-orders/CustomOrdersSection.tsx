@@ -36,16 +36,11 @@ export function CustomOrdersSection({
     <section className="cso-section" aria-labelledby="cso-title">
       <header className="cso-head">
         <div>
+          <p className="nv-eyebrow cso-head__eyebrow">Commandes en cours</p>
+          {/* The answer first, in large (Design): what waits on her, or that nothing does. */}
           <h2 className="nv-h2 cso-head__title" id="cso-title">
-            Commandes en cours
+            {headline(query.data, scope, waiting, creatorName)}
           </h2>
-          <p className="ps-muted">
-            {waiting === 0
-              ? `Les demandes sur mesure de ${creatorName}, jusqu’à la livraison.`
-              : waiting === 1
-                ? `Une demande attend la réponse de ${creatorName}.`
-                : `${String(waiting)} demandes attendent la réponse de ${creatorName}.`}
-          </p>
         </div>
         <div className="cso-scope" role="group" aria-label="Quelles commandes">
           {(
@@ -105,4 +100,20 @@ function sorted(orders: readonly CustomOrderView[]): CustomOrderView[] {
       rank[STATE_TONES[a.state]] - rank[STATE_TONES[b.state]] ||
       Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
   );
+}
+
+/** The heading: what waits on her answer, or how many orders move along. */
+function headline(
+  orders: readonly CustomOrderView[] | undefined,
+  scope: CustomOrdersScope,
+  waiting: number,
+  creatorName: string,
+): string {
+  if (orders === undefined) return 'Commandes sur mesure';
+  if (waiting === 1) return `1 demande attend la réponse de ${creatorName}`;
+  if (waiting > 1) return `${String(waiting)} demandes attendent la réponse de ${creatorName}`;
+  const moving = orders.filter((order) => STATE_TONES[order.state] === 'info').length;
+  if (moving > 0)
+    return `Rien n’attend, ${moving === 1 ? '1 commande avance' : `${String(moving)} commandes avancent`}`;
+  return scope === 'active' ? 'Aucune commande en cours' : 'Aucune commande pour l’instant';
 }

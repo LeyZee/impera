@@ -18,6 +18,9 @@
 .cso-head__title {
   margin: 0;
 }
+.cso-head__eyebrow {
+  margin: 0 0 var(--nv-space-1);
+}
 .cso-scope {
   display: flex;
   gap: var(--nv-space-2);
@@ -36,6 +39,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
   transition:
     transform var(--nv-dur-fast) var(--nv-ease-out),
     box-shadow var(--nv-dur-fast) var(--nv-ease-out);
@@ -77,6 +81,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .cso-card,
+  .cso-track__seg,
   .cso-card[data-tone='warn'] .cso-state::before {
     animation: none;
     transition: none;
@@ -87,38 +92,41 @@
   font-weight: 600;
 }
 
-.cso-progress {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
-}
-.cso-steps {
-  display: flex;
-  justify-content: space-between;
+.cso-track {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: var(--nv-space-1);
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: var(--nv-text-caption);
-  color: var(--nv-ink-muted);
 }
-.cso-step {
-  display: inline-flex;
+.cso-track__step {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  min-width: 0;
+  text-align: center;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
 }
-.cso-step__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1.5px solid var(--nv-ink-faint);
+.cso-track__seg {
+  align-self: stretch;
+  height: 6px;
+  margin-bottom: var(--nv-space-1);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
 }
-.cso-step[data-done='true'] {
+.cso-track__step[data-done='true'] {
   color: var(--nv-ink);
 }
-.cso-step[data-done='true'] .cso-step__dot {
-  border-color: var(--cso-c);
+.cso-track__step[data-done='true'] .cso-track__seg {
   background: var(--cso-c);
+}
+.cso-track__step[data-done='true'] .cso-track__word {
+  font-weight: 650;
 }
 
 .cso-details {
