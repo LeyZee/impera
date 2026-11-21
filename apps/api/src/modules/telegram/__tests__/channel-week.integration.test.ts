@@ -162,7 +162,13 @@ describe('her channel’s week on Postgres', () => {
     ] as const) {
       const saved = await module.saveChannel(
         creatorId,
-        { ...DEFAULT_TELEGRAM_CHANNEL_CONFIG, chatId: chatOf(title), channelLinkId: linkId },
+        // Switched on for her only: Léa's stays off, as every channel is until the owner says so.
+        {
+          ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
+          chatId: chatOf(title),
+          channelLinkId: linkId,
+          publishing: creatorId === nora,
+        },
         'owner-week',
       );
       if (!saved?.ok) throw new Error('channel refused');
@@ -287,6 +293,23 @@ describe('her channel’s week on Postgres', () => {
     const after = (await weekOf(nora, '2026-11-23')).posts.find((post) => post.id === next.id);
     expect(after?.state).toBe('failed');
     expect(after?.reason).toContain('pas renvoyé');
+  });
+
+  it('sends nothing on a channel whose publishing is off, nor a post past its window', async () => {
+    const before = telegram.published.length;
+    await module.jobs.channelSend();
+    expect(telegram.published.length).toBe(before);
+    const lea_ = (await weekOf(lea, '2026-11-23')).posts.filter((post) => post.state === 'skipped');
+    expect(lea_.length).toBeGreaterThan(0);
+    expect(lea_.every((post) => post.reason?.includes('éteinte') === true)).toBe(true);
+    // A day later: her posts of the day left behind are skipped, never sent in a burst.
+    now = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    await module.jobs.channelSend();
+    expect(telegram.published.length).toBe(before);
+    const late = (await weekOf(nora, '2026-11-23')).posts.filter(
+      (post) => post.reason?.includes('dépassée') === true,
+    );
+    expect(late.length).toBeGreaterThan(0);
   });
 
   it('refuses a gesture once the hour has passed', async () => {

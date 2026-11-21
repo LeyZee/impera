@@ -24,6 +24,10 @@ describe('her channel’s visuals: never any nudity (ADR 0162 § 5.2)', () => {
       }),
     ).toBeNull();
     expect(publicDescriptionOf(handDescription(photo, 'Elle pose nue sur le lit.', 'soft'))).toBeNull();
+    // A description the model was not sure of: in doubt, no visual.
+    expect(
+      publicDescriptionOf({ ...handDescription(photo, 'Elle sourit.', 'soft'), confidenceLow: true }),
+    ).toBeNull();
   });
 
   it('leaves out a description it cannot read', () => {

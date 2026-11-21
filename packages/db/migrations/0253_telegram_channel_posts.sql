@@ -1,6 +1,6 @@
 -- ADR 0162: the posts of her channel's week, planned on Saturday evening, reviewed by the owner and her, sent at their
--- hour. Agency data like the other telegram tables: RLS forced without a policy and revoked from `nirvana_app`, so only
--- `withAdmin` reads or writes them; the routes check who asks first.
+-- hour. RLS forced; read and written by the app role through the `telegram_channel` job's policies only (below), one
+-- creator at a time; the routes check who asks first.
 CREATE TABLE "telegram_channel_posts" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"creator_id" uuid NOT NULL,

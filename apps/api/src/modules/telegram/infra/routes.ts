@@ -67,6 +67,8 @@ const GESTURE_REFUSALS: Readonly<Record<ChannelGestureRefusalKind, string>> = {
   no_other_visual: 'Il n’y a pas d’autre visuel permis pour ce post.',
   not_a_text: 'Un sondage se réécrit, il ne se modifie pas à la main.',
   llm_unavailable: 'Aucun modèle n’a répondu, ou le budget du jour est atteint. Réessaie plus tard.',
+  guarded:
+    'Ce texte ne passe pas les règles du canal (ses limites, une adresse, une fausse rareté, trop long) : corrige-le.',
 };
 
 const TRY_REFUSALS: Readonly<Record<ChannelTryRefusalKind, string>> = {

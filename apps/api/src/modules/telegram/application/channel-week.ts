@@ -72,6 +72,8 @@ const THEME_HINTS: Readonly<Record<ChannelTheme, string>> = {
 /** How long ahead the texts are written: the whole planned week, plus its Monday. */
 const WRITE_AHEAD_MS = 8 * 24 * 60 * 60 * 1000;
 const BATCH = 20;
+/** A post is never sent after its window has closed (Sécurité, 21/11/2026): no burst on a public channel after an outage. */
+const LATE_MARGIN_MS = 10 * 60 * 1000;
 
 // ——— Planning ———
 
@@ -251,12 +253,26 @@ function outgoingOf(
 }
 
 /** Sends one due post, or says in amber why it did not go out. Never sends a post twice. */
-async function sendOne(deps: ChannelWeekDeps, post: ChannelPlannedPost, now: Date): Promise<void> {
+async function sendOne(
+  deps: ChannelWeekDeps,
+  post: ChannelPlannedPost,
+  now: Date,
+  timeZone: string,
+): Promise<void> {
   const skip = (reason: string): Promise<boolean> =>
     deps.week.update(post.creatorId, post.id, { state: 'skipped', reason });
+  const closes = wallClockToInstant(post.day, post.window.until, timeZone).getTime() + LATE_MARGIN_MS;
+  if (now.getTime() > closes) {
+    await skip('Heure dépassée : il n’est pas parti en retard.');
+    return;
+  }
   const { record, config } = await channelConfigOf(deps, post.creatorId);
   if (record === null || record.archived || record.chatId === null) {
     await skip('Le canal n’est plus branché.');
+    return;
+  }
+  if (!config.publishing) {
+    await skip('La publication du canal est éteinte : rien n’est parti.');
     return;
   }
   if (!config.publishWithoutValidation && !post.locked) {
@@ -322,9 +338,12 @@ async function sendOne(deps: ChannelWeekDeps, post: ChannelPlannedPost, now: Dat
 
 export async function sendDue(deps: ChannelWeekDeps, now: Date): Promise<number> {
   let sent = 0;
+  const zones = new Map((await deps.bots.listCreators()).map((creator) => [creator.id, creator.timezone]));
   for (const creatorId of await liveChannelCreators(deps)) {
+    const timeZone = zones.get(creatorId);
+    if (timeZone === undefined) continue;
     const due = await deps.week.due(creatorId, now, BATCH);
-    for (const post of due) await sendOne(deps, post, now);
+    for (const post of due) await sendOne(deps, post, now, timeZone);
     sent += due.length;
   }
   return sent;
@@ -383,7 +402,7 @@ async function replace(deps: ChannelWeekDeps, post: ChannelPlannedPost): Promise
   ]);
 }
 
-/** One gesture of the review (§ 3.3), by the owner, a manager or her, up to the post's hour. */
+/** One gesture of the review (§ 3.3), by the owner for now (her screen comes later, with Sécurité), up to the post's hour. */
 export async function applyGesture(
   deps: ChannelWeekDeps,
   creatorId: CreatorId,
@@ -414,10 +433,13 @@ export async function applyGesture(
         post.kind === 'main' && config.channelLinkId !== null
           ? (config.links.find((one) => one.id === config.channelLinkId) ?? null)
           : null;
-      change = {
-        ...signed,
-        draft: renderChannelPost(gesture.text, link === null ? null : linkOf(config, link)),
-      };
+      const draft = renderChannelPost(gesture.text, link === null ? null : linkOf(config, link));
+      // A hand's text passes the same guards as the voice's (Sécurité, 21/11/2026): her limits, the channel's rules.
+      const persona = await deps.persona(creatorId);
+      if (persona === null) return err('guarded');
+      const violations = [...persona.check(guardedTexts(draft)), ...channelChecks(draft)];
+      if (violations.some((violation) => violation.blocking)) return err('guarded');
+      change = { ...signed, draft };
       break;
     }
     case 'rewrite': {

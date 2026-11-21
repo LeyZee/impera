@@ -136,6 +136,11 @@ export const TelegramChannelConfigSchema = z
     previewMinutes: z.number().int().min(CHANNEL_PREVIEW_MIN).max(CHANNEL_PREVIEW_MAX),
     /** ADR 0080 § 2.6: on, a post goes out at its hour unless stopped; off, it waits for « Valider ». */
     publishWithoutValidation: z.boolean(),
+    /**
+     * ADR 0162 (Sécurité, 21/11/2026): whether her week is sent at all. Off by default and for every channel saved
+     * before: the week is planned and written, nothing goes out until the owner switches it on (recent sign-in).
+     */
+    publishing: z.boolean().default(false),
     linkForm: ChannelLinkFormSchema,
     /** The words that carry the link when `linkForm` is `label`; never an address. */
     /** Kept while `linkForm` is `bare`, so that going back to `label` finds it; required only for `label`. */
@@ -177,6 +182,7 @@ export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
   ],
   previewMinutes: 60,
   publishWithoutValidation: true,
+  publishing: false,
   linkForm: 'label',
   linkLabel: 'Viens me parler ✨',
   links: [],

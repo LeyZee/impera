@@ -11,7 +11,8 @@ export function publicDescriptionOf(content: unknown): string | null {
   const description = parsed.data;
   if (description.intensity !== 'soft' && description.intensity !== 'suggestive') return null;
   if (description.anatomyVisible.includes('genitals')) return null;
-  if (description.flags.length > 0 || description.notVisible) return null;
+  // In doubt, no visual: a public send is never taken back (Sécurité, 21/11/2026).
+  if (description.flags.length > 0 || description.notVisible || description.confidenceLow) return null;
   if (description.outfit?.style === 'nothing') return null;
   if (nudityIn(description.factualDescription) !== null || nudityIn(description.detailed) !== null)
     return null;
