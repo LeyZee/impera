@@ -42,11 +42,11 @@ import type {
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
-import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './modules/creator-decisions';
 import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
+import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
 import type { NotificationsModule } from './modules/notifications';
