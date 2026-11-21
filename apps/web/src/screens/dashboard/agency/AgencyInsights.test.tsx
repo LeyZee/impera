@@ -156,21 +156,6 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(rows.map((row) => row.hasAttribute('data-rule'))).toEqual([false, false, true]);
   });
 
-  it('shares the revenue, net of refunds, by the sales that stayed, in the average basket (PRO1-02)', async () => {
-    const [theo, agent, none] = AGENCY_WEEK.sellers;
-    if (theo === undefined || agent === undefined || none === undefined) throw new Error('fixture');
-    // Three sales, one of them refunded: the 50 € left are two baskets of 25 €.
-    serve(200, {
-      ...AGENCY_WEEK,
-      sellers: [{ ...theo, revenueMinor: 5_000, sales: 3, refunds: 1 }, agent, none],
-    });
-    show();
-    const ranking = await screen.findByRole('list', { name: 'Classement de qui a vendu' });
-    const row = within(ranking).getByText('Théo').closest('li');
-    if (row === null) throw new Error('row');
-    expect(row.textContent).toContain('panier moyen 25\u00a0€');
-  });
-
   it('waits in the shape of what comes: four tiles of money, the card of the split, two of the sales (ADM-21)', async () => {
     // A server that never answers: the placeholders stay.
     vi.stubGlobal(

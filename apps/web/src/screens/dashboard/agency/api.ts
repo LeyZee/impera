@@ -53,16 +53,13 @@ export function useSetObjective(): UseMutationResult<
   const client = useQueryClient();
   return useMutation({
     mutationFn: async ({ creatorId, month, amountMinor }) => {
-      // A network that drops rejects the fetch: the screen says so too, never a silent button (CODE-02).
       const response = await fetch(`/v1/dashboard/agency/objectives/${creatorId}/${month}`, {
         method: amountMinor === null ? 'DELETE' : 'PUT',
         credentials: 'include',
         ...(amountMinor === null
           ? {}
           : { headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amountMinor }) }),
-      }).catch(() => null);
-      if (response === null)
-        throw new ObjectiveNotSaved('Le serveur ne répond pas. Réessaie dans un instant.');
+      });
       if (response.status === 403) throw new ObjectiveNotSaved('Seul le propriétaire fixe les objectifs.');
       if (!response.ok)
         throw new ObjectiveNotSaved('L’objectif n’a pas été enregistré. Réessaie dans un instant.');

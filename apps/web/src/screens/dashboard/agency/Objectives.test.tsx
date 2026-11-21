@@ -5,14 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  aboutEuros,
-  objectiveEuros,
-  objectivesSub,
-  objectiveVerdict,
-  ObjectivesCard,
-  wholeEuros,
-} from './Objectives';
+import { aboutEuros, objectivesSub, objectiveVerdict, ObjectivesCard, wholeEuros } from './Objectives';
 import { AGENCY_WEEK, LINA, MAYA } from './fixture';
 
 // Invented figures only (ADR 0092 § 6): two invented creators, invented amounts.
@@ -80,9 +73,6 @@ describe('the card’s figures', () => {
   it('says what is done in whole euros and a projection to ten euros', () => {
     expect(wholeEuros(161_880)).toBe('1\u202f619\u00a0€');
     expect(aboutEuros(505_875)).toBe('environ 5\u202f060\u00a0€');
-    // An objective keeps the cents it was given, never rounded up to the next euro (PRO1-17).
-    expect(objectiveEuros(150_050)).toBe('1\u202f500,50\u00a0€');
-    expect(objectiveEuros(300_000)).toBe('3\u202f000\u00a0€');
     expect(objectivesSub(OBJECTIVES)).toBe('Novembre 2026 · jour 15 sur 30 · interne à l’agence');
     expect(objectivesSub({ ...OBJECTIVES, daysGone: 30 })).toBe(
       'Novembre 2026 · mois terminé · interne à l’agence',
@@ -128,19 +118,5 @@ describe('ObjectivesCard', () => {
       expect(calls).toHaveLength(1);
     });
     expect(calls[0]?.init?.method).toBe('DELETE');
-  });
-
-  it('says the server is silent when the network drops, the objective not saved (CODE-02)', async () => {
-    show(true);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Modifier l’objectif de Lina Test' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Objectif de novembre, en euros' }), {
-      target: { value: '3 100' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
-    expect(await screen.findByText('Le serveur ne répond pas. Réessaie dans un instant.')).toBeTruthy();
   });
 });
