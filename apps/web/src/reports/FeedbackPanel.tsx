@@ -121,32 +121,30 @@ export function IncidentTrack({
     seen: feedback.incidentSeenAt,
     resolved: feedback.incidentResolvedAt,
   };
+  // Three equal steps, each word and its time centred under its own segment (Design, #992).
   return (
-    <div className="rp-track" data-stage={stage}>
-      <div
-        className="rp-track__bar"
-        role="progressbar"
-        aria-valuemin={1}
-        aria-valuemax={3}
-        aria-valuenow={reached + 1}
-        aria-valuetext={STAGE_WORDS[stage]}
-      >
-        <span className="rp-track__fill" style={{ '--rp-fill': `${String(((reached + 1) / 3) * 100)}%` }} />
-      </div>
-      <ol className="rp-track__steps">
-        {order.map((one, index) => {
-          const said = at[one];
-          return (
-            <li key={one} className="rp-track__step" data-done={index <= reached ? 'true' : undefined}>
-              <span className="rp-track__word">{STAGE_WORDS[one]}</span>
-              {said === null ? null : (
-                <span className="rp-track__when nv-num">{whenSaid(said, today, zone)}</span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+    <ol
+      className="rp-track"
+      data-stage={stage}
+      role="progressbar"
+      aria-valuemin={1}
+      aria-valuemax={3}
+      aria-valuenow={reached + 1}
+      aria-valuetext={STAGE_WORDS[stage]}
+    >
+      {order.map((one, index) => {
+        const said = at[one];
+        return (
+          <li key={one} className="rp-track__step" data-done={index <= reached ? 'true' : undefined}>
+            <span className="rp-track__seg" aria-hidden="true" />
+            <span className="rp-track__word">{STAGE_WORDS[one]}</span>
+            {said === null ? null : (
+              <span className="rp-track__when nv-num">{whenSaid(said, today, zone)}</span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

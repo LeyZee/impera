@@ -203,7 +203,8 @@ export interface SchedulingModule {
      * active managers of its creator told on their phone, once each; how many rang. Null when push is off: the
      * incident still leads Équipe › Rapports.
      */
-    readonly notifyIncident: ((shiftFeedbackId: ShiftFeedbackId) => Promise<number>) | null;
+    readonly notifyIncident:
+      ((shiftFeedbackId: ShiftFeedbackId, creatorId: CreatorId) => Promise<number>) | null;
   };
 }
 
@@ -362,8 +363,8 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       notifyIncident:
         notify === null
           ? null
-          : async (shiftFeedbackId) => {
-              const read = await incidentReads.factsUnscoped(shiftFeedbackId);
+          : async (shiftFeedbackId, creatorId) => {
+              const read = await incidentReads.factsUnscoped(shiftFeedbackId, creatorId);
               if (read === null) return 0;
               let rang = 0;
               for (const request of incidentNotices(read.facts, read.recipients)) {

@@ -17867,7 +17867,7 @@
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "\"shift_incident_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"shift_incident_steps\".\"said_by\" = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"said_at\" = now() and exists (select 1 from shift_feedbacks f where f.id = \"shift_incident_steps\".\"shift_feedback_id\" and f.creator_id = \"shift_incident_steps\".\"creator_id\" and f.incident is not null and not exists (select 1 from team_members m where m.id = f.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+          "withCheck": "\"shift_incident_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"creator_id\" = any(u.creator_ids)))) and \"shift_incident_steps\".\"said_by\" = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"said_at\" = now() and exists (select 1 from shift_feedbacks f where f.id = \"shift_incident_steps\".\"shift_feedback_id\" and f.creator_id = \"shift_incident_steps\".\"creator_id\" and f.incident is not null and not exists (select 1 from team_members m where m.id = f.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')))"
         }
       },
       "checkConstraints": {

@@ -735,7 +735,7 @@ export const shiftIncidentSteps = pgTable(
     }),
     pgPolicy('agency_insert', {
       for: 'insert',
-      withCheck: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.saidBy} = ${currentUser} and ${t.saidAt} = now() and exists (select 1 from shift_feedbacks f where f.id = ${t.shiftFeedbackId} and f.creator_id = ${t.creatorId} and f.incident is not null and not ${isMine(sql`f.member_id`)})`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and (${isOwner} or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${t.creatorId} = any(u.creator_ids)))) and ${t.saidBy} = ${currentUser} and ${t.saidAt} = now() and exists (select 1 from shift_feedbacks f where f.id = ${t.shiftFeedbackId} and f.creator_id = ${t.creatorId} and f.incident is not null and not ${isMine(sql`f.member_id`)})`,
     }),
   ],
 );

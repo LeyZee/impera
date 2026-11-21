@@ -1378,9 +1378,12 @@ a.sc-sheet__report:focus-visible,
    category, each its colour of the design system (--nv-series-1…4, its categorical palette). Never a bar on a card's side. */
 .rp-track {
   --rp-stage: var(--nv-danger);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .rp-track[data-stage='seen'] {
   --rp-stage: var(--nv-warning);
@@ -1388,44 +1391,27 @@ a.sc-sheet__report:focus-visible,
 .rp-track[data-stage='resolved'] {
   --rp-stage: var(--nv-success);
 }
-.rp-track__bar {
-  height: 6px;
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-fill-track);
-  overflow: hidden;
-}
-.rp-track__fill {
-  display: block;
-  width: var(--rp-fill);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--rp-stage);
-  transition: width var(--nv-dur-progress) var(--nv-ease-out);
-}
-.rp-track__steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--nv-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 .rp-track__step {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  align-items: center;
+  gap: 2px;
   min-width: 0;
+  text-align: center;
   color: var(--nv-ink-faint);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
 }
-.rp-track__step:nth-child(2) {
-  align-items: center;
-  text-align: center;
+.rp-track__seg {
+  align-self: stretch;
+  height: 6px;
+  margin-bottom: var(--nv-space-1);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
 }
-.rp-track__step:nth-child(3) {
-  align-items: flex-end;
-  text-align: right;
+.rp-track__step[data-done='true'] .rp-track__seg {
+  background: var(--rp-stage);
 }
 .rp-track__step[data-done='true'] {
   color: var(--nv-ink);
@@ -1476,27 +1462,19 @@ a.sc-sheet__report:focus-visible,
   list-style: none;
 }
 .rp-signal,
-.rp-cat,
-.rp-sigbar__part,
-.rp-sigbar__key {
+.rp-cat {
   --rp-kind: var(--nv-series-4);
 }
 .rp-signal[data-kind='1'],
-.rp-cat[data-kind='1'],
-.rp-sigbar__part[data-kind='1'],
-.rp-sigbar__key[data-kind='1'] {
+.rp-cat[data-kind='1'] {
   --rp-kind: var(--nv-series-1);
 }
 .rp-signal[data-kind='2'],
-.rp-cat[data-kind='2'],
-.rp-sigbar__part[data-kind='2'],
-.rp-sigbar__key[data-kind='2'] {
+.rp-cat[data-kind='2'] {
   --rp-kind: var(--nv-series-2);
 }
 .rp-signal[data-kind='3'],
-.rp-cat[data-kind='3'],
-.rp-sigbar__part[data-kind='3'],
-.rp-sigbar__key[data-kind='3'] {
+.rp-cat[data-kind='3'] {
   --rp-kind: var(--nv-series-3);
 }
 .rp-signal {
@@ -1542,7 +1520,7 @@ a.sc-sheet__report:focus-visible,
 .rp-remontee__cats {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--nv-space-2);
+  gap: 6px;
 }
 .rp-remontee__line {
   display: flex;
@@ -1555,7 +1533,7 @@ a.sc-sheet__report:focus-visible,
 }
 .rp-cat {
   min-height: var(--nv-pill-choice);
-  padding: 0 12px;
+  padding: 0 10px;
   border: 0;
   border-radius: var(--nv-radius-full);
   background: var(--nv-glass-fill);
@@ -1731,46 +1709,17 @@ a.sc-sheet__report:focus-visible,
 .rp-fbs__figure[data-tone='ok'] .rp-fbs__value {
   color: var(--nv-success);
 }
-.rp-sigbar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
-}
-.rp-sigbar__track {
-  display: flex;
-  gap: 3px;
-  height: 10px;
-}
-.rp-sigbar__part {
-  flex: var(--rp-part) 1 0;
-  border-radius: var(--nv-radius-full);
-  background: var(--rp-kind);
-}
-.rp-sigbar__legend {
+.rp-sigs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--nv-space-1) var(--nv-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-caption);
-}
-.rp-sigbar__key {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: var(--nv-space-4);
 }
-.rp-sigbar__key::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: var(--nv-radius-full);
-  background: var(--rp-kind);
-}
-.rp-sigbar__key .nv-num {
-  color: var(--nv-ink);
-  font-weight: 650;
+/* The ring, its rows and their lighting are the design system's (`nv-donut`, `nv-breakdown`). */
+.rp-sigs__legend {
+  flex: 1 1 200px;
+  --nv-breakdown-cols: auto minmax(0, 1fr) auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1788,7 +1737,7 @@ a.sc-sheet__report:focus-visible,
     animation: none;
   }
   .rp-incident,
-  .rp-track__fill,
+  .rp-track__seg,
   .rp-cat,
   .rp-incident-line,
   .rp-correction,

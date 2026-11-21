@@ -367,7 +367,8 @@ export const JOB_PAYLOADS = {
    * the next one within its window, never later.
    */
   'scheduling.remind_reports': z.object({}),
-  'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid() }),
+  // The creator rides with the feedback so that the read of its facts is bounded to her (Sécurité, #992).
+  'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
   /**

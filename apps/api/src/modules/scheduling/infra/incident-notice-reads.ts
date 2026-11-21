@@ -1,4 +1,4 @@
-import { ShiftFeedbackIdSchema, type ShiftFeedbackId } from '@impera/contracts';
+import { ShiftFeedbackIdSchema, type CreatorId, type ShiftFeedbackId } from '@impera/contracts';
 import { sql, withAdmin, type Database } from '@impera/db';
 import { z } from 'zod';
 
@@ -26,10 +26,11 @@ const RecipientRowSchema = z.object({ user_id: z.string().min(1), time_zone: z.s
 export function createDrizzleIncidentNoticeReads(adminDb: Database): {
   factsUnscoped(
     feedbackId: ShiftFeedbackId,
+    creatorId: CreatorId,
   ): Promise<{ facts: IncidentFacts; recipients: IncidentRecipient[] } | null>;
 } {
   return {
-    factsUnscoped: (feedbackId) =>
+    factsUnscoped: (feedbackId, creatorId) =>
       withAdmin(adminDb, async (tx) => {
         const [raw] = (
           await tx.execute(sql`
@@ -39,7 +40,7 @@ export function createDrizzleIncidentNoticeReads(adminDb: Database): {
               join shifts s on s.id = f.shift_id
               join team_members m on m.id = f.member_id
               join creators c on c.id = f.creator_id
-             where f.id = ${feedbackId} and f.incident is not null`)
+             where f.id = ${feedbackId} and f.creator_id = ${creatorId} and f.incident is not null`)
         ).rows;
         if (raw === undefined) return null;
         const row = FactsRowSchema.parse(raw);

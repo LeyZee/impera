@@ -16,6 +16,7 @@ import {
   enterCreator,
   eq,
   inArray,
+  onCreatorList,
   schema,
   sql,
   SNAPSHOT_READ,
@@ -234,7 +235,7 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
         }
         await audit(tx, actor, 'shift_feedback.create', { kind: 'shift_feedback', id: sent.id }, { period });
         // An incident tells the owner and the managers at once, once it commits (trous béants n° 1): one job per feedback.
-        if (sent.incident !== null) await enqueueIncidentNotice(tx, sent.id);
+        if (sent.incident !== null) await enqueueIncidentNotice(tx, sent.id, shift.creatorId);
         const made = await feedbackWhere(tx, shiftFeedbacks.id, sent.id);
         if (made === null) throw new ShiftNotFound();
         return { feedback: made.feedback, created: true };
@@ -252,6 +253,8 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
           const feedbacks: (StoredShiftFeedback & { shiftStartsAt: Date; shiftEndsAt: Date })[] = [];
           const accounts: StoredAccount[] = [];
           for (const creatorId of creatorIds) {
+            // A manager reads the creators of his list only, as the reports (Sécurité, #992); the owner reads all.
+            if (scope === 'agency' && !(await onCreatorList(tx, actor, creatorId))) continue;
             await enterCreator(tx, creatorId, creatorIds);
             const rows = await tx
               .select({ ...feedbackColumns, shiftStartsAt: shifts.startsAt, shiftEndsAt: shifts.endsAt })
@@ -292,14 +295,18 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
 
     step: (actor, feedbackId, step) =>
       inFeedbackCreator(feedbackId, actor.userId, async (tx, creatorId) => {
-        const found = await feedbackWhere(tx, shiftFeedbacks.id, feedbackId);
-        if (found?.feedback.incident == null) throw new ShiftFeedbackNotFound();
-        const { feedback } = found;
-        const mine = feedback.memberId === (await ownMemberId(tx, actor.userId));
         const [scopeRow] = (
           await tx.execute(sql`select nullif(current_setting('app.team_scope', true), '') as scope`)
         ).rows;
         const scope = z.object({ scope: z.string().nullable() }).parse(scopeRow).scope;
+        // A manager off the creator's list is told nothing exists (Sécurité, #992), as for an unknown feedback.
+        if (scope === 'agency' && !(await onCreatorList(tx, actor.userId, creatorId))) {
+          throw new ShiftFeedbackNotFound();
+        }
+        const found = await feedbackWhere(tx, shiftFeedbacks.id, feedbackId);
+        if (found?.feedback.incident == null) throw new ShiftFeedbackNotFound();
+        const { feedback } = found;
+        const mine = feedback.memberId === (await ownMemberId(tx, actor.userId));
         if (mine || (scope !== 'owner' && scope !== 'agency')) throw new ShiftIncidentForbidden();
         const already = step === 'resolved' ? feedback.incidentResolvedAt : feedback.incidentSeenAt;
         if (already !== null) return feedback;
@@ -322,11 +329,15 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
 }
 
 /** `scheduling.notify_incident` for a feedback with an incident, once its transaction commits; one per feedback. */
-async function enqueueIncidentNotice(tx: Transaction, shiftFeedbackId: ShiftFeedbackId): Promise<void> {
+async function enqueueIncidentNotice(
+  tx: Transaction,
+  shiftFeedbackId: ShiftFeedbackId,
+  creatorId: CreatorId,
+): Promise<void> {
   await tx.execute(
     sql`select public.enqueue_job(
       task => 'scheduling.notify_incident',
-      payload => ${JSON.stringify({ shiftFeedbackId })}::jsonb,
+      payload => ${JSON.stringify({ shiftFeedbackId, creatorId })}::jsonb,
       max_attempts => ${JOB_MAX_ATTEMPTS['scheduling.notify_incident']}::int,
       job_key => ${`scheduling.notify_incident:${shiftFeedbackId}`},
       job_key_mode => 'preserve_run_at'

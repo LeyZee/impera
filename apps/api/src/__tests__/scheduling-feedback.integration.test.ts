@@ -299,9 +299,14 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
 
     // The phones of the agency are told by a job, once per incident; a feedback without one tells nobody.
     const jobs = await test.admin.db.execute(
-      sql`select key from graphile_worker._private_jobs where key like 'scheduling.notify_incident:%'`,
+      sql`select key, payload from graphile_worker._private_jobs where key like 'scheduling.notify_incident:%'`,
     );
-    expect(jobs.rows).toEqual([{ key: `scheduling.notify_incident:${incident.id}` }]);
+    expect(jobs.rows).toEqual([
+      {
+        key: `scheduling.notify_incident:${incident.id}`,
+        payload: { shiftFeedbackId: incident.id, creatorId: ines },
+      },
+    ]);
 
     // Without a period: the incidents still open, every period, for the owner and the manager.
     for (const cookie of [owner, noraCookie]) {
@@ -324,6 +329,23 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
 
     const step = (cookie: string, id: string, said: 'seen' | 'resolved') =>
       call('POST', `/scheduling/shift-feedback/${id}/incident`, cookie, { step: said });
+
+    // A manager whose list lacks the creator neither reads it nor says « Vu » nor « Réglé » (Sécurité, #992).
+    const { cookie: offList } = await addMember('mila@example.test', 'Mila', 'manager', [anna]);
+    const blind = ShiftFeedbackListSchema.parse(
+      (await call('GET', '/scheduling/shift-feedback', offList)).json(),
+    );
+    expect(blind.feedbacks).toEqual([]);
+    const blindPeriod = ShiftFeedbackListSchema.parse(
+      (
+        await call('GET', `/scheduling/shift-feedback?period=${payPeriodOfDay(parisDay(-3))}`, offList)
+      ).json(),
+    );
+    expect(blindPeriod.feedbacks.map((line) => line.id)).not.toContain(incident.id);
+    for (const said of ['seen', 'resolved'] as const) {
+      const refused = await step(offList, incident.id, said);
+      expect([refused.statusCode, codeOf(refused)]).toEqual([404, 'shift_feedback_not_found']);
+    }
 
     // Neither the chatter who wrote it nor the creator says « Vu »; a feedback without incident has none.
     const own = await step(basileCookie, incident.id, 'seen');

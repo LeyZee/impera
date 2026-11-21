@@ -1,12 +1,15 @@
 import {
   REPORT_SIGNAL_CATEGORIES,
   type PayPeriod,
-  type PlanningMember,
+  type ReportSignalCategory,
   type ShiftFeedbackLine,
   type ShiftFeedbackList,
   type ShiftIncidentStep,
 } from '@impera/contracts';
 import { useState, type JSX } from 'react';
+
+import { Avatar } from './parts';
+import './team.css';
 
 import { IncidentTrack, SignalChips } from '@/reports/FeedbackPanel';
 import {
@@ -22,12 +25,9 @@ import { periodLine } from '@/reports/model';
 import { accountLine, swapShiftLine } from '@/scheduling/model';
 import { dayOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { Donut, useLit } from '@/shell/figures/figures';
 import { Panel } from '@/shell/layout';
 import { Failure } from '@/shell/states';
-
-/** A member's colour on their swatch, or the swatch's own grey. */
-const swatchOf = (member: PlanningMember | undefined): { '--sc-color': string } | undefined =>
-  member?.color === null || member === undefined ? undefined : { '--sc-color': member.color };
 
 const plural = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
@@ -47,7 +47,7 @@ function Whose({
   return (
     <div className="rp-fb__whose">
       <p className="rp-fb__who">
-        <span className="sc-swatch" style={swatchOf(member)} aria-hidden="true" />
+        {member === undefined ? null : <Avatar member={member} />}
         {member?.displayName ?? 'Un membre'}
       </p>
       <p className="rp-fb__where">
@@ -156,7 +156,7 @@ export function IncidentsCard({ zone }: { zone: string }): JSX.Element | null {
                   ) : null}
                   <button
                     type="button"
-                    className="nv-btn nv-btn--plain rp-incident-line__done"
+                    className="nv-btn nv-btn--soft rp-incident-line__done"
                     disabled={busy !== null}
                     onClick={() => {
                       void say(line, 'resolved');
@@ -174,8 +174,9 @@ export function IncidentsCard({ zone }: { zone: string }): JSX.Element | null {
   );
 }
 
-/** How many signals of each category a period carries, in their colours. */
-function SignalBar({ list }: { list: ShiftFeedbackList }): JSX.Element | null {
+/** What the period's signals ask for, by category: a donut in their colours, its legend lighting it (the figures). */
+function SignalDonut({ list }: { list: ShiftFeedbackList }): JSX.Element | null {
+  const { lit, setLit, row } = useLit();
   const counts = REPORT_SIGNAL_CATEGORIES.map((category) => ({
     category,
     count: list.feedbacks.reduce(
@@ -185,22 +186,43 @@ function SignalBar({ list }: { list: ShiftFeedbackList }): JSX.Element | null {
   })).filter((one) => one.count > 0);
   const total = counts.reduce((sum, one) => sum + one.count, 0);
   if (total === 0) return null;
+  const colour = (category: ReportSignalCategory): string =>
+    `var(--nv-series-${String(SIGNAL_CATEGORIES[category].kind)})`;
+  const litOne = lit === null ? undefined : counts[lit];
   return (
-    <div className="rp-sigbar">
-      <div className="rp-sigbar__track" aria-hidden="true">
-        {counts.map((one) => (
-          <span
-            key={one.category}
-            className="rp-sigbar__part"
-            data-kind={SIGNAL_CATEGORIES[one.category].kind}
-            style={{ '--rp-part': String(one.count) }}
-          />
-        ))}
-      </div>
-      <ul className="rp-sigbar__legend">
-        {counts.map((one) => (
-          <li key={one.category} className="rp-sigbar__key" data-kind={SIGNAL_CATEGORIES[one.category].kind}>
-            {SIGNAL_CATEGORIES[one.category].label} <span className="nv-num">{one.count}</span>
+    <div className="rp-sigs">
+      <Donut
+        label={`Remontées par catégorie : ${counts
+          .map((one) => `${SIGNAL_CATEGORIES[one.category].label} ${String(one.count)}`)
+          .join(', ')}`}
+        slices={counts.map((one) => ({ key: one.category, colour: colour(one.category), value: one.count }))}
+        lit={lit}
+        onLit={setLit}
+      >
+        {litOne === undefined ? (
+          <>
+            <b className="nv-donut__value nv-num">{total}</b>
+            <span className="nv-donut__sub">{total > 1 ? 'remontées' : 'remontée'}</span>
+          </>
+        ) : (
+          <>
+            <b className="nv-donut__value nv-num">{litOne.count}</b>
+            <span className="nv-donut__sub">{SIGNAL_CATEGORIES[litOne.category].label}</span>
+          </>
+        )}
+      </Donut>
+      <ul className="nv-breakdown rp-sigs__legend">
+        {counts.map((one, i) => (
+          <li key={one.category}>
+            <button
+              type="button"
+              className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
+              {...row(i)}
+            >
+              <span className="nv-key" style={{ '--_c': colour(one.category) }} aria-hidden="true" />
+              <span className="nv-breakdown__label">{SIGNAL_CATEGORIES[one.category].label}</span>
+              <span className="nv-breakdown__value nv-num">{one.count}</span>
+            </button>
           </li>
         ))}
       </ul>
@@ -278,7 +300,7 @@ export function FeedbacksPanel({
                 rien à signaler
               </p>
             </div>
-            <SignalBar list={list} />
+            <SignalDonut list={list} />
             <ul className="rp-fbs__list">
               {list.feedbacks.map((line, index) => {
                 const stage = incidentStage(line);
