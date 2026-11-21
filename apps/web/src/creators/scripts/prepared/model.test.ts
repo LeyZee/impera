@@ -2,7 +2,7 @@ import { PlatformAccountIdSchema, PreparedScriptIdSchema } from '@impera/contrac
 import { describe, expect, it } from 'vitest';
 
 import { ACCOUNT, CHOICES, CONTENT, SCRIPT, VAULT, branchOf, viewOf } from './fixtures';
-import { editorMedia, pickerFolders, startFolder } from './media';
+import { editorMedia, pickerFolders, placeLine, startFolder } from './media';
 import {
   conditionLabel,
   crossScriptWarnings,
@@ -223,5 +223,14 @@ describe('a media sold in one script and offered in another (REV-08)', () => {
       PlatformAccountIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a2'),
     );
     expect(crossScriptWarnings(view, CONTENT, [paidToo, elsewhere, viewOf()])).toEqual([]);
+  });
+});
+
+describe('where to find a media in her Reveal vault, to copy a script (REV-09)', () => {
+  it('names its folder and its place in it, in the platform’s order', () => {
+    const media = editorMedia(VAULT, CHOICES);
+    expect(placeLine(media.get('m1'))).toBe('Dossier inventé, 1er média');
+    expect(placeLine(media.get('m3'))).toBe('Dossier inventé, 3e média');
+    expect(placeLine(media.get('absent'))).toBeNull();
   });
 });

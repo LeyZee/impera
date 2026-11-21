@@ -1741,3 +1741,10 @@ body {
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
+/* Where each media is in her Reveal vault, under the tiles (REV-09). */
+.se-copy__places {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
