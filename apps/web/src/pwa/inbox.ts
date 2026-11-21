@@ -129,7 +129,7 @@ export function headline(items: readonly NotificationInboxItem[]): {
 export const FAMILY_ICON = {
   money: 'pay',
   day: 'today',
-  team: 'people',
+  team: 'team',
   alert: 'bell',
   safety: 'shield',
 } as const satisfies Readonly<Record<InboxFamily, NavIconName>>;
