@@ -463,11 +463,6 @@
   display: grid;
   gap: 12px;
 }
-.cia-fc-lead__band {
-  display: grid;
-  gap: 6px;
-  align-content: end;
-}
 .cia-band {
   position: relative;
   height: 10px;
@@ -482,7 +477,7 @@
   border-radius: inherit;
   background: var(--nv-data-1);
   transform-origin: left center;
-  animation: cia-grow var(--nv-dur-data) var(--nv-ease-out) 200ms both;
+  animation: cia-grow var(--nv-dur-data) var(--nv-ease-out) calc(var(--nv-stagger) * 4) both;
 }
 .cia-band__mark {
   position: absolute;
@@ -495,28 +490,134 @@
   background: var(--nv-ink);
   box-shadow: 0 0 0 2px var(--nv-plate);
 }
-.cia-fc-cap {
+/* The verdict under the figures: one sentence, its tone said by an icon too (success, or amber; never red). */
+.cia-fc-verdict {
+  --_t: var(--nv-success);
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   align-items: flex-start;
-  margin: 0;
-  padding: var(--nv-plate-pad);
+  padding: 12px 14px;
+  border-radius: var(--nv-radius-md);
   font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
   color: var(--nv-ink);
-  background: color-mix(in oklab, var(--nv-warning) 12%, var(--nv-plate));
+  background: color-mix(in oklab, var(--_t) 12%, var(--nv-plate));
 }
-.cia-fc-cap__text {
+.cia-fc-verdict[data-tone='warn'] {
+  --_t: var(--nv-warning);
+}
+.cia-fc-verdict__text {
   flex: 1 1 220px;
   margin: 0;
 }
-.cia-fc-cap__act {
+.cia-fc-verdict__act {
   margin-left: 28px;
 }
-.cia-fc-cap__icon {
+.cia-fc-verdict__icon {
   flex: none;
   margin-top: 1px;
-  color: var(--nv-warning);
+  color: var(--_t);
+}
+.cia-fc-hero {
+  display: grid;
+  gap: 16px;
+  padding: var(--nv-plate-pad);
+}
+/* The amount and its share of the sales side by side, the same size: the two figures to read first. */
+.cia-fc-hero__figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-card-gap);
+}
+.cia-curve {
+  height: 200px;
+}
+.cia-curve__corridor {
+  fill: var(--_c);
+  fill-opacity: 0.1;
+  animation: nv-chart-fade var(--nv-dur-slow) calc(6 * var(--nv-stagger)) var(--nv-ease-out) both;
+}
+.cia-curve__pace {
+  fill: none;
+  stroke: var(--_c);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+  animation: nv-chart-fade var(--nv-dur-slow) calc(8 * var(--nv-stagger)) var(--nv-ease-out) both;
+}
+.cia-curve__cap {
+  stroke: var(--nv-warning);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+}
+.cia-curve__cap-label {
+  fill: var(--nv-warning);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+}
+.cia-curve__today {
+  stroke: var(--nv-ink-faint);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.cia-curve__keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.cia-curve__keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.cia-curve__keys li::before {
+  content: '';
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--nv-neon);
+}
+.cia-curve__keys li[data-k='pace']::before {
+  background: repeating-linear-gradient(90deg, var(--nv-neon) 0 4px, transparent 4px 7px);
+}
+.cia-curve__keys li[data-k='band']::before {
+  height: 10px;
+  background: color-mix(in srgb, var(--nv-neon) 18%, transparent);
+}
+.cia-curve__keys li[data-k='cap']::before {
+  background: repeating-linear-gradient(90deg, var(--nv-warning) 0 3px, transparent 3px 6px);
+}
+.cia-fc-tiles.ins-tiles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cia-fc-tiles .ins-tile__note {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+/* By line of spend: one bar split by colour; the row under the pointer lights its part, the others step back. */
+.cia-fc-bar.ins-money__bar {
+  height: 14px;
+}
+.cia-fc-bar.is-lit .ins-money__part:not(.is-on) {
+  opacity: 0.35;
+}
+.cia-fc-row.cia-fc-row--keyed {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  transition: background var(--nv-dur-fast);
+}
+.cia-fc-row__key {
+  align-self: start;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 3px;
+  background: var(--_c);
 }
 .cia-fc-list {
   align-self: start;
@@ -585,8 +686,11 @@
 }
 /* On a phone the forecast's tiles stack, one a row: a sentence under each figure needs the width. */
 @media (max-width: 720px) {
-  .cia-fc .cia-tiles .ins-tile {
-    grid-column: 1 / -1;
+  .cia-fc-tiles.ins-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cia-curve {
+    height: 180px;
   }
 }
 

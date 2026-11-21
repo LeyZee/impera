@@ -701,7 +701,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
         sub="ce que l’IA coûtera ce mois-ci et le suivant, au rythme réel des derniers jours, face aux ventes"
         index={2}
       >
-        <Forecast forecast={usage.forecast} />
+        <Forecast forecast={usage.forecast} days={usage.days} today={usage.today.day} tip={tip} />
       </Section>
 
       <Section
