@@ -1,6 +1,6 @@
 import type { JSX, ReactNode } from 'react';
 
-import type { HelpGuide } from './guides';
+import type { HelpGuide, HelpTone } from './guides';
 
 import { NavIcon } from '@/shell/NavIcon';
 
@@ -18,6 +18,14 @@ export function withKeys(text: string): ReactNode {
     ),
   );
 }
+
+/** A chip's tone, as the dot of its tinted tag: go in the rising green, ok in cyan, warn in amber, danger in red. */
+const TONE: Readonly<Record<HelpTone, string>> = {
+  go: 'var(--nv-trend-up)',
+  warn: 'var(--nv-warning)',
+  danger: 'var(--nv-danger)',
+  ok: 'var(--nv-success)',
+};
 
 const STAR = (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -80,7 +88,7 @@ export function Guide({
           <span className="nv-guide__title">
             {guide.title}
             {guide.essential === true ? (
-              <span className="nv-guide__key">
+              <span className="nv-tag nv-tag--tint nv-guide__key" style={{ '--_c': 'var(--nv-content-6)' }}>
                 {STAR}
                 Essentiel
               </span>
@@ -96,7 +104,7 @@ export function Guide({
         {guide.chips === undefined ? null : (
           <div className="nv-guide__chips">
             {guide.chips.map((chip) => (
-              <span key={chip.text} className={`nv-guide__chip nv-guide__chip--${chip.tone}`}>
+              <span key={chip.text} className="nv-tag nv-tag--tint" style={{ '--_c': TONE[chip.tone] }}>
                 {chip.text}
               </span>
             ))}
@@ -107,7 +115,9 @@ export function Guide({
             <li key={step.do}>
               <div>
                 <span className="nv-guide__do">{withKeys(step.do)}</span>
-                <span className="nv-guide__see">Tu dois voir : {withKeys(step.see)}</span>
+                <span className="nv-guide__see">
+                  <span className="nv-guide__see-label">Tu dois voir :</span> {withKeys(step.see)}
+                </span>
               </div>
             </li>
           ))}

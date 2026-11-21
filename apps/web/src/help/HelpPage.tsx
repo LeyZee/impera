@@ -69,7 +69,7 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
         <p className="hp__lead">{book.lead}</p>
         <ol className="hp__day">
           {book.day.map((beat) => (
-            <li key={beat.title}>
+            <li key={beat.title} className="nv-tile">
               <b>{beat.title}</b>
               {beat.text}
             </li>
@@ -82,12 +82,15 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
           <h2 className="nv-h2" id="hp-guides">
             Les gestes qui demandent un guide
           </h2>
-          <span className="hp__count">{book.guides.length} guides</span>
+          <span className="nv-count" aria-label={`${String(book.guides.length)} guides`}>
+            {book.guides.length}
+          </span>
         </div>
         <nav className="hp__toc" aria-label="Aller à un guide">
           {book.guides.map((guide) => (
             <a
               key={guide.id}
+              className="nv-chip"
               href={`#guide-${guide.id}`}
               onClick={(event) => {
                 const target = document.getElementById(`guide-${guide.id}`);
@@ -115,7 +118,7 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
         </h2>
         <div className="hp__links">
           {PAGES.filter((page) => page.for.includes(audience)).map((page) => (
-            <Link key={page.to} to={page.to} className="hp__link">
+            <Link key={page.to} to={page.to} className="nv-tile hp__link">
               <span className="hp__link-icon" aria-hidden="true">
                 <NavIcon name={page.icon} />
               </span>
@@ -130,7 +133,9 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
           <h2 className="nv-h2" id="hp-faq">
             Questions fréquentes
           </h2>
-          <span className="hp__count">{book.faq.length}</span>
+          <span className="nv-count" aria-label={`${String(book.faq.length)} questions`}>
+            {book.faq.length}
+          </span>
         </div>
         <div className="hp__faq">
           {book.faq.map((item) => (

@@ -18,7 +18,7 @@
   gap: 8px;
   font-size: var(--nv-text-footnote);
   font-weight: 600;
-  color: var(--_c);
+  color: var(--nv-ink);
 }
 .hp__kicker i {
   width: 6px;
@@ -45,22 +45,13 @@
   gap: 12px;
   counter-reset: hp-day;
 }
-.hp__day li {
+/* Each beat is an nv-tile; it keeps the page's colour for its number (nv-tile sets its own --_c). */
+.hp__day .nv-tile {
+  --_c: inherit;
   counter-increment: hp-day;
-  position: relative;
-  padding: 14px;
-  border-radius: var(--nv-radius-md);
-  border: 1px solid var(--nv-plate-edge);
-  background: var(--nv-glass-fill);
+  display: block;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
-  transition:
-    transform var(--nv-dur-slow) var(--nv-ease-spring),
-    border-color var(--nv-dur-fast) var(--nv-ease-out);
-}
-.hp__day li:hover {
-  transform: translateY(-3px);
-  border-color: color-mix(in srgb, var(--_c) 40%, transparent);
 }
 .hp__day li::before {
   content: counter(hp-day);
@@ -72,8 +63,9 @@
   border-radius: 50%;
   font-size: var(--nv-text-caption);
   font-weight: 600;
-  color: var(--_c);
+  color: var(--nv-ink);
   background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 45%, transparent);
 }
 .hp__day b {
   display: block;
@@ -84,12 +76,12 @@
   .hp__day {
     grid-template-columns: 1fr;
   }
-  .hp__day li {
+  .hp__day .nv-tile {
     display: grid;
     grid-template-columns: 26px minmax(0, 1fr);
     column-gap: 12px;
   }
-  .hp__day li::before {
+  .hp__day .nv-tile::before {
     grid-row: span 2;
     margin: 0;
   }
@@ -104,49 +96,25 @@
   justify-content: space-between;
   gap: 12px;
 }
-.hp__count {
-  padding: 4px 10px;
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-glass-fill);
-  font-size: var(--nv-text-caption);
-  color: var(--nv-ink-faint);
-  white-space: nowrap;
-}
 .hp__toc {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.hp__toc a {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  border-radius: var(--nv-radius-full);
-  border: 1px solid var(--nv-plate-edge);
-  background: var(--nv-glass-fill);
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
+.hp__toc .nv-chip {
   text-decoration: none;
-  transition:
-    color var(--nv-dur-fast) var(--nv-ease-out),
-    border-color var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.hp__toc a:hover {
-  color: var(--nv-ink);
-  border-color: color-mix(in srgb, var(--_c) 45%, transparent);
-  transform: translateY(-1px);
-}
-.hp__toc a:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
 }
 .hp__toc i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--_c);
+}
+/* On a phone the list just below is the table of contents. */
+@media (max-width: 560px) {
+  .hp__toc {
+    display: none;
+  }
 }
 .hp__guides {
   display: grid;
@@ -160,25 +128,14 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
 }
-.hp__link {
-  display: flex;
+/* A page of help: an nv-tile laid in a row, its icon then its name. */
+.hp__link.nv-tile {
+  flex-direction: row;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  border-radius: var(--nv-radius-md);
-  border: 1px solid transparent;
   color: var(--nv-ink);
   font-weight: 600;
   text-decoration: none;
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    border-color var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.hp__link:hover {
-  transform: translateY(-2px);
-  background: var(--nv-glass-fill);
-  border-color: var(--nv-plate-edge);
 }
 .hp__link:focus-visible {
   outline: 2px solid var(--nv-focus);
@@ -212,7 +169,7 @@
   font-weight: 500;
 }
 .hp__faq .nv-disclosure[open] .hp__q {
-  color: var(--_c);
+  font-weight: 600;
 }
 .hp__a {
   margin: 0;

@@ -1800,8 +1800,10 @@
 
 /* ───────────── Guide: a hard gesture, folded beside its screen and in Moi › Aide ─────────────
    <details class="nv-guide" style="--_c: var(--nv-content-5)">: one colour per page (the person's), carried by the
-   icon tile, the step numbers and the open guide's rim. Steps say what to do, then « Tu dois voir » what proves it;
-   « À savoir » on a tile, « Jamais » in the danger colour, « Si ça coince » in amber. Validated by Charles, 21/11. */
+   icon tile, the tint behind the step numbers and the open guide's rim; every word and figure stays in ink, so the
+   colour never carries small text (contrast test: nv-guide). Steps say what to do, then « Tu dois voir » what proves
+   it; « À savoir » on a tile, « Jamais » in the danger colour, « Si ça coince » in amber. « Essentiel » and the chips
+   are nv-tag nv-tag--tint. Validated by Charles, 21/11. */
 .nv-guide {
   --_c: var(--nv-ink);
   border-radius: var(--nv-radius-lg);
@@ -1811,16 +1813,13 @@
   interpolate-size: allow-keywords;
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
   animation-delay: calc(var(--nv-i, 0) * var(--nv-stagger));
-  transition:
-    border-color var(--nv-dur-fast) var(--nv-ease-out),
-    box-shadow var(--nv-dur-slow) var(--nv-ease-out);
+  transition: border-color var(--nv-dur-fast) var(--nv-ease-out);
 }
 .nv-guide:hover {
   border-color: color-mix(in srgb, var(--_c) 35%, var(--nv-plate-edge));
 }
 .nv-guide[open] {
   border-color: color-mix(in srgb, var(--_c) 40%, transparent);
-  box-shadow: 0 20px 44px -30px color-mix(in srgb, var(--_c) 80%, transparent);
 }
 .nv-guide > summary {
   list-style: none;
@@ -1868,7 +1867,7 @@
 .nv-guide[open] .nv-guide__icon {
   background: var(--_c);
   color: var(--nv-void);
-  box-shadow: 0 8px 18px -8px var(--_c);
+  box-shadow: none;
 }
 .nv-guide__head {
   display: grid;
@@ -1889,23 +1888,15 @@
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
 }
-/* « Essentiel »: a small gold star, the only gold of the page. */
-.nv-guide__key {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 6px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-weight: 600;
-  color: var(--nv-content-6);
-  background: color-mix(in srgb, var(--nv-content-6) 13%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-content-6) 28%, transparent);
+/* « Essentiel »: an nv-tag nv-tag--tint in gold whose dot is a star, the only gold of the page. */
+.nv-guide__key::before {
+  content: none;
 }
 .nv-guide__key svg {
+  flex: none;
   width: 11px;
   height: 11px;
+  color: var(--_c);
 }
 .nv-guide__time {
   font-size: var(--nv-text-caption);
@@ -1938,7 +1929,7 @@
   background: color-mix(in srgb, var(--_c) 16%, transparent);
 }
 .nv-guide[open] .nv-guide__chev::after {
-  border-color: var(--_c);
+  border-color: var(--nv-ink);
 }
 .nv-guide::details-content {
   block-size: 0;
@@ -1977,32 +1968,6 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.nv-guide__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-caption);
-  background: var(--nv-glass-fill);
-  box-shadow: inset 0 0 0 1px var(--nv-hairline);
-}
-.nv-guide__chip::before {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--_t, var(--nv-success));
-}
-.nv-guide__chip--go {
-  --_t: var(--nv-trend-up);
-}
-.nv-guide__chip--warn {
-  --_t: var(--nv-warning);
-}
-.nv-guide__chip--danger {
-  --_t: var(--nv-danger);
-}
 /* The steps: numbered in the page's colour, linked by a thread; each proves itself with « Tu dois voir ». */
 .nv-guide__steps {
   list-style: none;
@@ -2036,16 +2001,12 @@
   place-items: center;
   font-size: var(--nv-text-caption);
   font-weight: 600;
-  color: var(--_c);
-  background: color-mix(in srgb, var(--_c) 14%, transparent);
-  transition:
-    transform var(--nv-dur-slow) var(--nv-ease-spring),
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    color var(--nv-dur-fast) var(--nv-ease-out);
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--_c) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_c) 45%, transparent);
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .nv-guide__steps > li:hover::before {
-  background: var(--_c);
-  color: var(--nv-void);
   transform: scale(1.08);
 }
 .nv-guide__steps > li:not(:last-child)::after {
@@ -2067,6 +2028,10 @@
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink-muted);
+}
+/* « Tu dois voir : » steps back, so the proof stands out. */
+.nv-guide__see-label {
+  color: var(--nv-ink-faint);
 }
 .nv-guide__box {
   display: grid;
@@ -2114,6 +2079,19 @@
   }
   .nv-guide__body {
     padding: 4px 16px 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-guide,
+  .nv-guide[open] .nv-guide__body > * {
+    animation: none;
+  }
+  .nv-guide::details-content {
+    transition: none;
+  }
+  .nv-guide > summary:hover .nv-guide__icon,
+  .nv-guide__steps > li:hover::before {
+    transform: none;
   }
 }
 
