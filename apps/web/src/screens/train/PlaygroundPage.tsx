@@ -21,8 +21,9 @@ import {
   personaShort,
   stepOf,
 } from './playground/logic';
-import { filedAck, isHandoff, isWaiting, suggestedDestination } from './playground/model';
+import { filedAck, isFiledWarning, isHandoff, isWaiting, suggestedDestination } from './playground/model';
 import { revealTimes } from './playground/reveal';
+import { useTrainsAsOwner } from './playground/trainer';
 import { usePlayground } from './playground/usePlayground';
 
 import { initialOf } from '@/lib/utils';
@@ -74,6 +75,9 @@ const LOADING_TITLES: Readonly<Record<PlaygroundErrorCode, string>> = {
   failed: 'Le serveur ne répond pas',
 };
 
+/** A manager's lesson: kept for the owner to read, or a test; her bank is the owner's to fill (ADR 0092 § 8). */
+const MANAGER_DESTINATIONS: readonly Destination[] = ['rule', 'test'];
+
 /**
  * Entraîner > Playground (spec moteur-ia/playground-entrainement.md): the same path as production with no
  * connection, one number on top, three gestures under each answer, every correction becomes a lesson.
@@ -81,6 +85,8 @@ const LOADING_TITLES: Readonly<Record<PlaygroundErrorCode, string>> = {
 export function PlaygroundPage(): JSX.Element {
   const pg = usePlayground();
   const { state } = pg;
+  // A manager trains too (ADR 0092 § 8): he notes and corrects, the owner alone files in her bank and holds the keys.
+  const asOwner = useTrainsAsOwner();
   const [mode, setMode] = useState<LocalMode>('idle');
   const [lesson, setLesson] = useState<{ verdict: Verdict; destination: Destination } | undefined>(undefined);
   const [comparison, setComparison] = useState<PlaygroundComparison | undefined>(undefined);
@@ -96,6 +102,7 @@ export function PlaygroundPage(): JSX.Element {
   const [whyManual, setWhyManual] = useState<boolean | undefined>(undefined);
   /** Where the last lesson went, said until the next message. */
   const [filed, setFiled] = useState<Destination | undefined>(undefined);
+  const [filedBlockedBy, setFiledBlockedBy] = useState<readonly string[]>([]);
   /** On a phone the situation is a sheet over the conversation. */
   const [sheetOpen, setSheetOpen] = useState(false);
   // The situation's sheet takes the focus when it opens and gives it back to « Fan » when it closes.
@@ -192,9 +199,16 @@ export function PlaygroundPage(): JSX.Element {
   };
 
   const rate = async (verdict: Verdict, destination?: Destination): Promise<void> => {
-    if (!(await pg.run((c) => c.rate(verdict, destination)))) return;
+    let blockedBy: readonly string[] = [];
+    const isRated = await pg.run(async (c) => {
+      const rated = await c.rate(verdict, destination);
+      blockedBy = (rated.exampleBlockedBy ?? []).map((v) => v.label);
+      return rated;
+    });
+    if (!isRated) return;
     reset();
     setFiled(destination);
+    setFiledBlockedBy(blockedBy);
     // A rejected answer gets a new draw for the same moment, as a trainer would ask « again ».
     if (verdict.kind === 'rejected' && state !== undefined && !isHandoff(state.pending)) {
       replay(fanMessageCount(state));
@@ -202,7 +216,7 @@ export function PlaygroundPage(): JSX.Element {
   };
 
   const startLesson = (verdict: Verdict): void => {
-    setLesson({ verdict, destination: suggestedDestination(verdict) ?? 'test' });
+    setLesson({ verdict, destination: suggestedDestination(verdict, asOwner) ?? 'test' });
     setMode('lesson');
   };
 
@@ -282,7 +296,7 @@ export function PlaygroundPage(): JSX.Element {
             {refused ? null : (
               <>
                 {/* The provider refuses: a retry alone settles nothing, the key is where it is fixed. */}
-                {pg.error === 'llm_unavailable' ? (
+                {pg.error === 'llm_unavailable' && asOwner ? (
                   <Link className="nv-btn nv-btn--soft" to="/reglages/modeles-ia">
                     Ouvrir Modèles IA
                   </Link>
@@ -431,16 +445,23 @@ export function PlaygroundPage(): JSX.Element {
                 }
           }
           onSend={send}
+          onScriptStep={(answer) => {
+            void pg.run((c) => c.answerScriptStep(answer));
+          }}
         />
         <div className="pg-dock">
           {filed === undefined || mode === 'lesson' ? null : (
-            <p className="pg-ack" role="status">
-              {filedAck(filed, pg.client.isDemo)}
+            <p
+              className={`pg-ack${isFiledWarning(filed, filedBlockedBy) ? ' pg-ack--warn' : ''}`}
+              role="status"
+            >
+              {filedAck(filed, pg.client.isDemo, filedBlockedBy)}
             </p>
           )}
           {mode === 'lesson' && lesson !== undefined ? (
             <LessonCard
               destination={lesson.destination}
+              {...(!asOwner && { destinations: MANAGER_DESTINATIONS })}
               busy={pg.busy}
               onDestination={(destination) => {
                 setLesson({ ...lesson, destination });

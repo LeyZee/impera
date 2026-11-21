@@ -180,6 +180,19 @@ export interface StatsDay {
   readonly readAt: Date;
 }
 
+/**
+ * One refund the totals take off, as the connectors list it (ADR 0092 § 4): its sale's instant `null` when the sale
+ * is not in the register.
+ */
+export interface RefundRead {
+  readonly saleType: SaleType;
+  readonly currency: Currency;
+  readonly grossInclVatMinor: number;
+  readonly refundedAt: Date;
+  readonly saleOccurredAt: Date | null;
+  readonly seller: SaleSeller;
+}
+
 /** One creator's part of the read, inside her tenant. */
 export interface AgencyCreatorRead {
   readonly creatorId: CreatorId;
@@ -188,8 +201,12 @@ export interface AgencyCreatorRead {
   readonly totals: SalesTotals;
   readonly hours: readonly HourSum[];
   readonly fans: readonly FanSum[];
+  /** The period's refunds one by one, the latest first (ADR 0092 § 4). */
+  readonly refunds: readonly RefundRead[];
   /** Refunds of the period whose sale is older than the register: counted in no figure (CRM-02's note). */
   readonly refundsWithoutSale: number;
+  /** The owner's revenue objective for the month read, in euro cents; null without one or off a calendar month. */
+  readonly objectiveMinor: number | null;
   /** The day of her register's oldest line, in the platform's zone; null without one (ADR 0146 § 4). */
   readonly registerSince: string | null;
   /** Her accounts' days in the statistics' snapshot, from the day before the previous period to today. */
@@ -306,6 +323,79 @@ function pairIn<K>(map: Map<K, Pair>, key: K): Pair {
 
 const hasAny = (figures: AgencyFigures): boolean =>
   figures.sales > 0 || figures.refunds > 0 || figures.revenueMinor !== 0;
+
+/**
+ * Every creator's refunds one by one, the latest first (ADR 0092 § 4): the amount in euro cents (dollars converted
+ * one by one, null without a rate), the seller named, the whole days from the sale. Never a fan.
+ */
+function refundListOf(
+  creators: readonly AgencyCreatorRead[],
+  names: ReadonlyMap<string, string>,
+  rate: UsdRate | null,
+): AgencyInsights['refundList'] {
+  return creators
+    .flatMap((creator) =>
+      creator.refunds.map((refund) => ({
+        refundedAt: refund.refundedAt,
+        creatorId: creator.creatorId,
+        kind: KIND_OF[refund.saleType],
+        amountMinor:
+          refund.currency === 'USD'
+            ? rate === null
+              ? null
+              : usdToEurMinor(refund.grossInclVatMinor, rate.rateMicros)
+            : refund.grossInclVatMinor,
+        seller: named(refund.seller, names),
+        delayDays:
+          refund.saleOccurredAt === null
+            ? null
+            : Math.max(
+                0,
+                Math.floor((refund.refundedAt.getTime() - refund.saleOccurredAt.getTime()) / DAY_MS),
+              ),
+      })),
+    )
+    .sort((a, b) => b.refundedAt.getTime() - a.refundedAt.getTime())
+    .map((refund) => ({ ...refund, refundedAt: refund.refundedAt.toISOString() }));
+}
+
+/** A revenue at this pace over `daysGone` days, carried to `days`, to the cent; null once the month is over. */
+function projected(revenueMinor: number, daysGone: number, days: number): number | null {
+  return daysGone >= days ? null : Math.round((revenueMinor * days) / daysGone);
+}
+
+/**
+ * The month's objectives (ADR 0092 § 6): each creator counted, her objective, her revenue so far and its linear
+ * projection; the agency's objective the sum of those set. `range` is the month read, up to today.
+ */
+export function objectivesOf(
+  range: Pick<AgencyRange, 'from' | 'to'>,
+  creators: readonly Pick<AgencyCreatorRead, 'creatorId' | 'objectiveMinor'>[],
+  revenues: ReadonlyMap<CreatorId, number>,
+): NonNullable<AgencyInsights['objectives']> {
+  const daysGone = dayCount(range.from, range.to);
+  const days = dayCount(range.from, periodAround('month', range.from).to);
+  const rows = creators.map((creator) => {
+    const revenueMinor = revenues.get(creator.creatorId) ?? 0;
+    return {
+      creatorId: creator.creatorId,
+      objectiveMinor: creator.objectiveMinor,
+      revenueMinor,
+      projectedMinor: projected(revenueMinor, daysGone, days),
+    };
+  });
+  const set = rows.filter((row) => row.objectiveMinor !== null);
+  const revenueMinor = rows.reduce((sum, row) => sum + row.revenueMinor, 0);
+  return {
+    month: range.from,
+    daysGone,
+    days,
+    creators: rows,
+    objectiveMinor: set.length === 0 ? null : set.reduce((sum, row) => sum + (row.objectiveMinor ?? 0), 0),
+    revenueMinor,
+    projectedMinor: projected(revenueMinor, daysGone, days),
+  };
+}
 
 /** The insights of `creators` over `range`, in euro cents; `names` maps a member id to his display name. */
 export function agencyInsights(input: {
@@ -538,7 +628,16 @@ export function agencyInsights(input: {
       topTenShare: spentTotal > 0 ? Math.round((topTen / spentTotal) * 100) : null,
       averagePerPayingMinor: spent.length > 0 ? Math.round(spentTotal / spent.length) : null,
     },
+    refundList: refundListOf(creators, names, rate),
     refundsWithoutSale,
+    objectives:
+      span.unit === 'month'
+        ? objectivesOf(
+            range,
+            creators,
+            new Map(creatorFigures.map((one) => [one.creatorId, one.revenueMinor] as const)),
+          )
+        : null,
     timeZone,
     dollarsLeftOut: rate === null && dollarsSeen,
     subscribers: subscribersOf(creators, range),

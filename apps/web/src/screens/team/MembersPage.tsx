@@ -18,6 +18,7 @@ import './team.css';
 
 import { useCreators } from '@/creators/api';
 import { countryName } from '@/lib/country';
+import { TeamArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
 import { Failure } from '@/shell/states';
@@ -132,6 +133,7 @@ export function MembersPage({
       ) : all.length === 0 ? (
         canManage ? (
           <Notice
+            art={<TeamArt />}
             title="Ton équipe commence ici"
             text="Ajoute un chatteur ou un manager : tu lui envoies ensuite son lien d’invitation, et il choisit son mot de passe."
           >
@@ -139,6 +141,7 @@ export function MembersPage({
           </Notice>
         ) : (
           <Notice
+            art={<TeamArt />}
             title="Personne dans l’équipe pour l’instant"
             text="Les membres ajoutés par l’agence arrivent ici."
           />

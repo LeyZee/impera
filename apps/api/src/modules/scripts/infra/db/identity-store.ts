@@ -34,22 +34,6 @@ const SCRIPTS_PER_RUN = 200;
 
 const CountSchema = z.object({ n: z.coerce.number().int() });
 
-/** `scripts.identify_platform_script` for one script, keyed by it: one waiting job whatever asked for it. */
-async function enqueueIdentity(
-  tx: Transaction,
-  job: { readonly creatorId: string; readonly platformScriptId: string; readonly correlationId: string },
-): Promise<void> {
-  await tx.execute(
-    sql`select public.enqueue_job(
-      task => 'scripts.identify_platform_script',
-      payload => ${JSON.stringify(job)}::jsonb,
-      max_attempts => ${JOB_MAX_ATTEMPTS['scripts.identify_platform_script']}::int,
-      job_key => ${`scripts.identify_platform_script:${job.platformScriptId}`},
-      job_key_mode => 'preserve_run_at'
-    )`,
-  );
-}
-
 /**
  * The identity job's reads and writes (SC-04 lot c8), as the service role: out of any person, one script at a time.
  * No switch: a script is told once each of its media has a description a person validated (ADR 0145 § 5, 17/11).
@@ -134,12 +118,6 @@ export function createDrizzleScriptIdentityJobStore(adminDb: Database): ScriptId
           ) q`);
         return CountSchema.parse(result.rows[0]).n;
       }),
-
-    enqueue: (creatorId, scriptIds, correlationId) =>
-      withAdmin(adminDb, async (tx) => {
-        for (const platformScriptId of scriptIds)
-          await enqueueIdentity(tx, { creatorId, platformScriptId, correlationId });
-      }),
   };
 }
 
@@ -169,7 +147,7 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
   };
 
   return {
-    describe: (creatorId: CreatorId, scriptId, review, userId, correlationId) =>
+    describe: (creatorId: CreatorId, scriptId, review, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         const script = await reviewed(tx, scope, creatorId, scriptId, userId);
         if (script === null) return 'not_found';
@@ -194,9 +172,6 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
             entityId: scriptId,
             details: { ...details, creatorId },
           });
-        // Its identity is told again from what is validated now: one waiting job for the script, whoever asked.
-        const identify = () => enqueueIdentity(tx, { creatorId, platformScriptId: scriptId, correlationId });
-
         if (review.kind === 'validate') {
           const open = named.filter((id) => shown.get(id)?.validated === false);
           if (open.length === 0) return 'already';
@@ -216,7 +191,6 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
             return reasons.length === 0 ? [] : [{ descriptionId: id, reasons }];
           });
           await audit('media_description.validated', { descriptionIds: open, lifted });
-          await identify();
           return 'validated';
         }
 
@@ -250,50 +224,6 @@ export function createDrizzleScriptIdentityReviewStore(db: Database): ScriptIden
           lifted:
             base.reviewReasons.length === 0 ? [] : [{ descriptionId: base.id, reasons: base.reviewReasons }],
         });
-        await identify();
-        return 'corrected';
-      }),
-
-    review: (creatorId: CreatorId, scriptId, review, userId, currentHash) =>
-      withTenantMember(db, creatorId, userId, async (tx, scope) => {
-        const script = await reviewed(tx, scope, creatorId, scriptId, userId);
-        if (script === null) return 'not_found';
-        const inputHash = currentHash(script);
-        const audit = (action: string, identityId: string) =>
-          tx.insert(auditLog).values({
-            id: newId(AuditEntryIdSchema),
-            userId,
-            action,
-            entity: 'platform_script',
-            entityId: scriptId,
-            details: { identityId, creatorId },
-          });
-
-        if (review.kind === 'validate') {
-          const identity = script.identities.find((each) => each.id === review.identityId);
-          if (identity?.inputHash !== inputHash) return 'stale';
-          if (identity.validatedAt !== null) return 'already';
-          await tx
-            .update(scriptIdentities)
-            .set({ validatedBy: userId, validatedAt: sql`now()` })
-            .where(and(eq(scriptIdentities.id, identity.id), sql`${scriptIdentities.validatedAt} is null`));
-          await audit('script_identity.validated', identity.id);
-          return 'validated';
-        }
-
-        const id = newId(ScriptIdentityIdSchema);
-        await tx.insert(scriptIdentities).values({
-          id,
-          creatorId,
-          platformScriptId: scriptId,
-          inputHash,
-          schemaVersion: SCRIPT_IDENTITY_SCHEMA_VERSION,
-          content: review.content,
-          author: 'human',
-          validatedBy: userId,
-          validatedAt: sql`now()`,
-        });
-        await audit('script_identity.corrected', id);
         return 'corrected';
       }),
   };

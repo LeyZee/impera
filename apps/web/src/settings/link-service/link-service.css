@@ -1,0 +1,28 @@
+/*
+ * Réglages › Plateformes, « Liens de redirection » (INS-02): the card borrows the Services page's key field (`sv-`)
+ * and the sales feed's plate (`sf-`). Only this is its own: the frame holds the key and « Afficher » alone, and
+ * « Vérifier » and « Annuler » stand outside it, beside it on a computer and under it on a phone.
+ */
+.ls-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ls-key {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.ls-form__act {
+  display: flex;
+  gap: 6px;
+}
+.ls-help {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--nv-text-footnote);
+}
+.ls-help b {
+  color: var(--nv-ink);
+  font-weight: 600;
+}

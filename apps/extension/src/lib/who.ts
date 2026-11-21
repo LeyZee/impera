@@ -123,6 +123,8 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/contenu': 'today',
   '/equipe': 'team',
   '/paie': 'pay',
+  // Trafic is no role's shortcut today.
+  '/trafic': 'creators',
   '/creatrices': 'creators',
   '/moi': 'me',
   '/reglages': 'settings',

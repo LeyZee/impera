@@ -3,6 +3,12 @@ import type { Logger } from './logger';
 /** Hard stop if the graceful one hangs: under Docker's 30 s before `SIGKILL` (operations.md). */
 const FORCED_EXIT_MS = 28_000;
 
+/**
+ * How long the error reports still pending may take to leave at the end of a graceful stop (OPS-18): the worker's 25 s
+ * plus this stay under `FORCED_EXIT_MS`.
+ */
+export const SHUTDOWN_FLUSH_MS = 2_000;
+
 /** How an entry point stops once what it started is up: given once, in the order things must stop. */
 export interface GracefulExit {
   readonly stopWith: (stop: () => Promise<void>) => void;

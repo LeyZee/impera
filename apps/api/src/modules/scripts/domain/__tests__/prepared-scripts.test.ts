@@ -51,6 +51,8 @@ describe('what keeps a script in preparation from being ready to copy', () => {
   it('has no gap when every field is written and every media is in her vault, described', () => {
     const content = script([[branch(1)], [branch(2, { priceMinor: 1200 })]]);
     expect(preparedScriptGaps(content, described(['m1', 'm2']), noLimits)).toEqual([]);
+    // Played the day and the night alike (« polyvalent »): a moment like the others, no gap of its own.
+    expect(preparedScriptGaps({ ...content, moment: 'both' }, described(['m1', 'm2']), noLimits)).toEqual([]);
   });
 
   it('names the missing name, description, offer text and media, where they are', () => {

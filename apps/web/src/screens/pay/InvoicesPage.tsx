@@ -18,6 +18,7 @@ import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Select } from '@/shell/Select';
+import { InvoiceArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /** What the reader opened on a document: an answer to his own, the end of a contest, or its detail. */
@@ -185,6 +186,7 @@ export function InvoicesPage({
               <Loading rows={3} />
             ) : byPeriod.data.documents.length === 0 ? (
               <Empty
+                art={<InvoiceArt />}
                 whisper="Aucun document sur cette quinzaine."
                 text="Les factures s’émettent à la validation des relevés, pour chaque membre au dossier complet."
               />

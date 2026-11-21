@@ -28,6 +28,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { parisDay, weekdayOf } from './support/paris';
 import { activateDemoPersona } from './support/persona';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
@@ -455,9 +456,14 @@ describe('/v1/creators/:creatorId/ideas', () => {
       ending: null,
       seconds: 15,
     };
+    // Two weeks from today in Paris: the day is checked against the server's clock (a year back at most, CREA-14), so a
+    // fixed date would turn the 422 below into a 400 a year on.
+    const day = parisDay(14);
+    const monday = parisDay(14 - (weekdayOf(day) - 1));
+    const sunday = parisDay(14 + (7 - weekdayOf(day)));
     const body = (values: object) => ({
       id: newId(SuggestionIdSchema),
-      when: { kind: 'day', day: '2026-12-02' },
+      when: { kind: 'day', day },
       category: 'shoot',
       title: 'Reel café du matin',
       ...values,
@@ -495,7 +501,7 @@ describe('/v1/creators/:creatorId/ideas', () => {
     expect(made.statusCode, made.body).toBe(200);
     expect(made.json()).toMatchObject({ purpose: 'Pour : Reel Insta', reelBrief: sheet, shootBrief: null });
     const agenda = CreatorAgendaSchema.parse(
-      (await call('GET', '/v1/creator-space/agenda?from=2026-11-30&to=2026-12-06', cookies.nora)).json(),
+      (await call('GET', `/v1/creator-space/agenda?from=${monday}&to=${sunday}`, cookies.nora)).json(),
     );
     expect(agenda.suggestions.find((one) => one.title === 'Reel café du matin')?.reelBrief).toEqual(sheet);
   });

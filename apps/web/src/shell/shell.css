@@ -380,6 +380,23 @@
     transform: rotate(12deg) scale(1.12);
   }
 }
+/* Trafic: the two halves of the link close on each other. */
+.is-playing .nav-link-a {
+  animation: nv-nav-link-a var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+.is-playing .nav-link-b {
+  animation: nv-nav-link-b var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-link-a {
+  0% {
+    transform: translate(2.4px, -2.4px);
+  }
+}
+@keyframes nv-nav-link-b {
+  0% {
+    transform: translate(-2.4px, 2.4px);
+  }
+}
 /* Entraîner: the ring closes on the bull's-eye, which lands. */
 .is-playing .nav-ring {
   transform-origin: 12px 12px;
@@ -1334,6 +1351,7 @@
       color-mix(in srgb, var(--nv-void) 96%, transparent);
   }
   .nv-rail__brand,
+  .nv-rail__head,
   .nv-rail__sp,
   .nv-rail__lens,
   .nv-rail__agent,
@@ -1891,6 +1909,104 @@ label.nv-notif__row {
   .nv-blurrable {
     transition: none;
   }
+}
+
+/* ───────────── Creator selector (ADR 0134 § 3) ─────────────
+   Under the mark on a computer, at the head of the page on a phone: whose screens these are, « Toutes » for the
+   agency's. A pill, her face first; its word « Créatrice » reads as the menu's own headings. */
+.nv-scope {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+.nv-scope[data-place='page'] {
+  display: none;
+}
+.nv-scope__label {
+  padding: 0 12px 6px;
+  color: var(--nv-ink-faint);
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+.nv-scope .nv-select__field {
+  min-height: 40px;
+  padding: 0 10px 0 9px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-callout);
+  font-weight: 550;
+}
+/* A face made for a chip leans into its edge: here it sits in its own place. */
+.nv-select__lead .cr-chip-face {
+  margin-inline-start: 0;
+}
+/* « Toutes »: three discs that overlap, each cut out of the next by the pill's own ground. */
+.nv-scope__all {
+  width: 22px;
+  height: 22px;
+  fill: color-mix(in srgb, var(--nv-ink) 34%, var(--nv-surface-raised));
+  stroke: var(--nv-surface-raised);
+  stroke-width: 1.5;
+}
+@media (max-width: 1100px) and (min-width: 821px) {
+  /* The menu in icons alone: her face is the selector, its list as wide as the names. */
+  .nv-scope__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .nv-scope .nv-select__field {
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    margin-inline: auto;
+    padding: 0;
+  }
+  .nv-scope .nv-select__value,
+  .nv-scope .nv-select__chevron {
+    display: none;
+  }
+}
+@media (max-width: 820px) {
+  .nv-scope[data-place='page'] {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .nv-scope[data-place='page'] .nv-scope__label {
+    padding: 0;
+  }
+  .nv-scope[data-place='page'] .nv-scope__select {
+    flex: 1;
+    max-width: 260px;
+  }
+}
+
+/* « Plus » on the phone: a dot on its corner while a tab it holds has something waiting; the figure is in the sheet. */
+/* Out of the button's flow: the icon and its word stay where they are on every other tab. */
+.nv-rail__under {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nv-rail__under .nv-count {
+  display: none;
+}
+.nv-rail__under:has(.nv-count)::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 8px);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink-muted);
+  box-shadow: 0 0 0 2px var(--nv-surface-raised);
 }
 
 /* ───────────── /extension/lier (ADR 0067, amendement du 19/11): where to click, the icon in sight or behind the puzzle.

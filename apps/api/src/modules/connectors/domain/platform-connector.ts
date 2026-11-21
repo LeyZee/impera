@@ -4,6 +4,7 @@ import type {
   ConnectorEvent,
   ConversationSnapshot,
   CreatorNote,
+  CreatorProfile,
   ExternalMessage,
   ExternalRef,
   ExternalTransaction,
@@ -64,6 +65,8 @@ export interface PlatformConnector {
   setFanNote?(fanRef: ExternalRef, text: string, idempotencyKey: string): Promise<void>;
   /** `creatorNotes`: empty when the platform has none. */
   getCreatorNotes?(conversationRef: ExternalRef): Promise<CreatorNote[]>;
+  /** `creatorProfile`: her bio as every subscriber reads it, empty when she has none; never written (ADR 0154). */
+  getCreatorProfile?(): Promise<CreatorProfile>;
   /** `ppvStats`. */
   getFanPpvStats?(fanRef: ExternalRef): Promise<FanPpvStats>;
   /** `scripts`. */

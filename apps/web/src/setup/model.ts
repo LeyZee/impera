@@ -73,7 +73,7 @@ export function creatorLines(creatorId: CreatorId, steps: readonly CreatorSetupS
       case 'platform_account':
         return line(
           'Son compte Reveal relié',
-          done ? null : 'Importe-la depuis Réglages › Ventes : ses ventes et ses shifts en dépendent.',
+          done ? null : 'Importe-la depuis Réglages › Plateformes : ses ventes et ses shifts en dépendent.',
           { kind: 'page', to: '/reglages/ventes' },
         );
       case 'persona':

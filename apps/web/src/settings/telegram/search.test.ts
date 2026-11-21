@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseTelegramSearch, searchOfTab, TAB_OF_TOPIC, tabOfSearch } from './search';
 
-describe('the tab of Réglages › Telegram in the address', () => {
+describe('the tab of Réglages › Bots Telegram in the address', () => {
   it('lands on the tab a link or a reload names, and on the alerts otherwise', () => {
     expect(tabOfSearch(parseTelegramSearch({ onglet: 'ventes' }))).toBe('sales');
     expect(tabOfSearch(parseTelegramSearch({ onglet: 'bots' }))).toBe('bots');

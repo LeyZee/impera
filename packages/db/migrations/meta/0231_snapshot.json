@@ -1,5 +1,5 @@
 {
-  "id": "35268367-2b8a-439c-a133-e08fc4501987",
+  "id": "a05ee7c6-f8e6-4703-87e0-7ec2ca6ab459",
   "prevId": "aad13aa1-029e-4ad9-a201-9538d71ba21d",
   "version": "7",
   "dialect": "postgresql",
@@ -7718,6 +7718,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "voice_example_ids": {
+          "name": "voice_example_ids",
+          "type": "uuid[]",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -10313,20 +10319,20 @@
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
         },
-        "owner_insert": {
-          "name": "owner_insert",
+        "agency_insert": {
+          "name": "agency_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"bonuses\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"bonuses\".\"cancelled_at\" is null"
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"bonuses\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"bonuses\".\"cancelled_at\" is null"
         },
-        "owner_cancel": {
-          "name": "owner_cancel",
+        "agency_cancel": {
+          "name": "agency_cancel",
           "as": "PERMISSIVE",
           "for": "UPDATE",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' and not exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"bonuses\".\"cancelled_at\" is null",
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"bonuses\".\"cancelled_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and not exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"bonuses\".\"cancelled_at\" is null",
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"bonuses\".\"cancelled_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"bonuses\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {
@@ -11452,12 +11458,12 @@
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"pay_adjustments\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
         },
-        "owner_insert": {
-          "name": "owner_insert",
+        "agency_insert": {
+          "name": "agency_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "nullif(current_setting('app.team_scope', true), '') = 'owner' and \"pay_adjustments\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"pay_adjustments\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+          "withCheck": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"pay_adjustments\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and not exists (select 1 from team_members m where m.id = \"pay_adjustments\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {

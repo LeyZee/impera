@@ -13,7 +13,7 @@ import {
   type TelegramTopic,
 } from '@impera/contracts';
 
-/** View rules of Réglages › Telegram, kept out of the components so they are tested. */
+/** View rules of Réglages › Bots Telegram, kept out of the components so they are tested. */
 
 /** « Toutes les créatrices » or one of them. A route of `all` is stored with `creatorId: null`. */
 export type Scope = 'all' | CreatorId;

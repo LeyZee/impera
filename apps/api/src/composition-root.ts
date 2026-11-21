@@ -21,7 +21,7 @@ import {
 import { publishBudgetThreshold } from './budget-events';
 import type { Config } from './config';
 import { cronKnownSince } from './crontab';
-import { assertDatabaseRoles } from './database-roles';
+import { assertDatabaseRoles, assertNoForeignAccess } from './database-roles';
 import { createInvitationLinkRoutes } from './invitation-links';
 import { createJobQueue, defineTask, type JobQueue } from './jobs';
 import { createAppLlm } from './llm';
@@ -36,12 +36,14 @@ import type {
   AvatarPorts,
   ConnectorRegistry,
   ConnectorsModule,
+  LinkServiceReader,
   SalesFeedRegistry,
 } from './modules/connectors';
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
 import type { CreatorTasksModule } from './modules/creator-tasks';
+import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
@@ -57,6 +59,9 @@ import type { SupervisionModule } from './modules/supervision';
 import type { TeamModule } from './modules/team';
 import type { TelegramModule } from './modules/telegram';
 import type { TrendsModule } from './modules/trends';
+import { createClientErrorRoutes } from './observability/client-errors';
+import { INERT_ERROR_REPORTER, type ErrorReporter } from './observability/error-reporter';
+import { applyOwnerRemovalsUnscoped, createOwnersRoutes, relayOwnerAlertsUnscoped } from './owners';
 import { createPwnedPasswordsCheck, type PasswordBreachCheck } from './password-breaches';
 import { createPasswordResetRoutes } from './password-reset';
 import { postgresRateLimitStore, purgeRateLimitCounters, RATE_LIMIT_POOL_OPTIONS } from './rate-limit-store';
@@ -68,6 +73,7 @@ import { wireAgent } from './wiring/agent';
 import { wireAiBudget } from './wiring/ai-budget';
 import { wireAiUsage } from './wiring/ai-usage';
 import { wireAlerts } from './wiring/alerts';
+import { wireAudit } from './wiring/audit';
 import { wireBackups } from './wiring/backups';
 import { wireConnectors } from './wiring/connectors';
 import { wireContentDrops } from './wiring/content-drops';
@@ -75,6 +81,8 @@ import { wireContractors, type InvoiceBuckets } from './wiring/contractors';
 import { wireConversations } from './wiring/conversations';
 import { wireCreatorArchive } from './wiring/creator-archive';
 import { wireCreatorTasks } from './wiring/creator-tasks';
+import { wireCreatorWeek } from './wiring/creator-week';
+import { wireCustomOrders } from './wiring/custom-orders';
 import { wireFans } from './wiring/fans';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
@@ -107,6 +115,8 @@ interface Modules {
   readonly media: MediaModule;
   readonly notifications: NotificationsModule;
   readonly creatorTasks: CreatorTasksModule;
+  /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
+  readonly creatorWeek: CreatorWeekModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -148,6 +158,8 @@ export interface App {
    * own with a statement timeout. The worker builds it unused: its pool opens no connection until a first request.
    */
   readonly rateLimitStore: FastifyRateLimitStoreCtor;
+  /** Where production errors go (OPS-18): the server's 5xx, the worker's failed jobs, the dashboard's reports. */
+  readonly errorReporter: ErrorReporter;
   /** Closes the queue and the pools; the server and the worker are stopped before. */
   shutdown(): Promise<void>;
 }
@@ -185,6 +197,8 @@ export interface AppOptions {
   readonly connectorRegistry?: ConnectorRegistry;
   /** Tests plug FakeReveal's CRM API here; Reveal's own (`api.reveal.me`) otherwise. */
   readonly salesFeeds?: SalesFeedRegistry;
+  /** Tests plug a redirect service in memory here; the service over HTTPS otherwise (ADR 0120 § 3). */
+  readonly linkServiceReaderOf?: (key: string) => LinkServiceReader;
   /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
   readonly composer?: DraftComposer;
   /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
@@ -233,6 +247,8 @@ export interface AppOptions {
   readonly dropStorage?: DropStorage;
   /** Tests plug a check here that never leaves the machine; the Pwned Passwords range API otherwise. */
   readonly passwordBreaches?: PasswordBreachCheck;
+  /** The entry points give the one they started (`startErrorReporting`); inert otherwise (tests, scripts). */
+  readonly errorReporter?: ErrorReporter;
 }
 
 /** Wires every business module by hand (no DI container, coding.md). Called once by each entry point. */
@@ -256,9 +272,25 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
   const sandbox = sandboxOf(config);
   if (sandbox !== null) installSandboxGuard(sandbox, logger);
-  const db = createDbClient(config.DATABASE_URL, POOL_OPTIONS);
-  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, { ...POOL_OPTIONS, max: 5 });
-  const rateLimitDb = createDbClient(config.DATABASE_URL, RATE_LIMIT_POOL_OPTIONS);
+  const db = createDbClient(config.DATABASE_URL, { ...POOL_OPTIONS, max: config.DATABASE_POOL_MAX });
+  const adminDb = createDbClient(config.DATABASE_SERVICE_URL, {
+    ...POOL_OPTIONS,
+    max: config.DATABASE_SERVICE_POOL_MAX,
+  });
+  const rateLimitDb = createDbClient(config.DATABASE_URL, {
+    ...RATE_LIMIT_POOL_OPTIONS,
+    max: config.RATE_LIMIT_POOL_MAX,
+  });
+  // The connections this process may hold, for the budget of the pooler (ADR 0152 § 2, deploy.md).
+  logger.info(
+    {
+      app: config.DATABASE_POOL_MAX,
+      service: config.DATABASE_SERVICE_POOL_MAX,
+      rateLimit: config.RATE_LIMIT_POOL_MAX,
+      total: config.DATABASE_POOL_MAX + config.DATABASE_SERVICE_POOL_MAX + config.RATE_LIMIT_POOL_MAX,
+    },
+    'database connection budget of this process',
+  );
   // A client losing its connection must not crash the process; the next query reconnects.
   for (const [role, pool] of [
     ['app', db.pool],
@@ -274,6 +306,14 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   // A role that silences RLS (or skips it), or a service role that could change a structure, must stop the process.
   try {
     await assertDatabaseRoles(db.db, adminDb.db);
+    await assertNoForeignAccess(adminDb.db, config.NODE_ENV === 'production', {
+      warn: (message) => {
+        logger.warn(message);
+      },
+      info: (message) => {
+        logger.info(message);
+      },
+    });
   } catch (error) {
     await Promise.all([db.close(), adminDb.close(), rateLimitDb.close()]);
     throw error;
@@ -287,6 +327,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const requireRole = createRequireRole(auth, db.db, shiftCreators);
   const passwordBreaches = options.passwordBreaches ?? breachCheckOf(config, logger);
+  const errorReporter = options.errorReporter ?? INERT_ERROR_REPORTER;
   const shared: Shared = {
     config,
     logger,
@@ -314,6 +355,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     ...(options.connectorRegistry !== undefined && { registry: options.connectorRegistry }),
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
+    ...(options.linkServiceReaderOf !== undefined && { linkServiceReaderOf: options.linkServiceReaderOf }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });
@@ -342,7 +384,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
-  const redirectLinks = wireRedirectLinks(shared);
+  const redirectLinks = wireRedirectLinks(shared, { detectLinks: connectors.module.detectedLinks });
+  const customOrders = wireCustomOrders(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
     channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
@@ -359,6 +402,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     notifications: notifications.module,
     persona: persona.module,
   });
+  const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,
@@ -419,6 +463,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     llm,
     persona: persona.module,
     activePersona: persona.activePersona,
+    connectors: connectors.module,
+    scripts: scripts.module,
     personaPath: fromRepoRoot(config.PLAYGROUND_PERSONA_PATH ?? 'personas/demo/v0.4.0.yaml'),
     trainingDir: fromRepoRoot(config.IMPERA_TRAINING_DIR ?? '.scratch/training'),
     enabled: options.withPlayground !== false,
@@ -432,6 +478,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     scheduling: scheduling.module,
     scripts: scripts.module,
     connectors: connectors.module,
+    customOrders: customOrders.module,
     ...(options.composer !== undefined && { composer: options.composer }),
   });
   const conversations = wireConversations(shared, {
@@ -441,6 +488,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     alerts: alerts.module,
     agent,
     media,
+    customOrders: customOrders.module,
     copilot: {
       // The copilot panel writes with the person's extension link (ADR 0086 § 8), read as a session would read him:
       // his creators and his shift's at each gesture (ADR 0025).
@@ -453,6 +501,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
   });
   const backups = wireBackups(shared);
+  const audit = wireAudit(shared);
   const rewards = wireRewards(shared, { scheduling: scheduling.module });
   // ElevenLabs bills characters, not money: its month comes from its own check (ADR 0091 § 7).
   const aiUsage = wireAiUsage(shared, llm, () => providers.module.voiceQuota());
@@ -509,6 +558,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     media: media.module,
     notifications: notifications.module,
     creatorTasks: creatorTasks.module,
+    creatorWeek: creatorWeek.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -535,7 +585,27 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,
+    ...creatorWeek.tasks,
     ...trends.tasks,
+    // ADR 0096: the removal whose notice ended, then the owners told in the app of each change among them. The removal
+    // never waits for push: with push off the alerts reach Telegram only.
+    'owners.watch': defineTask(
+      'owners.watch',
+      JOB_PAYLOADS['owners.watch'],
+      logger,
+      async (_payload, context) => {
+        const removals = await applyOwnerRemovalsUnscoped(adminDb.db);
+        if (removals.applied > 0 || removals.lapsed > 0) {
+          context.logger.warn(removals, 'owners: removals past their notice');
+        }
+        const notify = notifications.module.notify;
+        if (notify === null) return;
+        await relayOwnerAlertsUnscoped(adminDb.db, {
+          notify,
+          agencyTimeZone: () => withAdmin(adminDb.db, (tx) => scheduling.module.pay.agencyTimeZone(tx)),
+        });
+      },
+    ),
     // ADR 0150 lot 2: each alert of a creator's tab, to the roles it reaches; nothing while push is off.
     'alerts.route': defineTask(
       'alerts.route',
@@ -603,6 +673,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         passwordBreaches,
         privateChat: telegram.module?.privateChat ?? null,
       }),
+      createClientErrorRoutes({ requireRole, reporter: errorReporter }),
+      createOwnersRoutes({ adminDb: adminDb.db, requireRole, requireRecentLogin: shared.recentLogin }),
       createSecuritySettingsRoutes({
         auth,
         db: db.db,
@@ -635,7 +707,9 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...scripts.routes,
       ...trends.routes,
       ...redirectLinks.routes,
+      ...customOrders.routes,
       ...creatorTasks.routes,
+      ...creatorWeek.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,
       ...contractors.routes,
@@ -643,6 +717,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...invoicing.routes,
       ...accounting.routes,
       ...backups.routes,
+      ...audit.routes,
       ...rewards.routes,
       ...aiUsage.routes,
       ...aiBudget.routes(llm),
@@ -657,6 +732,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     tasks,
     readiness: () => checkReadiness(db.db, adminDb.db),
     rateLimitStore: postgresRateLimitStore({ db: rateLimitDb.db, logger }),
+    errorReporter,
     async shutdown() {
       modules.providers.stop();
       llmLog.stop();

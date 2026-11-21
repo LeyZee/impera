@@ -54,6 +54,16 @@ export function bindScriptRuns(tx: DbTransaction, creatorId: string): Transactio
         .limit(1);
       return row === undefined ? null : toStored(row);
     },
+    async stalled(conversationId) {
+      const rows = await tx
+        .select()
+        .from(scriptRuns)
+        .where(and(eq(scriptRuns.conversationId, conversationId), eq(scriptRuns.status, 'stalled')))
+        .orderBy(sql`${scriptRuns.startedAt} desc`, sql`${scriptRuns.id} desc`)
+        // Whether he left one before is all that is read: the latest few say it.
+        .limit(20);
+      return rows.map(toStored);
+    },
     async open(conversationId, run) {
       // One open run per conversation: a second answers « no » by opening nothing.
       const [row] = await tx

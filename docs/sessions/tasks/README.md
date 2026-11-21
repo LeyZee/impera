@@ -87,7 +87,7 @@ Branche : task/<id>-<slug>
 | EQ-15 | Double authentification pour le propriétaire et les managers | équipe | todo | EQ-01, EQ-10, EQ-11 |
 | EQ-16 | S'entraîner : les recrues s'exercent contre des fans simulés | équipe | blocked (clés, comme le playground) | EQ-10, EQ-11, P3-01, P3-05 |
 | EQ-17 | Mise en service de la paie : sauvegardes, comptable, paie à blanc | équipe | in_progress | EQ-04 à EQ-06, EQ-15, déploiement |
-| EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | todo | EQ-11 |
+| EQ-18 | Journal : qui a fait quoi, lisible par le propriétaire | équipe | in_progress | EQ-11 |
 | EQ-19 | « Voir comme » : l'écran exact d'un chatteur, en lecture seule | équipe | todo | EQ-10, EQ-11, EQ-15, EQ-18 |
 | EQ-20 | Inviter un chatteur depuis Reveal : la part d'Équipe de l'ADR 0076 | équipe | in_progress | ADR 0076, la route et la migration de Bilan, l'écran d'Extension |
 | EQ-21 | Rappel du rapport de fin de shift sur le téléphone du chatteur | équipe | in_progress | ADR 0077, CR-01, EQ-03 |
@@ -107,6 +107,7 @@ Branche : task/<id>-<slug>
 | CR-13 | Poser et déplacer les shifts au doigt : glisser-déposer, ajout en masse, semaine en modèle, suggestion | espaces | todo | CR-12 |
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
 | CR-15 | Qui sont tes fans : les chiffres de sa base, tirés de leurs faits déclarés | espaces | todo | CR-02, ADR 0074 |
+| CR-16 | La semaine de la créatrice : deux jours de tournage, une livraison le dimanche, un agenda que le code remplit | espaces | in_progress (lot 1 en PR) | CR-05, CR-06, SC-02, ADR 0140 |
 | SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
@@ -131,7 +132,7 @@ Branche : task/<id>-<slug>
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
 | INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | in progress (lot a ; essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
-| INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lot a) | ADR 0120, ADR 0080 |
+| INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lots a et b) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
 | INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
@@ -148,6 +149,9 @@ Branche : task/<id>-<slug>
 | DSH-03 | La part de l'agence lue chez Reveal, le pourcentage facultatif | API CRM | review | CR-04, CRM-04 d3, ADR 0054 amendée le 14/11 |
 | DSH-04 | Le Dashboard de l'agence par jour, semaine, mois ou période choisie, la comparaison choisie, la courbe au survol | API CRM | done | DSH-01, ADR 0146 |
 | DSH-05 | Le Dashboard de l'agence en couleurs : l'agence en bleu, la courbe selon la tendance, une petite courbe sous Net | API CRM | done | DSH-04, ADR 0106 avenant du 17/11 |
+| DSH-06 | Le Dashboard de l'agence ne conclut pas sur trop peu de ventes | Web | review | DSH-01, DSH-04, ADR 0092 § 5 |
+| DSH-07 | Le Dashboard de l'agence liste les remboursements un par un | API CRM | in-progress | DSH-06, ADR 0092 § 4 |
+| DSH-08 | Le Dashboard de l'agence suit les objectifs mensuels par créatrice | API CRM | in-progress | DSH-07, ADR 0092 § 6 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
@@ -164,7 +168,9 @@ Branche : task/<id>-<slug>
 | OPS-14 | Les lectures de connectors pour le MCP | exploitation | review | MCP lot a |
 | OPS-15 | Un appel d'IA lent n'est plus attendu deux minutes | exploitation | done | ADR 0009, OPS-06 |
 | OPS-16 | Chaque service d'IA prouvé et suivi : essai réel, santé, ElevenLabs dans la conso | exploitation | in_progress | OPS-08, OPS-09, P3-03, ADR 0091 § 7 |
-| OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | todo | ADR 0152, OPS-01, OPS-02 |
+| OPS-18 | Les erreurs de production arrivent dans Sentry, sans rien de personnel | exploitation | done | OPS-01 |
+| OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | in_progress | ADR 0152, OPS-01, OPS-02 |
+| OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -178,7 +184,10 @@ Branche : task/<id>-<slug>
 | SEC-11 | Droits des tables en ajout seul et journaux de la bibliothèque d'authentification alignés sur la doc | exploitation | done | SEC-10 |
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
+| SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | done | SEC-02, SEC-04, EQ-10, EQ-18 |
 | SEC-15 | Primes et ajustements réservés au propriétaire | exploitation | in_progress | EQ-04, EQ-05 |
+| SEC-16 | Le rôle de service cesse de grandir : test de plafond par module, puis réduction (ADR 0087, lots b et c) | exploitation | en cours | SEC-10, ADR 0087 |
+| SEC-17 | Durée d'une session selon le rôle : propriétaire 48 h sans activité et 7 jours, créatrice 7 jours et 30 jours, les autres 12 h et 7 jours | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
 | ARC-01 | Les sommes et la prévision de quinzaine rendues par le serveur | exploitation | done | ADR 0047 |
 | ARC-02 | L'assemblage module par module | exploitation | done | ADR 0047 |
@@ -196,3 +205,4 @@ Branche : task/<id>-<slug>
 | CRE-05 | « Mot de passe oublié » sans Telegram : le lien que le propriétaire crée | exploitation | done | SEC-05, EQ-10, CR-02, ADR 0068 |
 | FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |
 | IA-01 | L'IA d'une créatrice : interrupteur avec pause, heures en frise, exceptions datées, vue agence | agent | in_progress | ADR 0148, P3-14 |
+| BIO-01 | L'IA connaît la bio de la créatrice sur la plateforme | agent | done | ADR 0154 |

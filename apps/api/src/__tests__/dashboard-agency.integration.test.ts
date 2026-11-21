@@ -11,7 +11,7 @@ import {
   type TeamMemberId,
   UserIdSchema,
 } from '@impera/contracts';
-import { eq, schema, sql } from '@impera/db';
+import { eq, schema, sql, withTenantMember } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -238,6 +238,15 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     // One fan, who bought ten days ago too: paying, not new; what he spent less the refund of his sale.
     expect(result.fans).toMatchObject({ paying: 1, newPaying: 0, averagePerPayingMinor: 6000 });
     expect(result.refundsWithoutSale).toBe(1);
+    // The refunds one by one (ADR 0092 § 4): the sale's seller, the days since it, none for a sale out of the register.
+    expect(
+      result.refundList
+        .map((one) => [one.creatorId, one.kind, one.amountMinor, one.seller, one.delayDays])
+        .sort((a, b) => Number(a[2]) - Number(b[2])),
+    ).toEqual([
+      [creatorId, 'ppv', 600, { kind: 'member', memberId: theo, name: 'Théo' }, 0],
+      [creatorId, 'ppv', 900, { kind: 'member', memberId: theo, name: 'Théo' }, null],
+    ]);
     // Nothing in the photo of the statistics yet: no subscriber figure, never a zero (ADR 0081).
     expect(result.subscribers).toBeNull();
     // Never the fan: neither his id at the platform nor anything of his.
@@ -330,6 +339,65 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
     expect((await get('manager', `period=day&creatorId=${elsewhere}`)).statusCode).toBe(403);
     expect((await get('creator')).statusCode).toBe(403);
     expect((await get('creator', `period=day&creatorId=${creatorId}`)).statusCode).toBe(403);
+  });
+
+  it('lets the owner alone set a creator’s monthly objective, read with a calendar month (ADR 0092 § 6)', async () => {
+    const month = `${calendarDayAt(new Date(), 'Europe/Paris').slice(0, 7)}-01`;
+    const objective = (who: Who, method: 'PUT' | 'DELETE', amountMinor = 500_000) =>
+      server.inject({
+        method,
+        url: `/v1/dashboard/agency/objectives/${creatorId}/${month}`,
+        headers: { origin: DASHBOARD_ORIGIN, cookie: cookies.get(who) },
+        ...(method === 'PUT' ? { payload: { amountMinor } } : {}),
+      });
+    // Never a manager's to write, never her account's, never a day that is not a month's first.
+    expect((await objective('manager', 'PUT')).statusCode).toBe(403);
+    expect((await objective('creator', 'PUT')).statusCode).toBe(403);
+    const wrongDay = await server.inject({
+      method: 'PUT',
+      url: `/v1/dashboard/agency/objectives/${creatorId}/${month.slice(0, 8)}02`,
+      headers: { origin: DASHBOARD_ORIGIN, cookie: cookies.get('owner') },
+      payload: { amountMinor: 1 },
+    });
+    expect(wrongDay.statusCode).toBe(400);
+
+    expect((await objective('owner', 'PUT', 400_000)).statusCode).toBe(200);
+    // Set again: replaced, never a second line.
+    const set = await objective('owner', 'PUT');
+    expect(set.json()).toEqual({ creatorId, month, amountMinor: 500_000 });
+    const read = await agency('owner', 'unit=month');
+    expect(read.objectives?.month).toBe(month);
+    expect(read.objectives?.creators.find((one) => one.creatorId === creatorId)?.objectiveMinor).toBe(
+      500_000,
+    );
+    expect(read.objectives?.objectiveMinor).toBe(500_000);
+    // The manager reads it with the figures; a week reads none.
+    expect((await agency('manager', 'unit=month')).objectives?.objectiveMinor).toBe(500_000);
+    expect((await agency('owner', 'unit=week')).objectives).toBeNull();
+
+    // Under the RLS, the chatter and her account read no line of it (`team_read`, `creator_closed`).
+    for (const who of ['chatter', 'creator'] as const) {
+      const rows = await withTenantMember(app.db.db, creatorId, users.get(who) ?? '', (tx) =>
+        tx.execute(sql`select id from creator_revenue_objectives`),
+      );
+      expect(rows.rows, who).toHaveLength(0);
+    }
+
+    expect((await objective('owner', 'DELETE')).statusCode).toBe(204);
+    expect((await agency('owner', 'unit=month')).objectives?.objectiveMinor).toBeNull();
+    // Each write in the journal, amounts only: set twice, then removed.
+    const journal = await test.admin.db.execute<{ action: string; details: unknown }>(sql`
+      select action, details from audit_log where entity = 'creator_revenue_objective' order by created_at, action`);
+    expect(journal.rows.map((row) => row.action)).toEqual([
+      'objective.set',
+      'objective.set',
+      'objective.remove',
+    ]);
+    expect(journal.rows.map((row) => row.details)).toEqual([
+      { creatorId, month, from: null, to: 400_000 },
+      { creatorId, month, from: 400_000, to: 500_000 },
+      { creatorId, month, from: 500_000 },
+    ]);
   });
 
   it('adds the photo of the daily statistics: subscribers for the owner and a manager, never a creator (ADR 0081)', async () => {

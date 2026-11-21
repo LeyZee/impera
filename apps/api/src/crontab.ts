@@ -133,18 +133,20 @@ const CRON_JOBS: readonly CronJob[] = [
   },
   // Her scripts (SC-02, ADR 0056 § 2): each creator's next one asked a week before it is due, in her own day; one
   // request per due day, so a replay or a missed hour asks nothing twice. No backfill: the next run catches up.
+  // Her week (ADR 0140 § 2): each creator whose Sunday 18 h has passed gets the week after as a draft for the owner,
+  // refreshed each hour until he validates it. No backfill: the next hour computes it on the stock of then.
+  {
+    task: 'creator_week.plan',
+    match: '50 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['creator_week.plan'] },
+  },
   {
     task: 'scripts.ask_scripts',
     match: '25 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.ask_scripts'] },
   },
-  // The identities of her native scripts (SC-04 lot c8): those whose media were described and validated since, or
-  // spent the day's budget, asked again; the job writes only what changed. No backfill: the next run finds them.
-  {
-    task: 'scripts.identify_backlog',
-    match: '40 * * * *',
-    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scripts.identify_backlog'] },
-  },
+  // No hourly identity of her native scripts any more (ADR 0161 § 5): the agent offers only the recognised copy of a
+  // script of ours, with our description, and reads no identity. `scripts.identify_backlog` stays a task, asked by no one.
   // Her facts about a fan last seen a year ago go (security.md, P3-02).
   {
     task: 'fans.purge_facts',
@@ -205,6 +207,13 @@ const CRON_JOBS: readonly CronJob[] = [
     task: 'scheduling.remind_reports',
     match: '*/5 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['scheduling.remind_reports'] },
+  },
+  // The owners (ADR 0096): a removal whose 72 hours ended is applied within the minute, and each change among the
+  // owners is told to them in the app. No backfill: the next minute reads everything again.
+  {
+    task: 'owners.watch',
+    match: '* * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['owners.watch'] },
   },
   // A role dated for a 1st or a 16th becomes the member's on that day (Charles, 28/10): each record takes the role in
   // force today, before the hour's recalculation. A run missed is caught up by the next one, no backfill.

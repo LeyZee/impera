@@ -4,14 +4,12 @@ import { useCallback, type JSX, type ReactNode } from 'react';
 
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
-import { BackupBanner } from './BackupBanner';
 import { CreatorPicker } from './CreatorPicker';
 import { FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
-import { PaperworkBanner } from './PaperworkBanner';
-import { ReportsBanner } from './ReportsBanner';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
+import { TodoCard } from './TodoCard';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
 import type { AgencySelection } from './agency/period';
@@ -130,10 +128,7 @@ function Offline({
       {creatorName === null ? null : (
         <header className="db-top nv-enter">
           {/* Another creator's Dashboard may still answer: the choice stays at hand. */}
-          <CreatorPicker
-            onChoose={onCreator}
-            agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
-          />
+          {agency === undefined ? <CreatorPicker onChoose={onCreator} /> : null}
           <div className="db-top__who">
             <span className="db-top__av" aria-hidden="true">
               {initialOf(creatorName)}
@@ -222,11 +217,6 @@ export function DashboardPage({
       <div className="db" aria-busy="true">
         <PageHeader title="Dashboard" />
         {/* The chips keep their place while her Dashboard loads: nothing jumps when it comes (ADM-21). */}
-        {agency === undefined ? null : (
-          <header className="db-top">
-            <CreatorPicker onChoose={onCreator} agency={{ selected: false, onChoose: agency.onAgency }} />
-          </header>
-        )}
         <div className="db-loading nv-plate" aria-label="Chargement du Dashboard" role="status" />
       </div>
     );
@@ -285,7 +275,7 @@ function Loaded({
   const sales = data.sales?.[period] ?? null;
   // With several creators the chips above name her: the header does not say her name a second time (DASH-03).
   const creators = useCreators().data;
-  const several = (creators?.length ?? 0) >= 2;
+  const several = agency === undefined && (creators?.length ?? 0) >= 2;
   // Her photo copied at her import (CRM-07 b2), read in the list: the Dashboard's answer does not carry it.
   const hasPhoto = creators?.find((one) => one.id === creatorId)?.hasAvatar === true;
 
@@ -333,10 +323,8 @@ function Loaded({
       <PageHeader title="Dashboard" />
       <header className="db-top nv-enter">
         {/* Whose agent this is, when the account sees several: the pill and Suivi follow the same choice. */}
-        <CreatorPicker
-          onChoose={onCreator}
-          agency={agency === undefined ? undefined : { selected: false, onChoose: agency.onAgency }}
-        />
+        {/* The owner and an active manager choose her in the menu's selector instead (ADR 0134 § 3). */}
+        {agency === undefined ? <CreatorPicker onChoose={onCreator} /> : null}
         <div className="db-top__who">
           {several ? null : (
             <CreatorFace
@@ -383,7 +371,7 @@ function Loaded({
       {agentHero}
 
       {/* Who is warned of an urgency at night: part of her agent's state, said right under it. The night's alerts and
-          where they go are the owner's to set (Réglages › Telegram): anyone else reads it. */}
+          where they go are the owner's to set (Réglages › Bots Telegram): anyone else reads it. */}
       <NightBanner night={data.telegram} creatorName={data.creator.name} opensSettings={forOwner} />
 
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
@@ -454,17 +442,9 @@ function Loaded({
           the reports are the agency's, said on its own view, not under each creator (PIL-04). The day's AI budget is
           never on this screen: on « Toute l'agence » for the owner and an active manager, in Réglages › Consommation IA,
           never to an operator who can set nothing of it (PIL-27). */}
-      {agency === undefined ? (
-        <>
-          <BackupBanner enabled={forOwner} />
-
-          {/* The invoices' due dates, contests and documents to check: the owner's to settle (EQ-06 lot 8d). */}
-          <PaperworkBanner enabled={forOwner} />
-
-          {/* The reports that wait on the agency, never left unseen in the queue (ADR 0073). */}
-          <ReportsBanner enabled={reviewsReports} />
-        </>
-      ) : null}
+      {/* The export, the invoices and the documents are the owner's to settle (OPS-02, EQ-06 lot 8d), the reports that
+          wait are their reviewer's (ADR 0073): one card, « À faire » (W3). */}
+      {agency === undefined ? <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} /> : null}
 
       {tip.element}
     </div>

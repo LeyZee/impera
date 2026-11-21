@@ -31,6 +31,9 @@ describe('desire signals', () => {
       ),
       ...BriefSchema.shape.risks.element.options.map((risk) => ({ ...base, risks: [risk] })),
       { ...base, ageDisputed: true },
+      // He came, hot, as a new fan and as a client: each rest level.
+      { ...base, previous: { score: 95, at: NOW }, signals: ['just_came'] },
+      { ...base, previous: { score: 95, at: NOW }, signals: ['just_came'], hasBought: true },
     ];
     const emitted: readonly string[] = [...new Set(turns.flatMap((turn) => desireScore(turn).signals))];
     const known: readonly string[] = DESIRE_SIGNALS;

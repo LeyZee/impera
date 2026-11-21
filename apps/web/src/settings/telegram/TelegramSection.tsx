@@ -105,7 +105,7 @@ const EMPTY_TAB: Readonly<Record<Tab, { readonly title: string; readonly text: s
 };
 
 /**
- * Réglages › Telegram (fiche P3-07, ADR 0020): who gets which alert, in which group, through which bot. One tab per
+ * Réglages › Bots Telegram (fiche P3-07, ADR 0020): who gets which alert, in which group, through which bot. One tab per
  * kind of message, plus the bots. Nothing on this page ever shows a token or a fan's words.
  */
 export function TelegramSection({

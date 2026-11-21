@@ -1,4 +1,12 @@
-import { payPeriodLastDay, type Currency, type MyFigures } from '@impera/contracts';
+import {
+  payPeriodLastDay,
+  type AgencySaleKind,
+  type Currency,
+  type MyFigures,
+  type SaleType,
+} from '@impera/contracts';
+
+import { kindSlices, type Slice } from '@/screens/dashboard/agency/view';
 
 /*
  * « Mes chiffres » as the screens say them (CHF-01, ADR 0104 § A), without React: pure, from the server's answer. The
@@ -204,3 +212,36 @@ export const hasRecords = (figures: Pick<MyFigures, 'records'>): boolean =>
 export function recordToday(figures: Pick<MyFigures, 'records' | 'today'>): boolean {
   return figures.records.bestDay?.day === figures.today;
 }
+
+/** A type of sale as the Dashboard's ring names it: a renewal is a subscription there too. */
+const KIND_OF_TYPE: Readonly<Record<SaleType, AgencySaleKind>> = {
+  subscription: 'subscriptions',
+  renewal: 'subscriptions',
+  ppv: 'ppv',
+  mass_dm: 'mass_dm',
+  tip: 'tips',
+  payment_link: 'payment_links',
+  boudoir: 'boudoir',
+  paid_message: 'paid_messages',
+  other: 'other',
+};
+
+/**
+ * « D'où vient mon argent » (ADR 0104 § 6): the member's net of the period under way by what was sold, in the
+ * Dashboard's own slices, names and colours (a kind keeps its colour on every screen). A type whose refunds took
+ * everything back holds no slice: a slice of nothing says nothing.
+ */
+export function moneySlices(figures: Pick<MyFigures, 'kinds'>, currency: Currency): Slice[] {
+  return kindSlices(
+    figures.kinds.items.map((item) => ({
+      kind: KIND_OF_TYPE[item.type],
+      revenueMinor: netIn(item.nets, currency),
+      sales: item.sales,
+      previousRevenueMinor: 0,
+    })),
+  );
+}
+
+/** Whether « D'où vient mon argent » has something of the member's to say: a slice, or sales not yet told by type. */
+export const hasMoneyKinds = (figures: Pick<MyFigures, 'kinds'>, currency: Currency): boolean =>
+  figures.kinds.untyped > 0 || moneySlices(figures, currency).length > 0;

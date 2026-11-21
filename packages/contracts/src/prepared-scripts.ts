@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { PlatformScriptMomentSchema } from './connector';
 import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 import {
@@ -73,12 +72,20 @@ export const PreparedStepSchema = z.strictObject({
 });
 export type PreparedStep = z.infer<typeof PreparedStepSchema>;
 
+/**
+ * When a script in preparation is played: the day, the night, or both (« polyvalent », Charles 20/11). Chosen by hand
+ * on the script by the creator or the agency, never read from the media's descriptions.
+ */
+export const PREPARED_SCRIPT_MOMENTS = ['day', 'night', 'both'] as const;
+export const PreparedScriptMomentSchema = z.enum(PREPARED_SCRIPT_MOMENTS);
+export type PreparedScriptMoment = z.infer<typeof PreparedScriptMomentSchema>;
+
 /** What the agency writes: everything a save sends, read back the same. */
 export const PreparedScriptContentSchema = z.strictObject({
   name: text(PLATFORM_SCRIPT_NAME_MAX),
   description: text(PREPARED_SCRIPT_DESCRIPTION_MAX),
-  /** « Se joue le jour / la nuit »: the script's moment, against which a mix is refused (ADR 0112 § 14). */
-  moment: PlatformScriptMomentSchema,
+  /** « Se joue le jour / la nuit / jour et nuit »: the script's moment, chosen by hand (ADR 0112 § 21). */
+  moment: PreparedScriptMomentSchema,
   steps: z.array(PreparedStepSchema).min(1).max(PLATFORM_SCRIPT_STEPS_MAX),
 });
 export type PreparedScriptContent = z.infer<typeof PreparedScriptContentSchema>;
