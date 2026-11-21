@@ -1067,12 +1067,12 @@ describe('Équipe › Planning (/v1/scheduling, EQ-02)', () => {
     if (ownerRow === undefined) throw new Error('no owner');
     await test.admin.db.insert(schema.schedulingSlotVersions).values({
       id: passed,
-      effectiveAt: new Date(Date.now() + 1_500),
+      // Took effect a second ago: written by the service role, as no route writes a version in the past.
+      effectiveAt: new Date(Date.now() - 1_000),
       timeZone: PARIS,
       slots: eight,
       createdBy: ownerRow.id,
     });
-    await new Promise((resolve) => setTimeout(resolve, 2_000));
     const kept = await withdraw(owner, passed);
     expect([kept.statusCode, codeOf(kept)]).toEqual([409, 'slot_version_effective_conflict']);
     // The version written « tout de suite » is withdrawn while still ahead.
