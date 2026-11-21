@@ -443,12 +443,41 @@ describe('/v1/creator-space/content/script-drops', () => {
         .set({ state: 'kept', mediaAssetId: medium?.id ?? null })
         .where(eq(schema.contentDropFiles.id, file.id));
     }
-    const due = await createDrizzleRetentionStore(test.service.db).dueOriginals(
-      new Date('2026-11-06T12:00:00Z'),
-    );
-    expect(due.filter((one) => one.creatorId === nora).map((one) => [one.mediaAssetId, one.reason])).toEqual([
-      [media.gone, 'withdrawn'],
-    ]);
+    const retention = createDrizzleRetentionStore(test.service.db, app.db.db);
+    const now = new Date('2026-11-06T12:00:00Z');
+    const due = (await retention.dueOriginals(now)).filter((one) => one.creatorId === nora);
+    expect(due.map((one) => [one.mediaAssetId, one.reason])).toEqual([[media.gone, 'withdrawn']]);
+    // Each erasure in its own creator (SEC-16): named with another's id, hers is not found, nothing removed nor said.
+    const [gone] = due;
+    if (gone === undefined) throw new Error('the replaced original is not due');
+    const removed: string[] = [];
+    const remove = (key: string) => Promise.resolve(void removed.push(key));
+    expect(await retention.erase({ ...gone, creatorId: ines }, now, 'test', remove)).toBe(false);
+    await retention.eraseFailed({ ...gone, creatorId: ines }, now, 'test');
+    // The live one, still held by her script, stays even when asked by name: the job reads her drops.
+    expect(
+      await retention.erase({ ...gone, mediaAssetId: media.live, reason: 'due' }, now, 'test', remove),
+    ).toBe(false);
+    expect(removed).toEqual([]);
+    const held = await test.admin.db
+      .select({ id: schema.mediaAssets.id })
+      .from(schema.mediaAssets)
+      .where(and(eq(schema.mediaAssets.creatorId, nora), sql`${schema.mediaAssets.erasedAt} is null`));
+    expect(held.map((one) => one.id).toSorted()).toEqual([media.gone, media.live].toSorted());
+    const said = await test.admin.db
+      .select({ id: schema.domainEvents.id })
+      .from(schema.domainEvents)
+      .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${media.gone}`);
+    expect(said).toEqual([]);
+    // In her own creator it goes, bytes then row, and is said once.
+    expect(await retention.erase(gone, now, 'test', remove)).toBe(true);
+    expect(removed).toEqual([gone.storageKey]);
+    expect(await retention.erase(gone, now, 'test', remove)).toBe(false);
+    const erased = await test.admin.db
+      .select({ type: schema.domainEvents.type, creatorId: schema.domainEvents.creatorId })
+      .from(schema.domainEvents)
+      .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${media.gone}`);
+    expect(erased).toEqual([{ type: 'content_media_erased', creatorId: nora }]);
     // The library's version she shoots stays frozen.
     const [version] = await test.admin.db
       .select({ frozen: sql<boolean>`${schema.scriptStructureVersions.frozenAt} is not null` })

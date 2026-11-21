@@ -239,7 +239,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       thumbnailBacklog: (correlationId) => thumbnails.backlog(correlationId),
       eraseOriginals: (correlationId) =>
         eraseOriginals(
-          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },
+          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb, deps.db) },
           clock(),
           correlationId,
         ),
