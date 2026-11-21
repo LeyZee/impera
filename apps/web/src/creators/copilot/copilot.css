@@ -50,11 +50,9 @@
   flex-direction: column;
   gap: 4px;
 }
+/* Its size, weight and face are `nv-h3`'s, the failure's title included. */
 .cc-title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 600;
   color: var(--nv-ink);
   text-wrap: balance;
 }

@@ -79,7 +79,7 @@ export function CopilotSection({
   if (query.data === undefined) {
     return query.isError ? (
       <section className="nv-plate cc-card" aria-label="Copilote dans l’extension">
-        <p className="cc-title">Le copilote ne se charge pas</p>
+        <p className="nv-h3 cc-title">Le copilote ne se charge pas</p>
         <p className="cc-muted">{COPILOT_ERRORS[copilotErrorKind(query.error)]}</p>
         <button
           type="button"
@@ -120,7 +120,7 @@ export function CopilotSection({
           <NavIcon name="puzzle" />
         </span>
         <div className="cc-head__words">
-          <h2 id="cc-title" className="cc-title">
+          <h2 id="cc-title" className="nv-h3 cc-title">
             Copilote dans l’extension
           </h2>
           <p className="cc-headline" data-tone={head.tone}>
