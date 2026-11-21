@@ -706,7 +706,8 @@ body {
   background: var(--_tone, var(--nv-ink-faint));
   transform: translateY(-2px);
 }
-/* Short values, one pill each, tinted with the field's colour (Design 21/11); a guess is dashed. */
+/* Short values, one pill each, tinted with the field's colour and its dot (Design 21/11), as the design system's tinted
+   tag will be at this size; a guess is dashed. */
 .cp-chips {
   display: flex;
   flex-wrap: wrap;
@@ -718,6 +719,7 @@ body {
 .cp-chip {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 26px;
   padding: 3px 10px;
   box-sizing: border-box;
@@ -726,8 +728,15 @@ body {
   line-height: var(--nv-text-footnote-leading);
   font-weight: 500;
   color: var(--nv-ink);
-  background: color-mix(in srgb, var(--_tone, var(--nv-ink-faint)) 18%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_tone, var(--nv-ink-faint)) 40%, transparent);
+  background: color-mix(in srgb, var(--_tone, var(--nv-ink-faint)) 16%, transparent);
+}
+.cp-chip::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_tone, var(--nv-ink-faint));
 }
 .cp-chip[data-guess='true'] {
   background: transparent;
@@ -940,8 +949,11 @@ body {
   border-radius: 50%;
   background: var(--nv-warning);
 }
-/* Its key in a corner, quiet: 1 to 5. */
+/* Its key in a corner, 1 to 5, only while the bar is hovered or holds the keyboard (Design 21/11): shown always, it
+   made two figures per tab next to the count. */
 .cp-tab__key {
+  opacity: 0;
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
   position: absolute;
   top: -5px;
   right: -3px;
@@ -960,8 +972,13 @@ body {
   background: var(--nv-void);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
+.cp-tabs:hover .cp-tab__key,
+.cp-tabs:focus-within .cp-tab__key {
+  opacity: 1;
+}
 @media (prefers-reduced-motion: reduce) {
-  .cp-tab {
+  .cp-tab,
+  .cp-tab__key {
     transition: none;
   }
 }
@@ -1044,8 +1061,9 @@ body {
   gap: 4px;
 }
 .cp-step {
-  width: 6px;
-  height: 6px;
+  /* Read beside the line's text (Design 21/11). */
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   box-sizing: border-box;
   border: 1px solid var(--nv-ink-faint);
@@ -1056,8 +1074,8 @@ body {
   background: var(--nv-ink);
 }
 .cp-step[data-step='now'] {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border: 0;
   background: var(--nv-neon);
   box-shadow:
