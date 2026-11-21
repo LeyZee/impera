@@ -4,7 +4,6 @@ import {
   CreatorIdSchema,
   MediaAssetIdSchema,
   newId,
-  ok,
   PLATFORM_SCRIPT_NAME_MAX,
   PLATFORM_SCRIPT_STEP_TEXT_MAX,
   PLATFORM_SCRIPT_STEPS_MAX,
@@ -12,6 +11,7 @@ import {
   PlatformScriptViewSchema,
   PreparedScriptContentSchema,
   PreparedScriptIdSchema,
+  SCRIPT_IDENTITY_SCHEMA_VERSION,
   ScriptIdentityIdSchema,
   TeamMemberIdSchema,
   type CreatorId,
@@ -21,7 +21,6 @@ import {
 } from '@impera/contracts';
 import { and, eq, schema, sql, withCreatorAccount, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
-import type { LlmGateway, ScriptIdentityInput } from '@impera/llm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
 
@@ -29,6 +28,9 @@ import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
 import { revealApiConnectors } from '../modules/connectors';
+import { identitySourceOf } from '../modules/scripts/application/platform-script-reads';
+import { identityInputHash } from '../modules/scripts/domain/script-identity';
+import { createDrizzlePlatformScriptReadStore } from '../modules/scripts/infra/db/platform-script-store';
 import { buildServer, type Server } from '../server';
 
 import { createFakeReveal, type FakeReveal } from './fake-reveal/server';
@@ -42,8 +44,7 @@ const PARIS = 'Europe/Paris';
 
 const JobSchema = z.object({ key: z.string(), queue_name: z.string().nullable(), task: z.string() });
 
-/** What the fixed brain was told, in order. */
-const told: ScriptIdentityInput[] = [];
+/** An identity as the retired job wrote them (ADR 0161 § 5): rows kept, read for their version. */
 const IDENTITY = {
   ambiance: 'complice et taquine',
   energy: 'rising' as const,
@@ -51,25 +52,6 @@ const IDENTITY = {
   useWhen: ['il raconte sa soirée'],
   avoidWhen: [],
 };
-const identityBrain: Pick<LlmGateway, 'identifyScript' | 'promptHashes'> = {
-  promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
-  identifyScript: (input) => {
-    told.push(input);
-    return Promise.resolve(
-      ok({
-        output: IDENTITY,
-        meta: {
-          provider: 'xai',
-          model: 'brain-test',
-          isFallback: false,
-          latencyMs: 1,
-          promptHash: 'identity-v1',
-        },
-      }),
-    );
-  },
-};
-
 /**
  * The import of the native scripts (ADR 0099 § 1 time 2, P6-01) on FakeReveal's invented world, through the owner's
  * « Synchroniser », the real connector, the vault sync and the real tables: four sequences of three steps. The import
@@ -133,7 +115,6 @@ describe('the native scripts imported from the platform', () => {
     logger = createLogger(config);
     app = await createApp(config, logger, {
       composer: fixedComposer,
-      scriptIdentityBrain: identityBrain,
       connectorsClock: () => new Date(fake.state().now),
       connectorRegistry: {
         reveal: revealApiConnectors({ fetch: fake.fetch, baseUrl: 'https://reveal.test' }),
@@ -562,17 +543,6 @@ describe('the native scripts imported from the platform', () => {
         },
       },
     ]);
-    // No identity is asked after it any more (ADR 0161 § 5): no job waits for the script.
-    const jobs = z.array(z.object({ key: z.string() })).parse(
-      (
-        await test.admin.db.execute(
-          sql`select j.key from graphile_worker._private_jobs j
-                join graphile_worker._private_tasks t on t.id = j.task_id
-                where t.identifier = 'scripts.identify_platform_script' and j.key = ${`scripts.identify_platform_script:${before.id}`}`,
-        )
-      ).rows,
-    );
-    expect(jobs).toHaveLength(0);
   });
 
   it('lets the owner and an active manager of her list read, never a chatter nor her own account', async () => {
@@ -703,11 +673,35 @@ describe('the native scripts imported from the platform', () => {
     return description;
   }
 
-  const identify = (ref: string) =>
-    ownerView(ref).then((view) => {
-      if (view === undefined) throw new Error(`no ${ref}`);
-      return scripts().jobs.identifyPlatformScript({ creatorId: nora, platformScriptId: view.id });
+  /**
+   * An identity row for the script's current version, as the retired job (`brain`) or a hand of the team (`human`,
+   * validated) left them before ADR 0161: rows kept and still read for their version, written here by the administrator.
+   */
+  async function identityRow(
+    ref: string,
+    author: 'brain' | 'human',
+    content: object = IDENTITY,
+  ): Promise<void> {
+    const view = await ownerView(ref);
+    if (view === undefined) throw new Error(`no ${ref}`);
+    const stored = await createDrizzlePlatformScriptReadStore(test.admin.db, test.admin.db).oneForJob(
+      nora,
+      view.id,
+    );
+    if (stored === null) throw new Error(`no stored ${ref}`);
+    await test.admin.db.insert(schema.scriptIdentities).values({
+      id: newId(ScriptIdentityIdSchema),
+      creatorId: nora,
+      platformScriptId: view.id,
+      inputHash: identityInputHash(identitySourceOf(stored)),
+      schemaVersion: SCRIPT_IDENTITY_SCHEMA_VERSION,
+      content,
+      author,
+      ...(author === 'brain'
+        ? { model: 'brain-test', promptHash: 'identity-v1' }
+        : { validatedBy: ids.owner, validatedAt: new Date() }),
     });
+  }
 
   /** One sign-in per person for the whole file: the sign-in limiter counts each one. */
   const cookies = new Map<string, string>();
@@ -732,9 +726,8 @@ describe('the native scripts imported from the platform', () => {
       payload,
     });
 
-  it('writes an identity once each photo and video of the script is described, with no switch, never a price', async () => {
+  it('reads the identity kept for the current version of the script, never one the brain wrote as validated', async () => {
     // Sequence 4: a photo; a photo and a teaser video; a video and a teaser photo.
-    expect(await identify('sequence_4')).toBe('waiting');
     for (const [ref, kind] of [
       ['media_10', 'image'],
       ['media_11', 'image'],
@@ -743,21 +736,9 @@ describe('the native scripts imported from the platform', () => {
       ['media_04', 'image'],
     ] as const)
       await described(ref, kind, `Une description inventée de ${ref}.`);
-    expect(await identify('sequence_4')).toBe('identified');
-    expect(await identify('sequence_4')).toBe('already');
-    expect(told).toHaveLength(1);
-    expect(told[0]?.steps.map((step) => [step.name, step.media.map((media) => media.description)])).toEqual([
-      ['Script de test 4 · étape 1', ['Une description inventée de media_10.']],
-      [
-        'Script de test 4 · étape 2',
-        ['Une description inventée de media_11.', 'Une description inventée de media_03.'],
-      ],
-      [
-        'Script de test 4 · étape 3',
-        ['Une description inventée de media_12.', 'Une description inventée de media_04.'],
-      ],
-    ]);
-    expect(JSON.stringify(told[0])).not.toMatch(/priceMinor|EUR/u);
+    // No brain writes one any more (ADR 0161 § 5): described, the script still has none.
+    expect(await ownerView('sequence_4')).toMatchObject({ identity: null, gaps: ['identity_not_validated'] });
+    await identityRow('sequence_4', 'brain');
     const view = await ownerView('sequence_4');
     expect(view?.identity).toMatchObject({ content: IDENTITY, author: 'brain', validatedAt: null });
     expect(view).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
@@ -785,36 +766,14 @@ describe('the native scripts imported from the platform', () => {
     const after = await ownerView('sequence_4');
     expect(after?.identity).toBeNull();
     expect(after).toMatchObject({ gaps: ['identity_not_validated'], proposable: false });
-    expect(await identify('sequence_4')).toBe('identified');
-    // An identity a hand of the team wrote before the routes left (rows kept, ADR 0161 § 3), stood up here by the
-    // administrator for the tests that follow: a row is written once, already validated, for the brain's version. It
-    // stands for its version, the brain leaves it alone.
-    const current = await ownerView('sequence_4');
-    if (current?.identity == null) throw new Error('identified again');
-    const [brain] = await test.admin.db
-      .select({
-        inputHash: schema.scriptIdentities.inputHash,
-        schemaVersion: schema.scriptIdentities.schemaVersion,
-      })
-      .from(schema.scriptIdentities)
-      .where(eq(schema.scriptIdentities.id, current.identity.id));
-    if (brain === undefined) throw new Error('brain identity row');
-    await test.admin.db.insert(schema.scriptIdentities).values({
-      id: newId(ScriptIdentityIdSchema),
-      creatorId: nora,
-      platformScriptId: current.id,
-      inputHash: brain.inputHash,
-      schemaVersion: brain.schemaVersion,
-      content: { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' },
-      author: 'human',
-      validatedBy: ids.owner,
-      validatedAt: new Date(),
-    });
+    // The rows the retired job left for this version, then one a hand of the team wrote before the routes left (rows
+    // kept, ADR 0161 § 3): validated, it stands for its version.
+    await identityRow('sequence_4', 'brain');
+    await identityRow('sequence_4', 'human', { ...IDENTITY, ambiance: 'douce et lente', energy: 'soft' });
     expect(await ownerView('sequence_4')).toMatchObject({
       proposable: true,
       identity: { author: 'human', content: { ambiance: 'douce et lente', energy: 'soft' } },
     });
-    expect(await identify('sequence_4')).toBe('already');
   });
 
   it('keeps the identities closed to her account and written by the job or a hand of the team only', async () => {
@@ -838,32 +797,12 @@ describe('the native scripts imported from the platform', () => {
     expect(cause).toMatch(/permission denied/u);
   });
 
-  it('no longer asks an identity after an import that changes a script (ADR 0161 § 5)', async () => {
-    await test.admin.db.execute(
-      sql`delete from graphile_worker._private_jobs j using graphile_worker._private_tasks t
-          where t.id = j.task_id and t.identifier = 'scripts.identify_platform_script'`,
-    );
-    const identityJobs = async () =>
-      z
-        .array(z.object({ key: z.string() }))
-        .parse(
-          (
-            await test.admin.db.execute(
-              sql`select j.key from graphile_worker._private_jobs j
-                  join graphile_worker._private_tasks t on t.id = j.task_id
-                  where t.identifier = 'scripts.identify_platform_script' order by j.key`,
-            )
-          ).rows,
-        )
-        .map((row) => row.key);
+  it('keeps the identity of a version across a change of price', async () => {
     await scenario([{ type: 'script_changed', scriptId: 'script_4_2', priceCents: 2_500 }]);
     expect(await importOf(noraAccount, nora, new Date('2026-11-15T10:00:00Z'))).toMatchObject({ changed: 1 });
     const changed = await ownerView('sequence_4');
-    expect(await identityJobs()).toEqual([]);
     // A price is not in the identity: the one written by hand still stands, the script still proposable.
     expect(changed).toMatchObject({ proposable: true, identity: { author: 'human' } });
-    const active = (await scriptRows()).filter((row) => row.active && row.creatorId === nora);
-    expect(await scripts().jobs.identifyBacklog('test')).toBe(active.length);
   });
 
   it('keeps the branches of a step in one order, offered only once the agency set each condition (ADR 0112)', async () => {
@@ -884,10 +823,6 @@ describe('the native scripts imported from the platform', () => {
     expect(view.steps.map((step) => step.condition)).toEqual([null, null, null, null]);
     expect(view.gaps).toContain('branch_unsettled');
     expect(view.proposable).toBe(false);
-    // The brain's prompt reads steps one after the other: such an identity is written by hand.
-    const before = told.length;
-    expect(await identify('sequence_4')).toBe('branched');
-    expect(told).toHaveLength(before);
 
     const url = `/v1/creators/${nora}/platform-scripts/${view.id}/steps/1/branches`;
     const body = {

@@ -10,7 +10,7 @@ import {
 
 import { amountText, signedAmountText } from '@/reports/model';
 import { platformName } from '@/scheduling/model';
-import { clockAt, longDay } from '@/scheduling/time';
+import { clockAt, longDay, withFirstOfMonth } from '@/scheduling/time';
 
 /**
  * Commissions › « Mes ventes lues » (CRM-03 lot b4c, ADR 0050 § 10), without React: what a line of the member's own
@@ -24,13 +24,30 @@ const NBSP = ' ';
 const counted = (count: number, one: string, many: string): string =>
   `${String(count)}${NBSP}${count > 1 ? many : one}`;
 
-/** « Vente de 22 h 05 », « Remboursement de 9 h 15 », « Vente, heure inconnue ». */
-export function mySaleWhen(sale: Pick<MySale, 'event' | 'occurredAt'>, timeZone: string): string {
+/**
+ * « Vente de 22 h 05 », « Remboursement de 9 h 15 », « Vente, heure inconnue »; a late refund says the sale it takes
+ * back: « Remboursement de 9 h 15, d’une vente du 5 mai ».
+ */
+export function mySaleWhen(
+  sale: Pick<MySale, 'event' | 'occurredAt' | 'saleOccurredAt'>,
+  timeZone: string,
+): string {
   const what = sale.event === 'sale' ? 'Vente' : 'Remboursement';
-  return sale.occurredAt === null
-    ? `${what}, heure inconnue`
-    : `${what} de ${clockAt(sale.occurredAt, timeZone)}`;
+  const when =
+    sale.occurredAt === null ? `${what}, heure inconnue` : `${what} de ${clockAt(sale.occurredAt, timeZone)}`;
+  return sale.event === 'refund' && sale.saleOccurredAt !== null
+    ? `${when}, d’une vente du ${saleDayOf(sale.saleOccurredAt, timeZone)}`
+    : when;
 }
+
+/**
+ * « 5 mai », « 1er mai »: the day of the sale a late refund takes back, in the reader's zone, its number and month
+ * held together so a phone never parts them.
+ */
+const saleDayOf = (at: string, timeZone: string): string =>
+  withFirstOfMonth(
+    new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', timeZone }).formatToParts(new Date(at)),
+  ).replace(' ', NBSP);
 
 /** The line's net, signed: a refund takes off. */
 export const mySaleAmount = (sale: Pick<MySale, 'netMinor' | 'currency'>): string =>

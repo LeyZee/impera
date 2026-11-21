@@ -11,6 +11,7 @@ import {
   OnDutyListSchema,
   PlanningSchema,
   SCHEDULING_ERROR_CODES,
+  ShiftCheckInSchema,
   ShiftSchema,
   ShiftSwapListSchema,
   ShiftSwapRequestSchema,
@@ -34,6 +35,7 @@ import {
   type Planning,
   type SchedulingErrorCode,
   type Shift,
+  type ShiftCheckIn,
   type ShiftSwapList,
   type ShiftSwapRequest,
   type ShiftTemplate,
@@ -271,6 +273,12 @@ export const updateShift = (shiftId: string, body: UpdateShiftBody): Promise<Out
 
 export const cancelShift = (shiftId: string): Promise<Outcome<null>> =>
   send('DELETE', `/v1/scheduling/shifts/${shiftId}`, undefined, () => null);
+
+/** « Je prends mon poste » (EQ-12): the instant, the first one again on a second tap. */
+export const checkIn = (shiftId: string): Promise<Outcome<ShiftCheckIn>> =>
+  send('POST', `/v1/scheduling/shifts/${shiftId}/check-in`, undefined, (json) =>
+    ShiftCheckInSchema.parse(json),
+  );
 
 export const createTemplate = (body: CreateShiftTemplateBody): Promise<Outcome<ShiftTemplate>> =>
   send('POST', '/v1/scheduling/shift-templates', body, (json) => ShiftTemplateSchema.parse(json));
