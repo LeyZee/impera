@@ -135,6 +135,7 @@ Branche : task/<id>-<slug>
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lots a et b) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
 | INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
+| INS-05 | « À décider » : les cartes de décision de la créatrice | Instagram (ADR 0164) | in progress (lot a) |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
@@ -186,6 +187,7 @@ Branche : task/<id>-<slug>
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
 | SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | done | SEC-02, SEC-04, EQ-10, EQ-18 |
+| SEC-15 | Primes et ajustements réservés au propriétaire | exploitation | in_progress | EQ-04, EQ-05 |
 | SEC-16 | Le rôle de service cesse de grandir : test de plafond par module, puis réduction (ADR 0087, lots b et c) | exploitation | en cours | SEC-10, ADR 0087 |
 | SEC-17 | Durée d'une session selon le rôle : propriétaire 48 h sans activité et 7 jours, créatrice 7 jours et 30 jours, les autres 12 h et 7 jours | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |
