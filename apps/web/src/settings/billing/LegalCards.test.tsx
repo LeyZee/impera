@@ -262,6 +262,12 @@ describe('Réglages › Facturation, régimes', () => {
     type('Validé le', '2026-11-06');
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
     expect(within(dialog()).getByText('Au plus tard aujourd’hui, le 5 novembre 2026.')).toBeTruthy();
+    // Never before the regime was written, on 3 November (COUV-11).
+    type('Validé le', '2026-11-02');
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Noter la validation' }));
+    expect(
+      within(dialog()).getByText('Au plus tôt le 3 novembre 2026, le jour où ce régime a été écrit.'),
+    ).toBeTruthy();
     // Typed in French, never the system's calendar: what is no day is said, and nothing is sent.
     type('Validé le', '31/10/2026');
     type('Validé le', '31/02');

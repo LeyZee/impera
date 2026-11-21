@@ -1,4 +1,5 @@
 import {
+  calendarDayAt,
   CONTEST_DELAY_MAX_DAYS,
   CreateBillingRegimeBodySchema,
   CreateContractTextBodySchema,
@@ -126,6 +127,7 @@ export function regimeBodyOf(
       if (field === 'countries' && problems.countries === undefined)
         problems.countries = draft.countries.length === 0 ? 'Au moins un pays.' : issue.message;
       if (field === 'documents' && problems.documents === undefined) problems.documents = issue.message;
+      if (field === 'vat' && problems.rate === undefined) problems.rate = issue.message;
       if (field === 'mentions' && problems.mentions === undefined)
         problems.mentions = `Au plus ${String(INVOICE_MENTIONS_MAX)} mentions de 400 caractères chacune.`;
     }
@@ -235,3 +237,13 @@ export const TEXT_LEADS: Readonly<Record<ContractTextKind, string>> = {
   billing_mandate:
     'Le mandat qui permet à l’agence d’émettre les factures au nom de chaque prestataire, et son délai de contestation. Sans mandat accepté, aucune facture ne part.',
 };
+
+/**
+ * The day a regime was written, in the agency's zone (`null` while it is not read: its UTC day): the accountant's
+ * validation is never noted before it (COUV-11).
+ */
+export function regimeWrittenOn(regime: Pick<BillingRegime, 'createdAt'>, timeZone: string | null): string {
+  return timeZone === null
+    ? regime.createdAt.slice(0, 10)
+    : calendarDayAt(new Date(regime.createdAt), timeZone);
+}
