@@ -246,6 +246,7 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
         mode: 'copilot',
         pausedUntil: null,
         globalStop: false,
+        hasActivePersona: false,
         hoursNow: { open: true, changesAt: null },
         resumesAs: 'copilot',
         sales: null,
