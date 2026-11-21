@@ -72,6 +72,23 @@ export const ConversationSummarySchema = z.object({
 });
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
 
+/**
+ * The step of her script that leaves with a draft once approved (ADR 0098 § 5), as the platform names it: what the
+ * person approving reads before « Valider » (recette REV-03). Names are `null` when the script is no longer in the
+ * catalogue read from the platform; `priceMinor` 0 is an offered step.
+ */
+export const DraftScriptStepViewSchema = z.object({
+  scriptName: z.string().nullable(),
+  /** Its place in the script, from 0. */
+  stepIndex: z.number().int().nonnegative(),
+  stepName: z.string().nullable(),
+  priceMinor: z.number().int().nonnegative(),
+  currency: CurrencySchema,
+  /** It sends a media of her vault. */
+  hasMedia: z.boolean(),
+});
+export type DraftScriptStepView = z.infer<typeof DraftScriptStepViewSchema>;
+
 export const DraftViewSchema = z.object({
   id: DraftIdSchema,
   status: DraftStatusSchema,
@@ -83,6 +100,11 @@ export const DraftViewSchema = z.object({
    * said discreetly under the draft (« 1 réponse écartée : un aveu d’IA »). Empty when the first answer went through.
    */
   retried: z.array(GuardCodeSchema).default([]),
+  /**
+   * The step of her script that leaves with it, after the bubbles; `null` when none does. Always said by the API;
+   * optional so that a view written before it still reads.
+   */
+  scriptStep: DraftScriptStepViewSchema.nullable().exactOptional(),
 });
 export type DraftView = z.infer<typeof DraftViewSchema>;
 
