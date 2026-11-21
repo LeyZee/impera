@@ -355,6 +355,17 @@ describe('voice guards', () => {
     expect(codes(['Tu me déçois pas 😏'])).toEqual([]);
   });
 
+  it('blocks any child or minor she names, joking or sexual, never « beau gosse » (Charles 21/11)', () => {
+    for (const text of [
+      'T’es qu’un gamin',
+      'Comme une écolière 😏',
+      'On dirait un ado',
+      'like a little girl',
+    ])
+      expect(codes([text])).toContain('minor_reference');
+    expect(codes(['Salut beau gosse 😏'])).not.toContain('minor_reference');
+  });
+
   it('asks for a regeneration on a pet name she never gives, and lets hers through', () => {
     const settings = { ...DEFAULT_GUARD_SETTINGS, petNames: ['Beau gosse', 'Mon grand'] };
     const slip = checkVoiceOutput(['Coucou mon bébé 😘'], settings);

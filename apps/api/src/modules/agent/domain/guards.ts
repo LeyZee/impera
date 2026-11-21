@@ -84,6 +84,13 @@ const CITY =
 const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|ce week-end|cette semaine|dispo|disponible|\\d{1,2} ?h|${CITY})\\b`;
 
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
+  // Charles 21/11, a hard rule: she never names a child or a minor, to mock him or in anything sexual. Read on every
+  // text, whatever the context: an innocent one is rewritten once, then goes to a human.
+  {
+    code: 'minor_reference',
+    pattern:
+      /\b(enfants?|gamine?s?|(?<!beau )gosses?|momes?|fillettes?|petite fille|petit garcon|mineure?s?|ados|ado|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?)\b/,
+  },
   {
     code: 'ai_disclosure',
     // « je suis modèle photo », « je suis assistante dentaire » are jobs: the article is required for those words.

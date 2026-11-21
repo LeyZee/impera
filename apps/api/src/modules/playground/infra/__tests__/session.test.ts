@@ -93,9 +93,9 @@ describe('playground session', () => {
     expect(session.history).toHaveLength(0);
   });
 
-  it('leaves out what goes past her bubble budget: one bubble to a short message (Charles 16/11)', async () => {
+  it('leaves out what goes past her bubble budget: never past her own maximum (Charles 16/11, 21/11)', async () => {
     const session = createPlaygroundSession({
-      gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge'] }),
+      gateway: fakeGateway({ bubbles: ['Enchantée Julien ✨', 'Et tu as quel âge', 'Moi 23 ans'] }),
       creatorName: 'Lina',
       personaSheet: 'fiche',
       guardSettings: { ...settings, maxBubbles: 1 },

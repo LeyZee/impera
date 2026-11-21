@@ -32,6 +32,9 @@ export const brainScriptId = (index: number): string => `s${String(index + 1)}`;
 export const SCRIPT_REPLIES = ['refused', 'answers_step', 'claims_bought'] as const;
 
 /** Brain output (docs/architecture/ai-engine.md, « Le Brief »). Decisions are taken by the policy in code, not here. */
+/** The moments the code answers by rule (Charles 21/11), read by the brain. */
+const BRIEF_OCCASIONS = ['says_love', 'asks_proof', 'partner_returns', 'unsolicited_explicit'] as const;
+
 export const BriefSchema = z.object({
   intent: BriefIntentSchema,
   /** What he opposes to a price, with `price_objection` only (ADR 0090 § 7): the code picks her reply from it. */
@@ -91,6 +94,11 @@ export const BriefSchema = z.object({
   asksHerNextParty: z.boolean().optional(),
   /** He comes back, or apologises, after insulting or belittling her earlier in the conversation (Charles 21/11). */
   returnsAfterInsult: z.boolean().optional(),
+  /**
+   * A moment the code answers by rule (Charles 21/11): he says he loves her, asks a proof she is real, says his partner
+   * is coming home, or sends an explicit photo of himself unasked. Absent, none.
+   */
+  occasion: z.enum(BRIEF_OCCASIONS).optional(),
   action: z.enum(['reply', 'offer', 'wait', 'follow_up', 'handoff']),
   replyBrief: z.string().min(1),
   toneHints: z.array(z.string()),
@@ -122,6 +130,7 @@ export const BriefFromModelSchema = BriefSchema.extend({
   customOrder: CustomOrderReadingFromModelSchema.nullish(),
   asksHerNextParty: z.boolean().nullish(),
   returnsAfterInsult: z.boolean().nullish(),
+  occasion: z.enum(BRIEF_OCCASIONS).nullish(),
   toneHints: BriefSchema.shape.toneHints.nullable(),
   callback: z.string().nullish(),
   selfDisclosure: z.string().nullish(),

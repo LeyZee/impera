@@ -112,6 +112,14 @@ import {
   type SexualizationLimits,
 } from '../domain/sexualization';
 import { describeSituation, isNight, type Situation } from '../domain/situation';
+import {
+  explicitPhotoAnswer,
+  fanStanding,
+  proofAnswer,
+  type ExplicitPhotoAnswer,
+  type ProofAnswer,
+  type StandingLimits,
+} from '../domain/standing';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
 
 import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
@@ -260,6 +268,8 @@ export interface ComposeTurnInput {
    * teased him once about it, how close the agency says he is, and her limits. Absent: nothing given, not close, no
    * limits (the lowest reason only).
    */
+  /** The agency's span after which a fan who never paid is a confirmed time-waster; absent, nobody is one. */
+  readonly standingLimits?: StandingLimits;
   readonly meeting?: {
     readonly given: readonly MeetingReason[];
     readonly teased: boolean;
@@ -501,7 +511,7 @@ const KEEP_WARM_HINT =
   'il est à sec pour l’instant mais il a déjà payé : elle le garde au chaud, gratuitement, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
 /** He asks for more the evening he took everything (passe 18, Charles 21/11): nothing more tonight (`asksMoreSameEvening`). */
 const MORE_TONIGHT_HINT =
-  'il en redemande alors qu’il a déjà eu son script ce soir : elle ne propose rien de plus ce soir ; s’il insiste, elle l’oriente vers une demande faite pour lui (une vidéo, une cam), sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
+  'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle l’oriente vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
 /** How frank her words may be (`registerOf`, Charles 21/11). */
 const REGISTER_HINTS: Readonly<Record<Register, string>> = {
   suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
@@ -509,6 +519,29 @@ const REGISTER_HINTS: Readonly<Record<Register, string>> = {
     'l’action est engagée : elle peut être franche et crue, avec les seuls mots de sa fiche et de ses exemples de sexto',
 };
 const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
+/** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
+const ASKS_IF_BOT_HINT =
+  'il demande si c’est une IA : elle en rit et s’en moque, retourne le doute contre lui (c’est lui le problème, un peu vexant qu’il ne reconnaisse pas une vraie femme), puis passe à autre chose ; jamais lui demander ce qui le fait douter ni l’inviter à s’expliquer';
+/** He says he loves her (Charles 21/11): never said back (`love_declaration` holds). */
+const SAYS_LOVE_HINT =
+  'il dit qu’il l’aime : elle est flattée et troublée, elle n’a jamais été en couple, c’est tôt, ils ne se connaissent pas vraiment ; elle ne le lui dit jamais en retour';
+/** His partner comes home (Charles 21/11). */
+const PARTNER_RETURNS_HINT =
+  'sa compagne rentre : elle le taquine gentiment, ne dit jamais rien de mal d’elle, lui dit de prendre soin d’elle, chaleureuse';
+/** He asks a proof she is real (Charles 21/11), by where he stands (`proofAnswer`). */
+const PROOF_HINTS: Readonly<Record<ProofAnswer, string>> = {
+  relay:
+    'il demande une preuve qu’elle est vraie : sans vexation, elle dit qu’elle le fera quand elle pourra, ou trouve une excuse légère pour plus tard ; ni prix, ni promesse d’heure, rien d’envoyé maintenant',
+  refuse:
+    'il demande une preuve qu’elle est vraie : agacée qu’il ne la croie pas réelle depuis le temps, elle n’envoie rien et ne promet rien',
+};
+/** An explicit photo of his, sent cold (Charles 21/11), by where he stands (`explicitPhotoAnswer`). */
+const EXPLICIT_PHOTO_HINTS: Readonly<Record<ExplicitPhotoAnswer, string>> = {
+  turned_on: 'il lui envoie une photo intime de lui : elle réagit comme sa copine, ça l’excite',
+  calm_down:
+    'il lui envoie une photo intime de lui sans prévenir : elle lui dit de se calmer, ferme et en riant, sans rien de sexuel',
+  mock: 'il lui envoie une photo intime de lui sans prévenir : elle s’en moque gentiment, sans rien de sexuel',
+};
 
 /**
  * He says goodbye (ADR 0158 § A): goodnight, or he has to go. She answers with a goodbye, one bubble, in her
@@ -1296,6 +1329,26 @@ export async function composeTurn(
       lastOfferAt: input.offer.lastOfferAt,
       fanAsksForPaid: offerSignals(brief).fanAsksForPaid,
     });
+  // The moments code answers by rule, by where he stands (Charles 21/11).
+  const standing = fanStanding(
+    {
+      knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+      hasBought: input.situation.spentCents > 0,
+    },
+    input.standingLimits,
+  );
+  const occasionHints: string[] =
+    brief === undefined || care
+      ? []
+      : [
+          ...(brief.intent === 'asks_if_bot' ? [ASKS_IF_BOT_HINT] : []),
+          ...(brief.occasion === 'says_love' ? [SAYS_LOVE_HINT] : []),
+          ...(brief.occasion === 'partner_returns' ? [PARTNER_RETURNS_HINT] : []),
+          ...(brief.occasion === 'asks_proof' ? [PROOF_HINTS[proofAnswer(standing)]] : []),
+          ...(brief.occasion === 'unsolicited_explicit'
+            ? [EXPLICIT_PHOTO_HINTS[explicitPhotoAnswer(standing, ageConfirmed && !noExplicit)]]
+            : []),
+        ];
   // How frank her words may be: suggestive until the action is engaged, then her own crude words (Charles 21/11).
   const register: Register | null =
     brief === undefined || care || !HEATED_INTENTS.includes(brief.intent)
@@ -1329,6 +1382,7 @@ export async function composeTurn(
                 ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
                 ...(warm ? [KEEP_WARM_HINT] : []),
                 ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
+                ...occasionHints,
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
@@ -1374,7 +1428,8 @@ export async function composeTurn(
       isSkipped: true,
     };
   }
-  const budget = farewell === null ? bubbleBudget(input.history) : 1;
+  // Never past her own maximum (her persona's `maxBubbles`).
+  const budget = farewell === null ? bubbleBudget(input.history, persona.guardSettings.maxBubbles) : 1;
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...base,

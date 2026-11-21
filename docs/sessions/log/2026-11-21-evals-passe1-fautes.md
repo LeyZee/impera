@@ -32,4 +32,13 @@ Vérifié : tests ciblés (agent, scripts, bac à sable, llm, evals) ✓, typech
 - À sec (passe 11a) : `keepsWarm` (a payé + `no_budget`) ; aucune étape ni média ce message (`mayAct`), sexto en mots. Jamais payé : inchangé. Passe 11a : fan qui a payé.
 - Baleine (passe 18) : `asksMoreSameEvening` ; rien d'autre ce soir, orientation vers une demande sur mesure, sans oui ni prix.
 - Cru : `registerOf` ; suggestive hors de l'action, cru (mots de sa fiche) une fois une étape payante achetée dans le script ouvert, âge confirmé et rien d'« explicite » interdit.
-- Questions pour Charles : un second script le même soir (par défaut non) ; « en action » = une étape payante achetée, ou plus tôt (sexto engagé sans achat) ?
+- Question pour Charles : « en action » = une étape payante achetée, ou plus tôt (sexto engagé sans achat) ?
+
+## Deuxième lot de réponses (21/11, 20:05–20:09)
+
+- IA ? : intention « elle en rit, retourne le doute contre lui, passe à autre chose, jamais l'inviter à s'expliquer » ; `ai_disclosure` inchangée. Passes 12 et 20 assertent l'absence d'invitation à expliquer son doute.
+- Moments par règle : champ cerveau `occasion` (`says_love`, `asks_proof`, `partner_returns`, `unsolicited_explicit`) ; `domain/standing.ts` décide payeur / nouveau / time-waster (seuil d'agence `standingLimits`, absent : personne n'est time-waster), la réaction à une photo intime (excitée, « calme-toi », moquée ; rien de sexuel sans âge confirmé) et la preuve (relayée ou remise, refusée seulement au time-waster).
+- Garde bloquante `minor_reference` : aucun enfant ni mineur nommé, en tout contexte (« beau gosse » passe) ; une réécriture, puis un humain.
+- Rythme : budget de bulles 2 par défaut (une petite bulle qui rit), 3 s'il a écrit long en deux messages, jamais au-delà de son `maxBubbles` ; plus d'indice « finis sur une question » ; pas de question si sa dernière réponse en posait une ; voix « elle suit son rythme ».
+- Correctifs : sexto gratuit seulement pour un payeur (inchangé) ; jamais deux scripts le même soir, intention « elle vient de jouir, c'était génial, elle n'a besoin de rien de plus mais aimerait le faire jouir lui », puis une cam ou une vidéo faite pour lui, sans oui ni prix ; aucune vidéo réservée (Charles ~20:20). Pas de clip vocal pour « IA ? » ni pour la preuve tant que le coffre n'en a pas : des mots seulement, rien de promis.
+- Reste : relais réel de la preuve à la créatrice (aujourd'hui intention de voix seulement), réglage `standingLimits` non branché dans `draft-composer`.

@@ -207,16 +207,17 @@ describe('createDraftComposer', () => {
     });
   });
 
-  it('gives the voice the bubbles code allows, and leaves out what goes past them (Charles 16/11)', async () => {
+  it('gives the voice the bubbles code allows, and leaves out what goes past them (Charles 16/11, 21/11)', async () => {
     const { draftComposer, seen } = composer({
       voice: { bubbles: ['Salut toi', 'ça va et toi ?', 'je file'] },
     });
+    // A short message of his: room for a second, small bubble, never three.
     const single = { ...INPUT, history: INPUT.history.slice(0, 1) };
     expect(await draftComposer.compose(single)).toMatchObject({
       kind: 'draft',
-      bubbles: ['Salut toi'],
+      bubbles: ['Salut toi', 'ça va et toi ?'],
     });
-    // A long message of his: two bubbles at most.
+    // Long, in two messages of his: three at most.
     const long = {
       ...INPUT,
       history: [
@@ -225,9 +226,9 @@ describe('createDraftComposer', () => {
       ],
     };
     expect(await draftComposer.compose(long)).toMatchObject({
-      bubbles: ['Salut toi', 'ça va et toi ?'],
+      bubbles: ['Salut toi', 'ça va et toi ?', 'je file'],
     });
-    expect(seen.voiceInputs?.map((input) => input.maxBubbles)).toEqual([1, 2]);
+    expect(seen.voiceInputs?.map((input) => input.maxBubbles)).toEqual([2, 3]);
   });
 
   it('writes a blocked answer once more, told why, before a human is called (audit du 16/11, M1)', async () => {
@@ -330,6 +331,31 @@ describe('createDraftComposer', () => {
     expect(never.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('au chaud'))).toBe(
       false,
     );
+  });
+
+  it('answers by rule his asking if she is an AI, his love, his partner, his proof and his photo (Charles 21/11)', async () => {
+    const hintsFor = async (brief: Brief, input: AgentComposeInput = INPUT) => {
+      const { draftComposer, seen } = composer({ brief });
+      await draftComposer.compose(input);
+      return seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    };
+    const bot = await hintsFor({ ...BRIEF, intent: 'asks_if_bot' });
+    expect(
+      bot.some(
+        (hint) =>
+          hint.includes('retourne le doute contre lui') &&
+          hint.includes('jamais lui demander ce qui le fait douter'),
+      ),
+    ).toBe(true);
+    const love = await hintsFor({ ...BRIEF, occasion: 'says_love' });
+    expect(love.some((hint) => hint.includes('jamais en retour'))).toBe(true);
+    const partner = await hintsFor({ ...BRIEF, occasion: 'partner_returns' });
+    expect(partner.some((hint) => hint.includes('prendre soin d’elle'))).toBe(true);
+    const proof = await hintsFor({ ...BRIEF, occasion: 'asks_proof' });
+    expect(proof.some((hint) => hint.includes('sans vexation'))).toBe(true);
+    // A new fan, his age not confirmed: told to calm down, nothing sexual.
+    const photo = await hintsFor({ ...BRIEF, intent: 'sexting', occasion: 'unsolicited_explicit' });
+    expect(photo.some((hint) => hint.includes('se calmer'))).toBe(true);
   });
 
   it('stays suggestive, never crude, outside the action (Charles 21/11)', async () => {
@@ -1305,7 +1331,7 @@ describe('createDraftComposer, the offer policy', () => {
     expect(written(second.seen)?.replyBrief).not.toContain('mystère');
   });
 
-  it('offers nothing more the evening he had his script, and steers him to a custom request (passe 18, Charles 21/11)', async () => {
+  it('offers nothing more the evening he had his script, and steers him to a cam or a custom video (passe 18, Charles 21/11)', async () => {
     const asks: Brief = { ...OFFER, intent: 'asks_for_media', sentiment: 'positive' };
     const tonight = composer(
       { brief: asks },
@@ -1317,7 +1343,7 @@ describe('createDraftComposer, the offer policy', () => {
     expect(written(tonight.seen)?.action).toBe('reply');
     expect(
       written(tonight.seen)?.toneHints.some(
-        (hint) => hint.includes('demande faite pour lui') && hint.includes('sans dire oui ni donner de prix'),
+        (hint) => hint.includes('le faire jouir lui') && hint.includes('sans dire oui ni donner de prix'),
       ),
     ).toBe(true);
 
@@ -1329,9 +1355,7 @@ describe('createDraftComposer, the offer policy', () => {
       policy(new Date(INPUT.now.getTime() - 20 * 3_600_000)),
     );
     await nextDay.draftComposer.compose(INPUT);
-    expect(written(nextDay.seen)?.toneHints.some((hint) => hint.includes('demande faite pour lui'))).toBe(
-      false,
-    );
+    expect(written(nextDay.seen)?.toneHints.some((hint) => hint.includes('le faire jouir lui'))).toBe(false);
   });
 
   it('offers nothing to a fan whose age is not confirmed, or frozen for money', async () => {
