@@ -225,7 +225,6 @@ function Overview({
                 <CategoryCard
                   key={one.category}
                   category={one}
-                  media={mediaCountOf(stock, one.category).all}
                   awaited={platform.open}
                   onOpen={() => {
                     onOpen({ kind: 'category', category: one.category });
@@ -298,13 +297,10 @@ function Inside({ stock }: { stock: ContentStock }): JSX.Element {
 
 function CategoryCard({
   category,
-  media,
   awaited,
   onOpen,
 }: {
   category: StockCategory;
-  /** Every medium the category view will list, gone ones included. */
-  media: number;
   /** False while her platform is not open: nothing is expected, nothing is lacking. */
   awaited: boolean;
   onOpen: () => void;
@@ -366,7 +362,7 @@ function CategoryCard({
         </div>
       </dl>
       <button type="button" className="nv-btn nv-btn--sm nv-btn--plain st-card__open" onClick={onOpen}>
-        Ouvrir {media === 0 ? 'la catégorie' : `les ${String(media)} médias`} →
+        Ouvrir la catégorie →
       </button>
     </article>
   );

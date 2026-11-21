@@ -186,15 +186,13 @@ const descriptionsLine = (count: number): string =>
   count === 1 ? 'Une description attend un œil.' : `${String(count)} descriptions attendent un œil.`;
 
 /**
- * Media in stock and all media shown, per category, counted from the one list every screen reads: the headline, the
- * donut, a card and the category view never disagree.
+ * Media in stock per category, counted from the one list every screen reads: the headline, the donut and the
+ * category view never disagree.
  */
-export function mediaCountOf(
-  stock: ContentStock,
-  category: DropCategory,
-): { readonly inStock: number; readonly all: number } {
-  const mine = stock.media.filter((one) => one.category === category);
-  return { inStock: mine.filter((one) => one.standing === 'stock').length, all: mine.length };
+export function mediaCountOf(stock: ContentStock, category: DropCategory): { readonly inStock: number } {
+  return {
+    inStock: stock.media.filter((one) => one.category === category && one.standing === 'stock').length,
+  };
 }
 
 /** The four figures under the headline. */
