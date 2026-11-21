@@ -36,7 +36,7 @@ import { createTeamModule } from '../modules/team';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
-import { parisDay } from './support/paris';
+import { fortnightDawn } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 /** Invented people and rates only (ADR 0010). */
@@ -45,9 +45,15 @@ const CREATOR = { email: 'creator@example.test', name: 'Creator', password: 'bat
 const THEO_PASSWORD = 'staple battery horse';
 const NORA_PASSWORD = 'horse staple battery';
 
+/**
+ * The team's clock: 00:00:30 in Paris on the first day of the running fortnight, the first instant of a 1st or a 16th,
+ * so that the test and the server never read two different days.
+ */
+const DAWN = fortnightDawn();
+
 /** The agency's day (Europe/Paris), shifted by `days`: what the server calls « today ». */
 function agencyDay(days = 0): string {
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(DAWN);
   const day = new Date(`${today}T12:00:00Z`);
   day.setUTCDate(day.getUTCDate() + days);
   return day.toISOString().slice(0, 10);
@@ -157,7 +163,10 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
     config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
-    app = await createApp(config, createLogger(config), { passwordBreaches: () => Promise.resolve(false) });
+    app = await createApp(config, createLogger(config), {
+      passwordBreaches: () => Promise.resolve(false),
+      teamClock: () => DAWN,
+    });
     server = await buildServer({
       config,
       logger: createLogger(config),
@@ -685,15 +694,13 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
       value: theo.userId,
       expiresAt: new Date(Date.now() + 86_400_000),
     });
-    const before = parisDay();
     const response = await call('PUT', `/team/members/${theo.id}/status`, owner, { status: 'left' });
-    const after = parisDay();
     expect(response.statusCode).toBe(200);
     expect(TeamMemberSchema.parse(response.json())).toMatchObject({ status: 'left', creatorIds: [] });
-    // The day he left is the agency's day of the click, never typed (EQ-14): pay reads the fortnight of his departure
-    // from it.
+    // The day he left is the agency's day of the click on the team's clock, never typed (EQ-14): pay reads the
+    // fortnight of his departure from it.
     const leftOn = await leftOnOf(theo.id);
-    expect([before, after]).toContain(leftOn);
+    expect(leftOn).toBe(agencyDay());
     expect((await call('GET', '/me', theoCookie)).statusCode).toBe(401);
     const sessions = await test.admin.db
       .select()

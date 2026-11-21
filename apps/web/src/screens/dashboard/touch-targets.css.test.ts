@@ -62,11 +62,10 @@ describe('touch targets of the Dashboard and the creators (ADM-22)', () => {
   });
 
   it('gives a legend row and a column of the chart 44 px on a phone', () => {
-    const agency = sheet('./agency/agency.css');
     // The legend's rows are the design system's, on every screen that draws a donut.
     const system = sheet('../../../../../packages/design-system/src/styles/components.css');
     expect(system).toMatch(/@media \(max-width: 720px\) \{[^@]*\.nv-breakdown__row \{\s*min-height: 44px;/u);
     // 33 px wide on a phone's week, 5 px more on each side, over half the 10 px gap.
-    expect(rule(agency, '.ins-col::after')).toContain('inset: 0 -5px;');
+    expect(rule(system, '.nv-col::after')).toContain('inset: 0 -5px;');
   });
 });

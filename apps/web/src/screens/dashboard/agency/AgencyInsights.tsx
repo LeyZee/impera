@@ -75,7 +75,7 @@ import './agency.css';
 
 import { initialOf } from '@/lib/utils';
 import { Select, type SelectOption } from '@/shell/Select';
-import { Donut, Meter, Spark } from '@/shell/figures/figures';
+import { Columns, Donut, Meter, Spark } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -84,7 +84,6 @@ import { Failure } from '@/shell/states';
  * platform and never receives a fan. Colours follow the entity (a creator, a kind of sale), never its rank.
  */
 
-const STEPS: Readonly<Record<string, 1 | -1>> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 /** « 20 % »: the transfers' VAT rate as the code holds it (ADR 0106 § 7), never written twice. */
 const VAT_RATE = `${(AGENCY_TRANSFER_VAT_BPS / 100).toLocaleString('fr-FR')}\u00a0%`;
 const formatEuros = (cents: number): string => euros(Math.round(cents));
@@ -716,9 +715,6 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   // A long period on a phone reads week by week: ninety columns do not fit a thumb.
   const weekly = narrow && insights.days.length > 45;
   const columns = weekly ? byWeek(days) : days;
-  const [focus, setFocus] = useState(columns.length - 1);
-  const current = Math.min(Math.max(0, focus), columns.length - 1);
-  const bars = useRef<HTMLDivElement>(null);
   const max = Math.max(
     0,
     ...columns.map((column) => column.parts.reduce((sum, part) => sum + Math.max(0, part), 0)),
@@ -741,15 +737,6 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   const labelled = (i: number): boolean =>
     i % every === 0 && !(narrow && i !== last && last % every === 0 && every > 1 && last - i <= every);
   const used = STACKS.filter((_, s) => columns.some((column) => (column.parts[s] ?? 0) > 0));
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const step =
-      event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
-    if (step === undefined) return;
-    event.preventDefault();
-    const next = Math.min(Math.max(0, current + step), columns.length - 1);
-    setFocus(next);
-    bars.current?.querySelectorAll<HTMLButtonElement>('.ins-col')[next]?.focus();
-  };
   const span = today ? 'heure par heure' : weekly ? 'semaine par semaine' : 'jour par jour';
   return (
     <div className="nv-plate ins-daily">
@@ -763,70 +750,34 @@ function Daily({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
           ))}
         </ul>
       ) : null}
-      <div className="ins-daily__plot">
-        <div className="ins-daily__grid" aria-hidden="true">
-          {ticks.map((value) => (
-            <span key={value} style={{ '--_y': `${String((value / top) * 100)}%` }}>
-              <i>{shortEuros(value)}</i>
-            </span>
-          ))}
-        </div>
-        <div
-          className="ins-daily__bars"
-          style={{ '--_n': columns.length }}
-          role="group"
-          aria-label={`Chiffre d’affaires ${span}, au plus ${euros(max)} : flèches pour passer d’une colonne à l’autre`}
-          ref={bars}
-          onKeyDown={onKeyDown}
-          onFocus={(event) => {
-            const at = Number(event.target.getAttribute('data-i'));
-            if (Number.isInteger(at)) setFocus(at);
-          }}
-        >
-          {columns.map((column, i) => (
-            <button
-              type="button"
-              key={column.key}
-              className="ins-col"
-              style={{ '--_i': i }}
-              tabIndex={i === current ? 0 : -1}
-              aria-label={`${column.title} : ${euros(column.total)}`}
-              data-i={i}
-              {...tip.bind(
-                {
-                  title: column.title,
-                  rows: [
-                    ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
-                      .filter(([, cents]) => cents !== 0)
-                      .map(([label, cents]) => [label, euros(cents)] as const),
-                    ['Total', euros(column.total)],
-                  ],
-                },
-                { above: true },
-              )}
-            >
-              <span className="ins-col__stack">
-                {column.parts.map((cents, s) =>
-                  cents <= 0 ? null : (
-                    <span
-                      // Bottom to top, in the legend's order.
-                      key={s}
-                      className="ins-col__part"
-                      style={{
-                        '--_c': STACKS[s]?.colour ?? OTHER,
-                        '--_h': `${String((cents / top) * 100)}%`,
-                      }}
-                    />
-                  ),
-                )}
-              </span>
-              <span className="ins-col__label" aria-hidden="true">
-                {labelled(i) ? column.label : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <Columns
+        label={`Chiffre d’affaires ${span}, au plus ${euros(max)} : flèches pour passer d’une colonne à l’autre`}
+        top={top}
+        ticks={ticks.map((value) => ({ value, text: shortEuros(value) }))}
+        columns={columns.map((column, i) => ({
+          key: column.key,
+          label: labelled(i) ? column.label : '',
+          says: `${column.title} : ${euros(column.total)}`,
+          // Bottom to top, in the legend's order.
+          parts: column.parts.map((cents, s) => ({
+            key: String(s),
+            colour: STACKS[s]?.colour ?? OTHER,
+            value: cents,
+          })),
+          handlers: tip.bind(
+            {
+              title: column.title,
+              rows: [
+                ...STACKS.map((stack, s) => [stack.label, column.parts[s] ?? 0] as const)
+                  .filter(([, cents]) => cents !== 0)
+                  .map(([label, cents]) => [label, euros(cents)] as const),
+                ['Total', euros(column.total)],
+              ],
+            },
+            { above: true },
+          ),
+        }))}
+      />
     </div>
   );
 }

@@ -30,13 +30,21 @@ if (credentials.LLM_XAI_API_KEY === undefined) {
 }
 
 const model = values.model;
-// No fallback: the probe measures this model alone.
-const solo = ({ provider, temperature, maxOutputTokens, timeoutMs }: LlmRoleConfig): LlmRoleConfig => ({
+// No fallback: the probe measures this model alone. Its thinking stays the role's: left at xAI's default (`high`),
+// Grok 4.7 ran past the brain's 45 s on 13 messages out of 14 (CI, 21/11), which production never does.
+const solo = ({
+  provider,
+  temperature,
+  maxOutputTokens,
+  timeoutMs,
+  reasoningEffort,
+}: LlmRoleConfig): LlmRoleConfig => ({
   provider,
   model,
   temperature,
   maxOutputTokens,
   timeoutMs,
+  ...(reasoningEffort !== undefined && { reasoningEffort }),
 });
 const { roles } = DEFAULT_LLM_CONFIG;
 const config: LlmConfig = {
