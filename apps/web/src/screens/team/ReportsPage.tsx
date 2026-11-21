@@ -10,6 +10,7 @@ import {
 import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState, type JSX } from 'react';
 
+import { FeedbacksPanel, IncidentsCard } from './ShiftFeedbackCards';
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
 
@@ -256,6 +257,8 @@ export function ReportsPage({
         />
       ) : null}
       <div className="rp-board">
+        {/* The incidents of the mini feedback still open, before anything else (trous béants n° 1). */}
+        <IncidentsCard zone={zone} />
         <ToValidate
           list={open.data}
           isError={open.isError}
@@ -308,6 +311,7 @@ export function ReportsPage({
             setCorrecting({ shiftId: line.shift.id, memberName, draft: emptyCorrection() });
           }}
         />
+        <FeedbacksPanel period={period} zone={zone} />
       </div>
       {correcting === null ? null : (
         <ReportPanel

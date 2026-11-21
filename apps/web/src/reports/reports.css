@@ -1373,6 +1373,406 @@ a.sc-sheet__report:focus-visible,
   }
 }
 
+/* ── Mini feedback of a shift (ADR 0050 § 10) and its incident followed « Vu », « Réglé » (trous béants n° 1) ──
+   An incident reads by its stage: red while nobody saw it, amber seen, green « Réglé ». A signal reads by its
+   category, each its colour of the design system (--nv-series-1…4, its categorical palette). Never a bar on a card's side. */
+.rp-track {
+  --rp-stage: var(--nv-danger);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rp-track[data-stage='seen'] {
+  --rp-stage: var(--nv-warning);
+}
+.rp-track[data-stage='resolved'] {
+  --rp-stage: var(--nv-success);
+}
+.rp-track__bar {
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.rp-track__fill {
+  display: block;
+  width: var(--rp-fill);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--rp-stage);
+  transition: width var(--nv-dur-progress) var(--nv-ease-out);
+}
+.rp-track__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-track__step {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+.rp-track__step:nth-child(2) {
+  align-items: center;
+  text-align: center;
+}
+.rp-track__step:nth-child(3) {
+  align-items: flex-end;
+  text-align: right;
+}
+.rp-track__step[data-done='true'] {
+  color: var(--nv-ink);
+}
+.rp-track__step[data-done='true'] .rp-track__word {
+  font-weight: 650;
+}
+.rp-track__when {
+  color: var(--nv-ink-muted);
+}
+
+.rp-incident-sent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-danger) 8%, var(--nv-fill-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 24%, transparent);
+}
+.rp-incident-sent[data-stage='seen'] {
+  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-fill-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 26%, transparent);
+}
+.rp-incident-sent[data-stage='resolved'] {
+  background: color-mix(in srgb, var(--nv-success) 8%, var(--nv-fill-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 24%, transparent);
+}
+.rp-incident-sent__title {
+  margin: 0;
+  font-weight: 650;
+}
+.rp-incident-sent__text,
+.rp-incident-line__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+/* A signal: its category in its colour, then its sentence. */
+.rp-signals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-signal,
+.rp-cat,
+.rp-sigbar__part,
+.rp-sigbar__key {
+  --rp-kind: var(--nv-series-4);
+}
+.rp-signal[data-kind='1'],
+.rp-cat[data-kind='1'],
+.rp-sigbar__part[data-kind='1'],
+.rp-sigbar__key[data-kind='1'] {
+  --rp-kind: var(--nv-series-1);
+}
+.rp-signal[data-kind='2'],
+.rp-cat[data-kind='2'],
+.rp-sigbar__part[data-kind='2'],
+.rp-sigbar__key[data-kind='2'] {
+  --rp-kind: var(--nv-series-2);
+}
+.rp-signal[data-kind='3'],
+.rp-cat[data-kind='3'],
+.rp-sigbar__part[data-kind='3'],
+.rp-sigbar__key[data-kind='3'] {
+  --rp-kind: var(--nv-series-3);
+}
+.rp-signal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--nv-space-1) var(--nv-space-2);
+  min-width: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-signal__cat {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--rp-kind) 16%, transparent);
+  color: var(--rp-kind);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.rp-signal__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The form's signals: a category picked among four coloured pills, then its sentence. */
+.rp-remontees {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.rp-remontees__add {
+  align-self: flex-start;
+}
+.rp-remontee {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+}
+.rp-remontee__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.rp-remontee__line {
+  display: flex;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.rp-remontee__line > input {
+  flex: 1;
+  min-width: 0;
+}
+.rp-cat {
+  min-height: var(--nv-pill-choice);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rp-kind) 35%, transparent);
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out);
+}
+.rp-cat:hover {
+  background: color-mix(in srgb, var(--rp-kind) 12%, var(--nv-glass-fill));
+  color: var(--nv-ink);
+}
+.rp-cat[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--rp-kind) 22%, var(--nv-glass-fill));
+  box-shadow: inset 0 0 0 1px var(--rp-kind);
+  color: var(--nv-ink);
+}
+.rp-cat:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+
+/* Équipe › Rapports: the incidents still open, first and in red. */
+.nv-plate.rp-incidents {
+  background: color-mix(in srgb, var(--nv-danger) 9%, var(--nv-plate));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 34%, transparent);
+}
+.rp-incidents .nv-eyebrow {
+  color: var(--nv-danger);
+}
+.rp-incidents__lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-incidents__list,
+.rp-fbs__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-incident-line,
+.rp-fb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-plate);
+  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  transition: opacity var(--nv-dur-base) var(--nv-ease-out);
+}
+.rp-incident-line[aria-busy='true'] {
+  opacity: 0.6;
+}
+.rp-incident-line__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.rp-incident-line__acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--nv-space-2);
+}
+.rp-incident-line__done:not(:disabled):hover {
+  color: var(--nv-success);
+}
+.rp-stage {
+  --rp-stage: var(--nv-danger);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: var(--nv-pill-info);
+  padding: 0 10px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--rp-stage) 14%, transparent);
+  color: var(--rp-stage);
+  font-size: var(--nv-text-caption);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rp-stage::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: currentColor;
+}
+.rp-stage[data-stage='sent']::before {
+  animation: rp-beat var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
+}
+.rp-stage[data-stage='seen'] {
+  --rp-stage: var(--nv-warning);
+}
+.rp-stage[data-stage='resolved'] {
+  --rp-stage: var(--nv-success);
+}
+@keyframes rp-beat {
+  50% {
+    opacity: 0.25;
+  }
+}
+.rp-fb__whose {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rp-fb__who {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-weight: 650;
+}
+.rp-fb__where {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.rp-fb__creator {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+.rp-fb__comment {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A period's feedbacks: three figures first, then the signals by category as one coloured bar. */
+.rp-fbs__figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+}
+.rp-fbs__figure {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.rp-fbs__value {
+  color: var(--nv-ink);
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+}
+.rp-fbs__figure[data-tone='bad'] {
+  background: color-mix(in srgb, var(--nv-danger) 10%, var(--nv-fill-soft));
+}
+.rp-fbs__figure[data-tone='bad'] .rp-fbs__value {
+  color: var(--nv-danger);
+}
+.rp-fbs__figure[data-tone='ok'] .rp-fbs__value {
+  color: var(--nv-success);
+}
+.rp-sigbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rp-sigbar__track {
+  display: flex;
+  gap: 3px;
+  height: 10px;
+}
+.rp-sigbar__part {
+  flex: var(--rp-part) 1 0;
+  border-radius: var(--nv-radius-full);
+  background: var(--rp-kind);
+}
+.rp-sigbar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-1) var(--nv-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+}
+.rp-sigbar__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rp-sigbar__key::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--rp-kind);
+}
+.rp-sigbar__key .nv-num {
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rp-island {
     animation: none;
@@ -1384,7 +1784,13 @@ a.sc-sheet__report:focus-visible,
   .rp-island__spin {
     animation-duration: 2.4s;
   }
+  .rp-stage[data-stage='sent']::before {
+    animation: none;
+  }
   .rp-incident,
+  .rp-track__fill,
+  .rp-cat,
+  .rp-incident-line,
   .rp-correction,
   .rp-todo__go,
   .rp-review,
