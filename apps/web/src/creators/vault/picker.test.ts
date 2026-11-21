@@ -55,6 +55,9 @@ const imported = (id: string) => ({
   imported: true,
   description: 'none' as const,
   excerpt: null,
+  descriptionId: null,
+  detailed: null,
+  validated: false,
 });
 const EMPTY: PickDraft = new Map();
 

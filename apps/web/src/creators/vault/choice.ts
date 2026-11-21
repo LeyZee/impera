@@ -1,4 +1,5 @@
 import {
+  type MediaDescriptionId,
   VAULT_DESCRIBE_COST_TENTHS,
   VAULT_DESCRIBE_MAX,
   type VaultChoicesView,
@@ -18,10 +19,21 @@ export interface MediaChoice {
   readonly imported: boolean;
   readonly description: VaultDescriptionState;
   readonly excerpt: string | null;
+  /** Its latest description, whole, and whether a person validated it: what a prepared script asks of it. */
+  readonly descriptionId: MediaDescriptionId | null;
+  readonly detailed: string | null;
+  readonly validated: boolean;
 }
 
 /** A media the choices do not list yet (a sync just read it): not imported, never described. */
-const UNCHOSEN: MediaChoice = { imported: false, description: 'none', excerpt: null };
+const UNCHOSEN: MediaChoice = {
+  imported: false,
+  description: 'none',
+  excerpt: null,
+  descriptionId: null,
+  detailed: null,
+  validated: false,
+};
 
 const mediaKey = (account: string, mediaId: string): string => `${account}:${mediaId}`;
 const folderKey = (account: string, folderRef: string | null): string => `${account}:${folderRef ?? ''}`;
@@ -37,7 +49,14 @@ export function choiceIndex(view: VaultChoicesView | undefined): ChoiceIndex {
     media: new Map(
       (view?.media ?? []).map((each) => [
         mediaKey(each.platformAccountId, each.platformMediaId),
-        { imported: each.imported, description: each.description, excerpt: each.excerpt },
+        {
+          imported: each.imported,
+          description: each.description,
+          excerpt: each.excerpt,
+          descriptionId: each.descriptionId,
+          detailed: each.detailed,
+          validated: each.validated,
+        },
       ]),
     ),
     folders: new Map(
@@ -254,7 +273,7 @@ const EUROS = new Intl.NumberFormat('fr-FR', {
 export const centsLine = (cents: number): string => EUROS.format(cents / 100);
 
 /** A media's description as the grid says it under its tile, `null` when there is nothing to say. */
-export function descriptionLine(choice: MediaChoice): {
+export function descriptionLine(choice: Pick<MediaChoice, 'imported' | 'description' | 'excerpt'>): {
   readonly text: string;
   readonly tone: 'described' | 'muted' | 'warn';
 } {

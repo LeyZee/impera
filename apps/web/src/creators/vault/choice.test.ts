@@ -60,7 +60,16 @@ const chosen = (
   id: string,
   imported: boolean,
   description: VaultChoicesView['media'][number]['description'] = 'none',
-) => ({ platformAccountId: ACCOUNT, platformMediaId: id, imported, description, excerpt: null });
+) => ({
+  platformAccountId: ACCOUNT,
+  platformMediaId: id,
+  imported,
+  description,
+  excerpt: null,
+  descriptionId: null,
+  detailed: null,
+  validated: false,
+});
 
 describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
   it('reads a media’s choice, a media not listed yet following its folder’s tick', () => {
@@ -72,7 +81,11 @@ describe('the vault by choice, for the screen (ADR 0145 § 5)', () => {
     );
     const f1 = folder('f1', []);
     expect(choiceOf(index, f1, media('a')).imported).toBe(false);
-    expect(choiceOf(index, f1, media('new'))).toEqual({ imported: true, description: 'none', excerpt: null });
+    expect(choiceOf(index, f1, media('new'))).toMatchObject({
+      imported: true,
+      description: 'none',
+      excerpt: null,
+    });
     expect(choiceOf(index, folder('f2', []), media('other')).imported).toBe(false);
     expect(choiceOf(choiceIndex(undefined), f1, media('a')).imported).toBe(false);
   });
