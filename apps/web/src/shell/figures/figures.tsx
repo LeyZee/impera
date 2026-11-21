@@ -1,4 +1,4 @@
-import { chartPoints, donutArcs, linePath } from '@impera/design-system';
+import { chartPoints, donutArcs, linePath, ringDash } from '@impera/design-system';
 import {
   useId,
   useRef,
@@ -12,7 +12,7 @@ import {
 
 /*
  * The figures every screen draws the same way (Charles, 21/11): the donut, its legend's lighting, the meter, the
- * small curve and the columns. Their look and their motion are the design system's (`nv-donut`, `nv-breakdown`,
+ * ring, the small curve and the columns. Their look and their motion are the design system's (`nv-donut`, `nv-breakdown`,
  * `nv-meter`, `nv-spark`, `nv-cols`); a screen gives numbers, colours and words, never a class of its own for the
  * drawing.
  */
@@ -156,17 +156,22 @@ export function useLit(): {
 /**
  * A meter: how far along, from 0 to 100 %, on its track. `label` says it to a screen reader; without it the meter
  * is decoration beside a figure that already says the same. `colour` is a CSS colour, the data's ink by default.
+ * `mark` is where the objective stands on the same track, in percent: a thin line across it, so the eye reads at once
+ * whether the fill is short of it or past it.
  */
 export function Meter({
   percent,
   label,
   colour,
+  mark,
 }: {
   percent: number;
   label?: string;
   colour?: string;
+  mark?: number;
 }): JSX.Element {
-  const width = `${String(Math.min(100, Math.max(0, percent)))}%`;
+  const within = (value: number): string => `${String(Math.min(100, Math.max(0, value)))}%`;
+  const width = within(percent);
   return (
     <span
       className="nv-meter"
@@ -175,7 +180,62 @@ export function Meter({
       aria-hidden={label === undefined ? true : undefined}
     >
       <span style={colour === undefined ? { '--_w': width } : { '--_w': width, '--_c': colour }} />
+      {mark === undefined ? null : <i className="nv-meter__mark" style={{ '--_m': within(mark) }} />}
     </span>
+  );
+}
+
+/** The ring's box: 66 units wide, a circle of radius 28 and 7 thick, as `nv-ring` draws it. */
+const RING_BOX = 66;
+const RING_RADIUS = 28;
+
+/**
+ * A ring: one part of a whole, from 0 to 1, drawn clockwise from the top; what it counts sits in its middle
+ * (`children`). `label` says it to a screen reader. `colour` is a CSS colour, the neon by default. At nothing, no value
+ * circle at all: a round cap of length 0 would still draw a lit dot.
+ */
+export function Ring({
+  share,
+  label,
+  colour,
+  className,
+  full,
+  children,
+}: {
+  share: number;
+  label: string;
+  colour?: string;
+  className?: string;
+  /** The whole is reached: the screen may dress it (`data-full`). */
+  full?: boolean;
+  children?: ReactNode;
+}): JSX.Element {
+  const part = Math.min(1, Math.max(0, Number.isFinite(share) ? share : 0));
+  const half = RING_BOX / 2;
+  return (
+    <div
+      className={className === undefined ? 'nv-ring' : `nv-ring ${className}`}
+      role="img"
+      aria-label={label}
+      data-full={full === true ? 'true' : undefined}
+      style={colour === undefined ? undefined : { '--_c': colour }}
+    >
+      <svg viewBox={`0 0 ${String(RING_BOX)} ${String(RING_BOX)}`} aria-hidden="true">
+        <circle className="nv-ring__track" cx={half} cy={half} r={RING_RADIUS} />
+        {part === 0 ? null : (
+          <circle
+            className="nv-ring__value"
+            cx={half}
+            cy={half}
+            r={RING_RADIUS}
+            strokeDasharray={ringDash(part, RING_RADIUS)}
+          />
+        )}
+      </svg>
+      <span className="nv-ring__label nv-num" aria-hidden="true">
+        {children}
+      </span>
+    </div>
   );
 }
 
