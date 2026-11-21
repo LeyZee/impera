@@ -33,7 +33,7 @@ Le rapport du 21/11 : un dépôt raté ne pouvait que disparaître de son écran
 - [x] Contrat : `ContentDropFile.redo`, `replacementRefusal`, `REDOABLE_DROP_STATES`.
 - [x] Web : `redoDropFile` (agence, pour l'écran du coffre), `replaceDropFile` puis `queueSend` ; carte de la créatrice : la phrase en ambre sur la ligne du média et « Remplacer » (aussi sur un fichier refusé) ; le remplaçant montre son envoi, la carte dit « En envoi » puis « Reçu » jusqu'à sa réception.
 - [x] Tests : contrat, base, intégration, écrans.
-- [ ] Captures de « Remplacer », avis Design.
+- [x] Captures de « Remplacer », avis Design ; validées par Charles le 21/11 (lot remplacer-1, sans retouche).
 
 ## Critères d'acceptation
 
