@@ -2210,6 +2210,20 @@
   transform-origin: left;
   animation: nv-widen var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
 }
+/* The objective on the same track: a thin line across it, a little taller than the track so it reads over the fill. */
+.nv-meter:has(.nv-meter__mark) {
+  overflow: visible;
+}
+.nv-meter__mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--_m);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+}
 @keyframes nv-widen {
   from {
     transform: scaleX(0);
@@ -3058,6 +3072,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* The value's glow reaches past the box: cut by it, it shows as a square behind the ring. */
+  overflow: visible;
   transform: rotate(-90deg);
 }
 .nv-ring__track,

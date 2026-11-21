@@ -89,6 +89,23 @@
   --nv-series-4: #9c9630;
   --nv-series-other: rgba(246, 238, 241, 0.32);
   /*
+   * The categories of content (the vault, the model's week): ten hues in a fixed order (blue, pink, green, olive,
+   * violet, gold, orange, cyan, magenta, slate), one per category, the same on every screen. An identity, not a
+   * series: ten hues cannot all stay apart for colour-blind readers, so a category is never told by its colour alone,
+   * its name or its icon is always beside it. Each at 3:1 at least on the plate, Nuit and Jour. The first four are the
+   * series' own hues; a chart of a few series still takes `--nv-series-*`.
+   */
+  --nv-content-1: #3d8ce6;
+  --nv-content-2: #d46a98;
+  --nv-content-3: #1aa37a;
+  --nv-content-4: #9c9630;
+  --nv-content-5: #8f7fe0;
+  --nv-content-6: #d9a521;
+  --nv-content-7: #e8743b;
+  --nv-content-8: #25b6d2;
+  --nv-content-9: #c558d6;
+  --nv-content-10: #7f93b2;
+  /*
    * The intensity of one measure (Dashboard de l'agence, « Quand ça vend »: the hours map and the ten biggest fans'
    * bar, Charles 20/11): one violet-fuchsia, mixed toward --nv-fill-track from pale to vivid. Never a state nor a
    * category. Apart from the creators' rose, the agent's violet and the agency's blue for full colour vision, and at
@@ -208,6 +225,17 @@
   --nv-series-3: #c2457e;
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
+  /* The ten categories of content, stepped darker for the day plate. */
+  --nv-content-1: #2a6fc9;
+  --nv-content-2: #c2457e;
+  --nv-content-3: #12825d;
+  --nv-content-4: #7a7414;
+  --nv-content-5: #6a52c4;
+  --nv-content-6: #946a00;
+  --nv-content-7: #c2500f;
+  --nv-content-8: #0b7f97;
+  --nv-content-9: #9b2fb0;
+  --nv-content-10: #55688a;
   --nv-heat: #b040d8;
   --nv-money-creator: #b8406f;
   /* The Impera logo's navy itself, Charles's value (19/11), unretouched. */
