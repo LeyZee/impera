@@ -348,6 +348,46 @@ describe('« Détecter ses liens » (INS-02)', () => {
     );
   });
 
+  it('is not offered when this installation has no link service, and says so plainly if asked (PRO1-14)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => {
+        const path = new URL(input, 'http://localhost').pathname;
+        if (path === '/v1/settings/link-service')
+          return Promise.resolve(new Response(JSON.stringify({ state: 'off', connectedAt: null })));
+        return Promise.resolve(new Response(JSON.stringify({ links: [STORY] })));
+      }),
+    );
+    renderSection();
+    expect(await screen.findByRole('button', { name: /Ajouter un lien/u })).toBeDefined();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Détecter ses liens' })).toBeNull();
+    });
+  });
+
+  it('says plainly that the service is not installed when the server answers so (PRO1-14)', async () => {
+    serve(
+      [STORY],
+      () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: 'link_service_unprocessable',
+              message: 'x',
+              details: { kind: 'off' },
+              requestId: 'r1',
+            },
+          }),
+          { status: 422 },
+        ),
+    );
+    renderSection();
+    fireEvent.click(await screen.findByRole('button', { name: 'Détecter ses liens' }));
+    expect(
+      await screen.findByText('Le service de liens n’est pas encore installé : ajoute ses liens à la main.'),
+    ).toBeDefined();
+  });
+
   it('is not offered to a manager', async () => {
     serve([STORY]);
     renderSection(false);
