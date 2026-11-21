@@ -67,7 +67,7 @@ describe('AI usage (ADR 0091)', () => {
 
   it('answers the contract with no call at all: thirty empty days, the hours up to now, no pace', () => {
     const usage = aiUsage(input());
-    expect(AiUsageSchema.parse(usage)).toEqual(usage);
+    expect(AiUsageSchema.omit({ forecast: true }).parse(usage)).toEqual(usage);
     expect(usage.days).toHaveLength(AI_USAGE_DAYS);
     expect(usage.days[0]?.day).toBe('2026-10-13');
     expect(usage.days.at(-1)?.day).toBe(TODAY);
@@ -182,7 +182,7 @@ describe('AI usage (ADR 0091)', () => {
     const entries = [entry({ provider: 'xai' })];
     const usage = aiUsage(input({ entries, spentSinceUsd: { xai: 1 } }));
     expect(usage.credits.map((c) => c.provider)).toEqual(['xai']);
-    expect(AiUsageSchema.parse(usage)).toEqual(usage);
+    expect(AiUsageSchema.omit({ forecast: true }).parse(usage)).toEqual(usage);
   });
 });
 
@@ -361,7 +361,7 @@ describe('AI spend the subscription paid (ADR 0091 § 6, « ok 0091 chiffres »)
     const usage = aiUsage(
       input({ rows, firstDay: '2026-10-20', entries: [plan('2026-11-01T00:00:00.000Z')] }),
     );
-    expect(AiUsageSchema.parse(usage)).toEqual(usage);
+    expect(AiUsageSchema.omit({ forecast: true }).parse(usage)).toEqual(usage);
     const today = usage.days.at(-1);
     expect(today?.coveredEur).toBeCloseTo(3);
     expect(today?.providers.map((p) => p.provider)).toEqual(['xai', 'mistral']);
