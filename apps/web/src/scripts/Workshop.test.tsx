@@ -139,7 +139,7 @@ describe('the workshop of a structure', () => {
   it('moves a stage with Alt and the arrows, and drops the bridge it leaves', () => {
     serve();
     renderWorkshop();
-    const bridges = (): number => screen.getAllByRole('button', { name: /^Pont \d & \d :/ }).length;
+    const bridges = (): number => screen.getAllByRole('button', { name: /^Pont vers l’étape \d :/ }).length;
     const before = bridges();
     const second = screen.getByRole('button', { name: /^Étape 2/ });
     fireEvent.keyDown(second, { key: 'ArrowUp', altKey: true });

@@ -259,6 +259,20 @@ export function scriptSegmentCodes(segments: readonly ScriptSegment[]): ScriptSe
 }
 
 /**
+ * The one name of a bridge, on every screen and in every export (« Pont vers l’étape 3 », recette MED-07, choix de
+ * Charles du 21/11): the number of the stage it leads to, `?` when that stage is absent.
+ */
+export function bridgeName(segments: readonly ScriptSegment[], to: string): string {
+  let number = 0;
+  for (const segment of segments) {
+    if (segment.kind !== 'stage') continue;
+    number += 1;
+    if (segment.key === to) return `Pont vers l’étape ${String(number)}`;
+  }
+  return 'Pont vers l’étape ?';
+}
+
+/**
  * One slot of a script drop (SC-02 lot b, ADR 0056 § 4): a media slot of a segment, for one series of a stage with
  * variants (each series is shot whole: `E1A`, `E1B`, ADR 0056 § 5). Its key, `<segment>:<series>:<rank>`, names it in
  * the drop; its position is its place in the script, which a file keeps when it is replaced.

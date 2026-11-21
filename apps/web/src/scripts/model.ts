@@ -1,4 +1,5 @@
 import {
+  bridgeName,
   SCRIPT_COLOR_PRESETS,
   SCRIPT_SEGMENTS_MAX,
   SCRIPT_VARIANT_LETTERS,
@@ -149,15 +150,13 @@ export function nextLetter(stage: ScriptStage): (typeof SCRIPT_VARIANT_LETTERS)[
   return SCRIPT_VARIANT_LETTERS.find((letter) => !stage.variants.some((v) => v.letter === letter)) ?? null;
 }
 
-/** « ÉTAPE 2 », « PONT 2 & 3 »: what the card will title the segment. */
+/** « Étape 2 », « Pont vers l’étape 3 »: what the card will title the segment. */
 export function segmentTitles(segments: readonly ScriptSegment[]): Map<string, string> {
   const codes = new Map(scriptSegmentCodes(segments).map((code) => [code.key, code.code.slice(1)]));
   return new Map(
     segments.map((segment) => [
       segment.key,
-      segment.kind === 'stage'
-        ? `Étape ${codes.get(segment.key) ?? '?'}`
-        : `Pont ${codes.get(segment.from) ?? '?'} & ${codes.get(segment.to) ?? '?'}`,
+      segment.kind === 'stage' ? `Étape ${codes.get(segment.key) ?? '?'}` : bridgeName(segments, segment.to),
     ]),
   );
 }

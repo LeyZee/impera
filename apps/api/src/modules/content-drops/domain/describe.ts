@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import {
+  bridgeName,
   DROP_CATEGORY_LABELS,
   MEDIA_VOCABULARY_VERSION,
   scriptSegmentCodes,
@@ -55,7 +56,7 @@ function stepCardOf(
   if (segment.kind === 'bridge')
     return {
       number: stageNumbers.get(segment.from) ?? 0,
-      name: `Pont vers l’étape ${String(stageNumbers.get(segment.to) ?? '?')}`,
+      name: bridgeName(segments, segment.to),
       lines: [segment.teaser],
     };
   const series = segment.variants.find((one) => one.letter === variant);

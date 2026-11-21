@@ -173,7 +173,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Structure de départ | `script_starter` | Structure proposée par l'atelier, à dupliquer puis ajuster : données des contrats (`SCRIPT_STARTERS`), dont celle d'OnlyScript avec ses noms d'étapes (ADR 0064 § 4). |
 | Tenue | `outfit` | Ce que la créatrice porte pour une étape (« Lingerie noire ») ; `null` quand l'agence la laisse choisir. Le mode tournage regroupe les étapes par tenue (SC-07). |
 | Lieu | `place` | Où se tourne une étape (« Chambre ») ; `null` quand l'agence la laisse choisir. Le mode tournage regroupe ensuite par lieu (SC-07). |
-| Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
+| Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). Un seul nom affiché partout, écrans et cartons : « Pont vers l'étape N », N étant l'étape où il mène (`bridgeName`). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
 | Emplacement de script | `script_slot` | Un emplacement d'un dépôt de script, pour une série : nommé `<segment>:<série>:<rang>` (`slot_key`), il garde sa position quand son fichier est remplacé (SC-02, ADR 0056 § 4). |
 | Numéro de script | `script_number` | Le rang d'un script envoyé parmi ceux de sa créatrice : 1 pour le premier, sans trou, donné à « Envoyer le script » et gardé ensuite ; le `S<nnn>` de son dossier (SC-03, ADR 0056 § 5). |
