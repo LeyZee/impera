@@ -584,6 +584,8 @@ describe('Créatrices, what a member without the list reads', () => {
     await serve([]);
     renderAt(operator, '/creatrices');
     expect(await screen.findByText('Aucune créatrice ne t’est confiée')).toBeDefined();
+    // The whole screen is empty: its drawing stands above the sentence.
+    expect(document.querySelector('.nv-empty__art svg')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
   });
 

@@ -41,8 +41,9 @@ import { AgentSwitch } from '@/agent/AgentSwitch';
 import { canSwitch } from '@/agent/state';
 import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
+import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
-import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
 
@@ -221,12 +222,9 @@ export function CreatorsPage({
     if (!isOwner && creators.length === 0) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">Aucune créatrice ne t’est confiée</p>
-            <p className="ps-muted">
-              Le propriétaire choisit les créatrices de chaque compte. Demande-lui de t’en confier une.
-            </p>
-          </div>
+          <Empty plate art={<CrownArt />} title="Aucune créatrice ne t’est confiée">
+            Le propriétaire choisit les créatrices de chaque compte. Demande-lui de t’en confier une.
+          </Empty>
         </section>
       );
     }
