@@ -5,13 +5,14 @@ import { useCallback, type JSX, type ReactNode } from 'react';
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
 import { CreatorPicker } from './CreatorPicker';
-import { FunnelPanel } from './Funnel';
+import { AGENT_PATH, FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TodoCard } from './TodoCard';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
+import { SteeringPanel } from './agency/Steering';
 import type { AgencySelection } from './agency/period';
 import { agentRuns, litParts } from './logic';
 import type { Fan, Period, Todo, Tone } from './model';
@@ -150,8 +151,8 @@ function Offline({
 }
 
 /**
- * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). Whoever can add one is led to
- * Créatrices; anyone else reads who does.
+ * No creator yet (first launch): what to do, never a page of made-up figures (DASH-13). The owner, who alone adds one,
+ * is led to Créatrices; a manager or an operator reads that none is entrusted to him yet.
  */
 export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.Element {
   return canAddCreator ? (
@@ -167,8 +168,8 @@ export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.El
   ) : (
     <Alone
       tone="idle"
-      headline="Aucune créatrice **pour l’instant**"
-      lead="Le propriétaire de l’agence les ajoute. Leur agent et ce qui attend un humain arriveront ici."
+      headline="Aucune créatrice **ne t’est confiée**"
+      lead="C’est le propriétaire de l’agence qui te les confie. Elles apparaîtront ici."
     />
   );
 }
@@ -202,7 +203,7 @@ export function DashboardPage({
   reviewsReports?: boolean;
   /** The account's rail holds Suivi: a best fan opens his conversation there (DASH-14). */
   opensTracking?: boolean;
-  /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
+  /** The owner, who alone adds a creator: before any creator, the screen leads him to Créatrices (DASH-13). */
   canAddCreator?: boolean;
   /** The owner's and an active manager's: her figures from the register lead the page (ADR 0078). */
   agency?: AgencyView;
@@ -376,7 +377,11 @@ function Loaded({
 
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
       {agency === undefined ? null : (
+        <SteeringPanel creatorId={creatorId} opensTracking={opensTracking} tip={tip} index={2} />
+      )}
+      {agency === undefined ? null : (
         <AgencyInsightsPanel
+          index={5}
           selection={agency.selection}
           onSelection={agency.onSelection}
           creatorId={creatorId}
@@ -393,7 +398,13 @@ function Loaded({
           </Section>
 
           <Section title="Parcours des fans" sub={FUNNEL_SUB[period]} index={3}>
-            <FunnelPanel key={period} counts={sales.funnel.counts} before={sales.funnel.before} tip={tip} />
+            <FunnelPanel
+              key={period}
+              labels={AGENT_PATH}
+              counts={sales.funnel.counts}
+              before={sales.funnel.before}
+              tip={tip}
+            />
           </Section>
         </>
       )}

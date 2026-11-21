@@ -111,9 +111,10 @@ describe('the AI keys, pasted as on the day they arrive', () => {
     expect((await module.connect('xai', 'xai-recette-ok-0000000001')).ok).toBe(true);
   });
 
-  it('generation is not simulated yet: an outage, never a made-up answer', async () => {
+  it('an xAI route the world does not simulate answers 503, as an outage, never a made-up answer', async () => {
     const reply = await fetch(`${base}/xai/v1/chat/completions`, { method: 'POST' });
     expect(reply.status).toBe(503);
+    expect(await reply.json()).toEqual({ error: 'not simulated by the sandbox yet (ADR 0075)' });
   });
 });
 

@@ -3,6 +3,7 @@ import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, inject, it } from 'vitest';
 
 import { testConfig } from '../../../__tests__/support/config';
+import { parisInstant } from '../../../__tests__/support/paris';
 import { signIn } from '../../../__tests__/support/sign-in';
 import { createOwner } from '../../../auth';
 import { createApp, type App } from '../../../composition-root';
@@ -37,13 +38,6 @@ describe('/v1/backups/status and the 26-hour check', () => {
       .select({ creatorId: schema.domainEvents.creatorId, payload: schema.domainEvents.payload })
       .from(schema.domainEvents)
       .where(and(eq(schema.domainEvents.type, 'backup_overdue'), sql`payload->>'day' = ${day}`));
-  const today = () =>
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Europe/Paris',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
@@ -109,11 +103,14 @@ describe('/v1/backups/status and the 26-hour check', () => {
   });
 
   it('publishes backup_overdue once for the day, with no creator, when the last success is past 26 hours', async () => {
-    const finishedAt = new Date(Date.now() - 30 * HOUR_MS);
+    // The day is read on the module's clock, fixed at 00:00:30 in Paris: never the day before the check's.
+    const day = new Date(parisInstant('2031-03-16', 0).getTime() + 30_000);
+    const module = startBackupsModule({ db: app.db.db, adminDb: app.adminDb.db, clock: { now: () => day } });
+    const finishedAt = new Date(day.getTime() - 30 * HOUR_MS);
     await test.admin.db.insert(schema.backupRuns).values(succeeded(finishedAt, 'b'));
-    expect(await app.modules.backups.jobs.check()).toBe('alerted');
-    expect(await app.modules.backups.jobs.check()).toBe('already_alerted');
-    const events = await overdueEvents(today());
+    expect(await module.jobs.check()).toBe('alerted');
+    expect(await module.jobs.check()).toBe('already_alerted');
+    const events = await overdueEvents('2031-03-16');
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       creatorId: null,

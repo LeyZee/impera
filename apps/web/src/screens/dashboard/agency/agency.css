@@ -395,139 +395,6 @@
 .ins-daily {
   padding: var(--nv-plate-pad);
 }
-.ins-daily__plot {
-  position: relative;
-  height: 220px;
-  padding-left: 52px;
-}
-.ins-daily__grid {
-  position: absolute;
-  inset: 0 0 22px 52px;
-  pointer-events: none;
-}
-.ins-daily__grid span {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--_y);
-  border-top: 1px solid var(--nv-plate-edge);
-}
-.ins-daily__grid i {
-  position: absolute;
-  right: calc(100% + 10px);
-  top: -8px;
-  font-style: normal;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  color: var(--nv-ink-faint);
-}
-.ins-daily__bars {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(var(--_n), minmax(0, 1fr));
-  /* A gap that shrinks with the columns: a bar keeps three quarters of its slot, whatever the width. */
-  column-gap: min(10px, calc(25% / var(--_n)));
-  height: 100%;
-}
-.ins-col {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  border-radius: var(--nv-radius-xs);
-  background: transparent;
-  font: inherit;
-  color: inherit;
-  cursor: default;
-}
-.ins-col:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 2px;
-}
-/* A column takes the finger over half the gap on each side: 44px wide on a phone's week (ADM-22). */
-.ins-col::after {
-  content: '';
-  position: absolute;
-  inset: 0 -5px;
-}
-.ins-col__stack {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 2px;
-  border-radius: var(--nv-radius-xs);
-  transform-origin: bottom;
-  transition:
-    background var(--nv-dur-fast),
-    opacity var(--nv-dur-fast),
-    transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-/* The column under the pointer swells, the others step back: the eye lands on the day read (recette du 07/11). */
-.ins-col:hover .ins-col__stack,
-.ins-col:focus-visible .ins-col__stack {
-  background: var(--nv-select);
-  transform: scaleX(1.16);
-}
-.ins-daily__bars:has(.ins-col:hover, .ins-col:focus-visible)
-  .ins-col:not(:hover, :focus-visible)
-  .ins-col__stack {
-  opacity: 0.45;
-}
-/* A finger has no hover: the tapped column, focused, swells the same way. */
-@media (hover: none) {
-  .ins-col:focus .ins-col__stack {
-    background: var(--nv-select);
-    transform: scaleX(1.16);
-  }
-  .ins-daily__bars:has(.ins-col:focus) .ins-col:not(:focus) .ins-col__stack {
-    opacity: 0.45;
-  }
-}
-.ins-col__part {
-  flex: none;
-  height: var(--_h);
-  min-height: 2px;
-  background: var(--_c);
-  transform-origin: bottom;
-  animation: ins-grow var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
-  animation-delay: calc(var(--_i, 0) * 12ms + 80ms);
-}
-.ins-col__part:first-child {
-  border-radius: 0 0 2px 2px;
-}
-.ins-col__part:last-child {
-  border-radius: 4px 4px 0 0;
-}
-.ins-col__part:only-child {
-  border-radius: 4px 4px 2px 2px;
-}
-@keyframes ins-grow {
-  from {
-    transform: scaleY(0);
-  }
-}
-.ins-col__label {
-  height: 22px;
-  padding-top: 6px;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: visible;
-  color: var(--nv-ink-faint);
-  text-align: left;
-}
-/* The last day's label ends at its column's right edge: left-aligned, it ran past the card on a phone. */
-.ins-col:last-child .ins-col__label {
-  display: flex;
-  justify-content: flex-end;
-}
 
 /* ── Two rings side by side: the ring, its legend and their lighting are the design system's (`nv-donut`). */
 .ins-pair {
@@ -1138,6 +1005,12 @@
   box-shadow: none;
   color: var(--nv-ink-muted);
 }
+/* The two quiet choices still show where the keyboard is (DS-03). */
+.ins-when__nav .ins-when__select .nv-select__field:focus-visible,
+.ins-when__compare .nv-select__field:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
 .ins-when__compare .nv-select__field:hover,
 .ins-when__compare .nv-select__field[aria-expanded='true'] {
   background: var(--nv-plate-hover);
@@ -1256,13 +1129,6 @@
     align-items: flex-start;
     gap: 4px;
   }
-  .ins-daily__plot {
-    height: 180px;
-    padding-left: 40px;
-  }
-  .ins-daily__grid {
-    left: 40px;
-  }
   .ins-rank {
     display: flex;
     flex-direction: column;
@@ -1346,7 +1212,6 @@
 @media (prefers-reduced-motion: reduce) {
   .ins-curve__plot svg,
   .ins-subs__plot svg,
-  .ins-col__part,
   .ins-rank__bar > span,
   .ins-creator__bar > span {
     animation: none;
@@ -1355,14 +1220,6 @@
   .ins-curve__plot svg,
   .ins-subs__plot svg {
     clip-path: none;
-  }
-  /* Without motion the lit slice and column still stand out, at once, without growing. */
-  .ins-col__stack {
-    transition: none;
-  }
-  .ins-col:hover .ins-col__stack,
-  .ins-col:focus .ins-col__stack {
-    transform: none;
   }
 }
 

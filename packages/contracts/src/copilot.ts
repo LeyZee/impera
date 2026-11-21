@@ -121,6 +121,8 @@ export const CopilotSaleStateSchema = z.strictObject({
       name: CopilotLabelSchema,
       stepIndex: z.number().int().nonnegative(),
       stepCount: z.number().int().positive(),
+      /** The current step as the panel names it, shown on hover (Design, 21/11). */
+      stepName: CopilotLabelSchema.optional(),
     })
     .nullable(),
   nextStep: z

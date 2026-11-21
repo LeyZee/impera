@@ -165,7 +165,9 @@ Date : AAAA-MM-JJ
 | 0153 | Le chatteur voit, pendant son shift, une fiche courte de la créatrice : qui elle est, comment elle écrit, ce qu'elle ne fait jamais | accepted (précise 0025, 0022, 0149) |
 | 0154 | L'IA connaît la bio de la créatrice sur la plateforme : lue en lecture seule, gardée avec le compte, donnée à l'IA comme une donnée, la bio prime sur la fiche | accepted (précise 0110, 0018, 0079) |
 | 0156 | Après une étape payante, elle continue de chatter : achat vu et aftercare, refus dans l'ordre, étape oubliée, aide au paiement, relances de vente | accepted (précise 0103, 0088, P6-02) |
+| 0157 | « Ta part » montre tout le chemin de ses ventes : ce que ses fans ont payé, la TVA, Reveal, l'agence et elle, avec son pourcentage | accepted (amende 0054 § 4 ; précise 0042 § 6, 0054 §§ 1-3) |
 | 0158 | Elle a du caractère et vend comme une fille : au revoir, bouderie, lassitude, répartie, mémoire datée, rythme d'un script | accepted (précise 0135, 0128, 0156 ; amende `protectionFor` pour l'insulte) |
 | 0159 | Une demande sur mesure passe par l'accord et le prix de la créatrice ; l'IA prend la commande avec un acompte par pourboire et livre depuis un dossier rattaché au fan | accepted (remplace 0090 § A points 1 et 2 ; précise 0145, 0150, 0135, 0018, 0021, 0088) |
 | 0160 | Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures | accepted (amende 0046 § 6) |
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
+| 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
