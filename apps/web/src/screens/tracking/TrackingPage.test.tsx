@@ -814,6 +814,40 @@ describe('the reader of Suivi', () => {
     });
   });
 
+  it('says his care mode since when, and closes it on « Il va mieux » asked twice (trou béant 4)', async () => {
+    const posted = serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
+    });
+    renderPage(OPEN);
+    expect(await screen.findByText(/^Mode soin depuis/u)).toBeTruthy();
+    expect(screen.getByText(/rien ne lui est vendu/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Il va mieux' }));
+    // Nothing goes on the first click: the second says what changes.
+    expect(posted).toEqual([]);
+    expect(screen.getByText(/Ses ventes restent gelées/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Oui, il va mieux' }));
+    await waitFor(() => {
+      expect(posted).toEqual([{ action: 'close', body: {} }]);
+    });
+  });
+
+  it('shows a chatter the care mode without « Il va mieux », and a creator nothing of it', async () => {
+    serve({
+      ...withDraft,
+      detail: () => ({ status: 200, body: waiting({ careSince: '2026-10-17T19:00:00Z' }) }),
+    });
+    renderPage(OPEN, true, false, true);
+    expect(await screen.findByText(/^Mode soin depuis/u)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Il va mieux' })).toBeNull();
+    expect(screen.getByText(/Seuls le propriétaire et un manager/u)).toBeTruthy();
+    cleanup();
+
+    renderPage(OPEN, false);
+    await screen.findByText('Fan 1');
+    expect(screen.queryByText(/^Mode soin depuis/u)).toBeNull();
+  });
+
   it('folds the fan’s limits to one line, in amber when one stops the agent', async () => {
     serve({
       ...withDraft,

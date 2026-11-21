@@ -2,6 +2,7 @@ import type { DraftView } from '@impera/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 
+import { CareBanner } from './CareBanner';
 import { FanSheet } from './FanSheet';
 import {
   approveDraft,
@@ -407,6 +408,17 @@ function Loaded({
         <p className="tr-warn tr-line" role="status">
           {outdated}
         </p>
+      )}
+      {/* Never shown to a creator: her inbox is the agency's (ADR 0063). */}
+      {detail.careSince === null || !canDecide ? null : (
+        <CareBanner
+          creatorId={creatorId}
+          conversationId={detail.id}
+          since={detail.careSince}
+          // Whoever reads the whole creator: the owner, an active manager (the server checks it again).
+          canClose={!selfScope}
+          onClosed={settle}
+        />
       )}
       {fanWaits ? (
         <div className="tr-hand tr-hand--alert">
