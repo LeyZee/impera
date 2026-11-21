@@ -883,11 +883,14 @@ export function Ring({
   slices,
   tipFor,
   tip,
+  bare = false,
 }: {
   title: string;
   slices: readonly Slice[];
   tipFor?: string;
   tip: FloatingTip;
+  /** Inside another card that already titles it (« Dépendance aux gros fans »): no plate, no title of its own. */
+  bare?: boolean;
 }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
   // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
@@ -907,8 +910,11 @@ export function Ring({
   const litSlice = lit === null ? null : shown[lit];
   const litShare = lit === null ? 0 : (shares[lit] ?? 0);
   return (
-    <article className="nv-plate ins-ring-card">
-      <h3 className="nv-h3 ins-card__title">{title}</h3>
+    <article
+      className={bare ? 'ins-ring-card ins-ring-card--bare' : 'nv-plate ins-ring-card'}
+      aria-label={bare ? title : undefined}
+    >
+      {bare ? null : <h3 className="nv-h3 ins-card__title">{title}</h3>}
       {total <= 0 ? (
         <p className="ins-empty">Aucune vente sur la période.</p>
       ) : (

@@ -66,6 +66,22 @@
 .stg-day__verdict[data-tone='down'] {
   --_c: var(--nv-trend-down-text);
 }
+.stg-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-inline-end: 8px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--_k, var(--nv-kind-2)) 32%, transparent);
+  vertical-align: 1px;
+}
+/* The ghost arc's own colour: the dot in front of the line it draws. */
+.stg-key[data-tone='up'] {
+  --_k: var(--nv-trend-up);
+}
+.stg-key[data-tone='down'] {
+  --_k: var(--nv-trend-down);
+}
 .stg-day__tag {
   display: inline-block;
   margin-inline-end: 8px;
@@ -223,33 +239,53 @@
   gap: 10px;
 }
 
+/* One ink down the path, the step that breaks in plain amber; no glow, its flag says it (Design, 21/11). */
+.stg-traffic .db-funnel .nv-funnel__step .nv-funnel__bar,
+.stg-traffic .db-funnel .nv-funnel__step:not(.nv-funnel__step--break) .nv-funnel__bar {
+  --_c: var(--nv-data-1);
+  background: var(--_c);
+  opacity: 1;
+  box-shadow: none;
+}
+.stg-traffic .db-funnel .nv-funnel__step.nv-funnel__step--break .nv-funnel__bar {
+  --_c: var(--nv-warning);
+}
+.stg-traffic .db-funnel .nv-funnel__step:hover .nv-funnel__bar {
+  box-shadow: none;
+  filter: brightness(1.08);
+}
+
 /* ── The fans it hangs on. */
 .stg-dep {
   display: flex;
   flex-direction: column;
   gap: var(--nv-card-gap);
 }
-.stg-dep__top {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: var(--nv-card-gap);
-}
-.stg-dep__figures {
+.stg-dep__card {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 16px;
+  gap: 18px;
   padding: var(--nv-plate-pad);
 }
+/* The sentence is the card's title, strong: it is what the card says. */
 .stg-dep__lead {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  color: var(--nv-ink);
   text-wrap: balance;
 }
-.stg-dep__figures[data-pending] .stg-dep__lead {
-  color: var(--nv-ink-faint);
+.stg-dep__card[data-pending] .stg-dep__lead {
+  color: var(--nv-ink-muted);
+}
+.stg-dep__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+}
+.stg-dep__card .ins-ring-card--bare {
+  padding: 0;
+}
+.stg-dep__figures {
+  gap: 16px;
 }
 
 .stg-lapsed {
@@ -351,8 +387,13 @@
     gap: 2px;
     height: 64px;
   }
-  .stg-dep__top {
+  .stg-dep__body {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* On a phone the tag stands alone on its line, the sentence under it. */
+  .stg-day__tag {
+    display: table;
+    margin: 0 auto 6px;
   }
   .stg-lapsed__row {
     grid-template-columns: minmax(0, 1fr) auto auto;

@@ -166,7 +166,12 @@ function DayCard({ daily, tip }: { daily: SteeringDaily; tip: FloatingTip }): JS
           </p>
           <dl className="stg-figures">
             <div>
-              <dt>Fin de journée estimée</dt>
+              <dt>
+                {daily.projectedMinor === null ? null : (
+                  <span className="stg-key" data-tone={verdict.tone} aria-hidden="true" />
+                )}
+                Fin de journée estimée
+              </dt>
               <dd>{daily.projectedMinor === null ? '—' : wholeEuros(daily.projectedMinor)}</dd>
             </div>
             <div>
@@ -303,14 +308,15 @@ function DependencyCard({
   const pending = dependency.sales < STEERING_PROFILE_MIN_SALES;
   return (
     <div className="stg-dep">
-      <div className="stg-dep__top">
-        {/* No comparison on this ring: its window is fixed, its slices say how the money spreads. */}
-        <Comparable.Provider value={false}>
-          <Ring title="Qui fait le chiffre" slices={slices} tip={tip} />
-        </Comparable.Provider>
-        <div className="nv-plate stg-dep__figures" data-pending={pending ? '' : undefined}>
-          <p className="stg-dep__lead">{spreadText(dependency)}</p>
-          <dl className="stg-figures">
+      {/* One subject, one card (Design, 21/11): the sentence titles it, the ring on the left, the figures on the right. */}
+      <article className="nv-plate stg-dep__card" data-pending={pending ? '' : undefined}>
+        <h3 className="nv-h3 stg-dep__lead">{spreadText(dependency)}</h3>
+        <div className="stg-dep__body">
+          {/* No comparison on this ring: its window is fixed, its slices say how the money spreads. */}
+          <Comparable.Provider value={false}>
+            <Ring title="Qui fait le chiffre" slices={slices} tip={tip} bare />
+          </Comparable.Provider>
+          <dl className="stg-figures stg-dep__figures">
             <div>
               <dt>Fans qui ont payé</dt>
               <dd>
@@ -331,7 +337,7 @@ function DependencyCard({
             </div>
           </dl>
         </div>
-      </div>
+      </article>
       <article className="nv-plate stg-lapsed">
         <h3 className="nv-h3 ins-card__title">
           Ont décroché
