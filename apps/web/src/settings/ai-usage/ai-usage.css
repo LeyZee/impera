@@ -670,6 +670,16 @@
 .cia-fc-row:hover {
   background: var(--nv-plate-hover);
 }
+.cia-fc-row.cia-fc-row--creator {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.cia-fc-row__share {
+  min-width: 72px;
+}
+/* A creator's span in the chatting's colour (85 % of the spend, Design 21/11), the realistic mark in ink. */
+.cia-fc-row--creator .cia-band__span {
+  background: var(--nv-series-1);
+}
 .cia-fc-row .cia-band {
   grid-column: 1 / -1;
   height: 6px;
@@ -717,6 +727,11 @@
   }
   .cia-curve {
     height: 180px;
+  }
+  /* On a phone the legend keeps the two lines and the cap; the bubble says the rest. */
+  .cia-curve__keys li[data-k='planned'],
+  .cia-curve__keys li[data-k='band'] {
+    display: none;
   }
 }
 

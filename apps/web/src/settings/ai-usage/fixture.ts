@@ -166,9 +166,9 @@ export function forecastFixture(overrides: Partial<AiForecast> = {}): AiForecast
       {
         line: 'chatting',
         monthSoFarEur: 140.2,
-        perDay: range(6.9, 9.1, 10.8),
+        perDay: range(6.9, 9.2, 10.8),
         thisMonth: range(202.3, 222.1, 237.4),
-        nextMonth: range(213.9, 282.1, 334.8),
+        nextMonth: range(213.9, 285.1, 334.8),
       },
       {
         line: 'playground',

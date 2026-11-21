@@ -166,10 +166,7 @@ function Lines({
   const litLine = lit === null ? undefined : lines[lit];
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="nv-h3 ins-card__title">
-        {`Par usage, en ${next}`}
-        {total > 0 ? <span className="ins-card__total">{forecastEur(total)}</span> : null}
-      </h3>
+      <h3 className="nv-h3 ins-card__title">{`Par usage, en ${next}`}</h3>
       {total <= 0 ? (
         <p className="ins-empty">Aucun appel facturé.</p>
       ) : (
@@ -260,18 +257,31 @@ function Creators({ forecast, next }: { forecast: AiForecast; next: string }): J
       ) : (
         <ol className="cia-fc-rows">
           {forecast.creators.map((creator, i) => (
-            <li key={creator.creatorId} className="cia-fc-row nv-enter" style={{ '--nv-i': i }}>
+            <li
+              key={creator.creatorId}
+              className="cia-fc-row cia-fc-row--creator nv-enter"
+              style={{ '--nv-i': i }}
+            >
               <span className="cia-fc-row__who">
                 <span className="cia-fc-row__name">{creator.name}</span>
                 <span className="cia-fc-row__line">
-                  {creator.salesNextMonthEur === null || creator.salesNextMonthEur === 0
-                    ? `${countText(Math.round(creator.conversationsPerDay))} conversations par jour`
-                    : `${shareText(creator.nextMonth.realistic / creator.salesNextMonthEur)} de ses ventes prévues`}
+                  {`${countText(Math.round(creator.conversationsPerDay))} conversation${creator.conversationsPerDay >= 1.5 ? 's' : ''} par jour, ${rangeText(creator.nextMonth)}`}
                 </span>
               </span>
               <span className="cia-fc-row__value">
                 <CountUp value={creator.nextMonth.realistic} format={forecastEur} />
-                <span className="cia-fc-row__range">{rangeText(creator.nextMonth)}</span>
+                <span className="cia-fc-row__range">IA</span>
+              </span>
+              <span className="cia-fc-row__value cia-fc-row__share">
+                {creator.salesNextMonthEur === null || creator.salesNextMonthEur === 0 ? (
+                  '—'
+                ) : (
+                  <CountUp
+                    value={creator.nextMonth.realistic / creator.salesNextMonthEur}
+                    format={formatShare}
+                  />
+                )}
+                <span className="cia-fc-row__range">de ses ventes</span>
               </span>
               <Band range={creator.nextMonth} end={end} label={creator.name} />
             </li>
