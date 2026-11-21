@@ -12,6 +12,7 @@ import { EntryForm, type EntryAdded } from './EntryForm';
 import { useCfaFrancs, type PayNames } from './data';
 import { Chip, Delta, MoneyPath, PayoutHoldLine, Swatch } from './parts';
 
+import { PayoutTo } from '@/payroll/PayoutCard';
 import { payStatement, useLatestPayPeriod, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import {
   changeBps,
@@ -26,6 +27,7 @@ import {
   statementChips,
   whoName,
 } from '@/payroll/model';
+import { usePayoutList } from '@/payroll/payout';
 import {
   amountInput,
   amountText,
@@ -377,6 +379,9 @@ function PayForm({
   const [touched, setTouched] = useState(false);
   const [refusal, setRefusal] = useState<PayRefusal | null>(null);
   const confirm = useConfirmAgain();
+  // « Où le verser » (ADR 0165): the way he receives and his last change; the number shows on « Afficher ».
+  const payouts = usePayoutList(true);
+  const payout = payouts.data?.destinations.find((one) => one.memberId === statement.memberId) ?? null;
 
   const sentMinor = parseAmount(amount);
   const [dayUnreadable, setDayUnreadable] = useState(false);
@@ -490,6 +495,15 @@ function PayForm({
             if (ready) onMode('check');
           }}
         >
+          {payouts.isPending ? null : (
+            <PayoutTo
+              memberId={statement.memberId}
+              memberName={memberName}
+              summary={payout}
+              zone={statement.window.timeZone}
+              now={new Date()}
+            />
+          )}
           <div className="tm-pair">
             <div className="nv-field tm-field" data-invalid={touched && !dayValid ? 'true' : undefined}>
               <label className="nv-field__label" htmlFor={`${id}-day`}>
