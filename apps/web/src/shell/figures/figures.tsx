@@ -32,14 +32,15 @@ export interface DonutSlice {
 /**
  * A donut: one arc per slice, drawn in one after the other; the slice at `lit` comes out and the others step back.
  * The middle is the caller's (`nv-donut__value`, `nv-donut__sub`): the total at rest, the lit slice otherwise.
- * `onLit` makes the arcs answer the pointer; without it the ring is still. `of` is the whole when the slices do not
- * add up to it (one share alone against its track).
+ * A donut always answers the pointer (Charles, 21/11): with `lit` and `onLit` the screen holds which slice is lit, to
+ * light its legend and its middle too; without them the ring lights its own arcs. `of` is the whole when the slices
+ * do not add up to it (one share alone against its track).
  */
 export function Donut({
   label,
   slices,
-  lit = null,
-  onLit,
+  lit: held,
+  onLit: hold,
   of,
   children,
 }: {
@@ -51,6 +52,10 @@ export function Donut({
   of?: number;
   children?: ReactNode;
 }): JSX.Element {
+  const [own, setOwn] = useState<number | null>(null);
+  // The screen's when it holds the lit slice, the ring's own otherwise.
+  const lit = held === undefined ? own : held;
+  const onLit = hold ?? setOwn;
   const values = slices.map((slice) => slice.value);
   const sum = values.reduce((total, value) => total + Math.max(0, value), 0);
   const solo = of !== undefined;
@@ -77,20 +82,13 @@ export function Donut({
               r={RADIUS}
               style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
               strokeDashoffset={arc.offset}
-              onPointerEnter={
-                onLit === undefined
-                  ? undefined
-                  : () => {
-                      onLit(i);
-                    }
-              }
-              onPointerLeave={
-                onLit === undefined
-                  ? undefined
-                  : (event) => {
-                      if (event.pointerType === 'mouse') onLit(null);
-                    }
-              }
+              onPointerEnter={(event) => {
+                // A mouse lights on entering; a finger's touch lights, and puts out the slice it lit.
+                onLit(event.pointerType !== 'mouse' && lit === i ? null : i);
+              }}
+              onPointerLeave={(event) => {
+                if (event.pointerType === 'mouse') onLit(null);
+              }}
             />
           );
         })}

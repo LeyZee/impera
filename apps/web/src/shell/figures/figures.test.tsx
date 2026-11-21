@@ -123,6 +123,26 @@ describe('Meter and Spark', () => {
   });
 });
 
+describe('Donut on its own', () => {
+  it('lights its own arcs under the pointer when the screen holds nothing, and a finger puts out what it lit', () => {
+    render(<Donut label="x" slices={SLICES} />);
+    const ring = screen.getByRole('img', { name: 'x' });
+    const arcs = [...ring.querySelectorAll('.nv-donut__arc')];
+    const [first, second] = arcs;
+    if (first === undefined || second === undefined) throw new Error('no arcs');
+    expect(ring.className).toBe('nv-donut');
+    fireEvent.pointerEnter(first, { pointerType: 'mouse' });
+    expect(ring.className).toBe('nv-donut is-lit');
+    expect(first.getAttribute('class')).toBe('nv-donut__arc is-on');
+    fireEvent.pointerLeave(first, { pointerType: 'mouse' });
+    expect(ring.className).toBe('nv-donut');
+    fireEvent.pointerEnter(second, { pointerType: 'touch' });
+    expect(second.getAttribute('class')).toBe('nv-donut__arc is-on');
+    fireEvent.pointerEnter(second, { pointerType: 'touch' });
+    expect(ring.className).toBe('nv-donut');
+  });
+});
+
 describe('Columns', () => {
   const columns = [
     {
