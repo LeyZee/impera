@@ -50,9 +50,10 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     manager: '',
     chatter: '',
   };
-  const today = calendarDayIn(new Date(), PARIS);
-  // The Monday after next: its Sunday evening before is still ahead, and every day of it too.
-  const week = addDays(today, 15 - isoWeekday(today));
+  // The Monday after next: its Sunday evening before is still ahead, and every day of it too (fixed for the file; a day
+  // read against the server's is read in its test).
+  const loaded = calendarDayIn(new Date(), PARIS);
+  const week = addDays(loaded, 15 - isoWeekday(loaded));
   const sundayEvening = wallClockToInstant(addDays(week, -1), 19 * 60, PARIS);
   const requestId = newId(ContentRequestIdSchema);
 
@@ -196,6 +197,38 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     return AgencyCreatorWeekSchema.parse(response.json());
   };
 
+  /** The owner's corrections: Saturday moved to Friday, the videos dropped. */
+  const corrected = (plan: AgencyCreatorWeek['plan']): AgencyCreatorWeek['plan'] => ({
+    ...plan,
+    shootDays: plan.shootDays.map((day, index) =>
+      index === 1
+        ? { day: addDays(week, 4), items: day.items.filter((item) => item.need !== 'feed_video') }
+        : { ...day, items: day.items.filter((item) => item.need !== 'feed_video') },
+    ),
+  });
+
+  // Each stage brings her week there from wherever the tests before left it, so that any test also runs alone (`-t`).
+  /** Computed by the Sunday evening's job. */
+  const computed = async () => {
+    if ((await call('GET', `/v1/creators/${nora}/weeks/${week}`, 'owner')).statusCode === 404)
+      await app.modules.creatorWeek.jobs.plan(sundayEvening);
+  };
+  /** Validated by the owner, with his corrections. */
+  const validated = async () => {
+    await computed();
+    const { state, plan } = await draft();
+    if (state !== 'draft') return;
+    const response = await call('POST', `/v1/creators/${nora}/weeks/${week}/validate`, 'owner', {
+      plan: corrected(plan),
+    });
+    expect(response.statusCode, response.body).toBe(200);
+  };
+  /** Accepted by her. */
+  const accepted = async () => {
+    await validated();
+    expect((await call('POST', '/v1/creator-space/week/accept', 'nora', { week })).statusCode).toBe(200);
+  };
+
   const herWeek = async (who: 'nora' | 'ines' = 'nora') => {
     const response = await call('GET', `/v1/creator-space/week?week=${addDays(week, 3)}`, who);
     expect(response.statusCode, response.body).toBe(200);
@@ -249,6 +282,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   });
 
   it('is read by her team, never by a chatter nor by her; validated by the owner alone', async () => {
+    await computed();
     expect((await draft('manager')).state).toBe('draft');
     for (const who of ['chatter', 'nora'] as const)
       expect((await call('GET', `/v1/creators/${nora}/weeks/${week}`, who)).statusCode).toBe(403);
@@ -270,6 +304,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   });
 
   it('takes the owner’s corrections, refuses a day outside the week, answers a replay and refuses another plan', async () => {
+    await computed();
     const { plan } = await draft();
     const outside = {
       ...plan,
@@ -281,21 +316,13 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     expect(refused.statusCode, refused.body).toBe(422);
     expect(refused.json()).toMatchObject({ error: { code: 'creator_week_plan_unprocessable' } });
     // He moves Saturday to Friday and drops the video.
-    const corrected = {
-      ...plan,
-      shootDays: plan.shootDays.map((day, index) =>
-        index === 1
-          ? { day: addDays(week, 4), items: day.items.filter((item) => item.need !== 'feed_video') }
-          : { ...day, items: day.items.filter((item) => item.need !== 'feed_video') },
-      ),
-    };
-    const validated = await call('POST', `/v1/creators/${nora}/weeks/${week}/validate`, 'owner', {
-      plan: corrected,
+    const done = await call('POST', `/v1/creators/${nora}/weeks/${week}/validate`, 'owner', {
+      plan: corrected(plan),
     });
-    expect(validated.statusCode, validated.body).toBe(200);
-    expect(AgencyCreatorWeekSchema.parse(validated.json())).toMatchObject({ state: 'validated' });
+    expect(done.statusCode, done.body).toBe(200);
+    expect(AgencyCreatorWeekSchema.parse(done.json())).toMatchObject({ state: 'validated' });
     const again = await call('POST', `/v1/creators/${nora}/weeks/${week}/validate`, 'owner', {
-      plan: corrected,
+      plan: corrected(plan),
     });
     expect(again.statusCode, again.body).toBe(200);
     const other = await call('POST', `/v1/creators/${nora}/weeks/${week}/validate`, 'owner', { plan });
@@ -340,6 +367,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   });
 
   it('reaches her as her week to accept, and no one else’s', async () => {
+    await validated();
     const mine = await herWeek();
     expect(mine.toAccept).toBe(true);
     expect(mine.shootDays.map((day) => [day.day, day.state])).toEqual([
@@ -354,6 +382,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   });
 
   it('lets her tick a line only once she accepted its day, and accepts her week in one gesture, replayable', async () => {
+    await validated();
     const line = (await herWeek()).shootDays[0]?.items[0];
     expect(line).toBeDefined();
     const early = await call('PUT', `/v1/creator-space/shoot-items/${line?.id ?? ''}`, 'nora', {
@@ -374,6 +403,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   });
 
   it('ticks the day’s task once every line is shot, and takes it back with a line', async () => {
+    await accepted();
     const [first] = (await herWeek()).shootDays;
     if (first?.taskId == null) throw new Error('no first day');
     const tick = (id: string, done: boolean, who: 'nora' | 'ines' = 'nora') =>
@@ -399,6 +429,7 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
   });
 
   it('counts her delivery by the drops that arrived in the week, and her script by its request', async () => {
+    await validated();
     const before = (await herWeek()).delivery;
     expect(before?.lines.find((line) => line.need === 'script')).toEqual({
       need: 'script',
@@ -436,6 +467,8 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     expect(after?.delivered).toBe(false);
   });
   it('gives her her day to tick, today and yesterday only, kept to her own account', async () => {
+    // Her day as the server reads it now, not when the file was loaded (a run across midnight in Paris).
+    const today = calendarDayIn(new Date(), PARIS);
     const read = async (who: 'nora' | 'ines', day?: string) => {
       const response = await call(
         'GET',
