@@ -449,10 +449,29 @@ describe('the money of a statement', () => {
     ).toEqual([
       'Ventes | 2 rapports | 200,00 $US',
       'En euros | 1 $ = 0,9217 € | 184,33 €',
-      'Hors TVA | sans TVA | 184,33 €',
       'Net d’OnlyFans | OnlyFans 20 % | 147,46 €',
       'Ta commission | 25 % | 36,87 €',
     ]);
+  });
+
+  it('says the VAT only when there is one: without it, the step would repeat the sales (CHAT-10)', () => {
+    const withVat = line({
+      vatBps: 2_000,
+      platformFeeBps: 2_000,
+      grossMinor: 12_000,
+      grossEurMinor: 12_000,
+      exclVatMinor: 10_000,
+      netMinor: 8_000,
+      commissionMinor: 2_000,
+    });
+    expect(
+      flowOf(withVat, 2_500, 'reveal', true).map((step) =>
+        plain(`${step.label} | ${step.op} | ${step.amount}`),
+      ),
+    ).toContain('Hors TVA | TVA 20 % | 100,00 €');
+    expect(flowOf({ ...withVat, vatBps: 0 }, 2_500, 'reveal', true).map((step) => step.label)).not.toContain(
+      'Hors TVA',
+    );
   });
 
   it('starts a line on the platform’s net from that net, the VAT and its commission already taken (CRM-03)', () => {

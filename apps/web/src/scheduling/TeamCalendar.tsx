@@ -155,7 +155,7 @@ function Slot({
         </span>
       ) : cell.shifts.length === 0 ? (
         <span className="cal-free" data-past={past ? 'true' : undefined} aria-hidden="true">
-          {past ? null : 'Libre'}
+          {past ? null : <span className="cal-free__word">Libre</span>}
           <span className="cal-hours nv-num">{hours}</span>
         </span>
       ) : null}

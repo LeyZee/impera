@@ -509,7 +509,8 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
     return (
       <Panel className="fi-panel nv-enter" title={<>Qui sont tes fans</>}>
         <Empty title="Encore trop peu de fans pour le dire.">
-          Ça s’affichera à partir de dix, pour qu’aucun ne s’y reconnaisse.
+          {/* Today's fans are not counted yet: said, beside a list that already holds them (recette MOD-08). */}
+          Ça s’affichera à partir de dix fans arrivés avant aujourd’hui, pour qu’aucun ne s’y reconnaisse.
         </Empty>
       </Panel>
     );

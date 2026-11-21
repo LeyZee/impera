@@ -105,16 +105,24 @@ export function ContentPage({
   const first = dueNow(asked, today)[0];
   const firstKey = first === undefined ? null : first.kind === 'script' ? first.drop.id : first.request.id;
 
-  // Aujourd'hui's « Déposer »: the sheet opens on its request once Contenu is read, then the address forgets it.
+  // Aujourd'hui's « Déposer »: the sheet opens on its request once Contenu is read. The address forgets it only as the
+  // sheet closes: the page may be drawn again meanwhile (the shell remounts it on the way in), and opens it again then
+  // (recette MOD-03).
   const requests = content.data?.requests;
+  const openedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (askedId === null || requests === undefined) return;
+    if (askedId === null || requests === undefined || openedFor.current === askedId) return;
+    openedFor.current = askedId;
     const request = requests.find((one) => one.id === askedId && one.state === 'open' && one.dropId === null);
     // A script asked with its version is begun card by card, from its own card: the page shows it.
     if (request !== undefined && !(request.category === 'script' && request.structureVersionId !== null))
       setOpened({ category: request.category, request });
-    onAsked?.();
+    else onAsked?.();
   }, [askedId, requests, onAsked]);
+  const closeSheet = (): void => {
+    setOpened(null);
+    if (askedId !== null) onAsked?.();
+  };
   const moving = content.data === undefined ? [] : onTheirWay(content.data.drops);
   const out = content.data === undefined ? [] : published(content.data.drops);
 
@@ -201,7 +209,8 @@ export function ContentPage({
           <section className="ct-section" aria-labelledby="ct-drop">
             {/* Not « Déposer », the word of every request's button above: these tiles send without a request (CRE-13). */}
             <h2 id="ct-drop" className="nv-h2 ct-section__title">
-              Envoyer autre chose
+              {/* « Autre chose » only beside a request; alone, nothing to be other than (recette MOD-09). */}
+              {asked.length === 0 ? 'Envoyer un contenu' : 'Envoyer autre chose'}
             </h2>
             {DROP_OUTPUTS.map((output) => (
               <div key={output.name} className="ct-output">
@@ -253,11 +262,9 @@ export function ContentPage({
         <DropSheet
           category={opened.category}
           request={opened.request}
-          onClose={() => {
-            setOpened(null);
-          }}
+          onClose={closeSheet}
           onDropped={(drop, files) => {
-            setOpened(null);
+            closeSheet();
             setLanded(drop.id);
             client.setQueryData(CONTENT_KEY, (old: typeof content.data) =>
               old === undefined

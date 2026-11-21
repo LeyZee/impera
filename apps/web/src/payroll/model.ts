@@ -523,11 +523,13 @@ export function flowOf(
       amount: amountText(line.grossEurMinor, 'EUR'),
     });
   if (counted === null) {
-    steps.push({
-      label: 'Hors TVA',
-      op: line.vatBps === 0 ? 'sans TVA' : `TVA ${percentText(line.vatBps)}`,
-      amount: amountText(line.exclVatMinor, 'EUR'),
-    });
+    // Without VAT the step changes nothing: it would only say the sales again (recette CHAT-10).
+    if (line.vatBps !== 0)
+      steps.push({
+        label: 'Hors TVA',
+        op: `TVA ${percentText(line.vatBps)}`,
+        amount: amountText(line.exclVatMinor, 'EUR'),
+      });
     steps.push({
       label: platformNetName(platform),
       op: `${platform === null ? 'la plateforme' : platformName(platform)} ${percentText(line.platformFeeBps)}`,

@@ -100,6 +100,8 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     });
     show();
     expect(await screen.findByText(/Encore trop peu de fans pour le dire/u)).toBeDefined();
+    // The fans seen today are not counted yet: said (MOD-08).
+    expect(screen.getByText(/à partir de dix fans arrivés avant aujourd’hui/u)).toBeDefined();
     expect(screen.queryByText('moins de 10')).toBeNull();
     expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
   });

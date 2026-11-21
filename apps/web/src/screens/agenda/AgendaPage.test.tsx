@@ -384,6 +384,61 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     expect(document.querySelector('.ag-ring .nv-ring__value')).toBeNull();
   });
 
+  it('never says « Rien à faire » nor « bravo » while her day’s essentials are left (MOD-01, MOD-02)', async () => {
+    const herDay = (done: number) => ({
+      day: WEDNESDAY,
+      today: WEDNESDAY,
+      lines: [1, 2, 3].map((n) => ({
+        item: ['reveal_story', 'reveal_video', 'insta_cta_story'][n - 1],
+        platform: n === 3 ? 'instagram' : 'reveal',
+        label: `Essentiel ${String(n)}`,
+        sheet: 'Une phrase.',
+        target: 1,
+        done: n <= done ? 1 : 0,
+        essential: true,
+      })),
+    });
+    const withDay = (done: number): void => {
+      serve(() => true, SHIFTS, agendaOf({ tasks: [], suggestions: [] }));
+      const others = globalThis.fetch;
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string, init?: RequestInit) =>
+          url === '/v1/creator-space/day'
+            ? Promise.resolve(new Response(JSON.stringify(herDay(done)), { status: 200 }))
+            : others(url, init),
+        ),
+      );
+    };
+    const glance = (): string => document.querySelector('.ag-glance__text')?.textContent ?? '';
+    withDay(1);
+    show();
+    expect(await screen.findByText('L’essentiel du jour : 1 sur 3 fait.')).toBeDefined();
+    expect(glance()).toContain('Rien à l’agenda');
+    expect(glance()).not.toContain('Rien à faire');
+    cleanup();
+    withDay(3);
+    show();
+    expect(await screen.findByText('Profite de ta journée.')).toBeDefined();
+    expect(glance()).toContain('Rien à faire');
+  });
+
+  it('says what is left of a day gone by as not done, never « à faire » (MOD-13)', async () => {
+    serve(() => true);
+    show('day', '2026-11-02');
+    expect(await screen.findByText('1 chose pas faite')).toBeDefined();
+    expect(screen.queryByText(/à faire$/u)).toBeNull();
+  });
+
+  it('says a free time up to midnight « minuit », never « 0 h » (H-06)', async () => {
+    serve(() => true);
+    show();
+    await screen.findByRole('heading', { name: 'Programme' });
+    const free = [...document.querySelectorAll('.ag-free')].map((one) => one.textContent);
+    expect(free.some((one) => one.includes('– minuit'))).toBe(true);
+    expect(free.some((one) => /–\s0\sh/u.test(one))).toBe(false);
+  });
+
   it('titles the suggestions of the day like « Sans date », with their count (CRE-07)', async () => {
     const dated = CreatorSuggestionSchema.parse({
       ...agendaOf().suggestions[0],
