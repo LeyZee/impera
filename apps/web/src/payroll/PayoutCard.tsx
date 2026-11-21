@@ -1,9 +1,14 @@
 import {
-  PAYOUT_BENEFICIARY_MAX,
+  PAYOUT_CITY_MAX,
+  PAYOUT_COUNTRIES,
+  PAYOUT_DIAL_CODES,
+  PAYOUT_EMAIL_MAX,
+  PAYOUT_NAME_MAX,
   PAYOUT_NOTE_MAX,
   PAYOUT_ORGANISATION_MAX,
   PAYOUT_RECEIVE_METHODS,
   PutPayoutDetailsBodySchema,
+  type PayoutCountry,
   type PayoutDestination,
   type PayoutDetails,
   type PayoutReceiveMethod,
@@ -13,6 +18,7 @@ import { useEffect, useId, useState, type JSX, type SyntheticEvent } from 'react
 
 import {
   changedRecently,
+  dialPrefix,
   holderOf,
   numberOf,
   PAYOUT_ERRORS,
@@ -21,14 +27,18 @@ import {
   useOwnPayout,
   usePayoutList,
   useRefreshPayouts,
+  phoneLine,
   writePayout,
   type PayoutOutcome,
 } from './payout';
 import './payout.css';
 
+import { countryFlag, countryName } from '@/lib/country';
 import { dayOf, longDay } from '@/scheduling/time';
 import { Loading } from '@/screens/pay/parts';
+import { FIRST_COUNTRIES } from '@/screens/team/model';
 import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
+import { Select } from '@/shell/Select';
 import { Panel } from '@/shell/layout';
 import { Failure } from '@/shell/states';
 
@@ -59,101 +69,245 @@ export function MethodIcon({ method }: { method: PayoutReceiveMethod }): JSX.Ele
   );
 }
 
-/** The details as two lines: who receives, then the number and who holds it. */
-function DetailsLines({ details }: { details: PayoutDetails }): JSX.Element {
+/** One line of the details, with its copy button for the owner, who pastes it into WorldRemit field by field. */
+function Line({
+  label,
+  value,
+  copy,
+  numeric = false,
+}: {
+  label: string;
+  value: string;
+  /** What the clipboard takes (spaces dropped from a number); `null` when the line is not copied. */
+  copy: string | null;
+  numeric?: boolean;
+}): JSX.Element {
+  const [copied, setCopied] = useState(false);
+  // « Copié » says the gesture worked, then gives the button back.
+  useEffect(() => {
+    if (!copied) return undefined;
+    const timer = setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [copied]);
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd className={numeric ? 'nv-num' : undefined}>
+        <span>{value}</span>
+        {copy === null ? null : (
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm po-copy"
+            aria-label={copied ? `${label} copié` : `Copier ${label.toLowerCase()}`}
+            onClick={() => {
+              void navigator.clipboard.writeText(copy).then(
+                () => {
+                  setCopied(true);
+                },
+                () => undefined,
+              );
+            }}
+          >
+            {copied ? 'Copié' : 'Copier'}
+          </button>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * The details in the order WorldRemit asks them: who receives, where, how to reach him, then the number and who holds
+ * it. `copyable`: each line gets its own copy button, never one for everything (Sécurité, 21/11).
+ */
+function DetailsLines({ details, copyable }: { details: PayoutDetails; copyable: boolean }): JSX.Element {
   const holder = holderOf(details);
+  const number = numberOf(details);
+  const copy = (value: string): string | null => (copyable ? value : null);
   return (
     <dl className="po-lines">
-      <div>
-        <dt>Bénéficiaire</dt>
-        <dd>{details.beneficiary}</dd>
-      </div>
-      <div>
-        <dt>
-          {details.method === 'mobile_money'
-            ? 'Numéro'
-            : details.method === 'bank_account'
-              ? 'IBAN ou compte'
-              : 'Ville du retrait'}
-        </dt>
-        <dd className="nv-num">{numberOf(details)}</dd>
-      </div>
+      <Line
+        label="Pays"
+        value={`${countryFlag(details.country)}  ${countryName(details.country)}`}
+        copy={null}
+      />
+      <Line label="Prénom" value={details.firstName} copy={copy(details.firstName)} />
+      <Line label="Nom" value={details.lastName} copy={copy(details.lastName)} />
+      <Line label="Ville" value={details.city} copy={copy(details.city)} />
+      <Line
+        label="Téléphone de contact"
+        value={phoneLine(details.contactPhone, details.country)}
+        copy={copy(details.contactPhone)}
+        numeric
+      />
+      {details.email === null ? null : (
+        <Line label="E-mail" value={details.email} copy={copy(details.email)} />
+      )}
+      {number === null ? null : (
+        <Line
+          label={details.method === 'mobile_money' ? 'Numéro mobile money' : 'IBAN ou RIB'}
+          value={number}
+          copy={copy(number.replace(/\s/gu, ''))}
+          numeric
+        />
+      )}
       {holder === null ? null : (
-        <div>
-          <dt>{details.method === 'mobile_money' ? 'Opérateur' : 'Banque'}</dt>
-          <dd>{holder}</dd>
-        </div>
+        <Line
+          label={details.method === 'mobile_money' ? 'Opérateur' : 'Banque'}
+          value={holder}
+          copy={copy(holder)}
+        />
       )}
-      {details.note === null ? null : (
-        <div>
-          <dt>Note</dt>
-          <dd>{details.note}</dd>
-        </div>
-      )}
+      {details.note === null ? null : <Line label="Note" value={details.note} copy={null} />}
     </dl>
   );
 }
 
 interface Draft {
   readonly method: PayoutReceiveMethod;
-  readonly beneficiary: string;
+  readonly country: PayoutCountry;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly city: string;
+  readonly contactPhone: string;
+  readonly email: string;
+  /** The mobile money number or the account. */
   readonly number: string;
+  /** The operator or the bank. */
   readonly holder: string;
   readonly note: string;
 }
 
+/** Where the agency's chatters mostly live (Charles, 27/10): the form starts there. */
+const FIRST_COUNTRY: PayoutCountry = 'BJ';
+
 function draftOf(details: PayoutDetails | null): Draft {
-  if (details === null) return { method: 'mobile_money', beneficiary: '', number: '', holder: '', note: '' };
-  const note = details.note ?? '';
-  if (details.method === 'mobile_money')
+  if (details === null) {
+    const prefix = `${dialPrefix(FIRST_COUNTRY)} `;
     return {
-      method: details.method,
-      beneficiary: details.beneficiary,
-      number: details.phone,
-      holder: details.operator,
-      note,
+      method: 'mobile_money',
+      country: FIRST_COUNTRY,
+      firstName: '',
+      lastName: '',
+      city: '',
+      contactPhone: prefix,
+      email: '',
+      number: prefix,
+      holder: '',
+      note: '',
     };
-  if (details.method === 'bank_account')
-    return {
-      method: details.method,
-      beneficiary: details.beneficiary,
-      number: details.account,
-      holder: details.bank,
-      note,
-    };
-  return { method: details.method, beneficiary: details.beneficiary, number: details.city, holder: '', note };
+  }
+  const who = {
+    method: details.method,
+    country: details.country,
+    firstName: details.firstName,
+    lastName: details.lastName,
+    city: details.city,
+    contactPhone: details.contactPhone,
+    email: details.email ?? '',
+    note: details.note ?? '',
+  };
+  if (details.method === 'mobile_money') return { ...who, number: details.phone, holder: details.operator };
+  if (details.method === 'bank_account') return { ...who, number: details.account, holder: details.bank };
+  return { ...who, number: '', holder: '' };
 }
 
 function bodyOf(draft: Draft): PutPayoutDetailsBody {
-  const note = draft.note.trim() === '' ? null : draft.note;
+  const who = {
+    country: draft.country,
+    firstName: draft.firstName,
+    lastName: draft.lastName,
+    city: draft.city,
+    contactPhone: draft.contactPhone,
+    email: draft.email.trim() === '' ? null : draft.email,
+    note: draft.note.trim() === '' ? null : draft.note,
+  };
   if (draft.method === 'mobile_money')
-    return {
-      method: draft.method,
-      beneficiary: draft.beneficiary,
-      phone: draft.number,
-      operator: draft.holder,
-      note,
-    };
+    return { method: draft.method, ...who, phone: draft.number, operator: draft.holder };
   if (draft.method === 'bank_account')
-    return {
-      method: draft.method,
-      beneficiary: draft.beneficiary,
-      account: draft.number,
-      bank: draft.holder,
-      note,
-    };
-  return { method: draft.method, beneficiary: draft.beneficiary, city: draft.number, note };
+    return { method: draft.method, ...who, account: draft.number, bank: draft.holder };
+  return { method: draft.method, ...who };
 }
 
-const NUMBER_LABELS: Readonly<
-  Record<PayoutReceiveMethod, { readonly label: string; readonly hint: string }>
-> = {
-  mobile_money: { label: 'Numéro mobile money', hint: 'Avec l’indicatif du pays : +229 01 23 45 67.' },
-  bank_account: { label: 'IBAN ou numéro de compte', hint: 'Recopie-le de ton relevé de banque.' },
-  cash_pickup: { label: 'Ville du retrait', hint: 'La ville où tu retires l’argent en agence.' },
-};
+/** A phone still holding only a prefix follows the country; one he typed stays as it is. */
+const followsCountry = (phone: string, from: PayoutCountry): boolean =>
+  phone.trim() === '' || phone.trim() === dialPrefix(from);
 
-/** The member's form: the way he receives first, as three tiles, then what that way needs. */
+const COUNTRY_OPTIONS = [
+  ...FIRST_COUNTRIES.filter((code): code is PayoutCountry => code in PAYOUT_DIAL_CODES).map((code) => ({
+    value: code,
+    label: `${countryFlag(code)}  ${countryName(code)}`,
+    group: 'Les plus fréquents',
+  })),
+  ...PAYOUT_COUNTRIES.filter((code) => !FIRST_COUNTRIES.includes(code))
+    .map((code) => ({
+      value: code,
+      label: `${countryFlag(code)}  ${countryName(code)}`,
+      group: 'Tous les pays',
+    }))
+    .toSorted((a, b) => a.label.localeCompare(b.label, 'fr')),
+];
+
+/** One text field of the form, its hint turning into its problem once he tried to save. */
+function TextField({
+  id,
+  label,
+  hint,
+  problem,
+  value,
+  onChange,
+  maxLength,
+  optional = false,
+  numeric = false,
+  inputMode,
+  autoComplete = 'off',
+}: {
+  id: string;
+  label: string;
+  hint: string | null;
+  problem: string | null;
+  value: string;
+  onChange: (value: string) => void;
+  maxLength: number;
+  optional?: boolean;
+  numeric?: boolean;
+  inputMode?: 'tel' | 'email' | 'text';
+  autoComplete?: string;
+}): JSX.Element {
+  const said = problem ?? hint;
+  return (
+    <div className="nv-field" data-invalid={problem === null ? undefined : 'true'}>
+      <label className="nv-field__label" htmlFor={id}>
+        {label} {optional ? <span className="po-optional">facultatif</span> : null}
+      </label>
+      <input
+        id={id}
+        className={numeric ? 'nv-field__control nv-glass nv-num' : 'nv-field__control nv-glass'}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
+        spellCheck={false}
+        maxLength={maxLength}
+        value={value}
+        aria-invalid={problem !== null}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+      {said === null ? null : (
+        <p className={problem === null ? 'tm-hint' : 'tm-hint tm-hint--error'}>{said}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The member's form, in the order WorldRemit asks (its pages for Benin, 21/11): the way he receives, then who he is
+ * and where, how to reach him, and what that way needs.
+ */
 function PayoutForm({
   memberId,
   current,
@@ -180,13 +334,14 @@ function PayoutForm({
       if (!problems.has(field)) problems.set(field, issue.message);
     }
   }
-  const numberField =
-    draft.method === 'mobile_money' ? 'phone' : draft.method === 'bank_account' ? 'account' : 'city';
-  const problemOf = (field: string, words: string): string | null =>
-    tried && problems.has(field) ? words : null;
-  const set = (field: keyof Draft) => (event: { target: { value: string } }) => {
-    setDraft({ ...draft, [field]: event.target.value });
-  };
+  /** Its problem once he tried, in the words given, or the schema's own when none are. */
+  const problemOf = (field: string, words?: string): string | null =>
+    tried && problems.has(field) ? (words ?? problems.get(field) ?? null) : null;
+  const set =
+    (field: Exclude<keyof Draft, 'method' | 'country'>) =>
+    (value: string): void => {
+      setDraft({ ...draft, [field]: value });
+    };
 
   const save = (): void => {
     if (!parsed.success || busy) return;
@@ -219,8 +374,8 @@ function PayoutForm({
   const prompt = confirm.prompt({ lead: MONEY_LEAD, layout: 'inline', onBusyChange: setBusy });
   if (prompt !== null) return <div className="po-form">{prompt}</div>;
 
-  const numberLabel = NUMBER_LABELS[draft.method];
-  const numberProblem = problemOf(numberField, problems.get(numberField) ?? '');
+  const prefix = dialPrefix(draft.country);
+  const phoneHint = `Avec l’indicatif du pays : ${prefix} 01 23 45 67.`;
   return (
     <form className="po-form" noValidate onSubmit={submit} aria-busy={busy}>
       <fieldset className="po-methods">
@@ -234,7 +389,13 @@ function PayoutForm({
               style={{ '--_c': `var(--nv-series-${String(RECEIVE_METHODS[method].series)})` }}
               aria-pressed={draft.method === method}
               onClick={() => {
-                setDraft({ ...draft, method, number: draft.method === method ? draft.number : '' });
+                if (draft.method === method) return;
+                setDraft({
+                  ...draft,
+                  method,
+                  number: method === 'mobile_money' ? `${prefix} ` : '',
+                  holder: '',
+                });
               }}
             >
               <MethodIcon method={method} />
@@ -243,82 +404,142 @@ function PayoutForm({
           ))}
         </div>
       </fieldset>
-      <div className="nv-field" data-invalid={problemOf('beneficiary', '') === null ? undefined : 'true'}>
-        <label className="nv-field__label" htmlFor={`${id}-beneficiary`}>
-          Nom du bénéficiaire
+      <div className="nv-field">
+        <label className="nv-field__label" htmlFor={`${id}-country`}>
+          Pays où tu reçois
         </label>
-        <input
-          id={`${id}-beneficiary`}
-          className="nv-field__control nv-glass"
-          autoComplete="name"
-          maxLength={PAYOUT_BENEFICIARY_MAX}
-          value={draft.beneficiary}
-          aria-invalid={problemOf('beneficiary', '') !== null}
-          onChange={set('beneficiary')}
+        <Select
+          id={`${id}-country`}
+          value={draft.country}
+          searchLabel="Chercher un pays"
+          empty="Aucun pays ne correspond."
+          options={COUNTRY_OPTIONS}
+          onChange={(country) => {
+            const next = `${dialPrefix(country)} `;
+            setDraft({
+              ...draft,
+              country,
+              contactPhone: followsCountry(draft.contactPhone, draft.country) ? next : draft.contactPhone,
+              number:
+                draft.method === 'mobile_money' && followsCountry(draft.number, draft.country)
+                  ? next
+                  : draft.number,
+            });
+          }}
         />
-        <p className={problemOf('beneficiary', '') === null ? 'tm-hint' : 'tm-hint tm-hint--error'}>
-          {problemOf('beneficiary', '') === null
-            ? 'Tel qu’il est écrit sur sa pièce d’identité.'
-            : 'Écris le nom de la personne qui reçoit.'}
-        </p>
       </div>
       <div className="po-pair">
-        <div className="nv-field" data-invalid={numberProblem === null ? undefined : 'true'}>
-          <label className="nv-field__label" htmlFor={`${id}-number`}>
-            {numberLabel.label}
-          </label>
-          <input
-            id={`${id}-number`}
-            className="nv-field__control nv-glass nv-num"
-            inputMode={draft.method === 'mobile_money' ? 'tel' : 'text'}
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={60}
-            value={draft.number}
-            aria-invalid={numberProblem !== null}
-            onChange={set('number')}
-          />
-          <p className={numberProblem === null ? 'tm-hint' : 'tm-hint tm-hint--error'}>
-            {numberProblem === null || numberProblem === '' ? numberLabel.hint : numberProblem}
-          </p>
-        </div>
-        {draft.method === 'cash_pickup' ? null : (
-          <div
-            className="nv-field"
-            data-invalid={
-              problemOf(draft.method === 'mobile_money' ? 'operator' : 'bank', '') === null
-                ? undefined
-                : 'true'
-            }
-          >
-            <label className="nv-field__label" htmlFor={`${id}-holder`}>
-              {draft.method === 'mobile_money' ? 'Opérateur' : 'Banque'}
-            </label>
-            <input
-              id={`${id}-holder`}
-              className="nv-field__control nv-glass"
-              maxLength={PAYOUT_ORGANISATION_MAX}
-              value={draft.holder}
-              onChange={set('holder')}
-            />
-            <p className="tm-hint">
-              {draft.method === 'mobile_money' ? 'MTN, Moov…' : 'Le nom de ta banque.'}
-            </p>
-          </div>
-        )}
-      </div>
-      <div className="nv-field">
-        <label className="nv-field__label" htmlFor={`${id}-note`}>
-          Note pour l’agence <span className="po-optional">facultatif</span>
-        </label>
-        <input
-          id={`${id}-note`}
-          className="nv-field__control nv-glass"
-          maxLength={PAYOUT_NOTE_MAX}
-          value={draft.note}
-          onChange={set('note')}
+        <TextField
+          id={`${id}-first`}
+          label="Prénom"
+          hint="Comme sur ta pièce d’identité."
+          problem={problemOf('firstName', 'Écris ton prénom, comme sur ta pièce.')}
+          value={draft.firstName}
+          onChange={set('firstName')}
+          maxLength={PAYOUT_NAME_MAX}
+          autoComplete="given-name"
+        />
+        <TextField
+          id={`${id}-last`}
+          label="Nom"
+          hint="WorldRemit ne paie que ce nom-là."
+          problem={problemOf('lastName', 'Écris ton nom, comme sur ta pièce.')}
+          value={draft.lastName}
+          onChange={set('lastName')}
+          maxLength={PAYOUT_NAME_MAX}
+          autoComplete="family-name"
         />
       </div>
+      <div className="po-pair">
+        <TextField
+          id={`${id}-city`}
+          label="Ville"
+          hint={
+            draft.method === 'cash_pickup'
+              ? 'Celle où tu retires l’argent en agence.'
+              : 'Ta ville, pas ton adresse.'
+          }
+          problem={problemOf('city', 'Écris ta ville.')}
+          value={draft.city}
+          onChange={set('city')}
+          maxLength={PAYOUT_CITY_MAX}
+          autoComplete="address-level2"
+        />
+        <TextField
+          id={`${id}-contact`}
+          label="Téléphone de contact"
+          hint="WorldRemit t’y envoie la référence du virement."
+          problem={problemOf('contactPhone', `Un numéro au format ${prefix}…`)}
+          value={draft.contactPhone}
+          onChange={set('contactPhone')}
+          maxLength={24}
+          numeric
+          inputMode="tel"
+          autoComplete="tel"
+        />
+      </div>
+      <TextField
+        id={`${id}-email`}
+        label="E-mail"
+        hint="Pour suivre tes virements. L’agence ne t’y écrit jamais."
+        problem={problemOf('email', 'Une adresse e-mail, ou rien.')}
+        value={draft.email}
+        onChange={set('email')}
+        maxLength={PAYOUT_EMAIL_MAX}
+        optional
+        inputMode="email"
+        autoComplete="email"
+      />
+      {draft.method === 'cash_pickup' ? (
+        <p className="tm-hint">
+          Au guichet, tu montres ta pièce d’identité et la référence que l’agence t’envoie : rien d’autre à
+          remplir.
+        </p>
+      ) : (
+        <div className="po-pair">
+          <TextField
+            id={`${id}-number`}
+            label={draft.method === 'mobile_money' ? 'Numéro mobile money' : 'IBAN ou RIB'}
+            hint={
+              draft.method === 'mobile_money'
+                ? `${phoneHint} Il peut être différent de ton numéro de contact.`
+                : 'Recopie-le de ton relevé : au Bénin, le RIB a 23 caractères.'
+            }
+            problem={problemOf(
+              draft.method === 'mobile_money' ? 'phone' : 'account',
+              draft.method === 'mobile_money' ? `Un numéro au format ${prefix}…` : 'Un IBAN ou un RIB.',
+            )}
+            value={draft.number}
+            onChange={set('number')}
+            maxLength={60}
+            numeric
+            inputMode={draft.method === 'mobile_money' ? 'tel' : 'text'}
+          />
+          <TextField
+            id={`${id}-holder`}
+            label={draft.method === 'mobile_money' ? 'Opérateur' : 'Banque'}
+            hint={draft.method === 'mobile_money' ? 'MTN, Moov…' : 'Le nom de ta banque.'}
+            problem={problemOf(
+              draft.method === 'mobile_money' ? 'operator' : 'bank',
+              draft.method === 'mobile_money' ? 'Écris ton opérateur.' : 'Écris le nom de ta banque.',
+            )}
+            value={draft.holder}
+            onChange={set('holder')}
+            maxLength={PAYOUT_ORGANISATION_MAX}
+          />
+        </div>
+      )}
+      <TextField
+        id={`${id}-note`}
+        label="Note pour l’agence"
+        hint={null}
+        problem={null}
+        value={draft.note}
+        onChange={set('note')}
+        maxLength={PAYOUT_NOTE_MAX}
+        optional
+        autoComplete="off"
+      />
       {refusal === null ? null : <p className="tm-hint tm-hint--error">{refusal}</p>}
       <p className="tm-hint">
         Chaque changement sonne sur ton téléphone et s’affiche à l’agence : si ce n’est pas toi, préviens ton
@@ -431,7 +652,7 @@ export function MyPayoutCard({ memberId, zone }: { memberId: string; zone: strin
             }
           />
         ) : (
-          <DetailsLines details={details} />
+          <DetailsLines details={details} copyable={false} />
         )}
       </div>
     </Panel>
@@ -459,17 +680,6 @@ export function PayoutTo({
   const [shown, setShown] = useState<PayoutDetails | null>(null);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  // « Copié » says the gesture worked, then gives the button back.
-  useEffect(() => {
-    if (!copied) return undefined;
-    const timer = setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [copied]);
 
   const reveal = (): void => {
     setBusy(true);
@@ -530,21 +740,7 @@ export function PayoutTo({
       {refusal === null ? null : <p className="tm-hint tm-hint--error">{refusal}</p>}
       {shown === null ? null : (
         <div className="po-to__shown">
-          <DetailsLines details={shown} />
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            onClick={() => {
-              void navigator.clipboard.writeText(numberOf(shown).replace(/\s/gu, '')).then(
-                () => {
-                  setCopied(true);
-                },
-                () => undefined,
-              );
-            }}
-          >
-            {copied ? 'Copié' : 'Copier le numéro'}
-          </button>
+          <DetailsLines details={shown} copyable />
         </div>
       )}
     </div>

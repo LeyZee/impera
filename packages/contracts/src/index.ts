@@ -61,6 +61,7 @@ export * from './pay-periods';
 export * from './pay-rules';
 export * from './payroll';
 export * from './payout-destinations';
+export * from './payout-countries';
 export * from './persona';
 export * from './persona-api';
 export * from './persona-sheet';
