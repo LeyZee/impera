@@ -649,8 +649,8 @@
 }
 .nv-switch:checked,
 .nv-switch[data-state='checked'] {
-  background: var(--nv-neon-solid);
-  box-shadow: var(--nv-shadow-neon-soft);
+  background: var(--nv-switch-on);
+  box-shadow: var(--nv-shadow-switch-on);
 }
 .nv-switch:checked::before,
 .nv-switch[data-state='checked']::before {

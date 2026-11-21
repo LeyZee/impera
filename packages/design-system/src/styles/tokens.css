@@ -25,7 +25,7 @@
   --nv-ink-muted: #bfb4b9;
   --nv-ink-faint: #9b9197;
 
-  /* Neon: the brand's single accent. A light, never a fill: one primary action, the "on" state, urgency. */
+  /* Neon: the brand's single accent. A light, never a fill: one primary action, urgency. A switch that is on is green (`switch-on`). */
   --nv-neon: #ff2a4d;
   --nv-neon-solid: #e3123f;
   --nv-on-neon: #ffffff;
@@ -140,6 +140,9 @@
     0 0 0 0.5px rgba(255, 110, 135, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.36),
     0 8px 26px -6px rgba(255, 42, 77, 0.75), 0 0 60px -12px rgba(255, 42, 77, 0.65);
   --nv-shadow-neon-soft: 0 4px 16px -6px rgba(255, 42, 77, 0.55);
+  /* A switch that is on: green, « allumé » is never an urgency (Charles, 21/11). The white thumb reads on it. */
+  --nv-switch-on: #1f9d5c;
+  --nv-shadow-switch-on: 0 4px 16px -6px rgba(47, 190, 115, 0.5);
   --nv-shadow-thumb: 0 3px 8px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.16);
   --nv-shadow-focus: 0 0 0 2px var(--nv-focus);
   /* A floating card raised under the pointer (.nv-lift). */
@@ -228,6 +231,7 @@
   --nv-shadow-neon: 0 0 0 1px rgba(208, 0, 44, 0.35), 0 8px 22px -8px rgba(208, 0, 44, 0.45);
   --nv-shadow-neon-strong: 0 0 0 1px rgba(208, 0, 44, 0.5), 0 10px 30px -8px rgba(208, 0, 44, 0.6);
   --nv-shadow-neon-soft: 0 6px 18px -8px rgba(208, 0, 44, 0.35);
+  --nv-shadow-switch-on: 0 6px 18px -8px rgba(31, 157, 92, 0.32);
   --nv-shadow-thumb: 0 3px 8px rgba(40, 0, 15, 0.18), 0 1px 1px rgba(40, 0, 15, 0.1);
   --nv-shadow-lift:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 4px 10px rgba(80, 10, 30, 0.08),

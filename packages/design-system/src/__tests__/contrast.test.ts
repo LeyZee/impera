@@ -141,6 +141,11 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     },
   );
 
+  it('a switch that is on stands out from void, and its thumb from it', () => {
+    expect(contrast(token(theme, 'switch-on'), ground.void)).toBeGreaterThanOrEqual(AA_NON_TEXT);
+    expect(contrast(token(theme, 'thumb'), token(theme, 'switch-on'))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+  });
+
   it('the focus ring stands out from void and from neon-solid', () => {
     expect(contrast(token(theme, 'focus'), token(theme, 'void'))).toBeGreaterThanOrEqual(AA_NON_TEXT);
     expect(contrast(token(theme, 'focus'), token(theme, 'surface-raised'))).toBeGreaterThanOrEqual(
