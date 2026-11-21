@@ -539,6 +539,18 @@ describe('TrackingPage', () => {
     expect(document.activeElement).toBe(back);
   });
 
+  it('says to confirm his age first instead of offering to give back a fan whose age is in doubt (IA-01)', async () => {
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
+      flags: { before: { ageDisputed: { since: '2026-10-22T10:00:00.000Z', by: 'policy' } } },
+    });
+    renderPage(OPEN);
+    expect(await screen.findByText(/confirme d’abord qu’il est majeur/)).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Rendre la main à l’agent' })).toBeNull();
+  });
+
   it('shows the three gravest of « À traiter », and the others on demand', async () => {
     const [first] = apiDashboard().todos;
     if (first === undefined) throw new Error('the fake dashboard has a todo');

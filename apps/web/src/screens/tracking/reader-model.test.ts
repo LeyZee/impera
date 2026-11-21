@@ -300,6 +300,10 @@ describe('draftsOf', () => {
 });
 
 describe('decisionError', () => {
+  it('says a fan whose age is in doubt needs his age confirmed before the agent gets him back (IA-01)', () => {
+    expect(decisionError(409, apiError('age_in_doubt_conflict', {}))).toContain('Confirmer son âge');
+  });
+
   it('says a creator without an active persona sends nothing, and where to activate one (recette G4)', () => {
     expect(decisionError(422, apiError('script_step_cut_unprocessable', { cut: 'sales_frozen' }))).toContain(
       'étape payante',
