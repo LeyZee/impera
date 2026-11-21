@@ -1,12 +1,15 @@
 import {
   CreatorConversationSchema,
+  CreatorEarningsSchema,
   CreatorFanInsightsSchema,
   CreatorFanPageSchema,
   CreatorMessagePageSchema,
   type CreatorConversation,
+  type CreatorEarnings,
   type CreatorFanInsights,
   type CreatorFanPage,
   type CreatorMessagePage,
+  type EarningsPeriod,
 } from '@impera/contracts';
 import {
   useInfiniteQuery,
@@ -107,6 +110,26 @@ export function useCreatorFanInsights(): UseQueryResult<CreatorFanInsights> {
     queryKey: ['creator-space', 'fan-insights'],
     queryFn: () => read(`${BASE}/fan-insights`, (body) => CreatorFanInsightsSchema.parse(body)),
     refetchInterval: 600_000,
+    retry: retryOnce,
+    retryDelay: 400,
+  });
+}
+
+/**
+ * `GET /v1/creator-space/earnings` (CR-04): her part over the period that holds `day` (today when `null`). Read again
+ * each minute while it is the current one: a sale arrives on its own.
+ */
+export function useCreatorEarnings(
+  period: EarningsPeriod,
+  day: string | null,
+): UseQueryResult<CreatorEarnings> {
+  const query = new URLSearchParams({ period });
+  if (day !== null) query.set('day', day);
+  return useQuery({
+    queryKey: ['creator-space', 'earnings', period, day],
+    queryFn: () => read(`${BASE}/earnings?${query.toString()}`, (body) => CreatorEarningsSchema.parse(body)),
+    refetchInterval: (state) => (state.state.data?.latest === false ? false : 60_000),
+    placeholderData: (before) => before,
     retry: retryOnce,
     retryDelay: 400,
   });

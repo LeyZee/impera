@@ -1317,6 +1317,20 @@
       "when": 1795267254967,
       "tag": "0246_drop_media_job_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 188,
+      "version": "7",
+      "when": 1795269629718,
+      "tag": "0247_shift_check_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1795269638355,
+      "tag": "0248_team_announcements",
+      "breakpoints": true
     }
   ]
 }

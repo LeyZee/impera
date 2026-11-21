@@ -81,6 +81,13 @@ export class ShiftEnded extends DomainError {
   }
 }
 
+/** « Je prends mon poste » before the shift's access window opens (`starts_at` − the planning's margin). */
+export class ShiftCheckInEarly extends DomainError {
+  constructor() {
+    super('shift_check_in_early_conflict', 'Ton poste n’est pas encore ouvert');
+  }
+}
+
 export class ShiftStarted extends DomainError {
   constructor() {
     super(
