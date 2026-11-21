@@ -51,7 +51,7 @@ export function NotificationInbox({ now: given }: { now?: Date }): JSX.Element {
   const litFamily: InboxFamily | null = lit === null ? null : (counts[lit]?.family ?? null);
   const answer = headline(items);
   return (
-    <Panel title="Tes notifications" eyebrow="7 derniers jours" className="nv-inbox">
+    <Panel eyebrow="Tes 7 derniers jours" className="nv-inbox">
       <div className="nv-inbox__body" data-lit={litFamily ?? undefined}>
         <PanelSection className="nv-inbox__head">
           <p className="nv-inbox__answer">
@@ -121,6 +121,9 @@ export function NotificationInbox({ now: given }: { now?: Date }): JSX.Element {
                       <time className="nv-inbox__time nv-num" dateTime={item.at}>
                         {clockOfInstant(item.at)}
                       </time>
+                      <svg className="nv-inbox__go" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 6l6 6-6 6" />
+                      </svg>
                     </a>
                   </li>
                 );

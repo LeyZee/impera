@@ -105,20 +105,24 @@ export function familyCounts(
   });
 }
 
-/** The answer first (the screen's one big thing): how many this week, then how many never rang. */
+/**
+ * The answer first (the screen's one big thing): what waits for the reader, the ones that never rang, when there are;
+ * otherwise how many this week. The other figure comes second, smaller.
+ */
 export function headline(items: readonly NotificationInboxItem[]): {
   readonly big: string;
   readonly small: string | null;
 } {
   if (items.length === 0) return { big: 'Rien cette semaine', small: null };
+  const total = `${String(items.length)} cette semaine`;
   const quiet = items.filter((item) => item.quiet).length;
-  const small =
-    quiet > 0
-      ? `dont ${String(quiet)} sans sonner`
-      : items.length === 1
-        ? 'elle a sonné'
-        : 'toutes ont sonné';
-  return { big: `${String(items.length)} cette semaine`, small };
+  if (quiet > 0) {
+    return {
+      big: quiet === 1 ? '1 arrivée sans sonner' : `${String(quiet)} arrivées sans sonner`,
+      small: `sur ${total}`,
+    };
+  }
+  return { big: total, small: items.length === 1 ? 'elle a sonné' : 'toutes ont sonné' };
 }
 
 /** The icon that says each family without its word (règle de Charles du 21/11). */

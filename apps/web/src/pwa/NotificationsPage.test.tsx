@@ -315,8 +315,8 @@ describe('Notifications, the ones of the last days', () => {
     });
     deviceIs('on');
     renderPage();
-    expect(await screen.findByText('3 cette semaine')).toBeTruthy();
-    expect(screen.getByText('dont 2 sans sonner')).toBeTruthy();
+    expect(await screen.findByText('2 arrivées sans sonner')).toBeTruthy();
+    expect(screen.getByText('sur 3 cette semaine')).toBeTruthy();
     expect(screen.getByText('Story du jour').closest('a')?.getAttribute('data-family')).toBe('day');
     expect(screen.getByText('Un fan à regarder').closest('a')?.getAttribute('data-family')).toBe('safety');
     expect(screen.getAllByText('Sans sonner')).toHaveLength(2);

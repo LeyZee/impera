@@ -2102,13 +2102,14 @@ label.nv-notif__row {
 }
 .nv-inbox__big {
   font-family: var(--nv-font-display);
-  font-size: 32px;
-  line-height: 1.1;
+  font-size: var(--nv-text-large-title);
+  line-height: var(--nv-text-large-title-leading);
+  letter-spacing: var(--nv-text-large-title-tracking);
   color: var(--nv-ink);
 }
 .nv-inbox__small {
   color: var(--nv-ink-muted);
-  font-size: 15px;
+  font-size: var(--nv-text-body);
 }
 .nv-inbox__bar {
   display: flex;
@@ -2233,6 +2234,7 @@ label.nv-notif__row {
 }
 .nv-inbox__title {
   max-width: 100%;
+  text-wrap: pretty;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2251,7 +2253,26 @@ label.nv-notif__row {
   align-self: flex-start;
   padding-top: 6px;
   color: var(--nv-ink-faint);
-  font-size: 13px;
+  font-size: var(--nv-text-footnote);
+}
+/* A line opens its page: a chevron says so, and slides on hover. */
+.nv-inbox__go {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    stroke var(--nv-dur-fast) var(--nv-ease-out);
+}
+.nv-inbox__item:hover .nv-inbox__go,
+.nv-inbox__item:focus-visible .nv-inbox__go {
+  stroke: var(--nv-ink);
+  transform: translateX(3px);
 }
 @media (prefers-reduced-motion: reduce) {
   .nv-inbox__seg,
@@ -2260,5 +2281,21 @@ label.nv-notif__row {
   }
   .nv-inbox__item:hover {
     transform: none;
+  }
+}
+/* The eyebrow sits right above the answer, no empty line between (avis Design du 21/11). */
+.nv-inbox > .nv-panel__head {
+  padding-bottom: 0;
+}
+.nv-inbox .nv-inbox__head {
+  padding-top: var(--nv-space-2, 8px);
+}
+.nv-inbox__big {
+  text-wrap: balance;
+}
+@media (max-width: 640px) {
+  .nv-inbox__big {
+    font-size: var(--nv-text-metric);
+    line-height: var(--nv-text-metric-leading);
   }
 }
