@@ -19,7 +19,7 @@ import {
   type DropMediaDescription,
   type PlatformAccountId,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withCreatorAccount, withTenant } from '@impera/db';
+import { and, eq, schema, sql, withCreatorAccount, withMember, withTenant } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -304,6 +304,26 @@ describe('the native scripts imported from the platform', () => {
     // The next day of the platform: a row of its own, the 14th kept.
     await importOf(noraAccount, nora, new Date('2026-11-14T23:30:00Z'));
     expect((await daily()).map((row) => row.day)).toEqual(['2026-11-14', '2026-11-15']);
+    // Bound to its creator: the owner, inside Nora, reads Nora's rows and never Inès's; inside Inès, only hers.
+    await test.admin.db.insert(schema.platformScriptStepDaily).values({
+      creatorId: ines,
+      platformAccountId: inesAccount,
+      platformStepRef: 'script_9_1',
+      day: '2026-11-14',
+      sent: 2,
+      purchased: 0,
+      paidMinor: 0,
+      currency: 'EUR',
+      readAt: new Date('2026-11-14T12:00:00Z'),
+    });
+    const seenInside = (creatorId: string) =>
+      withMember(app.db.db, ids.owner, async (tx) => {
+        await tx.execute(sql`select set_config('app.creator_id', ${creatorId}, true)`);
+        const rows = await tx.select().from(schema.platformScriptStepDaily);
+        return [...new Set(rows.map((row) => row.creatorId))];
+      });
+    expect(await seenInside(nora)).toEqual([nora]);
+    expect(await seenInside(ines)).toEqual([ines]);
     // Closed to her own account; the application role only reads.
     expect(
       await withCreatorAccount(app.db.db, ids.nora, (tx) => tx.select().from(schema.platformScriptStepDaily)),
