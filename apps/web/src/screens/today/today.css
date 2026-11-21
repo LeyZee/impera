@@ -74,3 +74,8 @@
   list-style: none;
   font-size: var(--nv-text-footnote);
 }
+/* What she told the agency herself (Charles, 21/11): newer than her sheet, so in ink and bold, never red. */
+.sc-her__lines [data-told] {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
