@@ -1,27 +1,10 @@
 import { DetectedLinkSchema, DETECTED_LINK_NAME_MAX, type DetectedLink } from '@impera/contracts';
 import { z } from 'zod';
 
+import { LinkServiceError, type LinkServiceReader } from '../../domain/link-service';
 import { isPrivateAddress, pinnedGet, systemLookup, type Lookup, type Pinned } from '../avatar/fetch-avatar';
 
 type FetchLike = (url: string, init: RequestInit, pinned: Pinned) => Promise<Response>;
-
-/** Why the redirect service did not answer what was asked. Nothing else of the exchange leaves the adapter. */
-export type LinkServiceFailure = 'unauthorized' | 'forbidden' | 'rate_limited' | 'unavailable' | 'unexpected';
-
-/**
- * A refusal or an outage of the redirect service (ADR 0120 § 3). Its message is the kind and nothing else: neither
- * the host, the key nor a word of the service's answer can reach a log, an API answer or `audit_log` through it.
- */
-export class LinkServiceError extends Error {
-  constructor(
-    readonly kind: LinkServiceFailure,
-    /** Seconds the service asks to wait, when it says so. */
-    readonly retryAfterSeconds: number | null = null,
-  ) {
-    super(`link service: ${kind}`);
-    this.name = 'LinkServiceError';
-  }
-}
 
 const TIMEOUT_MS = 10_000;
 /** A page of a hundred links is far below: a longer answer is not the one we asked for. */
@@ -101,13 +84,6 @@ function retryAfterOf(response: Response): number | null {
   const seconds = Number(response.headers.get('retry-after') ?? Number.NaN);
   if (!Number.isInteger(seconds) || seconds < 0) return null;
   return Math.min(seconds, RETRY_AFTER_MAX_SECONDS);
-}
-
-export interface LinkServiceReader {
-  /** Resolves when the service accepts the key; throws a `LinkServiceError` otherwise. */
-  ping(): Promise<void>;
-  /** Every link of the account: how the service names it, its name there, its address. Nothing else. */
-  listLinks(): Promise<readonly DetectedLink[]>;
 }
 
 /**

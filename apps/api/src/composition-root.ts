@@ -36,6 +36,7 @@ import type {
   AvatarPorts,
   ConnectorRegistry,
   ConnectorsModule,
+  LinkServiceReader,
   SalesFeedRegistry,
 } from './modules/connectors';
 import type { DropStorage } from './modules/content-drops';
@@ -196,6 +197,8 @@ export interface AppOptions {
   readonly connectorRegistry?: ConnectorRegistry;
   /** Tests plug FakeReveal's CRM API here; Reveal's own (`api.reveal.me`) otherwise. */
   readonly salesFeeds?: SalesFeedRegistry;
+  /** Tests plug a redirect service in memory here; the service over HTTPS otherwise (ADR 0120 § 3). */
+  readonly linkServiceReaderOf?: (key: string) => LinkServiceReader;
   /** Tests plug a composer with fixed bubbles here; the agent's composer otherwise, on the app's gateway. */
   readonly composer?: DraftComposer;
   /** Tests plug a vision with a fixed description here, for a marked post's captures; the app's gateway otherwise. */
@@ -352,6 +355,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     },
     ...(options.connectorRegistry !== undefined && { registry: options.connectorRegistry }),
     ...(options.salesFeeds !== undefined && { salesFeeds: options.salesFeeds }),
+    ...(options.linkServiceReaderOf !== undefined && { linkServiceReaderOf: options.linkServiceReaderOf }),
     ...(options.connectorsClock !== undefined && { now: options.connectorsClock }),
     ...(options.creatorAvatars !== undefined && { avatars: options.creatorAvatars }),
   });

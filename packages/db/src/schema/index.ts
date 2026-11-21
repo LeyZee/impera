@@ -11,6 +11,7 @@ export * from './events';
 export * from './fans';
 export * from './instagram';
 export * from './invoices';
+export * from './link-service';
 export * from './llm';
 export * from './mcp';
 export * from './media';

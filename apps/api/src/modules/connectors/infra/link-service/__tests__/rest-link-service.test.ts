@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { LinkServiceError } from '../../../domain/link-service';
 import type { Pinned } from '../../avatar/fetch-avatar';
-import { createLinkServiceReader, LinkServiceError } from '../rest-link-service';
+import { createLinkServiceReader } from '../rest-link-service';
 
 const ORIGIN = 'https://liens.example';
 const KEY = 'test-key-not-a-real-one';

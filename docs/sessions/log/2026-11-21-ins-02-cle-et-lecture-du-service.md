@@ -1,0 +1,5 @@
+# 2026-11-21 — INS-02 lot c2 (clé scellée et lecture seule du service de redirection) — in progress
+
+Fait : adaptateur HTTPS en lecture seule du service de redirection (GET seul, hôte du déploiement, adresse vérifiée et épinglée, aucune redirection, réponse bornée, schéma strict) ; table `link_service_credentials` (migration 0240) et routes `/v1/settings/link-service` du propriétaire (état, pose, retrait) ; trois actions d'audit ; plafond du rôle de service monté de trois pour `modules/connectors`. Tests : adaptateur (18), magasin de la clé et routes en intégration, balayages d'authentification et d'origine verts.
+Reste : brancher « Détecter ses liens » sur l'adaptateur (liste complète pour le propriétaire seul, test d'étanchéité), l'écran dans Réglages et dans l'onglet Liens (lot d, avec Design et captures), totaux par heure et robots (lot e).
+Découvertes : `pnpm ops:reencrypt-credentials` ne rescelle pas la clé du service de redirection ; le runbook de rotation dit de la recoller avant de retirer l'ancienne clé de chiffrement. L'inclure dans la commande serait plus sûr qu'une consigne.

@@ -11,7 +11,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/alerts': 1,
   'modules/audit': 3,
   'modules/backups': 1,
-  'modules/connectors': 35,
+  // +3 for the agency's key of the redirect service (INS-02): a table closed to the app role, read, kept and removed
+  // through the owner's gesture.
+  'modules/connectors': 38,
   'modules/content-drops': 29,
   'modules/contractors': 6,
   'modules/conversations': 1,
@@ -42,6 +44,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
 /**
  * The whole on 20/11/2026, when the ceiling reached main (264): the sum of the units never goes above it again. Raised
  * since: 269 by her week (CR-16, +5), 270 by the agent's read of her custom price grid (ADR 0159, +1), then 273 with
- * the audit journal (EQ-18), which reads `audit_log`, out of RLS by design, for the owner alone (+3).
+ * the audit journal (EQ-18), which reads `audit_log`, out of RLS by design, for the owner alone (+3), then 276 with
+ * the agency's key of the redirect service (INS-02), a table closed to the app role (+3).
  */
-export const SERVICE_ROLE_TOTAL_AT_START = 273;
+export const SERVICE_ROLE_TOTAL_AT_START = 276;
