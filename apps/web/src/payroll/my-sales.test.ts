@@ -35,6 +35,7 @@ const mineOf = (patch: Partial<MySale> = {}): MySale =>
     netMinor: 4_200,
     occurredAt: '2026-10-28T21:05:00.000Z',
     lateFrom: null,
+    saleOccurredAt: null,
     state: 'counted',
     signal: null,
     given: null,
@@ -48,6 +49,29 @@ describe('my sales read (CRM-03 lot b4c)', () => {
     expect(plain(mySaleWhen(mineOf({ event: 'refund', occurredAt: null }), 'Europe/Paris'))).toBe(
       'Remboursement, heure inconnue',
     );
+    // A late refund says the sale it takes back, on its day in the reader's zone.
+    expect(
+      plain(
+        mySaleWhen(
+          mineOf({
+            event: 'refund',
+            occurredAt: '2025-05-20T07:15:00.000Z',
+            saleOccurredAt: '2025-05-04T22:30:00.000Z',
+          }),
+          'Europe/Paris',
+        ),
+      ),
+    ).toBe('Remboursement de 9 h 15, d’une vente du 5 mai');
+    expect(
+      mySaleWhen(
+        mineOf({
+          event: 'refund',
+          occurredAt: '2025-05-20T07:15:00.000Z',
+          saleOccurredAt: '2025-05-01T10:00:00.000Z',
+        }),
+        'Europe/Paris',
+      ).endsWith('d’une vente du 1er\u00a0mai'),
+    ).toBe(true);
     expect(plain(mySaleAmount(mineOf()))).toBe('+42,00 €');
     expect(plain(mySaleAmount(mineOf({ event: 'refund', netMinor: -1_000 })))).toBe('−10,00 €');
   });

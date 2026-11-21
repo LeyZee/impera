@@ -68,11 +68,13 @@ describe('her dated exceptions (ADR 0148 § 3, /v1/creators/:id/agent-hours/exce
   });
 
   it('starts empty, on her clock', async () => {
-    expect(await list(nora.id)).toEqual({
-      exceptions: [],
-      timeZone: 'America/New_York',
-      today: dateIn(0, 'America/New_York'),
-    });
+    // The server reads the system clock: her day read before and after the request brackets the one it answers, so a
+    // midnight in New York between the two never fails the test.
+    const before = dateIn(0, 'America/New_York');
+    const view = await list(nora.id);
+    const after = dateIn(0, 'America/New_York');
+    expect(view).toEqual({ exceptions: [], timeZone: 'America/New_York', today: view.today });
+    expect([before, after]).toContain(view.today);
   });
 
   it('lets the owner write a date, replace it, give it back to her week, each change audited', async () => {

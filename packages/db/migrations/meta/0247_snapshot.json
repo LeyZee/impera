@@ -1,5 +1,5 @@
 {
-  "id": "3bb713be-b438-4b15-8f44-fa5a279b5c34",
+  "id": "408cf176-5de3-4a5d-989e-42c656dd0938",
   "prevId": "fe5e9db5-c935-4cc1-bd7a-4bb42af433cf",
   "version": "7",
   "dialect": "postgresql",
@@ -8615,7 +8615,7 @@
         },
         "llm_calls_purpose_check": {
           "name": "llm_calls_purpose_check",
-          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch', 'probe', 'instagram_comment', 'media', 'telegram')"
+          "value": "\"llm_calls\".\"purpose\" in ('chatting', 'trend_watch', 'probe', 'instagram_comment')"
         },
         "llm_calls_status_check": {
           "name": "llm_calls_status_check",
@@ -18755,6 +18755,12 @@
         },
         "stopped_at": {
           "name": "stopped_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "checked_in_at": {
+          "name": "checked_in_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

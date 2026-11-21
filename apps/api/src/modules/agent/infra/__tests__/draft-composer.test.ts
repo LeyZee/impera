@@ -10,17 +10,15 @@ import {
   type FanFlags,
   type MediaDescription,
 } from '@impera/contracts';
-import type {
-  BrainInput,
-  Brief,
-  HealthReport,
-  LlmGateway,
-  LlmFailure,
-  VoiceInput,
-  VoiceOutput,
-} from '@impera/llm';
+import type { Brief, VoiceOutput } from '@impera/llm';
 import { describe, expect, it } from 'vitest';
 
+import {
+  BRIEF,
+  fakeGateway as gateway,
+  type GatewayScript as Script,
+  type GatewaySeen as Seen,
+} from '../../../../__tests__/support/llm';
 import type { AlertSettings } from '../../domain/alerts';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
@@ -53,103 +51,6 @@ const PHOTO: MediaDescription = {
   notVisible: false,
   flags: [],
 };
-
-const BRIEF: Brief = {
-  intent: 'small_talk',
-  sentiment: 'positive',
-  factsProposed: [],
-  kycMissing: [],
-  risks: [],
-  action: 'reply',
-  replyBrief: 'Lui demander sa journée.',
-  toneHints: [],
-};
-const META = {
-  provider: 'xai',
-  model: 'grok-4.7',
-  isFallback: false,
-  latencyMs: 700,
-  costUsd: 0.002,
-  promptHash: 'h',
-} as const;
-
-function health(hasKey: boolean): HealthReport {
-  return {
-    state: hasKey ? 'ok' : 'down',
-    at: new Date(),
-    roles: [
-      {
-        role: 'voice',
-        state: hasKey ? 'ok' : 'down',
-        active: { provider: 'xai', model: 'grok-4.7', label: 'Grok 4.7' },
-        hasKey,
-        isOnFallback: false,
-        callsLastHour: 0,
-        errorRateLastHour: 0,
-        costTodayUsd: 0,
-      },
-    ],
-    providers: [],
-    costTodayUsd: 0,
-    budget: { day: '2026-10-17', spentEur: 0, capEur: 20, alertAtEur: 16, state: 'ok' },
-    trendWatchBudget: { day: '2026-10-17', spentEur: 0, capEur: 1, alertAtEur: 0.8, state: 'ok' },
-  };
-}
-
-interface Script {
-  readonly brief?: Brief;
-  readonly brain?: LlmFailure;
-  readonly voice?: VoiceOutput | LlmFailure;
-  readonly hasKey?: boolean;
-  /** What the voice writes from its second call on: her answer written once more after a guard refused it. */
-  readonly voiceAfter?: VoiceOutput;
-}
-
-interface Seen {
-  voiceCalls: number;
-  traces: unknown[];
-  brainInputs?: BrainInput[];
-  dropped?: { conversationId: string; count: number }[];
-  voiceInputs?: VoiceInput[];
-}
-
-function gateway(script: Script, seen: Seen): LlmGateway {
-  return {
-    sense: () => Promise.reject(new Error('not used')),
-    transcribe: () => Promise.reject(new Error('not used')),
-    describeTrendCaptures: () => Promise.reject(new Error('not used')),
-    describeDrop: () => Promise.reject(new Error('not used')),
-    channelPost: () => Promise.reject(new Error('not used')),
-    instagramComment: () => Promise.reject(new Error('not used')),
-    summarizeScript: () => Promise.reject(new Error('not used')),
-    identifyScript: () => Promise.reject(new Error('not used')),
-    readCard: () => Promise.reject(new Error('not used')),
-    promptHashes: { creatorDrop: 'drop-v1', scriptSummary: 'summary-v1', scriptIdentity: 'identity-v1' },
-    brain: (input) => {
-      seen.traces.push(input.trace);
-      seen.brainInputs?.push(input);
-      return Promise.resolve(
-        script.brain === undefined
-          ? { ok: true, value: { output: script.brief ?? BRIEF, meta: META } }
-          : { ok: false, error: script.brain },
-      );
-    },
-    voice: (input) => {
-      seen.voiceCalls += 1;
-      seen.voiceInputs?.push(input);
-      const voice =
-        seen.voiceCalls > 1 && script.voiceAfter !== undefined
-          ? script.voiceAfter
-          : (script.voice ?? { bubbles: ['Coucou toi ✨'] });
-      return Promise.resolve(
-        'bubbles' in voice ? { ok: true, value: { output: voice, meta: META } } : { ok: false, error: voice },
-      );
-    },
-    health: () => health(script.hasKey ?? true),
-    judge: () => Promise.reject(new Error('not used')),
-    testConnection: () => Promise.reject(new Error('not used')),
-  };
-}
 
 /** Her made-up catalogue (ADR 0010): one pack at 15 €, of either moment; Reveal never sent it to him. */
 const PACK_SOURCE: ScriptSource = {
