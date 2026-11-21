@@ -1,5 +1,6 @@
 import {
   containsIban,
+  containsPhoneNumber,
   PAYMENT_REFERENCE_MAX,
   type CommissionStatement,
   type ExchangeRate,
@@ -370,7 +371,10 @@ function PayForm({
   const refresh = useRefreshPayroll();
   const latest = useLatestPayPeriod();
   const today = dayOf(new Date(), statement.window.timeZone);
-  const firstDay = statement.window.period;
+  // Never before its period began, nor before its invoice was issued: the transfer settles it (COUV-02).
+  const invoicedOn = statement.invoicedOn ?? null;
+  const firstDay =
+    invoicedOn !== null && invoicedOn > statement.window.period ? invoicedOn : statement.window.period;
   const [day, setDay] = useState(today);
   const [amount, setAmount] = useState(amountInput(statement.payableMinor));
   const [reference, setReference] = useState('');
@@ -384,7 +388,8 @@ function PayForm({
   const [dayNoSuch, setDayNoSuch] = useState(false);
   const dayValid = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= firstDay && day <= today;
   const amountValid = sentMinor === statement.payableMinor;
-  const referenceValid = !containsIban(reference);
+  const phoneInReference = containsPhoneNumber(reference);
+  const referenceValid = !containsIban(reference) && !phoneInReference;
   const ready = dayValid && amountValid && referenceValid;
   const step = mode === 'pay' ? 0 : 1;
 
@@ -562,7 +567,9 @@ function PayForm({
             />
             <p className={touched && !referenceValid ? 'tm-hint tm-hint--error' : 'tm-hint'}>
               {touched && !referenceValid
-                ? 'Ceci contient un IBAN : garde seulement la référence du transfert.'
+                ? phoneInReference
+                  ? 'Ceci ressemble à un numéro de téléphone : garde seulement la référence du transfert.'
+                  : 'Ceci contient un IBAN : garde seulement la référence du transfert.'
                 : 'Celle que WorldRemit donne au transfert. Jamais un IBAN, un numéro de compte ni de téléphone.'}
             </p>
           </div>

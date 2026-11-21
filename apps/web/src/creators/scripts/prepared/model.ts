@@ -174,6 +174,43 @@ const WARNING_TEXTS: Readonly<Record<PreparedScriptWarning['code'], string>> = {
 export const warningText = (content: PreparedScriptContent, warning: PreparedScriptWarning): string =>
   `${where(content, warning)} : ${WARNING_TEXTS[warning.code]}`;
 
+/**
+ * A media sold in a paid step of one of her scripts and offered in another (REV-08, ADR 0145 § 2): a fan who received
+ * it offered can never buy the step that sells it. Read against her other scripts of the same account, both ways: a
+ * warning, never a gap; one line per branch and other script.
+ */
+export function crossScriptWarnings(
+  script: Pick<PreparedScriptView, 'id' | 'platformAccountId'>,
+  content: PreparedScriptContent,
+  others: readonly Pick<PreparedScriptView, 'id' | 'platformAccountId' | 'content'>[],
+): string[] {
+  const sold = new Map<string, Set<string>>();
+  const offered = new Map<string, Set<string>>();
+  for (const other of others) {
+    if (other.id === script.id || other.platformAccountId !== script.platformAccountId) continue;
+    for (const branch of other.content.steps.flatMap((step) => step.branches))
+      for (const media of branch.media) {
+        const into = branch.priceMinor > 0 ? sold : offered;
+        const names = into.get(media.ref) ?? new Set<string>();
+        names.add(other.content.name.trim() === '' ? 'un autre script' : `« ${other.content.name.trim()} »`);
+        into.set(media.ref, names);
+      }
+  }
+  const lines = new Set<string>();
+  for (const branch of content.steps.flatMap((step) => step.branches)) {
+    const place = branchPlace(content, branch.key).replace(/^./u, (first) => first.toUpperCase());
+    const against = branch.priceMinor > 0 ? offered : sold;
+    for (const media of branch.media)
+      for (const name of against.get(media.ref) ?? [])
+        lines.add(
+          branch.priceMinor > 0
+            ? `${place} : un de ses médias est offert dans ${name}, un fan qui l’a reçu ne pourra pas l’acheter ici`
+            : `${place} : un de ses médias est vendu dans ${name}, l’offrir ici le rend invendable à ce fan`,
+        );
+  }
+  return [...lines];
+}
+
 /** What keeps the copy from being recognised, for « À copier dans Reveal ». */
 export function differenceText(content: PreparedScriptContent, difference: CopyDifference): string {
   switch (difference.code) {

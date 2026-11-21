@@ -7,6 +7,7 @@ import {
   type ConversationDetail,
   type ConversationEventView,
   type DashboardTodo,
+  type DraftScriptStepView,
   type DraftView,
   type GuardCode,
   type MessageView,
@@ -319,6 +320,22 @@ export const AGE_IN_DOUBT_TEXT =
 export function retriedLine(retried: readonly GuardCode[]): string | null {
   if (retried.length === 0) return null;
   return `1 réponse écartée : ${[...new Set(retried.map((code) => GUARD_LABELS[code]))].join(', ')}`;
+}
+
+/**
+ * Under a draft, what leaves with it of her script (REV-03): « Part avec : étape 2 de « Café » · un média · 9 € ».
+ * `null` for words only, or while the server does not say it.
+ */
+export function scriptStepLine(step: DraftScriptStepView | null | undefined): string | null {
+  if (step === null || step === undefined) return null;
+  const which =
+    step.scriptName === null
+      ? `étape ${String(step.stepIndex + 1)} de son script`
+      : `étape ${String(step.stepIndex + 1)} de « ${step.scriptName} »`;
+  const which2 = step.stepName === null ? which : `${which} (${step.stepName})`;
+  const kinds = step.hasMedia ? ['un média'] : [];
+  const price = step.priceMinor === 0 ? 'offerte' : euros(step.priceMinor);
+  return `Part avec : ${[which2, ...kinds, price].join(' · ')}`;
 }
 
 /** The codes a refusal names; one this screen does not know yet is left out, never shown raw. */

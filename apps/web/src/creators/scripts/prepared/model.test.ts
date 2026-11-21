@@ -1,9 +1,11 @@
+import { PlatformAccountIdSchema, PreparedScriptIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { ACCOUNT, CHOICES, CONTENT, VAULT, branchOf } from './fixtures';
-import { editorMedia, pickerFolders, startFolder } from './media';
+import { ACCOUNT, CHOICES, CONTENT, SCRIPT, VAULT, branchOf, viewOf } from './fixtures';
+import { editorMedia, pickerFolders, placeLine, startFolder } from './media';
 import {
   conditionLabel,
+  crossScriptWarnings,
   differenceText,
   gapText,
   momentLabel,
@@ -192,5 +194,43 @@ describe('the media picker’s first folder (PRO1-11)', () => {
     expect(startFolder(folders, media, 'day')).toBe(`${ACCOUNT}:f1`);
     expect(startFolder(folders, editorMedia(vault, undefined), 'night')).toBe(`${ACCOUNT}:f0`);
     expect(startFolder([], media, 'both')).toBe('');
+  });
+});
+
+describe('a media sold in one script and offered in another (REV-08)', () => {
+  const OTHER = PreparedScriptIdSchema.parse('0192f3a0-0000-7000-8000-0000000000e2');
+  // CONTENT offers m1 at step 1 and sells m2 (12 €) and m3 (15 €) at step 2.
+  const other = (steps: (typeof CONTENT)['steps'], account = ACCOUNT) =>
+    viewOf({ id: OTHER, platformAccountId: account, content: { ...CONTENT, name: 'Sport inventé', steps } });
+  const step = (branch: ReturnType<typeof branchOf>) => ({ key: branch.key, rhythm: 0, branches: [branch] });
+
+  it('says it both ways, on the branch that holds it', () => {
+    const sells = other([step(branchOf(9, { media: [{ ref: 'm1' }], priceMinor: 1500 }))]);
+    expect(crossScriptWarnings({ id: SCRIPT, platformAccountId: ACCOUNT }, CONTENT, [sells])).toEqual([
+      'Étape 1 : un de ses médias est vendu dans « Sport inventé », l’offrir ici le rend invendable à ce fan',
+    ]);
+    const offers = other([step(branchOf(9, { media: [{ ref: 'm3' }], priceMinor: 0 }))]);
+    expect(crossScriptWarnings({ id: SCRIPT, platformAccountId: ACCOUNT }, CONTENT, [offers])).toEqual([
+      'Étape 2, branche 2 : un de ses médias est offert dans « Sport inventé », un fan qui l’a reçu ne pourra pas l’acheter ici',
+    ]);
+  });
+
+  it('says nothing for the same media sold in both, itself, or another account', () => {
+    const view = { id: SCRIPT, platformAccountId: ACCOUNT };
+    const paidToo = other([step(branchOf(9, { media: [{ ref: 'm2' }], priceMinor: 900 }))]);
+    const elsewhere = other(
+      [step(branchOf(9, { media: [{ ref: 'm1' }], priceMinor: 1500 }))],
+      PlatformAccountIdSchema.parse('0192f3a0-0000-7000-8000-0000000000a2'),
+    );
+    expect(crossScriptWarnings(view, CONTENT, [paidToo, elsewhere, viewOf()])).toEqual([]);
+  });
+});
+
+describe('where to find a media in her Reveal vault, to copy a script (REV-09)', () => {
+  it('names its folder and its place in it, in the platform’s order', () => {
+    const media = editorMedia(VAULT, CHOICES);
+    expect(placeLine(media.get('m1'))).toBe('Dossier inventé, 1er média');
+    expect(placeLine(media.get('m3'))).toBe('Dossier inventé, 3e média');
+    expect(placeLine(media.get('absent'))).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import {
   PATHS_SHOWN,
   branchAt,
   branchPlace,
+  crossScriptWarnings,
   emptyStep,
   gapText,
   priceLabel,
@@ -51,6 +52,7 @@ export function PreparedEditor({
   initial,
   media,
   folders,
+  others = [],
   onSaved,
   onReload,
   onCopy,
@@ -61,6 +63,8 @@ export function PreparedEditor({
   initial: PreparedScriptView;
   media: ReadonlyMap<string, EditorMedia>;
   folders: readonly PickerFolder[];
+  /** Her other scripts in preparation: a media sold in one and offered in another is said (REV-08). */
+  others?: readonly PreparedScriptView[];
   /** Each answer of the server, for the list to show the same. */
   onSaved: (view: PreparedScriptView) => void;
   /** Saved by someone else since: the list is read again and the editor starts from it. */
@@ -121,6 +125,7 @@ export function PreparedEditor({
     );
   const settled = save.kind === 'saved' && content === sent.current && refused.length === 0;
   const gaps = view.gaps;
+  const crossed = crossScriptWarnings(view, content, others);
   const missing = gaps.length + refused.length;
   const toState = async (to: 'ready' | 'editing'): Promise<void> => {
     setBusy(true);
@@ -392,11 +397,16 @@ export function PreparedEditor({
               <p className="nv-eyebrow">Ce qu’un fan paie</p>
               <h2 className="nv-h3">Chaque chemin du script</h2>
             </div>
-            {view.warnings.length > 0 ? (
+            {view.warnings.length + crossed.length > 0 ? (
               <div className="se-warns">
                 {view.warnings.map((warning, at) => (
                   <span key={`${warning.code}-${String(at)}`} className="se-warn">
                     {warningText(content, warning)}
+                  </span>
+                ))}
+                {crossed.map((line) => (
+                  <span key={line} className="se-warn">
+                    {line}
                   </span>
                 ))}
               </div>

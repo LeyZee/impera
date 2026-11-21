@@ -12,9 +12,11 @@ import { eq, schema, sql, withMember, type Database, type Transaction } from '@i
 import { assertRegimeChange } from '../domain/billing';
 import {
   BillingRegimeIdConflict,
+  BillingRegimeNameConflict,
   BillingRegimeNotFound,
   BillingRegimeValidated,
   BillingRegimeValidationAhead,
+  BillingRegimeValidationEarly,
   ContractorRegimeIdConflict,
   PayrollForbidden,
   TeamMemberNotFound,
@@ -126,6 +128,14 @@ export function createDrizzlePayrollRegimeStore(
           if (!sameRegime(bodyOf(existing), body)) throw new BillingRegimeIdConflict();
           return { regime: existing, created: false };
         }
+        // One name, one regime (COUV-04): a regime never changes, so two of one name could never be told apart.
+        await lock(tx, 'billing_regime_name');
+        const [named] = await tx
+          .select({ id: billingRegimes.id })
+          .from(billingRegimes)
+          .where(sql`lower(btrim(${billingRegimes.name})) = lower(btrim(${body.name}))`)
+          .limit(1);
+        if (named !== undefined) throw new BillingRegimeNameConflict();
         const [row] = await tx
           .insert(billingRegimes)
           .values({
@@ -169,8 +179,12 @@ export function createDrizzlePayrollRegimeStore(
           if (regime.validatedOn !== body.validatedOn) throw new BillingRegimeValidated(regime.validatedOn);
           return { regime, created: false };
         }
-        const today = calendarDayAt(now(), await reads.agencyTimeZone(tx));
+        const zone = await reads.agencyTimeZone(tx);
+        const today = calendarDayAt(now(), zone);
         if (body.validatedOn > today) throw new BillingRegimeValidationAhead(body.validatedOn);
+        // Never before the regime was written: the accountant validated this text (COUV-11).
+        const createdOn = calendarDayAt(new Date(regime.createdAt), zone);
+        if (body.validatedOn < createdOn) throw new BillingRegimeValidationEarly(createdOn);
         await tx
           .insert(billingRegimeValidations)
           .values({ regimeId, validatedOn: body.validatedOn, recordedBy: actor.userId });

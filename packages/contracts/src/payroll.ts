@@ -300,6 +300,17 @@ const CollectiveTiersSchema = z
   .refine((tiers) => !sameValues(tiers.map((tier) => tier.reachedBps)), 'Deux paliers au même pourcentage');
 
 /**
+ * Whether a higher tier always pays a higher bonus (COUV-03): read by percentage, each bonus above the one before.
+ * Otherwise reaching more of the target would lower what each chatter gets.
+ */
+export function collectiveTiersRise(
+  tiers: readonly Pick<CollectiveTier, 'reachedBps' | 'bonusMinor'>[],
+): boolean {
+  const ordered = [...tiers].sort((a, b) => a.reachedBps - b.reachedBps);
+  return ordered.every((tier, at) => at === 0 || tier.bonusMinor > (ordered[at - 1]?.bonusMinor ?? 0));
+}
+
+/**
  * The team's goal for `period`: its net, managers' sales included, against `targetMinor`; the highest tier reached
  * pays each chatter it covers, sales or not, never a manager. Added only: the newest for the period is in force, until
  * a statement of the period is validated (`pay_period_closed_conflict`). No tier means no goal for the period.
@@ -319,7 +330,8 @@ export const CreateCollectiveGoalBodySchema = z.object({
   id: CollectiveGoalIdSchema,
   period: PayPeriodSchema,
   targetMinor: z.number().int().min(1).max(PAY_TARGET_MAX_MINOR),
-  tiers: CollectiveTiersSchema,
+  // A goal written now: a higher tier pays more (COUV-03). One already kept is read as it is.
+  tiers: CollectiveTiersSchema.refine(collectiveTiersRise, 'Un palier plus haut donne une prime plus haute'),
 });
 export type CreateCollectiveGoalBody = z.infer<typeof CreateCollectiveGoalBodySchema>;
 
@@ -667,6 +679,16 @@ export function containsIban(text: string): boolean {
 }
 
 /**
+ * Whether `text` holds a phone number (COUV-07): an international one (« + » and at least 8 digits, spaces, dots,
+ * dashes or brackets between), or a French one (« 0 », then 9 digits, in pairs or not, one separator throughout). A transfer's reference
+ * (« Transfer #1284759302 ») is neither.
+ */
+export function containsPhoneNumber(text: string): boolean {
+  if (/\+\s*\d(?:[\s.()-]*\d){7,}/u.test(text)) return true;
+  return /(?<![\dA-Za-z])0[1-9]([\s.-]?)\d{2}(?:\1\d{2}){3}(?![\dA-Za-z])/u.test(text);
+}
+
+/**
  * The transfer's reference as the bank or the service shows it, to find it again; never an IBAN (refused, here for the
  * screen and the server alike: the repository is public and real payments go through this column) nor an account
  * number (said by the screen).
@@ -676,7 +698,11 @@ const PaymentReferenceSchema = z
   .trim()
   .min(1)
   .max(PAYMENT_REFERENCE_MAX)
-  .refine((reference) => !containsIban(reference), 'Une référence de transfert, jamais un IBAN');
+  .refine((reference) => !containsIban(reference), 'Une référence de transfert, jamais un IBAN')
+  .refine(
+    (reference) => !containsPhoneNumber(reference),
+    'Une référence de transfert, jamais un numéro de téléphone',
+  );
 
 /** What was sent, in euro cents: never nothing. */
 const SentMinorSchema = z.number().int().min(1).max(PAY_AMOUNT_MAX_MINOR);
@@ -751,6 +777,11 @@ export const CommissionStatementSchema = z.object({
   paidBy: UserIdSchema.nullable(),
   /** How the owner paid it, `null` until it is paid. */
   payment: StatementPaymentSchema.nullable(),
+  /**
+   * The day its invoice was issued, the latest, for a validated statement to pay: its transfer is never dated before
+   * (COUV-02). `null` without one; absent from a server that does not say it.
+   */
+  invoicedOn: z.iso.date().nullable().optional(),
   /**
    * Why its transfer could not be recorded today, as pay would refuse it (`payout_blocked_conflict`, ADR 0041): read for
    * a validated statement with something to pay, `null` otherwise and when nothing stops it.
@@ -948,7 +979,8 @@ export type ValidateCommissionStatementBody = z.infer<typeof ValidateCommissionS
  * `POST /v1/payroll/statements/:id/pay` (owner only) → 200 `CommissionStatementSchema`: `validated` → `paid`, once,
  * with how it was paid (ADR 0023 § Factures). `paidOn` is the day of the transfer, never after today in the agency's
  * zone (`payment_in_future_unprocessable`) nor before the first day of the statement's period
- * (`payment_before_period_unprocessable`). `reference` is refused when it holds an IBAN (400, `containsIban`).
+ * (`payment_before_period_unprocessable`), nor before its invoice was issued (`payment_before_invoice_unprocessable`,
+ * `details.invoicedOn`). `reference` is refused when it holds an IBAN (400, `containsIban`).
  * `sentMinor` is what was sent, and it must be what the statement pays (`payment_amount_unprocessable`; whether another
  * amount may be recorded is a question the EQ-05 card keeps open): a statement that pays nothing, its total carried
  * over, stays validated. The transfer waits (`payout_blocked_conflict`, ADR 0041) until the documents it pays are all
@@ -1456,6 +1488,7 @@ export type MyFigures = z.infer<typeof MyFiguresSchema>;
  * `commission_rate_missing_conflict` 409, a member to pay without a commission rate in force on the period's last day ;
  * `payment_in_future_unprocessable` 422, a payment dated after today in the agency's zone ;
  * `payment_before_period_unprocessable` 422, a payment dated before the first day of the statement's period ;
+ * `payment_before_invoice_unprocessable` 422, a payment dated before its statement's invoice was issued ;
  * `payment_amount_unprocessable` 422, an amount sent that is not what the statement pays ;
  * `payout_blocked_conflict` 409, a transfer whose documents are not all issued, or under a tax treaty without the
  * contractor's tax residence certificate of its calendar year accepted by the owner (ADR 0041, `details.reason` and
@@ -1502,6 +1535,7 @@ export const PAYROLL_ERROR_CODES = [
   'commission_rate_missing_conflict',
   'payment_in_future_unprocessable',
   'payment_before_period_unprocessable',
+  'payment_before_invoice_unprocessable',
   'payment_amount_unprocessable',
   'payout_blocked_conflict',
   'cursor_invalid',

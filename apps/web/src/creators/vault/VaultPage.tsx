@@ -827,6 +827,7 @@ function FolderPane({
       {media === undefined ? null : (
         <MediaSheet
           creatorId={creatorId}
+          platformAccountId={folder.platformAccountId}
           media={media}
           rank={at + 1}
           count={shown.length}

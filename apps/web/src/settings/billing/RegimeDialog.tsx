@@ -27,9 +27,12 @@ import { BILLING_LEAD } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 
-/** What the code prints on every invoice already: a regime's mentions never say it again. */
+/**
+ * What the code prints on every invoice already: a regime's mentions never say it again. No-break spaces hold the badge's
+ * name to its quotes at a line's end (recette COUV-15).
+ */
 export const PRINTED_BY_CODE =
-  'Le texte d’un régime ne répète pas ce que le code imprime déjà : le badge « Autofacturation », le mandat, la catégorie de l’opération, la TVA et l’échéance.';
+  'Le texte d’un régime ne répète pas ce que le code imprime déjà\u00A0: le badge «\u00A0Autofacturation\u00A0», le mandat, la catégorie de l’opération, la TVA et l’échéance.';
 
 /**
  * A new billing regime (EQ-06 lot 8c), as the agency's accountant wrote it, for one country or more. Never changed once

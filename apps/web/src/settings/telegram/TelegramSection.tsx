@@ -130,8 +130,8 @@ export function TelegramSection({
   /** Route saves run one after the other, each with the version the previous one returned. */
   const saving = useRef<Promise<void>>(Promise.resolve());
   const version = useRef(0);
-  /** Route saves not answered yet: the coverage is read again after the last one only, not between two. */
-  const pendingSaves = useRef(0);
+  /** Choices waiting to be saved: the page is read again once the last one is (COUV-05). */
+  const queued = useRef(0);
 
   const refresh = useCallback(async (): Promise<void> => {
     latest.current += 1;
@@ -181,27 +181,27 @@ export function TelegramSection({
           ? { kind: 'ready', overview: { ...current.overview, routes: next } }
           : current,
       );
-      pendingSaves.current += 1;
+      queued.current += 1;
       saving.current = saving.current.then(async () => {
+        let saved = false;
         try {
           const result = await saveRoutes(version.current, next);
           if (result.ok) {
             version.current = result.value.version;
-            pendingSaves.current -= 1;
-            // The strip's coverage (who is told of an urgent alert) is the server's: read it again (recette MED-03).
-            if (pendingSaves.current === 0) await refresh();
-            return;
-          }
-          setNotice(
-            result.refusal.kind === 'routes_version_conflict'
-              ? 'Quelqu’un a changé ces réglages en même temps que toi. Voici les siens : refais ton choix si besoin.'
-              : result.refusal.message,
-          );
+            saved = true;
+          } else
+            setNotice(
+              result.refusal.kind === 'routes_version_conflict'
+                ? 'Quelqu’un a changé ces réglages en même temps que toi. Voici les siens : refais ton choix si besoin.'
+                : result.refusal.message,
+            );
         } catch {
           setNotice(`Le choix n’a pas été enregistré. ${OFFLINE}`);
         }
-        pendingSaves.current -= 1;
-        await refresh();
+        queued.current -= 1;
+        // The health and the night's coverage are the server's reading of the routes: read again after a refusal, and
+        // once the last choice is saved, never between two (COUV-05).
+        if (!saved || queued.current === 0) await refresh();
       });
     },
     [refresh],

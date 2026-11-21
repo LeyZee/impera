@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   decisionError,
   retriedLine,
+  scriptStepLine,
   draftsOf,
   endsRun,
   isOutdated,
@@ -475,5 +476,37 @@ describe('the times and notes of the thread (CHAT-24)', () => {
       'L’arrêt d’urgence est actif\u00a0: rien ne part pour l’instant. Préviens ton responsable si ça dure.',
     );
     expect(stoppedText(false)).toContain('Dashboard');
+  });
+});
+
+describe('what leaves with a draft of her script (REV-03)', () => {
+  it('says the script, the step, its media and its price under the bubbles', () => {
+    expect(
+      scriptStepLine({
+        scriptName: 'Café inventé',
+        stepIndex: 1,
+        stepName: null,
+        priceMinor: 900,
+        currency: 'EUR',
+        hasMedia: true,
+      }),
+    ).toBe('Part avec : étape 2 de « Café inventé » · un média · 9\u00a0€');
+    expect(
+      scriptStepLine({
+        scriptName: null,
+        stepIndex: 0,
+        stepName: 'Teaser',
+        priceMinor: 0,
+        currency: 'EUR',
+        hasMedia: false,
+      }),
+    ).toBe('Part avec : étape 1 de son script (Teaser) · offerte');
+  });
+
+  it('says nothing for words only, nor while the server does not say it', () => {
+    expect(scriptStepLine(null)).toBeNull();
+    expect(scriptStepLine(undefined)).toBeNull();
+    const words = { id: DRAFT, status: 'pending', bubbles: ['Coucou'], finalBubbles: null };
+    expect(DraftViewSchema.parse({ ...words, createdAt: '2026-10-19T12:01:00Z' }).scriptStep).toBeUndefined();
   });
 });

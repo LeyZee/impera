@@ -119,6 +119,12 @@ export const CreateBillingRegimeBodySchema = BillingRegimeSchema.omit({ validate
     path: ['documents'],
     message:
       'La convention n’écarte la retenue qu’avec l’attestation de résidence fiscale : le régime la demande.',
+  })
+  // VAT charged at 0 % is no VAT charged (COUV-04): that is the franchise.
+  .refine((regime) => regime.vat.treatment !== 'charged' || regime.vat.rateBps > 0, {
+    path: ['vat'],
+    message:
+      'Un taux au-dessus de 0 quand le prestataire facture la TVA : sinon, choisis « Franchise en base ».',
   });
 export type CreateBillingRegimeBody = z.infer<typeof CreateBillingRegimeBodySchema>;
 

@@ -175,7 +175,12 @@ export function issuesOf(draft: Draft): Map<string, string[]> {
         : typeof field === 'string'
           ? field
           : '';
-    issues.set(place, [...(issues.get(place) ?? []), messageOf(issue.message, issue.code)]);
+    const said =
+      place === 'name' && issue.code === 'too_small'
+        ? // The field said by name, never « Un champ est vide » (recette COUV-10).
+          'Donne un nom à la structure.'
+        : messageOf(issue.message, issue.code);
+    issues.set(place, [...(issues.get(place) ?? []), said]);
   }
   return issues;
 }

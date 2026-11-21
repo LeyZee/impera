@@ -102,7 +102,7 @@ describe('the workshop draft', () => {
       name: ' ',
       segments: [{ ...first, name: '' }, ...draft.segments.slice(1)],
     });
-    expect(issues.get('name')).toEqual(['Un champ est vide']);
+    expect(issues.get('name')).toEqual(['Donne un nom à la structure.']);
     expect(issues.get(first.key)).toEqual(['Un champ est vide']);
   });
 

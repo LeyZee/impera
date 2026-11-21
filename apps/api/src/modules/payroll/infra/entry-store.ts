@@ -502,9 +502,10 @@ export function createDrizzlePayrollEntryStore(
         if (scope !== 'owner') throw new PayrollForbidden({ ownerOnly: true });
         if (row.status !== 'validated') throw new CommissionStatementStatusConflict(NOT_PAYABLE);
         if (row.revision !== revision) throw new CommissionStatementChanged(period);
+        const invoicedOn = (await gate.invoicedOn(tx, [statementId])).get(statementId) ?? null;
         assertPayment(
           payment,
-          { period, payableMinor: row.payableMinor },
+          { period, payableMinor: row.payableMinor, invoicedOn },
           calendarDayAt(now(), await reads.agencyTimeZone(tx)),
         );
         // Its documents all issued, and under a tax treaty the certificate of its year (ADR 0041): never 25 % withheld.

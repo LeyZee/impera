@@ -308,6 +308,22 @@ export class PaymentBeforePeriod extends DomainError {
   }
 }
 
+/**
+ * A payment dated before the statement's invoice was issued (COUV-02): the journal would show the transfer before the
+ * invoice it settles, and a lettering older than its document.
+ */
+export class PaymentBeforeInvoice extends DomainError {
+  constructor(invoicedOn: string) {
+    super(
+      'payment_before_invoice_unprocessable',
+      'Un paiement ne se date pas avant l’émission de sa facture',
+      {
+        details: { invoicedOn },
+      },
+    );
+  }
+}
+
 /** An amount sent that is not what the statement pays (EQ-05: the default while another amount has no rule). */
 export class PaymentAmountMismatch extends DomainError {
   constructor(payableMinor: number) {

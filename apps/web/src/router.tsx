@@ -337,7 +337,20 @@ const scriptStructures = createRoute({
       });
     }
   },
-  component: StructuresPage,
+  validateSearch: (search: Record<string, unknown>): { readonly vue?: 'files' } =>
+    search['vue'] === 'files' ? { vue: 'files' } : {},
+  component: function ScriptStructures() {
+    const { vue } = scriptStructures.useSearch();
+    const navigate = scriptStructures.useNavigate();
+    return (
+      <StructuresPage
+        queues={vue === 'files'}
+        onQueues={(queues) => {
+          void navigate({ search: queues ? { vue: 'files' } : {} });
+        }}
+      />
+    );
+  },
 });
 /**
  * Agence › Trafic (ADR 0134 § 5, ADR 0149 § 2): what brings fans to a creator, her redirect links first. The owner's

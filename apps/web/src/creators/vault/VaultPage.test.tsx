@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  MediaDescriptionIdSchema,
   CreatorIdSchema,
   PlatformAccountIdSchema,
   type VaultChoicesView,
@@ -88,6 +89,7 @@ function serve(
     choices?: VaultChoicesView[];
     put?: (body: unknown) => VaultChoicesView | number;
     describe?: (VaultDescribeAnswer | number)[];
+    review?: (body: unknown) => VaultChoicesView | number;
   } = {},
 ): Call[] {
   const calls: Call[] = [];
@@ -117,6 +119,10 @@ function serve(
         const all = api.describe ?? [500];
         const answer = all[Math.min(described, all.length - 1)];
         described += 1;
+        return typeof answer === 'number' ? json(null, answer) : json(answer);
+      }
+      if (method === 'POST' && url.startsWith(`${GET}/media/`) && url.endsWith('/description')) {
+        const answer = api.review?.(body) ?? 500;
         return typeof answer === 'number' ? json(null, answer) : json(answer);
       }
       if (url === GET) {
@@ -172,7 +178,16 @@ const mediaChoice = (
   imported: boolean,
   description: VaultChoicesView['media'][number]['description'] = 'none',
   excerpt: string | null = null,
-) => ({ platformAccountId: ACCOUNT, platformMediaId, imported, description, excerpt });
+) => ({
+  platformAccountId: ACCOUNT,
+  platformMediaId,
+  imported,
+  description,
+  excerpt,
+  descriptionId: null,
+  detailed: excerpt,
+  validated: false,
+});
 
 describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', () => {
   it('shows only what is in Impera: the folders imported, what is described, the line of figures', async () => {
@@ -583,6 +598,60 @@ describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', 
     expect(within(sheet).queryByText(/Image lue dans Reveal/u)).toBeNull();
     fireEvent.keyDown(sheet, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('validates a media’s description from its sheet, or corrects it, once per click (REV-02)', async () => {
+    const one = media('image', false, { platformMediaId: 'one' });
+    const DESCRIPTION = '0192f3a0-0000-7000-8000-0000000000d1';
+    const toReview = {
+      ...mediaChoice('one', true, 'described', 'Une photo inventée, lumière douce.'),
+      descriptionId: MediaDescriptionIdSchema.parse(DESCRIPTION),
+    };
+    const reviews: unknown[] = [];
+    let answer: VaultChoicesView | number = choicesOf({ media: [{ ...toReview, validated: true }] });
+    serve([viewOf({ folders: [folder('f1', 'Matin ☀️', 'day', [one])] })], undefined, {
+      choices: [choicesOf({ media: [toReview] })],
+      review: (body) => {
+        reviews.push(body);
+        return answer;
+      },
+    });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: '1. Photo, décrit' }));
+    const sheet = screen.getByRole('dialog', { name: 'Photo' });
+    expect(
+      within(sheet).getByText(/un script ne peut pas passer « Prêt à copier » sans elle/u),
+    ).toBeDefined();
+    const validate = within(sheet).getByRole('button', { name: 'Valider la description' });
+    fireEvent.click(validate);
+    fireEvent.click(validate);
+    expect(await within(sheet).findByText('Validée : les scripts peuvent la lire.')).toBeDefined();
+    expect(within(sheet).getByText('Description validée')).toBeDefined();
+    expect(within(sheet).queryByRole('button', { name: 'Valider la description' })).toBeNull();
+    expect(reviews).toEqual([{ kind: 'validate', platformAccountId: ACCOUNT, descriptionId: DESCRIPTION }]);
+
+    // Corrected: the words whole to start from, an empty text never sent, a description replaced meanwhile said.
+    answer = 409;
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Corriger' }));
+    const text = within(sheet).getByRole('textbox', { name: 'Sa description corrigée' });
+    expect(text).toHaveProperty('value', 'Une photo inventée, lumière douce.');
+    fireEvent.change(text, { target: { value: '  ' } });
+    expect(within(sheet).getByRole('button', { name: 'Enregistrer et valider' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+    fireEvent.change(text, { target: { value: 'Une photo inventée, corrigée.' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Enregistrer et valider' }));
+    expect(await within(sheet).findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Cette description a changé entre-temps : relis la nouvelle avant de la valider.',
+    );
+    expect(reviews[1]).toEqual({
+      kind: 'correct',
+      platformAccountId: ACCOUNT,
+      descriptionId: DESCRIPTION,
+      detailed: 'Une photo inventée, corrigée.',
+    });
   });
 
   it('goes from one media to the next in the sheet, by its arrows and the keyboard’s', async () => {

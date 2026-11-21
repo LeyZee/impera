@@ -712,6 +712,33 @@ describe('the reader of Suivi', () => {
     expect(within(panel).getByText('1 réponse écartée : un aveu d’IA')).toBeDefined();
   });
 
+  it('shows under the draft the step of her script that leaves with it (REV-03)', async () => {
+    const body = waiting({
+      openDrafts: [
+        {
+          id: DRAFT,
+          status: 'pending',
+          bubbles: ['Coucou toi'],
+          finalBubbles: null,
+          createdAt: '2026-10-17T20:01:00Z',
+          retried: [],
+          scriptStep: {
+            scriptName: 'Café inventé',
+            stepIndex: 1,
+            stepName: null,
+            priceMinor: 900,
+            currency: 'EUR',
+            hasMedia: true,
+          },
+        },
+      ],
+    });
+    serve({ ...withDraft, detail: () => ({ status: 200, body }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).getByText('Part avec : étape 2 de « Café inventé » · un média · 9 €')).toBeDefined();
+  });
+
   it('says nothing under a draft written at once', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
     renderPage(OPEN);
