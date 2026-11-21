@@ -505,9 +505,13 @@
 @media (max-width: 640px) {
   .urg__row {
     grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: 2px;
   }
+  /* The reason stays on a phone, on its own line under the fan: it says what to do. */
   .urg__why {
-    display: none;
+    grid-row: 2;
+    grid-column: 2 / -1;
+    white-space: normal;
   }
 }
 @media (prefers-reduced-motion: reduce) {

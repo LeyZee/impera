@@ -26,7 +26,9 @@ import { Failure } from '@/shell/states';
  * hangs on (who to win back, whether to widen the base). Fixed windows, whatever the period read below.
  */
 
-const formatEuros = (cents: number): string => euros(Math.round(cents));
+/** Whole euros on the cards: the cents are in the bars' tips. */
+const wholeEuros = (cents: number): string => euros(Math.round(cents / 100) * 100);
+const formatEuros = wholeEuros;
 const formatCount = (value: number): string => Math.round(value).toLocaleString('fr-FR');
 
 /** « Ça casse ici » needs enough fans in both windows to mean something (ADR 0092 § 5). */
@@ -66,7 +68,7 @@ function DayGauge({ daily }: { daily: SteeringDaily }): JSX.Element {
       <span className="stg-gauge__middle">
         <CountUp className="stg-gauge__value" value={daily.todayMinor} format={formatEuros} />
         <span className="stg-gauge__sub">
-          {daily.targetMinor === null ? 'aujourd’hui' : `sur ${euros(daily.targetMinor)}`}
+          {daily.targetMinor === null ? 'aujourd’hui' : `sur ${wholeEuros(daily.targetMinor)}`}
         </span>
       </span>
     </div>
@@ -89,7 +91,7 @@ function dayVerdict(daily: SteeringDaily): {
   if (daily.projectedMinor >= daily.targetMinor)
     return { text: 'En bonne voie pour l’objectif.', tone: 'up' };
   return {
-    text: `En retard : il manquerait ${euros(daily.targetMinor - daily.projectedMinor)} au rythme habituel. C’est le moment de relancer.`,
+    text: `En retard : il manquerait ${wholeEuros(daily.targetMinor - daily.projectedMinor)} au rythme habituel. C’est le moment de relancer.`,
     tone: 'down',
   };
 }
@@ -153,11 +155,11 @@ function DayCard({ daily, tip }: { daily: SteeringDaily; tip: FloatingTip }): JS
           <dl className="stg-figures">
             <div>
               <dt>Fin de journée estimée</dt>
-              <dd>{daily.projectedMinor === null ? '—' : euros(daily.projectedMinor)}</dd>
+              <dd>{daily.projectedMinor === null ? '—' : wholeEuros(daily.projectedMinor)}</dd>
             </div>
             <div>
               <dt>Moyenne des 7 derniers jours</dt>
-              <dd>{euros(daily.averageMinor)}</dd>
+              <dd>{wholeEuros(daily.averageMinor)}</dd>
             </div>
             {held === null ? null : (
               <div>
@@ -184,7 +186,7 @@ function trafficSteps(traffic: SteeringTraffic): {
     steps.push({
       label: {
         name: 'Nouveaux abonnés',
-        hint: 'gratuits et payants, lus chez Reveal',
+        hint: 'gratuits et payants',
         meaning: 'Les abonnés arrivés sur les 30 derniers jours : c’est le trafic.',
       },
       now: traffic.newSubscribers,
@@ -313,7 +315,7 @@ function DependencyCard({
             </div>
             <div>
               <dt>Dépense du fan médian</dt>
-              <dd>{dependency.medianMinor === null ? '—' : euros(dependency.medianMinor)}</dd>
+              <dd>{dependency.medianMinor === null ? '—' : wholeEuros(dependency.medianMinor)}</dd>
             </div>
           </dl>
         </div>
@@ -341,7 +343,7 @@ function DependencyCard({
                 <>
                   <span className="stg-lapsed__name">{fan.fanName}</span>
                   {several ? <span className="stg-lapsed__who">{names.get(fan.creatorId) ?? ''}</span> : null}
-                  <span className="stg-lapsed__spent">{euros(fan.spentMinor)}</span>
+                  <span className="stg-lapsed__spent">{wholeEuros(fan.spentMinor)}</span>
                   <span className="stg-lapsed__since">
                     {fan.daysSince} j
                     <span className="stg-lapsed__day"> · {shortDay(fan.lastPurchaseDay)}</span>
