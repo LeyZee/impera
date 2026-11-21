@@ -1,19 +1,8 @@
 import { FAN_CARD_FIELDS, type FanCardValue } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import {
-  ESSENTIALS,
-  groupChecks,
-  identitySources,
-  identityText,
-  newestOf,
-  PANEL_GROUPS,
-  restOf,
-  sourceLine,
-  valueText,
-} from './card';
+import { ESSENTIALS, groupChecks, identityText, newestOf, PANEL_GROUPS, restOf, valueText } from './card';
 
-const now = new Date('2026-11-08T18:00:00Z');
 const value = (patch: Partial<FanCardValue>): FanCardValue => ({
   items: ['Lyon'],
   source: 'declared',
@@ -35,17 +24,6 @@ describe('the fan’s card in the panel (ADR 0086 § 10)', () => {
     expect(shown.toSorted()).toEqual(FAN_CARD_FIELDS.map((spec) => spec.field).toSorted());
   });
 
-  it('says where a value comes from, by name when a chatter noted it', () => {
-    expect(sourceLine(value({}), now)).toBe('Dit par lui, il y a 3 jours');
-    expect(sourceLine(value({ source: 'inferred', observedAt: '2026-11-08T15:00:00Z' }), now)).toBe(
-      'Deviné, il y a 3 h',
-    );
-    expect(
-      sourceLine(value({ source: 'noted', notedByName: 'Inès', observedAt: '2026-11-07T12:00:00Z' }), now),
-    ).toBe('Noté par Inès, hier');
-    expect(sourceLine(value({ source: 'noted' }), now)).toBe('Noté par un chatteur, il y a 3 jours');
-  });
-
   it('reads a closed value by its label', () => {
     // In lower case, as every other value of the card.
     expect(valueText('intensity', ['naughty'])).toBe('coquin');
@@ -57,28 +35,6 @@ describe('the fan’s card in the panel (ADR 0086 § 10)', () => {
     expect(identityText('age', ['34'])).toBe('34 ans');
     expect(identityText('age', ['la trentaine'])).toBe('la trentaine');
     expect(identityText('location', ['Lyon'])).toBe('Lyon');
-  });
-
-  it('says where who he is comes from once, naming the parts only when the sources differ', () => {
-    const entry = (field: 'first_name' | 'age' | 'location', patch: Partial<FanCardValue>) => ({
-      field,
-      current: value(patch),
-      toCheck: [],
-    });
-    expect(identitySources([], now)).toEqual([]);
-    expect(identitySources([entry('first_name', {}), entry('location', {})], now)).toEqual([
-      'Dit par lui, il y a 3 jours',
-    ]);
-    expect(
-      identitySources(
-        [
-          entry('first_name', {}),
-          entry('age', {}),
-          entry('location', { source: 'inferred', observedAt: '2026-11-08T15:00:00Z' }),
-        ],
-        now,
-      ),
-    ).toEqual(['Prénom et âge : dit par lui, il y a 3 jours', 'Ville : deviné, il y a 3 h']);
   });
 
   it('finds the newest value of the card, none for an empty one', () => {
