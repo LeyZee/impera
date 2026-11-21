@@ -82,7 +82,8 @@ export interface GestureDone {
   readonly copied: number;
   /** The last bubble could not be put in the clipboard: it stays selectable above. */
   readonly copyFailed: boolean;
-  readonly sent: VerdictSent | 'sending';
+  /** `reconciled`: what left in Reveal was read by the CRM and matched to this draft (§ 5): « Envoyé ». */
+  readonly sent: VerdictSent | 'sending' | 'reconciled';
 }
 
 /**
@@ -97,6 +98,8 @@ export type DraftPart =
       readonly bubbles: readonly string[];
       /** Placed in Reveal by a chatter, waiting for what leaves (§ 5). */
       readonly placed: boolean;
+      /** Still waiting in the CRM: a gesture that did not count may be counted again (EXT-06). */
+      readonly pending: boolean;
       readonly mode: 'idle' | 'editing' | 'rejecting';
       /** The text being retouched, one bubble per line. */
       readonly text: string;
@@ -111,6 +114,8 @@ export interface PanelActions {
   readonly place: (edited: boolean) => void;
   /** `a` again: the next bubble of what was placed. */
   readonly copyNext: () => void;
+  /** The gesture sent again, once the extension is linked or the CRM answers (EXT-06). */
+  readonly recount: () => void;
   readonly edit: () => void;
   readonly editText: (text: string) => void;
   readonly reject: () => void;
@@ -437,7 +442,9 @@ const key = (letter: string): HTMLElement => h('span', { class: 'nv-kbd' }, lett
  * What a gesture left, in one or two quiet lines: the next step in Reveal, and whether it counted (§ 5, § 8). Several
  * bubbles go one at a time, as Reveal sends them (EXT-13): the next one waits on its button, under `a`.
  */
-function doneLines(done: GestureDone): HTMLElement[] {
+function doneLines(done: GestureDone, pending: boolean): HTMLElement[] {
+  // What left was matched to the draft by the CRM (§ 5): nothing is left to do.
+  if (done.sent === 'reconciled') return [h('p', { class: 'cp-draft__next', role: 'status' }, 'Envoyé.')];
   const lines: HTMLElement[] = [];
   const total = done.bubbles.length;
   if (done.outcome === 'rejected')
@@ -483,6 +490,7 @@ function doneLines(done: GestureDone): HTMLElement[] {
   const status: Record<GestureDone['sent'], string | null> = {
     sending: null,
     sent: null,
+    reconciled: null,
     unlinked:
       'Ce geste n’a pas compté : relie l’extension (clique sur l’icône Impera, puis «\u00a0Relier\u00a0»).',
     refused: 'Ce brouillon n’est plus à jour : l’agent en refait un.',
@@ -490,6 +498,19 @@ function doneLines(done: GestureDone): HTMLElement[] {
   };
   const text = status[done.sent];
   if (text !== null) lines.push(h('p', { class: 'cp-draft__warn', role: 'status' }, text));
+  // Not counted, and the draft still waits: it can be counted once linked, or once the CRM answers (EXT-06).
+  if (pending && (done.sent === 'unlinked' || done.sent === 'unreachable'))
+    lines.push(
+      h(
+        'div',
+        { class: 'cp-draft__actions' },
+        h(
+          'button',
+          { type: 'button', class: 'nv-btn nv-btn--soft nv-btn--sm', 'data-gesture': 'recount' },
+          'Compter ce geste',
+        ),
+      ),
+    );
   return lines;
 }
 
@@ -672,7 +693,7 @@ function draftPart(
   }
   section.append(head, bubbles);
   if (draft.done !== null) {
-    section.append(...doneLines(draft.done));
+    section.append(...doneLines(draft.done, draft.pending));
     return section;
   }
   if (draft.placed) {
@@ -735,6 +756,7 @@ function wire(root: ParentNode, actions: PanelActions): void {
     actions.place(true);
   });
   on('copy-next', actions.copyNext);
+  on('recount', actions.recount);
   on('edit', actions.edit);
   on('reject', actions.reject);
   on('cancel', actions.cancel);

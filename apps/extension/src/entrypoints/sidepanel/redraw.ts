@@ -24,6 +24,20 @@ export function drawnKey(screen: PanelScreen): string {
  * while, and as long as bubbles are left to copy, so the chatter reads it and finishes (EXT-23).
  */
 export function keepsDone(done: GestureDone, doneAt: number, now: number): boolean {
-  if (done.outcome === 'placed' && done.copied < done.bubbles.length) return true;
+  if (done.outcome === 'placed' && done.sent !== 'reconciled' && done.copied < done.bubbles.length)
+    return true;
   return now - doneAt < DONE_KEPT_MS;
+}
+
+/**
+ * The placing of this draft, once the CRM matched what left in Reveal to it (ADR 0086 § 5): « Envoyé ». `null` when
+ * nothing changes: another draft, a refusal, or already said.
+ */
+export function reconciledDone(
+  done: GestureDone | null,
+  draftId: string,
+  sentDraftId: string | undefined,
+): GestureDone | null {
+  if (done?.outcome !== 'placed' || done.sent === 'reconciled' || sentDraftId !== draftId) return null;
+  return { ...done, sent: 'reconciled', copied: done.bubbles.length };
 }

@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { standingOf } from '../../lib/copilot/standing';
 
-import { render, type DraftPart, type PanelActions, type PanelScreen } from './view';
+import { render, type DraftPart, type GestureDone, type PanelActions, type PanelScreen } from './view';
 
 /* An invented fan (ADR 0010). */
 const now = new Date('2026-11-08T18:00:00Z');
@@ -44,6 +44,7 @@ function draw(screen: PanelScreen): { root: HTMLElement; actions: PanelActions }
     toggleGroup: vi.fn(),
     place: vi.fn(),
     copyNext: vi.fn(),
+    recount: vi.fn(),
     edit: vi.fn(),
     editText: vi.fn(),
     reject: vi.fn(),
@@ -84,6 +85,7 @@ const ready = (patch: Partial<Extract<DraftPart, { kind: 'ready' }>> = {}): Draf
   kind: 'ready',
   bubbles: ['coucou toi 😘', 'tu rentres quand de ta garde ?'],
   placed: false,
+  pending: true,
   mode: 'idle',
   text: '',
   reason: null,
@@ -458,6 +460,35 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(unlinked.querySelector('.cp-draft__warn')?.textContent).toBe(
       'Ce geste n’a pas compté : relie l’extension (clique sur l’icône Impera, puis «\u00a0Relier\u00a0»).',
     );
+  });
+
+  // EXT-02 and EXT-06: « Envoyé » once reconciled; a gesture that did not count is counted again while the draft waits.
+  it('says « Envoyé » once what left is matched, and offers to count again a gesture that did not count', () => {
+    const done: GestureDone = {
+      outcome: 'placed',
+      bubbles: ['coucou toi 😘'],
+      copied: 1,
+      copyFailed: false,
+      sent: 'reconciled',
+    };
+    const sent = draw(onCard(card({}), [], { draft: ready({ placed: true, done, pending: false }) })).root;
+    expect(sent.querySelector('.cp-draft__next')?.textContent).toBe('Envoyé.');
+    expect(sent.querySelector('.cp-draft__warn')).toBeNull();
+
+    for (const missed of ['unlinked', 'unreachable'] as const) {
+      const { root, actions } = draw(
+        onCard(card({}), [], { draft: ready({ placed: true, done: { ...done, sent: missed } }) }),
+      );
+      root.querySelector<HTMLButtonElement>('[data-gesture="recount"]')?.click();
+      expect(actions.recount).toHaveBeenCalledOnce();
+    }
+    // Gone from the CRM, or refused by it: nothing to count again.
+    const gone = draw(
+      onCard(card({}), [], { draft: ready({ done: { ...done, sent: 'unlinked' }, pending: false }) }),
+    ).root;
+    expect(gone.querySelector('[data-gesture="recount"]')).toBeNull();
+    const stale = draw(onCard(card({}), [], { draft: ready({ done: { ...done, sent: 'refused' } }) })).root;
+    expect(stale.querySelector('[data-gesture="recount"]')).toBeNull();
   });
 
   // EXT-13: Reveal sends one bubble per message; they are copied one at a time, the gesture counted once.
