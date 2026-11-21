@@ -34,11 +34,11 @@ describe('Consommation IA, what the screen says (ADR 0091)', () => {
 
   it('measures today against the cap and says the room left by state', () => {
     const usage = usageFixture();
-    expect(capShare(usage)).toBeCloseTo(21);
-    expect(capNote(usage)).toBe(`15,80${NBSP}€ de marge avant le plafond du jour (20,00${NBSP}€).`);
-    const alert = usageFixture({ today: { ...usage.today, eur: 17, state: 'alert' } });
+    expect(capShare(usage)).toBeCloseTo(16.8);
+    expect(capNote(usage)).toBe(`20,80${NBSP}€ de marge avant le plafond du jour (25,00${NBSP}€).`);
+    const alert = usageFixture({ today: { ...usage.today, eur: 22, state: 'alert' } });
     expect(capNote(alert)).toBe(`Plus que 3,00${NBSP}€ avant le plafond du jour.`);
-    const reached = usageFixture({ today: { ...usage.today, eur: 20.1, state: 'reached' } });
+    const reached = usageFixture({ today: { ...usage.today, eur: 25.1, state: 'reached' } });
     expect(capShare(reached)).toBe(100);
     expect(capNote(reached)).toContain('Plafond atteint');
   });
