@@ -869,7 +869,7 @@ describe('the reader of Suivi', () => {
     expect(line.closest('.tr-warn')).toBeNull();
   });
 
-  it('says nothing to learn once every line is learnt, and never asks for a creator', async () => {
+  it('says nothing to learn once every line is learnt', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
     renderPage(OPEN);
     await screen.findByText('Limites du fan');
@@ -877,13 +877,6 @@ describe('the reader of Suivi', () => {
       expect(kycCalls()).toHaveLength(1);
     });
     expect(screen.queryByText('À apprendre')).toBeNull();
-    cleanup();
-
-    serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }), kyc: ['job'] });
-    renderPage(OPEN, false);
-    await screen.findByText('Limites du fan');
-    expect(screen.queryByText('À apprendre')).toBeNull();
-    expect(kycCalls()).toHaveLength(0);
   });
 
   it('says nothing to learn when the server does not answer for it', async () => {
@@ -1301,13 +1294,13 @@ describe('the reader of Suivi', () => {
     expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
   });
 
-  it('lets a creator read, never decide', async () => {
+  it('lets a chatter decide his draft, and only read the fan’s limits', async () => {
     serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
-    renderPage(OPEN, false);
-    expect(await screen.findByText('Tu lis seulement : l’équipe décide.')).toBeDefined();
-    expect(screen.queryByRole('button', { name: 'Valider' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Reprendre la main' })).toBeNull();
-    // Her fan's limits: read, never changed.
+    // His own Suivi, as ChatterTrackingPage mounts it (selfScope).
+    renderPage(OPEN, true, true, true);
+    expect(await screen.findByRole('button', { name: 'Valider' })).toBeDefined();
+    expect(screen.queryByText('Tu lis seulement : l’équipe décide.')).toBeNull();
+    // The fan's limits: read, changed by the owner and the managers only.
     expect(await screen.findByRole('switch', { name: /Ventes gelées/u })).toHaveProperty('disabled', true);
     expect(screen.queryByRole('button', { name: 'Confirmer son âge' })).toBeNull();
   });

@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyCalendarLinkPage } from './MyCalendarLinkPage';
 
-import { THEO_ME } from '@/test/pay';
+import { IRIS_ME } from '@/test/pay';
 
 const TOKEN = 'b'.repeat(43);
 const PATH = `/v1/calendar-feed/${TOKEN}.ics`;
@@ -47,7 +47,8 @@ function renderPage(): void {
   const page = createRoute({
     getParentRoute: () => root,
     path: '/moi/calendrier',
-    component: () => <MyCalendarLinkPage user={THEO_ME} />,
+    // Only a manager reaches it: a chatter's Moi › Calendrier is sent to his Planning (ADR 0134, lot 1).
+    component: () => <MyCalendarLinkPage user={IRIS_ME} />,
   });
   const others = ['/moi/profil', '/moi/dossier', '/moi/securite'].map((path) =>
     createRoute({ getParentRoute: () => root, path, component: () => null }),

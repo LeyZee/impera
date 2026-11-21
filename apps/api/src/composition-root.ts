@@ -42,6 +42,7 @@ import type {
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
+import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './modules/creator-decisions';
 import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
@@ -117,6 +118,8 @@ interface Modules {
   readonly creatorTasks: CreatorTasksModule;
   /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
   readonly creatorWeek: CreatorWeekModule;
+  /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
+  readonly creatorDecisions: CreatorDecisionsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -207,8 +210,6 @@ export interface AppOptions {
   readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
   readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
-  /** Tests plug a brain with a fixed identity here, for her native scripts (SC-04 lot c8); the app's gateway otherwise. */
-  readonly scriptIdentityBrain?: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
@@ -225,6 +226,8 @@ export interface AppOptions {
    * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
+  /** Tests only: the clock of « À décider » (ADR 0164), to pass a question's end. */
+  readonly decisionsClock?: () => Date;
   /**
    * Tests set the connectors' clock here, to make an unreachable register last a quarter of an hour (Telegram P3-12);
    * the system's otherwise.
@@ -403,6 +406,11 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     persona: persona.module,
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
+  const creatorDecisions = createCreatorDecisionsModule({
+    db: shared.db,
+    requireRole: shared.requireRole,
+    ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
+  });
   const scheduling = wireScheduling(shared, {
     persona: persona.module,
     creatorTasks: creatorTasks.module,
@@ -434,7 +442,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     contentDrops: contentDrops.module,
     connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
-    brain: options.scriptIdentityBrain ?? llm.gateway,
   });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,
@@ -559,6 +566,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     notifications: notifications.module,
     creatorTasks: creatorTasks.module,
     creatorWeek: creatorWeek.module,
+    creatorDecisions,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -710,6 +718,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       ...customOrders.routes,
       ...creatorTasks.routes,
       ...creatorWeek.routes,
+      creatorDecisions.routes,
       ...contentDrops.routes,
       ...vaultDescriptions.routes,
       ...contractors.routes,

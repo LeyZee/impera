@@ -143,3 +143,24 @@ export class OwnerProtected extends DomainError {
     );
   }
 }
+
+/** Unknown, withdrawn, or not addressed to the reader (EQ-12): the same answer for each, nothing to guess from it. */
+export class AnnouncementNotFound extends DomainError {
+  constructor() {
+    super('announcement_not_found', 'Annonce introuvable');
+  }
+}
+
+/** An active manager writes to the whole team or to the members of a creator of his own list (EQ-12). */
+export class AnnouncementCreatorForbidden extends DomainError {
+  constructor() {
+    super('announcement_creator_forbidden', 'Tu n’écris qu’aux membres des créatrices de ta liste');
+  }
+}
+
+/** Withdrawn by the owner or by its author alone (EQ-12). */
+export class AnnouncementWithdrawForbidden extends DomainError {
+  constructor() {
+    super('announcement_withdraw_forbidden', 'Seuls son auteur et le propriétaire retirent une annonce');
+  }
+}

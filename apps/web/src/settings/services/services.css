@@ -805,13 +805,17 @@ input.sv-key__secret[data-shown='true'] {
   opacity: 0.55;
   transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
 }
-.sv-probe__bolt {
-  fill: var(--nv-ink);
+.sv-probe__pulse {
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   transform-origin: center;
   transition: transform var(--nv-dur-fast) var(--nv-ease-spring-bouncy);
 }
-.sv-probe__btn:hover:not(:disabled) .sv-probe__bolt {
-  transform: scale(1.15) rotate(-6deg);
+.sv-probe__btn:hover:not(:disabled) .sv-probe__pulse {
+  transform: scale(1.15);
 }
 .sv-probe__btn:hover:not(:disabled) .sv-probe__ring {
   opacity: 1;
@@ -821,7 +825,7 @@ input.sv-key__secret[data-shown='true'] {
   stroke-dasharray: 0.3 0.7;
   animation: sv-spin var(--nv-dur-data) linear infinite;
 }
-.sv-probe__btn[data-busy] .sv-probe__bolt {
+.sv-probe__btn[data-busy] .sv-probe__pulse {
   animation: sv-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
 }
 .sv-probe__cost,

@@ -135,6 +135,7 @@ Branche : task/<id>-<slug>
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lots a et b) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
 | INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
+| INS-05 | « À décider » : les cartes de décision de la créatrice | Instagram (ADR 0164) | in progress (lot a) |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |
@@ -152,6 +153,7 @@ Branche : task/<id>-<slug>
 | DSH-06 | Le Dashboard de l'agence ne conclut pas sur trop peu de ventes | Web | review | DSH-01, DSH-04, ADR 0092 § 5 |
 | DSH-07 | Le Dashboard de l'agence liste les remboursements un par un | API CRM | in-progress | DSH-06, ADR 0092 § 4 |
 | DSH-08 | Le Dashboard de l'agence suit les objectifs mensuels par créatrice | API CRM | in-progress | DSH-07, ADR 0092 § 6 |
+| DSH-09 | Le pilotage de l'agence : objectif du jour, trafic, gros fans, IA | API CRM | in-progress | DSH-08, ADR 0092 (avenant du 21/11/2026) |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
@@ -171,6 +173,7 @@ Branche : task/<id>-<slug>
 | OPS-18 | Les erreurs de production arrivent dans Sentry, sans rien de personnel | exploitation | done | OPS-01 |
 | OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | in_progress | ADR 0152, OPS-01, OPS-02 |
 | OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
+| OPS-21 | Le prévisionnel du coût de l'IA | exploitation | review | OPS-08 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
@@ -185,6 +188,7 @@ Branche : task/<id>-<slug>
 | SEC-12 | Une identité de plateforme n'appartient qu'à un compte : la « Sync » d'une autre créatrice est refusée dès la première | exploitation | done | P2-01 |
 | SEC-13 | Une « Sync » refusée laisse sa ligne au journal d'audit | exploitation | done | SEC-12 |
 | SEC-14 | Un compte propriétaire de secours : deux propriétaires au plus, retrait après 72 h de préavis annulable par le visé (ADR 0096) | exploitation | done | SEC-02, SEC-04, EQ-10, EQ-18 |
+| SEC-15 | Primes et ajustements réservés au propriétaire | exploitation | in_progress | EQ-04, EQ-05 |
 | SEC-16 | Le rôle de service cesse de grandir : test de plafond par module, puis réduction (ADR 0087, lots b et c) | exploitation | en cours | SEC-10, ADR 0087 |
 | SEC-17 | Durée d'une session selon le rôle : propriétaire 48 h sans activité et 7 jours, créatrice 7 jours et 30 jours, les autres 12 h et 7 jours | exploitation | in_progress | ADR 0046, ADR 0160, SEC-03 |
 | REC-CREA-01 | Bac à sable : grosses requêtes de vision et transcription | recette | done | ADR 0075, recette créatrice du 11/11/2026 |

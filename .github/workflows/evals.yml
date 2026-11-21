@@ -1,0 +1,65 @@
+---
+name: Evals
+
+# The evals smoke on the real xAI (about 3 € a run, each run capped at 6 €). Charles, 21/11/2026: once a week and after
+# each change of the AI reaching main, not every night. Its own workflow, so that a merge on main never cuts a run
+# already paid for: runs queue one after the other, none is cancelled.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/llm/**'
+      - 'apps/api/src/modules/agent/**'
+      - 'apps/api/src/modules/persona/**'
+      - 'personas/**'
+      - 'evals/**'
+      - 'apps/api/src/scripts/evals.ts'
+      - 'apps/api/src/scripts/evals/**'
+  schedule:
+    - cron: '0 19 * * 0' # Sunday evening
+  workflow_dispatch:
+
+concurrency:
+  group: evals
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Without the xAI key the evals are skipped, said in the run's summary and as a warning, and the run stays green
+  # (« nightly vert », 06/11); with it, both fail without something to measure, and a failure turns the run red.
+  evals:
+    name: Evals smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HAS_XAI_KEY: ${{ secrets.LLM_XAI_API_KEY != '' }}
+    steps:
+      - name: Évaluations sautées, clé absente
+        if: env.HAS_XAI_KEY != 'true'
+        run: |
+          echo "::warning title=Évaluations sautées::Clé xAI absente : pnpm probe et pnpm evals n'ont pas tourné."
+          echo "### Évaluations sautées, clé absente" >> "$GITHUB_STEP_SUMMARY"
+          echo "Le secret \`LLM_XAI_API_KEY\` n'est pas posé : \`pnpm probe\` et \`pnpm evals\` n'ont pas tourné, rien n'a été mesuré." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: env.HAS_XAI_KEY == 'true'
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+        if: env.HAS_XAI_KEY == 'true'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        if: env.HAS_XAI_KEY == 'true'
+        with: { node-version-file: .nvmrc, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+        if: env.HAS_XAI_KEY == 'true'
+      - run: pnpm build
+        if: env.HAS_XAI_KEY == 'true'
+      - run: pnpm probe
+        if: env.HAS_XAI_KEY == 'true'
+        env:
+          LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
+          LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}
+      - run: pnpm evals
+        if: env.HAS_XAI_KEY == 'true'
+        env:
+          LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
+          LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}

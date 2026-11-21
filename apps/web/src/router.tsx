@@ -84,6 +84,7 @@ import {
   SettingsLayout,
   TelegramPage,
 } from './screens/settings/SettingsLayout';
+import { AnnouncementsPage } from './screens/team/AnnouncementsPage';
 import { MemberFilePage } from './screens/team/MemberFilePage';
 import { MembersPage } from './screens/team/MembersPage';
 import { PlanningPage } from './screens/team/PlanningPage';
@@ -204,7 +205,8 @@ const dashboard = createRoute({
             onCreator={openCreator}
             forOwner={user.role === 'owner'}
             reviewsReports={canOpen(rail, '/equipe')}
-            canAddCreator={canOpen(rail, '/creatrices')}
+            opensTracking={canOpen(rail, '/suivi')}
+            canAddCreator={user.role === 'owner'}
           />
         );
       }
@@ -216,7 +218,7 @@ const dashboard = createRoute({
           forOwner={user.role === 'owner'}
           reviewsReports={canOpen(rail, '/equipe')}
           opensTracking={canOpen(rail, '/suivi')}
-          canAddCreator={canOpen(rail, '/creatrices')}
+          canAddCreator={user.role === 'owner'}
           asked={shown}
           agency={{
             selection,
@@ -237,7 +239,7 @@ const dashboard = createRoute({
         forOwner={false}
         reviewsReports={canOpen(rail, '/equipe')}
         opensTracking={canOpen(rail, '/suivi')}
-        canAddCreator={canOpen(rail, '/creatrices')}
+        canAddCreator={user.role === 'owner'}
         asked={search.creatrice}
         onLeave={() => void navigate({ search: dashboardSearch(periodOf(search)), replace: true })}
       />
@@ -408,7 +410,8 @@ const tracking = createRoute({
       selectedCreator: creatrice ?? null,
       onSelect: (id: string | null) => void navigate({ search: id === null ? {} : { conversation: id } }),
       canDecide: user.role !== 'creator',
-      canAddCreator: canOpen(rail, '/creatrices'),
+      // Only the owner adds a creator (Créatrices): no one else is asked to (DASH-13).
+      canAddCreator: user.role === 'owner',
       liftsStop: user.role === 'owner',
     };
     // A chatter reads Suivi within his shift (EQ-13): outside it, the page says so; away, it says that (CHAT-09).
@@ -671,6 +674,16 @@ const teamMembers = createRoute({
 });
 
 // Reveal's team reviewed (ADR 0076), the owner's and an active manager's: anyone else is sent back to the members.
+/** Équipe › Annonces (EQ-12): the owner's and the managers', who see Équipe; the server refuses anyone else. */
+const teamAnnouncements = createRoute({
+  getParentRoute: () => team,
+  path: '/annonces',
+  component: function TeamAnnouncements() {
+    const { user } = rootRoute.useRouteContext();
+    return <AnnouncementsPage owner={user.role === 'owner'} />;
+  },
+});
+
 const teamReveal = createRoute({
   getParentRoute: () => team,
   path: '/reveal',
@@ -1286,7 +1299,15 @@ const routeTree = rootRoute.addChildren([
   content,
   contentScript,
   myPlanning,
-  team.addChildren([teamIndex, teamPlanning, teamReports, teamMembers, teamMemberFile, teamReveal]),
+  team.addChildren([
+    teamIndex,
+    teamPlanning,
+    teamReports,
+    teamMembers,
+    teamMemberFile,
+    teamAnnouncements,
+    teamReveal,
+  ]),
   pay.addChildren([payIndex, payPeriod, payPeriods, payEntries, payGoals, payInvoices, payExports]),
   commissions.addChildren([commissionsIndex, commissionsInvoices]),
   me.addChildren([

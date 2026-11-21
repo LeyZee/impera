@@ -113,7 +113,8 @@ export interface SenseInput {
 export interface DropSenseInput {
   readonly media: Exclude<SenseMedia, { readonly kind: 'audio' }>;
   readonly context: DropContext;
-  readonly trace?: CallTrace;
+  /** Always a `media` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** What the code knows of a drop, given to the model as data. */
@@ -267,7 +268,8 @@ export interface ChannelPostInput {
   readonly destination: string | null;
   /** The agency's advice for this post (§ 2.3); null: none. */
   readonly advice: string | null;
-  readonly trace?: CallTrace;
+  /** Always a `telegram` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /**
@@ -315,7 +317,8 @@ export interface ScriptSummaryInput {
   readonly scriptName: string;
   readonly moment: 'day' | 'night' | null;
   readonly steps: readonly ScriptSummaryStep[];
-  readonly trace?: CallTrace;
+  /** Always a `media` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** A step of a native script, as the identity is told it: its name, its offer's text and its media in order. */
@@ -334,7 +337,8 @@ interface ScriptIdentityStep {
 export interface ScriptIdentityInput {
   readonly scriptName: string;
   readonly steps: readonly ScriptIdentityStep[];
-  readonly trace?: CallTrace;
+  /** Always a `media` call: its purpose is set by the gateway (ADR 0091 § 8). */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** A message of the conversation the card is read in, numbered from 1 in the order they were written. */

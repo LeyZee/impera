@@ -172,7 +172,7 @@ export function createRedirectLinkRoutes(
         if (!detected.ok) throw new RefusalError(LINK_SERVICE_UNPROCESSABLE, detected.error);
         const found = serviceLinkOf(link, detected.links);
         if (found === null) throw new RedirectLinkError('not_at_service');
-        return store.attach(actor, creatorId, linkId, found.ref);
+        return store.attach(actor, creatorId, linkId, link.url, found.ref);
       },
     );
 

@@ -95,13 +95,16 @@ export function CreatorScope({ place }: { place: 'rail' | 'page' }): JSX.Element
   );
 }
 
-/** « Toutes »: three discs overlapping, the mark of several faces. */
+/** « Toutes »: three people, one in front (three bare discs did not read as faces; Charles, 21/11). */
 function AllFaces(): JSX.Element {
   return (
     <svg className="nv-scope__all" viewBox="0 0 22 22" aria-hidden="true">
-      <circle cx="7" cy="11" r="5" />
-      <circle cx="11" cy="11" r="5" />
-      <circle cx="15" cy="11" r="5" />
+      <circle cx="5.2" cy="8.6" r="2.7" />
+      <path d="M.8 18.4c0-3 1.9-5 4.4-5s4.4 2 4.4 5z" />
+      <circle cx="16.8" cy="8.6" r="2.7" />
+      <path d="M12.4 18.4c0-3 1.9-5 4.4-5s4.4 2 4.4 5z" />
+      <circle cx="11" cy="7.4" r="3.5" />
+      <path d="M4.6 19.8c0-3.9 2.8-6.6 6.4-6.6s6.4 2.7 6.4 6.6z" />
     </svg>
   );
 }
