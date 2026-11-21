@@ -34,6 +34,7 @@ describe('her channel’s visuals on Postgres', () => {
     unvalidated: newId(MediaAssetIdSchema),
     withdrawn: newId(MediaAssetIdSchema),
     massDm: newId(MediaAssetIdSchema),
+    inScript: newId(MediaAssetIdSchema),
   };
   const downloads: string[] = [];
   let source = '';
@@ -113,6 +114,61 @@ describe('her channel’s visuals on Postgres', () => {
     await drop('telegram_post', 'withdrawn', [
       { asset: assets.withdrawn, text: 'Elle lit.', level: 'soft', validated: true },
     ]);
+    await drop('telegram_post', 'ready', [
+      { asset: assets.inScript, text: 'Elle sourit au miroir.', level: 'soft', validated: true },
+    ]);
+    // That last one is sold in one of her scripts on the platform: never free, never on her channel (ADR 0145).
+    const account = newId(z.uuid());
+    const script = newId(z.uuid());
+    await test.admin.db.insert(schema.platformAccounts).values({
+      id: account,
+      creatorId: nora,
+      platform: 'reveal',
+      handle: 'compte_nora',
+      sessionState: 'none',
+    });
+    await test.admin.db.insert(schema.mediaPlatformRefs).values({
+      id: newId(z.uuid()),
+      creatorId: nora,
+      platform: 'reveal',
+      platformAccountId: account,
+      platformMediaId: 'media_inventee',
+      kind: 'image',
+      folderPosition: 0,
+      platformCreatedAt: new Date('2026-11-01T20:00:00Z'),
+      lastSyncedAt: new Date('2026-11-01T20:00:00Z'),
+      mediaAssetId: assets.inScript,
+    });
+    await test.admin.db.insert(schema.platformScripts).values({
+      id: script,
+      creatorId: nora,
+      platformAccountId: account,
+      platformScriptRef: 'sequence_inventee',
+      name: 'Soirée inventée',
+      fingerprint: 'empreinte-inventee',
+      syncedAt: new Date(),
+      versionAt: new Date(),
+    });
+    await test.admin.db.insert(schema.platformScriptSteps).values({
+      platformScriptId: script,
+      creatorId: nora,
+      position: 0,
+      platformStepRef: 'etape_inventee',
+      platformIndex: 0,
+      name: 'Étape inventée',
+      text: 'Un texte inventé.',
+      priceMinor: 1500,
+      currency: 'EUR',
+    });
+    await test.admin.db.insert(schema.platformScriptStepMedia).values({
+      platformScriptId: script,
+      creatorId: nora,
+      position: 0,
+      role: 'sold',
+      rank: 0,
+      platformMediaRef: 'media_inventee',
+      kind: 'image',
+    });
     await drop('mass_dm', 'ready', [
       { asset: assets.massDm, text: 'Elle pose en lingerie noire.', level: 'soft', validated: true },
     ]);
@@ -135,6 +191,12 @@ describe('her channel’s visuals on Postgres', () => {
     ]);
   });
 
+  it('never offers nor sends a medium sold in one of her scripts', async () => {
+    const offered = (await reader().eveningCandidates(nora, '2026-11-23')).map((one) => one.mediaId);
+    expect(offered).not.toContain(assets.inScript);
+    expect(await reader().file(nora, assets.inScript)).toBe('gone');
+  });
+
   it('reads nothing of hers under another creator', async () => {
     expect(await reader().telegramStock(ines)).toEqual([]);
     expect(await reader().file(ines, assets.stock)).toBe('gone');
@@ -142,7 +204,7 @@ describe('her channel’s visuals on Postgres', () => {
 
   it('fetches her file for the upload, and says when it is gone', async () => {
     const file = await reader().file(nora, assets.stock);
-    expect(file).toMatchObject({ filename: 'photo.jpeg', mime: 'image/jpeg' });
+    expect(file).toMatchObject({ filename: 'photo.jpg', mime: 'image/jpeg' });
     expect(file !== 'gone' && file !== 'too_big' && [...file.bytes]).toEqual([1, 2, 3]);
     expect(downloads).toEqual([`media/${nora}/${assets.stock}`]);
     expect(await reader().file(nora, newId(MediaAssetIdSchema))).toBe('gone');

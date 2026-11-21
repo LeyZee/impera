@@ -36,14 +36,34 @@ const CandidateRowSchema = z.object({
 /** The drops whose media her channel may send: the evening's (§ 5.2) and her Telegram stock (§ 1). */
 const EVENING = ['feed_video', 'mass_dm', 'telegram_post'] as const;
 const STOCK = ['telegram_post'] as const;
-const list = (values: readonly string[]) => sql.raw(`(${values.map((value) => `'${value}'`).join(', ')})`);
+const list = (values: readonly string[]) =>
+  sql`(${sql.join(
+    values.map((value) => sql`${value}`),
+    sql`, `,
+  )})`;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Her stock serves the week to come: a medium whose original goes before then is not offered. */
+const STOCK_HORIZON_MS = 8 * DAY_MS;
+
+interface CandidateAsk {
+  readonly categories: readonly string[];
+  /** Its original must outlive this instant: the day it goes out (Médias, 21/11). */
+  readonly keptUntil: Date;
+  /** One medium only, read again just before its file is sent. */
+  readonly mediaId?: string;
+}
 
 /**
- * Her live media in drops of these categories, oldest first, each with its latest validated description. Never one
- * that is in a script, hers or on the platform, nor one sold to a fan: a script's medium is never free (ADR 0145).
+ * Her live media in drops of these categories, oldest first, each with its latest validated description. The feed's
+ * video is taken once out on Reveal too (the evening post is that very video); the others only while in stock. Never
+ * one that is in a script, hers or on the platform, nor one sold to a fan: a script's medium is never free (ADR 0145).
  * Bounded to her, in her transaction (`withTenantJob`, job `telegram_channel`), read only.
  */
-async function candidates(tx: Transaction, creatorId: string, categories: readonly string[]) {
+async function candidates(
+  tx: Transaction,
+  creatorId: string,
+  ask: CandidateAsk,
+): Promise<ChannelVisualRead[]> {
   const result = await tx.execute(sql`
     select c.media_asset_id, c.kind, c.content from (
       select distinct on (f.media_asset_id) f.media_asset_id, a.kind, d.created_at, f.position, v.content
@@ -53,14 +73,19 @@ async function candidates(tx: Transaction, creatorId: string, categories: readon
         join lateral (
           select md.content from media_descriptions md
            where md.media_asset_id = a.id and md.creator_id = a.creator_id and md.validated_at is not null
-           order by md.created_at desc limit 1
+           order by md.validated_at desc, md.created_at desc, md.id desc limit 1
         ) v on true
        where d.creator_id = ${creatorId}
-         and d.category in ${list(categories)}
-         and d.state in ('ready', 'scheduled')
-         and d.exported_at is null and d.withdrawn_at is null
+         and d.category in ${list(ask.categories)}
+         and d.withdrawn_at is null
+         and (
+           (d.category = 'feed_video' and d.state in ('ready', 'scheduled', 'published'))
+           or (d.category <> 'feed_video' and d.state in ('ready', 'scheduled') and d.exported_at is null)
+         )
          and f.state in ('kept', 'duplicate') and f.replaced_at is null
          and a.kind in ('image', 'video') and a.erased_at is null
+         and (a.expires_at is null or a.expires_at > ${ask.keptUntil})
+         ${ask.mediaId === undefined ? sql`` : sql`and a.id = ${ask.mediaId}`}
          and not exists (
            select 1 from content_drop_files sf join content_drops sd on sd.id = sf.drop_id
             where sf.media_asset_id = a.id and sf.creator_id = a.creator_id and sd.category = 'script')
@@ -89,6 +114,17 @@ async function candidates(tx: Transaction, creatorId: string, categories: readon
   });
 }
 
+/** The file's name as Telegram shows it; never the storage's key. */
+const EXTENSIONS: Readonly<Record<string, string>> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
+};
+
 const AssetRowSchema = z.object({
   storage_key: z.string(),
   bytes: z.coerce.number(),
@@ -105,20 +141,34 @@ export function createChannelVisualsReader(
   storage: Pick<DropStorage, 'download'>,
   scratchDir: string,
 ): ChannelVisualsReader {
-  const read = (creatorId: string, categories: readonly string[]) =>
-    withTenantJob(db, creatorId, 'telegram_channel', (tx) => candidates(tx, creatorId, categories));
+  const read = (creatorId: string, ask: CandidateAsk) =>
+    withTenantJob(db, creatorId, 'telegram_channel', (tx) => candidates(tx, creatorId, ask));
   return {
-    // Nothing in a drop ties it to a day yet: the day is the Telegram module's, the stock is the same all week.
-    eveningCandidates: (creatorId) => read(creatorId, EVENING),
-    telegramStock: (creatorId) => read(creatorId, STOCK),
+    // Nothing in a drop ties it to a day yet: the day only says how long its original must be kept.
+    eveningCandidates: (creatorId, day) =>
+      read(creatorId, {
+        categories: EVENING,
+        keptUntil: new Date(Date.parse(`${day}T00:00:00Z`) + 2 * DAY_MS),
+      }),
+    telegramStock: (creatorId) =>
+      read(creatorId, { categories: STOCK, keptUntil: new Date(Date.now() + STOCK_HORIZON_MS) }),
     async file(creatorId, mediaId) {
-      const [raw] = (
-        await withTenantJob(db, creatorId, 'telegram_channel', (tx) =>
-          tx.execute(sql`
+      // Read again with the file, in one transaction: between Saturday and its hour it may have entered a script,
+      // lost its description or been withdrawn. It goes out only if it still passes every guard.
+      const raw = await withTenantJob(db, creatorId, 'telegram_channel', async (tx) => {
+        const still = await candidates(tx, creatorId, {
+          categories: EVENING,
+          keptUntil: new Date(),
+          mediaId,
+        });
+        if (still.length === 0) return undefined;
+        const [row] = (
+          await tx.execute(sql`
             select storage_key, bytes, mime, kind from media_assets
-             where id = ${mediaId} and creator_id = ${creatorId} and erased_at is null`),
-        )
-      ).rows;
+             where id = ${mediaId} and creator_id = ${creatorId} and erased_at is null`)
+        ).rows;
+        return row;
+      });
       const asset = AssetRowSchema.safeParse(raw);
       if (!asset.success) return 'gone';
       if (asset.data.bytes > CHANNEL_FILE_MAX_BYTES) return 'too_big';
@@ -126,7 +176,7 @@ export function createChannelVisualsReader(
       try {
         const path = join(dir, 'media');
         if (!(await storage.download(asset.data.storage_key, path, asset.data.bytes))) return 'gone';
-        const extension = asset.data.mime.split('/')[1] ?? 'bin';
+        const extension = EXTENSIONS[asset.data.mime] ?? (asset.data.kind === 'image' ? 'jpg' : 'mp4');
         return {
           bytes: new Uint8Array(await readFile(path)),
           filename: `${asset.data.kind === 'image' ? 'photo' : 'video'}.${extension}`,
