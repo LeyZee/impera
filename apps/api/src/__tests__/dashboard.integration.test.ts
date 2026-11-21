@@ -264,7 +264,7 @@ describe('GET /v1/dashboard', () => {
     });
     expect(dashboard.reveal).toMatchObject({ connected: true, conversations: 3 });
     expect(dashboard.guards.today.minor).toBe(1);
-    expect(dashboard.budget).toMatchObject({ cap: 20, alertAt: 16, costPerEuroSold: null });
+    expect(dashboard.budget).toMatchObject({ cap: 25, alertAt: 20, costPerEuroSold: null });
     expect(dashboard.todos.map((t) => [t.title, t.kind, t.tone])).toEqual([['Leo', 'minor', 'bad']]);
     expect(dashboard.fans.map((f) => [f.name, f.spent, f.byAgent])).toEqual([['Julien', 25, 25]]);
     // « Ouvrir dans Suivi » in the fan reader opens his conversation.

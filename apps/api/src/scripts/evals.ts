@@ -69,7 +69,7 @@ const SUITES = ['scenarios', 'adversarial', 'regression'] as const;
 /** His card read in his messages (ADR 0085 § 7): its own scenarios, checked without the judge. */
 const CARD_SUITE = 'card';
 const HOUR_MS = 3_600_000;
-const MAX_CAP_EUR = 20;
+const MAX_CAP_EUR = 25;
 
 const { values } = parseArgs({
   // pnpm forwards a bare `--` through each script hop.
@@ -93,7 +93,7 @@ if (!drawsArg.success) {
   process.exit(1);
 }
 const draws = drawsArg.data;
-/** What a run may spend, at most the agency's daily ceiling for paid AI (Charles: 20 € a day). */
+/** What a run may spend, at most the agency's daily ceiling for paid AI (Charles: 25 € a day since 21/11). */
 const capArg = z.coerce.number().positive().max(MAX_CAP_EUR).safeParse(values['cap-eur']);
 if (!capArg.success) {
   console.error(`evals --cap-eur : un montant en euros, ${String(MAX_CAP_EUR)} au plus.`);
