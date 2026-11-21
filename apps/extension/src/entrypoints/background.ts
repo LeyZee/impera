@@ -22,7 +22,13 @@ import {
   type SeenRequest,
 } from '../lib/reveal/sync';
 import { placeOf } from '../lib/tab';
-import { fetchMarkableCreators, sendCaptures, sendReadings } from '../lib/watch/api';
+import {
+  fetchLinkHolder,
+  fetchMarkableCreators,
+  linkCode,
+  sendCaptures,
+  sendReadings,
+} from '../lib/watch/api';
 import { captureMarked } from '../lib/watch/captures';
 import { forgetLink, linkState, markRevoked, readLink, saveLink } from '../lib/watch/link-store';
 import { postOfHref } from '../lib/watch/pages';
@@ -460,14 +466,17 @@ export default defineBackground(() => {
       case 'popup/link': {
         const trimmed = message.token.trim();
         if (!/^[A-Za-z0-9_-]{43}$/u.test(trimmed)) return { state: 'malformed' } satisfies LinkSaved;
-        const answer = await fetchMarkableCreators(await crmOrigin(), trimmed);
-        if (answer.kind === 'revoked' || answer.kind === 'refused')
-          return { state: 'refused' } satisfies LinkSaved;
-        if (answer.kind === 'busy' || answer.kind === 'unreachable')
-          return { state: answer.kind } satisfies LinkSaved;
-        await saveLink(trimmed);
-        await rebuildMenu(answer.value.items);
-        return { state: 'linked' } satisfies LinkSaved;
+        const origin = await crmOrigin();
+        const state = await linkCode(trimmed, {
+          check: (token) => fetchLinkHolder(origin, token),
+          save: saveLink,
+          // The watch's menu, for a holder of the watch only; an answer missing now is asked again with the popup.
+          watch: async (token) => {
+            const creators = await fetchMarkableCreators(origin, token);
+            if (creators.kind === 'ok') await rebuildMenu(creators.value.items);
+          },
+        });
+        return { state } satisfies LinkSaved;
       }
       case 'popup/unlink':
         await forgetLink();
