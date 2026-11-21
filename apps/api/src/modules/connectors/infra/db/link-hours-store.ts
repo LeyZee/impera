@@ -55,6 +55,10 @@ export function createDrizzleLinkHourStore(db: Database, adminDb: Database): Lin
     record: async (creatorId, linkId, hours, readAt) => {
       if (hours.length === 0) return 0;
       return withTenantJob(db, creatorId, 'link_hours', async (tx) => {
+        // One writer at a time per creator: an hour cannot close between the reading below and the write.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`link_hours:${creatorId}`}, 0))`,
+        );
         // A closed hour is not offered again: the job's update policy would refuse the whole statement on it.
         const closed = await tx
           .select({ hour: redirectLinkHours.hour })
