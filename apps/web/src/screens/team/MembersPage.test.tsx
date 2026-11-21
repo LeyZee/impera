@@ -159,12 +159,7 @@ function serve(
 }
 
 /** The page as the app mounts it: the tab and the open member live in the address. */
-function renderPage(
-  at = '/equipe/membres',
-  canManage = true,
-  viewerId = id(99),
-  seesSetup = canManage,
-): AnyRouter {
+function renderPage(at = '/equipe/membres', canManage = true, viewerId = id(99)): AnyRouter {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
   const team = createRoute({
@@ -179,7 +174,8 @@ function renderPage(
           tab={onglet === 'managers' ? 'manager' : 'chatter'}
           selected={membre ?? null}
           canManage={canManage}
-          seesSetup={seesSetup}
+          // As the router mounts it: only the owner and an active manager open Membres, and both see the setup.
+          seesSetup
           viewerId={viewerId}
           onTab={(tab) =>
             void navigate({ search: (s) => ({ ...s, onglet: tab === 'manager' ? 'managers' : undefined }) })
@@ -402,12 +398,12 @@ describe('Équipe › Membres', () => {
         },
       ],
     });
-    renderPage(`/equipe/membres?membre=${THEO.id}`, false, id(99), true);
+    renderPage(`/equipe/membres?membre=${THEO.id}`, false);
     const card = await screen.findByRole('region', { name: 'Mise en route du membre' });
     expect(within(card).getByText('2 sur 3')).toBeDefined();
     cleanup();
 
-    renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`, false, id(99), true);
+    renderPage(`/equipe/membres?onglet=managers&membre=${INES.id}`, false);
     await screen.findByRole('region', { name: 'Inès' });
     expect(screen.queryByRole('region', { name: 'Mise en route du membre' })).toBeNull();
   });
