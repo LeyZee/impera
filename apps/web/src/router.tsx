@@ -275,7 +275,8 @@ const creators = createRoute({
     }
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
-    if (first !== undefined && !sheets.includes(sheetOf(search))) {
+    // Only on her sheet: the list has no tab, and an address of the list never carries one (NAV-10).
+    if (first !== undefined && search.creatrice !== undefined && !sheets.includes(sheetOf(search))) {
       // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
       // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
       const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);

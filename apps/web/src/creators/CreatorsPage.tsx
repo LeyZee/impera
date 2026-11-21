@@ -44,6 +44,7 @@ import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
 import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
+import { creatorSheetTitle } from '@/shell/nav';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
@@ -185,6 +186,13 @@ export function CreatorsPage({
   useEffect(() => {
     if (onSheet) rememberCreatorTab(shown);
   }, [onSheet, shown]);
+  // The browser tab names her and the tab of her sheet, after the shell's « Créatrices · Impera » (NAV-06).
+  const title = creatorSheetTitle(
+    current === undefined ? null : { tab: TAB_LABELS[shownTab], name: current.displayName },
+  );
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
 
   const leaving = blocker.status === 'blocked';
   const stay = (): void => {

@@ -207,12 +207,17 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     fireEvent.click(within(anna).getByRole('link', { name: 'Anna' }));
     await picked('Anna');
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
+    // The browser tab names her and the tab of her sheet (NAV-06).
+    await waitFor(() => {
+      expect(document.title).toBe('Persona · Anna · Créatrices · Impera');
+    });
     // On her sheet, nothing of the list: neither the other creators nor « Ajouter une créatrice ».
     expect(screen.queryByRole('button', { name: 'Ajouter une créatrice' })).toBeNull();
 
     fireEvent.click(screen.getByRole('link', { name: '← Créatrices' }));
     await cardOf('Anna');
     expect(router.state.location.search).toEqual({});
+    expect(document.title).toBe('Créatrices · Impera');
   });
 
   it('opens the creator the address names, and the list for one it does not hold', async () => {

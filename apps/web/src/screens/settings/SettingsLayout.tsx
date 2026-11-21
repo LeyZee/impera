@@ -153,14 +153,19 @@ export function SettingsLayout(): JSX.Element {
                 <>
                   <span className="rgl-eyebrow">Réglages</span>
                   {/* A phone: the section is a screen of its own, the way back to the list in the eyebrow. */}
-                  <Link to="/reglages" className="nv-btn nv-btn--plain nv-btn--sm rgl-back">
+                  {/* Exact: a way back to the list, never « page actuelle » on a section under it (NAV-09). */}
+                  <Link
+                    to="/reglages"
+                    activeOptions={{ exact: true }}
+                    className="nv-btn nv-btn--plain nv-btn--sm rgl-back"
+                  >
                     ← Réglages
                   </Link>
                 </>
               ),
             })}
         title={open?.label ?? 'Réglages'}
-        lead="Ce qui règle le CRM pour toute l’agence."
+        lead="Les réglages de toute l’agence."
       />
       <div className="rgl-body" data-open={open === null ? undefined : ''}>
         <SettingsList groups={groups} />

@@ -552,8 +552,17 @@ describe('an address that leads nowhere (recette 28/10, M1)', () => {
     expect(screen.queryByText('Not Found')).toBeNull();
     const nav = screen.getByRole('navigation', { name: 'Navigation' });
     expect(nav.querySelector('[aria-current="page"]')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Revenir à Dashboard' }).getAttribute('href')).toBe('/');
+    expect(screen.getByRole('link', { name: 'Retour : Dashboard' }).getAttribute('href')).toBe('/');
     expect(document.title).toBe('Page introuvable · Impera');
+  });
+});
+
+describe('Créatrices for a manager (recette NAV-10)', () => {
+  it('keeps the list’s address free of a tab of her sheet', async () => {
+    const router = renderApp(manager, '/creatrices');
+    expect(await screen.findByRole('heading', { level: 1 })).toBeDefined();
+    expect(router.state.location.pathname).toBe('/creatrices');
+    expect(router.state.location.search).toEqual({});
   });
 });
 
@@ -1043,7 +1052,7 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
         '/entrainer/playground',
         'Parle à la persona comme un fan, avant qu’un vrai fan ne la lise : rien n’est envoyé.',
       ],
-      ['/reglages/modeles-ia', 'Ce qui règle le CRM pour toute l’agence.'],
+      ['/reglages/modeles-ia', 'Les réglages de toute l’agence.'],
       ['/creatrices', 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche et tous ses réglages.'],
     ] as const) {
       renderApp(owner, path);
@@ -1147,4 +1156,25 @@ describe('the header of a section with sub-tabs (NAV-08)', () => {
       expect(head.closest('.nv-page')?.getAttribute('data-width')).toBe('wide');
     },
   );
+});
+
+// Recette NAV-09: one link only says « page actuelle », for a screen reader.
+describe('aria-current (NAV-09)', () => {
+  it('marks the home tab, never the brand beside it', async () => {
+    renderApp(owner, '/');
+    const brand = await screen.findByRole('link', { name: /^Impera, / });
+    expect(brand.getAttribute('aria-current')).toBeNull();
+    expect(brand.getAttribute('href')).toBe('/');
+    expect(document.querySelectorAll('.nv-rail [aria-current="page"]')).toHaveLength(1);
+  });
+
+  it('never marks the way back to Réglages on one of its sections', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+    renderApp(owner, '/reglages/modeles-ia');
+    const back = await screen.findByRole('link', { name: '← Réglages' });
+    expect(back.getAttribute('aria-current')).toBeNull();
+  });
 });

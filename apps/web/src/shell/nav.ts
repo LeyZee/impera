@@ -215,6 +215,8 @@ const SCREENS = {
   '/paie/objectifs': 'Objectifs',
   '/paie/factures': 'Factures',
   '/paie/exports': 'Exports',
+  '/entrainer/playground': 'Chatting',
+  '/entrainer/canal': 'Post du canal',
   '/commissions/factures': 'Factures',
   '/moi/profil': 'Profil',
   '/moi/trophees': 'Trophées',
@@ -278,6 +280,15 @@ export function documentTitle(pathname: string, section: Section | null): string
       : (SCREEN_TITLES.get(path) ?? (MEMBER_FILE.test(path) ? 'Dossier' : undefined));
   const label = sectionLabel(section);
   return `${screen === undefined ? '' : `${screen} · `}${label} · Impera`;
+}
+
+/**
+ * The browser tab's title on a creator's sheet: its tab and her name before Créatrices, so that the history and two
+ * open sheets read apart (NAV-06). Set by the sheet itself, which alone knows her name.
+ */
+export function creatorSheetTitle(sheet: { readonly tab: string; readonly name: string } | null): string {
+  const list = documentTitle('/creatrices', '/creatrices');
+  return sheet === null ? list : `${sheet.tab} · ${sheet.name} · ${list}`;
 }
 
 /** Whether the rail holds the section: what the route guard asks before every screen. */
