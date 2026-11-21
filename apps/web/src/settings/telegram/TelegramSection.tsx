@@ -351,6 +351,8 @@ export function TelegramSection({
           <PrivateChat
             owner
             onAddBot={openBots}
+            // Only an active bot takes codes: with none, it is said before any password or code (CHAT-07).
+            botReady={overview.bots.some((bot) => bot.state === 'active')}
             frame={(body) => <div className="nv-plate pc-plate">{body}</div>}
           />
         )}
