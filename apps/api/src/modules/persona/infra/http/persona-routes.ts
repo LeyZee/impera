@@ -197,7 +197,9 @@ export function createPersonaRoutes(
       },
       async (request) => {
         const { creatorId } = request.params;
-        const user = actorFor(request, creatorId);
+        // Any reader but the creator herself is checked as for her whole sheet (Charles, 21/11, Sécurité).
+        const user =
+          request.user?.role === 'creator' ? actorFor(request, creatorId) : fullReaderFor(request, creatorId);
         const list =
           user.role === 'creator'
             ? await corrections.mine(user.id)

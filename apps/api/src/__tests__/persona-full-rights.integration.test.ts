@@ -103,6 +103,7 @@ describe('her whole sheet, the agency’s (GET /v1/creators/:id/persona)', () =>
     const response = await read(nora, ownerCookie);
     expect(response.statusCode, response.body).toBe(200);
     expect(PersonaOverviewSchema.parse(response.json()).versions.length).toBeGreaterThan(0);
+    expect((await read(nora, ownerCookie, '/corrections')).statusCode).toBe(200);
   });
 
   it('shows it to an active manager on a creator of his list, never on another', async () => {
@@ -110,6 +111,7 @@ describe('her whole sheet, the agency’s (GET /v1/creators/:id/persona)', () =>
     const response = await read(nora, manager);
     expect(response.statusCode, response.body).toBe(200);
     PersonaOverviewSchema.parse(response.json());
+    expect((await read(nora, manager, '/corrections')).statusCode).toBe(200);
     const elsewhere = await read(ines, manager);
     expect([elsewhere.statusCode, codeOf(elsewhere)]).toEqual([403, 'creator_forbidden']);
   });
@@ -124,10 +126,13 @@ describe('her whole sheet, the agency’s (GET /v1/creators/:id/persona)', () =>
       const refused = await read(nora, cookie);
       expect(refused.statusCode, JSON.stringify(team)).toBe(403);
       expect(refused.body).not.toContain('"strategies"');
+      // Her proposed corrections, words of her sheet, are refused alike.
+      expect((await read(nora, cookie, '/corrections')).statusCode, JSON.stringify(team)).toBe(403);
     }
     // The operator without a team row keeps his list: the short sheet stays his.
     const plain = await operator(null);
     expect(codeOf(await read(nora, plain))).toBe('persona_full_forbidden');
+    expect(codeOf(await read(nora, plain, '/corrections'))).toBe('persona_full_forbidden');
     expect((await read(nora, plain, '/chatter')).statusCode).toBe(200);
   });
 });
