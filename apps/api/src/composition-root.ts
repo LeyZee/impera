@@ -39,6 +39,7 @@ import type {
   LinkServiceReader,
   SalesFeedRegistry,
 } from './modules/connectors';
+import { confinePinnedGets } from './modules/connectors';
 import type { DropStorage } from './modules/content-drops';
 import type { ContractorsModule } from './modules/contractors';
 import type { ConversationsModule, DraftComposer } from './modules/conversations';
@@ -271,7 +272,11 @@ export function breachCheckOf(config: Config, logger: Logger): PasswordBreachChe
 export async function createApp(config: Config, logger: Logger, options: AppOptions = {}): Promise<App> {
   // ADR 0075: in the recette sandbox, the guard goes on `fetch` before any module captures it.
   const sandbox = sandboxOf(config);
-  if (sandbox !== null) installSandboxGuard(sandbox, logger);
+  if (sandbox !== null) {
+    installSandboxGuard(sandbox, logger);
+    // The GETs that go through `node:https` rather than `fetch`: the link service, the avatars, the vault's files.
+    confinePinnedGets(true);
+  }
   const db = createDbClient(config.DATABASE_URL, { ...POOL_OPTIONS, max: config.DATABASE_POOL_MAX });
   const adminDb = createDbClient(config.DATABASE_SERVICE_URL, {
     ...POOL_OPTIONS,

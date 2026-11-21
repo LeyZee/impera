@@ -327,7 +327,8 @@ export function PrivateChat({
                   2
                 </span>
                 <span className="pc-steps__text">
-                  Le bot répond « C’est fait » et cette page se met à jour.
+                  {/* The link is read each minute on the server's side (recette MED-11). */}
+                  Le bot répond « C’est fait » et cette page se met à jour, jusqu’à une minute après.
                 </span>
               </li>
             </ol>

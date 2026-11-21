@@ -11,6 +11,7 @@ import {
   fileLine,
   lengthOf,
   matchResumed,
+  measuredVideoRefusal,
   mediaLabel,
   mimeOf,
   moved,
@@ -30,6 +31,21 @@ import {
   UNREADABLE_HERE,
   weightOf,
 } from './model';
+
+describe('Contenu: a video measured on her phone (recette MED-04)', () => {
+  it('refuses a landscape video for a vertical category before it goes up', () => {
+    expect(measuredVideoRefusal('feed_video', { ms: 20_000, width: 1920, height: 1080 })).toBe(
+      '« Feed · Vidéo short » : la vidéo doit être verticale',
+    );
+    expect(measuredVideoRefusal('feed_video', { ms: 20_000, width: 1080, height: 1920 })).toBeNull();
+    expect(measuredVideoRefusal('feed_shoot', { ms: 20_000, width: 1920, height: 1080 })).toBeNull();
+  });
+
+  it('leaves to the server a video her phone could not measure', () => {
+    expect(measuredVideoRefusal('feed_video', { ms: 20_000, width: null, height: null })).toBeNull();
+    expect(measuredVideoRefusal('feed_video', { ms: null, width: 1920, height: 1080 })).toBeNull();
+  });
+});
 
 describe('Contenu: the rules of her screen (CR-06 d)', () => {
   it('reads a file’s type from her browser, or from its extension when the browser gives none', () => {

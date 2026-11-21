@@ -87,6 +87,7 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
     expect(screen.getByText('/start ABCDEFGH23')).toBeTruthy();
     expect(screen.getByText(/Valable jusqu’à/u)).toBeTruthy();
     expect(screen.getByText('En attente du bot…')).toBeTruthy();
+    expect(screen.getByText(/se met à jour, jusqu’à une minute après/u)).toBeTruthy();
 
     vi.mocked(fetchPrivateLink).mockResolvedValue(LINKED);
     comeBack();

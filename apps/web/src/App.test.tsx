@@ -544,6 +544,8 @@ describe('App on the screens of a contractor’s file', () => {
     await vi.waitFor(() => {
       expect(window.location.pathname).toBe('/commissions/factures');
     });
+    // His own page at another address: nothing says it is not his (recette MED-10).
+    expect(screen.queryByText('Cette page n’est pas dans ton espace.')).toBeNull();
   });
 
   it('gives a manager his own invoices in Moi, and keeps a member’s file to the owner', async () => {

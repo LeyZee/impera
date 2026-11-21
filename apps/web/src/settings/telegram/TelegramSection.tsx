@@ -130,6 +130,8 @@ export function TelegramSection({
   /** Route saves run one after the other, each with the version the previous one returned. */
   const saving = useRef<Promise<void>>(Promise.resolve());
   const version = useRef(0);
+  /** Route saves not answered yet: the coverage is read again after the last one only, not between two. */
+  const pendingSaves = useRef(0);
 
   const refresh = useCallback(async (): Promise<void> => {
     latest.current += 1;
@@ -179,11 +181,15 @@ export function TelegramSection({
           ? { kind: 'ready', overview: { ...current.overview, routes: next } }
           : current,
       );
+      pendingSaves.current += 1;
       saving.current = saving.current.then(async () => {
         try {
           const result = await saveRoutes(version.current, next);
           if (result.ok) {
             version.current = result.value.version;
+            pendingSaves.current -= 1;
+            // The strip's coverage (who is told of an urgent alert) is the server's: read it again (recette MED-03).
+            if (pendingSaves.current === 0) await refresh();
             return;
           }
           setNotice(
@@ -194,6 +200,7 @@ export function TelegramSection({
         } catch {
           setNotice(`Le choix n’a pas été enregistré. ${OFFLINE}`);
         }
+        pendingSaves.current -= 1;
         await refresh();
       });
     },
@@ -257,21 +264,28 @@ export function TelegramSection({
 
   // No bot yet: no strip and no table of empty rows (recette du 29/10), but the tabs stay, so that an address shared
   // (« va dans Telegram › Privé ») lands where it says; each tab says its own empty state, with the page's one action
-  // (recette visuelle 16/11, GES-15).
-  if (overview.bots.length === 0) {
-    const empty = EMPTY_TAB[tab];
-    return (
-      <section className="tg-page">
-        {lede}
-        <TabBar tab={tab} onTab={setTab} />
-        <div
-          className="tg-panel"
-          role="tabpanel"
-          id={`tg-panel-${tab}`}
-          aria-labelledby={`tg-tab-${tab}`}
-          key={tab}
-        >
-          {/* The page's one action, so its neon (the empty state's button is soft elsewhere). */}
+  // (recette visuelle 16/11, GES-15). One tree for both, so that the sheet adding the first bot is not remounted, and
+  // so not sent back to its first step, when the bot arrives (recette MED-02).
+  const isEmpty = overview.bots.length === 0;
+  const empty = EMPTY_TAB[tab];
+
+  return (
+    <section className="tg-page">
+      {lede}
+
+      {isEmpty ? null : <HealthStrip overview={overview} onFix={setTab} />}
+
+      <TabBar tab={tab} onTab={setTab} />
+
+      <div
+        className="tg-panel"
+        role="tabpanel"
+        id={`tg-panel-${tab}`}
+        aria-labelledby={`tg-tab-${tab}`}
+        key={tab}
+      >
+        {isEmpty ? (
+          // The page's one action, so its neon (the empty state's button is soft elsewhere).
           <Empty
             plate
             icon={<TelegramGlyph />}
@@ -284,28 +298,7 @@ export function TelegramSection({
           >
             {empty.text}
           </Empty>
-        </div>
-        {sheetView}
-      </section>
-    );
-  }
-
-  return (
-    <section className="tg-page">
-      {lede}
-
-      <HealthStrip overview={overview} onFix={setTab} />
-
-      <TabBar tab={tab} onTab={setTab} />
-
-      <div
-        className="tg-panel"
-        role="tabpanel"
-        id={`tg-panel-${tab}`}
-        aria-labelledby={`tg-tab-${tab}`}
-        key={tab}
-      >
-        {tab === 'alerts' ? (
+        ) : tab === 'alerts' ? (
           <AlertsTab
             overview={overview}
             choices={choices}
@@ -358,7 +351,7 @@ export function TelegramSection({
         )}
       </div>
 
-      {notice === null ? null : (
+      {isEmpty || notice === null ? null : (
         <p className="tg-notice" role="alert">
           {notice}
         </p>

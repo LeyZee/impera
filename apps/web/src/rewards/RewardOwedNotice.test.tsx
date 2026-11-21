@@ -55,7 +55,7 @@ describe('RewardOwedNotice', () => {
   });
 
   it('counts several gains', async () => {
-    renderAt('/commissions/factures', owing(2));
+    renderAt('/suivi', owing(2));
     expect(await screen.findByText('2 trophées à découvrir.')).toBeTruthy();
   });
 
@@ -63,6 +63,8 @@ describe('RewardOwedNotice', () => {
     for (const [pathname, trophyCase, user] of [
       ['/aujourdhui', owing(1), THEO_ME],
       ['/commissions', owing(1), THEO_ME],
+      // Its invoices are accepted from a button the pill would cover on a phone (recette MED-09).
+      ['/commissions/factures', owing(1), THEO_ME],
       ['/moi/trophees', owing(1), THEO_ME],
       ['/suivi', owing(0), THEO_ME],
       ['/suivi', owing(1), OWNER],
