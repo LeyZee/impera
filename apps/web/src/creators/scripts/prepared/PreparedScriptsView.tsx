@@ -106,6 +106,7 @@ export function PreparedScriptsView({
           initial={editing}
           media={media}
           folders={folders}
+          others={scripts.data ?? []}
           onSaved={remember}
           onReload={() => {
             void scripts.refetch().then((read) => {
