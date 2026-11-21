@@ -34,6 +34,14 @@ ADR 0080, ADR 0057, ADR 0055, ADR 0020, `docs/architecture/connectors.md`, READM
 - [ ] Valider, Réécrire (avec conseil), Changer de média, Changer de lien (ce post seulement, légende réécrite pour son endroit), Corriger, Ne pas publier.
 - [ ] Demande de dépôt automatique quand le pool baisse ; pool vide = ambre.
 - [ ] Journal et vues à 48 h (des nombres seulement).
+### Lot A4 : la semaine planifiée et revue à deux (ADR 0162, « ok décision Telegram » 21/11/2026 13 h 52)
+- [x] ADR 0162 acceptée (fenêtres, semaine du samedi 18 h, revue Charles et créatrice, remplaçant, rafraîchissement la veille, note d'engagement, repost, stories en un geste, kit du bot, « Ma journée »).
+- [ ] T1 serveur : contrats (fenêtres, posts planifiés), migration des posts du canal, planification de la semaine, heures tirées, rafraîchissement de la veille, envoi réel (`FakeTelegramChannel`), aperçu au groupe Info, gestes de la revue, remplaçant, note d'engagement (réactions + clics), repost, bloc du canal pour l'agent de chatting. Remplace le lot A3 ci-dessus.
+- [ ] T2 écran « Ma semaine à valider » (maquette du 21/11 à valider par Charles) et lignes de « Ma journée » ; captures Nuit/Jour, PC/téléphone.
+- [ ] T3 kit de démarrage du bot (BotFather, jeton, « Ajouter à mon canal », vérifications).
+- [ ] T4 recherche hebdomadaire sur ses passions ; stories en un geste.
+- Branche : claude/project-thread-0a2tnc.
+
 ### Lot B
 - [ ] Vidéo publique Reveal reprise sur le canal (après les captures et CR-08).
 
