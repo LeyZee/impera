@@ -508,7 +508,6 @@ export function CreatorsPage({
   );
 }
 
-/** Her switch on her sheet, from her card of the list (`GET /v1/dashboard/creators`): nothing until it is read. */
 /** The views of the tab on screen; with `readyOf`, « À copier » carries the count of her scripts ready to copy. */
 function ViewsSelector({
   label,
@@ -563,6 +562,7 @@ function ScriptsViewsSelector({
   );
 }
 
+/** Her switch on her sheet, from her card of the list (`GET /v1/dashboard/creators`): nothing until it is read. */
 function CreatorAgentSwitch({
   creator,
   user,
