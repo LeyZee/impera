@@ -40,6 +40,7 @@
     "ops:reencrypt-sessions": "pnpm --filter @impera/api ops:reencrypt-sessions",
     "ops:reencrypt-credentials": "pnpm --filter @impera/api ops:reencrypt-credentials",
     "ops:check-keys": "pnpm --filter @impera/api ops:check-keys",
+    "card:first-pass-cost": "pnpm --filter @impera/api card:first-pass-cost",
     "evals": "pnpm --filter @impera/evals run evals",
     "clean": "turbo run clean && rm -rf node_modules/.cache .turbo",
     "probe": "pnpm --filter @impera/evals run probe",

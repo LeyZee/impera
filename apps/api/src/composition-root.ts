@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { cardRereadHasRoom, JOB_PAYLOADS } from '@impera/contracts';
 import { createDbClient, withAdmin, type Database, type DbClient } from '@impera/db';
 import { createPersistentCallLog, DEFAULT_LLM_CONFIG, type LlmCallStore, type LlmGateway } from '@impera/llm';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -506,6 +506,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
       allCreatorIds: persona.allCreatorIds,
       askRead: (ask) => connectors.module.askConversationRead(ask),
     },
+    cardRereadRoom: () => cardRereadHasRoom(llm.gateway.health().budget),
   });
   const backups = wireBackups(shared);
   const audit = wireAudit(shared);

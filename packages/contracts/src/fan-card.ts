@@ -349,6 +349,36 @@ export const FAN_CARD_VALUE_UNPROCESSABLE = 'fan_card_value_unprocessable';
  */
 export const FAN_CARD_READ = { silenceMinutes: 5, burst: 10, spacingMinutes: 10 } as const;
 
+/**
+ * What one read gets (ADR 0085 § 7, amendement du 21/11): at most `window` messages, his oldest not read first, with
+ * up to `context` messages before them so the AI tells who says what. What is left is read by the next read, chained
+ * at once, until the whole conversation is read.
+ */
+export const FAN_CARD_READ_BATCH = { window: 40, context: 8 } as const;
+
+/**
+ * The weekly re-read (ADR 0085 § 7, amendement du 21/11): each conversation where he wrote in the last `activeDays`
+ * read again from its start, in batches, every week. It spends only while the day's AI spend is below
+ * `maxShareOfCap` of the day's cap (the alert is at 80 %), so a fan's answer never waits for it; out of room, a
+ * conversation tries again `retryMinutes` later, and gives up `giveUpDays` after the pass began. Conversations are
+ * spaced `spacingSeconds` apart.
+ */
+export const FAN_CARD_REREAD = {
+  activeDays: 7,
+  maxShareOfCap: 0.6,
+  retryMinutes: 60,
+  giveUpDays: 6,
+  spacingSeconds: 20,
+} as const;
+
+/**
+ * Whether the day's AI spend leaves room for the weekly re-read: below `maxShareOfCap` of the cap, so the alert (and a
+ * fan's answer) is never reached by it.
+ */
+export function cardRereadHasRoom(budget: { readonly spentEur: number; readonly capEur: number }): boolean {
+  return budget.spentEur < budget.capEur * FAN_CARD_REREAD.maxShareOfCap;
+}
+
 const MINUTE_MS = 60_000;
 
 /**

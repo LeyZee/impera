@@ -20,7 +20,8 @@ import type { Routes, Shared, TasksNamed, TasksOf } from './shared';
 export interface WiredConversations {
   readonly module: ConversationsModule;
   /** `fans.read_card` too: the conversation holds his messages and how far they were read (ADR 0085 § 7). */
-  readonly tasks: TasksOf<'conversation'> & TasksNamed<'fans.read_card'>;
+  readonly tasks: TasksOf<'conversation'> &
+    TasksNamed<'fans.read_card' | 'fans.reread_cards' | 'fans.reread_card'>;
   readonly routes: readonly Routes[];
 }
 
@@ -37,6 +38,8 @@ export function wireConversations(
     readonly customOrders: CustomOrdersModule;
     /** The copilot panel's doors (ADR 0086): the person an extension link names, every creator for the owner. */
     readonly copilot: NonNullable<ConversationsDeps['copilot']>;
+    /** The day's room for the weekly re-read of the fan cards (ADR 0085 § 7, amendement du 21/11). */
+    readonly cardRereadRoom: NonNullable<ConversationsDeps['cardRereadRoom']>;
   },
 ): WiredConversations {
   const { db, adminDb, logger, requireRole, recentLogin } = shared;
@@ -52,6 +55,7 @@ export function wireConversations(
     guard: agent.guard,
     composer: agent.composer,
     cardReader: agent.cardReader,
+    cardRereadRoom: deps.cardRereadRoom,
     ...(agent.followUps !== undefined && { followUps: agent.followUps }),
     typing: {
       delaysMs: bubbleDelays,
@@ -114,6 +118,18 @@ export function wireConversations(
         JOB_PAYLOADS['fans.read_card'],
         logger,
         (payload, context) => module.jobs.readCard(payload, context.logger),
+      ),
+      'fans.reread_cards': defineTask(
+        'fans.reread_cards',
+        JOB_PAYLOADS['fans.reread_cards'],
+        logger,
+        (payload, context) => module.jobs.rereadCards(payload, context.logger),
+      ),
+      'fans.reread_card': defineTask(
+        'fans.reread_card',
+        JOB_PAYLOADS['fans.reread_card'],
+        logger,
+        (payload, context) => module.jobs.rereadCard(payload, context.logger),
       ),
       'conversation.reopen': defineTask(
         'conversation.reopen',

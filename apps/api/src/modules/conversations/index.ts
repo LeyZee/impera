@@ -10,6 +10,7 @@ import { createReadCardJob } from './application/jobs/read-card';
 import { createRecordFactsJob } from './application/jobs/record-facts';
 import { createReleaseUnavailableJob } from './application/jobs/release-unavailable';
 import { createReopenJob } from './application/jobs/reopen';
+import { createRereadCardJob, createRereadCardsJob } from './application/jobs/reread-card';
 import { createRespondJob } from './application/jobs/respond';
 import { createSendJob } from './application/jobs/send';
 import { createConversationReads, type ConversationReads } from './application/reads';
@@ -17,6 +18,7 @@ import type {
   AlertNames,
   BubbleGuard,
   CardReader,
+  CardRereadRoom,
   Clock,
   DraftComposer,
   DraftVoice,
@@ -30,6 +32,7 @@ import type {
 } from './domain/ports';
 import { createDrizzleAlertHistory } from './infra/db/alert-history';
 import { createDrizzleAwayHolds } from './infra/db/away-holds';
+import { createDrizzleCardRereadScan } from './infra/db/card-reread-scan';
 import { createDrizzleCopilotReader } from './infra/db/copilot-reader';
 import { createDrizzleCreatorSpaceReader } from './infra/db/creator-reader';
 import { createDrizzleConversationReader } from './infra/db/reader';
@@ -40,6 +43,7 @@ import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
+export { cardReadBatches, type CardReadRow } from './domain/card-read-window';
 export type {
   BubbleGuard,
   CardReader,
@@ -92,6 +96,10 @@ export interface ConversationsModule extends ConversationCommands {
     recordFacts(payload: JobPayload<'conversation.record_facts'>, logger: JobLogger): Promise<void>;
     /** `fans.read_card` (ADR 0085 § 7): his new messages read for his card, whoever answers him. */
     readCard(payload: JobPayload<'fans.read_card'>, logger: JobLogger): Promise<void>;
+    /** `fans.reread_cards`, each week (amendement du 21/11): the active conversations' re-read enqueued. */
+    rereadCards(payload: JobPayload<'fans.reread_cards'>, logger: JobLogger): Promise<void>;
+    /** `fans.reread_card`: a batch of one conversation's weekly re-read, within the day's room. */
+    rereadCard(payload: JobPayload<'fans.reread_card'>, logger: JobLogger): Promise<void>;
     followUp(payload: JobPayload<'conversation.follow_up'>, logger: JobLogger): Promise<void>;
     /** `conversation.after_sale` (ADR 0156 § 2): a step he bought or a tip wakes his conversation for her word after it. */
     afterSale(payload: JobPayload<'conversation.after_sale'>, logger: JobLogger): Promise<void>;
@@ -120,6 +128,11 @@ export interface ConversationsDeps {
   readonly composer?: DraftComposer;
   /** His card read in his messages (ADR 0085 § 7, agent module's adapter); without it, the card waits for a chatter. */
   readonly cardReader?: CardReader;
+  /**
+   * Whether the day's AI spend leaves room for the weekly re-read of the cards (amendement du 21/11); without it,
+   * the re-read never spends.
+   */
+  readonly cardRereadRoom?: CardRereadRoom;
   /** Her follow-up delays (P3-10, agent module's adapter); without it, no follow-up is scheduled. */
   readonly followUps?: FollowUpPlan;
   /** Her typing rhythm between bubbles (agent module's adapter); without it, her bubbles leave one after the other. */
@@ -220,6 +233,20 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
               return Promise.resolve();
             }
           : createReadCardJob({ uow, clock, fans: deps.fans, reader: deps.cardReader }),
+      rereadCards: createRereadCardsJob({ uow, clock, scan: createDrizzleCardRereadScan(deps.adminDb) }),
+      rereadCard:
+        deps.cardReader === undefined
+          ? (_payload, logger) => {
+              logger.info({}, 'reread_card: no reader');
+              return Promise.resolve();
+            }
+          : createRereadCardJob({
+              uow,
+              clock,
+              fans: deps.fans,
+              reader: deps.cardReader,
+              room: deps.cardRereadRoom ?? (() => false),
+            }),
       followUp: createFollowUpJob({
         uow,
         clock,

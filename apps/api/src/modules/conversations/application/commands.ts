@@ -315,21 +315,21 @@ export function createConversationCommands({
         // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
         const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
         if (isInbound) {
-          // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
+          // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off. Caught up
+          // or not: history read once is what the card is made of (amendement du 21/11); reading answers no one.
           const pace = await tx.cardReads.pace(conversation.id);
-          if (isFresh)
-            await tx.jobs.enqueue(
-              'fans.read_card',
-              {
-                creatorId: input.creatorId,
-                conversationId: conversation.id,
-                correlationId: input.correlationId,
-              },
-              {
-                jobKey: jobKeyFor('fans.read_card', conversation.id),
-                runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
-              },
-            );
+          await tx.jobs.enqueue(
+            'fans.read_card',
+            {
+              creatorId: input.creatorId,
+              conversationId: conversation.id,
+              correlationId: input.correlationId,
+            },
+            {
+              jobKey: jobKeyFor('fans.read_card', conversation.id),
+              runAt: cardReadRunAt({ now: at, unread: pace.unread, lastReadAt: pace.lastReadAt }),
+            },
+          );
           conversation = await expireOpenDrafts(tx, conversation, NEW_FAN_MESSAGE, {
             ...meta,
             actor: 'system',

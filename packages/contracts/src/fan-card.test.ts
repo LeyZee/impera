@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  cardRereadHasRoom,
   cardReadRunAt,
   FAN_CARD_FIELDS,
   FanCardReadSchema,
@@ -91,5 +92,14 @@ describe('when the AI reads his messages again (ADR 0085 § 7)', () => {
     const unknown = { facts: [{ ...read.facts[0], field: 'religion' }] };
     expect(FanCardReadSchema.safeParse(unknown).success).toBe(false);
     expect(FanCardReadSchema.safeParse({ ...read, note: 'x' }).success).toBe(false);
+  });
+});
+
+describe('the weekly re-read spends only the day’s room (ADR 0085 § 7, amendement du 21/11)', () => {
+  it('stops well before the alert, so a fan’s answer never waits for it', () => {
+    expect(cardRereadHasRoom({ spentEur: 0, capEur: 25 })).toBe(true);
+    expect(cardRereadHasRoom({ spentEur: 14.9, capEur: 25 })).toBe(true);
+    expect(cardRereadHasRoom({ spentEur: 15, capEur: 25 })).toBe(false);
+    expect(cardRereadHasRoom({ spentEur: 20, capEur: 25 })).toBe(false);
   });
 });
