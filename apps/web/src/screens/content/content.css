@@ -147,6 +147,10 @@
   gap: var(--nv-space-2);
   margin-top: var(--nv-space-1);
 }
+/* A bare button's text on the card's edge, as its other lines (Design, 21/11). */
+.ct-card__actions > .nv-btn--plain:first-child {
+  margin-left: calc(-1 * var(--nv-space-4));
+}
 .ct-card__ask {
   font-size: var(--nv-text-footnote);
   font-weight: 600;
@@ -286,6 +290,18 @@
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
   text-align: right;
+}
+.ct-file__what {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ct-file__why {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
 }
 .ct-file__line--warn {
   color: var(--nv-warning);

@@ -823,8 +823,20 @@ function FileLine({
   return (
     <li className="ct-file">
       <div className="ct-file__row">
-        <span className="ct-file__name">{label}</span>
-        <span className={warn ? 'ct-file__line ct-file__line--warn' : 'ct-file__line nv-num'}>{line}</span>
+        {onReplace === undefined ? (
+          <>
+            <span className="ct-file__name">{label}</span>
+            <span className={warn ? 'ct-file__line ct-file__line--warn' : 'ct-file__line nv-num'}>
+              {line}
+            </span>
+          </>
+        ) : (
+          // To replace: its name, the reason under it, « Remplacer » alone on the right (Design, 21/11).
+          <span className="ct-file__what">
+            <span className="ct-file__name">{label}</span>
+            <span className="ct-file__why">{line}</span>
+          </span>
+        )}
         {stalled ? (
           <button
             type="button"
