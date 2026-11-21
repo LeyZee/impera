@@ -2,6 +2,7 @@ import type {
   CreatorId,
   DetectedLink,
   LinkPlacement,
+  LinkRef,
   LinkServiceRefusalKind,
   RedirectLinkId,
   UserId,
@@ -48,6 +49,17 @@ export interface RedirectLinkStore {
     creatorId: CreatorId,
     id: RedirectLinkId,
     write: RedirectLinkWrite,
+  ): Promise<StoredRedirectLink>;
+  /**
+   * Attaches a link of hers to its link at the redirect service, by the owner alone, under his own policy and in
+   * her creator, with its line in the audit log. `ref` is what the server just read at the service for this link's
+   * address. Refused when that link of the service is already attached to another link, hers or not.
+   */
+  attach(
+    actor: RedirectLinkActor,
+    creatorId: CreatorId,
+    id: RedirectLinkId,
+    ref: LinkRef,
   ): Promise<StoredRedirectLink>;
 }
 

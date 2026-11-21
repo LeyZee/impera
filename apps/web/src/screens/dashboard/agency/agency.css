@@ -136,36 +136,6 @@
   margin-top: auto;
   padding-top: 6px;
 }
-.ins-spark {
-  --_c: var(--nv-trend-up);
-  display: block;
-  width: 100%;
-  height: 28px;
-  overflow: visible;
-  clip-path: inset(-2px 100% -2px -2px);
-  animation: ins-draw var(--nv-dur-progress) var(--nv-ease-out) 260ms forwards;
-}
-.ins-spark--down {
-  --_c: var(--nv-trend-down);
-}
-.ins-spark__line {
-  fill: none;
-  stroke: var(--_c);
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.ins-spark__area {
-  stroke: none;
-}
-.ins-spark__fill-top {
-  stop-color: var(--_c);
-  stop-opacity: 0.12;
-}
-.ins-spark__fill-bottom {
-  stop-color: var(--_c);
-  stop-opacity: 0;
-}
 .ins-curve__hits {
   position: absolute;
   inset: -8px 0;
@@ -197,7 +167,7 @@
   grid-column: 1 / -1;
 }
 /* The net's small curve under its sentence, the tile's width, low: it fills the tile's foot and never rivals the lead's. */
-.ins-figures > .ins-tiles > .ins-tile:first-child .ins-spark {
+.ins-figures > .ins-tiles > .ins-tile:first-child .nv-spark {
   height: 52px;
 }
 /* A third has no room for a long amount and its change side by side: always under it, the three tiles alike. */
@@ -421,31 +391,6 @@
   color: var(--nv-warning);
 }
 
-/* ── Keys of a legend: a small round swatch in the series colour, the text in ink. */
-.ins-key {
-  flex: none;
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: var(--nv-radius-full);
-  background: var(--_c);
-}
-.ins-keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0 0 14px;
-  padding: 0;
-  list-style: none;
-  font-size: var(--nv-text-footnote);
-  color: var(--nv-ink-muted);
-}
-.ins-keys li {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
 /* ── Daily revenue: stacked columns from one baseline, a recessive grid. */
 .ins-daily {
   padding: var(--nv-plate-pad);
@@ -584,7 +529,7 @@
   justify-content: flex-end;
 }
 
-/* ── Two rings side by side. */
+/* ── Two rings side by side: the ring, its legend and their lighting are the design system's (`nv-donut`). */
 .ins-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -603,162 +548,6 @@
   justify-content: space-between;
   gap: 12px;
   margin: 0;
-}
-.ins-ring-row {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-.ins-ring {
-  position: relative;
-  flex: none;
-  width: 148px;
-  height: 148px;
-}
-.ins-ring svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  transform: rotate(-90deg);
-}
-.ins-ring__track,
-.ins-ring__arc {
-  fill: none;
-  stroke-width: 14;
-}
-.ins-ring__track {
-  stroke: var(--nv-fill-track);
-}
-.ins-ring__arc {
-  stroke: var(--_c);
-  stroke-dasharray: 0 999;
-  cursor: pointer;
-  transform-box: view-box;
-  transform-origin: 66px 66px;
-  animation: ins-ring var(--nv-dur-data) var(--nv-ease-out) both;
-  animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
-  transition:
-    stroke-width var(--nv-dur-base) var(--nv-ease-spring),
-    transform var(--nv-dur-base) var(--nv-ease-spring),
-    opacity var(--nv-dur-fast),
-    filter var(--nv-dur-base);
-}
-@keyframes ins-ring {
-  to {
-    stroke-dasharray: var(--_dash);
-  }
-}
-.ins-ring.is-lit .ins-ring__arc {
-  opacity: 0.35;
-}
-.ins-ring.is-lit .ins-ring__arc.is-on {
-  opacity: 1;
-  stroke-width: 20;
-  /* The slice comes out of the ring, a little bigger and lit with its own colour (recette du 07/11). */
-  transform: scale(1.08);
-  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
-}
-.ins-ring__middle {
-  position: absolute;
-  inset: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  pointer-events: none;
-}
-.ins-ring__value {
-  font-size: 22px;
-  line-height: 1.1;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: var(--nv-ink);
-}
-/* « 1 234,56 € » keeps its cents inside the ring: a long total takes a smaller size (ADM-05). */
-.ins-ring__value.is-long {
-  font-size: var(--nv-text-headline);
-}
-.ins-ring__sub {
-  margin-top: 2px;
-  font-size: var(--nv-text-caption);
-  line-height: 1.15;
-  color: var(--nv-ink-faint);
-}
-.ins-legend {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.ins-legend__row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto 52px;
-  grid-template-areas: 'key label value share delta';
-  column-gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: var(--nv-radius-xs);
-  background: transparent;
-  font: inherit;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background var(--nv-dur-fast),
-    color var(--nv-dur-fast);
-}
-.ins-legend__row > .ins-key {
-  grid-area: key;
-  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-.ins-legend__row > .nv-delta {
-  grid-area: delta;
-  justify-self: end;
-  height: 18px;
-}
-.ins-legend__row:hover,
-.ins-legend__row.is-on {
-  background: var(--nv-select);
-  color: var(--nv-ink);
-}
-.ins-legend__row.is-on > .ins-key {
-  transform: scale(1.35);
-}
-.ins-legend__row:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: 1px;
-}
-.ins-legend__label {
-  grid-area: label;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ins-legend__value {
-  grid-area: value;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--nv-ink);
-  white-space: nowrap;
-}
-.ins-legend__share {
-  grid-area: share;
-  min-width: 38px;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--nv-ink-faint);
 }
 
 /* ── Who sold: a ranking, bars from the same start, a single hue (magnitude, not identity). */
@@ -835,8 +624,7 @@
   background: var(--nv-fill-track);
 }
 .ins-rank__bar,
-.ins-creator__bar,
-.ins-meter {
+.ins-creator__bar {
   position: relative;
   display: block;
   height: 8px;
@@ -866,8 +654,7 @@
   --_c: var(--nv-series-other);
 }
 .ins-rank__bar > span,
-.ins-creator__bar > span,
-.ins-meter > span {
+.ins-creator__bar > span {
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--_w);
@@ -1087,13 +874,13 @@
   font-weight: 680;
   font-variant-numeric: tabular-nums;
 }
-.ins-meter {
+.ins-fans .nv-meter {
   height: 12px;
 }
-.ins-fans .ins-meter > span {
+.ins-fans .nv-meter > span {
   background: var(--nv-heat);
 }
-.ins-fans[data-pending] .ins-meter > span {
+.ins-fans[data-pending] .nv-meter > span {
   background: var(--nv-ink-faint);
 }
 .ins-fans__hint {
@@ -1437,10 +1224,6 @@
   .ins-period {
     width: 100%;
   }
-  /* A legend row is a target too: 44px to the finger (ADM-22). */
-  .ins-legend__row {
-    min-height: 44px;
-  }
   .ins-period .nv-seg__opt {
     flex: 1 1 0;
     min-width: 0;
@@ -1479,13 +1262,6 @@
   }
   .ins-daily__grid {
     left: 40px;
-  }
-  .ins-ring-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .ins-ring {
-    align-self: center;
   }
   .ins-rank {
     display: flex;
@@ -1570,29 +1346,20 @@
 @media (prefers-reduced-motion: reduce) {
   .ins-curve__plot svg,
   .ins-subs__plot svg,
-  .ins-spark,
   .ins-col__part,
-  .ins-ring__arc,
   .ins-rank__bar > span,
-  .ins-creator__bar > span,
-  .ins-meter > span {
+  .ins-creator__bar > span {
     animation: none;
   }
   /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
   .ins-curve__plot svg,
-  .ins-subs__plot svg,
-  .ins-spark {
+  .ins-subs__plot svg {
     clip-path: none;
   }
-  .ins-ring__arc {
-    stroke-dasharray: var(--_dash);
-  }
   /* Without motion the lit slice and column still stand out, at once, without growing. */
-  .ins-ring__arc,
   .ins-col__stack {
     transition: none;
   }
-  .ins-ring.is-lit .ins-ring__arc.is-on,
   .ins-col:hover .ins-col__stack,
   .ins-col:focus .ins-col__stack {
     transform: none;
@@ -1776,16 +1543,16 @@
   position: relative;
   display: block;
 }
-.ins-goal .ins-meter {
+.ins-goal .nv-meter {
   height: 8px;
 }
-.ins-goal[data-lead] .ins-meter {
+.ins-goal[data-lead] .nv-meter {
   height: 14px;
 }
-.ins-goal .ins-meter > span {
+.ins-goal .nv-meter > span {
   background: var(--nv-trend-up);
 }
-.ins-goal:has(.ins-goal__verdict[data-tone='down']) .ins-meter > span {
+.ins-goal:has(.ins-goal__verdict[data-tone='down']) .nv-meter > span {
   background: var(--nv-trend-down);
 }
 .ins-goal__pace {

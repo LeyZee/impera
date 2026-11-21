@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FanInsights, FanInsightsWaitLine } from './FanInsights';
 import { DEMO_INSIGHTS } from './insights-fixture';
-import { arcsOf, heatOf, shareText, slotLabel, waitingLines } from './insights-view';
+import { heatOf, shareText, slotLabel, waitingLines } from './insights-view';
 
 function serve(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -174,16 +174,6 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
 });
 
 describe('the geometry', () => {
-  it('cuts the ring in arcs that follow each other', () => {
-    const arcs = arcsOf([50, 50], 10, 0);
-    const half = Math.round(Math.PI * 10 * 100) / 100;
-    expect(arcs[0]?.offset).toBe(0);
-    expect(arcs[1]?.offset).toBe(-half);
-    expect(arcsOf([100], 10)[0]?.dash.startsWith(String(Math.round(2 * Math.PI * 10 * 100) / 100))).toBe(
-      true,
-    );
-  });
-
   it('says what each waiting block counts: facts told, fans in all, fans who wrote', () => {
     expect(waitingLines([])).toEqual([]);
     expect(waitingLines(['job'])).toEqual([

@@ -1,3 +1,4 @@
+import { LinkRefSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { LinkServiceError } from '../../../domain/link-service';
@@ -200,5 +201,110 @@ describe('the redirect service read over HTTPS', () => {
       expect(text).not.toContain(KEY);
     }
     expect(errors[0]?.kind).toBe('unavailable');
+  });
+
+  describe('the hours of a link', () => {
+    const ref = LinkRefSchema.parse(`lnk_${'0'.repeat(23)}1`);
+    const range = { from: new Date('2026-11-16T12:00:00Z'), to: new Date('2026-11-16T15:00:00Z') };
+    const series = (data: readonly unknown[]) => json({ object: 'list', data, has_more: false });
+
+    it('reads views then clicks by the hour in UTC, and keeps the hours of the range that have something', async () => {
+      const { service, calls } = reader([
+        series([
+          { bucket: '2026-11-16T11:00:00Z', pageviews: 9, clicks: 9 },
+          { bucket: '2026-11-16T12:00:00Z', pageviews: 4, clicks: 4 },
+          { bucket: '2026-11-16T13:00:00Z', pageviews: 0, clicks: 0 },
+          { bucket: '2026-11-16T14:00:00.000Z', pageviews: 2, clicks: 2 },
+          { bucket: '2026-11-16T15:00:00Z', pageviews: 7, clicks: 7 },
+        ]),
+        series([
+          { bucket: '2026-11-16T12:00:00Z', button_clicks: 1 },
+          { bucket: '2026-11-16T13:00:00Z', button_clicks: 0 },
+          { bucket: '2026-11-16T14:00:00Z', button_clicks: 2 },
+        ]),
+      ]);
+      expect(await service.readHours(ref, range)).toEqual([
+        { hour: '2026-11-16T12:00:00.000Z', pageviews: 4, clicks: 1 },
+        { hour: '2026-11-16T14:00:00.000Z', pageviews: 2, clicks: 2 },
+      ]);
+      expect(calls.map((call) => call.url.pathname)).toEqual([
+        '/v3/analytics/time-series',
+        '/v3/analytics/time-series',
+      ]);
+      expect(calls.map((call) => call.url.searchParams.get('metric'))).toEqual([
+        'pageviews',
+        'button_clicks',
+      ]);
+      for (const call of calls) {
+        expect(call.url.searchParams.get('link_id')).toBe(ref);
+        expect(call.url.searchParams.get('interval')).toBe('hour');
+        expect(call.url.searchParams.get('timezone')).toBe('UTC');
+        expect(call.url.searchParams.get('timeframe')).toBe('48h');
+      }
+    });
+
+    it('counts the robots of each hour, and nothing else of what the service flags', async () => {
+      const flagged = (hour: string, bot: number) => ({
+        bucket: `2026-11-16T${hour}:00:00.000Z`,
+        total: 40,
+        blocked: 0,
+        clean: 40,
+        breakdown: { vpn: 5, datacenter: 3, bot },
+      });
+      const { service, calls } = reader([
+        series([flagged('11', 6), flagged('12', 2), flagged('13', 0), flagged('14', 1)]),
+      ]);
+      expect(await service.readRobotHours(ref, range)).toEqual([
+        { hour: '2026-11-16T12:00:00.000Z', robots: 2 },
+        { hour: '2026-11-16T14:00:00.000Z', robots: 1 },
+      ]);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.url.pathname).toBe('/v3/analytics/shield');
+      expect(calls[0]?.url.searchParams.get('interval')).toBe('hour');
+    });
+
+    it('never asks for the visitors nor for where they came from', async () => {
+      const { service, calls } = reader([series([]), series([]), series([])]);
+      await service.readHours(ref, range);
+      await service.readRobotHours(ref, range);
+      for (const call of calls) expect(call.url.pathname).not.toMatch(/visitor|referr|countr/u);
+    });
+
+    it('does not send a reference the service could not have given', async () => {
+      const { service, calls } = reader([]);
+      const forged = LinkRefSchema.parse('lnk_1&team_id=tm_2');
+      expect((await failure(service.readHours(forged, range))).kind).toBe('unexpected');
+      expect((await failure(service.readRobotHours(forged, range))).kind).toBe('unexpected');
+      expect(calls).toHaveLength(0);
+    });
+
+    it('refuses a series that is not by the hour, is paginated, too long or miscounted', async () => {
+      const odd = [
+        series([{ bucket: '2026-11-16T12:30:00Z', pageviews: 1 }]),
+        series([{ bucket: '2026-11-16T12:00:00+01:00', pageviews: 1 }]),
+        series([{ bucket: '2026-11-16T12:00:00Z', pageviews: -1 }]),
+        series([{ bucket: '2026-11-16T12:00:00Z', pageviews: 1.5 }]),
+        series(Array.from({ length: 73 }, () => ({ bucket: '2026-11-16T12:00:00Z', pageviews: 1 }))),
+        json({ object: 'list', data: [], has_more: true }),
+        json({ data: 'none', has_more: false }),
+      ];
+      for (const answer of odd) {
+        expect((await failure(reader([answer]).service.readHours(ref, range))).kind).toBe('unexpected');
+      }
+      const robots = reader([series([{ bucket: '2026-11-16T12:00:00Z', total: 3 }])]);
+      expect((await failure(robots.service.readRobotHours(ref, range))).kind).toBe('unexpected');
+    });
+
+    it('fails whole when the clicks do not come, and says a limit like the rest', async () => {
+      const limited = reader([
+        series([{ bucket: '2026-11-16T12:00:00Z', pageviews: 4 }]),
+        json({ code: 'rate_limited' }, { status: 429, headers: { 'retry-after': '30' } }),
+      ]);
+      const error = await failure(limited.service.readHours(ref, range));
+      expect(error.kind).toBe('rate_limited');
+      expect(error.retryAfterSeconds).toBe(30);
+      const missing = reader([json({ code: 'link_not_found' }, { status: 404 })]);
+      expect((await failure(missing.service.readRobotHours(ref, range))).kind).toBe('unexpected');
+    });
   });
 });
