@@ -204,13 +204,15 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
   it('forecasts next month with its verdict, its curve, by line of spend and by creator (ADR 0091 § 8)', async () => {
     serve();
     renderPage();
-    expect(await screen.findByText('Prévu en décembre')).toBeTruthy();
+    expect(await screen.findByText('L’IA en novembre')).toBeTruthy();
     expect(screen.getByText('Part de vos ventes')).toBeTruthy();
-    expect(screen.getByText(/de 258.€ à 393.€ selon les semaines/u)).toBeTruthy();
+    expect(screen.getByText('Prévu en décembre')).toBeTruthy();
+    expect(screen.getByText(/de 258.€ à 393.€ selon les semaines, 3,6.% des ventes/u)).toBeTruthy();
     expect(screen.getByText(/Tout va bien : 335.€ prévus en décembre, 3,6.% de vos ventes/u)).toBeTruthy();
-    expect(screen.getByText(/291.€ prévus d’ici la fin du mois/u)).toBeTruthy();
-    expect(screen.getByText(/de 9.300.€ de ventes prévues en décembre/u)).toBeTruthy();
-    expect(screen.getByRole('img', { name: /Par usage : Chatting Reveal/u })).toBeTruthy();
+    expect(screen.getByText(/dont 171.€ déjà dépensés/u)).toBeTruthy();
+    expect(screen.getByText(/de 7.820.€ de ventes prévues en novembre/u)).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Par usage, en décembre : Chatting Reveal 85.%/u })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Chatting Reveal/u })).toBeTruthy();
     expect(screen.getByText('Chatting Reveal')).toBeTruthy();
     expect(screen.getByText('Créatrice A')).toBeTruthy();
     expect(screen.queryByRole('note')).toBeNull();

@@ -6,12 +6,14 @@ import {
   type AiUsageDay,
 } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import { useState, type JSX } from 'react';
+import type { JSX } from 'react';
 
 import { ForecastChart, daysBetween, type CurveDay } from './ForecastChart';
 import { countText, eurText } from './view';
 
+import { OTHER, SERIES } from '@/screens/dashboard/agency/view';
 import { CountUp, type FloatingTip } from '@/screens/dashboard/parts';
+import { Donut, useLit } from '@/shell/figures/figures';
 
 /*
  * The forecast (ADR 0091 § 8): what the AI will cost this month and next, for the owner's cash flow. Every figure is
@@ -36,14 +38,17 @@ const LINE_NOTES: Readonly<Record<AiSpendLine, string>> = {
   other: 'les « Essai réel » des Réglages',
 };
 
-/** One colour a line of spend, the same in the bar, its key and its row. */
-const LINE_COLOURS: Readonly<Record<AiSpendLine, string>> = {
-  chatting: 'var(--nv-series-1)',
-  media: 'var(--nv-series-2)',
-  telegram: 'var(--nv-series-3)',
-  instagram: 'var(--nv-series-4)',
-  playground: 'var(--nv-data-2)',
-  other: 'var(--nv-series-other)',
+/**
+ * One colour a line of spend, the series of the rings above (Design, 21/11): the chatting takes the voice's, the
+ * media the eyes', the playground and the services' trials share the neutral one, as the tests do there.
+ */
+export const LINE_COLOURS: Readonly<Record<AiSpendLine, string>> = {
+  chatting: SERIES[0],
+  telegram: SERIES[1],
+  media: SERIES[2],
+  instagram: SERIES[3],
+  playground: OTHER,
+  other: OTHER,
 };
 
 /** Past this share of the sales, the verdict turns amber: more than one euro in five goes to the AI. */
@@ -123,7 +128,7 @@ export function verdictOf(
     text:
       sales === null
         ? `Tout va bien : ${amount} prévus en ${next}, bien sous le plafond de ${forecastEur(cap.capEur)} par jour.`
-        : `Tout va bien : ${amount} prévus en ${next}, ${shareText(sales.aiShare)} de vos ventes, bien sous le plafond.`,
+        : `Tout va bien : ${amount} prévus en ${next}, ${shareText(sales.aiShare)} de vos ventes, bien sous le plafond de ${forecastEur(cap.capEur)} par jour.`,
   };
 }
 
@@ -144,7 +149,7 @@ function Band({ range, end, label }: { range: AiForecastRange; end: number; labe
   );
 }
 
-/** By line of spend: one bar split by colour, then a row a line; a row under the pointer lights its part. */
+/** By line of spend: a donut and its legend; a row under the pointer, the finger or the keyboard lights its slice. */
 function Lines({
   forecast,
   next,
@@ -154,71 +159,94 @@ function Lines({
   next: string;
   tip: FloatingTip;
 }): JSX.Element {
-  const [lit, setLit] = useState<AiSpendLine | null>(null);
-  const total = forecast.lines.reduce((sum, l) => sum + l.nextMonth.realistic, 0);
+  const { lit, setLit, row } = useLit();
+  const lines = forecast.lines.filter((l) => l.nextMonth.realistic > 0);
+  const total = lines.reduce((sum, l) => sum + l.nextMonth.realistic, 0);
+  const share = (eur: number): string => shareText(total === 0 ? 0 : eur / total);
+  const litLine = lit === null ? undefined : lines[lit];
   return (
-    <div className="nv-plate cia-fc-list">
-      <h3 className="nv-h3">{`Par usage, en ${next}`}</h3>
-      {forecast.lines.length === 0 || total <= 0 ? (
-        <p className="ins-none">Aucun appel facturé.</p>
+    <article className="nv-plate ins-ring-card">
+      <h3 className="nv-h3 ins-card__title">
+        {`Par usage, en ${next}`}
+        {total > 0 ? <span className="ins-card__total">{forecastEur(total)}</span> : null}
+      </h3>
+      {total <= 0 ? (
+        <p className="ins-empty">Aucun appel facturé.</p>
       ) : (
-        <>
-          <div
-            className={`ins-money__bar cia-fc-bar${lit === null ? '' : ' is-lit'}`}
-            role="img"
-            aria-label={`Par usage : ${forecast.lines
-              .map((l) => `${LINE_LABELS[l.line]} ${forecastEur(l.nextMonth.realistic)}`)
-              .join(' ; ')}`}
+        <div className="nv-donut-row">
+          <Donut
+            label={`Par usage, en ${next} : ${lines.map((l) => `${LINE_LABELS[l.line]} ${share(l.nextMonth.realistic)}`).join(', ')}`}
+            slices={lines.map((l) => ({
+              key: l.line,
+              colour: LINE_COLOURS[l.line],
+              value: l.nextMonth.realistic,
+            }))}
+            lit={lit}
+            onLit={setLit}
           >
-            {forecast.lines.map((l) =>
-              l.nextMonth.realistic <= 0 ? null : (
-                <span
-                  key={l.line}
-                  className={`ins-money__part${lit === l.line ? ' is-on' : ''}`}
-                  style={{ flexGrow: l.nextMonth.realistic, background: LINE_COLOURS[l.line] }}
-                  {...tip.bind(
-                    {
-                      title: LINE_LABELS[l.line],
-                      rows: [
-                        [`En ${next}`, forecastEur(l.nextMonth.realistic)],
-                        ['Part', shareText(l.nextMonth.realistic / total)],
-                        ['Par jour', forecastEur(l.perDay.realistic)],
-                      ],
-                    },
-                    { above: true },
-                  )}
-                />
-              ),
+            {litLine === undefined ? (
+              <>
+                <b className="nv-donut__value">{forecastEur(total)}</b>
+                <span className="nv-donut__sub">{`en ${next}`}</span>
+              </>
+            ) : (
+              <>
+                <b className="nv-donut__value">{share(litLine.nextMonth.realistic)}</b>
+                <span className="nv-donut__sub">{LINE_LABELS[litLine.line]}</span>
+              </>
             )}
-          </div>
-          <ol className="cia-fc-rows">
-            {forecast.lines.map((l, i) => (
-              <li
-                key={l.line}
-                className="cia-fc-row cia-fc-row--keyed nv-enter"
-                style={{ '--nv-i': i, '--_c': LINE_COLOURS[l.line] }}
-                onPointerEnter={() => {
-                  setLit(l.line);
-                }}
-                onPointerLeave={() => {
-                  setLit(null);
-                }}
-              >
-                <span className="cia-fc-row__key" aria-hidden="true" />
-                <span className="cia-fc-row__who">
-                  <span className="cia-fc-row__name">{LINE_LABELS[l.line]}</span>
-                  <span className="cia-fc-row__line">{LINE_NOTES[l.line]}</span>
-                </span>
-                <span className="cia-fc-row__value">
-                  <CountUp value={l.nextMonth.realistic} format={forecastEur} />
-                  <span className="cia-fc-row__range">{shareText(l.nextMonth.realistic / total)}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </>
+          </Donut>
+          <ul className="nv-breakdown cia-legend cia-fc-legend">
+            {lines.map((l, i) => {
+              const bound = tip.bind({
+                title: LINE_LABELS[l.line],
+                rows: [
+                  [`En ${next}`, forecastEur(l.nextMonth.realistic)],
+                  ['Bas – haut', `${forecastEur(l.nextMonth.low)} – ${forecastEur(l.nextMonth.high)}`],
+                  ['Par jour', forecastEur(l.perDay.realistic)],
+                  ['Déjà ce mois-ci', forecastEur(l.monthSoFarEur)],
+                ],
+                aside: LINE_NOTES[l.line],
+              });
+              const lighting = row(i);
+              return (
+                <li key={l.line}>
+                  <button
+                    type="button"
+                    className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
+                    {...bound}
+                    {...lighting}
+                    onPointerEnter={lighting.onPointerEnter}
+                    onPointerMove={bound.onPointerMove}
+                    onPointerLeave={(event) => {
+                      lighting.onPointerLeave(event);
+                      bound.onPointerLeave(event);
+                    }}
+                    onPointerDown={(event) => {
+                      lighting.onPointerDown(event);
+                      bound.onPointerDown(event);
+                    }}
+                    onFocus={(event) => {
+                      lighting.onFocus();
+                      bound.onFocus(event);
+                    }}
+                    onBlur={() => {
+                      lighting.onBlur();
+                      bound.onBlur();
+                    }}
+                  >
+                    <span className="nv-key" style={{ '--_c': LINE_COLOURS[l.line] }} aria-hidden="true" />
+                    <span className="nv-breakdown__label">{LINE_LABELS[l.line]}</span>
+                    <span className="nv-breakdown__value">{forecastEur(l.nextMonth.realistic)}</span>
+                    <span className="nv-breakdown__share">{share(l.nextMonth.realistic)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -297,6 +325,8 @@ export function Forecast({
   const current = monthName(thisMonth.month);
   const growth = `${String(Math.round(AI_FORECAST_TRAFFIC_GROWTH * 100))}\u00a0%`;
   const curve = curveOf(days, today, nextMonth.month);
+  const monthShare =
+    sales === null || sales.thisMonthEur === 0 ? null : thisMonth.realistic / sales.thisMonthEur;
   const verdict = verdictOf(forecast, {
     days: curve.past.filter((d) => (d.spent ?? 0) >= cap.capEur * CAPPED_AT).length,
     of: curve.past.length,
@@ -313,31 +343,25 @@ export function Forecast({
       <div className="nv-plate cia-fc-hero nv-enter" style={{ '--nv-i': 1 }}>
         <div className="cia-fc-hero__figures">
           <div className="nv-figure">
-            <span className="nv-figure__label">
-              {cap.reachedAtRealistic ? `Prévu en ${next}, sans plafond` : `Prévu en ${next}`}
-            </span>
+            <span className="nv-figure__label">{`L’IA en ${current}`}</span>
             <CountUp
               className="nv-figure__value ins-lead__value"
-              value={nextMonth.realistic}
+              value={thisMonth.realistic}
               format={forecastEur}
             />
-            <span className="nv-figure__note">{`${rangeText(nextMonth)} selon les semaines`}</span>
+            <span className="nv-figure__note">{`dont ${forecastEur(thisMonth.monthSoFarEur)} déjà dépensés, ${rangeText(thisMonth)} d’ici la fin du mois`}</span>
           </div>
           <div className="nv-figure">
             <span className="nv-figure__label">Part de vos ventes</span>
-            {sales === null ? (
+            {monthShare === null ? (
               <span className="nv-figure__value ins-lead__value">—</span>
             ) : (
-              <CountUp
-                className="nv-figure__value ins-lead__value"
-                value={sales.aiShare}
-                format={formatShare}
-              />
+              <CountUp className="nv-figure__value ins-lead__value" value={monthShare} format={formatShare} />
             )}
             <span className="nv-figure__note">
               {sales === null
                 ? 'aucune vente lue sur ces jours'
-                : `de ${forecastEur(sales.nextMonthEur)} de ventes prévues en ${next}, net de Reveal`}
+                : `de ${forecastEur(sales.thisMonthEur)} de ventes prévues en ${current}, net de Reveal`}
             </span>
           </div>
         </div>
@@ -385,10 +409,17 @@ export function Forecast({
           perDay={perDay}
           capEur={cap.capEur}
           format={forecastEur}
+          lines={forecast.lines.map((l) => ({
+            key: l.line,
+            label: LINE_LABELS[l.line],
+            colour: LINE_COLOURS[l.line],
+            perDay: l.perDay.realistic,
+          }))}
         />
         <ul className="cia-curve__keys" aria-hidden="true">
           <li data-k="spent">Dépensé</li>
           <li data-k="pace">Prévu, au rythme de la dernière semaine</li>
+          <li data-k="planned">À dépenser</li>
           <li data-k="band">Semaine calme à chargée</li>
           <li data-k="cap">Plafond du jour</li>
         </ul>
@@ -398,10 +429,10 @@ export function Forecast({
         {(
           [
             {
-              label: `Déjà dépensé en ${current}`,
-              value: thisMonth.monthSoFarEur,
+              label: cap.reachedAtRealistic ? `Prévu en ${next}, sans plafond` : `Prévu en ${next}`,
+              value: nextMonth.realistic,
               format: forecastEur,
-              note: `${forecastEur(thisMonth.realistic)} prévus d’ici la fin du mois`,
+              note: `${rangeText(nextMonth)} selon les semaines${sales === null ? '' : `, ${shareText(sales.aiShare)} des ventes`}`,
             },
             {
               label: `Avec ${growth} de trafic en plus`,

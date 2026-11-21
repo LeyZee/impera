@@ -530,7 +530,26 @@
   gap: var(--nv-card-gap);
 }
 .cia-curve {
+  --_c: var(--nv-series-1);
   height: 200px;
+  border-radius: var(--nv-radius-md);
+}
+.cia-curve:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 4px;
+}
+/* The planned days, hatched under the pace: what is not spent yet never reads as spent (Design, 21/11). */
+.cia-curve__hatch {
+  stroke: var(--_c);
+  stroke-width: 1.2;
+  stroke-opacity: 0.35;
+}
+.cia-curve__planned {
+  animation: nv-chart-fade var(--nv-dur-slow) calc(8 * var(--nv-stagger)) var(--nv-ease-out) both;
+}
+/* A row of the tip's table spans its two columns, so a line's key and its amount stay side by side. */
+.cia-curve__tip-row {
+  display: contents;
 }
 .cia-curve__corridor {
   fill: var(--_c);
@@ -580,14 +599,22 @@
   width: 14px;
   height: 2px;
   border-radius: 1px;
-  background: var(--nv-neon);
+  background: var(--nv-series-1);
 }
 .cia-curve__keys li[data-k='pace']::before {
-  background: repeating-linear-gradient(90deg, var(--nv-neon) 0 4px, transparent 4px 7px);
+  background: repeating-linear-gradient(90deg, var(--nv-series-1) 0 4px, transparent 4px 7px);
+}
+.cia-curve__keys li[data-k='planned']::before {
+  height: 10px;
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--nv-series-1) 45%, transparent) 0 1.2px,
+    transparent 1.2px 4px
+  );
 }
 .cia-curve__keys li[data-k='band']::before {
   height: 10px;
-  background: color-mix(in srgb, var(--nv-neon) 18%, transparent);
+  background: color-mix(in srgb, var(--nv-series-1) 18%, transparent);
 }
 .cia-curve__keys li[data-k='cap']::before {
   background: repeating-linear-gradient(90deg, var(--nv-warning) 0 3px, transparent 3px 6px);

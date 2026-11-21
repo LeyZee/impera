@@ -1,6 +1,6 @@
 import type { AiForecastRange } from '@impera/contracts';
 import { areaPath, chartPoints, linePath, nearestIndex, niceTicks } from '@impera/design-system';
-import { useLayoutEffect, useRef, useState, type JSX } from 'react';
+import { useId, useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 
 import { axisEur } from './view';
 
@@ -36,13 +36,22 @@ export function ForecastChart({
   perDay,
   capEur,
   format,
+  lines,
 }: {
   past: readonly CurveDay[];
   future: readonly string[];
   perDay: AiForecastRange;
   capEur: number;
   format: (eur: number) => string;
+  /** A forecast day's detail, line by line, in the tip. */
+  lines: readonly {
+    readonly key: string;
+    readonly label: string;
+    readonly colour: string;
+    readonly perDay: number;
+  }[];
 }): JSX.Element {
+  const hatch = useId();
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 200 });
   const [hover, setHover] = useState<number | null>(null);
@@ -113,6 +122,29 @@ export function ForecastChart({
       onPointerLeave={() => {
         setHover(null);
       }}
+      tabIndex={0}
+      aria-label="Dépense par jour : flèches pour passer d’un jour à l’autre"
+      onFocus={() => {
+        setHover((at) => at ?? Math.max(0, past.length - 1));
+      }}
+      onBlur={() => {
+        setHover(null);
+      }}
+      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
+        const step =
+          event.key === 'ArrowRight'
+            ? 1
+            : event.key === 'ArrowLeft'
+              ? -1
+              : event.key === 'End'
+                ? count
+                : event.key === 'Home'
+                  ? -count
+                  : 0;
+        if (step === 0) return;
+        event.preventDefault();
+        setHover((at) => Math.min(count - 1, Math.max(0, (at ?? past.length - 1) + step)));
+      }}
     >
       {width === 0 ? null : (
         <svg
@@ -150,6 +182,22 @@ export function ForecastChart({
             {todayX === null ? null : (
               <line className="cia-curve__today" x1={todayX} x2={todayX} y1={PAD.top} y2={base} />
             )}
+            <defs>
+              <pattern
+                id={hatch}
+                width="6"
+                height="6"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+              >
+                <line x1="0" y1="0" x2="0" y2="6" className="cia-curve__hatch" />
+              </pattern>
+            </defs>
+            <path
+              className="cia-curve__planned"
+              fill={`url(#${hatch})`}
+              d={`M${String(x(from))},${String(y(perDay.realistic))} H${String(x(count - 1))} V${String(base)} H${String(x(from))} Z`}
+            />
             <path className="cia-curve__corridor" d={corridor} />
             <path className="nv-chart__area" d={areaPath(spentPoints, base)} />
             <path className="nv-chart__line" pathLength={1} d={linePath(spentPoints)} />
@@ -187,8 +235,18 @@ export function ForecastChart({
           <span className="nv-chart__tip-l">{dayLabel(atDay)}</span>
           {atSpent === null ? (
             <>
-              <span className="nv-chart__tip-k">Prévu</span>
+              <span className="nv-chart__tip-k" style={{ '--_c': 'var(--nv-ink-faint)' }}>
+                Prévu
+              </span>
               <b className="nv-chart__tip-n">{format(perDay.realistic)}</b>
+              {lines.map((line) => (
+                <span key={line.key} className="cia-curve__tip-row">
+                  <span className="nv-chart__tip-k" style={{ '--_c': line.colour }}>
+                    {line.label}
+                  </span>
+                  <b className="nv-chart__tip-n">{format(line.perDay)}</b>
+                </span>
+              ))}
               <span className="nv-chart__tip-ft">{`de ${format(perDay.low)} à ${format(perDay.high)} selon les semaines`}</span>
             </>
           ) : (
