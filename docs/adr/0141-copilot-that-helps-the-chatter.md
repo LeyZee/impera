@@ -1,6 +1,6 @@
 # 0141. Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande
 
-Statut : accepted (« ok 0141 » de Charles, 16/11/2026 à 15 h 54 ; choix « Gratuit + accroches » sur carte à 15 h 44 ; relu par Agent, Sécurité et Design le 16/11)
+Statut : accepted (« ok 0141 » de Charles, 16/11/2026 à 15 h 54 ; choix « Gratuit + accroches » sur carte à 15 h 44 ; relu par Agent, Sécurité et Design le 16/11) ; amendé le 21/11/2026 (§ 7 : réécrire avec une consigne, choix de Charles sur carte à 15 h 49)
 Date : 2026-11-16
 Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps) ; l'ordre du panneau est amendé dans l'ADR 0086 (amendement du 16/11/2026, brouillon au-dessus de la fiche). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 
@@ -73,3 +73,13 @@ Charles a choisi, sur carte, d'afficher d'abord ce qui est déjà calculé (sans
 - **Des accroches à chaque message, sans clic** : un appel d'IA de plus par message pour des textes que le chatteur ne lira souvent pas.
 - **Laisser l'IA écrire « quoi faire »** : le code le décide déjà ; un texte libre pourrait contredire la décision ou inventer un prix.
 - **Montrer le chiffre du désir** : il reste au CRM ; le sens et le verdict du § 4 bis suffisent au chatteur et évitent qu'il joue le chiffre (option « Verdict et chiffre » écartée par Charles le 16/11/2026).
+
+## Amendement du 21/11/2026 : réécrire avec une consigne
+
+Charles a demandé, en relisant les captures du panneau, que le chatteur puisse faire réécrire le brouillon en disant ce qu'il veut, l'IA faisant le compromis entre la conversation et sa demande. Il a choisi sur carte que la consigne change le ton et le contenu seulement, jamais la vente. Le § 7 interdisait tout texte libre du chatteur dans l'appel ; il est amendé ainsi :
+
+17. **Un troisième bouton, « Réécrire avec une consigne »**, sur la rangée des boutons du lot b, discret comme eux (§ 13). Le chatteur écrit une **consigne du chatteur** de 200 caractères au plus ; l'appel rend un brouillon réécrit qui s'ouvre sous la rangée comme les accroches, avec son « Copier pour Reveal », sans remplacer le brouillon de l'agent.
+18. **La consigne est une donnée, jamais une instruction qui passe les gardes.** Elle entre dans l'appel dans son propre bloc délimité et typé, distinct de celui du message du fan ; le prompt dit au modèle qu'il en suit le ton et le sujet dans les limites qui suivent. Le texte rendu passe les mêmes gardes de sortie que le brouillon (§ 7 : rester en personnage, aucun prix ni remise inventés, pas de rendez-vous concret, curseur de sexualisation, rien de sexuel si l'âge n'est pas confirmé), avec la même réécriture bornée et le retrait d'un texte encore refusé.
+19. **La vente reste au code.** Une consigne ne peut ni demander une offre, ni changer un prix, ni ouvrir une étape : le seul prix possible reste celui de l'étape décidée par le code, et seulement quand le code propose une vente. Les coupures du § 9 retirent ce bouton comme les autres, et sont réévaluées à chaque appel.
+20. **Même coût tenu que les autres boutons (§ 8)** : un appel par clic, le même plafond de clics par chatteur et par jour, la même limite par minute, le budget IA du jour. L'appel est journalisé dans `llm_calls` avec le membre et sa consigne. La clé d'idempotence porte aussi la consigne : la même consigne sur le même message du fan rend le même texte sans nouvel appel.
+21. **Qui fait quoi** : Agent, la route, le bloc de la consigne et les gardes ; Extension, le champ et le résultat dans le panneau ; Design, la forme et son avis sur les captures avant Charles.
