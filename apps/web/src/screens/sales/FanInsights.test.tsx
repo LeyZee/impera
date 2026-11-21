@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { FanInsights } from './FanInsights';
+import { FanInsights, FanInsightsWaitLine } from './FanInsights';
 import { DEMO_INSIGHTS } from './insights-fixture';
 import { arcsOf, heatOf, shareText, slotLabel, waitingLines } from './insights-view';
 
@@ -19,6 +19,7 @@ function show(): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <FanInsights />
+      <FanInsightsWaitLine />
     </QueryClientProvider>,
   );
 }
@@ -86,7 +87,8 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
     expect(screen.getAllByText('moins de 10')).toHaveLength(2);
   });
 
-  it('says it once, in one short card, when every block has too few fans (recette CRE-04)', async () => {
+  // Choice of 21/11: no panel until one block has enough fans, one discreet line under her fans instead.
+  it('says it in one discreet line, without the panel, when every block has too few fans', async () => {
     const few = { status: 'too_few' } as const;
     serve(200, {
       ...DEMO_INSIGHTS,
@@ -99,14 +101,15 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
       activity: few,
     });
     show();
-    expect(await screen.findByText(/Encore trop peu de fans pour le dire/u)).toBeDefined();
     // The fans seen today are not counted yet: said (MOD-08).
-    expect(screen.getByText(/à partir de dix fans arrivés avant aujourd’hui/u)).toBeDefined();
+    const line = await screen.findByText(/à partir de dix fans arrivés avant aujourd’hui/u);
+    expect(line.className).toContain('vt-note');
+    expect(screen.queryByText('Qui sont tes fans')).toBeNull();
     expect(screen.queryByText('moins de 10')).toBeNull();
-    expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
+    expect(document.querySelectorAll('.fi-panel')).toHaveLength(0);
   });
 
-  it('with enough fans in all, never says there are too few fans: it names what is missing (recette CRE-04)', async () => {
+  it('with enough fans in all but no block shown yet, still one line and no panel', async () => {
     const few = { status: 'too_few' } as const;
     serve(200, {
       ...DEMO_INSIGHTS,
@@ -119,14 +122,28 @@ describe('« Qui sont tes fans » (CR-15, ADR 0074)', () => {
       activity: few,
     });
     show();
+    expect(await screen.findByText(/dès que dix fans t’en auront dit assez sur eux/u)).toBeDefined();
+    expect(document.querySelectorAll('.fi-panel')).toHaveLength(0);
+  });
+
+  it('once a block has enough fans, shows the panel and names what is missing (recette CRE-04)', async () => {
+    const few = { status: 'too_few' } as const;
+    serve(200, {
+      ...DEMO_INSIGHTS,
+      fans: { total: 20, newLast30Days: 20, wroteLast7Days: null },
+      age: few,
+      place: few,
+      situation: few,
+      job: few,
+    });
+    show();
     expect(await screen.findByText('fans en tout')).toBeDefined();
-    expect(screen.queryByText(/Encore trop peu de fans pour le dire/u)).toBeNull();
+    expect(document.querySelector('.fi-wait-line')).toBeNull();
     expect(
       screen.getByText(
         'Trop peu de fans t’ont encore dit leur âge, d’où ils sont, leur situation et leur métier : chacun s’affichera dès que dix l’auront dit.',
       ),
     ).toBeDefined();
-    expect(document.querySelectorAll('.fi-card')).toHaveLength(0);
   });
 
   it('says in one sentence that nobody unlocked yet, without a ring at 0 % nor a bar at 100 % (recette CRE-04)', async () => {
