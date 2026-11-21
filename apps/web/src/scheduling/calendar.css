@@ -76,6 +76,18 @@
   line-height: var(--nv-text-caption-leading);
   font-weight: 600;
 }
+/* In a narrow column the name is cut at its end, never in the middle of a word, and « suite » stays whole (recette
+   CHAT-04). */
+.cal-chip--cont .sc-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cal-chip__cont {
+  flex: none;
+  white-space: nowrap;
+}
 /* The agent is said once per creator, under her name: no edge on each créneau, no bar on a card's side (recette
    05/11, CHAT-27). On part of a créneau, a quiet tag says from or until when, « IA dès 9 h ». */
 .cal-tag {
@@ -150,6 +162,13 @@
   color: var(--nv-ink-faint);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
+  container-type: inline-size;
+}
+/* Too narrow for the word and the hours: the dashes say « Libre », the hours stay whole (recette CHAT-04). */
+@container (max-width: 7.5rem) {
+  .cal-free__word {
+    display: none;
+  }
 }
 .cal-free--key {
   flex: none;
