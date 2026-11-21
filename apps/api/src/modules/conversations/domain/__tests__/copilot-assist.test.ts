@@ -46,7 +46,7 @@ describe('the copilot’s lines beside the draft (ADR 0141 lot a)', () => {
     });
     expect(assist.reasons).toEqual([{ code: 'rewritten_once', label: 'Réécrit une fois par une garde' }]);
     expect(assist.sale).toEqual({
-      script: { name: 'Soirée de démonstration', stepIndex: 1, stepCount: 3 },
+      script: { name: 'Soirée de démonstration', stepIndex: 1, stepCount: 3, stepName: 'Étape 2' },
       nextStep: { name: 'Étape 2', priceMinor: 1_500 },
       refusedSteps: [],
       usedObjections: [OBJECTION_KIND_LABELS.too_expensive],

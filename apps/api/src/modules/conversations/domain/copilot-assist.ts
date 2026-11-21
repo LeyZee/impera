@@ -94,7 +94,12 @@ export function copilotAssist(live: CopilotLive, now: Date, withDraft: boolean):
       script:
         sale === null
           ? null
-          : { name: sale.scriptName, stepIndex: sale.stepIndex, stepCount: sale.stepCount },
+          : {
+              name: sale.scriptName,
+              stepIndex: sale.stepIndex,
+              stepCount: sale.stepCount,
+              stepName: copilotStepName(sale.stepIndex),
+            },
       nextStep: nextStepOf(sale?.nextStep ?? null),
       refusedSteps: unique(sale?.refusedStepIndexes ?? []).map(copilotStepName),
       usedObjections: unique(live.usedObjections).map((kind) => OBJECTION_KIND_LABELS[kind]),
