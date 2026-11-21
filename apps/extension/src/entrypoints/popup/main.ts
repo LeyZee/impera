@@ -347,11 +347,13 @@ const LINK_FAILURES: Readonly<Record<'page' | 'typed', Readonly<Record<LinkFailu
   page: {
     denied: 'Ton navigateur n’a pas autorisé ce site. Clique sur Relier et accepte sa question.',
     signed_out: 'Connecte-toi au CRM dans cet onglet, puis clique sur Relier.',
+    down: 'Le CRM ne répond pas : vérifie qu’il est lancé, puis réessaie.',
     not_crm: 'Cette adresse ne répond pas comme un CRM Impera. Recharge la page et réessaie.',
   },
   typed: {
     denied: 'Ton navigateur n’a pas autorisé ce site. Enregistre à nouveau et accepte sa question.',
     signed_out: 'Connecte-toi d’abord au CRM à cette adresse, puis enregistre-la.',
+    down: 'Le CRM ne répond pas : vérifie qu’il est lancé, puis réessaie.',
     not_crm: 'Cette adresse ne répond pas comme un CRM Impera.',
   },
 };
