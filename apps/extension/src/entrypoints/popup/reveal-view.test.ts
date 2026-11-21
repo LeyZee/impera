@@ -301,8 +301,10 @@ describe('the Reveal session card', () => {
 
   it('writes the day and the hour', () => {
     expect(whenOf(new Date(2026, 10, 9, 8, 30))).toBe('le 09/11/2026 à 8 h 30');
-    expect(untilOf(new Date(2026, 10, 15, 23, 0), NOW)).toBe('23 h 00');
-    expect(untilOf(new Date(2026, 10, 17, 8, 0), NOW)).toBe('le 17/11/2026 à 8 h 00');
+    expect(untilOf(new Date(2026, 10, 15, 23, 0), NOW)).toBe('jusqu’à 23 h 00');
+    expect(untilOf(new Date(2026, 10, 16, 8, 0), NOW)).toBe('jusqu’à demain 8 h 00');
+    // Never « jusqu’à le … » (EXT-03).
+    expect(untilOf(new Date(2026, 10, 17, 8, 0), NOW)).toBe('jusqu’au 17/11/2026 à 8 h 00');
   });
 });
 

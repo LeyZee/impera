@@ -221,16 +221,17 @@ function shortWhenOf(at: Date): string {
   return `${at.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à ${hourOf(at)}`;
 }
 
-/** « 9 h 05 » today, « demain 9 h 05 », else the CRM's full day. */
+/** « jusqu’à 9 h 05 » today, « jusqu’à demain 9 h 05 », else « jusqu’au 28/11/2026 à 9 h 05 » (EXT-03). */
 export function untilOf(at: Date, now: Date): string {
   const days = Math.round(
     (new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime() -
       new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
       DAY_MS,
   );
-  if (days === 0) return hourOf(at);
-  if (days === 1) return `demain ${hourOf(at)}`;
-  return whenOf(at);
+  if (days === 0) return `jusqu’à ${hourOf(at)}`;
+  if (days === 1) return `jusqu’à demain ${hourOf(at)}`;
+  const day = at.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `jusqu’au ${day} à ${hourOf(at)}`;
 }
 
 function dot(tone: Tone, live: boolean): HTMLElement {
@@ -300,7 +301,7 @@ function statusLine(account: Account, row: RowState, now: Date): HTMLElement {
     h('span', { class: `pp-sync__word pp-sync__word--${row.tone}` }, row.word),
     row.until === null || row.tone === 'red'
       ? null
-      : h('span', { class: 'pp-sync__until' }, `jusqu’à ${untilOf(row.until, now)}`),
+      : h('span', { class: 'pp-sync__until' }, untilOf(row.until, now)),
   );
   if (account.sessionUpdatedAt === null) return line;
   return withTip(line, {
