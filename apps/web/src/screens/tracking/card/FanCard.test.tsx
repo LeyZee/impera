@@ -11,7 +11,7 @@ import {
   type FanCardView,
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fanKycKey } from '../api';
@@ -273,7 +273,10 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
           body: { factId: note.factId },
         },
       ]);
-      expect(screen.queryByText('Ne jamais parler de sa femme')).toBeNull();
+      // The line leaves with the card the server answers, whenever it comes.
+      await waitFor(() => {
+        expect(screen.queryByText('Ne jamais parler de sa femme')).toBeNull();
+      });
     });
 
     it('says why a line was not retracted, and keeps it', async () => {
