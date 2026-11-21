@@ -1,5 +1,5 @@
 import type { CreatorId, CreatorSummary, PreparedScriptView } from '@impera/contracts';
-import { Link, useBlocker, useNavigate, useRouteContext } from '@tanstack/react-router';
+import { Link, useBlocker, useNavigate, useRouteContext, useSearch } from '@tanstack/react-router';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
@@ -30,6 +30,7 @@ import {
   accountCardId,
   creatorsSearch,
   rememberCreatorTab,
+  scriptSearch,
   sheetsFor,
   tabOf,
   type CreatorSheet,
@@ -128,6 +129,8 @@ export function CreatorsPage({
   const creators = query.data ?? [];
   const [adding, setAdding] = useState(false);
   const navigate = useNavigate();
+  // The script open in Scripts, from the address (PRO1-06).
+  const scriptId = useSearch({ strict: false, select: (search) => search.script ?? null });
   /** The persona, the hours or a card of Compte on screen holds changes not saved: which ones. */
   const [unsaved, setUnsaved] = useState<readonly string[]>([]);
   const dirty = unsaved.length > 0;
@@ -312,6 +315,11 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           opening={opening}
+          scriptId={scriptId}
+          onScript={(id) => {
+            // Pushed: the browser's step back returns to the list, a reload reopens the script (PRO1-06).
+            void navigate({ to: '/creatrices', search: scriptSearch(current.id, id) });
+          }}
           onCopy={() => {
             setOpening(null);
             void navigate({ to: '/creatrices', search: creatorsSearch('copy', current.id) });
@@ -335,7 +343,7 @@ export function CreatorsPage({
           }
           onOpen={(script) => {
             setOpening(script);
-            void navigate({ to: '/creatrices', search: creatorsSearch('scripts', current.id) });
+            void navigate({ to: '/creatrices', search: scriptSearch(current.id, script.id) });
           }}
         />
       );

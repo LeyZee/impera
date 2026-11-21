@@ -1718,3 +1718,13 @@ body {
     bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* A price typed that is not one (PRO1-08): said under the field, on its own line of the foot. */
+.se-price-hint {
+  flex-basis: 100%;
+  order: 1;
+  margin: 0;
+  color: var(--nv-danger);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}

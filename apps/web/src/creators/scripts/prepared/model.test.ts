@@ -46,6 +46,21 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
     ]);
   });
 
+  it('names a path through a branch still to set by its place, never « Par défaut » (PRO1-07)', () => {
+    const [first, second] = CONTENT.steps;
+    if (first === undefined || second === undefined) throw new Error('fixture');
+    const unset = {
+      ...CONTENT,
+      steps: [
+        first,
+        { ...second, branches: [...second.branches, branchOf(30, { condition: null, priceMinor: 900 })] },
+      ],
+    };
+    const names = scriptPaths(unset).shown.map((path) => path.name);
+    expect(names.filter((name) => name === 'Par défaut')).toHaveLength(1);
+    expect(names).toContain('Branche 3 à l’étape 2, à régler');
+  });
+
   it('counts the paths without building more than it shows', () => {
     const wide = {
       ...CONTENT,
