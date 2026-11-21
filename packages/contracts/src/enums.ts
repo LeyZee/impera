@@ -90,8 +90,17 @@ export type LlmRole = z.infer<typeof LlmRoleSchema>;
  * never deprives a fan's answer of budget; `probe` is the owner's « Essai réel » of a service (ADR 0091 § 7), one
  * tiny call on his click, counted in the spend and left out of the agent's health. `instagram_comment` is a reply
  * to a comment under one of her Instagram posts (ADR 0122), counted apart and stopped by the daily cap like any call.
+ * `media` is the description of what she drops and of a sent script (ADR 0083), `telegram` a post of her channel
+ * (ADR 0080): both are counted apart for the forecast (ADR 0091 § 8) and stopped by the daily cap like any call.
  */
-export const LlmPurposeSchema = z.enum(['chatting', 'trend_watch', 'probe', 'instagram_comment']);
+export const LlmPurposeSchema = z.enum([
+  'chatting',
+  'trend_watch',
+  'probe',
+  'instagram_comment',
+  'media',
+  'telegram',
+]);
 export type LlmPurpose = z.infer<typeof LlmPurposeSchema>;
 
 /** Who wrote an event: the system, the AI, a dashboard user (`human:<userId>`) or the fan. */

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 /**
@@ -35,6 +35,8 @@ const numberOf = (tag: string): string => tag.slice(0, 4);
 const snapshotPath = (tag: string): string => `${META}${numberOf(tag)}_snapshot.json`;
 const snapshotOf = (tag: string): z.infer<typeof SnapshotSchema> =>
   SnapshotSchema.parse(JSON.parse(readFileSync(snapshotPath(tag), 'utf8')));
+/** Reading every snapshot (some 90 MB of JSON) takes seconds on a busy machine: done once, with its own delay. */
+const READ_TIMEOUT_MS = 120_000;
 
 describe('the migrations’ journal', () => {
   it('numbers its entries in order, once each', () => {
@@ -67,6 +69,14 @@ describe('the migrations’ journal', () => {
 });
 
 describe('the migrations’ snapshots', () => {
+  const snapshots = new Map<string, z.infer<typeof SnapshotSchema>>();
+
+  beforeAll(() => {
+    for (const entry of journal)
+      if (!LOST_SNAPSHOTS.includes(numberOf(entry.tag)) && existsSync(snapshotPath(entry.tag)))
+        snapshots.set(entry.tag, snapshotOf(entry.tag));
+  }, READ_TIMEOUT_MS);
+
   it('exist for each entry, chained in the journal’s order', () => {
     let previous: string | null = ROOT_ID;
     const broken: string[] = [];
@@ -75,8 +85,9 @@ describe('the migrations’ snapshots', () => {
         previous = null;
         continue;
       }
-      expect(existsSync(snapshotPath(entry.tag)), `${entry.tag} has no snapshot`).toBe(true);
-      const snapshot = snapshotOf(entry.tag);
+      const snapshot = snapshots.get(entry.tag);
+      expect(snapshot, `${entry.tag} has no snapshot`).toBeDefined();
+      if (snapshot === undefined) continue;
       if (previous !== null && snapshot.prevId !== previous) broken.push(entry.tag);
       previous = snapshot.id;
     }

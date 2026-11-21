@@ -3,6 +3,7 @@ import { niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { CreditDialog, EntriesList } from './CreditDialog';
+import { Forecast } from './Forecast';
 import { useAiUsage } from './api';
 import {
   axisEur,
@@ -44,7 +45,7 @@ import './ai-usage.css';
 
 import { OTHER } from '@/screens/dashboard/agency/view';
 import { CountUp, Section, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
-import { Donut } from '@/shell/figures/figures';
+import { Columns, Donut } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -411,24 +412,12 @@ function Spend({
   tip: FloatingTip;
   span: Span;
 }): JSX.Element {
-  const [focus, setFocus] = useState(columns.length - 1);
-  const current = Math.min(Math.max(0, focus), columns.length - 1);
-  const bars = useRef<HTMLDivElement>(null);
   const max = Math.max(0, ...columns.map((column) => column.eur));
   const ticks = niceTicks(max, 3);
   const top = ticks[ticks.length - 1] ?? 1;
   const every = columns.length <= 8 ? 1 : columns.length <= 14 ? 3 : columns.length <= 24 ? 4 : 5;
   const used = PROVIDERS.filter((_, p) => columns.some((column) => (column.parts[p] ?? 0) > 0));
   const anyCovered = columns.some((column) => column.coveredEur > 0);
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const step =
-      event.key === 'Home' ? -columns.length : event.key === 'End' ? columns.length : STEPS[event.key];
-    if (step === undefined) return;
-    event.preventDefault();
-    const next = Math.min(Math.max(0, current + step), columns.length - 1);
-    setFocus(next);
-    bars.current?.querySelectorAll<HTMLButtonElement>('.ins-col')[next]?.focus();
-  };
   if (max <= 0) {
     return (
       <div className="nv-plate ins-daily">
@@ -458,82 +447,44 @@ function Spend({
           ) : null}
         </ul>
       ) : null}
-      <div className="ins-daily__plot">
-        <div className="ins-daily__grid" aria-hidden="true">
-          {ticks.map((value) => (
-            <span key={value} style={{ '--_y': `${String((value / top) * 100)}%` }}>
-              <i>{axisEur(value)}</i>
-            </span>
-          ))}
-        </div>
-        <div
-          className="ins-daily__bars"
-          style={{ '--_n': columns.length }}
-          role="group"
-          aria-label={`Dépense ${span === 'hours' ? 'heure par heure' : 'jour par jour'}, au plus ${eurText(max)} : flèches pour passer d’une colonne à l’autre`}
-          ref={bars}
-          onKeyDown={onKeyDown}
-          onFocus={(event) => {
-            const at = Number(event.target.getAttribute('data-i'));
-            if (Number.isInteger(at)) setFocus(at);
-          }}
-        >
-          {columns.map((column, i) => (
-            <button
-              type="button"
-              key={column.key}
-              className="ins-col"
-              style={{ '--_i': i }}
-              tabIndex={i === current ? 0 : -1}
-              aria-label={`${column.title} : ${eurText(column.eur)}${column.coveredEur > 0 ? ` dont ${eurText(column.coveredEur)} couverts par l’abonnement` : ''}, ${countText(column.calls)} appels`}
-              data-i={i}
-              {...tip.bind(
-                {
-                  title: column.title,
-                  rows: [
-                    ...PROVIDERS.map((provider, p) => [provider.label, column.parts[p] ?? 0] as const)
-                      .filter(([, eur]) => eur > 0)
-                      .map(([label, eur]) => [label, eurText(eur)] as const),
-                    ['Total', eurText(column.eur)],
-                    ...(column.coveredEur > 0
-                      ? [['dont abonnement', eurText(column.coveredEur)] as const]
-                      : []),
-                    ['Appels', countText(column.calls)],
-                  ],
-                },
-                // Beside the column, inside the card: over it, the tallest column's tip covered the span control.
-                { beside: true },
-              )}
-            >
-              <span className="ins-col__stack">
-                {column.parts.flatMap((eur, p) => {
-                  // What was paid, then on top, hatched, what the subscription covered (« ok 0091 chiffres »).
-                  const covered = Math.min(eur, column.covered[p] ?? 0);
-                  const colour = PROVIDERS[p]?.colour ?? OTHER;
-                  const key = PROVIDERS[p]?.key ?? String(p);
-                  return [
-                    { part: eur - covered, hatched: false },
-                    { part: covered, hatched: true },
-                  ]
-                    .filter(({ part }) => part > 0)
-                    .map(({ part, hatched }) => (
-                      <span
-                        key={`${key}${hatched ? ':covered' : ''}`}
-                        className={hatched ? 'ins-col__part cia-part--covered' : 'ins-col__part'}
-                        style={{ '--_c': colour, '--_h': `${String((part / top) * 100)}%` }}
-                      />
-                    ));
-                })}
-              </span>
-              <span className="ins-col__label" aria-hidden="true">
-                {(i % every === 0 && columns.length - 1 - i >= every) || i === columns.length - 1
-                  ? column.label
-                  : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
+      <Columns
+        label={`Dépense ${span === 'hours' ? 'heure par heure' : 'jour par jour'}, au plus ${eurText(max)} : flèches pour passer d’une colonne à l’autre`}
+        top={top}
+        ticks={ticks.map((value) => ({ value, text: axisEur(value) }))}
+        columns={columns.map((column, i) => ({
+          key: column.key,
+          label:
+            (i % every === 0 && columns.length - 1 - i >= every) || i === columns.length - 1
+              ? column.label
+              : '',
+          says: `${column.title} : ${eurText(column.eur)}${column.coveredEur > 0 ? ` dont ${eurText(column.coveredEur)} couverts par l’abonnement` : ''}, ${countText(column.calls)} appels`,
+          parts: column.parts.flatMap((eur, p) => {
+            // What was paid, then on top, hatched, what the subscription covered (« ok 0091 chiffres »).
+            const covered = Math.min(eur, column.covered[p] ?? 0);
+            const colour = PROVIDERS[p]?.colour ?? OTHER;
+            const key = PROVIDERS[p]?.key ?? String(p);
+            return [
+              { key, colour, value: eur - covered },
+              { key: `${key}:covered`, colour, value: covered, hatched: true },
+            ];
+          }),
+          handlers: tip.bind(
+            {
+              title: column.title,
+              rows: [
+                ...PROVIDERS.map((provider, p) => [provider.label, column.parts[p] ?? 0] as const)
+                  .filter(([, eur]) => eur > 0)
+                  .map(([label, eur]) => [label, eurText(eur)] as const),
+                ['Total', eurText(column.eur)],
+                ...(column.coveredEur > 0 ? [['dont abonnement', eurText(column.coveredEur)] as const] : []),
+                ['Appels', countText(column.calls)],
+              ],
+            },
+            // Beside the column, inside the card: over it, the tallest column's tip covered the span control.
+            { beside: true },
+          ),
+        }))}
+      />
     </div>
   );
 }
@@ -667,9 +618,17 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
       </Section>
 
       <Section
+        title="Prévisionnel"
+        sub="ce que l’IA coûtera ce mois-ci et le suivant, au rythme réel des derniers jours, face aux ventes"
+        index={2}
+      >
+        <Forecast forecast={usage.forecast} days={usage.days} today={usage.today.day} tip={tip} />
+      </Section>
+
+      <Section
         title="Crédits"
         sub="ce qu’il reste chez chaque service, décompté appel par appel, ou son abonnement ; les vocaux en caractères"
-        index={2}
+        index={3}
         control={
           usage.credits.length === 0 ? undefined : (
             <button
@@ -690,7 +649,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
       <Section
         title="Dépense"
         sub={span === 'days' ? 'jour par jour, par service' : 'heure par heure, par service'}
-        index={3}
+        index={4}
         control={<SpanControl span={span} onChange={setSpan} />}
       >
         <Spend
@@ -701,7 +660,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
         />
       </Section>
 
-      <div className="ins-pair nv-enter" style={{ '--nv-i': 4 }}>
+      <div className="ins-pair nv-enter" style={{ '--nv-i': 5 }}>
         <Ring
           title="Par modèle, 30 jours"
           slices={modelSlices(usage)}

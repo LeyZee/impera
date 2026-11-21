@@ -263,7 +263,7 @@ const sum = (rows: readonly UsageRow[], pick: (row: UsageRow) => number): number
  * Everything the screen shows, from the summed journal (ADR 0091 § 2): today against the cap, today hour by hour, the
  * last 30 days, the models and the uses over them, and the pace. Pure: the clock and the zone are given.
  */
-export function aiUsage(input: UsageInput): AiUsage {
+export function aiUsage(input: UsageInput): Omit<AiUsage, 'forecast'> {
   const { rows, usdPerEur, today } = input;
   const first = addDays(today, -(AI_USAGE_DAYS - 1));
   const inWindow = rows.filter((r) => r.day >= first && r.day <= today);

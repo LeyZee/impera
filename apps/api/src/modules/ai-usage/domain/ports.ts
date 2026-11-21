@@ -1,6 +1,7 @@
 import type { AiCreditEntry, AiCreditProvider, EVENT_PAYLOADS } from '@impera/contracts';
 import type { z } from 'zod';
 
+import type { ForecastRow, SalesRow } from './forecast';
 import type { UsageRow } from './usage';
 
 /** The journal of calls, summed (ADR 0091 § 1). Read with the owner role: `llm_calls` is the app's, not a tenant's. */
@@ -15,6 +16,18 @@ export interface UsageReader {
    * answered; null when it answered last, or never refused (ADR 0091 § 6).
    */
   quotaRefusedAt(provider: AiCreditProvider): Promise<Date | null>;
+  /**
+   * What the forecast reads since `from` (ADR 0091 § 8), in one read: every call by local day, line of spend and
+   * creator; the sales net of the platform in euros by local day and creator, refunds taken off; the creators' names.
+   */
+  forecast(
+    from: Date,
+    timeZone: string,
+  ): Promise<{
+    readonly rows: readonly ForecastRow[];
+    readonly sales: readonly SalesRow[];
+    readonly creatorNames: ReadonlyMap<string, string>;
+  }>;
 }
 
 export interface CreditActor {

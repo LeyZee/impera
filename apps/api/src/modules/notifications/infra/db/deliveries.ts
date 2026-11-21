@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import { JOB_MAX_ATTEMPTS, NOTIFICATION_REASONS } from '@impera/contracts';
+import { JOB_MAX_ATTEMPTS, NOTIFICATION_REASONS, NotificationInboxItemSchema } from '@impera/contracts';
 import { and, eq, inArray, schema, sql, withMember, type Database } from '@impera/db';
 
 import { isCapped } from '../../domain/policy';
-import type { DeliveryRegistry } from '../../domain/ports';
+import type { DeliveryRegistry, InboxReader } from '../../domain/ports';
 
 const deliveries = schema.notificationDeliveries;
 
@@ -100,6 +100,47 @@ export function createDeliveryRegistry(db: Database): DeliveryRegistry {
           .returning({ id: deliveries.id }),
       );
       return taken.length;
+    },
+  };
+}
+
+/** What never rang on its own: held for the quiet hours (then recapped), or kept silent past the daily cap. */
+const QUIET_DECISIONS: ReadonlySet<string> = new Set(['held', 'recapped', 'silent']);
+
+/** `notification_deliveries` read back for « Tes notifications », as the account (RLS: its own rows). */
+export function createInboxReader(db: Database): InboxReader {
+  return {
+    async recent(userId, since, limit) {
+      const rows = await withMember(db, userId, (tx) =>
+        tx
+          .select({
+            id: deliveries.id,
+            reason: deliveries.reason,
+            title: deliveries.title,
+            url: deliveries.url,
+            decision: deliveries.decision,
+            decidedAt: deliveries.decidedAt,
+          })
+          .from(deliveries)
+          .where(
+            and(
+              eq(deliveries.userId, userId),
+              sql`${deliveries.decidedAt} >= ${since.toISOString()}::timestamptz`,
+            ),
+          )
+          .orderBy(sql`${deliveries.decidedAt} desc`, sql`${deliveries.id} desc`)
+          .limit(limit),
+      );
+      return rows.map((row) =>
+        NotificationInboxItemSchema.parse({
+          id: row.id,
+          reason: row.reason,
+          title: row.title,
+          url: row.url,
+          quiet: QUIET_DECISIONS.has(row.decision),
+          at: row.decidedAt.toISOString(),
+        }),
+      );
     },
   };
 }

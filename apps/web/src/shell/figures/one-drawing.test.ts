@@ -6,13 +6,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /*
- * One drawing per kind of figure (Charles, 21/11): the donut, its legend, the key, the meter and the small curve are
- * the design system's (`nv-donut`, `nv-breakdown`, `nv-key`, `nv-meter`, `nv-spark`), drawn by `shell/figures`. The
+ * One drawing per kind of figure (Charles, 21/11): the donut, its legend, the key, the meter, the small curve and the
+ * columns are the design system's (`nv-donut`, `nv-breakdown`, `nv-key`, `nv-meter`, `nv-spark`, `nv-cols`), drawn by
+ * `shell/figures`. The
  * classes they replaced had drifted apart from screen to screen; a screen that writes one again, in a sheet or in its
  * markup, would style nothing or bring a second look back.
  */
 const RETIRED =
-  /\b(?:ins-(?:ring(?!-card)|legend|keys?\b|spark|meter)|mf-(?:donut|kind\b|kind__)|fi-(?:ring(?!-row)|legend__(?:row|key)))/u;
+  /\b(?:ins-(?:ring(?!-card)|legend|keys?\b|spark|meter|col\b|col__|daily__)|mf-(?:donut|kind\b|kind__)|fi-(?:ring(?!-row)|legend__(?:row|key)))/u;
 
 const SRC = fileURLToPath(new URL('../..', import.meta.url));
 

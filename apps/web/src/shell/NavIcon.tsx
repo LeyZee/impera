@@ -29,6 +29,23 @@ export type NavIconName =
   | 'clapper'
   | 'traffic';
 
+const PEOPLE = (
+  <>
+    <g className="nav-t1">
+      <circle cx="5" cy="9.5" r="2.2" />
+      <path d="M1.5 18.5v-.3c0-2 1.3-3.5 3.3-3.9" />
+    </g>
+    <g className="nav-t2">
+      <circle cx="12" cy="8" r="3" />
+      <path d="M6.5 19.5V19c0-2.8 2.4-5 5.5-5s5.5 2.2 5.5 5v.5" />
+    </g>
+    <g className="nav-t3">
+      <circle cx="19" cy="9.5" r="2.2" />
+      <path d="M22.5 18.5v-.3c0-2-1.3-3.5-3.3-3.9" />
+    </g>
+  </>
+);
+
 const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   // Trafic: a chain link, its two halves closing on each other (ADR 0134 § 9).
   traffic: (
@@ -53,13 +70,19 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
       <path className="nav-star" d="m18 11.6 1.3 3.1 3.1 1.3-3.1 1.3-1.3 3.1-1.3-3.1-3.1-1.3 3.1-1.3z" />
     </>
   ),
-  // Entraîner: a target, its bull's-eye hit.
+  // Entraîner: a dumbbell, lifted (the target read as « objectifs »; Charles, 21/11).
   train: (
-    <>
-      <circle cx="12" cy="12" r="9.5" />
-      <circle className="nav-ring" cx="12" cy="12" r="5.2" />
-      <circle className="nav-bull" cx="12" cy="12" r="1.4" fill="currentColor" />
-    </>
+    <g className="nav-lift">
+      <path d="M8.5 12h7" />
+      <g className="nav-w1">
+        <rect x="5" y="7" width="3.5" height="10" rx="1.6" />
+        <path d="M2.5 9.8v4.4" />
+      </g>
+      <g className="nav-w2">
+        <rect x="15.5" y="7" width="3.5" height="10" rx="1.6" />
+        <path d="M21.5 9.8v4.4" />
+      </g>
+    </g>
   ),
   // Suivi: two conversation bubbles, hers behind his.
   tracking: (
@@ -80,19 +103,19 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
       <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
     </g>
   ),
+  // Aujourd'hui: the house one comes home to, its door opening (the sun was already « Jour »; Charles, 21/11).
   today: (
     <>
-      <circle cx="12" cy="12" r="4" />
-      <path
-        className="nav-rays"
-        d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"
-      />
+      <path className="nav-roof" d="M3.5 11 12 3.5l8.5 7.5" />
+      <path className="nav-walls" d="M5.5 9.6V19A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V9.6" />
+      <path className="nav-door" d="M10 20.5v-5.2a2 2 0 0 1 4 0v5.2" />
     </>
   ),
   planning: (
     <>
       <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
-      <path d="M8 3v4M16 3v4M3.5 10h17" />
+      <path d="M3.5 10h17" />
+      <path className="nav-pins" d="M8 3v4M16 3v4" />
       <circle className="nav-day" cx="15.5" cy="15" r="1.3" fill="currentColor" />
     </>
   ),
@@ -101,36 +124,13 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <rect x="3.5" y="5.5" width="13" height="13" rx="3" />
       <path d="m3.5 15.5 3.6-3.6a1.5 1.5 0 0 1 2.1 0l4.3 4.3" />
-      <circle cx="12.6" cy="9.4" r="1.2" fill="currentColor" />
+      <circle className="nav-sun" cx="12.6" cy="9.4" r="1.2" fill="currentColor" />
       <path className="nav-up" d="M19.5 21v-7M17 16.4l2.5-2.5 2.5 2.5" />
     </>
   ),
-  // Équipe: a headset, the chatters' tool.
-  team: (
-    <g className="nav-set">
-      <path d="M4.5 14v-2.5a7.5 7.5 0 0 1 15 0V14" />
-      <rect x="3" y="13" width="4.2" height="6.5" rx="1.9" />
-      <rect x="16.8" y="13" width="4.2" height="6.5" rx="1.9" />
-      <path className="nav-mic" d="M19 19.5v.2a2.3 2.3 0 0 1-2.3 2.3H13.5" />
-    </g>
-  ),
-  // Several people: who is on a task or a shift.
-  people: (
-    <>
-      <g className="nav-t1">
-        <circle cx="5" cy="9.5" r="2.2" />
-        <path d="M1.5 18.5v-.3c0-2 1.3-3.5 3.3-3.9" />
-      </g>
-      <g className="nav-t2">
-        <circle cx="12" cy="8" r="3" />
-        <path d="M6.5 19.5V19c0-2.8 2.4-5 5.5-5s5.5 2.2 5.5 5v.5" />
-      </g>
-      <g className="nav-t3">
-        <circle cx="19" cy="9.5" r="2.2" />
-        <path d="M22.5 18.5v-.3c0-2-1.3-3.5-3.3-3.9" />
-      </g>
-    </>
-  ),
+  // Équipe, and who is on a task or a shift: several people (the headset read as « support »; Charles, 21/11).
+  team: PEOPLE,
+  people: PEOPLE,
   pay: (
     <g className="nav-coin">
       <circle cx="12" cy="12" r="9" />
@@ -141,7 +141,7 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <circle cx="12" cy="12" r="9.5" />
       <circle className="nav-head" cx="12" cy="10" r="3" />
-      <path d="M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1" />
+      <path className="nav-body" d="M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1" />
     </>
   ),
   bell: (
