@@ -40,6 +40,7 @@ import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
+export { MAX_SEND_ATTEMPTS } from './domain/state-machine';
 export type {
   BubbleGuard,
   CardReader,

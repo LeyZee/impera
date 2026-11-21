@@ -86,6 +86,7 @@ import {
 } from '../domain/sale-trouble';
 import {
   paidWaiting,
+  mayOpenScript,
   permittedScripts,
   scriptStepsHeld,
   type PlatformScriptView,
@@ -262,12 +263,18 @@ export interface ScriptsInput {
   readonly teased?: number;
 }
 
-/** The scripts the brain may pick from, by the short ids it answers with (`s1`…). */
+/**
+ * The scripts the brain may pick from, by the short ids it answers with (`s1`…): none when no script may open at this
+ * message, whatever he says (recette REV-13).
+ */
 function scriptChoices(
   scripts: ScriptsInput | undefined,
   situation: Situation,
+  offer: OfferInput | undefined,
+  careMode: boolean,
 ): readonly { readonly id: string; readonly script: PlatformScriptView }[] {
-  if (scripts?.history === undefined || scripts.history === null) return [];
+  if (scripts?.history === undefined || scripts.history === null || offer === undefined) return [];
+  if (!mayOpenScript({ offer, latest: scripts.latest, careMode })) return [];
   return permittedScripts(scripts.catalogue, {
     moment: isNight(situation) ? 'night' : 'day',
     history: scripts.history,
@@ -854,7 +861,8 @@ export async function composeTurn(
     return writeFollowUp(gateway, persona, base, aftercareBrief(input.aftercare), notes.dropped, exampleIds);
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
-  const choices = scriptChoices(input.scripts, input.situation);
+  // The care mode may depend on what the brain reads: only a care already open is known before it.
+  const choices = scriptChoices(input.scripts, input.situation, input.offer, input.care === true);
   const brainScripts: BrainScript[] = choices.map(({ id, script }) => ({
     id,
     description: script.description,

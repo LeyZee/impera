@@ -1,4 +1,4 @@
-import { agentHoursNow, DropCategorySchema } from '@impera/contracts';
+import { agentHoursNow, DropCategorySchema, PlatformSchema } from '@impera/contracts';
 import { sql, withTenantMember, type Database } from '@impera/db';
 import { z } from 'zod';
 
@@ -55,6 +55,15 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
             )
           ).rows,
         );
+        const expired = z.array(z.object({ platform: PlatformSchema })).parse(
+          (
+            await tx.execute(
+              sql`select distinct platform from platform_accounts
+                    where creator_id = ${creatorId}::uuid and session_state = 'expired'`,
+            )
+          ).rows,
+        );
+        const expiredSessions = expired.map((row) => row.platform);
         const switches = {
           global: stopped.some((s) => s.scope === 'global' && s.active),
           creator: stopped.some((s) => s.scope === 'creator' && s.active),
@@ -72,6 +81,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
             hoursNow,
             autoConversations: counts?.auto ?? 0,
             hasActivePersona: counts?.persona ?? false,
+            expiredSessions,
             requests: [],
             names: new Map(),
           };
@@ -99,6 +109,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
           hoursNow,
           autoConversations: counts?.auto ?? 0,
           hasActivePersona: counts?.persona ?? false,
+          expiredSessions,
           requests: requests.map((row) => ({ category: row.category, dueOn: row.due_on })),
           names: new Map(members.map((row) => [row.id, row.display_name] as const)),
         };

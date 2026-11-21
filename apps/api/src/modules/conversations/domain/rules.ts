@@ -81,6 +81,20 @@ export function fanAwaitsAnswer(conversation: {
   return lastInboundAt !== null && (lastOutboundAt === null || lastOutboundAt < lastInboundAt);
 }
 
+/**
+ * A message of the creator's side answers his last message only if nothing of his came after it on the platform: the
+ * dates are the platform's, never the order the messages reached us. A history read late (his first message brings
+ * the older thread with it) never answers him with a message from before his (recette REV-04). `history` is in the
+ * platform's order, oldest first; a message out of it is too old to be the answer.
+ */
+export function answersHisLastMessage(
+  history: readonly { readonly id: string; readonly direction: 'inbound' | 'outbound' }[],
+  answerId: string,
+): boolean {
+  const index = history.findIndex((message) => message.id === answerId);
+  return index !== -1 && !history.slice(index + 1).some((message) => message.direction === 'inbound');
+}
+
 /** One key per bubble, so a retried send never posts the same bubble twice (invariant 4). */
 export function bubbleIdempotencyKey(draftId: string, index: number): string {
   return `${draftId}:${String(index)}`;

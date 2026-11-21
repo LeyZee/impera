@@ -9,7 +9,7 @@ import {
   type UserId,
 } from '@impera/contracts';
 
-import { MAX_SEND_ATTEMPTS, nextState, type ConversationCommand } from './state-machine';
+import { LEGACY_MAX_SEND_ATTEMPTS, nextState, type ConversationCommand } from './state-machine';
 
 /** The columns of `conversations` that are projections of the journal (ADR 0007). */
 export interface ConversationProjection {
@@ -77,7 +77,7 @@ export function commandFor(event: EventBody): ConversationCommand | null {
   }
   if (event.type === 'send_failed') {
     // `isFinal` is absent from events written before it existed: the attempt count decides for them.
-    const isFinal = event.payload.isFinal ?? event.payload.attempt >= MAX_SEND_ATTEMPTS;
+    const isFinal = event.payload.isFinal ?? event.payload.attempt >= LEGACY_MAX_SEND_ATTEMPTS;
     return isFinal ? 'send_failed_final' : null;
   }
   // A placed draft reconciled with what the chatter sent himself (ADR 0086 § 5): no send follows, the fan is answered.

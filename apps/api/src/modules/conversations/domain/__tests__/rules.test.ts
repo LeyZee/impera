@@ -2,6 +2,7 @@ import type { FanAvailabilityRecord } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
+  answersHisLastMessage,
   boundFanText,
   bubbleIdempotencyKey,
   canSend,
@@ -150,5 +151,22 @@ describe('stepCutBy (relecture Sécurité de #812)', () => {
   it('lets it leave otherwise, whatever else he set', () => {
     expect(stepCutBy({}, null)).toBeNull();
     expect(stepCutBy({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, null)).toBeNull();
+  });
+});
+
+describe('answersHisLastMessage (recette REV-04)', () => {
+  const his = { id: 'fan-new', direction: 'inbound' as const };
+  const hers = { id: 'old-reply', direction: 'outbound' as const };
+
+  it('answers him when it comes after his last message on the platform', () => {
+    expect(answersHisLastMessage([his, hers], 'old-reply')).toBe(true);
+  });
+
+  it('never answers him with a message dated before his, whatever the order it reached us', () => {
+    expect(answersHisLastMessage([hers, his], 'old-reply')).toBe(false);
+  });
+
+  it('never answers him with a message too old to be among the last ones read', () => {
+    expect(answersHisLastMessage([his], 'old-reply')).toBe(false);
   });
 });

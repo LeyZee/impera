@@ -9,6 +9,7 @@ import {
   type CurrentUser,
   type DesireCurve,
   type MessageView,
+  type SendingStop,
   type UserId,
 } from '@impera/contracts';
 
@@ -70,8 +71,11 @@ export interface ConversationReads {
    * conversation he holds; otherwise 403 `creator_forbidden` or `conversation_forbidden`.
    */
   actorOn(viewer: ConversationViewer, creatorId: CreatorId, conversationId: ConversationId): Promise<UserId>;
-  /** Whether the emergency stop holds her messages: whoever lists her conversations reads it (recette CHAT-07). */
-  stopped(viewer: ConversationViewer, creatorId: CreatorId): Promise<boolean>;
+  /**
+   * Whether the emergency stop holds her messages (recette CHAT-07), and where her session expired (recette REV-05):
+   * whoever lists her conversations reads it.
+   */
+  stopped(viewer: ConversationViewer, creatorId: CreatorId): Promise<SendingStop>;
   /** Her conversations, only those he holds when he does not treat them all. */
   list(
     viewer: ConversationViewer,
@@ -143,7 +147,11 @@ export function createConversationReads(reader: ConversationReader): Conversatio
       if (!treatsEveryConversation(viewer, creatorId) && !viewer.routedCreators.includes(creatorId)) {
         throw new CreatorForbidden();
       }
-      return reader.sendingStopped(creatorId);
+      const [stopped, expiredSessions] = await Promise.all([
+        reader.sendingStopped(creatorId),
+        reader.expiredSessions(creatorId),
+      ]);
+      return { stopped, expiredSessions: [...expiredSessions] };
     },
     async list(viewer, creatorId, page) {
       const heldOnly = !treatsEveryConversation(viewer, creatorId);

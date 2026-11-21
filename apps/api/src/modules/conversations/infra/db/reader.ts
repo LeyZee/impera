@@ -16,9 +16,11 @@ import {
   MessageAuthorSchema,
   MessageDirectionSchema,
   MessageIdSchema,
+  PlatformSchema,
   type ConversationDesire,
   type ConversationId,
   type ConversationSummary,
+  type DraftScriptStepView,
   type DraftView,
   type MessageMediaView,
   type ConversationState,
@@ -37,11 +39,17 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
-import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '../../domain/ports';
+import type {
+  Clock,
+  ConversationReader,
+  DraftScriptStep,
+  MediaDescriptions,
+  PageRequest,
+} from '../../domain/ports';
 
 import { heldBy, holderFor } from './holds';
 import { openedLately, writeOpening } from './openings';
-import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toStoredEvent } from './rows';
+import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toDraft, toStoredEvent } from './rows';
 
 const SwitchRowsSchema = z.array(z.object({ active: z.boolean() }));
 
@@ -140,7 +148,83 @@ export function retriedOf(guardTrace: unknown): DraftView['retried'] {
   });
 }
 
-function draftView(draft: typeof schema.drafts.$inferSelect): DraftView {
+type DraftRow = typeof schema.drafts.$inferSelect;
+
+/** A script and one of its steps as the platform names them, by the refs a draft keeps. */
+interface StepNames {
+  readonly scriptName: string;
+  readonly stepName: string | null;
+}
+
+export const stepKey = (scriptRef: string, stepRef: string): string => JSON.stringify([scriptRef, stepRef]);
+
+/**
+ * The names of the steps these drafts send (recette REV-03), from the catalogue read on the conversation's account. A
+ * script no longer there is simply not found: the view says the step without its names.
+ */
+async function stepNamesOf(
+  tx: Transaction,
+  conversationId: ConversationId,
+  drafts: readonly DraftRow[],
+): Promise<ReadonlyMap<string, StepNames>> {
+  const steps = drafts.flatMap((draft) => {
+    const step = toDraft(draft).scriptStep;
+    return step === null ? [] : [step];
+  });
+  if (steps.length === 0) return new Map();
+  const rows = await tx
+    .select({
+      scriptRef: schema.platformScripts.platformScriptRef,
+      scriptName: schema.platformScripts.name,
+      stepRef: schema.platformScriptSteps.platformStepRef,
+      stepName: schema.platformScriptSteps.name,
+    })
+    .from(schema.platformScripts)
+    .leftJoin(
+      schema.platformScriptSteps,
+      eq(schema.platformScriptSteps.platformScriptId, schema.platformScripts.id),
+    )
+    .where(
+      and(
+        sql`${schema.platformScripts.platformAccountId} = (select ${schema.conversations.platformAccountId} from ${schema.conversations} where ${schema.conversations.id} = ${conversationId})`,
+        inArray(
+          schema.platformScripts.platformScriptRef,
+          steps.map((step) => step.scriptRef),
+        ),
+      ),
+    );
+  const names = new Map<string, StepNames>();
+  for (const step of steps) {
+    const script = rows.find((row) => row.scriptRef === step.scriptRef);
+    if (script === undefined) continue;
+    const named = rows.find((row) => row.scriptRef === step.scriptRef && row.stepRef === step.stepRef);
+    names.set(stepKey(step.scriptRef, step.stepRef), {
+      scriptName: script.scriptName,
+      stepName: named?.stepName ?? null,
+    });
+  }
+  return names;
+}
+
+/** The step of her script a draft sends, as the person approving reads it (recette REV-03). */
+export function scriptStepView(
+  step: DraftScriptStep | null,
+  names: ReadonlyMap<string, StepNames>,
+): DraftScriptStepView | null {
+  if (step === null) return null;
+  const named = names.get(stepKey(step.scriptRef, step.stepRef));
+  return {
+    scriptName: named?.scriptName ?? null,
+    stepIndex: step.stepIndex,
+    stepName: named?.stepName ?? null,
+    priceMinor: step.priceMinor,
+    // Reveal sells in euros (ADR 0098 § 5), as the send job prices the step.
+    currency: 'EUR',
+    hasMedia: step.hasMedia,
+  };
+}
+
+function draftView(draft: DraftRow, names: ReadonlyMap<string, StepNames>): DraftView {
   return {
     id: DraftIdSchema.parse(draft.id),
     status: DraftStatusSchema.parse(draft.status),
@@ -148,6 +232,7 @@ function draftView(draft: typeof schema.drafts.$inferSelect): DraftView {
     finalBubbles: draft.finalBubbles,
     createdAt: draft.createdAt.toISOString(),
     retried: retriedOf(draft.guardTrace),
+    scriptStep: scriptStepView(toDraft(draft).scriptStep, names),
   };
 }
 
@@ -200,6 +285,20 @@ export function createDrizzleConversationReader(
           where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
           order by scope, scope_id, set_at desc`);
         return SwitchRowsSchema.parse(switches.rows).some((row) => row.active);
+      }),
+
+    expiredSessions: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const rows = await tx
+          .selectDistinct({ platform: schema.platformAccounts.platform })
+          .from(schema.platformAccounts)
+          .where(
+            and(
+              eq(schema.platformAccounts.creatorId, creatorId),
+              eq(schema.platformAccounts.sessionState, 'expired'),
+            ),
+          );
+        return rows.map((row) => PlatformSchema.parse(row.platform));
       }),
 
     list: (creatorId, page, { userId, heldOnly }) =>
@@ -349,10 +448,11 @@ export function createDrizzleConversationReader(
             (summary.state === 'error' ||
               (AGENT_ANSWERING.includes(summary.state) &&
                 (lastOut === null || failed.createdAt.getTime() > lastOut)));
+          const names = await stepNamesOf(tx, id, stillUnsent ? [...drafts, failed] : drafts);
           return {
             ...summary,
-            openDrafts: drafts.map(draftView),
-            failedDraft: stillUnsent ? draftView(failed) : null,
+            openDrafts: drafts.map((draft) => draftView(draft, names)),
+            failedDraft: stillUnsent ? draftView(failed, names) : null,
           };
         },
         SNAPSHOT_READ,

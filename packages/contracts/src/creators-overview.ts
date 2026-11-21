@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AgentHoursNowSchema } from './agent-hours';
 import { DropCategorySchema } from './content-drops';
 import { AgentModeSchema, ResumeModeSchema } from './dashboard';
+import { PlatformSchema } from './enums';
 import { CreatorIdSchema, TeamMemberIdSchema } from './ids';
 
 /**
@@ -72,6 +73,11 @@ export const CreatorOverviewSchema = z.object({
    * it, his scope his own too; `true` from a server that does not say it yet, its mode alone said then.
    */
   hasActivePersona: z.boolean().default(true),
+  /**
+   * The platforms where one of her accounts' sessions expired (recette REV-05): her agent reads and sends nothing there
+   * until the session is captured again from the extension. Every reader gets it; empty from an older server.
+   */
+  expiredSessions: z.array(PlatformSchema).default([]),
   /** Null when no account is linked to the register, and for a reader whose scope is his own. */
   sales: CreatorOverviewSalesSchema.nullable(),
   /** Null for a reader whose scope is his own; empty when nobody is on shift. */

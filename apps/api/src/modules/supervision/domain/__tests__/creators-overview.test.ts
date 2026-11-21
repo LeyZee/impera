@@ -26,6 +26,7 @@ const facts = (patch: Partial<CreatorOverviewFacts> = {}): CreatorOverviewFacts 
   hoursNow: { open: true, changesAt: null },
   autoConversations: 0,
   hasActivePersona: true,
+  expiredSessions: [],
   requests: [],
   names: new Map([
     [THEO, 'Théo'],
@@ -76,6 +77,21 @@ describe('the cards of the list of Créatrices', () => {
     const older: Record<string, unknown> = { ...at({}) };
     delete older['hasActivePersona'];
     expect(CreatorOverviewSchema.parse(older).hasActivePersona).toBe(true);
+  });
+
+  it('tells every reader where her session expired (recette REV-05)', () => {
+    const at = (patch: Partial<CreatorOverviewFacts>) =>
+      creatorOverview({
+        creatorId: CREATOR,
+        facts: facts(patch),
+        now: NOW,
+        sales: undefined,
+        rate: null,
+        onShift: [],
+      });
+    expect(at({}).expiredSessions).toEqual([]);
+    expect(at({ expiredSessions: ['reveal'] }).expiredSessions).toEqual(['reveal']);
+    expect(at({ scope: 'self', expiredSessions: ['reveal'] }).expiredSessions).toEqual(['reveal']);
   });
 
   it('cuts her fortnight as pay does, in her zone', () => {
@@ -169,6 +185,7 @@ describe('the cards of the list of Créatrices', () => {
       hoursNow: { open: true, changesAt: null },
       resumesAs: 'copilot',
       hasActivePersona: true,
+      expiredSessions: [],
       sales: null,
       onShift: null,
       requests: null,

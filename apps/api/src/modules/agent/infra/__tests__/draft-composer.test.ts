@@ -2648,6 +2648,16 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     });
   });
 
+  it('shows the brain no script while his run is open or his age is not confirmed (recette REV-13)', async () => {
+    const running = composer({ brief: HOT }, undefined, limitsOf(ADULT).limits, deps(sent));
+    await running.draftComposer.compose({ ...free(INPUT), scriptRun: waiting });
+    expect(running.seen.brainInputs?.[0]?.scripts).toBeUndefined();
+
+    const unknownAge = composer({ brief: HOT }, undefined, limitsOf({}).limits, deps(PACK_SOURCE));
+    await unknownAge.draftComposer.compose(free(INPUT));
+    expect(unknownAge.seen.brainInputs?.[0]?.scripts).toBeUndefined();
+  });
+
   it('lets her announce the media her step sends, and still refuses one no step carries (ADR 0098, P3-13)', async () => {
     const withMedia: ScriptSource = {
       ...PACK_SOURCE,
