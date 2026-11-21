@@ -171,6 +171,7 @@ Branche : task/<id>-<slug>
 | OPS-18 | Les erreurs de production arrivent dans Sentry, sans rien de personnel | exploitation | done | OPS-01 |
 | OPS-19 | Mise en service sur le VPS Hostinger et la base Supabase | exploitation | in_progress | ADR 0152, OPS-01, OPS-02 |
 | OPS-20 | Les tests de la CI en parallèle | exploitation | done | OPS-01 |
+| OPS-21 | Le prévisionnel du coût de l'IA | exploitation | review | OPS-08 |
 | SEC-01 | Audit de sécurité : premiers correctifs | exploitation | done | — |
 | SEC-02 | Deuxième facteur pour tous les comptes | exploitation | done | ADR 0046, SEC-01 |
 | SEC-03 | Limites de connexion par compte et adresse, sessions de 7 jours au plus | exploitation | done | ADR 0046, SEC-02 |
