@@ -1,18 +1,18 @@
 import type { DetectedLink, LinkHourReading, LinkRef } from '@impera/contracts';
 
-import type { LinkStatsConnector, LinkStatsRange } from '../../domain/link-stats';
+import type { LinkRobotHour, LinkStatsConnector, LinkStatsRange } from '../../domain/link-stats';
 
 /**
- * The redirect service in memory (ADR 0120 § 3): hours and robot visits given by the test, read back by range, and
+ * The redirect service in memory (ADR 0120 § 3): hours and robots given by the test, read back by range, and
  * an outage on demand. Like the port, it has nothing that writes to the service.
  */
 export class FakeLinkStats implements LinkStatsConnector {
   private readonly hours = new Map<LinkRef, LinkHourReading[]>();
-  private readonly robots = new Map<LinkRef, Date[]>();
+  private readonly robots = new Map<LinkRef, LinkRobotHour[]>();
   private outage: Error | null = null;
   /** The calls made, in order: a test reads them to check what was asked. */
   readonly calls: {
-    readonly method: 'listLinks' | 'readHours' | 'readRobotVisits';
+    readonly method: 'listLinks' | 'readHours' | 'readRobotHours';
     readonly link: LinkRef | null;
   }[] = [];
   private links: DetectedLink[] = [];
@@ -33,8 +33,8 @@ export class FakeLinkStats implements LinkStatsConnector {
     return this;
   }
 
-  seedRobotVisits(link: LinkRef, visits: readonly Date[]): this {
-    this.robots.set(link, [...(this.robots.get(link) ?? []), ...visits]);
+  seedRobotHours(link: LinkRef, flagged: readonly LinkRobotHour[]): this {
+    this.robots.set(link, [...(this.robots.get(link) ?? []), ...flagged]);
     return this;
   }
 
@@ -56,10 +56,11 @@ export class FakeLinkStats implements LinkStatsConnector {
     return Promise.resolve(readings.filter((reading) => within(new Date(reading.hour), range)));
   }
 
-  readRobotVisits(link: LinkRef, range: LinkStatsRange): Promise<readonly Date[]> {
-    this.calls.push({ method: 'readRobotVisits', link });
+  readRobotHours(link: LinkRef, range: LinkStatsRange): Promise<readonly LinkRobotHour[]> {
+    this.calls.push({ method: 'readRobotHours', link });
     if (this.outage) return Promise.reject(this.outage);
-    return Promise.resolve((this.robots.get(link) ?? []).filter((visit) => within(visit, range)));
+    const flagged = this.robots.get(link) ?? [];
+    return Promise.resolve(flagged.filter((hour) => within(new Date(hour.hour), range)));
   }
 }
 

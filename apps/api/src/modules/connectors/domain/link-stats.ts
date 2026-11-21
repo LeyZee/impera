@@ -3,7 +3,7 @@ import type { DetectedLink, LinkHourReading, LinkHourTotal, LinkRef } from '@imp
 /**
  * The link connector (ADR 0120 § 3), pure: its read-only port, the hours kept of a reading once the robots are
  * removed, and the rule of the red alert on a story link gone silent (§ 6). Nothing of a visitor crosses the port:
- * a flagged visit is the instant it happened, and nothing else.
+ * robots are a number an hour, and nothing else.
  */
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -18,6 +18,13 @@ export interface LinkStatsRange {
   readonly to: Date;
 }
 
+/** The visits of one hour that the service flags as a robot: a count, never a visit. */
+export interface LinkRobotHour {
+  /** The start of the hour, UTC. */
+  readonly hour: string;
+  readonly robots: number;
+}
+
 /**
  * The redirect service, read only: the port has no method that creates, changes or removes a link, so no caller can
  * (ADR 0120 § 3). An adapter throws on a refusal or an outage; it never answers with a guess.
@@ -27,8 +34,8 @@ export interface LinkStatsConnector {
   listLinks(): Promise<readonly DetectedLink[]>;
   /** The hours of `link` in `range` as the service counts them, robots included; an hour without a visit may be absent. */
   readHours(link: LinkRef, range: LinkStatsRange): Promise<readonly LinkHourReading[]>;
-  /** The instants of the visits of `link` in `range` that the service flags as a robot. */
-  readRobotVisits(link: LinkRef, range: LinkStatsRange): Promise<readonly Date[]>;
+  /** How many visits of `link` the service flags as a robot, hour by hour in `range`; an hour without one may be absent. */
+  readRobotHours(link: LinkRef, range: LinkStatsRange): Promise<readonly LinkRobotHour[]>;
 }
 
 function hourStart(at: Date): string {
@@ -42,7 +49,7 @@ function hourStart(at: Date): string {
  */
 export function hoursWithoutRobots(
   readings: readonly LinkHourReading[],
-  robotVisits: readonly Date[],
+  robotHours: readonly LinkRobotHour[],
 ): LinkHourTotal[] {
   const hours = new Map<string, { pageviews: number; clicks: number; robots: number }>();
   const at = (hour: string) => {
@@ -57,7 +64,7 @@ export function hoursWithoutRobots(
     hour.pageviews += reading.pageviews;
     hour.clicks += reading.clicks;
   }
-  for (const visit of robotVisits) at(hourStart(visit)).robots += 1;
+  for (const flagged of robotHours) at(hourStart(new Date(flagged.hour))).robots += flagged.robots;
   return [...hours.entries()]
     .map(([hour, total]) => ({
       hour,

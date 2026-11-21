@@ -1,7 +1,14 @@
-import { DetectedLinkSchema, DETECTED_LINK_NAME_MAX, type DetectedLink } from '@impera/contracts';
+import {
+  DetectedLinkSchema,
+  DETECTED_LINK_NAME_MAX,
+  type DetectedLink,
+  type LinkHourReading,
+  type LinkRef,
+} from '@impera/contracts';
 import { z } from 'zod';
 
 import { LinkServiceError, type LinkServiceReader } from '../../domain/link-service';
+import type { LinkRobotHour, LinkStatsConnector, LinkStatsRange } from '../../domain/link-stats';
 import { isPrivateAddress, pinnedGet, systemLookup, type Lookup, type Pinned } from '../avatar/fetch-avatar';
 
 type FetchLike = (url: string, init: RequestInit, pinned: Pinned) => Promise<Response>;
@@ -16,6 +23,19 @@ const RETRY_AFTER_MAX_SECONDS = 24 * 60 * 60;
 
 const PING_PATH = '/v3/_ping';
 const LINKS_PATH = '/v3/links';
+
+/** Totals by hour, views or clicks. The lists of visitors and of origins have no path here: they are never read. */
+const HOURS_PATH = '/v3/analytics/time-series';
+/** What the service flags, counted by hour. Reading it changes nothing to a link's protection. */
+const ROBOTS_PATH = '/v3/analytics/shield';
+
+/** The widest window the service counts by the hour; a reading asks for it whole and keeps the hours of its range. */
+const HOURLY_WINDOW = '48h';
+/** The window is 48 hours: a longer series is not the one we asked for. */
+const BUCKETS_MAX = 72;
+const COUNT_MAX = 100_000_000;
+
+const SERVICE_LINK_ID = /^[a-z]{2,8}_[0-9a-f]{16,40}$/u;
 
 const DOMAIN = /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u;
 
@@ -32,12 +52,33 @@ const PageSchema = z.object({
  * tracking settings) is dropped here and never kept, shown nor given to a prompt.
  */
 const ServiceLinkSchema = z.object({
-  id: z.string().regex(/^[a-z]{2,8}_[0-9a-f]{16,40}$/u),
+  id: z.string().regex(SERVICE_LINK_ID),
   shortcode: z.string().regex(/^[a-z0-9_-]{3,24}$/u),
   domain: z.string().regex(DOMAIN),
   selected_domain: z.string().regex(DOMAIN).nullish(),
   display_name: z.string().nullish(),
 });
+
+const count = z.number().int().nonnegative().max(COUNT_MAX);
+/** The start of a bucket: an hour sharp in UTC, since the series is asked by the hour in UTC. */
+const bucket = z.iso
+  .datetime()
+  .refine((text) => /T\d{2}:00:00(\.0+)?Z$/u.test(text))
+  .transform((text) => new Date(text).toISOString());
+
+const seriesOf = <Item extends z.ZodType>(item: Item) =>
+  z.object({ has_more: z.literal(false), data: z.array(item).max(BUCKETS_MAX) });
+
+/** Of each bucket, the one figure asked; whatever else comes with it is dropped. */
+const ViewsSchema = seriesOf(z.object({ bucket, pageviews: count }));
+const ClicksSchema = seriesOf(z.object({ bucket, button_clicks: count }));
+/** Of what the service flags, only the visits it calls robots. */
+const RobotsSchema = seriesOf(z.object({ bucket, breakdown: z.object({ bot: count }) }));
+
+function within(hour: string, range: LinkStatsRange): boolean {
+  const at = Date.parse(hour);
+  return at >= range.from.getTime() && at < range.to.getTime();
+}
 
 function detectedOf(raw: unknown): DetectedLink | null {
   const link = ServiceLinkSchema.safeParse(raw);
@@ -98,7 +139,7 @@ export function createLinkServiceReader(options: {
   readonly key: string;
   readonly fetchLike?: FetchLike;
   readonly lookup?: Lookup;
-}): LinkServiceReader {
+}): LinkServiceReader & LinkStatsConnector {
   const { origin, key, fetchLike = pinnedGet, lookup = systemLookup } = options;
 
   async function get(path: string, query: Readonly<Record<string, string>> = {}): Promise<unknown> {
@@ -146,7 +187,51 @@ export function createLinkServiceReader(options: {
     throw new LinkServiceError('unexpected');
   }
 
+  /** One hourly series of one link, read through `schema`; a reference the service could not have given is not sent. */
+  async function hourly<Series extends z.ZodType>(
+    path: string,
+    link: LinkRef,
+    schema: Series,
+    extra: Readonly<Record<string, string>> = {},
+  ): Promise<z.infer<Series>> {
+    if (!SERVICE_LINK_ID.test(link)) throw new LinkServiceError('unexpected');
+    const parsed = schema.safeParse(
+      await get(path, {
+        link_id: link,
+        timeframe: HOURLY_WINDOW,
+        interval: 'hour',
+        timezone: 'UTC',
+        ...extra,
+      }),
+    );
+    if (!parsed.success) throw new LinkServiceError('unexpected');
+    return parsed.data;
+  }
+
   return {
+    async readHours(link, range) {
+      const views = await hourly(HOURS_PATH, link, ViewsSchema, { metric: 'pageviews' });
+      const clicks = await hourly(HOURS_PATH, link, ClicksSchema, { metric: 'button_clicks' });
+      const hours = new Map<string, LinkHourReading>();
+      for (const { bucket: hour, pageviews } of views.data) hours.set(hour, { hour, pageviews, clicks: 0 });
+      for (const { bucket: hour, button_clicks: pressed } of clicks.data) {
+        hours.set(hour, { hour, pageviews: hours.get(hour)?.pageviews ?? 0, clicks: pressed });
+      }
+      return [...hours.values()]
+        .filter((reading) => within(reading.hour, range) && (reading.pageviews > 0 || reading.clicks > 0))
+        .sort((a, b) => a.hour.localeCompare(b.hour));
+    },
+
+    async readRobotHours(link, range) {
+      const flagged = await hourly(ROBOTS_PATH, link, RobotsSchema);
+      const hours = new Map<string, LinkRobotHour>();
+      for (const { bucket: hour, breakdown } of flagged.data)
+        hours.set(hour, { hour, robots: breakdown.bot });
+      return [...hours.values()]
+        .filter((robots) => within(robots.hour, range) && robots.robots > 0)
+        .sort((a, b) => a.hour.localeCompare(b.hour));
+    },
+
     async ping() {
       if (!PingSchema.safeParse(await get(PING_PATH)).success) throw new LinkServiceError('unexpected');
     },
