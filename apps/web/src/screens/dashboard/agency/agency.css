@@ -1339,9 +1339,8 @@
   font-weight: 600;
   text-align: center;
 }
-/* Wide enough for « comparé au mois précédent » whole (H-09). */
 .ins-when__compare {
-  width: 16em;
+  width: 13.5em;
 }
 /* The comparison is a quieter choice than the period: no plate, muted ink until hovered or opened. */
 .ins-when__compare .nv-select__field {
@@ -1356,11 +1355,6 @@
 .ins-when__compare .nv-select__field[aria-expanded='true'] {
   background: var(--nv-plate-hover);
   color: var(--nv-ink);
-}
-/* Both fields above drop the plate's shadow, and with it the focus ring: the keyboard gets it back (DS-03). */
-.ins-when__nav .ins-when__select .nv-select__field:focus-visible,
-.ins-when__compare .nv-select__field:focus-visible {
-  box-shadow: var(--nv-shadow-focus);
 }
 .ins-when__days {
   display: inline-flex;

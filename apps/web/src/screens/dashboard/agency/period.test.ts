@@ -86,7 +86,7 @@ describe('the agency’s days (ADR 0146)', () => {
 
   it('offers the period just before, then earlier ones of the same unit, a Saturday against a Saturday', () => {
     const months = compareChoices({ unit: 'month' }, '2026-11-01', TODAY);
-    expect(months[0]).toEqual({ value: 'previous', label: 'comparé au mois précédent' });
+    expect(months[0]).toEqual({ value: 'previous', label: 'vs mois précédent' });
     expect(months[1]).toEqual({ value: '2026-09-01', label: 'vs septembre 2026' });
     expect(months.some((one) => one.value === '2025-11-01')).toBe(true);
     const days = compareChoices({ unit: 'day' }, '2026-11-14', TODAY);
