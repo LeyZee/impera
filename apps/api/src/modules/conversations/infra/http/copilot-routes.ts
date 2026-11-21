@@ -101,7 +101,14 @@ function viewOf(creatorId: CreatorId, read: CopilotRead): CopilotDraftView {
         placedAt: read.draft.placedAt?.toISOString() ?? null,
       },
     };
-  return { state: read.writing ? 'writing' : 'none', conversation };
+  if (read.writing) return { state: 'writing', conversation };
+  return {
+    state: 'none',
+    conversation,
+    ...(read.sent === null
+      ? {}
+      : { sent: { draftId: read.sent.draftId, sentAt: read.sent.at.toISOString() } }),
+  };
 }
 
 /**

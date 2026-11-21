@@ -114,6 +114,10 @@ export function toDraft(row: typeof schema.drafts.$inferSelect): Draft {
     createdAt: row.createdAt,
     facts: readFacts(row.brief),
     scriptStep: readScriptStep(row.policyTrace),
+    placed:
+      row.placedBy === null || row.placedAt === null
+        ? null
+        : { by: UserIdSchema.parse(row.placedBy), at: row.placedAt },
   };
 }
 

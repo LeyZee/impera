@@ -61,14 +61,18 @@ export const CopilotDraftSchema = z.strictObject({
  * What the panel reads every 5 s while it is shown (ADR 0086 § 9):
  * - `unknown`: Impera has not read this conversation yet;
  * - `off`: her drafts are off in the extension, the card may still be on;
- * - `none`: no draft is waiting;
+ * - `none`: no draft is waiting; `sent`, the last one was placed by a chatter and reconciled with what left (§ 5);
  * - `writing`: the agent is writing one;
  * - `ready`: one is waiting, with its bubbles.
  */
 export const CopilotDraftViewSchema = z.discriminatedUnion('state', [
   z.strictObject({ state: z.literal('unknown') }),
   z.strictObject({ state: z.literal('off'), conversation: CopilotConversationSchema }),
-  z.strictObject({ state: z.literal('none'), conversation: CopilotConversationSchema }),
+  z.strictObject({
+    state: z.literal('none'),
+    conversation: CopilotConversationSchema,
+    sent: z.strictObject({ draftId: DraftIdSchema, sentAt: z.iso.datetime() }).exactOptional(),
+  }),
   z.strictObject({ state: z.literal('writing'), conversation: CopilotConversationSchema }),
   z.strictObject({
     state: z.literal('ready'),
