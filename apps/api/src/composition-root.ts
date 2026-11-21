@@ -484,6 +484,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     alerts: alerts.module,
     agent,
     media,
+    customOrders: customOrders.module,
     copilot: {
       // The copilot panel writes with the person's extension link (ADR 0086 § 8), read as a session would read him:
       // his creators and his shift's at each gesture (ADR 0025).

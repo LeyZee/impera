@@ -186,6 +186,8 @@ const CREATOR_DECISIONS: Readonly<
   drafts: 'closed',
   script_runs: 'closed',
   conversation_events: 'closed',
+  // His custom orders (ADR 0159 § A): her yes comes with the next lot; until then she reads nothing of them.
+  custom_orders: 'closed',
   llm_calls: 'closed',
   calibration_ratings: 'closed',
   blind_tests: 'closed',

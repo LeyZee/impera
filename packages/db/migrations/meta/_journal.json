@@ -1282,6 +1282,13 @@
       "when": 1795221813804,
       "tag": "0241_sale_trouble_and_abandon_events",
       "breakpoints": true
+    },
+    {
+      "idx": 183,
+      "version": "7",
+      "when": 1795225926467,
+      "tag": "0242_custom_orders",
+      "breakpoints": true
     }
   ]
 }
