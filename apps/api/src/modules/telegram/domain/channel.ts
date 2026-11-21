@@ -84,7 +84,7 @@ const GAP_WORDS = `${String(CHANNEL_SLOT_GAP_MINUTES / 60)}${NBSP}h d’écart a
 function slotRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
   const main = mainRefusal(slots);
   if (main !== null) return main;
-  const reversed = slots.find((slot) => slot.untilMinute !== null && slot.untilMinute < slot.minute);
+  const reversed = slots.find((slot) => (slot.untilMinute ?? slot.minute) < slot.minute);
   if (reversed !== undefined) {
     return {
       kind: 'slots_too_close',

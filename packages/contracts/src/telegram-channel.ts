@@ -49,7 +49,7 @@ export const ChannelSlotSchema = z.object({
    * ADR 0162 § 2.1: the end of its window; the post's hour is drawn between `minute` and this when the week is
    * planned. Null, or absent from a setting saved before: an exact hour.
    */
-  untilMinute: MinuteOfDaySchema.nullable().default(null),
+  untilMinute: MinuteOfDaySchema.nullable().optional(),
   role: ChannelSlotRoleSchema,
   days: z
     .array(IsoDaySchema)
