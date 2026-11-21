@@ -170,6 +170,20 @@ describe('threadOf', () => {
     expect(whyHuman({ events: [] })).toBeNull();
   });
 
+  it('names the watched word that made the agent step back (IA-05)', () => {
+    const events = [
+      event(1, 1, {
+        type: 'handoff_requested',
+        payload: {
+          conversationId: CONVERSATION,
+          cause: 'keyword',
+          trigger: { alert: { kind: 'system', code: 'keyword' }, matchedBy: 'keyword', keyword: 'bot' },
+        },
+      }),
+    ];
+    expect(whyHuman({ events })).toBe('L’agent passe la main (Mot surveillé : « bot »)');
+  });
+
   // Recette 05/11, PRO-26: giving back a grave handoff asks for a confirmation.
   it('names a grave handoff while it is the latest change of hand, and only then', () => {
     const minor = event(5, 9, {

@@ -14,7 +14,7 @@ import { z } from 'zod';
 
 import { euros } from './flags-model';
 
-import { CAUSE_LABELS } from '@/agent/causes';
+import { CAUSE_LABELS, handoffCauseLabel } from '@/agent/causes';
 import { GUARD_LABELS } from '@/agent/guards';
 import { addDays, clockAt, dayMonth, dayOf, weekdayOf } from '@/scheduling/time';
 
@@ -115,7 +115,10 @@ function alertNote(trigger: AlertTrigger): string {
 /** The note an event leaves in the thread, or null for the events the messages already show. */
 function noteOf(event: ConversationEventView, timeZone: string): string | null {
   if (event.type === 'handoff_requested')
-    return withReason(`L’agent passe la main (${CAUSE_LABELS[event.payload.cause]})`, event.payload.reason);
+    return withReason(
+      `L’agent passe la main (${handoffCauseLabel(event.payload.cause, event.payload.trigger?.keyword)})`,
+      event.payload.reason,
+    );
   if (event.type === 'takeover_started') return withReason('Un humain reprend la main', event.payload.reason);
   if (event.type === 'alert_triggered') return alertNote(event.payload.trigger);
   if (event.type === 'takeover_ended') return 'La main revient à l’agent';
