@@ -1,5 +1,6 @@
 import type {
   Actor,
+  FanTiersSetting,
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
@@ -68,6 +69,7 @@ import type { CustomOrderTurn } from '../../custom-orders/pure';
 
 import type { AwayStatus } from './away';
 import type { ConversationProjection } from './projection';
+import type { ToTalkCandidate } from './to-talk';
 
 /** Ports of the `conversations` module (ADR 0002): what it needs, implemented in `infra/` or by other modules. */
 
@@ -950,6 +952,14 @@ export interface ConversationReader {
     page: PageRequest,
     reader: { readonly userId: UserId; readonly heldOnly: boolean },
   ): Promise<Page<ConversationSummary>>;
+  /**
+   * « À qui parler maintenant » (Charles, 21/11): her conversations where a fan wrote or arrived lately, each with what
+   * he spent and his flags, and her tier thresholds. With `heldOnly`, only those the reader holds.
+   */
+  toTalkCandidates(
+    creatorId: CreatorId,
+    reader: { readonly userId: UserId; readonly heldOnly: boolean },
+  ): Promise<{ readonly candidates: readonly ToTalkCandidate[]; readonly tiers: FanTiersSetting }>;
   /**
    * Whether that account holds the conversation (routed to it, or its takeover not ended): how a member whose scope is
    * `self` reaches it outside his access window (ADR 0025).
