@@ -603,6 +603,22 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     );
   });
 
+  // Agent, relecture du 21/11 (ADR 0086 § 5): a paid step copied by hand leaves without its media.
+  it('tells him to send the paid media too when the copied draft is the sale, in amber', () => {
+    const copied = ready({
+      done: { outcome: 'placed', bubbles: ['coucou toi 😘'], copied: 1, copyFailed: false, sent: 'sent' },
+    });
+    const sale = draw(onCard(card({}), [], { draft: copied, assist: assistOf() })).root;
+    expect(sale.querySelector('.cp-draft__warn[data-media]')?.textContent).toBe(
+      'Envoie aussi le média à 15\u00a0€ depuis Reveal : le texte seul ne le vend pas.',
+    );
+    const again = draw(onCard(card({}), [], { draft: ready({ placed: true }), assist: assistOf() })).root;
+    expect(again.querySelector('[data-media]')).not.toBeNull();
+    const talk = assistOf({ nextMove: { kind: 'reply', label: 'Répondre', priceMinor: null, block: null } });
+    const plain = draw(onCard(card({}), [], { draft: copied, assist: talk })).root;
+    expect(plain.querySelector('[data-media]')).toBeNull();
+  });
+
   // EXT-13: Reveal sends one bubble per message; they are copied one at a time, the gesture counted once.
   it('copies several bubbles one at a time, the next under its own button and `a`', () => {
     const done = (copied: number): DraftPart =>

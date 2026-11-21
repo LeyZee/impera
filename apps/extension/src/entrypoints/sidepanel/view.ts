@@ -17,6 +17,7 @@ import {
   cutOf,
   draftNotes,
   conditionWords,
+  eurosOf,
   momentLine,
   moveLines,
   saleLine,
@@ -832,10 +833,21 @@ function cardPart(
 const key = (letter: string): HTMLElement => h('span', { class: 'nv-kbd' }, letter);
 
 /**
+ * A draft that carries a paid step, copied by hand: its text leaves, the media does not (Agent, relecture du 21/11 of
+ * ADR 0086 § 5). What blocks the sale if forgotten, so in amber.
+ */
+const mediaLine = (price: number): HTMLElement =>
+  h(
+    'p',
+    { class: 'cp-draft__warn', 'data-media': 'true' },
+    `Envoie aussi le média à ${eurosOf(price)} depuis Reveal : le texte seul ne le vend pas.`,
+  );
+
+/**
  * What a gesture left, in one or two quiet lines: the next step in Reveal, and whether it counted (§ 5, § 8). Several
  * bubbles go one at a time, as Reveal sends them (EXT-13): the next one waits on its button, under `a`.
  */
-function doneLines(done: GestureDone): HTMLElement[] {
+function doneLines(done: GestureDone, salePrice: number | null): HTMLElement[] {
   const lines: HTMLElement[] = [];
   const total = done.bubbles.length;
   if (done.outcome === 'rejected')
@@ -865,6 +877,7 @@ function doneLines(done: GestureDone): HTMLElement[] {
           : `Bulle ${String(total)} sur ${String(total)} copiée : colle-la dans Reveal (Ctrl+V) et envoie. C’était la dernière.`,
       ),
     );
+  if (done.outcome === 'placed' && salePrice !== null) lines.push(mediaLine(salePrice));
   if (done.outcome === 'placed' && done.copied < total)
     lines.push(
       h(
@@ -935,11 +948,13 @@ interface DraftStops {
   readonly notes: readonly string[];
   /** The gesture is a sale the code proposes: « Copier pour Reveal » takes the brand's neon (Design 16/11, lot -5). */
   readonly sale: boolean;
+  /** That sale's price, in minor units: copied text never carries the paid media, so he is told to send it too. */
+  readonly salePrice: number | null;
 }
 
 function draftPart(
   draft: DraftPart,
-  { withheld, stops, saidAbove, notes, sale }: DraftStops,
+  { withheld, stops, saidAbove, notes, sale, salePrice }: DraftStops,
   actions: PanelActions,
 ): HTMLElement | null {
   if (draft.kind === 'hidden') return null;
@@ -1078,12 +1093,13 @@ function draftPart(
   }
   section.append(head, bubbles);
   if (draft.done !== null) {
-    section.append(...doneLines(draft.done));
+    section.append(...doneLines(draft.done, salePrice));
     return section;
   }
   if (draft.placed) {
     section.append(
       h('p', { class: 'cp-draft__next' }, 'Déjà copié pour Reveal : il compte quand le message part.'),
+      ...(salePrice === null ? [] : [mediaLine(salePrice)]),
     );
     return section;
   }
@@ -1255,6 +1271,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       saidAbove: cut !== null && !draftSaysCut,
       notes: assist === null ? [] : draftNotes(assist.reasons),
       sale: cut === null && assist?.nextMove?.kind === 'offer_step',
+      salePrice: cut === null && assist?.nextMove?.kind === 'offer_step' ? assist.nextMove.priceMinor : null,
     };
     const band = statusBand(screen.fanName, screen.standing, assist, cut, screen.signalsOpen);
     const pinned = move === null ? [] : [move];
