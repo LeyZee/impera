@@ -24,6 +24,7 @@ export * from './conversations';
 export * from './copilot';
 export * from './creator-space';
 export * from './creator-tasks';
+export * from './creator-decisions';
 export * from './creator-week';
 export * from './creators';
 export * from './agency-insights';

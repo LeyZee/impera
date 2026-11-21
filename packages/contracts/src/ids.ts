@@ -241,6 +241,10 @@ export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
 export const ShootItemIdSchema = uuid.brand<'ShootItemId'>();
 export type ShootItemId = z.infer<typeof ShootItemIdSchema>;
 
+/** A question put to her (`creator_decisions`, ADR 0162). */
+export const CreatorDecisionIdSchema = uuid.brand<'CreatorDecisionId'>();
+export type CreatorDecisionId = z.infer<typeof CreatorDecisionIdSchema>;
+
 /** A drop of hers (`content_drops`, CR-06, ADR 0044 § 1 and ADR 0055): drawn by her phone, so that a replay adds nothing. */
 export const ContentDropIdSchema = uuid.brand<'ContentDropId'>();
 export type ContentDropId = z.infer<typeof ContentDropIdSchema>;

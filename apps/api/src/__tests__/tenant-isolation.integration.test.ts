@@ -214,6 +214,10 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'DELETE /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id/ticks/:day': 'creator space: creator-tasks tests',
   'PUT /v1/creator-space/shoot-items/:id': 'creator space: creator-week tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/answer':
+    'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/later':
+    'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
