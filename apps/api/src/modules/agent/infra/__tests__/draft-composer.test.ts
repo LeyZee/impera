@@ -261,6 +261,14 @@ describe('createDraftComposer', () => {
       costUsd: 0.004,
       voice: { voicePrompt: '1.2.0', voiceModel: 'grok-4.7' },
       factsProposed: [],
+      // What the code decided, kept with the draft for the copilot (ADR 0141 lot a): a plain answer, nothing to sell.
+      copilot: {
+        move: { kind: 'reply', priceMinor: null, block: null },
+        reasons: [],
+        sale: null,
+        saleMoment: null,
+        desireTrend: null,
+      },
     });
     expect(seen.traces[0]).toEqual({
       creatorId: 'creator-1',

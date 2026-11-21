@@ -22,6 +22,7 @@ export * from './content-drops';
 export * from './file-sniff';
 export * from './conversations';
 export * from './copilot';
+export * from './copilot-trace';
 export * from './creator-space';
 export * from './creator-tasks';
 export * from './creator-week';
