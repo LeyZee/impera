@@ -1984,6 +1984,296 @@
   }
 }
 
+/* ───────────── Shared figures: donut, breakdown, key, meter, spark ─────────────
+   One drawing per kind of figure, on every screen (Charles, 21/11): the Dashboard's, promoted. A screen sets a
+   colour (`--_c`), a size or a column list; it never redraws the piece nor its motion. */
+
+/* Donut: a whole cut in slices, each drawn in after the other; the lit slice comes out, the others step back.
+   `donutArcs` gives each arc its `--_dash` and its offset; the middle says the total, or the lit slice. */
+.nv-donut {
+  position: relative;
+  flex: none;
+  width: var(--nv-donut-size, 148px);
+  height: var(--nv-donut-size, 148px);
+}
+.nv-donut svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.nv-donut__track,
+.nv-donut__arc {
+  fill: none;
+  stroke-width: 14;
+}
+.nv-donut__track {
+  stroke: var(--nv-fill-track);
+}
+.nv-donut__arc {
+  stroke: var(--_c);
+  stroke-dasharray: 0 999;
+  cursor: pointer;
+  transform-box: view-box;
+  transform-origin: 66px 66px;
+  animation: nv-donut var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 90ms + 120ms);
+  transition:
+    stroke-width var(--nv-dur-base) var(--nv-ease-spring),
+    transform var(--nv-dur-base) var(--nv-ease-spring),
+    opacity var(--nv-dur-fast),
+    filter var(--nv-dur-base);
+}
+@keyframes nv-donut {
+  to {
+    stroke-dasharray: var(--_dash);
+  }
+}
+.nv-donut.is-lit .nv-donut__arc {
+  opacity: 0.35;
+}
+.nv-donut.is-lit .nv-donut__arc.is-on {
+  opacity: 1;
+  stroke-width: 20;
+  /* The slice comes out of the ring, a little bigger and lit with its own colour (recette du 07/11). */
+  transform: scale(1.08);
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
+}
+/* One share alone against its track: a round end, nothing to light. */
+.nv-donut--solo .nv-donut__arc {
+  stroke-linecap: round;
+  cursor: default;
+}
+.nv-donut__middle {
+  position: absolute;
+  inset: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.nv-donut__value {
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+/* « 1 234,56 € » keeps its cents inside the ring: a long total takes a smaller size (ADM-05). */
+.nv-donut__value.is-long {
+  font-size: var(--nv-text-headline);
+}
+.nv-donut__sub {
+  margin-top: 2px;
+  font-size: var(--nv-text-caption);
+  line-height: 1.15;
+  color: var(--nv-ink-faint);
+}
+
+/* A donut beside its breakdown; on a phone the donut on top, centred, the rows the full width under it. */
+.nv-donut-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+@media (max-width: 720px) {
+  .nv-donut-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .nv-donut-row > .nv-donut {
+    align-self: center;
+  }
+}
+
+/* Key: a small round swatch in the series colour, never a bar on a side. `nv-keys` lines several up. */
+.nv-key {
+  flex: none;
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c);
+}
+.nv-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.nv-keys li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Breakdown: the legend of a donut, one row per slice (key, label, value, share, change), lit with its slice.
+   A screen with fewer columns sets `--nv-breakdown-cols`; the cells follow the order they are written in. */
+.nv-breakdown {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-breakdown__row {
+  display: grid;
+  grid-template-columns: var(--nv-breakdown-cols, auto minmax(0, 1fr) auto auto 52px);
+  column-gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--nv-radius-xs);
+  background: transparent;
+  font: inherit;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast),
+    color var(--nv-dur-fast);
+}
+.nv-breakdown__row > .nv-key {
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.nv-breakdown__row > .nv-delta {
+  justify-self: end;
+  height: 18px;
+}
+.nv-breakdown__row:hover,
+.nv-breakdown__row.is-on {
+  background: var(--nv-select);
+  color: var(--nv-ink);
+}
+.nv-breakdown__row.is-on > .nv-key {
+  transform: scale(1.35);
+}
+.nv-breakdown__row:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 1px;
+}
+.nv-breakdown__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nv-breakdown__value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+  white-space: nowrap;
+}
+.nv-breakdown__share {
+  min-width: 38px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--nv-ink-faint);
+}
+@media (max-width: 720px) {
+  /* A legend row is a target too: 44px to the finger (ADM-22). */
+  .nv-breakdown__row {
+    min-height: 44px;
+  }
+}
+
+/* Meter: how far along, on a track. `--_w` is the width reached, `--_c` the colour (the data's ink by default);
+   it widens from its start in the rhythm of the figures. A budget that can run over takes `nv-gauge`. */
+.nv-meter {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  overflow: hidden;
+}
+.nv-meter > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--_w);
+  border-radius: var(--nv-radius-full);
+  background: var(--_c, var(--nv-data-1));
+  transform-origin: left;
+  animation: nv-widen var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
+}
+@keyframes nv-widen {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Spark: the small curve at a tile's foot. 1.5px, no axis nor point, a 12 % fill at most, drawn left to right by a
+   clip (a dash is counted on screen under a non-scaling stroke). The trend's colour: `--up`, `--down`. */
+.nv-spark {
+  --_c: var(--nv-trend-up);
+  display: block;
+  width: 100%;
+  height: 28px;
+  overflow: visible;
+  clip-path: inset(-2px 100% -2px -2px);
+  animation: nv-spark var(--nv-dur-progress) var(--nv-ease-out) 260ms forwards;
+}
+.nv-spark--down {
+  --_c: var(--nv-trend-down);
+}
+.nv-spark__line {
+  fill: none;
+  stroke: var(--_c);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nv-spark__area {
+  stroke: none;
+}
+.nv-spark__fill-top {
+  stop-color: var(--_c);
+  stop-opacity: 0.12;
+}
+.nv-spark__fill-bottom {
+  stop-color: var(--_c);
+  stop-opacity: 0;
+}
+@keyframes nv-spark {
+  to {
+    clip-path: inset(-4px -4px -4px -4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nv-spark,
+  .nv-donut__arc,
+  .nv-meter > span {
+    animation: none;
+  }
+  /* Without its drawing-in, the curve is there at once: the clip it grows out of would hide it for good. */
+  .nv-spark {
+    clip-path: none;
+  }
+  .nv-donut__arc {
+    stroke-dasharray: var(--_dash);
+    /* Without motion the lit slice still stands out, at once, without growing. */
+    transition: none;
+  }
+  .nv-donut.is-lit .nv-donut__arc.is-on {
+    transform: none;
+  }
+}
+
 /* ───────────── Dashboard pieces ───────────── */
 
 /* Tones shared by the dot, the orb, a todo row and a tile: ok = success, warn = warning, bad = danger.
