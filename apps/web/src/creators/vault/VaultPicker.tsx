@@ -1,7 +1,7 @@
 import type { CreatorId, VaultFolderView, VaultMediaView } from '@impera/contracts';
 import { useState, type CSSProperties, type JSX } from 'react';
 
-import type { ChoiceIndex } from './choice';
+import { goneFromReveal, type ChoiceIndex } from './choice';
 import { durationLine, folderName, mediaKindLine, mediaLine, momentTag, syncedLine } from './model';
 import { ChevronIcon, FolderIcon, Preview, Sharp, SyncIcon, VoiceFace } from './parts';
 import {
@@ -70,7 +70,8 @@ export function VaultPicker({
   const [draft, setDraft] = useState<PickDraft>(new Map());
   const [open, setOpen] = useState<string | null>(startFolder);
   const blurred = useMediaBlur();
-  const listed = folders ?? [];
+  // A folder Reveal no longer lists has nothing left to choose (REV-07).
+  const listed = (folders ?? []).filter((each) => !goneFromReveal(each));
   const opened = open === null ? undefined : listed.find((each) => pickKey(each) === open);
   const summary = draftSummary(draft, index, listed);
   const said = draftLine(draft);

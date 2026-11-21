@@ -88,6 +88,13 @@ export function railFolders(view: VaultView): VaultFolderView[] {
   ];
 }
 
+/**
+ * A folder Reveal no longer lists (REV-07): every media of it removed at the last sync, the folder gone with them (a
+ * folder is only known by its media). Kept with what it held, never offered to import again.
+ */
+export const goneFromReveal = (folder: Pick<VaultFolderView, 'media'>): boolean =>
+  folder.media.length > 0 && folder.media.every((each) => each.removed);
+
 /** A folder's tick: none of its media imported, some, or all. */
 export type FolderTick = 'none' | 'some' | 'all';
 
@@ -97,6 +104,8 @@ export interface FolderCount {
   readonly listed: number;
   readonly imported: number;
   readonly described: number;
+  /** Reveal no longer lists it (`goneFromReveal`). */
+  readonly gone: boolean;
 }
 
 export function folderCount(index: ChoiceIndex, folder: VaultFolderView): FolderCount {
@@ -109,7 +118,7 @@ export function folderCount(index: ChoiceIndex, folder: VaultFolderView): Folder
     index.folders.get(folderKey(folder.platformAccountId, folder.folderRef)) === true ? 'all' : 'none';
   const tick: FolderTick =
     listed.length === 0 ? empty : imported === 0 ? 'none' : imported === listed.length ? 'all' : 'some';
-  return { tick, listed: listed.length, imported, described };
+  return { tick, listed: listed.length, imported, described, gone: goneFromReveal(folder) };
 }
 
 /** The figures at the head of the vault: media still listed, imported, and described among those imported. */
@@ -171,8 +180,14 @@ export function importedFolders(folders: readonly VaultFolderView[], index: Choi
   });
 }
 
-/** A folder's line on the rail: « 12 médias · 3 décrits », « 1 média · aucun décrit », « Vide ». */
-export function folderInLine(count: Pick<FolderCount, 'imported' | 'described'>): string {
+/**
+ * A folder's line on the rail: « 12 médias · 3 décrits », « 1 média · aucun décrit », « Vide », « Retiré de Reveal »
+ * for a folder Reveal no longer lists.
+ */
+export function folderInLine(
+  count: Pick<FolderCount, 'imported' | 'described'> & { readonly gone?: boolean },
+): string {
+  if (count.gone === true) return 'Retiré de Reveal';
   if (count.imported === 0) return 'Vide';
   const media = `${String(count.imported)} ${count.imported === 1 ? 'média' : 'médias'}`;
   const described =
