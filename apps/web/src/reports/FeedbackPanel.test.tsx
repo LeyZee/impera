@@ -20,6 +20,7 @@ const context = ShiftReportContextSchema.parse({
     endsAt: '2026-10-27T22:00:00.000Z',
     templateId: null,
     stoppedAt: null,
+    checkedInAt: null,
   },
   account: {
     id: id(11),
