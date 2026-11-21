@@ -416,6 +416,10 @@ export type ConnectorAccounts = z.infer<typeof ConnectorAccountsSchema>;
 /** The « Sync » refusals the extension tells apart (`/v1/connector/sessions`). */
 export const CONNECTOR_LINK_FORBIDDEN = 'connector_link_forbidden';
 export const CONNECTOR_SESSION_UNPROCESSABLE = 'connector_session_unprocessable';
+/** A Reveal token whose own expiry has already passed: a new login to the platform gives a fresh one. */
+export const CONNECTOR_SESSION_EXPIRED_UNPROCESSABLE = 'connector_session_expired_unprocessable';
+/** A token that names another platform member than the session declares beside it (ADR 0147 § 4). */
+export const CONNECTOR_SESSION_MEMBER_UNPROCESSABLE = 'connector_session_member_unprocessable';
 export const CONNECTOR_SESSION_CONFLICT = 'connector_session_conflict';
 /** The session of another team member than the « bot » member the account was first synced with (P2-02). */
 export const CONNECTOR_SESSION_MEMBER_CONFLICT = 'connector_session_member_conflict';

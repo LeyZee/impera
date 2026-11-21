@@ -139,18 +139,22 @@ export interface AccountStore {
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
 }
 
-/**
- * Reads a captured session's shape, platform by platform: `null` when the text is not a session of this platform, else
- * whose it is (`owner`: on Reveal, the creator's model id). Two sessions of one account must have the same owner.
- */
-export type SessionShape = (raw: string) => {
+/** A captured session as its platform's reader sees it. */
+interface SessionRead {
   readonly owner: string;
   readonly member?: string;
   /** The session's own expiry, when it carries one we can read (Reveal: the JWT's `exp`). */
   readonly expiresAt?: Date | null;
   /** The member is read in the token itself, not only declared beside it (ADR 0147 § 4). */
   readonly memberInToken?: boolean;
-} | null;
+}
+
+/**
+ * Reads a captured session's shape, platform by platform: `null` when the text is not a session of this platform,
+ * `'member_mismatch'` when its token names another member than the session declares beside it (ADR 0147 § 4), else
+ * whose it is (`owner`: on Reveal, the creator's model id). Two sessions of one account must have the same owner.
+ */
+export type SessionShape = (raw: string) => SessionRead | 'member_mismatch' | null;
 
 /** One reader per platform whose sessions the extension captures; a platform without one takes no session. */
 export type SessionShapes = Partial<Record<Platform, SessionShape>>;

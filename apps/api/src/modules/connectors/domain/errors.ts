@@ -2,7 +2,9 @@ import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
   CONNECTOR_SESSION_AUTO_UNPROCESSABLE,
+  CONNECTOR_SESSION_EXPIRED_UNPROCESSABLE,
   CONNECTOR_SESSION_MEMBER_CONFLICT,
+  CONNECTOR_SESSION_MEMBER_UNPROCESSABLE,
   CONNECTOR_SESSION_UNPROCESSABLE,
   DomainError,
   type ConnectorErrorCode,
@@ -46,6 +48,26 @@ export class ConnectorLinkForbidden extends DomainError {
 export class SessionShapeUnprocessable extends DomainError {
   constructor() {
     super(CONNECTOR_SESSION_UNPROCESSABLE, 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/** A token already past its own expiry: nothing is stored, a new login to the platform gives a fresh one. 422. */
+export class SessionTokenExpired extends DomainError {
+  constructor() {
+    super(
+      CONNECTOR_SESSION_EXPIRED_UNPROCESSABLE,
+      'Cette session a déjà expiré : déconnecte-toi de la plateforme, reconnecte-toi, puis synchronise',
+    );
+  }
+}
+
+/** A token that names another member than the session declares beside it (ADR 0147 § 4): nothing is stored. 422. */
+export class SessionMemberMismatch extends DomainError {
+  constructor() {
+    super(
+      CONNECTOR_SESSION_MEMBER_UNPROCESSABLE,
+      'La session lue ne correspond pas au membre connecté dans l’onglet',
+    );
   }
 }
 
