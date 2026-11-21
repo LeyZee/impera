@@ -275,7 +275,9 @@ const creators = createRoute({
     }
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
-    if (first !== undefined && !sheets.includes(sheetOf(search))) {
+    // No tab named opens the persona; a member whose sheet opens elsewhere (an active manager) lands there instead.
+    const landsElsewhere = search.onglet === undefined && first !== 'persona';
+    if (first !== undefined && (landsElsewhere || !sheets.includes(sheetOf(search)))) {
       // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
       // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
       const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
