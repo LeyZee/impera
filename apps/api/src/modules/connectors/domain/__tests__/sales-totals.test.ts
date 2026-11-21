@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { salesFeedTimeZone } from '../sale-days';
 import {
+  afterSaleOf,
   refundsListed,
   refundsOfDay,
   ringsWhenRecorded,
@@ -152,6 +153,22 @@ describe('the ring of a sale (CRM-04)', () => {
     expect(ringsWhenRecorded({ event: 'refund', occurredAt: ago(1000) }, at)).toBe(false);
     // A platform's clock a little ahead: still fresh.
     expect(ringsWhenRecorded({ event: 'sale', occurredAt: new Date(at.getTime() + 5000) }, at)).toBe(true);
+  });
+});
+
+describe('the sale that wakes his conversation (ADR 0156 § 2)', () => {
+  it('is a step he bought or a tip, nothing else', () => {
+    expect(afterSaleOf({ type: 'ppv' })).toBe('ppv');
+    expect(afterSaleOf({ type: 'tip' })).toBe('tip');
+    for (const type of [
+      'subscription',
+      'renewal',
+      'mass_dm',
+      'payment_link',
+      'paid_message',
+      'other',
+    ] as const)
+      expect(afterSaleOf({ type })).toBeNull();
   });
 });
 

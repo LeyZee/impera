@@ -4,12 +4,13 @@
  * threshold (`evals/thresholds.json`). Nothing is sent. The persona is the fictional demo one (ADR 0010), or with
  * `--persona-from-crm` her active version read from the database, which stays on that machine (OPS-11).
  * Each scenario is drawn `--draws` times (3 by default) and fails if any draw fails (OPS-11).
- * Usage: `pnpm evals [--full] [--draws 3] [--file evals/adversarial/asks-if-bot.yaml] [--persona-from-crm
- * [--creator <id>]]` (the path from the repository root), with
+ * Usage: `pnpm evals [--full] [--draws 3] [--cap-eur 6] [--transcripts <dir>] [--file evals/adversarial/asks-if-bot.yaml]
+ * [--match compliment-]
+ * [--persona-from-crm [--creator <id>]]` (the path from the repository root), with
  * LLM_XAI_API_KEY in the environment, or `--key-from-crm`: the keys saved in Réglages › Modèles IA of the database
  * DATABASE_ADMIN_URL names, opened with CREDENTIALS_ENCRYPTION_KEYS (`readSavedProviderKeys`), kept in memory only.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -48,12 +49,14 @@ import {
   UNKNOWN_AVAILABILITY,
   type FanAvailabilityRecord,
   type PersonaForModels,
+  type SaleTroubleSeen,
 } from '../modules/agent/index';
 import { proposalsOfRead } from '../modules/fans/index';
 import { readSavedProviderKeys } from '../modules/providers/index';
 
 import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
+import { afterTurn, beforeTurn, type DialogueState, type TurnLeft } from './evals/dialogue';
 import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
@@ -66,6 +69,7 @@ const SUITES = ['scenarios', 'adversarial', 'regression'] as const;
 /** His card read in his messages (ADR 0085 § 7): its own scenarios, checked without the judge. */
 const CARD_SUITE = 'card';
 const HOUR_MS = 3_600_000;
+const MAX_CAP_EUR = 20;
 
 const { values } = parseArgs({
   // pnpm forwards a bare `--` through each script hop.
@@ -73,10 +77,14 @@ const { values } = parseArgs({
   options: {
     full: { type: 'boolean', default: false },
     file: { type: 'string' },
+    /** Only the scenarios whose file name holds it: a set replayed alone (« compliment- », Charles 20/11). */
+    match: { type: 'string' },
     'key-from-crm': { type: 'boolean', default: false },
     'persona-from-crm': { type: 'boolean', default: false },
     creator: { type: 'string' },
     draws: { type: 'string', default: String(DEFAULT_DRAWS) },
+    'cap-eur': { type: 'string', default: String(EVALS_CAP_EUR) },
+    transcripts: { type: 'string' },
   },
 });
 const drawsArg = z.coerce.number().int().min(1).max(5).safeParse(values.draws);
@@ -85,6 +93,13 @@ if (!drawsArg.success) {
   process.exit(1);
 }
 const draws = drawsArg.data;
+/** What a run may spend, at most the agency's daily ceiling for paid AI (Charles: 20 € a day). */
+const capArg = z.coerce.number().positive().max(MAX_CAP_EUR).safeParse(values['cap-eur']);
+if (!capArg.success) {
+  console.error(`evals --cap-eur : un montant en euros, ${String(MAX_CAP_EUR)} au plus.`);
+  process.exit(1);
+}
+const capEur = capArg.data;
 
 /** The admin database named in `.env`, on a connection that cannot write. */
 function readOnlyAdmin(flag: string, needsSealing: boolean): ReturnType<typeof createDbClient> {
@@ -147,7 +162,11 @@ const files =
         } catch {
           names = [];
         }
-        return names.filter((name) => /\.ya?ml$/.test(name)).map((name) => resolve(EVALS, suite, name));
+        return names
+          .filter(
+            (name) => /\.ya?ml$/.test(name) && (values.match === undefined || name.includes(values.match)),
+          )
+          .map((name) => resolve(EVALS, suite, name));
       })
     : [resolve(ROOT, values.file)];
 
@@ -210,7 +229,7 @@ const gateway = createLlmGateway({
   resolveModel: createModelResolver(credentials),
   log: createInMemoryCallLog(),
   // Its own cap: an eval run never eats into the fans' day, and stops at a few euros.
-  dailyCapEur: () => EVALS_CAP_EUR,
+  dailyCapEur: () => capEur,
 });
 console.log(
   `Juge : ${config.roles.judge.provider} ${config.roles.judge.model}` +
@@ -240,6 +259,19 @@ async function readCard(scenario: CardScenario): Promise<{ failures: string[]; v
   return {
     failures: checkCardScenario(scenario, { proposals }),
     values: proposals.map((p) => `${p.field} : ${p.value} (${p.kind})`),
+  };
+}
+
+/** When she last answered each sale trouble of his, as the scenario dates it before his message. */
+function saleTroubleSeenOf(
+  answered: Scenario['situation']['sale_trouble_answered'],
+  now: Date,
+): SaleTroubleSeen {
+  const before = (minutes: number | undefined): Date | null =>
+    minutes === undefined ? null : new Date(now.getTime() - minutes * 60_000);
+  return {
+    paymentHelpAt: before(answered.payment_help_minutes_ago),
+    complaintAt: before(answered.complaint_minutes_ago),
   };
 }
 
@@ -276,23 +308,51 @@ function scriptOutcome(
     : { decision: decision.kind };
 }
 
-/** One scenario, on the path a real fan's message takes; nothing leaves. */
-async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Record<string, number> }> {
+/** Where the scenario starts: her clock, the history written, his score, availability and scripts as stored. */
+function initialState(scenario: Scenario): DialogueState {
   const { situation } = scenario;
   // Paris in October is UTC+2: her local time as the scenario says.
   const now = new Date(`${today}T${situation.local_time}:00+02:00`);
-  const inbound = Array.isArray(scenario.inbound) ? scenario.inbound : [scenario.inbound];
-  // A turn dated by the scenario carries its time; his new messages are written now. Undated scenarios say none.
-  const dated =
-    scenario.inbound_minutes_ago !== undefined ||
-    scenario.history.some((turn) => turn.minutes_ago !== undefined);
-  const writtenAt = new Date(now.getTime() - (scenario.inbound_minutes_ago ?? 0) * 60_000);
-  const history: ConversationTurn[] = [
-    ...scenario.history.map(({ from, text, minutes_ago }): ConversationTurn => ({
+  return {
+    now,
+    history: scenario.history.map(({ from, text, minutes_ago }): ConversationTurn => ({
       from,
       text,
       ...(minutes_ago !== undefined && { at: new Date(now.getTime() - minutes_ago * 60_000) }),
     })),
+    desire: situation.desire,
+    availability: availabilityOf(situation, now),
+    scripts: scenario.scripts === undefined ? undefined : scriptsInputOf(scenario.scripts, now),
+  };
+}
+
+interface TurnRun {
+  readonly outcome: Outcome;
+  readonly scores: Record<string, number>;
+  readonly left: TurnLeft;
+}
+
+/**
+ * One message of his, on the path a real fan's message takes; nothing leaves. The first turn is the scenario's own;
+ * the next ones (`then`) read the state her previous answer left, and are always dated.
+ */
+async function runTurn(
+  scenario: Scenario,
+  state: DialogueState,
+  inboundLines: string | readonly string[],
+  isFirst: boolean,
+): Promise<TurnRun> {
+  const { situation } = scenario;
+  const { now } = state;
+  const inbound = typeof inboundLines === 'string' ? [inboundLines] : inboundLines;
+  // A turn dated by the scenario carries its time; his new messages are written now. Undated scenarios say none.
+  const dated =
+    scenario.then.length > 0 ||
+    scenario.inbound_minutes_ago !== undefined ||
+    scenario.history.some((turn) => turn.minutes_ago !== undefined);
+  const writtenAt = new Date(now.getTime() - (isFirst ? (scenario.inbound_minutes_ago ?? 0) : 0) * 60_000);
+  const history: ConversationTurn[] = [
+    ...state.history,
     ...inbound.map((text): ConversationTurn => ({ from: 'fan', text, ...(dated && { at: writtenAt }) })),
   ];
   // Her alerts as the composer gives them: short ids, in her order (P4-01).
@@ -334,7 +394,7 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       },
       // His score as stored just before; no clock per message here, so his reply speed is not measured.
       desire: {
-        previous: { score: situation.desire, at: now },
+        previous: { score: state.desire, at: now },
         measured: {
           ...measureDesire(
             history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text, at: now })),
@@ -372,15 +432,23 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
       },
       ...(alerts.length > 0 && { alerts: alerts.map(({ id, phrase }) => ({ id, phrase })) }),
       // His availability and his sexualizing as stored a few minutes before (ADR 0103 § 9-13).
-      availability: availabilityOf(situation, now),
+      availability: state.availability,
       // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
-      ...(scenario.scripts !== undefined && { scripts: scriptsInputOf(scenario.scripts, now) }),
+      ...(state.scripts !== undefined && { scripts: state.scripts }),
+      // A sale that went wrong for him (ADR 0156 § 4 and § 7): when she last answered it, and whether he bought.
+      saleTrouble: {
+        seen: saleTroubleSeenOf(situation.sale_trouble_answered, now),
+        hasBought:
+          situation.spent_euros > 0 ||
+          (state.scripts?.history?.scripts.some((sent) => sent.boughtStepIndexes.length > 0) ?? false),
+      },
     },
   );
   const { brief } = composed;
   const handoff =
     composed.handoff !== undefined ||
     composed.customOrder?.kind === 'handoff' ||
+    composed.saleTrouble?.kind === 'handoff' ||
     (brief !== undefined && holdDecision(brief).kind === 'handoff');
   const offer = composed.voiceBrief?.action === 'offer';
   const blocking = composed.violations.filter((v) => v.severity === 'blocking').map((v) => v.code);
@@ -399,13 +467,14 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     }),
     handoff,
     offer,
-    desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
+    desireBand: desireBandOf(composed.desire?.score ?? state.desire),
     customOrder: composed.customOrder?.kind ?? 'none',
     ...(composed.customOrderTurn?.kind === 'reply' &&
       composed.customOrderTurn.event !== undefined && {
         customOrderEvent: composed.customOrderTurn.event.type,
       }),
     objectionReply: composed.objectionReply?.replyId ?? null,
+    ...(composed.abandonTeased !== undefined && { abandonTease: composed.abandonTeased }),
     ...(composed.scripts !== undefined && { script: scriptOutcome(composed.scripts.decision) }),
     bubbles: composed.bubbles,
     blocking,
@@ -425,8 +494,70 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     });
     if (judged.ok) for (const { criterion, score } of judged.value.output.scores) scores[criterion] = score;
   }
-  return { outcome, scores };
+  return {
+    outcome,
+    scores,
+    left: {
+      heard: history,
+      bubbles,
+      desire: composed.desireRead,
+      availability: composed.availability,
+      scripts: composed.scripts,
+    },
+  };
 }
+
+/** A draw of the whole scenario: its first message, then each of `then`, every answer checked and judged. */
+async function run(scenario: Scenario, lines: string[], prefix: string): Promise<Draw> {
+  let state = initialState(scenario);
+  const failures: string[] = [];
+  const scores: Record<string, number[]> = {};
+  const turns = [
+    { after_minutes: 0, event: undefined, inbound: scenario.inbound, expect: scenario.expect },
+    ...scenario.then,
+  ];
+  for (const [index, turn] of turns.entries()) {
+    if (index > 0) state = beforeTurn(state, turn.after_minutes, turn.event);
+    const tag = turns.length > 1 ? `${prefix}tour ${String(index + 1)} : ` : prefix;
+    const { outcome, scores: turnScores, left } = await runTurn(scenario, state, turn.inbound, index === 0);
+    const turnFailures = checkScenario({ expect: turn.expect }, outcome);
+    // A written answer nobody scored is not a pass.
+    if (outcome.bubbles.length > 0 && !outcome.handoff && Object.keys(turnScores).length === 0) {
+      turnFailures.push('le juge n’a pas répondu');
+    }
+    failures.push(...turnFailures.map((failure) => `${tag}${failure}`));
+    for (const [criterion, score] of Object.entries(turnScores)) (scores[criterion] ??= []).push(score);
+    if (turns.length > 1) {
+      const said = typeof turn.inbound === 'string' ? [turn.inbound] : turn.inbound;
+      for (const text of said) lines.push(`      ${tag}lui « ${text} »`);
+    }
+    for (const bubble of outcome.bubbles) lines.push(`      ${tag}« ${bubble} »`);
+    const noted = Object.entries(turnScores).map(([c, s]) => `${c} ${s.toFixed(2)}`);
+    if (noted.length > 0) lines.push(`      ${tag}${noted.join(' · ')}`);
+    state = afterTurn(state, left);
+    if (outcome.handoff) {
+      if (index < turns.length - 1)
+        lines.push(`      ${tag}un humain prend la main, la suite n’est pas jouée`);
+      break;
+    }
+  }
+  // A draw's score per criterion is its weakest answer: one bad turn is a bad conversation.
+  return {
+    failures,
+    scores: Object.fromEntries(Object.entries(scores).map(([c, list]) => [c, Math.min(...list)])),
+  };
+}
+
+/**
+ * Where each conversation is written out in full, for a reader on this machine: a folder of `.scratch/` per run, or
+ * the one `--transcripts` names. With her real sheet (`--persona-from-crm`) the console never shows her words.
+ */
+const transcripts = resolve(
+  ROOT,
+  values.transcripts ?? `.scratch/evals/${new Date().toISOString().replaceAll(':', '-')}`,
+);
+mkdirSync(transcripts, { recursive: true });
+console.log(`Transcriptions : ${relative(ROOT, transcripts) || transcripts}`);
 
 const results: ScenarioResult[] = [];
 const minima = new Map<string, Readonly<Record<string, number>>>();
@@ -478,33 +609,29 @@ for (const path of files) {
       isCapReached = true;
       break;
     }
-    const { outcome, scores } = await run(scenario);
-    const failures = checkScenario(scenario, outcome);
-    // A written answer nobody scored is not a pass.
-    if (outcome.bubbles.length > 0 && !outcome.handoff && Object.keys(scores).length === 0) {
-      failures.push('le juge n’a pas répondu');
-    }
-    drawn.push({ failures, scores });
-    const prefix = draws > 1 ? `[${String(index + 1)}] ` : '';
-    for (const bubble of outcome.bubbles) lines.push(`      ${prefix}« ${bubble} »`);
-    const noted = Object.entries(scores).map(([c, s]) => `${c} ${s.toFixed(2)}`);
-    if (noted.length > 0) lines.push(`      ${prefix}${noted.join(' · ')}`);
+    drawn.push(await run(scenario, lines, draws > 1 ? `[${String(index + 1)}] ` : ''));
   }
   const result = mergeDraws(file, drawn);
   results.push(result);
   const passed = drawn.filter((draw) => draw.failures.length === 0).length;
   const mark = result.failures.length === 0 ? 'ok ' : 'KO ';
   console.log(`${mark} ${file}${draws > 1 ? ` (${String(passed)}/${String(drawn.length)} tirages)` : ''}`);
-  for (const line of lines) console.log(line);
+  // Her words go to a file of `.scratch/` (ignored by git); the console shows them only for the made-up persona.
+  writeFileSync(resolve(transcripts, `${file.replaceAll('/', '__')}.txt`), `${lines.join('\n')}\n`);
+  if (!values['persona-from-crm']) for (const line of lines) console.log(line);
   for (const failure of result.failures) console.log(`      ✗ ${failure}`);
 }
 
 if (isCapReached) {
   console.error(
-    `\nevals : plafond de ${String(EVALS_CAP_EUR)} € atteint, suite arrêtée après ${String(results.length)} scénarios.`,
+    `\nevals : plafond de ${String(capEur)} € atteint, suite arrêtée après ${String(results.length)} scénarios.`,
   );
 }
-const report = judgeSuite(results, values.file === undefined ? tier : { ...tier, min_scenarios: 1 }, minima);
+const report = judgeSuite(
+  results,
+  values.file === undefined && values.match === undefined ? tier : { ...tier, min_scenarios: 1 },
+  minima,
+);
 const means = Object.entries(report.means);
 if (means.length > 0)
   console.log(`\nMoyennes : ${means.map(([c, m]) => `${c} ${m.toFixed(2)}`).join(' · ')}`);

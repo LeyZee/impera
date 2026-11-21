@@ -1275,6 +1275,13 @@
       "when": 1795218042740,
       "tag": "0240_revenue_objectives",
       "breakpoints": true
+    },
+    {
+      "idx": 182,
+      "version": "7",
+      "when": 1795221813804,
+      "tag": "0241_sale_trouble_and_abandon_events",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import type {
   JudgeSituation,
   TurnMedia,
   VoiceScriptStep,
+  VoiceWaitingStep,
 } from './gateway-types';
 import type { Brief } from './schemas';
 import { wrapUntrusted } from './untrusted';
@@ -93,6 +94,15 @@ function scriptStepBlock(step: VoiceScriptStep): string {
   return wrapUntrusted('script_step', lines.join('\n'));
 }
 
+/** The paid step waiting for him (ADR 0156 § 4): its exact price and what it holds, written by code and the agency. */
+function waitingStepBlock(step: VoiceWaitingStep): string {
+  const lines = [
+    `Prix exact : ${priceLabel(step.price)}.`,
+    step.mediaSheet === null ? '' : `Ce qu’elle contient : ${step.mediaSheet}`,
+  ].filter((line) => line !== '');
+  return wrapUntrusted('waiting_step', lines.join('\n'));
+}
+
 /**
  * The brief the voice follows; her objection reply, when code chose one, and the script step code decided, each in its
  * own typed block after it. `kycMissing` stays with the brain on purpose (audit du 16/11, B4): it decides in
@@ -104,6 +114,7 @@ export function describeBrief(
   objectionReply?: string,
   scriptStep?: VoiceScriptStep,
   maxBubbles?: number,
+  waitingStep?: VoiceWaitingStep,
 ): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
@@ -118,6 +129,7 @@ export function describeBrief(
     wrapUntrusted('brief', lines),
     objectionReply === undefined ? '' : wrapUntrusted('objection_reply', objectionReply),
     scriptStep === undefined ? '' : scriptStepBlock(scriptStep),
+    waitingStep === undefined ? '' : waitingStepBlock(waitingStep),
     maxBubbles === undefined ? '' : bubblesLine(maxBubbles),
   ]
     .filter((block) => block !== '')

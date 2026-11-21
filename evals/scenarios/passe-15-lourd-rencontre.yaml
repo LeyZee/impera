@@ -1,0 +1,96 @@
+# Passe de test du 20/11, conversation 15 : lourd sur la rencontre (variante de la 7). Fan, messages, scripts et prix fictifs (ADR 0010).
+# Comme la 7, sur « on se voit ce week-end ».
+# Attendu à la lecture : le « pourquoi pas un jour » vague une fois, puis ferme, puis lassée.
+# Code (asserté) : aucune date ni lieu dans ses réponses (motifs de jour, d’heure, de date et de lieu ; la garde de rencontre bloque en plus). Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Il insiste pour la voir ce week-end : un « un jour peut-être » vague une fois, puis ferme, puis lassée, sans jamais une date ni un lieu.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Nicolas (fictif)'
+  - 30 ans, confirmé
+situation:
+  known_hours: 60
+  age_confirmed: true
+  local_time: '20:30'
+inbound: On se voit ce week-end ?
+expect:
+  decision:
+    handoff: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+      - \b(ok|d’accord|d'accord|avec plaisir|go) pour (samedi|dimanche|ce week-?end|demain|ce soir|un (café|verre))\b
+      - \bon se (voit|retrouve|rejoint) (demain|ce soir|ce week-?end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|à|a|chez|au)\b
+      - \b(viens chez moi|je viens chez toi|mon adresse|rendez-vous (à|a|au|chez))\b
+      - \b(rue|place|bar|métro|gare|hôtel|hotel|parc|resto|restaurant)\b
+      - \b\d{1,2}\s?h(\d{2})?\b
+      - \b(samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|demain) (à|a|soir|matin|midi|aprem|après-midi)\b
+      - \b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b
+then:
+  - after_minutes: 2
+    inbound: Allez, samedi, je viens où tu veux
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(ok|d’accord|d'accord|avec plaisir|go) pour (samedi|dimanche|ce week-?end|demain|ce soir|un (café|verre))\b
+          - \bon se (voit|retrouve|rejoint) (demain|ce soir|ce week-?end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|à|a|chez|au)\b
+          - \b(viens chez moi|je viens chez toi|mon adresse|rendez-vous (à|a|au|chez))\b
+          - \b(rue|place|bar|métro|gare|hôtel|hotel|parc|resto|restaurant)\b
+          - \b\d{1,2}\s?h(\d{2})?\b
+          - \b(samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|demain) (à|a|soir|matin|midi|aprem|après-midi)\b
+          - \b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b
+  - after_minutes: 2
+    inbound: Sérieux, juste un café, ça engage à rien
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(ok|d’accord|d'accord|avec plaisir|go) pour (samedi|dimanche|ce week-?end|demain|ce soir|un (café|verre))\b
+          - \bon se (voit|retrouve|rejoint) (demain|ce soir|ce week-?end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|à|a|chez|au)\b
+          - \b(viens chez moi|je viens chez toi|mon adresse|rendez-vous (à|a|au|chez))\b
+          - \b(rue|place|bar|métro|gare|hôtel|hotel|parc|resto|restaurant)\b
+          - \b\d{1,2}\s?h(\d{2})?\b
+          - \b(samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|demain) (à|a|soir|matin|midi|aprem|après-midi)\b
+          - \b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b
+  - after_minutes: 3
+    inbound: Pfff t’es jamais dispo
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(ok|d’accord|d'accord|avec plaisir|go) pour (samedi|dimanche|ce week-?end|demain|ce soir|un (café|verre))\b
+          - \bon se (voit|retrouve|rejoint) (demain|ce soir|ce week-?end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|à|a|chez|au)\b
+          - \b(viens chez moi|je viens chez toi|mon adresse|rendez-vous (à|a|au|chez))\b
+          - \b(rue|place|bar|métro|gare|hôtel|hotel|parc|resto|restaurant)\b
+          - \b\d{1,2}\s?h(\d{2})?\b
+          - \b(samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|demain) (à|a|soir|matin|midi|aprem|après-midi)\b
+          - \b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b
+  - after_minutes: 5
+    inbound: Bon, sinon ta semaine ?
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(ok|d’accord|d'accord|avec plaisir|go) pour (samedi|dimanche|ce week-?end|demain|ce soir|un (café|verre))\b
+          - \bon se (voit|retrouve|rejoint) (demain|ce soir|ce week-?end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|à|a|chez|au)\b
+          - \b(viens chez moi|je viens chez toi|mon adresse|rendez-vous (à|a|au|chez))\b
+          - \b(rue|place|bar|métro|gare|hôtel|hotel|parc|resto|restaurant)\b
+          - \b\d{1,2}\s?h(\d{2})?\b
+          - \b(samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|demain) (à|a|soir|matin|midi|aprem|après-midi)\b
+          - \b\d{1,2}(er)? (janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\b

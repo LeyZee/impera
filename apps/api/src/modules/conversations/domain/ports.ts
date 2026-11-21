@@ -1,5 +1,6 @@
 import type {
   Actor,
+  AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
   CustomAlertGroupId,
@@ -50,6 +51,7 @@ import type {
   OutboundMedia,
   PlatformAccountId,
   SafetyEvent,
+  SaleTroubleKind,
   ScriptRunId,
   ScriptRunStatus,
   ScriptStepKind,
@@ -163,6 +165,11 @@ interface ConversationRepository {
   /** The creator's conversations in this state, the one whose fan wrote first at the head. */
   idsInState(state: ConversationState): Promise<readonly ConversationId[]>;
   /**
+   * The conversation of the fan this platform id names on this account (ADR 0156 § 2: a sale names him, not the
+   * conversation), the one he last wrote in; `null` when no fan or no conversation of his is known.
+   */
+  idOfFan(platformAccountId: PlatformAccountId, platformFanId: string): Promise<ConversationId | null>;
+  /**
    * Whether `userId` holds the conversation (EQ-13): it is routed to him, or it is in `human` and his takeover is the
    * last word on who holds it (no release nor handoff since).
    */
@@ -187,7 +194,8 @@ export interface AwayHolds {
 
 interface MessageRepository {
   /** `false` when the platform message is already known (unique per account): ingestion is idempotent. A known outbound
-   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media. */
+   * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media;
+   * a known outbound message the synced copy says paid becomes paid, never the reverse (ADR 0156 § 2). */
   insertIfNew(message: NewMessage): Promise<boolean>;
   /** Bubbles of this draft already on the platform; a retried send resumes after them. */
   countForDraft(draftId: DraftId): Promise<number>;
@@ -207,6 +215,8 @@ interface DraftRepository {
   lock(id: DraftId): Promise<Draft | null>;
   /** Drafts not yet sent nor closed (`pending`, `approved`, `edited`), oldest first. */
   openFor(conversationId: ConversationId): Promise<readonly Draft[]>;
+  /** Whether a draft already carries this idempotency key (one word after a sale, ADR 0156 § 2). */
+  existsWithKey(idempotencyKey: string): Promise<boolean>;
   /** Her answers written in this conversation since `since`, whatever became of them, and when the last one was. */
   paceSince(
     conversationId: ConversationId,
@@ -272,6 +282,8 @@ interface EventWriter {
    * `script_started` since. The episode lives in his journal, never in memory.
    */
   scriptsExhaustedSaid(conversationId: ConversationId): Promise<boolean>;
+  /** How many times she teased him about a run he left (`script_abandon_teased`, Charles 20/11). */
+  abandonTeases(conversationId: ConversationId, scriptRunId: ScriptRunId): Promise<number>;
   /**
    * What ADR 0090 reads in his journal: whether a custom order of his waits (a `custom_order_opened` with no
    * `takeover_started` since), and the replies of her objection bank he already received.
@@ -282,6 +294,14 @@ interface EventWriter {
 interface SalesState {
   readonly customOrderOpen: boolean;
   readonly usedObjectionReplies: readonly string[];
+  /** When she last answered each sale trouble (`sale_trouble`), since the last takeover; `null`: never. */
+  readonly saleTrouble: SaleTroubleSeen;
+}
+
+/** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7). */
+interface SaleTroubleSeen {
+  readonly paymentHelpAt: Date | null;
+  readonly complaintAt: Date | null;
 }
 
 interface JobOptions {
@@ -441,6 +461,8 @@ interface ScriptRunRepository {
   open(conversationId: ConversationId, run: ScriptRunState): Promise<StoredScriptRun | null>;
   /** Saves a run; `false` when it was no longer open (another turn closed it). */
   save(stored: StoredScriptRun): Promise<boolean>;
+  /** His runs that went cold (`stalled`), latest first: a run he left there makes her tease him (Charles 20/11). */
+  stalled(conversationId: ConversationId): Promise<StoredScriptRun[]>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -651,6 +673,12 @@ export interface ComposeInput {
    */
   readonly followUp?: FollowUpContext;
   /**
+   * Present for her word after a sale of his (ADR 0156 § 2): a step he bought or a tip, nothing of his to answer. The
+   * engine decides whether it goes out now (`held` with `no_reply`, and `retryAt` for her night) and writes it like a
+   * follow-up: thanks and tenderness, nothing to buy.
+   */
+  readonly aftercare?: AftercareContext;
+  /**
    * How many times she already waited on his last message (P3-11): 1 on the second pass after « attends, je
    * reviens », when she may no longer wait; absent otherwise.
    */
@@ -675,6 +703,8 @@ export interface ComposeInput {
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
   readonly scriptRun?: ScriptRunState | null;
+  /** His runs before `scriptRun` that went cold, and her teases about `scriptRun` when he left it (Charles 20/11). */
+  readonly scriptAbandon?: { readonly earlier: readonly ScriptRunState[]; readonly teased: number };
   /** His availability as last journaled (ADR 0103, amendement du 13/11); `null` before the first. */
   readonly fanAvailability?: FanAvailabilityRecord | null;
   /**
@@ -682,6 +712,8 @@ export interface ComposeInput {
    * help bubble already went out in this episode.
    */
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
+  /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7); absent: never. */
+  readonly saleTrouble?: SaleTroubleSeen;
 }
 
 /** An event of a script run this message journals, in order (ADR 0098 § 2). */
@@ -726,6 +758,13 @@ interface ComposedDesire {
 }
 
 /** Which follow-up this is, after which silence. */
+/** The sale she thanks him for (ADR 0156 § 2). */
+interface AftercareContext {
+  readonly saleType: AfterSaleType;
+  /** When he paid, as the platform dates it. */
+  readonly occurredAt: Date;
+}
+
 export interface FollowUpContext {
   /** The index of the delay in `persona.follow_ups.delays_hours`, from 0. */
   readonly step: number;
@@ -760,6 +799,10 @@ export type ComposeResult =
       readonly customOrderTurn?: KeptCustomOrderTurn;
       /** A script would open for him and none is left: one `scripts_exhausted` per episode (ADR 0150 § 9). */
       readonly scriptsExhausted?: true;
+      /** She answered a sale gone wrong: one `sale_trouble`, so that the same trouble again goes to a human. */
+      readonly saleTrouble?: SaleTroubleKind;
+      /** She teased him about the run he left: one `script_abandon_teased` on that run (Charles 20/11). */
+      readonly abandonTeased?: true;
       /** The reply of her objection bank this draft was written with: one `objection_reply_used` (ADR 0090 § B). */
       readonly objectionReply?: { readonly objection: BankedObjectionKind; readonly replyId: string };
       readonly scriptRun?: ComposedScriptRun;

@@ -63,5 +63,8 @@ export function scriptsInputOf(scripts: ScenarioScripts, now: Date): ScriptsInpu
     },
     latest,
     countsHisMessage: true,
+    // Runs he left before, as code stores them: only that he left them is read.
+    earlier: latest === null ? [] : Array.from({ length: scripts.earlier_left }, () => latest),
+    teased: scripts.teased,
   };
 }

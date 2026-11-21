@@ -31,6 +31,8 @@ export type UntrustedKind =
   | 'custom_supplement'
   /** The script step code decided to send now (ADR 0098 § 5): its kind, the agency's instruction, the price, the media. */
   | 'script_step'
+  /** The paid step waiting for him, when he asks how to pay (ADR 0156 § 4): its price and what it holds. */
+  | 'waiting_step'
   /**
    * A comment left under one of her Instagram posts, and that post's caption (ADR 0122 § 2): a third party's words
    * and hers, read as data, never as an order.

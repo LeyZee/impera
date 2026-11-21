@@ -9,7 +9,7 @@ import { NO_SALE_RISKS } from './policy';
  */
 
 /** Bumped whenever a weight, a bound or the emoji list changes: each score says which counting it came from. */
-export const DESIRE_WEIGHTS_VERSION = 'desire-3';
+export const DESIRE_WEIGHTS_VERSION = 'desire-4';
 
 /** Defaults of the persona's thresholds, when her file sets none. */
 export const DEFAULT_MIN_DESIRE_TO_OPEN = DESIRE_BAND_FLOORS.playful;
@@ -20,7 +20,26 @@ export const DEFAULT_SCRIPT_MIN_DESIRE = DESIRE_BAND_FLOORS.hot;
  * gives (intent, sentiment), then what code measures without a model. A first counting, to calibrate on the sales
  * corpus (P3-12, « Calibration »).
  */
-type CountedSignal = Exclude<DesireSignal, 'minor_suspected' | 'age_disputed' | 'frozen'>;
+type CountedSignal = Exclude<
+  DesireSignal,
+  'minor_suspected' | 'age_disputed' | 'frozen' | 'rest_new' | 'rest_client'
+>;
+
+/**
+ * Where his score comes back to once he came (ADR 0156 § 6, Charles 20/11): not zero, a calm level that depends on
+ * what they have, a little higher for a fan who already buys from her.
+ */
+const REST_LEVEL = { rest_new: 10, rest_client: 20 } as const;
+export type DesireRest = keyof typeof REST_LEVEL;
+
+/** The rest level of a fan, from whether he already bought from her. */
+export const desireRestOf = (hasBought: boolean): DesireRest => (hasBought ? 'rest_client' : 'rest_new');
+
+/** His score brought back to his rest level after he came, never raised by it. */
+export function restedDesire(reading: DesireReading, rest: DesireRest): DesireReading {
+  if (reading.score <= REST_LEVEL[rest]) return reading;
+  return { ...reading, score: REST_LEVEL[rest], signals: [...reading.signals, rest] };
+}
 
 const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   // He warms up.
@@ -38,6 +57,8 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   busy_now: -30,
   slows_down: -20,
   discomfort: -30,
+  // He just came (ADR 0156 § 6): the hot moment falls at once, nothing more to sell tonight on this heat.
+  just_came: -50,
   // His availability (ADR 0103, amendement du 13/11): a fan alone and free warms a little; someone beside him or an
   // appointment cools him as much as being busy. The gate before a script reads the state code holds, not these.
   alone: 6,
@@ -45,6 +66,8 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   free_now: 6,
   someone_nearby: -30,
   leaving_soon: -25,
+  // He goes to sleep (ADR 0158 § A): the evening is over.
+  says_goodnight: -30,
   // From the brief.
   'intent:flirt': 6,
   'intent:sexting': 12,
@@ -153,6 +176,8 @@ export interface DesireTurn {
   readonly ageDisputed: boolean;
   readonly now: Date;
   readonly floor?: number;
+  /** Whether he already bought from her: where his score comes back to when he says he came. */
+  readonly hasBought?: boolean;
 }
 
 export interface DesireReading {
@@ -223,7 +248,11 @@ export function desireScore(turn: DesireTurn): DesireReading {
     ...measuredSignals(turn.measured),
   ];
   const moved = signals.reduce((sum, signal) => sum + WEIGHTS[signal], 0);
-  return reading(turn.previous, before, bounded(before + moved), signals);
+  const counted = reading(turn.previous, before, bounded(before + moved), signals);
+  // He came: the hot moment is over, his score comes back to his rest level (ADR 0156 § 6).
+  return turn.signals.includes('just_came')
+    ? restedDesire(counted, desireRestOf(turn.hasBought === true))
+    : counted;
 }
 
 /** Whether this message moved his score: only then is it journaled (a first score of 0 moves nothing). */
@@ -240,7 +269,9 @@ export function recountDesire(reading: {
   const before = reading.before ?? 0;
   if (reading.signals.includes('minor_suspected') || reading.signals.includes('age_disputed')) return 0;
   if (reading.signals.includes('frozen')) return before;
-  return bounded(
+  const counted = bounded(
     before + reading.signals.filter(isCounted).reduce((sum, signal) => sum + WEIGHTS[signal], 0),
   );
+  const rest = reading.signals.find((signal): signal is DesireRest => Object.hasOwn(REST_LEVEL, signal));
+  return rest === undefined ? counted : Math.min(counted, REST_LEVEL[rest]);
 }
