@@ -26,6 +26,8 @@ const REFUSALS: Readonly<Record<string, string>> = {
   redirect_links_full_conflict: 'Elle a déjà le nombre maximal de liens.',
   redirect_link_not_found: 'Ce lien n’existe plus : recharge la page.',
   redirect_link_forbidden: 'Tu ne peux pas régler les liens de cette créatrice.',
+  redirect_link_unmatched_conflict: 'Aucun lien du service de redirection n’a cette adresse.',
+  redirect_link_attached_conflict: 'Ce lien du service de redirection est déjà relié à un autre lien.',
 };
 
 const path = (creatorId: string): string => `/v1/creators/${encodeURIComponent(creatorId)}/redirect-links`;

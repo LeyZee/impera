@@ -45,6 +45,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '7 * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_daily_stats'] },
   },
+  // The hours of every attached redirect link (ADR 0120 § 3): a quarter past, so that the hour just over is read ten
+  // minutes after its end and closes. No backfill: the next hour reads the same window again.
+  {
+    task: 'connector.read_link_hours',
+    match: '15 * * * *',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['connector.read_link_hours'] },
+  },
   // The agency's percentage of each creator against her part read on the register (CRM-04 lot d3): the same days,
   // half an hour later, the fortnight just over in the agency's zone. No backfill: a missed run waits for the next
   // fortnight, and the event is published once per account and fortnight anyway.
