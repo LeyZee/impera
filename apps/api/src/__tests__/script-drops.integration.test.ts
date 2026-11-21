@@ -651,6 +651,61 @@ describe('/v1/creator-space/content/script-drops', () => {
     });
   });
 
+  it('never puts a medium of her script in the archive of a free drop: left out, and the sheet says so (ADR 0145 § 2)', async () => {
+    const [script] = await test.admin.db
+      .select({ by: schema.contentDrops.createdBy })
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, dropId));
+    const [medium] = await test.admin.db
+      .select({ id: schema.mediaAssets.id })
+      .from(schema.contentDropFiles)
+      .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.contentDropFiles.mediaAssetId))
+      .where(
+        and(
+          eq(schema.contentDropFiles.dropId, dropId),
+          eq(schema.contentDropFiles.state, 'kept'),
+          sql`${schema.contentDropFiles.replacedAt} is null`,
+          sql`${schema.mediaAssets.erasedAt} is null`,
+        ),
+      )
+      .limit(1);
+    if (script === undefined || medium === undefined) throw new Error('fixture changed');
+    // The same photo sent again for a Mass DM: the cleaning finds it a duplicate of her script's.
+    const massDm = newId(ContentDropIdSchema);
+    await test.admin.db.insert(schema.contentDrops).values({
+      id: massDm,
+      creatorId: nora,
+      category: 'mass_dm',
+      state: 'ready',
+      createdBy: script.by,
+    });
+    await test.admin.db.insert(schema.contentDropFiles).values({
+      id: newId(ContentDropFileIdSchema),
+      creatorId: nora,
+      dropId: massDm,
+      position: 0,
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: 10,
+      state: 'duplicate',
+      mediaAssetId: medium.id,
+    });
+    const exported = await call('GET', `/v1/creators/${nora}/drops/${massDm}/export`, 'owner');
+    expect(exported.statusCode, exported.body).toBe(200);
+    const archive = unzipSync(new Uint8Array(exported.rawPayload));
+    const names = Object.keys(archive);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/\/00-fiche\.txt$/u);
+    expect(new TextDecoder().decode(archive[names[0] ?? ''])).toContain(
+      'Un média est laissé de côté : il est vendu dans un de ses scripts, il ne part jamais offert.',
+    );
+    // Withdrawn after: the later tests count her drops waiting for a description.
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: script.by })
+      .where(eq(schema.contentDrops.id, massDm));
+  });
+
   it('confirms her script copied into Reveal once, by the team: her originals of it go 30 days later (SC-03 c)', async () => {
     // Given back for this test: the archive's own refused an erased original.
     await test.admin.db

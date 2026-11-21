@@ -785,6 +785,11 @@ export const PLATFORM_SCRIPT_GAPS = [
   'media_twice',
   /** A step carries a « Tarif réduit » on the platform: never sold at a discount (recette 16/11, Charles). */
   'step_discounted',
+  /**
+   * A paid step sells a media offered once, sent for free or out in a drop that leaves for free (ADR 0145 § 2,
+   * Charles: « un média offert n'est jamais revendu »).
+   */
+  'media_offered',
 ] as const;
 
 /** The longest condition in text (ADR 0112 § 5), as Reveal's own: one sentence the brain reads. */
