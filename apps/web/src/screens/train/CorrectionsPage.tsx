@@ -86,7 +86,19 @@ function CreatorCorrections({ creatorId, name }: { creatorId: string; name: stri
         <SkeletonCard lines={4} />
       </Skeleton>
     );
-  if (corrections.isError) return <p className="co-state">{correctionsError(corrections.error)}</p>;
+  if (corrections.isError) {
+    const refused = correctionsError(corrections.error);
+    const retry = () => {
+      void corrections.refetch();
+    };
+    return refused === null ? (
+      <Failure onRetry={retry} />
+    ) : (
+      <Failure title={refused.title} onRetry={retry}>
+        {refused.line}
+      </Failure>
+    );
+  }
   const view = corrections.data;
   if (view.items.length === 0) {
     return (
@@ -212,7 +224,7 @@ function CorrectionCard({
         <span className="co-card__reason">
           <span className="nv-key" aria-hidden="true" />
           {DRAFT_CORRECTION_REASON_LABELS[item.reason]}
-          {item.kind === 'rejected' ? <span className="co-pill">Refusé</span> : null}
+          {item.kind === 'rejected' ? <span className="nv-tag nv-tag--declared">Refusé</span> : null}
         </span>
         <span className="co-card__meta">
           <Link to="/suivi" search={{ conversation: item.conversationId, creatrice: creatorId }}>

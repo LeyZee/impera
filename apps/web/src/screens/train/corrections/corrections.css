@@ -7,7 +7,6 @@
 .co-creator {
   max-width: 320px;
 }
-.co-state,
 .co-lead {
   margin: 0;
   color: var(--nv-ink-muted);
@@ -134,14 +133,6 @@
   align-items: center;
   gap: 8px;
   color: var(--_c);
-}
-.co-pill {
-  padding: 1px 8px;
-  border-radius: var(--nv-radius-full);
-  font-size: var(--nv-text-caption);
-  font-weight: 600;
-  color: var(--nv-ink-muted);
-  background: var(--nv-fill-soft);
 }
 /* What a retouch changed: taken out, struck in the faint ink; put in, lit in the card's colour. */
 .co-diff {

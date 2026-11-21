@@ -31,10 +31,12 @@ export function useDraftCorrections(creatorId: string): UseQueryResult<DraftCorr
 }
 
 /** What the page says when the list does not come. */
-export function correctionsError(error: unknown): string {
+/** Why the corrections did not read, said in the app's own failure: a refusal named, the server's silence otherwise. */
+export function correctionsError(error: unknown): { readonly title: string; readonly line: string } | null {
   if (error instanceof CorrectionsRefused) {
-    if (error.status === 401) return 'Ta session a expiré. Reconnecte-toi.';
-    if (error.status === 403) return 'Seul le compte propriétaire lit les corrections.';
+    if (error.status === 401) return { title: 'Ta session a expiré', line: 'Reconnecte-toi.' };
+    if (error.status === 403)
+      return { title: 'Réservé au propriétaire', line: 'Seul le compte propriétaire lit les corrections.' };
   }
-  return 'Le serveur ne répond pas. Réessaie dans un instant.';
+  return null;
 }
