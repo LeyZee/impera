@@ -72,7 +72,17 @@ export interface StoredShift {
   readonly endsAt: Date;
   readonly templateId: ShiftTemplateId | null;
   readonly stoppedAt: Date | null;
+  /** When the member took it (« Je prends mon poste », EQ-12), or `null`. */
+  readonly checkedInAt: Date | null;
 }
+
+/**
+ * What `check_in_own_shift` answers (migration 0247): the instant of the check-in, new or the first one again, or why
+ * there is none. `not_found` covers a shift of someone else's, a cancelled one, and a reader who is not `active`.
+ */
+type CheckInOutcome =
+  | { readonly kind: 'checked_in' | 'already'; readonly at: Date }
+  | { readonly kind: 'not_found' | 'early' | 'ended' };
 
 export interface StoredTemplate {
   readonly id: ShiftTemplateId;
@@ -255,6 +265,8 @@ export interface PlanningStore {
     clock: PlanningClock,
   ): Promise<StoredShift | null>;
   cancelShift(actor: Actor, id: ShiftId, clock: PlanningClock): Promise<void>;
+  /** Any member, on his own shift only: the database holds the boundary and the window (`check_in_own_shift`). */
+  checkIn(actor: UserId, id: ShiftId): Promise<CheckInOutcome>;
   /** Owner and active manager: the templates running from `today`, on what he plans. */
   templates(actor: UserId, creatorIds: readonly CreatorId[], today: string): Promise<StoredTemplate[]>;
   /**

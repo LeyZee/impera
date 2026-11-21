@@ -78,6 +78,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -119,6 +120,9 @@ describe('Équipe › Membres › Dossier', () => {
   });
 
   it('sets the prefix in capitals until the first invoice freezes it', async () => {
+    // The example's year is the page's: a fixed day, never a run that crosses the 31st of December.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-21T10:00:00.000Z'));
     server.file = fileOf({ profile: profileOf({ invoicePrefix: null }) });
     renderPage();
     const field = await screen.findByLabelText('Préfixe des factures');
@@ -130,7 +134,7 @@ describe('Équipe › Membres › Dossier', () => {
     // the colon kept beside its number.
     const hint = document.getElementById(field.getAttribute('aria-describedby') ?? '');
     expect(hint?.textContent).toBe(
-      `Ses numéros commencent par lui (THEO-${String(new Date().getFullYear())}-0001)\u00a0: il se fige à sa première facture.`,
+      'Ses numéros commencent par lui (THEO-2026-0001)\u00a0: il se fige à sa première facture.',
     );
     server.refusal = { status: 409, code: 'invoice_prefix_taken_conflict' };
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));

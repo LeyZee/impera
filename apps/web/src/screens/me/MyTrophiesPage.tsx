@@ -29,7 +29,7 @@ function rankLine(trophyCase: TrophyCase): { art: JSX.Element; text: string } | 
   if (level !== null)
     return {
       art: <LevelInsignia rank={level.rank} size={44} />,
-      text: `Rang ${level.name}\u00a0: il monte avec ton net depuis ton arrivée et ne redescend jamais`,
+      text: `Rang ${level.name}\u00a0: il suit ton net depuis ton arrivée, et redescend si une vente est remboursée ou un rapport corrigé`,
     };
   const next = trophyCase.nextLevel ?? null;
   if (next === null) return null;

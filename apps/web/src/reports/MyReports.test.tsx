@@ -34,6 +34,7 @@ const shift = (n: number, startsAt: string, endsAt: string): Record<string, unkn
   endsAt,
   templateId: null,
   stoppedAt: null,
+  checkedInAt: null,
 });
 
 const DONE = shift(101, '2026-11-02T08:00:00Z', '2026-11-02T14:00:00Z');

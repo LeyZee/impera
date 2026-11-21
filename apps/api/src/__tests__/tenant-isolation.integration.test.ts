@@ -188,6 +188,9 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
  */
 const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/alerts/triggers/:id/seen': 'a trigger of the person’s own alerts',
+  'POST /v1/team/announcements/:announcementId/read': 'an announcement to the team: announcements tests',
+  'GET /v1/team/announcements/:announcementId/readers': 'an announcement to the team: announcements tests',
+  'POST /v1/team/announcements/:announcementId/withdraw': 'an announcement to the team: announcements tests',
   'DELETE /v1/scheduling/settings/versions/:id': 'an agency planning version',
   'DELETE /v1/scheduling/swap-requests/:shiftSwapRequestId': 'swap requests: leaves-swaps tests',
   'POST /v1/scheduling/swap-requests/:shiftSwapRequestId/answer': 'swap requests: leaves-swaps tests',

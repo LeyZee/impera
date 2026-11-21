@@ -67,6 +67,7 @@ const night = {
   endsAt: '2026-10-28T04:00:00Z',
   templateId: TEMPLATE,
   stoppedAt: null,
+  checkedInAt: null,
 };
 
 const ACCOUNTS = [
