@@ -620,6 +620,17 @@ redirect_links           id, creator_id → creators, name (unique par créatric
                          (écrite par `withAdmin` seul, pour le propriétaire seul ; lue par le propriétaire et un
                          manager actif pour la créatrice en cours, et par la créatrice pour ses seuls liens allumés
                          qui ont un endroit ; jamais par un chatteur ; aucune suppression)
+                         service_ref? (comment le service de redirection nomme le lien : nul tant que le
+                         propriétaire ne l'a pas relié ; lu par le serveur auprès du service, jamais reçu d'un
+                         navigateur ; unique sur toute la table ; seule colonne écrite sous `nirvana_app`, par le
+                         propriétaire seul, politique `owner_attach` et `GRANT UPDATE` par colonne ; INS-02 lot e2)
+redirect_link_hours      id, creator_id → creators, (link_id, creator_id) → redirect_links, hour (heure pile, UTC),
+                         pageviews (robots retirés), clicks, robots, closed, read_at ; unique (link_id, hour) ;
+                         des totaux seuls, rien d'un visiteur ; une ligne par heure lue, zéro compris (une heure
+                         absente n'a pas été lue) ; écrite par la tâche horaire sous `withTenantJob` (`link_hours`),
+                         remplacée tant qu'elle est ouverte, figée une fois close (politique de la tâche), jamais
+                         supprimée ; lue par le propriétaire et un manager actif de sa liste, fermée à la créatrice
+                         (ADR 0120 § 3, migration 0245)
 ```
 
 ## Commercial (phase 6, réservé)
