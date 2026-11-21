@@ -74,9 +74,14 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   train: (
     <g className="nav-lift">
       <path d="M8.5 12h7" />
-      <rect x="5" y="7" width="3.5" height="10" rx="1.6" />
-      <rect x="15.5" y="7" width="3.5" height="10" rx="1.6" />
-      <path d="M2.5 9.8v4.4M21.5 9.8v4.4" />
+      <g className="nav-w1">
+        <rect x="5" y="7" width="3.5" height="10" rx="1.6" />
+        <path d="M2.5 9.8v4.4" />
+      </g>
+      <g className="nav-w2">
+        <rect x="15.5" y="7" width="3.5" height="10" rx="1.6" />
+        <path d="M21.5 9.8v4.4" />
+      </g>
     </g>
   ),
   // Suivi: two conversation bubbles, hers behind his.
@@ -101,7 +106,7 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   // Aujourd'hui: the house one comes home to, its door opening (the sun was already « Jour »; Charles, 21/11).
   today: (
     <>
-      <path d="M3.5 11 12 3.5l8.5 7.5" />
+      <path className="nav-roof" d="M3.5 11 12 3.5l8.5 7.5" />
       <path d="M5.5 9.6V19A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V9.6" />
       <path className="nav-door" d="M10 20.5v-5.2a2 2 0 0 1 4 0v5.2" />
     </>
@@ -109,7 +114,8 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
   planning: (
     <>
       <rect x="3.5" y="5" width="17" height="15.5" rx="3" />
-      <path d="M8 3v4M16 3v4M3.5 10h17" />
+      <path d="M3.5 10h17" />
+      <path className="nav-pins" d="M8 3v4M16 3v4" />
       <circle className="nav-day" cx="15.5" cy="15" r="1.3" fill="currentColor" />
     </>
   ),
@@ -118,7 +124,7 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <rect x="3.5" y="5.5" width="13" height="13" rx="3" />
       <path d="m3.5 15.5 3.6-3.6a1.5 1.5 0 0 1 2.1 0l4.3 4.3" />
-      <circle cx="12.6" cy="9.4" r="1.2" fill="currentColor" />
+      <circle className="nav-sun" cx="12.6" cy="9.4" r="1.2" fill="currentColor" />
       <path className="nav-up" d="M19.5 21v-7M17 16.4l2.5-2.5 2.5 2.5" />
     </>
   ),
@@ -135,7 +141,7 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <circle cx="12" cy="12" r="9.5" />
       <circle className="nav-head" cx="12" cy="10" r="3" />
-      <path d="M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1" />
+      <path className="nav-body" d="M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1" />
     </>
   ),
   bell: (

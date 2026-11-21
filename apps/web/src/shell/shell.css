@@ -345,6 +345,15 @@
 .nv-rail__item:active .nav-icon {
   transform: scale(0.86);
 }
+/* Every click: the whole icon lands with a small bounce, then its own gesture plays over it. */
+.nav-icon.is-playing {
+  animation: nv-nav-land var(--nv-dur-morph) var(--nv-ease-spring-bouncy) both;
+}
+@keyframes nv-nav-land {
+  0% {
+    transform: scale(0.78);
+  }
+}
 .nv-rail__item[aria-current='page'] .nav-icon {
   color: var(--nv-neon-ink);
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--nv-neon) 55%, transparent));
@@ -397,14 +406,33 @@
     transform: translate(-2.4px, 2.4px);
   }
 }
-/* Entraîner: the dumbbell is lifted. */
+/* Entraîner: the dumbbell is lifted from a tilt, its weights slide home one after the other. */
 .is-playing .nav-lift {
   transform-origin: 12px 12px;
-  animation: nv-nav-lift var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-lift var(--nv-dur-morph) var(--nv-ease-spring-bouncy) both;
 }
 @keyframes nv-nav-lift {
   0% {
-    transform: rotate(-32deg) scale(0.8);
+    transform: translateY(3px) rotate(-32deg);
+  }
+  55% {
+    transform: translateY(-2px) rotate(6deg);
+  }
+}
+.is-playing .nav-w1 {
+  animation: nv-nav-w1 var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
+}
+.is-playing .nav-w2 {
+  animation: nv-nav-w2 var(--nv-dur-morph) calc(2 * var(--nv-stagger)) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-w1 {
+  0% {
+    transform: translateX(2.2px);
+  }
+}
+@keyframes nv-nav-w2 {
+  0% {
+    transform: translateX(-2.2px);
   }
 }
 @keyframes nv-nav-twinkle {
@@ -449,10 +477,19 @@
   }
 }
 
-/* Aujourd'hui: the door opens from the ground. */
+/* Aujourd'hui: the roof comes down on the house, then the door opens from the ground. */
+.is-playing .nav-roof {
+  animation: nv-nav-roof var(--nv-dur-morph) var(--nv-ease-spring-bouncy) both;
+}
+@keyframes nv-nav-roof {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+}
 .is-playing .nav-door {
   transform-origin: 12px 20.5px;
-  animation: nv-nav-door var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-door var(--nv-dur-morph) calc(2 * var(--nv-stagger)) var(--nv-ease-spring) both;
 }
 @keyframes nv-nav-door {
   0% {
@@ -460,14 +497,27 @@
     opacity: 0;
   }
 }
-/* Planning: the day drops into its square. */
+/* Planning: the two rings are pinned on, then the day drops into its square. */
+.is-playing .nav-pins {
+  animation: nv-nav-pins var(--nv-dur-morph) var(--nv-ease-spring-bouncy) both;
+}
+@keyframes nv-nav-pins {
+  0% {
+    transform: translateY(-3px);
+    opacity: 0;
+  }
+}
 .is-playing .nav-day {
   transform-origin: 15.5px 15px;
   animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
 }
-/* Contenu: the drop's arrow goes up. */
+/* Contenu: the photo's sun rises, the drop's arrow goes up. */
+.is-playing .nav-sun {
+  transform-origin: 12.6px 9.4px;
+  animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
 .is-playing .nav-up {
-  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
 }
 /* Several people: the three hop, one after the other. */
 .is-playing :is(.nav-t1, .nav-t2, .nav-t3) {
@@ -494,13 +544,24 @@
     transform: scaleX(0.1);
   }
 }
-/* Moi: a nod. */
+/* Moi: a nod, the shoulders following. */
 .is-playing .nav-head {
   animation: nv-nav-nod var(--nv-dur-morph) var(--nv-ease-spring) both;
 }
+.is-playing .nav-body {
+  animation: nv-nav-shrug var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
+}
 @keyframes nv-nav-nod {
+  35% {
+    transform: translateY(2.2px);
+  }
+  70% {
+    transform: translateY(-0.8px);
+  }
+}
+@keyframes nv-nav-shrug {
   40% {
-    transform: translateY(1.5px);
+    transform: translateY(-1.4px);
   }
 }
 /* Plus: the dots bounce in a row. */
