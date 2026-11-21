@@ -1,7 +1,7 @@
 /*
  * The copilot side panel (ADR 0086). Design system tokens only; `cp-` is local to this page. Top to bottom, the order of
  * the chatter's questions (Design 16/11, lot 0141-3): who he is and whether one may write (the band), what to do and the
- * text (the core), then the sale line and him in brief, the rest folded. Colour says something or is not there (Design
+ * text (the core), then the tabs of his card and the sale, one at a time (Charles 21/11, piste C). Colour says something or is not there (Design
  * 16/11, lot 0141-5): red for a limit that forbids the sale, amber for what holds it back, the green of success for a
  * good moment and what is acquired (Design 21/11: red is an emergency to Charles), the neon for the step in progress and
  * the button, a tint of it for his desire. Nothing blinks.
@@ -617,8 +617,12 @@ body {
   line-height: var(--nv-text-footnote-leading);
   overflow-wrap: anywhere;
 }
-.cp-field + .cp-field {
-  border-top: 1px solid var(--nv-hairline);
+/* A group's tab and the sale's detail on the same card as « L’essentiel ». */
+.cp-scroll > .cp-fields,
+.cp-sale > .cp-fields {
+  padding: var(--nv-space-1) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
 }
 /* The label as an overline, where the value comes from on its right: one line, the value under it in ink. */
 .cp-field__top {
@@ -628,23 +632,39 @@ body {
   align-items: center;
   column-gap: var(--nv-space-2);
 }
+/* The label in its group's colour, in a sentence's case: read at a glance, no squinting (Charles 21/11, piste C). */
 .cp-field__label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--_tone, var(--nv-ink-muted));
 }
+/* One colour per group, the amber for what he does not want (Design 21/11). */
+.cp-field[data-tone='him'] {
+  --_tone: var(--nv-series-1);
+}
+.cp-field[data-tone='about_her'] {
+  --_tone: var(--nv-series-2);
+}
+.cp-field[data-tone='intimate'] {
+  --_tone: var(--nv-series-3);
+}
+.cp-field[data-tone='limit'] {
+  --_tone: var(--nv-warning);
+}
+/* « deviné », the only source said (Design 21/11): dashed, as the CRM's inferred tag. */
 .cp-field__source {
   margin-left: auto;
+  padding: 0 6px;
+  border-radius: var(--nv-radius-full);
+  outline: 1px dashed var(--nv-ink-faint);
+  outline-offset: -1px;
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-faint);
-  text-align: right;
+  color: var(--nv-ink-muted);
 }
 /* « nouveau » in ink on a quiet chip: neither red (forbids) nor amber (waits for him), it only says it changed. */
 .cp-field__new {
@@ -661,12 +681,12 @@ body {
   line-height: var(--nv-text-callout-leading);
   color: var(--nv-ink);
 }
-/* What he likes and does not want, as short bullets. */
+/* A long value, one bullet in the field's colour per item, at the body's size (Design 21/11). */
 .cp-items {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin: 0;
+  gap: 3px;
+  margin: 2px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -674,15 +694,46 @@ body {
   display: flex;
   align-items: baseline;
   gap: var(--nv-space-2);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
 }
 .cp-items > li::before {
   content: '';
   flex: none;
-  width: 4px;
-  height: 4px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--nv-ink-faint);
-  transform: translateY(-3px);
+  background: var(--_tone, var(--nv-ink-faint));
+  transform: translateY(-2px);
+}
+/* Short values, one pill each, tinted with the field's colour (Design 21/11); a guess is dashed. */
+.cp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 10px;
+  box-sizing: border-box;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 500;
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--_tone, var(--nv-ink-faint)) 18%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--_tone, var(--nv-ink-faint)) 40%, transparent);
+}
+.cp-chip[data-guess='true'] {
+  background: transparent;
+  box-shadow: none;
+  outline: 1px dashed color-mix(in srgb, var(--_tone, var(--nv-ink-faint)) 70%, transparent);
+  outline-offset: -1px;
 }
 /* Who he is, one line: the first name is the one value in bold. */
 .cp-ident__line {
@@ -691,15 +742,15 @@ body {
   align-items: baseline;
   column-gap: 6px;
   min-width: 0;
-  font-size: var(--nv-text-body);
-  line-height: var(--nv-text-body-leading);
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
   color: var(--nv-ink);
 }
 /* The first name in the serif of the CRM's titles, not in colour (Design 16/11, lot 0141-5). */
 .cp-ident__name {
   font-family: var(--nv-font-serif);
-  /* A quarter larger than at first, so its x-height matches « 34 ans · Nantes » (Design 16/11, lot 0141-5). */
-  font-size: 1.625em;
+  /* Read first, from a distance (Charles 21/11, piste C): twice the line it sits on, which is a headline. */
+  font-size: 2.1em;
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0;
@@ -718,11 +769,6 @@ body {
   line-height: var(--nv-text-caption-leading);
   font-weight: 500;
   color: var(--nv-danger);
-}
-.cp-ident__source {
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-faint);
 }
 .cp-field__quote {
   color: var(--nv-ink-muted);
@@ -798,117 +844,196 @@ body {
   text-wrap: pretty;
 }
 
-/* ───────────── Folded groups ───────────── */
-
-/* At the very bottom, closed, with their count. */
-.cp-group {
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
-}
-.cp-group > summary,
-.cp-group__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-2);
-  min-height: 44px;
-  padding: 0 var(--nv-space-3);
-  cursor: pointer;
-  list-style: none;
-  font-size: var(--nv-text-footnote);
-}
-/* Masked while his age is contested (ADR 0141 § 9): the same row, which does not open. */
-.cp-group__row {
-  justify-content: flex-start;
-  cursor: default;
-}
-.cp-group > summary::-webkit-details-marker {
-  display: none;
-}
-.cp-group > summary:hover .cp-group__title {
-  color: var(--nv-ink);
-}
-.cp-group > summary:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: -2px;
-  border-radius: var(--nv-radius-md);
-}
-.cp-group__title {
-  color: var(--nv-ink);
-}
-.cp-group__sum {
-  color: var(--nv-ink-muted);
-}
-.cp-group__check {
-  font-weight: 500;
-  color: var(--nv-warning);
-}
+/* The chevron of « à découvrir », turned when it is open. */
 .cp-group__chevron {
   flex: none;
   margin-left: auto;
   color: var(--nv-ink-faint);
   transition: transform var(--nv-dur-fast) var(--nv-ease-out);
 }
-.cp-group[open] .cp-group__chevron {
-  transform: rotate(90deg);
-}
 @media (prefers-reduced-motion: reduce) {
   .cp-group__chevron {
     transition: none;
   }
 }
-/* The gauge under the group's line (Design 21/11): fine, at the foot of the row, one colour per group. */
-.cp-group > summary {
+
+/* ───────────── The tabs (Charles 21/11, piste C; Design's corrections) ───────────── */
+
+/* Under the draft, they do not scroll: an icon and a count each, the word only on the open one, which takes more room. */
+.cp-tabs {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: var(--nv-space-2) var(--cp-gutter) 0;
+}
+.cp-tab {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  font: inherit;
   position: relative;
+  /* From its content: the open tab's word is never cut. */
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 7px;
+  border-radius: var(--nv-radius-full);
+  cursor: pointer;
+  font-size: var(--nv-text-footnote);
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--nv-ink-muted);
+  background: var(--nv-glass-fill);
+  transition:
+    flex var(--nv-dur-base) var(--nv-ease-spring),
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out);
 }
-.cp-group__meter {
+.cp-tab:hover {
+  color: var(--nv-ink);
+  background: var(--nv-glass-fill-strong);
+}
+.cp-tab:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.cp-tab[aria-selected='true'] {
+  flex: 2 0 auto;
+  background: var(--nv-ink);
+  color: var(--nv-void);
+}
+/* Each group's icon in its colour, so a tab is found without reading; the open one in the tab's ink. */
+.cp-tab[data-tab='him'] > svg {
+  color: var(--nv-series-1);
+}
+.cp-tab[data-tab='about_her'] > svg {
+  color: var(--nv-series-2);
+}
+.cp-tab[data-tab='intimate'] > svg {
+  color: var(--nv-series-3);
+}
+.cp-tab > svg {
+  flex: none;
+}
+.cp-tab[aria-selected='true'] > svg {
+  color: currentColor;
+}
+.cp-tab__word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cp-tab__count {
+  font-size: var(--nv-text-caption);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+/* Something waits for a check behind this tab: an amber dot, as the count on top. */
+.cp-tab__check {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nv-warning);
+}
+/* Its key in a corner, quiet: 1 to 5. */
+.cp-tab__key {
   position: absolute;
-  left: var(--nv-space-3);
-  right: var(--nv-space-3);
-  bottom: 5px;
-  height: 3px;
+  top: -5px;
+  right: -3px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 5px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--nv-ink-faint);
+  background: var(--nv-void);
+  box-shadow: inset 0 0 0 1px var(--nv-hairline);
 }
-.cp-group__meter[data-group='him'] {
-  --_c: var(--nv-series-1);
+@media (prefers-reduced-motion: reduce) {
+  .cp-tab {
+    transition: none;
+  }
 }
-.cp-group__meter[data-group='about_her'] {
-  --_c: var(--nv-series-2);
+
+/* What he does not want, pinned in amber over every tab (Design 21/11). */
+.cp-limits {
+  flex: none;
+  display: flex;
+  gap: var(--nv-space-2);
+  align-items: flex-start;
+  margin: var(--nv-space-2) var(--cp-gutter) 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  overflow-wrap: anywhere;
 }
-.cp-group__meter[data-group='intimate'] {
-  --_c: var(--nv-series-3);
+.cp-limits__icon {
+  flex: none;
+  display: inline-flex;
+  margin-top: 1px;
+  color: var(--nv-warning);
 }
-.cp-group .cp-fields {
-  padding: 0 var(--nv-space-3) var(--nv-space-1);
-  border-top: 1px solid var(--nv-hairline);
+.cp-limits__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cp-limits__text {
+  margin: 0;
+  color: var(--nv-ink);
+}
+.cp-limits__text b {
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+.cp-limits__text .cp-field__new,
+.cp-limits__text .cp-field__source {
+  margin-left: 6px;
+}
+/* An empty tab says so in one muted line. */
+.cp-pane__none {
+  margin: 0;
+  padding: var(--nv-space-2) var(--nv-space-1);
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-footnote);
+  text-wrap: pretty;
 }
 
 /* ───────────── The sale line (ADR 0141 § 14; Design 16/11, lot 0141-3) ───────────── */
 
-/* One line under the core, no card: a dot per step, the script and its step, the next one with its price. */
-.cp-sale > summary {
+/* The tab: its first line, then its detail on a card. */
+.cp-sale {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+/* Its first line: a dot per step, the script and its step, the next one with its price. */
+.cp-sale__head {
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
-  min-height: 44px;
+  margin: 0;
+  min-height: 36px;
   padding: 0 var(--nv-space-1);
-  cursor: pointer;
-  list-style: none;
-}
-.cp-sale > summary::-webkit-details-marker {
-  display: none;
-}
-.cp-sale > summary:focus-visible {
-  outline: 2px solid var(--nv-focus);
-  outline-offset: -2px;
-  border-radius: var(--nv-radius-md);
-}
-.cp-sale[open] .cp-group__chevron {
-  transform: rotate(90deg);
 }
 .cp-sale__line {
   min-width: 0;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
   color: var(--nv-ink);
   text-wrap: pretty;
 }
@@ -939,15 +1064,12 @@ body {
     0 0 0 3px var(--nv-neon-soft),
     0 0 8px var(--nv-aura-neon);
 }
-.cp-sale .cp-fields {
-  padding: 0 var(--nv-space-1) var(--nv-space-1);
-}
 
-/* A muted icon in front of each line of the card and each fold (Design 16/11, lot 0141-5): found by shape, never coloured. */
+/* The icon in front of a line of the card, in its field's colour (Design 21/11). */
 .cp-line-icon {
   flex: none;
   display: inline-flex;
-  color: var(--nv-ink-faint);
+  color: var(--_tone, var(--nv-ink-faint));
 }
 
 /* The moment's conditions in the sale's detail, each with its state. */
