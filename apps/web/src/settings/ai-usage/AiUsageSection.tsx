@@ -42,8 +42,9 @@ import '@/screens/dashboard/dashboard.css';
 import '@/screens/dashboard/agency/agency.css';
 import './ai-usage.css';
 
-import { arcs, OTHER } from '@/screens/dashboard/agency/view';
+import { OTHER } from '@/screens/dashboard/agency/view';
 import { CountUp, Section, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
+import { Donut } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -442,16 +443,16 @@ function Spend({
   return (
     <div className="nv-plate ins-daily">
       {used.length > 0 ? (
-        <ul className="ins-keys" aria-label="Légende">
+        <ul className="nv-keys" aria-label="Légende">
           {used.map((provider) => (
             <li key={provider.key}>
-              <span className="ins-key" style={{ '--_c': provider.colour }} aria-hidden="true" />
+              <span className="nv-key" style={{ '--_c': provider.colour }} aria-hidden="true" />
               {provider.label}
             </li>
           ))}
           {anyCovered ? (
             <li>
-              <span className="ins-key cia-key--covered" aria-hidden="true" />
+              <span className="nv-key cia-key--covered" aria-hidden="true" />
               Hachuré : couvert par l’abonnement
             </li>
           ) : null}
@@ -550,12 +551,7 @@ function Ring({
   empty: string;
 }): JSX.Element {
   const [lit, setLit] = useState<number | null>(null);
-  const radius = 52;
   const total = slices.reduce((sum, slice) => sum + slice.eur, 0);
-  const geometry = arcs(
-    slices.map((slice) => slice.eur),
-    radius,
-  );
   const litSlice = lit === null ? undefined : slices[lit];
   return (
     <article className="nv-plate ins-ring-card">
@@ -566,51 +562,26 @@ function Ring({
       {total <= 0 ? (
         <p className="ins-empty">{empty}</p>
       ) : (
-        <div className="ins-ring-row">
-          <div
-            className={lit === null ? 'ins-ring' : 'ins-ring is-lit'}
-            role="img"
-            aria-label={`${title} : ${slices.map((s) => `${s.label} ${String(shareOf(s.eur, total))} %`).join(', ')}`}
+        <div className="nv-donut-row">
+          <Donut
+            label={`${title} : ${slices.map((s) => `${s.label} ${String(shareOf(s.eur, total))} %`).join(', ')}`}
+            slices={slices.map((slice) => ({ key: slice.key, colour: slice.colour, value: slice.eur }))}
+            lit={lit}
+            onLit={setLit}
           >
-            <svg viewBox="0 0 132 132" aria-hidden="true">
-              <circle className="ins-ring__track" cx="66" cy="66" r={radius} />
-              {slices.map((slice, i) => {
-                const arc = geometry[i];
-                if (arc === undefined) return null;
-                return (
-                  <circle
-                    key={slice.key}
-                    className={lit === i ? 'ins-ring__arc is-on' : 'ins-ring__arc'}
-                    cx="66"
-                    cy="66"
-                    r={radius}
-                    style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
-                    strokeDashoffset={arc.offset}
-                    onPointerEnter={() => {
-                      setLit(i);
-                    }}
-                    onPointerLeave={(event) => {
-                      if (event.pointerType === 'mouse') setLit(null);
-                    }}
-                  />
-                );
-              })}
-            </svg>
-            <span className="ins-ring__middle" aria-hidden="true">
-              {litSlice === undefined ? (
-                <>
-                  <b className="ins-ring__value">{slices.length}</b>
-                  <span className="ins-ring__sub">{slices.length > 1 ? 'postes' : 'poste'}</span>
-                </>
-              ) : (
-                <>
-                  <b className="ins-ring__value">{String(shareOf(litSlice.eur, total))}&nbsp;%</b>
-                  <span className="ins-ring__sub">{litSlice.label}</span>
-                </>
-              )}
-            </span>
-          </div>
-          <ul className="ins-legend cia-legend">
+            {litSlice === undefined ? (
+              <>
+                <b className="nv-donut__value">{slices.length}</b>
+                <span className="nv-donut__sub">{slices.length > 1 ? 'postes' : 'poste'}</span>
+              </>
+            ) : (
+              <>
+                <b className="nv-donut__value">{String(shareOf(litSlice.eur, total))}&nbsp;%</b>
+                <span className="nv-donut__sub">{litSlice.label}</span>
+              </>
+            )}
+          </Donut>
+          <ul className="nv-breakdown cia-legend">
             {slices.map((slice, i) => {
               const bound = tip.bind({
                 title: slice.label,
@@ -624,7 +595,7 @@ function Ring({
                 <li key={slice.key}>
                   <button
                     type="button"
-                    className={lit === i ? 'ins-legend__row is-on' : 'ins-legend__row'}
+                    className={lit === i ? 'nv-breakdown__row is-on' : 'nv-breakdown__row'}
                     {...bound}
                     onPointerMove={(event) => {
                       if (event.pointerType === 'mouse') setLit(i);
@@ -643,10 +614,10 @@ function Ring({
                       bound.onBlur();
                     }}
                   >
-                    <span className="ins-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
-                    <span className="ins-legend__label">{slice.label}</span>
-                    <span className="ins-legend__value">{eurText(slice.eur)}</span>
-                    <span className="ins-legend__share">{String(shareOf(slice.eur, total))}&nbsp;%</span>
+                    <span className="nv-key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                    <span className="nv-breakdown__label">{slice.label}</span>
+                    <span className="nv-breakdown__value">{eurText(slice.eur)}</span>
+                    <span className="nv-breakdown__share">{String(shareOf(slice.eur, total))}&nbsp;%</span>
                   </button>
                 </li>
               );

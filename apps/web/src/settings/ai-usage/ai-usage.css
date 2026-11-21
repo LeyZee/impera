@@ -1,6 +1,6 @@
 /*
- * Réglages › Consommation IA (ADR 0091). Built on the Dashboard's charts (`ins-*`, agency.css): the same plates,
- * columns, rings and tips. The services take --nv-series-* (validated Nuit and Jour); amber and red only say when to
+ * Réglages › Consommation IA (ADR 0091). Built on the Dashboard's charts (`ins-*`, agency.css) and the design system's
+ * figures (`nv-donut`, `nv-breakdown`): the same plates, columns, rings and tips. The services take --nv-series-* (validated Nuit and Jour); amber and red only say when to
  * recharge. Tokens only. A rule that overrides a design-system class takes two classes.
  */
 
@@ -342,9 +342,8 @@
 }
 
 /* ── Rings: the legend has no comparison column here. */
-.cia-legend .ins-legend__row {
-  grid-template-columns: auto minmax(0, 1fr) auto 40px;
-  grid-template-areas: 'key label value share';
+.cia-legend {
+  --nv-breakdown-cols: auto minmax(0, 1fr) auto 40px;
 }
 .cia-foot {
   margin: -16px 0 0;
@@ -420,7 +419,7 @@
     color-mix(in oklab, var(--_c) 28%, transparent) 1.5px 4.5px
   );
 }
-.cia-key--covered,
+.nv-key.cia-key--covered,
 .cia-covered__key {
   --_c: var(--nv-ink-muted);
   background: repeating-linear-gradient(
@@ -429,7 +428,7 @@
     color-mix(in oklab, var(--_c) 25%, transparent) 1.5px 3.5px
   );
 }
-.cia-key--covered {
+.nv-key.cia-key--covered {
   border-radius: 2px;
 }
 .cia-covered {
