@@ -649,8 +649,8 @@
 }
 .nv-switch:checked,
 .nv-switch[data-state='checked'] {
-  background: var(--nv-neon-solid);
-  box-shadow: var(--nv-shadow-neon-soft);
+  background: var(--nv-switch-on);
+  box-shadow: var(--nv-shadow-switch-on);
 }
 .nv-switch:checked::before,
 .nv-switch[data-state='checked']::before {
@@ -1226,11 +1226,12 @@
   caret-color: var(--nv-neon);
   transition: box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
+/* The field one writes in keeps its plate: a fine edge of ink and a soft halo say where the caret is, without the
+   heavy dark frame on a grey fill it wore before (Charles, 21/11). The edge holds 3:1 on the plate (contrast test). */
 .nv-field__control:focus {
-  background: var(--nv-select);
   box-shadow:
-    inset 0 0 0 1px var(--nv-plate-edge),
-    var(--nv-shadow-focus);
+    inset 0 0 0 1.5px color-mix(in srgb, var(--nv-ink) 50%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--nv-ink) 9%, transparent);
 }
 .nv-field__control::placeholder {
   color: var(--nv-ink-faint);
@@ -1321,6 +1322,20 @@
   outline: 1px dashed var(--nv-ink-faint);
   outline-offset: -1px;
   color: var(--nv-ink-muted);
+}
+/* Tinted by its category (--_c: a content, series or state colour): a faint fill and a full dot of that colour, the
+   words in ink so they read on any tint. The 16 % is held by the contrast test. */
+.nv-tag--tint {
+  background: color-mix(in srgb, var(--_c, var(--nv-ink-faint)) 16%, transparent);
+  color: var(--nv-ink);
+}
+.nv-tag--tint::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--_c, var(--nv-ink-faint));
 }
 /* A counter (what waits behind a tab, unread messages, a rank): 18 px, 11 px figures, ink on a quiet fill. Never an
    alarm by itself: a screen that needs the amber or the red says so with a modifier of its own (COH-08). */
@@ -2210,6 +2225,20 @@
   transform-origin: left;
   animation: nv-widen var(--nv-dur-data) var(--nv-ease-spring-smooth) both;
 }
+/* The objective on the same track: a thin line across it, a little taller than the track so it reads over the fill. */
+.nv-meter:has(.nv-meter__mark) {
+  overflow: visible;
+}
+.nv-meter__mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--_m);
+  width: 2px;
+  margin-left: -1px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+}
 @keyframes nv-widen {
   from {
     transform: scaleX(0);
@@ -3058,6 +3087,8 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* The value's glow reaches past the box: cut by it, it shows as a square behind the ring. */
+  overflow: visible;
   transform: rotate(-90deg);
 }
 .nv-ring__track,
@@ -3085,6 +3116,98 @@
   line-height: 1;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Steps: where something stands on a short path (sent, seen, settled). One node per step, joined by a line; what is
+   reached is filled with --_c and ticked, the step it stands on wears a halo, what is ahead stays a hollow ring. The
+   word and its time sit centred under each node. Colour: --_c, the data's ink by default (amber for a warning, the
+   danger for an urgency, as the screen decides). */
+.nv-steps {
+  --_c: var(--nv-data-1);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nv-steps__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+/* The line from the node before, edge to edge: it never runs under a node. */
+.nv-steps__step + .nv-steps__step::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: calc(-50% + 17px);
+  right: calc(50% + 17px);
+  height: 2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-track);
+  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
+}
+.nv-steps__step[data-done='true']::before {
+  background: var(--_c);
+}
+.nv-steps__node {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
+  border-radius: var(--nv-radius-full);
+  box-shadow: inset 0 0 0 2px var(--nv-fill-track);
+  color: var(--nv-void);
+  transition:
+    background-color var(--nv-dur-base) var(--nv-ease-out),
+    box-shadow var(--nv-dur-base) var(--nv-ease-out);
+}
+.nv-steps__node > svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nv-steps__step[data-done='true'] > .nv-steps__node {
+  background: var(--_c);
+  box-shadow: none;
+  animation: nv-steps-in var(--nv-dur-base) var(--nv-ease-spring) both;
+}
+.nv-steps__step[aria-current='step'] > .nv-steps__node {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--_c) 24%, transparent);
+}
+.nv-steps__label {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+}
+.nv-steps__step[data-done='true'] > .nv-steps__label {
+  color: var(--nv-ink);
+}
+.nv-steps__when {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+}
+@keyframes nv-steps-in {
+  from {
+    transform: scale(0.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-steps__step[data-done='true'] > .nv-steps__node {
+    animation: none;
+  }
 }
 
 /* What the percentage counts (« agent »), under it. */

@@ -67,7 +67,7 @@ function setup(options: Setup): { deps: DescribeDeps; told: string[]; summaries:
       describe: () => Promise.resolve(options.outcome ?? 'described'),
     },
     summaries: {
-      enqueueFor: (mediaAssetId) => {
+      enqueueFor: (_creatorId, mediaAssetId) => {
         summaries.push(mediaAssetId);
         return Promise.resolve(0);
       },

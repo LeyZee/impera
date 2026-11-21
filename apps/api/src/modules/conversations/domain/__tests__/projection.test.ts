@@ -45,6 +45,30 @@ describe('conversation projection', () => {
     expect(applyEvent(sending, expired(false), at(2)).state).toBe('idle');
   });
 
+  it('moves nothing on a draft the chatter sent by hand, and sends an approved one as before (ADR 0086 § 5)', () => {
+    const decided = (type: 'draft_approved' | 'draft_edited', sentOnPlatform: boolean) =>
+      EventBodySchema.parse({
+        type,
+        payload: {
+          draftId: DRAFT,
+          status: type === 'draft_approved' ? 'approved' : 'edited',
+          ...(sentOnPlatform && { sentOnPlatform: true }),
+        },
+      });
+    // Its first bubble already put him at rest; its verdict changes nothing more.
+    const answered = {
+      ...INITIAL_PROJECTION,
+      state: 'idle' as const,
+      lastInboundAt: at(1),
+      lastOutboundAt: at(2),
+    };
+    expect(applyEvent(answered, decided('draft_approved', true), at(3)).state).toBe('idle');
+    expect(applyEvent(answered, decided('draft_edited', true), at(3)).state).toBe('idle');
+    // Written before it existed, or approved in Suivi: the draft leaves.
+    const waiting = { ...INITIAL_PROJECTION, state: 'awaiting_approval' as const, lastInboundAt: at(1) };
+    expect(applyEvent(waiting, decided('draft_approved', false), at(2)).state).toBe('sending');
+  });
+
   it('keeps a refused answer with the human as the event says, a refused follow-up at rest (recette CHAT-25)', () => {
     const rejected = (leavesFanWaiting: boolean) =>
       EventBodySchema.parse({

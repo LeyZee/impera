@@ -93,7 +93,11 @@ export function wireContentDrops(
         JOB_PAYLOADS['content_drops.summarize_script'],
         shared.logger,
         async (payload, context) => {
-          const outcome = await module.jobs.summarizeScript(payload.dropId, payload.correlationId);
+          const outcome = await module.jobs.summarizeScript(
+            payload.creatorId,
+            payload.dropId,
+            payload.correlationId,
+          );
           context.logger.info({ dropId: payload.dropId, outcome }, 'content drops: sent script summarized');
         },
       ),

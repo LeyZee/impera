@@ -75,7 +75,7 @@ export interface ContentDropsModule {
      * `content_drops.summarize_script` (ADR 0083 § 6): a script she sent, once each of its media is described, told
      * step by step and summed up by the brain, kept for the agency to validate. What happened, for the log.
      */
-    summarizeScript(dropId: string, correlationId: string): Promise<SummarizeOutcome>;
+    summarizeScript(creatorId: string, dropId: string, correlationId: string): Promise<SummarizeOutcome>;
     /**
      * `content_drops.describe_backlog` (ADR 0083 § 2): each hour, what of her drops waits for the vision or the brain
      * enqueued again. Counts, for the log.
@@ -181,7 +181,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const clock = deps.clock ?? (() => new Date());
   const scratchDir = deps.scratchDir ?? tmpdir();
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
-  const summaries = createDrizzleScriptSummaryStore(deps.adminDb);
+  const summaries = createDrizzleScriptSummaryStore(deps.db);
   const thumbnails = createDrizzleThumbnailQueue(deps.db, deps.adminDb);
   const agency = createDrizzleAgencyContentStore(deps.db);
   const scriptReads = { store: agency, versions: deps.scriptVersions };
@@ -219,7 +219,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
               clock(),
               correlationId,
             ),
-      summarizeScript: async (dropId, correlationId) =>
+      summarizeScript: async (creatorId, dropId, correlationId) =>
         deps.describer === undefined || deps.brain === undefined
           ? 'off'
           : summarizeScript(
@@ -229,6 +229,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
                 summarizer: createGatewayScriptSummarizer(deps.brain),
                 versions: deps.scriptVersions,
               },
+              creatorId,
               dropId,
               clock(),
               correlationId,
@@ -256,7 +257,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       thumbnailBacklog: (correlationId) => thumbnails.backlog(correlationId),
       eraseOriginals: (correlationId) =>
         eraseOriginals(
-          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },
+          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb, deps.db) },
           clock(),
           correlationId,
         ),

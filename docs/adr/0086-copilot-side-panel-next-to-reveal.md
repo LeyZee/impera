@@ -70,6 +70,22 @@ Négatives, à surveiller :
 - Un brouillon lent fait taper le chatteur lui-même, et le taux en réel ne bouge pas. Le délai est montré au propriétaire (§ 9).
 - Le panneau latéral d'Edge est à vérifier sur le PC de Charles avant le lot (b).
 
+## Amendement du 16/11/2026 : le brouillon passe au-dessus de la fiche (accepté, choix « Brouillon en haut » de Charles sur carte, 16/11/2026 à 17 h 19)
+
+Demande de Charles du 16/11/2026, 16 h 56 : que le chatteur voie en un coup d'œil ce qu'il lui faut, sans chercher ni lire. La forme vient de Design et de l'ADR 0141 § D.
+
+11. **Le § 3 change d'ordre.** De haut en bas : une bande d'état d'une ligne (le fan, puis au plus trois pastilles : l'arrêt ou la précaution, puis le désir) ; le cœur (quoi faire, son pourquoi, le brouillon et ses trois gestes) ; la vente en une ligne ; la fiche en bref, réduite à ce qui est su ; ce qui reste à découvrir et les groupes repliés. Sans brouillon, le cœur dit quoi faire ou ce qui coupe, et la fiche reste visible dessous.
+12. **Le § 10 « un brouillon qui arrive ne pousse pas la fiche » devient : un brouillon qui arrive ne déplace ni la bande ni le bouton « Copier pour Reveal ».** Pendant que l'agent écrit, le cœur garde la hauteur d'un brouillon court ; un brouillon long défile dans le cœur, qui ne dépasse pas 60 % du panneau. Seul le cœur se rafraîchit à un nouveau message du fan ; la fiche ne bouge pas sous les yeux du chatteur.
+
+## Amendement du 21/11/2026 : la fiche et la vente en onglets sous le brouillon (accepté, choix « C, onglets » de Charles sur carte, 21/11/2026 à 18 h 53)
+
+Demande de Charles du 21/11/2026, 16 h 01 : le copilote se lisait mal, « on doit vraiment plisser les yeux », et ses fantasmes se perdaient entre les catégories. Trois pistes lui ont été montrées avant/après, en Nuit et en Jour ; il a choisi les onglets, avec les corrections de Design.
+
+13. **Sous le cœur, des onglets au lieu des plis** (le § 11 change d'ordre une seconde fois, le § 14 de l'ADR 0141 aussi) : « L'essentiel » (prénom, âge, ville, ses fantasmes, ce qui se passe dans sa vie, puis ce qui reste à découvrir), « Lui », « Elle, vue par lui », « Intime » et « Vente » quand une vente court. Un onglet se lit à son icône et à son compte ; seul l'onglet ouvert dit son mot. Un seul onglet est montré à la fois, ouvert d'un clic ou des touches 1 à 5. Un point ambre dit où attend une valeur à vérifier.
+14. **Ce qu'il ne veut pas est épinglé en ambre au-dessus de chaque onglet**, avec ses mots et ce qui attend une vérification. Il reste lu quand son âge est contesté.
+15. **Une valeur courte (vingt caractères au plus) est une pastille teintée de la couleur de son groupe ; une valeur plus longue est une puce de la même couleur**, à la taille du texte courant. La source d'une valeur n'est plus dite, sauf « deviné », en pointillé.
+16. **Le § 10 « le panneau garde ce choix » devient : le panneau ouvre chaque conversation sur « L'essentiel ».** L'onglet choisi tient pour la conversation en cours, comme l'était le détail de la vente.
+
 ## Alternatives rejetées
 
 - **Un bouton qui envoie par le membre « bot »** : il faut ouvrir l'écriture sur un vrai compte, le message ne porte plus le nom du chatteur, et la paie doit alors trancher qui a vendu. Possible plus tard, par une ADR, quand l'agent écrira seul.

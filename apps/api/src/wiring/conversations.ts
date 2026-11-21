@@ -121,6 +121,12 @@ export function wireConversations(
         logger,
         (payload, context) => module.jobs.reopen(payload, context.logger),
       ),
+      'conversation.settle_placed': defineTask(
+        'conversation.settle_placed',
+        JOB_PAYLOADS['conversation.settle_placed'],
+        logger,
+        (payload) => module.jobs.settlePlaced(payload),
+      ),
       'conversation.release_unavailable': defineTask(
         'conversation.release_unavailable',
         JOB_PAYLOADS['conversation.release_unavailable'],

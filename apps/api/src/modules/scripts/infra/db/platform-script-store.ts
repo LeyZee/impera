@@ -6,6 +6,7 @@ import {
   MediaSlotKindSchema,
   newId,
   PlatformAccountIdSchema,
+  PlatformSchema,
   PlatformScriptIdSchema,
   PlatformScriptMomentSchema,
   PreparedScriptContentSchema,
@@ -48,6 +49,7 @@ const steps = schema.platformScriptSteps;
 const stepMedia = schema.platformScriptStepMedia;
 const identities = schema.scriptIdentities;
 const branches = schema.platformScriptBranches;
+const daily = schema.platformScriptStepDaily;
 
 /** Its steps and their media, in the platform's order: `index` is the position kept (`stepIndex`, ADR 0099 § 3). */
 async function writeSteps(
@@ -98,7 +100,11 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
     account: (creatorId, platformAccountId) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
-          .select({ id: schema.platformAccounts.id, creatorId: schema.platformAccounts.creatorId })
+          .select({
+            id: schema.platformAccounts.id,
+            creatorId: schema.platformAccounts.creatorId,
+            platform: schema.platformAccounts.platform,
+          })
           .from(schema.platformAccounts)
           .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
           // Hers, and an archived creator is read no more (ADR 0071 § 2).
@@ -111,7 +117,11 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
           );
         return row === undefined
           ? null
-          : { id: PlatformAccountIdSchema.parse(row.id), creatorId: CreatorIdSchema.parse(row.creatorId) };
+          : {
+              id: PlatformAccountIdSchema.parse(row.id),
+              creatorId: CreatorIdSchema.parse(row.creatorId),
+              platform: PlatformSchema.parse(row.platform),
+            };
       }),
 
     known: (accountId) =>
@@ -129,7 +139,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
         ).map((row): KnownPlatformScript => row),
       ),
 
-    apply: (account, plan: PlatformScriptsPlan, now) =>
+    apply: (account, plan: PlatformScriptsPlan, now, totals) =>
       withAdmin(adminDb, async (tx) => {
         const written: string[] = [];
         for (const script of plan.added) {
@@ -176,6 +186,33 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
             .update(scripts)
             .set({ active: false, deactivatedAt: now })
             .where(and(inArray(scripts.id, [...plan.gone]), eq(scripts.platformAccountId, account.id)));
+        // The platform's totals of its steps on the day, over the row of the same day (ADR 0129 § 12).
+        if (totals !== null && totals.steps.length > 0)
+          await tx
+            .insert(daily)
+            .values(
+              totals.steps.map((each) => ({
+                creatorId: account.creatorId,
+                platformAccountId: account.id,
+                platformStepRef: each.platformStepRef,
+                day: totals.day,
+                sent: each.sent,
+                purchased: each.purchased,
+                paidMinor: each.paidMinor,
+                currency: each.currency,
+                readAt: now,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [daily.platformAccountId, daily.platformStepRef, daily.day],
+              set: {
+                sent: sql`excluded.sent`,
+                purchased: sql`excluded.purchased`,
+                paidMinor: sql`excluded.paid_minor`,
+                currency: sql`excluded.currency`,
+                readAt: sql`excluded.read_at`,
+              },
+            });
         return written;
       }),
   };
@@ -191,6 +228,7 @@ const LinkRowSchema = z.object({
   media_asset_id: z.uuid().nullable(),
   description_id: z.uuid().nullable(),
   imported: z.boolean(),
+  offered: z.boolean(),
   shown_id: z.uuid().nullable(),
   shown_detailed: z.string().nullable(),
   shown_reasons: z.array(DescriptionReviewReasonSchema).nullable(),
@@ -201,9 +239,10 @@ const LinkRowSchema = z.object({
  * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
  * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
  * not in the vault. `description_id`: the latest description of its media a human validated (ADR 0083), with its
- * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5); `shown`,
- * the description the agency reviews (the latest validated, else the latest written with a `detailed` text: never the
- * platform's own, which has none, ADR 0099 § 4). Keyed by account and platform id.
+ * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5);
+ * `offered`, offered once (§ 2, `vaultOffered`); `shown`, the description the agency reviews (the latest validated,
+ * else the latest written with a `detailed` text: never the platform's own, which has none, ADR 0099 § 4). Keyed by
+ * account and platform id.
  */
 async function vaultLinksOf(
   tx: Transaction,
@@ -226,6 +265,7 @@ async function vaultLinksOf(
         order by md.validated_at desc, md.created_at desc, md.id desc
         limit 1) as description_id,
       ${schema.vaultImported({ account: sql`l.platform_account_id`, media: sql`l.platform_media_id`, folder: sql`l.folder_ref` })} as imported,
+      ${schema.vaultOffered({ sentForFreeAt: sql`l.sent_for_free_at`, mediaAsset: sql`l.media_asset_id` })} as offered,
       s.id as shown_id, s.content ->> 'detailed' as shown_detailed, s.review_reasons as shown_reasons,
       s.validated_at is not null as shown_validated
     from ${schema.mediaPlatformRefs} l
@@ -247,6 +287,7 @@ async function vaultLinksOf(
           mediaAssetId: row.media_asset_id,
           descriptionId: row.description_id,
           imported: row.imported,
+          offered: row.offered,
           shown:
             row.shown_id === null || row.shown_detailed === null
               ? null
