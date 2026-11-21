@@ -907,6 +907,8 @@ export function statementsCsv(
       'Hors TVA',
       'Net',
       'Commission',
+      // A manager's share of the others' net (recette PRO2-02): without it his total is not the sum of its row.
+      'Part d’équipe',
       'Primes',
       'Malus',
       'Reports reçus',
@@ -941,6 +943,7 @@ export function statementsCsv(
         '',
         '',
         '',
+        '',
         // Where the line's figures come from (CRM-03): on the platform's net, « Ventes » is that net already.
         line.base === 'platform_net' ? 'Net de la plateforme' : 'Rapports',
       ]);
@@ -953,6 +956,7 @@ export function statementsCsv(
       '',
       euros(statement.netMinor),
       euros(statement.commissionMinor),
+      euros(statement.teamShare?.amountMinor ?? 0),
       euros(statement.bonusesMinor),
       euros(-statement.penaltiesMinor),
       euros(statement.carryOversInMinor),
