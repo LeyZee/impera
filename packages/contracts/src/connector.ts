@@ -267,6 +267,8 @@ export const VaultMediaSchema = z.object({
   suggestedPriceMinor: z.object({ min: z.number().int().min(0), max: z.number().int().min(0) }).nullable(),
   /** The platform's blurred preview; `null` when it gives none or one that does not read as a blurhash. */
   blurhash: BlurhashSchema.nullable(),
+  /** The platform says it was sent for free (in a message or a Mass DM): offered, never sold again (ADR 0145 § 2). */
+  sentForFree: z.boolean(),
 });
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 

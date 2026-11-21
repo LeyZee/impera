@@ -22,6 +22,8 @@ export interface PreparedVaultMedia {
   readonly kind: MediaSlotKind;
   /** A description of its media a human validated (ADR 0083). */
   readonly described: boolean;
+  /** Offered once (ADR 0145 § 2): sent for free by the platform, or out in a drop that leaves for free. */
+  readonly offered: boolean;
 }
 
 /** One branch, as the shared branch rules read it: its key in place of a `stepRef`. */
@@ -72,7 +74,8 @@ const SHARED: readonly PreparedScriptGapCode[] = [
 
 /**
  * What keeps the script from « prêt à copier »: the script's name and description; for each branch its offer text, at
- * least one media, each media in her vault and, photo or video, described; a condition in text that says something;
+ * least one media, each media in her vault and, photo or video, described, and on a paid branch never one offered
+ * once; a condition in text that says something;
  * the shared branch rules (§§ 2, 13, 14); and no text touching her limits. `limits` is `null` without an active
  * persona: nothing is checked against it then, and the screen says so.
  */
@@ -96,6 +99,9 @@ export function preparedScriptGaps(
         return known !== undefined && known.kind !== 'audio' && !known.described;
       });
       if (undescribed) gaps.push(gap('media_not_described', at, branch.key));
+      // « Un média offert n'est jamais revendu » (ADR 0145 § 2): a paid branch never sells one.
+      if (branch.priceMinor > 0 && branch.media.some((media) => vault.get(media.ref)?.offered === true))
+        gaps.push(gap('media_offered', at, branch.key));
       if (
         step.branches.length > 1 &&
         branch.condition?.kind === 'text' &&

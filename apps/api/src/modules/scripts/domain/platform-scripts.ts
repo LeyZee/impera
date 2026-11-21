@@ -226,6 +226,8 @@ export interface StepMediaState {
   readonly imported: boolean;
   /** Its media has a description a human validated (ADR 0083, ADR 0030 § 3); `false` while its file is not read. */
   readonly described: boolean;
+  /** Offered once (ADR 0145 § 2): sent for free by the platform, or out in a drop that leaves for free. */
+  readonly offered: boolean;
 }
 
 /** Why a native script cannot be offered for sale yet. */
@@ -237,10 +239,19 @@ export type PlatformScriptGap = (typeof PLATFORM_SCRIPT_GAPS)[number];
  * § 5) keeps it from being offered; a photo or a video not described with a validated
  * description (a voice note is never described: ADR 0083 § 2); the identity of its current version (SC-04 c8) not
  * validated; what its branches lack (`branchGaps`, ADR 0112); a step with a « Tarif réduit » set on the platform, never
- * sold at (recette 16/11, Charles: blocked and said, as a changed price). Empty: it may be offered, when it is active.
+ * sold at (recette 16/11, Charles: blocked and said, as a changed price); a paid step that sells a media once offered
+ * (ADR 0145 § 2, Charles: « un média offert n'est jamais revendu »). Empty: it may be offered, when it is active.
  */
 export function platformScriptGaps(
-  steps: readonly { readonly discounted: boolean; readonly media: readonly StepMediaState[] }[],
+  steps: readonly {
+    readonly discounted: boolean;
+    /** Priced by the platform: its sold media are paid for. */
+    readonly paid: boolean;
+    /** Every media of the step, sold and preview. */
+    readonly media: readonly StepMediaState[];
+    /** The media it sells. */
+    readonly sold: readonly StepMediaState[];
+  }[],
   identityValidated: boolean,
   branches: readonly PlatformScriptGap[],
 ): PlatformScriptGap[] {
@@ -253,6 +264,8 @@ export function platformScriptGaps(
   if (!identityValidated) gaps.push('identity_not_validated');
   gaps.push(...branches);
   if (steps.some((step) => step.discounted)) gaps.push('step_discounted');
+  if (steps.some((step) => step.paid && step.sold.some((each) => each.inVault && each.offered)))
+    gaps.push('media_offered');
   return gaps;
 }
 

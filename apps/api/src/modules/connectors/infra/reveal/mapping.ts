@@ -357,5 +357,6 @@ export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null, posit
     suggestedPriceMinor: min === null || max === null || min < 0 || max < 0 ? null : { min, max },
     // A preview that does not read as a blurhash is dropped, never the media.
     blurhash: BlurhashSchema.safeParse(media.blurhash).data ?? null,
+    sentForFree: media.sentForFree,
   };
 }

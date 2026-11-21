@@ -108,6 +108,7 @@ Branche : task/<id>-<slug>
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
 | CR-15 | Qui sont tes fans : les chiffres de sa base, tirés de leurs faits déclarés | espaces | todo | CR-02, ADR 0074 |
 | CR-16 | La semaine de la créatrice : deux jours de tournage, une livraison le dimanche, un agenda que le code remplit | espaces | in_progress (lot 1 en PR) | CR-05, CR-06, SC-02, ADR 0140 |
+| COF-01 | Un média offert n'est jamais revendu, un média de script n'est jamais gratuit | coffre (ADR 0145 § 2) | done | synchro du coffre, scripts natifs et préparés |
 | SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |

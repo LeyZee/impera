@@ -55,7 +55,13 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
           {
             ref: 'media_1',
             kind: 'image',
-            vault: { mediaAssetId: null, descriptionId: 'desc_1', imported: true, shown: null },
+            vault: {
+              mediaAssetId: null,
+              descriptionId: 'desc_1',
+              imported: true,
+              offered: false,
+              shown: null,
+            },
           },
         ],
         previewMedia: [],
@@ -73,7 +79,7 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
           {
             ref: 'media_2',
             kind: 'audio',
-            vault: { mediaAssetId: null, descriptionId: null, imported: true, shown: null },
+            vault: { mediaAssetId: null, descriptionId: null, imported: true, offered: false, shown: null },
           },
         ],
         previewMedia: [],

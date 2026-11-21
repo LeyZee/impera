@@ -421,6 +421,43 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     });
   });
 
+  it('reads which media Reveal sent for free, and only those (ADR 0145 § 2)', async () => {
+    const fake = world();
+    const [conversation] = fake.state().conversations;
+    if (conversation === undefined) throw new Error('fixture changed');
+    const sent = (
+      id: string,
+      mediaIds: string[],
+      bundle: { priceCents: number; mediaIds: string[] } | null,
+    ) =>
+      fake.state().messages.push({
+        id,
+        conversationId: conversation.id,
+        direction: 'out',
+        content: 'Texte inventé',
+        mediaIds,
+        bundle:
+          bundle === null
+            ? null
+            : { id: `${id}_b`, ...bundle, teasingMediaIds: [], paidAt: null, transactionId: null },
+        author: null,
+        scriptId: null,
+        isUnread: true,
+        createdAt: fake.state().now,
+      });
+    sent('msg_free_a', ['media_11'], null);
+    sent('msg_free_b', [], { priceCents: 0, mediaIds: ['media_12'] });
+    sent('msg_paid', [], { priceCents: 1_500, mediaIds: ['media_13'] });
+    const vault = await connect(fake).listVaultMedia({});
+    const free = (id: string) => vault.find((m) => m.ref.id === id)?.sentForFree;
+    expect([free('media_11'), free('media_12'), free('media_13'), free('media_14')]).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
   it('cuts a vault folder’s name and a description longer than the contract allows, never half an emoji', async () => {
     const fake = world();
     const state = fake.state();
