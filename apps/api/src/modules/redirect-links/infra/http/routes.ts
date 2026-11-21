@@ -30,8 +30,11 @@ function actorOf(request: FastifyRequest): RedirectLinkActor {
   return { userId: UserIdSchema.parse(request.user.id), ip: request.ip };
 }
 
-/** A detection reads up to twenty pages at the service: a few a minute is a person's pace. */
-const DETECTIONS_PER_MINUTE = 5;
+/**
+ * A detection reads up to twenty pages at the service: a few a minute is a person's pace. A bound of its own: the shared
+ * store names a `createRateLimit` limiter by its bounds and refuses two of the same (`rate-limit-store.ts`).
+ */
+const DETECTIONS_PER_MINUTE = 6;
 
 /** The common 429 `rate_limited` (server.ts), as the plugin's own limits answer. */
 class OwnerLimitReached extends Error {
