@@ -810,7 +810,7 @@ function cardPart(
           'p',
           { class: 'cp-notice__text' },
           screen.opensCreators
-            ? 'Elle s’allume dans Créatrices › Agent.'
+            ? 'Elle s’allume dans Créatrices › IA.'
             : 'Demande à ton manager de l’allumer.',
         ),
       ),

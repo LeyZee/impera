@@ -403,9 +403,7 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(root.querySelector('.cp-notice__title')?.textContent).toBe(
       'La fiche du fan est éteinte pour cette créatrice',
     );
-    expect(root.querySelector('.cp-notice__text')?.textContent).toBe(
-      'Elle s’allume dans Créatrices › Agent.',
-    );
+    expect(root.querySelector('.cp-notice__text')?.textContent).toBe('Elle s’allume dans Créatrices › IA.');
     expect(root.querySelector('.cp-field')).toBeNull();
     // EXT-17: a chatter has no Créatrices; his manager turns it on.
     const chatter = draw({ ...screen, cardOn: false, opensCreators: false }).root;
