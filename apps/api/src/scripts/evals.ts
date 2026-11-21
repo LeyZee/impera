@@ -221,7 +221,7 @@ async function crmPersona(): Promise<PersonaForModels> {
 
 const persona = values['persona-from-crm']
   ? await crmPersona()
-  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.4.0.yaml'), 'utf8'), 'Elena', today);
+  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.5.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
 const gateway = createLlmGateway({
   config,

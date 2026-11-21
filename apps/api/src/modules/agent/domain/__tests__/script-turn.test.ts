@@ -132,7 +132,14 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
 
   it('pauses an unopened step when he comes back cold, never a refusal, and reminds him once (ADR 0156 § 1)', () => {
     // He fell asleep without opening it and writes « salut » the next day: the session cooled.
-    const back = scriptTurn({ ...input, latest: offered, history: history([0, 1]), hotSession: false });
+    const nextDay = new Date(NOW.getTime() + 20 * 3_600_000);
+    const back = scriptTurn({
+      ...input,
+      now: nextDay,
+      latest: offered,
+      history: history([0, 1]),
+      hotSession: false,
+    });
     expect(back.decision).toMatchObject({ kind: 'end', status: 'stalled', unopened: { stepIndex: 1 } });
     expect(back.moved?.run.status).toBe('stalled');
     expect(back.moved?.run.steps.at(-1)?.outcome).toBe('sent');
@@ -141,7 +148,7 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     // His next message: the reminder was once, nothing is left to remind.
     const later = scriptTurn({
       ...input,
-      now: new Date(NOW.getTime() + 60_000),
+      now: new Date(nextDay.getTime() + 60_000),
       latest: back.moved?.run ?? null,
       history: history([0, 1]),
       hotSession: false,
@@ -159,6 +166,13 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(no.decision.kind).toBe('after_refusal');
   });
 
+  it('never teases him about the step the same evening, when his heat fell because he came (eval passe-13)', () => {
+    // « Merci pour ce soir » a few minutes after « j'ai fini »: the run pauses, nothing is recalled to him.
+    const thanks = scriptTurn({ ...input, latest: offered, history: history([0, 1]), hotSession: false });
+    expect(thanks.moved?.run.status).toBe('stalled');
+    expect(thanks.decision).toEqual({ kind: 'end', status: 'stalled' });
+  });
+
   it('pauses an opened, unbought step without a reminder when he comes back cold (ADR 0156 § 1)', () => {
     const opened = played([
       { type: 'step_sent', stepIndex: 0, at: BEFORE },
@@ -169,16 +183,18 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     expect(back.decision).toEqual({ kind: 'end', status: 'stalled' });
   });
 
-  it('pauses right after he came: no step goes, and his message neither answers nor refuses hers (ADR 0156 § 6)', () => {
-    const waiting = scriptTurn({
+  it('ends the evening’s script when he came: no step goes, nothing recalled, never a refusal (passe 1, conversation 2)', () => {
+    // « J'ai fini » with her paid step waiting: the run ends here, and the step he left is never recalled to him.
+    const over = scriptTurn({
       ...input,
       latest: offered,
       history: history([0, 1]),
       heCame: true,
       mayAct: false,
     });
-    expect(waiting.decision.kind).toBe('wait');
-    expect(waiting.moved).toBeNull();
+    expect(over.decision).toEqual({ kind: 'end', status: 'stalled' });
+    expect(over.moved?.run.status).toBe('stalled');
+    expect(over.moved?.run.steps.at(-1)?.outcome).toBe('sent');
     // Even a message the brain reads as a no is no refusal right after he came.
     const no = scriptTurn({
       ...input,
@@ -188,8 +204,18 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
       mayAct: false,
       reply: 'refused',
     });
-    expect(no.decision.kind).toBe('wait');
-    expect(no.moved).toBeNull();
+    expect(no.decision).toEqual({ kind: 'end', status: 'stalled' });
+    // His next message, the next day: the run is history, nothing is recalled.
+    const nextDay = new Date(NOW.getTime() + 20 * 3_600_000);
+    const later = scriptTurn({
+      ...input,
+      now: nextDay,
+      offer: { ...offer, now: nextDay },
+      latest: over.moved?.run ?? null,
+      history: history([0, 1]),
+      hotSession: false,
+    });
+    expect(later.decision).not.toMatchObject({ kind: 'end' });
     // The next step would have gone: held.
     const next = scriptTurn({ ...input, latest: teased, history: history([0]), heCame: true, mayAct: false });
     expect(next.decision).toEqual({ kind: 'none', reason: 'held' });

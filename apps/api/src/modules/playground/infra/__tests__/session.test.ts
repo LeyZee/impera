@@ -67,6 +67,13 @@ function fakeGateway(
 
 const settings = { ...DEFAULT_GUARD_SETTINGS, forbiddenTerms: [] };
 
+/**
+ * Her first writing of each answer: the fake voice says the same line every time, which her guards read as a formula
+ * already used and have written once more (passe 1, 21/11). The rewrite carries the hint that her answer was refused.
+ */
+const firstWritten = (inputs: readonly VoiceInput[]): VoiceInput[] =>
+  inputs.filter((input) => !input.brief.toneHints.some((hint) => hint.includes('a été refusée')));
+
 describe('playground session', () => {
   it('runs brain, voice and guards, keeps notes and the history', async () => {
     const session = createPlaygroundSession({
@@ -527,7 +534,7 @@ describe('playground session, the offer policy and the cursor', () => {
     // The offered teaser first, written as a plain answer with its media; then the paid step, as an offer.
     await playground.handleFanMessage('Encore');
     await playground.handleFanMessage('Montre-moi');
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply', 'offer']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual(['reply', 'reply', 'offer']);
     // 22 h in Paris: her night script.
     expect(playground.scriptRun?.script.scriptRef).toBe('essai-nuit');
     expect(playground.scriptRun?.run.steps.map((step) => [step.kind, step.outcome])).toEqual([
@@ -580,7 +587,12 @@ describe('playground session, the offer policy and the cursor', () => {
     expect(scores.at(-2)).toBeLessThan(99);
     expect(scores.at(-1)).toBeGreaterThanOrEqual(99);
     // The script opens on the fourth message only, with its offered teaser.
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply', 'reply', 'reply']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual([
+      'reply',
+      'reply',
+      'reply',
+      'reply',
+    ]);
     expect(playground.scriptRun?.run.steps.map((step) => step.kind)).toEqual(['free']);
   });
 
@@ -589,7 +601,7 @@ describe('playground session, the offer policy and the cursor', () => {
     const playground = session(voiceInputs, true, 0, OFFER);
     await playground.handleFanMessage('J’ai 30 ans et t’es trop bonne');
     await playground.handleFanMessage('Encore');
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual(['reply', 'reply']);
   });
 
   it('says his availability and the gate under his score, as the gate read them (ADR 0103 § 14)', async () => {
@@ -669,7 +681,7 @@ describe('playground session, the offer policy and the cursor', () => {
     const playground = session(voiceInputs, false);
     await playground.handleFanMessage('J’ai 30 ans');
     await playground.handleFanMessage('T’es trop bonne');
-    expect(voiceInputs.map((input) => input.brief.action)).toEqual(['reply', 'reply']);
+    expect(firstWritten(voiceInputs).map((input) => input.brief.action)).toEqual(['reply', 'reply']);
   });
 });
 

@@ -252,6 +252,16 @@ describe('voice guards', () => {
     expect(codes(['Cette vidéo, tu l’ouvres en touchant le cadenas'])).toEqual([]);
   });
 
+  it('blocks « mdr » and its stretched forms, never a word that only starts like it (eval passe-15)', () => {
+    for (const laugh of ['mdr t’es bête', 'Mdrr', 'MDRRR 😂', 'non mais mdrrrr']) {
+      expect(codes([laugh]), laugh).toContain('forbidden_term');
+    }
+    const blocked = checkVoiceOutput(['mdrr'], DEFAULT_GUARD_SETTINGS);
+    expect(isBlocked(blocked)).toBe(true);
+    expect(codes(['T’es bête toi 😅'])).toEqual([]);
+    expect(codes(['On dit mdrine en Bretagne ?'])).toEqual([]);
+  });
+
   it('blocks a discount or a negotiation, and lets her refusal of one through', () => {
     for (const bubble of [
       'Allez je te fais un petit prix 😘',

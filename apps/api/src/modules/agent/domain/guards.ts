@@ -241,6 +241,8 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     pattern:
       /\b(sale|espece de|t'?es (qu'?)?une?|tu es (qu'?)?une?|quel|quelle) (radin|radine|rapiat|rapiate|menteur|menteuse|mendiant|mendiante|crevard|crevarde|minable|pauvre type)s?\b|\b(mendiant|mendiante|crevard|crevarde|pauvre type)s?\b/,
   },
+  // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat.
+  { code: 'forbidden_term', pattern: /\bmdr+\b/ },
   // « Rien à payer » about a paid bundle is a lie; « pas besoin de payer pour me parler » is true.
   {
     code: 'payment_lie',
@@ -551,6 +553,21 @@ const SENT_BEFORE_MIN_CHARS = 25;
 /** Her opening is its first two words: « coucou toi », « hey bébé ». */
 const OPENING_WORDS = 2;
 const OPENING_STREAK = 3;
+/**
+ * A formula she already used with him (lecture de la passe 1, 21/11): four words in a row met in one of her last
+ * turns, or the same opening as one of them. Soft: her answer is rewritten once, then goes as it is.
+ */
+const REUSED_WORDS = 4;
+const REUSED_TURNS = 6;
+
+function wordRuns(text: string): string[] {
+  const words = plain(text)
+    .split(' ')
+    .filter((word) => word !== '');
+  return words
+    .slice(0, Math.max(0, words.length - REUSED_WORDS + 1))
+    .map((_, i) => words.slice(i, i + REUSED_WORDS).join(' '));
+}
 
 const openingOf = (turn: readonly string[]): string | undefined => {
   const words = plain(turn[0] ?? '')
@@ -604,6 +621,17 @@ function againstHistory(
   ) {
     violations.push({ code: 'repetition', severity: 'soft', bubbleIndex: 0, match: opening });
   }
+  const lately = turns.slice(-REUSED_TURNS);
+  const usedRuns = new Set(lately.flat().flatMap(wordRuns));
+  const usedOpenings = new Set(lately.map(openingOf).filter((o) => o !== undefined));
+  bubbles.forEach((bubble, bubbleIndex) => {
+    if (violations.some((v) => v.code === 'repetition' && v.bubbleIndex === bubbleIndex)) return;
+    const reused =
+      wordRuns(bubble).find((run) => usedRuns.has(run)) ??
+      (bubbleIndex === 0 && opening !== undefined && usedOpenings.has(opening) ? opening : undefined);
+    if (reused !== undefined)
+      violations.push({ code: 'repetition', severity: 'soft', bubbleIndex, match: reused });
+  });
   const asked = [...turns.map(closedQuestion), closedQuestion(bubbles)].filter((q) => q !== undefined);
   if (closedQuestion(bubbles) === true && asked.length >= 3 && asked.slice(-3).every((closed) => closed)) {
     violations.push({ code: 'closed_question_streak', severity: 'soft' });
@@ -816,6 +844,11 @@ export function previousTurnsOf(
 
 export function isBlocked(violations: readonly GuardViolation[]): boolean {
   return violations.some((v) => v.severity === 'blocking');
+}
+
+/** Blocked, or a formula she already used with him: her answer is written once more, then goes (passe 1, 21/11). */
+export function wantsRewrite(violations: readonly GuardViolation[]): boolean {
+  return isBlocked(violations) || violations.some((v) => v.code === 'repetition');
 }
 
 // Explicit words, on the normalised text: « un baiser », « la queue au cinéma » or « ma chatte Moka » are not.

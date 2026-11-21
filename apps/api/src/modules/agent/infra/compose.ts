@@ -60,6 +60,7 @@ import {
   touchesTerm,
   type GuardContext,
   isBlocked,
+  wantsRewrite,
   type GuardSettings,
   type GuardViolation,
 } from '../domain/guards';
@@ -338,7 +339,7 @@ type OfferRefusal =
 
 /** Why her first answer was refused, as the voice reads it once more (M1): the fault, never the words she wrote. */
 const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
-  repetition: 'elle répétait une phrase déjà envoyée',
+  repetition: 'elle reprenait une phrase ou une formule déjà employée avec lui, ouverture comprise',
   explicit_before_age: 'elle était trop explicite pour le moment',
   meeting_promise: 'elle acceptait une rencontre concrète',
   contact_info: 'elle donnait un contact',
@@ -353,7 +354,9 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
 };
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
-  const blocking = violations.filter((violation) => violation.severity === 'blocking');
+  const blocking = violations.filter(
+    (violation) => violation.severity === 'blocking' || violation.code === 'repetition',
+  );
   const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
     (reason) => reason !== undefined,
   );
@@ -1287,9 +1290,10 @@ export async function composeTurn(
   };
   const first = await attempt(voiceInput);
   // A guard blocked her answer: the voice writes it once more, told what was wrong, before a human is called (audit
-  // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers.
+  // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers. A formula she already
+  // used with him is rewritten once the same way, and the second answer goes even if it still has one (passe 1).
   const retried =
-    first.voice.ok && isBlocked(first.violations)
+    first.voice.ok && wantsRewrite(first.violations)
       ? await attempt({
           ...voiceInput,
           brief: { ...voiceBrief, toneHints: [...voiceBrief.toneHints, rewriteHint(first.violations)] },

@@ -406,6 +406,9 @@ export type ScriptStepDecision =
       readonly unopened?: StepRecord;
     };
 
+/** Below this since her step was sent, he is still in the same evening (the session of a refusal, `REFUSAL_SESSION_MS`). */
+const SAME_EVENING_MS = 6 * 3_600_000;
+
 const later = (a: Date | null, b: Date | null): Date | null => {
   if (a === null) return b;
   if (b === null) return a;
@@ -447,8 +450,15 @@ export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
   if (status === 'open') return nextInOpenRun(input, run, script);
   if (run.endedAt?.getTime() === input.now.getTime()) {
     const last = current(run);
-    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message.
-    if (status === 'stalled' && last?.kind === 'paid' && last.outcome === 'sent')
+    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message. Only when
+    // he comes back another evening (ADR 0158, « revient le lendemain »): his heat falling the same evening (he came,
+    // he says thanks) is no reason to tease him about it (eval passe-13).
+    if (
+      status === 'stalled' &&
+      last?.kind === 'paid' &&
+      last.outcome === 'sent' &&
+      input.now.getTime() - last.sentAt.getTime() >= SAME_EVENING_MS
+    )
       return { kind: 'end', status, unopened: last };
     if (status !== 'refused') return { kind: 'end', status };
     if (last !== undefined) return { kind: 'after_refusal', step: last };

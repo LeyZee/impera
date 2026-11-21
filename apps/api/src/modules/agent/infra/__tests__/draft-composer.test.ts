@@ -248,6 +248,35 @@ describe('createDraftComposer', () => {
     expect(still.seen.voiceCalls).toBe(2);
   });
 
+  it('writes once more a formula she already used with him, then lets the second answer go (passe 1, 21/11)', async () => {
+    const asked = {
+      ...INPUT,
+      history: [
+        {
+          direction: 'outbound' as const,
+          text: 'Et tu comptes faire quoi de ton week-end',
+          at: new Date('2026-10-17T09:57:00Z'),
+        },
+        ...INPUT.history,
+      ],
+    };
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['Alors tu comptes faire quoi de ton week-end'] },
+      voiceAfter: { bubbles: ['Ça va bien, une journée tranquille 😌'] },
+    });
+    expect(await draftComposer.compose(asked)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Ça va bien, une journée tranquille 😌'],
+    });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('formule déjà employée');
+
+    // Still the same formula once rewritten: it goes, nobody is called for it.
+    const still = composer({ voice: { bubbles: ['Alors tu comptes faire quoi de ton week-end'] } });
+    expect(await still.draftComposer.compose(asked)).toMatchObject({ kind: 'draft' });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
   it('reads her clock from the creator of the conversation', async () => {
     const asked: string[] = [];
     const draftComposer = createDraftComposer({
@@ -2847,7 +2876,8 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     // His « salut » the next day: his desire fell under her threshold, the session cooled.
     const cold = { ...deps(sent), offerLimits: { cooldownHours: 10, minDesire: 100 } };
     const { draftComposer, seen } = composer({ brief: BRIEF }, undefined, limitsOf(ADULT).limits, cold);
-    const result = await draftComposer.compose({ ...INPUT, scriptRun: waiting });
+    const nextDay = new Date('2026-10-18T09:00:00Z');
+    const result = await draftComposer.compose({ ...INPUT, now: nextDay, scriptRun: waiting });
     expect(result.scriptRun?.moved?.run.status).toBe('stalled');
     expect(result.scriptRun?.moved?.events).toEqual([{ type: 'script_ended' }]);
     const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
