@@ -24,7 +24,7 @@ describe('content-drops › content_drops.make_thumbnail (SC-04 lot c4)', () => 
     };
     const queue: Pick<ThumbnailQueue, 'target' | 'settle' | 'later'> = {
       target: () => Promise.resolve(target),
-      settle: (id, key) => {
+      settle: (_creatorId, id, key) => {
         log.push(`settle ${id} ${key ?? 'none'}`);
         return Promise.resolve();
       },
@@ -62,7 +62,7 @@ describe('content-drops › content_drops.make_thumbnail (SC-04 lot c4)', () => 
 
   it('writes the picture under its fingerprint, then marks the medium', async () => {
     const { deps, log } = fakes(photo);
-    expect(await makeThumbnail(deps, 'media-1', NOW, 'test')).toBe('made');
+    expect(await makeThumbnail(deps, 'creator', 'media-1', NOW, 'test')).toBe('made');
     expect(log).toEqual([
       'download media/creator/abc',
       `upload ${thumbnailKeyOf('creator', 'abc')} image/jpeg`,
@@ -72,7 +72,7 @@ describe('content-drops › content_drops.make_thumbnail (SC-04 lot c4)', () => 
 
   it('marks a file ffmpeg cannot read as tried, without a picture', async () => {
     const { deps, log } = fakes(photo, 'none');
-    expect(await makeThumbnail(deps, 'media-1', NOW, 'test')).toBe('none');
+    expect(await makeThumbnail(deps, 'creator', 'media-1', NOW, 'test')).toBe('none');
     expect(log).toEqual(['download media/creator/abc', 'settle media-1 none']);
   });
 
@@ -84,14 +84,14 @@ describe('content-drops › content_drops.make_thumbnail (SC-04 lot c4)', () => 
       [null, 'gone'],
     ] as const) {
       const { deps, log } = fakes(target);
-      expect(await makeThumbnail(deps, 'media-1', NOW, 'test')).toBe(outcome);
+      expect(await makeThumbnail(deps, 'creator', 'media-1', NOW, 'test')).toBe(outcome);
       expect(log).toEqual([]);
     }
   });
 
   it('comes back later when the disk is short', async () => {
     const { deps, log } = fakes(photo, 'made', false);
-    expect(await makeThumbnail(deps, 'media-1', NOW, 'test')).toBe('later');
+    expect(await makeThumbnail(deps, 'creator', 'media-1', NOW, 'test')).toBe('later');
     expect(log).toEqual(['later media-1 2026-11-08T22:15:00.000Z']);
   });
 

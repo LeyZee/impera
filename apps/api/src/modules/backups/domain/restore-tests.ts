@@ -54,7 +54,7 @@ export function checkTestedAt(testedAt: Date, backupFinishedAt: Date, now: Date)
 }
 
 /**
- * Whether the restore is proven now (EQ-17's pay guard): the latest test, by `testedAt`, found no mismatch and is at
+ * Whether the restore is proven now (the Dashboard's reminder; never a pay guard, ADR 0028 § 6 as amended 21/11): the latest test, by `testedAt`, found no mismatch and is at
  * most `RESTORE_TEST_FRESH_DAYS` old. A recent failed test means the restore is broken now.
  *
  * `now` is the instant of the action being guarded, never a past date: the latest test is the latest of all, so a test
