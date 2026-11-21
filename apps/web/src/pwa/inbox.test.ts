@@ -37,16 +37,20 @@ describe('« Tes notifications »', () => {
     ]);
   });
 
-  it('answers first how many never rang', () => {
-    expect(headline([])).toBe('Rien cette semaine.');
-    expect(headline([item(1, '2026-11-21T10:00:00Z')])).toBe('Une notification, elle a sonné.');
-    expect(headline([item(1, '2026-11-21T10:00:00Z'), item(2, '2026-11-21T10:00:00Z')])).toBe(
-      'Toutes ont sonné.',
-    );
-    expect(headline([item(1, '2026-11-21T10:00:00Z', true)])).toBe('1 arrivée sans sonner');
-    expect(headline([item(1, '2026-11-21T10:00:00Z', true), item(2, '2026-11-21T10:00:00Z', true)])).toBe(
-      '2 arrivées sans sonner',
-    );
+  it('answers first how many this week, then how many never rang', () => {
+    expect(headline([])).toEqual({ big: 'Rien cette semaine', small: null });
+    expect(headline([item(1, '2026-11-21T10:00:00Z')])).toEqual({
+      big: '1 cette semaine',
+      small: 'elle a sonné',
+    });
+    expect(headline([item(1, '2026-11-21T10:00:00Z'), item(2, '2026-11-21T10:00:00Z')])).toEqual({
+      big: '2 cette semaine',
+      small: 'toutes ont sonné',
+    });
+    expect(headline([item(1, '2026-11-21T10:00:00Z', true), item(2, '2026-11-21T10:00:00Z')])).toEqual({
+      big: '2 cette semaine',
+      small: 'dont 1 sans sonner',
+    });
   });
 
   it('counts each family in the legend’s order, money first, the empty ones left out', () => {

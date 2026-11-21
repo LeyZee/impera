@@ -315,17 +315,22 @@ describe('Notifications, the ones of the last days', () => {
     });
     deviceIs('on');
     renderPage();
-    expect(await screen.findByText('2 arrivées sans sonner')).toBeTruthy();
+    expect(await screen.findByText('3 cette semaine')).toBeTruthy();
+    expect(screen.getByText('dont 2 sans sonner')).toBeTruthy();
     expect(screen.getByText('Story du jour').closest('a')?.getAttribute('data-family')).toBe('day');
     expect(screen.getByText('Un fan à regarder').closest('a')?.getAttribute('data-family')).toBe('safety');
     expect(screen.getAllByText('Sans sonner')).toHaveLength(2);
-    expect(screen.getByRole('img').getAttribute('aria-label')).toBe('Argent 1, Ta journée 1, Sécurité 1');
+    // A family of the legend lit by the keyboard: the others step back (the lines follow, in CSS).
+    const safety = screen.getByRole('button', { name: /Sécurité/u });
+    fireEvent.focus(safety);
+    expect(safety.getAttribute('aria-pressed')).toBe('true');
+    expect(safety.closest('.nv-inbox__body')?.getAttribute('data-lit')).toBe('safety');
   });
 
   it('says so when the week was quiet', async () => {
     serve();
     deviceIs('on');
     renderPage();
-    expect(await screen.findByText('Rien cette semaine.')).toBeTruthy();
+    expect(await screen.findByText('Rien cette semaine')).toBeTruthy();
   });
 });

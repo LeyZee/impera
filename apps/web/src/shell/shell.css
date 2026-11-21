@@ -2075,7 +2075,7 @@ label.nv-notif__row {
   stroke-dasharray: 3 3;
 }
 
-/* « Tes notifications » (trou 9 du 21/11): the answer, a bar of the five families, then each line by day. */
+/* « Tes notifications » (trou 9 du 21/11): how many first, a bar of the five families, then each line by day. */
 .nv-inbox [data-family='money'] {
   --nv-inbox-hue: var(--nv-sale);
 }
@@ -2096,14 +2096,19 @@ label.nv-notif__row {
   gap: 12px;
 }
 .nv-inbox__answer {
+  display: grid;
+  gap: 2px;
   margin: 0;
-  font-family: var(--nv-font-display, inherit);
-  font-size: 28px;
-  line-height: 1.15;
+}
+.nv-inbox__big {
+  font-family: var(--nv-font-display);
+  font-size: 32px;
+  line-height: 1.1;
   color: var(--nv-ink);
 }
-.nv-inbox__answer[data-quiet='some'] {
-  color: var(--nv-neon-ink, var(--nv-ink));
+.nv-inbox__small {
+  color: var(--nv-ink-muted);
+  font-size: 15px;
 }
 .nv-inbox__bar {
   display: flex;
@@ -2120,6 +2125,7 @@ label.nv-notif__row {
   transform-origin: left center;
   animation: nv-inbox-grow var(--nv-dur-slow) var(--nv-ease-out) backwards;
   animation-delay: calc(var(--nv-i, 0) * 70ms);
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
 }
 @keyframes nv-inbox-grow {
   from {
@@ -2129,25 +2135,64 @@ label.nv-notif__row {
 .nv-inbox__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
 }
-.nv-inbox__legend li {
+.nv-inbox__key {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px 4px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background var(--nv-dur-fast) var(--nv-ease-out),
+    color var(--nv-dur-fast) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
 }
-.nv-inbox__dot {
+.nv-inbox__key[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--nv-inbox-hue) 22%, transparent);
+  color: var(--nv-ink);
+}
+.nv-inbox__icon {
+  display: inline-grid;
+  place-items: center;
   flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--nv-inbox-hue);
-  box-shadow: 0 0 10px var(--nv-inbox-hue);
+  width: 22px;
+  height: 22px;
+  color: var(--nv-inbox-hue);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--nv-inbox-hue) 55%, transparent));
+}
+.nv-inbox__icon .nav-icon {
+  width: 18px;
+  height: 18px;
+}
+.nv-inbox__item .nv-inbox__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--nv-inbox-hue) 14%, transparent);
+}
+/* One family lit (legend hovered, touched or focused): the others step back, bar and lines alike. */
+.nv-inbox__body[data-lit] .nv-inbox__seg,
+.nv-inbox__body[data-lit] .nv-inbox__key,
+.nv-inbox__body[data-lit] .nv-inbox__item {
+  opacity: 0.32;
+}
+.nv-inbox__body[data-lit='money'] [data-family='money'],
+.nv-inbox__body[data-lit='day'] [data-family='day'],
+.nv-inbox__body[data-lit='team'] [data-family='team'],
+.nv-inbox__body[data-lit='alert'] [data-family='alert'],
+.nv-inbox__body[data-lit='safety'] [data-family='safety'] {
+  opacity: 1;
 }
 .nv-inbox__list {
   display: grid;
@@ -2171,16 +2216,23 @@ label.nv-notif__row {
   text-decoration: none;
   transition:
     background var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-fast) var(--nv-ease-out);
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    opacity var(--nv-dur-fast) var(--nv-ease-out);
 }
 .nv-inbox__item:hover,
 .nv-inbox__item:focus-visible {
   background: var(--nv-plate-hover, var(--nv-fill-soft));
   transform: translateX(2px);
 }
-.nv-inbox__title {
+.nv-inbox__text {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
   flex: 1;
   min-width: 0;
+}
+.nv-inbox__title {
+  max-width: 100%;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -2188,8 +2240,7 @@ label.nv-notif__row {
   line-clamp: 2;
 }
 .nv-inbox__tag {
-  flex: none;
-  padding: 2px 8px;
+  padding: 1px 8px;
   border-radius: 999px;
   background: var(--nv-fill-soft);
   color: var(--nv-ink-muted);
@@ -2197,6 +2248,8 @@ label.nv-notif__row {
 }
 .nv-inbox__time {
   flex: none;
+  align-self: flex-start;
+  padding-top: 6px;
   color: var(--nv-ink-faint);
   font-size: 13px;
 }

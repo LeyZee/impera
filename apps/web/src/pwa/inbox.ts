@@ -5,6 +5,8 @@ import {
   type NotificationReason,
 } from '@impera/contracts';
 
+import type { NavIconName } from '@/shell/NavIcon';
+
 /**
  * « Tes notifications » (trou 9 du 21/11): what the server kept for the account, read back on /notifications, where the
  * morning recap now leads. Pure helpers here, the screen in NotificationInbox.tsx.
@@ -103,13 +105,30 @@ export function familyCounts(
   });
 }
 
-/** The answer first (the screen's one big thing): how many never rang, or that all of them did. */
-export function headline(items: readonly NotificationInboxItem[]): string {
-  if (items.length === 0) return 'Rien cette semaine.';
+/** The answer first (the screen's one big thing): how many this week, then how many never rang. */
+export function headline(items: readonly NotificationInboxItem[]): {
+  readonly big: string;
+  readonly small: string | null;
+} {
+  if (items.length === 0) return { big: 'Rien cette semaine', small: null };
   const quiet = items.filter((item) => item.quiet).length;
-  if (quiet === 0) return items.length === 1 ? 'Une notification, elle a sonné.' : 'Toutes ont sonné.';
-  return quiet === 1 ? '1 arrivée sans sonner' : `${String(quiet)} arrivées sans sonner`;
+  const small =
+    quiet > 0
+      ? `dont ${String(quiet)} sans sonner`
+      : items.length === 1
+        ? 'elle a sonné'
+        : 'toutes ont sonné';
+  return { big: `${String(items.length)} cette semaine`, small };
 }
+
+/** The icon that says each family without its word (règle de Charles du 21/11). */
+export const FAMILY_ICON = {
+  money: 'pay',
+  day: 'today',
+  team: 'people',
+  alert: 'bell',
+  safety: 'shield',
+} as const satisfies Readonly<Record<InboxFamily, NavIconName>>;
 
 export function clockOfInstant(at: string, timeZone?: string): string {
   return new Intl.DateTimeFormat('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit' }).format(
