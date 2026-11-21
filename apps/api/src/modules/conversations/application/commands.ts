@@ -49,7 +49,14 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt, stepCutBy } from '../domain/rules';
+import {
+  FAN_MEDIA_MAX,
+  answersHisLastMessage,
+  boundFanText,
+  fanAwaitsAnswer,
+  respondAt,
+  stepCutBy,
+} from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -194,17 +201,20 @@ async function expireOpenDrafts(
   return current;
 }
 
-/** His messages since the last one of the creator's side carry a sign the safety net answers (a minor, self-harm). */
-async function waitingSafetySign(
+/**
+ * A message of the creator's side written on the platform answers him: it comes after his last message there, and his
+ * messages since the last one of hers carry no sign the safety net answers (a minor, self-harm).
+ */
+async function answersOnPlatform(
   tx: Transaction,
   conversation: Conversation,
   answer: MessageId,
 ): Promise<boolean> {
-  const history = (await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES)).filter(
-    (message) => message.id !== answer,
-  );
+  const read = await tx.messages.history(conversation.id, GUARD_HISTORY_MESSAGES);
+  if (!answersHisLastMessage(read, answer)) return false;
+  const history = read.filter((message) => message.id !== answer);
   const lastReply = history.findLastIndex((message) => message.author !== 'fan');
-  return history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
+  return !history.slice(lastReply + 1).some((message) => safetySigns(message.text).length > 0);
 }
 
 /** Opens the lock and holds it for the transaction, or refuses Automatique with what is missing. */
@@ -282,11 +292,12 @@ export function createConversationCommands({
         // Answered on the platform (ADR 0110 § 2): a chatter, the creator or an automation wrote while he waited for
         // the agent. Her open draft falls and nothing of hers goes over it, unless his words carry a sign the safety
         // net answers, or a care episode is open (ADR 0088): then the agent's draft still reaches a human.
+        // A message dated before his last one is history read late, never an answer (recette REV-04).
         const answered =
           author === 'human' &&
           AWAITING_AGENT.includes(conversation.state) &&
           conversation.careSince === null &&
-          !(await waitingSafetySign(tx, conversation, messageId));
+          (await answersOnPlatform(tx, conversation, messageId));
         if (answered)
           conversation = await expireOpenDrafts(tx, conversation, ANSWERED_ON_PLATFORM, {
             ...meta,
