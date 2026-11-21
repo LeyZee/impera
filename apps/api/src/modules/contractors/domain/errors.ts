@@ -279,3 +279,32 @@ export class ContractorDocumentUnavailable extends DomainError {
     );
   }
 }
+
+/**
+ * « Où te verser » (ADR 0165 §§ 3 and 4): only the member writes his own and reads it; the owner reveals it one member
+ * at a time; a manager never.
+ */
+export class PayoutDestinationForbidden extends DomainError {
+  constructor() {
+    super(
+      'payout_destination_forbidden',
+      'Seul le membre écrit où le verser ; seul le propriétaire le lit aussi',
+    );
+  }
+}
+
+/** More changes today than `PAYOUT_CHANGES_PER_DAY` (ADR 0165 § 5). */
+export class PayoutDestinationLimited extends DomainError {
+  constructor(perDay: number) {
+    super('payout_destination_limited', `Au plus ${String(perDay)} changements par jour`, {
+      details: { perDay },
+    });
+  }
+}
+
+/** No encryption key configured: nothing is kept unsealed (ADR 0165 § 2). */
+export class PayoutDestinationUnavailable extends DomainError {
+  constructor() {
+    super('payout_destination_unavailable', 'Les coordonnées de versement ne peuvent pas être gardées ici');
+  }
+}

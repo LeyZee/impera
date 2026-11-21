@@ -1345,6 +1345,13 @@
       "when": 1795275869236,
       "tag": "0250_creator_decisions",
       "breakpoints": true
+    },
+    {
+      "idx": 192,
+      "version": "7",
+      "when": 1795278081819,
+      "tag": "0258_payout_destinations",
+      "breakpoints": true
     }
   ]
 }

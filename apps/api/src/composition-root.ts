@@ -448,6 +448,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     requeue: invoiceRequeue,
     invoices: invoiceReadsForContractors,
     pay: payReadsForContractors,
+    notify: notifications.module.notify,
     ...(options.invoiceBuckets !== undefined && { invoiceBuckets: options.invoiceBuckets }),
     ...(options.payrollClock !== undefined && { now: options.payrollClock }),
   });

@@ -110,9 +110,10 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
 
 /**
  * Tables the service role does not even read: a migration that closes one names it here. The revenue objectives
- * (ADR 0092 § 6) are read by no job and never reach the MCP.
+ * (ADR 0092 § 6) are read by no job and never reach the MCP; where a member is paid (ADR 0165 § 4, Sécurité's call of
+ * 21/11) is read by him and the owner alone.
  */
-const CLOSED: readonly string[] = ['creator_revenue_objectives'];
+const CLOSED: readonly string[] = ['creator_revenue_objectives', 'payout_destinations'];
 
 describe('the service role (ADR 0087): rows only, where a migration opened them', () => {
   let test: TestDb;

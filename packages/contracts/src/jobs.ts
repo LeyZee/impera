@@ -87,6 +87,7 @@ export const JOB_NAMES = [
   'payroll.purge_refused_documents',
   'payroll.settle_documents',
   'payroll.lock_payout_certificate',
+  'payroll.notify_payout_change',
   'media.describe',
   'media.describe_vault',
   'content_drops.receive_file',
@@ -171,6 +172,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.purge_refused_documents': 'Nettoyage des documents refusés',
   'payroll.settle_documents': 'Règlement des documents',
   'payroll.lock_payout_certificate': 'Attestation de paiement',
+  'payroll.notify_payout_change': 'Où te verser changé',
   'media.describe': 'Description des médias',
   'media.describe_vault': 'Description des médias du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
@@ -455,6 +457,16 @@ export const JOB_PAYLOADS = {
    * not locked yet (`null`). A bucket that does not answer fails the run, never the transfer.
    */
   'payroll.lock_payout_certificate': z.object({ statementId: CommissionStatementIdSchema.nullable() }),
+  /**
+   * A member's « Où te verser » changed (ADR 0165 § 5): told to his own devices (his account, read with the write, so
+   * that the job needs no service-role read), the version's id as its object.
+   */
+  'payroll.notify_payout_change': z.object({
+    memberId: TeamMemberIdSchema,
+    versionId: z.uuid(),
+    userId: z.string().min(1),
+    timeZone: z.string().min(1),
+  }),
   'media.describe': z.object({
     creatorId: CreatorIdSchema,
     mediaAssetId: MediaAssetIdSchema,
@@ -689,6 +701,7 @@ export const JOB_MAX_ATTEMPTS = {
   'payroll.settle_documents': 5,
   // Replayable: a lock only lengthens, and the run records it once; the night's run takes again what failed.
   'payroll.lock_payout_certificate': 5,
+  'payroll.notify_payout_change': 5,
   'media.describe': 3,
   // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
   'media.describe_vault': 3,
