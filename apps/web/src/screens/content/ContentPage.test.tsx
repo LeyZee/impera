@@ -450,4 +450,65 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const drop = calls.find((call) => call.method === 'POST');
     expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
   });
+
+  it('replaces a medium the team asked again where it is, and says what does not fit (trou 7 du 21/11)', async () => {
+    const asked = fileOf({
+      position: 0,
+      redo: { sentence: 'Trop sombre, refais-la', at: '2026-11-05T09:00:00.000Z' },
+    });
+    const refused = fileOf({ position: 1, state: 'refused', refusal: 'Photo illisible' });
+    const drop = dropOf({ state: 'ready', files: [asked, refused] });
+    const calls = serve(
+      { requests: [], drops: [drop] },
+      {
+        [`POST /v1/creator-space/drops/${drop.id}/files/${asked.id}/replace`]: (body) => {
+          const sent = z.object({ id: ContentDropFileIdSchema }).parse(body);
+          return Response.json({
+            ...drop,
+            state: 'received',
+            files: [fileOf({ id: sent.id, position: 0, state: 'awaiting' }), refused],
+          });
+        },
+      },
+    );
+    show();
+    const section = (await screen.findByRole('heading', { name: 'En route' })).closest('section');
+    if (section === null) throw new Error('no section');
+    const card = within(section).getByText('Trop sombre, refais-la').closest('.ct-card');
+    if (!(card instanceof HTMLElement)) throw new Error('no card');
+    expect(within(card).getByText('Photo illisible')).toBeDefined();
+    expect(within(card).getByRole('button', { name: 'Remplacer Photo 2' })).toBeDefined();
+    fireEvent.click(within(card).getByRole('button', { name: 'Remplacer Photo 1' }));
+    const input = card.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    expect(input.accept).toContain('image/*');
+    pick(input, [new File([new Uint8Array(4)], 'vocal.mp3', { type: 'audio/mpeg' })]);
+    expect(await within(card).findByRole('alert')).toHaveProperty(
+      'textContent',
+      '« Feed · Séance boudoir » prend seulement des photos et des vidéos',
+    );
+    fireEvent.click(within(card).getByRole('button', { name: 'Remplacer Photo 1' }));
+    const better = fileWithHead('nouvelle.jpg', 'jpeg', 10, 'image/jpeg');
+    pick(input, [better]);
+    await waitFor(() => {
+      expect(queueSend).toHaveBeenCalledTimes(1);
+    });
+    const posted = calls.filter((call) => call.method === 'POST');
+    expect(posted).toHaveLength(1);
+    expect(posted[0]?.body).toMatchObject({ mime: 'image/jpeg', bytes: 13 });
+    expect(queueSend).toHaveBeenCalledWith(
+      drop.id,
+      z.object({ id: z.string() }).parse(posted[0]?.body).id,
+      better,
+      expect.any(Function),
+    );
+  });
+
+  it('keeps a published drop out of « En route » when nothing of it is asked again', async () => {
+    serve({ requests: [], drops: [dropOf({ state: 'ready', exportedAt: '2026-11-04T09:00:00.000Z' })] });
+    show();
+    expect(await screen.findByRole('heading', { name: 'Publié' })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remplacer/u })).toBeNull();
+  });
 });

@@ -1,8 +1,10 @@
 import {
   ApiErrorSchema,
   CONTENT_DROP_EXPORT_UNPROCESSABLE,
+  CONTENT_DROP_FILE_SETTLED_CONFLICT,
   CONTENT_DROP_SETTLED_CONFLICT,
   ContentDropSchema,
+  type ContentDropFileId,
   type ContentDropId,
   type CreatorId,
 } from '@impera/contracts';
@@ -82,4 +84,44 @@ export async function redoDrop(
   if (response.status === 403 || response.status === 404)
     return { kind: 'refused', message: REDO_ERRORS.forbidden };
   return { kind: 'refused', message: REDO_ERRORS.failed };
+}
+
+export const REDO_FILE_ERRORS = {
+  forbidden: 'Seuls le propriétaire et un manager actif lui demandent de refaire un média.',
+  settled: 'Ce dépôt est déjà publié : ses médias ne se refont plus d’ici.',
+  waiting: 'Ce média n’est pas encore arrivé, ou il est déjà remplacé : recharge la page.',
+  failed: REDO_ERRORS.failed,
+} as const;
+
+/**
+ * « À refaire » on one medium (trou 7 du 21/11): her sentence on that file, the drop kept; she replaces it in place
+ * from her Contenu. A script copied into Reveal may be asked again too: replaced, it is to copy again. Asked twice, the
+ * first sentence stands.
+ */
+export async function redoDropFile(
+  creatorId: CreatorId,
+  dropId: ContentDropId,
+  fileId: ContentDropFileId,
+  sentence: string,
+): Promise<RedoOutcome> {
+  let response: Response;
+  try {
+    response = await fetch(`/v1/creators/${creatorId}/drops/${dropId}/files/${fileId}/redo`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sentence }),
+    });
+  } catch {
+    return { kind: 'refused', message: REDO_FILE_ERRORS.failed };
+  }
+  if (response.ok) return { kind: 'ok' };
+  const refusal = ApiErrorSchema.safeParse(await response.json().catch(() => null));
+  if (refusal.success && refusal.data.error.code === CONTENT_DROP_SETTLED_CONFLICT)
+    return { kind: 'refused', message: REDO_FILE_ERRORS.settled };
+  if (refusal.success && refusal.data.error.code === CONTENT_DROP_FILE_SETTLED_CONFLICT)
+    return { kind: 'refused', message: REDO_FILE_ERRORS.waiting };
+  if (response.status === 403 || response.status === 404)
+    return { kind: 'refused', message: REDO_FILE_ERRORS.forbidden };
+  return { kind: 'refused', message: REDO_FILE_ERRORS.failed };
 }

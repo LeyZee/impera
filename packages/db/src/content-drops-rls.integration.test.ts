@@ -9,7 +9,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from '@impera/contracts';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { withAdmin, withCreatorAccount, withTenantMember } from './client';
@@ -274,6 +274,125 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
       ),
     );
     expect((await stateOf(mine.id))?.redoSentence).toBe('Trop sombre, refais-la avec plus de lumière');
+  });
+
+  it('only her team asks one medium again, on a drop received and not out, and only the server resets its export', async () => {
+    const mine = drop(nora, noraUser);
+    const medium = file(nora, mine.id);
+    await asNora(async (tx) => {
+      await tx.insert(s.contentDrops).values(mine);
+      await tx.insert(s.contentDropFiles).values(medium);
+    });
+    const ask = (sentence: string | null) => ({
+      redoSentence: sentence,
+      redoAt: new Date(),
+      redoBy: manager,
+    });
+    const fileOf = async () => {
+      const [row] = await withAdmin(test.admin.db, (tx) =>
+        tx.select().from(s.contentDropFiles).where(eq(s.contentDropFiles.id, medium.id)),
+      );
+      return row;
+    };
+    // Still on its way: nothing to ask again.
+    expect(
+      await asTeam(manager, (tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set(ask('Trop sombre'))
+          .where(eq(s.contentDropFiles.id, medium.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    await withAdmin(test.admin.db, (tx) =>
+      tx.update(s.contentDrops).set({ state: 'received' }).where(eq(s.contentDrops.id, mine.id)),
+    );
+    // Never by her, never by a chatter, never empty.
+    await failure(
+      asNora((tx) =>
+        tx.update(s.contentDropFiles).set(ask('Moi')).where(eq(s.contentDropFiles.id, medium.id)),
+      ),
+    );
+    expect(
+      await asTeam(chatter, (tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set(ask('Trop sombre'))
+          .where(eq(s.contentDropFiles.id, medium.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    expect((await fileOf())?.redoSentence).toBeNull();
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx.update(s.contentDropFiles).set(ask('')).where(eq(s.contentDropFiles.id, medium.id)),
+        ),
+      ),
+    ).toMatch(/content_drop_files_redo_check/u);
+    await asTeam(manager, (tx) =>
+      tx.update(s.contentDropFiles).set(ask('Trop sombre')).where(eq(s.contentDropFiles.id, medium.id)),
+    );
+    expect((await fileOf())?.redoSentence).toBe('Trop sombre');
+    // Out on her feed: no longer asked.
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'ready', exportedAt: new Date(), exportedBy: owner })
+        .where(eq(s.contentDrops.id, mine.id)),
+    );
+    expect(
+      await asTeam(owner, (tx) =>
+        tx
+          .update(s.contentDropFiles)
+          .set(ask('Autre'))
+          .where(eq(s.contentDropFiles.id, medium.id))
+          .returning(),
+      ),
+    ).toEqual([]);
+    // An export is taken back by the server alone, for a script, in the transaction that says so.
+    const reset = { exportedAt: null, exportedBy: null } as const;
+    expect(
+      await failure(
+        withAdmin(test.admin.db, async (tx) => {
+          await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
+          await tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, mine.id));
+        }),
+      ),
+    ).toMatch(/an export is confirmed once/u);
+    const script = drop(nora, owner, {
+      category: 'script',
+      requestId: await withAdmin(test.admin.db, async (tx) => {
+        const asked = request(owner, { category: 'script', structureId });
+        await tx.insert(s.contentRequests).values(asked);
+        return asked.id;
+      }),
+      state: 'ready',
+      scriptNumber: 1,
+      exportedAt: new Date(),
+      exportedBy: owner,
+    });
+    await withAdmin(test.admin.db, (tx) => tx.insert(s.contentDrops).values(script));
+    expect(
+      await failure(
+        withAdmin(test.admin.db, (tx) =>
+          tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, script.id)),
+        ),
+      ),
+    ).toMatch(/an export is confirmed once/u);
+    expect(
+      await failure(
+        asTeam(owner, async (tx) => {
+          await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
+          await tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, script.id));
+        }),
+      ),
+    ).toMatch(/an export is confirmed once|permission denied/u);
+    await withAdmin(test.admin.db, async (tx) => {
+      await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
+      await tx.update(s.contentDrops).set(reset).where(eq(s.contentDrops.id, script.id));
+    });
+    expect(await stateOf(script.id)).toMatchObject({ exportedAt: null, exportedBy: null });
   });
 
   it('she never withdraws a scheduled drop, never touches a file, never deletes', async () => {

@@ -171,7 +171,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   return {
     name: 'content-drops',
     routes: createContentDropRoutes(
-      createDrizzleCreatorContentStore(deps.db),
+      createDrizzleCreatorContentStore(deps.db, deps.adminDb),
       agency,
       storage,
       { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },

@@ -54,9 +54,10 @@ export function createDrizzleRetentionStore(adminDb: Database): RetentionStore {
           .where(
             and(
               eq(contentDropFiles.state, 'awaiting'),
-              // A drop sending since before the limit; in a script being filled, a file chosen before it (SC-02 lot b).
+              // A drop sending since before the limit; in a script being filled, or a medium replaced in a drop received
+              // (trou 7 du 21/11), a file chosen before it (SC-02 lot b).
               sql`((${contentDrops.state} = 'uploading' and ${contentDrops.createdAt} < ${before})
-                or (${contentDrops.state} = 'filling' and ${contentDropFiles.createdAt} < ${before}))`,
+                or (${contentDrops.state} in ('filling', 'received') and ${contentDropFiles.createdAt} < ${before}))`,
             ),
           );
         return rows.map((row) => row.id);

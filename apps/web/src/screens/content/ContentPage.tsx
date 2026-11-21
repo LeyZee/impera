@@ -3,21 +3,34 @@ import {
   type ContentDrop,
   type ContentDropFile,
   type ContentRequest,
+  ContentDropFileIdSchema,
   ContentDropIdSchema,
   type ContentDropId,
   type DropCategory,
+  replacementRefusal,
   type RedoneDrop,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
 import { DropSheet } from './DropSheet';
-import { CONTENT_KEY, refuseRequest, startScriptDrop, useContent, useScriptDrop, withdrawDrop } from './api';
+import {
+  CONTENT_KEY,
+  Refused,
+  refuseRequest,
+  replaceDropFile,
+  startScriptDrop,
+  useContent,
+  useScriptDrop,
+  withdrawDrop,
+} from './api';
 import {
   CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   DROP_OUTPUTS,
   STATE_WORDS,
+  UNKNOWN_TYPE,
+  acceptOfReplacing,
   contentsOf,
   dropName,
   droppedOn,
@@ -26,6 +39,7 @@ import {
   fileLine,
   isInterrupted,
   matchResumed,
+  mimeOf,
   onTheirWay,
   pickedHeadRefusal,
   outLine,
@@ -36,6 +50,7 @@ import {
   shotMomentOf,
   stateTone,
   toRedo,
+  toReplaceOf,
   toShoot,
   type LiveSend,
 } from './model';
@@ -562,6 +577,50 @@ function DropCard({
   const interrupted = drop.files.filter((file) => isInterrupted(file, sends.get(file.id)));
   // Cut while this page was open: the phone still holds every file, « Réessayer » sends them again.
   const allHeld = interrupted.length > 0 && interrupted.every((file) => holds(file.id));
+  // « Remplacer » (trou 7 du 21/11): a medium asked again or refused, swapped where it is, its bytes sent as any file's.
+  const replacer = useRef<HTMLInputElement>(null);
+  // The medium her gallery's choice replaces; a picker closed without a choice leaves it, the next tap sets another.
+  const replacing = useRef<ContentDropFile | null>(null);
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  const [replaceNote, setReplaceNote] = useState<string | null>(null);
+  const replaceable = new Set(toReplaceOf(drop).map((file) => file.id));
+  const replaceOn = (file: ContentDropFile): (() => void) | undefined =>
+    replaceable.has(file.id) && !replaceBusy
+      ? () => {
+          replacing.current = file;
+          setReplaceNote(null);
+          if (replacer.current === null) return;
+          replacer.current.accept = acceptOfReplacing(drop, file);
+          replacer.current.click();
+        }
+      : undefined;
+  const replaceWith = async (old: ContentDropFile, picked: File): Promise<void> => {
+    const mime = mimeOf(picked);
+    if (mime === null) {
+      setReplaceNote(UNKNOWN_TYPE);
+      return;
+    }
+    const declared = { id: ContentDropFileIdSchema.parse(crypto.randomUUID()), mime, bytes: picked.size };
+    // Said before anything goes: the server says it again.
+    const refusal =
+      replacementRefusal(drop.category, { kind: old.kind, slotKey: old.slotKey }, declared) ??
+      (await pickedHeadRefusal(picked, mime));
+    if (refusal !== null) {
+      setReplaceNote(refusal);
+      return;
+    }
+    try {
+      const after = await replaceDropFile(drop.id, old.id, declared);
+      void queueSend(after.id, declared.id, picked, onSettled);
+      onSettled();
+    } catch (error) {
+      setReplaceNote(
+        error instanceof Refused && error.sentences.length > 0
+          ? error.message
+          : 'Ce n’est pas parti : vérifie ta connexion et réessaie.',
+      );
+    }
+  };
 
   useEffect(() => {
     if (!landed) return;
@@ -646,7 +705,7 @@ function DropCard({
       {drop.state === 'uploading' || drop.state === 'received' ? (
         <ul className="ct-files">
           {drop.files.map((file) => (
-            <FileLine key={file.id} file={file} live={sends.get(file.id)} />
+            <FileLine key={file.id} file={file} live={sends.get(file.id)} onReplace={replaceOn(file)} />
           ))}
         </ul>
       ) : refused.length > 0 ? (
@@ -654,10 +713,31 @@ function DropCard({
         // never only « Aucun fichier n'a pu être gardé » (recette MED-03).
         <ul className="ct-files">
           {refused.map((file) => (
-            <FileLine key={file.id} file={file} live={undefined} />
+            <FileLine key={file.id} file={file} live={undefined} onReplace={replaceOn(file)} />
           ))}
         </ul>
       ) : null}
+      <input
+        ref={replacer}
+        type="file"
+        hidden
+        onChange={(event) => {
+          const picked = event.target.files?.[0];
+          event.target.value = '';
+          const old = replacing.current;
+          replacing.current = null;
+          if (picked === undefined || old === null) return;
+          setReplaceBusy(true);
+          void replaceWith(old, picked).finally(() => {
+            setReplaceBusy(false);
+          });
+        }}
+      />
+      {replaceNote === null ? null : (
+        <p className="ct-file__hint" role="alert">
+          {replaceNote}
+        </p>
+      )}
       {mayWithdrawHere(drop) && !sending ? (
         <div className="ct-card__actions">
           {confirming ? (
@@ -720,7 +800,16 @@ function DropCard({
  * A file's line: its progress while it goes up here; when the server keeps answering with an error, it says so in
  * amber with « Réessayer » (recette CRE-10). A cut send is resumed once, at the head of its card.
  */
-function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | undefined }): JSX.Element {
+function FileLine({
+  file,
+  live,
+  onReplace,
+}: {
+  file: ContentDropFile;
+  live: LiveSend | undefined;
+  /** « Remplacer », for a medium asked again or refused (trou 7 du 21/11). */
+  onReplace?: (() => void) | undefined;
+}): JSX.Element {
   const line = fileLine(file, live);
   const percent =
     live === undefined || live.total === 0 ? 0 : Math.min(100, Math.floor((100 * live.sent) / live.total));
@@ -729,7 +818,7 @@ function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | unde
     live !== undefined &&
     (live.phase === 'sending' || live.phase === 'waiting' || live.phase === 'stalled');
   const stalled = file.state === 'awaiting' && live?.phase === 'stalled';
-  const warn = file.state === 'refused' || stalled || isInterrupted(file, live);
+  const warn = file.state === 'refused' || file.redo !== null || stalled || isInterrupted(file, live);
   const label = `${file.kind === 'image' ? 'Photo' : file.kind === 'video' ? 'Vidéo' : 'Vocal'} ${String(file.position + 1)}`;
   return (
     <li className="ct-file">
@@ -747,6 +836,16 @@ function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | unde
             Réessayer
           </button>
         ) : null}
+        {onReplace === undefined ? null : (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            aria-label={`Remplacer ${label}`}
+            onClick={onReplace}
+          >
+            Remplacer
+          </button>
+        )}
       </div>
       {showsBar ? (
         <div

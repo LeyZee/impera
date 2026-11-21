@@ -9,6 +9,7 @@ import {
   ContentRequestSchema,
   CorrectDropCategoryBodySchema,
   RedoDropBodySchema,
+  ReplaceDropFileBodySchema,
   CorrectDropDescriptionBodySchema,
   CreateContentDropBodySchema,
   CreateContentRequestBodySchema,
@@ -165,6 +166,28 @@ export function createContentDropRoutes(
     );
 
     app.post(
+      '/creator-space/drops/:id/files/:fileId/replace',
+      {
+        ...creatorOnly,
+        schema: {
+          params: FileParamsSchema,
+          body: ReplaceDropFileBodySchema,
+          response: { 200: ContentDropSchema },
+        },
+      },
+      (request) =>
+        asCreator(() =>
+          creator.replaceFile(
+            signedIn(request.user),
+            request.params.id,
+            request.params.fileId,
+            request.body,
+            clock(),
+          ),
+        ),
+    );
+
+    app.post(
       '/creator-space/drops/:id/files/:fileId/complete',
       {
         ...creatorOnly,
@@ -300,6 +323,22 @@ export function createContentDropRoutes(
       { ...team, schema: { params: CreatorDropParamsSchema } },
       async (request, reply) => {
         await agency.withdraw(request.params.creatorId, signedIn(request.user), request.params.id, clock());
+        return reply.code(204).send();
+      },
+    );
+
+    app.post(
+      '/creators/:creatorId/drops/:id/files/:fileId/redo',
+      { ...team, schema: { params: CreatorFileParamsSchema, body: RedoDropBodySchema } },
+      async (request, reply) => {
+        await agency.redoFile(
+          request.params.creatorId,
+          signedIn(request.user),
+          request.params.id,
+          request.params.fileId,
+          request.body.sentence,
+          clock(),
+        );
         return reply.code(204).send();
       },
     );

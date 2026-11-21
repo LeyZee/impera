@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { dropOf, fileOf, fileWithHead, requestOf } from './fixtures';
 import {
   acceptOf,
+  acceptOfReplacing,
   contentsOf,
   droppedOn,
   dropName,
@@ -32,6 +33,7 @@ import {
   shotMomentOf,
   stateTone,
   toRedo,
+  toReplaceOf,
   toShoot,
   UNREADABLE_HERE,
   weightOf,
@@ -298,5 +300,43 @@ describe('Contenu: what the agency sent back (trou 7 du 21/11)', () => {
     expect(toRedo([story], [before, gone])).toEqual([story]);
     const again = dropOf({ category: 'reveal_story', createdAt: '2026-11-07T10:00:00.000Z' });
     expect(toRedo([story, seance], [again])).toEqual([seance]);
+  });
+});
+
+describe('Contenu: a medium to replace (trou 7 du 21/11)', () => {
+  const asked = fileOf({ redo: { sentence: 'Trop sombre', at: '2026-11-05T09:00:00.000Z' } });
+  const refused = fileOf({ position: 1, state: 'refused', refusal: 'Photo illisible' });
+  const kept = fileOf({ position: 2 });
+
+  it('is one asked again or refused, in a drop received and not out, but a script copied into Reveal', () => {
+    expect(toReplaceOf(dropOf({ state: 'ready', files: [asked, refused, kept] }))).toEqual([asked, refused]);
+    expect(toReplaceOf(dropOf({ state: 'uploading', files: [asked] }))).toEqual([]);
+    expect(toReplaceOf(dropOf({ state: 'scheduled', files: [asked] }))).toEqual([]);
+    const out = '2026-11-04T09:00:00.000Z';
+    expect(toReplaceOf(dropOf({ state: 'ready', exportedAt: out, files: [asked] }))).toEqual([]);
+    const script = dropOf({
+      category: 'script',
+      scriptNumber: 3,
+      requestId: requestOf({ category: 'script' }).id,
+      state: 'ready',
+      exportedAt: out,
+      files: [{ ...asked, slotKey: 'salon::0' }],
+    });
+    expect(toReplaceOf(script)).toHaveLength(1);
+    // Back on her way, above « Déposer », its line saying the team's sentence.
+    expect(onTheirWay([script])).toEqual([script]);
+    expect(published([script])).toEqual([]);
+    expect(routeFirst([script])).toBe(true);
+    expect(fileLine(asked, undefined)).toBe('Trop sombre');
+    expect(refusedOf(dropOf({ state: 'ready', files: [asked, kept] }))).toEqual([asked]);
+  });
+
+  it('opens her gallery on the step’s kind in a script, on the category’s kinds otherwise', () => {
+    const seance = dropOf({ files: [asked] });
+    expect(acceptOfReplacing(seance, asked)).toBe(acceptOf('feed_shoot'));
+    const vocal = fileOf({ kind: 'audio', mime: 'audio/mpeg', slotKey: 'salon::2' });
+    expect(acceptOfReplacing(dropOf({ category: 'script', requestId: requestOf().id }), vocal)).toBe(
+      'audio/*,.m4a,.mp3,.aac',
+    );
   });
 });

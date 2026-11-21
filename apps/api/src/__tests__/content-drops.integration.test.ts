@@ -496,6 +496,158 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     });
   });
 
+  it('« À refaire » on one medium: she replaces it where it is, the drop received again (trou 7 du 21/11)', async () => {
+    const first = photo();
+    const second = photo();
+    const seance = { id: newId(ContentDropIdSchema), category: 'feed_shoot', files: [first, second] };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', seance)).statusCode).toBe(200);
+    // Not received yet: nothing to ask again.
+    const redoFile = (
+      fileId: string,
+      who: 'owner' | 'manager' | 'chatter' | 'nora',
+      sentence = 'Trop sombre',
+    ) => call('POST', `/v1/creators/${nora}/drops/${seance.id}/files/${fileId}/redo`, who, { sentence });
+    expect((await redoFile(first.id, 'owner')).statusCode).toBe(409);
+    // The cleaning refused the second, kept nothing of the first here (a refusal stands for a medium in this test).
+    await test.admin.db
+      .update(schema.contentDropFiles)
+      .set({ state: 'refused', refusal: 'Photo illisible' })
+      .where(eq(schema.contentDropFiles.dropId, seance.id));
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'blocked', blockedReason: 'Aucun fichier de ce dépôt n’a pu être gardé' })
+      .where(eq(schema.contentDrops.id, seance.id));
+    expect((await redoFile(first.id, 'chatter')).statusCode).toBe(403);
+    expect((await redoFile(first.id, 'nora')).statusCode).toBe(403);
+    expect((await redoFile(first.id, 'manager')).statusCode, 'manager').toBe(204);
+    expect((await redoFile(first.id, 'owner', 'Autre chose')).statusCode).toBe(204);
+    const asked = (await content()).drops.find((one) => one.id === seance.id);
+    expect(asked?.files.find((one) => one.id === first.id)?.redo?.sentence).toBe('Trop sombre');
+    // Its archive waits for her replacement.
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'ready', blockedReason: null })
+      .where(eq(schema.contentDrops.id, seance.id));
+    const archive = await call('GET', `/v1/creators/${nora}/drops/${seance.id}/export`, 'owner');
+    expect(archive.statusCode).toBe(422);
+    expect(archive.json()).toMatchObject({ error: { details: { reason: 'redo_pending' } } });
+
+    const replace = (fileId: string, file: { id: string; mime: string; bytes: number }) =>
+      call('POST', `/v1/creator-space/drops/${seance.id}/files/${fileId}/replace`, 'nora', file);
+    // A vocal never stands in a séance.
+    const vocal = { id: newId(ContentDropFileIdSchema), mime: 'audio/mpeg', bytes: MB };
+    expect((await replace(first.id, vocal)).statusCode).toBe(422);
+    const better = photo();
+    const replaced = await replace(first.id, better);
+    expect(replaced.statusCode, replaced.body).toBe(200);
+    const drop = ContentDropSchema.parse(replaced.json());
+    expect(drop.state).toBe('received');
+    expect(drop.files.map((one) => [one.id, one.state, one.redo])).toEqual([
+      [better.id, 'awaiting', null],
+      [second.id, 'refused', null],
+    ]);
+    // Replayed: the same drop. Another file under its id: a conflict.
+    expect((await replace(first.id, better)).statusCode).toBe(200);
+    expect((await replace(first.id, { ...better, bytes: better.bytes + 1 })).statusCode).toBe(409);
+    // The refused one is hers to replace too; the new one, on its way, is not.
+    expect((await replace(second.id, photo())).statusCode).toBe(200);
+    expect((await replace(better.id, photo())).statusCode).toBe(409);
+    // Its bytes go up in a drop received again.
+    const upload = await call(
+      'POST',
+      `/v1/creator-space/drops/${seance.id}/files/${better.id}/upload`,
+      'nora',
+    );
+    expect(upload.statusCode, upload.body).not.toBe(409);
+  });
+
+  it('asks a medium of a script already copied into Reveal again: it is to copy again once replaced', async () => {
+    const reel = video();
+    // An invented sent script, copied into Reveal, whose video the cleaning refused.
+    const [owner] = await test.admin.db
+      .select({ id: schema.user.id })
+      .from(schema.user)
+      .where(eq(schema.user.email, 'owner@example.test'));
+    const structureId = randomUUID();
+    const requestId = newId(ContentRequestIdSchema);
+    const drop = { id: newId(ContentDropIdSchema) };
+    await test.admin.db
+      .insert(schema.scriptStructures)
+      .values({ id: structureId, createdBy: owner?.id ?? '' });
+    await test.admin.db.insert(schema.contentRequests).values({
+      id: requestId,
+      creatorId: nora,
+      category: 'script',
+      dueOn: DUE_ON,
+      reason: 'Un script inventé',
+      structureId,
+      origin: 'agency',
+      createdBy: owner?.id,
+    });
+    await test.admin.db.insert(schema.contentDrops).values({
+      id: drop.id,
+      creatorId: nora,
+      category: 'script',
+      requestId,
+      scriptNumber: 901,
+      state: 'ready',
+      exportedAt: new Date(),
+      exportedBy: owner?.id,
+      createdBy: owner?.id ?? '',
+    });
+    await test.admin.db.insert(schema.contentDropFiles).values({
+      ...reel,
+      creatorId: nora,
+      dropId: drop.id,
+      position: 0,
+      kind: 'video',
+      state: 'refused',
+      refusal: 'Vidéo floue',
+      slotKey: 'salon::0',
+    });
+    expect(
+      (
+        await call('POST', `/v1/creators/${nora}/drops/${drop.id}/files/${reel.id}/redo`, 'owner', {
+          sentence: 'Floue',
+        })
+      ).statusCode,
+    ).toBe(204);
+    const again = video();
+    const r = await call(
+      'POST',
+      `/v1/creator-space/drops/${drop.id}/files/${reel.id}/replace`,
+      'nora',
+      again,
+    );
+    expect(r.statusCode, r.body).toBe(200);
+    expect(ContentDropSchema.parse(r.json())).toMatchObject({ state: 'received', exportedAt: null });
+    // A drop of another kind, published, is out: never asked again.
+    const story = { id: newId(ContentDropIdSchema), category: 'reveal_story', files: [video()] };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', story)).statusCode).toBe(200);
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'ready', exportedAt: new Date(), exportedBy: owner?.id })
+      .where(eq(schema.contentDrops.id, story.id));
+    await test.admin.db
+      .update(schema.contentDropFiles)
+      .set({ state: 'refused', refusal: 'Vidéo floue' })
+      .where(eq(schema.contentDropFiles.dropId, story.id));
+    const [storyFile] = await test.admin.db
+      .select({ id: schema.contentDropFiles.id })
+      .from(schema.contentDropFiles)
+      .where(eq(schema.contentDropFiles.dropId, story.id));
+    expect(
+      (
+        await call(
+          'POST',
+          `/v1/creators/${nora}/drops/${story.id}/files/${storyFile?.id ?? ''}/redo`,
+          'owner',
+          { sentence: 'Floue' },
+        )
+      ).statusCode,
+    ).toBe(409);
+  });
+
   it('never lets her withdraw what is already scheduled; the agency drops for her', async () => {
     const drop = { id: newId(ContentDropIdSchema), category: 'telegram_post', files: [video()] };
     const byAgency = await call('POST', `/v1/creators/${nora}/drops`, 'owner', drop);

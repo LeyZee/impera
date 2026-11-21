@@ -46,6 +46,7 @@ export const fileOf = (fields: Partial<ContentDropFile> = {}): ContentDropFile =
     state: 'kept',
     refusal: null,
     slotKey: null,
+    redo: null,
     ...fields,
   });
 

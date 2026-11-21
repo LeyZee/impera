@@ -324,6 +324,13 @@ export const contentDropFiles = pgTable(
      * medium goes as a withdrawn drop's does (CR-06 c).
      */
     replacedAt: timestampTz('replaced_at'),
+    /**
+     * The agency's « À refaire » on this medium alone (trou 7 du 21/11, coffre): she replaces it where it is, the drop
+     * stays. Written by her team only (`guard_content_drop_file_redo`).
+     */
+    redoSentence: text('redo_sentence'),
+    redoAt: timestampTz('redo_at'),
+    redoBy: text('redo_by').references(() => user.id),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -337,8 +344,12 @@ export const contentDropFiles = pgTable(
       'content_drop_files_slot_check',
       sql`(${t.slotKey} is null or char_length(${t.slotKey}) between 4 and 40)
         and (${t.minSeconds} is null) = (${t.maxSeconds} is null)
-        and (${t.minSeconds} is null or (${t.slotKey} is not null and ${t.minSeconds} between 1 and ${t.maxSeconds}))
-        and (${t.replacedAt} is null or ${t.slotKey} is not null)`,
+        and (${t.minSeconds} is null or (${t.slotKey} is not null and ${t.minSeconds} between 1 and ${t.maxSeconds}))`,
+    ),
+    check(
+      'content_drop_files_redo_check',
+      sql`(${t.redoSentence} is null) = (${t.redoAt} is null) and (${t.redoAt} is null) = (${t.redoBy} is null)
+        and coalesce(char_length(${t.redoSentence}), 1) between 1 and 200`,
     ),
     // The heaviest file of each kind (`DROP_MAX_BYTES`, ADR 0070 § 1): 10 Gio for a video, 30 Mo for a photo or a vocal.
     check(
@@ -395,6 +406,16 @@ export const contentDropFiles = pgTable(
       withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.state} = 'awaiting' and exists (
         select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId} and d.state = 'uploading'
       )`,
+    }),
+    // « À refaire » on one live medium of a drop received and not out, or of a script already copied into Reveal (trou 7
+    // du 21/11, Charles: it is copied again): its redo columns only (the column grant), never its place.
+    pgPolicy('team_redo', {
+      for: 'update',
+      using: sql`${ofHerTeam(t.creatorId)} and ${t.replacedAt} is null and exists (
+        select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
+          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
+      )`,
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.replacedAt} is null`,
     }),
   ],
 );
