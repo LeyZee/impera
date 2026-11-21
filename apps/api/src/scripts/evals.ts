@@ -360,6 +360,11 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
             salesFrozen: { reason: 'operator', since: '2026-10-10T10:00:00.000Z' },
           }),
         },
+        // His order kept box by box, and her made-up grid (ADR 0159 § A.2).
+        ...(scenario.custom_order_kept !== undefined && {
+          order: scenario.custom_order_kept.open,
+          grid: scenario.custom_order_kept.grid,
+        }),
       },
       objections: {
         bank: persona.objectionReplies,
@@ -396,6 +401,10 @@ async function run(scenario: Scenario): Promise<{ outcome: Outcome; scores: Reco
     offer,
     desireBand: desireBandOf(composed.desire?.score ?? situation.desire),
     customOrder: composed.customOrder?.kind ?? 'none',
+    ...(composed.customOrderTurn?.kind === 'reply' &&
+      composed.customOrderTurn.event !== undefined && {
+        customOrderEvent: composed.customOrderTurn.event.type,
+      }),
     objectionReply: composed.objectionReply?.replyId ?? null,
     ...(composed.scripts !== undefined && { script: scriptOutcome(composed.scripts.decision) }),
     bubbles: composed.bubbles,
