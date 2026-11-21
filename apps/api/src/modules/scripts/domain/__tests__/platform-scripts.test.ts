@@ -17,6 +17,7 @@ import {
   platformScriptFingerprint,
   platformScriptGaps,
   priceWarnings,
+  stepTotalsOf,
   type KnownPlatformScript,
   type StepMediaState,
 } from '../platform-scripts';
@@ -344,5 +345,31 @@ describe('the descriptions of a script’s media, validated as shown (ADR 0030 �
 
   it('refuses one that is not shown for a media of the script now', () => {
     expect(descriptionRefusal(['d1', 'old'], shown)).toBe('stale');
+  });
+});
+
+describe('the platform’s totals of each step (ADR 0129 § 12)', () => {
+  /** Its first step counted by the platform, the others not. */
+  const counted = (id: string, sent: number, ref = `${id}_step_0`): PlatformScript => {
+    const base = script(id);
+    return {
+      ...base,
+      steps: base.steps.map((step, index) =>
+        index === 0 ? { ...step, ref: reveal(ref), totals: { sent, purchased: 1, paidMinor: 0 } } : step,
+      ),
+    };
+  };
+
+  it('never make a new version of the script: a send more is not a change', () => {
+    expect(platformScriptFingerprint(counted('s', 3))).toBe(platformScriptFingerprint(counted('s', 4)));
+    expect(platformScriptFingerprint(counted('s', 3))).toBe(platformScriptFingerprint(script('s')));
+  });
+
+  it('are kept a step once, only where the platform gave them, never for a ref the base cannot hold', () => {
+    const tooLong = counted('l', 2, 'x'.repeat(PLATFORM_SCRIPT_REF_MAX + 1));
+    // The same step listed twice (a read that moved): the last count.
+    expect(stepTotalsOf([counted('a', 5), counted('a', 7), tooLong])).toEqual([
+      { platformStepRef: 'a_step_0', sent: 7, purchased: 1, paidMinor: 0, currency: 'EUR' },
+    ]);
   });
 });

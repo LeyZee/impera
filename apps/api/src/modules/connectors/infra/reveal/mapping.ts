@@ -13,6 +13,7 @@ import {
   type PlatformMedia,
   type PlatformScript,
   type PlatformScriptStep,
+  PlatformStepTotalsSchema,
   type SentScriptStep,
   type VaultMedia,
 } from '@impera/contracts';
@@ -239,7 +240,32 @@ export function momentOf(name: string, folderNames: readonly string[]): Platform
 
 type StepSource = Pick<ScriptItem, 'medias' | 'teasingMedias'> & { readonly script: ScriptItem['script'] };
 
-function stepOf(source: StepSource, index: number, platformIndex: number): PlatformScriptStep {
+/**
+ * The step's totals (ADR 0129 § 12), from its line of `scripts.list` read without a conversation: all three or none.
+ * A step of a sequence carries none of its own; its line of the list does.
+ */
+/**
+ * A step's totals as the platform counts them, when it gives all three. A value out of range (negative, fractional or over
+ * the column) sets the step's totals aside rather than failing the whole import.
+ */
+export function totalsOf(
+  line: Pick<ScriptItem, 'sentCount' | 'paidBundlesCount' | 'paidBundlesTotalAmount'> | undefined,
+): Pick<PlatformScriptStep, 'totals'> {
+  if (line === undefined) return {};
+  const totals = PlatformStepTotalsSchema.safeParse({
+    sent: line.sentCount,
+    purchased: line.paidBundlesCount,
+    paidMinor: line.paidBundlesTotalAmount,
+  });
+  return totals.success ? { totals: totals.data } : {};
+}
+
+function stepOf(
+  source: StepSource,
+  index: number,
+  platformIndex: number,
+  line: ScriptItem | undefined,
+): PlatformScriptStep {
   return {
     ref: ref(source.script.id),
     index,
@@ -259,6 +285,7 @@ function stepOf(source: StepSource, index: number, platformIndex: number): Platf
             priceMinor: source.script.discountedPrice ?? null,
             minutes: source.script.discountDurationMinutes ?? null,
           },
+    ...totalsOf(line),
   };
 }
 
@@ -275,6 +302,7 @@ export function scriptsOf(
   const folders = (sources: readonly StepSource[]): string[] =>
     sources.flatMap((source) => source.medias.map((media) => folderOf(media.id) ?? ''));
   const inSequence = new Set<string>();
+  const lines = new Map(steps.map((step) => [step.script.id, step]));
   const scripts: PlatformScript[] = [];
   for (const { sequence, steps: ordered } of sequences) {
     // Two steps on the same `stepIndex` are branches of one step (ADR 0112): kept side by side with their rank, never
@@ -284,7 +312,9 @@ export function scriptsOf(
         a.step.stepIndex - b.step.stepIndex ||
         (a.script.id < b.script.id ? -1 : a.script.id > b.script.id ? 1 : 0),
     );
-    const [first, ...rest] = sorted.map((source, index) => stepOf(source, index, source.step.stepIndex));
+    const [first, ...rest] = sorted.map((source, index) =>
+      stepOf(source, index, source.step.stepIndex, lines.get(source.script.id)),
+    );
     if (first === undefined) continue;
     for (const source of sorted) inSequence.add(source.script.id);
     scripts.push({
@@ -300,7 +330,7 @@ export function scriptsOf(
       ref: ref(step.script.id),
       name: step.script.name,
       moment: momentOf(step.script.name, folders([step])),
-      steps: [stepOf(step, 0, 0)],
+      steps: [stepOf(step, 0, 0, step)],
     });
   }
   return scripts;

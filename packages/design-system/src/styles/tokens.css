@@ -25,7 +25,7 @@
   --nv-ink-muted: #bfb4b9;
   --nv-ink-faint: #9b9197;
 
-  /* Neon: the brand's single accent. A light, never a fill: one primary action, the "on" state, urgency. */
+  /* Neon: the brand's single accent. A light, never a fill: one primary action, urgency. A switch that is on is green (`switch-on`). */
   --nv-neon: #ff2a4d;
   --nv-neon-solid: #e3123f;
   --nv-on-neon: #ffffff;
@@ -89,6 +89,23 @@
   --nv-series-4: #9c9630;
   --nv-series-other: rgba(246, 238, 241, 0.32);
   /*
+   * The categories of content (the vault, the model's week): ten hues in a fixed order (blue, pink, green, olive,
+   * violet, gold, orange, cyan, magenta, slate), one per category, the same on every screen. An identity, not a
+   * series: ten hues cannot all stay apart for colour-blind readers, so a category is never told by its colour alone,
+   * its name or its icon is always beside it. Each at 3:1 at least on the plate, Nuit and Jour. The first four are the
+   * series' own hues; a chart of a few series still takes `--nv-series-*`.
+   */
+  --nv-content-1: #3d8ce6;
+  --nv-content-2: #d46a98;
+  --nv-content-3: #1aa37a;
+  --nv-content-4: #9c9630;
+  --nv-content-5: #8f7fe0;
+  --nv-content-6: #d9a521;
+  --nv-content-7: #e8743b;
+  --nv-content-8: #25b6d2;
+  --nv-content-9: #c558d6;
+  --nv-content-10: #7f93b2;
+  /*
    * The intensity of one measure (Dashboard de l'agence, « Quand ça vend »: the hours map and the ten biggest fans'
    * bar, Charles 20/11): one violet-fuchsia, mixed toward --nv-fill-track from pale to vivid. Never a state nor a
    * category. Apart from the creators' rose, the agent's violet and the agency's blue for full colour vision, and at
@@ -140,6 +157,9 @@
     0 0 0 0.5px rgba(255, 110, 135, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.36),
     0 8px 26px -6px rgba(255, 42, 77, 0.75), 0 0 60px -12px rgba(255, 42, 77, 0.65);
   --nv-shadow-neon-soft: 0 4px 16px -6px rgba(255, 42, 77, 0.55);
+  /* A switch that is on: green, « allumé » is never an urgency (Charles, 21/11). The white thumb reads on it. */
+  --nv-switch-on: #1f9d5c;
+  --nv-shadow-switch-on: 0 4px 16px -6px rgba(47, 190, 115, 0.5);
   --nv-shadow-thumb: 0 3px 8px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.16);
   --nv-shadow-focus: 0 0 0 2px var(--nv-focus);
   /* A floating card raised under the pointer (.nv-lift). */
@@ -205,6 +225,17 @@
   --nv-series-3: #c2457e;
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
+  /* The ten categories of content, stepped darker for the day plate. */
+  --nv-content-1: #2a6fc9;
+  --nv-content-2: #c2457e;
+  --nv-content-3: #12825d;
+  --nv-content-4: #7a7414;
+  --nv-content-5: #6a52c4;
+  --nv-content-6: #946a00;
+  --nv-content-7: #c2500f;
+  --nv-content-8: #0b7f97;
+  --nv-content-9: #9b2fb0;
+  --nv-content-10: #55688a;
   --nv-heat: #b040d8;
   --nv-money-creator: #b8406f;
   /* The Impera logo's navy itself, Charles's value (19/11), unretouched. */
@@ -228,6 +259,7 @@
   --nv-shadow-neon: 0 0 0 1px rgba(208, 0, 44, 0.35), 0 8px 22px -8px rgba(208, 0, 44, 0.45);
   --nv-shadow-neon-strong: 0 0 0 1px rgba(208, 0, 44, 0.5), 0 10px 30px -8px rgba(208, 0, 44, 0.6);
   --nv-shadow-neon-soft: 0 6px 18px -8px rgba(208, 0, 44, 0.35);
+  --nv-shadow-switch-on: 0 6px 18px -8px rgba(31, 157, 92, 0.32);
   --nv-shadow-thumb: 0 3px 8px rgba(40, 0, 15, 0.18), 0 1px 1px rgba(40, 0, 15, 0.1);
   --nv-shadow-lift:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 4px 10px rgba(80, 10, 30, 0.08),

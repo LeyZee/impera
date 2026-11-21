@@ -1356,6 +1356,20 @@
     {
       "idx": 193,
       "version": "7",
+      "when": 1795278389200,
+      "tag": "0252_script_step_daily",
+      "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "7",
+      "when": 1795283798403,
+      "tag": "0253_script_summary_job",
+      "breakpoints": true
+    },
+    {
+      "idx": 195,
+      "version": "7",
       "when": 1795277565288,
       "tag": "0254_vault_sent_for_free",
       "breakpoints": true
