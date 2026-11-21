@@ -2,6 +2,9 @@ import { DROP_CATEGORY_LABELS, type CreatorOnDuty } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
+import { DayHero } from './day-hero/DayHero';
+import { HerFigures } from './her-figures/HerFigures';
+
 import { useCreatorOnDuty } from '@/scheduling/api';
 import '@/scheduling/scheduling.css';
 import {
@@ -17,6 +20,7 @@ import {
   untilOf,
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { DayCard } from '@/screens/agenda/DayCard';
 import { Glance } from '@/screens/agenda/DayView';
 import { FreshnessNote } from '@/screens/agenda/FreshnessNote';
 import { useAgenda, useWithPending } from '@/screens/agenda/api';
@@ -47,7 +51,11 @@ export function CreatorTodayPage(): JSX.Element {
   const down = (day.isError && day.data === undefined) || onDuty.isError;
   return (
     <Page width="narrow">
-      <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" lead="Ta journée, et qui répond à tes fans." />
+      <PageHeader
+        eyebrow={longDay(today)}
+        title="Aujourd’hui"
+        lead="Ce qu’on attend de toi aujourd’hui, puis tes chiffres."
+      />
       <div className="sc-today">
         {down ? (
           <Failure
@@ -57,9 +65,13 @@ export function CreatorTodayPage(): JSX.Element {
             }}
           />
         ) : null}
-        {/* What she owes first: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
+        {/* The one big thing: all that is asked of her today, wherever it lives (Charles, 21/11). */}
+        <DayHero today={today} />
+        <DayCard />
+        {/* What she owes next: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
         <ToSend today={today} />
         <HerDay now={now} today={today} quiet={down} />
+        <HerFigures />
         <Fans now={now} today={today} />
       </div>
     </Page>

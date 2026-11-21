@@ -49,3 +49,25 @@
     height: 44px;
   }
 }
+
+/* Her three figures (Charles, 21/11): design-system tiles, three on one line even on her phone. */
+.sc-figures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.sc-figures__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.sc-figures__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+}
+.sc-figures__tiles .nv-tile__value {
+  white-space: normal;
+}
