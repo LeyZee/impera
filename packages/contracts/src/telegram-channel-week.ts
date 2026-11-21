@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { refusalBodySchema } from './errors';
 import { CreatorIdSchema } from './ids';
 import { MinuteOfDaySchema } from './scheduling';
 import { ChannelPostDraftSchema, ChannelSlotRoleSchema, CHANNEL_ADVICE_MAX } from './telegram-channel';
@@ -108,7 +109,7 @@ export const ChannelPostGestureSchema = z.discriminatedUnion('gesture', [
 ]);
 export type ChannelPostGesture = z.infer<typeof ChannelPostGestureSchema>;
 
-/** Why a gesture is refused (409): its hour has passed, it is already out or removed, or nothing else is allowed. */
+/** Why a gesture is refused (400): its hour has passed, it is already out or removed, or nothing else is allowed. */
 export const ChannelGestureRefusalKindSchema = z.enum([
   'too_late',
   'not_planned',
@@ -118,3 +119,4 @@ export const ChannelGestureRefusalKindSchema = z.enum([
 ]);
 export type ChannelGestureRefusalKind = z.infer<typeof ChannelGestureRefusalKindSchema>;
 export const TELEGRAM_CHANNEL_GESTURE_REFUSED = 'telegram_channel_gesture_refused';
+export const ChannelGestureRefusalBodySchema = refusalBodySchema(ChannelGestureRefusalKindSchema);

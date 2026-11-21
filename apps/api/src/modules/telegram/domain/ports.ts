@@ -20,6 +20,7 @@ import type {
 } from '@impera/contracts';
 
 import type { ScannedEvent } from './signals';
+import type { ChannelOutgoing } from './week-ports';
 
 /** Ports of the module (ADR 0020). The Postgres store seals tokens with CREDENTIALS_ENCRYPTION_KEYS. */
 
@@ -361,6 +362,12 @@ export interface NotificationChannel {
     message: OutgoingMessage,
   ): Promise<ChannelResult<{ readonly messageId: number }>>;
   edit(token: string, telegramChatId: string, messageId: number, text: string): Promise<ChannelResult<null>>;
+  /** ADR 0162: a post of her channel, a text, a photo, a video with its caption, or a poll. */
+  publish(
+    token: string,
+    telegramChatId: string,
+    message: ChannelOutgoing,
+  ): Promise<ChannelResult<{ readonly messageId: number }>>;
 }
 
 export interface Clock {

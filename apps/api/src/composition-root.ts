@@ -386,11 +386,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const persona = wirePersona(shared);
   const redirectLinks = wireRedirectLinks(shared, { detectLinks: connectors.module.detectedLinks });
   const customOrders = wireCustomOrders(shared);
-  const telegram = await wireTelegram(shared, {
-    alerts: alerts.module,
-    channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
-    channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
-  });
   const team = wireTeam(shared, {
     persona: persona.module,
     connectors: connectors.module,
@@ -421,6 +416,12 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
+  });
+  const telegram = await wireTelegram(shared, {
+    alerts: alerts.module,
+    channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
+    channelVisuals: contentDrops.module.channelVisuals,
+    channelWriter: { gateway: options.channelVoice ?? llm.gateway, activePersona: persona.activePersona },
   });
   // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
   const vaultDescriptions = wireVaultDescriptions(shared, {

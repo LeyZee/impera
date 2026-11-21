@@ -22,9 +22,9 @@ export const PLAN_MINUTE = 18 * 60;
 export const REFRESH_MINUTE = 18 * 60;
 
 /** Polls in a week (« de temps en temps », § 1.2): at most one a day, never on two days in a row. */
-export const POLLS_PER_WEEK = 3;
+const POLLS_PER_WEEK = 3;
 /** Opinions on her passions and their news (§ 4.2): twice a week. */
-export const PASSION_PER_WEEK = 2;
+const PASSION_PER_WEEK = 2;
 
 export interface PlanInput {
   readonly creatorId: string;
@@ -50,7 +50,7 @@ export interface PlannedSlot {
 }
 
 /** A small seeded generator (mulberry32) over a string's hash: enough to scatter hours, not for secrets. */
-export function seededRandom(seed: string): () => number {
+function seededRandom(seed: string): () => number {
   let state = 2166136261;
   for (let i = 0; i < seed.length; i += 1) state = Math.imul(state ^ seed.charCodeAt(i), 16777619);
   return () => {
@@ -66,7 +66,7 @@ const between = (random: () => number, from: number, until: number): number =>
   from + Math.floor(random() * (until - from + 1));
 
 /** The days of the week, Monday to Sunday. */
-export function weekDays(week: string): string[] {
+function weekDays(week: string): string[] {
   return Array.from({ length: 7 }, (_, rank) => addDays(week, rank));
 }
 

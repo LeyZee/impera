@@ -31,6 +31,7 @@ import type {
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
+import { createChannelVisualsReader, type ChannelVisualsReader } from './infra/db/channel-visuals';
 import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
@@ -120,6 +121,11 @@ export interface ContentDropsModule {
     /** The steps of a script of hers, the agency's words; `null` for a drop that is not a script of hers. */
     scriptSteps(creatorId: string, reader: ContentReader, dropId: string): Promise<ScriptSteps | null>;
   };
+  /**
+   * Her Telegram channel's visuals (ADR 0162 § 5.2), for the Telegram module's jobs through the composition root: the
+   * media it may send, public and never in a script nor sold, and their files. Read in her creator, under the app role.
+   */
+  readonly channelVisuals: ChannelVisualsReader;
   /** The scripts the cadence asks of her (SC-02), written by the scripts' job as the owner's role, replayable. */
   readonly scriptRequests: {
     ask(request: ScriptContentRequest): Promise<void>;
@@ -170,6 +176,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
     name: 'content-drops',
+    channelVisuals: createChannelVisualsReader(deps.db, storage, scratchDir),
     routes: createContentDropRoutes(
       createDrizzleCreatorContentStore(deps.db),
       agency,

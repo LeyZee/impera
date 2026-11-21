@@ -5,6 +5,7 @@ import type {
   NotificationChannel,
   OutgoingMessage,
 } from '../../domain/ports';
+import type { ChannelOutgoing } from '../../domain/week-ports';
 
 /**
  * Fictitious bot tokens, shaped like @BotFather's. Built at run time so that no literal in the repository looks like
@@ -27,6 +28,8 @@ export interface SentMessage extends OutgoingMessage {
 export class FakeTelegram implements NotificationChannel {
   readonly sent: SentMessage[] = [];
   readonly edits: { chatId: string; messageId: number; text: string }[] = [];
+  /** The posts of her channel (ADR 0162), as `FakeTelegramChannel`. */
+  readonly published: (ChannelOutgoing & { readonly chatId: string; readonly messageId: number })[] = [];
   readonly updates: ChannelUpdate[] = [];
   private readonly failures = new Map<string, ChannelFailure[]>();
   private readonly known = new Map<
@@ -43,7 +46,7 @@ export class FakeTelegram implements NotificationChannel {
     this.known.delete(token);
   }
 
-  failNext(method: 'getMe' | 'getUpdates' | 'send' | 'edit', failure: ChannelFailure): void {
+  failNext(method: 'getMe' | 'getUpdates' | 'send' | 'edit' | 'publish', failure: ChannelFailure): void {
     const queue = this.failures.get(method) ?? [];
     queue.push(failure);
     this.failures.set(method, queue);
@@ -81,6 +84,20 @@ export class FakeTelegram implements NotificationChannel {
       this.check('send', token, () => {
         const messageId = (this.nextMessageId += 1);
         this.sent.push({ ...message, chatId, messageId });
+        return { messageId };
+      }),
+    );
+  }
+
+  publish(
+    token: string,
+    chatId: string,
+    message: ChannelOutgoing,
+  ): ReturnType<NotificationChannel['publish']> {
+    return Promise.resolve(
+      this.check('publish', token, () => {
+        const messageId = (this.nextMessageId += 1);
+        this.published.push({ ...message, chatId, messageId });
         return { messageId };
       }),
     );

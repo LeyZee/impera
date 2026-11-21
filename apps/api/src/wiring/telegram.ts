@@ -12,6 +12,7 @@ import { latestRateOf } from '../modules/payroll';
 import {
   startTelegramModule,
   type ChannelLinksSource,
+  type ChannelVisualsSource,
   type ChannelPersonaSource,
   type TelegramModule,
 } from '../modules/telegram';
@@ -63,16 +64,20 @@ export async function wireTelegram(
     };
     /** Her redirect links where they are kept since INS-03 (ADR 0121 § 1). */
     readonly channelLinks?: ChannelLinksSource;
+    /** Her channel's visuals, kept by the content drops (ADR 0162 § 5.2). */
+    readonly channelVisuals?: ChannelVisualsSource;
   },
 ): Promise<WiredTelegram> {
-  const { config, adminDb, logger, requireRole, recentLogin } = shared;
+  const { config, db, adminDb, logger, requireRole, recentLogin } = shared;
   const credentialKeys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
   const module =
     credentialKeys === null
       ? null
       : await startTelegramModule({
           adminDb,
+          db,
           ...(deps.channelLinks !== undefined && { channelLinks: deps.channelLinks }),
+          ...(deps.channelVisuals !== undefined && { channelVisuals: deps.channelVisuals }),
           encryptionKeys: credentialKeys,
           webOrigin: config.WEB_ORIGIN,
           onUncovered: (event) => {
@@ -172,6 +177,18 @@ export async function wireTelegram(
         JOB_PAYLOADS['telegram.connection_reminders'],
         logger,
         withTelegram((telegram) => telegram.jobs.connectionReminders()),
+      ),
+      'telegram.channel_week': defineTask(
+        'telegram.channel_week',
+        JOB_PAYLOADS['telegram.channel_week'],
+        logger,
+        withTelegram((telegram) => telegram.jobs.channelWeek()),
+      ),
+      'telegram.channel_send': defineTask(
+        'telegram.channel_send',
+        JOB_PAYLOADS['telegram.channel_send'],
+        logger,
+        withTelegram((telegram) => telegram.jobs.channelSend()),
       ),
       'telegram.purge': defineTask(
         'telegram.purge',

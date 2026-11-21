@@ -31,7 +31,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { user } from './auth';
-import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
+import { createdAt, enumCheck, enumText, id, tenantJobRead, timestampTz, updatedAt } from './columns';
 import { mediaAssets } from './media';
 import { scriptStructureVersions, scriptStructures } from './scripts';
 import { creators } from './tenancy';
@@ -256,6 +256,7 @@ export const contentDrops = pgTable(
       withCheck: sql`${hers(t.creatorId)} and ${t.state} = 'withdrawn' and ${t.withdrawnBy} = ${currentUser}`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    tenantJobRead('telegram_channel_read', t.creatorId, 'telegram_channel'),
     pgPolicy('team_insert', {
       for: 'insert',
       withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.state} = 'uploading'
@@ -367,6 +368,7 @@ export const contentDropFiles = pgTable(
       withCheck: sql`${hers(t.creatorId)} and ${t.replacedAt} is not null`,
     }),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    tenantJobRead('telegram_channel_read', t.creatorId, 'telegram_channel'),
     pgPolicy('team_insert', {
       for: 'insert',
       withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.state} = 'awaiting' and exists (
