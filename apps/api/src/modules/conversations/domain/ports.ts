@@ -111,6 +111,10 @@ export interface Draft {
   readonly bubbles: readonly string[];
   readonly finalBubbles: readonly string[] | null;
   readonly createdAt: Date;
+  /** When a chatter put it in the platform's field from the copilot panel (ADR 0086 § 4); `null` until then. */
+  readonly placedAt: Date | null;
+  /** Who placed it; `null` until then. */
+  readonly placedBy: UserId | null;
   /** What the brief learnt about the fan for this draft, written as facts once a human approves it (P3-02). */
   readonly facts: readonly DraftFact[];
   /** The step of her script the code decided with this draft (ADR 0098): it leaves after the bubbles. */
@@ -199,6 +203,8 @@ interface MessageRepository {
   insertIfNew(message: NewMessage): Promise<boolean>;
   /** Bubbles of this draft already on the platform; a retried send resumes after them. */
   countForDraft(draftId: DraftId): Promise<number>;
+  /** The texts of the messages that left for this draft, in the order they were sent (ADR 0086 § 5). */
+  textsForDraft(draftId: DraftId): Promise<readonly string[]>;
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
