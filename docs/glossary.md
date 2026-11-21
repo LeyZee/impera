@@ -541,6 +541,11 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Carte | `nv-plate`, `Panel`, jeton `--nv-plate-pad` | Un bloc de contenu posé sur une plaque, un seul rayon (26) et une seule marge intérieure (20px, 16px au téléphone) ; une carte ne se pose pas dans une carte (docs/design, recette visuelle du 16/11). |
 | Pastille | `nv-status`, `nv-tag`, `nv-chip`, `nv-count`, jetons `--nv-pill-*` | Une capsule de texte court, de trois sortes seulement : d'information (22px), de choix (32px), compteur (18px). |
 | Titre de section | `nv-h2`, `nv-h3` | Le titre d'une section (22/28) ou d'un bloc dans une carte (17/22), en minuscules, jamais en capitales espacées ; le surtitre au-dessus est `nv-eyebrow`. |
+| Palier (d'un fan) | `fan_tier` (`new`, `payer`, `good`, `very_good`, `whale`) | Ce qu'un fan est pour l'agence, lu dans ce qu'il a débloqué chez elle (ventes moins remboursements, TTC) : Nouveau (rien acheté, arrivé il y a moins de 7 jours), Payeur, Bon payeur, Très bon payeur, Baleine. Les seuils sont réglés par le propriétaire pour chaque créatrice (50 €, 200 €, 500 € par défaut). Le chatteur le voit dans Impera et dans l'extension. |
+| À qui parler maintenant | `to_talk` | Sur l'accueil du chatteur : les payeurs qui attendent (le plus haut palier d'abord), les nouveaux à accueillir, les gros fans silencieux depuis 5 jours. Un doute sur l'âge bloque la conversation : compté, jamais listé. |
+| Absence (de la créatrice) | `creator_absence` | Ce qu'elle dit elle-même à l'agence depuis son Aujourd'hui : du … au …, inclus, avec un mot facultatif. Son équipe en poste le voit tout de suite. Elle peut l'annuler, jamais l'effacer. |
+| Ce qu'elle ne fait plus | `creator_stop` | Une chose qu'elle dit ne plus faire, dans ses mots, depuis son Aujourd'hui. Le chatteur la lit avant sa fiche ; le propriétaire met la fiche à jour (l'IA lit la fiche). Elle peut la reprendre (« Je le refais »). |
+| L'essentiel du jour | (écran) | Le seul gros élément de l'Aujourd'hui de la créatrice : un anneau qui compte ce qu'on attend d'elle aujourd'hui, où que ce soit (ce qu'elle poste, ses tâches de l'agenda, ce qu'elle doit envoyer à l'agence). |
 
 ## Noms à ne pas utiliser
 
