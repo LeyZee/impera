@@ -48,5 +48,8 @@ export function whenOf(fan: ToTalkFan, now: Date): { readonly text: string; read
       long: fan.waitingMinutes >= LONG_WAIT_MINUTES,
     };
   if (fan.lastMessageAt === null) return { text: 'jamais écrit', long: false };
-  return { text: `rien depuis ${plural(daysSince(fan.lastMessageAt, now), 'jour', 'jours')}`, long: false };
+  const days = daysSince(fan.lastMessageAt, now);
+  // Under a day, « rien depuis 0 jours » says nothing: a new one not answered yet is to welcome.
+  if (days === 0) return { text: fan.tier === 'new' ? 'à accueillir' : 'calme aujourd’hui', long: false };
+  return { text: `rien depuis ${plural(days, 'jour', 'jours')}`, long: false };
 }

@@ -55,7 +55,7 @@ export function CreatorTodayPage(): JSX.Element {
       <PageHeader
         eyebrow={longDay(today)}
         title="Aujourd’hui"
-        lead="Ce qu’on attend de toi aujourd’hui, puis tes chiffres."
+        lead="Ta journée d’abord, puis tes chiffres."
       />
       <div className="sc-today">
         {down ? (

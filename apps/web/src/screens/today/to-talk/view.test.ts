@@ -39,6 +39,9 @@ describe('« À qui parler », in words', () => {
   it('says a long wait in amber, and how long a quiet fan has been quiet', () => {
     expect(whenOf(fan({ waitingMinutes: 31 }), NOW)).toEqual({ text: 'attend depuis 31 min', long: true });
     expect(whenOf(fan({ waitingMinutes: 4 }), NOW).long).toBe(false);
+    expect(
+      whenOf(fan({ waitingMinutes: null, tier: 'new', lastMessageAt: NOW.toISOString() }), NOW).text,
+    ).toBe('à accueillir');
     expect(whenOf(fan({ lastMessageAt: '2026-11-15T14:00:00Z' }), NOW).text).toBe('rien depuis 6 jours');
   });
 });

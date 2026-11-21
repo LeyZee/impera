@@ -225,7 +225,7 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
       drops: [],
     });
     show();
-    const hero = (await screen.findByRole('heading', { level: 2, name: 'L’essentiel du jour' })).closest(
+    const hero = (await screen.findByRole('heading', { level: 2, name: 'Ce qu’on attend de toi' })).closest(
       'section',
     );
     expect(await screen.findByText('1 envoi à faire')).toBeDefined();

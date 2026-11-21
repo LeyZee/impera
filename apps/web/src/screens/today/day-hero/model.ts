@@ -81,7 +81,8 @@ export function dayHeroOf(source: DayHeroSource): DayHero | null {
     done,
     total,
     share: total === 0 ? 0 : done / total,
-    title: total === 0 ? 'Rien d’attendu aujourd’hui' : left === 0 ? 'Tout est fait' : 'L’essentiel du jour',
+    title:
+      total === 0 ? 'Rien d’attendu aujourd’hui' : left === 0 ? 'Tout est fait' : 'Ce qu’on attend de toi',
     line:
       total === 0
         ? 'Profite : rien ne t’attend pour l’instant.'
