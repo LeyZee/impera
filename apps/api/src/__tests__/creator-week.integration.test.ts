@@ -5,6 +5,7 @@ import {
   ContentDropIdSchema,
   ContentRequestIdSchema,
   CreatorIdSchema,
+  CreatorProgressSchema,
   CreatorWeekSchema,
   DAY_ITEM_LATE_UNPROCESSABLE,
   HerDaySchema,
@@ -485,5 +486,32 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
     );
     expect(seen).toHaveLength(3);
     expect(seen.every((row) => row.createdBy === noraUserId && row.updatedBy === noraUserId)).toBe(true);
+  });
+  it('shows her team where she is, day by day and in her week, never to a chatter nor to her', async () => {
+    const progress = async (who: 'owner' | 'manager', day: string) => {
+      const response = await call('GET', `/v1/creators/${nora}/progress?week=${day}`, who);
+      expect(response.statusCode).toBe(200);
+      return CreatorProgressSchema.parse(response.json());
+    };
+    const seen = await progress('owner', today);
+    expect(seen.today).toBe(today);
+    expect(seen.days[0]?.day).toBe(seen.week);
+    const todays = seen.days.find((day) => day.day === today);
+    // One post on Instagram, two on Telegram: none of them an essential.
+    expect(todays).toMatchObject({ essentialsDone: 0, done: 3, ahead: false });
+    expect(seen.days.filter((day) => day.day > today).every((day) => day.ahead)).toBe(true);
+    expect((await progress('manager', today)).days).toEqual(seen.days);
+    // Her validated week, as she reads it herself.
+    const next = await progress('owner', addDays(week, 2));
+    expect(next.week).toBe(week);
+    expect(next.delivery).toEqual((await herWeek()).delivery);
+    expect(next.shoot?.asked).toBeGreaterThan(0);
+    expect(next.days.every((day) => day.ahead && day.done === 0)).toBe(true);
+
+    expect((await call('GET', `/v1/creators/${nora}/progress?week=${today}`, 'chatter')).statusCode).toBe(
+      403,
+    );
+    expect((await call('GET', `/v1/creators/${nora}/progress?week=${today}`, 'nora')).statusCode).toBe(403);
+    expect((await call('GET', `/v1/creators/${nora}/progress?week=nope`, 'owner')).statusCode).toBe(400);
   });
 });

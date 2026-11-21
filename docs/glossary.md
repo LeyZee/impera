@@ -546,6 +546,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Absence (de la créatrice) | `creator_absence` | Ce qu'elle dit elle-même à l'agence depuis son Aujourd'hui : du … au …, inclus, avec un mot facultatif. Son équipe en poste le voit tout de suite. Elle peut l'annuler, jamais l'effacer. |
 | Ce qu'elle ne fait plus | `creator_stop` | Une chose qu'elle dit ne plus faire, dans ses mots, depuis son Aujourd'hui. Le chatteur la lit avant sa fiche ; le propriétaire met la fiche à jour (l'IA lit la fiche). Elle peut la reprendre (« Je le refais »). |
 | L'essentiel du jour | (écran) | Le seul gros élément de l'Aujourd'hui de la créatrice : un anneau qui compte ce qu'on attend d'elle aujourd'hui, où que ce soit (ce qu'elle poste, ses tâches de l'agenda, ce qu'elle doit envoyer à l'agence). |
+| Où elle en est | `creator_progress` | Dans sa fiche › Agenda, pour le propriétaire et un manager actif : ses sept jours (l'essentiel coché sur demandé, le bonus à côté) et l'avancée de sa semaine validée (tournage, livraison). Lecture seule. |
 
 ## Noms à ne pas utiliser
 

@@ -1,0 +1,112 @@
+/* « Où elle en est » (trous béants n° 11): seven small rings of her essentials, then her shooting and her delivery. */
+.pg-band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  padding: var(--nv-plate-pad);
+}
+.pg-band__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-1) var(--nv-space-3);
+}
+/* The answer of the band, in strong ink: how many days she held her essentials. */
+.pg-band__line {
+  margin: 0;
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.pg-band__key {
+  margin: calc(var(--nv-space-2) * -1) 0 0;
+  color: var(--nv-ink-faint);
+  font-size: var(--nv-text-caption);
+}
+.pg-band__none {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+
+.pg-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pg-day {
+  --nv-donut-size: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--nv-space-2) 0;
+  border-radius: var(--nv-radius-md);
+}
+.pg-day[data-today] {
+  background: color-mix(in srgb, var(--nv-series-1) 10%, transparent);
+}
+.pg-day[data-ahead] {
+  opacity: 0.45;
+}
+.pg-day__name {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.pg-day[data-today] .pg-day__name {
+  color: var(--nv-ink);
+}
+.pg-day__count {
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+.pg-day[data-held] .pg-day__count {
+  color: var(--nv-series-1);
+}
+/* Her bonus that day, beside the essentials, never as a fault. */
+.pg-day__extra {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+}
+
+.pg-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.pg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pg-row__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-footnote);
+}
+.pg-row__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--nv-ink);
+  font-weight: 650;
+}
+.pg-row__words {
+  color: var(--nv-ink-muted);
+}
+
+@media (max-width: 520px) {
+  .pg-days {
+    gap: 2px;
+  }
+  .pg-day {
+    --nv-donut-size: 38px;
+  }
+}
