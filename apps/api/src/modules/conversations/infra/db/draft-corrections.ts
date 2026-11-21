@@ -23,8 +23,8 @@ const RowSchema = z.object({
 
 /**
  * Her refused and retouched drafts since `since` (trou béant 12), newest first, read from the journal in her tenant
- * (RLS): `draft_rejected` and `draft_edited` with the draft they name, its live rating if the copilot panel wrote one,
- * and the fan's pseudonym. One more than `DRAFT_CORRECTIONS_MAX`, so the screen knows there were more.
+ * (RLS, and her id on the journal and the drafts): `draft_rejected` and `draft_edited` with the draft they name, its
+ * live rating if the copilot panel wrote one, and the fan's pseudonym. One more than `DRAFT_CORRECTIONS_MAX`, so the screen knows there were more.
  */
 export async function readDraftCorrections(
   db: Database,
@@ -44,7 +44,9 @@ export async function readDraftCorrections(
         join conversations c on c.id = e.conversation_id
         join fans f on f.id = c.fan_id
         left join calibration_ratings r on r.draft_id = d.id and r.source = 'live'
-       where e.type in ('draft_rejected', 'draft_edited')
+       where e.creator_id = ${creatorId}
+         and d.creator_id = ${creatorId}
+         and e.type in ('draft_rejected', 'draft_edited')
          and e.created_at >= ${since.toISOString()}::timestamptz
        order by e.created_at desc, e.id desc
        limit ${DRAFT_CORRECTIONS_MAX + 1}`),
