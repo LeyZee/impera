@@ -16,7 +16,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // through the owner's gesture; +1 for its re-sealing after a rotation of the encryption keys (ops command); +1 for
   // the hourly reading of the links' hours, which asks which creators have an attached link (identifiers only).
   'modules/connectors': 40,
-  'modules/content-drops': 23,
+  'modules/content-drops': 18,
   'modules/contractors': 6,
   'modules/conversations': 1,
   'modules/creator-tasks': 1,

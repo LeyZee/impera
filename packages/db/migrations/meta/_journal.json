@@ -1352,6 +1352,13 @@
       "when": 1795277087019,
       "tag": "0251_pay_gifts_owner_only",
       "breakpoints": true
+    },
+    {
+      "idx": 193,
+      "version": "7",
+      "when": 1795278616641,
+      "tag": "0260_script_summary_job",
+      "breakpoints": true
     }
   ]
 }
