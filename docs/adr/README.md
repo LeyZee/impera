@@ -128,7 +128,7 @@ Date : AAAA-MM-JJ
 | 0106 | Le Dashboard de l'agence sépare chiffre d'affaires, net, part de la créatrice et part de l'agence, et estime la TVA des virements | accepted (précise 0078 et 0054 § 2) |
 | 0107 | La créatrice gagne des médailles de série et des trophées pour ce qu'elle fait pour l'agence | accepted (précise 0042 § 3 et § 7, 0055 § 4 et § 6, 0044 § 4 ; reprend les limites de 0104 § B) |
 | 0108 | Une vitrine des trophées commune au chatteur et à la créatrice : tout ce qui est gagné, ce qui reste, l'avancement vers le prochain | accepted (précise 0104 § B et 0107 § C) |
-| 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025) |
+| 0109 | L'extension d'un chatteur écrit une case de la fiche du fan pendant son shift, et rien d'autre | accepted (précise 0066 § 7, 0086 § 8, 0085 et 0025 ; amendée le 21/11 : une note sur le fan depuis l'extension) |
 | 0110 | L'agent tient compte des automatisations de Reveal | accepted (remplace la ligne « sans effet sur le bot » de l'inventaire du connecteur ; précise 0006, 0018, P3-10) |
 | 0111 | Le jeu des cœurs : le code juge la réponse, l'agent joue, la récompense part une fois | accepted (précise 0021, 0030, 0099, 0090 § 8, 0098, 0103 et 0110) |
 | 0112 | Scripts à branches : les étapes et les branches de la plateforme, le code choisit la branche, la voix la dit | accepted (précise 0098 §§ 6 et 8, 0099, 0100 et 0103) ; amendement du 19/11 (créer un script à l’écran, le recopier dans Reveal) accepted, précise 0149 |
