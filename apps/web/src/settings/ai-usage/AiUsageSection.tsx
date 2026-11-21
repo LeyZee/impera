@@ -3,6 +3,7 @@ import { niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
 import { CreditDialog, EntriesList } from './CreditDialog';
+import { Forecast } from './Forecast';
 import { useAiUsage } from './api';
 import {
   axisEur,
@@ -696,9 +697,17 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
       </Section>
 
       <Section
+        title="Prévisionnel"
+        sub="ce que l’IA coûtera ce mois-ci et le suivant, au rythme réel des derniers jours, face aux ventes"
+        index={2}
+      >
+        <Forecast forecast={usage.forecast} />
+      </Section>
+
+      <Section
         title="Crédits"
         sub="ce qu’il reste chez chaque service, décompté appel par appel, ou son abonnement ; les vocaux en caractères"
-        index={2}
+        index={3}
         control={
           usage.credits.length === 0 ? undefined : (
             <button
@@ -719,7 +728,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
       <Section
         title="Dépense"
         sub={span === 'days' ? 'jour par jour, par service' : 'heure par heure, par service'}
-        index={3}
+        index={4}
         control={<SpanControl span={span} onChange={setSpan} />}
       >
         <Spend
@@ -730,7 +739,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
         />
       </Section>
 
-      <div className="ins-pair nv-enter" style={{ '--nv-i': 4 }}>
+      <div className="ins-pair nv-enter" style={{ '--nv-i': 5 }}>
         <Ring
           title="Par modèle, 30 jours"
           slices={modelSlices(usage)}

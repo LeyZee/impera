@@ -1021,11 +1021,13 @@ describe('channelPost (ADR 0080 § 5)', () => {
 
   it('writes a post with the media, where the link leads and the advice as data blocks', async () => {
     const xai = scripted([{ text: JSON.stringify({ text: 'Live ce soir **21 h** 💫' }) }]);
-    const { gateway } = setup({ xai });
+    const { gateway, log } = setup({ xai });
 
     const result = await gateway.channelPost(base);
 
     expect(result.ok && result.value.output).toEqual({ kind: 'post', text: 'Live ce soir **21 h** 💫' });
+    // Counted apart for the forecast (ADR 0091 § 8).
+    expect(log.since(new Date(0)).map((record) => record.purpose)).toEqual(['telegram']);
     const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'user'));
     const system = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'system'));
     expect(system).toContain('<channel_examples>\\nCe soir je réponds à tout le monde ✨');

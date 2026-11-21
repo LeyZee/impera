@@ -1,11 +1,18 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { AiUsageSection } from './AiUsageSection';
-import { usageFixture } from './fixture';
+import { forecastFixture, usageFixture } from './fixture';
 
 interface Reply {
   readonly status: number;
@@ -38,9 +45,20 @@ function serve(routes: { read?: () => Reply; post?: (body: unknown) => Reply } =
 
 function renderPage(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // A router: the forecast's cap warning links to Réglages › Modèles IA.
+  const rootRoute = createRootRoute();
+  const page = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/',
+    component: () => <AiUsageSection now={() => new Date('2026-11-11T13:30:00Z')} />,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([page]),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  });
   render(
     <QueryClientProvider client={client}>
-      <AiUsageSection now={() => new Date('2026-11-11T13:30:00Z')} />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -181,5 +199,45 @@ describe('Réglages › Consommation IA (ADR 0091)', () => {
     serve({ read: () => ({ status: 500 }) });
     renderPage();
     expect(await screen.findByRole('button', { name: 'Réessayer' })).toBeTruthy();
+  });
+
+  it('forecasts next month with its band, by line of spend and by creator, against the sales (ADR 0091 § 8)', async () => {
+    serve();
+    renderPage();
+    expect(await screen.findByText('Prévu en décembre')).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Prévu en décembre : 335.€, de 258.€ à 393.€/u })).toBeTruthy();
+    expect(screen.getByText(/En novembre : 291.€ prévus, dont 171.€ déjà dépensés/u)).toBeTruthy();
+    expect(screen.getByText(/^476.€$/u)).toBeTruthy();
+    expect(screen.getByText(/de 9.300.€ de ventes prévues en décembre/u)).toBeTruthy();
+    expect(screen.getByText('Chatting Reveal')).toBeTruthy();
+    expect(screen.getByText('Créatrice A')).toBeTruthy();
+    expect(screen.queryByRole('note')).toBeNull();
+  });
+
+  it('warns in amber when the realistic pace goes past the daily cap', async () => {
+    serve({
+      read: () => ({
+        status: 200,
+        body: usageFixture({
+          forecast: forecastFixture({
+            cap: { capEur: 20, reachedAtRealistic: true, reachedWithMoreTraffic: true, nextMonthMaxEur: 620 },
+          }),
+        }),
+      }),
+    });
+    renderPage();
+    const note = await screen.findByRole('note');
+    expect(note.textContent).toMatch(/dépasse le plafond de 20,00.€ par jour : il l’arrête chaque jour/u);
+    expect(note.textContent).toMatch(/décembre ne dépassera pas 620.€/u);
+    expect(within(note).getByRole('link', { name: 'Régler le plafond' })).toBeTruthy();
+    expect(screen.getByText('Prévu en décembre, sans plafond')).toBeTruthy();
+  });
+
+  it('waits for a first full day before forecasting', async () => {
+    serve({ read: () => ({ status: 200, body: usageFixture({ forecast: null }) }) });
+    renderPage();
+    expect(
+      await screen.findByText(/Le prévisionnel apparaît après une première journée complète/u),
+    ).toBeTruthy();
   });
 });

@@ -453,3 +453,144 @@
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
 }
+
+/*
+ * Le prévisionnel (ADR 0091 § 8): the realistic figure in large, the band from the calmer to the busier week as a soft
+ * span on a track, the realistic one as a notch; the cap's warning in amber, never red (nothing is wrong yet).
+ */
+.cia-fc {
+  display: grid;
+  gap: 12px;
+}
+.cia-fc-lead__band {
+  display: grid;
+  gap: 6px;
+  align-content: end;
+}
+.cia-band {
+  position: relative;
+  height: 10px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+}
+/* At least 8 px: a line that barely moves still reads as a span, never a dot (Design, 21/11). */
+.cia-band__span {
+  position: absolute;
+  inset: 0 auto 0 min(var(--_from), calc(100% - 8px));
+  width: max(8px, calc(var(--_to) - var(--_from)));
+  border-radius: inherit;
+  background: var(--nv-data-1);
+  transform-origin: left center;
+  animation: cia-grow var(--nv-dur-data) var(--nv-ease-out) 200ms both;
+}
+.cia-band__mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--_x);
+  width: 4px;
+  margin-left: -2px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink);
+  box-shadow: 0 0 0 2px var(--nv-plate);
+}
+.cia-fc-cap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 12px 14px;
+  font-size: var(--nv-text-callout);
+  color: var(--nv-ink);
+  background: color-mix(in oklab, var(--nv-warning) 12%, var(--nv-plate));
+}
+.cia-fc-cap__text {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.cia-fc-cap__act {
+  margin-left: 28px;
+}
+.cia-fc-cap__icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--nv-warning);
+}
+.cia-fc-list {
+  align-self: start;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 14px;
+}
+.cia-fc-rows {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cia-fc-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 8px 6px;
+  border-radius: var(--nv-radius-md);
+}
+.cia-fc-row:hover {
+  background: var(--nv-plate-hover);
+}
+.cia-fc-row .cia-band {
+  grid-column: 1 / -1;
+  height: 6px;
+}
+.cia-fc-row .cia-band__mark {
+  top: -2px;
+  bottom: -2px;
+  width: 3px;
+  margin-left: -1.5px;
+}
+.cia-fc-row__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cia-fc-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.cia-fc-row__line,
+.cia-fc-row__range {
+  font-size: var(--nv-text-footnote);
+  font-weight: 400;
+  color: var(--nv-ink-faint);
+}
+.cia-fc-row__value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+
+.cia-fc > .cia-foot {
+  margin-top: var(--nv-card-gap);
+}
+/* On a phone the forecast's tiles stack, one a row: a sentence under each figure needs the width. */
+@media (max-width: 720px) {
+  .cia-fc .cia-tiles .ins-tile {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cia-band__span {
+    animation: none;
+  }
+}

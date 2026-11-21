@@ -1,4 +1,4 @@
-import { AiUsageSchema, type AiUsage } from '@impera/contracts';
+import { AiForecastSchema, AiUsageSchema, type AiForecast, type AiUsage } from '@impera/contracts';
 
 /**
  * An invented month of AI spend (ADR 0010: no real figure), for the tests of Réglages › Consommation IA. Parsed with
@@ -148,6 +148,91 @@ export function usageFixture(overrides: Partial<AiUsage> = {}): AiUsage {
       resetsAt: '2026-12-01T00:00:00.000Z',
       plan: 'free',
       readAt: '2026-11-11T13:21:00.000Z',
+    },
+    forecast: forecastFixture(),
+    ...overrides,
+  });
+}
+
+const range = (low: number, realistic: number, high: number) => ({ low, realistic, high });
+
+/** An invented forecast (ADR 0091 § 8): one creator's month at about twenty conversations a day. */
+export function forecastFixture(overrides: Partial<AiForecast> = {}): AiForecast {
+  return AiForecastSchema.parse({
+    basisDays: 14,
+    thisMonth: { month: '2026-11', monthSoFarEur: 171.4, ...range(254.2, 290.6, 318.9) },
+    nextMonth: { month: '2026-12', ...range(258.1, 334.7, 392.9) },
+    lines: [
+      {
+        line: 'chatting',
+        monthSoFarEur: 140.2,
+        perDay: range(6.9, 9.1, 10.8),
+        thisMonth: range(202.3, 222.1, 237.4),
+        nextMonth: range(213.9, 282.1, 334.8),
+      },
+      {
+        line: 'playground',
+        monthSoFarEur: 14.8,
+        perDay: range(0.4, 0.7, 0.9),
+        thisMonth: range(18.4, 21.1, 22.9),
+        nextMonth: range(12.4, 21.7, 27.9),
+      },
+      {
+        line: 'instagram',
+        monthSoFarEur: 7.1,
+        perDay: range(0.3, 0.4, 0.5),
+        thisMonth: range(9.8, 10.7, 11.6),
+        nextMonth: range(9.3, 12.4, 15.5),
+      },
+      {
+        line: 'telegram',
+        monthSoFarEur: 5.2,
+        perDay: range(0.25, 0.3, 0.35),
+        thisMonth: range(7.5, 7.9, 8.4),
+        nextMonth: range(7.8, 9.3, 10.9),
+      },
+      {
+        line: 'media',
+        monthSoFarEur: 4.1,
+        perDay: range(0.1, 0.2, 0.3),
+        thisMonth: range(5.0, 5.9, 6.8),
+        nextMonth: range(3.1, 6.2, 9.3),
+      },
+    ],
+    creators: [
+      {
+        creatorId: '00000000-0000-4000-8000-00000000000a',
+        name: 'Créatrice A',
+        monthSoFarEur: 141.9,
+        thisMonth: range(210.1, 236.8, 254.2),
+        nextMonth: range(220.5, 289.4, 340.1),
+        conversationsPerDay: 21.4,
+        salesMonthSoFarEur: 4_870,
+        aiShareSoFar: 0.029,
+        salesNextMonthEur: 9_300,
+      },
+      {
+        creatorId: '00000000-0000-4000-8000-00000000000b',
+        name: 'Créatrice B',
+        monthSoFarEur: 14.7,
+        thisMonth: range(18.0, 21.0, 24.4),
+        nextMonth: range(20.1, 22.9, 26.5),
+        conversationsPerDay: 2.3,
+        salesMonthSoFarEur: null,
+        aiShareSoFar: null,
+        salesNextMonthEur: null,
+      },
+    ],
+    conversationsPerDay: 23.7,
+    eurPerConversationDay: 0.38,
+    moreTraffic: { thisMonthEur: 331.6, nextMonthEur: 475.8 },
+    cap: { capEur: 20, reachedAtRealistic: false, reachedWithMoreTraffic: false, nextMonthMaxEur: 620 },
+    sales: {
+      monthSoFarEur: 4_870,
+      aiShareSoFar: 0.035,
+      thisMonthEur: 7_820,
+      nextMonthEur: 9_300,
+      aiShare: 0.036,
     },
     ...overrides,
   });

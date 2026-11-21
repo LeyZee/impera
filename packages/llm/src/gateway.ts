@@ -188,7 +188,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           return content === undefined ? undefined : [{ role: 'user', content }];
         },
         DropSenseOutputSchema,
-        input.trace,
+        { ...input.trace, purpose: 'media' },
       );
       if (!result.ok) return result;
       const { media } = input;
@@ -369,24 +369,16 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const messages = (): Promise<{ role: 'user'; content: string }[]> =>
         Promise.resolve([{ role: 'user', content }]);
       if (input.kind === 'poll') {
-        const result = await run(
-          'voice',
-          channelPostPrompt,
-          system,
-          messages,
-          ChannelPollOutputSchema,
-          input.trace,
-        );
+        const result = await run('voice', channelPostPrompt, system, messages, ChannelPollOutputSchema, {
+          ...input.trace,
+          purpose: 'telegram',
+        });
         return result.ok ? ok({ ...result.value, output: { kind: 'poll', ...result.value.output } }) : result;
       }
-      const result = await run(
-        'voice',
-        channelPostPrompt,
-        system,
-        messages,
-        ChannelPostOutputSchema,
-        input.trace,
-      );
+      const result = await run('voice', channelPostPrompt, system, messages, ChannelPostOutputSchema, {
+        ...input.trace,
+        purpose: 'telegram',
+      });
       return result.ok ? ok({ ...result.value, output: { kind: 'post', ...result.value.output } }) : result;
     },
 
@@ -420,7 +412,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         system,
         () => Promise.resolve([{ role: 'user', content }]),
         ScriptDropSummarySchema,
-        input.trace,
+        { ...input.trace, purpose: 'media' },
       );
     },
 
@@ -433,7 +425,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         system,
         () => Promise.resolve([{ role: 'user', content }]),
         ScriptIdentityContentSchema,
-        input.trace,
+        { ...input.trace, purpose: 'media' },
       );
     },
 
