@@ -7,6 +7,7 @@ import type { GestureDone, PanelScreen } from './view';
 const screen = (now: string, text = ''): PanelScreen => ({
   kind: 'conversation',
   fanName: 'marc_lyon',
+  money: null,
   standing: null,
   cardOn: true,
   opensCreators: false,

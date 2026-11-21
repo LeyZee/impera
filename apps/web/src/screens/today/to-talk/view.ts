@@ -1,13 +1,6 @@
-import type { FanTier, ToTalkFan } from '@impera/contracts';
+import type { ToTalkFan } from '@impera/contracts';
 
-/** The words of a tier, as the chatter reads them (Charles, 21/11). */
-export const TIER_WORDS: Readonly<Record<FanTier, string>> = {
-  new: 'Nouveau',
-  payer: 'Payeur',
-  good: 'Bon payeur',
-  very_good: 'Très bon payeur',
-  whale: 'Baleine',
-};
+export { FAN_TIER_WORDS as TIER_WORDS } from '@impera/contracts';
 
 /** A wait past this many minutes is said in amber: a warning, never red (red is for urgencies). */
 export const LONG_WAIT_MINUTES = 30;

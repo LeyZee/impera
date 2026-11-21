@@ -24,6 +24,15 @@ export const FAN_SILENT_DAYS = 5;
 /** Each group shows at most this many fans: the list says who first, the inbox has the rest. */
 export const TO_TALK_GROUP_MAX = 5;
 
+/** What the chatter reads of a fan's money, in Impera and in the extension's panel (Charles, 21/11). */
+export const FanStandingSchema = z.strictObject({
+  tier: FanTierSchema.nullable(),
+  /** What he unlocked with her, in euro cents, his dollars at the last known rate (none known, they do not count). */
+  spentMinor: z.number().int().min(0),
+  lastPurchaseAt: z.iso.datetime().nullable(),
+});
+export type FanStanding = z.infer<typeof FanStandingSchema>;
+
 export const ToTalkFanSchema = z.strictObject({
   conversationId: ConversationIdSchema,
   fanId: FanIdSchema,
@@ -82,6 +91,15 @@ export function fanTierOf(
   if (fan.spentMinor > 0) return 'payer';
   return now.getTime() - fan.fanSince.getTime() < FAN_NEW_DAYS * 86_400_000 ? 'new' : null;
 }
+
+/** The words of a tier, as the chatter reads them in Impera and in the extension (Charles, 21/11). */
+export const FAN_TIER_WORDS: Readonly<Record<FanTier, string>> = {
+  new: 'Nouveau',
+  payer: 'Payeur',
+  good: 'Bon payeur',
+  very_good: 'Très bon payeur',
+  whale: 'Baleine',
+};
 
 /** The order a tier ranks in, the highest first. */
 export const FAN_TIER_RANK: Readonly<Record<FanTier, number>> = {

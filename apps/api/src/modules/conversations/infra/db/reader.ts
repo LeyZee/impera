@@ -3,7 +3,6 @@ import {
   ConversationIdSchema,
   ConversationModeSchema,
   ConversationStateSchema,
-  CreatorSettingsSchema,
   CurrencySchema,
   FAN_NEW_DAYS,
   FanFlagsSchema,
@@ -42,6 +41,7 @@ import { z } from 'zod';
 import type { Clock, ConversationReader, MediaDescriptions, PageRequest } from '../../domain/ports';
 import type { ToTalkCandidate } from '../../domain/to-talk';
 
+import { paidTables, spentOf, tiersAndRate } from './fan-standing';
 import { heldBy, holderFor } from './holds';
 import { openedLately, writeOpening } from './openings';
 import { cursorInstant, decodeCursor, decodeSeqCursor, encodeCursor, toStoredEvent } from './rows';
@@ -71,7 +71,6 @@ const ToTalkRowsSchema = z.array(
     held_by: z.string().nullable(),
   }),
 );
-const RateRowsSchema = z.array(z.object({ rate_micros: z.coerce.number().int().positive() }));
 
 const OPEN_DRAFT_STATUSES = ['pending', 'approved', 'edited'];
 /** The states where the agent answers him again after a failed send; once a human holds it or it rests, it is theirs. */
@@ -240,23 +239,9 @@ export function createDrizzleConversationReader(
     toTalkCandidates: (creatorId, { userId, heldOnly }) =>
       withTenant(db, creatorId, async (tx) => {
         const now = clock.now();
-        // What he paid, as « Fans » reads it (ADR 0124): the platform's register, his sales less their refunds, by
-        // currency, VAT included as Reveal shows it.
+        // What he paid, as « Fans » reads it (ADR 0124): shared with the extension's panel.
         const result = await tx.execute(sql`
-          with net as (
-            select s.platform_account_id as account, s.platform_fan_id as fan, s.currency, s.occurred_at,
-                   s.gross_incl_vat_minor - coalesce(r.gross_incl_vat_minor, 0) as gross
-              from platform_sales s
-              left join platform_sales r
-                on r.creator_id = ${creatorId}::uuid and r.event = 'refund'
-               and r.platform = s.platform and r.platform_sale_id = s.platform_sale_id
-             where s.creator_id = ${creatorId}::uuid and s.event = 'sale' and s.platform_fan_id is not null),
-          paid as (
-            select account, fan,
-                   coalesce(sum(gross) filter (where currency = 'EUR'), 0) as eur_minor,
-                   coalesce(sum(gross) filter (where currency = 'USD'), 0) as usd_minor,
-                   max(occurred_at) filter (where gross > 0) as last_purchase_at
-              from net group by account, fan)
+          with ${paidTables(creatorId)}
           select conversations.id as conversation_id, conversations.fan_id, f.display_name, f.first_seen_at, f.flags,
                  -- On the platform's clock as the list reads it; Impera's own time before a message is kept.
                  coalesce((select max(m.platform_created_at) from messages m
@@ -275,16 +260,7 @@ export function createDrizzleConversationReader(
             ${heldOnly ? sql`and ${heldBy(sql`${userId}`)}` : sql``}
           order by conversations.updated_at desc
           limit ${TO_TALK_ROWS_MAX}`);
-        const rate = await tx.execute(
-          sql`select rate_micros from exchange_rates where currency = 'USD' order by day desc limit 1`,
-        );
-        const [creator] = await tx
-          .select({ settings: schema.creators.settings })
-          .from(schema.creators)
-          .where(eq(schema.creators.id, creatorId));
-        const rateMicros = RateRowsSchema.parse(rate.rows)[0]?.rate_micros ?? null;
-        const settings = CreatorSettingsSchema.safeParse(creator?.settings ?? {});
-        const tiers = (settings.success ? settings.data : CreatorSettingsSchema.parse({})).fanTiers;
+        const { tiers, rateMicros } = await tiersAndRate(tx, creatorId);
         const candidates = ToTalkRowsSchema.parse(result.rows).map((row): ToTalkCandidate => {
           const flags = FanFlagsSchema.safeParse(row.flags);
           const f = flags.success ? flags.data : {};
@@ -295,12 +271,7 @@ export function createDrizzleConversationReader(
             fanSince: row.first_seen_at,
             lastInboundAt: row.last_inbound_at,
             lastOutboundAt: row.last_outbound_at,
-            // His dollars at the last known rate, as the Dashboard ranks its fans; without a rate they do not count.
-            spentMinor: Math.max(
-              0,
-              row.eur_minor +
-                (rateMicros === null ? 0 : Math.round((row.usd_minor * rateMicros) / 1_000_000)),
-            ),
+            spentMinor: spentOf(row.eur_minor, row.usd_minor, rateMicros),
             lastPurchaseAt: row.last_purchase_at,
             heldByOther: row.held_by === 'other',
             // A flag that no longer reads holds him as a doubt would: never listed by mistake.

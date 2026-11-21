@@ -1,5 +1,6 @@
 import type {
   Actor,
+  FanStanding,
   FanTiersSetting,
   AfterSaleType,
   AlertTrigger,
@@ -1032,6 +1033,8 @@ export interface CopilotRead {
   readonly writing: boolean;
   /** Her two switches, Créatrices › (elle) › Agent (§ 6), read from her settings; unreadable, the defaults. */
   readonly switches: CopilotSwitches;
+  /** What he spent, his tier, his last purchase (Charles, 21/11); `null` when the fan is not read. */
+  readonly standing: FanStanding | null;
   /** The latest pending draft that has bubbles, if any. */
   readonly draft: {
     readonly id: DraftId;

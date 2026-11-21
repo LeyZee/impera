@@ -1,9 +1,11 @@
 import {
+  FAN_TIER_WORDS,
   REJECT_REASONS,
   type FanCardEntry,
   type FanCardFieldSpec,
   type FanCardGroup,
   type FanCardView,
+  type FanStanding,
   type RejectReason,
 } from '@impera/contracts';
 
@@ -55,6 +57,8 @@ export type PanelScreen =
       readonly kind: 'conversation';
       /** His name on the platform, so the panel says which conversation it shows (EXT-14); null until read. */
       readonly fanName: string | null;
+      /** What he spent, his tier, his last purchase (Charles, 21/11); null while unread. Never a commission. */
+      readonly money: FanStanding | null;
       /** « Où on en est » (§ 3.1); null while it is read the first time. */
       readonly standing: Standing | null;
       /** Her switch « Fiche du fan dans l'extension » (§ 6). */
@@ -790,10 +794,30 @@ function refocus(root: HTMLElement, selector: string | null): void {
 }
 
 /** Which conversation the panel shows: his name on the platform (EXT-14), in a band that never scrolls. */
-function whoBand(fanName: string | null): HTMLElement | null {
-  return fanName === null
-    ? null
-    : h('header', { class: 'cp-who' }, h('span', { class: 'cp-who__fan' }, fanName));
+function whoBand(fanName: string | null, money: FanStanding | null, now: Date): HTMLElement | null {
+  if (fanName === null) return null;
+  const band = h('header', { class: 'cp-who' }, h('span', { class: 'cp-who__fan' }, fanName));
+  if (money === null) return band;
+  // What he spent, as Reveal shows it to chatters, and his tier (Charles, 21/11).
+  if (money.tier !== null)
+    band.append(h('span', { class: 'cp-who__tier', 'data-tier': money.tier }, FAN_TIER_WORDS[money.tier]));
+  band.append(h('span', { class: 'cp-who__money' }, moneyWords(money, now)));
+  return band;
+}
+
+/** « 250 € dépensés · dernier achat il y a 3 j », « rien dépensé ». */
+export function moneyWords(money: FanStanding, now: Date): string {
+  if (money.spentMinor === 0) return 'rien dépensé';
+  const spent = `${new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: money.spentMinor % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(money.spentMinor / 100)}\u00a0€ dépensés`;
+  if (money.lastPurchaseAt === null) return spent;
+  const days = Math.max(
+    0,
+    Math.floor((now.getTime() - new Date(money.lastPurchaseAt).getTime()) / 86_400_000),
+  );
+  return `${spent} · ${days === 0 ? 'achat aujourd’hui' : `dernier achat il y a ${String(days)}\u00a0j`}`;
 }
 
 export function render(root: HTMLElement, screen: PanelScreen, actions: PanelActions): void {
@@ -807,7 +831,7 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       withheld: withheldOf(screen.standing),
       stops: screen.standing?.stops ?? [],
     };
-    const top = [whoBand(screen.fanName), standingLine(screen.standing)].filter(
+    const top = [whoBand(screen.fanName, screen.money, screen.now), standingLine(screen.standing)].filter(
       (node): node is HTMLElement => node !== null,
     );
     const key = draftKey(screen.draft, stops);

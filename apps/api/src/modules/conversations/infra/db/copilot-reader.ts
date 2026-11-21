@@ -9,6 +9,7 @@ import { and, eq, schema, sql, withTenant, type Database } from '@impera/db';
 
 import type { CopilotReader } from '../../domain/ports';
 
+import { fanStanding } from './fan-standing';
 import { openedLately, writeOpening } from './openings';
 
 /** A fan's message waits for the agent: queued, or being written. */
@@ -21,7 +22,7 @@ function switchesOf(settings: unknown) {
 }
 
 /** The copilot panel's read (ADR 0086), in one tenant transaction: RLS scopes every statement to the creator. */
-export function createDrizzleCopilotReader(db: Database): CopilotReader {
+export function createDrizzleCopilotReader(db: Database, now: () => Date = () => new Date()): CopilotReader {
   return {
     read: (creatorId, { platform, platformConversationId }, trace) =>
       withTenant(db, creatorId, async (tx) => {
@@ -68,9 +69,11 @@ export function createDrizzleCopilotReader(db: Database): CopilotReader {
           )
           .orderBy(sql`${schema.drafts.createdAt} desc, ${schema.drafts.id} desc`)
           .limit(1);
+        const fanId = FanIdSchema.parse(conversation.fanId);
         return {
           conversationId: id,
-          fanId: FanIdSchema.parse(conversation.fanId),
+          fanId,
+          standing: await fanStanding(tx, creatorId, fanId, now()),
           writing: WRITING_STATES.has(ConversationStateSchema.parse(conversation.state)),
           switches: switchesOf(creator?.settings),
           draft:
