@@ -14,7 +14,7 @@ import {
   type UserId,
   type TeamMemberId,
 } from '@impera/contracts';
-import { eq, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
+import { eq, schema, sql, withAdmin, withMember, type Database, type Transaction } from '@impera/db';
 
 import { departureApplier, isLateDeparture } from '../domain/departures';
 import {
@@ -105,7 +105,7 @@ export interface DepartureStore {
 export function createDepartureStore(
   db: Database,
   /** The service role: the owners in office, nothing else. */
-  serviceDb: Database,
+  adminDb: Database,
   now: () => Date,
   /** The agency's day of an instant, where `left_on` is read (EQ-14). */
   today: (at: Date) => string,
@@ -225,11 +225,9 @@ export function createDepartureStore(
       }),
 
     apply: async (id, scheduledBy) => {
-      const owners = await serviceDb
-        .select({ id: user.id })
-        .from(user)
-        .where(eq(user.role, 'owner'))
-        .orderBy(user.createdAt);
+      const owners = await withAdmin(adminDb, (tx) =>
+        tx.select({ id: user.id }).from(user).where(eq(user.role, 'owner')).orderBy(user.createdAt),
+      );
       const applier = departureApplier(
         scheduledBy,
         owners.map((owner) => owner.id),
