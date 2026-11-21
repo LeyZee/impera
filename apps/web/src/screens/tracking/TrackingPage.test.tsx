@@ -846,7 +846,7 @@ describe('the reader of Suivi', () => {
     });
   });
 
-  it('folds the fan’s limits to one line, in amber when one stops the agent', async () => {
+  it('folds the fan’s limits to one line, in red when nobody may write to him (IA-06)', async () => {
     serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting() }),
@@ -854,7 +854,7 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     const line = await screen.findByText('Ne plus lui écrire', { selector: '.tr-limits__sum' });
-    expect(line.className).toContain('tr-warn');
+    expect(line.className).toContain('tr-bad');
   });
 
   it('says what she has still to learn about him, in her order, next to his limits', async () => {
@@ -1272,7 +1272,7 @@ describe('the reader of Suivi', () => {
     expect(flagCalls).toHaveLength(1);
   });
 
-  it('reads a disputed age as a suspected minor, in amber, and says confirming lifts the dispute', async () => {
+  it('reads a disputed age as a suspected minor, in red everywhere, and says confirming lifts the dispute', async () => {
     serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
@@ -1281,7 +1281,8 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     expect(await screen.findByText('Âge contesté', { selector: '.tr-alert--stop strong' })).toBeDefined();
-    expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-warn');
+    expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-bad');
+    expect(screen.getByText('Âge contesté', { selector: '.tr-limits__sum' }).className).toContain('tr-bad');
     expect(screen.getByText(/l’agent a relevé un signe de minorité/u)).toBeDefined();
     expect(screen.queryByText(/Pas encore confirmé/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer son âge' }));
