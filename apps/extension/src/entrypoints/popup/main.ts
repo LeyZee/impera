@@ -235,6 +235,8 @@ async function readSession(accountId: PlatformAccountId): Promise<void> {
   syncPending = null;
   // No answer here is the extension's own worker, never the CRM: reading the tab asks nothing of it.
   if (read === null) syncOutcome = { kind: 'failed', accountId, failure: 'extension' };
+  else if (read.state === 'other-account')
+    syncOutcome = { kind: 'failed', accountId, failure: 'other-account', other: read.accountId };
   else if (read.state !== 'held') syncOutcome = { kind: 'failed', accountId, failure: read.state };
   else {
     syncConfirm = { accountId, modelId: read.modelId, seen: read.seen };

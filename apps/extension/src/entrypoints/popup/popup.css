@@ -321,11 +321,6 @@ body {
   white-space: nowrap;
   border: 0;
 }
-.pp-code {
-  font-family: var(--nv-font-mono);
-  color: var(--nv-ink-muted);
-  overflow-wrap: anywhere;
-}
 
 /* ───────────── Shortcuts ───────────── */
 

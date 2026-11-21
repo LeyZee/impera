@@ -2,6 +2,7 @@ import {
   CONNECTOR_LINK_FORBIDDEN,
   CreatorIdSchema,
   WatchSessionIdSchema,
+  type ConnectorAccounts,
   type CreatorId,
   type PlatformAccountId,
   type TrendReadingsBatch,
@@ -348,11 +349,15 @@ export default defineBackground(() => {
    * read for that creator. Null before the first « Sync », or when the CRM does not answer.
    */
   async function crmModel(accountId: PlatformAccountId): Promise<string | null> {
+    return (await crmAccounts()).find((account) => account.id === accountId)?.modelId ?? null;
+  }
+
+  /** The CRM's Reveal accounts with their models; none when it does not answer. */
+  async function crmAccounts(): Promise<ConnectorAccounts['accounts']> {
     const token = await readLink();
-    if (token === null) return null;
+    if (token === null) return [];
     const answer = await fetchSyncableAccounts(await crmOrigin(), token).catch(() => null);
-    if (answer?.kind !== 'ok') return null;
-    return answer.value.accounts.find((account) => account.id === accountId)?.modelId ?? null;
+    return answer?.kind === 'ok' ? answer.value.accounts : [];
   }
 
   async function revealAccounts(): Promise<RevealAccounts> {
@@ -501,6 +506,15 @@ export default defineBackground(() => {
               }),
             expectedModel: async (accountId) =>
               (await crmModel(accountId)) ?? (await revealModels())[accountId] ?? null,
+            accountOfModel: async (modelId, except) => {
+              const remembered = await revealModels();
+              const accounts = await crmAccounts();
+              const other = accounts.find(
+                (account) =>
+                  account.id !== except && (account.modelId ?? remembered[account.id] ?? null) === modelId,
+              );
+              return other?.id ?? null;
+            },
           },
           held,
           message.accountId,
