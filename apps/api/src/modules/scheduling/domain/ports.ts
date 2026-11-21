@@ -20,6 +20,7 @@ import type {
   SchedulingSettings,
   SchedulingSettingsInput,
   ShiftFeedbackId,
+  ShiftIncidentStep,
   ShiftId,
   ShiftReportId,
   ShiftReportCheck,
@@ -799,6 +800,20 @@ export interface StoredShiftFeedback {
   readonly incident: string | null;
   readonly signals: readonly ReportSignal[];
   readonly createdAt: Date;
+  /** « Vu » on its incident (or « Réglé » said first); null without an incident or until then. */
+  readonly incidentSeenAt: Date | null;
+  /** « Réglé » on its incident; null without an incident or until then. */
+  readonly incidentResolvedAt: Date | null;
+}
+
+/** The feedbacks of a period, or the incidents still open, with what names their lines (trous béants n° 1). */
+export interface ShiftFeedbackListRead {
+  readonly feedbacks: readonly (StoredShiftFeedback & {
+    readonly shiftStartsAt: Date;
+    readonly shiftEndsAt: Date;
+  })[];
+  readonly accounts: readonly StoredAccount[];
+  readonly members: readonly StoredMember[];
 }
 
 /** What the member says at the end of the shift: the contract's body, checked. */
@@ -821,6 +836,17 @@ export interface ShiftFeedbackStore {
     feedback: ShiftFeedbackInput,
     now: Date,
   ): Promise<{ feedback: StoredShiftFeedback; created: boolean }>;
+  /**
+   * The feedbacks of `period` on `creatorIds` (every member's for the agency, one's own otherwise), or the incidents
+   * not « Réglé » yet when `period` is null; incidents still open first, then the most recent.
+   */
+  list(
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    period: PayPeriod | null,
+  ): Promise<ShiftFeedbackListRead>;
+  /** « Vu » or « Réglé » on an incident, by the owner or an active manager, never on their own; said once. */
+  step(actor: Actor, feedbackId: ShiftFeedbackId, step: ShiftIncidentStep): Promise<StoredShiftFeedback>;
 }
 
 /**

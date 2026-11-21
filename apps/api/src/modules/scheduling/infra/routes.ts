@@ -35,8 +35,12 @@ import {
   SchedulingSettingsSchema,
   SlotVersionInputSchema,
   SlotVersionParamsSchema,
+  ShiftFeedbackIdSchema,
+  ShiftFeedbackListSchema,
+  ShiftFeedbackQuerySchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
+  ShiftIncidentStepBodySchema,
   ShiftIdSchema,
   ShiftReportContextSchema,
   ShiftReportIdSchema,
@@ -453,6 +457,30 @@ export function createSchedulingRoutes(
         const made = await feedback.put(actorOf(request), request.params.shiftId, request.body);
         return reply.code(made.created ? 201 : 200).send(made.feedback);
       },
+    );
+
+    // Équipe › Rapports (trous béants n° 1): a period's feedbacks, or the incidents still open, theirs first.
+    app.get(
+      '/scheduling/shift-feedback',
+      {
+        preValidation: ownerOrMember,
+        schema: { querystring: ShiftFeedbackQuerySchema, response: { 200: ShiftFeedbackListSchema } },
+      },
+      (request) => feedback.list(userOf(request), request.query),
+    );
+
+    // « Vu », « Réglé » on an incident: said once, the same step again gives back what is recorded.
+    app.post(
+      '/scheduling/shift-feedback/:shiftFeedbackId/incident',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: z.object({ shiftFeedbackId: ShiftFeedbackIdSchema }),
+          body: ShiftIncidentStepBodySchema,
+          response: { 200: ShiftFeedbackSchema },
+        },
+      },
+      (request) => feedback.step(actorOf(request), request.params.shiftFeedbackId, request.body.step),
     );
 
     app.get(

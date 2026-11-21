@@ -529,6 +529,23 @@ export class ShiftFeedbackForbidden extends DomainError {
   }
 }
 
+/** A feedback the reader does not see, or one without an incident to follow: the same answer for both. */
+export class ShiftFeedbackNotFound extends DomainError {
+  constructor() {
+    super('shift_feedback_not_found', 'Ce retour de fin de shift est introuvable');
+  }
+}
+
+/** « Vu » and « Réglé » are the owner's and the active managers', never on their own incident. */
+export class ShiftIncidentForbidden extends DomainError {
+  constructor() {
+    super(
+      'shift_incident_forbidden',
+      'Seuls le propriétaire et les managers suivent un incident, jamais le leur',
+    );
+  }
+}
+
 /** A version of the créneaux that does not exist, or that the reader may not see (ADR 0049 § 1). */
 export class SlotVersionNotFound extends DomainError {
   constructor() {

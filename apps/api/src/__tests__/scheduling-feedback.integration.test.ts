@@ -5,6 +5,7 @@ import {
   payPeriodOfDay,
   PlatformAccountIdSchema,
   ShiftFeedbackIdSchema,
+  ShiftFeedbackListSchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
   ShiftIdSchema,
@@ -15,7 +16,7 @@ import {
   type ShiftId,
   type TeamMember,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LightMyRequestResponse } from 'fastify';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -58,7 +59,7 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
   let later: ShiftId;
   let cancelled: ShiftId;
 
-  const call = (method: 'GET' | 'PUT', url: string, cookie: string, payload?: object) =>
+  const call = (method: 'GET' | 'PUT' | 'POST', url: string, cookie: string, payload?: object) =>
     server.inject({
       method,
       url: `/v1${url}`,
@@ -282,6 +283,113 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
     expect([both.statusCode, codeOf(both)]).toEqual([400, 'request_invalid']);
     const neither = await put(basileCookie, onDeclared, {});
     expect([neither.statusCode, codeOf(neither)]).toEqual([400, 'request_invalid']);
+  });
+
+  it('tells the agency of an incident at once, and follows it « Vu » then « Réglé »', async () => {
+    const incidentShift = await shiftOn(
+      ines,
+      inesMain,
+      parisInstant(parisDay(-3), 600),
+      parisInstant(parisDay(-3), 720),
+    );
+    const made = await put(basileCookie, incidentShift, { incident: 'Le fan menace de signaler le compte' });
+    expect(made.statusCode, made.body).toBe(201);
+    const incident = ShiftFeedbackSchema.parse(made.json());
+    expect(incident).toMatchObject({ incidentSeenAt: null, incidentResolvedAt: null });
+
+    // The phones of the agency are told by a job, once per incident; a feedback without one tells nobody.
+    const jobs = await test.admin.db.execute(
+      sql`select key from graphile_worker._private_jobs where key like 'scheduling.notify_incident:%'`,
+    );
+    expect(jobs.rows).toEqual([{ key: `scheduling.notify_incident:${incident.id}` }]);
+
+    // Without a period: the incidents still open, every period, for the owner and the manager.
+    for (const cookie of [owner, noraCookie]) {
+      const open = await call('GET', '/scheduling/shift-feedback', cookie);
+      expect(open.statusCode, open.body).toBe(200);
+      const list = ShiftFeedbackListSchema.parse(open.json());
+      expect(list.feedbacks.map((line) => line.id)).toEqual([incident.id]);
+      expect(list.members.map((member) => member.id)).toContain(basile.id);
+      expect(list.accounts.map((account) => account.id)).toContain(inesMain);
+    }
+    // A period: every feedback of it, the open incident first.
+    const period = payPeriodOfDay(parisDay(-3));
+    if (period === payPeriodOfDay(parisDay(-1))) {
+      const all = ShiftFeedbackListSchema.parse(
+        (await call('GET', `/scheduling/shift-feedback?period=${period}`, owner)).json(),
+      );
+      expect(all.feedbacks[0]?.id).toBe(incident.id);
+      expect(all.feedbacks.length).toBeGreaterThan(1);
+    }
+
+    const step = (cookie: string, id: string, said: 'seen' | 'resolved') =>
+      call('POST', `/scheduling/shift-feedback/${id}/incident`, cookie, { step: said });
+
+    // Neither the chatter who wrote it nor the creator says « Vu »; a feedback without incident has none.
+    const own = await step(basileCookie, incident.id, 'seen');
+    expect([own.statusCode, codeOf(own)]).toEqual([403, 'shift_incident_forbidden']);
+    expect((await step(creator, incident.id, 'seen')).statusCode).toBe(403);
+    const quiet = ShiftFeedbackReadSchema.parse(
+      (await call('GET', `/scheduling/shifts/${onRead}/feedback`, owner)).json(),
+    ).feedback;
+    const none = await step(owner, quiet?.id ?? newId(ShiftFeedbackIdSchema), 'seen');
+    expect([none.statusCode, codeOf(none)]).toEqual([404, 'shift_feedback_not_found']);
+    const unknown = await step(owner, newId(ShiftFeedbackIdSchema), 'seen');
+    expect([unknown.statusCode, codeOf(unknown)]).toEqual([404, 'shift_feedback_not_found']);
+
+    // The manager says « Vu », the owner « Réglé »; the same step again gives back what is recorded.
+    const seen = await step(noraCookie, incident.id, 'seen');
+    expect(seen.statusCode, seen.body).toBe(200);
+    const seenAt = ShiftFeedbackSchema.parse(seen.json()).incidentSeenAt;
+    expect(seenAt).not.toBeNull();
+    const seenAgain = ShiftFeedbackSchema.parse((await step(owner, incident.id, 'seen')).json());
+    expect(seenAgain.incidentSeenAt).toBe(seenAt);
+    const resolved = ShiftFeedbackSchema.parse((await step(owner, incident.id, 'resolved')).json());
+    expect(resolved.incidentResolvedAt).not.toBeNull();
+
+    // The chatter reads where it stands; the agency's list of open incidents is empty again.
+    const mine = ShiftFeedbackReadSchema.parse(
+      (await call('GET', `/scheduling/shifts/${incidentShift}/feedback`, basileCookie)).json(),
+    ).feedback;
+    expect(mine).toMatchObject({ incidentSeenAt: seenAt, incidentResolvedAt: resolved.incidentResolvedAt });
+    const after = ShiftFeedbackListSchema.parse(
+      (await call('GET', '/scheduling/shift-feedback', owner)).json(),
+    );
+    expect(after.feedbacks).toEqual([]);
+
+    const audit = await test.admin.db
+      .select({ action: schema.auditLog.action })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.entityId, incident.id));
+    expect(
+      audit
+        .map((row) => row.action)
+        .filter((action) => action.startsWith('shift_incident.'))
+        .sort(),
+    ).toEqual(['shift_incident.resolved', 'shift_incident.seen']);
+    // The steps are never undone.
+    await expect(
+      test.admin.db
+        .delete(schema.shiftIncidentSteps)
+        .where(eq(schema.shiftIncidentSteps.shiftFeedbackId, incident.id)),
+    ).rejects.toThrow();
+  });
+
+  it('gives a chatter his own feedbacks only', async () => {
+    const { cookie: colleague } = await addMember('remi@example.test', 'Rémi', 'chatter');
+    const theirs = ShiftFeedbackListSchema.parse(
+      (
+        await call('GET', `/scheduling/shift-feedback?period=${payPeriodOfDay(parisDay(-1))}`, colleague)
+      ).json(),
+    );
+    expect(theirs.feedbacks).toEqual([]);
+    const his = ShiftFeedbackListSchema.parse(
+      (
+        await call('GET', `/scheduling/shift-feedback?period=${payPeriodOfDay(parisDay(-1))}`, basileCookie)
+      ).json(),
+    );
+    expect(his.feedbacks.every((line) => line.memberId === basile.id)).toBe(true);
+    expect(his.feedbacks.length).toBeGreaterThan(0);
   });
 
   it('is never rewritten nor deleted, whoever asks', async () => {

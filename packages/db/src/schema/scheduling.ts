@@ -2,6 +2,7 @@ import {
   CurrencySchema,
   REPORT_GAP_THRESHOLD_DEFAULT,
   SHIFT_FEEDBACK_SIGNALS_MAX,
+  SHIFT_INCIDENT_STEPS,
   SHIFT_REPORT_MAX_MINOR,
   SHIFT_REPORT_REVIEW_KINDS,
   SHIFT_REPORT_STATUSES,
@@ -701,6 +702,40 @@ export const shiftFeedbacks = pgTable(
     pgPolicy('member_insert', {
       for: 'insert',
       withCheck: sql`${t.creatorId} = ${currentCreator} and ${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
+    }),
+  ],
+);
+
+/**
+ * The follow-up of an incident of the mini feedback (trous béants n° 1, 21/11): « Vu », then « Réglé », each said once
+ * by the owner or an active manager, never on their own incident, never undone (trigger of the migration). « Réglé »
+ * without « Vu » counts as both. Read by whoever reads its feedback (its policy decides), never by the creator.
+ */
+export const shiftIncidentSteps = pgTable(
+  'shift_incident_steps',
+  {
+    shiftFeedbackId: uuid('shift_feedback_id')
+      .notNull()
+      .references(() => shiftFeedbacks.id),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    step: text('step').notNull(),
+    saidBy: text('said_by')
+      .notNull()
+      .references(() => user.id),
+    saidAt: timestampTz('said_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.shiftFeedbackId, t.step] }),
+    enumCheck('shift_incident_steps', t.step, SHIFT_INCIDENT_STEPS),
+    pgPolicy('feedback_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and exists (select 1 from shift_feedbacks f where f.id = ${t.shiftFeedbackId})`,
+    }),
+    pgPolicy('agency_insert', {
+      for: 'insert',
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${plans} and ${t.saidBy} = ${currentUser} and ${t.saidAt} = now() and exists (select 1 from shift_feedbacks f where f.id = ${t.shiftFeedbackId} and f.creator_id = ${t.creatorId} and f.incident is not null and not ${isMine(sql`f.member_id`)})`,
     }),
   ],
 );

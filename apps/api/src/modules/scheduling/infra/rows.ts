@@ -547,6 +547,7 @@ export async function creatorOfUnscoped(
     | typeof shiftTemplates
     | typeof schema.shiftSwapRequests
     | typeof schema.shiftReports
+    | typeof schema.shiftFeedbacks
     | typeof platformAccounts,
   id: string,
 ): Promise<string | null> {

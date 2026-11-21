@@ -482,6 +482,12 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     z.object({ period }),
     (d) => `a donné un retour sur un shift (quinzaine ${frenchPeriod(d.period)})`,
   ),
+  'shift_incident.seen': action('team', z.object({ period }), () => 'a vu un incident de fin de shift'),
+  'shift_incident.resolved': action(
+    'team',
+    z.object({ period }),
+    () => 'a réglé un incident de fin de shift',
+  ),
   'sales_feed.chatter_linked': action(
     'team',
     chatterLink,

@@ -1,37 +1,67 @@
 import {
   CreatorIdSchema,
+  JOB_MAX_ATTEMPTS,
   PayPeriodSchema,
   PlatformAccountIdSchema,
   ReportSignalSchema,
   ShiftFeedbackIdSchema,
   ShiftIdSchema,
   TeamMemberIdSchema,
+  type CreatorId,
+  type ShiftFeedbackId,
   type ShiftId,
 } from '@impera/contracts';
-import { eq, schema, withTenantMember, type Database, type Transaction } from '@impera/db';
+import {
+  and,
+  enterCreator,
+  eq,
+  inArray,
+  schema,
+  sql,
+  SNAPSHOT_READ,
+  withMember,
+  withTenantMember,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 import { z } from 'zod';
 
 import {
   ShiftFeedbackConflict,
   ShiftFeedbackExists,
   ShiftFeedbackForbidden,
+  ShiftFeedbackNotFound,
+  ShiftIncidentForbidden,
   ShiftNotFound,
 } from '../domain/errors';
-import type { ShiftFeedbackInput, ShiftFeedbackStore, StoredShiftFeedback } from '../domain/ports';
-import { assertFeedbackDue, shiftPeriod } from '../domain/reports';
+import type {
+  ShiftFeedbackInput,
+  ShiftFeedbackListRead,
+  ShiftFeedbackStore,
+  StoredAccount,
+  StoredShiftFeedback,
+} from '../domain/ports';
+import { assertFeedbackDue, isAgency, shiftPeriod } from '../domain/reports';
 
 import {
   agencyTimeZone,
   audit,
   creatorOfUnscoped,
+  memberColumns,
   ownMemberId,
   pgErrorOf,
   RulesRowSchema,
   shiftColumns,
+  StoredAccountSchema,
+  toMember,
   toShift,
 } from './rows';
 
-const { accountPayRules, shiftFeedbacks, shifts } = schema;
+const { accountPayRules, platformAccounts, shiftFeedbacks, shiftIncidentSteps, shifts, teamMembers } = schema;
+
+/** When its incident was first looked at: « Vu », or « Réglé » said straight away. */
+const seenAt = sql`(select min(s.said_at) from shift_incident_steps s where s.shift_feedback_id = ${shiftFeedbacks.id})`;
+const resolvedAt = sql`(select s.said_at from shift_incident_steps s where s.shift_feedback_id = ${shiftFeedbacks.id} and s.step = 'resolved')`;
 
 const feedbackColumns = {
   id: shiftFeedbacks.id,
@@ -45,6 +75,8 @@ const feedbackColumns = {
   incident: shiftFeedbacks.incident,
   signals: shiftFeedbacks.signals,
   createdAt: shiftFeedbacks.createdAt,
+  incidentSeenAt: seenAt,
+  incidentResolvedAt: resolvedAt,
 };
 
 const StoredShiftFeedbackSchema = z.object({
@@ -59,7 +91,24 @@ const StoredShiftFeedbackSchema = z.object({
   incident: z.string().nullable(),
   signals: z.array(ReportSignalSchema),
   createdAt: z.date(),
+  // Read through a subquery: Postgres gives the instant back as text there.
+  incidentSeenAt: z.coerce.date().nullable(),
+  incidentResolvedAt: z.coerce.date().nullable(),
 });
+
+const accountColumns = {
+  id: platformAccounts.id,
+  creatorId: platformAccounts.creatorId,
+  platform: platformAccounts.platform,
+  handle: platformAccounts.handle,
+};
+
+/** Incidents not « Réglé » first, then the most recent: what the agency still has to look at leads. */
+const byUrgency = (a: StoredShiftFeedback, b: StoredShiftFeedback): number => {
+  const open = (one: StoredShiftFeedback) =>
+    one.incident !== null && one.incidentResolvedAt === null ? 0 : 1;
+  return open(a) - open(b) || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+};
 
 async function feedbackWhere(
   tx: Transaction,
@@ -101,6 +150,17 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
     const creatorId = await creatorOfUnscoped(adminDb, shifts, shiftId);
     if (creatorId === null) throw new ShiftNotFound();
     return withTenantMember(db, creatorId, userId, (tx) => fn(tx));
+  }
+
+  async function inFeedbackCreator<T>(
+    feedbackId: ShiftFeedbackId,
+    userId: string,
+    fn: (tx: Transaction, creatorId: CreatorId) => Promise<T>,
+  ) {
+    const found = await creatorOfUnscoped(adminDb, shiftFeedbacks, feedbackId);
+    if (found === null) throw new ShiftFeedbackNotFound();
+    const creatorId = CreatorIdSchema.parse(found);
+    return withTenantMember(db, creatorId, userId, (tx) => fn(tx, creatorId));
   }
 
   return {
@@ -173,9 +233,103 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
           throw new ShiftFeedbackConflict();
         }
         await audit(tx, actor, 'shift_feedback.create', { kind: 'shift_feedback', id: sent.id }, { period });
+        // An incident tells the owner and the managers at once, once it commits (trous béants n° 1): one job per feedback.
+        if (sent.incident !== null) await enqueueIncidentNotice(tx, sent.id);
         const made = await feedbackWhere(tx, shiftFeedbacks.id, sent.id);
         if (made === null) throw new ShiftNotFound();
         return { feedback: made.feedback, created: true };
       }),
+
+    list: (actor, creatorIds, period) =>
+      withMember(
+        db,
+        actor,
+        async (tx, scope): Promise<ShiftFeedbackListRead> => {
+          const reader = { userId: actor, scope, memberId: await ownMemberId(tx, actor) };
+          // Anyone else than the agency reads their own, as the reports.
+          const own = isAgency(reader) ? null : reader.memberId;
+          if (!isAgency(reader) && own === null) return { feedbacks: [], accounts: [], members: [] };
+          const feedbacks: (StoredShiftFeedback & { shiftStartsAt: Date; shiftEndsAt: Date })[] = [];
+          const accounts: StoredAccount[] = [];
+          for (const creatorId of creatorIds) {
+            await enterCreator(tx, creatorId, creatorIds);
+            const rows = await tx
+              .select({ ...feedbackColumns, shiftStartsAt: shifts.startsAt, shiftEndsAt: shifts.endsAt })
+              .from(shiftFeedbacks)
+              .innerJoin(shifts, eq(shifts.id, shiftFeedbacks.shiftId))
+              .where(
+                and(
+                  period === null
+                    ? sql`${shiftFeedbacks.incident} is not null and ${resolvedAt} is null`
+                    : eq(shiftFeedbacks.period, period),
+                  own === null ? undefined : eq(shiftFeedbacks.memberId, own),
+                ),
+              );
+            const read = rows.map((row) => ({
+              ...StoredShiftFeedbackSchema.parse(row),
+              shiftStartsAt: row.shiftStartsAt,
+              shiftEndsAt: row.shiftEndsAt,
+            }));
+            feedbacks.push(...read);
+            const accountIds = [...new Set(read.map((one) => one.platformAccountId))];
+            if (accountIds.length > 0) {
+              const found = await tx
+                .select(accountColumns)
+                .from(platformAccounts)
+                .where(inArray(platformAccounts.id, accountIds));
+              accounts.push(...found.map((row) => StoredAccountSchema.parse(row)));
+            }
+          }
+          const memberIds = [...new Set(feedbacks.map((one) => one.memberId))];
+          const members =
+            memberIds.length === 0
+              ? []
+              : await tx.select(memberColumns).from(teamMembers).where(inArray(teamMembers.id, memberIds));
+          return { feedbacks: feedbacks.toSorted(byUrgency), accounts, members: members.map(toMember) };
+        },
+        SNAPSHOT_READ,
+      ),
+
+    step: (actor, feedbackId, step) =>
+      inFeedbackCreator(feedbackId, actor.userId, async (tx, creatorId) => {
+        const found = await feedbackWhere(tx, shiftFeedbacks.id, feedbackId);
+        if (found?.feedback.incident == null) throw new ShiftFeedbackNotFound();
+        const { feedback } = found;
+        const mine = feedback.memberId === (await ownMemberId(tx, actor.userId));
+        const [scopeRow] = (
+          await tx.execute(sql`select nullif(current_setting('app.team_scope', true), '') as scope`)
+        ).rows;
+        const scope = z.object({ scope: z.string().nullable() }).parse(scopeRow).scope;
+        if (mine || (scope !== 'owner' && scope !== 'agency')) throw new ShiftIncidentForbidden();
+        const already = step === 'resolved' ? feedback.incidentResolvedAt : feedback.incidentSeenAt;
+        if (already !== null) return feedback;
+        await tx
+          .insert(shiftIncidentSteps)
+          .values({ shiftFeedbackId: feedbackId, creatorId, step, saidBy: actor.userId })
+          .onConflictDoNothing();
+        await audit(
+          tx,
+          actor,
+          step === 'resolved' ? 'shift_incident.resolved' : 'shift_incident.seen',
+          { kind: 'shift_feedback', id: feedbackId },
+          { period: feedback.period },
+        );
+        const after = await feedbackWhere(tx, shiftFeedbacks.id, feedbackId);
+        if (after === null) throw new ShiftFeedbackNotFound();
+        return after.feedback;
+      }),
   };
+}
+
+/** `scheduling.notify_incident` for a feedback with an incident, once its transaction commits; one per feedback. */
+async function enqueueIncidentNotice(tx: Transaction, shiftFeedbackId: ShiftFeedbackId): Promise<void> {
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'scheduling.notify_incident',
+      payload => ${JSON.stringify({ shiftFeedbackId })}::jsonb,
+      max_attempts => ${JOB_MAX_ATTEMPTS['scheduling.notify_incident']}::int,
+      job_key => ${`scheduling.notify_incident:${shiftFeedbackId}`},
+      job_key_mode => 'preserve_run_at'
+    )`,
+  );
 }

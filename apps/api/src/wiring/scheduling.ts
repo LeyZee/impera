@@ -1,4 +1,4 @@
-import { JOB_PAYLOADS } from '@impera/contracts';
+import { JOB_PAYLOADS, ShiftFeedbackIdSchema } from '@impera/contracts';
 
 import { defineTask } from '../jobs';
 import { salesFeedReadsForReports, salesFeedSwitchReads, salesFeedTotals } from '../modules/connectors';
@@ -111,6 +111,19 @@ export function wireScheduling(
             return;
           }
           context.logger.info(await module.jobs.remindReports(), 'scheduling: shift reports reminded');
+        },
+      ),
+      'scheduling.notify_incident': defineTask(
+        'scheduling.notify_incident',
+        JOB_PAYLOADS['scheduling.notify_incident'],
+        logger,
+        async (payload, context) => {
+          if (module.jobs.notifyIncident === null) {
+            context.logger.warn('scheduling: push is off, the incident waits in Équipe › Rapports');
+            return;
+          }
+          const rang = await module.jobs.notifyIncident(ShiftFeedbackIdSchema.parse(payload.shiftFeedbackId));
+          context.logger.info({ rang }, 'scheduling: shift incident told to the agency');
         },
       ),
     },
