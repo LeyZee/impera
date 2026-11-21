@@ -23,6 +23,7 @@ import {
   graveHandoffOf,
   messageTime,
   retriedLine,
+  scriptStepLine,
   stoppedText,
   threadOf,
   whyHuman,
@@ -643,6 +644,7 @@ function DraftPanel({
   // An invalid text is a retouch too: the button keeps its name while it is off.
   const isChanged = edited?.join('\n') !== draft.bubbles.join('\n');
   const retried = retriedLine(draft.retried);
+  const stepLine = scriptStepLine(draft.scriptStep);
 
   const run = async (decide: () => Promise<Decision>): Promise<void> => {
     setPending(true);
@@ -676,6 +678,7 @@ function DraftPanel({
           ))}
         </div>
       )}
+      {stepLine === null ? null : <p className="nv-draft-panel__brief tr-draft__step">{stepLine}</p>}
       {retried === null ? null : <p className="nv-draft-panel__brief tr-draft__retried">{retried}</p>}
       {step === 'rejecting' ? (
         <label className="nv-field">

@@ -72,6 +72,22 @@ export const ConversationSummarySchema = z.object({
 });
 export type ConversationSummary = z.infer<typeof ConversationSummarySchema>;
 
+/**
+ * The step of her script that leaves with a draft (ADR 0098 § 5, REV-03): shown under its bubbles, so that « Valider »
+ * never sends a media or a price the person did not see. Absent while the server does not say it.
+ */
+export const DraftScriptStepViewSchema = z.object({
+  /** Her script as she named it; `null` when it is no longer listed. */
+  scriptName: z.string().nullable(),
+  /** The step's place in the script, from 0. */
+  stepIndex: z.number().int().nonnegative(),
+  /** The price it is sent at, in the platform's minor unit: 0 for an offered step. */
+  priceMinor: z.number().int().nonnegative(),
+  /** What it sends of her vault, by kind, in order: none for a step of text only. */
+  media: z.array(z.enum(['image', 'video', 'audio'])),
+});
+export type DraftScriptStepView = z.infer<typeof DraftScriptStepViewSchema>;
+
 export const DraftViewSchema = z.object({
   id: DraftIdSchema,
   status: DraftStatusSchema,
@@ -83,6 +99,8 @@ export const DraftViewSchema = z.object({
    * said discreetly under the draft (« 1 réponse écartée : un aveu d’IA »). Empty when the first answer went through.
    */
   retried: z.array(GuardCodeSchema).default([]),
+  /** The step of her script that leaves with it, `null` for words only; absent while the server does not say it. */
+  scriptStep: DraftScriptStepViewSchema.nullable().optional(),
 });
 export type DraftView = z.infer<typeof DraftViewSchema>;
 
