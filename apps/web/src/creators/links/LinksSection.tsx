@@ -192,7 +192,7 @@ export function LinksSection({
             </button>
             <button
               type="button"
-              className="nv-btn nv-btn--plain nv-btn--sm"
+              className="nv-btn nv-btn--soft nv-btn--sm"
               disabled={detected === 'busy'}
               aria-busy={detected === 'busy'}
               onClick={() => {
