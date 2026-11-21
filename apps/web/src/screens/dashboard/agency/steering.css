@@ -284,6 +284,11 @@
 .stg-dep__card .ins-ring-card--bare {
   padding: 0;
 }
+/* No comparison on this ring, so no delta column: its amounts end on the card's right edge, with the figures. */
+.stg-dep__card .ins-legend__row {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: 'key label value share';
+}
 .stg-dep__figures {
   gap: 16px;
 }
