@@ -39,6 +39,8 @@ describe('POST /v1/creators/:creatorId/redirect-links/detect', () => {
   let ines: CreatorId;
   let outage: LinkServiceError | null = null;
   let reads = 0;
+  /** What happens in the base while the service is being read. */
+  let meanwhile: (() => Promise<unknown>) | null = null;
   const cookies: Record<'owner' | 'manager' | 'chatter' | 'nora', string> = {
     owner: '',
     manager: '',
@@ -54,9 +56,11 @@ describe('POST /v1/creators/:creatorId/redirect-links/detect', () => {
 
   const readerOf = (): LinkServiceReader => ({
     ping: () => Promise.resolve(),
-    listLinks: () => {
+    listLinks: async () => {
       reads += 1;
-      return outage === null ? Promise.resolve(atService) : Promise.reject(outage);
+      await meanwhile?.();
+      if (outage !== null) throw outage;
+      return atService;
     },
     readHours: () => Promise.resolve([]),
     readRobotHours: () => Promise.resolve([]),
@@ -291,6 +295,19 @@ describe('POST /v1/creators/:creatorId/redirect-links/detect', () => {
       expect(response.statusCode).toBe(422);
       expect(await refOf(storyId)).toBeNull();
       outage = null;
+    });
+
+    it('attaches nothing to a link whose address changed while the service was read', async () => {
+      const story = (await links(nora)).find((one) => one.name === 'Story')?.id ?? '';
+      meanwhile = () =>
+        test.admin.db
+          .update(schema.redirectLinks)
+          .set({ url: 'https://liens.example.test/autre-story' })
+          .where(eq(schema.redirectLinks.id, story));
+      const response = await attach(nora, story);
+      meanwhile = null;
+      expect(response.statusCode, response.body).toBe(404);
+      expect(await refOf(story)).toBeNull();
     });
 
     it('detaches a link whose address changes, in the same write', async () => {

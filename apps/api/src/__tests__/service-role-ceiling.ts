@@ -7,7 +7,8 @@
  */
 export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/ai-budget': 2,
-  'modules/ai-usage': 9,
+  // +1 for the forecast (ADR 0091 § 8): the owner's screen reads every creator's calls, sales and name, sums only.
+  'modules/ai-usage': 10,
   'modules/alerts': 1,
   'modules/audit': 3,
   'modules/backups': 1,
@@ -47,6 +48,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
  * since: 269 by her week (CR-16, +5), 270 by the agent's read of her custom price grid (ADR 0159, +1), then 273 with
  * the audit journal (EQ-18), which reads `audit_log`, out of RLS by design, for the owner alone (+3), then 276 with
  * the agency's key of the redirect service (INS-02), a table closed to the app role (+3), and 277 with its
- * re-sealing by the ops command after a rotation of the encryption keys (+1).
+ * re-sealing by the ops command after a rotation of the encryption keys (+1), and 278 with the forecast of the AI
+ * bill (ADR 0091 § 8), the owner's sums of every creator's calls and sales in one read (+1).
  */
-export const SERVICE_ROLE_TOTAL_AT_START = 277;
+export const SERVICE_ROLE_TOTAL_AT_START = 278;
