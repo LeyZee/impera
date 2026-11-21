@@ -1,14 +1,17 @@
-import type {
-  ConversationId,
-  CopilotVerdictBody,
-  CopilotVerdictResult,
-  CreatorId,
-  DraftId,
-  DraftStatus,
-  UserId,
+import {
+  queueNameFor,
+  settlePlacedJobKey,
+  type ConversationId,
+  type CopilotVerdictBody,
+  type CopilotVerdictResult,
+  type CreatorId,
+  type DraftId,
+  type DraftStatus,
+  type UserId,
 } from '@impera/contracts';
 
 import { CopilotDraftConflict, DraftConflict, DraftNotFound } from '../domain/errors';
+import { PLACED_SETTLE_DELAY_MS } from '../domain/placed-draft';
 import type { Clock, UnitOfWork } from '../domain/ports';
 
 import type { ConversationCommands } from './commands';
@@ -54,14 +57,26 @@ export async function recordCopilotGesture(
       const draft = await tx.drafts.lock(draftId);
       if (draft === null) throw new DraftNotFound();
       if (draft.status !== 'pending') throw new CopilotDraftConflict();
-      const placed = await tx.drafts.place(draftId, userId, deps.clock.now());
-      if (placed)
+      const at = deps.clock.now();
+      const placed = await tx.drafts.place(draftId, userId, at);
+      if (placed) {
         await tx.audit.record({
           userId,
           action: 'draft.placed',
           entityId: draft.conversationId,
           details: { draftId, edited: body.edited },
         });
+        // Its window closes: what left of it by then decides it, nothing and it expires (§ 5).
+        await tx.jobs.enqueue(
+          'conversation.settle_placed',
+          { creatorId, conversationId: draft.conversationId, draftId, correlationId: gesture.correlationId },
+          {
+            queueName: queueNameFor(draft.conversationId),
+            jobKey: settlePlacedJobKey(draftId),
+            runAt: new Date(at.getTime() + PLACED_SETTLE_DELAY_MS),
+          },
+        );
+      }
       return { draftId, outcome: 'placed', replayed: !placed };
     });
   }

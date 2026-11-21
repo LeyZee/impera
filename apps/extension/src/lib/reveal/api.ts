@@ -60,8 +60,14 @@ export async function sendSession(
   platformAccountId: PlatformAccountId,
   session: RevealSession,
   fetchFn: Fetch = fetch,
+  trigger: 'click' | 'open' = 'click',
 ): Promise<Synced> {
-  const body = ConnectorSessionBodySchema.parse({ platformAccountId, session: JSON.stringify(session) });
+  // The gesture is said when the extension synced alone (ADR 0147 § 2), so that the server and its log tell it apart.
+  const body = ConnectorSessionBodySchema.parse({
+    platformAccountId,
+    session: JSON.stringify(session),
+    ...(trigger === 'open' && { trigger }),
+  });
   const sent = await call(
     fetchFn,
     `${origin}/v1/connector/sessions`,
