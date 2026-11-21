@@ -1005,6 +1005,12 @@
   box-shadow: none;
   color: var(--nv-ink-muted);
 }
+/* The two quiet choices still show where the keyboard is (DS-03). */
+.ins-when__nav .ins-when__select .nv-select__field:focus-visible,
+.ins-when__compare .nv-select__field:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
 .ins-when__compare .nv-select__field:hover,
 .ins-when__compare .nv-select__field[aria-expanded='true'] {
   background: var(--nv-plate-hover);

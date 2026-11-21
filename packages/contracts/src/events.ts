@@ -92,6 +92,11 @@ const draftPayload = z.object({
    */
   leavesFanWaiting: z.literal(true).optional(),
   /**
+   * On `draft_approved` and `draft_edited`: a chatter sent it himself on the platform, from the copilot panel, and what
+   * left decided the verdict (ADR 0086 § 5). Nothing is sent after it; the message itself already answered the fan.
+   */
+  sentOnPlatform: z.literal(true).optional(),
+  /**
    * On `draft_created`: written in the care mode (ADR 0088), a human validates it whatever the mode; `help`, it closes
    * on the fixed help bubble, given once per episode. Absent everywhere else.
    */

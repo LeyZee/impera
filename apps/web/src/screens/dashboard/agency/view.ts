@@ -90,20 +90,6 @@ export function percentText(share: number): string {
   return `${share.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}\u00a0%`;
 }
 
-/**
- * How « Les fans qui paient » names its biggest spenders: ten at most, the count they are below ten, one alone in the
- * singular (PAY-16: « Les 10 fans » said of three).
- */
-export function topFansWords(paying: number): { readonly lead: string; readonly short: string } {
-  const count = Math.min(10, Math.max(1, paying));
-  return count === 1
-    ? { lead: 'Le fan qui dépense le plus fait', short: 'le plus gros fan' }
-    : {
-        lead: `Les ${String(count)} fans qui dépensent le plus font`,
-        short: `les ${String(count)} plus gros fans`,
-      };
-}
-
 /** Euros to the cent, always: a figure read in a tip, never rounded away (ADR 0106 § 12). */
 export function exactEuros(cents: number): string {
   return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;

@@ -81,6 +81,12 @@ export function commandFor(event: EventBody): ConversationCommand | null {
     return isFinal ? 'send_failed_final' : null;
   }
   if (event.type === 'draft_expired' && event.payload.leavesFanWaiting === true) return 'expire_unanswered';
+  // Sent by hand from the copilot panel (ADR 0086 § 5): its first message already answered him, nothing else leaves.
+  if (
+    (event.type === 'draft_approved' || event.type === 'draft_edited') &&
+    event.payload.sentOnPlatform === true
+  )
+    return null;
   // A draft refused while he still waited, as the command saw it (recette CHAT-25): the conversation stays with the
   // person who refused it, who answers in Reveal. Read from the event, never from the state at replay (ADR 0007).
   if (event.type === 'draft_rejected' && event.payload.leavesFanWaiting === true) return 'reject_unanswered';

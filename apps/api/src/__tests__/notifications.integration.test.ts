@@ -3,6 +3,7 @@ import { createDecipheriv, createECDH, createHmac, randomBytes } from 'node:cryp
 import {
   CreatorIdSchema,
   newId,
+  NotificationInboxSchema,
   NotificationPreferencesSchema,
   PushPublicKeySchema,
   PushTestResultSchema,
@@ -73,6 +74,7 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
   let owner: Record<string, string>;
   let creator: Record<string, string>;
   let creatorId: string;
+  let ownerId: string;
   const config = () =>
     testConfig({
       DATABASE_URL: test.appUrl,
@@ -91,7 +93,7 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
       routes: app.routes,
       readiness: app.readiness,
     });
-    await createOwner(app.auth, app.db.db, OWNER);
+    ({ userId: ownerId } = await createOwner(app.auth, app.db.db, OWNER));
     ({ userId: creatorId } = await createOwner(app.auth, app.db.db, CREATOR));
     // A creator's account opens exactly one creator (CR-02, user_creator_link_check).
     const anna = newId(CreatorIdSchema);
@@ -309,6 +311,7 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
       expect(open(sent[1]?.body ?? Buffer.alloc(0), phone)).toMatchObject({
         title: 'Pendant tes heures calmes',
         body: '2 notifications t’attendent dans Impera.',
+        url: '/notifications',
       });
       expect(await recap(creatorId, new Date('2026-11-04T07:01:00Z'))).toBe(0);
       expect(sent).toHaveLength(2);
@@ -337,6 +340,44 @@ describe('push notifications (CR-01, /v1/notifications)', () => {
       expect(await ask('sale', 'sale-6', '2026-11-06T12:05:00Z')).toBe('rang');
       expect(sent).toHaveLength(6);
       expect(open(sent[3]?.body ?? Buffer.alloc(0), phone)).toMatchObject({ tag: 'sales-burst' });
+    });
+
+    it('lists the account’s own notifications of the last days, rung or kept quiet (trou 9 du 21/11)', async () => {
+      // No quiet hours, one a day: the second reminder of today stays in the app without ringing.
+      const oneADay = { quietHours: { startMinute: 0, endMinute: 0 }, dailyCap: 1 };
+      expect((await call('PUT', '/v1/notifications/preferences', creator, oneADay)).statusCode).toBe(200);
+      const now = new Date().toISOString();
+      expect(await ask('reminder', 'inbox-rung', now)).toBe('rang');
+      expect(await ask('reminder', 'inbox-kept', now)).toBe('silent');
+      await notify(
+        {
+          userId: ownerId,
+          reason: 'team',
+          objectKey: 'inbox-owner',
+          timeZone: PARIS,
+          message: { title: 'inbox-owner', url: '/' },
+        },
+        new Date(now),
+      );
+
+      const response = await call('GET', '/v1/notifications/inbox', creator);
+      expect(response.statusCode).toBe(200);
+      const { items } = NotificationInboxSchema.parse(response.json());
+      const mine = items.filter((item) => item.title.startsWith('inbox-'));
+      expect(mine.map((item) => [item.title, item.quiet, item.url])).toEqual(
+        expect.arrayContaining([
+          ['inbox-rung', false, '/agenda'],
+          ['inbox-kept', true, '/agenda'],
+        ]),
+      );
+      // Each account reads only its own (RLS own_rows), and nothing older than the window (the 3–6 November tests).
+      expect(items.some((item) => item.title === 'inbox-owner')).toBe(false);
+      expect(items.every((item) => Date.now() - Date.parse(item.at) <= 7 * 24 * 3600 * 1000)).toBe(true);
+      const ownerInbox = NotificationInboxSchema.parse(
+        (await call('GET', '/v1/notifications/inbox', owner)).json(),
+      );
+      expect(ownerInbox.items.map((item) => item.title)).toContain('inbox-owner');
+      expect((await call('GET', '/v1/notifications/inbox')).statusCode).toBe(401);
     });
   });
 });

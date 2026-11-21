@@ -1,5 +1,5 @@
 {
-  "id": "f0c0b696-40b6-46d2-a905-2a419f0a7eca",
+  "id": "e8d386b2-4bce-45cf-8501-d3f9d7dc7880",
   "prevId": "566d592c-6f30-437c-9c6e-817d85445453",
   "version": "7",
   "dialect": "postgresql",
@@ -2527,20 +2527,6 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media'"
-        },
-        "job_insert": {
-          "name": "job_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media' and \"script_drop_summaries\".\"author\" = 'brain' and \"script_drop_summaries\".\"validated_by\" is null"
         },
         "team_validate": {
           "name": "team_validate",
@@ -20069,6 +20055,147 @@
         "platform_script_branches_condition_check": {
           "name": "platform_script_branches_condition_check",
           "value": "jsonb_typeof(\"platform_script_branches\".\"condition\") = 'object' and \"platform_script_branches\".\"condition\"->>'kind' in ('none', 'structured', 'text')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.platform_script_step_daily": {
+      "name": "platform_script_step_daily",
+      "schema": "",
+      "columns": {
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_step_ref": {
+          "name": "platform_step_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sent": {
+          "name": "sent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purchased": {
+          "name": "purchased",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paid_minor": {
+          "name": "paid_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "platform_script_step_daily_creator_day_idx": {
+          "name": "platform_script_step_daily_creator_day_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "platform_script_step_daily_creator_id_creators_id_fk": {
+          "name": "platform_script_step_daily_creator_id_creators_id_fk",
+          "tableFrom": "platform_script_step_daily",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "platform_script_step_daily_platform_account_id_platform_accounts_id_fk": {
+          "name": "platform_script_step_daily_platform_account_id_platform_accounts_id_fk",
+          "tableFrom": "platform_script_step_daily",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "platform_script_step_daily_pkey": {
+          "name": "platform_script_step_daily_pkey",
+          "columns": ["platform_account_id", "platform_step_ref", "day"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"platform_script_step_daily\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "platform_script_step_daily_counts_check": {
+          "name": "platform_script_step_daily_counts_check",
+          "value": "\"platform_script_step_daily\".\"sent\" >= 0 and \"platform_script_step_daily\".\"purchased\" >= 0 and \"platform_script_step_daily\".\"paid_minor\" >= 0"
+        },
+        "platform_script_step_daily_ref_check": {
+          "name": "platform_script_step_daily_ref_check",
+          "value": "char_length(\"platform_script_step_daily\".\"platform_step_ref\") <= 200"
+        },
+        "platform_script_step_daily_currency_check": {
+          "name": "platform_script_step_daily_currency_check",
+          "value": "\"platform_script_step_daily\".\"currency\" in ('EUR', 'USD')"
         }
       },
       "isRLSEnabled": false

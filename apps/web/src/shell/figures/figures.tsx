@@ -1,4 +1,4 @@
-import { chartPoints, donutArcs, linePath } from '@impera/design-system';
+import { chartPoints, donutArcs, linePath, ringDash } from '@impera/design-system';
 import {
   useId,
   useRef,
@@ -12,7 +12,7 @@ import {
 
 /*
  * The figures every screen draws the same way (Charles, 21/11): the donut, its legend's lighting, the meter, the
- * small curve and the columns. Their look and their motion are the design system's (`nv-donut`, `nv-breakdown`,
+ * ring, the small curve and the columns. Their look and their motion are the design system's (`nv-donut`, `nv-breakdown`,
  * `nv-meter`, `nv-spark`, `nv-cols`); a screen gives numbers, colours and words, never a class of its own for the
  * drawing.
  */
@@ -32,14 +32,15 @@ export interface DonutSlice {
 /**
  * A donut: one arc per slice, drawn in one after the other; the slice at `lit` comes out and the others step back.
  * The middle is the caller's (`nv-donut__value`, `nv-donut__sub`): the total at rest, the lit slice otherwise.
- * `onLit` makes the arcs answer the pointer; without it the ring is still. `of` is the whole when the slices do not
- * add up to it (one share alone against its track).
+ * A donut always answers the pointer (Charles, 21/11): with `lit` and `onLit` the screen holds which slice is lit, to
+ * light its legend and its middle too; without them the ring lights its own arcs. `of` is the whole when the slices
+ * do not add up to it (one share alone against its track).
  */
 export function Donut({
   label,
   slices,
-  lit = null,
-  onLit,
+  lit: held,
+  onLit: hold,
   of,
   children,
 }: {
@@ -51,6 +52,10 @@ export function Donut({
   of?: number;
   children?: ReactNode;
 }): JSX.Element {
+  const [own, setOwn] = useState<number | null>(null);
+  // The screen's when it holds the lit slice, the ring's own otherwise.
+  const lit = held === undefined ? own : held;
+  const onLit = hold ?? setOwn;
   const values = slices.map((slice) => slice.value);
   const sum = values.reduce((total, value) => total + Math.max(0, value), 0);
   const solo = of !== undefined;
@@ -77,20 +82,13 @@ export function Donut({
               r={RADIUS}
               style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
               strokeDashoffset={arc.offset}
-              onPointerEnter={
-                onLit === undefined
-                  ? undefined
-                  : () => {
-                      onLit(i);
-                    }
-              }
-              onPointerLeave={
-                onLit === undefined
-                  ? undefined
-                  : (event) => {
-                      if (event.pointerType === 'mouse') onLit(null);
-                    }
-              }
+              onPointerEnter={(event) => {
+                // A mouse lights on entering; a finger's touch lights, and puts out the slice it lit.
+                onLit(event.pointerType !== 'mouse' && lit === i ? null : i);
+              }}
+              onPointerLeave={(event) => {
+                if (event.pointerType === 'mouse') onLit(null);
+              }}
             />
           );
         })}
@@ -158,17 +156,22 @@ export function useLit(): {
 /**
  * A meter: how far along, from 0 to 100 %, on its track. `label` says it to a screen reader; without it the meter
  * is decoration beside a figure that already says the same. `colour` is a CSS colour, the data's ink by default.
+ * `mark` is where the objective stands on the same track, in percent: a thin line across it, so the eye reads at once
+ * whether the fill is short of it or past it.
  */
 export function Meter({
   percent,
   label,
   colour,
+  mark,
 }: {
   percent: number;
   label?: string;
   colour?: string;
+  mark?: number;
 }): JSX.Element {
-  const width = `${String(Math.min(100, Math.max(0, percent)))}%`;
+  const within = (value: number): string => `${String(Math.min(100, Math.max(0, value)))}%`;
+  const width = within(percent);
   return (
     <span
       className="nv-meter"
@@ -177,7 +180,62 @@ export function Meter({
       aria-hidden={label === undefined ? true : undefined}
     >
       <span style={colour === undefined ? { '--_w': width } : { '--_w': width, '--_c': colour }} />
+      {mark === undefined ? null : <i className="nv-meter__mark" style={{ '--_m': within(mark) }} />}
     </span>
+  );
+}
+
+/** The ring's box: 66 units wide, a circle of radius 28 and 7 thick, as `nv-ring` draws it. */
+const RING_BOX = 66;
+const RING_RADIUS = 28;
+
+/**
+ * A ring: one part of a whole, from 0 to 1, drawn clockwise from the top; what it counts sits in its middle
+ * (`children`). `label` says it to a screen reader. `colour` is a CSS colour, the neon by default. At nothing, no value
+ * circle at all: a round cap of length 0 would still draw a lit dot.
+ */
+export function Ring({
+  share,
+  label,
+  colour,
+  className,
+  full,
+  children,
+}: {
+  share: number;
+  label: string;
+  colour?: string;
+  className?: string;
+  /** The whole is reached: the screen may dress it (`data-full`). */
+  full?: boolean;
+  children?: ReactNode;
+}): JSX.Element {
+  const part = Math.min(1, Math.max(0, Number.isFinite(share) ? share : 0));
+  const half = RING_BOX / 2;
+  return (
+    <div
+      className={className === undefined ? 'nv-ring' : `nv-ring ${className}`}
+      role="img"
+      aria-label={label}
+      data-full={full === true ? 'true' : undefined}
+      style={colour === undefined ? undefined : { '--_c': colour }}
+    >
+      <svg viewBox={`0 0 ${String(RING_BOX)} ${String(RING_BOX)}`} aria-hidden="true">
+        <circle className="nv-ring__track" cx={half} cy={half} r={RING_RADIUS} />
+        {part === 0 ? null : (
+          <circle
+            className="nv-ring__value"
+            cx={half}
+            cy={half}
+            r={RING_RADIUS}
+            strokeDasharray={ringDash(part, RING_RADIUS)}
+          />
+        )}
+      </svg>
+      <span className="nv-ring__label nv-num" aria-hidden="true">
+        {children}
+      </span>
+    </div>
   );
 }
 
