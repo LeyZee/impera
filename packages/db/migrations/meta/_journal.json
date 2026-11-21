@@ -1321,7 +1321,21 @@
     {
       "idx": 188,
       "version": "7",
-      "when": 1795271174773,
+      "when": 1795269629718,
+      "tag": "0247_shift_check_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 189,
+      "version": "7",
+      "when": 1795269638355,
+      "tag": "0248_team_announcements",
+      "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1795274186556,
       "tag": "0252_creator_decisions",
       "breakpoints": true
     }

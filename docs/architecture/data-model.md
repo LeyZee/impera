@@ -213,6 +213,9 @@ team_members             id, user_id (unique → user), team_role (chatter|manag
                          serveur, jamais saisi ; non nul si et seulement si `left`, jamais déplacé tant qu'il est parti,
                          migration 0051, EQ-14), created_at, updated_at        (jamais supprimé : un membre parti est `left`)
 team_member_notes        id, member_id, body (1 à 2 000 car.), author_user_id, created_at          (ajout seul)
+announcements            id, creator_id (nul : toute l'équipe), body (1 à 1 000 car.), author_user_id, created_at,
+                         withdrawn_at, withdrawn_by (EQ-12 ; jamais modifiée ni supprimée, seulement retirée)
+announcement_reads       announcement_id, member_id, read_at (« Lu » d'un membre, ajout seul, clé announcement_id + member_id)
 commission_presets       id, name, rate_bps (0 à 10 000), effective_from, created_by, created_at   (ajout seul, unique name + effective_from)
 member_commission_rates  id, member_id, rate_bps, team_share_bps (manager), preset_id, effective_from, created_by, created_at
                          (ajout seul, unique member_id + effective_from : le taux d'un jour est la dernière ligne en vigueur ce jour-là)

@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  currentIdentity,
-  hasBranches,
-  identityInputHash,
-  identityReady,
-  type IdentitySource,
-} from '../script-identity';
+import { currentIdentity, identityInputHash, type IdentitySource } from '../script-identity';
 
 /** An invented script of two steps, one photo each, both described. */
 const source = (): IdentitySource => ({
@@ -51,39 +45,6 @@ describe('the version of a script its identity is written for', () => {
     expect(
       changed((s) => ({ ...s, steps: s.steps.map((step) => ({ ...step, platformIndex: 0 })) })),
     ).not.toBe(base);
-  });
-});
-
-describe('when the brain may write it', () => {
-  it('waits for each photo and video to have a validated description, never for a voice note', () => {
-    expect(identityReady(source())).toBe(true);
-    const undescribed = source();
-    expect(
-      identityReady({
-        ...undescribed,
-        steps: undescribed.steps.map((step) => ({
-          ...step,
-          previewMedia: [{ ref: 'teaser', kind: 'video' as const, descriptionId: null }],
-        })),
-      }),
-    ).toBe(false);
-    expect(
-      identityReady({
-        ...undescribed,
-        steps: undescribed.steps.map((step) => ({
-          ...step,
-          media: [{ ref: 'voice', kind: 'audio' as const, descriptionId: null }],
-        })),
-      }),
-    ).toBe(true);
-  });
-});
-
-describe('branches', () => {
-  it('are two steps on one platform rank', () => {
-    expect(hasBranches([{ platformIndex: 0 }, { platformIndex: 1 }])).toBe(false);
-    expect(hasBranches([{ platformIndex: 0 }, { platformIndex: 1 }, { platformIndex: 1 }])).toBe(true);
-    expect(hasBranches([])).toBe(false);
   });
 });
 

@@ -210,8 +210,6 @@ export interface AppOptions {
   readonly dropVision?: Pick<LlmGateway, 'describeDrop' | 'transcribe' | 'promptHashes'>;
   /** Tests plug a brain with a fixed synthesis here, for her sent scripts (ADR 0083 § 6); the app's gateway otherwise. */
   readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
-  /** Tests plug a brain with a fixed identity here, for her native scripts (SC-04 lot c8); the app's gateway otherwise. */
-  readonly scriptIdentityBrain?: Pick<LlmGateway, 'identifyScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
@@ -444,7 +442,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     contentDrops: contentDrops.module,
     connectors: connectors.module,
     cardFontsDir: CARD_FONTS_DIR,
-    brain: options.scriptIdentityBrain ?? llm.gateway,
   });
   const contractors = wireContractors(shared, {
     scheduling: scheduling.module,

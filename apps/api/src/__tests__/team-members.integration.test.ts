@@ -111,6 +111,7 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
       db: app.db.db,
       adminDb: app.adminDb.db,
       creators: { existing: () => Promise.resolve(new Set()) },
+      creatorNames: () => Promise.resolve(new Map()),
       invitationLinks: { live: () => Promise.resolve(new Map()) },
       enqueuePayRecalculation,
       platformRemovals: () => Promise.resolve([]),
