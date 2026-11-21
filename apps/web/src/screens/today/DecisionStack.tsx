@@ -149,7 +149,7 @@ function Question({
   };
   return (
     <>
-      <h2 className="sc-ask__question">{decision.question}</h2>
+      <h2 className="nv-h3 sc-ask__question">{decision.question}</h2>
       <p className="sc-ask__context">{decision.context}</p>
       {thinking ? (
         <div className="sc-ask__rows" role="status" aria-label="Je cherche trois autres idées…">
