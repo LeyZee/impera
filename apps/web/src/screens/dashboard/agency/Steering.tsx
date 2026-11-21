@@ -18,7 +18,7 @@ import { TOO_FEW_TO_CONCLUDE } from './period';
 import { euros, exactEuros, shareOf, shortDay, type Slice } from './view';
 import './steering.css';
 
-import { Donut } from '@/shell/figures/figures';
+import { Donut, Meter } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -186,6 +186,26 @@ function DayCard({ daily, tip }: { daily: SteeringDaily; tip: FloatingTip }): JS
           </dl>
         </div>
       </div>
+      {daily.targetMinor === null ? null : (
+        <ul className="nv-keys stg-bars__keys" aria-label="Légende">
+          <li>
+            <span className="nv-key" style={{ '--_c': 'var(--nv-series-1)' }} aria-hidden="true" />
+            Jour tenu
+          </li>
+          <li>
+            <span className="nv-key" style={{ '--_c': 'var(--nv-series-3)' }} aria-hidden="true" />
+            Jour manqué
+          </li>
+          <li>
+            <span className="nv-key stg-bars__key-today" aria-hidden="true" />
+            Aujourd’hui, en cours
+          </li>
+          <li>
+            <span className="stg-bars__key-target" aria-hidden="true" />
+            Objectif du jour
+          </li>
+        </ul>
+      )}
       <DayBars daily={daily} tip={tip} />
     </div>
   );
@@ -232,7 +252,7 @@ function trafficSteps(traffic: SteeringTraffic): {
       },
       now: traffic.firstPurchase,
       then: traffic.previous.firstPurchase,
-      colour: 'var(--nv-series-4)',
+      colour: 'var(--nv-kind-2)',
     },
     {
       label: {
@@ -289,6 +309,9 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
         breakNote="La plus forte baisse face aux 30 jours d’avant : c’est ici qu’il faut agir."
         tip={tip}
       />
+      <p className="ins-note stg-traffic__scale">
+        Largeurs resserrées pour garder les petites étapes lisibles.
+      </p>
       {traffic.wrote === null ? (
         <p className="ins-note" role="note">
           L’étape « Ont écrit » apparaîtra quand Impera lira les conversations (session Reveal capturée).
@@ -298,16 +321,29 @@ function TrafficCard({ traffic, tip }: { traffic: SteeringTraffic; tip: Floating
   );
 }
 
-/** One sentence on the spread, once there are enough sales to say it (ADR 0092 § 5). */
-function spreadText(dependency: SteeringDependency): string {
-  if (dependency.sales < STEERING_PROFILE_MIN_SALES) return TOO_FEW_TO_CONCLUDE;
+/**
+ * The spread, as a big share and the words after it, once there are enough sales to say it (ADR 0092 § 5): the share
+ * is said once, in the figure.
+ */
+function spreadHero(dependency: SteeringDependency): { readonly figure: string; readonly words: string } {
   const one = shareOf(dependency.topOneMinor, dependency.totalMinor);
   const five = shareOf(dependency.topOneMinor + dependency.nextFourMinor, dependency.totalMinor);
-  if (one >= 40) return `Un seul fan fait ${String(one)} % du chiffre : s’il part, ça se sent tout de suite.`;
+  if (dependency.totalMinor <= 0) return { figure: '—', words: 'Aucune vente sur les 30 derniers jours.' };
+  if (dependency.sales < STEERING_PROFILE_MIN_SALES)
+    return { figure: `${String(five)} %`, words: `du chiffre vient de cinq fans. ${TOO_FEW_TO_CONCLUDE}` };
+  if (one >= 40)
+    return {
+      figure: `${String(one)} %`,
+      words: 'du chiffre vient d’un seul fan : s’il part, ça se sent tout de suite.',
+    };
   if (five >= 70)
-    return `Cinq fans font ${String(five)} % du chiffre : très concentré, il faut élargir la base.`;
-  if (five >= 45) return `Cinq fans font ${String(five)} % du chiffre : assez concentré.`;
-  return 'Bien réparti : le chiffre ne dépend pas de quelques fans.';
+    return {
+      figure: `${String(five)} %`,
+      words: 'du chiffre vient de cinq fans : très concentré, il faut élargir la base.',
+    };
+  if (five >= 45)
+    return { figure: `${String(five)} %`, words: 'du chiffre vient de cinq fans : assez concentré.' };
+  return { figure: `${String(five)} %`, words: 'du chiffre vient de cinq fans : bien réparti.' };
 }
 
 function DependencyCard({
@@ -329,18 +365,16 @@ function DependencyCard({
     { key: 'rest', label: 'Tous les autres', colour: 'var(--nv-series-other)', cents: dependency.restMinor },
   ].map((slice) => ({ ...slice, previousCents: slice.cents, sales: 0 }));
   const pending = dependency.sales < STEERING_PROFILE_MIN_SALES;
+  const hero = spreadHero(dependency);
+  const biggest = Math.max(1, ...dependency.lapsed.map((fan) => fan.spentMinor));
   return (
     <div className="stg-dep">
       {/* One subject, one card (Design, 21/11): the sentence titles it, the ring on the left, the figures on the right. */}
       <article className="nv-plate stg-dep__card" data-pending={pending ? '' : undefined}>
-        <div className="stg-hero">
-          <b className="stg-hero__figure">
-            {dependency.totalMinor > 0
-              ? `${String(shareOf(dependency.topOneMinor + dependency.nextFourMinor, dependency.totalMinor))} %`
-              : '—'}
-          </b>
-          <h3 className="nv-h3 stg-dep__lead">{spreadText(dependency)}</h3>
-        </div>
+        <h3 className="nv-h3 stg-hero stg-dep__lead">
+          <b className="stg-hero__figure">{hero.figure}</b>{' '}
+          <span className="stg-hero__words">{hero.words}</span>
+        </h3>
         <div className="stg-dep__body">
           {/* No comparison on this ring: its window is fixed, its slices say how the money spreads. */}
           <Comparable.Provider value={false}>
@@ -390,12 +424,22 @@ function DependencyCard({
               const body = (
                 <>
                   <span className="stg-lapsed__name">{fan.fanName}</span>
-                  {several ? <span className="stg-lapsed__who">{names.get(fan.creatorId) ?? ''}</span> : null}
-                  <span className="stg-lapsed__spent">{wholeEuros(fan.spentMinor)}</span>
-                  <span className="stg-lapsed__since">
-                    {fan.daysSince} j
-                    <span className="stg-lapsed__day"> · {shortDay(fan.lastPurchaseDay)}</span>
+                  <span className="stg-lapsed__who">{several ? (names.get(fan.creatorId) ?? '') : ''}</span>
+                  <span className="stg-lapsed__meter">
+                    {/* What he spent against the biggest of them, in the colour of his rank's slice. */}
+                    <Meter
+                      percent={(fan.spentMinor / biggest) * 100}
+                      colour={
+                        i === 0
+                          ? 'var(--nv-series-3)'
+                          : i < 5
+                            ? 'var(--nv-series-2)'
+                            : 'var(--nv-series-other)'
+                      }
+                    />
                   </span>
+                  <span className="stg-lapsed__spent">{wholeEuros(fan.spentMinor)}</span>
+                  <span className="stg-lapsed__since">{fan.daysSince} j</span>
                 </>
               );
               return (

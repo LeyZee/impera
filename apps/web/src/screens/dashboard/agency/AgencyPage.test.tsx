@@ -239,7 +239,9 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
       'Payeurs réguliers',
     ]);
     // Five fans make 51 %: fairly concentrated; never a ten that would say 100 %.
-    expect(screen.getByText('Cinq fans font 51 % du chiffre : assez concentré.')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: '51 % du chiffre vient de cinq fans : assez concentré.' }),
+    ).toBeTruthy();
     expect(screen.getByText('14 fans')).toBeTruthy();
     expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
   });

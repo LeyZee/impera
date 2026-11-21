@@ -297,8 +297,8 @@
 }
 .stg-lapsed__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) auto minmax(80px, 180px) auto auto;
+  align-items: center;
   gap: 16px;
   width: 100%;
   min-height: var(--nv-target-min);
@@ -338,9 +338,39 @@
   color: var(--nv-ink);
 }
 .stg-lapsed__since {
+  justify-self: end;
+  min-width: 42px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nv-fill-track);
   font-size: var(--nv-text-footnote);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--nv-ink-faint);
+  text-align: center;
+  color: var(--nv-ink-muted);
+}
+.stg-lapsed__meter {
+  min-width: 0;
+}
+
+/* The bars' legend: the dashed target and today's hatch drawn like the bars. */
+.stg-bars__keys {
+  margin-bottom: 10px;
+}
+.nv-keys .nv-key.stg-bars__key-today {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--nv-series-3) 0 2px,
+    color-mix(in oklab, var(--nv-series-3) 45%, transparent) 2px 4px
+  );
+}
+.stg-bars__key-target {
+  display: inline-block;
+  width: 16px;
+  border-top: 1.5px dashed var(--nv-ink-faint);
+}
+.stg-traffic__scale {
+  margin: -6px 0 0;
 }
 
 @media (max-width: 640px) {
@@ -369,11 +399,15 @@
   }
   .stg-lapsed__row {
     grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 10px;
+    gap: 6px 10px;
   }
-  .stg-lapsed__who,
-  .stg-lapsed__day {
+  .stg-lapsed__who {
     display: none;
+  }
+  /* The meter on its own line under the fan, the full width. */
+  .stg-lapsed__meter {
+    grid-row: 2;
+    grid-column: 1 / -1;
   }
 }
 
