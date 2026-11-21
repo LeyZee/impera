@@ -1,12 +1,12 @@
 import type { DropCategory, StockCategory, StockStatus } from '@impera/contracts';
 
 /*
- * Coffre Impera (ADR 0162): what she dropped, by use, against the rhythm the agency asks of her. The rhythm and the
+ * Coffre Impera (ADR 0163): what she dropped, by use, against the rhythm the agency asks of her. The rhythm and the
  * days of advance are values of code (CLAUDE.md, rule 3), never of a prompt nor of a screen.
  */
 
 /**
- * How a category is counted (ADR 0162 § 3):
+ * How a category is counted (ADR 0163 § 3):
  * - `days`: its stock in days of advance at its pace (a drop or a file each day, or a few a week);
  * - `count`: a stock that is not spent at a pace (scripts, gifts), held against a minimum;
  * - `bonus`: nothing is asked of her (Telegram rides on the feed's video), only shown.
@@ -91,7 +91,7 @@ export function statusOf(value: number, target: number): StockStatus {
 
 const round1 = (value: number): number => Math.floor(value * 10) / 10;
 
-/** A category of her stock, its stock read against its rule (ADR 0162 § 3). Pure. */
+/** A category of her stock, its stock read against its rule (ADR 0163 § 3). Pure. */
 export function stockCategory(category: DropCategory, counts: StockCounts): StockCategory {
   const rule = STOCK_RULES[category];
   const units = rule.unit === 'drop' ? counts.stockDrops : counts.stockFiles;

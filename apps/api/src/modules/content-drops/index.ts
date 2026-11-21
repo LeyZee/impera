@@ -187,7 +187,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
           clock,
         ),
       );
-      // Coffre Impera (ADR 0162): her stock by use, and her own review of her media.
+      // Coffre Impera (ADR 0163): her stock by use, and her own review of her media.
       await app.register(
         createStockRoutes(
           createDrizzleStockStore(deps.db),

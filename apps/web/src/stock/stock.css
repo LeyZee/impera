@@ -1,5 +1,5 @@
 /*
- * Coffre Impera (ADR 0162): the agency's view in Créatrices › Médias and hers in Contenu › Mon coffre. Each category
+ * Coffre Impera (ADR 0163): the agency's view in Créatrices › Médias and hers in Contenu › Mon coffre. Each category
  * carries its colour in `--st-c` (stock/model.ts); amber says what is short to the agency, never red, and nothing is
  * amber on her side. No coloured bar on a card's edge: a category's colour lives in its ring, its swatch and its bars.
  */

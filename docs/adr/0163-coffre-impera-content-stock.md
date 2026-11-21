@@ -1,4 +1,4 @@
-# 0162. Coffre Impera : le stock de ce qu'elle dépose, compté par usage, décrit et relu par les trois
+# 0163. Coffre Impera : le stock de ce qu'elle dépose, compté par usage, décrit et relu par les trois
 
 Statut : accepted (Charles, 21/11/2026 : choix de 15 h 42 heure de Paris, « go » sur la maquette à 15 h 56, carte de décision de 16 h 31 « Pause sauf si moins de 3 scripts » ; texte à relire par Bilan)
 Date : 2026-11-21

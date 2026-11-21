@@ -13,7 +13,7 @@ const counts = (over: Partial<StockCounts> = {}): StockCounts => ({
   ...over,
 });
 
-describe('content-drops › Coffre Impera, her stock against the rhythm (ADR 0162)', () => {
+describe('content-drops › Coffre Impera, her stock against the rhythm (ADR 0163)', () => {
   it('has a rule and a place on screen for every category', () => {
     expect([...STOCK_ORDER].sort()).toEqual([...DROP_CATEGORIES].sort());
     for (const category of DROP_CATEGORIES) expect(STOCK_RULES[category]).toBeDefined();

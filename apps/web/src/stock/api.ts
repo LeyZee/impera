@@ -12,7 +12,7 @@ import {
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 /**
- * Coffre Impera (ADR 0162): her stock and her media's descriptions, read through the agency's door for the owner and a
+ * Coffre Impera (ADR 0163): her stock and her media's descriptions, read through the agency's door for the owner and a
  * manager (`team`), through her own for her (`self`). The two doors answer the same shapes; every answer is parsed.
  */
 export type StockDoor = { readonly kind: 'team'; readonly creatorId: CreatorId } | { readonly kind: 'self' };

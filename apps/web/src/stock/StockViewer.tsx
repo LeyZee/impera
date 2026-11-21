@@ -28,7 +28,7 @@ const KIND_WORDS: Readonly<Record<DropMediaKind, string>> = {
 };
 
 /**
- * A medium of her coffre in large (ADR 0162 § 4): the photo whole, the video played with its controls, the arrows
+ * A medium of her coffre in large (ADR 0163 § 4): the photo whole, the video played with its controls, the arrows
  * (and the keyboard's) to the one before and after, and beside it its description, the same for the agency and for
  * her: « C'est bien ça » validates it in the reader's name, « Corriger » writes over it and validates as it saves.
  * Under « Flou des médias » it opens blurred until « Voir net ».

@@ -16,7 +16,7 @@ const DOOR: StockDoor = { kind: 'self' };
 const RING_RADIUS = 27;
 
 /**
- * Mon coffre, the creator's (ADR 0162 § 5), made for her phone: the one thing to drop today in large, two bonuses at
+ * Mon coffre, the creator's (ADR 0163 § 5), made for her phone: the one thing to drop today in large, two bonuses at
  * most, then each of her categories as a ring of days of advance (7 fills it). Never red: a short stock is said, not
  * blamed. A ring opens her media of that category, each with what the AI understood, « C'est bien ça » and « Corriger ».
  */

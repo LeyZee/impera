@@ -7,7 +7,7 @@ import { ContentDropForbidden } from '../../domain/errors';
 const readsTeam = (scope: string): boolean => scope === 'owner' || scope === 'agency';
 
 /**
- * Coffre Impera (ADR 0162): each medium of hers still alive in a drop that reached the agency, with where it stands
+ * Coffre Impera (ADR 0163): each medium of hers still alive in a drop that reached the agency, with where it stands
  * and its description. A file counts when it is kept or a duplicate, not replaced, in a drop not withdrawn (relecture
  * Médias). The newest first; the application counts all of them and keeps the newest for the screen.
  */

@@ -31,7 +31,7 @@ export interface StockRow {
 }
 
 const WEEK_MS = 7 * 24 * 3600 * 1000;
-/** A gift is never nude (ADR 0162 § 2): what the vision or a person said explicit or hard is not a gift. */
+/** A gift is never nude (ADR 0163 § 2): what the vision or a person said explicit or hard is not a gift. */
 const NOT_A_GIFT: ReadonlySet<string> = new Set(['explicit', 'hardcore']);
 
 function standingOf(dropState: string, outAt: Date | null): StockStanding {
@@ -40,7 +40,7 @@ function standingOf(dropState: string, outAt: Date | null): StockStanding {
 }
 
 /**
- * Her stock by use (ADR 0162 § 3): each category counted against its rule, and her newest media. A gift said nude is
+ * Her stock by use (ADR 0163 § 3): each category counted against its rule, and her newest media. A gift said nude is
  * shown but never counted (§ 2).
  */
 export function contentStockOf(rows: readonly StockRow[], now: Date): ContentStock {

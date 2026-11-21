@@ -29,7 +29,7 @@ export type StockOpened =
 const WEEK = 7 * 86_400_000;
 
 /**
- * One category of her coffre, or every description to validate (ADR 0162 § 4): its figures, a filter, then her media
+ * One category of her coffre, or every description to validate (ADR 0163 § 4): its figures, a filter, then her media
  * grouped by drop (a boudoir session stays together) with where each stands and its description's state; a tap
  * opens it in large.
  */

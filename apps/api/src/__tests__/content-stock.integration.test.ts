@@ -51,7 +51,7 @@ const described = (intensity: DropMediaDescription['intensity']): DropMediaDescr
 });
 
 /**
- * Coffre Impera (ADR 0162): her stock by use, read by the owner and a manager and by herself, and her own review of
+ * Coffre Impera (ADR 0163): her stock by use, read by the owner and a manager and by herself, and her own review of
  * her media's descriptions under her RLS. Invented data only (ADR 0010).
  */
 describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', () => {

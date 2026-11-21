@@ -4,11 +4,11 @@ import { DropCategorySchema, DropMediaKindSchema } from './content-drops';
 import { ContentDropFileIdSchema, ContentDropIdSchema } from './ids';
 
 /*
- * Coffre Impera (ADR 0162): what she dropped, by use, with what is in stock, scheduled and out, against the rhythm the
+ * Coffre Impera (ADR 0163): what she dropped, by use, with what is in stock, scheduled and out, against the rhythm the
  * agency asks of her. The same read for the owner, an active manager and herself.
  */
 
-/** Where a stock stands against its target (ADR 0162 § 3). `low` is amber for the agency, never red for her. */
+/** Where a stock stands against its target (ADR 0163 § 3). `low` is amber for the agency, never red for her. */
 export const STOCK_STATUSES = ['empty', 'low', 'short', 'ok'] as const;
 export const StockStatusSchema = z.enum(STOCK_STATUSES);
 export type StockStatus = z.infer<typeof StockStatusSchema>;
@@ -66,7 +66,7 @@ export const StockMediumSchema = z.strictObject({
   erasesAt: z.iso.datetime({ offset: true }).nullable(),
   durationMs: z.int().min(0).nullable(),
   /**
-   * A gift the description says is nude (ADR 0162 § 2): it stays in her stock but is never counted nor given as a
+   * A gift the description says is nude (ADR 0163 § 2): it stays in her stock but is never counted nor given as a
    * gift; the team moves it to another category.
    */
   notAGift: z.boolean(),

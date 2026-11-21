@@ -573,7 +573,7 @@ export interface DescriptionBacklog {
  * it and audited; each answers the drop's review as it now stands.
  */
 /**
- * Her own review of her media's descriptions (ADR 0162 § 4): read, validate as they are, correct the words. In her
+ * Her own review of her media's descriptions (ADR 0163 § 4): read, validate as they are, correct the words. In her
  * account; the other gestures of the review stay the agency's.
  */
 export interface CreatorDescriptionReview {

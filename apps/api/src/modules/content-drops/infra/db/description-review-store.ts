@@ -306,7 +306,7 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
 }
 
 /**
- * Her own review (ADR 0162 § 4): she reads, validates and corrects the descriptions of her media, in her account and
+ * Her own review (ADR 0163 § 4): she reads, validates and corrects the descriptions of her media, in her account and
  * under her RLS, as the agency does; her creator is read in her account, never in the request. The other gestures
  * (asking the vision again, writing by hand, the script's synthesis) stay the agency's.
  */

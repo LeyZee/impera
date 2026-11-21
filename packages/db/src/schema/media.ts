@@ -301,7 +301,7 @@ export function vaultImported(ref: {
 
 const appUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
 
-/** A medium kept from one of her drops not withdrawn (ADR 0162 § 4): the only rows of hers she may review. */
+/** A medium kept from one of her drops not withdrawn (ADR 0163 § 4): the only rows of hers she may review. */
 const herDroppedMedium = (t: { readonly creatorId: PgColumn; readonly mediaAssetId: PgColumn }): SQL =>
   sql`exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
        where f.media_asset_id = ${t.mediaAssetId} and d.creator_id = ${t.creatorId}
@@ -400,7 +400,7 @@ export const mediaDescriptions = pgTable(
       .on(t.mediaAssetId, t.promptHash)
       .where(sql`${t.author} = 'sense' and ${t.content} ? 'detailed'`),
     tenantPolicy(t.creatorId),
-    // She reads these rows, and since ADR 0162 § 4 she validates and corrects the description of a medium of her own
+    // She reads these rows, and since ADR 0163 § 4 she validates and corrects the description of a medium of her own
     // drops, as the agency does: a human row validated by her account at its writing, or the two stamp columns of a
     // row not validated yet (the column grant of migration 0152 and `refuse_description_change` hold the rest). The
     // restrictive policies stay restrictive: nothing permissive can open more for her.

@@ -10,7 +10,7 @@ import type {
 import { DROP_OUTPUTS } from '@/screens/content/model';
 
 /*
- * Coffre Impera (ADR 0162): what each category is for, its colour, where it goes out, and the sentences the screens
+ * Coffre Impera (ADR 0163): what each category is for, its colour, where it goes out, and the sentences the screens
  * lead with. The numbers are the server's; only their reading is here.
  */
 

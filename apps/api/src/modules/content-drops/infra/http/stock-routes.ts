@@ -38,7 +38,7 @@ async function asCreator<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Coffre Impera (ADR 0162): her stock by use, for the owner and an active manager under `/v1/creators/:creatorId`, and
+ * Coffre Impera (ADR 0163): her stock by use, for the owner and an active manager under `/v1/creators/:creatorId`, and
  * for herself under `/v1/creator-space`, with what she needs to look at her own media and review their descriptions
  * (§ 4). Her creator is read in her account, never in the request. `now` is the server's clock.
  */
