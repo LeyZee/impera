@@ -1252,7 +1252,10 @@ export async function follow(
  */
 const SETTLES_AGAIN: ReadonlySet<string> = new Set(['received', 'ready', 'blocked']);
 
-/** A file sent in place of another: the same drop holds a replaced file at its place. */
+/**
+ * A file sent in place of one asked again or refused (trou 7 du 21/11): the same drop holds such a replaced file at its
+ * place, as her insert policy wants it. A file she swapped while filling a script is not one.
+ */
 async function isReplacement(tx: Transaction, fileId: string): Promise<boolean> {
   const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
   if (file === undefined) return false;
@@ -1263,7 +1266,9 @@ async function isReplacement(tx: Transaction, fileId: string): Promise<boolean> 
       and(
         eq(contentDropFiles.dropId, file.dropId),
         eq(contentDropFiles.position, file.position),
+        sql`${contentDropFiles.slotKey} is not distinct from ${file.slotKey}`,
         sql`${contentDropFiles.replacedAt} is not null`,
+        sql`(${contentDropFiles.redoSentence} is not null or ${contentDropFiles.state} = 'refused')`,
       ),
     )
     .limit(1);

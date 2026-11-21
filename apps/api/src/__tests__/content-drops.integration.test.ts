@@ -671,6 +671,36 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     expect(ContentDropSchema.parse(r.json()).exportedAt).not.toBeNull();
     await settle(again.id, 'kept');
     expect(await dropRow(drop.id)).toMatchObject({ state: 'ready', exportedAt: null, exportedBy: null });
+    // Copied again. A step she changed while filling it is no replacement: its late receipt leaves the copy alone.
+    const copied = new Date();
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ exportedAt: copied, exportedBy: owner?.id })
+      .where(eq(schema.contentDrops.id, drop.id));
+    const swapped = video();
+    const late = video();
+    await test.admin.db.insert(schema.contentDropFiles).values([
+      {
+        ...swapped,
+        creatorId: nora,
+        dropId: drop.id,
+        position: 1,
+        kind: 'video',
+        slotKey: 'salon::1',
+        replacedAt: copied,
+      },
+      {
+        ...late,
+        creatorId: nora,
+        dropId: drop.id,
+        position: 1,
+        kind: 'video',
+        slotKey: 'salon::1',
+        state: 'received',
+      },
+    ]);
+    await settle(late.id, 'kept');
+    expect((await dropRow(drop.id))?.exportedAt).toEqual(copied);
     // A drop of another kind, published, is out: never asked again.
     const story = { id: newId(ContentDropIdSchema), category: 'reveal_story', files: [video()] };
     expect((await call('POST', '/v1/creator-space/drops', 'nora', story)).statusCode).toBe(200);
