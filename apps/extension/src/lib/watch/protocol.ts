@@ -183,7 +183,6 @@ export const RevealAutoSchema = z.discriminatedUnion('state', [
   }),
   z.strictObject({ state: z.literal('idle') }),
 ]);
-export type RevealAuto = z.infer<typeof RevealAutoSchema>;
 
 /** Popup → service worker. The tab is always the one open when the popup opened. */
 export const FromPopupSchema = z.discriminatedUnion('type', [
