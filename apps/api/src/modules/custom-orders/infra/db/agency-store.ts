@@ -160,7 +160,7 @@ export function createDrizzleCustomOrderAgencyStore(db: Database): CustomOrderAg
     await tx
       .update(customOrders)
       .set({ ...set, state: to, updatedAt: at })
-      .where(eq(customOrders.id, orderId));
+      .where(and(eq(customOrders.id, orderId), eq(customOrders.creatorId, creatorId)));
     // The audit says who moved which order where, never a price (methods of the agency).
     await tx.insert(auditLog).values({
       id: newId(AuditEntryIdSchema),
