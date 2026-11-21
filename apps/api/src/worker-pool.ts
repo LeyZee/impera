@@ -28,7 +28,7 @@ export function retryingPool<P extends Pick<Pool, 'connect'>>(
   options: RetryOptions = {},
 ): P {
   const sleep = options.sleep ?? pause;
-  const connect = async (): Promise<PoolClient> => {
+  const promised = async (): Promise<PoolClient> => {
     for (let attempt = 0; ; attempt += 1) {
       try {
         return await pool.connect();
@@ -40,6 +40,10 @@ export function retryingPool<P extends Pick<Pool, 'connect'>>(
       }
     }
   };
+  // Graphile's LISTEN client asks with a callback (`connect(listenForChanges)`) and retries on its own: that call
+  // goes to the pool untouched, or its callback would never run and the worker would never stop (e2e, 21/11).
+  const connect = (...args: readonly unknown[]): unknown =>
+    typeof args[0] === 'function' ? Reflect.apply(pool.connect, pool, args) : promised();
   return new Proxy(pool, {
     get(target, property) {
       if (property === 'connect') return connect;

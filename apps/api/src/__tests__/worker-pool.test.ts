@@ -41,4 +41,12 @@ describe('retryingPool (CHAT-03)', () => {
     await expect(wrapped.connect()).rejects.toBe(wrong);
     expect(wrapped.totalCount).toBe(0);
   });
+
+  it("hands a callback-style connect (Graphile's LISTEN client) to the pool untouched", () => {
+    const callback = vi.fn();
+    const pool = new pg.Pool();
+    const connect = vi.spyOn(pool, 'connect').mockImplementation(() => undefined);
+    retryingPool(pool, logger).connect(callback);
+    expect(connect).toHaveBeenCalledWith(callback);
+  });
 });
