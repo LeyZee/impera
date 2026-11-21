@@ -13,7 +13,7 @@ describe('the install card on a phone (recette 11/11, SOC-14)', () => {
       /@media \(max-width: 820px\) \{[^@]*\.nv-install\.nv-glass \{\s*position: relative;/u,
     );
     expect(shell).toMatch(
-      /<main className="nv-stage"[\s\S]*<InstallNudge \/>[\s\S]*<Outlet \/>[\s\S]*<\/main>/u,
+      /<main className="nv-stage"[\s\S]*<InstallNudge home=\{home\} \/>[\s\S]*<Outlet \/>[\s\S]*<\/main>/u,
     );
   });
   it('no longer reserves a floating card’s room under every page', () => {

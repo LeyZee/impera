@@ -167,7 +167,13 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
           >
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
-          <Stage key={current ?? 'none'} pathname={pathname} stage={main} scoped={scopesCreators(user)} />
+          <Stage
+            key={current ?? 'none'}
+            pathname={pathname}
+            stage={main}
+            scoped={scopesCreators(user)}
+            home={rail.home}
+          />
           {/* Both regions are always there, empty when silent: a screen reader announces what comes into a region it
               already knows. */}
           <div className="nv-offline-region" role="status">
@@ -209,8 +215,11 @@ function Stage({
   pathname,
   stage,
   scoped,
+  home,
 }: {
   pathname: string;
+  /** The role's home screen, the only one the install card heads (choice of 21/11). */
+  home: string;
   stage: RefObject<HTMLElement | null>;
   /** The account chooses a creator: on a phone the selector heads the page, the menu having no room for it. */
   scoped: boolean;
@@ -220,9 +229,9 @@ function Stage({
   if (!within && pathname !== first) setWithin(true);
   return (
     <main className="nv-stage" id="contenu" tabIndex={-1} ref={stage} data-within={within ? '' : undefined}>
-      {/* On a phone the install card heads the page, in its flow: it never covers what the page shows (recette 11/11,
-          SOC-14). A computer keeps it in its corner. */}
-      <InstallNudge />
+      {/* On a phone the install card heads the role's home screen, in its flow: it never covers what the page shows
+          (recette 11/11, SOC-14). A computer keeps it in its corner. */}
+      <InstallNudge home={home} />
       {scoped ? <CreatorScope place="page" /> : null}
       <Outlet />
     </main>

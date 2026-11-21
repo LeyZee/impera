@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState, useSyncExternalStore, type JSX } fro
 import {
   addRefusal,
   canPromptInstall,
+  isInstalled,
   isStandalone,
   onInstallPrompt,
   platformOf,
@@ -13,17 +14,18 @@ import {
 } from './install';
 
 const INSTALL_GUIDE = '/aide/installer';
-/** The pages that offer the install themselves. */
-const SAID_ON_PAGE: readonly string[] = [INSTALL_GUIDE, '/notifications'];
 
 /** Dismissed for this opening of the app (module state: a reload or a new opening offers it again). */
 let dismissedThisOpening = false;
 
+const trimSlash = (path: string): string => (path.length > 1 ? path.replace(/\/+$/u, '') : path);
+
 /**
- * « Installe Impera sur ton téléphone » (CR-01): a card at the head of the page, on a phone that does not run the
- * installed app. Android installs from the card when Chrome allows it; an iPhone gets the steps (/aide/installer).
+ * « Impera sur ton écran d’accueil » (CR-01): a card at the head of the role's home screen only (choice of 21/11), on a
+ * phone that does not run the installed app and does not know it installed. Android installs from the card when
+ * Chrome allows it; an iPhone gets the steps (/aide/installer).
  */
-export function InstallNudge(): JSX.Element | null {
+export function InstallNudge({ home }: { home: string }): JSX.Element | null {
   const [shown, setShown] = useState(() => {
     const platform = platformOf(navigator.userAgent, navigator.maxTouchPoints);
     // A computer is never asked: nothing more to read.
@@ -31,18 +33,19 @@ export function InstallNudge(): JSX.Element | null {
     return shouldNudge({
       platform,
       standalone: isStandalone(),
+      installed: isInstalled(),
       refusals: readRefusals(),
       dismissedThisOpening,
     });
   });
   const canPrompt = useSyncExternalStore(onInstallPrompt, canPromptInstall, () => false);
-  // The guide itself says it all: no card on top of it. Nor on Notifications, whose « Cet appareil » offers the same
-  // « Installer Impera » a little lower (recette 11/11, CRE-36).
-  const saidOnPage = useLocation({
-    select: (location) => SAID_ON_PAGE.some((path) => location.pathname.startsWith(path)),
-  });
+  // Learnt during the opening too: Chrome's `appinstalled`, or its answer on the related apps.
+  const installed = useSyncExternalStore(onInstallPrompt, isInstalled, () => false);
+  // Only on the role's home screen, never at the head of the others; so neither on the guide nor on Notifications,
+  // which offer the install themselves (recette 11/11, CRE-36).
+  const atHome = useLocation({ select: (location) => trimSlash(location.pathname) === trimSlash(home) });
   const card = useRef<HTMLElement>(null);
-  const visible = shown && !saidOnPage;
+  const visible = shown && !installed && atHome;
   // The room the card takes at the head of a phone's page, for a fill page (Suivi) to give it back (SOC-14).
   useLayoutEffect(() => {
     const element = card.current;
@@ -98,7 +101,7 @@ export function InstallNudge(): JSX.Element | null {
             Installer
           </button>
         ) : (
-          <Link to={INSTALL_GUIDE} className="nv-btn nv-btn--sm nv-btn--neon" onClick={hide}>
+          <Link to={INSTALL_GUIDE} className="nv-btn nv-btn--sm nv-btn--soft" onClick={hide}>
             Comment faire
           </Link>
         )}
