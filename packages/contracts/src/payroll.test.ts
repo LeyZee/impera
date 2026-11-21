@@ -174,6 +174,22 @@ describe('tiers and goals', () => {
     ];
     expect(CreateCollectiveGoalBodySchema.safeParse({ ...goal, tiers: twice }).success).toBe(false);
     expect(CreateCollectiveGoalBodySchema.safeParse({ ...goal, tiers: [] }).success).toBe(true);
+    // A higher tier pays more, whatever the order written (COUV-03).
+    const falling = [
+      { reachedBps: 10_000, bonusMinor: 3_000 },
+      { reachedBps: 8_000, bonusMinor: 5_000 },
+    ];
+    expect(CreateCollectiveGoalBodySchema.safeParse({ ...goal, tiers: falling }).success).toBe(false);
+    const level = [
+      { reachedBps: 8_000, bonusMinor: 3_000 },
+      { reachedBps: 10_000, bonusMinor: 3_000 },
+    ];
+    expect(CreateCollectiveGoalBodySchema.safeParse({ ...goal, tiers: level }).success).toBe(false);
+    const rising = [
+      { reachedBps: 12_000, bonusMinor: 5_000 },
+      { reachedBps: 8_000, bonusMinor: 3_000 },
+    ];
+    expect(CreateCollectiveGoalBodySchema.safeParse({ ...goal, tiers: rising }).success).toBe(true);
   });
 
   it('apply the newest tier set of the latest period at or before, whatever their order', () => {

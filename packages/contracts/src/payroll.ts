@@ -300,6 +300,17 @@ const CollectiveTiersSchema = z
   .refine((tiers) => !sameValues(tiers.map((tier) => tier.reachedBps)), 'Deux paliers au même pourcentage');
 
 /**
+ * Whether a higher tier always pays a higher bonus (COUV-03): read by percentage, each bonus above the one before.
+ * Otherwise reaching more of the target would lower what each chatter gets.
+ */
+export function collectiveTiersRise(
+  tiers: readonly Pick<CollectiveTier, 'reachedBps' | 'bonusMinor'>[],
+): boolean {
+  const ordered = [...tiers].sort((a, b) => a.reachedBps - b.reachedBps);
+  return ordered.every((tier, at) => at === 0 || tier.bonusMinor > (ordered[at - 1]?.bonusMinor ?? 0));
+}
+
+/**
  * The team's goal for `period`: its net, managers' sales included, against `targetMinor`; the highest tier reached
  * pays each chatter it covers, sales or not, never a manager. Added only: the newest for the period is in force, until
  * a statement of the period is validated (`pay_period_closed_conflict`). No tier means no goal for the period.
@@ -319,7 +330,8 @@ export const CreateCollectiveGoalBodySchema = z.object({
   id: CollectiveGoalIdSchema,
   period: PayPeriodSchema,
   targetMinor: z.number().int().min(1).max(PAY_TARGET_MAX_MINOR),
-  tiers: CollectiveTiersSchema,
+  // A goal written now: a higher tier pays more (COUV-03). One already kept is read as it is.
+  tiers: CollectiveTiersSchema.refine(collectiveTiersRise, 'Un palier plus haut donne une prime plus haute'),
 });
 export type CreateCollectiveGoalBody = z.infer<typeof CreateCollectiveGoalBodySchema>;
 
