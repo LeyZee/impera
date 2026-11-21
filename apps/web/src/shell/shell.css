@@ -2250,8 +2250,6 @@ label.nv-notif__row {
 }
 .nv-inbox__time {
   flex: none;
-  align-self: flex-start;
-  padding-top: 6px;
   color: var(--nv-ink-faint);
   font-size: var(--nv-text-footnote);
 }
