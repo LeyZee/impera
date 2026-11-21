@@ -430,6 +430,8 @@ describe('Paie › Quinzaine', () => {
     expect(text(await screen.findByText(/^Le premier relevé validé clôt la quinzaine/u))).toBe(
       'Le premier relevé validé clôt la quinzaine pour toute l’équipe. Un rapport validé ou une vente lue ensuite ira sur la quinzaine du 1er au 15 novembre.',
     );
+    // The row's button says one statement in the singular to a screen reader (recette COUV-12).
+    expect(screen.getByRole('button', { name: 'Valider 1 relevé' })).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'Valider (1)' }));
     const dialog = await screen.findByRole('dialog');
     expect(text(dialog)).toContain('Ventes comptées');
