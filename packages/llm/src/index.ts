@@ -51,6 +51,7 @@ export {
 export {
   createLlmGateway,
   type BrainAlert,
+  type BrainCustomOrder,
   type BrainScript,
   type BrainInput,
   type CallMeta,

@@ -1,6 +1,7 @@
 import type {
   AfterSaleType,
   AgentHours,
+  CustomPriceGrid,
   DatedRanges,
   AlertTrigger,
   FanFlags,
@@ -9,6 +10,7 @@ import type {
   MediaFlag,
   MessageOrigin,
   ObjectionReplies,
+  OpenCustomOrder,
   Result,
 } from '@impera/contracts';
 import {
@@ -152,6 +154,11 @@ export interface AgentComposeInput {
   };
   /** A custom order of his already waits for the team (ADR 0090 § A): she does not open another. */
   readonly customOrderOpen?: boolean;
+  /**
+   * His custom order as the custom-orders module keeps it (ADR 0159 § A.2), read in the turn's first transaction:
+   * `null`, none open. Absent, no order is kept and she answers as before (ADR 0090 § A).
+   */
+  readonly openCustomOrder?: OpenCustomOrder | null;
   /** The replies of her objection bank he already received (ADR 0090 § B): never twice. */
   readonly usedObjectionReplies?: readonly string[];
   /** His latest script run, open or ended (ADR 0098); `null` when he never had one. */
@@ -254,6 +261,8 @@ type AgentComposeResult = (
   readonly alerts?: readonly AlertNotice[];
   /** He asked for a custom order and it now waits for the team (`custom_order_opened`, ADR 0090 § A). */
   readonly customOrderOpened?: true;
+  /** The turn on his custom order (ADR 0159 § A.2), for the custom-orders module to keep, whatever the answer becomes. */
+  readonly customOrderTurn?: NonNullable<ComposedTurn['customOrderTurn']>;
   /** A script would open for him and none is left (`scripts_exhausted`, ADR 0150 § 9). */
   readonly scriptsExhausted?: true;
   /** She answered a sale gone wrong in this draft (`sale_trouble`, ADR 0156 § 4 and § 7): a human gets the next one. */
@@ -349,6 +358,11 @@ export interface DraftComposerDeps {
    * watched; unreadable, a human answers him, as with his limits.
    */
   readonly alertsOf?: (creatorId: string) => Promise<AlertSettings>;
+  /**
+   * Her grid of custom prices in force (ADR 0159 § C), read when his order is kept (`openCustomOrder`): its supplements
+   * for the brain, its price for her card. `null`, never filled in; absent, no grid.
+   */
+  readonly gridOf?: (creatorId: string) => Promise<CustomPriceGrid | null>;
   /**
    * Whether a chatter is on shift on her accounts now: a doubt on who she is (P4-01) and a custom order (ADR 0090)
    * go to them. Unknown: no.
@@ -845,6 +859,7 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
     ...(composed.saleTrouble?.kind === 'answer' &&
       result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
     ...(composed.abandonTeased !== undefined && result.kind === 'draft' && { abandonTeased: true }),
+    ...(composed.customOrderTurn !== undefined && { customOrderTurn: composed.customOrderTurn }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
   };
@@ -1141,6 +1156,10 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           chatterOnShift: chatter,
           orderOpen: input.customOrderOpen === true,
           flags: stop.flags,
+          ...(input.openCustomOrder !== undefined && {
+            order: input.openCustomOrder,
+            grid: deps.gridOf === undefined ? null : await deps.gridOf(input.creatorId),
+          }),
         },
         ...(withHer.objectionReplies !== undefined && {
           objections: {

@@ -6,6 +6,7 @@ import {
   type ConversationId,
   type CreatorId,
   type ExternalMedia,
+  type OpenCustomOrder,
   type PlatformAccountId,
 } from '@impera/contracts';
 import { eq, schema } from '@impera/db';
@@ -16,6 +17,7 @@ import { z } from 'zod';
 import { createJobQueue, type JobQueue } from '../jobs';
 import {
   createConversationsModule,
+  type ConversationsDeps,
   type ConversationsModule,
   type DraftComposer,
 } from '../modules/conversations';
@@ -44,12 +46,37 @@ class ScriptedComposer implements DraftComposer {
   }
 }
 
+type OrderStore = NonNullable<ConversationsDeps['customOrders']>;
+type OrderRecord = Parameters<OrderStore['record']>[1];
+
+/** The custom-orders store (ADR 0159 § A.2) by its port: kept in memory, once per message of his. */
+class MemoryOrders implements OrderStore {
+  readonly records: OrderRecord[] = [];
+  private readonly open = new Map<string, OpenCustomOrder>();
+
+  openFor(_tx: unknown, who: { readonly fanId: string }): Promise<OpenCustomOrder | null> {
+    return Promise.resolve(this.open.get(who.fanId) ?? null);
+  }
+
+  record(_tx: unknown, record: OrderRecord): Promise<void> {
+    if (this.records.some((one) => one.inboundMessageId === record.inboundMessageId))
+      return Promise.resolve();
+    this.records.push(record);
+    if (record.turn.order === null) this.open.delete(record.fanId);
+    else this.open.set(record.fanId, record.turn.order);
+    return Promise.resolve();
+  }
+}
+
 describe('conversation.respond with the engine (DraftComposer)', () => {
   let test: TestDb;
   let queue: JobQueue;
   let creatorId: CreatorId;
   let platformAccountId: PlatformAccountId;
   let conversations: ConversationsModule;
+  /** The same conversations, with her custom orders kept (ADR 0159). */
+  let ordering: ConversationsModule;
+  const orders = new MemoryOrders();
   const composer = new ScriptedComposer();
   let counter = 0;
 
@@ -130,6 +157,23 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
       voice: { voicePrompt: 'voice@test', voiceModel: 'model-test' },
       guard: PASS_GUARD,
       composer,
+    });
+    ordering = createConversationsModule({
+      db: test.app.db,
+      adminDb: test.service.db,
+      fans: createFansModule({ db: test.app.db, adminDb: test.service.db }),
+      sender: {
+        sendText: () => Promise.reject(new Error('not used')),
+        sendMedia: () => Promise.reject(new Error('not used')),
+        sendStep: () => Promise.reject(new Error('not used')),
+        verifySent: () => Promise.resolve({ status: 'not_found' }),
+      },
+      requireRole: () => () => Promise.resolve(),
+      recentLogin: () => Promise.resolve(),
+      voice: { voicePrompt: 'voice@test', voiceModel: 'model-test' },
+      guard: PASS_GUARD,
+      composer,
+      customOrders: orders,
     });
   });
 
@@ -699,5 +743,53 @@ describe('conversation.respond with the engine (DraftComposer)', () => {
     await respond(id);
     const [draft] = await drafts(id);
     expect(draft?.personaVersionId).toBe(personaVersionId);
+  });
+
+  it('keeps his custom order once per message of his, and gives it back on his next one (ADR 0159 § A.2)', async () => {
+    const id = await fanWrites('c-kept', 'Tu me ferais une vidéo rien que pour moi ?');
+    const asked: OpenCustomOrder = {
+      state: 'gathering',
+      format: 'video',
+      supplements: [],
+      minutes: null,
+      details: { what: 'une vidéo rien que pour lui' },
+      questionsAsked: 1,
+    };
+    composer.next = {
+      kind: 'draft',
+      bubbles: ['mmh et tu la vois durer combien ? 🙈'],
+      softViolations: [],
+      costUsd: 0,
+      customOrderTurn: {
+        kind: 'reply',
+        brief: 'Lui demander combien de temps.',
+        guards: ['no_commitment', 'no_tip_request'],
+        order: asked,
+        event: { type: 'custom_order_gathering', asked: 'duration' },
+      },
+    };
+    await ordering.jobs.respond({ creatorId, conversationId: id, correlationId: 'test' }, NO_LOG);
+    expect(composer.inputs.at(-1)).toMatchObject({ openCustomOrder: null });
+    expect(orders.records).toHaveLength(1);
+    expect(orders.records[0]).toMatchObject({
+      creatorId,
+      inboundMessageId: `m-${String(counter)}`,
+      turn: { order: asked },
+    });
+    expect(await drafts(id)).toHaveLength(1);
+
+    await fanWrites('c-kept', 'Trois minutes');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await ordering.jobs.respond({ creatorId, conversationId: id, correlationId: 'test' }, NO_LOG);
+    expect(composer.inputs.at(-1)).toMatchObject({ openCustomOrder: asked });
+    // Nothing about his order on that turn: nothing kept.
+    expect(orders.records).toHaveLength(1);
+  });
+
+  it('without the store, reads no order and keeps nothing (ADR 0090 as before)', async () => {
+    const id = await fanWrites('c-unkept', 'Une vidéo perso ?');
+    composer.next = { kind: 'held', reason: 'no_reply', detail: [], costUsd: 0 };
+    await respond(id);
+    expect(composer.inputs.at(-1)).not.toHaveProperty('openCustomOrder');
   });
 });

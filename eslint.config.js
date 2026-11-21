@@ -15,10 +15,12 @@ import prettier from 'eslint-config-prettier';
 const MODULE_DEPENDENCIES = {
   // INS-04: `FakeInstagram` implements the comments port of `instagram-comments`, read through its index.
   connectors: ['conversations', 'instagram-comments'],
-  conversations: ['fans', 'persona', 'agent', 'media'],
+  // ADR 0159: the turn on his custom order goes from the composer to the custom-orders store, typed by its pure.ts.
+  conversations: ['fans', 'persona', 'agent', 'media', 'custom-orders'],
   fans: [],
   persona: [],
-  agent: ['fans', 'persona', 'media'],
+  // ADR 0159: her turn on a custom order is the custom-orders module's (`customOrderTurn`), read through its index.
+  agent: ['fans', 'persona', 'media', 'custom-orders'],
   media: [],
   supervision: ['conversations', 'fans'],
   playground: ['agent'],

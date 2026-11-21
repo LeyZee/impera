@@ -152,6 +152,15 @@ export interface BrainAlert {
   readonly phrase: string;
 }
 
+/**
+ * His custom request as the brain reads it (ADR 0159 § A.2): whether one of his is open, and the supplements of her
+ * grid it may name, each by the id it answers with and the name the owner gave it.
+ */
+export interface BrainCustomOrder {
+  readonly open: boolean;
+  readonly supplements: readonly { readonly id: string; readonly name: string }[];
+}
+
 /** A script she may open with him, as the brain reads it (ADR 0098 § 6): the id it answers with, what it is about. */
 export interface BrainScript {
   readonly id: string;
@@ -165,6 +174,8 @@ export interface BrainInput extends ConversationInput {
   readonly scripts?: readonly BrainScript[];
   /** A step of a script waits for his answer: the brain reads what his last message does with it (`scriptReply`). */
   readonly scriptStepWaiting?: boolean;
+  /** His custom request, for `customOrder`; absent, the brain reads one only when he asks for one, with no supplement. */
+  readonly customOrder?: BrainCustomOrder;
 }
 
 /**

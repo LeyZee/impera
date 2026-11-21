@@ -536,6 +536,8 @@ describe('her sheet in seven tabs, and Trafic (ADR 0149)', () => {
       ),
     );
     const router = renderAt(owner, `/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
+    // The selector counts what waits to be copied.
+    expect(await screen.findByRole('radio', { name: 'À copier · 1' })).toBeDefined();
     fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({ onglet: 'scripts', creatrice: ANNA.id });
@@ -584,6 +586,8 @@ describe('Créatrices, what a member without the list reads', () => {
     await serve([]);
     renderAt(operator, '/creatrices');
     expect(await screen.findByText('Aucune créatrice ne t’est confiée')).toBeDefined();
+    // The whole screen is empty: its drawing stands above the sentence.
+    expect(document.querySelector('.nv-empty__art svg')).not.toBeNull();
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
   });
 

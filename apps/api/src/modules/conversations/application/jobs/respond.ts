@@ -434,6 +434,8 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         sales: await tx.events.salesState(conversation.id),
         scriptRun,
         scriptAbandon: await scriptAbandonOf(tx, conversation.id, scriptRun),
+        // His custom order kept by its module (ADR 0159 § A.2); undefined when no store is wired.
+        openCustomOrder: await tx.customOrders?.open(conversation.fanId),
         lastInbound: lastInboundKey(conversation),
       };
     });
@@ -462,6 +464,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         care: { since: read.conversation.careSince, helpGiven: read.conversation.careHelpAt !== null },
       }),
       ...(read.sales.customOrderOpen && { customOrderOpen: true }),
+      ...(read.openCustomOrder !== undefined && { openCustomOrder: read.openCustomOrder }),
       ...(read.sales.usedObjectionReplies.length > 0 && {
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
@@ -534,6 +537,15 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           { type: 'custom_order_opened', payload: { conversationId: conversation.id } },
           meta,
         );
+      }
+      // The turn on his custom order (ADR 0159 § A.2), kept once per message of his, whatever the answer becomes.
+      if (result.customOrderTurn !== undefined && source !== null && tx.customOrders !== undefined) {
+        await tx.customOrders.record({
+          fanId: conversation.fanId,
+          inboundMessageId: source.platformMessageId,
+          turn: result.customOrderTurn,
+          at: meta.at,
+        });
       }
       // No script left for him where one would open (ADR 0150 § 9): said once, until a script starts again for him.
       if (result.scriptsExhausted === true && !(await tx.events.scriptsExhaustedSaid(conversation.id))) {

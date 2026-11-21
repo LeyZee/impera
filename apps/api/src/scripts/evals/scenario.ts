@@ -1,4 +1,10 @@
-import { DesireBandSchema, ObjectionKindSchema, ObjectionReplyIdSchema } from '@impera/contracts';
+import {
+  CustomPriceGridSchema,
+  DesireBandSchema,
+  ObjectionKindSchema,
+  ObjectionReplyIdSchema,
+  OpenCustomOrderSchema,
+} from '@impera/contracts';
 import { BRAIN_ALERTS_MAX, BriefSchema, JudgeCriterionSchema, SCRIPT_REPLIES } from '@impera/llm';
 import { parse } from 'yaml';
 import { z } from 'zod';
@@ -7,6 +13,14 @@ const Risk = BriefSchema.shape.risks.element;
 const Intent = BriefSchema.shape.intent;
 const Action = BriefSchema.shape.action;
 const DesireSignal = BriefSchema.shape.desireSignals.unwrap().element;
+
+/** What a turn on his kept custom order says (ADR 0159 § A.2), or `none`. */
+export const CUSTOM_ORDER_EVENTS = [
+  'none',
+  'custom_order_gathering',
+  'custom_order_card_ready',
+  'custom_order_declined',
+] as const;
 
 /** A name the scenario gives one of her scripts (ADR 0098), its ref on the made-up platform. */
 const ScriptRef = z.string().regex(/^[a-z][a-z0-9-]*$/u);
@@ -123,6 +137,8 @@ const ExpectSchema = z
         desire_band_in: z.array(DesireBandSchema).min(1).optional(),
         /** What code did with a custom order (ADR 0090 § A): `none` when he asked for none. */
         custom_order: z.enum(['none', 'handoff', 'reply']).optional(),
+        /** What the turn on his kept order said (ADR 0159 § A.2): `none` when it said nothing. */
+        custom_order_event: z.enum(CUSTOM_ORDER_EVENTS).optional(),
         /** The reply of her objection bank given to the voice, by id; `null`: none (ADR 0090 § B). */
         objection_reply: ObjectionReplyIdSchema.nullable().optional(),
         /** Her tease about the run he left (Charles 20/11): `none`, she does not tease him. */
@@ -228,6 +244,17 @@ const ScenarioSchema = z
       .refine((list) => new Set(list.map((a) => a.name)).size === list.length, 'alert name repeated')
       .default([]),
     scripts: ScriptsSchema.optional(),
+    /**
+     * His custom order kept by its module (ADR 0159 § A.2): the one open before this message (`null`, none) and her
+     * made-up grid. Absent, no order is kept and she answers as before (ADR 0090 § A).
+     */
+    custom_order_kept: z
+      .object({
+        open: OpenCustomOrderSchema.nullable().default(null),
+        grid: CustomPriceGridSchema.nullable(),
+      })
+      .strict()
+      .optional(),
     /** His message, or several in a row since her last answer. */
     inbound: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
     /**

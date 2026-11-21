@@ -15,6 +15,9 @@ import {
   MessageDirectionSchema,
   MessageIdSchema,
   newId,
+  type CreatorId,
+  type FanId,
+  type OpenCustomOrder,
 } from '@impera/contracts';
 import {
   and,
@@ -28,7 +31,7 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
-import type { CardReadMessage, Transaction, UnitOfWork } from '../../domain/ports';
+import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
@@ -672,8 +675,50 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
   };
 }
 
-export function createDrizzleUnitOfWork(db: Database): UnitOfWork {
+/**
+ * The custom-orders module's store (ADR 0159 § A.2, `CustomOrdersModule.orders`), matched by shape: it works in the
+ * turn's own transaction, under her tenant.
+ */
+export interface CustomOrderStorePort {
+  openFor(
+    tx: DbTransaction,
+    who: { readonly creatorId: CreatorId; readonly fanId: FanId },
+  ): Promise<OpenCustomOrder | null>;
+  record(
+    tx: DbTransaction,
+    record: {
+      readonly creatorId: CreatorId;
+      readonly fanId: FanId;
+      readonly inboundMessageId: string;
+      readonly turn: KeptCustomOrderTurn;
+      readonly at: Date;
+    },
+  ): Promise<void>;
+}
+
+/** His custom order in this transaction, bound to her tenant. */
+const bindCustomOrders = (
+  store: CustomOrderStorePort,
+  tx: DbTransaction,
+  creatorId: CreatorId,
+): NonNullable<Transaction['customOrders']> => ({
+  open: (fanId) => store.openFor(tx, { creatorId, fanId }),
+  record: (entry) => store.record(tx, { creatorId, ...entry }),
+});
+
+export function createDrizzleUnitOfWork(
+  db: Database,
+  options: { readonly customOrders?: CustomOrderStorePort } = {},
+): UnitOfWork {
+  const { customOrders } = options;
   return {
-    inTenant: (creatorId, work) => withTenant(db, creatorId, (tx) => work(bind(tx, creatorId))),
+    inTenant: (creatorId, work) =>
+      withTenant(db, creatorId, (tx) =>
+        work(
+          customOrders === undefined
+            ? bind(tx, creatorId)
+            : { ...bind(tx, creatorId), customOrders: bindCustomOrders(customOrders, tx, creatorId) },
+        ),
+      ),
   };
 }
