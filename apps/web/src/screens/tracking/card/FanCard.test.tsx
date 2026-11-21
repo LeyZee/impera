@@ -131,9 +131,10 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       },
     });
     renderCard();
-    const him = await group('Lui');
-    // The first name shows on top among the essentials, and still counts for his group (recette du 21/11).
-    expect(within(him).getByText('2 sur 13')).toBeTruthy();
+    const him = await group('Le reste sur lui');
+    // The first name shows on top among the essentials: the fold counts what it holds, and says it is the rest (Design
+    // 21/11).
+    expect(within(him).getByText('1 sur 9')).toBeTruthy();
     const name = field(await essentials(), /^Son prénom/u);
     expect(within(name).getByText('Marc')).toBeTruthy();
     expect(within(name).getByText('Dit par lui, il y a 3 jours')).toBeTruthy();
@@ -197,7 +198,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
   it('sets a closed value in one tap', async () => {
     view = card({});
     renderCard();
-    const intimate = await group('Intime');
+    const intimate = await group('Le reste, côté intime');
     const row = field(intimate, /^L’intensité qu’il cherche/u);
     fireEvent.click(within(row).getByRole('radio', { name: 'Coquin' }));
     await act(() => Promise.resolve());
@@ -215,7 +216,7 @@ describe('Suivi › Fiche du fan › ce qu’on sait de lui (ADR 0085, lot c)', 
       },
     });
     renderCard();
-    const him = await group('Lui');
+    const him = await group('Le reste sur lui');
     expect(within(him).getByText('1 à vérifier ·')).toBeTruthy();
     const check = within(field(him, /^Son métier/u)).getByRole('group', { name: 'Son métier : à vérifier' });
     expect(within(check).getByText(/« aide-soignant »/u)).toBeTruthy();

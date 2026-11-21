@@ -8,9 +8,11 @@ import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { correctionsError, useDraftCorrections } from './corrections/api';
+import { correctionsHeadline, reasonColours, wordDiff, type DiffPart } from './corrections/model';
 
 import { useCreators } from '@/creators/api';
 import { Select } from '@/shell/Select';
+import { Donut, useLit } from '@/shell/figures/figures';
 import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 import './corrections/corrections.css';
@@ -64,14 +66,19 @@ export function CorrectionsPage({
           />
         </div>
       ) : null}
-      <CreatorCorrections key={creatorId} creatorId={creatorId} />
+      <CreatorCorrections
+        key={creatorId}
+        creatorId={creatorId}
+        name={list.find((one) => one.id === creatorId)?.displayName ?? null}
+      />
     </div>
   );
 }
 
-function CreatorCorrections({ creatorId }: { creatorId: string }): JSX.Element {
+function CreatorCorrections({ creatorId, name }: { creatorId: string; name: string | null }): JSX.Element {
   const corrections = useDraftCorrections(creatorId);
   const [reason, setReason] = useState<DraftCorrectionReason | null>(null);
+  const { lit, setLit, row } = useLit();
 
   if (corrections.isPending)
     return (
@@ -91,9 +98,46 @@ function CreatorCorrections({ creatorId }: { creatorId: string }): JSX.Element {
       </Empty>
     );
   }
+  const colours = reasonColours(view.counts);
+  const colourOf = (one: DraftCorrectionReason): string => colours.get(one) ?? 'var(--nv-series-other)';
   const shown = reason === null ? view.items : view.items.filter((item) => item.reason === reason);
+  const litCount = lit === null ? undefined : view.counts[lit];
   return (
     <>
+      {/* The answer first, in big, then the reasons as a ring that answers the pointer (Charles's screen rule). */}
+      <section className="nv-plate nv-plate--pad co-top" aria-label="En bref">
+        <div className="co-top__answer">
+          <p className="co-headline">{correctionsHeadline(view)}</p>
+          <p className="co-lead">
+            {`Les ${String(DRAFT_CORRECTIONS_DAYS)} derniers jours${name === null ? '' : ` de ${name}`}`}
+            {view.truncated ? `, les ${String(view.items.length)} plus récentes` : ''}.
+          </p>
+        </div>
+        <Donut
+          label={`Par raison : ${view.counts
+            .map((one) => `${DRAFT_CORRECTION_REASON_LABELS[one.reason]} ${String(one.count)}`)
+            .join(', ')}`}
+          slices={view.counts.map((one) => ({
+            key: one.reason,
+            colour: colourOf(one.reason),
+            value: one.count,
+          }))}
+          lit={lit}
+          onLit={setLit}
+        >
+          {litCount === undefined ? (
+            <>
+              <b className="nv-donut__value nv-num">{String(view.items.length)}</b>
+              <span className="nv-donut__sub">corrections</span>
+            </>
+          ) : (
+            <>
+              <b className="nv-donut__value nv-num">{String(litCount.count)}</b>
+              <span className="nv-donut__sub">{DRAFT_CORRECTION_REASON_LABELS[litCount.reason]}</span>
+            </>
+          )}
+        </Donut>
+      </section>
       <div className="co-reasons" role="group" aria-label="Raisons">
         <button
           type="button"
@@ -105,27 +149,36 @@ function CreatorCorrections({ creatorId }: { creatorId: string }): JSX.Element {
         >
           Toutes · {String(view.items.length)}
         </button>
-        {view.counts.map((one) => (
-          <button
-            key={one.reason}
-            type="button"
-            className="nv-chip"
-            aria-pressed={reason === one.reason}
-            onClick={() => {
-              setReason(one.reason);
-            }}
-          >
-            {DRAFT_CORRECTION_REASON_LABELS[one.reason]} · {String(one.count)}
-          </button>
-        ))}
+        {view.counts.map((one, index) => {
+          const lighting = row(index);
+          return (
+            <button
+              key={one.reason}
+              type="button"
+              className={lit === index ? 'nv-chip co-chip is-on' : 'nv-chip co-chip'}
+              aria-pressed={reason === one.reason}
+              onPointerEnter={lighting.onPointerEnter}
+              onPointerLeave={lighting.onPointerLeave}
+              onFocus={lighting.onFocus}
+              onBlur={lighting.onBlur}
+              onClick={() => {
+                setReason(reason === one.reason ? null : one.reason);
+              }}
+            >
+              <span className="nv-key" style={{ '--_c': colourOf(one.reason) }} aria-hidden="true" />
+              {DRAFT_CORRECTION_REASON_LABELS[one.reason]} · {String(one.count)}
+            </button>
+          );
+        })}
       </div>
-      <p className="co-lead">
-        Ses {String(DRAFT_CORRECTIONS_DAYS)} derniers jours
-        {view.truncated ? `, les ${String(view.items.length)} plus récentes` : ''}.
-      </p>
       <ul className="co-list">
         {shown.map((item) => (
-          <CorrectionCard key={`${item.draftId}-${item.kind}`} creatorId={creatorId} item={item} />
+          <CorrectionCard
+            key={`${item.draftId}-${item.kind}`}
+            creatorId={creatorId}
+            item={item}
+            colour={colourOf(item.reason)}
+          />
         ))}
       </ul>
     </>
@@ -140,12 +193,28 @@ const WHEN = new Intl.DateTimeFormat('fr-FR', {
   minute: '2-digit',
 });
 
-/** One draft: why, then what the agent wrote beside what left (nothing left for a refusal). */
-function CorrectionCard({ creatorId, item }: { creatorId: string; item: DraftCorrection }): JSX.Element {
+/**
+ * One draft. A retouch: what the agent wrote beside what left, the words it changed lit on each side (Design 21/11:
+ * that is the information). A refusal: « Refusé » and the agent's text full width, nothing left to set beside it.
+ */
+function CorrectionCard({
+  creatorId,
+  item,
+  colour,
+}: {
+  creatorId: string;
+  item: DraftCorrection;
+  colour: string;
+}): JSX.Element {
+  const diff = item.kind === 'edited' && item.after !== null ? wordDiff(item.before, item.after) : null;
   return (
-    <li className="nv-plate nv-plate--pad co-card">
+    <li className="nv-plate nv-plate--pad co-card" style={{ '--_c': colour }}>
       <div className="co-card__head">
-        <span className="co-card__reason">{DRAFT_CORRECTION_REASON_LABELS[item.reason]}</span>
+        <span className="co-card__reason">
+          <span className="nv-key" aria-hidden="true" />
+          {DRAFT_CORRECTION_REASON_LABELS[item.reason]}
+          {item.kind === 'rejected' ? <span className="co-pill">Refusé</span> : null}
+        </span>
         <span className="co-card__meta">
           <Link to="/suivi" search={{ conversation: item.conversationId, creatrice: creatorId }}>
             {item.fanDisplayName === '' ? 'Sa conversation' : item.fanDisplayName}
@@ -155,7 +224,7 @@ function CorrectionCard({ creatorId, item }: { creatorId: string; item: DraftCor
         </span>
       </div>
       {item.note === null ? null : <p className="co-card__note">« {item.note} »</p>}
-      <div className="co-card__sides">
+      {diff === null ? (
         <section className="co-side" aria-label="Avant">
           <h3 className="nv-eyebrow co-side__title">L’agent avait écrit</h3>
           {item.before.map((bubble, index) => (
@@ -164,21 +233,43 @@ function CorrectionCard({ creatorId, item }: { creatorId: string; item: DraftCor
             </p>
           ))}
         </section>
-        <section className="co-side" aria-label="Après">
-          <h3 className="nv-eyebrow co-side__title">
-            {item.kind === 'edited' ? 'Parti à la place' : 'Refusé'}
-          </h3>
-          {item.after === null ? (
-            <p className="co-side__none">Rien n’est parti de ce brouillon.</p>
-          ) : (
-            item.after.map((bubble, index) => (
-              <p key={index} className="co-side__bubble">
-                {bubble}
-              </p>
-            ))
-          )}
-        </section>
-      </div>
+      ) : (
+        <div className="co-card__sides">
+          <section className="co-side" aria-label="Avant">
+            <h3 className="nv-eyebrow co-side__title">L’agent avait écrit</h3>
+            <p className="co-side__bubble">
+              <Parts parts={diff.before} mark="del" />
+            </p>
+          </section>
+          <section className="co-side" aria-label="Après">
+            <h3 className="nv-eyebrow co-side__title">Parti à la place</h3>
+            <p className="co-side__bubble">
+              <Parts parts={diff.after} mark="ins" />
+            </p>
+          </section>
+        </div>
+      )}
     </li>
+  );
+}
+
+/** A side of a retouch, the words it changed marked: taken out before, put in after. */
+function Parts({ parts, mark }: { parts: readonly DiffPart[]; mark: 'del' | 'ins' }): JSX.Element {
+  return (
+    <>
+      {parts.map((one, index) =>
+        !one.changed ? (
+          <span key={index}>{one.text}</span>
+        ) : mark === 'del' ? (
+          <del key={index} className="co-diff co-diff--out">
+            {one.text}
+          </del>
+        ) : (
+          <ins key={index} className="co-diff co-diff--in">
+            {one.text}
+          </ins>
+        ),
+      )}
+    </>
   );
 }

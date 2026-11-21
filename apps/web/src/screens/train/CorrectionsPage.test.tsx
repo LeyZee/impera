@@ -110,10 +110,23 @@ describe('Entraîner › Corrections (trou béant 12)', () => {
     expect(
       within(within(refused).getByRole('region', { name: 'Avant' })).getByText('Coucou toi'),
     ).toBeTruthy();
-    expect(within(refused).getByText('Rien n’est parti de ce brouillon.')).toBeTruthy();
-    expect(
-      within(within(edited).getByRole('region', { name: 'Après' })).getByText('Coucou toi 😘'),
-    ).toBeTruthy();
+    // A refusal says so once, its text full width: nothing left to set beside it (Design 21/11).
+    expect(within(refused).getByText('Refusé')).toBeTruthy();
+    expect(within(refused).queryByRole('region', { name: 'Après' })).toBeNull();
+    // A retouch lights what it changed on each side.
+    const after = within(edited).getByRole('region', { name: 'Après' });
+    expect(after.querySelector('ins')?.textContent).toBe('😘');
+    expect(within(edited).getByRole('region', { name: 'Avant' }).querySelector('del')?.textContent).toBe(
+      'Tu fais quoi ce soir ?',
+    );
+    expect(within(edited).queryByText('Refusé')).toBeNull();
+
+    // The answer in big, and each reason in its colour, on its chip and on its card.
+    expect(screen.getByText('2 corrections en 30 jours')).toBeTruthy();
+    expect(screen.getByText('Les 30 derniers jours de Nora.')).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Par raison : Trop long 1, Retouché 1' })).toBeTruthy();
+    expect(refused.style.getPropertyValue('--_c')).toBe('var(--nv-series-1)');
+    expect(edited.style.getPropertyValue('--_c')).toBe('var(--nv-series-2)');
     expect(within(refused).getByRole('link', { name: 'Fan 1' }).getAttribute('href')).toContain('/suivi?');
 
     const reasons = screen.getByRole('group', { name: 'Raisons' });

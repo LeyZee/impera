@@ -16,4 +16,11 @@ describe('the fan card’s rows (recette du 21/11)', () => {
     expect(css).not.toMatch(/^\s*\.tr-card__empty \{[^}]*visibility: hidden;/mu);
     expect(css).toMatch(/:is\(:hover, :focus-within\) \.tr-card__empty \{\s*visibility: hidden;/u);
   });
+
+  it('keeps « Retirer » on every line of « Autres », in its place, even with a pointer (Design 21/11)', () => {
+    expect(css).toMatch(/\.tr-card__field:not\(\.tr-card__field--other, :hover, :focus-within\)/u);
+    expect(css).toMatch(
+      /\.tr-card__field:not\(\.tr-card__field--other\) \.tr-card__head > \.nv-btn--plain \{\s*position: absolute;/u,
+    );
+  });
 });

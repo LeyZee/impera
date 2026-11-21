@@ -821,8 +821,9 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     const since = await screen.findByText(/^Mode soin depuis/u);
-    // A state to know, in neutral glass: the amber stays for a person to act (recette du 21/11).
+    // A state to know, in calm blue with a heart: the amber stays for a person to act (recette du 21/11).
     expect(since.closest('.tr-care')?.classList.contains('tr-hand--alert')).toBe(false);
+    expect(since.querySelector('svg.tr-care__icon')).not.toBeNull();
     expect(screen.getByText(/rien ne lui est vendu/u)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Il va mieux' }));
     // Nothing goes on the first click: the second says what changes.
@@ -832,6 +833,27 @@ describe('the reader of Suivi', () => {
     await waitFor(() => {
       expect(posted).toEqual([{ action: 'close', body: {} }]);
     });
+  });
+
+  it('says « Mode soin » under his name and at the head of his sheet, never « Rien à faire » (Design 21/11)', async () => {
+    serve({
+      ...withDraft,
+      detail: () => ({
+        status: 200,
+        body: waiting({
+          careSince: '2026-10-17T19:00:00Z',
+          state: 'idle',
+          openDrafts: [],
+          lastInboundAt: '2026-10-17T20:00:00Z',
+          lastOutboundAt: '2026-10-17T20:05:00Z',
+        }),
+      }),
+    });
+    renderPage(OPEN);
+    await screen.findByText(/^Mode soin depuis/u);
+    expect(document.querySelector('.tr-reader__state-label')?.textContent).toBe('Mode soin');
+    expect(screen.queryByText('Rien à faire', { selector: '.tr-reader__state-label' })).toBeNull();
+    expect(screen.queryByText('Rien à signaler')).toBeNull();
   });
 
   it('shows a chatter the care mode without « Il va mieux », and a creator nothing of it', async () => {

@@ -70,9 +70,9 @@ describe('the fan card (ADR 0085, lot c)', () => {
       { field: 'job', current: value({ source: 'noted' }), toCheck: [value({ source: 'inferred' })] },
       { field: 'hobbies', current: value({ items: ['course'] }), toCheck: [] },
     ];
-    // The first name shows on top among the essentials, and still counts for his group (recette du 21/11).
-    expect(groupLine(entries, 'him')).toEqual({ filled: '3 sur 13', toCheck: 1 });
-    expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 4', toCheck: 0 });
+    // The first name shows on top among the essentials: the fold counts only what it holds (Design 21/11).
+    expect(groupLine(entries, 'him')).toEqual({ filled: '2 sur 9', toCheck: 1 });
+    expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 2', toCheck: 0 });
   });
 
   it('takes one line for a one-value field, one item per line for a list, and keeps the save shut when empty', () => {

@@ -39,11 +39,14 @@ export function CareBanner({
   };
 
   return (
-    // Neutral glass, never the amber of « Personne n'a répondu » it may sit above: a state to know, not a task (recette
-    // du 21/11). Its words carry the weight.
+    // A calm blue with a heart, never the amber of « Personne n'a répondu » it may sit above: a state to know, not a
+    // task, seen without reading (Design, recette du 21/11).
     <div className="tr-hand tr-care" role="status">
       <p>
-        <strong>{careSinceText(since, new Date())}</strong>
+        <strong>
+          <CareIcon />
+          {careSinceText(since, new Date())}
+        </strong>
         <span>
           Il traverse un moment difficile : chaque réponse de l’agent attend un humain, et rien ne lui est
           vendu.
@@ -99,5 +102,23 @@ export function CareBanner({
         </p>
       )}
     </div>
+  );
+}
+
+/** A heart drawn in the menu icons' stroke (`NavIcon`): his care mode at a glance. */
+function CareIcon(): JSX.Element {
+  return (
+    <svg
+      className="tr-care__icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20s-7.5-4.6-7.5-10.1A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20Z" />
+    </svg>
   );
 }

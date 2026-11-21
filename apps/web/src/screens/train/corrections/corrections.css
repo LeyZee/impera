@@ -43,10 +43,6 @@
   justify-content: space-between;
   gap: var(--nv-space-2);
 }
-.co-card__reason {
-  font-weight: 600;
-  color: var(--nv-ink);
-}
 .co-card__meta {
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
@@ -80,10 +76,6 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-.co-side__none {
-  margin: 0;
-  color: var(--nv-ink-faint);
-}
 /* On a phone the two sides stack, after under before, a hairline between them. */
 @media (max-width: 560px) {
   .co-card__sides {
@@ -93,4 +85,66 @@
     padding-top: var(--nv-space-2);
     border-top: 1px solid var(--nv-hairline);
   }
+}
+/* The answer first, in big, beside the reasons' ring (Design, recette du 21/11). */
+.co-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-4);
+}
+.co-top__answer {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  min-width: 0;
+}
+.co-headline {
+  margin: 0;
+  font-size: var(--nv-text-metric);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--nv-ink);
+  text-wrap: balance;
+}
+/* A reason's chip carries its colour, and lights its slice of the ring under the pointer. */
+.co-chip {
+  gap: 6px;
+}
+.co-chip.is-on {
+  border-color: var(--_c, var(--nv-hairline));
+}
+/* A card's title in its reason's colour (`--_c` set on the card). */
+.co-card__reason {
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--_c);
+}
+.co-pill {
+  padding: 1px 8px;
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  background: var(--nv-fill-soft);
+}
+/* What a retouch changed: taken out, struck in the faint ink; put in, lit in the card's colour. */
+.co-diff {
+  border-radius: 4px;
+  padding: 0 2px;
+  text-decoration: none;
+}
+.co-diff--out {
+  color: var(--nv-ink-faint);
+  text-decoration: line-through;
+  background: color-mix(in srgb, var(--nv-ink-faint) 14%, transparent);
+}
+.co-diff--in {
+  color: var(--nv-ink);
+  background: color-mix(in srgb, var(--_c) 24%, transparent);
 }

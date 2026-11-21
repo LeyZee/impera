@@ -390,7 +390,7 @@ function OtherRow({
   };
 
   return (
-    <li className="tr-card__field">
+    <li className="tr-card__field tr-card__field--other">
       <div className="tr-card__head">
         <p className="tr-card__value tr-card__other">{other.value}</p>
         {asking ? null : (

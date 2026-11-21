@@ -100,6 +100,16 @@ export const STOP_SITUATION: Situation = {
 };
 
 /**
+ * His care mode said by the reader's pill (ADR 0088, Design 21/11): when nothing is to be done, « Mode soin » in the
+ * care banner's calm blue, never « Rien à faire » above a banner that says why each answer waits for a person. A
+ * situation where someone acts keeps its words.
+ */
+export function withCare(situation: Situation, care: boolean): Situation {
+  if (!care || situation.hand !== 'quiet') return situation;
+  return { hand: 'quiet', label: 'Mode soin', pill: 'tr-status--care' };
+}
+
+/**
  * The state every line of a group says alike, said once by the group's title instead (PIL-10: « Un humain répond » on
  * thirty lines): the label when two lines or more all say it, null when one differs.
  */

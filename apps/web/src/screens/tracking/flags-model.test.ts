@@ -91,6 +91,14 @@ describe('the fan’s limits', () => {
       urgent: null,
       rest: 'Rien à signaler',
     });
+    // His care mode is said first, never « Rien à signaler » (Design 21/11).
+    expect(sheetSummary({ flags: {}, toLearn: null, band: null, care: true })).toEqual({
+      urgent: null,
+      rest: 'Mode soin',
+    });
+    expect(sheetSummary({ flags, toLearn: 7, band: 'neutre', care: true }).rest).toBe(
+      'Mode soin · 7 à apprendre · désir neutre',
+    );
     // Unread or refused limits are said in amber; while they are read, nothing is claimed.
     expect(sheetSummary({ flags: 'refused', toLearn: null, band: null })).toEqual({
       urgent: 'Limites non lisibles',

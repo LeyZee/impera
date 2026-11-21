@@ -24,9 +24,10 @@ import {
  */
 
 export const CARD_GROUPS: readonly { readonly group: FanCardGroup; readonly title: string }[] = [
-  { group: 'him', title: 'Lui' },
+  // A group some of whose fields stand among the essentials on top names what its fold holds (Design 21/11).
+  { group: 'him', title: 'Le reste sur lui' },
   { group: 'about_her', title: 'Ce qu’il aime chez elle' },
-  { group: 'intimate', title: 'Intime' },
+  { group: 'intimate', title: 'Le reste, côté intime' },
 ];
 
 /** The two fields whose values are a closed list: chosen in one tap, never typed. */
@@ -113,15 +114,16 @@ export function entryOf(entries: readonly FanCardEntry[], field: FanCardField): 
 }
 
 /**
- * « 4 sur 12 », and how many wait for a chatter: the folded line of a group, on every field of the group, the
- * essentials shown on top included (recette du 21/11: « 0 sur 9 » under a first name, an age and a town read as
- * « nothing known »).
+ * « 0 sur 9 », and how many wait for a chatter: the folded line of a group, on the fields the fold shows when opened
+ * (the essentials stand on top, outside it). The fold that leaves essentials out says so in its title (« Le reste sur
+ * lui »), so its count never reads as « nothing known » under a first name (Design, recette du 21/11), the same count
+ * as the extension's panel.
  */
 export function groupLine(
   entries: readonly FanCardEntry[],
   group: FanCardGroup,
 ): { readonly filled: string; readonly toCheck: number } {
-  const specs = FAN_CARD_FIELDS.filter((spec) => spec.group === group);
+  const specs = fieldsOf(group);
   const known = specs.filter((spec) => entryOf(entries, spec.field).current !== null).length;
   const toCheck = specs.filter((spec) => entryOf(entries, spec.field).toCheck.length > 0).length;
   return { filled: `${String(known)} sur ${String(specs.length)}`, toCheck };
