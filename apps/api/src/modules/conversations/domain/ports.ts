@@ -1016,6 +1016,8 @@ export interface ConversationReader {
   desireCurve(creatorId: CreatorId, id: ConversationId): Promise<DesireCurve | null>;
   /** Whether the latest global or creator-wide emergency stop of hers is on (recette CHAT-07). */
   sendingStopped(creatorId: CreatorId): Promise<boolean>;
+  /** The platforms where a session of one of her accounts expired (recette REV-05), each once. */
+  expiredSessions(creatorId: CreatorId): Promise<readonly Platform[]>;
 }
 
 /** The conversation open on the platform, as the copilot panel reads it (ADR 0086 § 3, § 9). */

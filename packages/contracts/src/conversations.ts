@@ -8,6 +8,7 @@ import {
   DraftStatusSchema,
   MessageAuthorSchema,
   MessageDirectionSchema,
+  PlatformSchema,
 } from './enums';
 import { EventBodySchema } from './events';
 import { GuardCodeSchema } from './guards';
@@ -40,7 +41,14 @@ export type ConversationDesire = z.infer<typeof ConversationDesireSchema>;
  * `GET /v1/conversations/stop`: whether the emergency stop holds every message of this creator (global, or hers), so
  * that Suivi says it before a decision rather than after (recette CHAT-07). A stop on one conversation is not here.
  */
-export const SendingStopSchema = z.object({ stopped: z.boolean() });
+export const SendingStopSchema = z.object({
+  stopped: z.boolean(),
+  /**
+   * The platforms where one of her accounts' sessions expired (recette REV-05): nothing is read there and nothing
+   * leaves until it is captured again from the extension. Empty from a server that does not say it yet.
+   */
+  expiredSessions: z.array(PlatformSchema).default([]),
+});
 export type SendingStop = z.infer<typeof SendingStopSchema>;
 
 /** Who holds a conversation, said to the person reading it: him, or another person (EQ-13). */

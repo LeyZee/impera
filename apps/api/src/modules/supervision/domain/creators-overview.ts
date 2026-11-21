@@ -42,6 +42,8 @@ export function creatorOverview(input: {
     hoursNow: facts.hoursNow,
     resumesAs,
     hasActivePersona: facts.hasActivePersona,
+    // Every reader is told: nothing is read or sent there until the session is captured again (recette REV-05).
+    expiredSessions: [...facts.expiredSessions],
   };
   if (facts.scope === 'self')
     return { creatorId, mode, ...agent, sales: null, onShift: null, requests: null };

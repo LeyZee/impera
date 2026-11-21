@@ -16,6 +16,7 @@ import {
   MessageAuthorSchema,
   MessageDirectionSchema,
   MessageIdSchema,
+  PlatformSchema,
   type ConversationDesire,
   type ConversationId,
   type ConversationSummary,
@@ -284,6 +285,20 @@ export function createDrizzleConversationReader(
           where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
           order by scope, scope_id, set_at desc`);
         return SwitchRowsSchema.parse(switches.rows).some((row) => row.active);
+      }),
+
+    expiredSessions: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const rows = await tx
+          .selectDistinct({ platform: schema.platformAccounts.platform })
+          .from(schema.platformAccounts)
+          .where(
+            and(
+              eq(schema.platformAccounts.creatorId, creatorId),
+              eq(schema.platformAccounts.sessionState, 'expired'),
+            ),
+          );
+        return rows.map((row) => PlatformSchema.parse(row.platform));
       }),
 
     list: (creatorId, page, { userId, heldOnly }) =>
