@@ -24,10 +24,10 @@ async function failure(promise: Promise<unknown>): Promise<string> {
 }
 
 /**
- * « À décider », hers (ADR 0162): the code that asks writes, she reads and answers her own, the owner answers in her
+ * « À décider », hers (ADR 0164): the code that asks writes, she reads and answers her own, the owner answers in her
  * place, nobody else reads. Invented people and creators only (ADR 0010).
  */
-describe('her decisions (ADR 0162): asked by the code, answered by her or by the owner, once', () => {
+describe('her decisions (ADR 0164): asked by the code, answered by her or by the owner, once', () => {
   let test: TestDb;
   const owner = newId(UserIdSchema);
   const manager = newId(UserIdSchema);
@@ -173,6 +173,26 @@ describe('her decisions (ADR 0162): asked by the code, answered by her or by the
     ]);
     for (const member of [manager, chatter])
       expect(await withTenantMember(test.app.db, nora, member, set(answer(member)))).toEqual([]);
+    // An account signs an answer with itself alone, and never withdraws: only the code that asked does.
+    for (const run of [
+      () =>
+        withCreatorAccount(test.app.db, noraUser, (tx) =>
+          tx.update(d).set(answer(owner)).where(eq(d.id, noraCaption)),
+        ),
+      () =>
+        withCreatorAccount(test.app.db, noraUser, (tx) =>
+          tx.update(d).set({ state: 'withdrawn' }).where(eq(d.id, noraCaption)),
+        ),
+      () =>
+        withTenantMember(test.app.db, nora, owner, (tx) =>
+          tx.update(d).set(answer(noraUser)).where(eq(d.id, noraCaption)),
+        ),
+      () =>
+        withTenantMember(test.app.db, nora, owner, (tx) =>
+          tx.update(d).set({ state: 'withdrawn' }).where(eq(d.id, noraCaption)),
+        ),
+    ])
+      expect(await failure(run())).toMatch(/row-level security/u);
     expect(
       await withCreatorAccount(test.app.db, noraUser, (tx) =>
         tx.update(d).set(answer(noraUser)).where(eq(d.id, noraCaption)).returning(all),

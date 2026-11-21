@@ -12,7 +12,7 @@ export type OtherIdeas = (
 ) => Promise<readonly DecisionAnswer[]>;
 
 /**
- * « À décider », hers (ADR 0162): one question at a time, on top of Aujourd'hui. The next one enters once she
+ * « À décider », hers (ADR 0164): one question at a time, on top of Aujourd'hui. The next one enters once she
  * answered or put the first aside; nothing shows when nothing waits. « Plus tard » is always there, said plainly.
  * The list is the server's: an answer kept leaves it, and the count goes on from what she already answered here.
  */

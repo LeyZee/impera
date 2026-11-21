@@ -1,4 +1,4 @@
-# 0162. « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours
+# 0164. « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours
 
 Statut : accepted (décisions de Charles du 21/11/2026 : la créatrice valide d'un geste, lui en secours ; feu vert pour les cartes de décision dans son espace ; captures « cartes-de-decision-2 » validées le même jour)
 Date : 2026-11-21
@@ -15,7 +15,7 @@ Charles veut que ces questions lui fassent gagner du temps : une question, deux 
 2. **Le code qui demande** écrit la décision et lit la réponse ; c'est lui qui sait ce qu'une réponse déclenche. Le module `creator-decisions` ne connaît aucun genre : il pose, garde la réponse et la rend. Une règle de métier ne vit jamais dans le texte d'une question.
 3. **Une fois par sujet.** Qui demande nomme le sujet (un contenu) : la même question redemandée n'écrit rien.
 4. **Une réponse est donnée une fois.** La même réponse renvoyée ne change rien ; une autre est refusée. La base le tient : une ligne qui n'est plus ouverte ne correspond à aucune politique d'écriture.
-5. **Qui répond.** La créatrice, sur son propre compte. Le propriétaire, à sa place, pour la créatrice nommée, avec une ligne au journal d'audit (jamais la réponse elle-même). Un manager et un chatteur ne lisent ni ne répondent.
+5. **Qui répond.** La créatrice, sur son propre compte. Le propriétaire, à sa place, pour la créatrice nommée, avec une ligne au journal d'audit (jamais la réponse elle-même). Un manager et un chatteur ne lisent ni ne répondent. La base tient aussi qu'un compte ne signe une réponse que de son propre nom et ne retire jamais une décision : seul le code qui a demandé la retire.
 6. **« Plus tard »** est toujours proposé : la question se met de côté deux heures, jamais au-delà de sa fin. Le propriétaire voit aussi ce qu'elle a mis de côté.
 7. **Une fin.** Chaque décision porte l'instant après lequel elle n'a plus de sens : passé cet instant, personne ne la lit ni n'y répond, et qui a demandé la lit « finie ». Qui a demandé peut aussi la retirer tant qu'elle est ouverte.
 8. **À l'écran** : une seule question visible, tout en haut d'« Aujourd'hui », avec un compteur discret quand plusieurs attendent ; la suivante entre après la réponse ; rien quand rien n'attend. Après sa réponse, la carte se replie en une ligne qui dit ce qui est noté. Aucune réponse n'est mise en avant.

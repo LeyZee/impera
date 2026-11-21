@@ -26,7 +26,7 @@ import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './co
 import { creators } from './tenancy';
 
 /*
- * « À décider », hers (ADR 0162): a question put to her about a content of hers, with two or three answers. A row is
+ * « À décider », hers (ADR 0164): a question put to her about a content of hers, with two or three answers. A row is
  * written by the code that asks, in the creator it asks for (`withTenantJob(…, 'creator_decisions', …)`), once per
  * subject. She reads her own and answers it or puts it aside; the owner reads and answers in her place; a manager
  * and a chatter read none. An answer is given once: a row that is no longer open matches no policy that changes it.
@@ -37,6 +37,7 @@ const currentCreator: SQL = sql`nullif(current_setting('app.creator_id', true), 
 const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), '')`;
 const isCreatorAccount: SQL = sql`current_setting('app.account_role', true) = 'creator'`;
 const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
+const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
 const ofHerOwner = (creatorId: PgColumn): SQL =>
   sql`${notCreatorAccount} and ${currentScope} = 'owner' and ${creatorId} = ${currentCreator}`;
@@ -44,13 +45,17 @@ const ofHerOwner = (creatorId: PgColumn): SQL =>
 const asking = (creatorId: PgColumn): SQL =>
   sql`${creatorId} = ${currentCreator} and nullif(current_setting('app.job', true), '') = 'creator_decisions'`;
 
+/** An account leaves a row open or answered, never withdrawn, and signs an answer with itself alone. */
+const answeredByHand = (state: PgColumn, answeredBy: PgColumn): SQL =>
+  sql`${state} in ('open', 'answered') and (${answeredBy} is null or ${answeredBy} = ${currentUser})`;
+
 export const creatorDecisions = pgTable(
   'creator_decisions',
   {
     id: id(),
     creatorId: uuid('creator_id')
       .notNull()
-      .references(() => creators.id, { onDelete: 'cascade' }),
+      .references(() => creators.id),
     kind: enumText('kind').notNull(),
     /** What it is about, named by who asks: asked twice, written once. */
     subject: text('subject').notNull(),
@@ -100,13 +105,13 @@ export const creatorDecisions = pgTable(
     pgPolicy('hers_answer', {
       for: 'update',
       using: sql`${hers(t.creatorId)} and ${t.state} = 'open'`,
-      withCheck: hers(t.creatorId),
+      withCheck: sql`${hers(t.creatorId)} and ${answeredByHand(t.state, t.answeredBy)}`,
     }),
     pgPolicy('owner_read', { for: 'select', using: ofHerOwner(t.creatorId) }),
     pgPolicy('owner_answer', {
       for: 'update',
       using: sql`${ofHerOwner(t.creatorId)} and ${t.state} = 'open'`,
-      withCheck: ofHerOwner(t.creatorId),
+      withCheck: sql`${ofHerOwner(t.creatorId)} and ${answeredByHand(t.state, t.answeredBy)}`,
     }),
     pgPolicy('asking_read', { for: 'select', using: asking(t.creatorId) }),
     pgPolicy('asking_insert', { for: 'insert', withCheck: asking(t.creatorId) }),

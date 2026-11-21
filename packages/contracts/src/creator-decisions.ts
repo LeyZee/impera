@@ -4,7 +4,7 @@ import { CreatorTaskCategorySchema } from './creator-tasks';
 import { CreatorDecisionIdSchema, CreatorIdSchema } from './ids';
 
 /*
- * « À décider », hers (ADR 0162): one question put to her at a time on top of Aujourd'hui, about a content of hers,
+ * « À décider », hers (ADR 0164): one question put to her at a time on top of Aujourd'hui, about a content of hers,
  * with two or three answers and « Plus tard ». The code that asks decides what an answer does; this contract is only
  * what she reads and what she sends back. The owner answers in her place when she does not.
  */

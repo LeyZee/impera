@@ -1,4 +1,4 @@
-# Module `creator-decisions` : « À décider », les questions posées à la créatrice (ADR 0162)
+# Module `creator-decisions` : « À décider », les questions posées à la créatrice (ADR 0164)
 
 Le code pose une **décision** à une créatrice sur un de ses contenus : une question, une ligne de contexte, deux ou trois réponses. Elle y répond une fois, sur son téléphone, ou la met de côté (« Plus tard ») ; le propriétaire peut répondre à sa place. Le module garde la réponse et la rend à qui a demandé : il ne sait pas ce qu'une réponse déclenche.
 

@@ -45,7 +45,7 @@ async function asCreator<T>(run: () => Promise<T>): Promise<T> {
 }
 
 /**
- * « À décider », hers (ADR 0162): she reads what waits on her under `/v1/creator-space/decisions`, answers it or puts
+ * « À décider », hers (ADR 0164): she reads what waits on her under `/v1/creator-space/decisions`, answers it or puts
  * it aside; the owner reads and answers in her place under `/v1/creators/:creatorId/decisions`. The store reads each
  * person's right again in the base. `now` is the server's clock.
  */

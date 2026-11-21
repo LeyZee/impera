@@ -1,4 +1,4 @@
-/** Public entry point of the `creator-decisions` module (ADR 0162, « À décider »). Other modules import this file only. */
+/** Public entry point of the `creator-decisions` module (ADR 0164, « À décider »). Other modules import this file only. */
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 

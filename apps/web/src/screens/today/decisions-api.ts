@@ -6,7 +6,7 @@ import {
 } from '@impera/contracts';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-/* « À décider », hers (ADR 0162): what waits on her, her answer, « Plus tard ». The server holds the truth. */
+/* « À décider », hers (ADR 0164): what waits on her, her answer, « Plus tard ». The server holds the truth. */
 
 const BASE = '/v1/creator-space/decisions';
 export const DECISIONS_KEY = ['creator-space', 'decisions'] as const;

@@ -45,7 +45,7 @@ const quiet = { onAnswer: () => Promise.resolve('C’est noté.'), onLater: () =
 
 afterEach(cleanup);
 
-describe('« À décider », hers (ADR 0162)', () => {
+describe('« À décider », hers (ADR 0164)', () => {
   it('shows nothing while nothing waits', () => {
     const { container } = render(<DecisionStack decisions={[]} {...quiet} />);
     expect(container.textContent).toBe('');

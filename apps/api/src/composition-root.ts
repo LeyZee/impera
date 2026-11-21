@@ -118,7 +118,7 @@ interface Modules {
   readonly creatorTasks: CreatorTasksModule;
   /** Her week (ADR 0140): its job, called by the tests at a Sunday evening of their choosing. */
   readonly creatorWeek: CreatorWeekModule;
-  /** « À décider », hers (ADR 0162): its door for the code that asks, called by the tests. */
+  /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
   readonly creatorDecisions: CreatorDecisionsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
@@ -228,7 +228,7 @@ export interface AppOptions {
    * departure (EQ-14); the system's otherwise. A departure is the day it is said: nothing else ever back-dates one.
    */
   readonly teamClock?: () => Date;
-  /** Tests only: the clock of « À décider » (ADR 0162), to pass a question's end. */
+  /** Tests only: the clock of « À décider » (ADR 0164), to pass a question's end. */
   readonly decisionsClock?: () => Date;
   /**
    * Tests set the connectors' clock here, to make an unreachable register last a quarter of an hour (Telegram P3-12);

@@ -21,10 +21,10 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const PASSWORD = 'correct horse battery';
 
 /**
- * « À décider », hers (ADR 0162) through the real app: the code asks, she reads and answers her own, the owner
+ * « À décider », hers (ADR 0164) through the real app: the code asks, she reads and answers her own, the owner
  * answers in her place, nobody else reads. Invented people, creators and questions only (ADR 0010).
  */
-describe('her decisions (ADR 0162)', () => {
+describe('her decisions (ADR 0164)', () => {
   let test: TestDb;
   let app: App;
   let server: Server;

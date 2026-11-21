@@ -62,7 +62,7 @@ export function CreatorTodayPage(): JSX.Element {
           />
         ) : null}
         {/* What she owes first: an empty agenda under it is not a day off (recette visuelle 16/11, CRE-01). */}
-        {/* What waits on her answer comes before anything else, one question at a time (ADR 0162). */}
+        {/* What waits on her answer comes before anything else, one question at a time (ADR 0164). */}
         <Decisions />
         <ToSend today={today} />
         <HerDay now={now} today={today} quiet={down} />
@@ -73,7 +73,7 @@ export function CreatorTodayPage(): JSX.Element {
 }
 
 /**
- * « À décider » (ADR 0162): what the agency's code asks her about a content of hers. Nothing while nothing waits, or
+ * « À décider » (ADR 0164): what the agency's code asks her about a content of hers. Nothing while nothing waits, or
  * while the server is silent: the page says that once, on top.
  */
 function Decisions(): JSX.Element | null {

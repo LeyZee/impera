@@ -241,7 +241,7 @@ export type SuggestionId = z.infer<typeof SuggestionIdSchema>;
 export const ShootItemIdSchema = uuid.brand<'ShootItemId'>();
 export type ShootItemId = z.infer<typeof ShootItemIdSchema>;
 
-/** A question put to her (`creator_decisions`, ADR 0162). */
+/** A question put to her (`creator_decisions`, ADR 0164). */
 export const CreatorDecisionIdSchema = uuid.brand<'CreatorDecisionId'>();
 export type CreatorDecisionId = z.infer<typeof CreatorDecisionIdSchema>;
 

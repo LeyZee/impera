@@ -1,7 +1,7 @@
 # INS-05 « À décider » : les cartes de décision de la créatrice
 Statut : in progress (lot a fait : contrat, table, routes, carte dans « Aujourd'hui » ; rien ne s'affiche tant qu'aucun code ne demande)
-Phase : Instagram (ADR 0162)
-Dépend de : ADR 0162 acceptée ; ADR 0042 (espace de la créatrice) ; captures « cartes-de-decision-2 » validées par Charles le 21/11/2026
+Phase : Instagram (ADR 0164)
+Dépend de : ADR 0164 acceptée ; ADR 0042 (espace de la créatrice) ; captures « cartes-de-decision-2 » validées par Charles le 21/11/2026
 Branche : claude/project-thread-u073g5
 Propriétaire : fil Instagram ; relecture Bilan (base, contrats, serveur), Sécurité (droits, cloisonnement), Design (carte)
 
@@ -9,7 +9,7 @@ Propriétaire : fil Instagram ; relecture Bilan (base, contrats, serveur), Sécu
 La créatrice répond d'un geste, sur son téléphone, à une question que le code lui pose sur un de ses contenus ; le propriétaire répond à sa place quand elle ne répond pas.
 
 ## Contexte à lire
-ADR 0162, ADR 0042 § 2, ADR 0087 (rôles de base), `apps/web/src/screens/today/`, `docs/conventions/hygiene.md`.
+ADR 0164, ADR 0042 § 2, ADR 0087 (rôles de base), `apps/web/src/screens/today/`, `docs/conventions/hygiene.md`.
 
 ## À faire
 Lot a, le mécanisme :
