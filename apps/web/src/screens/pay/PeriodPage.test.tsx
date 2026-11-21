@@ -626,6 +626,38 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryByRole('link', { name: 'Ouvrir sa fiche' })).toBeNull();
   });
 
+  it('never dates a payment before its invoice was issued (COUV-02)', async () => {
+    periods[OCT2] = periodOf(
+      OCT2,
+      [
+        statementOf(THEO, OCT2, {
+          status: 'validated',
+          payableMinor: 28_840,
+          totalMinor: 28_840,
+          canValidate: false,
+          invoicedOn: '2026-11-01',
+        }),
+      ],
+      {
+        closing: {
+          period: OCT2,
+          exchangeRates: [],
+          closedBy: OWNER_USER,
+          closedAt: '2026-11-01T08:41:00.000Z',
+        },
+      },
+    );
+    renderPage(OWNER);
+    fireEvent.click(
+      await within(await waitFor(() => row('Théo'))).findByRole('button', { name: 'Marquer payé' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Payé le'), { target: { value: '2026-10-31' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(within(dialog).getByText(/^Un jour du dimanche 1/u)).toBeTruthy();
+    expect(within(dialog).queryByText(/versés à/u)).toBeNull();
+  });
+
   it('lets the owner mark a validated statement paid in two steps, the amount to pay and none other', async () => {
     const closed = {
       period: OCT2,

@@ -66,6 +66,7 @@
   "pay_sale_signal_not_found": 404,
   "pay_sale_signal_state_conflict": 409,
   "payment_amount_unprocessable": 422,
+  "payment_before_invoice_unprocessable": 422,
   "payment_before_period_unprocessable": 422,
   "payment_in_future_unprocessable": 422,
   "payout_blocked_conflict": 409,

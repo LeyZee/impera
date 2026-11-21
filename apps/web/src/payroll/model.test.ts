@@ -757,6 +757,16 @@ describe('words', () => {
       ),
     ).toBe('Le paiement ne peut pas être daté avant le début de la quinzaine (vendredi 16 octobre).');
     expect(
+      payRefusalText(
+        {
+          kind: 'refused',
+          code: 'payment_before_invoice_unprocessable',
+          details: { invoicedOn: '2026-11-21' },
+        },
+        names,
+      ),
+    ).toBe('Le paiement ne peut pas être daté avant l’émission de sa facture (samedi 21 novembre).');
+    expect(
       payRefusalText({ kind: 'refused', code: 'pay_period_not_computed_conflict', details: {} }, names),
     ).toBe('La paie n’a pas encore calculé cette quinzaine : réessaie dans quelques minutes.');
     expect(

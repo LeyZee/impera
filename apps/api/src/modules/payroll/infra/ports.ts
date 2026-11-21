@@ -33,6 +33,11 @@ export interface PayoutGate {
     adminTx: Transaction,
     statements: readonly { readonly memberId: string; readonly statementId: string }[],
   ): Promise<ReadonlyMap<string, InvoiceNotIssuedReason>>;
+  /**
+   * The day the invoice of each statement of `statementIds` was issued, the latest when it was billed again; a statement
+   * without one is left out. A transfer is never dated before it (COUV-02). Read in the caller's transaction.
+   */
+  invoicedOn(tx: Transaction, statementIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
 }
 
 /**
