@@ -1,4 +1,11 @@
-import type { CreatorId, LinkPlacement, RedirectLinkId, UserId } from '@impera/contracts';
+import type {
+  CreatorId,
+  DetectedLink,
+  LinkPlacement,
+  LinkServiceRefusalKind,
+  RedirectLinkId,
+  UserId,
+} from '@impera/contracts';
 
 import type { StoredRedirectLink } from './links';
 
@@ -43,3 +50,15 @@ export interface RedirectLinkStore {
     write: RedirectLinkWrite,
   ): Promise<StoredRedirectLink>;
 }
+
+/**
+ * The links of the agency's account at the redirect service, read now by the `connectors` module (ADR 0120 § 3), or
+ * why they could not be. The account is the agency's, so the list crosses creators: it is the owner's alone.
+ */
+export type DetectLinks = () => Promise<
+  | { readonly ok: true; readonly links: readonly DetectedLink[] }
+  | {
+      readonly ok: false;
+      readonly error: { readonly kind: LinkServiceRefusalKind; readonly message: string };
+    }
+>;

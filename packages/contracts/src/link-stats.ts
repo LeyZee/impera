@@ -75,6 +75,14 @@ export type LinkServiceFailure = z.infer<typeof LinkServiceFailureSchema>;
 
 /** The key was not kept (422): the service refused it, did not answer, or this server has no address for it. */
 export const LINK_SERVICE_UNPROCESSABLE = 'link_service_unprocessable';
-export const LinkServiceRefusalBodySchema = refusalBodySchema(
-  z.enum([...LinkServiceFailureSchema.options, 'off']),
-);
+/**
+ * Why the redirect service was not read, or its key not kept. `off`: this server has no address for it.
+ * `not_connected`: the owner has not given a key yet.
+ */
+export const LinkServiceRefusalKindSchema = z.enum([
+  ...LinkServiceFailureSchema.options,
+  'off',
+  'not_connected',
+]);
+export type LinkServiceRefusalKind = z.infer<typeof LinkServiceRefusalKindSchema>;
+export const LinkServiceRefusalBodySchema = refusalBodySchema(LinkServiceRefusalKindSchema);

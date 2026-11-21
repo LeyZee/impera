@@ -384,7 +384,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...(sandbox !== null && { baseUrls: sdkBaseUrlsOf(sandbox) }),
   });
   const persona = wirePersona(shared);
-  const redirectLinks = wireRedirectLinks(shared);
+  const redirectLinks = wireRedirectLinks(shared, { detectLinks: connectors.module.detectedLinks });
   const customOrders = wireCustomOrders(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,

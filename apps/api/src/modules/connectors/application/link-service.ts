@@ -1,11 +1,10 @@
-import type { LinkServiceFailure, LinkServiceStatus } from '@impera/contracts';
+import type { DetectedLink, LinkServiceRefusalKind, LinkServiceStatus } from '@impera/contracts';
 
 import { LinkServiceError, type LinkServiceKeyStore, type LinkServiceReader } from '../domain/link-service';
 import type { KeyActor } from '../domain/sales-feed';
 
-type Refusal = LinkServiceFailure | 'off';
-
-const REFUSALS: Readonly<Record<Refusal, string>> = {
+const REFUSALS: Readonly<Record<LinkServiceRefusalKind, string>> = {
+  not_connected: 'Aucune clé du service de liens n’est enregistrée. Colle-la dans Réglages.',
   off: 'Le service de liens n’est pas configuré sur ce serveur.',
   unauthorized: 'Le service de liens refuse cette clé. Vérifie que tu as collé la clé entière.',
   forbidden: 'Le service de liens n’ouvre pas son accès à ce compte.',
@@ -14,15 +13,30 @@ const REFUSALS: Readonly<Record<Refusal, string>> = {
   unexpected: 'Le service de liens a répondu autre chose que prévu. La clé n’a pas été gardée.',
 };
 
+interface LinkServiceRefusal {
+  readonly kind: LinkServiceRefusalKind;
+  readonly message: string;
+}
+
+/** The links of the agency's account at the service, or why they could not be read. */
+export type DetectedLinks =
+  | { readonly ok: true; readonly links: readonly DetectedLink[] }
+  | { readonly ok: false; readonly error: LinkServiceRefusal };
+
 type LinkServiceConnect =
   | { readonly ok: true; readonly value: LinkServiceStatus }
-  | { readonly ok: false; readonly error: { readonly kind: Refusal; readonly message: string } };
+  | { readonly ok: false; readonly error: LinkServiceRefusal };
 
 export interface LinkServiceSettings {
   status(): Promise<LinkServiceStatus>;
   /** Asks the service whether it accepts `key`, and keeps it only if it does. */
   connect(key: string, by: KeyActor): Promise<LinkServiceConnect>;
   disconnect(by: KeyActor): Promise<LinkServiceStatus>;
+  /**
+   * Every link of the agency's account at the service, read now with the kept key. Nothing is stored: the caller
+   * shows them to the owner alone, who decides which is whose.
+   */
+  detectedLinks(): Promise<DetectedLinks>;
 }
 
 /**
@@ -47,10 +61,10 @@ export function createLinkServiceSettings(deps: {
     };
   }
 
-  const refused = (kind: Refusal): LinkServiceConnect => ({
-    ok: false,
-    error: { kind, message: REFUSALS[kind] },
-  });
+  const refusal = (kind: LinkServiceRefusalKind): LinkServiceRefusal => ({ kind, message: REFUSALS[kind] });
+  const refused = (kind: LinkServiceRefusalKind): LinkServiceConnect => ({ ok: false, error: refusal(kind) });
+  const kindOf = (error: unknown): LinkServiceRefusalKind =>
+    error instanceof LinkServiceError ? error.kind : 'unavailable';
 
   return {
     status,
@@ -60,7 +74,7 @@ export function createLinkServiceSettings(deps: {
       try {
         await readerOf(key).ping();
       } catch (error) {
-        return refused(error instanceof LinkServiceError ? error.kind : 'unavailable');
+        return refused(kindOf(error));
       }
       await keys.save(key, now(), by);
       return { ok: true, value: await status() };
@@ -69,6 +83,19 @@ export function createLinkServiceSettings(deps: {
     async disconnect(by) {
       if (keys !== null) await keys.remove(by);
       return status();
+    },
+
+    async detectedLinks() {
+      if (keys === null || readerOf === null) return { ok: false, error: refusal('off') };
+      const stored = await keys.find();
+      if (stored === null) return { ok: false, error: refusal('not_connected') };
+      // A key no listed encryption key opens is one to paste again, as a key the service no longer accepts.
+      if (stored.key === null) return { ok: false, error: refusal('unauthorized') };
+      try {
+        return { ok: true, links: await readerOf(stored.key).listLinks() };
+      } catch (error) {
+        return { ok: false, error: refusal(kindOf(error)) };
+      }
     },
   };
 }
