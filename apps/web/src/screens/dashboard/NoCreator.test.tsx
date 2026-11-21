@@ -89,7 +89,9 @@ describe('the Dashboard and Suivi before any creator, as each role opens them', 
     for (const user of [manager, operator]) {
       renderApp(user, '/');
       expect(await screen.findByText(/ne t’est confiée/u), user.team?.role ?? user.role).toBeDefined();
-      expect(screen.getByText('Le propriétaire de l’agence te les confie.')).toBeDefined();
+      expect(
+        screen.getByText('C’est le propriétaire de l’agence qui te les confie. Elles apparaîtront ici.'),
+      ).toBeDefined();
       expect(screen.queryByText(/première créatrice/u)).toBeNull();
       expect(screen.queryByRole('link', { name: 'Aller à Créatrices' })).toBeNull();
       cleanup();

@@ -168,7 +168,7 @@ export function NoCreator({ canAddCreator }: { canAddCreator: boolean }): JSX.El
     <Alone
       tone="idle"
       headline="Aucune créatrice **ne t’est confiée**"
-      lead="Le propriétaire de l’agence te les confie."
+      lead="C’est le propriétaire de l’agence qui te les confie. Elles apparaîtront ici."
     />
   );
 }
