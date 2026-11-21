@@ -8,15 +8,13 @@ import {
 } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
-import { Avatar } from './parts';
 import './team.css';
 
-import { IncidentTrack, SignalChips } from '@/reports/FeedbackPanel';
+import { IncidentTrack, RpIcon, SignalChips, StagePill } from '@/reports/FeedbackPanel';
 import {
   FEEDBACK_ERRORS,
   incidentStage,
   SIGNAL_CATEGORIES,
-  STAGE_WORDS,
   stepIncident,
   useRefreshFeedbacks,
   useShiftFeedbacks,
@@ -25,6 +23,7 @@ import { periodLine } from '@/reports/model';
 import { accountLine, swapShiftLine } from '@/scheduling/model';
 import { dayOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { initialsOf } from '@/settings/sales-feed/importing';
 import { Donut, useLit } from '@/shell/figures/figures';
 import { Panel } from '@/shell/layout';
 import { Failure } from '@/shell/states';
@@ -47,7 +46,11 @@ function Whose({
   return (
     <div className="rp-fb__whose">
       <p className="rp-fb__who">
-        {member === undefined ? null : <Avatar member={member} />}
+        {member === undefined ? null : (
+          <span className="nv-avatar nv-avatar--sm" aria-hidden="true">
+            {initialsOf(member.displayName)}
+          </span>
+        )}
         {member?.displayName ?? 'Un membre'}
       </p>
       <p className="rp-fb__where">
@@ -132,11 +135,7 @@ export function IncidentsCard({ zone }: { zone: string }): JSX.Element | null {
               >
                 <div className="rp-incident-line__top">
                   <Whose line={line} list={list} zone={zone} />
-                  {stage === null ? null : (
-                    <span className="rp-stage" data-stage={stage}>
-                      {STAGE_WORDS[stage]}
-                    </span>
-                  )}
+                  {stage === null ? null : <StagePill stage={stage} />}
                 </div>
                 <p className="rp-incident-line__text">{line.incident}</p>
                 <IncidentTrack feedback={line} zone={zone} today={dayOf(now, zone)} />
@@ -145,23 +144,25 @@ export function IncidentsCard({ zone }: { zone: string }): JSX.Element | null {
                   {stage === 'sent' ? (
                     <button
                       type="button"
-                      className="nv-btn nv-btn--soft"
+                      className="nv-btn nv-btn--plain nv-btn--sm rp-icon-btn"
                       disabled={busy !== null}
                       onClick={() => {
                         void say(line, 'seen');
                       }}
                     >
+                      <RpIcon name="seen" />
                       Vu
                     </button>
                   ) : null}
                   <button
                     type="button"
-                    className="nv-btn nv-btn--soft rp-incident-line__done"
+                    className="nv-btn nv-btn--soft nv-btn--sm rp-icon-btn rp-incident-line__done"
                     disabled={busy !== null}
                     onClick={() => {
                       void say(line, 'resolved');
                     }}
                   >
+                    <RpIcon name="done" />
                     Réglé
                   </button>
                 </div>
@@ -310,12 +311,13 @@ export function FeedbacksPanel({
                       <Whose line={line} list={list} zone={zone} />
                       {stage === null ? (
                         line.nothingToReport ? (
-                          <span className="rp-chip rp-chip--ok">Rien à signaler</span>
+                          <span className="nv-status rp-stage-pill" data-stage="resolved">
+                            <span className="nv-status__dot" />
+                            Rien à signaler
+                          </span>
                         ) : null
                       ) : (
-                        <span className="rp-stage" data-stage={stage}>
-                          Incident · {STAGE_WORDS[stage]}
-                        </span>
+                        <StagePill stage={stage} prefix="Incident · " />
                       )}
                     </div>
                     {line.incident === null ? null : (

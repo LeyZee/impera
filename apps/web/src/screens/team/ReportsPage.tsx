@@ -57,7 +57,7 @@ import { PeriodArrows, PeriodHeading } from '@/screens/pay/parts';
 import { useTeamImportCounts } from '@/settings/sales-feed/api';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { screenLabel } from '@/shell/nav';
-import { Failure } from '@/shell/states';
+import { Empty, Failure } from '@/shell/states';
 
 /** The correction panel the agency opens on a validated report, for its shift. */
 interface Correcting {
@@ -484,21 +484,23 @@ function ToValidate({
   return (
     <Panel className="rp-validate nv-enter" eyebrow="À valider">
       <div className="rp-sec">
-        <div className="rp-validate__top">
-          <p className="rp-validate__count">
-            <span className="rp-validate__num nv-num">{waiting.length}</span>
-            <span className="rp-validate__what">
-              {waiting.length === 0
-                ? 'Rien à valider'
-                : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
-            </span>
-          </p>
-          {sums.length === 0 ? null : (
-            <p className="rp-validate__sum nv-num">
-              {sums.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' · ')} déclarés
+        {waiting.length === 0 ? null : (
+          <div className="rp-validate__top">
+            <p className="rp-validate__count">
+              <span className="rp-validate__num nv-num">{waiting.length}</span>
+              <span className="rp-validate__what">
+                {waiting.length === 0
+                  ? 'Rien à valider'
+                  : `${waiting.length === 1 ? 'rapport attend' : 'rapports attendent'}${decideLine}`}
+              </span>
             </p>
-          )}
-        </div>
+            {sums.length === 0 ? null : (
+              <p className="rp-validate__sum nv-num">
+                {sums.map((sum) => amountText(sum.waitingMinor, sum.currency)).join(' · ')} déclarés
+              </p>
+            )}
+          </div>
+        )}
         {unread ? (
           <p className="rp-validate__unread">
             Les ventes de Reveal ne sont pas encore lues : aucun rapport ne se valide tout seul, chacun se
@@ -538,9 +540,9 @@ function ToValidate({
         ) : null}
 
         {waiting.length === 0 ? (
-          <p className="rp-mine__empty">
+          <Empty title="Rien à valider">
             Tout est validé. Un rapport arrive ici dès qu’un membre le fait, à la fin de son shift.
-          </p>
+          </Empty>
         ) : (
           <>
             {reviewable.length === 0 ? null : (

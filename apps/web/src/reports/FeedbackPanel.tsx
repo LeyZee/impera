@@ -157,7 +157,10 @@ export function SignalChips({ feedback }: { feedback: Pick<ShiftFeedback, 'signa
         const category = SIGNAL_CATEGORIES[signal.category];
         return (
           <li key={index} className="rp-signal" data-kind={category.kind}>
-            <span className="rp-signal__cat">{category.label}</span>
+            <span className="nv-tag rp-signal__cat">
+              <span className="rp-cat__dot" aria-hidden="true" />
+              {category.label}
+            </span>
             <span className="rp-signal__text">{signal.text}</span>
           </li>
         );
@@ -301,6 +304,9 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
 
       <div className="rp-incident" data-on={incidentOn ? 'true' : undefined}>
         <label className="rp-incident__row" htmlFor={`${id}-incident-on`}>
+          <span className="rp-incident__badge" aria-hidden="true">
+            <RpIcon name="alert" />
+          </span>
           <span className="rp-incident__text">
             <span className="rp-incident__title">Signaler un incident</span>
             <span className="rp-incident__sub">L’agence est prévenue tout de suite sur son téléphone.</span>
@@ -354,13 +360,14 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
                 <button
                   key={category}
                   type="button"
-                  className="rp-cat"
+                  className="nv-chip rp-cat"
                   data-kind={SIGNAL_CATEGORIES[category].kind}
                   aria-pressed={one.category === category}
                   onClick={() => {
                     change(one.key, { category });
                   }}
                 >
+                  <span className="rp-cat__dot" aria-hidden="true" />
                   {SIGNAL_CATEGORIES[category].label}
                 </button>
               ))}
@@ -379,11 +386,12 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
               />
               <button
                 type="button"
-                className="nv-btn nv-btn--plain"
+                className="nv-btn nv-btn--plain nv-btn--sm rp-icon-btn"
                 onClick={() => {
                   setSignals((before) => before.filter((other) => other.key !== one.key));
                 }}
               >
+                <RpIcon name="remove" />
                 Retirer
               </button>
             </div>
@@ -393,7 +401,7 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
         {signals.length < SHIFT_FEEDBACK_SIGNALS_MAX ? (
           <button
             type="button"
-            className="nv-btn nv-btn--soft rp-remontees__add"
+            className="nv-btn nv-btn--soft nv-btn--sm rp-remontees__add rp-icon-btn"
             onClick={() => {
               setSignals((before) => [
                 ...before,
@@ -401,6 +409,7 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
               ]);
             }}
           >
+            <RpIcon name="add" />
             Ajouter une remontée
           </button>
         ) : null}
@@ -430,5 +439,39 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
         </button>
       </div>
     </form>
+  );
+}
+
+/** The form's few pictograms, drawn like the navigation's (round stroke, 24 grid): never an emoji. */
+export function RpIcon({ name }: { name: 'add' | 'remove' | 'alert' | 'seen' | 'done' }): JSX.Element {
+  return (
+    <svg className="rp-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {name === 'add' ? <path d="M12 5v14M5 12h14" /> : null}
+      {name === 'remove' ? <path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10.5 11v5M13.5 11v5" /> : null}
+      {name === 'alert' ? (
+        <>
+          <path d="M12 3.5 2.8 19.5h18.4z" />
+          <path d="M12 10v4.2M12 17.2v.1" />
+        </>
+      ) : null}
+      {name === 'seen' ? (
+        <>
+          <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+          <circle cx="12" cy="12" r="2.8" />
+        </>
+      ) : null}
+      {name === 'done' ? <path d="m5 12.5 4.5 4.5L19 7.5" /> : null}
+    </svg>
+  );
+}
+
+/** Where an incident stands, as the system's state pill: red while nobody saw it (it breathes), amber seen, green done. */
+export function StagePill({ stage, prefix = '' }: { stage: IncidentStage; prefix?: string }): JSX.Element {
+  return (
+    <span className="nv-status rp-stage-pill" data-stage={stage}>
+      <span className="nv-status__dot" />
+      {prefix}
+      {STAGE_WORDS[stage]}
+    </span>
   );
 }

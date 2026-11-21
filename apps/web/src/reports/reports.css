@@ -149,28 +149,39 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-3) var(--nv-space-4);
+  padding: var(--nv-space-3);
+  margin-inline: calc(var(--nv-space-3) * -1);
   border-radius: var(--nv-radius-md);
-  /* A discreet ground of its own: the glass fill vanishes on a dialog in Jour (captures of #591). */
-  background: var(--nv-fill-soft);
   transition: background-color var(--nv-dur-base) var(--nv-ease-out);
 }
-.rp-incident:hover {
-  background: var(--nv-fill-track);
-}
+/* Switched on, the urgency's red, at 8 % on the glass: one tint, no frame. */
 .rp-incident[data-on='true'] {
-  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-fill-soft));
+  background: color-mix(in srgb, var(--nv-danger) 8%, transparent);
 }
 .rp-incident__row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--nv-space-3);
   min-height: var(--nv-target-min);
   cursor: pointer;
 }
+.rp-incident__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-danger) 14%, transparent);
+  color: var(--nv-danger);
+  transition: transform var(--nv-dur-base) var(--nv-ease-spring, var(--nv-ease-out));
+}
+.rp-incident[data-on='true'] .rp-incident__badge {
+  transform: scale(1.08) rotate(-6deg);
+}
 .rp-incident__text {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
@@ -1424,21 +1435,19 @@ a.sc-sheet__report:focus-visible,
 }
 
 .rp-incident-sent {
+  --_c: var(--nv-danger);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
   padding: var(--nv-space-4);
   border-radius: var(--nv-radius-md);
-  background: color-mix(in srgb, var(--nv-danger) 8%, var(--nv-fill-soft));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 24%, transparent);
+  background: color-mix(in srgb, var(--_c) 10%, transparent);
 }
 .rp-incident-sent[data-stage='seen'] {
-  background: color-mix(in srgb, var(--nv-warning) 8%, var(--nv-fill-soft));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 26%, transparent);
+  --_c: var(--nv-warning);
 }
 .rp-incident-sent[data-stage='resolved'] {
-  background: color-mix(in srgb, var(--nv-success) 8%, var(--nv-fill-soft));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 24%, transparent);
+  --_c: var(--nv-success);
 }
 .rp-incident-sent__title {
   margin: 0;
@@ -1488,12 +1497,10 @@ a.sc-sheet__report:focus-visible,
 }
 .rp-signal__cat {
   flex: none;
-  padding: 1px 8px;
-  border-radius: var(--nv-radius-full);
-  background: color-mix(in srgb, var(--rp-kind) 16%, transparent);
-  color: var(--rp-kind);
-  font-size: var(--nv-text-caption);
-  font-weight: 650;
+}
+.rp-signal__cat .rp-cat__dot {
+  width: 6px;
+  height: 6px;
 }
 .rp-signal__text {
   min-width: 0;
@@ -1513,9 +1520,8 @@ a.sc-sheet__report:focus-visible,
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-3);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-fill-soft);
+  padding-bottom: var(--nv-space-3);
+  border-bottom: 1px solid var(--nv-hairline, var(--nv-plate-edge));
 }
 .rp-remontee__cats {
   display: flex;
@@ -1533,39 +1539,25 @@ a.sc-sheet__report:focus-visible,
   align-self: flex-end;
 }
 .rp-cat {
-  min-height: var(--nv-pill-choice);
-  padding: 0 10px;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* The category's colour as a dot in front of its word (nv-chip, nv-tag): the pill stays the system's. */
+.rp-cat__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
   border-radius: var(--nv-radius-full);
-  background: var(--nv-glass-fill);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rp-kind) 35%, transparent);
-  color: var(--nv-ink-muted);
-  font: inherit;
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    color var(--nv-dur-fast) var(--nv-ease-out);
+  background: var(--rp-kind);
 }
-.rp-cat:hover {
-  background: color-mix(in srgb, var(--rp-kind) 12%, var(--nv-glass-fill));
-  color: var(--nv-ink);
-}
-.rp-cat[aria-pressed='true'] {
-  background: color-mix(in srgb, var(--rp-kind) 22%, var(--nv-glass-fill));
-  box-shadow: inset 0 0 0 1px var(--rp-kind);
-  color: var(--nv-ink);
-}
-.rp-cat:focus-visible {
-  outline: none;
-  box-shadow: var(--nv-shadow-focus);
+.rp-cat[aria-pressed='true'] .rp-cat__dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rp-kind) 40%, transparent);
 }
 
 /* Équipe › Rapports: the incidents still open, first and in red. */
 .nv-plate.rp-incidents {
-  background: color-mix(in srgb, var(--nv-danger) 9%, var(--nv-plate));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-danger) 34%, transparent);
+  background: color-mix(in srgb, var(--nv-danger) 8%, var(--nv-plate));
 }
 .rp-incidents .nv-eyebrow {
   color: var(--nv-danger);
@@ -1580,21 +1572,30 @@ a.sc-sheet__report:focus-visible,
 .rp-fbs__list {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* One plate per subject (Design, #992): its lines are parted by a hairline, never cards in a card. */
 .rp-incident-line,
 .rp-fb {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-4);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-plate);
-  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
+  padding: var(--nv-space-4) 0;
   transition: opacity var(--nv-dur-base) var(--nv-ease-out);
+}
+.rp-incident-line + .rp-incident-line,
+.rp-fb + .rp-fb {
+  border-top: 1px solid var(--nv-hairline, var(--nv-plate-edge));
+}
+.rp-incident-line:first-child,
+.rp-fb:first-child {
+  padding-top: var(--nv-space-2);
+}
+.rp-incident-line:last-child,
+.rp-fb:last-child {
+  padding-bottom: 0;
 }
 .rp-incident-line[aria-busy='true'] {
   opacity: 0.6;
@@ -1615,41 +1616,44 @@ a.sc-sheet__report:focus-visible,
 .rp-incident-line__done:not(:disabled):hover {
   color: var(--nv-success);
 }
-.rp-stage {
-  --rp-stage: var(--nv-danger);
+.nv-status.rp-stage-pill {
+  --_c: var(--nv-danger);
+}
+.nv-status.rp-stage-pill[data-stage='seen'] {
+  --_c: var(--nv-warning);
+}
+.nv-status.rp-stage-pill[data-stage='resolved'] {
+  --_c: var(--nv-success);
+}
+/* Nobody saw it yet: its dot breathes, as the system's states at work do. */
+.rp-stage-pill[data-stage='sent'] .nv-status__dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--_c);
+  animation: nv-ping 1.8s var(--nv-ease-out) infinite;
+}
+.rp-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rp-icon-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex: none;
-  min-height: var(--nv-pill-info);
-  padding: 0 10px;
-  border-radius: var(--nv-radius-full);
-  background: color-mix(in srgb, var(--rp-stage) 14%, transparent);
-  color: var(--rp-stage);
-  font-size: var(--nv-text-caption);
-  font-weight: 700;
-  white-space: nowrap;
 }
-.rp-stage::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: var(--nv-radius-full);
-  background: currentColor;
+.rp-incident__badge .rp-icon {
+  width: 18px;
+  height: 18px;
 }
-.rp-stage[data-stage='sent']::before {
-  animation: rp-beat var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
-}
-.rp-stage[data-stage='seen'] {
-  --rp-stage: var(--nv-warning);
-}
-.rp-stage[data-stage='resolved'] {
-  --rp-stage: var(--nv-success);
-}
-@keyframes rp-beat {
-  50% {
-    opacity: 0.25;
-  }
+.rp-incident-line__done:not(:disabled):hover .rp-icon {
+  color: var(--nv-success);
 }
 .rp-fb__whose {
   display: flex;
@@ -1734,8 +1738,10 @@ a.sc-sheet__report:focus-visible,
   .rp-island__spin {
     animation-duration: 2.4s;
   }
-  .rp-stage[data-stage='sent']::before {
+  .rp-stage-pill[data-stage='sent'] .nv-status__dot::after,
+  .rp-incident__badge {
     animation: none;
+    transition: none;
   }
   .rp-incident,
   .rp-track__seg,
