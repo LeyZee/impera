@@ -7,6 +7,7 @@ import type {
   MediaSlotKind,
   SaveScriptStructureBody,
   PersonaLimits,
+  Platform,
   PlatformAccountId,
   PlatformScript,
   PlatformScriptId,
@@ -29,7 +30,7 @@ import type {
 } from '@impera/contracts';
 
 import type { BranchSetting } from './branches';
-import type { KnownPlatformScript, PlatformScriptsPlan } from './platform-scripts';
+import type { KnownPlatformScript, PlatformScriptsPlan, StepTotals } from './platform-scripts';
 import type { PreparedVaultMedia } from './prepared-scripts';
 import type { NativeScriptForMatch, PreparedForMatch, Recognition } from './recognition';
 
@@ -176,6 +177,17 @@ export type LimitsOf = (creatorId: CreatorId) => Promise<PersonaLimits | null>;
 interface ImportAccount {
   readonly id: PlatformAccountId;
   readonly creatorId: CreatorId;
+  readonly platform: Platform;
+}
+
+/**
+ * The platform's totals of the steps read by an import, for its day (ADR 0129 § 12): written with the plan, each over
+ * the row of the same day (the platform's last word); the days before stay as they were.
+ */
+export interface ImportTotals {
+  /** The platform's day of the read, `YYYY-MM-DD`. */
+  readonly day: string;
+  readonly steps: readonly StepTotals[];
 }
 
 /** The import's writes (`scripts.import_platform_scripts`, ADR 0099 § 1 time 2), as the service role. */
@@ -187,7 +199,12 @@ export interface PlatformScriptImportStore {
    * The whole plan in one transaction: a cut import leaves the account as it was. Gives the ids of the scripts added
    * or rewritten, whose identity is to write again.
    */
-  apply(account: ImportAccount, plan: PlatformScriptsPlan, now: Date): Promise<readonly string[]>;
+  apply(
+    account: ImportAccount,
+    plan: PlatformScriptsPlan,
+    now: Date,
+    totals: ImportTotals | null,
+  ): Promise<readonly string[]>;
 }
 
 /**

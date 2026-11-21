@@ -65,6 +65,19 @@ describe('sendSession', () => {
     ]);
   });
 
+  it('says « open » when the extension synced alone, so the server tells the gesture apart (ADR 0147 § 2)', async () => {
+    const fetchFn = answer(200, {
+      sessionState: 'valid',
+      expiresAt: null,
+      reconnectFirst: false,
+      kept: false,
+    });
+    await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, fetchFn, 'open');
+    const [, init] = vi.mocked(fetchFn).mock.calls[0] ?? [];
+    const body: unknown = JSON.parse(typeof init?.body === 'string' ? init.body : '');
+    expect(body).toEqual({ platformAccountId: ACCOUNT, session: JSON.stringify(SESSION), trigger: 'open' });
+  });
+
   // A 2xx is a session stored: an answer without its details only loses the hour (an older CRM answered 204).
   it('takes a stored session whose answer says nothing of its end', async () => {
     expect(await sendSession(ORIGIN, TOKEN, ACCOUNT, SESSION, answer(204, null))).toEqual({

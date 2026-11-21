@@ -5,6 +5,7 @@ export * from './calibration';
 export * from './content-drops';
 export * from './conversations';
 export * from './creator-tasks';
+export * from './creator-decisions';
 export * from './creator-week';
 export * from './credentials';
 export * from './events';

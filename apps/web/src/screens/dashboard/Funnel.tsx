@@ -4,8 +4,15 @@ import type { JSX } from 'react';
 import { signed } from './logic';
 import { CountUp, type FloatingTip } from './parts';
 
-/** The steps of the fans' path, in the trade's words, with what each one means. */
-const STEPS: readonly { readonly name: string; readonly hint: string; readonly meaning: string }[] = [
+/** One step of a path, in the trade's words, with what it means. */
+export interface FunnelLabel {
+  readonly name: string;
+  readonly hint: string;
+  readonly meaning: string;
+}
+
+/** The agent's path of a fan on a creator's Dashboard, shown once Reveal's purchases are observed. */
+export const AGENT_PATH: readonly FunnelLabel[] = [
   { name: 'Nouveaux fans', hint: 'abonnés sur la période', meaning: 'Tous les fans arrivés sur la période.' },
   {
     name: 'Fan connu',
@@ -29,19 +36,33 @@ const formatCount = (value: number): string => String(Math.round(value));
 
 /** Level 2 bis: where the agent loses fans. The step that fell the most against the period before is amber. */
 export function FunnelPanel({
+  labels,
   counts,
   before,
+  breakNote = 'La plus forte baisse de la période : c’est ici qu’il faut lire les conversations.',
+  colours,
+  soft = false,
   tip,
 }: {
+  labels: readonly FunnelLabel[];
   counts: readonly number[];
-  before: readonly number[];
+  /** Absent: no comparison, so no step is flagged. */
+  before?: readonly number[];
+  breakNote?: string;
+  /** One colour per step (series tokens); absent, the design system's ink. */
+  colours?: readonly string[];
+  /**
+   * Widths on a square-root scale: a path that falls from thousands to tens keeps its last steps apart (38 against
+   * 14 stays readable). The counts and rates are untouched.
+   */
+  soft?: boolean;
   tip: FloatingTip;
 }): JSX.Element {
   const { steps, breakIndex } = funnelSteps(counts, before);
   return (
     <div className="nv-funnel nv-plate db-funnel">
       {steps.map((step, i) => {
-        const label = STEPS[i];
+        const label = labels[i];
         const previous = steps[i - 1];
         const broke = i === breakIndex;
         const rows: [string, string][] = [];
@@ -54,24 +75,25 @@ export function FunnelPanel({
           <div
             key={label?.name ?? i}
             className={`nv-funnel__step${broke ? ' nv-funnel__step--break' : ''}`}
-            style={{ '--nv-i': i }}
+            style={colours?.[i] === undefined ? { '--nv-i': i } : { '--nv-i': i, '--_step': colours[i] }}
             tabIndex={0}
             {...tip.bind({
               title: label?.name ?? '',
               text: label?.meaning ?? '',
               rows,
-              ...(broke
-                ? {
-                    note: 'La plus forte baisse de la période : c’est ici qu’il faut lire les conversations.',
-                  }
-                : {}),
+              ...(broke ? { note: breakNote } : {}),
             })}
           >
             <span className="nv-funnel__label">
               <span className="nv-funnel__name">{label?.name}</span>
               <span className="nv-funnel__hint">{label?.hint}</span>
             </span>
-            <span className="nv-funnel__track" style={{ '--nv-w': `${String(step.width)}%` }}>
+            <span
+              className="nv-funnel__track"
+              style={{
+                '--nv-w': `${String(step.count > 0 ? Math.max(soft ? Math.sqrt(step.width / 100) * 100 : step.width, 3) : 0)}%`,
+              }}
+            >
               <span className="nv-funnel__bar" />
               {broke ? <span className="nv-funnel__flag">Ça casse ici</span> : null}
             </span>

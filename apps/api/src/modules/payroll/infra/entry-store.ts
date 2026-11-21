@@ -31,6 +31,7 @@ import {
   assertNotTooFar,
   assertOpenBeforeLocks,
   assertPayment,
+  assertGivesPayOf,
   assertWritesPayOf,
   isOpenFor,
   penaltyCancelledFrom,
@@ -186,7 +187,7 @@ async function enqueueChanged(
  * The period a new adjustment of the member goes on, its locks held (ADR 0035): the member's first open period. It is
  * chosen before the locks, then checked under them: a validation that came in between closes it for the member and
  * moves the choice later, to periods the transaction holds already or after today's. The member has joined by then
- * and has a rate in force there. An adjustment typed by a manager and the correction of an upheld contest (ADR 0039)
+ * and has a rate in force there. An adjustment typed by the owner and the correction of an upheld contest (ADR 0039)
  * go there alike.
  */
 async function lockAdjustmentPeriod(
@@ -291,7 +292,7 @@ export function createDrizzlePayrollEntryStore(
   return {
     createBonus: (actor, body) =>
       withMember(db, actor.userId, async (tx, scope) => {
-        assertWritesPayOf(await readerOf(tx, actor.userId, scope), body.memberId);
+        assertGivesPayOf(await readerOf(tx, actor.userId, scope), body.memberId);
         const replay = async () => {
           const [row] = await tx.select().from(bonuses).where(eq(bonuses.id, body.id));
           if (row === undefined) return null;
@@ -329,7 +330,7 @@ export function createDrizzlePayrollEntryStore(
         const [found] = await tx.select().from(bonuses).where(eq(bonuses.id, id));
         if (found === undefined) throw new BonusNotFound();
         const memberId = TeamMemberIdSchema.parse(found.memberId);
-        assertWritesPayOf(await readerOf(tx, actor.userId, scope), memberId);
+        assertGivesPayOf(await readerOf(tx, actor.userId, scope), memberId);
         if (found.cancelledAt !== null) return bonusOfRow(found);
 
         const period = PayPeriodSchema.parse(found.period);
@@ -443,7 +444,7 @@ export function createDrizzlePayrollEntryStore(
 
     createAdjustment: (actor, body) =>
       withMember(db, actor.userId, async (tx, scope) => {
-        assertWritesPayOf(await readerOf(tx, actor.userId, scope), body.memberId);
+        assertGivesPayOf(await readerOf(tx, actor.userId, scope), body.memberId);
         const replay = async () => {
           const [row] = await tx.select().from(payAdjustments).where(eq(payAdjustments.id, body.id));
           if (row === undefined) return null;

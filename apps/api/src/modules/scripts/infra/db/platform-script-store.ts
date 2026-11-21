@@ -6,6 +6,7 @@ import {
   MediaSlotKindSchema,
   newId,
   PlatformAccountIdSchema,
+  PlatformSchema,
   PlatformScriptIdSchema,
   PlatformScriptMomentSchema,
   PreparedScriptContentSchema,
@@ -48,6 +49,7 @@ const steps = schema.platformScriptSteps;
 const stepMedia = schema.platformScriptStepMedia;
 const identities = schema.scriptIdentities;
 const branches = schema.platformScriptBranches;
+const daily = schema.platformScriptStepDaily;
 
 /** Its steps and their media, in the platform's order: `index` is the position kept (`stepIndex`, ADR 0099 § 3). */
 async function writeSteps(
@@ -98,7 +100,11 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
     account: (creatorId, platformAccountId) =>
       withAdmin(adminDb, async (tx) => {
         const [row] = await tx
-          .select({ id: schema.platformAccounts.id, creatorId: schema.platformAccounts.creatorId })
+          .select({
+            id: schema.platformAccounts.id,
+            creatorId: schema.platformAccounts.creatorId,
+            platform: schema.platformAccounts.platform,
+          })
           .from(schema.platformAccounts)
           .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
           // Hers, and an archived creator is read no more (ADR 0071 § 2).
@@ -111,7 +117,11 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
           );
         return row === undefined
           ? null
-          : { id: PlatformAccountIdSchema.parse(row.id), creatorId: CreatorIdSchema.parse(row.creatorId) };
+          : {
+              id: PlatformAccountIdSchema.parse(row.id),
+              creatorId: CreatorIdSchema.parse(row.creatorId),
+              platform: PlatformSchema.parse(row.platform),
+            };
       }),
 
     known: (accountId) =>
@@ -129,7 +139,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
         ).map((row): KnownPlatformScript => row),
       ),
 
-    apply: (account, plan: PlatformScriptsPlan, now) =>
+    apply: (account, plan: PlatformScriptsPlan, now, totals) =>
       withAdmin(adminDb, async (tx) => {
         const written: string[] = [];
         for (const script of plan.added) {
@@ -176,6 +186,33 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
             .update(scripts)
             .set({ active: false, deactivatedAt: now })
             .where(and(inArray(scripts.id, [...plan.gone]), eq(scripts.platformAccountId, account.id)));
+        // The platform's totals of its steps on the day, over the row of the same day (ADR 0129 § 12).
+        if (totals !== null && totals.steps.length > 0)
+          await tx
+            .insert(daily)
+            .values(
+              totals.steps.map((each) => ({
+                creatorId: account.creatorId,
+                platformAccountId: account.id,
+                platformStepRef: each.platformStepRef,
+                day: totals.day,
+                sent: each.sent,
+                purchased: each.purchased,
+                paidMinor: each.paidMinor,
+                currency: each.currency,
+                readAt: now,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [daily.platformAccountId, daily.platformStepRef, daily.day],
+              set: {
+                sent: sql`excluded.sent`,
+                purchased: sql`excluded.purchased`,
+                paidMinor: sql`excluded.paid_minor`,
+                currency: sql`excluded.currency`,
+                readAt: sql`excluded.read_at`,
+              },
+            });
         return written;
       }),
   };
