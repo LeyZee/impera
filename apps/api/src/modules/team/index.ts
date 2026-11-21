@@ -3,9 +3,18 @@ import type { Database, Transaction } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { createAnnouncementService } from './application/announcements';
 import { createTeamService, type InviteFromPlatform } from './application/team';
 import { calendarDayIn } from './domain/members';
-import type { Actor, CreatorRoster, InvitationLinkDirectory, PlatformRemovals } from './domain/ports';
+import type {
+  Actor,
+  CreatorNames,
+  CreatorRoster,
+  InvitationLinkDirectory,
+  PlatformRemovals,
+} from './domain/ports';
+import { createDrizzleAnnouncementStore } from './infra/announcement-store';
+import { createAnnouncementRoutes } from './infra/http/announcement-routes';
 import { createTeamRoutes, type RequireRole } from './infra/http/routes';
 import { membersForPay, type MemberForPay } from './infra/pay-reads';
 import { applyRolesUnscoped } from './infra/role-jobs';
@@ -27,6 +36,8 @@ export interface TeamModule {
    * every write of the owner (EQ-15).
    */
   routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
+  /** Mounted under `/v1` by the server: `/team/announcements` (EQ-12), the owner's and the team's accounts. */
+  announcementRoutes(requireRole: RequireRole): FastifyPluginAsyncZod;
   /**
    * What pay reads of the team (EQ-04), in pay's own transaction, given by the composition root: every member with
    * the rate in force on a day (pay's job on the admin connection, or a validation as its member).
@@ -56,6 +67,8 @@ export interface TeamDeps {
   readonly adminDb: Database;
   /** The creators that exist, to refuse an unknown one in `creatorIds` (the `persona` module's directory). */
   readonly creators: CreatorRoster;
+  /** The creators' names, for what an announcement says it is addressed to (the `persona` module's directory). */
+  readonly creatorNames: CreatorNames;
   /** Each member's link out (EQ-10), for when it stops working. */
   readonly invitationLinks: InvitationLinkDirectory;
   /** Pay's `payroll.recalculate` for a period, which a new rate or role enqueues (the `payroll` module's, EQ-04). */
@@ -73,8 +86,13 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
     deps.invitationLinks,
     { agencyTimeZone: DEFAULT_AGENCY_TIME_ZONE, now },
   );
+  const announcements = createAnnouncementService(
+    createDrizzleAnnouncementStore(deps.db, now),
+    deps.creatorNames,
+  );
   return {
     name: 'team',
+    announcementRoutes: (requireRole) => createAnnouncementRoutes(announcements, requireRole),
     routes: (requireRole, recentLogin) =>
       createTeamRoutes(service, requireRole, deps.platformRemovals, recentLogin),
     pay: { members: membersForPay },

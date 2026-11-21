@@ -25,6 +25,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { aMinuteAgoToday } from './support/paris';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const PASSWORD = 'correct horse battery';
@@ -34,21 +35,6 @@ const PASSWORD = 'correct horse battery';
  * only, never for a chatter, an operator of his own scope nor the creator, and never a fan. Everything is invented
  * (ADR 0010).
  */
-
-/** This instant's midnight in Paris, in ms (the hours of a change of time are past at 3h, never in the first minute). */
-function parisMidnight(at: Date): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/Paris',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-    hourCycle: 'h23',
-  }).formatToParts(at);
-  const part = (type: Intl.DateTimeFormatPartTypes): number =>
-    Number(parts.find((one) => one.type === type)?.value ?? 0);
-  const since = ((part('hour') * 60 + part('minute')) * 60 + part('second')) * 1000 + at.getMilliseconds();
-  return at.getTime() - since;
-}
 
 const shiftDayBy = (day: string, days: number): string =>
   new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -193,9 +179,8 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       { platform: 'reveal', platformChatterId: 'bot_test_01', kind: 'agent' },
     ]);
 
-    // Today in Paris, whatever the hour the test runs at: a minute ago, or just after midnight when it runs in the first
-    // minute of the day (the route reads the real clock, up to the end of today).
-    const now = new Date(Math.max(Date.now() - 60_000, parisMidnight(new Date()) + 1000));
+    // Today in Paris, whatever the hour the test runs at (the route reads the real clock, up to the end of today).
+    const now = aMinuteAgoToday();
     await line('sale_theo', 'chatter_theo', now);
     await line('sale_theo_2', 'chatter_theo', now, { gross: 600 });
     await line('sale_theo_2', 'chatter_theo', now, { event: 'refund', gross: 600 });
@@ -586,7 +571,7 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       event: 'sale',
       saleType: 'tip',
       status: 'paid',
-      occurredAt: new Date(Math.max(Date.now() - 60_000, parisMidnight(new Date()) + 1000)),
+      occurredAt: aMinuteAgoToday(),
       platformModelId: 'model_test_02',
       platformChatterId: null,
       platformFanId: 'fan_test_02',

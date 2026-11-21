@@ -20,9 +20,16 @@ import {
   type ShiftTemplateId,
   type UpdateShiftBody,
   type UserId,
+  type ShiftCheckIn,
 } from '@impera/contracts';
 
-import { CreatorArchived, CreatorNotFound } from '../domain/errors';
+import {
+  CreatorArchived,
+  CreatorNotFound,
+  ShiftCheckInEarly,
+  ShiftEnded,
+  ShiftNotFound,
+} from '../domain/errors';
 import { leaveCover } from '../domain/leaves';
 import type {
   Actor,
@@ -67,6 +74,8 @@ export interface SchedulingService {
   /** `null` when the change cancelled the shift: stopped in the minute it started. */
   updateShift(actor: Actor, id: ShiftId, body: UpdateShiftBody): Promise<Shift | null>;
   cancelShift(actor: Actor, id: ShiftId): Promise<void>;
+  /** « Je prends mon poste » (EQ-12): the member's own shift, in its window; the first instant on a second try. */
+  checkIn(actor: UserId, id: ShiftId): Promise<ShiftCheckIn>;
   templates(actor: UserId): Promise<ShiftTemplate[]>;
   createTemplate(actor: Actor, body: CreateShiftTemplateBody): Promise<ShiftTemplate>;
   endTemplate(actor: Actor, id: ShiftTemplateId): Promise<void>;
@@ -264,6 +273,21 @@ export function createSchedulingService(
     },
 
     cancelShift: async (actor, id) => store.cancelShift(actor, id, await clockOf(actor.userId)),
+
+    checkIn: async (actor, id) => {
+      const answer = await store.checkIn(actor, id);
+      switch (answer.kind) {
+        case 'checked_in':
+        case 'already':
+          return { shiftId: id, checkedInAt: answer.at.toISOString() };
+        case 'not_found':
+          throw new ShiftNotFound();
+        case 'early':
+          throw new ShiftCheckInEarly();
+        case 'ended':
+          throw new ShiftEnded();
+      }
+    },
 
     templates: async (actor) => {
       const today = calendarDayIn(now(), (await settingsOf(actor)).timeZone);

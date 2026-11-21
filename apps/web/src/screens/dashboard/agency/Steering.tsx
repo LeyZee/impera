@@ -6,6 +6,7 @@ import {
   type SteeringDependency,
   type SteeringTraffic,
 } from '@impera/contracts';
+import { niceTicks } from '@impera/design-system';
 import { useNavigate } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
@@ -15,10 +16,10 @@ import { CountUp, Section, type FloatingTip } from '../parts';
 import { Comparable, Ring } from './AgencyInsights';
 import { NotYours, useAgencySteering } from './api';
 import { TOO_FEW_TO_CONCLUDE } from './period';
-import { euros, exactEuros, shareOf, shortDay, type Slice } from './view';
+import { euros, exactEuros, shareOf, shortDay, shortEuros, type Slice } from './view';
 import './steering.css';
 
-import { Donut, Meter } from '@/shell/figures/figures';
+import { Columns, Donut, Meter } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 /*
@@ -108,41 +109,46 @@ function dayVerdict(daily: SteeringDaily): {
 
 /** The thirty days as bars, the target as a dashed line: a day held in ink, one missed on the pale track (Design, 21/11). */
 function DayBars({ daily, tip }: { daily: SteeringDaily; tip: FloatingTip }): JSX.Element {
-  const top = Math.max(1, daily.targetMinor ?? 0, ...daily.days.map((day) => day.revenueMinor));
+  const max = Math.max(1, daily.targetMinor ?? 0, ...daily.days.map((day) => day.revenueMinor));
+  const ticks = niceTicks(max, 3);
+  const top = ticks[ticks.length - 1] ?? max;
   const last = daily.days.length - 1;
   return (
-    <div className="stg-bars" role="group" aria-label="Chiffre d’affaires des 30 derniers jours">
-      {daily.targetMinor === null ? null : (
-        <span
-          className="stg-bars__target"
-          style={{ '--_y': `${String((daily.targetMinor / top) * 100)}%` }}
-          aria-hidden="true"
-        />
-      )}
-      {daily.days.map((day, i) => {
-        const held = daily.targetMinor === null ? null : day.revenueMinor >= daily.targetMinor;
-        const today = i === last;
-        const rows: [string, string][] = [['Chiffre d’affaires', exactEuros(day.revenueMinor)]];
-        if (daily.targetMinor !== null) rows.push(['Objectif', exactEuros(daily.targetMinor)]);
-        return (
-          <button
-            key={day.day}
-            type="button"
-            className="stg-bars__day"
-            data-held={held === null ? undefined : String(held)}
-            data-today={today ? '' : undefined}
-            style={{ '--_h': `${String(Math.max(2, (day.revenueMinor / top) * 100))}%`, '--_i': i }}
-            aria-label={`${shortDay(day.day)} : ${exactEuros(day.revenueMinor)}`}
-            {...tip.bind({
-              title: today ? `Aujourd’hui, ${shortDay(day.day)}` : shortDay(day.day),
-              rows,
-              ...(held === null || today ? {} : { aside: held ? 'Objectif tenu' : 'Objectif manqué' }),
-            })}
-          >
-            <span className="stg-bars__bar" />
-          </button>
-        );
-      })}
+    <div className="stg-bars">
+      <Columns
+        label="Chiffre d’affaires des 30 derniers jours face à l’objectif : flèches pour passer d’un jour à l’autre"
+        top={top}
+        ticks={ticks.map((value) => ({ value, text: shortEuros(value) }))}
+        {...(daily.targetMinor === null ? {} : { mark: daily.targetMinor })}
+        columns={daily.days.map((day, i) => {
+          const held = daily.targetMinor === null ? null : day.revenueMinor >= daily.targetMinor;
+          const today = i === last;
+          const rows: [string, string][] = [['Chiffre d’affaires', exactEuros(day.revenueMinor)]];
+          if (daily.targetMinor !== null) rows.push(['Objectif', exactEuros(daily.targetMinor)]);
+          return {
+            key: day.day,
+            label: i % 7 === last % 7 ? shortDay(day.day) : '',
+            says: `${shortDay(day.day)} : ${exactEuros(day.revenueMinor)}`,
+            parts: [
+              {
+                key: 'revenue',
+                colour: held === false ? 'var(--nv-series-3)' : 'var(--nv-series-1)',
+                value: day.revenueMinor,
+                // Today is still under way: hatched, like its key.
+                ...(today ? { hatched: true } : {}),
+              },
+            ],
+            handlers: tip.bind(
+              {
+                title: today ? `Aujourd’hui, ${shortDay(day.day)}` : shortDay(day.day),
+                rows,
+                ...(held === null || today ? {} : { aside: held ? 'Objectif tenu' : 'Objectif manqué' }),
+              },
+              { above: true },
+            ),
+          };
+        })}
+      />
     </div>
   );
 }

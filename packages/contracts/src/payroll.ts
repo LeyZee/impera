@@ -1306,6 +1306,11 @@ export const MySaleSchema = z.object({
   /** The line's own instant; `null` on a statement written before it was kept. */
   occurredAt: z.iso.datetime().nullable(),
   lateFrom: PayPeriodSchema.nullable(),
+  /**
+   * For a refund that comes late (`lateFrom`), the instant of the sale it takes back, read on the member's own earlier
+   * statement; `null` otherwise, or when that statement does not keep it.
+   */
+  saleOccurredAt: z.iso.datetime().nullable(),
   state: MySaleStateSchema,
   signal: z.object({ note: PayReasonSchema.nullable(), signalledAt: z.iso.datetime() }).nullable(),
   /** A sale the validator gave, whole or shared (ADR 0101); `null` otherwise. */

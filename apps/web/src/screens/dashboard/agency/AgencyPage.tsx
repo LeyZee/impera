@@ -37,7 +37,7 @@ export function AgencyPage({
   reviewsReports: boolean;
   /** The account opens Suivi: a lapsed payer leads to his conversation. */
   opensTracking: boolean;
-  /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
+  /** The owner, who alone adds a creator: before any creator, the screen leads him to Créatrices (DASH-13). */
   canAddCreator: boolean;
 }): JSX.Element {
   const tip = useFloatingTip();

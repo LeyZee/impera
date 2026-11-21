@@ -104,76 +104,6 @@
   letter-spacing: var(--nv-text-title-1-tracking);
 }
 
-/* Thirty days as bars, the target a dashed line across. */
-.stg-bars {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 84px;
-}
-.stg-bars__target {
-  position: absolute;
-  inset-inline: 0;
-  bottom: var(--_y);
-  border-top: 1.5px dashed var(--nv-ink-faint);
-  pointer-events: none;
-}
-.stg-bars__day {
-  display: flex;
-  flex: 1;
-  align-items: flex-end;
-  height: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  --_c: var(--nv-series-2);
-}
-/* One colour per kind of day (Design, 21/11): held, missed; the dashed line is the target. */
-.stg-bars__day[data-held='true'] {
-  --_c: var(--nv-series-1);
-}
-.stg-bars__day[data-held='false'] {
-  --_c: var(--nv-series-3);
-}
-.stg-bars__bar {
-  display: block;
-  width: 100%;
-  height: var(--_h);
-  border-radius: 3px 3px 1px 1px;
-  background: var(--_c);
-  transform-origin: bottom;
-  animation: stg-grow var(--nv-dur-data) var(--nv-ease-out) both;
-  animation-delay: calc(var(--_i, 0) * 18ms + 120ms);
-  transition:
-    filter var(--nv-dur-fast),
-    transform var(--nv-dur-base) var(--nv-ease-spring);
-}
-.stg-bars__day[data-today] .stg-bars__bar {
-  background: repeating-linear-gradient(
-    135deg,
-    var(--_c) 0 4px,
-    color-mix(in oklab, var(--_c) 45%, transparent) 4px 8px
-  );
-}
-.stg-bars__day:hover .stg-bars__bar,
-.stg-bars__day:focus-visible .stg-bars__bar {
-  filter: brightness(1.18) drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
-  transform: scaleY(1.04);
-}
-.stg-bars__day:focus-visible {
-  outline: none;
-  box-shadow: var(--nv-shadow-focus);
-  border-radius: 4px;
-}
-@keyframes stg-grow {
-  from {
-    transform: scaleY(0);
-  }
-}
-
 /* ── Traffic to money: the shared path, its note under it. */
 .stg-traffic {
   display: flex;
@@ -287,7 +217,7 @@
 }
 .stg-lapsed__list li {
   animation: stg-in var(--nv-dur-base) var(--nv-ease-out) both;
-  animation-delay: calc(var(--_i, 0) * 40ms + 100ms);
+  animation-delay: calc(var(--_i, 0) * var(--nv-stagger) + var(--nv-dur-fast));
 }
 @keyframes stg-in {
   from {
@@ -375,7 +305,7 @@
   color: var(--nv-ink-faint);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .stg-day__head {
     flex-direction: column;
     gap: 16px;
@@ -386,10 +316,6 @@
   }
   .stg-gauge {
     --nv-donut-size: 168px;
-  }
-  .stg-bars {
-    gap: 2px;
-    height: 64px;
   }
   .stg-dep__body {
     grid-template-columns: minmax(0, 1fr);
@@ -414,7 +340,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .stg-bars__bar,
   .stg-lapsed__list li {
     animation: none;
   }
@@ -450,7 +375,7 @@
   inset: 0;
   border-radius: 50%;
   background: var(--_c);
-  animation: urg-pulse 1.8s var(--nv-ease-out) infinite;
+  animation: urg-pulse var(--nv-dur-breathe) var(--nv-ease-out) infinite;
 }
 @keyframes urg-pulse {
   to {
@@ -493,7 +418,7 @@
 }
 .urg__list li {
   animation: stg-in var(--nv-dur-base) var(--nv-ease-out) both;
-  animation-delay: calc(var(--_i, 0) * 50ms + 80ms);
+  animation-delay: calc(var(--_i, 0) * var(--nv-stagger) + var(--nv-dur-fast));
 }
 .urg__row {
   display: grid;
@@ -559,7 +484,7 @@
   color: var(--_c);
   white-space: nowrap;
 }
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .urg__row {
     grid-template-columns: auto minmax(0, 1fr) auto;
     row-gap: 2px;
