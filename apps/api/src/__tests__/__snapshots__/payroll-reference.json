@@ -324,7 +324,10 @@
       "vatMinor": -50,
       "inclVatMinor": -300,
       "selfAssessedVatMinor": 0,
-      "mentions": ["Avoir sur la facture THEO-YYYY-NNNN du …", "Autofacturation"],
+      "mentions": [
+        "Avoir sur la facture THEO-YYYY-NNNN du …",
+        "Autofacturation"
+      ],
       "lines": [
         {
           "kind": "adjustment",
