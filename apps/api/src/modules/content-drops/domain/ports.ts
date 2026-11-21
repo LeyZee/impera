@@ -453,11 +453,12 @@ export interface MediaToDescribe {
 
 /** `content_drops.describe_file`'s reads and its next run, as the owner role. */
 export interface DescriptionQueue {
-  target(mediaAssetId: string): Promise<MediaToDescribe | null>;
+  /** The medium in this creator, `null` when she has none of that id: the job's creator is never taken on its word. */
+  target(creatorId: string, mediaAssetId: string): Promise<MediaToDescribe | null>;
   /** The job again at `runAt` (budget spent, disk short), keyed by the medium: a new job, never twice. */
   later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
   /** One more try of the vision AI failed on this medium: its count of failures, this one included. */
-  failed(mediaAssetId: string): Promise<number>;
+  failed(creatorId: string, mediaAssetId: string): Promise<number>;
 }
 
 /** The media module's description of a dropped media, seen from here (ADR 0083). */
@@ -671,9 +672,10 @@ export interface MediaToThumbnail {
 
 /** `content_drops.make_thumbnail`'s reads and writes, and the hourly backlog, as the owner role (SC-04 lot c4). */
 export interface ThumbnailQueue {
-  target(mediaAssetId: string): Promise<MediaToThumbnail | null>;
+  /** The medium in this creator, `null` when she has none of that id: the job's creator is never taken on its word. */
+  target(creatorId: string, mediaAssetId: string): Promise<MediaToThumbnail | null>;
   /** Tried: its picture's key, or `null` when the file did not give one. Once: a medium already tried stays. */
-  settle(mediaAssetId: string, thumbnailKey: string | null, now: Date): Promise<void>;
+  settle(creatorId: string, mediaAssetId: string, thumbnailKey: string | null, now: Date): Promise<void>;
   /** The job again at `runAt` (disk short), keyed by the medium. */
   later(creatorId: string, mediaAssetId: string, correlationId: string, runAt: Date): Promise<void>;
   /** Each photo and video of a live drop never tried, its original held, enqueued; how many. */

@@ -14,7 +14,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // +3 for the agency's key of the redirect service (INS-02): a table closed to the app role, read, kept and removed
   // through the owner's gesture; +1 for its re-sealing after a rotation of the encryption keys (ops command).
   'modules/connectors': 39,
-  'modules/content-drops': 29,
+  'modules/content-drops': 23,
   'modules/contractors': 6,
   'modules/conversations': 1,
   'modules/creator-tasks': 1,
