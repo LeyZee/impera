@@ -452,13 +452,13 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
     ).toEqual(['Coffre', 'Dépôts']);
-    // Structures and her made-to-measure prices are the owner's: a manager has her scripts and what is to copy.
+    // Structures and her made-to-measure prices are the owner's; a manager reads her custom orders under « Sur mesure ».
     router.history.push(`/creatrices?onglet=scripts&creatrice=${ANNA.id}`);
     expect(
       within(await screen.findByRole('radiogroup', { name: 'Vue de ses scripts' }))
         .getAllByRole('radio')
         .map((radio) => radio.textContent),
-    ).toEqual(['Scripts', 'À copier']);
+    ).toEqual(['Scripts', 'À copier', 'Sur mesure']);
     router.history.push(`/creatrices?onglet=scripts&vue=a-copier&creatrice=${ANNA.id}`);
     await screen.findByText('Scripts envoyés par Anna');
     // The addresses of before the seven tabs lead to their view (ADR 0149 § 5).

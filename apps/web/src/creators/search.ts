@@ -121,14 +121,15 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
 /**
  * The sheets a member opens: all of them for the owner; for an active manager her vault and her other drops (recette
  * créatrice 1), her sent scripts (SC-03 c2b), her agenda (CR-05 lot c, Charles, 05/11 17h22: « Ouvrir aux managers »),
- * her ideas of the day (VEI-02, ADR 0060 § 5) and what the agency asks of her (MED-09); the persona alone for anyone
+ * her ideas of the day (VEI-02, ADR 0060 § 5), what the agency asks of her (MED-09) and her custom orders, read only
+ * (ADR 0159, Charles 21/11); the persona alone for anyone
  * else. Her redirect links are no sheet: Trafic holds them. The first one is where Créatrices opens: her
  * persona for the owner, Médias for an active manager (ADR 0149 § 1).
  */
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
   return user.teamScope === 'agency'
-    ? ['vault', 'content', 'scripts', 'copy', 'agenda', 'ideas', 'requests']
+    ? ['vault', 'content', 'scripts', 'copy', 'custom', 'agenda', 'ideas', 'requests']
     : ['persona'];
 }
 

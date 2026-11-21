@@ -9,6 +9,7 @@ import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
 import { AlertsTab } from './alerts/AlertsTab';
 import { useCreators } from './api';
+import { CustomOrdersSection } from './custom-orders/CustomOrdersSection';
 import { CustomPricesSection } from './custom-prices/CustomPricesSection';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
@@ -339,13 +340,24 @@ export function CreatorsPage({
       );
     }
     if (shown === 'custom' && current !== undefined) {
+      // Her orders first, read by an active manager too; her grid, the owner's alone, below (trous béants point 6).
       return (
-        <CustomPricesSection
-          key={current.id}
-          creatorId={current.id}
-          creatorName={current.displayName}
-          onDirty={setDirty}
-        />
+        <div className="cso-sheet">
+          <CustomOrdersSection
+            key={`orders-${current.id}`}
+            creatorId={current.id}
+            creatorName={current.displayName}
+            canAnswer={isOwner}
+          />
+          {isOwner ? (
+            <CustomPricesSection
+              key={current.id}
+              creatorId={current.id}
+              creatorName={current.displayName}
+              onDirty={setDirty}
+            />
+          ) : null}
+        </div>
       );
     }
     if (shown === 'structures' && current !== undefined) return <StructuresView />;
