@@ -305,6 +305,9 @@ describe('Créatrices › Persona, recette 28/10', () => {
     expect(
       screen.getByText('Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.'),
     ).toBeDefined();
+    // Nothing that says a save is possible here (MAN-04).
+    expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
+    expect(screen.queryByText(/Chaque enregistrement crée une nouvelle version/u)).toBeNull();
   });
 
   it('stays on the tab it saved from', async () => {

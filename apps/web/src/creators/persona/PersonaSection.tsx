@@ -897,17 +897,20 @@ function Head({
               {`Activer la version ${draft.meta.version}`}
             </button>
           ) : null}
-          <button
-            type="button"
-            className="nv-btn nv-btn--neon"
-            disabled={blocked !== null || saving}
-            title={blocked ?? undefined}
-            aria-describedby="ps-save-note"
-            aria-busy={saving}
-            onClick={onSave}
-          >
-            {saving ? 'Enregistrement…' : 'Enregistrer une version'}
-          </button>
+          {/* Read only, nothing is saved here: neither the button nor what a save does (MAN-04). */}
+          {readOnly ? null : (
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon"
+              disabled={blocked !== null || saving}
+              title={blocked ?? undefined}
+              aria-describedby="ps-save-note"
+              aria-busy={saving}
+              onClick={onSave}
+            >
+              {saving ? 'Enregistrement…' : 'Enregistrer une version'}
+            </button>
+          )}
         </div>
       </div>
       <div className="ps-head__state" aria-live="polite">
@@ -943,9 +946,11 @@ function Head({
       )}
       {showMoves ? <Moves moved={moved} upcoming={upcoming} onShow={onShow} /> : null}
       <Completion completion={completion} onShowPanel={onShowPanel} />
-      <p className="ps-muted" id="ps-save-note">
-        {noteOf(ready, known, upcoming)}
-      </p>
+      {readOnly ? null : (
+        <p className="ps-muted" id="ps-save-note">
+          {noteOf(ready, known, upcoming)}
+        </p>
+      )}
     </div>
   );
 }
