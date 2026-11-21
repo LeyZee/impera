@@ -15,6 +15,12 @@ export function wholeEuros(cents: number): string {
   return `${Math.round(cents / 100).toLocaleString('fr-FR')}\u00a0€`;
 }
 
+/** An objective as the owner typed it: whole euros, or its cents when it has some, never rounded up (PRO1-17). */
+export function objectiveEuros(cents: number): string {
+  if (cents % 100 === 0) return wholeEuros(cents);
+  return `${(cents / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\u00a0€`;
+}
+
 /** « environ 5 060 € »: a projection is no reading, so it is said to ten euros (Design, 20/11). */
 export function aboutEuros(cents: number): string {
   return `environ ${(Math.round(cents / 1000) * 10).toLocaleString('fr-FR')}\u00a0€`;
@@ -104,7 +110,7 @@ function ObjectiveRow({
         <span className="ins-goal__name">{name}</span>
         <span className="ins-goal__figures">
           <b>{wholeEuros(row.revenueMinor)}</b>
-          {row.objectiveMinor === null ? null : <> sur {wholeEuros(row.objectiveMinor)}</>}
+          {row.objectiveMinor === null ? null : <> sur {objectiveEuros(row.objectiveMinor)}</>}
           {reserve && !(editable && !editing) ? (
             <span
               className="nv-btn nv-btn--plain nv-btn--sm ins-goal__edit ins-goal__edit-slot"

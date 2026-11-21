@@ -8,6 +8,8 @@ import { useDashboard } from '../useDashboard';
 import '../dashboard.css';
 
 import { AgencyInsightsPanel } from './AgencyInsights';
+import { SteeringPanel } from './Steering';
+import { UrgentCard } from './Urgent';
 import type { AgencySelection } from './period';
 
 import { PageHeader } from '@/shell/layout';
@@ -23,6 +25,7 @@ export function AgencyPage({
   onCreator,
   forOwner,
   reviewsReports,
+  opensTracking,
   canAddCreator,
 }: {
   selection: AgencySelection;
@@ -32,6 +35,8 @@ export function AgencyPage({
   forOwner: boolean;
   /** The account reviews the team's reports (ADR 0073). */
   reviewsReports: boolean;
+  /** The account opens Suivi: a lapsed payer leads to his conversation. */
+  opensTracking: boolean;
   /** The account's rail holds Créatrices: before any creator, the screen leads there (DASH-13). */
   canAddCreator: boolean;
 }): JSX.Element {
@@ -46,8 +51,13 @@ export function AgencyPage({
       <PageHeader title="Dashboard" />
       {/* What waits on the reader, in one card and before the figures, as « Aujourd'hui » does for the team (W3):
           nothing when nothing waits, so the figures stay first on a quiet day. Then the day's AI budget (PIL-04). */}
+      {/* The fans who wait, before anything else (grande recette 21/11, point 2): red the grave, amber the rest. */}
+      <UrgentCard opensTracking={opensTracking} />
       <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} />
+      {/* What the owner steers with, each card tied to a decision (pilotage 21/11), then the period's figures. */}
+      <SteeringPanel creatorId={null} opensTracking={opensTracking} tip={tip} />
       <AgencyInsightsPanel
+        index={4}
         selection={selection}
         onSelection={onSelection}
         creatorId={null}

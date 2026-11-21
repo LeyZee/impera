@@ -1,4 +1,9 @@
-import { AgencyInsightsSchema, type AgencyInsights } from '@impera/contracts';
+import {
+  AgencyInsightsSchema,
+  AgencySteeringSchema,
+  type AgencyInsights,
+  type AgencySteering,
+} from '@impera/contracts';
 import {
   keepPreviousData,
   useMutation,
@@ -65,5 +70,25 @@ export function useSetObjective(): UseMutationResult<
         throw new ObjectiveNotSaved('L’objectif n’a pas été enregistré. Réessaie dans un instant.');
     },
     onSettled: () => client.invalidateQueries({ queryKey: ['dashboard', 'agency'] }),
+  });
+}
+
+/**
+ * `GET /v1/dashboard/agency/steering` (ADR 0092, avenant du 21/11/2026): the day's objective, traffic to money and the
+ * fans the revenue hangs on, on fixed windows whatever the period read below.
+ */
+export function useAgencySteering(creatorId: string | null): UseQueryResult<AgencySteering> {
+  return useQuery({
+    queryKey: ['dashboard', 'agency', 'steering', creatorId],
+    queryFn: async () => {
+      const query = creatorId === null ? '' : `?creatorId=${encodeURIComponent(creatorId)}`;
+      const response = await fetch(`/v1/dashboard/agency/steering${query}`, { credentials: 'include' });
+      if (response.status === 403) throw new NotYours('GET /v1/dashboard/agency/steering: 403');
+      if (!response.ok) throw new Error(`GET /v1/dashboard/agency/steering: ${String(response.status)}`);
+      return AgencySteeringSchema.parse(await response.json());
+    },
+    refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
+    retry: (count, error) => !(error instanceof NotYours) && count < 1,
   });
 }

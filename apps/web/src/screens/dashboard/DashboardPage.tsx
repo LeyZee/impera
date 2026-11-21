@@ -5,13 +5,14 @@ import { useCallback, type JSX, type ReactNode } from 'react';
 import { AgentHero } from './AgentHero';
 import { AutomaticConfirm } from './AutomaticConfirm';
 import { CreatorPicker } from './CreatorPicker';
-import { FunnelPanel } from './Funnel';
+import { AGENT_PATH, FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TodoCard } from './TodoCard';
 import { TopFans } from './TopFans';
 import { AgencyInsightsPanel } from './agency/AgencyInsights';
+import { SteeringPanel } from './agency/Steering';
 import type { AgencySelection } from './agency/period';
 import { agentRuns, litParts } from './logic';
 import type { Fan, Period, Todo, Tone } from './model';
@@ -376,7 +377,11 @@ function Loaded({
 
       {/* A creator chosen from the agency: her figures from the register, under her agent (recette 06/11). */}
       {agency === undefined ? null : (
+        <SteeringPanel creatorId={creatorId} opensTracking={opensTracking} tip={tip} index={2} />
+      )}
+      {agency === undefined ? null : (
         <AgencyInsightsPanel
+          index={5}
           selection={agency.selection}
           onSelection={agency.onSelection}
           creatorId={creatorId}
@@ -393,7 +398,13 @@ function Loaded({
           </Section>
 
           <Section title="Parcours des fans" sub={FUNNEL_SUB[period]} index={3}>
-            <FunnelPanel key={period} counts={sales.funnel.counts} before={sales.funnel.before} tip={tip} />
+            <FunnelPanel
+              key={period}
+              labels={AGENT_PATH}
+              counts={sales.funnel.counts}
+              before={sales.funnel.before}
+              tip={tip}
+            />
           </Section>
         </>
       )}

@@ -1,0 +1,518 @@
+/* ── « Le pilotage » (ADR 0092, avenant du 21/11/2026): the day's objective, traffic to money, the fans it hangs on. */
+.stg-body {
+  display: contents;
+}
+.stg-loading {
+  min-height: 260px;
+}
+
+/* The figures beside a gauge or a ring: a label, its value on the same line. */
+.stg-figures {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.stg-figures div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stg-figures dt {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.stg-figures dd {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+
+/* ── The day. */
+.stg-day {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: var(--nv-plate-pad);
+}
+.stg-day__head {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.stg-day__words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.stg-day__verdict {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 650;
+  letter-spacing: var(--nv-text-title-2-tracking);
+  color: var(--nv-ink);
+  text-wrap: balance;
+}
+.stg-day__verdict[data-tone='up'] {
+  color: var(--nv-trend-up-text);
+}
+.stg-day__verdict[data-tone='down'] {
+  color: var(--nv-trend-down-text);
+}
+
+.stg-gauge {
+  position: relative;
+  flex: none;
+  width: 168px;
+  height: 168px;
+  --_c: var(--nv-kind-2);
+}
+.stg-gauge[data-tone='up'] {
+  --_c: var(--nv-trend-up);
+}
+.stg-gauge[data-tone='down'] {
+  --_c: var(--nv-trend-down);
+}
+.stg-gauge svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg);
+}
+.stg-gauge__track,
+.stg-gauge__ghost,
+.stg-gauge__arc {
+  fill: none;
+  stroke-width: 14;
+  stroke-linecap: round;
+}
+.stg-gauge__track {
+  stroke: var(--nv-fill-track);
+}
+.stg-gauge__ghost {
+  stroke: color-mix(in oklab, var(--_c) 32%, transparent);
+  stroke-dasharray: 0 999;
+  animation: stg-arc var(--nv-dur-data) var(--nv-ease-out) 260ms both;
+}
+.stg-gauge__arc {
+  stroke: var(--_c);
+  stroke-dasharray: 0 999;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--_c) 45%, transparent));
+  animation: stg-arc var(--nv-dur-data) var(--nv-ease-out) 120ms both;
+}
+@keyframes stg-arc {
+  to {
+    stroke-dasharray: var(--_dash);
+  }
+}
+.stg-gauge__middle {
+  position: absolute;
+  inset: 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.stg-gauge__value {
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.stg-gauge__sub {
+  margin-top: 4px;
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+
+/* Thirty days as bars, the target a dashed line across. */
+.stg-bars {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 84px;
+}
+.stg-bars__target {
+  position: absolute;
+  inset-inline: 0;
+  bottom: var(--_y);
+  border-top: 1.5px dashed var(--nv-ink-faint);
+  pointer-events: none;
+}
+.stg-bars__day {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  --_c: var(--nv-kind-2);
+}
+.stg-bars__day[data-held='true'] {
+  --_c: var(--nv-trend-up);
+}
+.stg-bars__day[data-held='false'] {
+  --_c: color-mix(in oklab, var(--nv-trend-down) 70%, transparent);
+}
+.stg-bars__bar {
+  display: block;
+  width: 100%;
+  height: var(--_h);
+  border-radius: 3px 3px 1px 1px;
+  background: var(--_c);
+  transform-origin: bottom;
+  animation: stg-grow var(--nv-dur-data) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 18ms + 120ms);
+  transition:
+    filter var(--nv-dur-fast),
+    transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.stg-bars__day[data-today] .stg-bars__bar {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--_c) 0 4px,
+    color-mix(in oklab, var(--_c) 45%, transparent) 4px 8px
+  );
+}
+.stg-bars__day:hover .stg-bars__bar,
+.stg-bars__day:focus-visible .stg-bars__bar {
+  filter: brightness(1.18) drop-shadow(0 0 6px color-mix(in oklab, var(--_c) 55%, transparent));
+  transform: scaleY(1.04);
+}
+.stg-bars__day:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+  border-radius: 4px;
+}
+@keyframes stg-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+/* ── Traffic to money: the shared path, its note under it. */
+.stg-traffic {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── The fans it hangs on. */
+.stg-dep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-card-gap);
+}
+.stg-dep__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--nv-card-gap);
+}
+.stg-dep__figures {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: var(--nv-plate-pad);
+}
+.stg-dep__lead {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  color: var(--nv-ink);
+  text-wrap: balance;
+}
+.stg-dep__figures[data-pending] .stg-dep__lead {
+  color: var(--nv-ink-faint);
+}
+
+.stg-lapsed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--nv-plate-pad);
+}
+.stg-lapsed__sub {
+  font-family: var(--nv-font-sans);
+  font-size: var(--nv-text-caption);
+  font-weight: 450;
+  color: var(--nv-ink-faint);
+}
+.stg-lapsed__none {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.stg-lapsed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stg-lapsed__list li {
+  animation: stg-in var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 40ms + 100ms);
+}
+@keyframes stg-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.stg-lapsed__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  min-height: var(--nv-target-min);
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.stg-lapsed__row.is-link {
+  cursor: pointer;
+  transition: background var(--nv-dur-fast);
+}
+.stg-lapsed__row.is-link:hover {
+  background: var(--nv-plate-hover);
+}
+.stg-lapsed__row.is-link:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+.stg-lapsed__name {
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stg-lapsed__who {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.stg-lapsed__spent {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink);
+}
+.stg-lapsed__since {
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+  color: var(--nv-ink-faint);
+}
+
+@media (max-width: 640px) {
+  .stg-day__head {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .stg-day__words {
+    width: 100%;
+    text-align: center;
+  }
+  .stg-gauge {
+    width: 148px;
+    height: 148px;
+  }
+  .stg-bars {
+    gap: 2px;
+    height: 64px;
+  }
+  .stg-dep__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stg-lapsed__row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 10px;
+  }
+  .stg-lapsed__who,
+  .stg-lapsed__day {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stg-gauge__arc,
+  .stg-gauge__ghost {
+    animation: none;
+    stroke-dasharray: var(--_dash);
+  }
+  .stg-bars__bar,
+  .stg-lapsed__list li {
+    animation: none;
+  }
+}
+
+/* ── « Ils t'attendent »: the fans waiting, before any figure. Red the grave, amber the rest; no bar on the left. */
+.urg {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--nv-plate-pad);
+  --_c: var(--nv-warning);
+}
+.urg[data-tone='bad'] {
+  --_c: var(--nv-danger);
+}
+.urg__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.urg__pulse {
+  position: relative;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--_c);
+}
+.urg__pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--_c);
+  animation: urg-pulse 1.8s var(--nv-ease-out) infinite;
+}
+@keyframes urg-pulse {
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+.urg__title {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+}
+.urg__grave {
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-danger);
+}
+.urg__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-ink-muted);
+  text-decoration: none;
+}
+.urg__all:hover {
+  color: var(--nv-ink);
+}
+.urg__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.urg__list li {
+  animation: stg-in var(--nv-dur-base) var(--nv-ease-out) both;
+  animation-delay: calc(var(--_i, 0) * 50ms + 80ms);
+}
+.urg__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 0.9fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--nv-target-min);
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--nv-radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--nv-dur-fast);
+  --_c: var(--nv-warning);
+}
+.urg__row[data-tone='bad'] {
+  --_c: var(--nv-danger);
+}
+.urg__row:hover {
+  background: color-mix(in oklab, var(--_c) 9%, transparent);
+}
+.urg__row:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+.urg__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--_c);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--_c) 60%, transparent);
+}
+.urg__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.urg__who b {
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--nv-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.urg__creator {
+  font-size: var(--nv-text-caption);
+  color: var(--nv-ink-faint);
+}
+.urg__why {
+  overflow: hidden;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.urg__time {
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+  color: var(--_c);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .urg__row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .urg__why {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .urg__pulse::after,
+  .urg__list li {
+    animation: none;
+  }
+}

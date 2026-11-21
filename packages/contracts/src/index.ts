@@ -27,6 +27,7 @@ export * from './creator-tasks';
 export * from './creator-week';
 export * from './creators';
 export * from './agency-insights';
+export * from './agency-steering';
 export * from './ai-budget';
 export * from './ai-usage';
 export * from './creators-overview';

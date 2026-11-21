@@ -94,8 +94,9 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     }
     const ranking = screen.getByRole('list', { name: 'Classement de qui a vendu' });
     expect(within(ranking).getByText('Théo')).toBeTruthy();
+    // 40 sales, one refunded: the average divides the money by the 39 kept (PRO1-02).
+    expect(ranking.textContent).toContain('panier moyen 25,13');
     expect(within(ranking).getByText('Agent IA')).toBeTruthy();
-    expect(screen.getByText(/Les 10 fans qui dépensent le plus/u).textContent).toContain('58');
     // The hours as the rest of the CRM writes them (ADM-08).
     const slot = screen.getByText(/^21\sh\s–\s0\sh$/u, { selector: 'b' });
     expect(slot.textContent).toBe('21\u00a0h\u00a0–\u00a00\u00a0h');
@@ -186,7 +187,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(tile.querySelector('.ins-tile__note')).toBeNull();
   });
 
-  it('says the paying fans once, in « Les fans qui paient », and two figures by the money (PIL-21)', async () => {
+  it('says two figures by the money, the paying fans in the steering now (PIL-21, pilotage 21/11)', async () => {
     serve(200, AGENCY_WEEK);
     show();
     const sales = await screen.findByLabelText('Les ventes');
@@ -194,8 +195,9 @@ describe('L’agence en chiffres (ADR 0078)', () => {
       'Ventes',
       'Remboursements',
     ]);
-    expect(screen.getAllByText('Fans qui ont payé')).toHaveLength(1);
-    expect(screen.getAllByText(/^Dépense moyenne/u)).toHaveLength(1);
+    // « Les fans qui paient » gave way to « Dépendance aux gros fans », on 30 days whatever the period.
+    expect(screen.queryByText('Fans qui ont payé')).toBeNull();
+    expect(screen.queryByText(/^Dépense moyenne/u)).toBeNull();
   });
 
   it('walks the map of the hours with the arrows, one stop, each cell saying its hour and its amount (ADM-09)', async () => {
@@ -394,14 +396,6 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     expect(tipText()).not.toContain('Part du chiffre d’affaires');
   });
 
-  it('names as many biggest fans as there are, never « 10 » for three (PAY-16)', async () => {
-    serve(200, { ...AGENCY_WEEK, fans: { ...AGENCY_WEEK.fans, paying: 3, topTenShare: 100 } });
-    show();
-    expect(await screen.findByText(/Les 3 fans qui dépensent le plus font/u)).toBeTruthy();
-    expect(screen.queryByText(/Les 10 fans/u)).toBeNull();
-    expect(screen.getByRole('img', { name: '100 % fait par les 3 plus gros fans' })).toBeTruthy();
-  });
-
   it('draws no conclusion from too few sales, and keeps every figure (ADR 0092 § 5)', async () => {
     const current = { ...AGENCY_WEEK.totals.current, sales: 4 };
     serve(200, { ...AGENCY_WEEK, totals: { ...AGENCY_WEEK.totals, current } });
@@ -410,11 +404,13 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     // The slot, the peak and the concentration are not written; the sentence that says why is, twice.
     expect(screen.queryByText(/Le créneau qui rapporte le plus/u)).toBeNull();
     expect(screen.queryByText(/concentré|Bien réparti/u)).toBeNull();
-    expect(screen.getAllByText('Pas encore assez de ventes pour conclure.')).toHaveLength(2);
-    // The figures stay: the map, the meter, the paying and new payers.
+    expect(screen.getAllByText('Pas encore assez de ventes pour conclure.')).toHaveLength(1);
+    // The figures stay, their changes too, but without the colour of better or worse (pilotage 21/11).
     expect(within(map).getAllByRole('button')).toHaveLength(7 * 24);
-    expect(screen.getByText(/Les 10 fans qui dépensent le plus/u).textContent).toContain('58');
-    expect(screen.getByText('Nouveaux payeurs')).toBeTruthy();
+    // The subscribers follow their own counts, never the sales': their colours stay.
+    const judged = Array.from(document.querySelectorAll('.nv-delta--better, .nv-delta--worse'));
+    expect(judged.filter((pill) => pill.closest('.ins-subs') === null)).toHaveLength(0);
+    expect(document.querySelectorAll('.ins-figures .nv-delta').length).toBeGreaterThan(0);
   });
 
   it('draws no conclusion before the registers hold enough days of the period (ADR 0092 § 5)', async () => {
@@ -423,7 +419,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
     expect(screen.queryByText(/Le créneau qui rapporte le plus/u)).toBeNull();
     // Too little hindsight is said as such, not as too few sales (Charles, 20/11).
-    expect(screen.getAllByText('Pas encore assez de recul pour conclure.')).toHaveLength(2);
+    expect(screen.getAllByText('Pas encore assez de recul pour conclure.')).toHaveLength(1);
     expect(screen.queryByText('Pas encore assez de ventes pour conclure.')).toBeNull();
   });
 
@@ -441,7 +437,6 @@ describe('L’agence en chiffres (ADR 0078)', () => {
     show();
     const grey = await screen.findByRole('group', { name: /par jour de la semaine et par heure/u });
     expect(grey.closest('.ins-hours')?.hasAttribute('data-pending')).toBe(true);
-    expect(document.querySelector('.ins-fans')?.hasAttribute('data-pending')).toBe(true);
     expect(grey.querySelectorAll('.ins-heat__best')).toHaveLength(0);
   });
 
@@ -482,7 +477,7 @@ describe('L’agence en chiffres (ADR 0078)', () => {
   it('shows no refunds card on a period without one', async () => {
     serve(200, { ...AGENCY_WEEK, refundList: [] });
     show();
-    await screen.findByRole('heading', { name: /Les fans qui paient/u });
+    await screen.findByRole('heading', { name: /Quand ça vend/u });
     expect(screen.queryByRole('heading', { name: /Les remboursements/u })).toBeNull();
   });
 
