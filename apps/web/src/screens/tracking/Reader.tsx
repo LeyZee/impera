@@ -22,6 +22,7 @@ import {
   endsRun,
   graveHandoffOf,
   messageTime,
+  retriedLine,
   stoppedText,
   threadOf,
   whyHuman,
@@ -641,6 +642,7 @@ function DraftPanel({
   const problem = step === 'editing' ? bubblesProblem(text) : null;
   // An invalid text is a retouch too: the button keeps its name while it is off.
   const isChanged = edited?.join('\n') !== draft.bubbles.join('\n');
+  const retried = retriedLine(draft.retried);
 
   const run = async (decide: () => Promise<Decision>): Promise<void> => {
     setPending(true);
@@ -674,6 +676,7 @@ function DraftPanel({
           ))}
         </div>
       )}
+      {retried === null ? null : <p className="nv-draft-panel__brief tr-draft__retried">{retried}</p>}
       {step === 'rejecting' ? (
         <label className="nv-field">
           <span className="nv-field__label">Pourquoi ? (facultatif, ça sert à entraîner l’agent)</span>

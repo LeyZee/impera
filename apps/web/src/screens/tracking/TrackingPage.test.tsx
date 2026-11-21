@@ -5,6 +5,7 @@ import {
   ConversationSummarySchema,
   DashboardSchema,
   DraftIdSchema,
+  GuardCodeSchema,
   MessageViewSchema,
   type ConversationDetail,
   type ConversationSummary,
@@ -691,6 +692,33 @@ describe('the reader of Suivi', () => {
     expect(screen.getByText('Salut, ça va ?')).toBeDefined();
   });
 
+  it('says discreetly under the draft an answer the guards set aside before it (IA-08)', async () => {
+    const draft = (retried: string[]) =>
+      waiting({
+        openDrafts: [
+          {
+            id: DRAFT,
+            status: 'pending',
+            bubbles: ['Coucou toi'],
+            finalBubbles: null,
+            createdAt: '2026-10-17T20:01:00Z',
+            retried: GuardCodeSchema.array().parse(retried),
+          },
+        ],
+      });
+    serve({ ...withDraft, detail: () => ({ status: 200, body: draft(['ai_disclosure']) }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).getByText('1 réponse écartée : un aveu d’IA')).toBeDefined();
+  });
+
+  it('says nothing under a draft written at once', async () => {
+    serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).queryByText(/réponse écartée/u)).toBeNull();
+  });
+
   it('sends the draft as written on Valider, then reads the conversation again', async () => {
     let approved = false;
     const posted = serve({
@@ -1122,6 +1150,7 @@ describe('the reader of Suivi', () => {
             bubbles: ['Coucou toi'],
             finalBubbles: ['Coucou toi, tu es là ?'],
             createdAt: '2026-10-17T20:01:00Z',
+            retried: [],
           },
         }),
       }),

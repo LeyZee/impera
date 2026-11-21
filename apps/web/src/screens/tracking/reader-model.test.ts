@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decisionError,
+  retriedLine,
   draftsOf,
   endsRun,
   isOutdated,
@@ -310,6 +311,16 @@ describe('draftsOf', () => {
     expect(
       draftsOf({ detail: { state: 'error', openDrafts: [], failedDraft: draft('failed') }, events: [] }),
     ).toEqual({ state: 'error', sending: [], failed: draft('failed') });
+  });
+});
+
+describe('retriedLine (IA-08)', () => {
+  it('names the guards of the answer set aside, each once, and says nothing without one', () => {
+    expect(retriedLine([])).toBeNull();
+    expect(retriedLine(['ai_disclosure'])).toBe('1 réponse écartée : un aveu d’IA');
+    expect(retriedLine(['ai_disclosure', 'contact_info', 'ai_disclosure'])).toBe(
+      '1 réponse écartée : un aveu d’IA, des coordonnées',
+    );
   });
 });
 

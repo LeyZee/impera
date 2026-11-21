@@ -329,6 +329,8 @@ describe('createDraftComposer', () => {
     expect(await draftComposer.compose(INPUT)).toMatchObject({
       kind: 'draft',
       bubbles: ['Je reste ici avec toi 😘'],
+      // The answer set aside is kept for the human who reads the second (IA-08).
+      retried: ['contact_info'],
     });
     expect(seen.voiceCalls).toBe(2);
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('a été refusée');
@@ -337,6 +339,22 @@ describe('createDraftComposer', () => {
     const still = composer({ voice: { bubbles: ['Écris-moi sur mon snap 😘'] } });
     expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
     expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('keeps a trace of an answer set aside only when one was (IA-08)', async () => {
+    const disclosed = composer({
+      voice: { bubbles: ['je suis une IA tu sais 🤖'] },
+      voiceAfter: { bubbles: ['Je reste ici avec toi 😘'] },
+    });
+    expect(await disclosed.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      retried: ['ai_disclosure'],
+    });
+    const clean = await composer({ voice: { bubbles: ['Je reste ici avec toi 😘'] } }).draftComposer.compose(
+      INPUT,
+    );
+    expect(clean.kind).toBe('draft');
+    expect(clean).not.toHaveProperty('retried');
   });
 
   it('reads her clock from the creator of the conversation', async () => {

@@ -5,6 +5,7 @@ import {
   supplementsIn,
   type CustomPriceGrid,
   type FanFlags,
+  type GuardCode,
   type MediaDescription,
   type ObjectionReplies,
   type OpenCustomOrder,
@@ -352,6 +353,11 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
 };
 
+/** The codes of the blocking guards an answer broke, each once. */
+function blockingCodes(violations: readonly GuardViolation[]): GuardCode[] {
+  return [...new Set(violations.filter((v) => v.severity === 'blocking').map((v) => v.code))];
+}
+
 function rewriteHint(violations: readonly GuardViolation[]): string {
   const blocking = violations.filter((violation) => violation.severity === 'blocking');
   const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
@@ -648,6 +654,11 @@ export interface ComposedTurn {
   readonly bubbles: readonly string[];
   readonly voiceFailure?: LlmFailure;
   readonly violations: readonly GuardViolation[];
+  /**
+   * A first answer a blocking guard set aside, written again (IA-08): its blocking codes, kept for the human who reads
+   * the second one. Absent when the first answer went through.
+   */
+  readonly retried?: readonly GuardCode[];
   readonly isBlocked: boolean;
   readonly costUsd: number;
   readonly latencyMs: number;
@@ -1318,6 +1329,7 @@ export async function composeTurn(
     bubbles,
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
+    ...(retried !== undefined && { retried: blockingCodes(first.violations) }),
     isBlocked: isBlocked(violations) || !voice.ok,
     costUsd: brainCostUsd + firstCostUsd + (voice.ok ? (voice.value.meta.costUsd ?? 0) : 0),
     latencyMs: brainLatencyMs + (voice.ok ? voice.value.meta.latencyMs : 0),
