@@ -30,6 +30,13 @@ export interface CreatorsSearch {
   readonly script?: PreparedScriptId;
 }
 
+/**
+ * What an address that names a creator the list does not hold says once it has led back to the list (PRO1-16): an
+ * archived one, or one that is not the reader's; the owner reopens an archived one from « Archivées ».
+ */
+export const CREATOR_GONE =
+  'Créatrice archivée ou introuvable : une archivée se rouvre depuis « Archivées ».';
+
 /** The seven tabs of a creator's sheet, in their order (ADR 0149 § 1). Her links are Trafic's (`/trafic`). */
 export const CREATOR_TABS = ['persona', 'ai', 'media', 'scripts', 'agenda', 'alerts', 'account'] as const;
 export type CreatorTabName = (typeof CREATOR_TABS)[number];

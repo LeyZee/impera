@@ -10,6 +10,7 @@ import { createAppRouter, type AppRouter } from '../router';
 
 import { parsePersonaYaml } from './persona/source';
 import { SCRIPT, viewOf } from './scripts/prepared/fixtures';
+import { CREATOR_GONE } from './search';
 
 /** A version stored at format 2: the draft is the version itself, nothing moved (ADR 0079 § 5). */
 const asDraft = (persona: PersonaV2) => ({ draft: persona, moved: [] });
@@ -485,6 +486,22 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     });
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
     expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
+  });
+
+  it('leads an address naming a creator the list does not hold back to the list, and says why (PRO1-16)', async () => {
+    await serve([ANNA]);
+    const gone = '0192f3a0-0000-7000-8000-0000000000ff';
+    const router = renderAt(owner, `/creatrices?onglet=agenda&creatrice=${gone}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'agenda' });
+    });
+    expect(await screen.findByText(CREATOR_GONE)).toBeDefined();
+    // Trafic too: never another creator's links in silence.
+    router.history.push(`/trafic?creatrice=${gone}`);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/trafic');
+      expect(router.state.location.search).toEqual({});
+    });
   });
 
   it('takes an operator who is not an active manager back to the persona', async () => {

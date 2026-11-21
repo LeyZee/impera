@@ -26,6 +26,7 @@ import { PreparedScriptsView } from './scripts/prepared/PreparedScriptsView';
 import { ScriptsToCopyView } from './scripts/prepared/ScriptsToCopyView';
 import { usePreparedScripts } from './scripts/prepared/api';
 import {
+  CREATOR_GONE,
   CREATOR_TABS,
   accountCardId,
   creatorsSearch,
@@ -168,6 +169,18 @@ export function CreatorsPage({
   });
   const isOwner = user.role === 'owner';
   const current = creators.find((creator) => creator.id === creatorId);
+  // An address naming a creator the list does not hold (archived, or not the reader's) leads back to the list and says
+  // why, never a silent list (PRO1-16); read once the list is settled, so a creator just added is never sent away.
+  const gone = creatorId !== null && query.isSuccess && !query.isFetching && current === undefined;
+  useEffect(() => {
+    if (!gone) return;
+    void navigate({
+      to: '/creatrices',
+      search: creatorsSearch(tab, null),
+      replace: true,
+      state: { notice: CREATOR_GONE },
+    });
+  }, [gone, navigate, tab]);
   // Added from the list; with no creator yet, the owner is asked for one first: the persona needs her.
   const showForm = isOwner && current === undefined && (adding || (query.isSuccess && creators.length === 0));
   const selected = current?.id ?? null;

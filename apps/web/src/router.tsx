@@ -20,6 +20,7 @@ import { CreatorsPage } from './creators/CreatorsPage';
 import { MyPersonaPage } from './creators/MyPersonaPage';
 import { useCreators } from './creators/api';
 import {
+  CREATOR_GONE,
   creatorsSearch,
   legacyCreatorsSearch,
   parseCreatorsSearch,
@@ -351,11 +352,23 @@ const traffic = createRoute({
   component: function Traffic() {
     const { user } = rootRoute.useRouteContext();
     const { creatrice } = traffic.useSearch();
+    const navigate = traffic.useNavigate();
+    const listed = useCreators();
+    // A link that names a creator the list does not hold (archived, or not the reader's) is said, never another
+    // creator's links in silence (PRO1-16).
+    const gone =
+      creatrice !== undefined &&
+      listed.isSuccess &&
+      !listed.isFetching &&
+      !listed.data.some((creator) => creator.id === creatrice);
+    useEffect(() => {
+      if (gone) void navigate({ search: {}, replace: true, state: { notice: CREATOR_GONE } });
+    }, [gone, navigate]);
     // A link that names a creator sets the selector on her, as on Suivi.
     const chooses = scopesCreators(user);
     useEffect(() => {
-      if (chooses && creatrice !== undefined) scopeTo(creatrice);
-    }, [chooses, creatrice]);
+      if (chooses && creatrice !== undefined && !gone) scopeTo(creatrice);
+    }, [chooses, creatrice, gone]);
     return <TrafficPage scoped={useScopedCreator(chooses)} canEdit={user.role === 'owner'} />;
   },
 });
