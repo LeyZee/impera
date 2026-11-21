@@ -2,6 +2,8 @@ import {
   AgencyInsightsSchema,
   AgencySteeringSchema,
   calendarDayAt,
+  ConversationIdSchema,
+  EventIdSchema,
   FanIdSchema,
   CreatorIdSchema,
   newId,
@@ -499,6 +501,57 @@ describe('GET /v1/dashboard/agency, the agency’s insights (ADR 0078)', () => {
       });
       expect(refused.statusCode, who).toBe(403);
     }
+  });
+
+  it('never names a lapsed payer in care or with an open doubt on his age, one given back is named (Sécurité 21/11)', async () => {
+    const long = new Date(Date.now() - 40 * 86_400_000);
+    const payer = async (platformFanId: string, displayName: string) => {
+      await line(`sale_${platformFanId}`, 'chatter_theo', long, { gross: 7000, fan: platformFanId });
+      const fanId = newId(FanIdSchema);
+      await test.admin.db
+        .insert(schema.fans)
+        .values({ id: fanId, creatorId, platformAccountId: accountId, platformFanId, displayName });
+      const conversationId = newId(ConversationIdSchema);
+      await test.admin.db.insert(schema.conversations).values({
+        id: conversationId,
+        creatorId,
+        platformAccountId: accountId,
+        fanId,
+        platformConversationId: `conv_${platformFanId}`,
+      });
+      return conversationId;
+    };
+    const event = async (conversationId: string, seq: number, type: string, payload: object) =>
+      test.admin.db.insert(schema.conversationEvents).values({
+        id: newId(EventIdSchema),
+        creatorId,
+        conversationId,
+        seq,
+        type,
+        payload: { conversationId, ...payload },
+        actor: 'ai',
+        correlationId: 'steering-withheld',
+      });
+    const care = await payer('fan_test_10', 'En soin');
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ careSince: new Date() })
+      .where(eq(schema.conversations.id, care));
+    const doubt = await payer('fan_test_11', 'Doute ouvert');
+    await event(doubt, 1, 'handoff_requested', { cause: 'minor' });
+    const lifted = await payer('fan_test_12', 'Rendu');
+    await event(lifted, 1, 'handoff_requested', { cause: 'minor' });
+    await event(lifted, 2, 'takeover_ended', {});
+    const answer = await server.inject({
+      method: 'GET',
+      url: '/v1/dashboard/agency/steering',
+      headers: { origin: DASHBOARD_ORIGIN, cookie: cookies.get('owner') },
+    });
+    expect(answer.statusCode, answer.body).toBe(200);
+    const names = AgencySteeringSchema.parse(answer.json()).dependency.lapsed.map((one) => one.fanName);
+    expect(names).toContain('Rendu');
+    expect(names).not.toContain('En soin');
+    expect(names).not.toContain('Doute ouvert');
   });
 
   it('gives the MCP the same figures by the same rule, a manager his list alone (supervision.reads, ADR 0026 § 1)', async () => {

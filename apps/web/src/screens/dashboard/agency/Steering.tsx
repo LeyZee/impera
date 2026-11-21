@@ -75,28 +75,39 @@ function DayGauge({ daily }: { daily: SteeringDaily }): JSX.Element {
   );
 }
 
-/** What the day says, in one sentence: on track, behind by how much, or why nothing is said yet. */
+/**
+ * What the day says, in one sentence: on track, behind by how much, or why nothing is said yet. Only the tag carries the
+ * tone (Design, 21/11): amber is a warning, never the colour of a sentence.
+ */
 function dayVerdict(daily: SteeringDaily): {
+  readonly tag: string | null;
   readonly text: string;
   readonly tone: 'up' | 'down' | 'neutral';
 } {
   if (daily.targetMinor === null)
     return {
+      tag: null,
       text: 'Pose l’objectif du mois (période « Mois ») : celui du jour en découle.',
       tone: 'neutral',
     };
-  if (daily.todayMinor >= daily.targetMinor) return { text: 'Objectif du jour atteint.', tone: 'up' };
+  if (daily.todayMinor >= daily.targetMinor)
+    return { tag: 'Atteint', text: 'Objectif du jour tenu.', tone: 'up' };
   if (daily.projectedMinor === null)
-    return { text: 'Trop tôt, ou pas assez de ventes, pour estimer la fin de journée.', tone: 'neutral' };
+    return {
+      tag: null,
+      text: 'Trop tôt, ou pas assez de ventes, pour estimer la fin de journée.',
+      tone: 'neutral',
+    };
   if (daily.projectedMinor >= daily.targetMinor)
-    return { text: 'En bonne voie pour l’objectif.', tone: 'up' };
+    return { tag: 'En avance', text: 'En bonne voie pour l’objectif.', tone: 'up' };
   return {
-    text: `En retard : il manquerait ${wholeEuros(daily.targetMinor - daily.projectedMinor)} au rythme habituel. C’est le moment de relancer.`,
+    tag: 'En retard',
+    text: `Il manquerait ${wholeEuros(daily.targetMinor - daily.projectedMinor)} au rythme habituel. C’est le moment de relancer.`,
     tone: 'down',
   };
 }
 
-/** The thirty days as bars, the target as a dashed line: a day held in the trend's colour, one missed in amber. */
+/** The thirty days as bars, the target as a dashed line: a day held in ink, one missed on the pale track (Design, 21/11). */
 function DayBars({ daily, tip }: { daily: SteeringDaily; tip: FloatingTip }): JSX.Element {
   const top = Math.max(1, daily.targetMinor ?? 0, ...daily.days.map((day) => day.revenueMinor));
   const last = daily.days.length - 1;
@@ -150,6 +161,7 @@ function DayCard({ daily, tip }: { daily: SteeringDaily; tip: FloatingTip }): JS
         <DayGauge daily={daily} />
         <div className="stg-day__words">
           <p className="stg-day__verdict" data-tone={verdict.tone}>
+            {verdict.tag === null ? null : <span className="stg-day__tag">{verdict.tag}</span>}
             {verdict.text}
           </p>
           <dl className="stg-figures">

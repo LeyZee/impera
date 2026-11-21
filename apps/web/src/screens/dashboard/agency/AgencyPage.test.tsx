@@ -225,8 +225,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     const day = await screen.findByRole('heading', { name: /Objectif du jour/u });
     const figures = await screen.findByRole('heading', { name: /L’agence en chiffres/u });
     expect(day.compareDocumentPosition(figures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // 300 € a day, 273 € expected at this pace: behind by 27 €, said in amber.
-    const verdict = await screen.findByText(/En retard : il manquerait 27 €/u);
+    // 300 € a day, 273 € expected at this pace: behind by 27 €, its tag in amber.
+    const verdict = await screen.findByText(/Il manquerait 27 €/u);
     expect(verdict.getAttribute('data-tone')).toBe('down');
     expect(screen.getAllByRole('button', { name: /^\d+ (oct|nov)\./u })).toHaveLength(30);
     expect(screen.getByText('Jours tenus sur les 29 derniers')).toBeTruthy();

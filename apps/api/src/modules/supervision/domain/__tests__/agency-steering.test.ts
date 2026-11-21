@@ -44,6 +44,7 @@ const fan = (over: Partial<SteeringFanRead> = {}): SteeringFanRead => ({
   windowMinor: 10_000,
   windowPurchases: 1,
   previousPurchases: 0,
+  withheld: false,
   ...over,
 });
 
@@ -191,6 +192,23 @@ describe('dependencyOf', () => {
     const { lapsed } = dependencyOf([creator({ fans })], range, null);
     expect(lapsed.map((one) => one.fanName)).toEqual(['Gros', 'Petit']);
     expect(lapsed[0]).toMatchObject({ daysSince: 27, spentMinor: 90_000, creatorId: LINA });
+  });
+
+  it('never names a fan in care or with an open doubt on his age, yet counts his money (Sécurité, 21/11)', () => {
+    const fans = [
+      fan({ key: 'a:1', fanName: 'Gros', lifetimeMinor: 90_000, windowMinor: 0, lastDay: '2026-10-25' }),
+      fan({
+        key: 'a:2',
+        fanName: 'Soin',
+        lifetimeMinor: 95_000,
+        windowMinor: 20_000,
+        lastDay: '2026-10-25',
+        withheld: true,
+      }),
+    ];
+    const dependency = dependencyOf([creator({ fans })], range, null);
+    expect(dependency.lapsed.map((one) => one.fanName)).toEqual(['Gros']);
+    expect(dependency.totalMinor).toBe(20_000);
   });
 
   it('has no median without a payer', () => {

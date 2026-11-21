@@ -36,6 +36,7 @@ const FanSchema = z.array(
     window_minor: z.coerce.number().int(),
     window_purchases: z.coerce.number().int().nonnegative(),
     previous_purchases: z.coerce.number().int().nonnegative(),
+    withheld: z.boolean(),
   }),
 );
 const WroteSchema = z.array(
@@ -137,7 +138,21 @@ export function createAgencySteeringReader(
                        where c.creator_id = ${creatorId}::uuid and c.fan_id = f.id
                        order by c.last_inbound_at desc nulls last limit 1) as conversation_id,
                      p.currency, p.first_day, p.last_day, p.lifetime, p.window_minor, p.window_purchases,
-                     p.previous_purchases
+                     p.previous_purchases,
+                     -- Never named among the lapsed: an open care episode, or a doubt on his age (a « minor » handoff)
+                     -- with no hand given back since, on any of his conversations with her (Sécurité, 21/11).
+                     coalesce(exists (
+                       select 1 from conversations c
+                        where c.creator_id = ${creatorId}::uuid and c.fan_id = f.id
+                          and (c.care_since is not null
+                               or exists (
+                                 select 1 from conversation_events e
+                                  where e.conversation_id = c.id and e.type = 'handoff_requested'
+                                    and e.payload->>'cause' = 'minor'
+                                    and e.seq > coalesce((select max(t.seq) from conversation_events t
+                                                          where t.conversation_id = c.id
+                                                            and t.type = 'takeover_ended'), -1)))), false)
+                       as withheld
                 from p
                 left join fans f
                   on f.creator_id = ${creatorId}::uuid and f.platform_account_id = p.account and f.platform_fan_id = p.fan`)
@@ -215,6 +230,7 @@ export function createAgencySteeringReader(
               windowMinor: row.window_minor,
               windowPurchases: row.window_purchases,
               previousPurchases: row.previous_purchases,
+              withheld: row.withheld,
             })),
             wrote:
               wrote === undefined || wrote.conversations === 0

@@ -49,20 +49,33 @@
   gap: 14px;
   min-width: 0;
 }
+/* The sentence in ink, a step under the day's figure; only its tag carries the tone. */
 .stg-day__verdict {
   margin: 0;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  font-weight: 650;
-  letter-spacing: var(--nv-text-title-2-tracking);
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 600;
+  letter-spacing: var(--nv-text-headline-tracking);
   color: var(--nv-ink);
   text-wrap: balance;
+  --_c: var(--nv-ink-muted);
 }
 .stg-day__verdict[data-tone='up'] {
-  color: var(--nv-trend-up-text);
+  --_c: var(--nv-trend-up-text);
 }
 .stg-day__verdict[data-tone='down'] {
-  color: var(--nv-trend-down-text);
+  --_c: var(--nv-trend-down-text);
+}
+.stg-day__tag {
+  display: inline-block;
+  margin-inline-end: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--_c) 14%, transparent);
+  color: var(--_c);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+  vertical-align: 2px;
 }
 
 .stg-gauge {
@@ -103,7 +116,6 @@
 .stg-gauge__arc {
   stroke: var(--_c);
   stroke-dasharray: 0 999;
-  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--_c) 45%, transparent));
   animation: stg-arc var(--nv-dur-data) var(--nv-ease-out) 120ms both;
 }
 @keyframes stg-arc {
@@ -122,7 +134,7 @@
   pointer-events: none;
 }
 .stg-gauge__value {
-  font-size: 26px;
+  font-size: 30px;
   line-height: 1.1;
   font-weight: 680;
   font-variant-numeric: tabular-nums;
@@ -159,13 +171,11 @@
   border: 0;
   background: none;
   cursor: pointer;
-  --_c: var(--nv-kind-2);
+  --_c: var(--nv-data-1);
 }
-.stg-bars__day[data-held='true'] {
-  --_c: var(--nv-trend-up);
-}
+/* One ink: the dashed line already says who falls short. */
 .stg-bars__day[data-held='false'] {
-  --_c: color-mix(in oklab, var(--nv-trend-down) 70%, transparent);
+  --_c: var(--nv-fill-track);
 }
 .stg-bars__bar {
   display: block;
@@ -179,6 +189,9 @@
   transition:
     filter var(--nv-dur-fast),
     transform var(--nv-dur-base) var(--nv-ease-spring);
+}
+.stg-bars__day[data-today] {
+  --_c: var(--nv-data-1);
 }
 .stg-bars__day[data-today] .stg-bars__bar {
   background: repeating-linear-gradient(

@@ -51,6 +51,11 @@ export interface SteeringFanRead {
   readonly windowMinor: number;
   readonly windowPurchases: number;
   readonly previousPurchases: number;
+  /**
+   * Never named among the lapsed (Sécurité, 21/11): an open care episode or an open doubt on his age on one of his
+   * conversations. Charles's two rules come first, a lapsed payer's name invites a sale. His money still counts.
+   */
+  readonly withheld: boolean;
 }
 
 /** One creator's part of the read, inside her tenant. */
@@ -298,7 +303,10 @@ export function dependencyOf(
   }
   const lapsedBefore = shiftDay(range.today, -STEERING_LAPSED_DAYS);
   const lapsed: SteeringLapsed[] = fans
-    .filter((fan) => fan.lifetime > 0 && fan.lastDay <= lapsedBefore && fan.fan.fanName !== null)
+    .filter(
+      (fan) =>
+        fan.lifetime > 0 && fan.lastDay <= lapsedBefore && fan.fan.fanName !== null && !fan.fan.withheld,
+    )
     .sort((a, b) => b.lifetime - a.lifetime || a.lastDay.localeCompare(b.lastDay))
     .slice(0, STEERING_LAPSED_MAX)
     .map((fan) => ({
