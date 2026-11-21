@@ -606,6 +606,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
           ...(scripted.step !== undefined && { scriptStep: scripted.step }),
+          ...(result.copilot !== undefined && { copilot: result.copilot }),
         });
         await appendEvent(
           tx,
