@@ -7,7 +7,7 @@
  */
 
 /** The reasons, in the order of the relationship: each tier allows its own and every one below it. */
-export const MEETING_REASONS = ['too_early', 'needs_time', 'secret', 'no_dates', 'safety'] as const;
+const MEETING_REASONS = ['too_early', 'needs_time', 'secret', 'no_dates', 'safety'] as const;
 export type MeetingReason = (typeof MEETING_REASONS)[number];
 
 /** Where they are: how long they have talked, whether he bought from her, and how close the agency says he is. */

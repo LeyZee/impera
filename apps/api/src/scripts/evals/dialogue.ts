@@ -24,7 +24,7 @@ type MeetingAnswer = NonNullable<ComposedTurn['meetingAnswer']>;
 type MeetingReason = Extract<MeetingAnswer, { kind: 'reason' }>['reason'];
 
 /** What she already answered him about meeting her, as the journal would keep it (Charles 21/11). */
-export interface MeetingSeen {
+interface MeetingSeen {
   readonly given: readonly MeetingReason[];
   readonly teased: boolean;
 }
