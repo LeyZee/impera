@@ -17,8 +17,14 @@ export type DayHeroPart = 'essentials' | 'tasks' | 'toSend';
 
 export interface DayHeroChip {
   readonly part: DayHeroPart;
+  /** The legend's words: what it is. */
+  readonly label: string;
+  readonly done: number;
+  readonly total: number;
   readonly words: string;
   readonly settled: boolean;
+  /** One series token a source (design system, « Figures partagées »): never red nor amber. */
+  readonly colour: string;
 }
 
 export interface DayHero {
@@ -43,17 +49,33 @@ export function dayHeroOf(source: DayHeroSource): DayHero | null {
   if (essentials !== null && essentials.total > 0)
     chips.push({
       part: 'essentials',
+      label: 'À poster',
+      done: essentials.done,
+      total: essentials.total,
       words: `À poster ${String(essentials.done)}/${String(essentials.total)}`,
       settled: essentials.done >= essentials.total,
+      colour: 'var(--nv-series-1)',
     });
   if (tasks !== null && tasks.total > 0)
     chips.push({
       part: 'tasks',
+      label: 'Tâches',
+      done: tasks.done,
+      total: tasks.total,
       words: `Tâches ${String(tasks.done)}/${String(tasks.total)}`,
       settled: tasks.done >= tasks.total,
+      colour: 'var(--nv-series-2)',
     });
   if (sent > 0)
-    chips.push({ part: 'toSend', words: `${plural(sent, 'envoi', 'envois')} à faire`, settled: false });
+    chips.push({
+      part: 'toSend',
+      label: 'À envoyer à l’agence',
+      done: 0,
+      total: sent,
+      words: `${plural(sent, 'envoi', 'envois')} à faire`,
+      settled: false,
+      colour: 'var(--nv-series-3)',
+    });
   const left = total - done;
   return {
     done,

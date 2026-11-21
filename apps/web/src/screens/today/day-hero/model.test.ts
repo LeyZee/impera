@@ -8,6 +8,7 @@ describe('« L’essentiel du jour » on her Aujourd’hui', () => {
     expect(hero).toMatchObject({ done: 3, total: 7, title: 'L’essentiel du jour' });
     expect(hero?.line).toBe('Encore 4 choses pour boucler ta journée.');
     expect(hero?.chips.map((c) => c.words)).toEqual(['À poster 2/4', 'Tâches 1/2', '1 envoi à faire']);
+    expect(new Set(hero?.chips.map((c) => c.colour)).size).toBe(3);
   });
 
   it('adapts to what exists: a day with tasks only counts tasks', () => {

@@ -1,35 +1,22 @@
 /*
- * « L'essentiel du jour » (Charles, 21/11): the one big thing of her Aujourd'hui. A large design-system ring, her
- * sentence, a chip per source. Never red: what is left is not a fault.
+ * « L'essentiel du jour » (Charles, 21/11): the one big thing of her Aujourd'hui. The shared donut and its legend
+ * (design system, « Figures partagées »); this sheet only lays them out. Never red: what is left is not a fault.
  */
 .dh-card {
   display: flex;
-  align-items: center;
-  gap: var(--nv-space-5);
-  padding: var(--nv-plate-pad);
-}
-.dh-ring.nv-ring {
-  width: 120px;
-  height: 120px;
-}
-.dh-ring .nv-ring__track,
-.dh-ring .nv-ring__value {
-  stroke-width: 11;
-}
-.dh-ring .nv-ring__label {
-  font-size: 26px;
-}
-.dh-ring[data-full] {
-  --_c: var(--nv-success);
-}
-.dh-text {
-  display: flex;
   flex-direction: column;
-  gap: var(--nv-space-2);
-  min-width: 0;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
 }
 .dh-title.nv-h2 {
   margin: 0;
+}
+.dh-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
 }
 .dh-line {
   margin: 0;
@@ -37,34 +24,6 @@
   font-size: var(--nv-text-callout);
   line-height: var(--nv-text-callout-leading);
 }
-.dh-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nv-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.dh-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--nv-fill-track);
-  color: var(--nv-ink);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-}
-.dh-chip[data-part='toSend'] {
-  background: color-mix(in srgb, var(--nv-warning) 18%, transparent);
-}
-.dh-chip[data-settled] {
-  color: var(--nv-success);
-}
-@media (max-width: 520px) {
-  .dh-card {
-    flex-direction: column;
-    text-align: center;
-  }
-  .dh-chips {
-    justify-content: center;
-  }
+.dh-legend {
+  --nv-breakdown-cols: 12px minmax(0, 1fr) auto;
 }

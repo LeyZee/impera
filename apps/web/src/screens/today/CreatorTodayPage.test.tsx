@@ -229,7 +229,7 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
       'section',
     );
     expect(await screen.findByText('1 envoi à faire')).toBeDefined();
-    expect(screen.getByText(/^Tâches \d+\/\d+$/u)).toBeDefined();
+    expect(screen.getByRole('button', { name: /^Tâches\s*\d+\/\d+$/u })).toBeDefined();
     const send = (await screen.findByRole('heading', { level: 2, name: 'À envoyer' })).closest('section');
     expect(send === null ? null : hero?.compareDocumentPosition(send)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
