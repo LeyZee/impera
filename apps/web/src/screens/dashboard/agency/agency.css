@@ -1356,6 +1356,11 @@
   background: var(--nv-plate-hover);
   color: var(--nv-ink);
 }
+/* Both fields above drop the plate's shadow, and with it the focus ring: the keyboard gets it back (DS-03). */
+.ins-when__nav .ins-when__select .nv-select__field:focus-visible,
+.ins-when__compare .nv-select__field:focus-visible {
+  box-shadow: var(--nv-shadow-focus);
+}
 .ins-when__days {
   display: inline-flex;
   flex-wrap: wrap;

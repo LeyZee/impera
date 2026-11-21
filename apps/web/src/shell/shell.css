@@ -857,6 +857,8 @@
   box-sizing: border-box;
   margin: 0;
   padding: 10px 16px;
+  /* Opaque: it lands on whatever card is up top, whose words must not show through it (DS-10). */
+  background: var(--nv-surface-raised);
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   color: var(--nv-ink);

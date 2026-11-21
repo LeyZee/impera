@@ -1718,3 +1718,16 @@ body {
     bottom: calc(14px + 64px + 10px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Reduced motion: the bars stand, the steps and pads are there, the flash and the pop are skipped, the skeleton
+   holds still (DS-12). */
+@media (prefers-reduced-motion: reduce) {
+  .se-stairs i,
+  .se-step,
+  .se-step__pad,
+  .se-branch[data-flash],
+  .se-choice[aria-checked='true'] .se-radio::after,
+  .se-skel i {
+    animation: none;
+  }
+}

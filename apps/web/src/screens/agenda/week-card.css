@@ -807,8 +807,9 @@
   height: 26px;
   margin-top: 2px;
 }
+/* 26px + 2 × 9px: the 44px target, its overflow kept inside the gap between two marks (DS-09). */
 .dy-marks[data-many] .dy-tick::before {
-  inset: -5px;
+  inset: -9px;
 }
 /* On a phone, a line of several marks puts them under its words: the words keep their width. */
 @media (max-width: 640px) {
