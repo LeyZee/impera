@@ -78,7 +78,13 @@ export function nextSlot(slots: readonly ChannelSlot[]): ChannelSlot | null {
   const last = slots.at(-1);
   // Her first slot is the main post at 19 h (ADR 0080 § 1.5); the others are engagement.
   if (last === undefined)
-    return { minute: CHANNEL_MAIN_MINUTE, role: 'main', days: [1, 2, 3, 4, 5, 6, 7], enabled: true };
+    return {
+      minute: CHANNEL_MAIN_MINUTE,
+      role: 'main',
+      days: [1, 2, 3, 4, 5, 6, 7],
+      enabled: true,
+      untilMinute: null,
+    };
   const start = (last.minute + CHANNEL_SLOT_GAP_MINUTES) % DAY_MINUTES;
   for (let step = 0; step < DAY_MINUTES; step += 30) {
     const minute = (start + step) % DAY_MINUTES;

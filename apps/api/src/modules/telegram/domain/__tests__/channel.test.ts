@@ -88,12 +88,12 @@ describe('the slots of the channel (ADR 0080 § 1)', () => {
     expect(channelRefusal(config({ slots: oneOff }), context([]))).toBeNull();
   });
 
-  it('refuses two posts of one day under three hours apart, and names them', () => {
+  it('refuses two posts of one day under two hours apart, and names them', () => {
     const refusal = channelRefusal(
       config({
         slots: [
           { minute: 19 * 60, role: ENGAGEMENT, days: everyDay, enabled: true },
-          { minute: 21 * 60, role: ENGAGEMENT, days: [5], enabled: true },
+          { minute: 20 * 60, role: ENGAGEMENT, days: [5], enabled: true },
         ],
       }),
       context([]),
@@ -104,9 +104,20 @@ describe('the slots of the channel (ADR 0080 § 1)', () => {
 
   it('counts the gap across midnight, Sunday to Monday too', () => {
     const late = { minute: 23 * 60, role: ENGAGEMENT, days: [7], enabled: true };
-    const early = { minute: 60, role: ENGAGEMENT, days: [1], enabled: true };
+    const early = { minute: 30, role: ENGAGEMENT, days: [1], enabled: true };
     expect(channelRefusal(config({ slots: [late, early] }), context([]))?.kind).toBe('slots_too_close');
-    expect(channelRefusal(config({ slots: [late, { ...early, minute: 2 * 60 }] }), context([]))).toBeNull();
+    expect(channelRefusal(config({ slots: [late, { ...early, minute: 60 }] }), context([]))).toBeNull();
+  });
+
+  it('reads a window from its start to its end, and refuses one that ends before it starts (ADR 0162 § 2)', () => {
+    const morning = { minute: 9 * 60, untilMinute: 11 * 60, role: ENGAGEMENT, days: everyDay, enabled: true };
+    const noon = { ...morning, minute: 12 * 60, untilMinute: 14 * 60 };
+    expect(channelRefusal(config({ slots: [morning, noon] }), context([]))?.message).toMatch(/9.h – 11.h/);
+    expect(
+      channelRefusal(config({ slots: [morning, { ...noon, minute: 13 * 60 }] }), context([])),
+    ).toBeNull();
+    const reversed = { ...morning, untilMinute: 8 * 60 };
+    expect(channelRefusal(config({ slots: [reversed] }), context([]))?.kind).toBe('slots_too_close');
   });
 
   it('sorts the days and the slots it stores', () => {

@@ -86,6 +86,7 @@ export * from './team';
 export * from './team-members';
 export * from './telegram';
 export * from './telegram-channel';
+export * from './telegram-channel-week';
 export * from './trends';
 export * from './trophy-case';
 export * from './vault';

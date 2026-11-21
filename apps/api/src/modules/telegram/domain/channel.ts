@@ -37,17 +37,28 @@ export function normalizedConfig(config: TelegramChannelConfig): TelegramChannel
   return { ...config, slots };
 }
 
-/** The hours of the switched-on slots of each ISO day (1 to 7), sorted. */
-function minutesByDay(slots: readonly ChannelSlot[]): Map<number, number[]> {
-  const byDay = new Map<number, number[]>();
+/** A window of a day, in minutes after her midnight: from its start to its end (the same for an exact hour). */
+interface Span {
+  readonly from: number;
+  readonly until: number;
+}
+
+/** The windows of the switched-on slots of each ISO day (1 to 7), sorted by start. */
+function spansByDay(slots: readonly ChannelSlot[]): Map<number, Span[]> {
+  const byDay = new Map<number, Span[]>();
   for (let day = 1; day <= 7; day += 1) byDay.set(day, []);
   for (const slot of slots) {
     if (!slot.enabled) continue;
-    for (const day of slot.days) byDay.get(day)?.push(slot.minute);
+    const span = { from: slot.minute, until: Math.max(slot.minute, slot.untilMinute ?? slot.minute) };
+    for (const day of slot.days) byDay.get(day)?.push(span);
   }
-  for (const minutes of byDay.values()) minutes.sort((a, b) => a - b);
+  for (const spans of byDay.values()) spans.sort((a, b) => a.from - b.from);
   return byDay;
 }
+
+/** « 19 h » or « 18 h – 21 h ». */
+const spanWords = (span: Span): string =>
+  span.until === span.from ? clockWords(span.from) : `${clockWords(span.from)} – ${clockWords(span.until)}`;
 
 /** ADR 0080 § 1.5: one main post a day at most, the others are engagement. */
 function mainRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
@@ -64,38 +75,54 @@ function mainRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
   return null;
 }
 
-/** ADR 0080 § 1.1 and § 1.3: four posts a day at most, three hours apart at least, across midnight too. */
+const GAP_WORDS = `${String(CHANNEL_SLOT_GAP_MINUTES / 60)}${NBSP}h d’écart au moins`;
+
+/**
+ * ADR 0080 § 1.1, ADR 0162 § 2: four posts a day at most; a window ends before it starts, and two windows of a day,
+ * across midnight too, leave two hours between the end of one and the start of the next.
+ */
 function slotRefusal(slots: readonly ChannelSlot[]): ChannelRefusal | null {
   const main = mainRefusal(slots);
   if (main !== null) return main;
-  const byDay = minutesByDay(slots);
-  for (const [day, minutes] of byDay) {
-    if (minutes.length > CHANNEL_POSTS_PER_DAY_MAX) {
+  const reversed = slots.find((slot) => slot.untilMinute !== null && slot.untilMinute < slot.minute);
+  if (reversed !== undefined) {
+    return {
+      kind: 'slots_too_close',
+      message: `La fenêtre de ${clockWords(reversed.minute)} finit avant de commencer.`,
+    };
+  }
+  const byDay = spansByDay(slots);
+  for (const [day, spans] of byDay) {
+    if (spans.length > CHANNEL_POSTS_PER_DAY_MAX) {
       return {
         kind: 'too_many_posts',
-        message: `Le ${dayName(day)} a ${String(minutes.length)} posts : ${String(CHANNEL_POSTS_PER_DAY_MAX)} par jour au plus.`,
+        message: `Le ${dayName(day)} a ${String(spans.length)} posts : ${String(CHANNEL_POSTS_PER_DAY_MAX)} par jour au plus.`,
       };
     }
-    for (let i = 1; i < minutes.length; i += 1) {
-      const before = minutes[i - 1] ?? 0;
-      const after = minutes[i] ?? 0;
-      if (after - before < CHANNEL_SLOT_GAP_MINUTES) {
+    for (let i = 1; i < spans.length; i += 1) {
+      const before = spans[i - 1];
+      const after = spans[i];
+      if (
+        before !== undefined &&
+        after !== undefined &&
+        after.from - before.until < CHANNEL_SLOT_GAP_MINUTES
+      ) {
         return {
           kind: 'slots_too_close',
-          message: `Le ${dayName(day)}, ${clockWords(before)} et ${clockWords(after)} sont trop proches : 3 h d’écart au moins.`,
+          message: `Le ${dayName(day)}, ${spanWords(before)} et ${spanWords(after)} sont trop proches : ${GAP_WORDS}.`,
         };
       }
     }
-    const last = minutes.at(-1);
+    const last = spans.at(-1);
     const next = byDay.get((day % 7) + 1)?.[0];
     if (
       last !== undefined &&
       next !== undefined &&
-      MINUTES_PER_DAY - last + next < CHANNEL_SLOT_GAP_MINUTES
+      MINUTES_PER_DAY - last.until + next.from < CHANNEL_SLOT_GAP_MINUTES
     ) {
       return {
         kind: 'slots_too_close',
-        message: `${clockWords(last)} le ${dayName(day)} et ${clockWords(next)} le ${dayName((day % 7) + 1)} sont trop proches : 3 h d’écart au moins.`,
+        message: `${spanWords(last)} le ${dayName(day)} et ${spanWords(next)} le ${dayName((day % 7) + 1)} sont trop proches : ${GAP_WORDS}.`,
       };
     }
   }
