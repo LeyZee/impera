@@ -15,8 +15,10 @@ import {
   figuresOf,
   fillOf,
   headlineOf,
+  mediaCountOf,
   paceOf,
   platformsOf,
+  unitsOf,
 } from './model';
 
 import { useNow } from '@/scheduling/useNow';
@@ -128,7 +130,7 @@ function Overview({
           <span className="nv-tile__value nv-num">{figures.dropped14}</span>
           <span className={`nv-delta ${change >= 0 ? 'nv-delta--better' : 'nv-delta--worse'}`}>
             {change >= 0 ? '+' : '−'}
-            {Math.abs(change)} par rapport aux 14 jours d’avant
+            {Math.abs(change)} face aux 14 j d’avant
           </span>
           <Spark values={droppedByDay(stock, now)} tone={change >= 0 ? 'up' : 'down'} />
         </div>
@@ -223,6 +225,8 @@ function Overview({
                 <CategoryCard
                   key={one.category}
                   category={one}
+                  media={mediaCountOf(stock, one.category).all}
+                  awaited={platform.open}
                   onOpen={() => {
                     onOpen({ kind: 'category', category: one.category });
                   }}
@@ -246,13 +250,13 @@ function Overview({
 function Inside({ stock }: { stock: ContentStock }): JSX.Element {
   const { lit, setLit, row } = useLit();
   const slices = stock.categories
-    .filter((one) => one.stockMedia > 0)
     .map((one) => ({
       key: one.category,
       label: STOCK_NAMES[one.category],
       colour: STOCK_COLOURS[one.category],
-      value: one.stockMedia,
-    }));
+      value: mediaCountOf(stock, one.category).inStock,
+    }))
+    .filter((one) => one.value > 0);
   const total = slices.reduce((sum, one) => sum + one.value, 0);
   const shown = lit === null ? undefined : slices[lit];
   return (
@@ -292,7 +296,19 @@ function Inside({ stock }: { stock: ContentStock }): JSX.Element {
   );
 }
 
-function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: () => void }): JSX.Element {
+function CategoryCard({
+  category,
+  media,
+  awaited,
+  onOpen,
+}: {
+  category: StockCategory;
+  /** Every medium the category view will list, gone ones included. */
+  media: number;
+  /** False while her platform is not open: nothing is expected, nothing is lacking. */
+  awaited: boolean;
+  onOpen: () => void;
+}): JSX.Element {
   const fill = fillOf(category);
   const rule = STOCK_RULES[category.category];
   const centre =
@@ -332,10 +348,11 @@ function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: (
         </div>
       </header>
       <p className="st-card__use">{STOCK_USES[category.category]}</p>
+      {rule === undefined ? null : <span className="st-rule">{rule}</span>}
       <dl className="st-card__facts">
         <div>
           <dt>En stock</dt>
-          <dd className="nv-num">{category.stockUnits}</dd>
+          <dd className="nv-num">{unitsOf(category.category, category.stockUnits)}</dd>
         </div>
         <div>
           <dt>Parti en 7 j</dt>
@@ -343,14 +360,13 @@ function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: (
         </div>
         <div>
           <dt>Manque</dt>
-          <dd className="nv-num" data-tone={category.lacking > 0 ? 'warn' : undefined}>
-            {category.lacking === 0 ? 'Rien' : category.lacking}
+          <dd className="nv-num" data-tone={awaited && category.lacking > 0 ? 'warn' : undefined}>
+            {!awaited || category.lacking === 0 ? 'Rien' : category.lacking}
           </dd>
         </div>
       </dl>
-      {rule === undefined ? null : <span className="st-rule">{rule}</span>}
       <button type="button" className="nv-btn nv-btn--sm nv-btn--plain st-card__open" onClick={onOpen}>
-        Ouvrir {category.stockMedia === 0 ? 'la catégorie' : `les ${String(category.stockMedia)} médias`} →
+        Ouvrir {media === 0 ? 'la catégorie' : `les ${String(media)} médias`} →
       </button>
     </article>
   );

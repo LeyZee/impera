@@ -185,6 +185,18 @@ export function headlineOf(stock: ContentStock, now: Date): StockHeadline {
 const descriptionsLine = (count: number): string =>
   count === 1 ? 'Une description attend un œil.' : `${String(count)} descriptions attendent un œil.`;
 
+/**
+ * Media in stock and all media shown, per category, counted from the one list every screen reads: the headline, the
+ * donut, a card and the category view never disagree.
+ */
+export function mediaCountOf(
+  stock: ContentStock,
+  category: DropCategory,
+): { readonly inStock: number; readonly all: number } {
+  const mine = stock.media.filter((one) => one.category === category);
+  return { inStock: mine.filter((one) => one.standing === 'stock').length, all: mine.length };
+}
+
 /** The four figures under the headline. */
 export interface StockFigures {
   readonly inStock: number;
@@ -203,8 +215,8 @@ export function figuresOf(stock: ContentStock, now: Date): StockFigures {
     return time > at - from * 86_400_000 && time <= at - to * 86_400_000;
   };
   return {
-    inStock: stock.media.filter((one) => one.standing !== 'out').length,
-    scripts: stock.media.filter((one) => one.category === 'script' && one.standing !== 'out').length,
+    inStock: stock.media.filter((one) => one.standing === 'stock').length,
+    scripts: stock.media.filter((one) => one.category === 'script' && one.standing === 'stock').length,
     dropped14: stock.media.filter((one) => within(one.droppedAt, 14, 0)).length,
     droppedBefore: stock.media.filter((one) => within(one.droppedAt, 28, 14)).length,
     out7: stock.media.filter((one) => one.outAt !== null && within(one.outAt, 7, 0)).length,

@@ -120,7 +120,20 @@ export function StockCategoryView({
         ))}
       </div>
 
-      <FilterBar value={filter} onChange={setFilter} />
+      <div className="st-toolbar">
+        <FilterBar value={filter} onChange={setFilter} />
+        <div className="st-key" aria-hidden="true">
+          <span className="st-key__item" data-desc="validated">
+            {DESCRIPTION_LABELS.validated}
+          </span>
+          <span className="st-key__item" data-desc="to_validate">
+            {DESCRIPTION_LABELS.to_validate}
+          </span>
+          <span className="st-key__item" data-desc="pending">
+            {DESCRIPTION_LABELS.pending}
+          </span>
+        </div>
+      </div>
 
       {groups.length === 0 ? (
         <Empty title={filter === 'all' ? 'Rien ici pour l’instant.' : 'Rien sous ce filtre.'}>
@@ -171,18 +184,6 @@ export function StockCategoryView({
           })}
         </div>
       )}
-
-      <div className="st-key" aria-hidden="true">
-        <span className="st-key__item" data-desc="validated">
-          {DESCRIPTION_LABELS.validated}
-        </span>
-        <span className="st-key__item" data-desc="to_validate">
-          {DESCRIPTION_LABELS.to_validate}
-        </span>
-        <span className="st-key__item" data-desc="pending">
-          {DESCRIPTION_LABELS.pending}
-        </span>
-      </div>
 
       {viewing === null ? null : (
         <StockViewer

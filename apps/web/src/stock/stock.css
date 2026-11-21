@@ -98,6 +98,9 @@
 .nv-tile.st-tile-figure--spark {
   padding-bottom: 34px;
 }
+.st-tile-figure--spark .nv-delta {
+  white-space: nowrap;
+}
 .st-tile-figure--open {
   cursor: pointer;
 }
@@ -196,7 +199,7 @@
   font-weight: 650;
   text-align: right;
 }
-.st-bar__days:is([data-status='low'], [data-status='empty']) {
+.st-bar__days:is([data-status='short'], [data-status='low'], [data-status='empty']) {
   color: var(--nv-warning);
 }
 @keyframes st-grow {
@@ -276,7 +279,8 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--nv-space-2);
-  margin: 0;
+  margin: auto 0 0;
+  padding-top: var(--nv-space-2);
 }
 .st-card__facts div {
   display: flex;
@@ -289,6 +293,7 @@
 }
 .st-card__facts dd {
   margin: 0;
+  white-space: nowrap;
   font-weight: 650;
 }
 .st-card__facts dd[data-tone='warn'] {
@@ -296,7 +301,6 @@
 }
 .st-card__open {
   align-self: flex-start;
-  margin-top: auto;
 }
 .st-rule {
   display: inline-flex;
@@ -373,8 +377,14 @@
 .st-figure[data-tone='warn'] .nv-tile__value {
   color: var(--nv-warning);
 }
+.st-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
 .st-filter {
-  align-self: flex-start;
   max-width: 100%;
 }
 .st-groups {
@@ -850,4 +860,9 @@
   .st-ring:hover {
     transform: none;
   }
+}
+
+/* The ring's glow is drawn past its circle: left uncut, it stays round instead of a lighter square. */
+:is(.st-ring, .st-card) .nv-ring > svg {
+  overflow: visible;
 }
