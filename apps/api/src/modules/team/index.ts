@@ -60,10 +60,11 @@ export interface TeamModule {
      */
     applyRoles(): Promise<number>;
     /**
-     * `team.member_departure`, at the hour a departure ends (ADR 0166 § 2), in the name of the owner who set it:
+     * `team.member_departure`, at the hour a departure ends (ADR 0166 § 2), in the name of the owner who set it or of an
+     * owner in office:
      * whether it applied now (false when cancelled or already applied).
      */
-    applyDeparture(id: MemberDepartureId, ownerId: UserId): Promise<boolean>;
+    applyDeparture(id: MemberDepartureId, scheduledBy: UserId): Promise<boolean>;
   };
 }
 
@@ -94,7 +95,7 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
     { agencyTimeZone: DEFAULT_AGENCY_TIME_ZONE, now },
   );
   const today = (at: Date): string => calendarDayIn(at, DEFAULT_AGENCY_TIME_ZONE);
-  const departures = createDepartureStore(deps.db, now, today);
+  const departures = createDepartureStore(deps.db, deps.adminDb, now, today);
   const announcements = createAnnouncementService(
     createDrizzleAnnouncementStore(deps.db, now),
     deps.creatorNames,
@@ -117,7 +118,7 @@ export function createTeamModule(deps: TeamDeps): TeamModule {
     },
     jobs: {
       applyRoles: async () => (await applyRolesUnscoped(deps.adminDb, today(now()))).length,
-      applyDeparture: (id, ownerId) => departures.apply(id, ownerId),
+      applyDeparture: (id, scheduledBy) => departures.apply(id, scheduledBy),
     },
   };
 }

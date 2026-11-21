@@ -11,11 +11,12 @@ import {
   UserIdSchema,
   type MemberDeparture,
   type MemberDepartureId,
-  type TeamMemberId,
   type UserId,
+  type TeamMemberId,
 } from '@impera/contracts';
 import { eq, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 
+import { departureApplier, isLateDeparture } from '../domain/departures';
 import {
   MemberDepartureConflict,
   MemberDepartureDateInvalid,
@@ -32,7 +33,7 @@ const { auditLog, teamMemberDepartures, teamMemberNotes, teamMembers, user } = s
 
 type Row = typeof teamMemberDepartures.$inferSelect;
 
-const toDeparture = (row: Row): MemberDeparture =>
+const toDeparture = (row: Row, now: Date): MemberDeparture =>
   MemberDepartureSchema.parse({
     id: row.id,
     memberId: row.memberId,
@@ -42,6 +43,7 @@ const toDeparture = (row: Row): MemberDeparture =>
     appliedAt: row.appliedAt?.toISOString() ?? null,
     revealRemovedAt: row.revealRemovedAt?.toISOString() ?? null,
     revealRemovedBy: row.revealRemovedBy,
+    late: isLateDeparture(row, now),
   });
 
 const isUniqueViolation = (error: unknown): boolean =>
@@ -88,16 +90,22 @@ export interface DepartureStore {
   ): Promise<MemberDeparture>;
   cancel(actor: Actor, id: MemberDepartureId): Promise<MemberDeparture>;
   revealRemoved(actor: Actor, id: MemberDepartureId): Promise<MemberDeparture>;
-  /** `team.member_departure`, in the name of the owner who set it: whether it applied now. */
-  apply(id: MemberDepartureId, ownerId: UserId): Promise<boolean>;
+  /**
+   * `team.member_departure`: whether it applied now. In the name of the owner who set it, or of an owner in office if
+   * he no longer is one (ADR 0166 § 2). `scheduledBy`, from the job's payload, must be the departure's own.
+   */
+  apply(id: MemberDepartureId, scheduledBy: UserId): Promise<boolean>;
 }
 
 /**
  * A member's departure (ADR 0166): the owner sets it, cancels it or ticks Reveal through `withMember`, and the job
- * applies it in his name at its hour, through the same policies. Nothing goes through the service role.
+ * applies it at its hour in an owner's name, through the same policies. The service role reads who the owners are,
+ * never a departure.
  */
 export function createDepartureStore(
   db: Database,
+  /** The service role: the owners in office, nothing else. */
+  serviceDb: Database,
   now: () => Date,
   /** The agency's day of an instant, where `left_on` is read (EQ-14). */
   today: (at: Date) => string,
@@ -113,7 +121,7 @@ export function createDepartureStore(
             sql`${teamMemberDepartures.cancelledAt} is null and (${teamMemberDepartures.appliedAt} is null or ${teamMemberDepartures.revealRemovedAt} is null)`,
           )
           .orderBy(teamMemberDepartures.endsAt);
-        return rows.map(toDeparture);
+        return rows.map((row) => toDeparture(row, now()));
       }),
 
     schedule: (actor, memberId, endsAt, reason) =>
@@ -167,19 +175,19 @@ export function createDepartureStore(
           const leftOn = today(now());
           const done = await leaveTeam(tx, memberId, UserIdSchema.parse(member.userId), leftOn);
           await audit(tx, actor, 'team_member.departure_apply', memberId, { ...done, leftOn });
-          return toDeparture(row);
+          return toDeparture(row, now());
         }
         // At its hour, once: the key makes a second scheduling of the same departure the same job.
         await tx.execute(
           sql`select public.enqueue_job(
             task => 'team.member_departure',
-            payload => ${JSON.stringify({ departureId: id, ownerId: actor.userId })}::jsonb,
+            payload => ${JSON.stringify({ departureId: id, scheduledBy: actor.userId })}::jsonb,
             run_at => ${row.endsAt.toISOString()}::timestamptz,
             max_attempts => ${JOB_MAX_ATTEMPTS['team.member_departure']}::int,
             job_key => ${`team.member_departure:${id}`}
           )`,
         );
-        return toDeparture(row);
+        return toDeparture(row, now());
       }),
 
     cancel: (actor, id) =>
@@ -196,7 +204,7 @@ export function createDepartureStore(
           .returning();
         await audit(tx, actor, 'team_member.departure_cancel', TeamMemberIdSchema.parse(row.memberId));
         if (cancelled === undefined) throw new MemberDepartureNotFound();
-        return toDeparture(cancelled);
+        return toDeparture(cancelled, now());
       }),
 
     revealRemoved: (actor, id) =>
@@ -205,7 +213,7 @@ export function createDepartureStore(
         const row = await departureOf(tx, id);
         if (row.cancelledAt !== null) throw new MemberDepartureConflict('Ce départ est annulé');
         // Ticked twice, the first tick stays: its day and who ticked it.
-        if (row.revealRemovedAt !== null) return toDeparture(row);
+        if (row.revealRemovedAt !== null) return toDeparture(row, now());
         const [ticked] = await tx
           .update(teamMemberDepartures)
           .set({ revealRemovedAt: sql`now()`, revealRemovedBy: actor.userId })
@@ -213,14 +221,28 @@ export function createDepartureStore(
           .returning();
         if (ticked === undefined) throw new MemberDepartureNotFound();
         await audit(tx, actor, 'team_member.reveal_removed', TeamMemberIdSchema.parse(row.memberId));
-        return toDeparture(ticked);
+        return toDeparture(ticked, now());
       }),
 
-    apply: (id, ownerId) =>
-      withMember(db, ownerId, async (tx, scope) => {
-        // The owner who set it is no longer one: nothing applies in his name; the job fails and says so.
+    apply: async (id, scheduledBy) => {
+      const owners = await serviceDb
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.role, 'owner'))
+        .orderBy(user.createdAt);
+      const applier = departureApplier(
+        scheduledBy,
+        owners.map((owner) => owner.id),
+      );
+      // No owner at all: thrown, the job is tried again and the departure stays late, in red.
+      if (applier === null) throw new Error('team.member_departure: no owner to apply it');
+      const ownerId = UserIdSchema.parse(applier);
+      return withMember(db, ownerId, async (tx, scope) => {
         assertOwnerScope(scope);
         const row = await departureOf(tx, id);
+        // A payload that names another owner than the one who set it is not this departure's job.
+        if (row.createdBy !== scheduledBy)
+          throw new Error('team.member_departure: not set by the owner named');
         if (row.cancelledAt !== null || row.appliedAt !== null) return false;
         // Never before its hour: thrown, so that the job is tried again rather than marked done.
         if (row.endsAt.getTime() > now().getTime()) throw new Error('team.member_departure: before its hour');
@@ -231,21 +253,23 @@ export function createDepartureStore(
           .for('update');
         if (member === undefined) throw new MemberNotFound();
         const memberId = TeamMemberIdSchema.parse(row.memberId);
-        const userId = UserIdSchema.parse(member.userId);
         const leftOn = today(now());
         const done =
           member.status === 'left'
             ? { sessionsEnded: 0, passkeysRemoved: 0 }
-            : await leaveTeam(tx, memberId, userId, leftOn);
+            : await leaveTeam(tx, memberId, UserIdSchema.parse(member.userId), leftOn);
         await tx
           .update(teamMemberDepartures)
           .set({ appliedAt: sql`greatest(now(), ${teamMemberDepartures.endsAt})` })
           .where(eq(teamMemberDepartures.id, id));
+        // The entry says who applied it and who had set it, when an owner in office took it over.
         await audit(tx, { userId: ownerId, ip: null }, 'team_member.departure_apply', memberId, {
           ...done,
           leftOn,
+          scheduledBy: row.createdBy,
         });
         return true;
-      }),
+      });
+    },
   };
 }

@@ -425,7 +425,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
   ),
   'team_member.departure_apply': action(
     'team',
-    z.object({ sessionsEnded: count, passkeysRemoved: count, leftOn: day }),
+    z.object({ sessionsEnded: count, passkeysRemoved: count, leftOn: day, scheduledBy: id.optional() }),
     (d, c) =>
       `a fait partir ${c.member(c.entityId)} (${plural(d.sessionsEnded, 'session fermée', 'sessions fermées')})`,
   ),

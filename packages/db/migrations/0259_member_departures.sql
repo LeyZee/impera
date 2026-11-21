@@ -51,6 +51,13 @@ BEGIN
     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'team_member_departures: an end or a tick once set never changes' USING ERRCODE = 'check_violation';
   END IF;
+  -- Who cancels or ticks is the account of the transaction, never another owner's name.
+  IF (OLD.cancelled_by IS NULL AND NEW.cancelled_by IS NOT NULL
+      AND NEW.cancelled_by IS DISTINCT FROM nullif(current_setting('app.user_id', true), ''))
+    OR (OLD.reveal_removed_by IS NULL AND NEW.reveal_removed_by IS NOT NULL
+      AND NEW.reveal_removed_by IS DISTINCT FROM nullif(current_setting('app.user_id', true), '')) THEN
+    RAISE EXCEPTION 'team_member_departures: signed by another account' USING ERRCODE = 'insufficient_privilege';
+  END IF;
   RETURN NEW;
 END;
 $$;--> statement-breakpoint

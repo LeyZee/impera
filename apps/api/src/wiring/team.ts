@@ -59,7 +59,7 @@ export function wireTeam(
         JOB_PAYLOADS['team.member_departure'],
         logger,
         async (payload, context) => {
-          const applied = await module.jobs.applyDeparture(payload.departureId, payload.ownerId);
+          const applied = await module.jobs.applyDeparture(payload.departureId, payload.scheduledBy);
           context.logger.info({ departureId: payload.departureId, applied }, 'team: departure at its hour');
         },
       ),

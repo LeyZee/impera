@@ -67,6 +67,8 @@ describe('« Faire partir » : une heure de fin, la coche Reveal, appliqué par 
     ));
   });
 
+  const owner = () => UserIdSchema.parse(team.ownerId);
+
   afterAll(async () => {
     await team.close();
   });
@@ -76,7 +78,7 @@ describe('« Faire partir » : une heure de fin, la coche Reveal, appliqué par 
     const set = await leave(theo, { endsAt, reason: 'Fin de mission' });
     expect(set.statusCode, set.body).toBe(201);
     const departure = departureOf(set.body);
-    expect(departure).toMatchObject({ memberId: theo.id, state: 'scheduled', appliedAt: null });
+    expect(departure).toMatchObject({ memberId: theo.id, state: 'scheduled', appliedAt: null, late: false });
     expect(Date.parse(departure.endsAt)).toBe(Date.parse(endsAt));
     expect((await team.call('GET', '/me', theoCookie)).statusCode).toBe(200);
     expect(await statusOf(theo)).toMatchObject({ status: 'active' });
@@ -95,6 +97,17 @@ describe('« Faire partir » : une heure de fin, la coche Reveal, appliqué par 
     );
     const [job] = z.array(z.object({ run_at: z.coerce.date(), key: z.string() })).parse(jobs.rows);
     expect(job?.key).toBe(`team.member_departure:${departure.id}`);
+    // Its payload names who set it, checked against the departure before it applies.
+    const [payload] = z
+      .array(z.object({ payload: z.unknown() }))
+      .parse(
+        (
+          await db().execute(
+            sql`select payload from graphile_worker._private_jobs j join graphile_worker._private_tasks t on t.id = j.task_id where t.identifier = 'team.member_departure'`,
+          )
+        ).rows,
+      );
+    expect(payload?.payload).toEqual({ departureId: departure.id, scheduledBy: team.ownerId });
     expect(job?.run_at.getTime()).toBe(Date.parse(endsAt));
 
     const [scheduled] = await auditOf('team_member.departure_schedule', theo);
@@ -120,20 +133,21 @@ describe('« Faire partir » : une heure de fin, la coche Reveal, appliqué par 
     expect(departureOf(cancelled.body).state).toBe('cancelled');
     const again = await team.call('POST', `/team/departures/${set.id}/cancel`, team.owner);
     expect(codeOf(again.body)).toBe('member_departure_conflict');
-    expect(await team.app.modules.team.jobs.applyDeparture(set.id, UserIdSchema.parse(team.ownerId))).toBe(
-      false,
-    );
+    expect(await team.app.modules.team.jobs.applyDeparture(set.id, owner())).toBe(false);
     expect(await statusOf(lou)).toMatchObject({ status: 'active' });
   });
 
   it('applies at its hour, never before: left, no creator in the base, nothing signed in; replayed, nothing more', async () => {
     const set = departureOf((await leave(lou, { endsAt: inHours(1 / 3600), reason: null })).body);
-    const owner = UserIdSchema.parse(team.ownerId);
+    await expect(team.app.modules.team.jobs.applyDeparture(set.id, owner())).rejects.toThrow(
+      /before its hour/u,
+    );
+    // A payload naming another than the owner who set it applies nothing.
     await expect(
-      team.app.modules.team.jobs.applyDeparture(MemberDepartureIdSchema.parse(set.id), owner),
-    ).rejects.toThrow(/before its hour/u);
+      team.app.modules.team.jobs.applyDeparture(set.id, UserIdSchema.parse(manager.userId)),
+    ).rejects.toThrow(/not set by the owner named/u);
     await new Promise((resolve) => setTimeout(resolve, 1_200));
-    expect(await team.app.modules.team.jobs.applyDeparture(set.id, owner)).toBe(true);
+    expect(await team.app.modules.team.jobs.applyDeparture(set.id, owner())).toBe(true);
     expect(await statusOf(lou)).toMatchObject({ status: 'left' });
     expect(await creatorsOf(lou)).toEqual([]);
     expect((await team.call('GET', '/me', louCookie)).statusCode).toBe(401);
@@ -141,8 +155,12 @@ describe('« Faire partir » : une heure de fin, la coche Reveal, appliqué par 
     expect(sessions).toEqual([]);
     const [applied] = await auditOf('team_member.departure_apply', lou);
     // Two sessions: the activation of his code left one, his sign-in with the code another (ADR 0046).
-    expect(applied?.details).toMatchObject({ sessionsEnded: 2, passkeysRemoved: 0 });
-    expect(await team.app.modules.team.jobs.applyDeparture(set.id, owner)).toBe(false);
+    expect(applied?.details).toMatchObject({
+      sessionsEnded: 2,
+      passkeysRemoved: 0,
+      scheduledBy: team.ownerId,
+    });
+    expect(await team.app.modules.team.jobs.applyDeparture(set.id, owner())).toBe(false);
     expect(await auditOf('team_member.departure_apply', lou)).toHaveLength(1);
   });
 
@@ -236,5 +254,65 @@ describe('« Faire partir » : une heure de fin, la coche Reveal, appliqué par 
     await expect(
       db().delete(schema.teamMemberDepartures).where(eq(schema.teamMemberDepartures.id, row.id)),
     ).rejects.toThrow();
+  });
+
+  it('is applied by an owner in office when the one who set it no longer is one, and the entry says both', async () => {
+    const { member: paul } = await team.addMember('paul@example.test', 'Paul');
+    const { member: ines } = await team.addMember('ines@example.test', 'Inès');
+    const roleOf = async () => {
+      const [row] = await db()
+        .select({ role: schema.user.role })
+        .from(schema.user)
+        .where(eq(schema.user.id, ines.userId));
+      return row?.role;
+    };
+    const before = await roleOf();
+    if (before === undefined) throw new Error('no account');
+    const setRole = (role: string) =>
+      db().update(schema.user).set({ role }).where(eq(schema.user.id, ines.userId));
+    await setRole('owner');
+    const id = MemberDepartureIdSchema.parse('0199f2a0-0000-7000-8000-000000000611');
+    await withMember(team.test.app.db, ines.userId, (tx) =>
+      tx.insert(schema.teamMemberDepartures).values({
+        id,
+        memberId: paul.id,
+        endsAt: sql`now()`,
+        createdBy: ines.userId,
+      }),
+    );
+    // Inès is no longer an owner when its hour comes: the departure applies all the same.
+    await setRole(before);
+    expect(await team.app.modules.team.jobs.applyDeparture(id, UserIdSchema.parse(ines.userId))).toBe(true);
+    expect(await statusOf(paul)).toMatchObject({ status: 'left' });
+    const [entry] = await db()
+      .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(
+        sql`${schema.auditLog.action} = 'team_member.departure_apply' and ${schema.auditLog.entityId} = ${paul.id}`,
+      );
+    expect(entry).toMatchObject({ userId: team.ownerId, details: { scheduledBy: ines.userId } });
+  });
+
+  it('never lets an owner sign a cancel or a tick in another account’s name', async () => {
+    const [waiting] = await db()
+      .select({ id: schema.teamMemberDepartures.id })
+      .from(schema.teamMemberDepartures)
+      .where(
+        sql`${schema.teamMemberDepartures.memberId} = ${theo.id} and ${schema.teamMemberDepartures.appliedAt} is null`,
+      );
+    if (waiting === undefined) throw new Error('no departure');
+    for (const set of [
+      { cancelledAt: new Date(), cancelledBy: theo.userId },
+      { revealRemovedAt: new Date(), revealRemovedBy: theo.userId },
+    ]) {
+      await expect(
+        withMember(team.test.app.db, team.ownerId, (tx) =>
+          tx
+            .update(schema.teamMemberDepartures)
+            .set(set)
+            .where(eq(schema.teamMemberDepartures.id, waiting.id)),
+        ),
+      ).rejects.toMatchObject({ cause: { code: '42501' } });
+    }
   });
 });

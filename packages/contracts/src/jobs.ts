@@ -366,8 +366,11 @@ export const JOB_PAYLOADS = {
   'scheduling.remind_reports': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
-  /** At the hour a departure ends (ADR 0166 § 2): applied once, replayed it does nothing more. */
-  'team.member_departure': z.object({ departureId: MemberDepartureIdSchema, ownerId: UserIdSchema }),
+  /**
+   * At the hour a departure ends (ADR 0166 § 2): applied once, replayed it does nothing more. By the owner who set it,
+   * or by an owner in office if he no longer is one; `scheduledBy` is checked against the departure before anything.
+   */
+  'team.member_departure': z.object({ departureId: MemberDepartureIdSchema, scheduledBy: UserIdSchema }),
   /**
    * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
    * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a

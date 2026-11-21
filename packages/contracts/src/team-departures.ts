@@ -13,6 +13,11 @@ export type MemberDepartureState = z.infer<typeof MemberDepartureStateSchema>;
 
 /** How far ahead a departure may be set (ADR 0166 § 1). */
 export const DEPARTURE_MAX_DAYS_AHEAD = 31;
+/**
+ * A departure still scheduled this long after its hour is late (ADR 0166 § 2): its job failed or never ran, and the
+ * member keeps his access. Said in red in Équipe.
+ */
+export const DEPARTURE_LATE_MINUTES = 10;
 /** The internal reason, a note of the member's record: read by the owner and the managers, never by the member. */
 export const DEPARTURE_REASON_MAX = 500;
 
@@ -27,6 +32,8 @@ export const MemberDepartureSchema = z.object({
   /** « Accès Reveal retiré », ticked by the owner (ADR 0166 § 3); amber in Équipe while `null` on an applied one. */
   revealRemovedAt: z.iso.datetime().nullable(),
   revealRemovedBy: UserIdSchema.nullable(),
+  /** Scheduled, and its hour passed more than `DEPARTURE_LATE_MINUTES` ago: red in Équipe. */
+  late: z.boolean(),
 });
 export type MemberDeparture = z.infer<typeof MemberDepartureSchema>;
 
