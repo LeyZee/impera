@@ -38,7 +38,7 @@ export function wireInstagramCaptions(
   },
 ): WiredInstagramCaptions {
   const module = createInstagramCaptionsModule({
-    adminDb: shared.adminDb,
+    db: shared.db,
     gateway: deps.gateway,
     drops: (creatorId, mediaAssetId) => deps.contentDrops.describedDrops(creatorId, mediaAssetId),
     persona: async (creatorId) => {

@@ -274,7 +274,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
     describedDrops: async (creatorId, mediaAssetId) => {
       const description = (await deps.describer?.detailed([mediaAssetId]))?.get(mediaAssetId);
       if (description === undefined) return [];
-      const drops = await dropsOfMedium(deps.adminDb, creatorId, mediaAssetId);
+      const drops = await dropsOfMedium(deps.db, creatorId, mediaAssetId);
       return drops.map((drop) => ({ ...drop, description: description.detailed }));
     },
     unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),

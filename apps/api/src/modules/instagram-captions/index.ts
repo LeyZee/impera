@@ -11,8 +11,8 @@ import { createGatewayCaptionWriter } from './infra/gateway-writer';
 const BUDGET_DELAY_MS = 60 * 60_000;
 
 export interface InstagramCaptionsDeps {
-  /** Owner role: the job's queue only. */
-  readonly adminDb: Database;
+  /** Application role: the job's queue, in her creator. */
+  readonly db: Database;
   readonly gateway: Pick<LlmGateway, 'proposeCaptions'>;
   /** `content-drops`: the live drops that hold a medium, described. */
   readonly drops: (creatorId: string, mediaAssetId: string) => Promise<readonly DescribedReel[]>;
@@ -42,7 +42,7 @@ export function createInstagramCaptionsModule(deps: InstagramCaptionsDeps): Inst
   return {
     name: 'instagram-captions',
     described: (creatorId, mediaAssetId, correlationId) =>
-      enqueueCaptions(deps.adminDb, { creatorId, mediaAssetId, correlationId }, null),
+      enqueueCaptions(deps.db, { creatorId, mediaAssetId, correlationId }, null),
     jobs: {
       propose: async (creatorId, mediaAssetId, correlationId) => {
         const now = clock();
@@ -54,7 +54,7 @@ export function createInstagramCaptionsModule(deps: InstagramCaptionsDeps): Inst
         );
         if (outcome === 'budget')
           await enqueueCaptions(
-            deps.adminDb,
+            deps.db,
             { creatorId, mediaAssetId, correlationId },
             new Date(now.getTime() + BUDGET_DELAY_MS),
           );

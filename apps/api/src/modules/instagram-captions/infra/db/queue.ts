@@ -1,5 +1,5 @@
 import { JOB_MAX_ATTEMPTS } from '@impera/contracts';
-import { sql, withAdmin, type Database } from '@impera/db';
+import { sql, withTenant, type Database } from '@impera/db';
 
 export interface CaptionJob {
   readonly creatorId: string;
@@ -9,10 +9,11 @@ export interface CaptionJob {
 
 /**
  * `instagram_captions.propose` for a medium of hers, keyed by the medium: one waiting job whatever asked for it (each
- * description, a replay); `runAt` puts it off (budget spent), `null` runs it now.
+ * description, a replay); `runAt` puts it off (budget spent), `null` runs it now. Under the app role, in her creator:
+ * never the service role.
  */
-export function enqueueCaptions(adminDb: Database, job: CaptionJob, runAt: Date | null): Promise<void> {
-  return withAdmin(adminDb, async (tx) => {
+export function enqueueCaptions(db: Database, job: CaptionJob, runAt: Date | null): Promise<void> {
+  return withTenant(db, job.creatorId, async (tx) => {
     await tx.execute(
       sql`select public.enqueue_job(
         task => 'instagram_captions.propose',

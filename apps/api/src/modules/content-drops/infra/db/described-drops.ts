@@ -1,4 +1,4 @@
-import { and, eq, inArray, schema, sql, withAdmin, type Database } from '@impera/db';
+import { and, eq, inArray, schema, sql, withTenantJob, type Database } from '@impera/db';
 
 const { contentDropFiles, contentDrops, contentRequests, mediaAssets } = schema;
 
@@ -15,14 +15,15 @@ export interface DropOfMedium {
 
 /**
  * The live drops of a creator that hold this medium: neither being filled, blocked nor withdrawn, the file kept and
- * not replaced. As the owner role, bounded by the creator the job names.
+ * not replaced. Read in her creator under the app role, as the jobs on a medium she dropped are (`drop_media`,
+ * ADR 0087 lot c): never the service role.
  */
 export function dropsOfMedium(
-  adminDb: Database,
+  db: Database,
   creatorId: string,
   mediaAssetId: string,
 ): Promise<DropOfMedium[]> {
-  return withAdmin(adminDb, async (tx) => {
+  return withTenantJob(db, creatorId, 'drop_media', async (tx) => {
     const rows = await tx
       .selectDistinct({
         dropId: contentDrops.id,
