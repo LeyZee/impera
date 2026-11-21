@@ -2060,7 +2060,7 @@
         },
         "content_drops_blocked_check": {
           "name": "content_drops_blocked_check",
-          "value": "(\"content_drops\".\"state\" = 'blocked') = (\"content_drops\".\"blocked_reason\" is not null)\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
+          "value": "(\"content_drops\".\"state\" <> 'blocked' or \"content_drops\".\"blocked_reason\" is not null)\n        and (\"content_drops\".\"blocked_reason\" is null or \"content_drops\".\"state\" in ('blocked', 'withdrawn'))\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
         },
         "content_drops_correction_check": {
           "name": "content_drops_correction_check",
