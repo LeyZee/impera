@@ -315,7 +315,8 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
   it('says when nothing rang yet, and when the server does not answer', async () => {
     serve((call) => (call.path === '/v1/alerts/triggers' ? page([]) : undefined));
     renderPage();
-    expect(await screen.findByText(/Aucune alerte n’a encore sonné/)).toBeTruthy();
+    // Réglages is the owner's: a manager or an operator is not sent there (MAN-02).
+    expect(await screen.findByText('Aucune alerte n’a encore sonné.')).toBeTruthy();
     cleanup();
 
     serve(() => ({ status: 500 }));

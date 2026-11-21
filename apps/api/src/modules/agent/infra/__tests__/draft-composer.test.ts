@@ -1042,6 +1042,47 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     ]);
   });
 
+  it('reads a sign of a minor only since a human confirmed his age, and always on a new one (IA-02)', async () => {
+    const before: AgentComposeInput['history'][number] = {
+      direction: 'inbound',
+      text: 'j’ai 16 ans et toi ?',
+      at: new Date('2026-10-17T09:00:00Z'),
+    };
+    const confirmed = limitsOf({ ageConfirmedAt: '2026-10-17T09:30:00.000Z' });
+    const settled = composer({}, undefined, confirmed.limits);
+    const after: AgentComposeInput = {
+      ...INPUT,
+      history: [
+        before,
+        {
+          direction: 'inbound',
+          text: 'ok cool, tu fais quoi ce soir ?',
+          at: new Date('2026-10-17T09:59:30Z'),
+        },
+      ],
+    };
+    expect(await settled.draftComposer.compose(after)).toMatchObject({ kind: 'draft' });
+    expect(confirmed.protections).toEqual([]);
+
+    const again = limitsOf({ ageConfirmedAt: '2026-10-17T09:30:00.000Z' });
+    const young = composer({}, undefined, again.limits);
+    const saysAgain: AgentComposeInput = {
+      ...INPUT,
+      history: [
+        before,
+        { direction: 'inbound', text: 'en vrai j’ai 16 ans', at: new Date('2026-10-17T09:59:30Z') },
+      ],
+    };
+    expect(await young.draftComposer.compose(saysAgain)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_suspected'],
+    });
+    expect(young.seen.traces).toHaveLength(0);
+    expect(again.protections.map((p) => p.protection.unconfirmAge)).toEqual([true]);
+  });
+
   it('hands a fan who says he is 16 to a human before any model, and answers one who wants to end it with care', async () => {
     const says = (text: string): AgentComposeInput => ({
       ...INPUT,

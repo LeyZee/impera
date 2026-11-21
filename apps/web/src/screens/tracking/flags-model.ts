@@ -207,7 +207,7 @@ export function alertsOf(flags: FanFlags): FanAlert[] {
     alerts.push({
       level: 'stop',
       label: 'Âge contesté',
-      text: 'Un signe de minorité : rien d’explicite tant qu’un responsable ne l’a pas confirmé.',
+      text: 'L’agent ne lui écrit plus tant que le propriétaire ou un manager n’a pas confirmé qu’il est majeur.',
     });
   if (flags.fragile !== undefined)
     alerts.push({

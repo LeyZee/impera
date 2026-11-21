@@ -170,6 +170,20 @@ describe('threadOf', () => {
     expect(whyHuman({ events: [] })).toBeNull();
   });
 
+  it('names the watched word that made the agent step back (IA-05)', () => {
+    const events = [
+      event(1, 1, {
+        type: 'handoff_requested',
+        payload: {
+          conversationId: CONVERSATION,
+          cause: 'keyword',
+          trigger: { alert: { kind: 'system', code: 'keyword' }, matchedBy: 'keyword', keyword: 'bot' },
+        },
+      }),
+    ];
+    expect(whyHuman({ events })).toBe('L’agent passe la main (Mot surveillé : « bot »)');
+  });
+
   // Recette 05/11, PRO-26: giving back a grave handoff asks for a confirmation.
   it('names a grave handoff while it is the latest change of hand, and only then', () => {
     const minor = event(5, 9, {
@@ -300,6 +314,10 @@ describe('draftsOf', () => {
 });
 
 describe('decisionError', () => {
+  it('says a fan whose age is in doubt needs his age confirmed before the agent gets him back (IA-01)', () => {
+    expect(decisionError(409, apiError('age_in_doubt_conflict', {}))).toContain('Confirmer son âge');
+  });
+
   it('says a creator without an active persona sends nothing, and where to activate one (recette G4)', () => {
     expect(decisionError(422, apiError('script_step_cut_unprocessable', { cut: 'sales_frozen' }))).toContain(
       'étape payante',

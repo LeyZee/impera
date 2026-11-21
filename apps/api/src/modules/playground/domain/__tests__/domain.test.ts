@@ -44,7 +44,7 @@ describe('playground domain', () => {
       if (preset.declaredAge === null) continue;
       expect(preset.declaredAge).toBeGreaterThanOrEqual(18);
       // Her notes say it too, as the card of a real fan would.
-      expect(preset.fanNotes).toContain(`identity / age : ${String(preset.declaredAge)} (declared)`);
+      expect(preset.fanNotes).toContain(`Âge : ${String(preset.declaredAge)}`);
     }
   });
 });

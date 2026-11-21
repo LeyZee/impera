@@ -38,7 +38,7 @@ const STATE: PlaygroundState = {
 /** Where the bar's router is, once a test has rendered it. */
 let location = (): string => '';
 
-function renderBar(state: PlaygroundState, isDemo = false): void {
+function renderBar(state: PlaygroundState, isDemo = false, role?: string): void {
   // « Clé manquante » links to Réglages: the bar needs a router around it.
   const root = createRootRoute();
   const router = createRouter({
@@ -51,6 +51,7 @@ function renderBar(state: PlaygroundState, isDemo = false): void {
       createRoute({ getParentRoute: () => root, path: '/reglages/modeles-ia' }),
     ]),
     history: createMemoryHistory({ initialEntries: ['/'] }),
+    ...(role !== undefined && { context: { user: { role } } }),
   });
   location = () => router.state.location.href;
   render(<RouterProvider router={router} />);
@@ -75,6 +76,18 @@ describe('RateBar', () => {
       await screen.findByText((_, element) => element?.textContent === '1,50\u00a0€ cette session'),
     ).toBeTruthy();
     expect(screen.queryByText('Clé manquante')).toBeNull();
+  });
+
+  it('names the voice and its model to the owner only (IA-04)', async () => {
+    renderBar(STATE, false, 'owner');
+    expect(await screen.findByText('Voix 1.4.0 · grok-4.7')).toBeTruthy();
+    cleanup();
+    renderBar(STATE, false, 'manager');
+    expect(
+      (await screen.findAllByText((_, element) => element?.textContent === '1,50\u00a0€ cette session'))
+        .length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/grok-4\.7/)).toBeNull();
   });
 
   it('names the persona it plays, with or without a key', async () => {

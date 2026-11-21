@@ -627,6 +627,22 @@ async function stopped(
 }
 
 /**
+ * Platform clocks may run behind ours: a message dated up to this much before the confirmation is still read, the
+ * safe side (IA-02).
+ */
+const CLOCK_SLACK_MS = 2 * 60_000;
+
+/** What he wrote since a human confirmed his age (all of it while it is not confirmed), as one text. */
+function sinceAgeConfirmed(messages: AgentComposeInput['history'], flags: FanFlags | undefined): string {
+  const confirmed = flags?.ageConfirmedAt;
+  const from = confirmed === undefined ? Number.NaN : Date.parse(confirmed) - CLOCK_SLACK_MS;
+  return messages
+    .filter((m) => Number.isNaN(from) || m.at.getTime() >= from)
+    .map((m) => m.text)
+    .join('\n');
+}
+
+/**
  * His age is in doubt (`ageDisputed`, set by the policy on a sign of a minor or by a human): the agent writes nothing to
  * him until the owner or a manager confirms it (Charles, 16/11), and each new message of his goes to a human, as on
  * the message the doubt opened on. His score drops to 0, as the brain would have counted it.
@@ -1047,7 +1063,13 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // He says plainly he is a minor (recette AGT-01): a human answers him before any model, whatever the brain would
       // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
-      const signs = safetySigns(fanText, input.now);
+      // Once a human confirmed his age, a sign of a minor read before that decision is settled: only what he wrote
+      // since is read for one, so a new « j'ai 16 ans » always opens the net again (IA-02). Distress reads it all.
+      const signs = safetySigns(fanText, input.now).filter(
+        (sign) =>
+          sign !== 'minor_suspected' ||
+          safetySigns(sinceAgeConfirmed(sinceAnswer, stop.flags), input.now).includes('minor_suspected'),
+      );
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);

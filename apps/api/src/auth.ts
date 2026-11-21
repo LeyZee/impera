@@ -557,11 +557,22 @@ async function readSession(auth: Auth, db: Database, request: FastifyRequest, re
       void reply.header('set-cookie', cookies);
     return response;
   } catch (error) {
-    // The refresh of a session already over, refused and closed by `refuseEndedRefresh`.
-    if (isAPIError(error) && error.statusCode === 401) return null;
-    if (isAPIError(error) && error.statusCode >= 500) await db.execute(sql`select 1`);
-    throw error;
+    return sessionReadFailed(error, () => db.execute(sql`select 1`));
   }
+}
+
+/**
+ * Why Better Auth could not read a session. The refresh of a session already over (refused and closed by
+ * `refuseEndedRefresh`): no session. Its bare 500: `probe` (a `select 1`) throws the database's own error when it is
+ * down; when it passes, the database was only short of connections a moment (IA-09): 503 and retry, never 500.
+ */
+export async function sessionReadFailed(error: unknown, probe: () => Promise<unknown>): Promise<null> {
+  if (isAPIError(error) && error.statusCode === 401) return null;
+  if (isAPIError(error) && error.statusCode >= 500) {
+    await probe();
+    throw Object.assign(new Error('session read failed', { cause: error }), { statusCode: 503 });
+  }
+  throw error;
 }
 
 /**

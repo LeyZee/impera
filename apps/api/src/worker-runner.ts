@@ -10,6 +10,7 @@ import { purgeDeadJobs } from './dead-jobs';
 import { workerLoggerFrom, type Logger } from './logger';
 import { releaseOrphanedLocks } from './orphaned-locks';
 import { useFrenchValidationMessages } from './validation-messages';
+import { retryingPool } from './worker-pool';
 
 export interface WorkerOptions {
   readonly logger: Logger;
@@ -57,7 +58,8 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
     });
   });
   const runner: Runner = await run({
-    pgPool: app.adminDb.pool,
+    // A connection refused for a moment is asked again, never left to stop the process (recette CHAT-03).
+    pgPool: retryingPool(app.adminDb.pool, options.logger),
     taskList: app.tasks,
     parsedCronItems: parsedCronJobs(options.cronJobs),
     concurrency: options.concurrency,
