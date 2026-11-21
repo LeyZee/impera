@@ -1331,6 +1331,13 @@
       "when": 1795269638355,
       "tag": "0248_team_announcements",
       "breakpoints": true
+    },
+    {
+      "idx": 190,
+      "version": "7",
+      "when": 1795274746735,
+      "tag": "0251_script_step_daily",
+      "breakpoints": true
     }
   ]
 }

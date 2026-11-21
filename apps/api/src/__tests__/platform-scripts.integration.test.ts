@@ -282,6 +282,42 @@ describe('the native scripts imported from the platform', () => {
     expect((await ownerView('sequence_2'))?.steps).toHaveLength(3);
   });
 
+  it('keeps the platform’s totals of each step once a day, the day’s last read over the earlier (ADR 0129 § 12)', async () => {
+    const daily = () =>
+      test.admin.db
+        .select()
+        .from(schema.platformScriptStepDaily)
+        .where(eq(schema.platformScriptStepDaily.platformStepRef, 'script_1_1'))
+        .orderBy(schema.platformScriptStepDaily.day);
+    // Three reads on the 14th: one row, the last read's.
+    expect(
+      (await daily()).map((row) => [
+        row.creatorId,
+        row.day,
+        row.sent,
+        row.purchased,
+        row.paidMinor,
+        row.currency,
+      ]),
+    ).toEqual([[nora, '2026-11-14', 1, 1, 500, 'EUR']]);
+    expect((await daily())[0]?.readAt.toISOString()).toBe('2026-11-14T12:00:00.000Z');
+    // The next day of the platform: a row of its own, the 14th kept.
+    await importOf(noraAccount, nora, new Date('2026-11-14T23:30:00Z'));
+    expect((await daily()).map((row) => row.day)).toEqual(['2026-11-14', '2026-11-15']);
+    // Closed to her own account; the application role only reads.
+    expect(
+      await withCreatorAccount(app.db.db, ids.nora, (tx) => tx.select().from(schema.platformScriptStepDaily)),
+    ).toEqual([]);
+    const failure: unknown = await withTenant(app.db.db, nora, (tx) =>
+      tx.update(schema.platformScriptStepDaily).set({ sent: 0 }),
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    const cause = failure instanceof Error && failure.cause instanceof Error ? failure.cause.message : '';
+    expect(cause).toMatch(/permission denied/u);
+  });
+
   it('says where each media stands in the vault the sync left, and offers no script before its identity', async () => {
     const step = () => ownerView('sequence_1').then((view) => view?.steps[1]);
     // Nothing of her vault is in the CRM before the owner ticks it (ADR 0145 § 5): the script says so.

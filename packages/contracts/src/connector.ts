@@ -181,6 +181,18 @@ export const PlatformStepDiscountSchema = z
   });
 export type PlatformStepDiscount = z.infer<typeof PlatformStepDiscountSchema>;
 
+/**
+ * What the platform counts on a step since it exists, every seller together, never by day nor by fan (ADR 0129 § 12):
+ * its sends, its packs paid and what they brought. Kept one row a day, so that a period reads as a difference.
+ */
+export const PlatformStepTotalsSchema = z.object({
+  sent: z.number().int().min(0),
+  purchased: z.number().int().min(0),
+  /** Minor units, VAT included, as the platform shows it. */
+  paidMinor: z.number().int().min(0),
+});
+export type PlatformStepTotals = z.infer<typeof PlatformStepTotalsSchema>;
+
 export const PlatformScriptStepSchema = z.object({
   /** The step as the platform names it: what a send of this step refers to. */
   ref: ExternalRefSchema,
@@ -204,6 +216,8 @@ export const PlatformScriptStepSchema = z.object({
    * has none. Impera never sells at it: such a step is never sent and its script never offered (recette 16/11, Charles).
    */
   discount: PlatformStepDiscountSchema.nullable(),
+  /** Its totals as the platform counts them (ADR 0129 § 12); absent when the platform gives none. Never in a version. */
+  totals: PlatformStepTotalsSchema.optional(),
 });
 export type PlatformScriptStep = z.infer<typeof PlatformScriptStepSchema>;
 
