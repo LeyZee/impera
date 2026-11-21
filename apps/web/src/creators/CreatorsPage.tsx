@@ -9,6 +9,7 @@ import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
 import { AlertsTab } from './alerts/AlertsTab';
 import { useCreators } from './api';
+import { CopilotSection } from './copilot/CopilotSection';
 import { CustomPricesSection } from './custom-prices/CustomPricesSection';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
@@ -387,12 +388,12 @@ export function CreatorsPage({
       return <AlertsTab key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
     return shown === 'hours' && current !== undefined ? (
-      <HoursSection
-        key={current.id}
-        creatorId={current.id}
-        creatorName={current.displayName}
-        onDirty={setDirty}
-      />
+      // Her AI: the copilot of the extension first, its switches decide what her chatters get beside Reveal; then her
+      // hours (trous béants, 21/11: the switches had no screen, the drafts were off for every creator).
+      <div className="cr-ai" key={current.id}>
+        <CopilotSection creatorId={current.id} creatorName={current.displayName} />
+        <HoursSection creatorId={current.id} creatorName={current.displayName} onDirty={setDirty} />
+      </div>
     ) : (
       <PersonaSection
         key={selected ?? 'none'}
