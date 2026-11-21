@@ -93,3 +93,16 @@
 .sc-hero__gauge.nv-gauge {
   --_g: var(--nv-series-2);
 }
+
+/* « Ma quinzaine » in the narrow column (avis Design, accueils-2): the figure and its words the full width, the ring and
+   its tier on their own line under them, as on a phone; never a sentence broken on four lines beside the ring. */
+.sc-today__side .mf-card__body {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--nv-space-3);
+}
+.sc-today__side .mf-tier {
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+}

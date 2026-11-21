@@ -176,7 +176,7 @@
 }
 
 /* On a phone: the wait under the name, the same button on the right of every line. */
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .tt-row {
     grid-template-columns: minmax(0, 1fr) 5.5rem;
   }

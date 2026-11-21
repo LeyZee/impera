@@ -77,3 +77,10 @@
 .sc-today .ag-glance .ag-ring {
   display: none;
 }
+/* Without the ring, the streak pill stands alone: its count, its words and its chevron on one line (avis Design). */
+.sc-today .ag-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
