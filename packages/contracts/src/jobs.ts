@@ -109,6 +109,7 @@ export const JOB_NAMES = [
   'connector.check_sales',
   'connector.copy_avatar',
   'connector.read_daily_stats',
+  'connector.read_link_hours',
   'telegram.scan',
   'telegram.flush_chat',
   'telegram.dispatch_polls',
@@ -194,6 +195,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
   'connector.read_daily_stats': 'Statistiques quotidiennes Reveal',
+  'connector.read_link_hours': 'Vues et clics des liens de redirection',
   'connector.copy_avatar': 'Copie de la photo d’une créatrice',
   'telegram.scan': 'Alertes Telegram',
   'telegram.flush_chat': 'Envoi des messages Telegram',
@@ -610,6 +612,11 @@ export const JOB_PAYLOADS = {
    */
   'connector.read_daily_stats': z.object({}),
   /**
+   * Each hour (ADR 0120 § 3): the page views, clicks and robots of every redirect link its owner attached, hour by
+   * hour, one creator at a time. Totals only; an hour once closed is never written again.
+   */
+  'connector.read_link_hours': z.object({}),
+  /**
    * The photo of a creator just imported from a platform (CRM-07 a2b, ADR 0069 § 3): read again from the platform's
    * model list, fetched, re-encoded and kept in the media bucket under `creators/<id>/avatar`. Replayable: the object
    * is written over and `creators.avatar_key` set to the same key.
@@ -748,6 +755,8 @@ export const JOB_MAX_ATTEMPTS = {
   'connector.copy_avatar': 5,
   // Each hour: the next run is the retry, and a reading is replayable (each row written over).
   'connector.read_daily_stats': 1,
+  // Each hour as well: the next run is the retry, and an open hour is written over.
+  'connector.read_link_hours': 1,
   // The scan is also enqueued by the `domain_events` trigger (0006) with 25, and a flush by the module with 10:
   // a scan is idempotent (cursor) and a flush is Telegram's own pace, both cheap to retry.
   'telegram.scan': 25,

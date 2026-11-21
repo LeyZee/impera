@@ -54,6 +54,8 @@ export interface KeptLinkHour extends LinkHourTotal {
  * link is, never an answer of the service: the references read here are hers, and each series goes to her link.
  */
 export interface LinkHourStore {
+  /** The creators with a link to read, and nothing else of them: the one reading that crosses creators. */
+  creatorsToRead(): Promise<readonly string[]>;
   /** Her links that are attached, on and placed: the ones the hourly reading reads. */
   attachedLinks(creatorId: string): Promise<readonly AttachedLink[]>;
   /** Keeps the hours of one link: an open hour is replaced, a closed hour is left as it is. The number written. */
