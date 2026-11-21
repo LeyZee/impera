@@ -31,7 +31,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/providers': 7,
   'modules/redirect-links': 2,
   'modules/rewards': 7,
-  'modules/scheduling': 28,
+  // +1 (EQ-23): the incident notice reads its facts and the agency's recipients across creators, under withAdmin.
+  'modules/scheduling': 29,
   'modules/scripts': 19,
   'modules/supervision': 2,
   'modules/team': 1,

@@ -15,5 +15,8 @@ Sur un compte dont la paie lit les ventes relevées, le chatteur fait son mini f
 - [x] Tests : unitaires (message), intégration (droits, liste, étapes idempotentes, job), écran (formulaire, piste, carte).
 - [ ] Captures validées par Design ; OK de Sécurité sur les droits de la nouvelle route.
 
+## Plafond du rôle de service
+`modules/scheduling` passe de 28 à 29 : l'alerte d'incident lit, sous withAdmin, les faits du feedback et ses destinataires (propriétaires, managers actifs de la créatrice), hors de toute requête d'un membre. Lecture seule, à relire par Sécurité.
+
 ## Reste
 L'incident d'un rapport déclaré (`shift_report.incident`) ne sonne pas encore : il se lit avec le rapport à valider.
