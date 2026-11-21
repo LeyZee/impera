@@ -27,7 +27,10 @@ export function RewardOwedNotice({ user, pathname }: { user: Me; pathname: strin
       {plays && owed > 0 && !isQuietScreen(pathname) ? (
         <p className="rw-owed nv-glass nv-glass--thick">
           <span className="rw-owed__dot" aria-hidden="true" />
-          <span>{owed === 1 ? 'Un gain t’attend.' : `${String(owed)} gains t’attendent.`}</span>
+          <span>
+            {/* What waits, said by its name (recette H-21). */}
+            {owed === 1 ? 'Un trophée à découvrir.' : `${String(owed)} trophées à découvrir.`}
+          </span>
           <Link to="/aujourdhui" className="nv-btn nv-btn--soft nv-btn--sm">
             Voir
           </Link>
