@@ -388,6 +388,7 @@ describe('Créatrices › Pourcentage, the owner’s alone (CR-04)', () => {
     expect([...document.querySelectorAll('.cr-account__card')].map((card) => card.id)).toEqual([
       'acces',
       'part',
+      'paliers',
       'profil',
       'telegram',
     ]);
