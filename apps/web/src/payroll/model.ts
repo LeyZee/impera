@@ -1392,9 +1392,12 @@ export function periodsBetween(from: PayPeriod, to: PayPeriod): PayPeriod[] {
 export const spanText = (span: { readonly from: PayPeriod; readonly to: PayPeriod }): string =>
   `sur ${String(periodsBetween(span.from, span.to).length)} quinzaines, du ${dayShortMonth(span.from)} au ${dayShortMonth(payPeriodLastDay(span.to))}`;
 
-/** Who made an entry and when, or who cancelled it: « par Charles le lun. 9 nov. », « annulé par Charles le … ». */
+/**
+ * Who made an entry and when, or who cancelled it: « par Charles le lun. 9 nov. », « annulé par Charles le … ». A prime
+ * is feminine (« annulée par », « elle compte encore ici »), a malus or an adjustment masculine (recette MAN-06).
+ */
 export function entryByText(
-  row: Pick<EntryRow, 'createdBy' | 'createdAt' | 'cancellation'>,
+  row: Pick<EntryRow, 'kind' | 'createdBy' | 'createdAt' | 'cancellation'>,
   period: PayPeriod,
   who: (userId: string) => string,
   timeZone: string,
@@ -1403,9 +1406,10 @@ export function entryByText(
   const made = `${by(row.createdBy).trim()} le ${dayAt(row.createdAt, timeZone)}`;
   const { cancellation } = row;
   if (cancellation === null) return made;
-  const cancelled = `annulé${by(cancellation.by)} le ${dayAt(cancellation.at, timeZone)}`;
+  const feminine = row.kind === 'bonus';
+  const cancelled = `${feminine ? 'annulée' : 'annulé'}${by(cancellation.by)} le ${dayAt(cancellation.at, timeZone)}`;
   if (cancellation.from !== null && cancellation.from > period)
-    return `${made} · ${cancelled}, à partir de la quinzaine ${periodLine(cancellation.from)} : il compte encore ici`;
+    return `${made} · ${cancelled}, à partir de la quinzaine ${periodLine(cancellation.from)} : ${feminine ? 'elle' : 'il'} compte encore ici`;
   return cancelled;
 }
 

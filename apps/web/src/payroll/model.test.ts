@@ -1298,6 +1298,13 @@ describe('Primes et malus', () => {
     if (spread === undefined || cancelled === undefined) throw new Error('rows');
     const who = (): string => 'Charles';
     expect(entryByText(cancelled, PERIOD, who, 'Europe/Paris')).toBe('annulé par Charles le ven. 6 nov.');
+    // A prime is feminine (recette MAN-06).
+    expect(entryByText({ ...cancelled, kind: 'bonus' }, PERIOD, who, 'Europe/Paris')).toBe(
+      'annulée par Charles le ven. 6 nov.',
+    );
+    expect(entryByText({ ...spread, kind: 'bonus' }, PERIOD, who, 'Europe/Paris')).toMatch(
+      / · annulée par Charles le ven\. 20 nov\., .* : elle compte encore ici$/u,
+    );
     expect(entryByText(spread, PERIOD, who, 'Europe/Paris')).toBe(
       'par Charles le jeu. 5 nov. · annulé par Charles le ven. 20 nov., à partir de la quinzaine du 16 au 30 novembre : il compte encore ici',
     );
