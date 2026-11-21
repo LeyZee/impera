@@ -540,6 +540,7 @@ it('declares the capabilities a Reveal connector can claim', () => {
     fanNoteRead: true,
     fanNoteWrite: true,
     creatorNotes: true,
+    creatorProfile: true,
     ppvStats: true,
     scripts: true,
     scriptHistory: true,

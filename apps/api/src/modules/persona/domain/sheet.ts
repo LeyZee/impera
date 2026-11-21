@@ -1,5 +1,7 @@
 import {
+  ageOn,
   asPersonaV2,
+  type ChatterPersonaSheet,
   type CreatorPersonaSheet,
   type PersonaSheet,
   type StoredPersona,
@@ -29,4 +31,52 @@ export function sheetOf(persona: StoredPersona): CreatorPersonaSheet | null {
  */
 export function answersOf(persona: StoredPersona): PersonaSheet {
   return asPersonaV2(persona).sheet;
+}
+
+/**
+ * What a chatter reads of her on shift (ADR 0153), from her version at either format: each field named, so a field
+ * added to the persona stays hidden until an ADR adds it. Her age on `today` (her clock), never her birth date.
+ */
+export function chatterSheetOf(persona: StoredPersona, today: string): ChatterPersonaSheet {
+  const { sheet, agent } = asPersonaV2(persona);
+  const { identity, relationships, intimacy } = sheet;
+  const { no_go_zones, ...intimate } = intimacy;
+  return {
+    her: {
+      nickname: identity.nickname,
+      age: ageOn(identity.birth_date, today),
+      city: identity.city,
+      country: identity.country,
+      job: identity.job,
+      spoken_languages: identity.spoken_languages,
+      relationship_status: relationships.relationship_status,
+      kids_status: relationships.kids_status,
+    },
+    physique: {
+      physical_description: identity.physical_description,
+      height_m: identity.height_m,
+      weight_kg: identity.weight_kg,
+      eye_color: identity.eye_color,
+      hair_color: identity.hair_color,
+      breast_size: identity.breast_size,
+      shoe_size: identity.shoe_size,
+    },
+    lifestyle: sheet.lifestyle,
+    preferences: sheet.preferences,
+    writing: {
+      ...sheet.conversation,
+      pet_names: agent.behavior.pet_names,
+      emojis_forbidden: agent.rules.emojis_forbidden,
+    },
+    limits: {
+      never_do: agent.rules.never_do,
+      never_show: agent.rules.never_show,
+      never_say: agent.rules.never_say,
+      disgusts: agent.rules.disgusts,
+      off_limits: sheet.boundaries.off_limits,
+      no_go_zones,
+      turn_offs: relationships.turn_offs,
+    },
+    intimate: { ...intimate, turn_ons: relationships.turn_ons, body_count: relationships.body_count },
+  };
 }

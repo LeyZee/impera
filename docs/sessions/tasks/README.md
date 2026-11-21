@@ -151,6 +151,7 @@ Branche : task/<id>-<slug>
 | DSH-05 | Le Dashboard de l'agence en couleurs : l'agence en bleu, la courbe selon la tendance, une petite courbe sous Net | API CRM | done | DSH-04, ADR 0106 avenant du 17/11 |
 | DSH-06 | Le Dashboard de l'agence ne conclut pas sur trop peu de ventes | Web | review | DSH-01, DSH-04, ADR 0092 § 5 |
 | DSH-07 | Le Dashboard de l'agence liste les remboursements un par un | API CRM | in-progress | DSH-06, ADR 0092 § 4 |
+| DSH-08 | Le Dashboard de l'agence suit les objectifs mensuels par créatrice | API CRM | in-progress | DSH-07, ADR 0092 § 6 |
 | OPS-01 | Mise en production : images, limiteur partagé, runbook | exploitation | done | ADR 0027 |
 | OPS-02 | Export quotidien chiffré de la base, hors de Neon | exploitation | in_progress | OPS-01, ADR 0028 |
 | OPS-03 | Les deux tests instables de la CI | exploitation | done | OPS-01 |
@@ -203,3 +204,4 @@ Branche : task/<id>-<slug>
 | CRE-05 | « Mot de passe oublié » sans Telegram : le lien que le propriétaire crée | exploitation | done | SEC-05, EQ-10, CR-02, ADR 0068 |
 | FNW-01 | L'agent écrit le prénom du membre et le canevas de la note client | connectors | in_progress | ADR 0117 |
 | IA-01 | L'IA d'une créatrice : interrupteur avec pause, heures en frise, exceptions datées, vue agence | agent | in_progress | ADR 0148, P3-14 |
+| BIO-01 | L'IA connaît la bio de la créatrice sur la plateforme | agent | done | ADR 0154 |

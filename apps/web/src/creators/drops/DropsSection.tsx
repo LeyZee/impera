@@ -11,7 +11,8 @@ import { dayLabel } from '@/creators/scripts/model';
 import '@/creators/scripts/scripts.css';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
-import { Failure } from '@/shell/states';
+import { CameraArt } from '@/shell/art/EmptyArt';
+import { Empty, Failure } from '@/shell/states';
 
 /**
  * Créatrices › Contenu (recette créatrice 1 et 6), the owner's and an active manager's: every drop of hers but a
@@ -39,13 +40,10 @@ export function DropsSection({
     const rows = herDrops(content.data);
     if (rows.length === 0)
       return (
-        <div className="nv-plate aa-empty">
-          <p className="aa-empty__title">Aucun dépôt</p>
-          <p className="ps-muted">
-            Quand {creatorName} dépose une séance, une story ou une relance depuis son téléphone, elle arrive
-            ici avec ses médias et leurs descriptions. Ses scripts ont leur onglet.
-          </p>
-        </div>
+        <Empty plate art={<CameraArt />} title="Aucun dépôt">
+          Quand {creatorName} dépose une séance, une story ou une relance depuis son téléphone, elle arrive
+          ici avec ses médias et leurs descriptions. Ses scripts ont leur onglet.
+        </Empty>
       );
     const first = rows.find((row) => row.standing === 'to_publish');
     return (

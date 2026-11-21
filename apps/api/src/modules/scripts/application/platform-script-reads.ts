@@ -239,8 +239,7 @@ export async function accountPlatformScriptsForJob(
 
 /**
  * The agency validates the descriptions of a native script's media as shown, or rewrites one by hand (ADR 0030 § 3,
- * ADR 0099 § 4): the owner and the active managers of her list, as for its identity. Each write asks the identity
- * again, which is told only from validated descriptions.
+ * ADR 0099 § 4): the owner and the active managers of her list. No identity is asked after it any more (ADR 0161 § 5).
  */
 export async function reviewScriptDescriptions(
   deps: { readonly store: ScriptIdentityReviewStore },
@@ -248,10 +247,9 @@ export async function reviewScriptDescriptions(
   creatorId: CreatorId,
   scriptId: string,
   review: DescriptionReview,
-  correlationId: string,
 ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'> {
   if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
-  return deps.store.describe(creatorId, scriptId, review, reader.userId, correlationId);
+  return deps.store.describe(creatorId, scriptId, review, reader.userId);
 }
 
 /**

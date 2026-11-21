@@ -33,6 +33,8 @@ x-api-env: &api-env
   PLAYGROUND_PERSONA_PATH: ${PLAYGROUND_PERSONA_PATH:-}
   # Required (OPS-18): production errors reach Sentry, EU region, scrubbed by the API (operations.md § Observabilité).
   SENTRY_DSN: ${SENTRY_DSN:?}
+  # Optional: the origin of the redirect service; empty, the link connector is off (ADR 0120 § 3).
+  LINK_SERVICE_ORIGIN: ${LINK_SERVICE_ORIGIN:-}
   LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
   LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
   LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}

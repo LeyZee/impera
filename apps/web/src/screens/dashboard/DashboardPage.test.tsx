@@ -203,7 +203,7 @@ describe('DashboardPage on the server’s data', () => {
     expect(screen.getByText('28 €')).toBeDefined();
     const sellers = screen.getByRole('list', { name: 'Qui a vendu' });
     expect(sellers.textContent).toMatch(/L’agent.*Maya.*Chatteur non relié/u);
-    expect(screen.getByText('1 vente · à relier dans Équipe › Reveal')).toBeDefined();
+    expect(screen.getByText('1 vente · à relier dans Équipe › Comptes Reveal')).toBeDefined();
     expect(
       screen.getByText(/1 remboursement porte sur une vente plus ancienne que le registre/u),
     ).toBeDefined();
@@ -304,7 +304,9 @@ describe('DashboardPage on the server’s data', () => {
     renderDashboard(false);
     expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeDefined();
     expect(screen.queryByRole('link', { name: 'Choisir un groupe' })).toBeNull();
-    expect(screen.getByText('Le propriétaire choisit ce groupe dans Réglages › Telegram.')).toBeDefined();
+    expect(
+      screen.getByText('Le propriétaire choisit ce groupe dans Réglages › Bots Telegram.'),
+    ).toBeDefined();
     cleanup();
     serveDashboard({ status: 200, body: apiDashboard({ telegramCoverage: { urgentReachable: false } }) });
     renderDashboard(true);

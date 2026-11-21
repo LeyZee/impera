@@ -144,7 +144,7 @@ export function ModelLinks({
 }
 
 /**
- * Who is who in the platform's team (ADR 0050 § 5, ADR 0076): reviewed in Équipe › Reveal, where an active manager
+ * Who is who in the platform's team (ADR 0050 § 5, ADR 0076): reviewed in Équipe › Comptes Reveal, where an active manager
  * links and invites too. Here, the way there and what waits in it.
  */
 export function TeamLink({ platform }: { platform: Platform }): JSX.Element | null {
@@ -158,8 +158,8 @@ export function TeamLink({ platform }: { platform: Platform }): JSX.Element | nu
           Équipe {name}
         </h3>
         <p className="sv-muted">
-          Chaque compte de l’équipe {name} se relie à un membre, à l’agent ou à personne dans Équipe › {name},
-          où tes managers actifs relient et invitent aussi. La paie lit ces liens.
+          Chaque compte de l’équipe {name} se relie à un membre, à l’agent ou à personne dans Équipe › Comptes{' '}
+          {name}, où tes managers actifs relient et invitent aussi. La paie lit ces liens.
         </p>
         {counts === undefined || counts.newCount === 0 ? null : (
           <p className="sv-muted">{newcomersLine(counts.newCount, name)}.</p>
@@ -170,7 +170,7 @@ export function TeamLink({ platform }: { platform: Platform }): JSX.Element | nu
       </header>
       <div className="sf-import__foot">
         <Link to="/equipe/reveal" className="nv-btn nv-btn--soft">
-          Ouvrir Équipe › {name}
+          Ouvrir Équipe › Comptes {name}
         </Link>
       </div>
     </section>

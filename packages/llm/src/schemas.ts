@@ -1,5 +1,7 @@
 import {
   BriefIntentSchema,
+  CustomOrderReadingFromModelSchema,
+  CustomOrderReadingSchema,
   CHANNEL_POLL_OPTION_MAX,
   CHANNEL_POLL_OPTIONS_MAX,
   CHANNEL_POLL_OPTIONS_MIN,
@@ -77,6 +79,12 @@ export const BriefSchema = z.object({
   scriptPick: z.string().regex(BRAIN_SCRIPT_ID).optional(),
   /** What his last message does with the script step waiting for him, when the prompt says one waits. */
   scriptReply: z.enum(SCRIPT_REPLIES).optional(),
+  /**
+   * What his custom request asks (ADR 0159 § A.2), read into closed boxes when he asks for one or speaks of the one
+   * open: the format, her supplements by the ids the prompt gave, the minutes, the details he gave. Never a price; the
+   * code decides what is missing and when the card goes to her. Absent, nothing read.
+   */
+  customOrder: CustomOrderReadingSchema.optional(),
   action: z.enum(['reply', 'offer', 'wait', 'follow_up', 'handoff']),
   replyBrief: z.string().min(1),
   toneHints: z.array(z.string()),
@@ -105,6 +113,7 @@ export const BriefFromModelSchema = BriefSchema.extend({
   alertsSeen: z.array(z.string().regex(BRAIN_ALERT_ID)).max(BRAIN_ALERTS_MAX).nullish(),
   scriptPick: z.union([z.string().regex(BRAIN_SCRIPT_ID), z.literal('')]).nullish(),
   scriptReply: z.enum(SCRIPT_REPLIES).nullish(),
+  customOrder: CustomOrderReadingFromModelSchema.nullish(),
   toneHints: BriefSchema.shape.toneHints.nullable(),
   callback: z.string().nullish(),
   selfDisclosure: z.string().nullish(),

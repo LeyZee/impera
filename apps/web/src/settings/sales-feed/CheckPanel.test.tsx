@@ -172,7 +172,7 @@ function page(
     [`GET ${BASE}/reveal/check`]: lastCheck,
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // The page links to Équipe › Reveal (ADR 0076): a router, as the app gives it.
+  // The page links to Équipe › Comptes Reveal (ADR 0076): a router, as the app gives it.
   const rootRoute = createRootRoute();
   const page = createRoute({ getParentRoute: () => rootRoute, path: '/', component: SalesFeedSection });
   const router = createRouter({
@@ -205,7 +205,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Réglages › Ventes, vérification de fiabilité (CRM-02)', () => {
+describe('Réglages › Plateformes, vérification de fiabilité (CRM-02)', () => {
   it('checks the last fortnight over by default, without an export, and says the figures agree', async () => {
     const fetch = page(ok(report()));
     const panel = await screen.findByRole('region', { name: 'Vérification de fiabilité' });

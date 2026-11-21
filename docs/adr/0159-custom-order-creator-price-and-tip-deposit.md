@@ -80,7 +80,7 @@ Le code vient en petits lots. Charles a levé l'attente de la première vente r�
 
 0. Comprendre la demande en jouant (§ A.2, A.2 bis) : lecture du format, des suppléments et des détails (`CustomOrderReading`), une question légère à la fois, au plus trois, fiche complète à la créatrice ou incomplète au propriétaire, fan gardé au chaud (`customOrderTurn`).
 
-   Commande enregistrée (lot du 20/11 au soir) : table `custom_orders` (migration 0239), une commande ouverte par fan au plus (`gathering` ou `awaiting_creator`), écrite par le tour de l'agent sous la RLS de la créatrice (`withTenant`), jamais par le rôle de service ; le même message du fan ne compte qu'une fois ; le fan est lié à la créatrice de la commande par une clé étrangère composée. Le compte de la créatrice n'en lit rien avant le lot 1.
+   Commande enregistrée (lot du 20/11 au soir) : table `custom_orders` (migration 0242), une commande ouverte par fan au plus (`gathering` ou `awaiting_creator`), écrite par le tour de l'agent sous la RLS de la créatrice (`withTenant`), jamais par le rôle de service ; le même message du fan ne compte qu'une fois ; le fan est lié à la créatrice de la commande par une clé étrangère composée. Le compte de la créatrice n'en lit rien avant le lot 1.
 
 1. Oui ou non et prix de la créatrice saisis sur la ligne « Demande sur mesure » d'« À traiter » ; annonce du prix et demande d'acompte ; pourboire reconnu ; garde « pourboire seulement ici » ; relais de preuve (§ F).
 2. Dossier `custom` rattaché au fan, livraison au prix restant (§ B, § A.6).

@@ -5,7 +5,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { loadConfig, mediaBucket } from '../config';
+import { linkServiceOriginOf, loadConfig, mediaBucket } from '../config';
 import { createLogger } from '../logger';
 import type { Readiness } from '../readiness';
 import { buildServer, statusForCode } from '../server';
@@ -561,6 +561,47 @@ describe('loadConfig', () => {
       ['not a URL', 'publickey@errors.example.test/42'],
     ])('refuses a DSN with %s', (_why, value) => {
       expect(() => testConfig({ SENTRY_DSN: value })).toThrow(/SENTRY_DSN must be an https Sentry DSN/u);
+    });
+  });
+
+  describe('the origin of the redirect service (ADR 0120 § 3)', () => {
+    it('is optional, empty counting as unset: the link connector is then off', () => {
+      expect(testConfig().LINK_SERVICE_ORIGIN).toBeUndefined();
+      expect(testConfig({ LINK_SERVICE_ORIGIN: '' }).LINK_SERVICE_ORIGIN).toBeUndefined();
+      expect(testConfig({ LINK_SERVICE_ORIGIN: 'https://liens.example' }).LINK_SERVICE_ORIGIN).toBe(
+        'https://liens.example',
+      );
+      expect(linkServiceOriginOf('https://api.liens.example')).toBe('https://api.liens.example');
+    });
+
+    it.each([
+      ['http, not https', 'http://liens.example'],
+      ['a port', 'https://liens.example:8443'],
+      ['the default port written out', 'https://liens.example:443'],
+      ['a path', 'https://liens.example/v1'],
+      ['a trailing slash', 'https://liens.example/'],
+      ['a query', 'https://liens.example?x=1'],
+      ['credentials', 'https://user:secret@liens.example'],
+      ['an IPv4 address', 'https://203.0.113.7'],
+      ['an IPv6 address', 'https://[2001:db8::1]'],
+      ['localhost', 'https://localhost'],
+      ['a local name', 'https://liens.localhost'],
+      ['an internal name', 'https://liens.internal'],
+      ['a single label', 'https://liens'],
+      ['capital letters', 'https://Liens.example'],
+      ['a name outside ASCII', 'https://liéns.example'],
+      ['an internationalised label', 'https://xn--lins-bpa.example'],
+      ['no scheme', 'liens.example'],
+    ])('refuses to start with %s, without echoing the value', (_why, value) => {
+      expect(linkServiceOriginOf(value)).toBeNull();
+      let message = '';
+      try {
+        testConfig({ LINK_SERVICE_ORIGIN: value });
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message).toMatch(/LINK_SERVICE_ORIGIN must be https:\/\/<domain>/u);
+      expect(message).not.toContain(value);
     });
   });
 

@@ -15,6 +15,7 @@ import {
 
 import { CountUp, Section, type FloatingTip } from '../parts';
 
+import { ObjectivesCard, objectivesSub } from './Objectives';
 import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
 import {
@@ -1751,7 +1752,7 @@ export function AgencyInsightsPanel({
   creatorId: string | null;
   creatorName?: string;
   onCreator?: ((creatorId: string) => void) | undefined;
-  /** The owner links the registers (Réglages › Ventes): the empty screen leads there. */
+  /** The owner links the registers (Réglages › Plateformes): the empty screen leads there. */
   canOpenSettings: boolean;
   tip: FloatingTip;
   index?: number;
@@ -1807,7 +1808,7 @@ export function AgencyInsightsPanel({
           </p>
           {canOpenSettings ? (
             <Link to="/reglages/ventes" className="nv-btn nv-btn--soft">
-              Relier dans Réglages › Ventes
+              Relier dans Réglages › Plateformes
             </Link>
           ) : null}
         </div>
@@ -1846,6 +1847,12 @@ export function AgencyInsightsPanel({
             </p>
           ) : null}
         </Section>
+
+        {insights.objectives === null ? null : (
+          <Section title="Objectifs du mois" sub={objectivesSub(insights.objectives)} index={next()}>
+            <ObjectivesCard insights={insights} objectives={insights.objectives} canEdit={canOpenSettings} />
+          </Section>
+        )}
 
         <Section title="Chiffre d’affaires" sub={dailySub(insights)} index={next()}>
           <Daily key={`${insights.from}:${insights.to}`} insights={insights} tip={tip} />

@@ -1,5 +1,6 @@
 import {
   calendarDayAt,
+  type AfterSaleType,
   type Currency,
   type Platform,
   type PlatformAccountId,
@@ -212,4 +213,24 @@ export function ringsWhenRecorded(
   recordedAt: Date,
 ): boolean {
   return line.event === 'sale' && recordedAt.getTime() - line.occurredAt.getTime() < SALE_RING_WINDOW_MS;
+}
+
+/**
+ * The sale that wakes his conversation for a word after it (ADR 0156 § 2): a step he bought or a tip; a subscription,
+ * a mass message or anything else does not. Read on a line that rings, so never a refund nor a sale read late.
+ */
+export function afterSaleOf(line: { readonly type: SaleType }): AfterSaleType | null {
+  switch (line.type) {
+    case 'ppv':
+    case 'tip':
+      return line.type;
+    case 'subscription':
+    case 'renewal':
+    case 'mass_dm':
+    case 'payment_link':
+    case 'boudoir':
+    case 'paid_message':
+    case 'other':
+      return null;
+  }
 }

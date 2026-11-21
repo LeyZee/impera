@@ -1,6 +1,6 @@
 # P6-02 Après une offre : refus, achat, aide au paiement, relances de vente
 
-Statut : todo (ID validé par Charles le 27/10 à 19h56)
+Statut : in progress (ID validé par Charles le 27/10 à 19h56 ; ADR 0156 acceptée le 20/11, découpée en PR courtes)
 Phase : 6
 Dépend de : P6-01 (historique des scripts, des offres et des ventes Reveal), P3-10
 Branche : task/P6-02-after-offer
@@ -28,6 +28,7 @@ Appliquer en code ce que la méthode de chatting (document hors dépôt, tenu pa
 
 - [ ] Politique : `lastOfferAt` branché sur l'historique de P6-01 ; `refusalStep` (comprendre, insister, bouder, lâcher) ; `afterPurchase` ; `salesFollowUpDecision`. Tout en règles pures testées.
 - [ ] Composeur : brief fixé par le code à chaque étape (refus, aftercare, aide au paiement), comme le recadrage et les relances.
+  - [x] Aftercare : une vente d'étape ou un pourboire réveille sa conversation, brouillon d'après-achat (lot 3, `conversation.after_sale`).
 - [ ] Évals : fan qui refuse, fan qui achète, fan qui ne sait pas payer, fan qui demande s'il doit payer.
 
 ## Critères d'acceptation
@@ -44,3 +45,5 @@ Le catalogue et la synchronisation des scripts (P6-01), les textes de vente prop
 27/10 : proposée par le fil agent après la passe méthode / code sur main 5a3e09d.
 
 27/10 19h56 : ID P6-02 donné par Charles. En numérotant, retiré les deux compteurs d'offres que la fiche réintroduisait : Charles les a remplacés le 17/10 à 22h00 par le délai entre scripts et la re-sexualisation (journal `2026-10-17-sales-policy.md`).
+
+20/11 : ADR 0156 (« ok 0156 » de Charles, 14 h 28 heure de Paris) reprend cette fiche et l'audit « Trous de l'IA de chatting ». Lot 1 : une étape achetée est enregistrée payée depuis sa copie synchronisée (jamais l'inverse), base de l'aftercare. Lots suivants, dans l'ordre : étape oubliée, réveil par la vente et aftercare, refus, aide au paiement, relances de vente, puis les points secondaires de l'ADR.

@@ -1,5 +1,5 @@
 {
-  "id": "6e9b77a4-395f-4d37-80f8-66682a344512",
+  "id": "5aa8f6ca-b267-4da2-9513-446db8731c26",
   "prevId": "bbf3b840-d7d1-49d3-bca4-d7ffc9c1e64d",
   "version": "7",
   "dialect": "postgresql",
@@ -5588,11 +5588,6 @@
           "name": "fans_platform_fan_unique",
           "nullsNotDistinct": false,
           "columns": ["platform_account_id", "platform_fan_id"]
-        },
-        "fans_id_creator_unique": {
-          "name": "fans_id_creator_unique",
-          "nullsNotDistinct": false,
-          "columns": ["id", "creator_id"]
         }
       },
       "policies": {
@@ -18918,212 +18913,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.custom_orders": {
-      "name": "custom_orders",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fan_id": {
-          "name": "fan_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "state": {
-          "name": "state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "format": {
-          "name": "format",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "supplements": {
-          "name": "supplements",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "minutes": {
-          "name": "minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "details": {
-          "name": "details",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "questions_asked": {
-          "name": "questions_asked",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "card": {
-          "name": "card",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_inbound_message_id": {
-          "name": "last_inbound_message_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "custom_orders_open_per_fan": {
-          "name": "custom_orders_open_per_fan",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "fan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"custom_orders\".\"state\" in ('gathering', 'awaiting_creator')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "custom_orders_fan_message": {
-          "name": "custom_orders_fan_message",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "fan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "last_inbound_message_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "custom_orders_creator_id_creators_id_fk": {
-          "name": "custom_orders_creator_id_creators_id_fk",
-          "tableFrom": "custom_orders",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "custom_orders_fan_creator_fk": {
-          "name": "custom_orders_fan_creator_fk",
-          "tableFrom": "custom_orders",
-          "tableTo": "fans",
-          "columnsFrom": ["fan_id", "creator_id"],
-          "columnsTo": ["id", "creator_id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "tenant_isolation": {
-          "name": "tenant_isolation",
-          "as": "PERMISSIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "\"custom_orders\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
-          "withCheck": "\"custom_orders\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_closed": {
-          "name": "creator_closed",
-          "as": "RESTRICTIVE",
-          "for": "ALL",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        }
-      },
-      "checkConstraints": {
-        "custom_orders_state_check": {
-          "name": "custom_orders_state_check",
-          "value": "\"custom_orders\".\"state\" in ('gathering', 'awaiting_creator', 'creator_yes', 'creator_no', 'deposit_paid', 'delivered', 'expired', 'cancelled')"
-        },
-        "custom_orders_questions_asked_check": {
-          "name": "custom_orders_questions_asked_check",
-          "value": "\"custom_orders\".\"questions_asked\" >= 0"
-        },
-        "custom_orders_minutes_check": {
-          "name": "custom_orders_minutes_check",
-          "value": "\"custom_orders\".\"minutes\" is null or \"custom_orders\".\"minutes\" >= 1"
-        },
-        "custom_orders_supplements_check": {
-          "name": "custom_orders_supplements_check",
-          "value": "jsonb_typeof(\"custom_orders\".\"supplements\") = 'array'"
-        },
-        "custom_orders_details_check": {
-          "name": "custom_orders_details_check",
-          "value": "jsonb_typeof(\"custom_orders\".\"details\") = 'object'"
-        },
-        "custom_orders_card_check": {
-          "name": "custom_orders_card_check",
-          "value": "\"custom_orders\".\"card\" is null or jsonb_typeof(\"custom_orders\".\"card\") = 'object'"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.custom_price_grids": {
       "name": "custom_price_grids",
       "schema": "",
@@ -23650,6 +23439,18 @@
         },
         "vault_synced_at": {
           "name": "vault_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_bio": {
+          "name": "profile_bio",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_bio_read_at": {
+          "name": "profile_bio_read_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

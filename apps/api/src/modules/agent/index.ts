@@ -31,6 +31,7 @@ export { touchesTerm } from './domain/guards';
 export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision, type HoldDecision } from './domain/hold';
+export type { SaleTroubleSeen } from './domain/sale-trouble';
 export { withoutOrders } from './domain/injection';
 /** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
 export { safetySigns } from './domain/safety-net';
@@ -125,6 +126,11 @@ export interface DraftComposerStartOptions {
   readonly activePersona: ActivePersonaSource;
   /** Her clock, read for each draft: the creator's time zone. */
   readonly timeZoneOf: (creatorId: string) => Promise<string>;
+  /**
+   * Her bio on her platform profile, as last read (ADR 0154), read at each draft beside her persona; `null`: none.
+   * Without it, she writes from her sheet alone. A failed read writes without it, never stops the draft.
+   */
+  readonly profileBioOf?: (creatorId: string) => Promise<string | null>;
   /** His media seen before she answers; without it, any media goes to a human. */
   readonly sight?: MediaSight;
   /** His limits: nothing is written to a stopped fan, and a risk sets them itself (P3-02). */
@@ -144,6 +150,8 @@ export interface DraftComposerStartOptions {
   readonly scripts?: ScriptSource;
   /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
   readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
+  /** Her grid of custom prices (`custom-orders`, ADR 0159 § C), read when his order is kept. */
+  readonly gridOf?: DraftComposerDeps['gridOf'];
   /**
    * Her bank of examples, newest first, withdrawn ones left out (ADR 0102): the playground's corrections filed as her
    * voice's examples, one bank whichever version they were made on. Without it, or unreadable, she writes from her
@@ -158,7 +166,11 @@ export interface DraftComposerStartOptions {
  * Her fields for the composer, from her persona: her sheet, her own sample replies in it (P5-01), and the examples of
  * her bank chosen as the playground chooses them (ADR 0102 § 2): what the owner sees there is what a fan receives.
  */
-function composerFields(persona: PersonaForModels, bank: readonly VoiceExample[]): ComposerPersonaFields {
+function composerFields(
+  persona: PersonaForModels,
+  bank: readonly VoiceExample[],
+  profileBio: string | null = null,
+): ComposerPersonaFields {
   const guardSettings = guardSettingsOf(persona);
   // Each turn takes the twelve this fan may read among them (`examplesForTurn`): his age decides the explicit ones.
   const examples = pickVoiceExamples(bank, guardSettings, bank.length);
@@ -168,6 +180,7 @@ function composerFields(persona: PersonaForModels, bank: readonly VoiceExample[]
       personaSheet: persona.personaSheet,
       guardSettings,
       splitMessages: persona.splitMessages,
+      ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(examples.length > 0 && { voiceExamples: examples }),
     },
     offerLimits: persona.offerLimits,
@@ -204,7 +217,8 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     personaOf: async (creatorId, now) => {
       const persona = await activePersonaForModels(options.activePersona, creatorId, now);
       if (persona === null) return null;
-      return composerFields(persona, await bankOf(options, creatorId, persona.versionId));
+      const profileBio = await (options.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
+      return composerFields(persona, await bankOf(options, creatorId, persona.versionId), profileBio);
     },
     timeZoneOf: options.timeZoneOf,
     voicePrompt: loadPrompt('voice').header.version,
@@ -216,6 +230,7 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
     ...(options.scripts !== undefined && { scripts: options.scripts }),
     ...(options.lastOfferAt !== undefined && { lastOfferAt: options.lastOfferAt }),
+    ...(options.gridOf !== undefined && { gridOf: options.gridOf }),
   });
 }
 

@@ -1,5 +1,5 @@
 /*
- * Réglages › Ventes (CRM-01). On top of the Services page's classes (`sv-`), which it shares for the key field, the
+ * Réglages › Plateformes (CRM-01). On top of the Services page's classes (`sv-`), which it shares for the key field, the
  * dots, the password prompt and the confirmations; only what is its own lives here, prefixed `sf-`. Content sits on
  * plates. Amber for something to do (a model to link, a webhook to register again); red only for reading stopped.
  */

@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SAVE_AFTER_MS } from './PreparedEditor';
 import { PreparedScriptsView } from './PreparedScriptsView';
-import { ScriptsTab } from './ScriptsTab';
 import { ScriptsToCopyView } from './ScriptsToCopyView';
 import { CHOICES, CONTENT, CREATOR, SCRIPT, VAULT, viewOf } from './fixtures';
 
@@ -44,7 +43,9 @@ const vaultRoutes = {
 };
 
 function show(
-  screenOf: JSX.Element = <ScriptsTab creatorId={CREATOR} creatorName="Lina" sent={<p>Scripts envoyés</p>} />,
+  screenOf: JSX.Element = (
+    <PreparedScriptsView creatorId={CREATOR} creatorName="Lina" onCopy={() => undefined} />
+  ),
 ): void {
   vi.stubGlobal(
     'matchMedia',
@@ -231,13 +232,15 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
         body: [viewOf({ state: 'ready_to_copy', copyDifferences: [{ code: 'name_not_found' }] })],
       }),
     });
-    show();
-    const tab = await screen.findByRole('tab', { name: /À copier dans Reveal/u });
-    await waitFor(() => {
-      expect(within(tab).getByText('1')).toBeDefined();
-    });
-    fireEvent.click(tab);
-    expect(screen.getByText('Aucun script de ce nom dans Reveal pour l’instant')).toBeDefined();
+    show(
+      <ScriptsToCopyView
+        creatorId={CREATOR}
+        creatorName="Lina"
+        sent={<p>Scripts envoyés</p>}
+        onOpen={() => undefined}
+      />,
+    );
+    expect(await screen.findByText('Aucun script de ce nom dans Reveal pour l’instant')).toBeDefined();
     expect(screen.getByText('Scripts envoyés')).toBeDefined();
     const name = screen.getByText('Nom').closest<HTMLElement>('.se-copy__row');
     if (name === null) throw new Error('no name row');
@@ -246,18 +249,6 @@ describe('Créatrices › Scripts › Scripts (SCB-04 lot 3)', () => {
       expect(writeText).toHaveBeenCalledWith(CONTENT.name);
     });
     expect(await screen.findByRole('button', { name: '✓ Copié' })).toBeDefined();
-  });
-
-  it('opens a script ready to copy back in « Scripts », in its editor', async () => {
-    serve({
-      ...vaultRoutes,
-      [`GET ${BASE}`]: () => ({ status: 200, body: [viewOf({ state: 'ready_to_copy' })] }),
-    });
-    show();
-    fireEvent.click(await screen.findByRole('tab', { name: /À copier dans Reveal/u }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir le script' }));
-    expect(await screen.findByRole('button', { name: /Ses scripts/u })).toBeDefined();
-    expect(screen.getByRole('tab', { name: 'Scripts', selected: true })).toBeDefined();
   });
 });
 
