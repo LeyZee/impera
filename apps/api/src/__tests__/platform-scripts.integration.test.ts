@@ -1157,27 +1157,28 @@ describe('the native scripts imported from the platform', () => {
       });
     }
     // Two fans got its first step from the agent yesterday: one bought it, one refused it; a third, 40 days ago.
-    const runOf = async (fanRef: string, ago: number, outcome: 'bought' | 'refused') => {
+    const runOf = async (fanRef: string, ago: number, outcome: 'bought' | 'refused', creatorId = nora) => {
+      const accountId = creatorId === nora ? noraAccount : inesAccount;
       const fanId = newId(FanIdSchema);
       const conversationId = newId(ConversationIdSchema);
       const at = new Date(now - ago * 86_400_000).toISOString();
       await test.admin.db.insert(schema.fans).values({
         id: fanId,
-        creatorId: nora,
-        platformAccountId: noraAccount,
+        creatorId,
+        platformAccountId: accountId,
         platformFanId: fanRef,
         displayName: 'Fan inventé',
       });
       await test.admin.db.insert(schema.conversations).values({
         id: conversationId,
-        creatorId: nora,
-        platformAccountId: noraAccount,
+        creatorId,
+        platformAccountId: accountId,
         fanId,
         platformConversationId: `conv-${fanRef}`,
       });
       await test.admin.db.insert(schema.scriptRuns).values({
         id: newId(ScriptRunIdSchema),
-        creatorId: nora,
+        creatorId,
         conversationId,
         scriptRef: 'sequence_1',
         status: outcome === 'bought' ? 'open' : 'refused',
@@ -1189,11 +1190,13 @@ describe('the native scripts imported from the platform', () => {
     await runOf('perf-1', 1, 'bought');
     await runOf('perf-2', 1, 'refused');
     await runOf('perf-3', 40, 'bought');
+    // One of Inès's under the same reference, yesterday: never counted for Nora.
+    await runOf('perf-ines', 1, 'bought', ines);
 
-    const read = async (who: 'owner' | 'manager' | 'chatter' | 'nora', days: number) =>
+    const read = async (who: 'owner' | 'manager' | 'chatter' | 'nora', days: number, creatorId = nora) =>
       server.inject({
         method: 'GET',
-        url: `/v1/creators/${nora}/platform-scripts/performance?days=${String(days)}`,
+        url: `/v1/creators/${creatorId}/platform-scripts/performance?days=${String(days)}`,
         headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
       });
     const response = await read('owner', 7);
@@ -1222,6 +1225,11 @@ describe('the native scripts imported from the platform', () => {
     expect((await read('manager', 30)).statusCode).toBe(200);
     expect((await read('chatter', 30)).statusCode).toBe(404);
     expect([403, 404]).toContain((await read('nora', 30)).statusCode);
+    // Inès's: the owner reads none of Nora's there, and the manager, who has not got her on his list, nothing at all.
+    const inesList = await read('owner', 30, ines);
+    expect(inesList.statusCode).toBe(200);
+    expect(ScriptPerformanceListSchema.parse(inesList.json()).scripts).toEqual([]);
+    expect((await read('manager', 30, ines)).statusCode).toBe(404);
     expect(
       await withCreatorAccount(app.db.db, ids.nora, (tx) => tx.select().from(schema.scriptRuns)),
     ).toEqual([]);
