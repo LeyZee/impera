@@ -1,4 +1,4 @@
-import type { CreatorId, PreparedScriptView } from '@impera/contracts';
+import type { CreatorId, PreparedScriptId, PreparedScriptView } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
 
@@ -16,24 +16,43 @@ import { Empty, Failure } from '@/shell/states';
 /**
  * « Scripts » (ADR 0112 § 20), standing alone: her scripts in preparation, « Nouveau script » and the editor. `opening`
  * is a script to open at once, given by the caller (from « À copier dans Reveal »); `onCopy` is called when the editor
- * sends the person to copy it.
+ * sends the person to copy it. With `onScript`, the script open is the address's (`scriptId`, PRO1-06): opening one
+ * or going back to the list writes it, so a reload or the browser's step back lands where it was.
  */
 export function PreparedScriptsView({
   creatorId,
   creatorName,
   opening = null,
+  scriptId = null,
+  onScript,
   onCopy,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   opening?: PreparedScriptView | null;
+  /** The script the address opens; `null`, the list. Read only with `onScript`. */
+  scriptId?: PreparedScriptId | null;
+  onScript?: (id: PreparedScriptId | null) => void;
   onCopy: () => void;
 }): JSX.Element {
   const client = useQueryClient();
   const scripts = usePreparedScripts(creatorId);
   const { vault, media, folders } = useEditorMedia(creatorId);
-  const [editing, setEditing] = useState<PreparedScriptView | null>(opening);
+  const [held, setHeld] = useState<PreparedScriptView | null>(opening);
   const [creating, setCreating] = useState(false);
+  // The address decides which script is open when it is given; the one held is its latest copy (saved, read again).
+  const editing =
+    onScript === undefined
+      ? held
+      : scriptId === null
+        ? null
+        : held?.id === scriptId
+          ? held
+          : (scripts.data?.find((one) => one.id === scriptId) ?? null);
+  const setEditing = (view: PreparedScriptView | null): void => {
+    setHeld(view);
+    if (view?.id !== editing?.id) onScript?.(view === null ? null : view.id);
+  };
 
   const remember = (saved: PreparedScriptView): void => {
     client.setQueryData<readonly PreparedScriptView[]>(preparedKey(creatorId), (before) =>
@@ -95,7 +114,8 @@ export function PreparedScriptsView({
             });
           }}
           onCopy={() => {
-            setEditing(null);
+            // The page goes to « À copier » itself: no step back through the list in between.
+            setHeld(null);
             onCopy();
           }}
           onBack={() => {

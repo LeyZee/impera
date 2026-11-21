@@ -10,6 +10,7 @@ import {
   percentOf,
   quoteSentence,
   readDraft,
+  roundingLine,
   savedLine,
 } from './model';
 
@@ -72,6 +73,21 @@ describe('the draft of the grid', () => {
     expect([...readDraft(twice).problems.values()]).toEqual(['Un autre supplément porte déjà ce nom.']);
   });
 
+  it('asks the minutes included when a video charges a percent per minute beyond them (CODE-06)', () => {
+    const draft = draftOf(emptyCustomPriceGrid());
+    const video = (patch: { includedMinutes: string; extraMinutePercent: string }) => ({
+      ...draft,
+      formats: draft.formats.map((line) =>
+        line.format === 'video' ? { ...line, price: '40', ...patch } : line,
+      ),
+    });
+    const without = readDraft(video({ includedMinutes: '', extraMinutePercent: '20' }));
+    expect(without.grid).toBeNull();
+    expect(without.problems.get('video.includedMinutes')).toBe('Dis combien de minutes sont comprises.');
+    expect(readDraft(video({ includedMinutes: '10', extraMinutePercent: '20' })).problems.size).toBe(0);
+    expect(readDraft(video({ includedMinutes: '', extraMinutePercent: '0' })).problems.size).toBe(0);
+  });
+
   it('draws a fresh id each time', () => {
     expect(newSupplement().id).toMatch(/^sup_[0-9a-f]{8}$/u);
     expect(newSupplement().id).not.toBe(newSupplement().id);
@@ -94,6 +110,13 @@ describe('the calculator sentence', () => {
     expect(quoteSentence(never, quoteCustomOrder(never, { format: 'call', supplements: [] }))).toBe(
       'Elle ne le fait pas (Appel) : l’IA déclinera sans lui demander.',
     );
+  });
+
+  it('says what the rounding to the euro changed, so the detail adds up (CODE-05)', () => {
+    // A video at 40 € with 31 %: 40 € + 12,40 €, a total of 52 €.
+    expect(roundingLine(5_200, [{ amountMinor: 4_000 }, { amountMinor: 1_240 }])).toBe('−0,40 €');
+    expect(roundingLine(5_300, [{ amountMinor: 4_000 }, { amountMinor: 1_270 }])).toBe('+0,30 €');
+    expect(roundingLine(5_000, [{ amountMinor: 4_000 }, { amountMinor: 1_000 }])).toBeNull();
   });
 
   it('says a grid never saved', () => {

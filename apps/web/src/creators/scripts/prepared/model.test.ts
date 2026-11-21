@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { CONTENT, branchOf } from './fixtures';
+import { ACCOUNT, CHOICES, CONTENT, VAULT, branchOf } from './fixtures';
+import { editorMedia, pickerFolders, startFolder } from './media';
 import {
   conditionLabel,
   differenceText,
@@ -43,6 +44,21 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
       ['Par défaut', [0, 1200], 1200],
       ['S’il aime le rouge', [0, 1500], 1500],
     ]);
+  });
+
+  it('names a path through a branch still to set by its place, never « Par défaut » (PRO1-07)', () => {
+    const [first, second] = CONTENT.steps;
+    if (first === undefined || second === undefined) throw new Error('fixture');
+    const unset = {
+      ...CONTENT,
+      steps: [
+        first,
+        { ...second, branches: [...second.branches, branchOf(30, { condition: null, priceMinor: 900 })] },
+      ],
+    };
+    const names = scriptPaths(unset).shown.map((path) => path.name);
+    expect(names.filter((name) => name === 'Par défaut')).toHaveLength(1);
+    expect(names).toContain('Branche 3 à l’étape 2, à régler');
   });
 
   it('counts the paths without building more than it shows', () => {
@@ -158,5 +174,23 @@ describe('the editor of a script in preparation, pure (SCB-04 lot 3)', () => {
       [...CONTENT.steps].reverse().map((step) => step.key),
     );
     expect(withStepMoved(CONTENT, 0, -1)).toBe(CONTENT);
+  });
+});
+
+describe('the media picker’s first folder (PRO1-11)', () => {
+  const [night] = VAULT.folders;
+  if (night === undefined) throw new Error('fixture');
+  // A Day folder first, not in Impera, then the Night one, imported.
+  const day = { ...night, folderRef: 'f0', folderName: 'Café inventé ☀️', moment: 'day' as const };
+  const vault = { ...VAULT, folders: [day, night] };
+
+  it('opens on the first folder in Impera of the script’s moment, else the first in Impera, else the first', () => {
+    const folders = pickerFolders(vault);
+    const media = editorMedia(vault, CHOICES);
+    expect(folders.map((folder) => folder.name)).toEqual(['Café inventé ☀️', 'Dossier inventé']);
+    expect(startFolder(folders, media, 'night')).toBe(`${ACCOUNT}:f1`);
+    expect(startFolder(folders, media, 'day')).toBe(`${ACCOUNT}:f1`);
+    expect(startFolder(folders, editorMedia(vault, undefined), 'night')).toBe(`${ACCOUNT}:f0`);
+    expect(startFolder([], media, 'both')).toBe('');
   });
 });

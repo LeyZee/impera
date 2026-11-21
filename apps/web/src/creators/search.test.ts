@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { CreatorIdSchema, type Me } from '@impera/contracts';
+import { CreatorIdSchema, PreparedScriptIdSchema, type Me } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,6 +8,7 @@ import {
   parseCreatorsSearch,
   rememberCreatorTab,
   rememberedSheet,
+  scriptSearch,
   sheetOf,
   sheetsFor,
   tabOf,
@@ -186,5 +187,26 @@ describe('the vault folder in the address (`dossier`)', () => {
     });
     expect(creatorsSearch('vault', creatrice)).toEqual({ onglet: 'medias', creatrice });
     expect(creatorsSearch('agenda', creatrice, 'f1')).toEqual({ onglet: 'agenda', creatrice });
+  });
+});
+
+describe('the script open in Scripts in the address (`script`, PRO1-06)', () => {
+  const script = PreparedScriptIdSchema.parse('0192f3a0-0000-7000-8000-0000000000e1');
+
+  it('reads a script id on Scripts only, and writes it back', () => {
+    expect(parseCreatorsSearch({ onglet: 'scripts', creatrice, script })).toEqual({
+      onglet: 'scripts',
+      creatrice,
+      script,
+    });
+    expect(parseCreatorsSearch({ onglet: 'scripts', vue: 'a-copier', creatrice, script })).toEqual({
+      onglet: 'scripts',
+      vue: 'a-copier',
+      creatrice,
+    });
+    expect(parseCreatorsSearch({ onglet: 'scripts', script: 'pas-un-id' })).toEqual({ onglet: 'scripts' });
+    expect(scriptSearch(creatrice, script)).toEqual({ onglet: 'scripts', creatrice, script });
+    expect(scriptSearch(creatrice, null)).toEqual({ onglet: 'scripts', creatrice });
+    expect(sheetOf(scriptSearch(creatrice, script))).toBe('scripts');
   });
 });

@@ -207,12 +207,18 @@ export const PATHS_SHOWN = 8;
 function pathName(content: PreparedScriptContent, taken: readonly PreparedBranch[]): string {
   const parts = taken.flatMap((branch, step) => {
     const condition = branch.condition;
-    if (condition === null || condition.kind === 'none') return [];
+    const index = content.steps[step]?.branches.indexOf(branch) ?? 0;
+    // A branch among others whose condition is still to set is no default: named by its place, never « Par défaut »
+    // (PRO1-07). A step's lone branch needs none.
+    if (condition === null)
+      return (content.steps[step]?.branches.length ?? 0) > 1
+        ? [`branche ${String(index + 1)} à l’étape ${String(step + 1)}, à régler`]
+        : [];
+    if (condition.kind === 'none') return [];
     if (condition.kind === 'text' || condition.rule.kind === 'spent_at_least')
       return [conditionLabel(condition, content).text];
     const said = (branch.teaser.trim() === '' ? branch.offerText : branch.teaser).trim();
     if (said !== '') return [`« ${said} »`];
-    const index = content.steps[step]?.branches.indexOf(branch) ?? 0;
     return [`branche ${String(index + 1)} à l’étape ${String(step + 1)}`];
   });
   if (parts.length === 0) return 'Par défaut';

@@ -69,14 +69,17 @@ export function AlertsTab({
           : { ...old, alerts: old.alerts.map((each) => (each.code === next.code ? next : each)) },
       );
     };
-    // Shown at once; the server's answer, or the line as it was, comes after.
+    // A read under way would bring the old line back over this one (CODE-04).
+    await client.cancelQueries({ queryKey: key });
+    // Shown at once; the server's answer, or what it holds, comes after.
     put({ ...line, routes, isDefault: false });
     setStatus(null);
     try {
       put(await saveCreatorAlert(creatorId, line.code, routes));
       setStatus({ text: `${ALERT_TEXT[line.code].title} : enregistré.`, failed: false });
     } catch (error) {
-      put(line);
+      // Read again rather than the line as it was: a change made since and saved is never undone (CODE-04).
+      void client.invalidateQueries({ queryKey: key });
       setStatus({ text: ALERTS_ERRORS[alertsErrorKind(error)], failed: true });
     }
   }

@@ -7,6 +7,7 @@ import {
   type DropCategory,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX } from 'react';
 
 import { askContent, cadenceKey, cancelRequest, setCadence, useCadence } from './api';
@@ -27,6 +28,7 @@ import {
 import './requests.css';
 
 import { contentKey, useCreatorContent } from '@/creators/scripts/api';
+import { creatorsSearch } from '@/creators/search';
 import { DayField } from '@/scheduling/DayField';
 import { addDays, dayOf } from '@/scheduling/time';
 import { CATEGORY_EMOJIS, namedDay, shotMomentOf } from '@/screens/content/model';
@@ -440,6 +442,8 @@ function AskDialog({
     value: structure.id,
     label: structure.current.name,
   }));
+  // No structure to ask a script on: « Script » is greyed and the way to Structures said, never a dead end (PRO1-13).
+  const noStructure = structures.isSuccess && options.length === 0;
 
   const set = (patch: Partial<AskDraft>): void => {
     setRefused(null);
@@ -509,6 +513,7 @@ function AskDialog({
                 role="radio"
                 className="nv-chip"
                 aria-checked={draft.category === category}
+                disabled={category === 'script' && noStructure}
                 {...(index === 0 ? { 'data-autofocus': true } : {})}
                 onClick={() => {
                   set({ category });
@@ -524,8 +529,17 @@ function AskDialog({
               {problems.category}
             </p>
           )}
+          {noStructure ? (
+            <p className="rq-hint">
+              Aucune structure pour un script :{' '}
+              <Link to="/creatrices" search={creatorsSearch('structures', creatorId)}>
+                crée-la dans Scripts › Structures
+              </Link>
+              .
+            </p>
+          ) : null}
         </div>
-        {draft.category === 'script' ? (
+        {draft.category === 'script' && !noStructure ? (
           <div className="nv-field">
             <label className="nv-field__label" htmlFor={`${id}-structure`}>
               Structure

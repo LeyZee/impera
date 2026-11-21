@@ -8,7 +8,7 @@ import type {
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type JSX, type MouseEvent } from 'react';
 
-import { VaultPicker } from './VaultPicker';
+import { MomentTag, VaultPicker } from './VaultPicker';
 import {
   askVaultDescribe,
   askVaultSync,
@@ -200,6 +200,8 @@ export function VaultPage({
     setPending(false);
     if (last === null) {
       setFailed(true);
+      // A turn may have gone through before one failed: the screen reads what the server holds (CODE-01).
+      void queryClient.invalidateQueries({ queryKey: vaultChoicesKey(creatorId) });
       return false;
     }
     queryClient.setQueryData(vaultChoicesKey(creatorId), last);
@@ -236,6 +238,8 @@ export function VaultPage({
     setPending(false);
     if (last === null) {
       setFailed(true);
+      // A turn may have gone through before one failed: the screen reads what the server holds (CODE-01).
+      void queryClient.invalidateQueries({ queryKey: vaultChoicesKey(creatorId) });
       return;
     }
     queryClient.setQueryData(vaultChoicesKey(creatorId), last);
@@ -449,6 +453,7 @@ function FolderRow({
         <span className="vp-folder__text">
           <span className="vp-folder__name">
             <span className="vp-folder__label">{name}</span>
+            <MomentTag folder={folder} />
           </span>
           <span className="vp-folder__line nv-num">{folderInLine(count)}</span>
         </span>

@@ -47,6 +47,9 @@ export function MediaSheet({
     };
   }, [onStep]);
   const described = descriptionLine(choice);
+  // What became of the sharp picture of this media: the note says it was read only once it was (PRO1-10).
+  const [sharp, setSharp] = useState<{ readonly id: string; readonly state: SharpState } | null>(null);
+  const sharpState = sharp?.id === media.platformMediaId ? sharp.state : 'loading';
 
   return (
     <Dialog
@@ -65,7 +68,13 @@ export function MediaSheet({
           ) : (
             <>
               <Preview hash={media.blurhash} />
-              <Sharp creatorId={creatorId} media={media} />
+              <Sharp
+                creatorId={creatorId}
+                media={media}
+                onState={(state) => {
+                  setSharp({ id: media.platformMediaId, state });
+                }}
+              />
             </>
           )}
           {media.kind !== 'image' && media.durationSeconds !== null ? (
@@ -149,8 +158,12 @@ export function MediaSheet({
             </div>
           )}
         </dl>
-        {media.kind === 'audio' || media.removed ? null : (
-          <p className="vx-note">Image lue dans Reveal à l’instant, jamais gardée par Impera.</p>
+        {media.kind === 'audio' || media.removed || sharpState === 'loading' ? null : (
+          <p className="vx-note">
+            {sharpState === 'shown'
+              ? 'Image lue dans Reveal à l’instant, jamais gardée par Impera.'
+              : 'Aperçu indisponible : sa session Reveal n’est pas lisible.'}
+          </p>
         )}
       </div>
     </Dialog>
@@ -183,14 +196,19 @@ export function VoiceFace({ seed, bars }: { seed: string; bars: number }): JSX.E
  * The sharp small picture over the blurred one (ADR 0138), faded in once loaded; on any failure it stays hidden and
  * the blur shows. Never for a voice note nor a media Reveal removed: there is no picture to read.
  */
+type SharpState = 'loading' | 'shown' | 'failed';
+
 export function Sharp({
   creatorId,
   media,
+  onState,
 }: {
   creatorId: CreatorId;
   media: VaultMediaView;
+  /** Told once the picture is read or failed. */
+  onState?: (state: SharpState) => void;
 }): JSX.Element | null {
-  const [state, setState] = useState<'loading' | 'shown' | 'failed'>('loading');
+  const [state, setState] = useState<SharpState>('loading');
   if (media.kind === 'audio' || media.removed || state === 'failed') return null;
   return (
     <img
@@ -203,9 +221,11 @@ export function Sharp({
       decoding="async"
       onLoad={() => {
         setState('shown');
+        onState?.('shown');
       }}
       onError={() => {
         setState('failed');
+        onState?.('failed');
       }}
     />
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentStateOf, pauseChoices, type AgentStateInput } from './state';
+import { agentStateOf, pauseChoices, withPersona, type AgentStateInput } from './state';
 
 const PARIS = 'Europe/Paris';
 /** Thursday 19/11/2026, 16:30 in Paris (UTC+1). */
@@ -59,6 +59,20 @@ describe('agentStateOf (ADR 0148 § 1)', () => {
       kind: 'global',
       label: 'IA coupée pour toute l’agence',
     });
+  });
+
+  it('without an active persona, waits for it, never « IA active »; an Arrêt is still said (PRO1-03)', () => {
+    expect(agentStateOf(input({ hasActivePersona: false }), PARIS, NOW)).toEqual({
+      kind: 'idle',
+      label: 'IA en attente de sa persona',
+      detail: 'aucun brouillon tant qu’aucune persona n’est active',
+      tone: 'warn',
+    });
+    expect(agentStateOf(input({ mode: 'stop', hasActivePersona: false }), PARIS, NOW).kind).toBe('off');
+    expect(agentStateOf(input({ hasActivePersona: true }), PARIS, NOW).kind).toBe('on');
+    // Unknown to the reader: the mode alone, as before.
+    expect(withPersona(input(), undefined)).toEqual(input());
+    expect(agentStateOf(withPersona(input(), false), PARIS, NOW).kind).toBe('idle');
   });
 
   it('a far day is named', () => {

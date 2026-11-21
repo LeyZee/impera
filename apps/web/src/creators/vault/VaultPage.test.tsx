@@ -256,6 +256,27 @@ describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', 
     expect(await within(dialog).findByText(/Aucun compte Reveal lisible pour l’instant/u)).toBeDefined();
   });
 
+  it('pills each folder’s Day or Night in the window, « À classer » when its name says neither (PRO1-04)', async () => {
+    serve([viewOf()], { status: 200, body: { accounts: 0 } });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    expect([...dialog.querySelectorAll('.vx-moment')].map((tag) => tag.textContent)).toEqual([
+      '☀️ Jour',
+      '🌙 Nuit',
+      'À classer',
+    ]);
+  });
+
+  it('says a vault never read as such, never « Coffre vide » (PRO1-09)', async () => {
+    serve([viewOf({ folders: [], syncedAt: null })], { status: 200, body: { accounts: 0 } });
+    show(true);
+    fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
+    expect(await within(dialog).findByText('Pas encore lu')).toBeDefined();
+    expect(within(dialog).queryByText('Coffre vide')).toBeNull();
+  });
+
   it('ticks folders as cards, writes nothing before « Importer », then imports only what was ticked', async () => {
     const calls = serve([named()], undefined, {
       put: () => whole(['f1']),
@@ -288,13 +309,13 @@ describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', 
     expect(await screen.findByRole('list', { name: 'Médias de Matin ☀️' })).toBeDefined();
   });
 
-  it('opens a folder in the window to tick its media one by one, the root last as « Médias hors dossier »', async () => {
+  it('opens a folder in the window to tick its media one by one, the root last as « Hors dossier »', async () => {
     const calls = serve([named()], undefined, { put: () => choicesOf({ media: [mediaChoice('p2', true)] }) });
     show(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
     const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
     const names = [...dialog.querySelectorAll('.vk-card__name')].map((name) => name.textContent);
-    expect(names).toEqual(['Matin ☀️', 'Médias hors dossier']);
+    expect(names).toEqual(['Matin ☀️', 'Hors dossier']);
     fireEvent.click(within(dialog).getByRole('button', { name: /Voir les médias/u }));
     expect(within(dialog).getByText('0 sur 3 cochés')).toBeDefined();
     fireEvent.click(within(dialog).getByRole('checkbox', { name: '2. Photo' }));
@@ -317,17 +338,22 @@ describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', 
     });
   });
 
-  it('says in the window when the choice was not saved, and keeps it open', async () => {
-    serve([named()], undefined, { put: () => 503 });
+  it('says in the window when the choice was not saved, keeps it open and reads the server again (CODE-01)', async () => {
+    const calls = serve([named()], { status: 200, body: { accounts: 0 } }, { put: () => 503 });
     show(true);
     fireEvent.click(await screen.findByRole('button', { name: 'Choisir dans Reveal' }));
     const dialog = await screen.findByRole('dialog', { name: 'Choisir dans Reveal' });
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /^Matin ☀️/u }));
+    const before = said(calls, 'GET', CHOICES).length;
     fireEvent.click(within(dialog).getByRole('button', { name: 'Importer 3 médias' }));
     expect(await within(dialog).findByRole('alert')).toHaveProperty(
       'textContent',
       'Le choix n’a pas été enregistré : le serveur ne répond pas. Réessaie dans un instant.',
     );
+    // Part of it may have gone through: what the screen shows is read again from the server.
+    await waitFor(() => {
+      expect(said(calls, 'GET', CHOICES).length).toBeGreaterThan(before);
+    });
   });
 
   it('says what of a folder stayed in Reveal, and opens the window on it', async () => {
@@ -546,6 +572,15 @@ describe('« Son coffre » (ADR 0099, ADR 0145 § 5 and its avenant du 20/11)', 
     expect(within(sheet).getByText('Une vidéo inventée')).toBeDefined();
     expect(within(sheet).getByText('Texte inventé du coffre')).toBeDefined();
     expect(within(sheet).getByText('10 € – 25 €')).toBeDefined();
+    // The note says the picture was read only once it was; a picture that fails says so (PRO1-10).
+    expect(within(sheet).queryByText(/Image lue dans Reveal/u)).toBeNull();
+    const sharp = sheet.querySelector('.vx-sharp');
+    if (sharp === null) throw new Error('sharp');
+    fireEvent.error(sharp);
+    expect(
+      within(sheet).getByText('Aperçu indisponible : sa session Reveal n’est pas lisible.'),
+    ).toBeDefined();
+    expect(within(sheet).queryByText(/Image lue dans Reveal/u)).toBeNull();
     fireEvent.keyDown(sheet, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
