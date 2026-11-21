@@ -9,7 +9,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # By event too: a merge on main cancels the previous push run, never a manual or nightly run of main (21/11).
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
