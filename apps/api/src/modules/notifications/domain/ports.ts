@@ -1,5 +1,6 @@
 import type {
   Currency,
+  NotificationInboxItem,
   NotificationPreferences,
   NotificationRequest,
   PushMessage,
@@ -75,6 +76,14 @@ export interface DeliveryRegistry {
   ): Promise<RecordedDecision>;
   /** Marks the account's notifications held until `at` or before as recapped; how many there were. */
   takeHeld(userId: string, at: Date): Promise<number>;
+}
+
+/**
+ * « Tes notifications » (trou 9 du 21/11): the account's own, newest first, decided at `since` or after. Read under its
+ * own RLS (`own_rows`), whether push is on or not: a notification is recorded even with no device to ring.
+ */
+export interface InboxReader {
+  recent(userId: string, since: Date, limit: number): Promise<readonly NotificationInboxItem[]>;
 }
 
 /** A fresh sale to tell her (CRM-04 lot d2): her part and its currency, never who sold nor the fan. */

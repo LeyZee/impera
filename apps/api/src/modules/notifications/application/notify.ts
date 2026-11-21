@@ -62,7 +62,8 @@ export async function recap(deps: NotifyDeps, userId: string, at: Date): Promise
       held === 1
         ? 'Une notification t’attend dans Impera.'
         : `${String(held)} notifications t’attendent dans Impera.`,
-    url: '/',
+    // Where they wait (trou 9 du 21/11): « Tes notifications », not a home page that lists none.
+    url: '/notifications',
     tag: 'quiet-recap',
   });
   return held;

@@ -5,6 +5,7 @@ import {
   AgencyObjectiveBodySchema,
   AgencyObjectiveParamsSchema,
   AgencyObjectiveSchema,
+  AgencySteeringSchema,
   CreatorIdSchema,
   CreatorSetupListSchema,
   CreatorsOverviewSchema,
@@ -12,6 +13,7 @@ import {
   DashboardSchema,
   DomainError,
   MemberSetupListSchema,
+  SteeringQuerySchema,
   TodosAcrossCreatorsSchema,
   type CreatorId,
   type DashboardPeriod,
@@ -23,6 +25,8 @@ import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { readAgencyInsights } from '../../application/agency-reads';
+import { readAgencySteering } from '../../application/agency-steering';
+import type { AgencySteeringReader } from '../../domain/agency-steering';
 import { creatorOverview, fortnightDays } from '../../domain/creators-overview';
 import {
   assembleDashboard,
@@ -83,6 +87,8 @@ export interface DashboardRouteDeps {
   readonly agency: AgencyInsightsReader;
   /** The zone the agency's days are counted in: the platforms' (Reveal's, Europe/Paris). */
   readonly agencyTimeZone: string;
+  /** The agency's steering, read creator by creator (ADR 0092, avenant du 21/11/2026). */
+  readonly steering: AgencySteeringReader;
   /** The owner's monthly revenue objectives (ADR 0092 § 6). */
   readonly objectives: ObjectivesStore;
   /** « Mise en route » of the creators and the members (pilotage plan W1), the owner's alone. */
@@ -192,6 +198,38 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
           );
         }
         return answer.insights;
+      },
+    );
+
+    app.get(
+      '/dashboard/agency/steering',
+      {
+        // The same readers as the agency's figures (ADR 0078 § 1): the owner and an active manager, his list only.
+        preValidation: deps.requireRole('owner', 'operator'),
+        schema: { querystring: SteeringQuerySchema, response: { 200: AgencySteeringSchema } },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const answer = await readAgencySteering(
+          deps,
+          {
+            userId: UserIdSchema.parse(user.id),
+            role: user.role,
+            creatorIds: user.creatorIds.map((id) => CreatorIdSchema.parse(id)),
+          },
+          request.query.creatorId,
+        );
+        if (answer.kind === 'creator_out_of_scope') {
+          throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
+        }
+        if (answer.kind === 'team_out_of_scope') {
+          throw new DomainError(
+            'creator_forbidden',
+            'Les chiffres de l’agence ne sont pas dans ton périmètre',
+          );
+        }
+        return answer.steering;
       },
     );
 
