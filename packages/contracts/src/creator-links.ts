@@ -93,8 +93,15 @@ export const AgencyRedirectLinkWriteSchema = RedirectLinkSchema.omit({ id: true 
 });
 export type AgencyRedirectLinkWrite = z.infer<typeof AgencyRedirectLinkWriteSchema>;
 
-/** A redirect link as the owner and an active manager read it: placed or not, on or off. */
-export const AgencyRedirectLinkSchema = AgencyRedirectLinkWriteSchema.extend({ id: RedirectLinkIdSchema });
+/**
+ * A redirect link as the owner and an active manager read it: placed or not, on or off. `attached` says whether the
+ * owner attached it to its link at the redirect service, so that its hours are read; how the service names it is
+ * never sent.
+ */
+export const AgencyRedirectLinkSchema = AgencyRedirectLinkWriteSchema.extend({
+  id: RedirectLinkIdSchema,
+  attached: z.boolean(),
+});
 export type AgencyRedirectLink = z.infer<typeof AgencyRedirectLinkSchema>;
 
 export const AgencyRedirectLinksResponseSchema = z.object({ links: z.array(AgencyRedirectLinkSchema) });

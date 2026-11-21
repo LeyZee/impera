@@ -1,4 +1,5 @@
 import {
+  AgencyRedirectLinkWriteSchema,
   LINK_DESTINATION_MAX,
   LINK_PLACEMENTS,
   LINK_USAGE_NOTE_MAX,
@@ -73,8 +74,9 @@ export function LinksSection({
   async function toggle(link: AgencyRedirectLink, enabled: boolean): Promise<void> {
     setBusyId(link.id);
     setFailed(null);
-    const { id, ...write } = link;
-    const outcome = await saveRedirectLink(creatorId, id, { ...write, enabled });
+    // What the agency writes of a link, and nothing it only reads (`attached`).
+    const write = AgencyRedirectLinkWriteSchema.parse(link);
+    const outcome = await saveRedirectLink(creatorId, link.id, { ...write, enabled });
     if (outcome.kind === 'refused') setFailed(outcome.message);
     if (outcome.kind === 'reauth') setPending({ link, enabled });
     await refresh();

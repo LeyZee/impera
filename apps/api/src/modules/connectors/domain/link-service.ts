@@ -1,5 +1,6 @@
-import type { DetectedLink, LinkServiceFailure } from '@impera/contracts';
+import type { LinkServiceFailure } from '@impera/contracts';
 
+import type { LinkStatsConnector } from './link-stats';
 import type { KeyActor } from './sales-feed';
 
 /**
@@ -18,11 +19,9 @@ export class LinkServiceError extends Error {
 }
 
 /** The redirect service read with one key. It has nothing that writes to the service. */
-export interface LinkServiceReader {
+export interface LinkServiceReader extends LinkStatsConnector {
   /** Resolves when the service accepts the key; throws a `LinkServiceError` otherwise. */
   ping(): Promise<void>;
-  /** Every link of the account: how the service names it, its name there, its address. Nothing else. */
-  listLinks(): Promise<readonly DetectedLink[]>;
 }
 
 /** The agency's saved key; `key` is `null` when no listed encryption key opens it any more. */
