@@ -366,6 +366,7 @@ async function runTurn(
     {
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
+      ...(scenario.profile_bio !== undefined && { profileBio: scenario.profile_bio }),
       guardSettings: guardSettingsOf(persona),
       splitMessages: persona.splitMessages,
     },
@@ -474,6 +475,7 @@ async function runTurn(
     const judged = await gateway.judge({
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
+      ...(scenario.profile_bio !== undefined && { profileBio: scenario.profile_bio }),
       fanNotes: scenario.fan_facts.join('\n'),
       // What the agent saw: without it, the judge read every fan as one whose age is unknown (OPS-07).
       situation: judgeSituationOf(scenario, now),

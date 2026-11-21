@@ -164,6 +164,8 @@ const ScenarioSchema = z
     /** `smoke` runs every night; `full` only with `--full` (playbook: smoke stays at 30 or fewer). */
     tier: z.enum(['smoke', 'full']).default('smoke'),
     fan_facts: z.array(z.string().min(1)).default([]),
+    /** Her bio on her profile as every subscriber read it (ADR 0154): fictional, never a real one. Absent: none. */
+    profile_bio: z.string().min(1).optional(),
     /** Where they are: written by code, the brain reads it as trusted context. */
     situation: z
       .object({

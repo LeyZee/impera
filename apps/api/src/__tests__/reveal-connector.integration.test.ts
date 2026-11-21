@@ -141,6 +141,8 @@ describe('Reveal connector: a poll on FakeReveal (P2-02)', () => {
 
     await poll();
     expect(await messages()).toBe(lastDay);
+    // Her bio read on her profile at the first poll and kept with her account (ADR 0154).
+    expect(await app.modules.connectors.profileBioOf(creatorId)).toBe('Description de test');
 
     // Read again over the overlap: nothing twice.
     await poll();

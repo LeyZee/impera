@@ -9,6 +9,7 @@ export function wireCustomOrders(shared: Shared): {
 } {
   const module = createCustomOrdersModule({
     db: shared.db,
+    adminDb: shared.adminDb,
     requireRole: shared.requireRole,
   });
   return { module, routes: [module.routes] };

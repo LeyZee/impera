@@ -138,6 +138,8 @@ export interface ConversationInput {
   readonly personaSheet: string;
   /** What she knows about this fan; derived from the fan, so treated as untrusted. */
   readonly fanNotes: string;
+  /** Her bio on her platform profile, as last read (ADR 0154); none or empty: no section. */
+  readonly profileBio?: string | null;
   /** Her local time, day or night, how long they have known each other: written by code, trusted. */
   readonly situation?: string;
   readonly history: readonly ConversationTurn[];

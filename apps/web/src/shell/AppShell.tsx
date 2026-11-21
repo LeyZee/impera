@@ -33,6 +33,7 @@ import {
 } from './nav';
 
 import { useCreatorScope } from '@/agent/scope';
+import { creatorsSearch, sheetsFor, useRememberedSheet, type CreatorSheet } from '@/creators/search';
 import { initialOf } from '@/lib/utils';
 import { InstallNudge } from '@/pwa/InstallNudge';
 import { useFollowDeviceZone } from '@/pwa/device-zone';
@@ -65,6 +66,8 @@ export interface Account {
 
 export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   const rail = useMemo(() => railOf(user), [user]);
+  const creatorSheets = useMemo(() => sheetsFor(user), [user]);
+  const creatorSheet = useRememberedSheet(creatorSheets) ?? 'persona';
   // A member's record takes the zone of the phone at each opening (recette CHT-01): his screens speak his hour.
   useFollowDeviceZone(user);
   const account = useMemo(
@@ -159,6 +162,7 @@ export function AppShell({ user, onSignOut }: { user: Me; onSignOut: () => void 
             onSignOut={onSignOut}
             account={account}
             head={scopesCreators(user) ? <CreatorScope place="rail" /> : undefined}
+            creatorSheet={creatorSheet}
           >
             <UserMenu account={account} onSignOut={onSignOut} />
           </RailNav>
@@ -234,9 +238,12 @@ export function RailNav({
   onSignOut,
   account,
   head,
+  creatorSheet = 'persona',
   children,
 }: {
   rail: Rail;
+  /** The sheet Créatrices opens the chosen creator on: the tab left open last on this device (ADR 0149 § 2). */
+  creatorSheet?: CreatorSheet;
   /** Under the mark, before the tabs: the creator selector of the accounts that choose one (ADR 0134 § 3). */
   head?: JSX.Element | undefined;
   /** The section on screen, or null outside every section (an unknown address): no tab is lit. */
@@ -316,8 +323,13 @@ export function RailNav({
     <Link
       key={item.to}
       to={item.to}
-      // Créatrices opens on the creator the selector is set on: there the address is the choice (ADR 0134 § 3).
-      {...(item.to === '/creatrices' && scoped !== null ? { search: { creatrice: scoped } } : {})}
+      // Créatrices opens on the creator the selector is set on: there the address is the choice (ADR 0134 § 3), on the
+      // tab of her sheet left open last on this device (ADR 0149 § 2). Trafic opens on her too.
+      {...(item.to === '/creatrices' && scoped !== null
+        ? { search: { ...creatorsSearch(creatorSheet, null), creatrice: scoped } }
+        : item.to === '/trafic' && scoped !== null
+          ? { search: { creatrice: scoped } }
+          : {})}
       data-section={item.to}
       data-phone={rail.more.has(item.to) ? 'more' : 'bar'}
       className="nv-rail__item"

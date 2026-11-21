@@ -64,7 +64,7 @@ const teamMember = (memberId: string, name: string, status = 'active'): Record<s
 let team: { status: number; body: unknown };
 /** A period whose list the server does not answer. */
 let downPeriod: string | null;
-/** Reveal's team answers: the reader may open Équipe › Reveal (the owner, an active manager). */
+/** Reveal's team answers: the reader may open Équipe › Comptes Reveal (the owner, an active manager). */
 let revealOpen: boolean;
 
 const text = (element: Element | null | undefined): string =>
@@ -782,7 +782,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     ]);
   });
 
-  it('says « Relier » only to who may open Équipe › Reveal (GES-25)', async () => {
+  it('says « Relier » only to who may open Équipe › Comptes Reveal (GES-25)', async () => {
     open = [report(1, 0, { check: { state: 'unavailable', reason: 'chatter_unlinked' } })];
     renderPage();
     await screen.findByText('1 membre n’est pas relié à Reveal : ses rapports ne sont pas comparés.');

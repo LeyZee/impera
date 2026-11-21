@@ -26,9 +26,17 @@ export type NavIconName =
   | 'puzzle'
   | 'sign-out'
   | 'compass'
-  | 'clapper';
+  | 'clapper'
+  | 'traffic';
 
 const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
+  // Trafic: a chain link, its two halves closing on each other (ADR 0134 § 9).
+  traffic: (
+    <>
+      <path className="nav-link-a" d="M10.2 13.8a4.2 4.2 0 0 0 6 0l3-3a4.2 4.2 0 0 0-6-6l-1.2 1.2" />
+      <path className="nav-link-b" d="M13.8 10.2a4.2 4.2 0 0 0-6 0l-3 3a4.2 4.2 0 0 0 6 6l1.2-1.2" />
+    </>
+  ),
   dashboard: (
     <>
       <path d="M3 20h18" />

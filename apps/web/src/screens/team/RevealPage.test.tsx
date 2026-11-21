@@ -212,7 +212,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Équipe › Reveal (ADR 0076)', () => {
+describe('Équipe › Comptes Reveal (ADR 0076)', () => {
   it('confirms the ticked rows in one batch, never an invitation, and says a refused row under it', async () => {
     const fetch = serve({
       ...TEAM,

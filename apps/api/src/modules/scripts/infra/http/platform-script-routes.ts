@@ -158,16 +158,8 @@ export function createPlatformScriptRoutes(
     scriptId: string,
     reader: PlatformScriptsReader,
     review: DescriptionReview,
-    correlationId: string,
   ): Promise<PlatformScriptViewDto> => {
-    const outcome = await reviewScriptDescriptions(
-      { store: reviews },
-      reader,
-      creatorId,
-      scriptId,
-      review,
-      correlationId,
-    );
+    const outcome = await reviewScriptDescriptions({ store: reviews }, reader, creatorId, scriptId, review);
     if (outcome === 'not_found') throw new PlatformScriptNotFound();
     if (outcome === 'stale') throw new ScriptDescriptionStale();
     if (outcome === 'alone') throw new ScriptDescriptionAlone();
@@ -232,13 +224,10 @@ export function createPlatformScriptRoutes(
         },
       },
       (request) =>
-        described(
-          request.params.creatorId,
-          request.params.scriptId,
-          readerOf(request.user),
-          { kind: 'validate', descriptionIds: request.body.descriptionIds },
-          request.id,
-        ),
+        described(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
+          kind: 'validate',
+          descriptionIds: request.body.descriptionIds,
+        }),
     );
 
     // A description rewritten by hand from the one shown, validated by whoever writes it.
@@ -253,13 +242,11 @@ export function createPlatformScriptRoutes(
         },
       },
       (request) =>
-        described(
-          request.params.creatorId,
-          request.params.scriptId,
-          readerOf(request.user),
-          { kind: 'correct', descriptionId: request.body.descriptionId, detailed: request.body.detailed },
-          request.id,
-        ),
+        described(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
+          kind: 'correct',
+          descriptionId: request.body.descriptionId,
+          detailed: request.body.detailed,
+        }),
     );
 
     return Promise.resolve();

@@ -459,11 +459,11 @@ export const SOURCE_REFUSAL_TEXTS: Readonly<Record<PayRulesSourceRefusal, string
   platform_without_net:
     'La plateforme de ce compte ne donne pas de net : sa paie se lit dans les rapports validés.',
   model_unlinked:
-    'Aucun modèle de la plateforme n’est relié à ce compte : relie son modèle dans Réglages › Ventes, sinon ses ventes ne comptent nulle part.',
+    'Aucun modèle de la plateforme n’est relié à ce compte : relie son modèle dans Réglages › Plateformes, sinon ses ventes ne comptent nulle part.',
   check_missing:
-    'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Ventes, sur une quinzaine entière déjà finie.',
+    'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Plateformes, sur une quinzaine entière déjà finie.',
   check_not_clean:
-    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Plateformes.',
   check_not_before:
     'La dernière vérification ne porte ni sur cette quinzaine ni sur une quinzaine qui finit avant elle : fais partir ces règles de la quinzaine vérifiée ou d’une plus tardive.',
   period_closed:
@@ -517,11 +517,11 @@ export function uncheckedText(reason: ShiftReportCheckReason, platform: string, 
       return `Les ventes de ${platform} ne sont pas lues en ce moment : rien n’est comparé, la relecture se fait comme avant.`;
     case 'model_unlinked':
       return agency
-        ? `Ce compte n’est relié à aucun modèle de ${platform} : relie-le dans Réglages › Ventes pour comparer ses rapports.`
+        ? `Ce compte n’est relié à aucun modèle de ${platform} : relie-le dans Réglages › Plateformes pour comparer ses rapports.`
         : `Ce compte n’est pas encore comparé aux ventes de ${platform} : l’agence relit ton rapport.`;
     case 'chatter_unlinked':
       return agency
-        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Équipe › ${platform} pour comparer ses rapports.`
+        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Équipe › Comptes ${platform} pour comparer ses rapports.`
         : `Ton compte de chatteur sur ${platform} n’est pas encore relié : l’agence relit ton rapport.`;
   }
 }

@@ -15,6 +15,7 @@ src/
 ├── crontab.ts            jobs périodiques Graphile (poll, reconcile, purge)
 ├── readiness.ts          vérifications de /ready
 ├── shutdown.ts           SIGTERM : arrêt ordonné, code 0
+├── observability/        Sentry (OPS-18) : nettoyage des événements, rapports d'erreurs, plantages, POST /v1/client-errors
 ├── composition-root.ts   câblage manuel des modules
 ├── modules/              connectors, conversations, fans, persona, agent, media, supervision, sales, scripts
 ├── scripts/              commandes ops et persona (pnpm ops:*, persona:*)

@@ -1147,6 +1147,14 @@
   margin-bottom: 4px;
 }
 
+/* ── As a view of a creator's sheet (Scripts › Structures): the views and « Nouvelle structure » on one row ── */
+.st-tabs--embedded {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+
 /* ── Queues: the creators on the left, her queue beside ── */
 .st-queues {
   display: grid;

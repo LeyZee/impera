@@ -32,6 +32,7 @@ describe('what is read of her Instagram account (ADR 0120 § 1 and § 2)', () =>
     const snapshot = { mediaRef: 'media-1', age: '48h', readAt: '2026-11-18T03:00:00.000Z', numbers };
     expect(MediaInsightSnapshotSchema.safeParse(snapshot).success).toBe(true);
     expect(MediaInsightSnapshotSchema.safeParse({ ...snapshot, age: '72h' }).success).toBe(false);
+    expect(MediaInsightSnapshotSchema.safeParse({ ...snapshot, numbers: null }).success).toBe(true);
   });
 
   it('keeps numbers only: a field that would carry a commenter is refused', () => {

@@ -77,6 +77,8 @@ export interface EngineDeps {
   /** The same gateway with another voice model, for a comparison; undefined for an unknown model. */
   readonly gatewayForVoice: (voiceModel: string) => LlmGateway | undefined;
   readonly persona: PersonaForModels;
+  /** Her bio on her platform profile when her own version is played (ADR 0154 § 7); absent: none. */
+  readonly profileBio?: string | null;
   readonly store: CalibrationStore;
   /** Every rating so far, shared by all the trainers: the rate measures the bot, not the person. */
   readonly records: CalibrationRecord[];
@@ -225,6 +227,7 @@ export function createPlaygroundEngine(deps: EngineDeps): PlaygroundEngine {
     gateway: deps.gateway,
     creatorName: deps.persona.creatorName,
     personaSheet: deps.persona.personaSheet,
+    ...(deps.profileBio !== undefined && { profileBio: deps.profileBio }),
     guardSettings: guardSettingsOf(deps.persona),
     splitMessages: deps.persona.splitMessages,
     // Her examples only when her own version is played: never the invented persona's, never another creator's.

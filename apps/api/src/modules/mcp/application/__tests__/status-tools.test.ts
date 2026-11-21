@@ -163,6 +163,16 @@ const insights: AgencyInsights = AgencyInsightsSchema.parse({
     },
   ],
   refundsWithoutSale: 0,
+  // The month's objectives (ADR 0092 § 6): internal, never the MCP's.
+  objectives: {
+    month: '2026-11-01',
+    daysGone: 16,
+    days: 30,
+    creators: [{ creatorId: ines, objectiveMinor: 888_001, revenueMinor: 50_000, projectedMinor: 93_750 }],
+    objectiveMinor: 888_001,
+    revenueMinor: 50_000,
+    projectedMinor: 93_750,
+  },
   timeZone: 'Europe/Paris',
   dollarsLeftOut: false,
   subscribers: {
@@ -235,11 +245,13 @@ describe('stats_get (ADR 0026 § 5, ADR 0078, decision A of 14/11)', () => {
       'memberId',
       'refundList',
       'delayDays',
+      'objectives',
+      'objectiveMinor',
     ])
       expect(text).not.toContain(`"${key}"`);
     expect(text).not.toContain('Chatteur Inventé');
     expect(text).not.toContain('Chatteur Remboursé');
-    for (const amount of [...SHARES, 700_007, 700_008, ...SELLER, 910_005, 777_001])
+    for (const amount of [...SHARES, 700_007, 700_008, ...SELLER, 910_005, 777_001, 888_001])
       expect(numbersIn(out)).not.toContain(amount);
   });
 
