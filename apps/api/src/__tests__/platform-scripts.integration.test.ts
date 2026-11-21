@@ -1225,11 +1225,11 @@ describe('the native scripts imported from the platform', () => {
     expect((await read('manager', 30)).statusCode).toBe(200);
     expect((await read('chatter', 30)).statusCode).toBe(404);
     expect([403, 404]).toContain((await read('nora', 30)).statusCode);
-    // Inès's: the owner reads none of Nora's there, and the manager, who has not got her on his list, nothing at all.
+    // Inès's: the owner reads none of Nora's there, and the manager, who has not got her on his list, is refused at the door.
     const inesList = await read('owner', 30, ines);
     expect(inesList.statusCode).toBe(200);
     expect(ScriptPerformanceListSchema.parse(inesList.json()).scripts).toEqual([]);
-    expect((await read('manager', 30, ines)).statusCode).toBe(404);
+    expect((await read('manager', 30, ines)).statusCode).toBe(403);
     expect(
       await withCreatorAccount(app.db.db, ids.nora, (tx) => tx.select().from(schema.scriptRuns)),
     ).toEqual([]);
