@@ -555,7 +555,7 @@ export const JOB_PAYLOADS = {
   /**
    * The account's native scripts mirrored from the platform (ADR 0099 § 1 time 2): steps in the platform's order, prices
    * as they are, a script gone deactivated. Asked with each vault sync the owner asks, never by a cron for now;
-   * replayable, writes nothing when nothing changed.
+   * replayable, writes nothing when nothing changed but the day's totals of its steps (ADR 0129 § 12).
    */
   'scripts.import_platform_scripts': z.object({
     creatorId: CreatorIdSchema,

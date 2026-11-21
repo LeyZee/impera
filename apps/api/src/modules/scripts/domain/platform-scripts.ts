@@ -279,3 +279,27 @@ export function descriptionRefusal(
     return 'alone';
   return null;
 }
+
+/** The platform's totals of one step (ADR 0129 § 12), by its own id on the account, as the import reads them. */
+export interface StepTotals {
+  readonly platformStepRef: string;
+  readonly sent: number;
+  readonly purchased: number;
+  readonly paidMinor: number;
+  readonly currency: Currency;
+}
+
+/**
+ * The totals of every step the platform listed (ADR 0129 § 12), a step once: a script out of the base's bounds keeps
+ * its totals all the same, and a step without any (the platform gave none) has no row. A ref longer than the base keeps
+ * is left out.
+ */
+export function stepTotalsOf(listed: readonly PlatformScript[]): StepTotals[] {
+  const byRef = new Map<string, StepTotals>();
+  for (const script of listed)
+    for (const step of script.steps) {
+      if (step.totals === undefined || step.ref.id.length > PLATFORM_SCRIPT_REF_MAX) continue;
+      byRef.set(step.ref.id, { platformStepRef: step.ref.id, ...step.totals, currency: step.currency });
+    }
+  return [...byRef.values()];
+}

@@ -32,8 +32,10 @@ interface Call {
   readonly body: unknown;
 }
 
-/** The server: preferences kept as written, the test send answered with `testStatus`. */
-function serve(testStatus = 200): Call[] {
+const EMPTY_INBOX = { items: [] };
+
+/** The server: preferences kept as written, the test send answered with `testStatus`, the inbox as given. */
+function serve(testStatus = 200, inbox: unknown = EMPTY_INBOX): Call[] {
   const calls: Call[] = [];
   let saved: unknown = DEFAULTS;
   vi.stubGlobal(
@@ -45,6 +47,9 @@ function serve(testStatus = 200): Call[] {
       if (url === '/v1/notifications/preferences') {
         if (method === 'PUT') saved = body;
         return Promise.resolve(new Response(JSON.stringify(saved), { status: 200 }));
+      }
+      if (url === '/v1/notifications/inbox') {
+        return Promise.resolve(new Response(JSON.stringify(inbox), { status: 200 }));
       }
       if (url === '/v1/notifications/test') {
         return Promise.resolve(
@@ -262,6 +267,9 @@ describe('Notifications, settings that cannot be read', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
+        if (url === '/v1/notifications/inbox') {
+          return Promise.resolve(new Response(JSON.stringify(EMPTY_INBOX), { status: 200 }));
+        }
         if (url !== '/v1/notifications/preferences') {
           return Promise.resolve(new Response(null, { status: 500 }));
         }
@@ -282,5 +290,47 @@ describe('Notifications, settings that cannot be read', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();
     expect(answers).toBe(2);
+  });
+});
+
+// Trou 9 du 21/11: the recap said « 3 notifications t’attendent dans Impera » and none was to be found.
+describe('Notifications, the ones of the last days', () => {
+  const at = (iso: string) => new Date(iso).toISOString();
+  const line = (id: number, reason: string, title: string, quiet: boolean, when: string) => ({
+    id: `00000000-0000-4000-8000-00000000000${String(id)}`,
+    reason,
+    title,
+    url: '/agenda',
+    quiet,
+    at: at(when),
+  });
+
+  it('says first how many never rang, then each line under its family’s colour, a touch from its page', async () => {
+    serve(200, {
+      items: [
+        line(1, 'sale', 'Nouvelle vente', false, '2026-11-21T09:00:00Z'),
+        line(2, 'reminder', 'Story du jour', true, '2026-11-21T06:00:00Z'),
+        line(3, 'safety_alert', 'Un fan à regarder', true, '2026-11-20T23:00:00Z'),
+      ],
+    });
+    deviceIs('on');
+    renderPage();
+    expect(await screen.findByText('2 arrivées sans sonner')).toBeTruthy();
+    expect(screen.getByText('sur 3 cette semaine')).toBeTruthy();
+    expect(screen.getByText('Story du jour').closest('a')?.getAttribute('data-family')).toBe('day');
+    expect(screen.getByText('Un fan à regarder').closest('a')?.getAttribute('data-family')).toBe('safety');
+    expect(screen.getAllByText('Sans sonner')).toHaveLength(2);
+    // A family of the legend lit by the keyboard: the others step back (the lines follow, in CSS).
+    const safety = screen.getByRole('button', { name: /Sécurité/u });
+    fireEvent.focus(safety);
+    expect(safety.getAttribute('aria-pressed')).toBe('true');
+    expect(safety.closest('.nv-inbox__body')?.getAttribute('data-lit')).toBe('safety');
+  });
+
+  it('says so when the week was quiet', async () => {
+    serve();
+    deviceIs('on');
+    renderPage();
+    expect(await screen.findByText('Rien cette semaine')).toBeTruthy();
   });
 });
