@@ -380,7 +380,7 @@ describe('Paie › Quinzaine', () => {
     // Only the validated statements not paid yet: never the drafts, never what already went.
     expect(text((await screen.findByText('Reste à envoyer')).nextElementSibling)).toBe('200,00 €');
     expect(text(screen.getByText(/^Déjà versé/u))).toBe(
-      'Déjà versé 100,00 € · 50,00 € pas encore validé (1 relevé)',
+      'Déjà versé 100,00 € · hors ce montant : 50,00 € encore à valider (1 relevé)',
     );
     expect(text(row('Théo'))).toContain('versé le 3 nov.');
     expect(within(row('Théo')).getByText('Payé').className).toContain('rp-chip--ok');
@@ -970,12 +970,16 @@ describe('Paie › Quinzaine', () => {
           totalMinor: 20_000,
           validatedAt,
         }),
+        statementOf(LOU, OCT2, { payableMinor: 5_000, totalMinor: 5_000 }),
       ],
       { closing: { period: OCT2, exchangeRates: [], closedBy: OWNER_USER, closedAt: validatedAt } },
     );
     renderPage(OWNER);
     expect(text((await screen.findByText('Reste à envoyer')).nextElementSibling)).toBe('300,00 €');
-    expect(text(screen.getByText(/^Dont/u))).toBe('Dont 100,00 € au versement bloqué (1 relevé)');
+    // « Dont » right after the amount; what waits for a validation is said apart from it (COUV-01).
+    expect(text(screen.getByText(/^Dont/u))).toBe(
+      'Dont 100,00 € au versement bloqué (1 relevé) · hors ce montant : 50,00 € encore à valider (1 relevé)',
+    );
     expect(text(row('Théo'))).toContain('Versement bloqué : attestation de résidence 2026 absente.');
     expect(within(row('Théo')).getByText('Versement bloqué').className).toContain('rp-chip--warn');
     expect(within(row('Théo')).queryByRole('button', { name: 'Marquer payé' })).toBeNull();

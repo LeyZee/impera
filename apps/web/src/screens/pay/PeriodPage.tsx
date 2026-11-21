@@ -868,15 +868,16 @@ function EndedHero({
   const notes = stale
     ? ['Plus à jour : le calcul est bloqué.']
     : [
-        !paid && sent > 0 ? `déjà versé ${amountText(sent, 'EUR')}` : null,
+        // « dont » right after the amount it is part of; what is not part of it said as such (COUV-01).
         blocked.length === 0
           ? null
           : `dont ${amountText(sumOf(blocked), 'EUR')} au versement bloqué (${statementsWord(blocked.length)})`,
+        !paid && sent > 0 ? `déjà versé ${amountText(sent, 'EUR')}` : null,
         drafts.length === 0
           ? null
           : validated.length + payments.length === 0
             ? `${statementsWord(drafts.length)} à valider`
-            : `${amountText(sumOf(drafts), 'EUR')} pas encore validé${drafts.length > 1 ? 's' : ''} (${statementsWord(drafts.length)})`,
+            : `hors ce montant : ${amountText(sumOf(drafts), 'EUR')} encore à valider (${statementsWord(drafts.length)})`,
         paid && statements.length > 0
           ? `${statementsWord(payments.length)} payé${payments.length > 1 ? 's' : ''}`
           : null,
