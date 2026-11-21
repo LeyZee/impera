@@ -366,8 +366,9 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
               ))}
             </div>
             <div className="rp-remontee__line">
-              <input
-                className="nv-field__control nv-glass"
+              <textarea
+                className="nv-field__control nv-glass sc-note"
+                rows={2}
                 maxLength={SIGNAL_MAX}
                 value={one.text}
                 placeholder="Un fan demande une vidéo en extérieur…"

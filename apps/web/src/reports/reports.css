@@ -1522,14 +1522,15 @@ a.sc-sheet__report:focus-visible,
   flex-wrap: wrap;
   gap: 6px;
 }
+/* The sentence takes the whole width, « Retirer » under it (Design, #992): never a phrase cut on a phone. */
 .rp-remontee__line {
   display: flex;
+  flex-direction: column;
   gap: var(--nv-space-2);
   min-width: 0;
 }
-.rp-remontee__line > input {
-  flex: 1;
-  min-width: 0;
+.rp-remontee__line > button {
+  align-self: flex-end;
 }
 .rp-cat {
   min-height: var(--nv-pill-choice);
