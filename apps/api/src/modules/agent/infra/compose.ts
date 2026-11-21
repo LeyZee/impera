@@ -66,6 +66,14 @@ import {
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
+import {
+  meetingAnswer,
+  relationshipTier,
+  type MeetingAnswer,
+  type MeetingLimits,
+  type MeetingReason,
+  type Relationship,
+} from '../domain/meeting';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -244,6 +252,17 @@ export interface ComposeTurnInput {
    * from her. Absent: never answered, nothing bought.
    */
   readonly saleTrouble?: { readonly seen: SaleTroubleSeen; readonly hasBought: boolean };
+  /**
+   * When he asks to see her (Charles 21/11): the reasons she already gave him (the journal), whether she already
+   * teased him once about it, how close the agency says he is, and her limits. Absent: nothing given, not close, no
+   * limits (the lowest reason only).
+   */
+  readonly meeting?: {
+    readonly given: readonly MeetingReason[];
+    readonly teased: boolean;
+    readonly closeness: Relationship['closeness'];
+    readonly limits?: MeetingLimits;
+  };
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -431,6 +450,31 @@ const ASK_AVAILABILITY_HINT =
   'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
 const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
 /** He came back without opening the paid step she sent: she teases him about it once (ADR 0156 § 1). */
+/**
+ * He asks to see her (Charles 21/11): code picks the reason (`meetingAnswer`), each a neutral intent here; her own
+ * words for it are in her persona (« Comment elle dit non »), never in the repo. Never a yes (`meeting_promise` holds).
+ */
+const MEETING_COMMON =
+  'il veut la voir en vrai : ni oui ni non sec, une seule raison dans ce message, jamais tournée contre lui, dite à sa façon (sa fiche, « Comment elle dit non ») ; ni date, ni lieu, ni ville';
+const MEETING_REASON_HINTS: Readonly<Record<MeetingReason, string>> = {
+  too_early: `${MEETING_COMMON} ; raison : c’est trop tôt, ils se découvrent à peine`,
+  needs_time: `${MEETING_COMMON} ; raison : elle a besoin de temps`,
+  secret: `${MEETING_COMMON} ; raison : ce qu’elle aime, c’est leur échange à eux, ici`,
+  no_dates: `${MEETING_COMMON} ; raison : elle ne fait de rendez-vous à deux nulle part`,
+  safety: `${MEETING_COMMON} ; raison, sur un ton léger : elle protège sa vie privée`,
+};
+function meetingHint(answer: MeetingAnswer): string {
+  switch (answer.kind) {
+    case 'reason':
+      return MEETING_REASON_HINTS[answer.reason];
+    case 'tease':
+      return 'il redemande à la voir : plus de raison, elle le taquine gentiment, une fois, sans reproche ni date ni lieu';
+    case 'heavy':
+      return 'il redemande à la voir : elle ne donne plus de raison, répond court, sans reproche ni date ni lieu, et passe à autre chose';
+    case 'next_party':
+      return 'il demande sa prochaine soirée : si elle y va, elle le lui dira ; rien de plus, ni date, ni lieu, ni ville';
+  }
+}
 const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
@@ -645,6 +689,8 @@ export interface ComposedTurn {
   readonly saleTrouble?: SaleTroubleOutcome;
   /** She teased him about the run he left (Charles 20/11): one `script_abandon_teased`, counted against what is due. */
   readonly abandonTeased?: AbandonTease;
+  /** What she answered to his asking to see her (Charles 21/11), when the voice wrote: to be journaled, never twice. */
+  readonly meetingAnswer?: MeetingAnswer;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -1076,6 +1122,24 @@ export async function composeTurn(
     offerRefused === undefined
       ? decidedBrief
       : { ...cursored, action: 'reply', replyBrief: refusedOfferBrief(cursored) };
+  // He asks to see her, or about her next party: code picks the reason, from where they are (Charles 21/11).
+  const meeting: MeetingAnswer | undefined =
+    brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
+      ? meetingAnswer({
+          tier: relationshipTier(
+            {
+              knownHours:
+                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+              hasBought: input.situation.spentCents > 0,
+              closeness: input.meeting?.closeness ?? 'none',
+            },
+            input.meeting?.limits,
+          ),
+          given: input.meeting?.given ?? [],
+          teased: input.meeting?.teased ?? false,
+          herNextParty: brief.asksHerNextParty === true,
+        })
+      : undefined;
   const answered: Brief = care
     ? careBrief(read)
     : customOrder?.kind === 'reply'
@@ -1210,6 +1274,7 @@ export async function composeTurn(
                 ...answered.toneHints,
                 ...paced,
                 ...(reminds ? [UNOPENED_STEP_HINT] : []),
+                ...(meeting === undefined ? [] : [meetingHint(meeting)]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
@@ -1326,6 +1391,7 @@ export async function composeTurn(
     ...(saleTrouble !== undefined && { saleTrouble }),
     // Teased only if the voice wrote it: a tease never written is still due.
     ...(teases !== null && voice.ok && { abandonTeased: teases }),
+    ...(meeting !== undefined && voice.ok && { meetingAnswer: meeting }),
     voiceBrief,
     voiceInput,
     bubbles,

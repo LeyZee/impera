@@ -87,6 +87,8 @@ export const BriefSchema = z.object({
    * code decides what is missing and when the card goes to her. Absent, nothing read.
    */
   customOrder: CustomOrderReadingSchema.optional(),
+  /** He asks where or when her next party or outing is (Charles 21/11). Absent, he does not. */
+  asksHerNextParty: z.boolean().optional(),
   action: z.enum(['reply', 'offer', 'wait', 'follow_up', 'handoff']),
   replyBrief: z.string().min(1),
   toneHints: z.array(z.string()),
@@ -116,6 +118,7 @@ export const BriefFromModelSchema = BriefSchema.extend({
   scriptPick: z.union([z.string().regex(BRAIN_SCRIPT_ID), z.literal('')]).nullish(),
   scriptReply: z.enum(SCRIPT_REPLIES).nullish(),
   customOrder: CustomOrderReadingFromModelSchema.nullish(),
+  asksHerNextParty: z.boolean().nullish(),
   toneHints: BriefSchema.shape.toneHints.nullable(),
   callback: z.string().nullish(),
   selfDisclosure: z.string().nullish(),

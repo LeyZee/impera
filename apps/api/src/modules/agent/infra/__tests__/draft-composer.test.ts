@@ -277,6 +277,28 @@ describe('createDraftComposer', () => {
     expect(still.seen.voiceCalls).toBe(2);
   });
 
+  it('answers his asking to meet with one reason his relationship allows, never twice (Charles 21/11)', async () => {
+    const meet: Brief = { ...BRIEF, intent: 'asks_to_meet', risks: ['meet_request'] };
+    const first = composer({ brief: meet });
+    const draft = await first.draftComposer.compose(INPUT);
+    expect(draft).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'reason', reason: 'too_early' } });
+    const hints = first.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('ni oui ni non sec') && hint.includes('trop tôt'))).toBe(true);
+
+    // The one reason his tier allows is given: she teases once, then no reason any more.
+    const again = composer({ brief: meet });
+    const teased = await again.draftComposer.compose({
+      ...INPUT,
+      meeting: { given: ['too_early'], teased: false, closeness: 'none' },
+    });
+    expect(teased).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'tease' } });
+  });
+
+  it('says nothing of meeting when he does not ask', async () => {
+    const draft = await composer({}).draftComposer.compose(INPUT);
+    expect(draft).not.toHaveProperty('meetingAnswer');
+  });
+
   it('reads her clock from the creator of the conversation', async () => {
     const asked: string[] = [];
     const draftComposer = createDraftComposer({

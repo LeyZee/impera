@@ -16,3 +16,11 @@ Décisions : aucune ADR nouvelle. Le « même soir » vaut 6 h, comme la session
 Découvertes : la fin du script quand il a joui amende l'ADR 0156 § 6 (« met le déroulé en pause ») : à confirmer par Charles. La passe-04 (l'étape à 25 € dans la même bulle que le compliment, juste après un achat) relève de § 41 (des messages entre deux étapes payantes, un minimum réglé dans la fiche), pas codée.  les consignes écrites par le code (`NO_OFFER_BRIEF`, `MEDIA_LATER_BRIEF`, les consignes de ralentir) sont identiques d'un tour à l'autre. La voix réécrit alors la même idée, probable cause première du score no_repetition. La garde `repetition` ne bloque que la bulle identique, et la reprise d'une même ouverture n'y est qu'un avertissement. § 42 (« jamais deux scripts le même soir ») et § 49 (« sans jamais refuser une vente qu'il demande ») se contredisent pour la baleine ; le code suit § 42 et le scénario.
 Candidats à suppression : aucun.
 Vérifié : tests ciblés (agent, scripts, bac à sable, llm, evals) ✓, typecheck api/web/llm/evals ✓, prettier ✓.
+
+## Rencontre par palier de relation (règle de Charles du 21/11, 19:50)
+
+- `domain/meeting.ts` : `relationshipTier` (5 paliers selon la relation : heures connues, achat, proximité) et `meetingAnswer` (une raison permise non encore donnée, la plus haute ; toutes données : une taquinerie, puis réponse courte ; « ta prochaine soirée ? » : « si j'y vais je te le dis »). Sans seuil réglé, palier 1 seulement.
+- Composeur : l'intention de la raison va à la voix en code neutre (aucune formulation de créatrice dans le dépôt) ; le brouillon rend `meetingAnswer`. Cerveau : champ `asksHerNextParty`.
+- Rejoueur d'évals : la raison donnée et la taquinerie passent d'un tour à l'autre, comme le journal le fera. Passes 12 et 15 : attendus réécrits.
+- Juge 1.4.0 : `relevance` plafonnée à 0,5 si plus d'une raison, une raison contre lui, un non sec ou un oui.
+- Reste : persistance (événement de journal `meeting_reason_given` + migration de la contrainte CHECK sur `conversation_events.type` + lecture/écriture dans `respond`), signaux de proximité (fournis à `none` pour l'instant), réglage du seuil « nouveau » en heures.
