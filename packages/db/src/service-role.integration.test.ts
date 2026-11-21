@@ -49,6 +49,8 @@ const WRITES: Readonly<Record<string, readonly Write[]>> = {
   invoice_pdf_copies: ['insert'],
   invoice_pdfs: ['insert'],
   invoices: ['insert'],
+  // The owner's gesture keeps, replaces or removes the agency's key of the redirect service (ADR 0120 § 3).
+  link_service_credentials: ['insert', 'update', 'delete'],
   llm_calls: ['insert'],
   media_assets: ['insert', 'update'],
   media_descriptions: ['insert'],

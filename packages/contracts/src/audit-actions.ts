@@ -320,6 +320,9 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     (d) =>
       `a rechiffré les clés des fournisseurs${d.rewritten === undefined ? '' : ` (${String(d.rewritten)})`}`,
   ),
+  'link_service_key.connected': access('a branché la clé du service de redirection'),
+  'link_service_key.replaced': access('a remplacé la clé du service de redirection'),
+  'link_service_key.disconnected': access('a débranché la clé du service de redirection'),
   'sales_feed_key.connected': action(
     'access',
     platformOnly,
