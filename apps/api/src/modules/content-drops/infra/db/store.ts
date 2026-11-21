@@ -329,8 +329,7 @@ async function withdrawIn(
     throw new ContentDropSettled();
   await tx
     .update(contentDrops)
-    // A blocked drop carries its reason, which only the blocked state may hold (content_drops_blocked_check).
-    .set({ state: 'withdrawn', blockedReason: null, withdrawnAt: now, withdrawnBy: userId, updatedAt: now })
+    .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, updatedAt: now })
     .where(eq(contentDrops.id, dropId));
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
