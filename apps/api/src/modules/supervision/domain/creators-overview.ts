@@ -41,6 +41,7 @@ export function creatorOverview(input: {
     globalStop: facts.switches.global,
     hoursNow: facts.hoursNow,
     resumesAs,
+    hasActivePersona: facts.hasActivePersona,
   };
   if (facts.scope === 'self')
     return { creatorId, mode, ...agent, sales: null, onShift: null, requests: null };

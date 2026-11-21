@@ -34,7 +34,7 @@ export const FREEZE_REASON_LABELS: Readonly<Record<SalesFreezeReason, string>> =
 
 export const isOn = (flags: FanFlags, flag: SwitchFlag): boolean => flags[flag] !== undefined;
 
-/** A limit that stops the agent from writing or selling: the one thing the summary shows in amber. */
+/** A limit that stops the agent from writing or selling. */
 export const isBlocking = (flags: FanFlags): boolean =>
   flags.doNotContact !== undefined || flags.salesFrozen !== undefined;
 
@@ -58,12 +58,28 @@ export function switchDetail(flags: FanFlags, flag: SwitchFlag): string | null {
 
 /**
  * His age taken back, by a sign of a minor the agent read or by a human (P3-09): a suspected minor, never to be read
- * as an age nobody checked yet. Amber wherever it shows.
+ * as an age nobody checked yet. Red wherever it shows, as « Ne plus lui écrire » (IA-06).
  */
 export const isAgeDisputed = (flags: FanFlags): boolean => flags.ageDisputed !== undefined;
 
-/** What the summary shows in amber: a limit that stops the agent, or a suspected minor. */
-export const needsAttention = (flags: FanFlags): boolean => isBlocking(flags) || isAgeDisputed(flags);
+/**
+ * One rule for a fan's states wherever they show (sheet, card, « Limites du fan », Suivi › Fans, IA-06): red for « Ne
+ * plus lui écrire » and « Âge contesté », amber for « Ventes gelées ».
+ */
+export type FlagTone = 'bad' | 'warn';
+
+/** The tone of the summary of his limits: the most urgent of those on, or none. */
+export function attentionTone(flags: FanFlags): FlagTone | null {
+  if (flags.doNotContact !== undefined || isAgeDisputed(flags)) return 'bad';
+  return flags.salesFrozen === undefined ? null : 'warn';
+}
+
+/** The tone of one switch once it is on: red forbids writing, amber stops selling; none otherwise. */
+export function switchTone(flags: FanFlags, flag: SwitchFlag): FlagTone | null {
+  if (!isOn(flags, flag)) return null;
+  if (flag === 'doNotContact') return 'bad';
+  return flag === 'salesFrozen' ? 'warn' : null;
+}
 
 /**
  * The line under « Âge »: a disputed age says who may lift it to a reader who may not (SUIVI-04), so that the missing
@@ -186,8 +202,8 @@ export interface FanAlert {
 
 /**
  * What a person must know before writing to him, unfolded above his sheet (CHAT-23): what forbids first, in red (no
- * more messages, sales frozen, a disputed age), then what changes how one writes, in amber (fragile, nothing explicit,
- * his ceiling). Said to a person, who writes in Reveal too, not only of the agent.
+ * more messages, a disputed age), then in amber what changes how one writes (sales frozen, fragile, nothing explicit,
+ * his ceiling; IA-06). Said to a person, who writes in Reveal too, not only of the agent.
  */
 export function alertsOf(flags: FanFlags): FanAlert[] {
   const alerts: FanAlert[] = [];
@@ -197,17 +213,17 @@ export function alertsOf(flags: FanFlags): FanAlert[] {
       label: 'Ne plus lui écrire',
       text: 'Personne ne lui écrit, ni l’agent ni toi dans Reveal.',
     });
-  if (flags.salesFrozen !== undefined)
-    alerts.push({
-      level: 'stop',
-      label: 'Ventes gelées',
-      text: `Aucune offre, aucune relance de vente. ${switchDetail(flags, 'salesFrozen') ?? ''}`.trim(),
-    });
   if (isAgeDisputed(flags))
     alerts.push({
       level: 'stop',
       label: 'Âge contesté',
       text: 'L’agent ne lui écrit plus tant que le propriétaire ou un manager n’a pas confirmé qu’il est majeur.',
+    });
+  if (flags.salesFrozen !== undefined)
+    alerts.push({
+      level: 'care',
+      label: 'Ventes gelées',
+      text: `Aucune offre, aucune relance de vente. ${switchDetail(flags, 'salesFrozen') ?? ''}`.trim(),
     });
   if (flags.fragile !== undefined)
     alerts.push({

@@ -11,6 +11,7 @@ import {
   DraftStatusSchema,
   ExternalMediaSchema,
   FanIdSchema,
+  GuardCodeSchema,
   MediaAssetIdSchema,
   MessageAuthorSchema,
   MessageDirectionSchema,
@@ -126,6 +127,19 @@ async function summaries(
   }));
 }
 
+/** What `guard_trace` keeps of a first answer set aside (IA-08): its codes still known, nothing else. */
+const RetriedTraceSchema = z.object({ retried: z.array(z.unknown()) });
+
+/** The guards that set aside a first answer to this draft (IA-08); none for a trace without them or unreadable. */
+export function retriedOf(guardTrace: unknown): DraftView['retried'] {
+  const trace = RetriedTraceSchema.safeParse(guardTrace);
+  if (!trace.success) return [];
+  return trace.data.retried.flatMap((code) => {
+    const known = GuardCodeSchema.safeParse(code);
+    return known.success ? [known.data] : [];
+  });
+}
+
 function draftView(draft: typeof schema.drafts.$inferSelect): DraftView {
   return {
     id: DraftIdSchema.parse(draft.id),
@@ -133,6 +147,7 @@ function draftView(draft: typeof schema.drafts.$inferSelect): DraftView {
     bubbles: draft.bubbles,
     finalBubbles: draft.finalBubbles,
     createdAt: draft.createdAt.toISOString(),
+    retried: retriedOf(draft.guardTrace),
   };
 }
 

@@ -1,3 +1,4 @@
+import { CreatorOverviewSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { agentStateOf, pauseChoices, withPersona, type AgentStateInput } from './state';
@@ -73,6 +74,19 @@ describe('agentStateOf (ADR 0148 § 1)', () => {
     // Unknown to the reader: the mode alone, as before.
     expect(withPersona(input(), undefined)).toEqual(input());
     expect(agentStateOf(withPersona(input(), false), PARIS, NOW).kind).toBe('idle');
+  });
+
+  it('a manager reads it from her card, without her « Mise en route » (PRO1-03)', () => {
+    const card = CreatorOverviewSchema.parse({
+      creatorId: '018f0000-0000-7000-8000-000000000001',
+      mode: 'copilot',
+      hasActivePersona: false,
+      sales: null,
+      onShift: [],
+      requests: null,
+    });
+    expect(agentStateOf(withPersona(card, undefined), PARIS, NOW).kind).toBe('idle');
+    expect(agentStateOf(withPersona(card, true), PARIS, NOW).kind).toBe('on');
   });
 
   it('a far day is named', () => {

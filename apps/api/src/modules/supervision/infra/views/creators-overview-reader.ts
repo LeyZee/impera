@@ -15,7 +15,10 @@ const SwitchSchema = z.object({
     .transform((value) => new Date(value))
     .nullable(),
 });
-const CountSchema = z.object({ auto: z.coerce.number().int().nonnegative() });
+const CountSchema = z.object({
+  auto: z.coerce.number().int().nonnegative(),
+  persona: z.boolean(),
+});
 const RequestSchema = z.object({ category: DropCategorySchema, due_on: z.string() });
 const NameSchema = z.object({ id: z.string(), display_name: z.string() });
 
@@ -46,7 +49,8 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
         const [counts] = z.array(CountSchema).parse(
           (
             await tx.execute(
-              sql`select count(*) filter (where mode = 'auto' and state not in ('human', 'paused')) as auto
+              sql`select count(*) filter (where mode = 'auto' and state not in ('human', 'paused')) as auto,
+                         exists (select 1 from persona_versions where is_active) as persona
                   from conversations`,
             )
           ).rows,
@@ -67,6 +71,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
             pausedUntil,
             hoursNow,
             autoConversations: counts?.auto ?? 0,
+            hasActivePersona: counts?.persona ?? false,
             requests: [],
             names: new Map(),
           };
@@ -93,6 +98,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
           pausedUntil,
           hoursNow,
           autoConversations: counts?.auto ?? 0,
+          hasActivePersona: counts?.persona ?? false,
           requests: requests.map((row) => ({ category: row.category, dueOn: row.due_on })),
           names: new Map(members.map((row) => [row.id, row.display_name] as const)),
         };

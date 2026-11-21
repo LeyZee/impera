@@ -329,14 +329,26 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           .limit(1);
         return row !== undefined;
       },
-      async insert({ bubbles, softViolations, voice, personaVersionId, facts, scriptStep, ...draft }) {
+      async insert({
+        bubbles,
+        softViolations,
+        retried,
+        voice,
+        personaVersionId,
+        facts,
+        scriptStep,
+        ...draft
+      }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
           ...(scriptStep !== undefined && { policyTrace: toStoredPolicyTrace(scriptStep) }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],
-          guardTrace: { softViolations: [...(softViolations ?? [])] },
+          guardTrace: {
+            softViolations: [...(softViolations ?? [])],
+            ...(retried !== undefined && retried.length > 0 && { retried: [...retried] }),
+          },
           ...(voice !== undefined && {
             promptHashes: { ...voice },
             personaVersionId: personaVersionId ?? activePersona,

@@ -602,7 +602,7 @@ function CreatorAgentSwitch({
   user: { readonly role: string; readonly teamScope: string | null };
 }): JSX.Element | null {
   const overview = useCreatorsOverview();
-  // Her persona is read from her « Mise en route », the owner's alone (PRO1-03).
+  // Her card says whether a persona is active for her, to every reader; the owner's « Mise en route » too (PRO1-03).
   const setups = useCreatorSetups(user.role === 'owner');
   const card = overview.data?.find((one) => one.creatorId === creator.id);
   if (card === undefined) return null;

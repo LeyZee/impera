@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decisionError,
+  retriedLine,
   draftsOf,
   endsRun,
   isOutdated,
@@ -313,6 +314,16 @@ describe('draftsOf', () => {
   });
 });
 
+describe('retriedLine (IA-08)', () => {
+  it('names the guards of the answer set aside, each once, and says nothing without one', () => {
+    expect(retriedLine([])).toBeNull();
+    expect(retriedLine(['ai_disclosure'])).toBe('1 réponse écartée : un aveu d’IA');
+    expect(retriedLine(['ai_disclosure', 'contact_info', 'ai_disclosure'])).toBe(
+      '1 réponse écartée : un aveu d’IA, des coordonnées',
+    );
+  });
+});
+
 describe('decisionError', () => {
   it('says a fan whose age is in doubt needs his age confirmed before the agent gets him back (IA-01)', () => {
     expect(decisionError(409, apiError('age_in_doubt_conflict', {}))).toContain('Confirmer son âge');
@@ -409,6 +420,9 @@ describe('todoLabel', () => {
     expect(todoLabel(todo('send_failed'))).toBe('Envoi échoué');
     expect(todoLabel(todo('awaiting_approval'))).toBe('Brouillon à valider');
     expect(todoLabel(todo('unanswered'))).toBe('Sans réponse');
+    // An AI outage, then over (IA-07).
+    expect(todoLabel(todo('llm_unavailable'))).toBe('IA indisponible');
+    expect(todoLabel({ ...todo('llm_unavailable'), voiceBack: true })).toBe('IA de retour');
   });
 });
 

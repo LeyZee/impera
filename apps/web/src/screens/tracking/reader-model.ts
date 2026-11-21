@@ -8,6 +8,7 @@ import {
   type ConversationEventView,
   type DashboardTodo,
   type DraftView,
+  type GuardCode,
   type MessageView,
 } from '@impera/contracts';
 import { z } from 'zod';
@@ -29,6 +30,8 @@ export function todoLabel(todo: DashboardTodo): string {
   if (todo.kind === 'send_failed') return 'Envoi échoué';
   if (todo.kind === 'unanswered') return 'Sans réponse';
   if (todo.kind === 'fragile_proposed') return 'Le marquer fragile ?';
+  // The outage is over (IA-07): never « IA indisponible » above « L’IA répond de nouveau ».
+  if (todo.kind === 'llm_unavailable' && todo.voiceBack === true) return 'IA de retour';
   return CAUSE_LABELS[todo.kind];
 }
 
@@ -308,6 +311,15 @@ export const stoppedText = (selfScope: boolean): string =>
 /** A fan whose age is in doubt is never given back to the agent: his age is confirmed first (IA-01). */
 export const AGE_IN_DOUBT_TEXT =
   'Son âge est en doute : confirme d’abord qu’il est majeur (Fiche du fan › Limites du fan › Confirmer son âge), puis rends la main.';
+
+/**
+ * Under a draft, discreetly: the first answer a blocking guard set aside before this one was written (IA-08), « 1
+ * réponse écartée : un aveu d’IA ». Null when the first answer went through.
+ */
+export function retriedLine(retried: readonly GuardCode[]): string | null {
+  if (retried.length === 0) return null;
+  return `1 réponse écartée : ${[...new Set(retried.map((code) => GUARD_LABELS[code]))].join(', ')}`;
+}
 
 /** The codes a refusal names; one this screen does not know yet is left out, never shown raw. */
 const GuardsSchema = z.object({ guards: z.array(z.string()) });

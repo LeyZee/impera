@@ -602,6 +602,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           createdAt: meta.at,
           bubbles: result.bubbles,
           softViolations: result.softViolations,
+          ...(result.retried !== undefined && { retried: result.retried }),
           ...(result.voice !== undefined && { voice: result.voice }),
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),

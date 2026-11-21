@@ -10,6 +10,7 @@ import {
   MessageDirectionSchema,
 } from './enums';
 import { EventBodySchema } from './events';
+import { GuardCodeSchema } from './guards';
 import { ConversationIdSchema, DraftIdSchema, FanIdSchema, MessageIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -77,6 +78,11 @@ export const DraftViewSchema = z.object({
   bubbles: z.array(z.string()),
   finalBubbles: z.array(z.string()).nullable(),
   createdAt: z.iso.datetime(),
+  /**
+   * A first answer the agent wrote was set aside by a blocking guard and written again (IA-08): the guards it broke,
+   * said discreetly under the draft (« 1 réponse écartée : un aveu d’IA »). Empty when the first answer went through.
+   */
+  retried: z.array(GuardCodeSchema).default([]),
 });
 export type DraftView = z.infer<typeof DraftViewSchema>;
 

@@ -25,6 +25,7 @@ const facts = (patch: Partial<CreatorOverviewFacts> = {}): CreatorOverviewFacts 
   pausedUntil: null,
   hoursNow: { open: true, changesAt: null },
   autoConversations: 0,
+  hasActivePersona: true,
   requests: [],
   names: new Map([
     [THEO, 'Théo'],
@@ -57,6 +58,26 @@ const sales = (rows: SalesTotalsRow[]) => ({
 });
 
 describe('the cards of the list of Créatrices', () => {
+  it('says whether a persona is active for her, to the owner and to any reader (PRO1-03)', () => {
+    const at = (patch: Partial<CreatorOverviewFacts>) =>
+      creatorOverview({
+        creatorId: CREATOR,
+        facts: facts(patch),
+        now: NOW,
+        sales: undefined,
+        rate: null,
+        onShift: [],
+      });
+    expect(at({}).hasActivePersona).toBe(true);
+    expect(at({ hasActivePersona: false }).hasActivePersona).toBe(false);
+    expect(at({ scope: 'agency', hasActivePersona: false }).hasActivePersona).toBe(false);
+    expect(at({ scope: 'self', hasActivePersona: false }).hasActivePersona).toBe(false);
+    // A server that does not say it yet: her mode alone, as before.
+    const older: Record<string, unknown> = { ...at({}) };
+    delete older['hasActivePersona'];
+    expect(CreatorOverviewSchema.parse(older).hasActivePersona).toBe(true);
+  });
+
   it('cuts her fortnight as pay does, in her zone', () => {
     expect(fortnightDays(NOW, 'Europe/Paris')).toEqual({ from: '2026-11-16', to: '2026-11-20' });
     expect(fortnightDays(new Date('2026-11-15T23:30:00Z'), 'Europe/Paris')).toEqual({
@@ -147,6 +168,7 @@ describe('the cards of the list of Créatrices', () => {
       globalStop: false,
       hoursNow: { open: true, changesAt: null },
       resumesAs: 'copilot',
+      hasActivePersona: true,
       sales: null,
       onShift: null,
       requests: null,

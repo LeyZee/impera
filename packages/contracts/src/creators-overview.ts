@@ -67,6 +67,11 @@ export const CreatorOverviewSchema = z.object({
   hoursNow: AgentHoursNowSchema.nullable().default(null),
   /** The mode lifting her Arrêt gives back, the one she had (ADR 0148 § 1 « Rallumer »). */
   resumesAs: ResumeModeSchema.default('copilot'),
+  /**
+   * A persona is active for her: without one her agent writes nothing, whatever its mode (PRO1-03). Every reader gets
+   * it, his scope his own too; `true` from a server that does not say it yet, its mode alone said then.
+   */
+  hasActivePersona: z.boolean().default(true),
   /** Null when no account is linked to the register, and for a reader whose scope is his own. */
   sales: CreatorOverviewSalesSchema.nullable(),
   /** Null for a reader whose scope is his own; empty when nobody is on shift. */

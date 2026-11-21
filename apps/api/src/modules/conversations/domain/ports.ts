@@ -230,6 +230,8 @@ interface DraftRepository {
     bubbles?: readonly string[];
     /** Soft guard findings the operator should see next to the draft. */
     softViolations?: readonly string[];
+    /** The blocking codes of a first answer set aside and written again (IA-08), shown under the draft. */
+    retried?: readonly string[];
     /** The voice that wrote it, for the live rate (ADR 0019). */
     voice?: DraftVoice;
     /**
@@ -782,6 +784,8 @@ export type ComposeResult =
       readonly kind: 'draft';
       readonly bubbles: readonly string[];
       readonly softViolations: readonly string[];
+      /** The blocking codes of a first answer set aside and written again (IA-08). */
+      readonly retried?: readonly string[];
       readonly costUsd: number;
       readonly voice?: DraftVoice;
       /** Her persona version it was written with (ADR 0019): never the one active when it is saved. */

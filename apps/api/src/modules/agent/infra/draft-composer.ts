@@ -216,6 +216,8 @@ type AgentComposeResult = (
       readonly kind: 'draft';
       readonly bubbles: readonly string[];
       readonly softViolations: readonly string[];
+      /** The blocking codes of a first answer set aside and written again (IA-08): kept in `guard_trace`. */
+      readonly retried?: readonly string[];
       readonly costUsd: number;
       /** Absent when no model is known: no voice is better than a false one on the live rate (ADR 0019). */
       readonly voice?: { readonly voicePrompt: string; readonly voiceModel: string };
@@ -821,6 +823,7 @@ async function quietTurn(
     kind: 'draft',
     bubbles: composed.bubbles,
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: [],
     ...(composed.model !== undefined && {
@@ -924,6 +927,7 @@ async function settleCare(
     kind: 'draft',
     bubbles: help ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText))] : composed.bubbles,
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
     ...(composed.model !== undefined && {
@@ -1022,6 +1026,7 @@ async function settle(
     kind: 'draft',
     bubbles: composed.bubbles,
     softViolations: composed.violations.map((v) => v.code),
+    ...(composed.retried !== undefined && { retried: composed.retried }),
     costUsd,
     factsProposed: withoutOrders(composed.brief.factsProposed),
     ...(composed.model !== undefined && {

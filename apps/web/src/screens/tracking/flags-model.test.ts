@@ -9,10 +9,11 @@ import {
   euros,
   flagError,
   flagsSummary,
+  attentionTone,
   isBlocking,
-  needsAttention,
   sheetSummary,
   switchDetail,
+  switchTone,
 } from './flags-model';
 
 describe('the fan’s limits', () => {
@@ -34,10 +35,27 @@ describe('the fan’s limits', () => {
     expect(euros(5000)).toBe('50\u00a0€');
   });
 
-  it('is amber only when it stops the agent from writing or selling', () => {
+  it('stops the agent only when it forbids writing or selling', () => {
     expect(isBlocking({ fragile: true, noExplicit: true, spendingLimitMinor: 0 })).toBe(false);
     expect(isBlocking({ doNotContact: true })).toBe(true);
     expect(isBlocking({ salesFrozen: { reason: 'distress', since: '2026-10-23T10:00:00.000Z' } })).toBe(true);
+  });
+
+  it('colours a fan’s states by one rule: red to stop writing or a disputed age, amber for frozen sales (IA-06)', () => {
+    const frozen = { salesFrozen: { reason: 'distress' as const, since: '2026-10-23T10:00:00.000Z' } };
+    const disputed = { ageDisputed: { since: '2026-10-28T10:00:00.000Z', by: 'policy' as const } };
+    expect(attentionTone({})).toBeNull();
+    expect(attentionTone(frozen)).toBe('warn');
+    expect(attentionTone({ ...frozen, doNotContact: true })).toBe('bad');
+    expect(attentionTone({ ...frozen, ...disputed })).toBe('bad');
+    expect(switchTone({ doNotContact: true }, 'doNotContact')).toBe('bad');
+    expect(switchTone(frozen, 'salesFrozen')).toBe('warn');
+    expect(switchTone({}, 'doNotContact')).toBeNull();
+    expect(switchTone({ fragile: true }, 'fragile')).toBeNull();
+    const levels = (flags: Parameters<typeof alertsOf>[0]) => alertsOf(flags).map((a) => [a.label, a.level]);
+    expect(levels(frozen)).toEqual([['Ventes gelées', 'care']]);
+    expect(levels(disputed)).toEqual([['Âge contesté', 'stop']]);
+    expect(levels({ doNotContact: true })).toEqual([['Ne plus lui écrire', 'stop']]);
   });
 
   it('says since when and why sales stopped', () => {
@@ -70,8 +88,8 @@ describe('the fan’s limits', () => {
     );
     expect(ageLine(byHuman, true)).toBe('Contesté le 28 octobre par un humain. Rien d’explicite.');
     expect(flagsSummary({ ...byAgent, doNotContact: true })).toBe('Âge contesté · ne plus lui écrire');
-    expect(needsAttention(byAgent)).toBe(true);
-    expect(needsAttention({ fragile: true })).toBe(false);
+    expect(attentionTone(byAgent)).toBe('bad');
+    expect(attentionTone({ fragile: true })).toBeNull();
     expect(ageQuestion(byAgent)).toContain('Ça lève la contestation');
     expect(ageQuestion({})).not.toContain('contestation');
   });
@@ -125,7 +143,7 @@ describe('the fan’s limits', () => {
     });
     expect(alerts.map((a) => [a.level, a.label])).toEqual([
       ['stop', 'Ne plus lui écrire'],
-      ['stop', 'Ventes gelées'],
+      ['care', 'Ventes gelées'],
       ['care', 'Fan fragile'],
       ['care', 'Plafond de 50\u00a0€'],
     ]);

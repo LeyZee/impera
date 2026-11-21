@@ -5,6 +5,7 @@ import {
   ConversationSummarySchema,
   DashboardSchema,
   DraftIdSchema,
+  GuardCodeSchema,
   MessageViewSchema,
   type ConversationDetail,
   type ConversationSummary,
@@ -691,6 +692,33 @@ describe('the reader of Suivi', () => {
     expect(screen.getByText('Salut, ça va ?')).toBeDefined();
   });
 
+  it('says discreetly under the draft an answer the guards set aside before it (IA-08)', async () => {
+    const draft = (retried: string[]) =>
+      waiting({
+        openDrafts: [
+          {
+            id: DRAFT,
+            status: 'pending',
+            bubbles: ['Coucou toi'],
+            finalBubbles: null,
+            createdAt: '2026-10-17T20:01:00Z',
+            retried: GuardCodeSchema.array().parse(retried),
+          },
+        ],
+      });
+    serve({ ...withDraft, detail: () => ({ status: 200, body: draft(['ai_disclosure']) }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).getByText('1 réponse écartée : un aveu d’IA')).toBeDefined();
+  });
+
+  it('says nothing under a draft written at once', async () => {
+    serve({ ...withDraft, detail: () => ({ status: 200, body: waiting() }) });
+    renderPage(OPEN);
+    const panel = await screen.findByRole('region', { name: 'Brouillon à valider' });
+    expect(within(panel).queryByText(/réponse écartée/u)).toBeNull();
+  });
+
   it('sends the draft as written on Valider, then reads the conversation again', async () => {
     let approved = false;
     const posted = serve({
@@ -846,7 +874,7 @@ describe('the reader of Suivi', () => {
     });
   });
 
-  it('folds the fan’s limits to one line, in amber when one stops the agent', async () => {
+  it('folds the fan’s limits to one line, in red when nobody may write to him (IA-06)', async () => {
     serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting() }),
@@ -854,7 +882,7 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     const line = await screen.findByText('Ne plus lui écrire', { selector: '.tr-limits__sum' });
-    expect(line.className).toContain('tr-warn');
+    expect(line.className).toContain('tr-bad');
   });
 
   it('says what she has still to learn about him, in her order, next to his limits', async () => {
@@ -1122,6 +1150,7 @@ describe('the reader of Suivi', () => {
             bubbles: ['Coucou toi'],
             finalBubbles: ['Coucou toi, tu es là ?'],
             createdAt: '2026-10-17T20:01:00Z',
+            retried: [],
           },
         }),
       }),
@@ -1272,7 +1301,7 @@ describe('the reader of Suivi', () => {
     expect(flagCalls).toHaveLength(1);
   });
 
-  it('reads a disputed age as a suspected minor, in amber, and says confirming lifts the dispute', async () => {
+  it('reads a disputed age as a suspected minor, in red everywhere, and says confirming lifts the dispute', async () => {
     serve({
       ...withDraft,
       detail: () => ({ status: 200, body: waiting({ state: 'human', openDrafts: [] }) }),
@@ -1281,7 +1310,8 @@ describe('the reader of Suivi', () => {
     });
     renderPage(OPEN);
     expect(await screen.findByText('Âge contesté', { selector: '.tr-alert--stop strong' })).toBeDefined();
-    expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-warn');
+    expect(screen.getByText('Âge contesté', { selector: '.tr-limit__label' }).className).toContain('tr-bad');
+    expect(screen.getByText('Âge contesté', { selector: '.tr-limits__sum' }).className).toContain('tr-bad');
     expect(screen.getByText(/l’agent a relevé un signe de minorité/u)).toBeDefined();
     expect(screen.queryByText(/Pas encore confirmé/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmer son âge' }));
