@@ -10,6 +10,7 @@ import {
   CarryOverSchema,
   CollectiveGoalSchema,
   containsIban,
+  containsPhoneNumber,
   CreateBonusBodySchema,
   CreateBonusTierSetBodySchema,
   CreateCollectiveGoalBodySchema,
@@ -279,7 +280,26 @@ describe('payments', () => {
       'FR76',
     ]) {
       expect(containsIban(reference), reference).toBe(false);
+      expect(containsPhoneNumber(reference), reference).toBe(false);
       expect(pay(reference).success, reference).toBe(true);
+    }
+  });
+
+  it('refuse a reference that holds a phone number, international or French (COUV-07)', () => {
+    for (const reference of [
+      '+33 6 12 34 56 78',
+      '+33612345678',
+      '+229 97 00 00 00',
+      '06 12 34 56 78',
+      '06.12.34.56.78',
+      '0612345678',
+      'Envoyé au 07 00 00 00 00',
+    ]) {
+      expect(containsPhoneNumber(reference), reference).toBe(true);
+      expect(
+        pay(reference).error?.issues.map((issue) => issue.message),
+        reference,
+      ).toEqual(['Une référence de transfert, jamais un numéro de téléphone']);
     }
   });
 

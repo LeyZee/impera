@@ -1,5 +1,6 @@
 import {
   containsIban,
+  containsPhoneNumber,
   PAYMENT_REFERENCE_MAX,
   type CommissionStatement,
   type ExchangeRate,
@@ -387,7 +388,8 @@ function PayForm({
   const [dayNoSuch, setDayNoSuch] = useState(false);
   const dayValid = !dayUnreadable && /^\d{4}-\d{2}-\d{2}$/u.test(day) && day >= firstDay && day <= today;
   const amountValid = sentMinor === statement.payableMinor;
-  const referenceValid = !containsIban(reference);
+  const phoneInReference = containsPhoneNumber(reference);
+  const referenceValid = !containsIban(reference) && !phoneInReference;
   const ready = dayValid && amountValid && referenceValid;
   const step = mode === 'pay' ? 0 : 1;
 
@@ -565,7 +567,9 @@ function PayForm({
             />
             <p className={touched && !referenceValid ? 'tm-hint tm-hint--error' : 'tm-hint'}>
               {touched && !referenceValid
-                ? 'Ceci contient un IBAN : garde seulement la référence du transfert.'
+                ? phoneInReference
+                  ? 'Ceci ressemble à un numéro de téléphone : garde seulement la référence du transfert.'
+                  : 'Ceci contient un IBAN : garde seulement la référence du transfert.'
                 : 'Celle que WorldRemit donne au transfert. Jamais un IBAN, un numéro de compte ni de téléphone.'}
             </p>
           </div>

@@ -702,6 +702,11 @@ describe('Paie › Quinzaine', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     expect(within(dialog).getByText(/Ceci contient un IBAN/u)).toBeTruthy();
     expect(within(dialog).queryByText(/versés à/u)).toBeNull();
+    // Nor a phone number (COUV-07).
+    fireEvent.change(reference, { target: { value: '+33 6 12 34 56 78' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    expect(within(dialog).getByText(/Ceci ressemble à un numéro de téléphone/u)).toBeTruthy();
+    expect(within(dialog).queryByText(/versés à/u)).toBeNull();
 
     fireEvent.change(reference, { target: { value: 'WR-4E7F2C1A' } });
     // WorldRemit pays the chatters, and nothing else: no method to choose.

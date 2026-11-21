@@ -679,6 +679,16 @@ export function containsIban(text: string): boolean {
 }
 
 /**
+ * Whether `text` holds a phone number (COUV-07): an international one (« + » and at least 8 digits, spaces, dots,
+ * dashes or brackets between), or a French one (« 0 », then 9 digits, in pairs or not, one separator throughout). A transfer's reference
+ * (« Transfer #1284759302 ») is neither.
+ */
+export function containsPhoneNumber(text: string): boolean {
+  if (/\+\s*\d(?:[\s.()-]*\d){7,}/u.test(text)) return true;
+  return /(?<![\dA-Za-z])0[1-9]([\s.-]?)\d{2}(?:\1\d{2}){3}(?![\dA-Za-z])/u.test(text);
+}
+
+/**
  * The transfer's reference as the bank or the service shows it, to find it again; never an IBAN (refused, here for the
  * screen and the server alike: the repository is public and real payments go through this column) nor an account
  * number (said by the screen).
@@ -688,7 +698,11 @@ const PaymentReferenceSchema = z
   .trim()
   .min(1)
   .max(PAYMENT_REFERENCE_MAX)
-  .refine((reference) => !containsIban(reference), 'Une référence de transfert, jamais un IBAN');
+  .refine((reference) => !containsIban(reference), 'Une référence de transfert, jamais un IBAN')
+  .refine(
+    (reference) => !containsPhoneNumber(reference),
+    'Une référence de transfert, jamais un numéro de téléphone',
+  );
 
 /** What was sent, in euro cents: never nothing. */
 const SentMinorSchema = z.number().int().min(1).max(PAY_AMOUNT_MAX_MINOR);
