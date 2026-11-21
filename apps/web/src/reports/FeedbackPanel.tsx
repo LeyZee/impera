@@ -23,6 +23,7 @@ import { periodLine } from './model';
 
 import { clockAt, dayMonth, dayOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
+import { Steps } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 const TEXT_MAX = 1000;
@@ -102,7 +103,14 @@ const whenSaid = (instant: string, today: string, zone: string): string => {
   return day === today ? `à ${clockAt(instant, zone)}` : `le ${dayMonth(day)} à ${clockAt(instant, zone)}`;
 };
 
-/** An incident's three steps, as a bar that fills: red while nobody saw it, amber seen, green « Réglé ». */
+/** Each step's colour: red while nobody saw it, amber once seen, green when settled (Design, #1008). */
+const STAGE_COLOURS: Readonly<Record<IncidentStage, string>> = {
+  sent: 'var(--nv-danger)',
+  seen: 'var(--nv-warning)',
+  resolved: 'var(--nv-success)',
+};
+
+/** An incident's three steps, the system's `Steps`: each reached one ticked, with the time it was said. */
 export function IncidentTrack({
   feedback,
   zone,
@@ -115,36 +123,21 @@ export function IncidentTrack({
   const stage = incidentStage(feedback);
   if (stage === null) return null;
   const order: readonly IncidentStage[] = ['sent', 'seen', 'resolved'];
-  const reached = order.indexOf(stage);
   const at: Readonly<Record<IncidentStage, string | null>> = {
     sent: null,
     seen: feedback.incidentSeenAt,
     resolved: feedback.incidentResolvedAt,
   };
-  // Three equal steps, each word and its time centred under its own segment (Design, #992).
   return (
-    <ol
-      className="rp-track"
-      data-stage={stage}
-      role="progressbar"
-      aria-valuemin={1}
-      aria-valuemax={3}
-      aria-valuenow={reached + 1}
-      aria-valuetext={STAGE_WORDS[stage]}
-    >
-      {order.map((one, index) => {
+    <Steps
+      steps={order.map((one) => {
         const said = at[one];
-        return (
-          <li key={one} className="rp-track__step" data-done={index <= reached ? 'true' : undefined}>
-            <span className="rp-track__seg" aria-hidden="true" />
-            <span className="rp-track__word">{STAGE_WORDS[one]}</span>
-            {said === null ? null : (
-              <span className="rp-track__when nv-num">{whenSaid(said, today, zone)}</span>
-            )}
-          </li>
-        );
+        return { label: STAGE_WORDS[one], when: said === null ? null : whenSaid(said, today, zone) };
       })}
-    </ol>
+      reached={order.indexOf(stage)}
+      label={`Incident : ${STAGE_WORDS[stage]}`}
+      colour={STAGE_COLOURS[stage]}
+    />
   );
 }
 
@@ -157,10 +150,7 @@ export function SignalChips({ feedback }: { feedback: Pick<ShiftFeedback, 'signa
         const category = SIGNAL_CATEGORIES[signal.category];
         return (
           <li key={index} className="rp-signal" data-kind={category.kind}>
-            <span className="nv-tag rp-signal__cat">
-              <span className="rp-cat__dot" aria-hidden="true" />
-              {category.label}
-            </span>
+            <span className="nv-tag nv-tag--tint rp-signal__cat">{category.label}</span>
             <span className="rp-signal__text">{signal.text}</span>
           </li>
         );

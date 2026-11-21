@@ -862,7 +862,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(card)).toContain('Un fan menace de signaler le compte');
     expect(text(card)).toContain('Basile');
     expect(text(card)).toContain('1 pas encore vu');
-    expect(within(card).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
+    expect(within(card).getByRole('list', { name: 'Incident : Envoyé' })).toBeTruthy();
     // Before the reports to validate: the urgency first.
     const board = card.parentElement;
     expect(board?.firstElementChild).toBe(card);

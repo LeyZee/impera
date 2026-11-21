@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { ShiftReportContextSchema } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FeedbackPanel } from './FeedbackPanel';
@@ -143,12 +143,11 @@ describe('Mon retour de fin de shift (ADR 0050 § 10, trous béants n° 1)', () 
     expect(screen.getByText('L’agence a été prévenue sur son téléphone.')).toBeTruthy();
   });
 
-  it('shows where a sent incident stands: « Vu » by the agency, its bar two thirds full', async () => {
+  it('shows where a sent incident stands: « Vu » by the agency, its second step the current one', async () => {
     stored = sent({ incident: 'Coupure de connexion', incidentSeenAt: '2026-10-27T23:10:00.000Z' });
     renderPanel();
-    const bar = await screen.findByRole('progressbar');
-    expect(bar.getAttribute('aria-valuenow')).toBe('2');
-    expect(bar.getAttribute('aria-valuetext')).toBe('Vu');
+    const steps = await screen.findByRole('list', { name: 'Incident : Vu' });
+    expect(within(steps).getAllByRole('listitem')[1]?.getAttribute('aria-current')).toBe('step');
     expect(screen.getByText('L’agence l’a vu et s’en occupe.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Rien à signaler' })).toBe(null);
   });
