@@ -33,6 +33,8 @@ export interface StockRow {
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 /** A gift is never nude (ADR 0163 § 2): what the vision or a person said explicit or hard is not a gift. */
 const NOT_A_GIFT: ReadonlySet<string> = new Set(['explicit', 'hardcore']);
+/** A gift counts only once its description proves it is not nude: undescribed, it waits outside the count. */
+const PROVEN_GIFT: ReadonlySet<string> = new Set(['soft', 'suggestive']);
 
 function standingOf(dropState: string, outAt: Date | null): StockStanding {
   if (outAt !== null || DropStateSchema.parse(dropState) === 'published') return 'out';
@@ -40,10 +42,17 @@ function standingOf(dropState: string, outAt: Date | null): StockStanding {
 }
 
 /**
- * Her stock by use (ADR 0163 § 3): each category counted against its rule, and her newest media. A gift said nude is
- * shown but never counted (§ 2).
+ * Her stock by use (ADR 0163 § 3): each category counted against its rule, and her newest media. A gift is counted
+ * only once described soft or suggestive; one said nude is shown, flagged, and never counted (§ 2).
  */
 export function contentStockOf(rows: readonly StockRow[], now: Date): ContentStock {
+  const unproven = new Set(
+    rows
+      .filter(
+        (row) => row.category === 'whale_gift' && (row.intensity === null || !PROVEN_GIFT.has(row.intensity)),
+      )
+      .map((row) => row.fileId),
+  );
   const media: StockMedium[] = rows.map((row) => {
     const category = DropCategorySchema.parse(row.category);
     return {
@@ -62,7 +71,7 @@ export function contentStockOf(rows: readonly StockRow[], now: Date): ContentSto
   });
   const since = now.getTime() - WEEK_MS;
   const categories = STOCK_ORDER.map((category) => {
-    const mine = media.filter((m) => m.category === category && !m.notAGift);
+    const mine = media.filter((m) => m.category === category && !unproven.has(m.fileId));
     const drops = (standing: StockStanding, recent = false): ReadonlySet<string> =>
       new Set(
         mine

@@ -270,6 +270,8 @@ function Description({
     );
 
   const validated = description.validatedAt !== null;
+  // A description the code held for a human is the agency's to lift, never hers (Sécurité on #995).
+  const agencyFirst = her && !validated && description.reviewReasons.length > 0;
   const provenance = validated
     ? description.author === 'sense'
       ? 'Validée'
@@ -287,7 +289,12 @@ function Description({
           {error}
         </p>
       )}
-      {draft === null ? (
+      {agencyFirst ? (
+        <>
+          <p className="st-desc__text">{description.detailed}</p>
+          <p className="st-muted">L’agence la relit d’abord. Tu n’as rien à faire.</p>
+        </>
+      ) : draft === null ? (
         <>
           <p className="st-desc__text">{description.detailed}</p>
           <div className="st-desc__actions">

@@ -14,7 +14,7 @@ import {
   type DropCategory,
   type DropMediaDescription,
 } from '@impera/contracts';
-import { eq, schema } from '@impera/db';
+import { eq, schema, withCreatorAccount } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
@@ -61,7 +61,8 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
   let nora: CreatorId;
   let ines: CreatorId;
   const users: Record<'nora' | 'ines' | 'owner', string> = { nora: '', ines: '', owner: '' };
-  const cookies: Record<'nora' | 'ines' | 'owner' | 'manager' | 'chatter', string> = {
+  const cookies: Record<'nora' | 'ines' | 'owner' | 'manager' | 'managerElsewhere' | 'chatter', string> = {
+    managerElsewhere: '',
     nora: '',
     ines: '',
     owner: '',
@@ -89,6 +90,7 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
     category: DropCategory,
     files: readonly (DropMediaDescription['intensity'] | null)[],
     over: Partial<typeof schema.contentDrops.$inferInsert> = {},
+    held: readonly ('reason' | 'flag' | null)[] = [],
   ) {
     const dropId = newId(ContentDropIdSchema);
     await test.admin.db
@@ -131,10 +133,14 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
         creatorId,
         mediaAssetId,
         vocabularyVersion: MEDIA_VOCABULARY_VERSION,
-        content: described(intensity),
+        content:
+          held[position] === 'flag'
+            ? { ...described(intensity), flags: ['identifiable_third_party'] }
+            : described(intensity),
         model: 'vision-test',
         promptHash: 'drop-v2',
         author: 'sense',
+        reviewReasons: held[position] === 'reason' ? ['unsure'] : [],
       });
       descriptionIds.push(descriptionId);
     }
@@ -189,6 +195,19 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
       });
       cookies[teamRole] = member.cookie;
     }
+    const elsewhere = await account('manager-ines@example.test', { role: 'operator', creatorIds: [ines] });
+    await test.admin.db.insert(schema.teamMembers).values({
+      id: newId(TeamMemberIdSchema),
+      userId: elsewhere.userId,
+      teamRole: 'manager',
+      firstName: 'Prénom',
+      lastName: 'Inventé',
+      displayName: 'Membre manager d’Ines',
+      country: 'BJ',
+      timeZone: 'Africa/Porto-Novo',
+      joinedOn: '2026-10-01',
+    });
+    cookies.managerElsewhere = elsewhere.cookie;
     for (const [who, creatorId] of [
       ['nora', nora],
       ['ines', ines],
@@ -230,6 +249,9 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
   it('opens her stock to the owner and a manager, to herself at her door, to no chatter', async () => {
     expect((await call('GET', `/v1/creators/${nora}/stock`, 'chatter')).statusCode).toBe(403);
     expect((await call('GET', `/v1/creators/${nora}/stock`, 'nora')).statusCode).toBe(403);
+    // A manager reaches only the creators on his own list.
+    expect((await call('GET', `/v1/creators/${nora}/stock`, 'managerElsewhere')).statusCode).toBe(403);
+    await stockOf(`/v1/creators/${ines}/stock`, 'managerElsewhere');
     for (const who of ['owner', 'manager', 'chatter'] as const)
       expect((await call('GET', '/v1/creator-space/stock', who)).statusCode).toBe(403);
     const team = await stockOf(`/v1/creators/${nora}/stock`, 'manager');
@@ -323,5 +345,61 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
       expect(
         (await call('GET', `/v1/creator-space/drops/${video.dropId}/descriptions`, who)).statusCode,
       ).toBe(403);
+  });
+  it('leaves a description waiting for the agency to the agency: never hers to validate or correct', async () => {
+    const held = await drop(nora, users.nora, 'feed_video', ['soft', 'soft'], {}, ['reason', 'flag']);
+    const [reasoned, flagged] = held.descriptionIds;
+    const url = `/v1/creator-space/drops/${held.dropId}/descriptions`;
+    for (const id of [reasoned, flagged]) {
+      const validate = await call('POST', `${url}/validate`, 'nora', { descriptionIds: [id] });
+      expect(validate.statusCode, validate.body).toBe(409);
+      expect(validate.body).toContain('L’agence doit d’abord relire');
+      const correct = await call('POST', `${url}/correct`, 'nora', {
+        descriptionId: id,
+        detailed: 'Une phrase inventée.',
+      });
+      expect(correct.statusCode, correct.body).toBe(409);
+    }
+
+    // The base says the same, past the code: her account stamps nothing and writes no row over them.
+    const stamped = await withCreatorAccount(app.db.db, users.nora, (tx) =>
+      tx
+        .update(schema.mediaDescriptions)
+        .set({ validatedBy: users.nora, validatedAt: new Date() })
+        .where(eq(schema.mediaDescriptions.id, reasoned ?? ''))
+        .returning({ id: schema.mediaDescriptions.id }),
+    );
+    expect(stamped).toEqual([]);
+    const [base] = await test.admin.db
+      .select()
+      .from(schema.mediaDescriptions)
+      .where(eq(schema.mediaDescriptions.id, flagged ?? ''));
+    await expect(
+      withCreatorAccount(app.db.db, users.nora, (tx) =>
+        tx.insert(schema.mediaDescriptions).values({
+          id: randomUUID(),
+          creatorId: nora,
+          mediaAssetId: base?.mediaAssetId ?? '',
+          vocabularyVersion: MEDIA_VOCABULARY_VERSION,
+          content: { ...described('soft'), flags: ['identifiable_third_party'] },
+          model: 'human',
+          promptHash: 'drop-v2',
+          author: 'human',
+          validatedBy: users.nora,
+          validatedAt: new Date(),
+        }),
+      ),
+    ).rejects.toMatchObject({ cause: { code: '42501' } });
+
+    // The agency lifts it at its own door.
+    const lifted = await call(
+      'POST',
+      `/v1/creators/${nora}/drops/${held.dropId}/descriptions/validate`,
+      'owner',
+      {
+        descriptionIds: [reasoned],
+      },
+    );
+    expect(lifted.statusCode, lifted.body).toBe(200);
   });
 });

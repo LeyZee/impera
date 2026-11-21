@@ -41,6 +41,7 @@ import {
   orderedSummary,
   scriptStepsOf,
   shownRow,
+  awaitsAgency,
   validationRefusal,
   type ReviewedRow,
 } from '../../domain/describe';
@@ -311,7 +312,7 @@ export function createDrizzleDescriptionReview(db: Database): DescriptionReview 
  * (asking the vision again, writing by hand, the script's synthesis) stay the agency's.
  */
 export function createDrizzleCreatorDescriptionReview(db: Database): CreatorDescriptionReview {
-  const review = reviewIn((_creatorId, userId, run) => withCreatorAccount(db, userId, run));
+  const review = reviewIn((_creatorId, userId, run) => withCreatorAccount(db, userId, run), true);
   return {
     read: (userId, dropId) => review.read('', userId, dropId),
     validate: (userId, dropId, ids, now, correlationId) =>
@@ -323,7 +324,8 @@ export function createDrizzleCreatorDescriptionReview(db: Database): CreatorDesc
   };
 }
 
-function reviewIn(asTeam: ReviewScope): DescriptionReview {
+/** `herOwn`: her account, which never lifts a description waiting for the agency (Sécurité on #995). */
+function reviewIn(asTeam: ReviewScope, herOwn = false): DescriptionReview {
   return {
     read: (creatorId, userId, dropId) =>
       asTeam(creatorId, userId, async (tx) => (await stateOf(tx, dropId)).review),
@@ -334,6 +336,8 @@ function reviewIn(asTeam: ReviewScope): DescriptionReview {
         const named = namedRows(state, descriptionIds);
         const refusal = validationRefusal(named, (mediaAssetId) => state.shown.get(mediaAssetId) ?? null);
         if (refusal !== null) throw new DropDescriptionReviewConflict(refusal);
+        if (herOwn && named.some((row) => row.validatedAt === null && awaitsAgency(row)))
+          throw new DropDescriptionReviewConflict('agency');
         const open = named.filter((row) => row.validatedAt === null).map((row) => row.id);
         if (open.length === 0) return state.review;
         await tx
@@ -352,6 +356,15 @@ function reviewIn(asTeam: ReviewScope): DescriptionReview {
         if (base === undefined) throw new ContentDropNotFound();
         if (state.shown.get(base.mediaAssetId)?.id !== base.id)
           throw new DropDescriptionReviewConflict('not_shown');
+        if (
+          herOwn &&
+          (awaitsAgency(base) ||
+            state.rows.some(
+              (row) =>
+                row.mediaAssetId === base.mediaAssetId && row.validatedAt === null && awaitsAgency(row),
+            ))
+        )
+          throw new DropDescriptionReviewConflict('agency');
         const content = DropMediaDescriptionSchema.parse(base.content);
         const id = newId(MediaDescriptionIdSchema);
         // A new row (the table is append-only): the vision's closed labels kept, her note kept, the words rewritten.

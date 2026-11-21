@@ -1,5 +1,12 @@
 import { DESCRIPTION_TRIES } from '@impera/contracts';
-import { sql, withCreatorAccount, withTenantMember, type Database, type Transaction } from '@impera/db';
+import {
+  onCreatorList,
+  sql,
+  withCreatorAccount,
+  withTenantMember,
+  type Database,
+  type Transaction,
+} from '@impera/db';
 
 import type { StockRow } from '../../application/stock';
 import { ContentDropForbidden } from '../../domain/errors';
@@ -70,7 +77,7 @@ async function stockRowsIn(tx: Transaction, creatorId: string): Promise<readonly
   }));
 }
 
-/** Her stock, read by herself (her RLS) or by the owner and an active manager; a chatter is refused. */
+/** Her stock, read by herself (her RLS), by the owner, or by an active manager who has her on his list. */
 export interface StockStore {
   forCreator(userId: string): Promise<readonly StockRow[]>;
   forTeam(creatorId: string, userId: string): Promise<readonly StockRow[]>;
@@ -80,8 +87,11 @@ export function createDrizzleStockStore(db: Database): StockStore {
   return {
     forCreator: (userId) => withCreatorAccount(db, userId, (tx, creatorId) => stockRowsIn(tx, creatorId)),
     forTeam: (creatorId, userId) =>
-      withTenantMember(db, creatorId, userId, (tx, scope) => {
+      withTenantMember(db, creatorId, userId, async (tx, scope) => {
         if (!readsTeam(scope)) throw new ContentDropForbidden();
+        // An active manager reaches only the creators on his own list (Sécurité, as on the links and the vault).
+        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId)))
+          throw new ContentDropForbidden();
         return stockRowsIn(tx, creatorId);
       }),
   };

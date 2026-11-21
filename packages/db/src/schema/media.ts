@@ -308,6 +308,20 @@ const herDroppedMedium = (t: { readonly creatorId: PgColumn; readonly mediaAsset
          and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate'))`;
 
 /**
+ * A description that waits for the agency (Sécurité on #995): a reason the code held it for a human (ADR 0083 § 3 to
+ * 5) or a flag of the vision. Hers to read, never hers to lift.
+ */
+const awaitsAgency = (t: { readonly reviewReasons: PgColumn; readonly content: PgColumn }): SQL =>
+  sql`(cardinality(${t.reviewReasons}) > 0 or jsonb_array_length(coalesce(${t.content} -> 'flags', '[]'::jsonb)) > 0)`;
+
+/** Some row of this medium, not validated yet, waits for the agency: her correction cannot lift it either. */
+const mediumAwaitsAgency = (t: { readonly mediaAssetId: PgColumn }): SQL =>
+  sql`exists (select 1 from media_descriptions w
+       where w.media_asset_id = ${t.mediaAssetId} and w.validated_at is null
+         and (cardinality(w.review_reasons) > 0
+              or jsonb_array_length(coalesce(w.content -> 'flags', '[]'::jsonb)) > 0))`;
+
+/**
  * A media of the vault the owner asked to describe (ADR 0145 § 5, amendment of 17/11), after the count and the cost
  * were shown: `media.describe_vault` takes only these. Once per media; `asked_key` is the gesture's, so a gesture
  * replayed answers what it asked. Written by the owner alone, never changed nor removed.
@@ -403,18 +417,20 @@ export const mediaDescriptions = pgTable(
     // She reads these rows, and since ADR 0163 § 4 she validates and corrects the description of a medium of her own
     // drops, as the agency does: a human row validated by her account at its writing, or the two stamp columns of a
     // row not validated yet (the column grant of migration 0152 and `refuse_description_change` hold the rest). The
-    // restrictive policies stay restrictive: nothing permissive can open more for her.
+    // restrictive policies stay restrictive: nothing permissive can open more for her. A row waiting for the agency (a
+    // review reason, a flag of the vision) is never hers to validate or to correct (Sécurité on #995).
     pgPolicy('creator_no_delete', { as: 'restrictive', for: 'delete', using: notCreatorAccount }),
     pgPolicy('creator_no_insert', {
       as: 'restrictive',
       for: 'insert',
       withCheck: sql`${notCreatorAccount} or (${t.author} = 'human' and ${t.model} = 'human'
-        and ${t.validatedBy} = ${appUser} and ${t.validatedAt} is not null and ${herDroppedMedium(t)})`,
+        and ${t.validatedBy} = ${appUser} and ${t.validatedAt} is not null and ${herDroppedMedium(t)}
+        and not ${awaitsAgency(t)} and not ${mediumAwaitsAgency(t)})`,
     }),
     pgPolicy('creator_no_update', {
       as: 'restrictive',
       for: 'update',
-      using: sql`${notCreatorAccount} or (${t.validatedAt} is null and ${herDroppedMedium(t)})`,
+      using: sql`${notCreatorAccount} or (${t.validatedAt} is null and ${herDroppedMedium(t)} and not ${awaitsAgency(t)})`,
       withCheck: sql`${notCreatorAccount} or (${t.validatedBy} = ${appUser} and ${herDroppedMedium(t)})`,
     }),
   ],
