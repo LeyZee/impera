@@ -21,7 +21,6 @@ import {
   TeamMemberIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
-import { PlatformScriptIdSchema } from './scripts';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
 
 /**
@@ -101,8 +100,6 @@ export const JOB_NAMES = [
   'content_drops.thumbnail_backlog',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
-  'scripts.identify_platform_script',
-  'scripts.identify_backlog',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -186,8 +183,6 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
   'scripts.import_platform_scripts': 'Import des scripts Reveal',
-  'scripts.identify_platform_script': 'Identité des scripts Reveal',
-  'scripts.identify_backlog': 'Rattrapage des identités de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
@@ -565,19 +560,6 @@ export const JOB_PAYLOADS = {
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
-  /**
-   * A native script's identity (SC-04 lot c8), written by the brain once each of its media has a validated description,
-   * under her descriptions switch. Asked after each import that adds or changes a script, and by the hourly backlog;
-   * replayable: the same texts and descriptions with the same prompt are left alone, and a validated identity is
-   * never written over.
-   */
-  'scripts.identify_platform_script': z.object({
-    creatorId: CreatorIdSchema,
-    platformScriptId: PlatformScriptIdSchema,
-    correlationId: z.string().min(1),
-  }),
-  /** Each hour: every active native script of a creator whose switch is on, asked again; the job decides. */
-  'scripts.identify_backlog': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -726,10 +708,6 @@ export const JOB_MAX_ATTEMPTS = {
   'scripts.ask_scripts': 1,
   // A platform that did not answer: a few tries; a failed read changes nothing for the account.
   'scripts.import_platform_scripts': 3,
-  // A brain that failed: a few tries; the budget spent waits for the hourly backlog.
-  'scripts.identify_platform_script': 3,
-  // Each hour: the next run is the retry.
-  'scripts.identify_backlog': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,

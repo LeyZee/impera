@@ -31,7 +31,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/redirect-links': 2,
   'modules/rewards': 7,
   'modules/scheduling': 28,
-  'modules/scripts': 19,
+  'modules/scripts': 16,
   'modules/supervision': 2,
   'modules/team': 1,
   'modules/telegram': 10,
