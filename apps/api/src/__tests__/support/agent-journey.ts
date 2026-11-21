@@ -46,7 +46,7 @@ import { DASHBOARD_ORIGIN, signIn } from './sign-in';
 
 /** 9 h in Paris on a Thursday: inside her hours, far from midnight. */
 export const T0 = new Date('2026-10-29T08:00:00.000Z');
-export const NO_LOG = { info: (): undefined => undefined, warn: (): undefined => undefined };
+const NO_LOG = { info: (): undefined => undefined, warn: (): undefined => undefined };
 const APPROVER = UserIdSchema.parse('0199f2a0-0000-7000-8000-000000000003');
 const OWNER = { email: 'owner@recette.test', name: 'Owner', password: 'correct horse battery staple' };
 
