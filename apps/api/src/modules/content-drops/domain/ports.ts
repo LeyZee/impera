@@ -510,17 +510,17 @@ export interface SummarizedScript {
   readonly promptHash: string;
 }
 
-/** `content_drops.summarize_script`'s reads, writes and next runs, as the owner role. */
+/** `content_drops.summarize_script`'s reads, writes and next runs, in the creator the job carries. */
 export interface ScriptSummaryStore {
   /** `null` for a drop that is not a script, is withdrawn, or is still being filled. */
-  target(dropId: string): Promise<ScriptToSummarize | null>;
+  target(creatorId: string, dropId: string): Promise<ScriptToSummarize | null>;
   /** Whether this set of media and descriptions of the script was already told with this version of the prompt. */
-  summarized(dropId: string, mediaHash: string, promptHash: string): Promise<boolean>;
+  summarized(creatorId: string, dropId: string, mediaHash: string, promptHash: string): Promise<boolean>;
   save(creatorId: string, dropId: string, summary: SummarizedScript): Promise<void>;
   /** The job again at `runAt` (budget spent), keyed by the drop. */
   later(creatorId: string, dropId: string, correlationId: string, runAt: Date): Promise<void>;
-  /** The job for each sent script holding this medium in a live slot, now; how many. */
-  enqueueFor(mediaAssetId: string, correlationId: string): Promise<number>;
+  /** The job for each sent script of hers holding this medium in a live slot, now; how many. */
+  enqueueFor(creatorId: string, mediaAssetId: string, correlationId: string): Promise<number>;
 }
 
 /** The brain that tells a script (ADR 0083 § 6), seen from here: never a price, from the cards and descriptions. */

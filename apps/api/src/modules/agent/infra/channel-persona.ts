@@ -1,4 +1,5 @@
 import {
+  asPersonaV2,
   COMMENT_REPLY_MAX,
   PERSONA_SHEET,
   type ChannelPostViolation,
@@ -6,6 +7,7 @@ import {
 } from '@impera/contracts';
 
 import { checkExplicit, checkVoiceOutput } from '../domain/guards';
+import { checkPlaceNames, placeNames } from '../domain/place-names';
 
 import { guardSettingsOf, personaForModels } from './persona-file';
 
@@ -38,7 +40,7 @@ interface PublicWriterPersona {
 
 /**
  * Who she is for anything she writes in public, read as her drafts read her but without her intimacy, and her guards
- * on its words: the agent's, and nothing explicit. One list of what stays private for every public surface, so that
+ * on its words: the agent's, nothing explicit, and never a place where she lives (ADR 0080 § 5.9). One list of what stays private for every public surface, so that
  * none drifts from the others; `maxChars` is the longest text the surface holds.
  */
 function publicWriterPersona(
@@ -53,18 +55,23 @@ function publicWriterPersona(
     PRIVATE_ANSWERS,
   );
   const settings = { ...guardSettingsOf(persona), maxBubbleChars: options.maxChars };
+  // Her town and her « lieu de vie », left out while still a placeholder of the sheet.
+  const { city, place_of_life: placeOfLife } = asPersonaV2(stored.persona).sheet.identity;
+  const places = placeNames([city, placeOfLife].map((answer) => (answer?.startsWith('<') ? null : answer)));
   return {
     version: stored.version,
     creatorName: persona.creatorName,
     personaSheet: persona.personaSheet,
     check: (texts) =>
-      [...checkVoiceOutput(texts, { ...settings, maxBubbles: texts.length }), ...checkExplicit(texts)].map(
-        (violation) => ({
-          code: violation.code,
-          blocking: violation.severity === 'blocking',
-          match: violation.match ?? null,
-        }),
-      ),
+      [
+        ...checkVoiceOutput(texts, { ...settings, maxBubbles: texts.length }),
+        ...checkExplicit(texts),
+        ...checkPlaceNames(texts, places),
+      ].map((violation) => ({
+        code: violation.code,
+        blocking: violation.severity === 'blocking',
+        match: violation.match ?? null,
+      })),
   };
 }
 

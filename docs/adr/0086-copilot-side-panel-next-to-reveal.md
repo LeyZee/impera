@@ -70,6 +70,13 @@ Négatives, à surveiller :
 - Un brouillon lent fait taper le chatteur lui-même, et le taux en réel ne bouge pas. Le délai est montré au propriétaire (§ 9).
 - Le panneau latéral d'Edge est à vérifier sur le PC de Charles avant le lot (b).
 
+## Amendement du 16/11/2026 : le brouillon passe au-dessus de la fiche (accepté, choix « Brouillon en haut » de Charles sur carte, 16/11/2026 à 17 h 19)
+
+Demande de Charles du 16/11/2026, 16 h 56 : que le chatteur voie en un coup d'œil ce qu'il lui faut, sans chercher ni lire. La forme vient de Design et de l'ADR 0141 § D.
+
+11. **Le § 3 change d'ordre.** De haut en bas : une bande d'état d'une ligne (le fan, puis au plus trois pastilles : l'arrêt ou la précaution, puis le désir) ; le cœur (quoi faire, son pourquoi, le brouillon et ses trois gestes) ; la vente en une ligne ; la fiche en bref, réduite à ce qui est su ; ce qui reste à découvrir et les groupes repliés. Sans brouillon, le cœur dit quoi faire ou ce qui coupe, et la fiche reste visible dessous.
+12. **Le § 10 « un brouillon qui arrive ne pousse pas la fiche » devient : un brouillon qui arrive ne déplace ni la bande ni le bouton « Copier pour Reveal ».** Pendant que l'agent écrit, le cœur garde la hauteur d'un brouillon court ; un brouillon long défile dans le cœur, qui ne dépasse pas 60 % du panneau. Seul le cœur se rafraîchit à un nouveau message du fan ; la fiche ne bouge pas sous les yeux du chatteur.
+
 ## Alternatives rejetées
 
 - **Un bouton qui envoie par le membre « bot »** : il faut ouvrir l'écriture sur un vrai compte, le message ne porte plus le nom du chatteur, et la paie doit alors trancher qui a vendu. Possible plus tard, par une ADR, quand l'agent écrira seul.

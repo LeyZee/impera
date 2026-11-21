@@ -21,7 +21,7 @@ import {
   type CreatorId,
   type DropMediaDescription,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withTenantMember } from '@impera/db';
+import { and, eq, schema, sql, withTenantJob, withTenantMember } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import type { LlmGateway, ScriptSummaryInput } from '@impera/llm';
 import { unzipSync } from 'fflate';
@@ -766,7 +766,10 @@ describe('/v1/creator-space/content/script-drops', () => {
 
     // The last one described: the job asked for this script alone, which is told and kept.
     await describe(media[2] ?? '');
-    expect(await createDrizzleScriptSummaryStore(test.service.db).enqueueFor(media[2] ?? '', 'test')).toBe(1);
+    // Asked in her creator only (SEC-16): the same medium named from another creator enqueues nothing.
+    const asking = createDrizzleScriptSummaryStore(app.db.db);
+    expect(await asking.enqueueFor(ines, media[2] ?? '', 'test')).toBe(0);
+    expect(await asking.enqueueFor(nora, media[2] ?? '', 'test')).toBe(1);
     await summarize();
     expect(told).toHaveLength(1);
     expect(told[0]?.scriptName).toBe('Soirée inventée');
@@ -1153,9 +1156,28 @@ describe('/v1/creator-space/content/script-drops', () => {
           () => null,
           (error: unknown) => error,
         );
-    const store = createDrizzleScriptSummaryStore(test.service.db);
-    expect(await store.summarized(dropId, row.mediaHash, 'summary-v2')).toBe(true);
-    expect(await store.summarized(dropId, 'other-media', 'summary-v2')).toBe(false);
+    const store = createDrizzleScriptSummaryStore(app.db.db);
+    expect(await store.summarized(nora, dropId, row.mediaHash, 'summary-v2')).toBe(true);
+    expect(await store.summarized(nora, dropId, 'other-media', 'summary-v2')).toBe(false);
+    // The job in another creator (SEC-16): neither her script nor what was told of it, and nothing written for her.
+    expect(await store.target(ines, dropId)).toBeNull();
+    expect(await store.target(nora, dropId)).toMatchObject({ creatorId: nora });
+    expect(await store.summarized(ines, dropId, row.mediaHash, 'summary-v2')).toBe(false);
+    const asJob = (creatorId: string, values: Partial<typeof schema.scriptDropSummaries.$inferInsert>) =>
+      withTenantJob(app.db.db, creatorId, 'drop_media', (tx) =>
+        tx.insert(schema.scriptDropSummaries).values({ ...row, id: crypto.randomUUID(), ...values }),
+      ).then(
+        () => null,
+        (error: unknown) => error,
+      );
+    const byBrain = { author: 'brain', model: 'brain-test', validatedBy: null, validatedAt: null } as const;
+    expect(await asJob(ines, { ...byBrain, promptHash: 'summary-v3' })).toBeInstanceOf(Error);
+    expect(await asJob(ines, { ...byBrain, promptHash: 'summary-v3', creatorId: ines })).toBeInstanceOf(
+      Error,
+    );
+    // Never a telling by hand nor a validated one, even in her creator; the brain's own passes.
+    expect(await asJob(nora, { promptHash: 'summary-v3' })).toBeInstanceOf(Error);
+    expect(await asJob(nora, { ...byBrain, promptHash: 'summary-v3' })).toBeNull();
     expect(await insert({ validatedBy: null, validatedAt: null })).toBeInstanceOf(Error);
     expect(await insert({ reviewReasons: ['price'] })).toBeInstanceOf(Error);
 
