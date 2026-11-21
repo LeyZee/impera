@@ -397,19 +397,14 @@
     transform: translate(-2.4px, 2.4px);
   }
 }
-/* Entraîner: the ring closes on the bull's-eye, which lands. */
-.is-playing .nav-ring {
+/* Entraîner: the dumbbell is lifted. */
+.is-playing .nav-lift {
   transform-origin: 12px 12px;
-  animation: nv-nav-close var(--nv-dur-morph) var(--nv-ease-spring) both;
+  animation: nv-nav-lift var(--nv-dur-morph) var(--nv-ease-spring) both;
 }
-.is-playing .nav-bull {
-  transform-origin: 12px 12px;
-  animation: nv-nav-twinkle var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
-}
-@keyframes nv-nav-close {
+@keyframes nv-nav-lift {
   0% {
-    transform: scale(1.6);
-    opacity: 0;
+    transform: rotate(-32deg) scale(0.8);
   }
 }
 @keyframes nv-nav-twinkle {
@@ -454,14 +449,14 @@
   }
 }
 
-/* Aujourd'hui: the rays turn an eighth and come out. */
-.is-playing .nav-rays {
-  transform-origin: 12px 12px;
-  animation: nv-nav-rays var(--nv-dur-morph) var(--nv-ease-spring) both;
+/* Aujourd'hui: the door opens from the ground. */
+.is-playing .nav-door {
+  transform-origin: 12px 20.5px;
+  animation: nv-nav-door var(--nv-dur-morph) var(--nv-ease-spring) both;
 }
-@keyframes nv-nav-rays {
+@keyframes nv-nav-door {
   0% {
-    transform: rotate(-45deg) scale(0.6);
+    transform: scaleY(0.2);
     opacity: 0;
   }
 }
@@ -473,19 +468,6 @@
 /* Contenu: the drop's arrow goes up. */
 .is-playing .nav-up {
   animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-/* Équipe: the headset is put on, its mic swings in. */
-.is-playing .nav-set {
-  animation: nv-nav-hop var(--nv-dur-morph) var(--nv-ease-spring) both;
-}
-.is-playing .nav-mic {
-  transform-origin: 19px 19.5px;
-  animation: nv-nav-swing var(--nv-dur-morph) var(--nv-stagger) var(--nv-ease-spring) both;
-}
-@keyframes nv-nav-swing {
-  0% {
-    transform: rotate(-50deg);
-  }
 }
 /* Several people: the three hop, one after the other. */
 .is-playing :is(.nav-t1, .nav-t2, .nav-t3) {
