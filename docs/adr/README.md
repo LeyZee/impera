@@ -171,3 +171,4 @@ Date : AAAA-MM-JJ
 | 0160 | Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures | accepted (amende 0046 § 6) |
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
 | 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
+| 0167 | La pièce d'identité du prestataire : déposée par lui, lue sur notre serveur, elle conditionne le premier versement | proposed (précise 0041 § 4 et 0165 ; numéro provisoire) |
