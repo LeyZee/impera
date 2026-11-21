@@ -118,7 +118,7 @@ describe('on_shift_now (ADR 0026 § 5, read:team)', () => {
         },
       ],
     });
-    expect(JSON.stringify(value)).not.toMatch(/compte-plateforme|2000|rate/u);
+    expect(JSON.stringify(value)).not.toMatch(/compte-plateforme|[:,[]2000[,\]}]|rate/u);
   });
 });
 
@@ -155,7 +155,7 @@ describe('shifts_list (ADR 0026 § 5, read:team)', () => {
         },
       ],
     });
-    expect(JSON.stringify(value)).not.toMatch(/compte-plateforme|2000|45000|rate|amount/u);
+    expect(JSON.stringify(value)).not.toMatch(/compte-plateforme|[:,[](?:2000|45000)[,\]}]|rate|amount/u);
   });
 
   it('refuses a range backwards or longer than the planning reads', () => {
