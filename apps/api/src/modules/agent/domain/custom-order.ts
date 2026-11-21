@@ -65,6 +65,28 @@ export function customOrderDecision(context: CustomOrderContext): CustomOrderDec
   return { kind: 'reply', brief: CUSTOM_ORDER_WAIT_BRIEF, opens: true };
 }
 
+/**
+ * What stops a custom order before anything is asked (ADR 0159 § A.11), from the rules that come first: no sale for
+ * him now (a risk, sales frozen, « Ne plus lui écrire »), something she never does, his limits unknown or his age not
+ * confirmed. The same reading as `customOrderDecision`, for the turn of the custom-orders module.
+ */
+export type CustomOrderStopReason = 'none' | 'no_sale' | 'never_does' | 'hold';
+
+export function customOrderStop(
+  context: Pick<CustomOrderContext, 'risks' | 'flags' | 'ageConfirmed' | 'neverDoes'>,
+): CustomOrderStopReason {
+  const { flags } = context;
+  if (
+    flags?.doNotContact === true ||
+    flags?.salesFrozen !== undefined ||
+    context.risks.some((risk) => NO_SALE_RISKS.includes(risk))
+  )
+    return 'no_sale';
+  if (context.neverDoes === true) return 'never_does';
+  if (flags === undefined || context.ageConfirmed === false) return 'hold';
+  return 'none';
+}
+
 // A yes to his order: « je te fais ça », « c'est d'accord », « ok je te la fais », « je peux te faire ça ».
 const YES =
   /\b(oui|ok|okay|d'?accord|ca marche|pas de souci|pas de probleme|carrement|avec plaisir)\b.{0,30}\b(je (te |vous )?(la |le |les |l'|en )?(fais|ferai|fait|tourne|tournerai|envoie|enverrai|prepare|preparerai)|je peux (te |vous )?(la |le |les |l'|en )?(faire|tourner|envoyer|preparer))|\b(c'?est (d'accord|ok|bon|note pour toi)|marche conclu|deal)\b|\bje (te |vous )?(la |le |les |l')?(fais|ferai|tourne|tournerai|prepare|preparerai) (ca|cette|ce|ta|ton|tes|pour toi)\b|\bje peux (te |vous )?(la |le |les |l')?(faire|tourner|preparer) (ca|cette|ce|ta|ton|tes|pour toi)\b/;
@@ -73,18 +95,22 @@ const YES =
 const DELAY =
   /\b(demain|apres-demain|ce soir|cette nuit|ce week-?end|cette semaine|la semaine prochaine|d'?ici (ce soir|demain|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|la fin|\d+|une|deux|trois|quelques)|dans (\d+|une|un|deux|trois|quelques|peu de) ?(minutes?|min|heures?|h|jours?|j|semaines?)|sous (\d+|une|un|deux|trois|quelques) ?(heures?|h|jours?|j|semaines?)|(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) (prochain|soir|matin))\b/;
 
+// A tip asked (ADR 0159 § A.4): only ever the deposit of an order she said yes to, never on these answers.
+const TIP = /\b(pourboires?|tips?)\b/;
+
 // A price: a sum, or a sum's words (« pour 50 », « ça te coûtera », « tarif »).
 const PRICE =
   /\d+([.,]\d{1,2})? ?(€|\$|(euros?|eur|balles|dollars?|usd)\b)|(€|\$) ?\d|\b(tarifs?|ca (te )?(coute|coutera|couterait)|prix (de|pour|special)|pour \d+)\b/;
 
 /**
- * Her waiting answer to a custom order commits to nothing (ADR 0090 § A): no yes, no price, no delay. Blocking:
- * a human answers. Read only when that answer was asked of the voice, on each bubble and on the whole message.
+ * Her waiting answer to a custom order commits to nothing (ADR 0090 § A): no yes, no price, no delay, no tip asked
+ * (ADR 0159 § A.4). Blocking: a human answers. Read only when that answer was asked of the voice, on each bubble and
+ * on the whole message.
  */
 export function checkNoCommitment(bubbles: readonly string[]): GuardViolation[] {
   const violations: GuardViolation[] = [];
   const found = (text: string) =>
-    [YES, DELAY, PRICE].map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
+    [YES, DELAY, PRICE, TIP].map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
   bubbles.forEach((bubble, bubbleIndex) => {
     const match = found(normalise(bubble));
     if (match !== undefined)

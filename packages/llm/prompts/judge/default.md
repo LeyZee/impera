@@ -1,5 +1,5 @@
 ---
-version: 1.1.0
+version: 1.2.0
 role: judge
 model_hint: grok-4.7
 output_schema: JudgeOutput
@@ -9,6 +9,8 @@ Tu évalues une réponse que {{creator_name}}, créatrice de contenu, s'apprête
 
 # Elle
 {{persona_sheet}}
+
+{{profile_bio}}
 
 # Les critères
 

@@ -256,6 +256,53 @@ export function ofUnit(
 export const comparable = (insights: Pick<AgencyInsights, 'registerSince' | 'previousFrom'>): boolean =>
   insights.registerSince === null || insights.registerSince <= insights.previousFrom;
 
+/**
+ * The least a period needs before the screen draws a conclusion from it (ADR 0092 § 5): sales counted, and days of
+ * the period the registers already covered.
+ */
+export const CONCLUDE_MIN_SALES = 30;
+export const CONCLUDE_MIN_REGISTER_DAYS = 7;
+
+/**
+ * What the screen writes instead of a conclusion it cannot draw yet; the figures stay (ADR 0092 § 5). Too few sales
+ * and a register too young are said apart (Charles, 20/11).
+ */
+export const TOO_FEW_TO_CONCLUDE = 'Pas encore assez de ventes pour conclure.';
+export const TOO_YOUNG_TO_CONCLUDE = 'Pas encore assez de recul pour conclure.';
+
+/**
+ * The days of the period the registers covered: from the later of its first day and the registers' first line to the
+ * earlier of its last day and today, both included; none without a line.
+ */
+export function registerDays(
+  insights: Pick<AgencyInsights, 'from' | 'to' | 'registerSince' | 'span'>,
+): number {
+  if (insights.registerSince === null) return 0;
+  const start = insights.registerSince > insights.from ? insights.registerSince : insights.from;
+  const end = insights.span.today < insights.to ? insights.span.today : insights.to;
+  return end < start ? 0 : dayCount(start, end);
+}
+
+/**
+ * Whether an insight sentence (the slot that brings in the most, the concentration, the share of new payers) may be
+ * written for the period (ADR 0092 § 5): enough sales and enough days of register, or no conclusion at all.
+ */
+export const canConclude = (
+  insights: Pick<AgencyInsights, 'from' | 'to' | 'registerSince' | 'span' | 'totals'>,
+): boolean => conclusionWait(insights) === null;
+
+/**
+ * Why no conclusion is drawn yet, as the screen writes it, or null when one may be: a register too young first (it is
+ * also why the sales are few), then too few sales.
+ */
+export function conclusionWait(
+  insights: Pick<AgencyInsights, 'from' | 'to' | 'registerSince' | 'span' | 'totals'>,
+): string | null {
+  if (registerDays(insights) < CONCLUDE_MIN_REGISTER_DAYS) return TOO_YOUNG_TO_CONCLUDE;
+  if (insights.totals.current.sales < CONCLUDE_MIN_SALES) return TOO_FEW_TO_CONCLUDE;
+  return null;
+}
+
 /** The query string of `GET /v1/dashboard/agency` for a selection. */
 export function selectionQuery(selection: AgencySelection): Record<string, string> {
   const compare = selection.compareAt === undefined ? {} : { compareAt: selection.compareAt };

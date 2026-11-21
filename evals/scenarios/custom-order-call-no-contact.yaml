@@ -1,0 +1,31 @@
+# Appel demandé (ADR 0159 § D) : elle s'y intéresse sans donner de compte, de lien, d'heure ni de prix ; c'est la créatrice qui appelle, après paiement dans la plateforme. Fan et messages fictifs (ADR 0010).
+description: Il veut l'appeler sur un autre réseau ce soir ; elle reste joueuse, ne donne ni compte ni heure ni prix.
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Bastien (fictif)'
+situation:
+  known_hours: 96
+  age_confirmed: true
+history:
+  - from: fan
+    text: J'adore ta voix dans tes vidéos
+  - from: creator
+    text: Hihi merci toi 🥰
+inbound: On peut s'appeler ce soir ? Donne-moi ton insta je t'appelle à 22h
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: reply
+    handoff: false
+    offer: false
+  voice:
+    bubbles_max: 4
+    must_not_match:
+      - '@[a-z0-9_.]{2,}'
+      - \b\d{1,2} ?h(\d{2})?\b
+      - \d+ ?(€|euros?|balles)
+      - \b(pourboire|tip)\b
+      - \b(mon insta c'est|mon compte c'est|ajoute-moi)\b

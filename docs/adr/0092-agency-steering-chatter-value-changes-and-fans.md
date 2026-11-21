@@ -27,6 +27,14 @@ L'audit fonctionnel du 11/11 (rapport hors dépôt) a joué la journée d'un dir
 7. **Ce que coûte l'IA, créatrice par créatrice.** Complète l'ADR 0091 (consommation et crédits, au global) : sur le même écran Réglages › Consommation IA, une ligne par créatrice et par mois avec le coût de ses appels (`llm_calls.creator_id`), les ventes de l'agent sur la même période (registre) et le rapport des deux. Les appels sans créatrice (veille, tests) restent sur une ligne « Agence ». Lecture seule.
 8. **Le playground pour les managers.** Amende 0024 : un manager actif ouvre Entraîner › Playground pour les créatrices de sa liste. Il ne modifie ni la persona ni ses réglages, ne passe pas en Automatique, n'ouvre ni Corrections ni Post du canal (Charles, Q5).
 
+## Avenant du 20/11/2026 : le manager note, le propriétaire range
+
+Le 20/11/2026, à l'ouverture du Playground aux managers (§ 8), Charles choisit « il note, toi tu ranges » :
+
+1. **Un manager note et corrige** les réponses des créatrices de sa liste. Ses notes comptent dans le taux, comme celles du propriétaire.
+2. **Seul le propriétaire range une correction en Exemple de voix ou en retire un** (ADR 0102). Une correction du manager est gardée en Règle, pour être relue ; le serveur refuse au manager l'Exemple de voix et « Retirer » (`voice_bank_owner_forbidden`), et l'écran ne les lui propose pas. Le manager lit la banque de sa créatrice.
+3. **Le serveur reste la barrière** : une créatrice hors de sa liste est refusée (`creator_forbidden`) ; un manager retiré de sa liste retrouve la persona inventée ; un manager en congé ou un chatteur n'ouvre pas le Playground. Les clés des modèles, le test des alertes et le Post du canal restent au propriétaire.
+
 ## Conséquences
 
 - Positives : le directeur sait qui est bon, pourquoi une créatrice baisse, quels fans relancer, et ce que coûte l'agent.

@@ -274,8 +274,6 @@ export function createScriptsModule(deps: ScriptsDeps): ScriptsModule {
             store: platformImports,
             source: platform.source,
             recognition: createDrizzlePreparedRecognitionStore(deps.adminDb),
-            askIdentities: (creatorId, scriptIds, correlationId) =>
-              identities.enqueue(creatorId, scriptIds, correlationId),
             ...(onRecognitionFailed === undefined ? {} : { onRecognitionFailed }),
           },
           request,

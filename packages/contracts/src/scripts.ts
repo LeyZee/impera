@@ -632,8 +632,6 @@ export const SCRIPT_ERROR_CODES = [
   'script_card_not_found',
   /** No native script of hers by this id, or a reader who may not read her. */
   'platform_script_not_found',
-  /** Not an identity of this script's current version (its texts or media changed since): read the script again. */
-  'script_identity_stale_conflict',
   /** The branches given are not those the step has now (Reveal changed them since): read the script again. */
   'platform_script_branches_stale_conflict',
   /**
@@ -928,12 +926,4 @@ export const ValidatePlatformScriptDescriptionsBodySchema = z.strictObject({
 export const CorrectPlatformScriptDescriptionBodySchema = z.strictObject({
   descriptionId: MediaDescriptionIdSchema,
   detailed: z.string().trim().min(1).max(6000),
-});
-
-/** `POST …/platform-scripts/:scriptId/identity/validate`: the identity shown, validated as it is. */
-export const ValidateScriptIdentityBodySchema = z.strictObject({ identityId: ScriptIdentityIdSchema });
-
-/** `POST …/platform-scripts/:scriptId/identity/correct`: an identity written by hand, validated by whoever writes it. */
-export const CorrectScriptIdentityBodySchema = z.strictObject({
-  content: ScriptIdentityContentSchema.strict(),
 });

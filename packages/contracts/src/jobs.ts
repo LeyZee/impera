@@ -16,6 +16,7 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
 } from './ids';
@@ -28,6 +29,10 @@ import { TELEGRAM_JOB_PAYLOADS } from './telegram';
  * `conv:<conversationId>`; a poll runs on `account:<platformAccountId>`, one at a time per account.
  */
 
+/** The sales that wake his conversation for a word after it (ADR 0156 § 2): a step he bought, a tip. */
+export const AFTER_SALE_TYPES = ['ppv', 'tip'] as const;
+export type AfterSaleType = (typeof AFTER_SALE_TYPES)[number];
+
 const conversationJob = z.object({
   creatorId: CreatorIdSchema,
   conversationId: ConversationIdSchema,
@@ -38,6 +43,7 @@ export const JOB_NAMES = [
   'conversation.respond',
   'conversation.send',
   'conversation.follow_up',
+  'conversation.after_sale',
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
@@ -59,6 +65,7 @@ export const JOB_NAMES = [
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
+  'creator_week.plan',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
@@ -121,6 +128,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.respond': 'Réponse aux fans',
   'conversation.send': 'Envoi des messages',
   'conversation.follow_up': 'Relances des fans',
+  'conversation.after_sale': 'Mot d’après-achat',
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
@@ -142,6 +150,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
+  'creator_week.plan': 'Semaine de la créatrice',
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
@@ -215,6 +224,20 @@ export const JOB_PAYLOADS = {
   'conversation.follow_up': conversationJob.extend({
     anchorAt: z.iso.datetime(),
     step: z.number().int().min(0).max(4),
+  }),
+  /**
+   * A fresh sale of his woke his conversation (ADR 0156 § 2): a step he bought or a tip, recorded by the sales ledger in
+   * the transaction of its line under the key `conversation.after_sale:<saleId>`. The sale names his account and his
+   * platform id, not the conversation: the job finds it, and a fan nobody knows wakes nothing.
+   */
+  'conversation.after_sale': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    platformFanId: z.string().min(1),
+    saleId: SalesLineIdSchema,
+    saleType: z.enum(AFTER_SALE_TYPES),
+    occurredAt: z.iso.datetime(),
+    correlationId: z.string().min(1),
   }),
   /**
    * What she learnt about the fan becomes facts (P3-02): the facts the brief proposed for a draft a human approved,
@@ -317,6 +340,11 @@ export const JOB_PAYLOADS = {
     state: z.enum(['accepted', 'declined']),
     day: z.iso.date(),
   }),
+  /**
+   * Each hour (ADR 0140 § 2): for each creator whose Sunday 18 h has passed in her zone, the week after computed as a
+   * draft for the owner. Replayable: one week per creator, a draft already there is kept.
+   */
+  'creator_week.plan': z.object({}),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -598,6 +626,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.respond': 3,
   'conversation.send': 3,
   'conversation.follow_up': 3,
+  'conversation.after_sale': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
@@ -629,6 +658,8 @@ export const JOB_MAX_ATTEMPTS = {
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
   'creator_tasks.suggestion_decided': 5,
+  // Each hour: the next run is the retry, and a week is written once.
+  'creator_week.plan': 1,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
@@ -785,5 +816,5 @@ export function resumeRunAt(index: number, now: Date): Date {
  * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
  * (`withTenantJob`) refuses any other.
  */
-export const TenantJobSchema = z.enum(['daily_stats', 'drop_media']);
+export const TenantJobSchema = z.enum(['daily_stats', 'media_insights', 'link_hours', 'drop_media']);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

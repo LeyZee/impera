@@ -1,0 +1,72 @@
+# Passe de test du 20/11, conversation 19 : la demande sur mesure. Fan, messages, scripts et prix fictifs (ADR 0010).
+# Il veut une vidéo où elle dit son prénom ; personne en poste.
+# Attendu à la lecture : deux ou trois questions joueuses, une à la fois ; ni oui, ni non, ni prix ; elle le fait patienter sans promettre.
+# Code : demande transmise, aucun prix écrit. Asserté : décision sur mesure `reply` à sa demande (sans chatteur en poste, c’est la réponse qui ouvre la demande pour l’équipe) et aucun prix à chaque réponse. Non asserté, pas de clé : que la demande est bien ouverte (`opens`).
+# Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Il demande une vidéo où elle dit son prénom, sans chatteur en poste : la demande va à l’équipe, elle pose des questions joueuses une à une, sans oui, sans non, sans prix.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Quentin (fictif)'
+  - 32 ans, confirmé
+situation:
+  known_hours: 90
+  age_confirmed: true
+  local_time: '21:30'
+  chatter_on_shift: false
+history:
+  - from: fan
+    text: Je repense à ta dernière photo, t’es incroyable
+    minutes_ago: 4
+  - from: creator
+    text: Miiiii t’es mignon 😏
+    minutes_ago: 3
+inbound: Tu pourrais me faire une vidéo où tu dis mon prénom ? Juste pour moi
+expect:
+  brief:
+    intent_in:
+      - asks_for_service
+  decision:
+    custom_order: reply
+    handoff: false
+    offer: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+then:
+  - after_minutes: 3
+    inbound: Bah une petite vidéo de toi qui me dit bonne nuit
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 3
+    inbound: Genre en nuisette, si tu veux 😇
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 4
+    inbound: Et tu me la fais quand ?
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

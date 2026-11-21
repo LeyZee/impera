@@ -31,6 +31,18 @@ const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit'
  * asks first.
  */
 export function StructuresPage(): JSX.Element {
+  return <Structures embedded={false} />;
+}
+
+/**
+ * The same library as a view of a creator's sheet (Scripts › Structures, ADR 0149 § 1): no page nor header of its own,
+ * « Nouvelle structure » above the library.
+ */
+export function StructuresView(): JSX.Element {
+  return <Structures embedded />;
+}
+
+function Structures({ embedded }: { embedded: boolean }): JSX.Element {
   const structures = useStructures();
   const starters = useStarters();
   const creators = useCreators();
@@ -76,6 +88,15 @@ export function StructuresPage(): JSX.Element {
     } else setOpen(null);
   };
 
+  const create = (): void => {
+    setOpen({
+      id: newId(ScriptStructureIdSchema),
+      basedOnVersion: null,
+      frozen: false,
+      draft: emptyDraft(),
+    });
+  };
+
   const body = (): JSX.Element => {
     if (open !== null) {
       return <Workshop key={open.id} start={open} onClose={close} onDirty={setDirty} />;
@@ -94,10 +115,11 @@ export function StructuresPage(): JSX.Element {
         </section>
       );
     }
+    // Inside a creator's sheet the two views and « Nouvelle structure » share one row, under the tab's own selector.
     const tabs = (
-      <div className="st-tabs">
+      <div className={embedded ? 'st-tabs st-tabs--embedded' : 'st-tabs'}>
         <Segment
-          label="Vue"
+          label="Vue des structures"
           value={tab}
           options={[
             { value: 'library', label: 'Bibliothèque' },
@@ -105,6 +127,11 @@ export function StructuresPage(): JSX.Element {
           ]}
           onChange={setTab}
         />
+        {embedded ? (
+          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={create}>
+            Nouvelle structure
+          </button>
+        ) : null}
       </div>
     );
     if (tab === 'queues') {
@@ -191,6 +218,26 @@ export function StructuresPage(): JSX.Element {
     );
   };
 
+  const sheet = (
+    <div className="ps-sheet">
+      {leaving ? (
+        <LeaveConfirm
+          onLeave={() => {
+            if (blocker.status === 'blocked') blocker.proceed();
+            pending?.();
+            setPending(null);
+          }}
+          onStay={() => {
+            if (blocker.status === 'blocked') blocker.reset();
+            setPending(null);
+          }}
+        />
+      ) : null}
+      {body()}
+    </div>
+  );
+  if (embedded) return sheet;
+
   return (
     <Page>
       <PageHeader
@@ -204,39 +251,13 @@ export function StructuresPage(): JSX.Element {
         lead="Les étapes que tes créatrices tournent, leurs cartons et leur couleur. Une structure se tourne carton par carton."
         actions={
           open === null ? (
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                setOpen({
-                  id: newId(ScriptStructureIdSchema),
-                  basedOnVersion: null,
-                  frozen: false,
-                  draft: emptyDraft(),
-                });
-              }}
-            >
+            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={create}>
               Nouvelle structure
             </button>
           ) : undefined
         }
       />
-      <div className="ps-sheet">
-        {leaving ? (
-          <LeaveConfirm
-            onLeave={() => {
-              if (blocker.status === 'blocked') blocker.proceed();
-              pending?.();
-              setPending(null);
-            }}
-            onStay={() => {
-              if (blocker.status === 'blocked') blocker.reset();
-              setPending(null);
-            }}
-          />
-        ) : null}
-        {body()}
-      </div>
+      {sheet}
     </Page>
   );
 }

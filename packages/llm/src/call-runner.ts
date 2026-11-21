@@ -327,6 +327,9 @@ export function createCallRunner(deps: CallRunnerDeps): CallRunner {
             messages,
             output: Output.object({ schema }),
             temperature: roleConfig.temperature,
+            // Mistral refuses greedy sampling (temperature 0) unless top_p is 1, and its SDK never sends it (400 «
+            // invalid_request_greedy_sampling », the evals' judge, 20/11): every call of that role would fail.
+            ...(ref.provider === 'mistral' && roleConfig.temperature === 0 && { topP: 1 }),
             maxOutputTokens: roleConfig.maxOutputTokens,
             maxRetries: 0,
             abortSignal: AbortSignal.timeout(roleConfig.timeoutMs),

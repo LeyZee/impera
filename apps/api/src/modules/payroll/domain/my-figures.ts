@@ -10,6 +10,7 @@ import {
   type PayPeriod,
   type PlatformAccountId,
   type SaleEvent,
+  type SaleType,
 } from '@impera/contracts';
 
 /**
@@ -27,6 +28,8 @@ export interface FigureLine {
   readonly currency: Currency;
   readonly netMinor: number;
   readonly occurredAt: Date | null;
+  /** What was sold; `null` on a statement written before the type was kept, and on a shift counted from its report. */
+  readonly saleType: SaleType | null;
 }
 
 type Net = MyFigures['nets'][number];
@@ -79,6 +82,30 @@ function daysOf(
     }));
 }
 
+/**
+ * Where the net of `lines` comes from, by what was sold (ADR 0104 § 6): a refund lowers the net of its own type and
+ * is no sale of its count. A sale whose statement kept no type is counted apart, never as a zero of any type; its
+ * refund is no sale there either.
+ */
+function kindsOf(lines: readonly FigureLine[]): MyFigures['kinds'] {
+  const groups = new Map<SaleType, FigureLine[]>();
+  let untyped = 0;
+  for (const line of lines) {
+    if (line.saleType === null) untyped += line.event === 'sale' ? 1 : 0;
+    else groups.set(line.saleType, [...(groups.get(line.saleType) ?? []), line]);
+  }
+  return {
+    untyped,
+    items: [...groups.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([type, group]) => ({
+        type,
+        sales: group.filter((line) => line.event === 'sale').length,
+        nets: netsOf(group),
+      })),
+  };
+}
+
 /** `day` moved by `count` days, as a calendar day. */
 function shiftDay(day: string, count: number): string {
   return new Date(Date.parse(`${day}T00:00:00.000Z`) + count * DAY_MS).toISOString().slice(0, 10);
@@ -126,7 +153,9 @@ function bestOf<Key extends string>(sums: ReadonlyMap<Key, number>): { key: Key;
  *   the first day);
  * - the sales read in the last `MY_FIGURES_WEEKS` weeks by weekday and hour, in the member's own zone: a shift counted
  *   from its report has a total and no hour of sale, so it is not on that grid;
- * - their best day and best fortnight, in the currency that brought them the most.
+ * - their best day and best fortnight, in the currency that brought them the most;
+ * - where the net of the period under way comes from, by what was sold, on the sales read only (a report has a total
+ *   and no type).
  */
 export function myFigures(input: {
   readonly lines: readonly FigureLine[];
@@ -190,6 +219,7 @@ export function myFigures(input: {
     timeZone: memberZone,
     days: daysOf(current, agencyZone, reported),
     nets: netsOf(current),
+    kinds: kindsOf(input.lines.filter((line) => line.period === period)),
     previous:
       previous.length === 0
         ? null

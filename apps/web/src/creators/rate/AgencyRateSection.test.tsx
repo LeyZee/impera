@@ -89,7 +89,7 @@ function serve(
 
 function renderSection(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  // A router of its own: the card links to Réglages › Ventes to link Reveal.
+  // A router of its own: the card links to Réglages › Plateformes to link Reveal.
   const root = createRootRoute({
     component: (): JSX.Element => <AgencyRateSection creatorId={CREATOR} creatorName="Anna" />,
   });

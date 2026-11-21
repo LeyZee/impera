@@ -16,6 +16,8 @@ L'exécuteur vit dans `apps/api/src/scripts/evals.ts` (il appelle le code de l'a
 
 Commandes : `pnpm evals` (smoke : tout sauf `tier: full`), `pnpm evals -- --full`, `pnpm evals -- --file evals/adversarial/asks-if-bot.yaml` (chemin depuis la racine).
 
+Jeux : `pnpm evals -- --full --match compliment-` rejoue seuls les scénarios dont le nom de fichier contient `compliment-` (le jeu « compliments » de Charles, 20/11 : onze compliments sans rien de sexuel, accueillis avec assurance et un merci, sans commentaire sur l’audace ni le rythme du fan). On le rejoue à chaque changement du cerveau, de la voix ou de leurs consignes.
+
 Tirages : chaque scénario est tiré trois fois (`--draws`, de 1 à 5). La voix est réglée pour varier, et un seul tirage peut passer ou échouer par hasard. Un scénario échoue si un de ses tirages échoue ; ses notes sont la moyenne des tirages, et son minimum (`judge:` du scénario) se lit sur le pire tirage.
 
 Persona en vigueur : `pnpm evals -- --key-from-crm --persona-from-crm` fait passer les scénarios sur la persona active de la créatrice dans la base de `.env` (`--creator <id>` s'il y en a plusieurs), lue sur une connexion qui ne peut pas écrire. On ne le lance que sur le PC qui tient la base : les réponses affichées sont écrites dans sa voix, elles ne se collent ni dans une PR, ni dans le chat, ni dans `/mnt/project-files`. Seuls les comptes (scénarios passés, moyennes, échecs par nom de scénario) en sortent. Un scénario qui attend un fait de la persona de démo (son prénom, sa ville, ses goûts) échoue alors sans que l'agent ait tort : un tel échec se lit comme un faux rouge, pas comme une régression.

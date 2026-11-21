@@ -380,6 +380,23 @@
     transform: rotate(12deg) scale(1.12);
   }
 }
+/* Trafic: the two halves of the link close on each other. */
+.is-playing .nav-link-a {
+  animation: nv-nav-link-a var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+.is-playing .nav-link-b {
+  animation: nv-nav-link-b var(--nv-dur-morph) var(--nv-ease-spring) both;
+}
+@keyframes nv-nav-link-a {
+  0% {
+    transform: translate(2.4px, -2.4px);
+  }
+}
+@keyframes nv-nav-link-b {
+  0% {
+    transform: translate(-2.4px, 2.4px);
+  }
+}
 /* Entraîner: the ring closes on the bull's-eye, which lands. */
 .is-playing .nav-ring {
   transform-origin: 12px 12px;

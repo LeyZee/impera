@@ -4,7 +4,7 @@ import { useId, useState, type JSX, type ReactNode } from 'react';
 import { nextOf, progressOf, type SetupLine, type SetupTarget } from './model';
 import './setup.css';
 
-import { creatorsSearch } from '@/creators/search';
+import { accountCardId, creatorsSearch } from '@/creators/search';
 import { dashboardSearch } from '@/screens/dashboard/logic';
 
 /**
@@ -140,17 +140,21 @@ export function SetupLink({
   children: ReactNode;
 }): JSX.Element {
   switch (target.kind) {
-    case 'sheet':
+    case 'sheet': {
+      // A subject of Compte is a card of its page: the link lands on it.
+      const card = accountCardId(target.sheet);
       return (
         <Link
           to="/creatrices"
           search={creatorsSearch(target.sheet, target.creatorId)}
+          {...(card === undefined ? {} : { hash: card })}
           className={className}
           aria-label={label}
         >
           {children}
         </Link>
       );
+    }
     case 'dashboard':
       return (
         <Link

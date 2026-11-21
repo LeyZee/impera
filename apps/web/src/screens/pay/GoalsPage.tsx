@@ -38,6 +38,7 @@ import {
 import { LevelsPanel } from '@/rewards/LevelsPanel';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
+import { TargetArt } from '@/shell/art/EmptyArt';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 import { Empty } from '@/shell/states';
@@ -158,6 +159,7 @@ export function GoalsPage({
           <div className="rp-sec">
             {goal === null ? (
               <Empty
+                art={<TargetArt />}
                 title={`Pas d’objectif sur la quinzaine ${periodLine(data.period)}.`}
                 {...(owner && open && goalWindow(data.period) !== 'closed'
                   ? {

@@ -15,9 +15,18 @@ import {
 
 import { CountUp, Section, type FloatingTip } from '../parts';
 
+import { ObjectivesCard, objectivesSub } from './Objectives';
 import { PeriodBar } from './PeriodBar';
 import { NotYours, useAgencyInsights } from './api';
-import { againstText, comparable, readName, shortDate, spanText, type AgencySelection } from './period';
+import {
+  againstText,
+  conclusionWait,
+  comparable,
+  readName,
+  shortDate,
+  spanText,
+  type AgencySelection,
+} from './period';
 import { useNarrow } from './useNarrow';
 import {
   arcs,
@@ -29,6 +38,7 @@ import {
   dayStacks,
   deltaText,
   euros,
+  exactEuros,
   heatOf,
   hourLabel,
   hoursLabel,
@@ -43,6 +53,11 @@ import {
   OTHER_KINDS_NOTE,
   ppvRate,
   readAtLabel,
+  REFUND_KIND,
+  refundDateLabel,
+  refundDelayLabel,
+  refundsKept,
+  sellerKeyOf,
   SELLER_NOTES,
   sellerRanking,
   shareOf,
@@ -60,6 +75,7 @@ import {
 import './agency.css';
 
 import { initialOf } from '@/lib/utils';
+import { Select, type SelectOption } from '@/shell/Select';
 import { Failure } from '@/shell/states';
 
 /*
@@ -1163,6 +1179,7 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
   if (peak === null || slot === null)
     return <p className="nv-plate ins-empty">Aucune vente sur la période.</p>;
   const at = focus ?? { day: peak.day, hour: peak.hour };
+  const wait = conclusionWait(insights);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const moves: Readonly<Record<string, readonly [number, number]>> = {
       ArrowRight: [0, 1],
@@ -1185,15 +1202,20 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
       ?.focus();
   };
   return (
-    <div className="nv-plate ins-hours">
-      <p className="ins-hours__lead">
-        Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
-        chiffre d’affaires. Le pic :{' '}
-        <b className="ins-nowrap">
-          {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
-        </b>
-        .
-      </p>
+    <div className="nv-plate ins-hours" data-pending={wait === null ? undefined : ''}>
+      {/* The map stays, grey; the sentence that reads it waits for enough sales and hindsight (ADR 0092 § 5). */}
+      {wait === null ? (
+        <p className="ins-hours__lead">
+          Le créneau qui rapporte le plus : <b>{slotLabel(slot.from)}</b>, {String(slot.share)}&nbsp;% du
+          chiffre d’affaires. Le pic :{' '}
+          <b className="ins-nowrap">
+            {WEEKDAYS[peak.day]?.toLowerCase()}, {hourLabel(peak.hour)}
+          </b>
+          .
+        </p>
+      ) : (
+        <p className="ins-hours__lead">{wait}</p>
+      )}
       <div
         className="ins-heat"
         role="group"
@@ -1209,7 +1231,7 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
         ))}
         {insights.hours.map((row, day) => (
           <div key={WEEKDAYS[day]} className="ins-heat__row" role="presentation">
-            <span className="ins-heat__day" aria-hidden="true">
+            <span className="ins-heat__day" aria-hidden="true" style={{ gridArea: `${String(day + 2)} / 1` }}>
               {WEEKDAYS_SHORT[day]}
             </span>
             {row.map((cents, hour) => {
@@ -1226,7 +1248,9 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
                   type="button"
                   key={hour}
                   className="ins-heat__cell"
-                  style={{ '--_h': heatOf(cents, max) }}
+                  // Every cell placed, so the best slot's ring lies over them without moving one.
+                  style={{ '--_h': heatOf(cents, max), gridArea: `${String(day + 2)} / ${String(hour + 2)}` }}
+                  data-empty={cents > 0 ? undefined : ''}
                   data-cell={`${String(day)}-${String(hour)}`}
                   tabIndex={day === at.day && hour === at.hour ? 0 : -1}
                   aria-label={`${when} : ${euros(cents)}`}
@@ -1240,12 +1264,122 @@ function Hours({ insights, tip }: { insights: AgencyInsights; tip: FloatingTip }
             })}
           </div>
         ))}
+        {/* The slot that brings in the most, ringed as one block over its three hours of every day. */}
+        {wait === null && (
+          <span
+            className="ins-heat__best"
+            aria-hidden="true"
+            style={{
+              gridColumn: `${String(slot.from + 2)} / span 3`,
+              gridRow: `2 / span ${String(insights.hours.length)}`,
+            }}
+          />
+        )}
       </div>
       <div className="ins-heat__scale" aria-hidden="true">
         <span>moins</span>
         <i />
         <span>plus</span>
       </div>
+    </div>
+  );
+}
+
+const ALL = 'all';
+
+/** A seller as « Qui a vendu » names him. */
+const sellerLabel = (seller: AgencyInsights['refundList'][number]['seller']): string =>
+  seller.kind === 'member' ? seller.name : SELLER_NAME[seller.kind];
+
+/**
+ * The period's refunds one by one (ADR 0092 § 4): when, whose, what, how much, who sold it and how long after the sale.
+ * Read only; filtered by creator and by the sale's chatter, each filter shown only when it has a choice to make.
+ */
+function Refunds({ insights }: { insights: AgencyInsights }): JSX.Element {
+  const [creatorId, setCreatorId] = useState<string>(ALL);
+  const [seller, setSeller] = useState<string>(ALL);
+  const list = insights.refundList;
+  const names = new Map(insights.creators.map((one) => [one.creatorId, one.name] as const));
+  const creatorChoices: SelectOption<string>[] = [
+    { value: ALL, label: 'Toutes les créatrices' },
+    ...insights.creators
+      .filter((one) => list.some((refund) => refund.creatorId === one.creatorId))
+      .map((one) => ({ value: one.creatorId, label: one.name })),
+  ];
+  const sellers = new Map(list.map((one) => [sellerKeyOf(one.seller), sellerLabel(one.seller)] as const));
+  const sellerChoices: SelectOption<string>[] = [
+    { value: ALL, label: 'Tous les chatteurs' },
+    ...[...sellers].map(([value, label]) => ({ value, label })),
+  ];
+  const kept = refundsKept(list, creatorId, seller);
+  const several = insights.creators.length > 1;
+  return (
+    <div className="nv-plate ins-refunds">
+      {creatorChoices.length > 2 || sellerChoices.length > 2 ? (
+        <div className="ins-refunds__filters">
+          {several && creatorChoices.length > 2 ? (
+            <Select
+              className="ins-refunds__select"
+              ariaLabel="Créatrice"
+              listWidth="options"
+              search="never"
+              value={creatorId}
+              options={creatorChoices}
+              onChange={setCreatorId}
+            />
+          ) : null}
+          {sellerChoices.length > 2 ? (
+            <Select
+              className="ins-refunds__select"
+              ariaLabel="Chatteur de la vente"
+              listWidth="options"
+              search="never"
+              value={seller}
+              options={sellerChoices}
+              onChange={setSeller}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {kept.length === 0 ? (
+        <p className="ins-refunds__none">Aucun remboursement pour ce choix.</p>
+      ) : (
+        <table className="ins-refunds__table">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              {several ? <th scope="col">Créatrice</th> : null}
+              <th scope="col">Type</th>
+              <th scope="col" className="ins-refunds__money">
+                Montant
+              </th>
+              <th scope="col" className="ins-refunds__seller">
+                Chatteur de la vente
+              </th>
+              <th scope="col">Délai depuis la vente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {kept.map((one, i) => (
+              <tr key={`${one.refundedAt}-${String(i)}`}>
+                <td className="ins-refunds__date">{refundDateLabel(one.refundedAt, insights.timeZone)}</td>
+                {several ? <td className="ins-refunds__who">{names.get(one.creatorId) ?? '—'}</td> : null}
+                <td className="ins-refunds__kind">{REFUND_KIND[one.kind]}</td>
+                <td className="ins-refunds__money">
+                  {one.amountMinor === null ? '—' : exactEuros(one.amountMinor)}
+                </td>
+                <td
+                  className="ins-refunds__seller"
+                  data-named={one.seller.kind === 'member' || one.seller.kind === 'agent' ? '' : undefined}
+                >
+                  {sellerLabel(one.seller)}
+                </td>
+                <td className="ins-refunds__delay">{refundDelayLabel(one.delayDays)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -1258,8 +1392,9 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
   const top = fans.topTenShare ?? 0;
   // Ten at most: with fewer paying fans, the count they are (PAY-16, « Les 10 fans » for 3).
   const biggest = topFansWords(fans.paying);
+  const wait = conclusionWait(insights);
   return (
-    <div className="nv-plate ins-fans">
+    <div className="nv-plate ins-fans" data-pending={wait === null ? undefined : ''}>
       <div className="ins-fans__meter">
         <p className="ins-fans__lead">
           {biggest.lead} <b>{String(top)}&nbsp;%</b> du chiffre d’affaires.
@@ -1268,11 +1403,13 @@ function Fans({ insights }: { insights: AgencyInsights }): JSX.Element {
           <span style={{ '--_w': `${String(top)}%` }} />
         </span>
         <p className="ins-fans__hint">
-          {top >= 60
-            ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
-            : top >= 35
-              ? 'Assez concentré : quelques gros fans portent une bonne part des ventes.'
-              : 'Bien réparti : les ventes ne dépendent pas de quelques fans.'}
+          {/* The meter and its share stay, grey; what they mean waits for enough sales and hindsight (ADR 0092 § 5). */}
+          {wait ??
+            (top >= 60
+              ? 'Très concentré : perdre un de ces fans se sentirait tout de suite. Il faut élargir la base.'
+              : top >= 35
+                ? 'Assez concentré : quelques gros fans portent une bonne part des ventes.'
+                : 'Bien réparti : les ventes ne dépendent pas de quelques fans.')}
         </p>
       </div>
       <dl className="ins-fans__figures">
@@ -1615,7 +1752,7 @@ export function AgencyInsightsPanel({
   creatorId: string | null;
   creatorName?: string;
   onCreator?: ((creatorId: string) => void) | undefined;
-  /** The owner links the registers (Réglages › Ventes): the empty screen leads there. */
+  /** The owner links the registers (Réglages › Plateformes): the empty screen leads there. */
   canOpenSettings: boolean;
   tip: FloatingTip;
   index?: number;
@@ -1671,7 +1808,7 @@ export function AgencyInsightsPanel({
           </p>
           {canOpenSettings ? (
             <Link to="/reglages/ventes" className="nv-btn nv-btn--soft">
-              Relier dans Réglages › Ventes
+              Relier dans Réglages › Plateformes
             </Link>
           ) : null}
         </div>
@@ -1710,6 +1847,12 @@ export function AgencyInsightsPanel({
             </p>
           ) : null}
         </Section>
+
+        {insights.objectives === null ? null : (
+          <Section title="Objectifs du mois" sub={objectivesSub(insights.objectives)} index={next()}>
+            <ObjectivesCard insights={insights} objectives={insights.objectives} canEdit={canOpenSettings} />
+          </Section>
+        )}
 
         <Section title="Chiffre d’affaires" sub={dailySub(insights)} index={next()}>
           <Daily key={`${insights.from}:${insights.to}`} insights={insights} tip={tip} />
@@ -1761,6 +1904,12 @@ export function AgencyInsightsPanel({
         >
           <Fans insights={insights} />
         </Section>
+
+        {insights.refundList.length > 0 ? (
+          <Section title="Les remboursements" sub="un par un, lus dans le registre des ventes" index={next()}>
+            <Refunds insights={insights} />
+          </Section>
+        ) : null}
       </div>
     </Comparable.Provider>
   );

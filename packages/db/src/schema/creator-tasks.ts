@@ -1,8 +1,12 @@
 import {
   CREATOR_TASK_CATEGORIES,
   CREATOR_TASK_KINDS,
+  DAY_ITEMS,
+  DAY_TARGET_MAX,
   SUGGESTION_ORIGINS,
   SUGGESTION_STATES,
+  WEEK_NEEDS,
+  WEEK_ROLES,
 } from '@impera/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 import {
@@ -15,6 +19,7 @@ import {
   jsonb,
   pgPolicy,
   pgTable,
+  primaryKey,
   text,
   unique,
   uuid,
@@ -24,6 +29,7 @@ import {
 
 import { user } from './auth';
 import { createdAt, enumCheck, enumText, id, timestampTz, updatedAt } from './columns';
+import { contentRequests } from './content-drops';
 import { creators } from './tenancy';
 
 /*
@@ -42,6 +48,9 @@ const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is 
 const readsTeam: SQL = sql`${notCreatorAccount} and ${currentScope} in ('owner', 'agency')`;
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
 const ofHerTeam = (creatorId: PgColumn): SQL => sql`${readsTeam} and ${creatorId} = ${currentCreator}`;
+/** Her week of shooting is the owner's alone to write (ADR 0140 § 3): a manager reads it. */
+const ofHerOwner = (creatorId: PgColumn): SQL =>
+  sql`${notCreatorAccount} and ${currentScope} = 'owner' and ${creatorId} = ${currentCreator}`;
 
 /** The shape each kind takes: a start and an end, a day, or weekdays (1 Monday … 7 Sunday, each once). */
 const whenShape = (t: {
@@ -247,6 +256,11 @@ export const creatorSuggestions = pgTable(
     weekdays: integer('weekdays').array(),
     minutes: integer('minutes'),
     week: date('week', { mode: 'string' }).notNull(),
+    /**
+     * A « Jour de tournage » or « Livrer ma semaine » of her week (ADR 0140 § 7), written when the owner validates it;
+     * `null` for any other suggestion. Its id is drawn from (her, the week, the role, the day): a replay writes nothing.
+     */
+    weekRole: enumText('week_role'),
     state: enumText('state').notNull().default('suggested'),
     reason: text('reason'),
     decidedAt: timestampTz('decided_at'),
@@ -261,6 +275,12 @@ export const creatorSuggestions = pgTable(
     enumCheck('creator_suggestions', t.kind, CREATOR_TASK_KINDS),
     enumCheck('creator_suggestions', t.category, CREATOR_TASK_CATEGORIES),
     enumCheck('creator_suggestions', t.state, SUGGESTION_STATES),
+    enumCheck('creator_suggestions', t.weekRole, WEEK_ROLES),
+    // A frame of her week is a task of a day, never a task with hours (ADR 0140 § 2): it never meets her timed tasks.
+    check(
+      'creator_suggestions_week_role_shape_check',
+      sql`${t.weekRole} is null or (${t.kind} = 'day' and ${t.category} = 'shoot')`,
+    ),
     check(
       'creator_suggestions_when_check',
       sql`(${t.kind} = 'timed' and ${t.startsAt} is null and ${t.endsAt} is null and ${t.day} is null and ${t.weekdays} is null)
@@ -306,7 +326,125 @@ export const creatorSuggestions = pgTable(
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
     pgPolicy('team_insert', {
       for: 'insert',
-      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}`,
+      // A frame of her week (`week_role`) is the owner's alone; any other suggestion, the owner's or a manager's.
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.origin} = 'agency' and ${t.createdBy} = ${currentUser}
+        and (${t.weekRole} is null or ${currentScope} = 'owner')`,
     }),
+  ],
+);
+
+/**
+ * One line of a « Jour de tournage » (ADR 0140 § 24): what there is to shoot that day, written with its suggestion when
+ * the owner validates her week, never by her. She only ticks it (`done_at`, `done_by`: her column grant), once she has
+ * accepted the day; the day's task is done when all its lines are. Never deleted.
+ */
+export const creatorShootItems = pgTable(
+  'creator_shoot_items',
+  {
+    id: id(),
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    suggestionId: uuid('suggestion_id').notNull(),
+    position: integer('position').notNull(),
+    need: enumText('need').notNull(),
+    label: text('label').notNull(),
+    sheet: text('sheet'),
+    count: integer('count').notNull(),
+    /** The script request the line answers (ADR 0055 § 4), `null` for any other need. */
+    requestId: uuid('request_id'),
+    doneAt: timestampTz('done_at'),
+    doneBy: text('done_by').references(() => user.id),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    enumCheck('creator_shoot_items', t.need, WEEK_NEEDS),
+    check('creator_shoot_items_label_check', sql`char_length(${t.label}) between 1 and 120`),
+    check(
+      'creator_shoot_items_sheet_check',
+      sql`${t.sheet} is null or char_length(${t.sheet}) between 1 and 600`,
+    ),
+    check('creator_shoot_items_count_check', sql`${t.count} between 1 and 50`),
+    check('creator_shoot_items_position_check', sql`${t.position} between 0 and 19`),
+    check('creator_shoot_items_request_check', sql`${t.requestId} is null or ${t.need} = 'script'`),
+    check('creator_shoot_items_done_check', sql`(${t.doneAt} is null) = (${t.doneBy} is null)`),
+    unique('creator_shoot_items_position_unique').on(t.suggestionId, t.position),
+    // Her suggestion, never another creator's.
+    foreignKey({
+      name: 'creator_shoot_items_suggestion_fk',
+      columns: [t.suggestionId, t.creatorId],
+      foreignColumns: [creatorSuggestions.id, creatorSuggestions.creatorId],
+    }),
+    foreignKey({
+      name: 'creator_shoot_items_request_fk',
+      columns: [t.requestId, t.creatorId],
+      foreignColumns: [contentRequests.id, contentRequests.creatorId],
+    }),
+    index('creator_shoot_items_creator_idx').on(t.creatorId),
+    pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
+    // Her tick, on a day she accepted: the line's suggestion became one of her tasks.
+    pgPolicy('creator_tick', {
+      for: 'update',
+      using: sql`${hers(t.creatorId)} and exists (
+        select 1 from creator_suggestions s
+         where s.id = ${t.suggestionId} and s.creator_id = ${t.creatorId} and s.state = 'accepted'
+      )`,
+      withCheck: sql`${hers(t.creatorId)} and (${t.doneBy} is null or ${t.doneBy} = ${currentUser})`,
+    }),
+    pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    // Written by the owner with the shooting day he validates, still to decide.
+    pgPolicy('team_insert', {
+      for: 'insert',
+      withCheck: sql`${ofHerOwner(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.doneAt} is null
+        and exists (
+          select 1 from creator_suggestions s
+           where s.id = ${t.suggestionId} and s.creator_id = ${t.creatorId} and s.week_role = 'shoot_day'
+             and s.state = 'suggested'
+        )`,
+    }),
+  ],
+);
+
+/**
+ * Her day (ADR 0140, second avenant of 20/11/2026): how many of a line of her day she did (`DAY_ITEMS`: her Reveal
+ * story, her Instagram posts…), one row a day and a line, written by her alone, today or yesterday in her zone (checked
+ * by the code). What a line asks is the code's, never stored. Read by her team; never deleted.
+ */
+export const creatorDayTicks = pgTable(
+  'creator_day_ticks',
+  {
+    creatorId: uuid('creator_id')
+      .notNull()
+      .references(() => creators.id),
+    day: date('day', { mode: 'string' }).notNull(),
+    item: enumText('item').notNull(),
+    done: integer('done').notNull(),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => user.id),
+    updatedBy: text('updated_by')
+      .notNull()
+      .references(() => user.id),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    enumCheck('creator_day_ticks', t.item, DAY_ITEMS),
+    check('creator_day_ticks_done_check', sql`${t.done} between 0 and ${sql.raw(String(DAY_TARGET_MAX))}`),
+    primaryKey({ name: 'creator_day_ticks_pkey', columns: [t.creatorId, t.day, t.item] }),
+    pgPolicy('creator_read', { for: 'select', using: hers(t.creatorId) }),
+    pgPolicy('creator_insert', {
+      for: 'insert',
+      withCheck: sql`${hers(t.creatorId)} and ${t.createdBy} = ${currentUser} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('creator_update', {
+      for: 'update',
+      using: hers(t.creatorId),
+      withCheck: sql`${hers(t.creatorId)} and ${t.updatedBy} = ${currentUser}`,
+    }),
+    pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
   ],
 );

@@ -1,0 +1,122 @@
+# Passe de test du 20/11, conversation 1 : faire connaissance, puis elle sexualise. Fan, messages, scripts et prix fictifs (ADR 0010).
+# Fan nouveau, poli, âge confirmé, ne sexualise pas. Tours : il se présente ; son métier ; bonne nuit ; J+1 sa journée ; J+2 au soir il est seul chez lui ; il suit son allusion ; il répond à sa question.
+# Attendu à la lecture : pas de questionnaire ; au revoir sans le retenir ; à J+2 elle ouvre par une allusion accrochée à une situation, un cran à la fois ; l’aperçu offert ne vient qu’après qu’il a suivi.
+# Code (asserté) : aucune offre avant J+2. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Fan nouveau et poli sur trois jours : elle fait connaissance sans questionnaire, le laisse dormir, et ne propose rien avant le soir du surlendemain.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Florian (fictif)'
+  - 34 ans, confirmé
+situation:
+  known_hours: 0.5
+  age_confirmed: true
+  local_time: '21:00'
+scripts:
+  catalogue:
+    - ref: soiree-demo
+      moment: night
+      description: Une soirée en nuisette, de la douceur au plus chaud (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Une photo floutée en nuisette, de dos.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite de l’aperçu.
+          media: Trois photos en nuisette, de face.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme plus intime que la précédente.
+          media: Une courte vidéo en nuisette.
+        - kind: paid
+          price_euros: 35
+          instruction: Le présenter comme la fin de la soirée, la plus intime.
+          media: Une vidéo plus longue, la nuisette retirée.
+    - ref: matin-demo
+      moment: null
+      description: Un réveil paresseux sous la couette, joué à toute heure (script fictif).
+      steps:
+        - kind: free
+          instruction: Un aperçu offert pour lui donner envie, sans prix.
+          media: Un selfie au réveil, sous la couette.
+        - kind: paid
+          price_euros: 15
+          instruction: Le présenter comme la suite du réveil.
+          media: Des photos au saut du lit.
+        - kind: paid
+          price_euros: 25
+          instruction: Le présenter comme le plus intime du réveil.
+          media: Une courte vidéo sous la douche.
+inbound: Salut ! Moi c’est Florian, je viens de m’abonner 🙂
+expect:
+  decision:
+    handoff: false
+    offer: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+then:
+  - after_minutes: 3
+    inbound: Je suis boulanger, je me lève à 3h du mat alors je me couche tôt
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 4
+    inbound: Bon je vais dormir moi, bonne nuit !
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 660
+    inbound: Coucou ! Grosse journée, on a fait trois cents croissants pour un mariage
+    expect:
+      decision:
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 2240
+    inbound: Ce soir je suis tranquille, tout seul chez moi devant un film
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 3
+    inbound: Ah ouais ? Et tu penses à quoi là 😏
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+  - after_minutes: 3
+    inbound: Franchement à toi… je t’imagine bien en nuisette
+    expect:
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \b(?!(15|25|35)\b)\d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

@@ -1,4 +1,4 @@
-import type { CreatorId, PlatformScriptMoment } from '@impera/contracts';
+import type { CreatorId, PreparedScriptMoment } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 import type { EditorMedia } from './media';
@@ -107,17 +107,28 @@ export function ChevronIcon(): JSX.Element {
   );
 }
 
-/** « Se joue le jour / la nuit »: a setting of the script, never the screen's appearance. */
+/**
+ * « Se joue le jour / la nuit / jour et nuit »: a setting of the script chosen by hand, never read from its media, never
+ * the screen's appearance.
+ */
 export function MomentChoice({
   value,
   onChange,
 }: {
-  value: PlatformScriptMoment;
-  onChange: (moment: PlatformScriptMoment) => void;
+  value: PreparedScriptMoment;
+  onChange: (moment: PreparedScriptMoment) => void;
 }): JSX.Element {
-  const options: readonly [PlatformScriptMoment, string, JSX.Element][] = [
+  const options: readonly [PreparedScriptMoment, string, JSX.Element][] = [
     ['day', 'le jour', <SunIcon key="sun" />],
     ['night', 'la nuit', <MoonIcon key="moon" />],
+    [
+      'both',
+      'jour et nuit',
+      <span key="both" className="se-moment__both" aria-hidden="true">
+        <SunIcon />
+        <MoonIcon />
+      </span>,
+    ],
   ];
   return (
     <div className="se-moment" role="radiogroup" aria-label="Moment où il se joue">

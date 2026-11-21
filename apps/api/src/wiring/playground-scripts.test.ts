@@ -3,6 +3,7 @@ import {
   MediaDescriptionIdSchema,
   PlatformAccountIdSchema,
   PlatformScriptIdSchema,
+  PreparedScriptIdSchema,
   ScriptIdentityIdSchema,
   newId,
 } from '@impera/contracts';
@@ -90,10 +91,19 @@ function script(ref: string, steps: readonly HerStep[], over: Partial<HerScript>
   };
 }
 
-const ready = script('seq-1', [
+/** Ours as an import recognised it on Reveal (ADR 0161): the same steps at the same prices. */
+const oursOf = (steps: readonly HerStep[]) => ({
+  preparedScriptId: PreparedScriptIdSchema.parse(newId(PreparedScriptIdSchema)),
+  description: 'Une soirée complice inventée.',
+  moment: 'night' as const,
+  steps: steps.map((each) => ({ branches: [{ priceMinor: each.priceMinor, currency: 'EUR' as const }] })),
+});
+
+const readySteps = [
   { ...step(0, 'step-a', 0, ['media-1']), text: 'Coucou toi' },
   { ...step(1, 'step-b', 1_500, ['media-2', 'media-3']), previewMedia: [media('media-4')] },
-]);
+];
+const ready = script('seq-1', readySteps, { ours: oursOf(readySteps) });
 
 describe('her scripts in the playground (ADR 0103 § 15)', () => {
   it('plays the scripts production would offer, each step with its words, its bundle and its teaser', () => {
@@ -120,14 +130,19 @@ describe('her scripts in the playground (ADR 0103 § 15)', () => {
   });
 
   it('leaves out what production would not offer, and says why none can be played', () => {
-    const unvalidated = script('seq-2', ready.steps, { identity: null });
-    const branched = script('seq-3', [{ ...step(0, 'step-z', 900, ['media-9']), branches: 2 }]);
+    // A native script of none of ours (ADR 0161 § 4), even with a validated identity.
+    const unvalidated = script('seq-2', readySteps);
+    const branchedSteps = [{ ...step(0, 'step-z', 900, ['media-9']), branches: 2 }];
+    const branched = script('seq-3', branchedSteps, { ours: oursOf(branchedSteps) });
     expect(playgroundCatalogueOf([])).toEqual({ kind: 'none', reason: 'no_script' });
     expect(playgroundCatalogueOf([unvalidated, branched])).toEqual({ kind: 'none', reason: 'none_ready' });
     const read = playgroundCatalogueOf([ready, unvalidated]);
     expect(read.kind === 'ready' ? read.scripts.map((each) => each.view.scriptRef) : []).toEqual(['seq-1']);
     // A fan's catalogue is one account's: ready on two, none is played rather than mixing them.
-    const other = script('seq-4', ready.steps, { platformAccountId: newId(PlatformAccountIdSchema) });
+    const other = script('seq-4', readySteps, {
+      platformAccountId: newId(PlatformAccountIdSchema),
+      ours: oursOf(readySteps),
+    });
     expect(playgroundCatalogueOf([ready, other])).toEqual({ kind: 'none', reason: 'several_accounts' });
   });
 
@@ -139,8 +154,11 @@ describe('her scripts in the playground (ADR 0103 § 15)', () => {
         return Promise.resolve(asked.length === 1 ? [ready] : null);
       },
     });
-    expect((await source(creatorId, 'user-1')).kind).toBe('ready');
+    expect((await source(creatorId, { userId: 'user-1', role: 'owner' })).kind).toBe('ready');
     expect(asked).toEqual([[creatorId, { userId: 'user-1', role: 'owner' }]]);
-    expect(await source(creatorId, 'user-1')).toEqual({ kind: 'none', reason: 'unreadable' });
+    expect(await source(creatorId, { userId: 'user-1', role: 'owner' })).toEqual({
+      kind: 'none',
+      reason: 'unreadable',
+    });
   });
 });

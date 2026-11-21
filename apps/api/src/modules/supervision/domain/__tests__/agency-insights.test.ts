@@ -14,6 +14,7 @@ import {
   agencyTransferVat,
   agencyRange,
   agencySpan,
+  objectivesOf,
   periodAround,
   subscribersOf,
   type AgencyCreatorRead,
@@ -67,7 +68,9 @@ function creator(
     totals: { from: RANGE.previousFrom, to: RANGE.to, rows: [...rows], refundsWithoutSale: 0 },
     hours: [],
     fans: [],
+    refunds: [],
     refundsWithoutSale: 0,
+    objectiveMinor: null,
     registerSince: null,
     stats: [],
     ...more,
@@ -604,5 +607,132 @@ describe('subscribersOf (ADR 0081)', () => {
   it('passes the contract', () => {
     const result = insights([creator(LINA, 'Lina', [row()], { stats: every(4, 6) })]);
     expect(AgencyInsightsSchema.parse(result).subscribers?.current.daysRead).toBe(3);
+  });
+});
+
+describe('the refunds one by one (ADR 0092 § 4)', () => {
+  const refund = (patch: Partial<AgencyCreatorRead['refunds'][number]> = {}) => ({
+    saleType: 'ppv' as const,
+    currency: 'EUR' as const,
+    grossInclVatMinor: 1200,
+    refundedAt: new Date('2026-11-06T10:00:00Z'),
+    saleOccurredAt: new Date('2026-11-04T09:00:00Z'),
+    seller: theo,
+    ...patch,
+  });
+
+  it('lists every creator’s refunds, the latest first, the seller named and the whole days since the sale', () => {
+    const read = insights([
+      creator(LINA, 'Lina Test', [], {
+        refunds: [
+          refund(),
+          refund({ saleType: 'subscription', refundedAt: new Date('2026-11-04T09:30:00Z') }),
+        ],
+      }),
+      creator(MAYA, 'Maya Démo', [], {
+        refunds: [
+          refund({
+            seller: { kind: 'agent' },
+            refundedAt: new Date('2026-11-05T12:00:00Z'),
+            saleOccurredAt: null,
+          }),
+        ],
+      }),
+    ]);
+    expect(read.refundList).toEqual([
+      {
+        refundedAt: '2026-11-06T10:00:00.000Z',
+        creatorId: LINA,
+        kind: 'ppv',
+        amountMinor: 1200,
+        seller: { kind: 'member', memberId: THEO, name: 'Théo' },
+        delayDays: 2,
+      },
+      {
+        refundedAt: '2026-11-05T12:00:00.000Z',
+        creatorId: MAYA,
+        kind: 'ppv',
+        amountMinor: 1200,
+        seller: { kind: 'agent' },
+        delayDays: null,
+      },
+      expect.objectContaining({ creatorId: LINA, kind: 'subscriptions', delayDays: 0 }),
+    ]);
+  });
+
+  it('converts a dollar refund at the rate, and says none without one', () => {
+    const lines = [
+      creator(LINA, 'Lina Test', [], { refunds: [refund({ currency: 'USD', grossInclVatMinor: 1000 })] }),
+    ];
+    expect(insights(lines).refundList[0]?.amountMinor).toBeNull();
+    expect(insights(lines, { day: '2026-11-01', rateMicros: 900_000 }).refundList[0]?.amountMinor).toBe(900);
+  });
+});
+
+describe('the month’s revenue objectives (ADR 0092 § 6)', () => {
+  const NOV = { from: '2026-11-01', to: '2026-11-10' };
+
+  it('carries each revenue to the month’s end at its pace, and sums the objectives set', () => {
+    const read = objectivesOf(
+      NOV,
+      [
+        { creatorId: LINA, objectiveMinor: 300_000 },
+        { creatorId: MAYA, objectiveMinor: null },
+      ],
+      new Map([
+        [LINA, 100_000],
+        [MAYA, 20_000],
+      ]),
+    );
+    expect(read).toEqual({
+      month: '2026-11-01',
+      daysGone: 10,
+      days: 30,
+      creators: [
+        { creatorId: LINA, objectiveMinor: 300_000, revenueMinor: 100_000, projectedMinor: 300_000 },
+        { creatorId: MAYA, objectiveMinor: null, revenueMinor: 20_000, projectedMinor: 60_000 },
+      ],
+      objectiveMinor: 300_000,
+      revenueMinor: 120_000,
+      projectedMinor: 360_000,
+    });
+  });
+
+  it('projects nothing once the month is over, and says no objective when none is set', () => {
+    const read = objectivesOf(
+      { from: '2026-10-01', to: '2026-10-31' },
+      [{ creatorId: LINA, objectiveMinor: null }],
+      new Map(),
+    );
+    expect(read).toMatchObject({
+      daysGone: 31,
+      days: 31,
+      objectiveMinor: null,
+      revenueMinor: 0,
+      projectedMinor: null,
+    });
+    expect(read.creators[0]?.projectedMinor).toBeNull();
+  });
+
+  it('reads them on a calendar month only', () => {
+    const lines = [creator(LINA, 'Lina Test', [row()], { objectiveMinor: 50_000 })];
+    expect(insights(lines).objectives).toBeNull();
+    const month = AgencyInsightsSchema.parse(
+      agencyInsights({
+        period: null,
+        span: { unit: 'month', partial: true, end: '2026-11-30', compare: 'previous', today: '2026-11-06' },
+        range: { from: '2026-11-01', to: '2026-11-06', previousFrom: '2026-10-01', previousTo: '2026-10-06' },
+        creators: lines,
+        names: NAMES,
+        rate: null,
+        timeZone: 'Europe/Paris',
+      }),
+    );
+    expect(month.objectives).toMatchObject({
+      objectiveMinor: 50_000,
+      revenueMinor: 1200,
+      daysGone: 6,
+      days: 30,
+    });
   });
 });

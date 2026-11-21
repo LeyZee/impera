@@ -22,7 +22,7 @@ Empêcher que les accès à la base par le rôle de service, qui traverse les cr
 - [ ] Réduction, module par module (une ligne par PR ici, avec le nombre avant et après).
   - [x] Connecteurs, statistiques du jour : les deux photos s'écrivent sous le rôle applicatif, une créatrice à la fois (`withTenantJob`, migration 0235) ; le rôle de service n'écrit plus ces deux tables. Plafond des connecteurs : 36 → 35 (la date de la lecture complète, donnée de l'agence, reste au service).
   - [ ] Connecteurs, registre des ventes et comptes.
-  - [x] Dépôts de contenu, vignettes et descriptions des médias : les deux tâches lisent et écrivent dans la créatrice du média, sous le rôle applicatif (`withTenantJob`, tâche `drop_media`, migration 0236 : lecture des dépôts pour cette tâche seule). La créatrice nommée par la tâche n'est plus crue sur parole : un média d'une autre n'est pas trouvé. Plafond des dépôts de contenu : 29 → 23 (les deux rattrapages horaires, qui parcourent toutes les créatrices, restent au service).
+  - [x] Dépôts de contenu, vignettes et descriptions des médias : les deux tâches lisent et écrivent dans la créatrice du média, sous le rôle applicatif (`withTenantJob`, tâche `drop_media`, migration 0246 : lecture des dépôts pour cette tâche seule). La créatrice nommée par la tâche n'est plus crue sur parole : un média d'une autre n'est pas trouvé. Plafond des dépôts de contenu : 29 → 23 (les deux rattrapages horaires, qui parcourent toutes les créatrices, restent au service).
   - [ ] Dépôts de contenu, réception des fichiers, conservation, synthèses de scripts, demandes.
 
 ## Critères d'acceptation (tests, commandes, comportements observables)
