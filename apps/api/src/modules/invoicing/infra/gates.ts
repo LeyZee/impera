@@ -7,7 +7,7 @@ import { payoutDecision } from '../domain/payouts';
 import { enqueueDocumentSettle, enqueueInvoiceIssue } from './invoice-queue';
 import { payoutFactsOf } from './payout-facts';
 
-const { domainEvents, invoices } = schema;
+const { domainEvents } = schema;
 
 /**
  * `PayoutGate` (ADR 0047 § 1), which the composition root gives pay: what the invoices and the contractor's file say of
@@ -30,18 +30,6 @@ export const payoutGate: PayoutGate = {
       );
     }
     return verdicts;
-  },
-
-  async invoicedOn(tx, statementIds) {
-    const days = new Map<string, string>();
-    if (statementIds.length === 0) return days;
-    const rows = await tx
-      .select({ statementId: invoices.statementId, issuedOn: sql<string>`max(${invoices.issuedOn})::text` })
-      .from(invoices)
-      .where(and(eq(invoices.kind, 'invoice'), inArray(invoices.statementId, [...statementIds])))
-      .groupBy(invoices.statementId);
-    for (const row of rows) if (row.statementId !== null) days.set(row.statementId, row.issuedOn);
-    return days;
   },
 
   // Through the events' partial index, by member: the newest said wins, its invoice's before a credit note's of the same

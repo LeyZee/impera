@@ -371,10 +371,7 @@ function PayForm({
   const refresh = useRefreshPayroll();
   const latest = useLatestPayPeriod();
   const today = dayOf(new Date(), statement.window.timeZone);
-  // Never before its period began, nor before its invoice was issued: the transfer settles it (COUV-02).
-  const invoicedOn = statement.invoicedOn ?? null;
-  const firstDay =
-    invoicedOn !== null && invoicedOn > statement.window.period ? invoicedOn : statement.window.period;
+  const firstDay = statement.window.period;
   const [day, setDay] = useState(today);
   const [amount, setAmount] = useState(amountInput(statement.payableMinor));
   const [reference, setReference] = useState('');

@@ -167,20 +167,6 @@ describe('a payment (ADR 0023 § Factures)', () => {
     expect(paying({ paidOn: '2025-04-16' })).toBe('no error');
   });
 
-  it('refuses a transfer dated before its invoice was issued, and lets it go from that day (COUV-02)', () => {
-    const invoiced = (paidOn: string, invoicedOn: string | null): string =>
-      codeOf(() => {
-        assertPayment(
-          { paidOn, sentMinor: 13_333 },
-          { period: P4, payableMinor: 13_333, invoicedOn },
-          '2025-05-02',
-        );
-      });
-    expect(invoiced('2025-04-30', '2025-05-01')).toBe('payment_before_invoice_unprocessable');
-    expect(invoiced('2025-05-01', '2025-05-01')).toBe('no error');
-    expect(invoiced('2025-04-30', null)).toBe('no error');
-  });
-
   it('refuses an amount that is not what the statement pays, a cent off included', () => {
     expect(paying({ sentMinor: 13_332 })).toBe('payment_amount_unprocessable');
     expect(paying({ sentMinor: 13_334 })).toBe('payment_amount_unprocessable');

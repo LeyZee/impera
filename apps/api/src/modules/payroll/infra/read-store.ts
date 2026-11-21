@@ -284,12 +284,6 @@ export function createDrizzlePayrollReadStore(
                 ),
               );
 
-        // The day each invoice to settle was issued: a transfer is never dated before it (COUV-02).
-        const invoiced = await gate.invoicedOn(
-          tx,
-          toPay.map((row) => row.id),
-        );
-
         const statements: StoredStatement[] = statementRows.map((row) => {
           if (window === null) throw new Error(`Statement ${row.id} without its period`);
           const counted = CountedSchema.parse(row.counted);
@@ -366,7 +360,6 @@ export function createDrizzlePayrollReadStore(
                     }),
               payoutBlock: payoutBlockOf(row),
               notIssuedReason: notIssued.get(row.id) ?? null,
-              ...(toPay.includes(row) && { invoicedOn: invoiced.get(row.id) ?? null }),
             },
             team: {
               netMinor: row.teamNetMinor,

@@ -302,7 +302,6 @@ const DetailsSchema = z
     payableMinor: z.number().int(),
     totalMinor: z.number().int(),
     today: z.string(),
-    invoicedOn: z.iso.date(),
     currency: z.string(),
     reason: PayoutBlockReasonSchema,
     year: z.string().nullable(),

@@ -778,11 +778,6 @@ export const CommissionStatementSchema = z.object({
   /** How the owner paid it, `null` until it is paid. */
   payment: StatementPaymentSchema.nullable(),
   /**
-   * The day its invoice was issued, the latest, for a validated statement to pay: its transfer is never dated before
-   * (COUV-02). `null` without one; absent from a server that does not say it.
-   */
-  invoicedOn: z.iso.date().nullable().optional(),
-  /**
    * Why its transfer could not be recorded today, as pay would refuse it (`payout_blocked_conflict`, ADR 0041): read for
    * a validated statement with something to pay, `null` otherwise and when nothing stops it.
    */
@@ -979,8 +974,7 @@ export type ValidateCommissionStatementBody = z.infer<typeof ValidateCommissionS
  * `POST /v1/payroll/statements/:id/pay` (owner only) → 200 `CommissionStatementSchema`: `validated` → `paid`, once,
  * with how it was paid (ADR 0023 § Factures). `paidOn` is the day of the transfer, never after today in the agency's
  * zone (`payment_in_future_unprocessable`) nor before the first day of the statement's period
- * (`payment_before_period_unprocessable`), nor before its invoice was issued (`payment_before_invoice_unprocessable`,
- * `details.invoicedOn`). `reference` is refused when it holds an IBAN (400, `containsIban`).
+ * (`payment_before_period_unprocessable`). `reference` is refused when it holds an IBAN (400, `containsIban`).
  * `sentMinor` is what was sent, and it must be what the statement pays (`payment_amount_unprocessable`; whether another
  * amount may be recorded is a question the EQ-05 card keeps open): a statement that pays nothing, its total carried
  * over, stays validated. The transfer waits (`payout_blocked_conflict`, ADR 0041) until the documents it pays are all
@@ -1488,7 +1482,6 @@ export type MyFigures = z.infer<typeof MyFiguresSchema>;
  * `commission_rate_missing_conflict` 409, a member to pay without a commission rate in force on the period's last day ;
  * `payment_in_future_unprocessable` 422, a payment dated after today in the agency's zone ;
  * `payment_before_period_unprocessable` 422, a payment dated before the first day of the statement's period ;
- * `payment_before_invoice_unprocessable` 422, a payment dated before its statement's invoice was issued ;
  * `payment_amount_unprocessable` 422, an amount sent that is not what the statement pays ;
  * `payout_blocked_conflict` 409, a transfer whose documents are not all issued, or under a tax treaty without the
  * contractor's tax residence certificate of its calendar year accepted by the owner (ADR 0041, `details.reason` and
@@ -1535,7 +1528,6 @@ export const PAYROLL_ERROR_CODES = [
   'commission_rate_missing_conflict',
   'payment_in_future_unprocessable',
   'payment_before_period_unprocessable',
-  'payment_before_invoice_unprocessable',
   'payment_amount_unprocessable',
   'payout_blocked_conflict',
   'cursor_invalid',

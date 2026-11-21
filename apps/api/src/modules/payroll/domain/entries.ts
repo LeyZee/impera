@@ -12,7 +12,6 @@ import {
   PayPeriodClosed,
   PayPeriodTooFar,
   PaymentAmountMismatch,
-  PaymentBeforeInvoice,
   PaymentBeforePeriod,
   PaymentInFuture,
   PayrollOwnForbidden,
@@ -146,22 +145,14 @@ export function periodsChanged(from: PayPeriod, to: PayPeriod, current: PayPerio
  * A payment as the owner records it (ADR 0023 § Factures): a transfer made, so never dated after `today` (the agency's
  * zone), nor before the first day of the statement's period (a slip of the year, which a paid statement would keep
  * forever; money may leave before the validation in Impera, so the bound is the period, not `validated_at`), and of
- * what the statement pays. Nor before its invoice was issued, when it has one (COUV-02): the transfer settles it. Days
- * compare as `YYYY-MM-DD` text, and a period is its first day.
+ * what the statement pays. Days compare as `YYYY-MM-DD` text, and a period is its first day.
  */
 export function assertPayment(
   payment: { readonly paidOn: string; readonly sentMinor: number },
-  statement: {
-    readonly period: PayPeriod;
-    readonly payableMinor: number;
-    /** The day its invoice was issued, the latest; `null` without one (a member who does not invoice). */
-    readonly invoicedOn?: string | null;
-  },
+  statement: { readonly period: PayPeriod; readonly payableMinor: number },
   today: string,
 ): void {
   if (payment.paidOn > today) throw new PaymentInFuture(today);
   if (payment.paidOn < statement.period) throw new PaymentBeforePeriod(statement.period);
-  const invoicedOn = statement.invoicedOn ?? null;
-  if (invoicedOn !== null && payment.paidOn < invoicedOn) throw new PaymentBeforeInvoice(invoicedOn);
   if (payment.sentMinor !== statement.payableMinor) throw new PaymentAmountMismatch(statement.payableMinor);
 }

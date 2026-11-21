@@ -777,10 +777,6 @@ export function payRefusalText(refusal: PayRefusal, names: RefusalNames): string
       return named.success
         ? `Le paiement ne peut pas être daté avant le début de la quinzaine (${longDay(named.data)}).`
         : 'Le paiement ne peut pas être daté avant le début de la quinzaine.';
-    case 'payment_before_invoice_unprocessable':
-      return details.invoicedOn === undefined
-        ? 'Le paiement ne peut pas être daté avant l’émission de sa facture.'
-        : `Le paiement ne peut pas être daté avant l’émission de sa facture (${longDay(details.invoicedOn)}).`;
     case 'payout_blocked_conflict': {
       // Recorded only once its documents are issued and, under a treaty, the certificate of its year accepted (ADR
       // 0041 § 4): nothing is written.
