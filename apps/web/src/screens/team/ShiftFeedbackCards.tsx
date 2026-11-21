@@ -287,18 +287,19 @@ export function FeedbacksPanel({
           </p>
         ) : (
           <>
-            <div className="rp-fbs__figures">
-              <p className="rp-fbs__figure" data-tone={incidents > 0 ? 'bad' : undefined}>
-                <span className="rp-fbs__value nv-num">{incidents}</span>
-                {incidents > 1 ? 'incidents' : 'incident'}
+            {/* Three tiles of the system: the colour on the figure alone (Design, 21/11). */}
+            <div className="nv-tiles rp-fbs__tiles">
+              <p className={`nv-tile${incidents > 0 ? ' nv-tone--bad' : ''}`}>
+                <span className="nv-tile__value rp-fbs__value">{incidents}</span>
+                <span className="nv-tile__label">{incidents > 1 ? 'incidents' : 'incident'}</span>
               </p>
-              <p className="rp-fbs__figure">
-                <span className="rp-fbs__value nv-num">{list.feedbacks.length - quiet}</span>
-                avec un mot
+              <p className="nv-tile">
+                <span className="nv-tile__value rp-fbs__value">{list.feedbacks.length - quiet}</span>
+                <span className="nv-tile__label">avec un mot</span>
               </p>
-              <p className="rp-fbs__figure" data-tone="ok">
-                <span className="rp-fbs__value nv-num">{quiet}</span>
-                rien à signaler
+              <p className="nv-tile nv-tone--ok">
+                <span className="nv-tile__value rp-fbs__value">{quiet}</span>
+                <span className="nv-tile__label">rien à signaler</span>
               </p>
             </div>
             <SignalDonut list={list} />

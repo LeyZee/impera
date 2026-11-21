@@ -1684,35 +1684,19 @@ a.sc-sheet__report:focus-visible,
 }
 
 /* A period's feedbacks: three figures first, then the signals by category as one coloured bar. */
-.rp-fbs__figures {
-  display: grid;
+/* Three figures side by side, a phone too: short words under big numbers. */
+.nv-tiles.rp-fbs__tiles {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--nv-space-3);
 }
-.rp-fbs__figure {
-  display: flex;
-  flex-direction: column;
+.rp-fbs__tiles .nv-tile {
   margin: 0;
-  padding: var(--nv-space-3);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-fill-soft);
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-footnote);
 }
 .rp-fbs__value {
-  color: var(--nv-ink);
   font-size: var(--nv-text-title-2);
   line-height: var(--nv-text-title-2-leading);
-  font-weight: 650;
 }
-.rp-fbs__figure[data-tone='bad'] {
-  background: color-mix(in srgb, var(--nv-danger) 10%, var(--nv-fill-soft));
-}
-.rp-fbs__figure[data-tone='bad'] .rp-fbs__value {
-  color: var(--nv-danger);
-}
-.rp-fbs__figure[data-tone='ok'] .rp-fbs__value {
-  color: var(--nv-success);
+.rp-fbs__tiles :is(.nv-tone--bad, .nv-tone--ok) .rp-fbs__value {
+  color: var(--_c);
 }
 .rp-sigs {
   display: flex;
