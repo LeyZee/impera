@@ -63,7 +63,7 @@ import {
 import type { PasswordBreachCheck } from './password-breaches';
 import { forgetCount } from './rate-limit-store';
 import { alertOwnerSignIn, recordRefusal, type RefusalAction } from './security-alerts';
-import { LONGEST_IDLE_MS, sessionEnd } from './session-lifetime';
+import { ACTIVITY_REFRESH_MS, LONGEST_IDLE_MS, sessionEnd } from './session-lifetime';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -77,10 +77,10 @@ declare module 'fastify' {
 /**
  * Better Auth's own lifetime of a session without activity is the longest a role gets (the creator's 7 days,
  * `session-lifetime.ts`); the shorter ones of the other roles are ours to apply (`refuseEndedRefresh`, `sessionOf`).
- * Refreshed at most once an hour while in use.
+ * Refreshed at most once a minute while in use, its last activity read within the minute (PRO2-10).
  */
 const SESSION_SECONDS = LONGEST_IDLE_MS / 1000;
-const SESSION_REFRESH_SECONDS = 60 * 60;
+const SESSION_REFRESH_SECONDS = ACTIVITY_REFRESH_MS / 1000;
 /**
  * Attempts per minute and per IP on `/v1/auth/*`, tighter than the API-wide limit, wide enough for a team behind one
  * address at a change of shift: ten sign-ins, password and code, and their pages (recette SEC-11).
@@ -419,7 +419,7 @@ export function createAuth(config: Config, db: Database, logger: Logger) {
             await recordLogin(db, logger, session, context?.path);
           },
         },
-        // A refresh is the only write that carries `expiresAt` (Better Auth's `getSession`, once an hour of use).
+        // A refresh is the only write that carries `expiresAt` (Better Auth's `getSession`, once a minute of use).
         update: {
           before: (data, context) =>
             data.expiresAt === undefined ? Promise.resolve(undefined) : refuseEndedRefresh(db, context),
