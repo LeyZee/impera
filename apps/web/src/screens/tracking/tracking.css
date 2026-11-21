@@ -371,16 +371,18 @@
 }
 .tr-care > p:first-child strong {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--nv-space-2);
 }
 .nv-status.tr-status--care {
   --_c: var(--nv-series-2);
 }
+/* On the first line of a title that wraps, as on a phone. */
 .tr-care__icon {
   flex: none;
   width: 20px;
   height: 20px;
+  margin-top: 1px;
   color: var(--nv-series-2);
 }
 .tr-care__confirm {

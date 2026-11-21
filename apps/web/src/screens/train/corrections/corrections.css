@@ -110,6 +110,12 @@
   color: var(--nv-ink);
   text-wrap: balance;
 }
+/* On a phone the ring wraps under the answer: centred, not left at the edge. */
+@media (max-width: 560px) {
+  .co-top > .nv-donut {
+    margin-inline: auto;
+  }
+}
 /* A reason's chip carries its colour, and lights its slice of the ring under the pointer. */
 .co-chip {
   gap: 6px;
