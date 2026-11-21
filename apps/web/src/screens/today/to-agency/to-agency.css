@@ -98,8 +98,9 @@
 .ta-seg {
   align-self: flex-start;
 }
-.ta-body {
-  resize: vertical;
+/* No native grip (avis Design): the shared `grow-area` grows the box with the text; three lines to start. */
+.ta-body.grow-area {
+  min-height: 3lh;
 }
 .ta-told {
   margin: 0;
@@ -122,12 +123,12 @@
   }
 }
 
-/* The agency's side, inside « À faire » (trous béants n° 13): her words, whose they are, and the owner's answer box. */
+/* The agency's side, inside « À faire » (trous béants n° 13): her words, whose they are, and the owner's answer box.
+   On the card's own inset, one axis with « À faire » and the lines under it (avis Design). */
 .ta-todo {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
 }
 .ta-todo__title {
   margin: 0;

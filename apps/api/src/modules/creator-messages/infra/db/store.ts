@@ -4,7 +4,16 @@ import {
   ToAgencyMessageKindSchema,
   type ToAgencyMessage,
 } from '@impera/contracts';
-import { and, eq, schema, sql, withCreatorAccount, withTenantMember, type Database } from '@impera/db';
+import {
+  and,
+  eq,
+  onCreatorList,
+  schema,
+  sql,
+  withCreatorAccount,
+  withTenantMember,
+  type Database,
+} from '@impera/db';
 
 import { answerOutcome } from '../../domain/answer';
 import { MessageAnsweredConflict, MessageNotFound, MessagesForbidden } from '../../domain/errors';
@@ -54,6 +63,9 @@ export function createDrizzleMessageStore(db: Database): MessageStore {
     waiting: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         if (scope !== 'owner' && scope !== 'agency') throw new MessagesForbidden('read');
+        // A manager reads only the creators on his own list (avis Sécurité, 21/11).
+        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId)))
+          throw new MessagesForbidden('read');
         const [creator] = await tx
           .select({ name: schema.creators.displayName })
           .from(schema.creators)

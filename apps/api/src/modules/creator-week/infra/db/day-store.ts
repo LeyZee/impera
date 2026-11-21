@@ -2,6 +2,7 @@ import { DayItemSchema, type DayItem } from '@impera/contracts';
 import {
   and,
   eq,
+  onCreatorList,
   schema,
   sql,
   withCreatorAccount,
@@ -49,6 +50,9 @@ export function createDrizzleDayTickStore(db: Database): DayTickStore {
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         // Her owner and an active manager read where she is; a chatter does not (trous béants n° 11).
         if (scope !== 'owner' && scope !== 'agency') throw new CreatorWeekForbidden('read');
+        // A manager reads only the creators on his own list (avis Sécurité, 21/11).
+        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId)))
+          throw new CreatorWeekForbidden('read');
         const rows = await tx
           .select({ day: ticks.day, item: ticks.item, done: ticks.done })
           .from(ticks)

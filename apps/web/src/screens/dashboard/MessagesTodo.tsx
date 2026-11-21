@@ -6,9 +6,10 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX } from 'react';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { NOT_SENT } from '@/screens/agenda/api';
 import { answerMessage, readWaitingAgain } from '@/screens/today/to-agency/api';
-import { answerRefusal, kindWords, writtenOn } from '@/screens/today/to-agency/model';
+import { answerRefusal, kindWords, waitingSince } from '@/screens/today/to-agency/model';
 import '@/screens/today/to-agency/to-agency.css';
 
 /**
@@ -40,7 +41,7 @@ export function MessagesTodo({
                   {kindWords(message.kind)}
                 </span>
               </span>
-              <span className="ta-item__on nv-num">{writtenOn(message.createdAt)}</span>
+              <span className="ta-item__on nv-num">{waitingSince(message.createdAt, new Date())}</span>
             </div>
             <p className="ta-item__body">{message.body}</p>
             {canAnswer ? (
@@ -60,6 +61,7 @@ function AnswerBox({ message }: { message: WaitingToAgencyMessage }): JSX.Elemen
   const id = useId();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const area = useGrowingArea(text);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const body = AnswerToAgencyMessageBodySchema.safeParse({ answer: text });
@@ -103,8 +105,9 @@ function AnswerBox({ message }: { message: WaitingToAgencyMessage }): JSX.Elemen
           Ta réponse, qu’elle lira sur son accueil
         </label>
         <textarea
+          ref={area}
           id={`${id}-answer`}
-          className="nv-field__control nv-glass ta-body"
+          className="nv-field__control nv-glass grow-area ta-body"
           value={text}
           rows={3}
           maxLength={CREATOR_MESSAGE_TEXT_MAX}

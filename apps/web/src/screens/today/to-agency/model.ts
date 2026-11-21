@@ -18,6 +18,19 @@ const DAY = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' })
 /** « 4 nov. »: when she wrote, in the reader's own calendar. */
 export const writtenOn = (instant: string): string => DAY.format(new Date(instant));
 
+const HOUR_MS = 3_600_000;
+
+/**
+ * « depuis 2 j »: how long a message has waited for its answer, what tells the owner where to begin (avis Design,
+ * 21/11). Under an hour, under a day in hours, then in days.
+ */
+export const waitingSince = (instant: string, now: Date): string => {
+  const hours = Math.max(0, Math.floor((now.getTime() - new Date(instant).getTime()) / HOUR_MS));
+  if (hours < 1) return 'depuis moins d’une heure';
+  if (hours < 24) return `depuis ${String(hours)} h`;
+  return `depuis ${String(Math.floor(hours / 24))} j`;
+};
+
 export const kindWords = (kind: ToAgencyMessageKind): string => CREATOR_MESSAGE_KIND_WORDS[kind];
 
 export interface MessageLine {

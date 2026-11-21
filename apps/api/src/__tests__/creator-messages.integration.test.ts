@@ -180,4 +180,23 @@ describe('what she writes to the agency, and the owner’s answer', () => {
     );
     expect(touched).toEqual([]);
   });
+  it('never shows her messages to a manager whose list has not her, neither by the route nor in the base', async () => {
+    await test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [ines] })
+      .where(eq(schema.user.id, managerUserId));
+    try {
+      // He follows only Inès, who wrote nothing: none of the creators he may read, so he is refused.
+      expect((await call('GET', '/v1/creator-messages/waiting', 'manager')).statusCode).toBe(403);
+      const seen = await withTenantMember(app.db.db, nora, managerUserId, (tx) =>
+        tx.select().from(schema.creatorMessages).where(eq(schema.creatorMessages.creatorId, nora)),
+      );
+      expect(seen).toEqual([]);
+    } finally {
+      await test.admin.db
+        .update(schema.user)
+        .set({ creatorIds: [nora, ines] })
+        .where(eq(schema.user.id, managerUserId));
+    }
+  });
 });

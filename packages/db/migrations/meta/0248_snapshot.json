@@ -4203,7 +4203,7 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"creator_messages\".\"creator_id\" = any(u.creator_ids))))"
         },
         "owner_answer": {
           "name": "owner_answer",

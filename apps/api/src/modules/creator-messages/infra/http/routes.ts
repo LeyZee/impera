@@ -42,6 +42,9 @@ export interface MessageRoutesDeps {
   readonly clock?: () => Date;
 }
 
+/** Her writing to the agency: twenty an hour is far beyond a person, and a replay counts too. */
+const WRITE_LIMIT = { max: 20, timeWindow: '1 hour', skipOnError: false };
+
 /**
  * « Écrire à l'agence » (trous béants n° 13): hers under `/v1/creator-space/messages`; the agency's waiting list under
  * `/v1/creator-messages/waiting` (owner, an active manager); the owner's answer under
@@ -62,6 +65,8 @@ export function createMessageRoutes(deps: MessageRoutesDeps): FastifyPluginAsync
       '/creator-space/messages',
       {
         ...creatorOnly,
+        // A few messages an hour: a stolen session never floods the agency (avis Sécurité, 21/11).
+        config: { rateLimit: WRITE_LIMIT },
         schema: { body: NewToAgencyMessageBodySchema, response: { 201: ToAgencyMessageSchema } },
       },
       async (request, reply) => {

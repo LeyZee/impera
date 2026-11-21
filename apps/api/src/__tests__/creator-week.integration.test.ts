@@ -512,6 +512,21 @@ describe('her week: computed, validated by the owner, accepted and ticked by her
       403,
     );
     expect((await call('GET', `/v1/creators/${nora}/progress?week=${today}`, 'nora')).statusCode).toBe(403);
+    // A manager whose own list has not her reads nothing of her (avis Sécurité, 21/11).
+    await test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [ines] })
+      .where(eq(schema.user.id, managerUserId));
+    try {
+      expect((await call('GET', `/v1/creators/${nora}/progress?week=${today}`, 'manager')).statusCode).toBe(
+        403,
+      );
+    } finally {
+      await test.admin.db
+        .update(schema.user)
+        .set({ creatorIds: [nora, ines] })
+        .where(eq(schema.user.id, managerUserId));
+    }
     expect((await call('GET', `/v1/creators/${nora}/progress?week=nope`, 'owner')).statusCode).toBe(400);
   });
 });

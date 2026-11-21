@@ -11,6 +11,7 @@ import { readMineAgain, useMyMessages, writeToAgency } from './api';
 import { kindWords, messageLines } from './model';
 import './to-agency.css';
 
+import { useGrowingArea } from '@/lib/growing-area';
 import { NOT_SENT } from '@/screens/agenda/api';
 
 /**
@@ -99,6 +100,7 @@ function MessageForm({
   const [key] = useState(() => crypto.randomUUID());
   const [kind, setKind] = useState<ToAgencyMessageKind>('question');
   const [text, setText] = useState('');
+  const area = useGrowingArea(text);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const group = useRef<HTMLDivElement>(null);
@@ -179,8 +181,9 @@ function MessageForm({
           Ton message
         </label>
         <textarea
+          ref={area}
           id={`${id}-body`}
-          className="nv-field__control nv-glass ta-body"
+          className="nv-field__control nv-glass grow-area ta-body"
           value={text}
           rows={4}
           maxLength={CREATOR_MESSAGE_TEXT_MAX}

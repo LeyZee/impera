@@ -18,8 +18,9 @@ const currentScope: SQL = sql`nullif(current_setting('app.team_scope', true), ''
 const isCreatorAccount: SQL = sql`current_setting('app.account_role', true) = 'creator'`;
 const notCreatorAccount: SQL = sql`current_setting('app.account_role', true) is distinct from 'creator'`;
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
+// A manager reads only the creators on his own list (`user.creator_ids`), as the sales feed does (avis Sécurité, 21/11).
 const ofHerTeam = (creatorId: PgColumn): SQL =>
-  sql`${notCreatorAccount} and ${currentScope} in ('owner', 'agency') and ${creatorId} = ${currentCreator}`;
+  sql`${notCreatorAccount} and ${creatorId} = ${currentCreator} and (${currentScope} = 'owner' or (${currentScope} = 'agency' and exists (select 1 from "user" u where u.id = ${currentUser} and ${creatorId} = any(u.creator_ids))))`;
 const ofHerOwner = (creatorId: PgColumn): SQL =>
   sql`${notCreatorAccount} and ${currentScope} = 'owner' and ${creatorId} = ${currentCreator}`;
 

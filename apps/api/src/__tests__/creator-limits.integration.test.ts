@@ -115,7 +115,7 @@ describe('what she tells the agency: her absences and what she no longer does', 
       endsOn: addDays(today, 1),
     });
     expect(response.statusCode).toBe(422);
-    expect(response.json()).toMatchObject({ code: ABSENCE_IN_PAST_UNPROCESSABLE });
+    expect(response.json()).toMatchObject({ error: { code: ABSENCE_IN_PAST_UNPROCESSABLE } });
   });
 
   it('lets her take back what she no longer does, kept but never listed', async () => {

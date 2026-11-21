@@ -165,7 +165,7 @@ describe('GET /v1/conversations/to-talk and PUT /v1/creators/:id/fan-tiers', () 
     await sale('fan_b', 's_b2', 1_000, 'refund');
     // Côme: arrived yesterday, never answered. Damien: 250 €, quiet for six days.
     await conversation(await fan('fan_c', 'Côme', 1), 0.5, null);
-    await conversation(await fan('fan_d', 'Damien', 120), 6, 6.5);
+    await conversation(await fan('fan_d', 'Damien', 120), 6.5, 6);
     await sale('fan_d', 's_d', 25_000);
     // Émile: his age in doubt, waiting: counted, never listed.
     await conversation(

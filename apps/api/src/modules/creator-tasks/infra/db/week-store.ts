@@ -8,6 +8,7 @@ import {
 import {
   and,
   eq,
+  onCreatorList,
   inArray,
   schema,
   sql,
@@ -214,9 +215,12 @@ export function createDrizzleWeekAgendaStore(db: Database): WeekAgendaStore {
       withCreatorAccount(db, userId, (tx, creatorId) => weekFrames(tx, creatorId, week, now)),
 
     teamWeek: (creatorId, userId, week, now) =>
-      withTenantMember(db, creatorId, userId, (tx, scope) => {
+      withTenantMember(db, creatorId, userId, async (tx, scope) => {
         // Her owner and an active manager read where she is; a chatter does not (trous béants n° 11).
         if (scope !== 'owner' && scope !== 'agency') throw new SuggestionForbidden();
+        // A manager reads only the creators on his own list (avis Sécurité, 21/11).
+        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId)))
+          throw new SuggestionForbidden();
         return weekFrames(tx, creatorId, week, now);
       }),
 
