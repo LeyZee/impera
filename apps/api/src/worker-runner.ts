@@ -8,7 +8,7 @@ import type { App } from './composition-root';
 import { parsedCronJobs, type CronJob } from './crontab';
 import { purgeDeadJobs } from './dead-jobs';
 import { workerLoggerFrom, type Logger } from './logger';
-import { releaseOrphanedLocks } from './orphaned-locks';
+import { releaseIdleLocks, releaseOrphanedLocks } from './orphaned-locks';
 import { useFrenchValidationMessages } from './validation-messages';
 import { retryingPool } from './worker-pool';
 
@@ -48,6 +48,14 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
   events.on('pool:create', ({ workerPool }) => {
     poolId ??= workerPool.id;
   });
+  // The jobs this worker runs now: a lock of its own on any other is one a lost completion left (`releaseIdleLocks`).
+  const running = new Set<string>();
+  events.on('job:start', ({ job }) => {
+    running.add(job.id);
+  });
+  events.on('job:complete', ({ job }) => {
+    running.delete(job.id);
+  });
   // Each failed attempt goes to Sentry (OPS-18) by its task and its attempt, never its payload: what a person wrote
   // can be in it (`placedJob`, logger.ts).
   events.on('job:failed', ({ job, error }) => {
@@ -74,6 +82,14 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
   }
   const workerId = poolId;
   const logger = options.logger.child({ workerId });
+  // A runner that stops on its own (a fatal error of Graphile) says so here, never as a rejection nobody handles: that
+  // would stop the API with its inline worker (recette COUV-14). Its heartbeat stops with it, so `/ready` tells.
+  const timers: { heartbeat?: NodeJS.Timeout } = {};
+  runner.promise.catch((error: unknown) => {
+    clearInterval(timers.heartbeat);
+    logger.error({ err: error }, 'worker stopped on an error');
+    app.errorReporter.captureException(error, { service: 'worker' });
+  });
 
   const beat = async (): Promise<void> => {
     try {
@@ -90,11 +106,14 @@ export async function startWorker(app: App, options: WorkerOptions): Promise<Wor
   };
   await beat();
   const heartbeat = setInterval(() => void beat(), options.heartbeatIntervalMs ?? 30_000);
+  timers.heartbeat = heartbeat;
 
   const unlock = async (): Promise<void> => {
     try {
       const released = await releaseOrphanedLocks(app.adminDb.db);
       if (released.length > 0) logger.warn({ released }, 'locks of dead workers released');
+      const idle = await releaseIdleLocks(app.adminDb.db, workerId, running);
+      if (idle > 0) logger.warn({ idle }, 'own locks of jobs no longer running released');
     } catch (error) {
       logger.warn({ err: error }, 'releasing the locks of dead workers failed');
     }

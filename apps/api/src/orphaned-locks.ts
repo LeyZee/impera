@@ -44,6 +44,39 @@ export async function releaseOrphanedLocks(adminDb: Database): Promise<string[]>
   return lockers;
 }
 
+/**
+ * A live worker's own locks on jobs it no longer runs (recette CHAT-03, COUV-14): Graphile does not await the call that
+ * marks a job done or failed, so the database cut at that moment leaves the job, and its conversation's queue, locked by
+ * a worker that goes on beating; nothing else of that conversation ran for 4 hours. A lock of `workerId` older than
+ * `ORPHAN_LOCK_MINUTES` on a job not in `running` is freed: the job runs again (jobs are idempotent, ADR 0006), and its
+ * queue with it unless one of `running` holds it. Says how many jobs were freed.
+ */
+export async function releaseIdleLocks(
+  adminDb: Database,
+  workerId: string,
+  running: Iterable<string>,
+): Promise<number> {
+  const ids = [...running].filter((id) => /^[0-9]+$/u.test(id));
+  const active = sql`array[${sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `,
+  )}]::bigint[]`;
+  const freed = await adminDb.execute(sql`
+    update graphile_worker._private_jobs set locked_by = null, locked_at = null
+     where locked_by = ${workerId}
+       and locked_at < now() - make_interval(mins => ${ORPHAN_LOCK_MINUTES})
+       and not (id = any(${active}))
+    returning id`);
+  await adminDb.execute(sql`
+    update graphile_worker._private_job_queues as queues set locked_by = null, locked_at = null
+     where locked_by = ${workerId}
+       and locked_at < now() - make_interval(mins => ${ORPHAN_LOCK_MINUTES})
+       and not exists (
+         select 1 from graphile_worker._private_jobs jobs
+          where jobs.job_queue_id = queues.id and jobs.id = any(${active}))`);
+  return freed.rows.length;
+}
+
 /** Jobs held by a dead worker's lock, for `/ready`: freed within a minute while a worker runs, so mostly zero. */
 export async function countOrphanedJobs(adminDb: Database): Promise<number> {
   const result = await adminDb.execute<{ orphaned: number }>(
