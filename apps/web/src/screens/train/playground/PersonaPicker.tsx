@@ -14,6 +14,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 
+import { noPersonaText } from './logic';
 import type { Playground } from './usePlayground';
 
 import { useCreators } from '@/creators/api';
@@ -138,7 +139,16 @@ const inForce = (overview: PersonaOverview): { id: PersonaVersionId; version: st
  * the evals and the sandbox, and for a scene opened before any creator has a version in force: the screen then says
  * so. Changing her starts the conversation over.
  */
-export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playground }): JSX.Element {
+export function PersonaPicker({
+  state,
+  pg,
+  asOwner = true,
+}: {
+  state: PlaygroundState;
+  pg: Playground;
+  /** A manager has no Persona tab: he is told who activates one (MAN-01). */
+  asOwner?: boolean;
+}): JSX.Element {
   const client = useQueryClient();
   const creators = useCreators();
   const { played } = state.persona;
@@ -184,10 +194,7 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
     }
     const version = inForce(hers);
     if (version === null) {
-      if (!quiet)
-        setProblem(
-          `${creator.displayName} n’a pas de persona en vigueur : active-en une dans Créatrices › Persona.`,
-        );
+      if (!quiet) setProblem(noPersonaText(creator.displayName, asOwner));
       return 'none';
     }
     const ran = await pg.run((c) =>
@@ -239,7 +246,7 @@ export function PersonaPicker({ state, pg }: { state: PlaygroundState; pg: Playg
     : played !== null
       ? 'Sa version en vigueur, celle que lisent ses fans. Tes notes vont à cette créatrice ; changer recommence la conversation.'
       : opening === 'none'
-        ? 'Aucune créatrice n’a de persona en vigueur : active-en une dans Créatrices › Persona.'
+        ? noPersonaText(null, asOwner)
         : opening === 'failed'
           ? 'Les personas ne se chargent pas. Choisis une créatrice pour réessayer.'
           : null;

@@ -53,8 +53,8 @@ const WHY: Readonly<Record<WaitingConversation['kind'], string>> = {
   custom_alert: 'Une de ses alertes personnalisées a sonné. L’agent attend un humain.',
   identity_doubt: 'Le fan doute que ce soit vraiment elle. Un chatteur en poste lui répond.',
   persona_inactive:
-    // Read by a chatter too, who cannot activate one (recette CHT-13): the sentence says who can.
-    'Elle n’a pas de persona active : l’agent n’écrit rien. Le propriétaire ou un manager en active une dans Créatrices › Persona.',
+    // Read by a chatter or a manager too, who cannot activate one (recette CHT-13, MAN-01): the sentence says who can.
+    'Elle n’a pas de persona active : l’agent n’écrit rien. Le propriétaire en active une dans Créatrices › Persona.',
   custom_order:
     'Il demande quelque chose fait pour lui : un humain prend la commande, l’agent ne promet rien.',
   sale_trouble:
