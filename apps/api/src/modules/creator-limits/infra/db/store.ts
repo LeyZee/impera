@@ -78,17 +78,22 @@ export function createDrizzleLimitStore(db: Database): LimitStore {
           })
           .onConflictDoNothing();
         // A replay reads back what the first call wrote; another creator's id reads nothing and says so.
-        const [row] = await tx.select().from(absences).where(eq(absences.id, body.id));
+        const [row] = await tx
+          .select()
+          .from(absences)
+          .where(and(eq(absences.id, body.id), eq(absences.creatorId, creatorId)));
         if (row === undefined) throw new Error('creator-limits: absence not written');
         return absenceOf(row);
       }),
 
     cancelAbsence: (userId, id) =>
-      withCreatorAccount(db, userId, async (tx) => {
+      withCreatorAccount(db, userId, async (tx, creatorId) => {
         await tx
           .update(absences)
           .set({ cancelledAt: sql`now()`, cancelledBy: userId })
-          .where(and(eq(absences.id, id), sql`${absences.cancelledAt} is null`));
+          .where(
+            and(eq(absences.id, id), eq(absences.creatorId, creatorId), sql`${absences.cancelledAt} is null`),
+          );
       }),
 
     tellStop: (userId, body) =>
@@ -97,17 +102,20 @@ export function createDrizzleLimitStore(db: Database): LimitStore {
           .insert(stops)
           .values({ id: body.id, creatorId, what: body.what, createdBy: userId })
           .onConflictDoNothing();
-        const [row] = await tx.select().from(stops).where(eq(stops.id, body.id));
+        const [row] = await tx
+          .select()
+          .from(stops)
+          .where(and(eq(stops.id, body.id), eq(stops.creatorId, creatorId)));
         if (row === undefined) throw new Error('creator-limits: stop not written');
         return stopOf(row);
       }),
 
     withdrawStop: (userId, id) =>
-      withCreatorAccount(db, userId, async (tx) => {
+      withCreatorAccount(db, userId, async (tx, creatorId) => {
         await tx
           .update(stops)
           .set({ withdrawnAt: sql`now()`, withdrawnBy: userId })
-          .where(and(eq(stops.id, id), sql`${stops.withdrawnAt} is null`));
+          .where(and(eq(stops.id, id), eq(stops.creatorId, creatorId), sql`${stops.withdrawnAt} is null`));
       }),
   };
 }

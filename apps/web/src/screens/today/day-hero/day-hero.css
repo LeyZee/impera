@@ -3,6 +3,8 @@
  * (design system, « Figures partagées »); this sheet only lays them out. Never red: what is left is not a fault.
  */
 .dh-card {
+  /* The one big thing of her screen (Design, 21/11): the shared donut, twice its legend size. */
+  --nv-donut-size: 264px;
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-3);
@@ -20,9 +22,15 @@
 }
 .dh-line {
   margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 700;
+}
+@media (max-width: 720px) {
+  .dh-card {
+    --nv-donut-size: 216px;
+  }
 }
 .dh-legend {
   --nv-breakdown-cols: 12px minmax(0, 1fr) auto;

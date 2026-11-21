@@ -71,3 +71,9 @@
 .sc-figures__tiles .nv-tile__value {
   white-space: normal;
 }
+
+/* Her day says its count once, in « Ce qu'on attend de toi » (Design, 21/11): the agenda's glance keeps where to
+   start and what is next, without its own ring. */
+.sc-today .ag-glance .ag-ring {
+  display: none;
+}

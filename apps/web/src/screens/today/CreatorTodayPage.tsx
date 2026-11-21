@@ -57,7 +57,7 @@ export function CreatorTodayPage(): JSX.Element {
         title="Aujourd’hui"
         lead="Ta journée d’abord, puis tes chiffres."
       />
-      <div className="sc-today">
+      <div className="sc-today ag-scope">
         {down ? (
           <Failure
             onRetry={() => {

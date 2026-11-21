@@ -79,3 +79,17 @@
   color: var(--nv-ink);
   font-weight: 600;
 }
+
+/* The shift's gauge says what it measures (Design, 21/11), in the series colour, never the neon. */
+.sc-hero__gauge-label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.sc-hero__gauge-label b {
+  color: var(--nv-ink);
+}
+.sc-hero__gauge.nv-gauge {
+  --_g: var(--nv-series-2);
+}

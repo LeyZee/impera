@@ -82,7 +82,7 @@ export async function fanStanding(
            p.last_purchase_at
       from fans f
       left join paid p on p.account = f.platform_account_id and p.fan = f.platform_fan_id
-     where f.id = ${fanId}::uuid`);
+     where f.id = ${fanId}::uuid and f.creator_id = ${creatorId}::uuid`);
   const [row] = PaidRowsSchema.parse(result.rows);
   if (row === undefined) return null;
   const spentMinor = spentOf(row.eur_minor, row.usd_minor, rateMicros);

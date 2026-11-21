@@ -276,6 +276,12 @@ function Hero({
       {/* Her limits and her voice before his first message (Charles, 21/11): the hours her creator is open to him. */}
       {state.kind === 'later' ? null : <HerLines creatorId={shift.creatorId} />}
       {state.kind === 'on' ? (
+        <span className="sc-hero__gauge-label">
+          Temps de poste écoulé{' '}
+          <b className="nv-num">{`${String(Math.round(progressOf(shift, now) * 100))} %`}</b>
+        </span>
+      ) : null}
+      {state.kind === 'on' ? (
         <div
           className="nv-gauge sc-hero__gauge"
           role="progressbar"

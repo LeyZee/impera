@@ -17,6 +17,10 @@ export function ToTalkCard({ creatorId, now }: { creatorId: string; now: Date })
   // Silent while it loads or fails: the hero's « Ouvrir Suivi » stays the way in.
   if (data === undefined) return null;
   const empty = data.waiting.length + data.newcomers.length + data.silent.length === 0;
+  // The answer first, large (Design, 21/11): the fan to write to now; the lists then hold the others.
+  const first = data.waiting[0] ?? data.newcomers[0] ?? data.silent[0];
+  const others = (fans: readonly ToTalkFan[]): readonly ToTalkFan[] =>
+    fans.filter((fan) => fan.conversationId !== first?.conversationId);
   return (
     <section className="nv-plate tt-card nv-enter" aria-labelledby="tt-title">
       <header className="tt-head">
@@ -26,11 +30,14 @@ export function ToTalkCard({ creatorId, now }: { creatorId: string; now: Date })
         {empty ? null : <span className="tt-hint">dans cet ordre</span>}
       </header>
       {empty ? <p className="tt-empty">Personne n’attend : tout le monde a sa réponse.</p> : null}
-      <Group title="Payeurs qui attendent" fans={data.waiting} creatorId={creatorId} now={now} />
-      <Group title="Nouveaux à accueillir" fans={data.newcomers} creatorId={creatorId} now={now} />
+      {first === undefined ? null : (
+        <Lead fan={first} creatorId={creatorId} now={now} silent={data.silent[0] === first} />
+      )}
+      <Group title="Payeurs qui attendent" fans={others(data.waiting)} creatorId={creatorId} now={now} />
+      <Group title="Nouveaux à accueillir" fans={others(data.newcomers)} creatorId={creatorId} now={now} />
       <Group
         title="Gros fans silencieux"
-        fans={data.silent}
+        fans={others(data.silent)}
         creatorId={creatorId}
         now={now}
         action="Relancer"
@@ -68,15 +75,11 @@ function Group({
                 className="tt-row nv-tap"
                 aria-label={`${fan.fanDisplayName} : ${action.toLowerCase()} sa conversation dans Suivi`}
               >
-                {fan.tier === null ? (
-                  <span className="tt-tier" />
-                ) : (
-                  <span className="tt-tier" data-tier={fan.tier}>
-                    {TIER_WORDS[fan.tier]}
-                  </span>
-                )}
                 <span className="tt-who">
-                  <b className="tt-name">{fan.fanDisplayName}</b>
+                  <span className="tt-who__top">
+                    <b className="tt-name">{fan.fanDisplayName}</b>
+                    <Tier fan={fan} />
+                  </span>
                   <span className="tt-standing nv-num">{standingOf(fan, now)}</span>
                 </span>
                 <span className="tt-when nv-num" data-long={when.long || undefined}>
@@ -90,6 +93,51 @@ function Group({
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+function Tier({ fan }: { fan: ToTalkFan }): JSX.Element | null {
+  return fan.tier === null ? null : (
+    <span className="tt-tier" data-tier={fan.tier}>
+      {TIER_WORDS[fan.tier]}
+    </span>
+  );
+}
+
+/** The fan to write to now, large, with the one neon of the card. */
+function Lead({
+  fan,
+  creatorId,
+  now,
+  silent,
+}: {
+  fan: ToTalkFan;
+  creatorId: string;
+  now: Date;
+  silent: boolean;
+}): JSX.Element {
+  const when = whenOf(fan, now);
+  return (
+    <div className="tt-lead">
+      <span className="tt-lead__eyebrow">Maintenant</span>
+      <div className="tt-lead__who">
+        <b className="tt-lead__name">{fan.fanDisplayName}</b>
+        <Tier fan={fan} />
+      </div>
+      <span className="tt-standing nv-num">
+        {standingOf(fan, now)} ·{' '}
+        <span className="tt-when" data-long={when.long || undefined}>
+          {when.text}
+        </span>
+      </span>
+      <Link
+        to="/suivi"
+        search={{ conversation: fan.conversationId, creatrice: creatorId }}
+        className="nv-btn nv-btn--neon tt-lead__go"
+      >
+        {silent ? 'Le relancer' : 'Lui répondre'}
+      </Link>
     </div>
   );
 }
