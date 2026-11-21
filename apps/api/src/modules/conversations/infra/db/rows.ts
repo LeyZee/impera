@@ -16,6 +16,8 @@ import {
   MessageIdSchema,
   PlatformAccountIdSchema,
   UserIdSchema,
+  CopilotTraceSchema,
+  type CopilotTrace,
 } from '@impera/contracts';
 import { sql, type schema } from '@impera/db';
 import { z } from 'zod';
@@ -95,8 +97,23 @@ const StoredPolicyTraceSchema = z.object({
     .optional(),
 });
 
-export function toStoredPolicyTrace(scriptStep: DraftScriptStep): z.infer<typeof StoredPolicyTraceSchema> {
-  return StoredPolicyTraceSchema.parse({ scriptStep });
+/** The copilot's trace beside it (ADR 0141 lot a), read on its own: a trace that does not read never hides the step. */
+const StoredCopilotTraceSchema = z.object({ copilot: CopilotTraceSchema });
+
+export function toStoredPolicyTrace(trace: {
+  readonly scriptStep?: DraftScriptStep | undefined;
+  readonly copilot?: CopilotTrace | undefined;
+}): z.infer<typeof StoredPolicyTraceSchema> & { readonly copilot?: CopilotTrace } {
+  return {
+    ...StoredPolicyTraceSchema.parse({ scriptStep: trace.scriptStep }),
+    ...(trace.copilot !== undefined && { copilot: CopilotTraceSchema.parse(trace.copilot) }),
+  };
+}
+
+/** What the code decided with a draft, for the copilot panel; `null` for a trace written before it or that does not read. */
+export function readCopilotTrace(trace: unknown): CopilotTrace | null {
+  const parsed = StoredCopilotTraceSchema.safeParse(trace);
+  return parsed.success ? parsed.data.copilot : null;
 }
 
 function readScriptStep(trace: unknown): DraftScriptStep | null {
