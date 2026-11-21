@@ -1,5 +1,4 @@
 import type { ContentStock, StockCategory } from '@impera/contracts';
-import { ringDash } from '@impera/design-system';
 import { useState, type JSX } from 'react';
 
 import { StockCategoryView, type StockOpened } from './StockCategoryView';
@@ -7,14 +6,13 @@ import { useStock, type StockDoor } from './api';
 import { HER_CATEGORIES, STOCK_COLOURS, STOCK_NAMES, fillOf, herFocusOf, unitsOf } from './model';
 
 import { useNow } from '@/scheduling/useNow';
+import { Ring } from '@/shell/figures/figures';
 import { Page, PageHeader } from '@/shell/layout';
 import { Failure } from '@/shell/states';
 
 import './stock.css';
 
 const DOOR: StockDoor = { kind: 'self' };
-const RING_RADIUS = 27;
-
 /**
  * Mon coffre, the creator's (ADR 0163 § 5), made for her phone: the one thing to drop today in large, two bonuses at
  * most, then each of her categories as a ring of days of advance (7 fills it). Never red: a short stock is said, not
@@ -122,19 +120,9 @@ function Mine({
                   onOpen({ kind: 'category', category: one.category });
                 }}
               >
-                <span className="nv-ring" aria-hidden="true">
-                  <svg viewBox="0 0 66 66">
-                    <circle className="nv-ring__track" cx="33" cy="33" r={RING_RADIUS} />
-                    <circle
-                      className="nv-ring__value"
-                      cx="33"
-                      cy="33"
-                      r={RING_RADIUS}
-                      strokeDasharray={ringDash(fillOf(one) / 100, RING_RADIUS)}
-                    />
-                  </svg>
-                  <span className="nv-ring__label nv-num">{ringValue(one)}</span>
-                </span>
+                <Ring share={fillOf(one) / 100} label={ringSub(one)} colour={STOCK_COLOURS[one.category]}>
+                  {ringValue(one)}
+                </Ring>
                 <span className="st-ring__name">{STOCK_NAMES[one.category]}</span>
                 <span className="st-ring__sub nv-num">{ringSub(one)}</span>
               </button>

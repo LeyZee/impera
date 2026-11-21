@@ -167,33 +167,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.st-bar__track {
-  position: relative;
-  height: 10px;
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-fill-soft);
-}
-.st-bar__fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--st-fill);
-  border-radius: inherit;
-  background: var(--st-c);
-  box-shadow: 0 0 12px color-mix(in oklab, var(--st-c) 50%, transparent);
-  animation: st-grow var(--nv-dur-slow) var(--nv-ease-spring) both;
-  transform-origin: left;
-}
-.st-bar__mark {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  left: var(--st-mark);
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 2px;
-  background: var(--nv-ink);
-  opacity: 0.55;
-}
 .st-bar__days {
   font-size: var(--nv-text-footnote);
   font-weight: 650;
@@ -201,11 +174,6 @@
 }
 .st-bar__days:is([data-status='short'], [data-status='low'], [data-status='empty']) {
   color: var(--nv-warning);
-}
-@keyframes st-grow {
-  from {
-    transform: scaleX(0);
-  }
 }
 
 /* ── Platforms and their categories ── */
@@ -249,9 +217,6 @@
   display: flex;
   align-items: center;
   gap: var(--nv-space-3);
-}
-.nv-ring.st-card__ring {
-  --_c: var(--st-c);
 }
 .st-card__ring .nv-ring__label {
   font-size: 14px;
@@ -796,9 +761,6 @@
 .st-ring:active {
   transform: scale(0.97);
 }
-.st-ring .nv-ring {
-  --_c: var(--st-c);
-}
 .st-ring .nv-ring__label {
   font-size: 14px;
 }
@@ -840,13 +802,12 @@
   .st-bar__days {
     grid-area: days;
   }
-  .st-bar__track {
+  .st-bar > .nv-meter {
     grid-area: track;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .st-bar__fill,
   .st-viewer__media {
     animation: none;
   }
@@ -860,9 +821,4 @@
   .st-ring:hover {
     transform: none;
   }
-}
-
-/* The ring's glow is drawn past its circle: left uncut, it stays round instead of a lighter square. */
-:is(.st-ring, .st-card) .nv-ring > svg {
-  overflow: visible;
 }

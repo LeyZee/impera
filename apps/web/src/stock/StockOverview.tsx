@@ -1,5 +1,4 @@
 import type { ContentStock, CreatorId, StockCategory } from '@impera/contracts';
-import { ringDash } from '@impera/design-system';
 import { useState, type JSX } from 'react';
 
 import { StockCategoryView, type StockOpened } from './StockCategoryView';
@@ -22,12 +21,10 @@ import {
 } from './model';
 
 import { useNow } from '@/scheduling/useNow';
-import { Donut, Spark, useLit } from '@/shell/figures/figures';
+import { Donut, Meter, Ring, Spark, useLit } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
 
 import './stock.css';
-
-const RING_RADIUS = 27;
 
 /**
  * Coffre Impera, the agency's view (ADR 0163): Créatrices › Médias for the owner and an active manager. The answer
@@ -176,17 +173,11 @@ function Overview({
                   }}
                 >
                   <span className="st-bar__name">{STOCK_NAMES[one.category]}</span>
-                  <span
-                    className="st-bar__track"
-                    style={{
-                      '--st-fill': `${String(Math.min(100, ((one.daysAhead ?? 0) / 14) * 100))}%`,
-                      '--st-mark': `${String(((one.target ?? 0) / 14) * 100)}%`,
-                    }}
-                    aria-hidden="true"
-                  >
-                    <span className="st-bar__fill" />
-                    <span className="st-bar__mark" />
-                  </span>
+                  <Meter
+                    percent={((one.daysAhead ?? 0) / 14) * 100}
+                    mark={((one.target ?? 0) / 14) * 100}
+                    colour={STOCK_COLOURS[one.category]}
+                  />
                   <span className="st-bar__days nv-num" data-status={one.status}>
                     {daysLabel(one.daysAhead ?? 0)}
                   </span>
@@ -321,21 +312,14 @@ function CategoryCard({
       aria-labelledby={`st-c-${category.category}`}
     >
       <header className="st-card__head">
-        <div className="nv-ring st-card__ring" role="img" aria-label={`${String(fill)} % de l’objectif`}>
-          <svg viewBox="0 0 66 66" aria-hidden="true">
-            <circle className="nv-ring__track" cx="33" cy="33" r={RING_RADIUS} />
-            <circle
-              className="nv-ring__value"
-              cx="33"
-              cy="33"
-              r={RING_RADIUS}
-              strokeDasharray={ringDash(fill / 100, RING_RADIUS)}
-            />
-          </svg>
-          <span className="nv-ring__label nv-num" aria-hidden="true">
-            {centre}
-          </span>
-        </div>
+        <Ring
+          className="st-card__ring"
+          share={fill / 100}
+          label={`${String(fill)} % de l’objectif`}
+          colour={STOCK_COLOURS[category.category]}
+        >
+          {centre}
+        </Ring>
         <div className="st-card__titles">
           <h4 id={`st-c-${category.category}`} className="st-card__name">
             {STOCK_NAMES[category.category]}

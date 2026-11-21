@@ -52,21 +52,18 @@ export const STOCK_RULES: Partial<Readonly<Record<DropCategory, string>>> = {
   whale_gift: 'Jamais de nu, jamais revendu',
 };
 
-/**
- * Each category's colour: the four series of the design system first, then their mixes, so that two neighbours never
- * share one (Charles, 21/11: une couleur par type de contenu).
- */
+/** Each category's colour: the design system's ten content hues, in their fixed order (Charles, 21/11). */
 export const STOCK_COLOURS: Readonly<Record<DropCategory, string>> = {
-  feed_video: 'var(--nv-series-2)',
-  feed_shoot: 'var(--nv-series-3)',
-  reveal_story: 'var(--nv-series-1)',
-  mass_dm: 'var(--nv-series-4)',
-  script: 'color-mix(in oklab, var(--nv-series-3) 45%, var(--nv-series-2))',
-  whale_gift: 'color-mix(in oklab, var(--nv-series-4) 55%, #e8a33a)',
-  instagram_post: 'color-mix(in oklab, var(--nv-series-1) 45%, var(--nv-series-2))',
-  instagram_reel: 'color-mix(in oklab, var(--nv-series-2) 60%, var(--nv-series-3))',
-  instagram_story: 'color-mix(in oklab, var(--nv-series-3) 70%, #ffffff)',
-  telegram_post: 'color-mix(in oklab, var(--nv-series-2) 55%, #ffffff)',
+  feed_video: 'var(--nv-content-1)',
+  feed_shoot: 'var(--nv-content-2)',
+  reveal_story: 'var(--nv-content-3)',
+  mass_dm: 'var(--nv-content-4)',
+  script: 'var(--nv-content-5)',
+  whale_gift: 'var(--nv-content-6)',
+  instagram_post: 'var(--nv-content-7)',
+  instagram_reel: 'var(--nv-content-8)',
+  instagram_story: 'var(--nv-content-9)',
+  telegram_post: 'var(--nv-content-10)',
 };
 
 export const PLATFORM_NAMES: Readonly<Record<StockCategory['platform'], string>> = {
