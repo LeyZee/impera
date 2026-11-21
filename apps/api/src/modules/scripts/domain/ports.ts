@@ -30,6 +30,7 @@ import type {
 } from '@impera/contracts';
 
 import type { BranchSetting } from './branches';
+import type { DailyReading, MeasuredScript, PeriodRun } from './performance';
 import type { KnownPlatformScript, PlatformScriptsPlan, StepTotals } from './platform-scripts';
 import type { PreparedVaultMedia } from './prepared-scripts';
 import type { NativeScriptForMatch, PreparedForMatch, Recognition } from './recognition';
@@ -344,7 +345,29 @@ export interface PlatformScriptReadStore {
    * read her.
    */
   discountedOf(creatorId: CreatorId, userId: string): Promise<readonly DiscountedPlatformScript[] | null>;
+  /**
+   * What the performance of her scripts counts besides the runs (ADR 0129, sous-lot 4c), read as `ofCreator` is and
+   * under the same rights: her active scripts recognised as ours and Reveal's daily readings of their steps. `null` for
+   * a reader who may not read her.
+   */
+  performanceOf(creatorId: CreatorId, userId: string): Promise<PerformanceInput | null>;
 }
+
+/** Her scripts as the performance measures them; readings by `readingKey(account, step ref)`. */
+interface PerformanceInput {
+  readonly scripts: readonly MeasuredScript[];
+  readonly readings: ReadonlyMap<string, readonly DailyReading[]>;
+}
+
+/**
+ * Her runs started from `since` (`conversations`, wired by the composition root), as a person of the agency reads them;
+ * `null` for anyone else.
+ */
+export type RunsSince = (
+  creatorId: CreatorId,
+  userId: string,
+  since: Date,
+) => Promise<readonly PeriodRun[] | null>;
 
 /** A native script of hers kept from being offered by a « Tarif réduit » on the platform, as long as it is there. */
 export interface DiscountedPlatformScript {

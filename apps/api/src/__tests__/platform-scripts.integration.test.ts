@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+  calendarDayAt,
+  ConversationIdSchema,
   CreatorIdSchema,
+  FanIdSchema,
   MediaAssetIdSchema,
   newId,
   PLATFORM_SCRIPT_NAME_MAX,
@@ -13,6 +16,9 @@ import {
   PreparedScriptIdSchema,
   SCRIPT_IDENTITY_SCHEMA_VERSION,
   ScriptIdentityIdSchema,
+  SCRIPT_STATS_MIN_FANS,
+  ScriptRunIdSchema,
+  ScriptPerformanceListSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type DescriptionReviewReason,
@@ -1113,5 +1119,111 @@ describe('the native scripts imported from the platform', () => {
     expect(await importOf(noraAccount, nora, new Date('2026-11-16T11:00:00Z'))).toMatchObject({
       recognised: 0,
     });
+  });
+
+  it('measures her active scripts recognised as ours over the period, for the team only (ADR 0129, sous-lot 4c)', async () => {
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.platformScripts)
+      .where(eq(schema.platformScripts.platformScriptRef, 'sequence_1'));
+    if (row === undefined) throw new Error('imported');
+    const [first] = await test.admin.db
+      .select()
+      .from(schema.platformScriptSteps)
+      .where(eq(schema.platformScriptSteps.platformScriptId, row.id))
+      .orderBy(schema.platformScriptSteps.position)
+      .limit(1);
+    if (first === undefined) throw new Error('steps');
+    const now = Date.now();
+    const dayOf = (ago: number) => calendarDayAt(new Date(now - ago * 86_400_000), PARIS);
+    // Reveal's readings of its first step, relative to today: ten days ago, then today.
+    await test.admin.db
+      .delete(schema.platformScriptStepDaily)
+      .where(eq(schema.platformScriptStepDaily.creatorId, nora));
+    for (const [ago, sent, purchased, paidMinor] of [
+      [10, 10, 2, 1000],
+      [0, 13, 3, 1500],
+    ] as const) {
+      await test.admin.db.insert(schema.platformScriptStepDaily).values({
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        platformStepRef: first.platformStepRef,
+        day: dayOf(ago),
+        sent,
+        purchased,
+        paidMinor,
+        currency: 'EUR',
+        readAt: new Date(now - ago * 86_400_000),
+      });
+    }
+    // Two fans got its first step from the agent yesterday: one bought it, one refused it; a third, 40 days ago.
+    const runOf = async (fanRef: string, ago: number, outcome: 'bought' | 'refused') => {
+      const fanId = newId(FanIdSchema);
+      const conversationId = newId(ConversationIdSchema);
+      const at = new Date(now - ago * 86_400_000).toISOString();
+      await test.admin.db.insert(schema.fans).values({
+        id: fanId,
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        platformFanId: fanRef,
+        displayName: 'Fan inventé',
+      });
+      await test.admin.db.insert(schema.conversations).values({
+        id: conversationId,
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        fanId,
+        platformConversationId: `conv-${fanRef}`,
+      });
+      await test.admin.db.insert(schema.scriptRuns).values({
+        id: newId(ScriptRunIdSchema),
+        creatorId: nora,
+        conversationId,
+        scriptRef: 'sequence_1',
+        status: outcome === 'bought' ? 'open' : 'refused',
+        steps: [{ stepIndex: 0, kind: 'paid', outcome, priceMinor: first.priceMinor, sentAt: at, at }],
+        startedAt: new Date(at),
+        endedAt: outcome === 'bought' ? null : new Date(at),
+      });
+    };
+    await runOf('perf-1', 1, 'bought');
+    await runOf('perf-2', 1, 'refused');
+    await runOf('perf-3', 40, 'bought');
+
+    const read = async (who: 'owner' | 'manager' | 'chatter' | 'nora', days: number) =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/creators/${nora}/platform-scripts/performance?days=${String(days)}`,
+        headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
+      });
+    const response = await read('owner', 7);
+    expect(response.statusCode).toBe(200);
+    const list = ScriptPerformanceListSchema.parse(response.json());
+    expect(list).toMatchObject({ days: 7, minFans: SCRIPT_STATS_MIN_FANS });
+    // Only ours: the script recognised from Impera, never a native one of another tool (ADR 0161).
+    expect(list.scripts.map((line) => line.id)).toEqual([row.id]);
+    expect(list.scripts[0]).toMatchObject({
+      fans: 2,
+      revenueMinor: first.priceMinor,
+      revenuePerFanMinor: null,
+      revealSince: dayOf(7),
+    });
+    expect(list.scripts[0]?.steps[0]).toMatchObject({
+      rank: 0,
+      sent: 2,
+      bought: 1,
+      purchaseRate: null,
+      reveal: { sent: 3, purchased: 1, paidMinor: 500 },
+    });
+    // Over 90 days, the third fan counts too.
+    expect(ScriptPerformanceListSchema.parse((await read('owner', 90)).json()).scripts[0]?.fans).toBe(3);
+    expect((await read('owner', 12)).statusCode).toBe(400);
+    // An active manager of her list reads it; a chatter and her own account never, nor anyone about Inès's.
+    expect((await read('manager', 30)).statusCode).toBe(200);
+    expect((await read('chatter', 30)).statusCode).toBe(404);
+    expect([403, 404]).toContain((await read('nora', 30)).statusCode);
+    expect(
+      await withCreatorAccount(app.db.db, ids.nora, (tx) => tx.select().from(schema.scriptRuns)),
+    ).toEqual([]);
   });
 });
