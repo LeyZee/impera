@@ -24,12 +24,13 @@ const THEO_HERE: TeamMember = TeamMemberSchema.parse({
   commission: { rateBps: 1_000, teamShareBps: null, presetId: null, effectiveFrom: '2026-10-01' },
 });
 
-function serve(members: readonly TeamMember[]): void {
+function serve(members: readonly TeamMember[], rates: readonly unknown[] = []): void {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: string) => {
       const url = new URL(input, 'http://localhost');
       if (url.pathname === '/v1/team/members') return Promise.resolve(Response.json({ members }));
+      if (url.pathname.endsWith('/commission')) return Promise.resolve(Response.json({ rates }));
       // The creators of his account, whatever his shifts (recette 16/11, CHT-31): Léa is not on his list.
       if (url.pathname === '/v1/creators')
         return Promise.resolve(
@@ -111,6 +112,21 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
     expect(text).toContain('Bénin');
     expect(text).toContain('Porto-Novo · celui de ton téléphone, repris à chaque ouverture');
     expect(text).toContain('1er septembre 2026');
+  });
+
+  it('says the rate set ahead of him, as the owner reads it (PRO2-05)', async () => {
+    const inForce = THEO_HERE.commission;
+    serve(
+      [THEO_HERE],
+      [inForce, { rateBps: 2_200, teamShareBps: null, presetId: null, effectiveFrom: '2026-12-01' }],
+    );
+    renderPage(THEO_ME);
+    const facts = await screen.findByText('Nora Vidal');
+    await vi.waitFor(() => {
+      expect(facts.closest('dl')?.textContent.replace(NBSP, ' ')).toContain(
+        '10 % · depuis le 1er octobre 2026 · 22 % à partir du 1er décembre 2026',
+      );
+    });
   });
 
   // No « Calendrier »: a chatter's link is on Planning, « Dans mon téléphone » (ADR 0134, lot 1).
