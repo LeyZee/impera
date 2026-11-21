@@ -59,7 +59,7 @@ export function endValidations(): void {
  */
 export function cutValidations(
   period: string,
-  statements: readonly Pick<CommissionStatement, 'id' | 'status'>[],
+  statements: readonly { readonly id: string; readonly status: CommissionStatement['status'] }[],
 ): number | null {
   const queue = read();
   if (queue?.period !== period) return null;
