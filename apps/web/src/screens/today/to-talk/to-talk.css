@@ -28,13 +28,9 @@
   flex-direction: column;
   gap: var(--nv-space-1);
 }
-.tt-group__title {
+.tt-group__title.nv-h3 {
   margin: var(--nv-space-2) 0 0;
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-caption);
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  color: var(--nv-ink-muted);
 }
 .tt-list {
   display: flex;
@@ -63,8 +59,7 @@
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 var(--nv-space-2);
+  padding: 2px var(--nv-space-2);
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
   font-weight: 650;

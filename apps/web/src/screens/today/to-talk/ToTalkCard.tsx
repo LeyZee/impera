@@ -56,7 +56,7 @@ function Group({
   if (fans.length === 0) return null;
   return (
     <div className="tt-group">
-      <h3 className="tt-group__title">{title}</h3>
+      <h3 className="nv-h3 tt-group__title">{title}</h3>
       <ul className="tt-list">
         {fans.map((fan) => {
           const when = whenOf(fan, now);

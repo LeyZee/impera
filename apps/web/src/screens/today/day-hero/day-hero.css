@@ -28,12 +28,8 @@
   gap: var(--nv-space-2);
   min-width: 0;
 }
-.dh-title {
+.dh-title.nv-h2 {
   margin: 0;
-  font-family: var(--nv-font-display);
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  letter-spacing: var(--nv-text-title-2-tracking);
 }
 .dh-line {
   margin: 0;

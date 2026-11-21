@@ -47,7 +47,7 @@ beforeEach(() => {
   // jsdom has no matchMedia: a reduced motion, so the lens and the icons do not play.
   vi.stubGlobal(
     'matchMedia',
-    vi.fn(() => ({ matches: true })),
+    vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
   // The screens stay on their loading state: only the shell is under test.
   vi.stubGlobal(
@@ -921,7 +921,8 @@ describe('the width of each section without tabs', () => {
 
   const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self', creatorIds: ['c1'] };
   it.each([
-    ['/aujourdhui', 'Aujourd’hui', 'narrow', chatter],
+    // Two columns on a computer: who to talk to, his figures beside (Charles, 21/11).
+    ['/aujourdhui', 'Aujourd’hui', 'wide', chatter],
     ['/planning', 'Planning', 'narrow', chatter],
     ['/notifications', 'Notifications', 'narrow', chatter],
     ['/aide/installer', 'Installer Impera', 'narrow', chatter],

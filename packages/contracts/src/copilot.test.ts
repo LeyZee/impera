@@ -28,6 +28,7 @@ describe('the copilot panel’s contract (ADR 0086)', () => {
       conversationId: DRAFT,
       fanId: DRAFT,
       switches: { fanCard: true, drafts: true },
+      standing: null,
     };
     expect(CopilotDraftViewSchema.safeParse({ state: 'none', conversation }).success).toBe(true);
     expect(

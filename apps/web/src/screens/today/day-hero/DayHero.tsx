@@ -57,7 +57,7 @@ export function DayHero({ today }: { today: string }): JSX.Element | null {
         </span>
       </div>
       <div className="dh-text">
-        <h2 id="dh-title" className="dh-title">
+        <h2 id="dh-title" className="nv-h2 dh-title">
           {hero.title}
         </h2>
         <p className="dh-line">{hero.line}</p>
