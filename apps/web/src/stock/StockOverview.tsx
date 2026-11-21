@@ -17,7 +17,6 @@ import {
   headlineOf,
   paceOf,
   platformsOf,
-  unitsOf,
 } from './model';
 
 import { useNow } from '@/scheduling/useNow';
@@ -87,7 +86,10 @@ function Overview({
   const headline = headlineOf(stock, now);
   const figures = figuresOf(stock, now);
   const platforms = platformsOf(stock);
-  const paced = stock.categories.filter((one) => one.mode === 'days');
+  const opened = new Set(
+    platforms.filter((one) => one.open).flatMap((one) => one.categories.map((c) => c.category)),
+  );
+  const paced = stock.categories.filter((one) => one.mode === 'days' && opened.has(one.category));
   const change = figures.dropped14 - figures.droppedBefore;
 
   return (
@@ -121,7 +123,7 @@ function Overview({
               : `dont ${String(figures.scripts)} dans des scripts`}
           </span>
         </div>
-        <div className="nv-tile st-tile-figure">
+        <div className="nv-tile st-tile-figure st-tile-figure--spark">
           <span className="nv-tile__label">Déposés sur 14 jours</span>
           <span className="nv-tile__value nv-num">{figures.dropped14}</span>
           <span className={`nv-delta ${change >= 0 ? 'nv-delta--better' : 'nv-delta--worse'}`}>
@@ -295,10 +297,10 @@ function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: (
   const rule = STOCK_RULES[category.category];
   const centre =
     category.mode === 'days'
-      ? daysLabel(category.daysAhead ?? 0).replace(' et plus', '+')
+      ? daysLabel(category.daysAhead ?? 0).replace(' +', '+')
       : category.mode === 'count'
-        ? String(category.stockUnits)
-        : '·';
+        ? `${String(category.stockUnits)}/${String(category.target ?? 0)}`
+        : '+';
   return (
     <article
       className="nv-plate nv-plate--pad st-card"
@@ -318,11 +320,8 @@ function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: (
               strokeDasharray={ringDash(fill / 100, RING_RADIUS)}
             />
           </svg>
-          <span className="nv-ring__label" aria-hidden="true">
+          <span className="nv-ring__label nv-num" aria-hidden="true">
             {centre}
-            <span className="nv-ring__sub">
-              {category.mode === 'days' ? 'd’avance' : category.mode === 'count' ? 'prêts' : 'bonus'}
-            </span>
           </span>
         </div>
         <div className="st-card__titles">
@@ -336,7 +335,7 @@ function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: (
       <dl className="st-card__facts">
         <div>
           <dt>En stock</dt>
-          <dd className="nv-num">{unitsOf(category.category, category.stockUnits)}</dd>
+          <dd className="nv-num">{category.stockUnits}</dd>
         </div>
         <div>
           <dt>Parti en 7 j</dt>
@@ -345,7 +344,7 @@ function CategoryCard({ category, onOpen }: { category: StockCategory; onOpen: (
         <div>
           <dt>Manque</dt>
           <dd className="nv-num" data-tone={category.lacking > 0 ? 'warn' : undefined}>
-            {category.lacking === 0 ? 'Rien' : unitsOf(category.category, category.lacking)}
+            {category.lacking === 0 ? 'Rien' : category.lacking}
           </dd>
         </div>
       </dl>

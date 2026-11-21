@@ -76,7 +76,7 @@ export function StockCategoryView({
       'out',
     ],
     ['À valider', all.filter((one) => one.description === 'to_validate').length, 'to_validate'],
-    ...(her ? [] : [['Original effacé sous 7 j', erasing, null] as const]),
+    ...(her ? [] : [['Effacé sous 7 j', erasing, null] as const]),
   ];
   const rule = category === null ? undefined : STOCK_RULES[category];
 

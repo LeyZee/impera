@@ -162,7 +162,7 @@ function ViewerBody({
             <>
               <button
                 type="button"
-                className="nv-iconbtn st-viewer__step st-viewer__step--previous"
+                className="st-viewer__step st-viewer__step--previous"
                 aria-label="Média précédent"
                 onClick={onPrevious}
               >
@@ -170,7 +170,7 @@ function ViewerBody({
               </button>
               <button
                 type="button"
-                className="nv-iconbtn st-viewer__step st-viewer__step--next"
+                className="st-viewer__step st-viewer__step--next"
                 aria-label="Média suivant"
                 onClick={onNext}
               >

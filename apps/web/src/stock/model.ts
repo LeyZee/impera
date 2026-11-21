@@ -92,9 +92,9 @@ const UNIT_WORDS: Readonly<Record<DropCategory, readonly [string, string]>> = {
 export const unitsOf = (category: DropCategory, count: number): string =>
   `${String(count)} ${UNIT_WORDS[category][count > 1 ? 1 : 0]}`;
 
-/** « 4 j », « 2,5 j », « 14 j et plus ». */
+/** « 4 j », « 2,5 j », « 14 j + » past two weeks. */
 export function daysLabel(days: number): string {
-  if (days >= 14) return '14 j et plus';
+  if (days >= 14) return '14 j +';
   return `${days.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`;
 }
 

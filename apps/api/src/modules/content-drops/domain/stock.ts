@@ -41,7 +41,7 @@ export const STOCK_RULES: Readonly<Record<DropCategory, StockRule>> = {
 };
 
 /** Where a category goes out, for the screen's groups (Reveal, Instagram, Telegram). */
-export const STOCK_PLATFORM_OF: Readonly<Record<DropCategory, StockCategory['platform']>> = {
+const STOCK_PLATFORM_OF: Readonly<Record<DropCategory, StockCategory['platform']>> = {
   feed_video: 'reveal',
   feed_shoot: 'reveal',
   reveal_story: 'reveal',
