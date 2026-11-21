@@ -415,6 +415,8 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   const creatorDecisions = createCreatorDecisionsModule({
     db: shared.db,
     requireRole: shared.requireRole,
+    // Late bound: the captions ask through this module's door, and this module asks them for other ideas.
+    otherIdeas: { caption: (ask) => instagramCaptions.module.otherIdeas(ask) },
     ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
   });
   const scheduling = wireScheduling(shared, {

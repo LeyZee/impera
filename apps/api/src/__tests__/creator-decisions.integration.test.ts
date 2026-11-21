@@ -169,6 +169,13 @@ describe('her decisions (ADR 0164)', () => {
     expect((await call('POST', `/v1/creator-space/decisions/${first.id}/later`, 'ines')).statusCode).toBe(
       404,
     );
+    const ideas = await server.inject({
+      method: 'POST',
+      url: `/v1/creator-space/decisions/${first.id}/other-ideas`,
+      headers: { cookie: cookies.ines, origin: DASHBOARD_ORIGIN },
+      payload: { hints: ['shorter'], note: '' },
+    });
+    expect(ideas.statusCode).toBe(404);
     expect(await hers('nora')).toHaveLength(2);
   });
 

@@ -31,7 +31,7 @@ import type {
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
-import { dropsOfMedium, type DropOfMedium } from './infra/db/described-drops';
+import { dropsOfMedium, mediaOfDrop, type DropOfMedium } from './infra/db/described-drops';
 import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
@@ -103,6 +103,11 @@ export interface ContentDropsModule {
    * `onDescribed` reads. Empty while the medium has no description, or when nothing describes.
    */
   describedDrops(creatorId: string, mediaAssetId: string): Promise<readonly DescribedDrop[]>;
+  /**
+   * One live drop of hers with the latest description of a medium it holds (ADR 0164 § 9, « D'autres idées »); `null`
+   * when the drop is not hers, no longer live, or holds no described medium.
+   */
+  describedDrop(creatorId: string, dropId: string): Promise<DescribedDrop | null>;
   /** That picture removed when no media came to carry it (ADR 0113 § 1); nothing when no storage is set. */
   unpicture(key: string): Promise<void>;
   /**
@@ -277,6 +282,16 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       if (description === undefined) return [];
       const drops = await dropsOfMedium(deps.db, creatorId, mediaAssetId);
       return drops.map((drop) => ({ ...drop, description: description.detailed }));
+    },
+    describedDrop: async (creatorId, dropId) => {
+      const held = await mediaOfDrop(deps.db, creatorId, dropId);
+      if (held.length === 0 || deps.describer === undefined) return null;
+      const descriptions = await deps.describer.detailed(held.map((one) => one.mediaAssetId));
+      for (const { mediaAssetId, ...drop } of held) {
+        const description = descriptions.get(mediaAssetId);
+        if (description !== undefined) return { ...drop, description: description.detailed };
+      }
+      return null;
     },
     unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),

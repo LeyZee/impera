@@ -4,7 +4,7 @@ Le code pose une **décision** à une créatrice sur un de ses contenus : une qu
 
 **Peut dépendre de.** Aucun autre module.
 
-**État.** Lot a : contrat (`packages/contracts`, `creator-decisions.ts`), table et RLS (`creator_decisions`), routes, porte `asking`. Premier code qui demande : `instagram-captions` (les légendes d'un Reel déposé). La notification et « D'autres idées » viennent ensuite (fiche INS-05).
+**État.** Lot a : contrat (`packages/contracts`, `creator-decisions.ts`), table et RLS (`creator_decisions`), routes, porte `asking`. Premier code qui demande : `instagram-captions` (les légendes d'un Reel déposé). « D'autres idées » : `POST /v1/creator-space/decisions/:id/other-ideas`, son droit relu dans son compte, les réponses écrites par le code branché pour ce genre de décision (`otherIdeas`, à la racine de composition), gardées par la porte `asking` ; sa demande est comptée avant tout appel payant, une à la fois (`countIdeas`), et rendue quand rien ne peut être proposé (`returnIdeas`). La notification vient ensuite (fiche INS-05).
 
 ## Pour le code qui demande (`asking`)
 
