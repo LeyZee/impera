@@ -132,10 +132,25 @@ describe('situationOf and groupByHand (CHAT-22, PRO-03)', () => {
 
   it('says « Mode soin » instead of « Rien à faire » under his care mode, never over a task (Design 21/11)', () => {
     const quiet = situationOf(conversation('1', { state: 'idle', ...answered }));
-    expect(withCare(quiet, true)).toEqual({ hand: 'quiet', label: 'Mode soin', pill: 'tr-status--care' });
+    expect(withCare(quiet, true)).toEqual({ hand: 'care', label: 'Mode soin', pill: 'tr-status--care' });
     expect(withCare(quiet, false)).toBe(quiet);
     const waits = situationOf(conversation('1', { state: 'idle', ...unanswered }));
     expect(withCare(waits, true)).toBe(waits);
+    // In the list, under « Mode soin », never « Rien à faire »; a creator never reads it.
+    const careSince = '2026-10-17T19:00:00Z';
+    const lines = [
+      { conversation: conversation('1', { state: 'idle', ...answered, careSince }) },
+      { conversation: conversation('2', { state: 'idle', ...answered }) },
+      { conversation: conversation('3', { state: 'idle', ...unanswered, careSince }) },
+    ];
+    expect(
+      groupByHand(lines).map((g) => [g.hand, g.lines.map((l) => l.conversation.fanDisplayName)]),
+    ).toEqual([
+      ['yours', ['Fan 3']],
+      ['care', ['Fan 1']],
+      ['quiet', ['Fan 2']],
+    ]);
+    expect(groupByHand(lines, false, false).map((g) => g.hand)).toEqual(['yours', 'quiet']);
   });
 
   it('never says « Rien à faire » while his last message has no answer', () => {

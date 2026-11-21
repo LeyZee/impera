@@ -10,28 +10,24 @@ import {
  * retouch changed. Pure: the page gives the view, these give its words and its colours.
  */
 
-/** The design system's categorical series, in order; a fifth reason and beyond fold into its « other » ink. */
-const SERIES: readonly string[] = [
-  'var(--nv-series-1)',
-  'var(--nv-series-2)',
-  'var(--nv-series-3)',
-  'var(--nv-series-4)',
-];
-const OTHER = 'var(--nv-series-other)';
-
 /**
- * A colour per reason, by rank: the four reasons that count most take the four series in order, the rest the series'
- * « other » ink, as every chart of the app folds a fifth category (tokens.css). `counts` comes in the view's order;
- * ties keep it.
+ * Each reason's colour, fixed for good so that a reason reads at a glance from one month to the next (Design, recette
+ * du 21/11). The design system has four categorical series (tokens.css): they go to the reasons met most by nature, a
+ * retouch and the three refusals the copilot panel offers first; every other reason takes the series' « other » ink.
+ * A coloured reason never changes colour.
  */
-export function reasonColours(
-  counts: DraftCorrectionsView['counts'],
-): ReadonlyMap<DraftCorrectionReason, string> {
-  const ranked = counts
-    .map((one, index) => ({ ...one, index }))
-    .sort((a, b) => b.count - a.count || a.index - b.index);
-  return new Map(ranked.map((one, rank) => [one.reason, SERIES[rank] ?? OTHER]));
-}
+export const REASON_COLOURS: Readonly<Record<DraftCorrectionReason, string>> = {
+  edited: 'var(--nv-series-1)',
+  sounds_ai: 'var(--nv-series-2)',
+  too_long: 'var(--nv-series-3)',
+  out_of_character: 'var(--nv-series-4)',
+  too_early_sexual: 'var(--nv-series-other)',
+  missed_sale: 'var(--nv-series-other)',
+  forgot_fact: 'var(--nv-series-other)',
+  other: 'var(--nv-series-other)',
+  written: 'var(--nv-series-other)',
+  none: 'var(--nv-series-other)',
+};
 
 /** What most of them were, in a few words: a retouch, a refusal and why. */
 function mostly(reason: DraftCorrectionReason): string {

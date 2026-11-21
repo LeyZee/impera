@@ -125,8 +125,8 @@ describe('Entraîner › Corrections (trou béant 12)', () => {
     expect(screen.getByText('2 corrections en 30 jours')).toBeTruthy();
     expect(screen.getByText('Les 30 derniers jours de Nora.')).toBeTruthy();
     expect(screen.getByRole('img', { name: 'Par raison : Trop long 1, Retouché 1' })).toBeTruthy();
-    expect(refused.style.getPropertyValue('--_c')).toBe('var(--nv-series-1)');
-    expect(edited.style.getPropertyValue('--_c')).toBe('var(--nv-series-2)');
+    expect(refused.style.getPropertyValue('--_c')).toBe('var(--nv-series-3)');
+    expect(edited.style.getPropertyValue('--_c')).toBe('var(--nv-series-1)');
     expect(within(refused).getByRole('link', { name: 'Fan 1' }).getAttribute('href')).toContain('/suivi?');
 
     const reasons = screen.getByRole('group', { name: 'Raisons' });

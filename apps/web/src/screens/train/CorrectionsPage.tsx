@@ -8,7 +8,7 @@ import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { correctionsError, useDraftCorrections } from './corrections/api';
-import { correctionsHeadline, reasonColours, wordDiff, type DiffPart } from './corrections/model';
+import { correctionsHeadline, REASON_COLOURS, wordDiff, type DiffPart } from './corrections/model';
 
 import { useCreators } from '@/creators/api';
 import { Select } from '@/shell/Select';
@@ -98,8 +98,7 @@ function CreatorCorrections({ creatorId, name }: { creatorId: string; name: stri
       </Empty>
     );
   }
-  const colours = reasonColours(view.counts);
-  const colourOf = (one: DraftCorrectionReason): string => colours.get(one) ?? 'var(--nv-series-other)';
+  const colourOf = (one: DraftCorrectionReason): string => REASON_COLOURS[one];
   const shown = reason === null ? view.items : view.items.filter((item) => item.reason === reason);
   const litCount = lit === null ? undefined : view.counts[lit];
   return (

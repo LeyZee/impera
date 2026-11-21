@@ -1,24 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import { correctionsHeadline, reasonColours, wordDiff } from './model';
+import { correctionsHeadline, REASON_COLOURS, wordDiff } from './model';
 
 const items = (n: number): readonly never[] => new Array<never>(n);
 
 describe('Entraîner › Corrections in figures (Design, recette du 21/11)', () => {
-  it('gives each reason its colour by rank, folding a fifth into the series’ other ink', () => {
-    const colours = reasonColours([
-      { reason: 'too_long', count: 1 },
-      { reason: 'edited', count: 4 },
-      { reason: 'sounds_ai', count: 2 },
-      { reason: 'none', count: 1 },
-      { reason: 'other', count: 1 },
-    ]);
-    expect(colours.get('edited')).toBe('var(--nv-series-1)');
-    expect(colours.get('sounds_ai')).toBe('var(--nv-series-2)');
-    // A tie keeps the view's order.
-    expect(colours.get('too_long')).toBe('var(--nv-series-3)');
-    expect(colours.get('none')).toBe('var(--nv-series-4)');
-    expect(colours.get('other')).toBe('var(--nv-series-other)');
+  it('gives each reason one colour for good: the four series to the commonest, the other ink to the rest', () => {
+    expect(REASON_COLOURS).toEqual({
+      edited: 'var(--nv-series-1)',
+      sounds_ai: 'var(--nv-series-2)',
+      too_long: 'var(--nv-series-3)',
+      out_of_character: 'var(--nv-series-4)',
+      too_early_sexual: 'var(--nv-series-other)',
+      missed_sale: 'var(--nv-series-other)',
+      forgot_fact: 'var(--nv-series-other)',
+      other: 'var(--nv-series-other)',
+      written: 'var(--nv-series-other)',
+      none: 'var(--nv-series-other)',
+    });
+    // Each series tint goes to one reason only.
+    const tinted = Object.values(REASON_COLOURS).filter((colour) => colour !== 'var(--nv-series-other)');
+    expect(new Set(tinted).size).toBe(tinted.length);
   });
 
   it('says the answer in a sentence: how many, over how long, and what most were', () => {

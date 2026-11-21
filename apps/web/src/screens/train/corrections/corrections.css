@@ -88,6 +88,7 @@
 }
 /* The answer first, in big, beside the reasons' ring (Design, recette du 21/11). */
 .co-top {
+  padding-block: var(--nv-space-3);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
