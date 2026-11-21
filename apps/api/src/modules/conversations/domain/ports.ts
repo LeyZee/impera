@@ -3,6 +3,7 @@ import type {
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
+  CopilotTrace,
   CustomAlertGroupId,
   CustomAlertId,
   EventId,
@@ -67,6 +68,7 @@ import type {
 import type { CustomOrderTurn } from '../../custom-orders/pure';
 
 import type { AwayStatus } from './away';
+import type { CopilotLive } from './copilot-assist';
 import type { ConversationProjection } from './projection';
 
 /** Ports of the `conversations` module (ADR 0002): what it needs, implemented in `infra/` or by other modules. */
@@ -241,6 +243,8 @@ interface DraftRepository {
     facts?: readonly DraftFact[];
     /** The step of her script decided with it (ADR 0098). */
     scriptStep?: DraftScriptStep;
+    /** What the code decided with it, as the copilot panel reads it (ADR 0141 lot a). */
+    copilot?: CopilotTrace;
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
   /**
@@ -808,6 +812,8 @@ export type ComposeResult =
       readonly scriptRun?: ComposedScriptRun;
       /** Written in the care mode: a human validates it whatever the mode (ADR 0088 § 5). */
       readonly care?: ComposedCare;
+      /** What the code decided with it, kept with the draft for the copilot panel (ADR 0141 lot a). */
+      readonly copilot?: CopilotTrace;
     }
   | {
       readonly kind: 'held';
@@ -1029,6 +1035,8 @@ export interface CopilotRead {
     readonly createdAt: Date;
     readonly placedAt: Date | null;
   } | null;
+  /** What the code decided and what holds now, for the panel's lines (ADR 0141 lot a). */
+  readonly live: CopilotLive;
 }
 
 export interface CopilotReader {

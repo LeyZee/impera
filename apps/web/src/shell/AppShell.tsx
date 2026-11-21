@@ -319,6 +319,11 @@ export function RailNav({
   }, [current]);
 
   const { chosen: scoped } = useCreatorScope();
+  const playIcon = (event: { readonly currentTarget: Element }): void => {
+    const icon = event.currentTarget.querySelector('svg');
+    if (icon !== null) playOnce(icon, 'is-playing');
+  };
+
   const link = (item: NavItem): JSX.Element => (
     <Link
       key={item.to}
@@ -338,6 +343,8 @@ export function RailNav({
       // only the exact address counts, so that /equipe/nexiste-pas lights nothing (NAV-01).
       activeOptions={{ exact: item.to !== current }}
       title={item.label}
+      // Every click plays the icon's gesture, on the tab already open too (Charles, 21/11).
+      onClick={playIcon}
     >
       <NavIcon name={item.icon} />
       <span className="nv-rail__label">{item.label}</span>
@@ -401,7 +408,8 @@ export function RailNav({
           aria-haspopup="dialog"
           aria-expanded={isMoreOpen}
           data-current={isInMore}
-          onClick={() => {
+          onClick={(event) => {
+            playIcon(event);
             setIsMoreOpen(!isMoreOpen);
           }}
         >

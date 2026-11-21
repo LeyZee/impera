@@ -48,3 +48,15 @@ Le 20/11/2026, à l'ouverture du Playground aux managers (§ 8), Charles choisit
 - Classer les chatteurs entre eux sur un écran qu'ils voient : contraire à 0043 § 7.
 - Mettre le chiffre par heure dans les paliers de paie : refusé (Q1).
 - Garder les fans anonymes sur la vue agence : on ne peut pas agir sur un fan qu'on ne peut pas nommer.
+
+## Avenant du 21/11/2026 : piloter avec peu de chiffres, chacun relié à une décision
+
+Le 21/11/2026, Charles choisit « les 4 cartes + corrections » après un audit du Dashboard. Son cadre : 300 € de ventes par jour au moins, faits par 2 à 5 fans ; 30 à 80 nouveaux abonnés par jour ; une IA qui peut coûter jusqu'à 2 500 € par mois si les ventes suivent.
+
+1. **Le pilotage passe avant les chiffres de la période**, sur des fenêtres fixes : aujourd'hui, et les 30 derniers jours comparés aux 30 d'avant. Une seule route, `GET /v1/dashboard/agency/steering`, mêmes lecteurs que les chiffres de l'agence (0078 § 1 ; propriétaire et manager actif, sa liste seulement).
+2. **Objectif du jour** : les objectifs du mois (§ 6) divisés par ses jours ; le chiffre d'affaires du jour, la fin de journée estimée selon le profil horaire des 28 jours d'avant (rien sous 7 jours de registre, 30 ventes, ou avant qu'un dixième de journée habituelle soit fait), la moyenne des 7 jours d'avant, et les 30 jours en barres. Décision : en retard, on relance.
+3. **Du trafic à l'argent** : nouveaux abonnés (statistiques Reveal), fans dont le premier message est arrivé (conversations lues par Impera ; l'étape disparaît sans conversation lue), premiers achats, payeurs réguliers (deux achats ou plus sur la fenêtre). « Ça casse ici » seulement quand les deux fenêtres comptent au moins 30 fans en tête. Décision : l'étape qui casse dit où agir. C'est un flux sur la fenêtre, pas une cohorte : le registre ne garde pas les abonnements gratuits, la date d'arrivée d'un fan n'est donc pas connue.
+4. **Dépendance aux gros fans** : la part du plus gros fan, des quatre suivants et du reste, le nombre de fans qui font 80 % du chiffre, la dépense du fan médian (une baleine ne la bouge pas), et la liste du § 3 « ont décroché » (21 jours, les plus gros d'abord, huit au plus, nommés, menant à la conversation). Elle remplace « Les fans qui paient », dont la part des dix plus gros valait presque toujours 100 % à ce volume. Phrase de concentration seulement au-delà de 30 ventes (§ 5).
+5. **Un changement sans couleur sur trop peu de ventes** : en dessous du seuil du § 5, la pastille d'écart d'une période garde son chiffre et perd le vert ou l'ambre.
+6. **L'IA rapporte-t-elle ?** : coût de l'IA en pourcentage des ventes, par créatrice, repère d'une commission de chatteur à 15 %, lu dans le calcul de Réglages › Consommation IA (pas de second calcul). Elle arrive après celui-ci.
+7. **Les fans qui attendent en tête** (grande recette du 21/11, point 2, validé par Charles) : « À traiter » de toutes les créatrices suivies, rouge pour une ligne grave, ambre sinon, trois au plus avec « Tout voir » vers Suivi.
