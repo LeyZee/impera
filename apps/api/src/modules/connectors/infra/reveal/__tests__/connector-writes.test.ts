@@ -5,6 +5,7 @@ import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake
 import {
   ConnectorError,
   ScriptStepAlreadySent,
+  ScriptStepDiscounted,
   ScriptStepPriceChanged,
 } from '../../../domain/platform-connector';
 import type { ConnectorSend, SendJournal } from '../../../domain/ports';
@@ -462,6 +463,38 @@ describe('RevealApiConnector: script steps (spec §§ 5, 6; ADR 0018 § 5)', () 
     );
     expect(thread(fake, 'conv_01').find((m) => m.id === sent.messageRef.id)?.bundle?.priceCents).toBe(900);
     expect(posts(spied)).toHaveLength(2);
+  });
+  it('never sends a step with a « Tarif réduit » on Reveal, at any price; taken off, it goes (recette 16/11)', async () => {
+    const fake = world();
+    const spied = spy(fake);
+    const sends = new MemorySendJournal();
+    const connector = connect(fake, { fetch: spied.fetch, sends });
+    await scenario(fake, [
+      {
+        type: 'script_changed',
+        scriptId: 'script_2_1',
+        priceCents: 500,
+        discount: { priceCents: 300, minutes: 60 },
+      },
+    ]);
+    const refused = await connector
+      .sendScriptStep(ref('conv_01'), ref('sequence_2'), ref('script_2_1'), eur(500), 'step-1')
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ScriptStepDiscounted);
+    // Validated at the reduced price, it is refused all the same: Impera never sells at a discount.
+    expect(
+      await connector
+        .sendScriptStep(ref('conv_01'), ref('sequence_2'), ref('script_2_1'), eur(300), 'step-2')
+        .catch((error: unknown) => error),
+    ).toBeInstanceOf(ScriptStepPriceChanged);
+    expect(posts(spied)).toHaveLength(0);
+    expect(thread(fake, 'conv_01')).toHaveLength(0);
+    expect(sends.rows.has('step-1')).toBe(false);
+    await scenario(fake, [
+      { type: 'script_changed', scriptId: 'script_2_1', priceCents: 500, discount: null },
+    ]);
+    await connector.sendScriptStep(ref('conv_01'), ref('sequence_2'), ref('script_2_1'), eur(500), 'step-3');
+    expect(thread(fake, 'conv_01')[0]?.bundle?.priceCents).toBe(500);
   });
 
   it('sends nothing when the history cannot be read, nor for a step that does not exist', async () => {

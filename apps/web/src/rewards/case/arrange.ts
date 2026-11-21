@@ -40,12 +40,15 @@ export interface Shelf {
   readonly earned: number;
 }
 
-/** The three shelves, an empty one left out. The sort is stable: the server's order breaks a tie. */
-export function shelvesOf(trophyCase: TrophyCase): Shelf[] {
+/**
+ * The three shelves, an empty one left out unless the role keeps it to say why it is empty (recette 16/11, CHT-17).
+ * The sort is stable: the server's order breaks a tie.
+ */
+export function shelvesOf(trophyCase: TrophyCase, keepEmpty: readonly ShelfFamily[] = []): Shelf[] {
   return SHELF_ORDER.map((family) => {
     const items = trophyCase.items.filter((item) => item.family === family).toSorted(byShelfOrder);
     return { family, items, earned: items.filter(isEarned).length };
-  }).filter((shelf) => shelf.items.length > 0);
+  }).filter((shelf) => shelf.items.length > 0 || keepEmpty.includes(shelf.family));
 }
 
 /**

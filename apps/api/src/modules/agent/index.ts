@@ -5,6 +5,7 @@ import type { FansModule } from '../fans';
 
 import { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 import { createBubbleGuard, type AgentBubbleGuard } from './infra/bubble-guard';
+import { pickVoiceExamples, type VoiceExample } from './infra/calibration-record';
 import { createCardReader, type AgentCardReader } from './infra/card-reader';
 import {
   createDraftComposer,
@@ -12,6 +13,7 @@ import {
   type ComposerPersonaFields,
   type DraftComposerDeps,
   type MediaSight,
+  type ScriptSource,
 } from './infra/draft-composer';
 import { createFanLimits } from './infra/fan-limits';
 import { guardSettingsOf, type PersonaForModels } from './infra/persona-file';
@@ -29,9 +31,11 @@ export { touchesTerm } from './domain/guards';
 export type { TrapAssessment } from './domain/traps';
 /** @public The policy, read by `pnpm evals` on the same path as a real fan (and by the composer at P6-01). */
 export { holdDecision, type HoldDecision } from './domain/hold';
+export type { SaleTroubleSeen } from './domain/sale-trouble';
 export { withoutOrders } from './domain/injection';
 /** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
 export { safetySigns } from './domain/safety-net';
+export { declaredAdultAge } from './domain/sexualization';
 export { bubbleDelays } from './domain/bubbles';
 /** @public */
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';
@@ -70,13 +74,15 @@ export {
   type Verdict,
 } from './domain/calibration';
 export {
+  pickVoiceExamples,
   replayableTests,
   voiceExamples,
   type CalibrationRecord,
+  type VoiceExample,
   type CalibrationStore,
   type RatedMoment,
 } from './infra/calibration-record';
-export { createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
+export { CalibrationRecordSchema, createJsonlCalibrationStore } from './infra/jsonl-calibration-store';
 export {
   asSent,
   composeTurn,
@@ -89,9 +95,16 @@ export {
 export { guardSettingsOf, readPersonaFile, type PersonaForModels } from './infra/persona-file';
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
+/** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
+export type { ScriptSource } from './infra/draft-composer';
+export type { PlatformScriptView as AgentScriptView, ScriptHistoryView } from './domain/script-run';
+/** @public The playground plays trial scripts by the same rules (ADR 0103 § 15-17): its fictive purchase and refusal. */
+export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/script-run';
 
 /** @public Her persona and guards for a post of her Telegram channel (ADR 0080 § 5), the `telegram` port. */
 export { channelWriterPersona } from './infra/channel-persona';
+/** @public Her public panels and guards for a reply to an Instagram comment (ADR 0122 § 2), the `instagram-comments` port. */
+export { commentWriterPersona } from './infra/channel-persona';
 /** @public Réglages › Alertes tries an alert on an example message (`POST /v1/alerts/test`, P4-01). */
 export { createAlertTester, type AlertTester } from './infra/alert-test';
 /** @public The persona module refuses a version whose sample replies a hard guard would block (P5-01). */
@@ -113,6 +126,11 @@ export interface DraftComposerStartOptions {
   readonly activePersona: ActivePersonaSource;
   /** Her clock, read for each draft: the creator's time zone. */
   readonly timeZoneOf: (creatorId: string) => Promise<string>;
+  /**
+   * Her bio on her platform profile, as last read (ADR 0154), read at each draft beside her persona; `null`: none.
+   * Without it, she writes from her sheet alone. A failed read writes without it, never stops the draft.
+   */
+  readonly profileBioOf?: (creatorId: string) => Promise<string | null>;
   /** His media seen before she answers; without it, any media goes to a human. */
   readonly sight?: MediaSight;
   /** His limits: nothing is written to a stopped fan, and a risk sets them itself (P3-02). */
@@ -128,19 +146,42 @@ export interface DraftComposerStartOptions {
   readonly alertsOf?: DraftComposerDeps['alertsOf'];
   /** Whether a chatter is on shift on her accounts (`scheduling`): a doubt on who she is goes to them (P4-01). */
   readonly chatterOnShift?: DraftComposerDeps['chatterOnShift'];
+  /** Her scripts on the platform and his history (ADR 0098); without it, no script moves and nothing is sold. */
+  readonly scripts?: ScriptSource;
+  /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
+  readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
+  /** Her grid of custom prices (`custom-orders`, ADR 0159 § C), read when his order is kept. */
+  readonly gridOf?: DraftComposerDeps['gridOf'];
+  /**
+   * Her bank of examples, newest first, withdrawn ones left out (ADR 0102): the playground's corrections filed as her
+   * voice's examples, one bank whichever version they were made on. Without it, or unreadable, she writes from her
+   * sheet alone.
+   */
+  readonly voiceExamplesOf?: (creatorId: string) => Promise<readonly VoiceExample[]>;
+  /** Her bank could not be read: she wrote from her sheet alone, the log says so. */
+  readonly onExamplesUnread?: (event: { readonly creatorId: string }) => void;
 }
 
 /**
- * Her fields for the composer, from her persona: her sheet as it is, her own sample replies in it (P5-01). The
- * playground's corrected answers never join it: they were written on its fictional persona, not hers (M13).
+ * Her fields for the composer, from her persona: her sheet, her own sample replies in it (P5-01), and the examples of
+ * her bank chosen as the playground chooses them (ADR 0102 § 2): what the owner sees there is what a fan receives.
  */
-function composerFields(persona: PersonaForModels): ComposerPersonaFields {
+function composerFields(
+  persona: PersonaForModels,
+  bank: readonly VoiceExample[],
+  profileBio: string | null = null,
+): ComposerPersonaFields {
+  const guardSettings = guardSettingsOf(persona);
+  // Each turn takes the twelve this fan may read among them (`examplesForTurn`): his age decides the explicit ones.
+  const examples = pickVoiceExamples(bank, guardSettings, bank.length);
   return {
     persona: {
       creatorName: persona.creatorName,
       personaSheet: persona.personaSheet,
-      guardSettings: guardSettingsOf(persona),
+      guardSettings,
       splitMessages: persona.splitMessages,
+      ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
+      ...(examples.length > 0 && { voiceExamples: examples }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,
@@ -149,6 +190,21 @@ function composerFields(persona: PersonaForModels): ComposerPersonaFields {
     objectionReplies: persona.objectionReplies,
     ...(persona.versionId !== undefined && { personaVersionId: persona.versionId }),
   };
+}
+
+/** Her bank, for the version she writes with to choose from; none without a version, a reader, or when unreadable. */
+async function bankOf(
+  options: DraftComposerStartOptions,
+  creatorId: string,
+  personaVersionId: string | undefined,
+): Promise<readonly VoiceExample[]> {
+  if (personaVersionId === undefined || options.voiceExamplesOf === undefined) return [];
+  try {
+    return await options.voiceExamplesOf(creatorId);
+  } catch {
+    options.onExamplesUnread?.({ creatorId });
+    return [];
+  }
 }
 
 /**
@@ -160,7 +216,9 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     gateway: options.gateway,
     personaOf: async (creatorId, now) => {
       const persona = await activePersonaForModels(options.activePersona, creatorId, now);
-      return persona === null ? null : composerFields(persona);
+      if (persona === null) return null;
+      const profileBio = await (options.profileBioOf?.(creatorId) ?? Promise.resolve(null)).catch(() => null);
+      return composerFields(persona, await bankOf(options, creatorId, persona.versionId), profileBio);
     },
     timeZoneOf: options.timeZoneOf,
     voicePrompt: loadPrompt('voice').header.version,
@@ -170,6 +228,9 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.onLimitsNotSaved !== undefined && { onLimitsNotSaved: options.onLimitsNotSaved }),
     ...(options.alertsOf !== undefined && { alertsOf: options.alertsOf }),
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
+    ...(options.scripts !== undefined && { scripts: options.scripts }),
+    ...(options.lastOfferAt !== undefined && { lastOfferAt: options.lastOfferAt }),
+    ...(options.gridOf !== undefined && { gridOf: options.gridOf }),
   });
 }
 

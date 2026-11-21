@@ -8,6 +8,7 @@ import {
   disconnectProvider,
   listProviderStatuses,
   createRefusalReporter,
+  probeProvider,
   reverifyAll,
   reverifyProvider,
   updateProviderSettings,
@@ -17,9 +18,13 @@ import { createKeyCache } from './application/key-cache';
 import type { ProvidersApi } from './application/providers-api';
 import { connectionServiceOf } from './domain/connection-signal';
 import type { Clock, CredentialStore } from './domain/ports';
+import type { ActivityReader } from './domain/probe';
+import { createPostgresActivityReader } from './infra/activity.reader';
+import { createElevenLabsProbe } from './infra/elevenlabs.probe';
 import { createElevenLabsVerifier } from './infra/elevenlabs.verifier';
 import { createGoogleVerifier } from './infra/google.verifier';
 import type { FetchLike } from './infra/http';
+import { createLlmProbe, type GatewayTest } from './infra/llm.probe';
 import { createMemoryCredentialStore } from './infra/memory.store';
 import { createMistralVerifier } from './infra/mistral.verifier';
 import { createPostgresCredentialStore } from './infra/postgres.store';
@@ -30,6 +35,7 @@ export { ProviderNotConnected } from './application/connections';
 export { resealProviderCredentials } from './infra/postgres.store';
 export { nextAction } from './domain/next-action';
 export { createMemoryCredentialStore };
+export type { GatewayTest } from './infra/llm.probe';
 
 /** The verified services' base addresses, each optional. */
 type VerifierBaseUrls = Partial<Record<'xai' | 'google' | 'elevenlabs' | 'mistral', string>>;
@@ -62,6 +68,23 @@ export interface ProvidersDeps {
     signal: ConnectionSignal,
     correlationId: string,
   ) => Promise<unknown>;
+  /**
+   * The gateway's tiny real call (ADR 0091 § 7), late-bound: the gateway is built after this module, on its keys.
+   * Absent, Grok, Gemini and Mistral have no « Essai réel ».
+   */
+  readonly testConnection?: GatewayTest;
+  /** Each service's calls of the last 24 hours (`llm_calls`); absent, the lines say nothing of them. */
+  readonly activity?: ActivityReader;
+  readonly onActivityError?: (error: unknown) => void;
+}
+
+/** ElevenLabs' month as its last check read it, for Consommation IA (ADR 0091 § 7). */
+interface VoiceQuota {
+  readonly used: number;
+  readonly limit: number;
+  readonly resetsAt: Date | null;
+  readonly plan: 'free' | 'paid' | null;
+  readonly readAt: Date;
 }
 
 export interface ProvidersModule extends ProvidersApi {
@@ -74,6 +97,8 @@ export interface ProvidersModule extends ProvidersApi {
   readonly stop: () => void;
   /** `/v1/settings/providers`, behind the guard given here. */
   readonly routes: (options: ProvidersRoutesOptions) => FastifyPluginAsyncZod;
+  /** ElevenLabs' characters of the month, null while it is not connected or its account was never read. */
+  readonly voiceQuota: () => Promise<VoiceQuota | null>;
 }
 
 export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
@@ -91,6 +116,16 @@ export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
       createElevenLabsVerifier({ fetch: deps.fetch, ...at(deps.baseUrls?.elevenlabs) }),
       createMistralVerifier({ fetch: deps.fetch, ...at(deps.baseUrls?.mistral) }),
     ],
+    probes: [
+      createElevenLabsProbe({ fetch: deps.fetch, ...at(deps.baseUrls?.elevenlabs) }),
+      ...(deps.testConnection === undefined
+        ? []
+        : (['xai', 'google', 'mistral'] as const).map((provider) =>
+            createLlmProbe(provider, deps.testConnection ?? noGateway),
+          )),
+    ],
+    ...(deps.activity !== undefined && { activity: deps.activity }),
+    ...(deps.onActivityError !== undefined && { onActivityError: deps.onActivityError }),
     onChange: async (provider) => {
       await cache.reload();
       deps.onChange?.(provider);
@@ -111,6 +146,7 @@ export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
     reportRefusedKey,
     updateSettings: (provider, settings) => updateProviderSettings(connections, provider, settings),
     disconnect: (provider, by) => disconnectProvider(connections, provider, by),
+    probe: (provider) => probeProvider(connections, provider),
   };
   let timer: ReturnType<typeof setInterval> | undefined;
   return {
@@ -132,8 +168,21 @@ export function createProvidersModule(deps: ProvidersDeps): ProvidersModule {
       timer = undefined;
     },
     routes: (options) => createProvidersRoutes(api, options),
+    async voiceQuota() {
+      const stored = await deps.store.find('elevenlabs');
+      if (stored?.quota == null || stored.charactersLeft === null) return null;
+      return {
+        used: Math.max(0, stored.quota.limit - stored.charactersLeft),
+        limit: stored.quota.limit,
+        resetsAt: stored.quota.resetsAt,
+        plan: stored.quota.plan,
+        readAt: stored.verifiedAt,
+      };
+    },
   };
 }
+
+const noGateway: GatewayTest = () => Promise.reject(new Error('gateway not bound'));
 
 export interface ProvidersStartOptions {
   /** The admin connection (`provider_credentials` is revoked from the application role). */
@@ -153,6 +202,8 @@ export interface ProvidersStartOptions {
   readonly publishConnectionState?: ProvidersDeps['publishConnectionState'];
   /** The recette sandbox's fake world (ADR 0075); the real services when absent. */
   readonly baseUrls?: VerifierBaseUrls;
+  /** The gateway's « Essai réel », late-bound (`ProvidersDeps.testConnection`). */
+  readonly testConnection?: GatewayTest;
 }
 
 const KEY_RELOAD_MS = 30_000;
@@ -200,6 +251,9 @@ export async function startProvidersModule(options: ProvidersStartOptions): Prom
     ...(options.publishConnectionState !== undefined && {
       publishConnectionState: options.publishConnectionState,
     }),
+    ...(options.testConnection !== undefined && { testConnection: options.testConnection }),
+    activity: createPostgresActivityReader(options.adminDb),
+    onActivityError: options.onLoadError,
   });
   await module.start().catch(options.onLoadError);
   return module;

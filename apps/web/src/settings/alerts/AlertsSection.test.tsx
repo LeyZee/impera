@@ -147,7 +147,7 @@ describe('Réglages › Alertes when it cannot load (P4-01)', () => {
     renderSection();
     // The one wording of Réglages for a silent server, then what could not be read (REG-21).
     expect(await screen.findByText('Le serveur ne répond pas')).toBeTruthy();
-    expect(screen.getByText('Les alertes n’ont pas pu être lues.')).toBeTruthy();
+    expect(screen.getByText('Réessaie dans un instant.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     await waitFor(() => {
       expect(calls.filter((call) => call.url === '/v1/alerts')).toHaveLength(2);

@@ -329,3 +329,75 @@ describe('downloadVaultFile against FakeReveal', () => {
     }
   });
 });
+
+describe('downloadVaultFile: the origin header of the videos host', () => {
+  const REFERER = { host: 'videos.test', value: 'https://dashboard.example/' } as const;
+  const bounds: DownloadBounds = {
+    ...BOUNDS,
+    hosts: ['videos.test', 'photos.test'],
+    allowHttp: true,
+    referer: REFERER,
+  };
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'vault-referer-'));
+  });
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  /** Records each GET's headers, answers `status` (a redirect included) or a small body. */
+  function recording(status = 200) {
+    const seen: { url: string; headers: Readonly<Record<string, string>> | undefined; args: number }[] = [];
+    const transport: FileTransport = {
+      lookup: () => Promise.resolve([{ address: '203.0.113.10', family: 4 }]),
+      get: (...args) => {
+        const [url, , , headers] = args;
+        seen.push({ url, headers, args: args.length });
+        return Promise.resolve(
+          status === 200
+            ? new Response(new Uint8Array(16), { status })
+            : new Response(null, { status, headers: { location: 'https://elsewhere.example/a' } }),
+        );
+      },
+    };
+    return { seen, transport };
+  }
+
+  it('sends that value to that host over HTTPS, and nothing else', async () => {
+    const { seen, transport } = recording();
+    await downloadVaultFile(
+      transport,
+      { url: 'https://videos.test/a', isHls: false },
+      join(dir, 'a'),
+      bounds,
+    );
+    expect(seen).toEqual([
+      { url: 'https://videos.test/a', headers: { referer: 'https://dashboard.example/' }, args: 4 },
+    ]);
+  });
+
+  it('sends no header to another listed host, nor to that host over plain HTTP', async () => {
+    const { seen, transport } = recording();
+    await downloadVaultFile(
+      transport,
+      { url: 'https://photos.test/a', isHls: false },
+      join(dir, 'b'),
+      bounds,
+    );
+    await downloadVaultFile(transport, { url: 'http://videos.test/a', isHls: false }, join(dir, 'c'), bounds);
+    expect(seen.map(({ headers, args }) => ({ headers, args }))).toEqual([
+      { headers: undefined, args: 3 },
+      { headers: undefined, args: 3 },
+    ]);
+  });
+
+  it('follows no redirect from that host', async () => {
+    const { seen, transport } = recording(302);
+    await expect(
+      downloadVaultFile(transport, { url: 'https://videos.test/a', isHls: false }, join(dir, 'd'), bounds),
+    ).rejects.toMatchObject({ reason: 'failed' });
+    expect(seen.map(({ url }) => url)).toEqual(['https://videos.test/a']);
+  });
+});

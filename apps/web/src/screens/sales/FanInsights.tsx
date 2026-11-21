@@ -22,8 +22,8 @@ import {
 } from './insights-view';
 import './insights.css';
 
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Panel, PanelSection } from '@/shell/layout';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 /*
  * « Qui sont tes fans » (CR-15, ADR 0065 § 2, ADR 0074 § 8): in front of Ventes, figures on all her fans, never one.
@@ -84,7 +84,7 @@ function RingCard({
   const label = (key: string) => labels[key] ?? key;
   return (
     <article className="fi-card nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">{title}</h3>
+      <h3 className="nv-h3 fi-card__title">{title}</h3>
       <div className="fi-ring-row">
         <div
           className={lit === null ? 'fi-ring' : 'fi-ring is-lit'}
@@ -195,7 +195,7 @@ function BarsCard({
   const top = Math.max(1, ...cases.map((c) => c.share));
   return (
     <article className="fi-card nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">{title}</h3>
+      <h3 className="nv-h3 fi-card__title">{title}</h3>
       <ul className={lit === null ? 'fi-bars' : 'fi-bars is-lit'}>
         {cases.map((c, i) => (
           <li key={c.key}>
@@ -257,13 +257,13 @@ function SpendingCard({
   if (spending.payingShare === 0)
     return (
       <article className="fi-card fi-card--full nv-enter" style={{ '--nv-i': index }}>
-        <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
+        <h3 className="nv-h3 fi-card__title">Ce qu’ils débloquent</h3>
         <p className="fi-none">Aucun de tes fans n’a encore débloqué de message.</p>
       </article>
     );
   return (
     <article className="fi-card fi-card--wide nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">Ce qu’ils débloquent</h3>
+      <h3 className="nv-h3 fi-card__title">Ce qu’ils débloquent</h3>
       <div className="fi-spend">
         <div className="fi-spend__lead">
           <div
@@ -292,15 +292,18 @@ function SpendingCard({
             </span>
           </div>
           <div className="fi-basket">
-            <span className="fi-basket__label">Panier moyen sur 30 jours</span>
+            {/* One line of notice, not three: what the basket is and how it is counted (recette visuelle 16/11, CRE-19). */}
+            <span className="fi-basket__label">Panier moyen d’un fan qui a payé, sur 30 jours</span>
             {spending.averageBasketMinor === null ? (
               <span className="fi-basket__none">Pas encore assez de fans payants pour le dire.</span>
             ) : (
-              <b className="fi-basket__value">
-                <Count value={spending.averageBasketMinor} format={euros} />
-              </b>
+              <>
+                <b className="fi-basket__value">
+                  <Count value={spending.averageBasketMinor} format={euros} />
+                </b>
+                <span className="fi-basket__note">TVA comprise, avant parts</span>
+              </>
             )}
-            <span className="fi-basket__note">Par fan qui a payé, TVA comprise, avant parts.</span>
           </div>
         </div>
         <BarsInline cases={spending.cases} labels={TIER_LABELS} />
@@ -377,7 +380,7 @@ function ActivityCard({
   const say = (c: { day: number; slot: number }) => `${DAYS[c.day] ?? ''}, ${slotLabel(c.slot)}`;
   return (
     <article className="fi-card fi-card--full nv-enter" style={{ '--nv-i': index }}>
-      <h3 className="fi-card__title">Quand ils t’écrivent</h3>
+      <h3 className="nv-h3 fi-card__title">Quand ils t’écrivent</h3>
       <p className="fi-heat__line" aria-live="polite">
         {lit === null ? (
           peak === null ? null : (
@@ -469,6 +472,10 @@ function Stat({ value, label }: { value: number | null; label: string }): JSX.El
   );
 }
 
+/** The three counts are one figure: rounded to ten, all alike, and none under the threshold. */
+const sameCounts = (fans: CreatorFanInsights['fans']): boolean =>
+  fans.total !== null && fans.newLast30Days === fans.total && fans.wroteLast7Days === fans.total;
+
 /**
  * The panel: three numbers, then a card per question that has enough fans, and for those that wait, what they wait
  * for (recette CRE-04). Under ten fans in all, one short sentence and nothing else. `silent`: the page says once that
@@ -479,8 +486,7 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
   if (insights.isError && insights.data === undefined && silent) return null;
   if (insights.isError && insights.data === undefined)
     return (
-      <ServerSilent
-        text="Les chiffres de tes fans n’ont pas pu être lus."
+      <Failure
         onRetry={() => {
           void insights.refetch();
         }}
@@ -488,15 +494,9 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
     );
   if (insights.data === undefined)
     return (
-      <Panel className="fi-panel">
-        <PanelSection>
-          <div className="fi-skeleton" aria-busy="true" aria-label="Chargement des chiffres de tes fans">
-            <i />
-            <i />
-            <i />
-          </div>
-        </PanelSection>
-      </Panel>
+      <Skeleton label="Chargement des chiffres de tes fans…">
+        <SkeletonCard lines={4} />
+      </Skeleton>
     );
   const data = insights.data;
   const age = data.age;
@@ -507,20 +507,10 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
   // its numbers and says block by block what is missing, since each block counts something else (recette CRE-04).
   if (waiting.length === 6 && data.fans.total === null)
     return (
-      <Panel
-        className="fi-panel nv-enter"
-        title={
-          <>
-            Qui sont <em className="fi-serif">tes fans</em>
-          </>
-        }
-      >
-        <PanelSection>
-          <p className="fi-few">
-            Encore trop peu de fans pour le dire. Ça s’affichera à partir de dix, pour qu’aucun ne s’y
-            reconnaisse.
-          </p>
-        </PanelSection>
+      <Panel className="fi-panel nv-enter" title={<>Qui sont tes fans</>}>
+        <Empty title="Encore trop peu de fans pour le dire.">
+          Ça s’affichera à partir de dix, pour qu’aucun ne s’y reconnaisse.
+        </Empty>
       </Panel>
     );
   const lines = waitingLines(waiting);
@@ -528,18 +518,24 @@ export function FanInsights({ silent = false }: { silent?: boolean }): JSX.Eleme
     <Panel
       className="fi-panel nv-enter"
       eyebrow="Sur l’ensemble de tes fans, jamais un seul"
-      title={
-        <>
-          Qui sont <em className="fi-serif">tes fans</em>
-        </>
-      }
+      title={<>Qui sont tes fans</>}
     >
       <PanelSection>
-        <div className="fi-stats">
-          <Stat value={data.fans.total} label="fans en tout" />
-          <Stat value={data.fans.newLast30Days} label="nouveaux sur 30 jours" />
-          <Stat value={data.fans.wroteLast7Days} label="t’ont écrit cette semaine" />
-        </div>
+        {sameCounts(data.fans) ? (
+          // Three tiles that say « ≈ 20 » three times say it once (recette visuelle 16/11, CRE-02).
+          <div className="fi-stats fi-stats--one">
+            <Stat
+              value={data.fans.total}
+              label="fans en tout, à peu près autant de nouveaux sur 30 jours et à t’avoir écrit cette semaine"
+            />
+          </div>
+        ) : (
+          <div className="fi-stats">
+            <Stat value={data.fans.total} label="fans en tout" />
+            <Stat value={data.fans.newLast30Days} label="nouveaux sur 30 jours" />
+            <Stat value={data.fans.wroteLast7Days} label="t’ont écrit cette semaine" />
+          </div>
+        )}
         <div className="fi-grid">
           {age.status === 'enough' ? (
             <RingCard

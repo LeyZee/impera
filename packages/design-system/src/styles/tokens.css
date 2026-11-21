@@ -89,13 +89,39 @@
   --nv-series-4: #9c9630;
   --nv-series-other: rgba(246, 238, 241, 0.32);
   /*
-   * Where the money goes (ADR 0106 § 10): the creator's part rose, the agency's gold, the same on every block of the
-   * Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second hatched). Validated
-   * at 3:1 at least on the plate, Nuit and Jour, and 13 ΔE at least from --nv-series-4's olive, 8 at least for
-   * colour-blind readers (dataviz validator): they never sit in the same chart, and the legend labels every block.
+   * The intensity of one measure (Dashboard de l'agence, « Quand ça vend »: the hours map and the ten biggest fans'
+   * bar, Charles 20/11): one violet-fuchsia, mixed toward --nv-fill-track from pale to vivid. Never a state nor a
+   * category. Apart from the creators' rose, the agent's violet and the agency's blue for full colour vision, and at
+   * 3:1 on the plate, Nuit and Jour (dataviz validator).
+   */
+  --nv-heat: #a64ff0;
+  /*
+   * Where the money goes (ADR 0106 § 10, avenant du 17/11): the creator's part rose, the agency's blue, the same on
+   * every block of the Dashboard; the fans' VAT and the platform's commission take --nv-series-other (the second
+   * hatched). Validated at 3:1 at least on the plate, Nuit and Jour, and apart for colour-blind readers (dataviz
+   * validator); the legend labels every block. The kinds' bars take the cyan ramp below, never these two.
    */
   --nv-money-creator: #d06c98;
-  --nv-money-agency: #9c6420;
+  /* The blue of the Impera logo (Charles, 19/11), its hue (209°) made lighter for the night plate (fil Design). */
+  --nv-money-agency: #3e99ef;
+  /*
+   * A curve's trend against the period compared (ADR 0146): green above it, or with nothing to compare; the warning's
+   * amber below it, never the danger's red (a lower month is no emergency). Always beside the « +n % » that says it.
+   */
+  --nv-trend-up: #5fd08f;
+  --nv-trend-down: var(--nv-warning);
+  /* The same trend as text, in a change's pill: readable at 4.5:1 on the plate. */
+  --nv-trend-up-text: var(--nv-trend-up);
+  --nv-trend-down-text: var(--nv-trend-down);
+  /*
+   * The kinds of sale (subscriptions, PPV, tips, others): one cyan, light to dark (Charles's choice B, 19/11), apart
+   * from the money's rose and blue and the trend's green by its hue and its steps (dataviz validator, ordinal, Nuit and
+   * Jour). Each step is labelled in the legend and the tip, never colour alone.
+   */
+  --nv-kind-1: #b3eef2;
+  --nv-kind-2: #5fd3dd;
+  --nv-kind-3: #21a7b4;
+  --nv-kind-4: #137582;
 
   /* Shadows */
   --nv-shadow-glass:
@@ -179,8 +205,19 @@
   --nv-series-3: #c2457e;
   --nv-series-4: #7a7414;
   --nv-series-other: rgba(60, 10, 30, 0.26);
+  --nv-heat: #b040d8;
   --nv-money-creator: #b8406f;
-  --nv-money-agency: #bd853c;
+  /* The Impera logo's navy itself, Charles's value (19/11), unretouched. */
+  --nv-money-agency: #001a33;
+  --nv-trend-up: #2aa866;
+  /* A stroke's amber on the day plate (3:1 on it, dataviz validator); the warning's own is made for text, and drew brown. */
+  --nv-trend-down: #c27400;
+  --nv-trend-up-text: #1b7a49;
+  --nv-trend-down-text: var(--nv-warning);
+  --nv-kind-1: #0a3e45;
+  --nv-kind-2: #146a75;
+  --nv-kind-3: #2ea6b3;
+  --nv-kind-4: #4fbfcb;
 
   --nv-shadow-glass:
     inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 6px rgba(80, 10, 30, 0.07),
@@ -210,6 +247,22 @@
   --nv-space-10: 40px;
   --nv-space-12: 48px;
 
+  /* Page widths: the two columns a screen may have, one per section (recette visuelle 16/11, COH-02). Wide holds
+     tables, grids, Suivi and the Dashboard; narrow holds settings, forms and reading. */
+  --nv-page-wide: 1128px;
+  --nv-page-narrow: 820px;
+
+  /* Cards (recette visuelle 16/11, COH-03, COH-11): one padding inside every plate, so the texts of stacked cards
+     start on the same edge; 16 px between two cards, 28 between two groups of cards. 16 px inside on a phone. */
+  --nv-plate-pad: 20px;
+  --nv-card-gap: 16px;
+  --nv-group-gap: 28px;
+
+  /* Pills (COH-08): three heights only. Information (a state, a tag) 22, a choice to tap 32, a counter 18. */
+  --nv-pill-info: 22px;
+  --nv-pill-choice: 32px;
+  --nv-pill-count: 18px;
+
   /* Radii: everything you touch is a capsule */
   --nv-radius-xs: 8px;
   --nv-radius-sm: 12px;
@@ -237,6 +290,10 @@
   --nv-dur-data: 1000ms;
   /* One breath of something loading (a skeleton, a placeholder that waits). */
   --nv-dur-breathe: 1600ms;
+  /* A progress bar going from the value last seen to the current one (game: tiers, objectives, streaks). */
+  --nv-dur-progress: 800ms;
+  /* Upper bound of a one-off ceremony (a tier reached, a trophy won): never longer, never looping. */
+  --nv-dur-ceremony: 2500ms;
   --nv-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --nv-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   /* Springs, one family (SwiftUI's smooth / snappy / bouncy): everything that moves or resizes uses one of
@@ -378,4 +435,12 @@
 
   /* Minimum touch target (brief: >= 44px) */
   --nv-target-min: 44px;
+}
+
+/* A phone: 16 px inside a card, the 20 of a computer would eat a column of 358 px (COH-03). */
+@media (max-width: 720px) {
+  :root,
+  :host {
+    --nv-plate-pad: 16px;
+  }
 }

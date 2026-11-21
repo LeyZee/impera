@@ -64,17 +64,80 @@ const mount = (user: Me) =>
   );
 
 describe('RewardRevealGate (ADR 0104 § 12)', () => {
-  it('plays what a chatter is owed, the oldest first, one at a time, and marks each as it closes', async () => {
+  it('plays one reveal for everything owed: the most recent of two as high, the other named under it', async () => {
     const { marked } = serve(CASE);
     mount({ ...THEO_ME, preferences: { sounds: false } });
-    expect(await screen.findByRole('dialog', { name: 'Première vente' })).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
-    expect(await screen.findByRole('dialog', { name: 'Record du jour' })).toBeDefined();
+    const dialog = await screen.findByRole('dialog', { name: 'Record du jour' });
+    expect(dialog.textContent).toContain('Aussi gagné : Première vente.');
+    expect(dialog.querySelectorAll('.rw-reveal__alsoitem')).toHaveLength(1);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
-    expect(marked).toEqual([['first_sale'], ['day_record']]);
+    expect(marked).toEqual([['day_record', 'first_sale']]);
+  });
+
+  it('gives the ceremony to the highest (rank, medal, trophy, streak) and counts beyond three others', async () => {
+    const { marked } = serve({
+      ...CASE,
+      items: [
+        item('streak_5', '2026-11-12T12:00:00Z'),
+        item('first_sale', '2026-11-10T10:00:00Z'),
+        item('day_record', '2026-11-11T10:00:00Z'),
+        item('fortnight_record', '2026-11-12T10:00:00Z'),
+        { ...item('tier:2026-11-01:100000', '2026-11-09T10:00:00Z'), family: 'medal' as const },
+        { ...item('level:1', '2026-11-08T10:00:00Z'), family: 'level' as const },
+      ],
+      level: { rank: 1, name: 'Étincelle' },
+    });
+    mount({ ...THEO_ME, preferences: { sounds: false } });
+    const dialog = await screen.findByRole('dialog', { name: 'Étincelle' });
+    expect([...dialog.querySelectorAll('.rw-reveal__alsoname')].map((one) => one.textContent)).toEqual([
+      'Palier atteint',
+      'Record de quinzaine',
+      'Record du jour',
+      'autres',
+    ]);
+    expect(dialog.querySelector('[data-more]')?.textContent).toBe('+2');
+    expect(dialog.textContent).toContain(
+      'Aussi gagné : Palier atteint, Record de quinzaine, Record du jour et 2 autres.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(marked).toHaveLength(1);
+    expect(marked[0]?.[0]).toBe('level:1');
+    expect(marked[0]).toHaveLength(6);
+  });
+
+  it('plays several ranks owed at once as one, the highest, and marks the ones under it with it', async () => {
+    const level = (rank: number, earnedAt: string) => ({
+      ...item(`level:${String(rank)}`, earnedAt),
+      family: 'level' as const,
+    });
+    const { marked } = serve({
+      ...CASE,
+      items: [
+        item('first_sale', '2026-11-10T10:00:00Z'),
+        level(1, '2026-11-12T10:00:00Z'),
+        level(2, '2026-11-12T10:00:01Z'),
+        level(3, '2026-11-12T10:00:02Z'),
+      ],
+      level: { rank: 3, name: 'Charmeur' },
+    });
+    mount({ ...THEO_ME, preferences: { sounds: false } });
+    const dialog = await screen.findByRole('dialog', { name: 'Charmeur' });
+    // The ranks passed on the way are not named beside it; the trophy is.
+    expect([...dialog.querySelectorAll('.rw-reveal__alsoname')].map((one) => one.textContent)).toEqual([
+      'Première vente',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(marked).toEqual([['level:3', 'first_sale', 'level:1', 'level:2']]);
   });
 
   it('shows nothing when every gain was already revealed, or none is earned', async () => {
@@ -100,13 +163,24 @@ describe('RewardRevealGate (ADR 0104 § 12)', () => {
     expect(urls.filter((url) => url.startsWith('/v1/rewards'))).toEqual([]);
   });
 
-  it('marks a kind it cannot draw as seen without a show, and goes on to the next', async () => {
+  it('marks a kind it cannot draw as seen without a show: with what is shown, or alone at once', async () => {
     const { marked } = serve({
       ...CASE,
       items: [item('creator_only', '2026-11-09T10:00:00Z'), item('first_sale', '2026-11-10T10:00:00Z')],
     });
     mount({ ...THEO_ME, preferences: { sounds: false } });
-    expect(await screen.findByRole('dialog', { name: 'Première vente' })).toBeDefined();
-    expect(marked).toEqual([['creator_only']]);
+    const dialog = await screen.findByRole('dialog', { name: 'Première vente' });
+    expect(dialog.querySelector('.rw-reveal__also')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await waitFor(() => {
+      expect(marked).toEqual([['first_sale', 'creator_only']]);
+    });
+    cleanup();
+    const alone = serve({ ...CASE, items: [item('creator_only', '2026-11-09T10:00:00Z')] });
+    mount({ ...THEO_ME, preferences: { sounds: false } });
+    await waitFor(() => {
+      expect(alone.marked).toEqual([['creator_only']]);
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

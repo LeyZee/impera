@@ -1,5 +1,6 @@
 import { normalise } from '@impera/contracts';
 
+import { SUGGESTIVE_EMOJIS } from './desire';
 import type { GuardViolation } from './guards';
 
 /**
@@ -33,6 +34,8 @@ const CARE_FORBIDDEN: readonly RegExp[] = [
   // A meeting.
   /\b(?:rendez-vous|rdv|se voir|qu'on se voie|on se voit|se rencontrer|on se retrouve|venir chez|chez moi|chez toi)\b/u,
   // A sexual word.
+  // Seduction without a sexual word (recette AGR-08): « je suis toute à toi ce soir », a giggle, a moan.
+  /\b(?:toute? a toi|rien qu'a toi|tu me rends (?:folle|fou)|hihi+|hehe+|mm+h+)\b/u,
   /\b(?:sexe|sexy|sexuel\w*|bite|queue|chatte|seins?|nichons?|cul|fesses|sucer|suce|baiser|baise|jouir|orgasme|excite\w*|bander|bande dur|branle\w*|mouille\w*|coquin\w*|lingerie|nue?s?|a poil|chaud(?:e|es)? pour|envie de toi)\b/u,
 ];
 
@@ -49,6 +52,10 @@ export function checkCare(bubbles: readonly string[]): GuardViolation[] {
       if (match !== null)
         violations.push({ code: 'care_breach', severity: 'blocking', bubbleIndex, match: match[0] });
     }
+    // A wink, a flame, a devil: the emojis that read as desire (`desire.ts`), on the bubble as written.
+    const emoji = SUGGESTIVE_EMOJIS.find((e) => bubble.includes(e));
+    if (emoji !== undefined)
+      violations.push({ code: 'care_breach', severity: 'blocking', bubbleIndex, match: emoji });
   });
   return violations;
 }

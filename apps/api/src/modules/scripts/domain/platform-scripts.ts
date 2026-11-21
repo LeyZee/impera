@@ -81,7 +81,8 @@ export function priceWarnings(steps: readonly PricedStep[]): PlatformScriptWarni
 
 /**
  * What a script is, as the platform says it, in a stable form: its name, its moment, each step in order with its
- * text, its price and its media in order. Two reads that give the same fingerprint changed nothing.
+ * text, its price, its discount when it has one, and its media in order. Two reads that give the same fingerprint
+ * changed nothing.
  */
 export function platformScriptFingerprint(script: PlatformScript): string {
   const canonical = JSON.stringify([
@@ -97,6 +98,8 @@ export function platformScriptFingerprint(script: PlatformScript): string {
       step.currency,
       step.media.map((media) => [media.ref.id, media.kind]),
       step.previewMedia.map((media) => [media.ref.id, media.kind]),
+      // Only when there is one: the fingerprint of a step without a discount stays the one it had (recette 16/11).
+      ...(step.discount === null ? [] : [[step.discount.priceMinor, step.discount.minutes]]),
     ]),
   ]);
   return createHash('sha256').update(canonical).digest('hex');
@@ -219,6 +222,8 @@ export interface StepMediaState {
   readonly kind: MediaSlotKind;
   /** Listed by the last sync of the vault, and not removed since. */
   readonly inVault: boolean;
+  /** Chosen for the CRM (ADR 0145 § 5): a media of the vault not imported does not exist for the agent. */
+  readonly imported: boolean;
   /** Its media has a description a human validated (ADR 0083, ADR 0030 § 3); `false` while its file is not read. */
   readonly described: boolean;
 }
@@ -228,21 +233,49 @@ export type PlatformScriptGap = (typeof PLATFORM_SCRIPT_GAPS)[number];
 
 /**
  * What keeps a native script from being proposable (P6-01, ADR 0099 § 1, remark Médias 6): a media of a step (sold or
- * preview) absent from the vault makes its step incomplete; a photo or a video not described with a validated
+ * preview) absent from the vault makes its step incomplete; one in the vault but not imported into the CRM (ADR 0145
+ * § 5) keeps it from being offered; a photo or a video not described with a validated
  * description (a voice note is never described: ADR 0083 § 2); the identity of its current version (SC-04 c8) not
- * validated; what its branches lack (`branchGaps`, ADR 0112). Empty: it may be offered, when it is active.
+ * validated; what its branches lack (`branchGaps`, ADR 0112); a step with a « Tarif réduit » set on the platform, never
+ * sold at (recette 16/11, Charles: blocked and said, as a changed price). Empty: it may be offered, when it is active.
  */
 export function platformScriptGaps(
-  steps: readonly { readonly media: readonly StepMediaState[] }[],
+  steps: readonly { readonly discounted: boolean; readonly media: readonly StepMediaState[] }[],
   identityValidated: boolean,
   branches: readonly PlatformScriptGap[],
 ): PlatformScriptGap[] {
   const media = steps.flatMap((step) => step.media);
   const gaps: PlatformScriptGap[] = [];
   if (media.some((each) => !each.inVault)) gaps.push('media_absent');
+  if (media.some((each) => each.inVault && !each.imported)) gaps.push('media_not_imported');
   if (media.some((each) => each.inVault && each.kind !== 'audio' && !each.described))
     gaps.push('media_not_described');
   if (!identityValidated) gaps.push('identity_not_validated');
   gaps.push(...branches);
+  if (steps.some((step) => step.discounted)) gaps.push('step_discounted');
   return gaps;
+}
+
+/** What the agency names to validate, against the descriptions a script's media are shown with now. */
+export type DescriptionRefusal = 'stale' | 'alone';
+
+/**
+ * Whether these descriptions can be validated together (ADR 0030 § 3, ADR 0083 § 3 to 5): each the one a media of the
+ * script is shown with now (`stale` otherwise: a newer one came, or the media left the script), and one that waits for
+ * a person for a reason only alone, never under « Tout valider ».
+ */
+export function descriptionRefusal(
+  named: readonly string[],
+  shown: ReadonlyMap<string, { readonly reviewReasons: readonly string[]; readonly validated: boolean }>,
+): DescriptionRefusal | null {
+  if (named.some((id) => !shown.has(id))) return 'stale';
+  if (
+    named.length > 1 &&
+    named.some((id) => {
+      const row = shown.get(id);
+      return row !== undefined && !row.validated && row.reviewReasons.length > 0;
+    })
+  )
+    return 'alone';
+  return null;
 }

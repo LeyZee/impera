@@ -195,7 +195,7 @@ export function RestoreTestDialog({ onClose }: { onClose: () => void }): JSX.Ele
       >
         <header className="bk-dialog__head">
           <div className="bk-dialog__title">
-            <h2 id={`${id}-title`}>
+            <h2 className="nv-h2" id={`${id}-title`}>
               {phase.kind === 'done' ? 'Essai noté' : 'Noter un essai de restauration'}
             </h2>
             {phase.kind === 'done' ? null : (

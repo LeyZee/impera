@@ -13,6 +13,7 @@ import {
   newId,
   ok,
   type CreatorId,
+  type RedirectLink,
   type TelegramChannelConfig,
   type TelegramChatId,
 } from '@impera/contracts';
@@ -38,6 +39,8 @@ describe('the creator’s Telegram channel on Postgres', () => {
   let queue: JobQueue;
   let server: Awaited<ReturnType<typeof buildServer>>;
   let module: TelegramModule;
+  /** Her links that are on, as the `redirect-links` module would give them (INS-03); none of hers until set. */
+  const linksOn = new Map<string, RedirectLink[]>();
   let nora: CreatorId;
   let lea: CreatorId;
   let channelA: TelegramChatId;
@@ -117,6 +120,7 @@ describe('the creator’s Telegram channel on Postgres', () => {
       deliveries: store.deliveries,
       channels: createPostgresChannelsStore(test.service.db),
       channel: telegram,
+      channelLinks: (creatorId) => Promise.resolve(linksOn.get(creatorId) ?? null),
       webOrigin: 'https://crm.example.test',
       channelWriter: {
         // Nora has an active persona, no one else.
@@ -209,7 +213,7 @@ describe('the creator’s Telegram channel on Postgres', () => {
     expect(view.warnings).toEqual(['no_channel', 'no_link']);
   });
 
-  it('saves her channel, slots and links, sorted, with a fresh sign-in and an audit row', async () => {
+  it('saves her channel and slots, sorted, with a fresh sign-in and an audit row', async () => {
     const linkId = newId(RedirectLinkIdSchema);
     const body: TelegramChannelConfig = {
       ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
@@ -229,6 +233,11 @@ describe('the creator’s Telegram channel on Postgres', () => {
       channelLinkId: linkId,
     };
     expect((await put(nora, body, { 'x-test-stale': '1' })).statusCode).toBe(403);
+    // Her links are set in « Liens »: a save that brings one of its own is refused, never dropped in silence.
+    const moved = await put(nora, body);
+    expect(moved.statusCode).toBe(400);
+    expect(moved.json()).toMatchObject({ error: { details: { kind: 'links_moved' } } });
+    linksOn.set(nora, [...body.links]);
     const saved = await put(nora, body);
     expect(saved.statusCode).toBe(200);
     const view = TelegramChannelViewSchema.parse(saved.json());
@@ -244,6 +253,18 @@ describe('the creator’s Telegram channel on Postgres', () => {
       .where(eq(schema.auditLog.action, 'telegram_channel.save'));
     expect(audit).toHaveLength(1);
     expect(JSON.stringify(audit[0]?.details)).not.toContain('redirect.example.test');
+  });
+
+  it('warns of no link when the channel’s link is switched off, and refuses to choose it again', async () => {
+    const on = linksOn.get(nora) ?? [];
+    linksOn.set(nora, []);
+    const read = await server.inject({ method: 'GET', url: url(nora), headers });
+    const view = TelegramChannelViewSchema.parse(read.json());
+    expect(view.config.links).toEqual([]);
+    expect(view.warnings).toEqual(['no_link']);
+    const again = await put(nora, view.config);
+    expect(again.json()).toMatchObject({ error: { details: { kind: 'channel_link_unknown' } } });
+    linksOn.set(nora, on);
   });
 
   it('refuses slots too close, in the common body', async () => {
@@ -321,7 +342,7 @@ describe('the creator’s Telegram channel on Postgres', () => {
     expect(TelegramChannelConfigSchema.parse(held?.config).chatId).toBeNull();
   });
 
-  it('reads a removed chat as no channel, and still saves her links', async () => {
+  it('reads a removed chat as no channel, and still saves her setting', async () => {
     await test.admin.db.delete(schema.telegramChats).where(eq(schema.telegramChats.id, channelA));
     const view = TelegramChannelViewSchema.parse(
       (await server.inject({ method: 'GET', url: url(nora), headers })).json(),
@@ -396,24 +417,20 @@ describe('the creator’s Telegram channel on Postgres', () => {
     const body = { kind: 'main', media: 'Une photo au miroir', advice: 'Parle du live', linkId: null };
 
     beforeAll(async () => {
+      linksOn.set(nora, [
+        { id: reveal, name: 'Reveal', url: 'https://redirect.example.test/nora', destination: 'mon Reveal' },
+        {
+          id: live,
+          name: 'Live',
+          url: 'https://redirect.example.test/live?a=1&b=2',
+          destination: 'mon live TikTok ce soir 21 h',
+        },
+      ]);
       const saved = await put(nora, {
         ...DEFAULT_TELEGRAM_CHANNEL_CONFIG,
         // The channel itself does not matter to a try: earlier tests removed theirs.
         chatId: null,
-        links: [
-          {
-            id: reveal,
-            name: 'Reveal',
-            url: 'https://redirect.example.test/nora',
-            destination: 'mon Reveal',
-          },
-          {
-            id: live,
-            name: 'Live',
-            url: 'https://redirect.example.test/live?a=1&b=2',
-            destination: 'mon live TikTok ce soir 21 h',
-          },
-        ],
+        links: linksOn.get(nora) ?? [],
         channelLinkId: reveal,
         examples: ['Ce soir je réponds à tout le monde ✨'],
       });
@@ -469,6 +486,17 @@ describe('the creator’s Telegram channel on Postgres', () => {
       const unknown = await tryPost(nora, { ...body, linkId: newId(RedirectLinkIdSchema) });
       expect(unknown.statusCode).toBe(400);
       expect(unknown.json()).toMatchObject({ error: { details: { kind: 'link_unknown' } } });
+
+      // A link switched off in « Liens » is no longer one of her channel's: the try refuses it the same way.
+      const on = linksOn.get(nora) ?? [];
+      linksOn.set(
+        nora,
+        on.filter((one) => one.id !== live),
+      );
+      const off = await tryPost(nora, { ...body, kind: 'main', linkId: live });
+      linksOn.set(nora, on);
+      expect(off.statusCode).toBe(400);
+      expect(off.json()).toMatchObject({ error: { details: { kind: 'link_unknown' } } });
     });
 
     it('writes a poll without a link, nor a media, nor a place', async () => {

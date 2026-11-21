@@ -13,6 +13,7 @@ import {
 } from 'react';
 
 import { Reader } from './Reader';
+import { suiviEyebrow } from './SuiviNav';
 import { fetchConversations, fetchSendingStop, todosAcrossQuery } from './api';
 import { todoLabel } from './reader-model';
 import {
@@ -28,11 +29,13 @@ import {
   searchLines,
   sharedMode,
   situationOf,
+  sharedLabel,
   STOP_SITUATION,
   storeListOrder,
   subline,
   type Hand,
   type ListOrder,
+  type Situation,
 } from './view';
 import './tracking.css';
 
@@ -40,7 +43,10 @@ import { fansWaiting, queueEntries, toneOf, type QueueEntry } from '@/agent/queu
 import { useCreators } from '@/creators/api';
 import { frenchSpaces, initialOf } from '@/lib/utils';
 import { dashboardSearch } from '@/screens/dashboard/logic';
+import { ChatArt, CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 const REFRESH_MS = 30_000;
 
@@ -66,7 +72,10 @@ export function TrackingPage({
   selfScope = false,
   nothingListed,
   nav,
+  only = null,
 }: {
+  /** The creator the menu's selector is set on, or null for all of them (« Toutes », and every account without it). */
+  only?: string | null;
   /** The conversation open in the reader (`/suivi?conversation=<id>`), or null for the list alone. */
   selected: string | null;
   /** The creator the link names for it (`&creatrice=<id>`), read first when she is one of this account's. */
@@ -95,7 +104,10 @@ export function TrackingPage({
   nav?: ReactNode;
 }): JSX.Element {
   const creatorsQuery = useCreators();
-  const creators = creatorsQuery.data ?? [];
+  const listed = creatorsQuery.data ?? [];
+  // The menu's selector set on one creator (ADR 0134 § 3): Suivi reads her alone, as an account that has only her.
+  const narrowed = only !== null && listed.some((creator) => creator.id === only);
+  const creators = narrowed ? listed.filter((creator) => creator.id === only) : listed;
   const queries = useQueries({
     queries: creators.map((creator) => ({
       queryKey: ['conversations', creator.id],
@@ -151,7 +163,7 @@ export function TrackingPage({
     if (queue.isError) void queue.refetch();
   };
   // Each line of the queue carries its creator: its conversation opens with her id.
-  const todos = queue.data?.items ?? [];
+  const todos = (queue.data?.items ?? []).filter((todo) => !narrowed || todo.creatorId === only);
   // « Nothing for you » only once the queue answered: a queue in error or on its way may hide an urgency (relecture #538).
   const isQueueEmpty = queue.isSuccess && todos.length === 0;
   // The gravest first (the server's order): three lines keep the search and the list above the fold; the one open stays.
@@ -176,15 +188,18 @@ export function TrackingPage({
         todos.find((t) => t.conversationId === selected)?.creatorId ??
         null);
 
+  const oneName = creators.length === 1 ? creators[0]?.displayName : undefined;
   return (
     <Page className={selected === null ? 'tr-page' : 'tr-page tr-is-reading'}>
       <PageHeader
-        eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
-        title="Suivi"
+        // With its tabs, the section above and the open tab as the title (recette visuelle 16/11, T2); a chatter's Suivi
+        // is one screen, named by the section itself.
+        eyebrow={nav === undefined ? oneName : suiviEyebrow(oneName)}
+        title={nav === undefined ? 'Suivi' : screenLabel('/suivi')}
         // Only what the mode means: the panels say the rest themselves (D-03).
         // Off shift or away, he decides nothing: what the mode asks of him is not his to read (EQ-13).
         lead={mode === null || offShift !== undefined ? undefined : MODE_MEANINGS[mode]}
-        actions={nav}
+        tabs={nav}
       />
       {offShift?.(lines.length > 0)}
       {stoppedNames.length === 0 ? null : (
@@ -206,14 +221,7 @@ export function TrackingPage({
         </Panel>
       ) : null}
       {creatorsQuery.isError || (failed.length > 0 && lines.length === 0) ? (
-        <Notice
-          title="Le serveur ne répond pas"
-          text="La liste n’a pas pu être lue. Réessaie dans un instant."
-        >
-          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={retry}>
-            Réessayer
-          </button>
-        </Notice>
+        <Failure onRetry={retry} />
       ) : isLoading && lines.length === 0 ? (
         <Panel className="tr-panel">
           <div className="tr-skeleton" aria-hidden="true">
@@ -224,6 +232,7 @@ export function TrackingPage({
         </Panel>
       ) : creators.length === 0 && canAddCreator ? (
         <Notice
+          art={<CrownArt />}
           title="Aucune créatrice pour l’instant"
           text="Ajoute ta première créatrice : ses conversations arriveront ici dès que sa session Reveal sera reliée."
         >
@@ -242,6 +251,7 @@ export function TrackingPage({
         </>
       ) : creators.length === 0 && isQueueEmpty ? (
         <Notice
+          art={<ChatArt />}
           title="Rien pour toi pour l’instant"
           text="Les conversations des créatrices qui te sont confiées arrivent ici."
         />
@@ -252,12 +262,9 @@ export function TrackingPage({
             {/* An unread queue is never silent: an urgency may be missing from it. */}
             {queue.isError ? (
               <Panel className="tr-panel" eyebrow="À traiter">
-                <p className="tr-queue-error tr-warn">
-                  « À traiter » n’a pas pu être lu : une urgence peut manquer ici.
-                </p>
-                <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={retry}>
-                  Réessayer
-                </button>
+                <Failure inline className="tr-queue-error" onRetry={retry}>
+                  Une urgence peut manquer ici : réessaie dans un instant.
+                </Failure>
               </Panel>
             ) : null}
             {todos.length === 0 ? null : (
@@ -339,34 +346,48 @@ export function TrackingPage({
                   ) : null}
                   {/* Grouped by who acts (CHAT-22): the state is said by the group, not on every line. */}
                   <div role="group" aria-label="Conversations" className="tr-groups">
-                    {groupByHand(shown, selfScope).map((group) => (
-                      <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
-                        <h3 className="tr-group__title">
-                          {HAND_TITLES[group.hand]}
-                          {group.hand === 'yours' ? (
-                            <span className="tr-group__count">{group.lines.length}</span>
-                          ) : null}
-                        </h3>
-                        <ul className="nv-list tr-list" aria-label={HAND_TITLES[group.hand]}>
-                          {group.lines.map(({ conversation, creatorId, creatorName }) => (
-                            <Row
-                              key={conversation.id}
-                              conversation={conversation}
-                              hand={group.hand}
-                              selfScope={selfScope}
-                              creatorName={showsCreator ? creatorName : undefined}
-                              stopped={isStopped(creatorId)}
-                              now={now}
-                              isOpen={conversation.id === selected}
-                              onOpen={() => {
-                                setNotice(null);
-                                onSelect(conversation.id);
-                              }}
-                            />
-                          ))}
-                        </ul>
-                      </section>
-                    ))}
+                    {groupByHand(shown, selfScope).map((group) => {
+                      // In « À toi », a state all its lines share is said once, by the title (PIL-10).
+                      const shared =
+                        group.hand === 'yours'
+                          ? sharedLabel(
+                              group.lines.map(
+                                (line) =>
+                                  rowSituation(line.conversation, selfScope, isStopped(line.creatorId)).label,
+                              ),
+                            )
+                          : null;
+                      return (
+                        <section key={group.hand} className="tr-group" aria-label={HAND_TITLES[group.hand]}>
+                          <h3 className="nv-eyebrow tr-group__title">
+                            {HAND_TITLES[group.hand]}
+                            {group.hand === 'yours' ? (
+                              <span className="tr-group__count">{group.lines.length}</span>
+                            ) : null}
+                            {shared === null ? null : <span>{lowerFirst(shared)}</span>}
+                          </h3>
+                          <ul className="nv-list tr-list" aria-label={HAND_TITLES[group.hand]}>
+                            {group.lines.map(({ conversation, creatorId, creatorName }) => (
+                              <Row
+                                key={conversation.id}
+                                conversation={conversation}
+                                hand={group.hand}
+                                saidByGroup={shared !== null}
+                                selfScope={selfScope}
+                                creatorName={showsCreator ? creatorName : undefined}
+                                stopped={isStopped(creatorId)}
+                                now={now}
+                                isOpen={conversation.id === selected}
+                                onOpen={() => {
+                                  setNotice(null);
+                                  onSelect(conversation.id);
+                                }}
+                              />
+                            ))}
+                          </ul>
+                        </section>
+                      );
+                    })}
                   </div>
                   {hasMore ? (
                     <p className="tr-more">
@@ -383,13 +404,13 @@ export function TrackingPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <p className="tr-reader__empty">
-                Choisis une conversation à gauche : elle s’ouvre ici, avec son brouillon s’il y en a un.
-              </p>
+              <Empty art={<ChatArt />} title="Choisis une conversation à gauche.">
+                Elle s’ouvre ici, avec son brouillon s’il y en a un.
+              </Empty>
             </section>
           ) : open === null ? (
             <section className="nv-plate tr-reader" aria-label="Conversation">
-              <p className="tr-reader__empty">Cette conversation n’est pas dans la liste.</p>
+              <Empty title="Cette conversation n’est pas dans la liste." />
             </section>
           ) : (
             <Reader
@@ -580,9 +601,20 @@ function QueueGroupRow({
  * when he wrote under it. The state shows only where it tells something: in « À toi », why a person must act; elsewhere
  * the group's title says it, but for a pause and another person's hand (CHAT-22, EQ-13).
  */
+/** Where a line stands: a draft held by her emergency stop never says « À valider » (CHAT-07). */
+function rowSituation(conversation: ConversationSummary, selfScope: boolean, stopped: boolean): Situation {
+  return stopped && conversation.state === 'awaiting_approval'
+    ? STOP_SITUATION
+    : situationOf(conversation, selfScope);
+}
+
+/** « Un humain répond » after « À toi · 30 »: the group's title goes on in lower case. */
+const lowerFirst = (text: string): string => text.charAt(0).toLocaleLowerCase('fr') + text.slice(1);
+
 function Row({
   conversation,
   hand,
+  saidByGroup,
   selfScope,
   creatorName,
   stopped,
@@ -593,6 +625,8 @@ function Row({
   conversation: ConversationSummary;
   /** The group the line is in: its state is said once, by the group. */
   hand: Hand;
+  /** Every line of « À toi » says the same: its title says it, the line does not. */
+  saidByGroup: boolean;
   /** A member whose scope is `self`: another person's hand is said beside it, in the quiet ones. */
   selfScope: boolean;
   /** Shown beside his pseudo when the account sees several creators, never cut. */
@@ -605,14 +639,13 @@ function Row({
 }): JSX.Element {
   const name = conversation.fanDisplayName.trim() === '' ? 'Fan sans nom' : conversation.fanDisplayName;
   const line = subline(conversation, now);
-  const situation =
-    stopped && conversation.state === 'awaiting_approval'
-      ? STOP_SITUATION
-      : situationOf(conversation, selfScope);
+  const situation = rowSituation(conversation, selfScope, stopped);
   // Outside « À toi », only a pause and another person's hand are worth a word: the group says the rest.
   const says =
     hand === 'yours'
-      ? 'pill'
+      ? saidByGroup
+        ? null
+        : 'pill'
       : conversation.state === 'paused' || conversation.state === 'human'
         ? 'word'
         : null;
@@ -640,9 +673,7 @@ function Row({
               </span>
             ) : null}
             {creatorName === undefined ? null : (
-              <span className="nv-tag nv-tag--declared tr-row__creator" title={creatorName}>
-                {creatorName}
-              </span>
+              <span className="nv-tag nv-tag--declared tr-row__creator">{creatorName}</span>
             )}
           </span>
           <span className="nv-convo__preview">
@@ -682,20 +713,19 @@ function noticeOf(text: string | null): JSX.Element | null {
 function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tr-notice">
-        <h2>{title}</h2>
-        <p>{text}</p>
-        {children}
-      </div>
-    </Panel>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
+      {text}
+    </Empty>
   );
 }
 

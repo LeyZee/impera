@@ -24,7 +24,7 @@ const ids = (order: readonly VaultCandidate[]): string[] =>
   order.map((candidate) => candidate.platformMediaId);
 
 describe('vaultDescribeOrder (ADR 0113 § 5)', () => {
-  it('takes the vault in its own order when no script holds a media: folders by number, the root last', () => {
+  it('takes the folders in the vault’s own order when no script holds a media, by number, the root last', () => {
     const order = vaultDescribeOrder(
       [
         media('root', { folderRef: null, folderName: null }),
@@ -71,11 +71,20 @@ describe('vaultDescribeOrder (ADR 0113 § 5)', () => {
     expect(ids(order)).toEqual(['x', 'y']);
   });
 
-  it('keeps every candidate, each once', () => {
-    const candidates = [media('a'), media('b', { folderRef: null, folderName: null }), media('c')];
+  it('keeps every candidate of a folder or a script, each once', () => {
+    const candidates = [media('a'), media('b'), media('c')];
     const order = vaultDescribeOrder(candidates, [script('s', true, ['c', 'a', 'c'])]);
     expect([...ids(order)].sort()).toEqual(['a', 'b', 'c']);
     expect(ids(order)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('describes a media of the root she asked, a script’s first, the others after the folders (ADR 0145 § 5)', () => {
+    const root = { folderRef: null, folderName: null };
+    const order = vaultDescribeOrder(
+      [media('loose_root', root), media('in_folder'), media('scripted_root', root)],
+      [script('s', false, ['scripted_root'])],
+    );
+    expect(ids(order)).toEqual(['scripted_root', 'in_folder', 'loose_root']);
   });
 });
 

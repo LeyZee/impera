@@ -303,7 +303,7 @@ describe('Réglages › Sauvegardes', () => {
     });
     renderPage();
     expect((await screen.findByRole('status')).textContent).toMatch(
-      /^Le service de sauvegarde n’a pas pris la demande de \d\d:\d\d\. Tu peux redemander\.$/u,
+      /^Le service de sauvegarde n’a pas pris la demande de \d{1,2}\u00a0h\u00a0\d\d\. Tu peux redemander\.$/u,
     );
     expect(screen.getByRole('button', { name: 'Relancer la sauvegarde maintenant' })).toBeTruthy();
   });

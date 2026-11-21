@@ -86,7 +86,7 @@ let gate: Promise<void> | null;
 /** The agency's settings answer a server error (recette EQP-05). */
 let settingsDown: boolean;
 let team: readonly TeamMember[];
-/** The platform's team as Équipe › Reveal reads it (ADR 0076); `'down'` answers a refused list. */
+/** The platform's team as Équipe › Comptes Reveal reads it (ADR 0076); `'down'` answers a refused list. */
 let revealTeam: { platformChatterId: string; firstName: string; lastName: string }[] | 'down';
 
 function serve(): void {
@@ -315,9 +315,12 @@ describe('Paie › Quinzaine', () => {
     renderPage(OWNER);
     // Nothing validated yet: the amount says it is owed only once validated, never as owed already.
     expect(text(await screen.findByText('À verser une fois validé')).length).toBeGreaterThan(0);
-    // The period is the page's title, alone in its name: the arrows sit in the page's actions.
-    expect(screen.getByRole('heading', { level: 1, name: '16 – 31 octobre 2026' })).toBeTruthy();
+    // The tab is the page's title (recette visuelle 16/11, GES-03); the period sits between its arrows, in the actions.
+    expect(screen.getByRole('heading', { level: 1, name: 'Quinzaine' })).toBeTruthy();
     expect(within(screen.getByRole('heading', { level: 1 })).queryByRole('button')).toBeNull();
+    const arrows = screen.getByRole('group', { name: 'Quinzaine' });
+    expect(text(arrows)).toBe('16 – 31 octobre 2026');
+    expect(arrows.closest('.nv-page__actions')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Quinzaine précédente' })).toBeTruthy();
     expect(text(screen.getByText('À verser une fois validé').nextElementSibling)).toBe('342,50 €');
     expect(screen.getByRole('button', { name: 'Valider (4)' })).toBeTruthy();
@@ -526,6 +529,24 @@ describe('Paie › Quinzaine', () => {
     expect(screen.queryAllByRole('checkbox')).toEqual([]);
     expect(screen.queryByRole('button', { name: /^Valider/u })).toBeNull();
     expect(text(row('Iris'))).toContain('Ton relevé : un autre membre de l’agence le valide.');
+  });
+
+  it('counts on its button the reports the reader decides, never a manager’s own (recette visuelle 16/11, GES-19)', async () => {
+    periods[OCT2] = endedOctober({}, false);
+    reports = [
+      { ...report(1, BASILE.id), status: 'submitted' },
+      { ...report(2, LOU.id), status: 'submitted' },
+      { ...report(3, IRIS.id), status: 'submitted', canReview: false },
+    ];
+    renderPage(IRIS_ME);
+    expect(await screen.findByText('3 rapports de la quinzaine attendent leur relecture')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Relire les 2 rapports' })).toBeTruthy();
+    cleanup();
+    reports = [{ ...report(3, IRIS.id), status: 'submitted', canReview: false }];
+    renderPage(IRIS_ME);
+    expect(await screen.findByText('Un rapport de la quinzaine attend sa relecture')).toBeTruthy();
+    const link = screen.getByRole('link', { name: 'Voir les rapports' });
+    expect(link.className).not.toContain('nv-btn--neon');
   });
 
   it('says that a gap still waiting for its member holds the period too, and that sending it back frees it (ADR 0073)', async () => {
@@ -995,7 +1016,7 @@ describe('Paie › Quinzaine', () => {
     settingsDown = true;
     renderPage(OWNER);
     const said = await screen.findByText(
-      'Le serveur ne répond pas : la quinzaine en cours n’a pas pu être lue.',
+      'La quinzaine en cours n’a pas pu être lue : réessaie dans un instant.',
     );
     settingsDown = false;
     fireEvent.click(
@@ -1246,7 +1267,7 @@ describe('Paie › Quinzaine', () => {
     periods[OCT2] = 'down';
     renderPage(OWNER, `/paie/quinzaine?quinzaine=${OCT2}`);
     expect(
-      await screen.findByText('Le serveur ne répond pas : la quinzaine n’a pas pu être lue.'),
+      await screen.findByText('La quinzaine n’a pas pu être lue : réessaie dans un instant.'),
     ).toBeTruthy();
   });
 
@@ -1378,7 +1399,7 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
         'Vente du mercredi 28 octobre à 22 h · chatteur non relié · Camille Essai',
       );
     });
-    expect(text(unlinked)).toContain('relie-le dans Équipe › Reveal');
+    expect(text(unlinked)).toContain('relie-le dans Équipe › Comptes Reveal');
     expect(within(unlinked).queryByRole('button', { name: /^Compter/u })).toBeNull();
 
     const excluded = card(list, /^Écartée$/u);
@@ -1563,7 +1584,7 @@ describe('Paie › Quinzaine › Ventes en attente (CRM-03 lot b4b)', () => {
     const list = await panel();
     expect(
       await within(list).findByText(
-        'Le serveur ne répond pas : la liste des ventes en attente n’a pas pu être lue.',
+        'La liste des ventes en attente n’a pas pu être lue : réessaie dans un instant.',
       ),
     ).toBeTruthy();
     held[OCT2] = [heldSaleOf()];

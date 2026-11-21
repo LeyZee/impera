@@ -131,7 +131,7 @@ export function createSetupReader(
         );
         const switches = await read(
           SwitchRow,
-          sql`select distinct on (scope, scope_id) scope, scope_id::text as scope_id, active from kill_switches
+          sql`select distinct on (scope, scope_id) scope, scope_id::text as scope_id, (active and (active_until is null or active_until > now())) as active from kill_switches
               order by scope, scope_id, set_at desc`,
         );
         const auto = await read(

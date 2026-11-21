@@ -16,6 +16,7 @@ import type {
   TelegramRoute,
   TelegramSaleSettingsEntry,
   TelegramTopic,
+  RedirectLink,
 } from '@impera/contracts';
 
 import type { ScannedEvent } from './signals';
@@ -382,6 +383,12 @@ export interface ChannelRecord {
 }
 
 /** The creators' channels, as the admin role; each save writes `audit_log`. */
+/**
+ * Her redirect links that are on, kept by the `redirect-links` module since INS-03 (ADR 0121 § 1), matched by shape.
+ * Null when that module holds no link of hers: the links of the channel's own setting are read, for one version.
+ */
+export type ChannelLinksSource = (creatorId: CreatorId) => Promise<readonly RedirectLink[] | null>;
+
 export interface ChannelsStore {
   /** Null when the owner never saved one for her; a row it cannot read reads as never saved. */
   findChannel(creatorId: CreatorId): Promise<ChannelRecord | null>;

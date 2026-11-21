@@ -34,6 +34,21 @@ describe('activePersonaForModels (recette G4)', () => {
     expect((await activePersonaForModels(sourceOf(unnamed), 'creator-1', NOW))?.creatorName).toBe('Nora');
   });
 
+  it('never lets her open it herself later than she would sell (audit du 16/11, B3)', async () => {
+    const strategies = DEMO.strategies;
+    const crossed = {
+      ...DEMO,
+      strategies: {
+        ...strategies,
+        sexualization: { ...strategies.sexualization, min_desire_to_open: 70 },
+        script_launch: { ...strategies.script_launch, min_desire: 50 },
+      },
+    };
+    const read = await activePersonaForModels(sourceOf(crossed), 'creator-1', NOW);
+    expect(read?.sexualizationLimits.minDesireToOpen).toBe(50);
+    expect(read?.offerLimits.minDesire).toBe(50);
+  });
+
   it('names the version it was read from, for the draft to carry it', async () => {
     expect((await activePersonaForModels(sourceOf(DEMO), 'creator-1', NOW))?.versionId).toBe('version-2');
   });

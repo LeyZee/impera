@@ -63,8 +63,8 @@ const planningRead = (patch: Partial<PlanningRead>): PlanningRead => ({
   made: new Set(),
   leaves: [],
   members: [
-    { id: theo, displayName: 'Théo', color: null, status: 'active' },
-    { id: lou, displayName: 'Lou', color: null, status: 'active' },
+    { id: theo, displayName: 'Théo', color: null, status: 'active', creatorIds: [anna, bea] },
+    { id: lou, displayName: 'Lou', color: null, status: 'active', creatorIds: [anna, bea] },
   ],
   ...patch,
 });
@@ -262,7 +262,7 @@ describe('createSchedulingReads (ADR 0026 § 1)', () => {
     for (const written of ['écran', 'incident', 'refus', 'explication']) expect(text).not.toContain(written);
   });
 
-  it('reads who is on shift at an instant: the start included, the end excluded, active members only', async () => {
+  it('reads who is on shift at an instant: the start included, the end excluded, never a shift nobody holds', async () => {
     const at = new Date('2026-11-02T10:00:00Z');
     const covering = shift({});
     const starting = shift({
@@ -278,17 +278,21 @@ describe('createSchedulingReads (ADR 0026 § 1)', () => {
     });
     const onLeave = newId(TeamMemberIdSchema);
     const away = shift({ memberId: onLeave });
+    const cut = newId(TeamMemberIdSchema);
+    const withoutAccess = shift({ memberId: cut });
     const hidden = shift({ memberId: newId(TeamMemberIdSchema) });
     const elsewhere = shift({ creatorId: bea, platformAccountId: beas });
     const planning = planningStore(
       planningRead({
         scope: 'agency',
         planned: new Set([anna]),
-        shifts: [starting, ended, stopped, away, hidden, elsewhere, covering],
+        shifts: [starting, ended, stopped, away, withoutAccess, hidden, elsewhere, covering],
         members: [
-          { id: theo, displayName: 'Théo', color: null, status: 'active' },
-          { id: lou, displayName: 'Lou', color: null, status: 'active' },
-          { id: onLeave, displayName: 'Nina', color: null, status: 'on_leave' },
+          { id: theo, displayName: 'Théo', color: null, status: 'active', creatorIds: [anna, bea] },
+          { id: lou, displayName: 'Lou', color: null, status: 'active', creatorIds: [anna, bea] },
+          { id: onLeave, displayName: 'Nina', color: null, status: 'on_leave', creatorIds: [anna] },
+          // Anna taken off her list (recette EQU-01): her shift on Anna is nobody's.
+          { id: cut, displayName: 'Iris', color: null, status: 'active', creatorIds: [bea] },
         ],
       }),
     );

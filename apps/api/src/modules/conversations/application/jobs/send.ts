@@ -8,7 +8,7 @@ import {
   type SendResult,
 } from '@impera/contracts';
 
-import { BLOCKED_EXPIRY_REASONS, SendRefused } from '../../domain/errors';
+import { BLOCKED_EXPIRY_REASONS, SendRefused, stepCutExpiryReason } from '../../domain/errors';
 import type {
   Clock,
   Conversation,
@@ -21,7 +21,7 @@ import type {
   TypingRhythm,
   UnitOfWork,
 } from '../../domain/ports';
-import { bubbleIdempotencyKey, canSend, fanAwaitsAnswer } from '../../domain/rules';
+import { bubbleIdempotencyKey, canSend, fanAwaitsAnswer, stepCutBy } from '../../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../../domain/state-machine';
 import { scheduleFollowUp } from '../follow-ups';
 import { appendEvent, lockConversation, setDraftStatus } from '../journal';
@@ -42,6 +42,8 @@ interface Sendable {
 }
 
 const SENDABLE: readonly DraftStatus[] = ['approved', 'edited'];
+/** Reveal sells in euros: a step's price is in cents (ADR 0098 § 5). */
+const STEP_CURRENCY = 'EUR';
 
 /**
  * `conversation.send` (message-flow.md §3), on the conversation's serial queue. Sends the approved bubbles one by
@@ -100,6 +102,28 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
     return null;
   }
 
+  /** Expires the draft when his limits now keep its paid step; `true` when they do. */
+  async function expiredForStep(
+    tx: Transaction,
+    { conversation, draft }: Sendable,
+    payload: JobPayload<'conversation.send'>,
+  ): Promise<boolean> {
+    const cut = stepCutBy(await tx.gate.fanFlags(conversation), conversation.careSince);
+    if (cut === null) return false;
+    const at = meta(payload);
+    await appendEvent(
+      tx,
+      conversation,
+      {
+        type: 'draft_expired',
+        payload: { draftId: draft.id, status: 'expired', reason: stepCutExpiryReason(cut) },
+      },
+      at,
+    );
+    await setDraftStatus(tx, draft, 'expired', { decidedBy: null, at: at.at });
+    return true;
+  }
+
   /** The persona's delays, or none: a follow-up missed is better than a send that fails after it went out. */
   async function followUpDelays(
     payload: JobPayload<'conversation.send'>,
@@ -137,14 +161,22 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
     // his meanwhile expires the draft at the check below, and the rest never leaves.
     const typingMs = typing?.delaysMs(bubbles) ?? [];
 
-    for (let index = start.alreadySent; index < bubbles.length; index += 1) {
-      const idempotencyKey = bubbleIdempotencyKey(payload.draftId, index);
-      const text = bubbles[index] ?? '';
-      const pause = index > 0 ? (typingMs[index] ?? 0) : 0;
+    // The step of her script decided with the draft leaves last, once the bubbles that bring it are out (ADR 0098).
+    const step = start.draft.scriptStep;
+    const total = bubbles.length + (step === null ? 0 : 1);
+
+    for (let index = start.alreadySent; index < total; index += 1) {
+      const isStep = step !== null && index === bubbles.length;
+      const idempotencyKey = isStep ? step.idempotencyKey : bubbleIdempotencyKey(payload.draftId, index);
+      const text = isStep ? '' : (bubbles[index] ?? '');
+      const pause = index > 0 && !isStep ? (typingMs[index] ?? 0) : 0;
       if (pause > 0 && typing !== undefined) await typing.wait(pause);
       const conversation = await uow.inTenant(payload.creatorId, async (tx) => {
         const sendable = await lockSendable(tx, payload, true);
         if (sendable === null) return null;
+        // His limits, read again before the paid step: one set since the approval keeps it, the bubbles already
+        // gone stay, and the draft expires so no retry sends it (relecture Sécurité de #812).
+        if (isStep && (await expiredForStep(tx, sendable, payload))) return null;
         await appendEvent(
           tx,
           sendable.conversation,
@@ -169,7 +201,14 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
       let result: SendResult | null;
       let failure: unknown = null;
       try {
-        result = await sender.sendText(conversation, text, idempotencyKey);
+        result = isStep
+          ? await sender.sendStep(
+              conversation,
+              { scriptRef: step.scriptRef, stepRef: step.stepRef },
+              { amountMinor: step.priceMinor, currency: STEP_CURRENCY },
+              idempotencyKey,
+            )
+          : await sender.sendText(conversation, text, idempotencyKey);
       } catch (error) {
         failure = error;
         // The platform may have taken it before the error: ask before counting it as failed. A refused send never left.
@@ -226,8 +265,9 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
           direction: 'outbound',
           author,
           text,
-          priceMinor: null,
-          currency: null,
+          // A paid step is priced as the platform sells it; it is paid once the platform says he bought it.
+          priceMinor: isStep && step.priceMinor > 0 ? step.priceMinor : null,
+          currency: isStep && step.priceMinor > 0 ? STEP_CURRENCY : null,
           isPaid: false,
           platformCreatedAt: new Date(sent.sentAt),
           draftId: payload.draftId,
@@ -276,6 +316,9 @@ export function createSendJob({ uow, clock, sender, followUps, typing }: SendDep
       // He has her answer: if he goes silent, she follows up (P3-10).
       await scheduleFollowUp(tx, sent, delaysHours, at);
     });
-    logger.info({ draftId: payload.draftId, bubbles: bubbles.length }, 'send: verified');
+    logger.info(
+      { draftId: payload.draftId, bubbles: bubbles.length, scriptStep: step !== null },
+      'send: verified',
+    );
   };
 }

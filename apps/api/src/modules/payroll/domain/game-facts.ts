@@ -1,5 +1,6 @@
-import { calendarDayAt, type Currency, type PayPeriod } from '@impera/contracts';
+import { calendarDayAt, type Currency, type PayPeriod, type PlatformAccountId } from '@impera/contracts';
 
+import { platformNetOfGross } from './commission-statements';
 import { mainCurrencyOf, type FigureLine } from './my-figures';
 
 /*
@@ -13,8 +14,59 @@ export interface TierReached {
   readonly thresholdMinor: number;
 }
 
+/**
+ * A shift whose reports the agency validated, as the planning gives it to the game (ADR 0118 § 1): when it was held,
+ * the total validated in the currency declared, and what pay takes off a gross on that account for that period.
+ */
+export interface ValidatedShift {
+  readonly platformAccountId: PlatformAccountId;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly period: PayPeriod;
+  readonly currency: Currency;
+  readonly grossMinor: number;
+  readonly vatBps: number;
+  readonly platformFeeBps: number;
+}
+
+/**
+ * The validated shifts as lines of the game's net (ADR 0118): each on the day its shift began (§ 2), at the net pay's
+ * chain gives its total, in the currency declared. A shift with a sale read in its hours on its own account is left to
+ * the sales (§ 3): nothing is counted twice. A sale read on another account says nothing of this shift, so it leaves
+ * the report its line. A total of zero or less brings no line.
+ */
+export function reportLines(shifts: readonly ValidatedShift[], lines: readonly FigureLine[]): FigureLine[] {
+  const read = new Map<PlatformAccountId, number[]>();
+  for (const line of lines) {
+    if (line.occurredAt === null) continue;
+    read.set(line.platformAccountId, [
+      ...(read.get(line.platformAccountId) ?? []),
+      line.occurredAt.getTime(),
+    ]);
+  }
+  return shifts.flatMap((shift) => {
+    const from = shift.startsAt.getTime();
+    const to = shift.endsAt.getTime();
+    if ((read.get(shift.platformAccountId) ?? []).some((at) => at >= from && at < to)) return [];
+    const netMinor = platformNetOfGross(shift);
+    return netMinor <= 0
+      ? []
+      : [
+          {
+            period: shift.period,
+            platformAccountId: shift.platformAccountId,
+            event: 'sale' as const,
+            currency: shift.currency,
+            netMinor,
+            occurredAt: shift.startsAt,
+            saleType: null,
+          },
+        ];
+  });
+}
+
 export interface PayGameFacts {
-  /** Sales on the member's statements, ever. */
+  /** Sales on the member's statements, and shifts with a validated total, ever. */
   readonly sales: number;
   /** The net of each day that has sales with an instant, the oldest first, in the currency that brought the most. */
   readonly dayNetsMinor: readonly number[];
@@ -34,12 +86,15 @@ const ascending = <Value>(sums: ReadonlyMap<string, Value>): Value[] =>
 
 export function payGameFacts(input: {
   readonly lines: readonly FigureLine[];
+  /** The member's shifts with a validated total (ADR 0118); none when the planning was not read. */
+  readonly validatedShifts?: readonly ValidatedShift[];
   readonly tiers: readonly TierReached[];
   readonly agencyZone: string;
   /** The fortnight under way: its net still moves, so it sets no record yet. */
   readonly currentPeriod: PayPeriod;
 }): PayGameFacts {
-  const { lines, tiers, agencyZone, currentPeriod } = input;
+  const { tiers, agencyZone, currentPeriod } = input;
+  const lines = [...input.lines, ...reportLines(input.validatedShifts ?? [], input.lines)];
   const currency = mainCurrencyOf(lines);
   const byDay = new Map<string, number>();
   const byPeriod = new Map<string, number>();

@@ -122,7 +122,11 @@ export function createDrizzleCreatorRewardsStore(
               earnedAt: now,
             })),
           )
-          .onConflictDoNothing({ target: [rewardGains.userId, rewardGains.kind, rewardGains.scopeKey] })
+          .onConflictDoNothing({
+            target: [rewardGains.userId, rewardGains.kind, rewardGains.scopeKey],
+            // The key holds among the gains not taken back (ADR 0118); none of hers ever is.
+            where: sql`${rewardGains.takenBackAt} is null`,
+          })
           .returning({ id: rewardGains.id });
         return written.length;
       }),

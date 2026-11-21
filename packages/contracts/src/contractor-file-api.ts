@@ -13,6 +13,7 @@ import {
   InvoicePrefixSchema,
   Sha256Schema,
   frenchVatNumberOf,
+  legalNameReadsRight,
   sirenChecksOut,
 } from './invoices-fields';
 import { ContractorRegimeSchema } from './invoices-parties';
@@ -50,6 +51,13 @@ export const ContractorProfileBodySchema = ContractorProfileSchema.pick({
   rcsCity: true,
   email: true,
 }).superRefine((profile, context) => {
+  if (!legalNameReadsRight(profile.legalName)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['legalName'],
+      message: 'Le nom tel qu’il s’imprime sur une facture : sans emoji ni pictogramme.',
+    });
+  }
   const company = [profile.legalForm, profile.shareCapitalMinor, profile.rcsCity];
   if (company.some((value) => value === null) && company.some((value) => value !== null)) {
     context.addIssue({
@@ -71,7 +79,9 @@ export const ContractorProfileBodySchema = ContractorProfileSchema.pick({
     context.addIssue({
       code: 'custom',
       path: ['businessId'],
-      message: 'Ce numéro n’est pas un SIREN : sa clé de contrôle (le 9e chiffre) ne correspond pas.',
+      message: /^0+$/u.test(siren)
+        ? 'Ce numéro n’est pas un SIREN : l’INSEE n’en attribue aucun fait de zéros.'
+        : 'Ce numéro n’est pas un SIREN : sa clé de contrôle (le 9e chiffre) ne correspond pas.',
     });
     return;
   }

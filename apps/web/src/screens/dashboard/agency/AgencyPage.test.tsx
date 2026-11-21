@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,35 +80,32 @@ function show(page: () => ReactNode): void {
 }
 
 describe('the agency’s Dashboard (ADR 0078)', () => {
-  it('opens on « Toute l’agence », and the arrows lead to a creator', async () => {
+  it('opens on the agency’s figures, the choice of a creator left to the menu’s selector (ADR 0134 § 3)', async () => {
     serve();
-    const chosen: string[] = [];
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
-        onCreator={(id) => chosen.push(id)}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
+        onCreator={() => undefined}
         forOwner
         reviewsReports={false}
         canAddCreator
       />
     ));
-    const agency = await screen.findByRole('radio', { name: /Toute l’agence/u });
-    expect(agency.getAttribute('aria-checked')).toBe('true');
-    expect(agency.tabIndex).toBe(0);
     expect(await screen.findByRole('heading', { name: /L’agence en chiffres/u })).toBeTruthy();
-    fireEvent.keyDown(agency, { key: 'ArrowRight' });
-    await waitFor(() => {
-      expect(chosen).toEqual([CREATOR.id]);
-    });
+    // A title, as on every screen (recette visuelle 16/11, PIL-04).
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeTruthy();
+    // No chips of its own any more: one selector, in the menu.
+    expect(screen.queryByRole('radio', { name: /Toute l’agence/u })).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Ce que montre le Dashboard' })).toBeNull();
   });
 
   it('says the AI budget in the banners’ face, without « Pour toute l’agence » on the agency’s view (ADM-26)', async () => {
     serve();
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={() => undefined}
         forOwner
         reviewsReports={false}
@@ -127,8 +124,8 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     serve([]);
     show(() => (
       <AgencyPage
-        period="week"
-        onPeriod={() => undefined}
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
         onCreator={() => undefined}
         forOwner
         reviewsReports={false}
@@ -139,6 +136,45 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
     expect(screen.queryByRole('heading', { name: /L’agence en chiffres/u })).toBeNull();
   });
 
+  it('puts the figures before what the agency runs, the AI budget last (PIL-04)', async () => {
+    serve();
+    show(() => (
+      <AgencyPage
+        selection={{ unit: 'week' }}
+        onSelection={() => undefined}
+        onCreator={() => undefined}
+        forOwner
+        reviewsReports={false}
+        canAddCreator
+      />
+    ));
+    const budget = await screen.findByRole('complementary', { name: 'Budget IA du jour, toutes créatrices' });
+    const figures = await screen.findByRole('heading', { name: /L’agence en chiffres/u });
+    expect(figures.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('puts her agent first on a creator’s Dashboard, her figures under it, nothing of the agency’s (PIL-01, PIL-04)', async () => {
+    serve();
+    show(() => (
+      <DashboardPage
+        period="week"
+        onPeriod={() => undefined}
+        forOwner
+        agency={{
+          selection: { unit: 'week' },
+          onSelection: () => undefined,
+          onAgency: () => undefined,
+          canOpenSettings: true,
+        }}
+      />
+    ));
+    const figures = await screen.findByRole('heading', { name: /Les chiffres de/u });
+    const hero = document.querySelector('.db-hero');
+    if (hero === null) throw new Error('hero');
+    expect(hero.compareDocumentPosition(figures) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByText(/Budget IA du jour/u)).toBeNull();
+  });
+
   it('puts her figures first on a creator’s Dashboard, one period control, no second sales panel', async () => {
     serve();
     show(() => (
@@ -147,15 +183,16 @@ describe('the agency’s Dashboard (ADR 0078)', () => {
         onPeriod={() => undefined}
         forOwner
         agency={{
-          period: 'week',
-          onPeriod: () => undefined,
+          selection: { unit: 'week' },
+          onSelection: () => undefined,
           onAgency: () => undefined,
           canOpenSettings: true,
         }}
       />
     ));
     expect(await screen.findByRole('heading', { name: /Les chiffres de/u })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: /Toute l’agence/u }).getAttribute('aria-checked')).toBe('false');
+    // Whose it is reads in the header: the chips are gone, the menu's selector chooses (ADR 0134 § 3).
+    expect(screen.queryByRole('radio', { name: /Toute l’agence/u })).toBeNull();
     expect(screen.getAllByRole('radiogroup', { name: 'Période' })).toHaveLength(1);
     expect(screen.queryByRole('heading', { name: /Ventes lues chez/u })).toBeNull();
   });

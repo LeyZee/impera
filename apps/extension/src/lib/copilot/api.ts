@@ -94,10 +94,14 @@ export async function readFanCard(
   return card.success ? { kind: 'card', card: card.data } : { kind: 'down' };
 }
 
-/** « Où on en est » (§ 3.1): his limits and his desire. A part that cannot be read is said, never guessed. */
+/**
+ * « Où on en est » (§ 3.1): his limits and his desire, and his name on the platform, so a chatter sees the panel shows
+ * the conversation he has open (recette du 16/11, EXT-14). A part that cannot be read is said, never guessed.
+ */
 export interface StandingRead {
   readonly flags: FanFlags | 'unread';
   readonly band: DesireBand | null;
+  readonly fanName: string | null;
 }
 
 export async function readStanding(
@@ -123,5 +127,9 @@ export async function readStanding(
   return {
     flags: flags?.success === true ? flags.data.flags : 'unread',
     band: detail?.success === true ? (detail.data.desire?.band ?? null) : null,
+    fanName:
+      detail?.success === true && detail.data.fanDisplayName.trim() !== ''
+        ? detail.data.fanDisplayName
+        : null,
   };
 }

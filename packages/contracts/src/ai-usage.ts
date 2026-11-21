@@ -14,10 +14,19 @@ export const AiUsageProviderSchema = z.enum(['xai', 'mistral', 'google', 'venice
 export type AiUsageProvider = z.infer<typeof AiUsageProviderSchema>;
 
 /**
- * What the money went to, the way the screen names it: the four roles of the gateway (ADR 0009), and the trend
- * watch apart (ADR 0060 § 7), whatever role it used.
+ * What the money went to, the way the screen names it: the four roles of the gateway (ADR 0009), the trend watch
+ * apart (ADR 0060 § 7) and the owner's « Essai réel » of a service apart (ADR 0091 § 7), whatever role they used, and
+ * the replies to her Instagram comments apart (ADR 0122).
  */
-export const AiUsageUseSchema = z.enum(['voice', 'brain', 'sense', 'judge', 'trend_watch']);
+export const AiUsageUseSchema = z.enum([
+  'voice',
+  'brain',
+  'sense',
+  'judge',
+  'trend_watch',
+  'probe',
+  'instagram_comment',
+]);
 export type AiUsageUse = z.infer<typeof AiUsageUseSchema>;
 
 const eur = z.number().nonnegative();
@@ -180,6 +189,22 @@ export const AiCreditsSchema = z.strictObject({
 });
 export type AiCredits = z.infer<typeof AiCreditsSchema>;
 
+/**
+ * ElevenLabs counts characters, not money (ADR 0091 § 7): what its account says at the last check, every 15 minutes or
+ * on « Vérifier maintenant ». Its calls are not in `llm_calls`.
+ */
+export const AiUsageVoiceSchema = z.strictObject({
+  used: count,
+  limit: count,
+  /** When the month's characters come back; null when the account does not say. */
+  resetsAt: z.iso.datetime({ offset: true }).nullable(),
+  /** `free`: ElevenLabs' free offer, which forbids commercial use; null when the account does not say. */
+  plan: z.enum(['free', 'paid']).nullable(),
+  /** When the account was read. */
+  readAt: z.iso.datetime({ offset: true }),
+});
+export type AiUsageVoice = z.infer<typeof AiUsageVoiceSchema>;
+
 export const AiUsageCapStateSchema = z.enum(['ok', 'alert', 'reached']);
 export type AiUsageCapState = z.infer<typeof AiUsageCapStateSchema>;
 
@@ -232,6 +257,8 @@ export const AiUsageSchema = z.strictObject({
   lastCallAt: z.iso.datetime({ offset: true }).nullable(),
   /** One card per provider with at least one line in the ledger, in `AiCreditProviderSchema`'s order. */
   credits: z.array(AiCreditsSchema),
+  /** ElevenLabs' characters of the month (ADR 0091 § 7), as its last check read them; null while it is not connected. */
+  voice: AiUsageVoiceSchema.nullable(),
 });
 export type AiUsage = z.infer<typeof AiUsageSchema>;
 

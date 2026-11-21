@@ -12,7 +12,7 @@ import { useState, type JSX } from 'react';
 import { GoalDialog, TiersDialog } from './GoalForms';
 import { PayNav } from './PayNav';
 import { useAgencySettingsDown, useAgencyToday, useCurrentPeriod, usePayNames } from './data';
-import { Gauge, GoalTicks, Loading, LockIcon, PeriodArrows, PeriodHeading, Unreachable } from './parts';
+import { Gauge, GoalTicks, Loading, LockIcon, PeriodArrows, Unreachable } from './parts';
 
 import { usePayPeriod } from '@/payroll/api';
 import {
@@ -38,8 +38,10 @@ import {
 import { LevelsPanel } from '@/rewards/LevelsPanel';
 import '@/scheduling/scheduling.css';
 import { longDay } from '@/scheduling/time';
+import { TargetArt } from '@/shell/art/EmptyArt';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Empty } from '@/shell/states';
 
 /** How many periods ahead new tiers may start. */
 const TIER_PERIODS = 4;
@@ -63,6 +65,7 @@ export function GoalsPage({
   const current = useCurrentPeriod();
   const down = useAgencySettingsDown();
   const today = useAgencyToday();
+  // The quinzaine the tabs carry (GES-02); without one, the one under way.
   const period = chosen ?? current;
   const read = usePayPeriod(period);
   const after = usePayPeriod(period === null ? null : followingPeriod(period));
@@ -83,14 +86,12 @@ export function GoalsPage({
   const head = (
     <PageHeader
       eyebrow="Paie"
-      title={period === null ? 'Objectifs' : <PeriodHeading period={period} />}
+      title="Objectifs"
       lead="Ce que l’équipe vise ensemble, et ce que chacun débloque seul."
-      actions={
-        <>
-          {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav user={user} />
-        </>
-      }
+      tabs={<PayNav user={user} period={period} />}
+      {...(period === null
+        ? {}
+        : { actions: <PeriodArrows period={period} current={current} onPeriod={onPeriod} named /> })}
     />
   );
 
@@ -145,42 +146,45 @@ export function GoalsPage({
     <Page>
       {head}
       <div className="py-board">
+        {/* Without a goal, the card is named after its subject and says it once (GES-18). */}
         <Panel
           className="nv-enter"
-          eyebrow="Objectif collectif"
+          {...(goal === null ? {} : { eyebrow: 'Objectif collectif' })}
           title={
             goal === null
-              ? 'Pas d’objectif collectif'
+              ? 'Objectif collectif'
               : `${amountText(goal.targetMinor, 'EUR')} de net pour l’équipe`
           }
         >
           <div className="rp-sec">
             {goal === null ? (
-              <div className="py-empty">
-                <p className="py-empty__whisper">
-                  Pas d’objectif sur la quinzaine {periodLine(data.period)}.
-                </p>
-                <p className="py-empty__text">
-                  {!open
-                    ? 'La quinzaine est close : son objectif ne change plus.'
-                    : goalWindow(data.period) === 'closed'
-                      ? 'L’objectif d’une quinzaine se pose au plus tard son 3e jour : celle-ci n’en aura pas.'
-                      : owner
-                        ? 'Une cible de net pour l’équipe et ses paliers : chaque chatteur touche la prime du plus haut palier atteint.'
-                        : 'Le propriétaire pose l’objectif d’une quinzaine.'}
-                </p>
-                {owner && open && goalWindow(data.period) !== 'closed' ? (
-                  <button
-                    type="button"
-                    className="nv-btn nv-btn--soft"
-                    onClick={() => {
-                      setEditing({ kind: 'goal', period: data.period, goal: null });
-                    }}
-                  >
-                    Poser l’objectif
-                  </button>
-                ) : null}
-              </div>
+              <Empty
+                art={<TargetArt />}
+                title={`Pas d’objectif sur la quinzaine ${periodLine(data.period)}.`}
+                {...(owner && open && goalWindow(data.period) !== 'closed'
+                  ? {
+                      action: (
+                        <button
+                          type="button"
+                          className="nv-btn nv-btn--soft"
+                          onClick={() => {
+                            setEditing({ kind: 'goal', period: data.period, goal: null });
+                          }}
+                        >
+                          Poser l’objectif
+                        </button>
+                      ),
+                    }
+                  : {})}
+              >
+                {!open
+                  ? 'La quinzaine est close : son objectif ne change plus.'
+                  : goalWindow(data.period) === 'closed'
+                    ? 'L’objectif d’une quinzaine se pose au plus tard son 3e jour : celle-ci n’en aura pas.'
+                    : owner
+                      ? 'Une cible de net pour l’équipe et ses paliers : chaque chatteur touche la prime du plus haut palier atteint.'
+                      : 'Le propriétaire pose l’objectif d’une quinzaine.'}
+              </Empty>
             ) : (
               <GoalGauge data={data} goal={goal} />
             )}
@@ -366,10 +370,10 @@ function TiersPanel({
   return (
     <Panel
       className="nv-enter"
-      eyebrow="Paliers individuels"
+      {...(set === null || tiers.length === 0 ? {} : { eyebrow: 'Paliers individuels' })}
       title={
         set === null || tiers.length === 0
-          ? 'Aucun palier en vigueur'
+          ? 'Paliers individuels'
           : `En vigueur depuis la quinzaine ${periodLineFrom(set.fromPeriod, current)}`
       }
       actions={

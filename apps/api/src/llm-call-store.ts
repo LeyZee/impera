@@ -21,6 +21,7 @@ const RowSchema = z.object({
   conversation_id: z.string().nullable(),
   draft_id: z.string().nullable(),
   hedge: z.enum(HEDGE_ROLES).nullable(),
+  error_code: z.string().nullable(),
 });
 
 function toRecord(row: z.infer<typeof RowSchema>): LlmCallRecord {
@@ -42,6 +43,7 @@ function toRecord(row: z.infer<typeof RowSchema>): LlmCallRecord {
     ...(row.conversation_id === null ? {} : { conversationId: row.conversation_id }),
     ...(row.draft_id === null ? {} : { draftId: row.draft_id }),
     ...(row.hedge === null ? {} : { hedge: row.hedge }),
+    ...(row.error_code === null ? {} : { errorCode: row.error_code }),
   };
 }
 
@@ -70,13 +72,17 @@ export function createDrizzleLlmCallStore(adminDb: Database): LlmCallStore {
         conversationId: record.conversationId ?? null,
         draftId: record.draftId ?? null,
         hedge: record.hedge ?? null,
+        // Paths and kinds only (`invalidOutputCode`): `errorMessage` may quote the answer and is never stored.
+        errorCode: record.errorCode ?? null,
+        voiceExampleIds: record.voiceExampleIds === undefined ? null : [...record.voiceExampleIds],
         createdAt: record.at,
       });
     },
     async listSince(from) {
       const result = await adminDb.execute(sql`
         select created_at, creator_id, role, purpose, provider, model, prompt_hash, status, latency_ms, is_fallback,
-               input_tokens, output_tokens, cost_micro_usd, conversation_id, draft_id, hedge
+               input_tokens, output_tokens, cost_micro_usd, conversation_id, draft_id, hedge,
+               error_code
         from llm_calls where created_at >= ${from.toISOString()}::timestamptz order by created_at`);
       return z.array(RowSchema).parse(result.rows).map(toRecord);
     },

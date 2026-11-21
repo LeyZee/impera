@@ -186,8 +186,9 @@ describe('Notifications, when it rings', () => {
     deviceIs('unsupported');
     renderPage();
     const start = await screen.findByLabelText('Début des heures calmes');
-    expect(start).toHaveProperty('value', '22:00');
-    expect(screen.getByLabelText('Fin des heures calmes')).toHaveProperty('value', '08:00');
+    // Written as the line under them writes them, « 22 h », not « 22:00 » (CHA-26).
+    expect(start).toHaveProperty('value', '22\u00a0h');
+    expect(screen.getByLabelText('Fin des heures calmes')).toHaveProperty('value', '8\u00a0h');
     expect(save()).toHaveProperty('disabled', true);
 
     fireEvent.change(start, { target: { value: '23:30' } });
@@ -274,7 +275,9 @@ describe('Notifications, settings that cannot be read', () => {
     );
     deviceIs('off');
     renderPage();
-    expect(await screen.findByText('Tes réglages n’ont pas pu être lus.')).toBeTruthy();
+    expect((await screen.findByRole('alert')).textContent).toContain('Le serveur ne répond pas');
+    // One message for one silent server (ETA-05): this device's card says nothing of it.
+    expect(screen.queryByText(/rouvre cette page/u)).toBeNull();
     expect(screen.queryByText(/illisibles/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByLabelText('Début des heures calmes')).toBeTruthy();

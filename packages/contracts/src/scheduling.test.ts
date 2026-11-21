@@ -286,6 +286,14 @@ describe('shifts and templates', () => {
     ).toBe(false);
   });
 
+  it('names a member with a creator no longer on his list, none in a planning read before the field (recette EQU-01)', () => {
+    const empty = { settings, accounts: [], members: [], shifts: [], conflicts: [], away: [] };
+    expect(PlanningSchema.parse(empty).withoutAccess).toEqual([]);
+    const pair = { memberId: MEMBER, creatorId: CREATOR };
+    expect(PlanningSchema.parse({ ...empty, withoutAccess: [pair] }).withoutAccess).toEqual([pair]);
+    expect(PlanningSchema.safeParse({ ...empty, withoutAccess: [{ memberId: MEMBER }] }).success).toBe(false);
+  });
+
   it('gives a chatter their own shifts, the accounts those are on, themselves alone and no conflict', () => {
     const chatterPlanning = {
       settings,

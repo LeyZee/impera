@@ -26,6 +26,14 @@ describe('checkCare (ADR 0088 § 3)', () => {
     }
   });
 
+  it('stops seduction without a sexual word: a wink, a flame, « toute à toi » (recette AGR-08)', () => {
+    const codes = (text: string) => checkCare([text]).map((v) => v.match);
+    expect(codes('hihi j’avoue 😏')).toEqual(['hihi', '😏']);
+    expect(codes('Courage toi 🔥')).toEqual(['🔥']);
+    expect(codes('je suis toute à toi ce soir')).toEqual(['toute a toi']);
+    expect(codes('Je suis là pour toi, vraiment 🤍')).toEqual([]);
+  });
+
   it('asks the voice for no sale, no seduction, no promise and no medical advice', () => {
     for (const words of ['sans séduction', 'sans promesse', 'sans conseil médical', 'sans rien proposer']) {
       expect(CARE_BRIEF).toContain(words);

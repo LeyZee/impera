@@ -5,30 +5,28 @@ import { useId, useState, type JSX } from 'react';
 import { confirmOut, dropArchiveHref } from './api';
 import { OUT_LABELS, OUT_PLACES, herDrops, holdsLine, summaryLine, type HerDropRow } from './model';
 
-import { DescribeSwitch } from '@/creators/scripts/DescribeSwitch';
 import { ScriptReview } from '@/creators/scripts/ScriptReview';
 import { contentKey, useCreatorContent } from '@/creators/scripts/api';
 import { dayLabel } from '@/creators/scripts/model';
 import '@/creators/scripts/scripts.css';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
+import { CameraArt } from '@/shell/art/EmptyArt';
+import { Empty, Failure } from '@/shell/states';
 
 /**
  * Créatrices › Contenu (recette créatrice 1 et 6), the owner's and an active manager's: every drop of hers but a
  * script, her media, their descriptions to read, its archive and « Publié » once the team put it out by hand (ADR 0044):
- * her originals of it go 30 days later. The switch of the descriptions stands here, at the head of what it describes.
+ * her originals of it go 30 days later. Each of her media is described on arrival: no switch (ADR 0145 § 5, 17/11).
  */
 export function DropsSection({
   creatorId,
   creatorName,
   timezone,
-  isOwner = false,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
-  /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9). */
-  isOwner?: boolean;
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
   const [confirming, setConfirming] = useState<HerDropRow | null>(null);
@@ -36,31 +34,16 @@ export function DropsSection({
   const list = (): JSX.Element => {
     if (content.data === undefined) {
       if (content.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="aa-empty__title">Son contenu ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void content.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+        return <Failure title="Son contenu ne se charge pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const rows = herDrops(content.data);
     if (rows.length === 0)
       return (
-        <div className="nv-plate aa-empty">
-          <p className="aa-empty__title">Aucun dépôt</p>
-          <p className="ps-muted">
-            Quand {creatorName} dépose une séance, une story ou une relance depuis son téléphone, elle arrive
-            ici avec ses médias et leurs descriptions. Ses scripts ont leur onglet.
-          </p>
-        </div>
+        <Empty plate art={<CameraArt />} title="Aucun dépôt">
+          Quand {creatorName} dépose une séance, une story ou une relance depuis son téléphone, elle arrive
+          ici avec ses médias et leurs descriptions. Ses scripts ont leur onglet.
+        </Empty>
       );
     const first = rows.find((row) => row.standing === 'to_publish');
     return (
@@ -99,7 +82,6 @@ export function DropsSection({
           </div>
         </div>
       </div>
-      {isOwner ? <DescribeSwitch creatorId={creatorId} creatorName={creatorName} /> : null}
       {list()}
       {confirming === null ? null : (
         <ConfirmOut
@@ -166,7 +148,7 @@ function DropCard({
         </span>
       </div>
       <div className="sx-card__body">
-        <h3 id={`${id}-title`} className="sx-title">
+        <h3 id={`${id}-title`} className="nv-h3 sx-title">
           {row.label}
         </h3>
         <p className="sx-meta nv-num">

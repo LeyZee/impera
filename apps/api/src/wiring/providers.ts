@@ -3,7 +3,7 @@ import { JOB_PAYLOADS } from '@impera/contracts';
 import { secretOrNull } from '../config';
 import { createConnectionStatePublisher } from '../connection-state';
 import { defineTask } from '../jobs';
-import { startProvidersModule, type ProvidersModule } from '../modules/providers';
+import { startProvidersModule, type GatewayTest, type ProvidersModule } from '../modules/providers';
 import { sandboxOf } from '../sandbox';
 
 import type { Routes, Shared, TasksOf } from './shared';
@@ -14,7 +14,11 @@ export interface WiredProviders {
   readonly routes: readonly Routes[];
 }
 
-export async function wireProviders(shared: Shared): Promise<WiredProviders> {
+/**
+ * `testConnection`: the gateway's « Essai réel » (ADR 0091 § 7). The gateway is built after this module, on its keys:
+ * the composition root hands a function that reaches it at call time.
+ */
+export async function wireProviders(shared: Shared, testConnection?: GatewayTest): Promise<WiredProviders> {
   const { config, adminDb, logger, requireRole, recentLogin } = shared;
   const sandbox = sandboxOf(config);
   const module = await startProvidersModule({
@@ -38,6 +42,7 @@ export async function wireProviders(shared: Shared): Promise<WiredProviders> {
     },
     publishConnectionState: createConnectionStatePublisher(adminDb),
     ...(sandbox !== null && { baseUrls: sandbox.baseUrls }),
+    ...(testConnection !== undefined && { testConnection }),
   });
   return {
     module,

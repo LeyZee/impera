@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import {
   PLATFORM_SCRIPT_NAME_MAX,
   PLATFORM_SCRIPT_REF_MAX,
@@ -10,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   boundedPlatformScript,
+  descriptionRefusal,
   planPlatformScripts,
   platformScriptFingerprint,
   platformScriptGaps,
@@ -35,6 +38,7 @@ function script(id: string, prices: readonly number[] = [0, 1_500, 3_000]): Plat
       previewMedia: [],
       priceMinor,
       currency: 'EUR' as const,
+      discount: null,
     })),
   };
 }
@@ -192,11 +196,13 @@ describe('the price warnings of P6-01, never a refusal', () => {
 });
 
 describe('what keeps a native script from being proposable', () => {
-  const inVault = { kind: 'image' as const, inVault: true, described: true };
+  const inVault = { kind: 'image' as const, inVault: true, imported: true, described: true };
   const step = (
     _platformIndex: number,
-    ...media: (typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; described: boolean })[]
-  ) => ({ media });
+    ...media: (
+      typeof inVault | { kind: 'image' | 'audio'; inVault: boolean; imported: boolean; described: boolean }
+    )[]
+  ) => ({ discounted: false, media });
 
   it('needs each media in the vault and described, and the identity validated', () => {
     expect(platformScriptGaps([step(0, inVault), step(1, inVault)], true, [])).toEqual([]);
@@ -204,8 +210,8 @@ describe('what keeps a native script from being proposable', () => {
     expect(
       platformScriptGaps(
         [
-          step(0, inVault, { kind: 'image', inVault: false, described: false }),
-          step(1, { kind: 'image', inVault: true, described: false }),
+          step(0, inVault, { kind: 'image', inVault: false, imported: false, described: false }),
+          step(1, { kind: 'image', inVault: true, imported: true, described: false }),
         ],
         true,
         [],
@@ -213,10 +219,38 @@ describe('what keeps a native script from being proposable', () => {
     ).toEqual(['media_absent', 'media_not_described']);
   });
 
+  it('never offers a script whose media is in the vault but not imported into the CRM (ADR 0145 § 5)', () => {
+    expect(
+      platformScriptGaps(
+        [step(0, inVault, { kind: 'image', inVault: true, imported: false, described: true })],
+        true,
+        [],
+      ),
+    ).toEqual(['media_not_imported']);
+    // A voice note too: the agent does not see what is not in the CRM.
+    expect(
+      platformScriptGaps(
+        [step(0, { kind: 'audio', inVault: true, imported: false, described: false })],
+        true,
+        [],
+      ),
+    ).toEqual(['media_not_imported']);
+  });
+
   it('never waits for a voice note to be described: the vision never hears one', () => {
     expect(
-      platformScriptGaps([step(0, { kind: 'audio', inVault: true, described: false })], true, []),
+      platformScriptGaps(
+        [step(0, { kind: 'audio', inVault: true, imported: true, described: false })],
+        true,
+        [],
+      ),
     ).toEqual([]);
+  });
+
+  it('never offers a script with a « Tarif réduit » on a step: never sold at a discount (recette 16/11)', () => {
+    expect(
+      platformScriptGaps([step(0, inVault), { ...step(1, inVault), discounted: true }], true, []),
+    ).toEqual(['step_discounted']);
   });
 
   it('adds what its branches lack (ADR 0112)', () => {
@@ -227,6 +261,34 @@ describe('what keeps a native script from being proposable', () => {
 });
 
 describe('the fingerprint of a native script', () => {
+  it('changes when a « Tarif réduit » is set or taken off, and stays the same for a step without one', () => {
+    const plain = script('s1');
+    const discounted: PlatformScript = {
+      ...plain,
+      steps: plain.steps.map((each, index) =>
+        index === 1 ? { ...each, discount: { priceMinor: 1_000, minutes: 60 } } : each,
+      ),
+    };
+    expect(platformScriptFingerprint(discounted)).not.toBe(platformScriptFingerprint(plain));
+    // The fingerprint of a script without one is the one it had before discounts were read: no rewrite for nothing.
+    const canonical = JSON.stringify([
+      plain.name,
+      plain.moment,
+      plain.steps.map((step) => [
+        step.ref.id,
+        step.index,
+        step.platformIndex,
+        step.name,
+        step.text,
+        step.priceMinor,
+        step.currency,
+        step.media.map((media) => [media.ref.id, media.kind]),
+        step.previewMedia.map((media) => [media.ref.id, media.kind]),
+      ]),
+    ]);
+    expect(platformScriptFingerprint(plain)).toBe(createHash('sha256').update(canonical).digest('hex'));
+  });
+
   it('changes with the platform rank of a step, so that branches appearing rewrite the script', () => {
     const plain = script('s1');
     const branched: PlatformScript = {
@@ -234,5 +296,26 @@ describe('the fingerprint of a native script', () => {
       steps: plain.steps.map((each, index) => ({ ...each, platformIndex: Math.min(index, 1) })),
     };
     expect(platformScriptFingerprint(branched)).not.toBe(platformScriptFingerprint(plain));
+  });
+});
+
+describe('the descriptions of a script’s media, validated as shown (ADR 0030 § 3, ADR 0099 § 4)', () => {
+  const shown = new Map([
+    ['d1', { reviewReasons: [], validated: false }],
+    ['d2', { reviewReasons: [], validated: false }],
+    ['d3', { reviewReasons: ['unsure'], validated: false }],
+    ['d4', { reviewReasons: ['flagged'], validated: true }],
+  ]);
+
+  it('takes those shown now, several at once, and one that waits for a reason only alone', () => {
+    expect(descriptionRefusal(['d1', 'd2'], shown)).toBeNull();
+    expect(descriptionRefusal(['d3'], shown)).toBeNull();
+    expect(descriptionRefusal(['d1', 'd3'], shown)).toBe('alone');
+    // Already validated, its reason no longer holds the others back.
+    expect(descriptionRefusal(['d1', 'd4'], shown)).toBeNull();
+  });
+
+  it('refuses one that is not shown for a media of the script now', () => {
+    expect(descriptionRefusal(['d1', 'old'], shown)).toBe('stale');
   });
 });

@@ -1,5 +1,4 @@
 import {
-  CREATOR_REPLIES_EMOJI,
   type CreatorAccountShift,
   type CreatorAgenda,
   type CreatorSuggestion,
@@ -10,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState, type JSX } from 'react';
 
 import { AddDialog, type AddPreset } from './AddDialog';
+import { DayCard } from './DayCard';
 import { DayView } from './DayView';
 import { FreshnessNote } from './FreshnessNote';
 import { MonthView } from './MonthView';
@@ -17,6 +17,7 @@ import { PhoneDialog } from './PhoneDialog';
 import { SuggestionDialog, UndatedSuggestions } from './SuggestionCard';
 import { DeclineDialog, PlaceDialog } from './SuggestionDialogs';
 import { TaskDialog } from './TaskDialog';
+import { WeekCard } from './WeekCard';
 import { WeekGrid } from './WeekGrid';
 import { WeekList } from './WeekList';
 import { moveTask, tickTask, useAgenda, useFlushOnReconnect, useWithPending, type Flushed } from './api';
@@ -28,8 +29,9 @@ import './agenda.css';
 import { lookAgainAtHerCase } from '@/rewards/api';
 import { useCreatorShifts } from '@/scheduling/api';
 import { addDays, dayOf, mondayOf, readerZone, weekLabel, longDay } from '@/scheduling/time';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { NavIcon } from '@/shell/NavIcon';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type AgendaView = 'day' | 'week' | 'month';
 
@@ -146,9 +148,11 @@ export function AgendaPage({
         eyebrow={seen === 'day' ? longDay(shown) : seen === 'month' ? monthLabel(shown) : weekLabel(monday)}
         title="Agenda"
         actions={
+          // Unread (loading or the server silent), « Ajouter » cannot work: off, and not the screen's neon, so that the
+          // eye goes to « Réessayer » (ETA-23).
           <button
             type="button"
-            className="nv-btn nv-btn--neon"
+            className={agenda === undefined ? 'nv-btn nv-btn--soft' : 'nv-btn nv-btn--neon'}
             disabled={agenda === undefined}
             onClick={() => {
               setOpen({ kind: 'add', preset: { day: shown } });
@@ -247,33 +251,36 @@ export function AgendaPage({
       )}
       {agenda === undefined ? (
         read.isError ? (
-          <ServerSilent
-            text="Ton agenda n’a pas pu être lu, et ce téléphone n’en a pas encore de copie."
+          <Failure
             onRetry={() => {
               void read.refetch();
             }}
           />
         ) : (
-          <div className="ag-skeleton nv-plate" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
+          <Skeleton label="Chargement de ton agenda…">
+            <SkeletonCard lines={5} height={320} />
+          </Skeleton>
         )
       ) : (
-        <Views
-          agenda={agenda}
-          view={seen}
-          wide={wide}
-          day={shown}
-          monday={monday}
-          onDay={onDay}
-          onView={onView}
-          onTick={tick}
-          onMove={move}
-          onOpen={setOpen}
-          shifts={shifts}
-        />
+        <>
+          {/* Her day first, what she posts today; then her week of shooting, once the agency sent it: above the
+              views, on every one of them (ADR 0140). */}
+          <DayCard />
+          <WeekCard monday={monday} zone={agenda.timeZone} today={herToday} />
+          <Views
+            agenda={agenda}
+            view={seen}
+            wide={wide}
+            day={shown}
+            monday={monday}
+            onDay={onDay}
+            onView={onView}
+            onTick={tick}
+            onMove={move}
+            onOpen={setOpen}
+            shifts={shifts}
+          />
+        </>
       )}
       {agenda === undefined ? null : (
         <p className="ag-foot">
@@ -286,7 +293,7 @@ export function AgendaPage({
                 setRepliesShown(!repliesShown);
               }}
             >
-              {CREATOR_REPLIES_EMOJI}{' '}
+              <NavIcon name="people" />
               {repliesShown ? 'Masquer qui répond à tes fans' : 'Voir qui répond à tes fans'}
             </button>
           )}
@@ -297,7 +304,8 @@ export function AgendaPage({
               setOpen({ kind: 'phone' });
             }}
           >
-            📲 Mon agenda dans mon téléphone
+            <NavIcon name="phone" />
+            Mon agenda dans mon téléphone
           </button>
         </p>
       )}

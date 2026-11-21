@@ -1,7 +1,6 @@
 import {
   ApiErrorSchema,
   DropDescriptionsReviewSchema,
-  DropDescriptionsSwitchSchema,
   type ContentDropFileId,
   type ContentDropId,
   type CreatorId,
@@ -14,51 +13,15 @@ import {
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 /**
- * Créatrices › Scripts (SC-04 lot c3): her switch of the descriptions (the owner's, ADR 0083 § 9) and the review of a
- * sent script's descriptions and synthesis (ADR 0030 § 3, ADR 0083 § 7). Every answer is parsed with the contract.
+ * Créatrices › Scripts (SC-04 lot c3): the review of a sent script's descriptions and synthesis (ADR 0030 § 3, ADR 0083
+ * § 7). Every answer is parsed with the contract.
  */
 
-export const switchKey = (creatorId: CreatorId) => ['creators', creatorId, 'drop-descriptions'] as const;
 export const reviewKey = (creatorId: CreatorId, dropId: ContentDropId) =>
   ['creators', creatorId, 'drops', dropId, 'descriptions'] as const;
 
-const switchUrl = (creatorId: CreatorId) => `/v1/creators/${creatorId}/drop-descriptions`;
 const reviewUrl = (creatorId: CreatorId, dropId: ContentDropId) =>
   `/v1/creators/${creatorId}/drops/${dropId}`;
-
-export function useDescribeSwitch(creatorId: CreatorId, enabled: boolean): UseQueryResult<boolean> {
-  return useQuery({
-    queryKey: switchKey(creatorId),
-    enabled,
-    queryFn: async () => {
-      const response = await fetch(switchUrl(creatorId), { credentials: 'include' });
-      if (!response.ok) throw new Error(`GET drop-descriptions: ${String(response.status)}`);
-      return DropDescriptionsSwitchSchema.parse(await response.json()).on;
-    },
-    retry: 1,
-    retryDelay: 400,
-  });
-}
-
-export const SWITCH_FAILED =
-  'Le serveur ne répond pas : l’interrupteur n’a pas bougé. Réessaie dans un instant.';
-
-/** Her switch turned; `null` when the server did not take it (nothing changed). */
-export async function setDescribeSwitch(creatorId: CreatorId, on: boolean): Promise<boolean | null> {
-  try {
-    const response = await fetch(switchUrl(creatorId), {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ on }),
-    });
-    if (!response.ok) return null;
-    const answer = DropDescriptionsSwitchSchema.safeParse(await response.json().catch(() => null));
-    return answer.success ? answer.data.on : null;
-  } catch {
-    return null;
-  }
-}
 
 /** Her medium's reduced picture, and the medium itself while its original is held (SC-04 lot c4): our own origin. */
 export const thumbnailUrl = (

@@ -6,6 +6,7 @@ import { useBackupStatusQuery } from './api';
 import { exportViewOf, restoreViewOf, type Tone } from './model';
 
 import './backups.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Réglages › Sauvegardes (EQ-17, ADR 0028), owner only: the nightly export as a strip, then the restore test, the
@@ -29,17 +30,7 @@ export function BackupsSection(): JSX.Element {
   if (status.isError) {
     return (
       <section className="bk-page">
-        <div className="nv-plate bk-cover nv-enter" data-tone="warn">
-          <p className="bk-cover__title">Le serveur ne répond pas</p>
-          <p className="bk-text">L’état des sauvegardes n’a pas pu être lu. Réessaie dans un instant.</p>
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft bk-self-start"
-            onClick={() => void status.refetch()}
-          >
-            Réessayer
-          </button>
-        </div>
+        <Failure onRetry={() => void status.refetch()} />
       </section>
     );
   }
@@ -68,7 +59,7 @@ export function BackupsSection(): JSX.Element {
         <StateDot tone={copy.tone} />
         <div className="bk-strip__body">
           <p className="bk-eyebrow">Sauvegarde de chaque nuit</p>
-          <h2 ref={copyTitle} id="bk-copy-title" className="bk-strip__title" tabIndex={-1}>
+          <h2 ref={copyTitle} id="bk-copy-title" className="nv-h2 bk-strip__title" tabIndex={-1}>
             {copy.title}
           </h2>
           <p className="bk-text">{copy.text}</p>
@@ -87,7 +78,7 @@ export function BackupsSection(): JSX.Element {
           <StateDot tone={restore.tone} />
           <p className="bk-eyebrow">Essai de restauration</p>
         </div>
-        <h2 id="bk-restore-title" className="bk-card__title">
+        <h2 id="bk-restore-title" className="nv-h2 bk-card__title">
           {restore.title}
         </h2>
         <p className="bk-text">{restore.text}</p>

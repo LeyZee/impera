@@ -5,15 +5,19 @@ import {
   PlaygroundComparisonSchema,
   PlaygroundRatingResultSchema,
   PlaygroundStateSchema,
+  VoiceBankSchema,
   type CreatorId,
   type DesireMarks,
   type DesireMarkVerdict,
   type Destination,
   type PlaygroundComparison,
   type PlaygroundMedia,
+  type PersonaVersionId,
+  type PlaygroundGuardViolation,
   type PlaygroundPersonaBody,
   type PlaygroundState,
   type Verdict,
+  type VoiceBank,
 } from '@impera/contracts';
 import type { z } from 'zod';
 
@@ -33,7 +37,8 @@ export interface PlaygroundClient {
   reset(): Promise<PlaygroundState>;
   /** His message; her answer comes back as `pending`. */
   send(text: string, media: readonly PlaygroundMedia[]): Promise<PlaygroundState>;
-  rate(verdict: Verdict, destination?: Destination): Promise<PlaygroundState>;
+  /** The state after it; a correction a hard guard keeps out of her bank says which guard (ADR 0102 § 4). */
+  rate(verdict: Verdict, destination?: Destination): Promise<RatedState>;
   /** Back to just before his n-th message (from 1), sent again: a new answer to the same moment. */
   branch(fanMessageNumber: number): Promise<PlaygroundState>;
   /** The owner's mark on his desire score after his n-th message (ADR 0103 § 6): kept, with what was counted. */
@@ -49,13 +54,26 @@ export interface PlaygroundClient {
   setNotes(notes: readonly string[]): Promise<PlaygroundState>;
   setSpent(cents: number): Promise<PlaygroundState>;
   sendCreatorMedia(media: CreatorMedia): Promise<PlaygroundState>;
+  /** « Payer (fictif) » or « Refuser » the paid step of a trial script waiting for him (ADR 0103 § 16). */
+  answerScriptStep(answer: ScriptStepAnswer): Promise<PlaygroundState>;
+  /** Her bank for the version played (ADR 0102 § 5): what her voice reads, here and with her real fans. */
+  bank(creatorId: CreatorId, versionId: PersonaVersionId): Promise<VoiceBank>;
+  /** Out of her bank everywhere, kept for history; her bank as it is now. */
+  withdrawExample(creatorId: CreatorId, versionId: PersonaVersionId, id: string): Promise<VoiceBank>;
 }
+
+/** What he does with the paid step waiting: buys it fictively, or says no. */
+export type ScriptStepAnswer = 'buy' | 'refuse';
+
+export type RatedState = PlaygroundState & {
+  readonly exampleBlockedBy?: readonly PlaygroundGuardViolation[];
+};
 
 /** The voice the comparison asks for: the fallback of the voice role (ADR 0017), to see if it holds up. */
 export const COMPARE_MODEL = 'mistral-large-4';
 
 export type PlaygroundErrorCode =
-  'llm_unavailable' | 'not_deployed' | 'still_writing' | 'forbidden' | 'failed';
+  'llm_unavailable' | 'unreachable' | 'not_deployed' | 'still_writing' | 'forbidden' | 'failed';
 
 /** What went wrong, said plainly on screen. `message` is the server's own French sentence, when it gave one. */
 export class PlaygroundError extends Error {
@@ -79,7 +97,11 @@ async function errorOf(response: Response): Promise<PlaygroundError> {
   }
   // The server keeps the playground to the owner: a refusal, not an outage.
   if (response.status === 403) return new PlaygroundError('forbidden');
-  if (code === 'llm_unavailable' || response.status === 503) return new PlaygroundError('llm_unavailable');
+  // Only the server's own word blames the AI provider (key refused, no credit, rate limit). A 502/503/504 without it is
+  // Impera's API not answering, behind its proxy (recette visuelle V-ETA-06).
+  if (code === 'llm_unavailable') return new PlaygroundError('llm_unavailable');
+  if (response.status === 502 || response.status === 503 || response.status === 504)
+    return new PlaygroundError('unreachable');
   if (code === 'answer_in_progress_conflict') return new PlaygroundError('still_writing');
   return new PlaygroundError('failed', parsed.success ? parsed.data.error.message : undefined);
 }
@@ -97,6 +119,9 @@ async function call<S extends z.ZodType>(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     }),
+  }).catch(() => {
+    // No answer at all (network down, server stopped): the server, not the AI provider.
+    throw new PlaygroundError('unreachable');
   });
   if (!response.ok) throw await errorOf(response);
   return schema.parse(await response.json());
@@ -118,11 +143,14 @@ export function createHttpClient(): PlaygroundClient {
       return state();
     },
     rate: async (verdict, destination) => {
-      await call(PlaygroundRatingResultSchema, '/rating', 'POST', {
+      const result = await call(PlaygroundRatingResultSchema, '/rating', 'POST', {
         verdict,
         ...(destination !== undefined && { destination }),
       });
-      return state();
+      const next = await state();
+      return result.exampleBlockedBy === undefined
+        ? next
+        : { ...next, exampleBlockedBy: result.exampleBlockedBy };
     },
     branch: (fanMessageNumber) => call(PlaygroundStateSchema, '/branch', 'POST', { fanMessageNumber }),
     markDesire: (fanMessageNumber, verdict) =>
@@ -136,5 +164,13 @@ export function createHttpClient(): PlaygroundClient {
     setNotes: (notes) => call(PlaygroundStateSchema, '/notes', 'PUT', { notes }),
     setSpent: (spentCents) => call(PlaygroundStateSchema, '/situation', 'PATCH', { spentCents }),
     sendCreatorMedia: (media) => call(PlaygroundStateSchema, '/creator-media', 'POST', media),
+    answerScriptStep: (answer) => call(PlaygroundStateSchema, `/script/${answer}`, 'POST'),
+    bank: (creatorId, versionId) =>
+      call(
+        VoiceBankSchema,
+        `/bank?creatorId=${encodeURIComponent(creatorId)}&versionId=${encodeURIComponent(versionId)}`,
+      ),
+    withdrawExample: (creatorId, versionId, id) =>
+      call(VoiceBankSchema, '/bank/withdraw', 'POST', { creatorId, versionId, id }),
   };
 }

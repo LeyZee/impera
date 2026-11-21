@@ -1,5 +1,6 @@
 /*
- * The levels (ADR 0104 § 16): a rank that rises with the member's net since they joined and never comes down.
+ * The levels (ADR 0104 § 16): a rank that follows the member's net since they joined, and comes down only when that
+ * net is corrected under the threshold it was reached at (ADR 0118 § 5), never because the thresholds moved (§ 7).
  * Honorary only: no rate, tier or right hangs on it. The ranks are a closed list named here; the cumulated net that
  * opens each one is the owner's setting, and with none set there is no level.
  */
@@ -30,9 +31,9 @@ export function levelSteps(thresholdsMinor: readonly number[]): LevelStep[] {
   });
 }
 
-/** The ranks a cumulated net has reached: each is noted once and kept, so a refund never takes one back. */
-export const ranksReached = (cumulatedNetMinor: number, steps: readonly LevelStep[]): number[] =>
-  steps.filter((step) => step.thresholdMinor <= cumulatedNetMinor).map((step) => step.rank);
+/** The ranks a cumulated net reaches today, each with the threshold that opens it. */
+export const ranksReached = (cumulatedNetMinor: number, steps: readonly LevelStep[]): LevelStep[] =>
+  steps.filter((step) => step.thresholdMinor <= cumulatedNetMinor);
 
 /** A rank by its number, or `null` when the list has none there. */
 export function levelOfRank(rank: number): { readonly rank: number; readonly name: string } | null {

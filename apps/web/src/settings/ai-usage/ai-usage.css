@@ -4,10 +4,6 @@
  * recharge. Tokens only. A rule that overrides a design-system class takes two classes.
  */
 
-.cia-body {
-  margin-top: 8px;
-}
-
 /* ── Today: the live dot, the gauge against the cap. */
 .cia-live {
   display: inline-flex;
@@ -140,7 +136,22 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 18px 20px 14px;
+  padding: var(--nv-plate-pad) var(--nv-plate-pad) 14px;
+  transition:
+    transform var(--nv-dur-fast) var(--nv-ease-out),
+    box-shadow var(--nv-dur-fast) var(--nv-ease-out),
+    background-color var(--nv-dur-fast) var(--nv-ease-out);
+}
+/* A card lifts under the pointer, as the Dashboard's (ADR 0091 § 7, « ok essai IA » : de beaux survols). */
+.cia-credit:hover {
+  transform: translateY(-2px);
+  background: var(--nv-plate-hover);
+  box-shadow: var(--nv-shadow-lift);
+}
+/* ElevenLabs' free offer: said in amber, never a block. */
+.cia-credit__runway.cia-voice__plan {
+  font-weight: 500;
+  color: var(--nv-warning);
 }
 .cia-credit__head {
   display: flex;
@@ -150,15 +161,12 @@
 }
 .cia-credit__name {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 650;
 }
 .cia-badge {
   display: inline-flex;
   align-items: center;
   flex: none;
-  min-height: 24px;
+  min-height: var(--nv-pill-info);
   padding: 0 10px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -318,7 +326,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 14px;
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
 }
 .cia-none p {
   margin: 0;
@@ -395,6 +403,9 @@
   .cia-gauge__fill,
   .cia-runway__fill {
     animation: none;
+  }
+  .cia-credit:hover {
+    transform: none;
   }
 }
 

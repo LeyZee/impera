@@ -2,7 +2,7 @@ import type {
   CalendarAgent,
   OnDuty,
   Planning,
-  PlanningAway,
+  Shift,
   ShiftReportList,
   ShiftTemplate,
   TeamMember,
@@ -15,8 +15,7 @@ import { ShiftSheet } from './ShiftSheet';
 import { OnLeave, PendingLeaves, TeamSwaps, type InTheWay } from './TeamExchanges';
 import { TeamNav } from './TeamNav';
 import { useMembers } from './api';
-import { STATUS_LABELS } from './model';
-import { Unread } from './parts';
+import { unheldLabel } from './model';
 import './team.css';
 
 import { ReportPanel } from '@/reports/ReportPanel';
@@ -47,11 +46,13 @@ import {
   leftOf,
   phaseOf,
   slotRowOf,
+  unheldReader,
   type Chip,
   type Fill,
   type GridRow,
   type SlotCell,
   type SlotChip,
+  type Unheld,
 } from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import {
@@ -72,7 +73,10 @@ import {
 } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Answers } from '@/screens/planning/Exchanges';
+import { PlanningArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 type Open =
   | { readonly kind: 'add'; readonly start: ShiftStart }
@@ -244,23 +248,19 @@ export function PlanningPage({
   return (
     <Page>
       <PageHeader
-        title="Équipe"
+        eyebrow="Équipe"
+        title={screenLabel('/equipe/planning')}
         lead={
           agency === null
             ? 'Qui chatte sur quel compte, et quand.'
             : `Qui chatte sur quel compte, et quand. À l’heure ${zone === agency ? `de l’agence (${cityOf(agency)})` : `de ${cityOf(zone)}`}.`
         }
-        actions={
-          <>
-            <TeamNav />
-            {/* No button above a page that could not be read: it would only be greyed out (EQ-22). */}
-            {data === undefined ? null : add}
-          </>
-        }
+        tabs={<TeamNav />}
+        // No button above a page that could not be read: it would only be greyed out (EQ-22).
+        {...(data === undefined ? {} : { actions: add })}
       />
       {shown.isError && data === undefined ? (
-        <Unread
-          text="Le serveur ne répond pas : le planning n’a pas pu être lu."
+        <Failure
           onRetry={() => {
             void shown.refetch();
           }}
@@ -694,11 +694,11 @@ function OnDutyStrip({
   const known = new Set<string>(planning.shifts.map((shift) => shift.id));
   return (
     <section className="sc-duty" aria-labelledby="sc-duty-title">
-      <h2 id="sc-duty-title" className="sc-duty__title">
+      <p id="sc-duty-title" className="sc-duty__title">
         {/* Fixed: the shift under way on the grid is the page's one moving sign (CR-12, Charles 02/11 17h56). */}
         <span className={`nv-dot${list.length === 0 ? '' : ' nv-tone--ok'}`} />
         En poste maintenant
-      </h2>
+      </p>
       {list.length === 0 ? (
         <p className="sc-duty__none">Personne pour l’instant.</p>
       ) : (
@@ -763,7 +763,7 @@ function Conflicts({
   const known = new Set<string>(planning.shifts.map((shift) => shift.id));
   return (
     <section className="nv-plate sc-conflicts nv-swap" role="status" aria-labelledby="sc-conflicts-title">
-      <h2 id="sc-conflicts-title" className="sc-conflicts__title">
+      <h2 id="sc-conflicts-title" className="nv-h2 sc-conflicts__title">
         {conflictTitle(lines)}
       </h2>
       <ul className="sc-conflicts__list">
@@ -845,15 +845,10 @@ function Grid({
 }): JSX.Element {
   if (planning.accounts.length === 0) {
     return (
-      <Panel className="nv-coming">
-        <div className="nv-coming__in sc-notice">
-          <h2>Aucun compte à planifier</h2>
-          <p>
-            Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
-            d’abord.
-          </p>
-        </div>
-      </Panel>
+      <Empty plate art={<PlanningArt />} title="Aucun compte à planifier">
+        Une ligne apparaît ici pour chaque compte de créatrice : ajoute la créatrice et son compte Reveal
+        d’abord.
+      </Empty>
     );
   }
   const week = planning.shifts.filter((shift) =>
@@ -865,9 +860,10 @@ function Grid({
   );
   // The créneaux are the agency's: they line up at its hour, not at another one (EQ-01).
   const lined = zone === planning.settings.timeZone;
-  // A member away (suspended, on leave, gone) holds none of his shifts: they stay drawn, and their places are to fill.
-  const away = new Map(planning.away.map((one) => [one.memberId, one.status]));
-  const held = planning.shifts.filter((shift) => !away.has(shift.memberId));
+  // A member away (suspended, on leave, gone), or one whose creator was taken off his list, holds none of those shifts:
+  // they stay drawn, and their places are to fill (recette EQP-03, EQU-01).
+  const unheld = unheldReader(planning, now);
+  const held = planning.shifts.filter((shift) => unheld(shift) === null);
   const slotted = rows.map((row) =>
     lined
       ? slotRowOf(
@@ -989,7 +985,8 @@ function Grid({
           >
             <span className="sc-grid__account" role="rowheader">
               <span className="sc-grid__creator">{row.account.creatorName}</span>
-              <span className="sc-grid__handle">{accountLine(row.account)}</span>
+              {/* « @nora »: the handle reads as the account, « sur Reveal » only cut it (GES-22). */}
+              <span className="sc-grid__handle">@{row.account.handle}</span>
               {row.account.archived ? <span className="sc-grid__archived">archivée</span> : null}
               <RowAgent agents={agents} creatorId={row.account.creatorId} />
             </span>
@@ -1012,7 +1009,7 @@ function Grid({
                 focus={focus}
                 flagged={flagged}
                 incidents={incidents}
-                away={away}
+                unheld={unheld}
                 onAdd={onAdd}
                 onShow={onShow}
               />
@@ -1041,10 +1038,15 @@ function Grid({
   );
 }
 
-type AwayStatus = PlanningAway['status'];
-
 /** A créneau with a stretch ahead and nobody on it: a dashed amber « À pourvoir » that opens a shift on that stretch. */
 const isOpen = (slot: SlotCell): boolean => slot.open !== null;
+
+/** A shift that starts after the créneau's stretch to fill begins: drawn under it, never above (GES-05). */
+const after = (chip: SlotChip, slot: SlotCell): boolean =>
+  slot.open !== null && !chip.earlier && Date.parse(chip.shift.startsAt) > slot.open.from.getTime();
+
+/** Within a day of what is still to fill, « À pourvoir » keeps its amber: further on, it is said quietly (GES-05). */
+const SOON_MS = 24 * 3_600_000;
 
 function Cell({
   day,
@@ -1063,7 +1065,7 @@ function Cell({
   focus,
   flagged,
   incidents,
-  away,
+  unheld,
   onAdd,
   onShow,
 }: {
@@ -1088,8 +1090,8 @@ function Cell({
   focus: string | null;
   flagged: ReadonlySet<string>;
   incidents: ReadonlyMap<string, readonly string[]>;
-  /** The members away, by their status: their shifts are held by nobody. */
-  away: ReadonlyMap<string, AwayStatus>;
+  /** Why nobody holds a shift, `null` when its member does. */
+  unheld: (shift: Shift) => Unheld | null;
   onAdd: (start: ShiftStart) => void;
   onShow: (shiftId: string) => void;
 }): JSX.Element {
@@ -1104,7 +1106,7 @@ function Cell({
       muted={focus !== null && chip.shift.memberId !== focus}
       flagged={flagged.has(chip.shift.id)}
       incident={incidents.has(chip.shift.id)}
-      away={away.get(chip.shift.memberId) ?? null}
+      unheld={unheld(chip.shift)}
       onShow={onShow}
     />
   );
@@ -1129,7 +1131,9 @@ function Cell({
                 data-seats={slot.seats === 2 ? '2' : undefined}
                 data-ai={agent === null || alone ? undefined : agent.full ? 'full' : 'part'}
               >
-                {slot.chips.map(chipOf)}
+                {/* The shifts begun before the stretch to fill, then the stretch, then the later ones: one créneau
+                    reads in the order of the day, 12 h – 16 h before 16 h – 22 h (recette visuelle 16/11, GES-05). */}
+                {slot.chips.filter((chip) => !after(chip, slot)).map(chipOf)}
                 {slot.open !== null && alone ? (
                   // Nobody but the agent, in Automatique: nothing to fill (ADR 0048 § 1).
                   <span className="cal-alone" role="img" aria-label={`${hours}, l’IA seule`}>
@@ -1141,6 +1145,7 @@ function Cell({
                     open={slot.open}
                     second={slot.seats === 2 && slot.places === 1}
                     places={slot.places}
+                    soon={slot.open.from.getTime() - now.getTime() < SOON_MS}
                     agency={agency}
                     zone={zone}
                     where={where}
@@ -1155,6 +1160,7 @@ function Cell({
                   // A créneau gone by with nobody, or one of an archived creator: left grey, nothing to do about it.
                   <span className="sc-slot__gone" aria-hidden="true" />
                 ) : null}
+                {slot.chips.filter((chip) => after(chip, slot)).map(chipOf)}
                 {agent === null || alone ? null : (
                   <>
                     {agent.full ? null : (
@@ -1191,12 +1197,14 @@ function Cell({
 
 /**
  * « À pourvoir » on what is left of a créneau with nobody: its hours, « maintenant – 0 h » for the créneau under way
- * (never « 20 h 01 », recette #564), and the new-shift panel opens on them, from the present minute.
+ * (never « 20 h 01 », recette #564), and the new-shift panel opens on them, from the present minute. In amber within
+ * the next day only, quiet further on: the grid shows who works, the corner counts the places (GES-05).
  */
 function OpenStretch({
   open,
   second = false,
   places = 1,
+  soon = false,
   agency,
   zone,
   where,
@@ -1208,6 +1216,8 @@ function OpenStretch({
   second?: boolean;
   /** The places to fill there: two on a créneau that wants two and has nobody. */
   places?: number;
+  /** It begins within the next 24 hours: the one place still in amber. */
+  soon?: boolean;
   agency: string;
   zone: string;
   where: string;
@@ -1223,6 +1233,7 @@ function OpenStretch({
       type="button"
       className="sc-slot__fill"
       data-second={second ? 'true' : undefined}
+      data-soon={soon ? 'true' : undefined}
       aria-label={`${second ? '2e chatteur à pourvoir' : places === 2 ? 'À pourvoir, 2 places' : 'À pourvoir'} : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}${agentWords}`}
       onClick={() => {
         onAdd({
@@ -1280,13 +1291,13 @@ function ShiftChip({
   muted,
   flagged,
   incident,
-  away,
+  unheld,
   onShow,
 }: {
   chip: Chip;
-  /** Begun in an earlier créneau: its hours come after « … ». */
+  /** Begun in an earlier créneau of another day (a phone shows one day): its hours come after « … ». */
   earlier: boolean;
-  /** The same shift on a later créneau of the same day: drawn there too, read and reached on the first. */
+  /** The same shift on a later créneau of the same day: only « suite » there, read and reached on the first. */
   carried: boolean;
   now: Date;
   zone: string;
@@ -1295,8 +1306,8 @@ function ShiftChip({
   flagged: boolean;
   /** Its report says something went wrong. */
   incident: boolean;
-  /** Its member's status when he is away: nobody holds it. */
-  away: AwayStatus | null;
+  /** Why nobody holds it: its member is away, or its creator is off his list. */
+  unheld: Unheld | null;
   onShow: (shiftId: string) => void;
 }): JSX.Element {
   const { shift, member } = chip;
@@ -1305,7 +1316,28 @@ function ShiftChip({
   // Read again on the next day, it ends there: no « +1 ».
   const overnight = chip.overnight && !earlier;
   // Under way with nobody on it (EQP-03): neither « en poste » nor the time left.
-  const onShift = phase === 'live' && away === null;
+  const onShift = phase === 'live' && unheld === null;
+  if (carried) {
+    // Drawn whole on its first créneau of the day: here it only goes on, greyed, its name and « suite », never its
+    // hours again, as on the team's calendar (recette visuelle 16/11, GES-05).
+    return (
+      <button
+        type="button"
+        className="sc-chip cal-chip--cont"
+        data-phase={phase}
+        data-muted={muted ? 'true' : undefined}
+        data-carried="true"
+        tabIndex={-1}
+        aria-hidden="true"
+        onClick={() => {
+          onShow(shift.id);
+        }}
+      >
+        <span className="sc-chip__name">{name}</span>
+        <span className="cal-chip__cont">suite</span>
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -1314,14 +1346,11 @@ function ShiftChip({
       data-muted={muted ? 'true' : undefined}
       data-flagged={flagged ? 'true' : undefined}
       data-incident={incident ? 'true' : undefined}
-      data-away={away === null ? undefined : 'true'}
+      data-away={unheld === null ? undefined : 'true'}
       data-repeat={shift.templateId === null ? undefined : 'true'}
       data-color={member?.color === null || member === null ? undefined : 'true'}
       style={member?.color === null || member === null ? undefined : { '--sc-color': member.color }}
-      data-carried={carried ? 'true' : undefined}
-      tabIndex={carried ? -1 : undefined}
-      aria-hidden={carried ? 'true' : undefined}
-      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${onShift ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}${away === null || phase === 'past' ? '' : `, ${STATUS_LABELS[away].toLowerCase()}, à pourvoir`}`}
+      aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${onShift ? `, en poste, ${leftOf(shift, now)}` : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}${unheld === null || phase === 'past' ? '' : `, ${unheldLabel(unheld).toLowerCase()}, à pourvoir`}`}
       onClick={() => {
         onShow(shift.id);
       }}
@@ -1339,9 +1368,9 @@ function ShiftChip({
       {/* The shift under way: its edge breathes in the member's colour (CSS) and says what is left. */}
       {onShift ? <span className="sc-chip__left nv-num">{leftOf(shift, now)}</span> : null}
       {/* Nobody holds it (EQP-03): said in words, its places counted « à pourvoir ». Gone by, it is only history. */}
-      {away === null || phase === 'past' ? null : (
+      {unheld === null || phase === 'past' ? null : (
         <span className="sc-chip__away" aria-hidden="true">
-          {STATUS_LABELS[away]}
+          {unheldLabel(unheld)}
         </span>
       )}
       {shift.templateId === null ? null : <RepeatIcon className="sc-chip__repeat" titled />}

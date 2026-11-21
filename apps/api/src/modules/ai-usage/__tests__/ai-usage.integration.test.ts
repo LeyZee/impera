@@ -268,4 +268,11 @@ describe('/v1/settings/ai-usage', () => {
       .where(eq(schema.domainEvents.type, 'ai_quota_exhausted'));
     expect(rows).toHaveLength(1);
   });
+
+  it('sums the owner’s « Essai réel » apart, and shows no voice card while ElevenLabs is not connected', async () => {
+    await call({ purpose: 'probe', provider: 'mistral', model: 'mistral-large-4', costMicroUsd: 40 });
+    const { body } = await read();
+    expect(body?.uses.find((u) => u.use === 'probe')).toMatchObject({ calls: 1 });
+    expect(body?.voice).toBeNull();
+  });
 });

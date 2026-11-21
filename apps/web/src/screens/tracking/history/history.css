@@ -4,22 +4,51 @@
  * a seen one fades a little; what asks for a hand is in « À traiter ».
  */
 
-/* The chip and the compact selects share the column; a select never shrinks under its words (« Toutes les
- * créatrices »): when they do not fit, they go to the next line (recette 11/11). */
-.hi-filters {
-  display: flex;
-  flex-wrap: wrap;
+/* The list has room for its lines on a computer (recette visuelle 16/11): « Agent en pause » and the server's line no
+ * longer wrap in 300 px. It grows to 440–460 px once the conversation has its own minimum; the reading side (the
+ * conversation, and from 1320 px the fan beside it) keeps the rest. Two classes: over Suivi's own columns. */
+@media (min-width: 900px) {
+  .tr-layout.hi-layout {
+    grid-template-columns: minmax(320px, 460px) minmax(360px, 1fr);
+  }
+}
+@media (min-width: 1320px) {
+  .tr-layout.hi-layout {
+    grid-template-columns: minmax(360px, 440px) minmax(320px, 1fr) minmax(240px, 300px);
+  }
+}
+
+/* The list's header, on the list's own side edges: « Non vues » and « Tout marquer comme vu » share the first row,
+ * the chip at the start, the button at the end; the selects come under. A select never shrinks under its words
+ * (« Toutes les créatrices »): on a phone each takes a row, on a computer, where the list is a column of
+ * 440–460 px, they share one in halves (recette 11/11, recette visuelle 16/11). */
+.hi-head {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: var(--nv-space-2);
-  padding: var(--nv-space-2) var(--nv-space-2) var(--nv-space-3);
+  gap: var(--nv-space-2) var(--nv-space-3);
+  padding: var(--nv-space-3) var(--nv-space-4);
+}
+.hi-filters {
+  display: contents;
 }
 .hi-filters .nv-chip {
-  flex: none;
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+.hi-head__all {
+  grid-area: 1 / 2;
+  justify-self: end;
 }
 .hi-filters .hi-select {
-  flex: 1 1 auto;
-  min-width: 10.5rem;
-  max-width: 240px;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+@media (min-width: 900px) {
+  .hi-filters .hi-select {
+    grid-column: auto;
+    grid-row: 2;
+  }
 }
 .hi-filters .hi-select .nv-select__field {
   width: 100%;
@@ -97,9 +126,10 @@
   font-weight: 500;
   color: var(--nv-ink-muted);
 }
-.hi-line__tag {
-  background: var(--nv-glass-fill-strong);
-  color: var(--nv-ink-muted);
+/* Always on its own line under the title, whatever the title's length or the width. */
+.hi-line__tags {
+  display: flex;
+  margin: 2px 0;
 }
 /* The line the server writes is the point of the row: it wraps, never cut. */
 .hi-line__reason {
@@ -114,7 +144,8 @@
 .hi-line__seen {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-faint);
+  /* Read, not guessed: the faint ink failed its contrast in Jour (recette visuelle 16/11). */
+  color: var(--nv-ink-muted);
 }
 .hi-line__see {
   position: absolute;

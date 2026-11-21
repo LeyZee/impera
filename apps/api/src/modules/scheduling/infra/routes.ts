@@ -515,7 +515,8 @@ export function createSchedulingRoutes(
       (request) => reports.reject(actorOf(request), request.params.shiftReportId, request.body),
     );
 
-    // The threshold of a report against the platform (ADR 0073 § 3): read by the agency, set by the owner.
+    // The threshold of a report against the platform (ADR 0073 § 3): read by the agency, set by the owner. A report in
+    // it validates itself into pay: set like the pay rules, with the password and the code (EQ-15).
     app.get(
       '/scheduling/report-gap',
       { preValidation: ownerOrMember, schema: { response: { 200: ReportGapThresholdSchema } } },
@@ -525,7 +526,7 @@ export function createSchedulingRoutes(
     app.put(
       '/scheduling/report-gap',
       {
-        preValidation: owner,
+        preValidation: ownerConfirmed,
         schema: { body: ReportGapThresholdSchema, response: { 200: ReportGapThresholdSchema } },
       },
       (request) => reports.saveReportGap(actorOf(request), request.body),

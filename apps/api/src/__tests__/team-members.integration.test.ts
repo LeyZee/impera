@@ -1,18 +1,23 @@
 import {
   ApiErrorSchema,
+  AuditEntryIdSchema,
   CommissionPresetListSchema,
   CommissionPresetSchema,
   CommissionRateHistorySchema,
   CommissionRateSchema,
   InvitationLinkCreatedSchema,
+  newId,
   nextPayPeriod,
+  OwnTimeZoneSchema,
   payPeriodOfDay,
   TeamMemberListSchema,
   TeamMemberNoteListSchema,
   TeamMemberSchema,
+  TeamMemberTimeZoneHistorySchema,
   TeamPlatformRemovalListSchema,
   TeamRoleChangeSchema,
   TeamRoleHistorySchema,
+  TIME_ZONE_CHANGES_PAGE,
   type CreatorId,
   type InvitationLinkCreated,
   type TeamMember,
@@ -583,6 +588,92 @@ describe('Équipe › Membres (/v1/team, EQ-01)', () => {
     expect(byManager.members.map((member) => member.id)).toEqual([nora.id]);
     expect((await call('GET', `/team/members/${theo.id}/notes`, noraCookie)).statusCode).toBe(403);
     await call('PUT', `/team/members/${nora.id}/status`, owner, { status: 'active' });
+  });
+
+  it('lets a member’s own zone follow his phone, and the owner alone read its trace (recette CHT-01)', async () => {
+    const follow = (cookie: string, payload: object) => call('PUT', '/team/me/time-zone', cookie, payload);
+    const noraBefore = TeamMemberSchema.parse((await call('GET', `/team/members/${nora.id}`, owner)).json());
+    const moved = await follow(theoCookie, { timeZone: 'Europe/Paris' });
+    expect(moved.statusCode).toBe(200);
+    expect(OwnTimeZoneSchema.parse(moved.json())).toEqual({ timeZone: 'Europe/Paris' });
+    // His zone again writes nothing.
+    expect((await follow(theoCookie, { timeZone: 'Europe/Paris' })).json()).toEqual({
+      timeZone: 'Europe/Paris',
+    });
+
+    // The body names no member and carries nothing but a place of the IANA regions.
+    for (const payload of [
+      { timeZone: 'Asia/Tokyo', memberId: nora.id },
+      { timeZone: 'Asia/Tokyo', teamRole: 'manager' },
+      { timeZone: 'Etc/GMT+3' },
+      { timeZone: 'UTC' },
+      {},
+    ]) {
+      const refused = await follow(theoCookie, payload);
+      expect(refused.statusCode, JSON.stringify(payload)).toBe(400);
+      expect(codeOf(refused)).toBe('request_invalid');
+    }
+    // A team account only: the owner keeps the agency's zone, a creator never reaches the team.
+    for (const cookie of [owner, creator]) {
+      const refused = await follow(cookie, { timeZone: 'Europe/Paris' });
+      expect(refused.statusCode).toBe(403);
+      expect(codeOf(refused)).toBe('role_forbidden');
+    }
+
+    const own = TeamMemberSchema.parse((await call('GET', `/team/members/${theo.id}`, theoCookie)).json());
+    expect(own).toMatchObject({ timeZone: 'Europe/Paris', teamRole: 'chatter', status: 'active' });
+    expect(own.commission).toEqual(theo.commission);
+    expect(TeamMemberSchema.parse((await call('GET', `/team/members/${nora.id}`, owner)).json())).toEqual(
+      noraBefore,
+    );
+
+    const trace = (cookie: string, query = '') =>
+      call('GET', `/team/members/${theo.id}/time-zones${query}`, cookie);
+    const first = TeamMemberTimeZoneHistorySchema.parse((await trace(owner)).json());
+    expect(first.changes.map(({ from, to }) => ({ from, to }))).toEqual([
+      { from: 'Africa/Porto-Novo', to: 'Europe/Paris' },
+    ]);
+    expect(first.nextBefore).toBeNull();
+    for (const cookie of [noraCookie, theoCookie, creator]) {
+      const refused = await trace(cookie);
+      expect(refused.statusCode).toBe(403);
+      expect(codeOf(refused)).toBe('role_forbidden');
+    }
+    const unknown = await call('GET', `/team/members/${anna}/time-zones`, owner);
+    expect(unknown.statusCode).toBe(404);
+    expect(codeOf(unknown)).toBe('member_not_found');
+  });
+
+  it('pages the trace of a member’s zone, and never ends a page on another member’s line', async () => {
+    const older = Array.from({ length: 24 }, (_, i) => ({
+      id: newId(AuditEntryIdSchema),
+      userId: theo.userId,
+      action: 'team_member.time_zone_follow',
+      entity: 'team_member',
+      entityId: theo.id,
+      details: { from: 'Africa/Porto-Novo', to: 'Africa/Lagos' },
+      createdAt: new Date(Date.UTC(2026, 9, 1 + i, 12)),
+    }));
+    await test.admin.db.insert(schema.auditLog).values(older);
+    const page = async (query: string) =>
+      TeamMemberTimeZoneHistorySchema.parse(
+        (await call('GET', `/team/members/${theo.id}/time-zones${query}`, owner)).json(),
+      );
+    const first = await page('');
+    expect(first.changes).toHaveLength(TIME_ZONE_CHANGES_PAGE);
+    expect(first.changes[0]?.to).toBe('Europe/Paris');
+    expect(first.nextBefore).toBe(first.changes.at(-1)?.id);
+    const second = await page(`?before=${first.nextBefore ?? ''}`);
+    expect(second.changes).toHaveLength(25 - TIME_ZONE_CHANGES_PAGE);
+    expect(second.nextBefore).toBeNull();
+    expect(new Set([...first.changes, ...second.changes].map((change) => change.id)).size).toBe(25);
+    // A line that is not one of his changes ends the list instead of opening another one's.
+    const [other] = await test.admin.db
+      .select({ id: schema.auditLog.id })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'team_member.create'));
+    expect((await page(`?before=${other?.id ?? ''}`)).changes).toEqual([]);
+    expect((await call('GET', `/team/members/${theo.id}/time-zones?before=x`, owner)).statusCode).toBe(400);
   });
 
   it('marks a member who left: no creator, no session, and his record no longer changes', async () => {

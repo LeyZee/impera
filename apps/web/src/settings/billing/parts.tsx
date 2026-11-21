@@ -21,7 +21,7 @@ export function Card({
     <div className="nv-plate rp-account nv-enter" style={{ '--nv-i': Math.min(index + 1, 8) }}>
       <div className="rp-account__head">
         <div className="rp-account__who">
-          <h2 className="rp-account__name">{title}</h2>
+          <h2 className="nv-h2 rp-account__name">{title}</h2>
           <p className="rp-account__handle">{sub}</p>
         </div>
         <button

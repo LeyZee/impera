@@ -3,6 +3,7 @@ import {
   DraftIdSchema,
   newId,
   PayPeriodSchema,
+  PlatformAccountIdSchema,
   ShiftFeedbackIdSchema,
   ShiftIdSchema,
   ShiftTemplateIdSchema,
@@ -38,6 +39,18 @@ const bodiesFor = (
   ids: Readonly<Record<Seeded, string>>,
 ): Readonly<Record<string, Record<string, unknown>>> => ({
   'POST /v1/conversations/:id/mode': { mode: 'auto' },
+  // The vault by choice (ADR 0145 § 5): the owner's alone, so A's people stop at the guard, B's account or not.
+  'PUT /v1/creators/:creatorId/vault/choices': {
+    platformAccountId: newId(PlatformAccountIdSchema),
+    folders: [{ folderRef: null, imported: true }],
+    media: [],
+  },
+  'POST /v1/creators/:creatorId/vault/describe': {
+    platformAccountId: newId(PlatformAccountIdSchema),
+    platformMediaIds: ['vault_media_inventee'],
+    confirm: null,
+    idempotencyKey: newId(PlatformAccountIdSchema),
+  },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
@@ -59,18 +72,8 @@ const bodiesFor = (
   'POST /v1/creators/:creatorId/drops/:id/summary/validate': {
     summaryId: '00000000-0000-4000-8000-000000000000',
   },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/validate': {
-    identityId: '00000000-0000-4000-8000-000000000000',
-  },
-  'POST /v1/creators/:creatorId/platform-scripts/:scriptId/identity/correct': {
-    content: {
-      ambiance: 'Ambiance inventée',
-      energy: 'soft',
-      setting: 'Décor inventé',
-      useWhen: ['Situation inventée'],
-      avoidWhen: [],
-    },
-  },
+  // The owner's alone (ADR 0092 § 6): A's people stop at the guard, B's creator or not.
+  'PUT /v1/dashboard/agency/objectives/:creatorId/:month': { amountMinor: 100_000 },
   'PATCH /v1/scheduling/shift-reports/:shiftReportId': { version: 1, amountMinor: 1 },
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
@@ -175,6 +178,8 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
   sha256: 'a logo of the agency',
   file: 'a calendar feed token, read without a session',
   field: 'a field of the fan’s card, a closed code (ADR 0085)',
+  day: 'a calendar day; the route reads the session’s own creator (her day, ADR 0140)',
+  item: 'a line of her own day, a closed code (ADR 0140)',
 };
 
 /**
@@ -208,6 +213,7 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'PATCH /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id/ticks/:day': 'creator space: creator-tasks tests',
+  'PUT /v1/creator-space/shoot-items/:id': 'creator space: creator-week tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
@@ -256,8 +262,11 @@ function seededFor(path: string, name: string): Seeded | undefined {
 /** Filler for a parameter beside B's creator: any value, the creator's guard answers first. */
 function filler(name: string): string {
   if (name === 'day') return '2026-11-06';
+  // A date of her clock far ahead: a past one is refused before the guard could prove anything.
+  if (name === 'date') return '2099-01-01';
   if (name === 'slotKey' || name === 'segmentKey') return 'a';
   if (name === 'field') return 'first_name';
+  if (name === 'month') return '2026-11-01';
   return '00000000-0000-4000-8000-000000000000';
 }
 

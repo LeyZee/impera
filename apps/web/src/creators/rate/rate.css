@@ -130,6 +130,26 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* The head's dot on its first line, as the alerts' dots: one rule for every dot of the sheet (avis Design, 16/11). */
+.ar-page .ps-head__state {
+  align-items: baseline;
+}
+
+/* The alerts the automatic check sent (PAY-04): one line each, an amber dot, no bar, the size of the rows read. */
+.ar-alerts {
+  display: grid;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ar-alert {
+  display: flex;
+  align-items: baseline;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink);
+}
+
 /* A share off her percentage (ADR 0054 § 6): amber, like every warning. */
 .ar-read__gap {
   color: var(--nv-warning);

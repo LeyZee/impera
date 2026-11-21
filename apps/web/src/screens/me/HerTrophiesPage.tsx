@@ -7,6 +7,7 @@ import { useHerTrophyCase, useMarkHerRevealed, usePreferences } from '@/rewards/
 import { TrophyCaseDown, TrophyCaseLoading, TrophyCaseView } from '@/rewards/case/TrophyCaseView';
 import { creatorEntry } from '@/rewards/creator-case';
 import { Page, PageHeader } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 
 const plural = (count: number, one: string, many: string): string =>
   `${String(count)} ${count > 1 ? many : one}`;
@@ -52,8 +53,13 @@ export function HerTrophiesPage({ user }: { user: Me }): JSX.Element {
   const day = read?.streaks.find((streak) => streak.kind === 'day');
   const delivery = read?.streaks.find((streak) => streak.kind === 'delivery');
   return (
-    <Page>
-      <PageHeader eyebrow="Moi" title="Mes trophées" actions={<MeNav creator />} />
+    <Page width="narrow">
+      <PageHeader
+        eyebrow="Moi"
+        title={screenLabel('/moi/trophees')}
+        lead="Ce que tu as gagné, et ce qui vient ensuite."
+        tabs={<MeNav creator />}
+      />
       {read === undefined ? (
         caseRead.isError ? (
           <TrophyCaseDown onRetry={() => void caseRead.refetch()} />

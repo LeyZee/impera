@@ -100,7 +100,7 @@ function renderPage(user: Me): void {
     path: '/moi/trophees',
     component: () => <MyTrophiesPage user={user} />,
   });
-  const others = ['/moi/persona', '/moi/securite', '/moi/preferences'].map((path) =>
+  const others = ['/moi/profil', '/moi/persona', '/moi/securite', '/moi/preferences'].map((path) =>
     createRoute({ getParentRoute: () => root, path, component: () => null }),
   );
   const router = createRouter({
@@ -218,5 +218,68 @@ describe('Moi › Trophées while it is read, or when the server does not answer
     );
     renderPage(THEO_ME);
     expect((await screen.findByRole('alert')).textContent).toContain('Ta vitrine n’a pas pu être lue.');
+  });
+});
+
+describe('Moi › Trophées, the chatter’s rank and medals (recette 16/11, CHT-17)', () => {
+  const HIS_CASE: TrophyCase = {
+    items: [
+      {
+        kind: 'streak_10',
+        family: 'streak',
+        earnedAt: null,
+        revealedAt: null,
+        progress: { current: 8, target: 10, unit: 'shift' },
+      },
+    ],
+    streaks: [{ kind: 'shift', current: 8, best: 12 }],
+    level: null,
+    nextLevel: { rank: 1, name: 'Étincelle', thresholdMinor: 10_000, currentMinor: 4_000, currency: 'EUR' },
+  };
+  const serve = (trophyCase: TrophyCase): void => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) =>
+        new URL(input, 'http://localhost').pathname === '/v1/rewards/my-trophy-case'
+          ? Promise.resolve(Response.json(trophyCase))
+          : Promise.resolve(new Response(null, { status: 404 })),
+      ),
+    );
+  };
+
+  it('says the first rank ahead, with its insignia still to win, while none is held', async () => {
+    serve(HIS_CASE);
+    renderPage(THEO_ME);
+    const hero = await screen.findByRole('region', { name: 'Série de 10' });
+    expect(hero.textContent).toMatch(/Premier rang\u00a0: Étincelle, à 100\s€ de net depuis ton arrivée/u);
+    expect(hero.querySelector('[data-earned="false"]')).not.toBeNull();
+  });
+
+  it('says the rank held, with its insignia earned', async () => {
+    serve({ ...HIS_CASE, level: { rank: 3, name: 'Charmeur' } });
+    renderPage(THEO_ME);
+    const hero = await screen.findByRole('region', { name: 'Série de 10' });
+    expect(hero.textContent).toContain('Rang Charmeur');
+    expect(hero.querySelector('[data-earned="true"]')).not.toBeNull();
+  });
+
+  it('says nothing of a rank when the agency set none', async () => {
+    serve({ ...HIS_CASE, nextLevel: null });
+    renderPage(THEO_ME);
+    const hero = await screen.findByRole('region', { name: 'Série de 10' });
+    expect(hero.textContent).not.toMatch(/rang/iu);
+  });
+
+  it('keeps the medal shelf without tiers set, and says why it is empty', async () => {
+    serve(HIS_CASE);
+    renderPage(THEO_ME);
+    const medals = await screen.findByRole('region', { name: 'Médailles' });
+    expect(medals.textContent).toContain(
+      'L’agence n’a pas encore posé de paliers de prime. Tes médailles apparaîtront ici.',
+    );
+    expect(screen.getAllByRole('heading', { level: 3 }).map((one) => one.textContent)).toEqual([
+      'Médailles',
+      'Séries',
+    ]);
   });
 });

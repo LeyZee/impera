@@ -126,6 +126,12 @@ describe('Équipe › Membres › Dossier', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect(screen.getByText('De 2 à 8 majuscules ou chiffres, par exemple NORA.')).toBeTruthy();
     fireEvent.change(field, { target: { value: 'theo' } });
+    // The example follows what is typed (Design, recette of 16/11): never another prefix than the one in the field,
+    // the colon kept beside its number.
+    const hint = document.getElementById(field.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe(
+      `Ses numéros commencent par lui (THEO-${String(new Date().getFullYear())}-0001)\u00a0: il se fige à sa première facture.`,
+    );
     server.refusal = { status: 409, code: 'invoice_prefix_taken_conflict' };
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
     expect((await screen.findByRole('alert')).textContent).toBe('Un autre prestataire a déjà ce préfixe.');

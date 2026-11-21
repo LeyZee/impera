@@ -19,8 +19,6 @@ import { createDrizzleVaultDescribeStore, enqueueVaultDescribe } from './vault-d
 export interface VaultDescriptions {
   /** `media.describe_vault`: one lot of an account's vault. Counts, for the log. */
   run(job: { readonly platformAccountId: string; readonly correlationId: string }): Promise<VaultDescribeRun>;
-  /** `media.describe_vault_backlog`, each hour: a run queued for each account whose vault waits. How many. */
-  backlog(correlationId: string): Promise<number>;
   /** A run queued behind a vault sync; one already waiting keeps its time. */
   enqueue(job: {
     readonly creatorId: string;
@@ -36,6 +34,8 @@ export function createVaultDescriptions(deps: {
   readonly read: VaultFileRead;
   /** The content drops' reduced picture (`ContentDropsModule.picture`), wired by the composition root. */
   readonly picture: VaultDescribeDeps['picture'];
+  /** The content drops' removal of that picture (`ContentDropsModule.unpicture`). */
+  readonly unpicture: VaultDescribeDeps['unpicture'];
   /** Tests only: other tools than ffmpeg's. */
   readonly tools?: FileMediaTools;
   /** Where each file is read, in a folder of its own; the system's temporary folder by default. */
@@ -59,12 +59,12 @@ export function createVaultDescriptions(deps: {
           tools,
           remux: (path, out) => remuxVaultStream(path, out),
           picture: deps.picture,
+          unpicture: deps.unpicture,
           scratchDir: deps.scratchDir ?? tmpdir(),
           now: deps.now ?? (() => new Date()),
         },
         job,
       ),
-    backlog: (correlationId) => store.backlog(correlationId),
     enqueue: (job) => enqueueVaultDescribe(deps.adminDb, job),
   };
 }

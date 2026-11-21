@@ -1,0 +1,7 @@
+# 2026-11-17 — Recette visuelle, lot 8 (espace chatteur) rejoué sur main — done
+Fait : le lot 8 rejoué sur main après #852, pour ce que main n’avait pas déjà repris : Mon planning, Aujourd'hui et sa carte « À faire », champ d'heure, Moi › Factures et ses années, Moi › Sécurité, Notifications, et les libellés des prestataires.
+Pas fait : la page d’aide de l’extension (une liste d’étapes par navigateur, CHA-15) attend la fusion de la PR du fil Extension qui refait cette page, pour être posée dessus. Mes rapports, Commissions, Ma quinzaine, la vitrine du chatteur et sa page Trophées restent tels que sur main. Depuis l'écriture du lot, d'autres sessions y ont répondu aux mêmes constats (montant qui domine et ce qu'il contient, quinzaine sans palier dite dans le surtitre, étagères du téléphone en rangées pleines, prochain trophée qui dit comment le gagner, rang en tête de vitrine) ; les changements du lot sur ces fichiers sont abandonnés plutôt que fusionnés par-dessus.
+Décisions : sur un écran refait depuis par son fil, la version de main est gardée en entier, tests compris.
+Découvertes : à vérifier à l'écran après fusion, sur Trophées du chatteur : une série à zéro et « 0 sur N gagnés » s'affichent-ils encore (CHA-07) ; sur Commissions, la ligne discrète les jours qui suivent la fin d'une quinzaine (CHA-06). À reprendre avec le fil propriétaire si oui.
+Candidats à suppression : aucun.
+Vérifié : typecheck ✓, lint ✓, tests web ✓ (268 fichiers, 2 587 tests). Pas vérifié à l'écran dans cette session.

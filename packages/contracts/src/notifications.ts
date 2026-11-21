@@ -94,6 +94,8 @@ export const PushMessageSchema = z.object({
   url: AppPathSchema,
   /** A newer message with the same tag replaces the older one on the screen (a grouped burst of sales). */
   tag: z.string().max(64).optional(),
+  /** Shown without sound nor vibration: an alert « en sourdine » (ADR 0150 § 1). */
+  silent: z.boolean().optional(),
 });
 export type PushMessage = z.infer<typeof PushMessageSchema>;
 
@@ -111,8 +113,10 @@ export type PushTestResult = z.infer<typeof PushTestResultSchema>;
 /**
  * What a notification is about (CR-01): the reason that makes it unique for an account with its object, and sets the
  * rules. A sale and the start or the end of one's own shift are never capped; the start of one's own shift and the
- * first reminder of its report (`own_shift_end`, ADR 0077) ring even in the quiet hours. EQ-12, CR-04 and CR-13 bring
- * their own.
+ * first reminder of its report (`own_shift_end`, ADR 0077) ring even in the quiet hours, as does a creator's safety relay
+ * (`safety_alert`, ADR 0150 § 6). EQ-12, CR-04 and CR-13 bring
+ * their own. `agency_share` tells the owner of an alert on the agency's share (ADR 0054 §§ 2 and 5, PAY-04), under the
+ * rules of every other: quiet hours and the daily cap.
  */
 export const NOTIFICATION_REASONS = [
   'sale',
@@ -122,6 +126,19 @@ export const NOTIFICATION_REASONS = [
   'routine',
   'streak',
   'team',
+  'agency_share',
+  /** An alert of a creator's tab, to a role it reaches (ADR 0150): outside the daily cap, held in the quiet hours. */
+  'creator_alert',
+  /**
+   * A human relay for safety of her tab (ADR 0150 § 6, locked on « reçoit »): it rings even in the quiet hours and
+   * outside the daily cap, which it does not consume.
+   */
+  'safety_alert',
+  /**
+   * A change among the owners (ADR 0096 §§ 2 and 5): an owner added, a removal asked, cancelled or applied. It rings
+   * even in the quiet hours and outside the daily cap: the notice only protects an owner who hears of it.
+   */
+  'owner_change',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;

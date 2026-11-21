@@ -1,8 +1,9 @@
 /**
- * The order in which the vault's media are described (ADR 0113 § 5): first the media of the imported scripts that are
- * active, previews included, beginning with the scripts that miss the fewest descriptions (they become proposable
- * first); then those of the other imported scripts; then the rest of the vault in the vault's order. Pure: the store
- * reads, this decides.
+ * The order in which the media the owner asked to describe are described (ADR 0113 § 5, ADR 0145 § 5): first the media
+ * of the imported scripts that are active, previews included, beginning with the scripts that miss the fewest
+ * descriptions (they become proposable first); then those of the other imported scripts; then the rest in the vault's
+ * order, the root last. A media of the root is described when she asked it, as any other (17/11: her choice, media by
+ * media). Pure: the store reads, this decides.
  */
 
 /** A media of the vault that has no file yet, as `media_platform_refs` keeps it. */
@@ -63,8 +64,9 @@ const compareRank = (a: Rank, b: Rank): number =>
   a.tier - b.tier || a.missing - b.missing || a.scriptId.localeCompare(b.scriptId) || a.place - b.place;
 
 /**
- * Every candidate, in the order they are described (ADR 0113 § 5). A media in several scripts takes its best place.
- * A script's missing descriptions are its media still waiting here: counted once each, a media listed twice in it too.
+ * The candidates in the order they are described (ADR 0113 § 5): each one, the root's included, since only what the
+ * owner asked is a candidate (ADR 0145 § 5). A media in several scripts takes its best place. A script's missing descriptions are its
+ * media still waiting here: counted once each, a media listed twice in it too.
  */
 export function vaultDescribeOrder<T extends VaultCandidate>(
   candidates: readonly T[],

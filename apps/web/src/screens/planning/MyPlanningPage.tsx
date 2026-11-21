@@ -30,6 +30,7 @@ import {
 } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { CalendarLinkBody, SHIFT_LINK_WORDS } from '@/scheduling/CalendarLinkBody';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
@@ -53,13 +54,18 @@ import {
 import { useNow } from '@/scheduling/useNow';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
+import { Dialog } from '@/shell/Dialog';
+import { PlanningArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Empty, Failure } from '@/shell/states';
 
 /** The chatter's Planning in the address: the week, and the team's calendar by week or month (CR-12). */
 export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | undefined };
 
 type Open =
   | { readonly kind: 'leave' }
+  /** « Dans mon téléphone »: the link that puts his shifts in his phone's calendar (CR-12; Moi › Calendrier before). */
+  | { readonly kind: 'phone' }
   | { readonly kind: 'swap'; readonly shift: Shift; readonly creatorName: string | undefined }
   | { readonly kind: 'report'; readonly shiftId: string; readonly draft: ReportDraft | null };
 
@@ -146,10 +152,31 @@ export function MyPlanningPage({
   const [focus, setFocus] = useState<string | null>(null);
   const leaves = useLeaves(leaveRangeOf(today, zone));
   const swaps = useSwaps();
+  // This week with nothing left ahead (a Sunday evening): the next one is read too and shown under it, so that the
+  // shift of tomorrow is on screen without a turn of the week (recette visuelle 16/11, CHA-04).
+  const thisMonday = mondayOf(today);
+  const weekDone =
+    !team &&
+    monday === thisMonday &&
+    planning.data !== undefined &&
+    mineOf(planning.data, me).shifts.every((shift) => phaseOf(shift, now) === 'past');
+  const following = usePlanning(
+    {
+      from: zonedInstant(addDays(monday, 7), 0, zone).toISOString(),
+      to: zonedInstant(addDays(monday, 14), 0, zone).toISOString(),
+      creatorId: null,
+    },
+    weekDone,
+  );
+  const nextWeek = weekDone && following.data !== undefined ? mineOf(following.data, me) : null;
   const swapOf = (shiftId: string): Open | null => {
-    const shift = planning.data?.shifts.find((one) => one.id === shiftId);
-    if (shift === undefined) return null;
-    const creatorName = planning.data?.accounts.find(
+    // A shift of the next week, shown under this one when it is done, is offered from there too (CHA-04).
+    const source = [planning.data, nextWeek]
+      .filter((one) => one !== undefined && one !== null)
+      .find((one) => one.shifts.some((shift) => shift.id === shiftId));
+    const shift = source?.shifts.find((one) => one.id === shiftId);
+    if (source === undefined || shift === undefined) return null;
+    const creatorName = source.accounts.find(
       (account) => account.id === shift.platformAccountId,
     )?.creatorName;
     return { kind: 'swap', shift, creatorName };
@@ -161,7 +188,7 @@ export function MyPlanningPage({
   });
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         title="Planning"
         lead={
@@ -238,32 +265,36 @@ export function MyPlanningPage({
                 Mois
               </button>
             </div>
-          ) : null}
-        </div>
-        {members.isError && me === null ? (
-          <div className="sc-inline-warn sc-unread nv-swap" role="alert">
-            <p className="tm-warn">
-              Le serveur ne répond pas : ta fiche n’a pas pu être lue, et un congé ne peut pas encore être
-              demandé.
-            </p>
+          ) : (
+            // His own shifts in his phone's calendar: where the shifts are, not a tab of Moi (ADR 0134, lot 1).
             <button
               type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
+              className="nv-btn nv-btn--soft nv-btn--sm cal-bar__end"
               onClick={() => {
-                void members.refetch();
+                setOpen({ kind: 'phone' });
               }}
             >
-              Réessayer
+              <PhoneMark />
+              Dans mon téléphone
             </button>
-          </div>
+          )}
+        </div>
+        {/* The planning silent says it for the page: the lines of its other reads keep quiet then (ETA-05). */}
+        {members.isError && me === null && !planning.isError ? (
+          <Failure
+            inline
+            className="sc-inline-warn sc-unread nv-swap"
+            onRetry={() => {
+              void members.refetch();
+            }}
+          >
+            Un congé ne peut pas encore être demandé : réessaie dans un instant.
+          </Failure>
         ) : null}
-        {reports.failed ? (
-          <div className="sc-inline-warn sc-unread nv-swap" role="alert">
-            <p className="tm-warn">Tes rapports n’ont pas pu être lus.</p>
-            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={reports.retry}>
-              Réessayer
-            </button>
-          </div>
+        {reports.failed && !planning.isError ? (
+          <Failure inline className="sc-inline-warn sc-unread nv-swap" onRetry={reports.retry}>
+            Tes rapports n’ont pas pu être lus : réessaie dans un instant.
+          </Failure>
         ) : null}
         {me === null || swaps.data === undefined ? null : (
           <Answers
@@ -280,6 +311,7 @@ export function MyPlanningPage({
             failed={planning.isError && agency === null}
             onRetry={() => {
               void (agency === null ? planning.refetch() : calendar.refetch());
+              if (members.isError) void members.refetch();
             }}
             days={window?.days ?? weekOf(monday)}
             month={byMonth ? month : null}
@@ -290,21 +322,12 @@ export function MyPlanningPage({
             onFocus={setFocus}
           />
         ) : planning.isError ? (
-          <Panel className="nv-coming">
-            <div className="nv-coming__in sc-notice">
-              <h2>Le serveur ne répond pas</h2>
-              <p>Ton planning n’a pas pu être lu. Réessaie dans un instant.</p>
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft nv-btn--sm"
-                onClick={() => {
-                  void planning.refetch();
-                }}
-              >
-                Réessayer
-              </button>
-            </div>
-          </Panel>
+          <Failure
+            onRetry={() => {
+              void planning.refetch();
+              if (members.isError) void members.refetch();
+            }}
+          />
         ) : planning.data === undefined || members.isPending ? (
           <Panel>
             <div className="sc-skeleton" aria-hidden="true">
@@ -329,6 +352,7 @@ export function MyPlanningPage({
             )}
             offers={offersOf(swaps.data, me)}
             reports={reports.list}
+            nextWeek={nextWeek === null ? null : { planning: nextWeek, days: weekOf(addDays(monday, 7)) }}
             onSwap={(shiftId) => {
               setOpen(swapOf(shiftId));
             }}
@@ -352,6 +376,17 @@ export function MyPlanningPage({
             {swaps.data === undefined ? null : <MySwaps list={swaps.data} memberId={me.id} zone={zone} />}
           </div>
         )}
+        {open?.kind === 'phone' ? (
+          <Dialog
+            title="Mes shifts dans mon téléphone"
+            lead="iPhone, Mac, Google Agenda"
+            onClose={() => {
+              setOpen(null);
+            }}
+          >
+            <CalendarLinkBody words={SHIFT_LINK_WORDS} />
+          </Dialog>
+        ) : null}
         {open?.kind === 'leave' && me !== null ? (
           <LeavePanel
             today={dayOf(now, me.timeZone)}
@@ -402,6 +437,16 @@ function mineOf(planning: Planning, me: Pick<TeamMember, 'id'> | null): Planning
   return { ...planning, shifts: planning.shifts.filter((shift) => shift.memberId === me.id) };
 }
 
+/** A phone, drawn in the line of the menu's icons. */
+function PhoneMark(): JSX.Element {
+  return (
+    <svg className="cal-bar__mark" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="4.25" y="1.75" width="7.5" height="12.5" rx="1.75" />
+      <path d="M7 12h2" />
+    </svg>
+  );
+}
+
 /** The reader's open proposals by shift, with the colleague each one waits on. */
 function offersOf(list: ShiftSwapList | undefined, me: TeamMember | null): ReadonlyMap<string, string[]> {
   const offers = new Map<string, string[]>();
@@ -424,6 +469,7 @@ function Week({
   away,
   offers,
   reports,
+  nextWeek,
   onSwap,
   onReport,
 }: {
@@ -439,19 +485,26 @@ function Week({
   offers: ReadonlyMap<string, readonly string[]>;
   /** The reports of the week's periods, `null` until read (when they cannot be, the page says so above the week). */
   reports: ShiftReportList | null;
+  /** The week after, read when nothing is left ahead in this one (CHA-04); `null` otherwise. */
+  nextWeek: { readonly planning: Planning; readonly days: readonly string[] } | null;
   onSwap: (shiftId: string) => void;
   onReport: (shiftId: string) => void;
 }): JSX.Element {
-  const accounts = new Map(planning.accounts.map((account) => [account.id, account]));
+  const accounts = new Map(
+    [...planning.accounts, ...(nextWeek?.planning.accounts ?? [])].map((account) => [account.id, account]),
+  );
   const agency = planning.settings.timeZone;
-  const byDay = days
-    .map((day) => ({
-      day,
-      shifts: planning.shifts
-        .filter((shift) => dayOf(shift.startsAt, zone) === day)
-        .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
-    }))
-    .filter(({ shifts }) => shifts.length > 0);
+  const daysOf = (week: Planning, of: readonly string[]): { day: string; shifts: Shift[] }[] =>
+    of
+      .map((day) => ({
+        day,
+        shifts: week.shifts
+          .filter((shift) => dayOf(shift.startsAt, zone) === day)
+          .sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+      }))
+      .filter(({ shifts }) => shifts.length > 0);
+  const byDay = daysOf(planning, days);
+  const nextDays = nextWeek === null ? [] : daysOf(nextWeek.planning, nextWeek.days);
   const reportFor = (shift: Shift): RowReport => {
     if (!reports?.shifts.some((one) => one.id === shift.id)) return null;
     const report = reportOf(reports.reports, shift.id);
@@ -505,7 +558,12 @@ function Week({
   ]
     .filter((part) => part !== null)
     .join(' · ');
-  const daySection = ({ day, shifts }: { day: string; shifts: Shift[] }, index: number): JSX.Element => (
+  // A day under « Semaine prochaine » is a level below it.
+  const daySection = (
+    { day, shifts }: { day: string; shifts: Shift[] },
+    index: number,
+    Heading: 'h2' | 'h3' = 'h2',
+  ): JSX.Element => (
     <section
       key={day}
       className="sc-mine__day nv-enter"
@@ -513,9 +571,9 @@ function Week({
       aria-labelledby={`sc-day-${day}`}
       data-today={day === today ? 'true' : undefined}
     >
-      <h2 id={`sc-day-${day}`} className="sc-mine__date">
+      <Heading id={`sc-day-${day}`} className="nv-h3 sc-mine__date">
         {day === today ? 'Aujourd’hui' : longDay(day).replace(/^./u, (letter) => letter.toUpperCase())}
-      </h2>
+      </Heading>
       <ul className="sc-mine__list">
         {shifts.map((shift) => {
           const phase = phaseOf(shift, now);
@@ -540,27 +598,37 @@ function Week({
     </section>
   );
 
+  // The week after, under a week with nothing left ahead: its days as this week's, under their own title (CHA-04).
+  const following =
+    nextDays.length === 0 ? null : (
+      <section className="sc-mine sc-mine__next" aria-labelledby="sc-next-week">
+        <h2 id="sc-next-week" className="nv-h2">
+          Semaine prochaine
+        </h2>
+        {nextDays.map((one, index) => daySection(one, byDay.length + index, 'h3'))}
+      </section>
+    );
+
   if (byDay.length === 0) {
     return (
       <div className="sc-mine nv-swap" key={days[0]}>
         {leaves}
-        <Panel className="nv-coming">
-          <div className="nv-coming__in sc-notice">
-            <h2>Aucun shift cette semaine</h2>
-            <p>
-              Ton responsable te place sur le planning : tes shifts s’afficheront ici dès qu’ils sont posés.
-            </p>
-          </div>
-        </Panel>
+        <Empty plate art={<PlanningArt />} title="Aucun shift cette semaine">
+          Ton responsable te place sur le planning : tes shifts s’afficheront ici dès qu’ils sont posés.
+        </Empty>
+        {following}
       </div>
     );
   }
 
+  const aheadCount = ahead.reduce((sum, { shifts }) => sum + shifts.length, 0);
   return (
     <div className="sc-mine nv-swap" key={days[0]}>
       <p className="sc-mine__sum nv-num">
-        {planning.shifts.length === 1 ? '1 shift' : `${String(planning.shifts.length)} shifts`} ·{' '}
-        {lengthOf(total)}
+        {earlierCount === 0
+          ? `${planning.shifts.length === 1 ? '1 shift' : `${String(planning.shifts.length)} shifts`} · ${lengthOf(total)}`
+          : // Days gone by count apart: the week's total read as still ahead on a Sunday (CHA-04).
+            `${String(aheadCount)} à venir · ${String(earlierCount)} ${earlierCount > 1 ? 'faits' : 'fait'}`}
       </p>
       {leaves}
       {earlier.length === 0 ? null : (
@@ -569,10 +637,13 @@ function Week({
             <span className="nv-disclosure__title">Plus tôt cette semaine ({earlierCount})</span>
             {foldSum === '' ? null : <span className="nv-disclosure__sum">{foldSum}</span>}
           </summary>
-          <div className="nv-disclosure__body sc-mine">{earlier.map(daySection)}</div>
+          <div className="nv-disclosure__body sc-mine">
+            {earlier.map((one, index) => daySection(one, index))}
+          </div>
         </details>
       )}
-      {ahead.map(daySection)}
+      {ahead.map((one, index) => daySection(one, index))}
+      {following}
     </div>
   );
 }
@@ -595,7 +666,10 @@ function MyShiftRow({
   zone: string;
   agency: string;
   phase: Phase;
-  /** His to hold: away from the team, a shift under way is not his « En poste » (CHAT-09). */
+  /**
+   * His to hold: away from the team, a shift under way is not his « En poste » (CHAT-09), and none is his to offer
+   * (CHT-31).
+   */
   held: boolean;
   /** The colleagues an open proposal of this shift waits on. */
   offeredTo: readonly string[];
@@ -614,7 +688,7 @@ function MyShiftRow({
     <li
       className="nv-plate sc-mine__shift"
       data-phase={phase}
-      data-actions={phase === 'later' ? 'true' : undefined}
+      data-actions={phase === 'later' && held ? 'true' : undefined}
     >
       <div className="sc-mine__hours">
         <p className="sc-mine__range nv-num">{rangeAt(shift.startsAt, shift.endsAt, zone)}</p>
@@ -671,7 +745,8 @@ function MyShiftRow({
                 : `Rapport ${MEMBER_STATUS[report.report.status].toLowerCase()}`}
         </button>
       )}
-      {phase === 'later' ? (
+      {/* Away from the team, he holds no shift: none to offer, the agency places them (recette 16/11, CHT-31). */}
+      {phase === 'later' && held ? (
         <button
           type="button"
           className="sc-link sc-mine__swap"

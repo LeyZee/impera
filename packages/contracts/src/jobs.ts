@@ -16,6 +16,7 @@ import {
   InvoiceIdSchema,
   MediaAssetIdSchema,
   PlatformAccountIdSchema,
+  SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
 } from './ids';
@@ -28,6 +29,10 @@ import { TELEGRAM_JOB_PAYLOADS } from './telegram';
  * `conv:<conversationId>`; a poll runs on `account:<platformAccountId>`, one at a time per account.
  */
 
+/** The sales that wake his conversation for a word after it (ADR 0156 § 2): a step he bought, a tip. */
+export const AFTER_SALE_TYPES = ['ppv', 'tip'] as const;
+export type AfterSaleType = (typeof AFTER_SALE_TYPES)[number];
+
 const conversationJob = z.object({
   creatorId: CreatorIdSchema,
   conversationId: ConversationIdSchema,
@@ -38,6 +43,7 @@ export const JOB_NAMES = [
   'conversation.respond',
   'conversation.send',
   'conversation.follow_up',
+  'conversation.after_sale',
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
@@ -55,15 +61,18 @@ export const JOB_NAMES = [
   'rewards.evaluate_creator',
   'ai_usage.check_credits',
   'notifications.recap',
+  'alerts.route',
   'notifications.creator_sale',
   'creator_tasks.remind',
   'creator_tasks.suggestion_decided',
+  'creator_week.plan',
   'scheduling.make_shifts',
   'scheduling.lapse_swaps',
   'scheduling.check_agency_shares',
   'scheduling.check_reports',
   'scheduling.remind_reports',
   'team.apply_roles',
+  'owners.watch',
   'payroll.recalculate',
   'payroll.recalculate_open',
   'payroll.fetch_exchange_rates',
@@ -81,7 +90,6 @@ export const JOB_NAMES = [
   'payroll.lock_payout_certificate',
   'media.describe',
   'media.describe_vault',
-  'media.describe_vault_backlog',
   'content_drops.receive_file',
   'content_drops.convert_file',
   'content_drops.erase_originals',
@@ -120,6 +128,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.respond': 'Réponse aux fans',
   'conversation.send': 'Envoi des messages',
   'conversation.follow_up': 'Relances des fans',
+  'conversation.after_sale': 'Mot d’après-achat',
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
@@ -137,15 +146,18 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'rewards.evaluate_creator': 'Gains de la créatrice après son geste',
   'ai_usage.check_credits': 'Vérification des crédits IA',
   'notifications.recap': 'Récapitulatif des notifications',
+  'alerts.route': 'Alertes de l’équipe',
   'notifications.creator_sale': 'Notification de vente à la créatrice',
   'creator_tasks.remind': 'Rappels de l’agenda',
   'creator_tasks.suggestion_decided': 'Réponse à une suggestion d’agenda',
+  'creator_week.plan': 'Semaine de la créatrice',
   'scheduling.make_shifts': 'Création des shifts réguliers',
   'scheduling.lapse_swaps': 'Échanges de shift expirés',
   'scheduling.check_agency_shares': 'Contrôle des pourcentages de l’agence',
   'scheduling.check_reports': 'Rapports de fin de shift comparés à Reveal',
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'team.apply_roles': 'Rôles de l’équipe',
+  'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
   'payroll.fetch_exchange_rates': 'Taux de change du jour',
@@ -163,7 +175,6 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'payroll.lock_payout_certificate': 'Attestation de paiement',
   'media.describe': 'Description des médias',
   'media.describe_vault': 'Description des médias du coffre',
-  'media.describe_vault_backlog': 'Rattrapage des descriptions du coffre',
   'content_drops.receive_file': 'Réception des fichiers de contenu',
   'content_drops.convert_file': 'Conversion des vidéos',
   'content_drops.erase_originals': 'Nettoyage des originaux de contenu',
@@ -213,6 +224,20 @@ export const JOB_PAYLOADS = {
   'conversation.follow_up': conversationJob.extend({
     anchorAt: z.iso.datetime(),
     step: z.number().int().min(0).max(4),
+  }),
+  /**
+   * A fresh sale of his woke his conversation (ADR 0156 § 2): a step he bought or a tip, recorded by the sales ledger in
+   * the transaction of its line under the key `conversation.after_sale:<saleId>`. The sale names his account and his
+   * platform id, not the conversation: the job finds it, and a fan nobody knows wakes nothing.
+   */
+  'conversation.after_sale': z.object({
+    creatorId: CreatorIdSchema,
+    platformAccountId: PlatformAccountIdSchema,
+    platformFanId: z.string().min(1),
+    saleId: SalesLineIdSchema,
+    saleType: z.enum(AFTER_SALE_TYPES),
+    occurredAt: z.iso.datetime(),
+    correlationId: z.string().min(1),
   }),
   /**
    * What she learnt about the fan becomes facts (P3-02): the facts the brief proposed for a draft a human approved,
@@ -286,6 +311,11 @@ export const JOB_PAYLOADS = {
   /** At the end of an account's quiet hours: one notification for all it held (CR-01). Keyed by account. */
   'notifications.recap': z.object({ userId: z.string().min(1) }),
   /**
+   * Each minute (crontab, ADR 0150 lot 2): the alerts of the outbox's recent window, to the roles each creator's tab
+   * chooses. Re-reading the window is harmless: a notification is once per account, reason and event.
+   */
+  'alerts.route': z.object({}),
+  /**
    * A fresh sale told to her own accounts (CRM-04 lot d2, ADR 0042 § 7): the `sale_detected` that the sales ledger
    * published, enqueued in the same transaction under the key `notifications.creator_sale:<saleId>`. The job reads her
    * part and its currency from the event, never its seller.
@@ -310,6 +340,11 @@ export const JOB_PAYLOADS = {
     state: z.enum(['accepted', 'declined']),
     day: z.iso.date(),
   }),
+  /**
+   * Each hour (ADR 0140 § 2): for each creator whose Sunday 18 h has passed in her zone, the week after computed as a
+   * draft for the owner. Replayable: one week per creator, a draft already there is kept.
+   */
+  'creator_week.plan': z.object({}),
   'scheduling.make_shifts': z.object({}),
   'scheduling.lapse_swaps': z.object({}),
   /**
@@ -330,6 +365,12 @@ export const JOB_PAYLOADS = {
   'scheduling.remind_reports': z.object({}),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
+  /**
+   * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
+   * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a
+   * notification is unique per event and account.
+   */
+  'owners.watch': z.object({}),
   /**
    * The drafts of `period` computed again (EQ-04, ADR 0032), and those of the team's first open period when `period`
    * is closed: a report validated after its period's closing counts there. Enqueued by what changes a period's inputs,
@@ -423,18 +464,17 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
-   * The media of an account's vault that have no file yet, described by lots (ADR 0113 § 1, § 5): each read from the
-   * platform into a folder of the job's own, described by the vision AI, reduced to its picture, then erased. On the
-   * account's queue under `vaultDescribeJobKey`: one waiting run per account. Queued at the end of each vault sync and
-   * by the hourly catch-up; a spent AI budget puts it off an hour. Replayable: a media linked is never taken again.
+   * The media of an account's vault the owner asked to describe and that have no file yet, described by lots (ADR 0113
+   * § 1, ADR 0145 § 5): each read from the platform into a folder of the job's own, described by the vision AI, reduced
+   * to its picture, then erased. On the account's queue under `vaultDescribeJobKey`: one waiting run per account.
+   * Queued by the owner's confirmed request and at the end of each vault sync (a request waiting for a file the sync
+   * now lists); never on its own. A spent AI budget puts it off an hour. Replayable: a media linked is never taken again.
    */
   'media.describe_vault': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
-  /** Each hour (ADR 0113 § 5): `media.describe_vault` queued for each account whose vault still waits, her switch on. */
-  'media.describe_vault_backlog': z.object({}),
   /**
    * Her file's bytes are whole in the storage (CR-06 b): the job checks their size against what her phone declared and
    * marks the file received, then cleans it (metadata removed, format checked, fingerprint) into her library or finds
@@ -586,6 +626,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.respond': 3,
   'conversation.send': 3,
   'conversation.follow_up': 3,
+  'conversation.after_sale': 3,
   'conversation.record_facts': 3,
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
@@ -609,12 +650,16 @@ export const JOB_MAX_ATTEMPTS = {
   // Each hour: the next run is the retry; an alert is published once per episode.
   'ai_usage.check_credits': 1,
   'notifications.recap': 3,
+  // The next minute re-reads the window: one try is enough.
+  'alerts.route': 1,
   // Replayable: each account is told once per sale (`notification_deliveries`), so a retry tells only the ones missed.
   'notifications.creator_sale': 5,
   // Replayable: told once per task and start (`notification_deliveries`).
   'creator_tasks.remind': 3,
   // Replayable: the request is written under the idea's id, the idea moves only from `suggested`.
   'creator_tasks.suggestion_decided': 5,
+  // Each hour: the next run is the retry, and a week is written once.
+  'creator_week.plan': 1,
   'scheduling.make_shifts': 1,
   'scheduling.lapse_swaps': 1,
   // Twice a month, reading the register only: a failure is worth a retry, and the event is published once anyway.
@@ -623,6 +668,8 @@ export const JOB_MAX_ATTEMPTS = {
   // Every five minutes, and each reminder rings once: the next run is the retry.
   'scheduling.remind_reports': 1,
   'team.apply_roles': 1,
+  // Every minute: the next run is the retry.
+  'owners.watch': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.
   'payroll.recalculate': 5,
   'payroll.recalculate_open': 1,
@@ -656,8 +703,6 @@ export const JOB_MAX_ATTEMPTS = {
   'media.describe': 3,
   // A storage or an ffmpeg that does not answer: a few tries; a spent budget is not a failure, the run puts itself off.
   'media.describe_vault': 3,
-  // Each hour: the next run is the retry.
-  'media.describe_vault_backlog': 1,
   // Graphile waits exp(n) seconds after the n-th failure: nine attempts span a little more than an hour, through a
   // short outage of the storage; a file left waiting is sent again by her phone.
   'content_drops.receive_file': 9,
@@ -733,6 +778,14 @@ export function reopenJobKey(creatorId: string): string {
   return `conversation.reopen:${creatorId}`;
 }
 
+/**
+ * The reopening at the end of her pause (ADR 0148 § 1): a key of its own, so that her hours, which move
+ * `reopenJobKey`, never move it, and a new pause replaces it.
+ */
+export function pauseEndJobKey(creatorId: string): string {
+  return `conversation.reopen:pause:${creatorId}`;
+}
+
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {
   return `account:${platformAccountId}`;
 }
@@ -757,3 +810,11 @@ export const RESUME_SPACING_SECONDS = 15;
 export function resumeRunAt(index: number, now: Date): Date {
   return new Date(now.getTime() + index * RESUME_SPACING_SECONDS * 1_000);
 }
+
+/**
+ * The background jobs that write a creator's rows under the app role, one creator at a time (ADR 0087, avenant du
+ * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
+ * (`withTenantJob`) refuses any other.
+ */
+export const TenantJobSchema = z.enum(['daily_stats', 'media_insights', 'link_hours', 'drop_media']);
+export type TenantJob = z.infer<typeof TenantJobSchema>;

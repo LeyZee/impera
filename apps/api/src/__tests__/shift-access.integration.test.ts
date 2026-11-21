@@ -455,6 +455,23 @@ describe('access of a chatter during his shift (EQ-13)', () => {
     expect(await openings(outside, paul)).toEqual([]);
   });
 
+  it('never lets him close the care mode, and tells him who can (recette AGE-04, ADR 0088 § 7)', async () => {
+    const who = await chatterWith(-60, 60);
+    const marc = conversation('Marc');
+    await test.admin.db
+      .update(schema.conversations)
+      .set({ careSince: new Date('2026-11-12T20:00:00Z') })
+      .where(eq(schema.conversations.id, marc));
+    const close = (cookie: string) =>
+      call('POST', `/v1/conversations/${marc}/care/close?creatorId=${nora.creatorId}`, cookie, {});
+    const refused = await close(who.cookie);
+    expect([refused.statusCode, refused.json()]).toMatchObject([
+      403,
+      { error: { code: 'care_close_forbidden' } },
+    ]);
+    expect((await close(ownerCookie)).statusCode).toBe(204);
+  });
+
   it('gives back his own hand or a handoff nobody took, never another person’s', async () => {
     const who = await chatterWith(-60, 60);
     const [marc, paul] = [conversation('Marc'), conversation('Paul')];

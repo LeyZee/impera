@@ -5,7 +5,7 @@ import { StoredPersonaSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-import { channelWriterPersona } from '../channel-persona';
+import { channelWriterPersona, commentWriterPersona } from '../channel-persona';
 
 /** The fictional demo persona of the repository (ADR 0010: never a real one in a test). */
 const DEMO = StoredPersonaSchema.parse(
@@ -54,5 +54,26 @@ describe('her persona for a post of her channel (ADR 0080 § 5)', () => {
   it('reads a poll’s question and each answer, never as too many bubbles', () => {
     const violations = persona.check(['Ce soir je fais quoi ?', 'Un live', 'Une story', 'Les deux']);
     expect(violations).toEqual([]);
+  });
+});
+
+describe('her persona for a reply to an Instagram comment (ADR 0122 § 2)', () => {
+  const stored = { version: '0.3.0', creatorName: 'Nora', persona: DEMO };
+  const persona = commentWriterPersona(stored, NOW);
+
+  it('reads her public panels only: the same sheet as her channel, never her intimacy', () => {
+    expect(persona.personaSheet).toBe(channelWriterPersona(stored, NOW).personaSheet);
+    expect(persona.personaSheet).not.toContain('Pratiques / Kinks');
+    expect(persona.personaSheet).not.toContain('Jouets sexuels');
+    expect(persona.personaSheet).toContain('Zones interdites');
+  });
+
+  it('lets a short warm reply through and blocks an explicit one', () => {
+    expect(persona.check(['Merci, ça me fait plaisir 🌸'])).toEqual([]);
+    expect(persona.check(['J’ai envie de te sucer']).some((violation) => violation.blocking)).toBe(true);
+  });
+
+  it('blocks a reply that says she is an AI', () => {
+    expect(persona.check(['Je suis une IA']).map((violation) => violation.code)).toContain('ai_disclosure');
   });
 });

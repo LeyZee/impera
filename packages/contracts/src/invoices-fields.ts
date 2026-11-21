@@ -124,10 +124,10 @@ export const VatNumberSchema = z
 
 /**
  * Whether a SIREN's last digit is its check key (Luhn, as INSEE computes it). Only some SIRETs of La Poste escape the
- * rule, never a SIREN.
+ * rule, never a SIREN. Nine zeros pass the key but INSEE gives that number to no one (recette 16/11, CHT-23).
  */
 export function sirenChecksOut(siren: string): boolean {
-  if (!/^[0-9]{9}$/u.test(siren)) return false;
+  if (!/^[0-9]{9}$/u.test(siren) || /^0+$/u.test(siren)) return false;
   let sum = 0;
   for (let index = 0; index < siren.length; index += 1) {
     // From the right, every second digit counts twice, its two digits added.
@@ -136,6 +136,14 @@ export function sirenChecksOut(siren: string): boolean {
     sum += counted > 9 ? counted - 9 : counted;
   }
   return sum % 10 === 0;
+}
+
+/**
+ * Whether a legal name can be printed on an invoice as the Kbis or the identity card writes it: no emoji, pictograph or
+ * flag (recette 16/11, CHT-23). Letters of any alphabet, digits and punctuation pass.
+ */
+export function legalNameReadsRight(name: string): boolean {
+  return !/[\p{Extended_Pictographic}\p{Regional_Indicator}\u{FE0F}\u{20E3}]/u.test(name);
 }
 
 /**

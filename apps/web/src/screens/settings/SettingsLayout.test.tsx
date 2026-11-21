@@ -28,9 +28,10 @@ beforeEach(() => {
       disconnect = vi.fn();
     },
   );
+  // A computer's width: the list stands beside the section open.
   vi.stubGlobal(
     'matchMedia',
-    vi.fn(() => ({ matches: true })),
+    vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
   // The pages stay on their loading state: only the tabs are under test.
   vi.stubGlobal(
@@ -44,10 +45,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function settingsTabs(user: Me): Promise<string[]> {
+async function settingsTabs(user: Me, at = '/reglages/modeles-ia'): Promise<string[]> {
   const router = createAppRouter(
     { user, onSignOut: () => undefined },
-    createMemoryHistory({ initialEntries: ['/reglages/modeles-ia'] }),
+    createMemoryHistory({ initialEntries: [at] }),
   );
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -60,14 +61,14 @@ async function settingsTabs(user: Me): Promise<string[]> {
     .map((link) => link.textContent);
 }
 
-describe('Réglages tabs', () => {
-  it('gives Telegram to the owner, whom the server serves it to', async () => {
-    expect(await settingsTabs(owner)).toContain('Telegram');
+describe('Réglages’ list', () => {
+  it('gives Bots Telegram to the owner, whom the server serves it to', async () => {
+    expect(await settingsTabs(owner)).toContain('Bots Telegram');
   });
 
-  it('gives the sales feeds (CRM-01) a tab right after the AI keys', async () => {
+  it('opens the list on the platforms (the sales feeds, CRM-01), then the Telegram bots', async () => {
     const tabs = await settingsTabs(owner);
-    expect(tabs.slice(0, 2)).toEqual(['Modèles IA', 'Ventes']);
+    expect(tabs.slice(0, 2)).toEqual(['Plateformes', 'Bots Telegram']);
   });
 
   it('keeps Apparence and « Se déconnecter » out of the tabs: both live in the account menu (NAV-03)', async () => {
@@ -83,12 +84,76 @@ describe('Réglages tabs', () => {
   });
 });
 
+describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
+  it('groups its sections in four titled groups: Connexions, IA, Argent, Sécurité (ADR 0134 § 6)', async () => {
+    const lines = await settingsTabs(owner);
+    expect(lines).toEqual([
+      'Plateformes',
+      'Bots Telegram',
+      'Modèles IA',
+      'Consommation IA',
+      'Règles de paie',
+      'Facturation',
+      'Alertes',
+      'Sauvegardes',
+      'Sécurité',
+    ]);
+    const nav = screen.getByRole('navigation', { name: 'Réglages' });
+    expect([...nav.querySelectorAll('.rgl-list__group')].map((title) => title.textContent)).toEqual([
+      'Connexions',
+      'IA',
+      'Argent',
+      'Sécurité',
+    ]);
+  });
+
+  it('names the section open as the title, « Réglages » above it, and lights its line', async () => {
+    await settingsTabs(owner, '/reglages/regles-de-paie');
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe('Règles de paie');
+    const header = document.querySelector<HTMLElement>('.nv-page__head');
+    if (header === null) throw new Error('no header');
+    expect(within(header).getByText('Réglages').className).toBe('rgl-eyebrow');
+    expect(within(header).getByRole('link', { name: '← Réglages' }).getAttribute('href')).toBe('/reglages');
+    const nav = screen.getByRole('navigation', { name: 'Réglages' });
+    expect(within(nav).getByRole('link', { name: 'Règles de paie' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+  });
+
+  it('is the screen of Réglages on a phone: the list alone, with no section open', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+    const lines = await settingsTabs(owner, '/reglages');
+    expect(lines).toHaveLength(9);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Réglages');
+    expect(screen.queryByRole('link', { name: '← Réglages' })).toBeNull();
+    expect(document.querySelector('.rgl-body')?.hasAttribute('data-open')).toBe(false);
+  });
+
+  it('opens on its first section on a computer', async () => {
+    const router = createAppRouter(
+      { user: owner, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: ['/reglages'] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(router.state.location.pathname).toBe('/reglages/ventes');
+    });
+  });
+});
+
 describe('Pages without a screen (recette 05/11, PRO-25)', () => {
   it.each([
     ['/entrainer/corrections', '/entrainer/playground'],
     ['/entrainer/tests', '/entrainer/playground'],
-    ['/reglages/appareils', '/reglages/modeles-ia'],
-    ['/reglages/mode', '/reglages/modeles-ia'],
+    ['/reglages/appareils', '/reglages/ventes'],
+    ['/reglages/mode', '/reglages/ventes'],
   ])('sends %s to %s instead of an « à venir » page', async (address, home) => {
     const router = createAppRouter(
       { user: owner, onSignOut: () => undefined },
@@ -105,7 +170,7 @@ describe('Pages without a screen (recette 05/11, PRO-25)', () => {
   });
 });
 
-describe('Réglages › Ventes, the creators found and not imported yet (CRM-07 b2, ADR 0069 § 5)', () => {
+describe('Réglages › Plateformes, the creators found and not imported yet (CRM-07 b2, ADR 0069 § 5)', () => {
   const answer = (body: unknown, status = 200): Promise<Response> =>
     Promise.resolve(
       new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } }),
@@ -125,17 +190,19 @@ describe('Réglages › Ventes, the creators found and not imported yet (CRM-07 
     serveNewModels(() => answer({ total: 3, byPlatform: [{ platform: 'reveal', count: 3 }] }));
     await settingsTabs(owner);
     const nav = screen.getByRole('navigation', { name: 'Réglages' });
-    const tab = await within(nav).findByRole('link', { name: 'Ventes, 3 nouvelles créatrices sur Reveal' });
+    const tab = await within(nav).findByRole('link', {
+      name: 'Plateformes, 3 nouvelles créatrices sur Reveal',
+    });
     expect(within(tab).getByText('3').getAttribute('title')).toBe('3 nouvelles créatrices sur Reveal');
   });
 
   it('shows the tab bare when none waits or the count cannot be read', async () => {
     serveNewModels(() => answer({ total: 0, byPlatform: [] }));
-    expect(await settingsTabs(owner)).toContain('Ventes');
+    expect(await settingsTabs(owner)).toContain('Plateformes');
     cleanup();
     serveNewModels(() => answer({ error: { code: 'internal', message: 'Erreur' } }, 500));
     const tabs = await settingsTabs(owner);
-    expect(tabs).toContain('Ventes');
+    expect(tabs).toContain('Plateformes');
     expect(tabs.some((tab) => tab.includes('nouvelle'))).toBe(false);
   });
 });

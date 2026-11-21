@@ -35,7 +35,7 @@ Ce que la créatrice **dépose** depuis son téléphone (une catégorie qu'elle 
 
 Le même job, une fois le fichier reçu, le télécharge dans un dossier temporaire, puis :
 
-- **lit ce qu'il est** par ses premiers octets (`domain/sniff.ts`), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
+- **lit ce qu'il est** par ses premiers octets (`sniff` de `@impera/contracts`, que la feuille de dépôt lit aussi avant tout envoi), jamais par le type annoncé : un fichier qui n'est pas ce qu'il annonce est refusé (« Ce fichier n'est pas ce qu'il annonce : renvoie-le depuis ta galerie ») ;
 - **retire ses métadonnées** (`infra/cleaning/`) :
   - une photo octet par octet, sans la décoder ni la réencoder. JPEG : EXIF, XMP, commentaires et tout ce qui suit la fin de l'image (l'iPhone y met une seconde image avec son propre EXIF) ; l'orientation est réécrite seule dans un EXIF minimal ; le profil de couleur ICC, JFIF et Adobe restent. PNG : `eXIf`, `tEXt`, `zTXt`, `iTXt`, `tIME`. WebP : `EXIF`, `XMP ` et leurs drapeaux. HEIC : les items EXIF et XMP recouverts de zéros sur place, aucun décalage ne bouge ;
   - une vidéo ou un vocal par ffmpeg, flux copiés sans réencodage dans un conteneur neuf : ni étiquettes globales (position ISO 6709, marque, modèle, logiciel, dates), ni celles des flux, ni chapitres, ni pistes de données (`mebx` d'Apple), ni ID3 ; la rotation, propriété du flux, reste ;
@@ -57,7 +57,7 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 
 - Chaque photo et chaque vidéo gardée comme **nouveau** média de sa médiathèque met en file `content_drops.describe_file` dans la transaction qui la garde, sous la clé `content_drops.describe_file:<média>` : une fois par média, quel que soit le nombre de dépôts qui le donnent. Un doublon ne relance rien ; un vocal n'est pas décrit (sa transcription est ailleurs).
 - Le job lit le premier fichier vivant d'un dépôt qui tient ce média (gardé, non remplacé, dépôt non retiré) : il donne le contexte écrit par le code (`domain/describe.ts`), la catégorie telle que son écran la nomme et, pour un script, l'étape de la version figée qu'elle a tournée (numéro et nom du carton, ce qu'elle vend, ambiance, tenue, lieu, consigne de la série et de l'emplacement, place du média dans l'étape). Le modèle ne pose jamais de question.
-- Rien tant que son interrupteur est éteint (`CreatorSettings.describeDrops`, faux par défaut, ADR 0083 § 9) ; rien pour un original effacé ou un média qu'aucun dépôt vivant ne tient ; rien pour un média déjà décrit pour un dépôt.
+- Aucun interrupteur : un dépôt est décrit à son arrivée, le dépôt vaut choix (ADR 0145 § 5, choix de Charles du 17/11 ; l'interrupteur de l'ADR 0083 § 9 est retiré). Rien pour un original effacé ou un média qu'aucun dépôt vivant ne tient ; rien pour un média déjà décrit pour un dépôt.
 - Le job prend sur le disque le poids du fichier, le télécharge dans un dossier à lui, puis le passe au module `media` (`createDropDescriptions`, branché par `wiring/content-drops.ts` sur la passerelle). Budget du jour épuisé : il se remet une heure plus tard, jusqu'au lendemain, jamais abandonné ; disque trop plein : 15 minutes ; tous les modèles en échec : il lève, et Graphile réessaie (5 fois).
 
 ## La synthèse d'un script envoyé (ADR 0083 § 6, SC-04 lot b, migration 0145)
@@ -72,8 +72,7 @@ Le dépôt passe à « prêt » quand tous ses fichiers sont réglés et qu'au m
 
 ## L'interrupteur et le rattrapage (ADR 0083 § 2 et § 9, SC-04 lot c1)
 
-- `GET` et `PUT /v1/creators/:creatorId/drop-descriptions` (`{ on }`) : l'interrupteur d'une créatrice, au propriétaire seul (on l'allume après avoir vérifié la vision sur quelques vrais médias, § 9). Chaque changement est journalisé (`creator.describe_drops_on` / `_off`) ; rallumer un interrupteur déjà allumé ne fait rien.
-- Allumé, il met en file `content_drops.describe_backlog` pour elle, dans la même transaction. Le même job tourne chaque heure (`35 * * * *`) pour toutes les créatrices allumées et non archivées.
+- `content_drops.describe_backlog` tourne chaque heure (`35 * * * *`) pour toutes les créatrices non archivées : il remet en file ce qui attend une description ou une synthèse du prompt du moment. L'interrupteur par créatrice et sa route `…/drop-descriptions` sont retirés le 17/11 (ADR 0145 § 5) ; les lignes de journal `creator.describe_drops_on` / `_off` déjà écrites restent.
 - Le job remet en file, sans avancer l'heure d'un job déjà en attente (`preserve_run_at` : un budget épuisé garde son heure) :
   - chaque média d'un dépôt vivant sans description du prompt de maintenant : aucune, ou seulement celle de la vision avec une version plus ancienne et aucune d'un humain (au plus 500 par heure) ;
   - chaque script envoyé sans synthèse du prompt de maintenant ni synthèse humaine, ou dont la synthèse est plus ancienne qu'une description de ses médias (au plus 200 par heure).

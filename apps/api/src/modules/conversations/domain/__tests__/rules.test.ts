@@ -1,3 +1,4 @@
+import type { FanAvailabilityRecord } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,10 +9,12 @@ import {
   DEFAULT_DEBOUNCE_SECONDS,
   deferredRespondAt,
   fanAwaitsAnswer,
+  farewellNotBefore,
   followUpIdempotencyKey,
   followUpRetry,
   nextFollowUp,
   respondAt,
+  stepCutBy,
 } from '../rules';
 
 const AT = new Date('2026-10-17T20:00:00Z');
@@ -72,6 +75,31 @@ describe('conversation rules', () => {
     expect(nextFollowUp(null, [12, 23], AT)).toBeNull();
   });
 
+  it('lets him be after a goodbye on his last message: a night after goodnight, hours after he leaves (ADR 0158 § A)', () => {
+    const hours = (h: number) => later(h * 3_600);
+    const said = (signal: FanAvailabilityRecord['signal'], at: Date): FanAvailabilityRecord => ({
+      state: 'no',
+      signal,
+      at,
+      expiresAt: null,
+      seen: [],
+      sexualizedAt: null,
+      askedAt: null,
+      hotAt: null,
+    });
+    // Read on his last message, a minute after it.
+    expect(farewellNotBefore(said('says_goodnight', hours(0.02)), AT)).toEqual(hours(9.02));
+    expect(farewellNotBefore(said('leaving_soon', hours(0.02)), AT)).toEqual(hours(3.02));
+    expect(farewellNotBefore(said('busy_now', hours(0.02)), AT)).toEqual(hours(3.02));
+    // Someone beside him is no goodbye; a goodbye before he wrote again says nothing of now.
+    expect(farewellNotBefore(said('someone_nearby', hours(0.02)), AT)).toBeNull();
+    expect(farewellNotBefore(said('says_goodnight', hours(-1)), AT)).toBeNull();
+    expect(farewellNotBefore(null, AT)).toBeNull();
+    // The follow-up waits for it, never comes sooner than the persona's delay.
+    expect(nextFollowUp(AT, [2, 23], hours(0.1), hours(9))).toEqual({ step: 0, runAt: hours(9) });
+    expect(nextFollowUp(AT, [12, 23], hours(0.1), hours(9))).toEqual({ step: 0, runAt: hours(12) });
+  });
+
   it('keys a follow-up draft by his silence and its step', () => {
     expect(followUpIdempotencyKey('c', AT, 1)).toBe(`follow_up:c:${String(AT.getTime())}:1`);
   });
@@ -105,5 +133,22 @@ describe('fanAwaitsAnswer', () => {
     expect(fanAwaitsAnswer({ lastInboundAt: at(2), lastOutboundAt: at(3) })).toBe(false);
     // A follow-up to a fan who never wrote answers nothing.
     expect(fanAwaitsAnswer({ lastInboundAt: null, lastOutboundAt: at(3) })).toBe(false);
+  });
+});
+
+describe('stepCutBy (relecture Sécurité de #812)', () => {
+  const since = '2026-11-16T20:00:00.000Z';
+
+  it('keeps a paid step under care, not to contact, sales frozen, age in doubt, or limits it cannot read', () => {
+    expect(stepCutBy({}, new Date(since))).toBe('care');
+    expect(stepCutBy({ doNotContact: true }, null)).toBe('do_not_contact');
+    expect(stepCutBy({ salesFrozen: { reason: 'distress', since } }, null)).toBe('sales_frozen');
+    expect(stepCutBy({ ageDisputed: { since, by: 'policy' } }, null)).toBe('age_disputed');
+    expect(stepCutBy(null, null)).toBe('limits_unreadable');
+  });
+
+  it('lets it leave otherwise, whatever else he set', () => {
+    expect(stepCutBy({}, null)).toBeNull();
+    expect(stepCutBy({ fragile: true, noExplicit: true, spendingLimitMinor: 5_000 }, null)).toBeNull();
   });
 });

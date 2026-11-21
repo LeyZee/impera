@@ -1,6 +1,6 @@
 # 0106. Le Dashboard de l'agence sépare le chiffre d'affaires, le net, la part de la créatrice et celle de l'agence, et estime la TVA des virements
 
-Statut : accepted (« ok 0106 » de Charles le 13/11/2026, 0 h 52, fil « Afficher parts modèle, agence et TVA » ; numéro attribué par le coordinateur). Amendée : § 10 à § 14 (« ok phrases 0106 », 13/11/2026, 1 h 11, même fil), qui remplacent « une encre en quatre pas » du § 5.
+Statut : accepted (« ok 0106 » de Charles le 13/11/2026, 0 h 52, fil « Afficher parts modèle, agence et TVA » ; numéro attribué par le coordinateur). Amendée : § 10 à § 14 (« ok phrases 0106 », 13/11/2026, 1 h 11, même fil), qui remplacent « une encre en quatre pas » du § 5. Avenant du 17/11/2026 au § 10 (part de l'agence au bleu du logo, courbes selon la tendance, barres des sortes de vente en cyan : décisions de Charles des 17 et 19/11/2026).
 Date : 2026-11-13
 Précise : l'ADR 0078 (insights de l'agence lus dans le registre des ventes) et l'ADR 0054 § 2 (sur Reveal, la part de la créatrice est le chiffre de Reveal). Ne remplace rien.
 
@@ -34,11 +34,20 @@ Ce que le registre a déjà, vente par vente (connecteur Reveal) : le TTC, le HT
 
 À la recette du lot argent-tuiles-tva, Charles trouve que le Dashboard manque de repères par couleur et que « Où va l'argent » manque de survol avec des données précises.
 
-10. **Chaque destination de l'argent a sa couleur, toujours la même partout sur le Dashboard** : TVA payée par les fans en gris (elle n'est à personne), commission de la plateforme en gris hachuré, part de la créatrice en rose (`--nv-money-creator`), part de l'agence en doré (`--nv-money-agency`).
+10. **Chaque destination de l'argent a sa couleur, toujours la même partout sur le Dashboard** : TVA payée par les fans en gris (elle n'est à personne), commission de la plateforme en gris hachuré, part de la créatrice en rose (`--nv-money-creator`), part de l'agence en bleu (`--nv-money-agency` ; doré jusqu'à l'avenant du 17/11/2026).
 11. **Où elles s'appliquent** : la barre « Où va l'argent », sa légende, et une pastille ronde à côté du titre des tuiles Part de l'agence et Part de la créatrice. Jamais de barre colorée sur le côté ; ni rouge ni ambre, réservés aux urgences et aux avertissements.
 12. **Une bulle de survol** sur chaque bloc de la barre, chaque ligne de la légende et chaque tuile d'argent : le montant au centime, le montant de la période d'avant avec l'évolution, la part du chiffre d'affaires, la part du net pour les parts, et une phrase d'explication en gris. La TVA des virements, qui n'est pas une part du chiffre d'affaires, n'en donne pas la part.
 13. **Au téléphone**, un appui ouvre la bulle et un second la ferme.
 14. **Les couleurs sont vérifiées** par l'outil de contraste du projet (séparation pour les daltoniens, 3:1 sur la plaque), en Nuit comme en Jour, puis montrées sur un nouveau lot de captures avant la fusion.
+
+## Avenant du 17/11/2026 : l'agence en bleu, les courbes selon la tendance
+
+Le 17/11/2026 vers 13 h (heure de Paris), à la recette des périodes du Dashboard (ADR 0146), Charles veut plus de couleur et de courbes, « comme Reveal ». Ses choix : la part des créatrices reste rose (« ça fait féminin »), la part de l'agence passe au bleu, celui du logo d'Impera ; la courbe du chiffre d'affaires quitte le blanc.
+
+1. **La part de l'agence est bleue** partout où le § 10 la place (`--nv-money-agency`, Nuit et Jour, validés par le fil Design au validateur dataviz). Le 19/11/2026, Charles a choisi le bleu exact de son logo : le marine #001A33 en Jour, tel quel, et en Nuit la même teinte (209°) éclaircie par le fil Design pour rester lisible sur la plaque sombre.
+2. **La courbe du chiffre d'affaires prend la couleur de sa tendance** : verte (`--nv-trend-up`) au-dessus de la période comparée ou quand rien n'est comparable (ADR 0146 § 4), ambre (`--nv-trend-down`, la couleur des avertissements) en dessous ; jamais rouge, réservé aux urgences. Elle dit toujours la même chose que le pourcentage écrit à côté.
+3. **Une petite courbe au pied de la tuile Net**, jour par jour depuis le premier jour du registre : 1,5 px, sans axe ni point, cachée aux lecteurs d'écran (le chiffre et son pourcentage la disent), dans la couleur de sa tendance. Aucune pour un jour lu heure par heure. Les deux parts en avaient une aussi à la recette ; Charles a choisi le 19/11/2026 de n'en garder qu'une, sous Net, car les parts redessinaient la même forme. Les deux parts par jour viennent du serveur, aux mêmes droits que leurs totaux, jamais au MCP (ADR 0144).
+4. **Les barres et l'anneau des sortes de vente passent en une rampe cyan** (`--nv-kind-1..4`, une seule teinte du clair au foncé), distincte du rose et du bleu de l'argent et du vert de la tendance. Deux variantes ont été montrées à Charles à la recette du lot (rampe neutre ou cyan) : il a choisi le cyan le 19/11/2026.
 
 ## Conséquences
 

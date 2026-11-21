@@ -57,11 +57,37 @@ describe('Entraîner header', () => {
         <RouterProvider router={router} />
       </QueryClientProvider>,
     );
-    expect(await screen.findByRole('heading', { name: 'Entraîner' })).toBeTruthy();
+    // The section above, the open tab as the title (recette visuelle 16/11, T2); the tabs on their own row.
+    const title = await screen.findByRole('heading', { level: 1, name: 'Chatting' });
+    expect(title.parentElement?.querySelector('.nv-eyebrow')?.textContent).toBe('Entraîner');
     const tabs = screen.getByRole('navigation', { name: 'Entraîner' });
+    expect(tabs.closest('.nv-page__tabs')).not.toBeNull();
+    expect(tabs.closest('.nv-page__actions')).toBeNull();
     expect(within(tabs).getByRole('link', { name: 'Chatting' })).toBeTruthy();
     expect(within(tabs).getByRole('link', { name: 'Post du canal' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Corrections' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Tests' })).toBeNull();
+  });
+
+  it('opens a manager the chat alone, without her channel’s posts nor any tab bar (ADR 0092 § 8)', async () => {
+    const manager: Me = {
+      ...owner,
+      id: 'u2',
+      role: 'operator',
+      team: { role: 'manager', status: 'active' },
+      teamScope: 'agency',
+    };
+    const router = createAppRouter(
+      { user: manager, onSignOut: () => undefined },
+      createMemoryHistory({ initialEntries: ['/entrainer/playground'] }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chatting' })).toBeTruthy();
+    expect(screen.queryByRole('navigation', { name: 'Entraîner' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Post du canal' })).toBeNull();
   });
 });

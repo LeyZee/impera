@@ -301,6 +301,9 @@ describe('draftsOf', () => {
 
 describe('decisionError', () => {
   it('says a creator without an active persona sends nothing, and where to activate one (recette G4)', () => {
+    expect(decisionError(422, apiError('script_step_cut_unprocessable', { cut: 'sales_frozen' }))).toContain(
+      'étape payante',
+    );
     expect(decisionError(422, apiError('persona_inactive_unprocessable', {}))).toBe(
       'Ce message ne peut pas partir : cette créatrice n’a pas de persona active. Active une version dans Créatrices › Persona.',
     );

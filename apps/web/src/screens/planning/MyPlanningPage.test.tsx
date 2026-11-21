@@ -140,6 +140,8 @@ interface Data {
   reportsDown: number;
   /** Tuesday's report waits for him instead: 120,00 € declared, 108,00 € read by Reveal (ADR 0073 § 5). */
   gap: boolean;
+  /** A shift on Monday 2 November, 16 h – 22 h at the reader's hour: the week after this one (CHA-04). */
+  nextWeek?: boolean;
   /** Basile's Friday shift, offered to Théo: the server's planning carries it (recette 05/11, CHAT-05). */
   offered: boolean;
   /** The zone of his record, when it is not the device's. */
@@ -231,6 +233,7 @@ function serve(
     gap: data.gap ?? false,
     offered: data.offered ?? false,
     meZone: data.meZone ?? null,
+    nextWeek: data.nextWeek ?? false,
   };
   const written: Written[] = [];
   vi.stubGlobal(
@@ -247,6 +250,8 @@ function serve(
         weeks.push(url.searchParams.get('from') ?? '');
         const thisWeek = url.searchParams.get('from') === '2026-10-25T21:00:00.000Z';
         const lastWeek = state.lastWeek && url.searchParams.get('from') === '2026-10-18T21:00:00.000Z';
+        const nextWeek =
+          state.nextWeek === true && url.searchParams.get('from') === '2026-11-01T21:00:00.000Z';
         // Any other range (a leave's days): the week's shifts that touch it.
         const from = url.searchParams.get('from') ?? '';
         const to = url.searchParams.get('to') ?? '';
@@ -269,15 +274,17 @@ function serve(
                     ? [shift(201, '2026-10-30T16:00:00Z', '2026-10-30T22:00:00Z', BASILE)]
                     : []),
                 ]
-              : lastWeek
-                ? [
-                    shift(106, '2026-10-20T06:00:00Z', '2026-10-20T12:00:00Z'),
-                    shift(107, '2026-10-21T06:00:00Z', '2026-10-21T12:00:00Z'),
-                  ]
-                : [
-                    shift(101, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z'),
-                    shift(102, '2026-10-29T16:00:00Z', '2026-10-29T22:00:00Z'),
-                  ].filter(touched),
+              : nextWeek
+                ? [shift(108, '2026-11-02T13:00:00Z', '2026-11-02T19:00:00Z')]
+                : lastWeek
+                  ? [
+                      shift(106, '2026-10-20T06:00:00Z', '2026-10-20T12:00:00Z'),
+                      shift(107, '2026-10-21T06:00:00Z', '2026-10-21T12:00:00Z'),
+                    ]
+                  : [
+                      shift(101, '2026-10-27T22:00:00Z', '2026-10-28T04:00:00Z'),
+                      shift(102, '2026-10-29T16:00:00Z', '2026-10-29T22:00:00Z'),
+                    ].filter(touched),
             conflicts: [],
             away: [],
           },
@@ -390,6 +397,18 @@ describe('the chatter’s Planning', () => {
     expect(screen.getByText('2 shifts · 12 h')).toBeTruthy();
   });
 
+  it('puts his shifts in his phone from here, « Dans mon téléphone », not from a tab of Moi (ADR 0134, lot 1)', async () => {
+    serve();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Dans mon téléphone' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mes shifts dans mon téléphone' });
+    expect(within(dialog).getByText('iPhone, Mac, Google Agenda')).toBeTruthy();
+    // The team's calendar is not his own link's place.
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('radio', { name: 'L’équipe' }));
+    expect(screen.queryByRole('button', { name: 'Dans mon téléphone' })).toBeNull();
+  });
+
   it('keeps a colleague’s shift offered to him out of his shifts and their total (CHAT-05)', async () => {
     serve({ offered: true, swaps: [swap({})] });
     renderPage();
@@ -473,6 +492,9 @@ describe('the chatter’s Planning', () => {
     const wednesday = await screen.findByRole('region', { name: 'Mercredi 28 octobre' });
     expect(text(wednesday)).toContain('22 h – 4 h');
     expect(text(wednesday)).not.toContain('En poste');
+    // Away, he holds no shift: the one ahead, at 19 h, is not his to offer (recette 16/11, CHT-31).
+    expect(screen.getByText('19 h – 1 h')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Échanger/u })).toBe(null);
   });
 
   it('keeps a week gone by in its order, with no fold', async () => {
@@ -489,15 +511,40 @@ describe('the chatter’s Planning', () => {
     // The first read and its one retry fail; « Réessayer » reads them.
     serve({ earlier: true, reportsDown: 2 });
     renderPage();
-    const alert = await screen.findByText('Tes rapports n’ont pas pu être lus.', {}, { timeout: 3000 });
-    fireEvent.click(within(alert.parentElement ?? document.body).getByRole('button', { name: 'Réessayer' }));
+    const line = 'Tes rapports n’ont pas pu être lus : réessaie dans un instant.';
+    const alert = await screen.findByText(line, {}, { timeout: 3000 });
+    fireEvent.click(
+      within(alert.closest('[role="alert"]') ?? document.body).getByRole('button', { name: 'Réessayer' }),
+    );
     await waitFor(() => {
-      expect(screen.queryByText('Tes rapports n’ont pas pu être lus.')).toBe(null);
+      expect(screen.queryByText(line)).toBe(null);
     });
     const fold = screen.getByText('Plus tôt cette semaine (2)').closest('summary');
     await waitFor(() => {
       expect(text(fold)).toContain('1 rapport à faire');
     });
+  });
+
+  it('shows the next week under a week with nothing left ahead, and counts the days gone by apart (CHA-04, CHA-22)', async () => {
+    // Sunday 1 November, 21 h at his hour: the week's shifts are done, Monday's is tomorrow.
+    vi.setSystemTime(new Date('2026-11-01T18:00:00Z'));
+    serve({ earlier: true, nextWeek: true });
+    renderPage();
+    const next = await screen.findByRole('region', { name: 'Semaine prochaine' });
+    const monday = within(next).getByRole('region', { name: 'Lundi 2 novembre' });
+    expect(text(monday)).toContain('16 h – 22 h');
+    expect(within(next).getByRole('heading', { name: 'Lundi 2 novembre' }).tagName).toBe('H3');
+    expect(screen.getByText('0 à venir · 4 faits')).toBeTruthy();
+    expect(screen.getByText('Plus tôt cette semaine (4)')).toBeTruthy();
+    expect(weeks).toContain('2026-11-01T21:00:00.000Z');
+  });
+
+  it('reads no next week while a shift is left ahead in this one', async () => {
+    serve({ nextWeek: true });
+    renderPage();
+    await screen.findByText('2 shifts · 12 h');
+    expect(screen.queryByRole('region', { name: 'Semaine prochaine' })).toBeNull();
+    expect(weeks).not.toContain('2026-11-01T21:00:00.000Z');
   });
 
   it('turns to the next week, says when it is empty, and comes back', async () => {
@@ -679,7 +726,8 @@ describe('the chatter’s Planning', () => {
     serve({ membersDown: 2 });
     renderPage();
     const warning = await screen.findByRole('alert', {}, { timeout: 4_000 });
-    expect(text(warning)).toContain('Le serveur ne répond pas : ta fiche n’a pas pu être lue');
+    expect(text(warning)).toContain('Le serveur ne répond pas');
+    expect(text(warning)).toContain('Un congé ne peut pas encore être demandé');
     // « Mes congés », where a leave is asked, waits for his record.
     expect(screen.queryByRole('button', { name: 'Demander un congé' })).toBe(null);
     fireEvent.click(within(warning).getByRole('button', { name: 'Réessayer' }));

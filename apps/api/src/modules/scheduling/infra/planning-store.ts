@@ -15,7 +15,6 @@ import {
   and,
   enterCreator,
   eq,
-  inArray,
   schema,
   sql,
   SNAPSHOT_READ,
@@ -80,6 +79,7 @@ import {
   pgErrorOf,
   placed,
   plannedIn,
+  plannedMembersOf,
   shiftColumns,
   shiftOnAccountInTheWay,
   StoredAccountSchema,
@@ -439,13 +439,10 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
             }
           }
           const named = [...new Set([...found.shifts, ...found.templates].map((row) => row.memberId))];
-          const members =
-            named.length === 0
-              ? []
-              : await tx.select(memberColumns).from(teamMembers).where(inArray(teamMembers.id, named));
+          const members = await plannedMembersOf(tx, named);
           const planned = [...new Set(found.templates.map((template) => template.memberId))];
           const leaves = plans ? await leavesOf(tx, planned, range.from, range.to) : [];
-          return { scope, planned: plannedCreators, ...found, leaves, members: members.map(toMember) };
+          return { scope, planned: plannedCreators, ...found, leaves, members };
         },
         SNAPSHOT_READ,
       ),
@@ -535,16 +532,19 @@ export function createDrizzlePlanningStore(db: Database, adminDb: Database): Pla
           const onDuty: { shift: StoredShift; member: StoredMember }[] = [];
           for (const creatorId of creatorIds.filter((id) => plansCreator(planned, id))) {
             await enterCreator(tx, creatorId, creatorIds);
+            // Nobody is « en poste » on a shift he does not hold (`holdsShift`): away, or the creator taken off his list.
             const rows = await tx
               .select({ shift: shiftColumns, member: memberColumns })
               .from(shifts)
               .innerJoin(teamMembers, eq(teamMembers.id, shifts.memberId))
+              .innerJoin(user, eq(user.id, teamMembers.userId))
               .where(
                 and(
                   sql`${shifts.cancelledAt} is null`,
                   sql`${shifts.startsAt} <= ${at}`,
                   sql`${shifts.endsAt} > ${at}`,
                   eq(teamMembers.status, 'active'),
+                  sql`${shifts.creatorId} = any(${user.creatorIds})`,
                 ),
               );
             onDuty.push(...rows.map((row) => ({ shift: toShift(row.shift), member: toMember(row.member) })));
@@ -710,13 +710,16 @@ export function createDrizzlePlanningAdmin(adminDb: Database): PlanningAdmin {
           })
           .from(shifts)
           .innerJoin(teamMembers, eq(teamMembers.id, shifts.memberId))
+          .innerJoin(user, eq(user.id, teamMembers.userId))
           .where(
             and(
               eq(shifts.creatorId, creatorId),
               sql`${shifts.cancelledAt} is null`,
               sql`${shifts.startsAt} <= ${at}`,
               sql`${shifts.endsAt} > ${at}`,
+              // A handover never goes to a member who does not hold his shift (`holdsShift`, recette EQU-01).
               eq(teamMembers.status, 'active'),
+              sql`${shifts.creatorId} = any(${user.creatorIds})`,
             ),
           );
         return rows.map((row) => ({

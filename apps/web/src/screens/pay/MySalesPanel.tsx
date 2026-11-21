@@ -37,6 +37,7 @@ import { accountLine } from '@/scheduling/model';
 import { dayOf } from '@/scheduling/time';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /** The longest note pay keeps on a signal (`PayReasonSchema`). */
 const NOTE_MAX = 500;
@@ -229,9 +230,9 @@ export function MySalesPanel({
           </button>
         ) : null}
         {mine.isFetchNextPageError ? (
-          <p className="tm-warn" role="alert">
-            Le serveur ne répond pas : tes ventes plus anciennes n’ont pas pu être lues.
-          </p>
+          <Failure inline onRetry={() => void mine.fetchNextPage()}>
+            Tes ventes plus anciennes n’ont pas pu être lues : réessaie dans un instant.
+          </Failure>
         ) : null}
       </div>
       {asked === null ? null : (

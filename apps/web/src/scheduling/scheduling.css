@@ -13,13 +13,6 @@
   background: var(--sc-color);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-color) 18%, transparent);
 }
-.sc-notice h2 {
-  text-wrap: balance;
-}
-.sc-notice .nv-btn {
-  align-self: center;
-  margin-top: var(--nv-space-2);
-}
 .sc-phase {
   flex: none;
 }
@@ -35,7 +28,7 @@
 .sc-skeleton i {
   height: 56px;
   border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: sc-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 .sc-skeleton--grid i {
@@ -99,8 +92,7 @@
     transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
 .sc-arrow svg,
-.sc-add svg,
-.sc-more svg {
+.sc-add svg {
   width: 16px;
   height: 16px;
   fill: none;
@@ -127,8 +119,7 @@
 .sc-add:focus-visible,
 .sc-chip:focus-visible,
 .sc-days__one:focus-visible,
-.sc-duty__one:focus-visible,
-.sc-more:focus-visible {
+.sc-duty__one:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
 }
@@ -255,17 +246,13 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-1);
-  padding: var(--nv-space-3) var(--nv-space-5);
-  border-radius: var(--nv-radius-xl);
+  padding: var(--nv-space-3) var(--nv-plate-pad);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-warning) 38%, transparent);
   background: color-mix(in srgb, var(--nv-warning) 7%, var(--nv-plate));
 }
 .sc-conflicts__title {
   margin: 0;
   color: var(--nv-warning);
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  font-weight: 650;
 }
 .sc-conflicts__list {
   display: flex;
@@ -308,6 +295,13 @@ button.sc-duty__one:active {
   min-width: 0;
   transition: opacity var(--nv-dur-base) var(--nv-ease-out);
 }
+/* Wide enough, the accounts' column gives its handle 160 px, « @… » whole (recette visuelle 16/11, GES-22); at 1024
+   the days keep the room a shift's hours need. */
+@media (min-width: 1280px) {
+  .sc-grid {
+    grid-template-columns: calc(160px + var(--nv-space-4) + var(--nv-plate-pad)) repeat(7, minmax(0, 1fr));
+  }
+}
 .sc-grid[data-loading='true'] {
   opacity: 0.55;
 }
@@ -323,7 +317,7 @@ button.sc-duty__one:active {
 .sc-grid__corner {
   display: flex;
   align-items: flex-end;
-  padding: var(--nv-space-4) var(--nv-space-4) var(--nv-space-3) var(--nv-space-5);
+  padding: var(--nv-space-4) var(--nv-space-4) var(--nv-space-3) var(--nv-plate-pad);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
   color: var(--nv-ink-faint);
@@ -368,7 +362,7 @@ button.sc-duty__one:active {
   justify-content: center;
   gap: 2px;
   min-width: 0;
-  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-space-5);
+  padding: var(--nv-space-3) var(--nv-space-4) var(--nv-space-3) var(--nv-plate-pad);
 }
 /* Her name on two lines at most, so that « Créatrice Recette A » and « … B » read apart (recette 05/11, CHAT-15). */
 .sc-grid__creator {
@@ -417,7 +411,7 @@ button.sc-duty__one:active {
   background: var(--nv-select-strong);
 }
 .sc-grid__row:last-child .sc-grid__cell:last-child {
-  border-bottom-right-radius: var(--nv-radius-xl);
+  border-bottom-right-radius: var(--nv-radius-lg);
 }
 
 /* A shift: tinted with its member's colour, the name, the hours. No coloured bar on its side (Charles's rule;
@@ -487,10 +481,7 @@ button.sc-duty__one:active {
   pointer-events: none;
   animation: sc-live 2.8s var(--nv-ease-in-out) infinite alternate;
 }
-/* Its copy on a later créneau keeps the edge, still: one shift, one moving sign. */
-.sc-chip[data-phase='live'][data-carried='true']::after {
-  animation: none;
-}
+/* Its « suite » on a later créneau (`.cal-chip--cont`, calendar.css) draws no edge: one shift, one moving sign. */
 @keyframes sc-live {
   from {
     opacity: 0.85;
@@ -506,23 +497,25 @@ button.sc-duty__one:active {
   color: var(--nv-ink);
   white-space: nowrap;
 }
+/* A member's name on two lines at most, broken between its words, never cut at 1024 (« Chatteur Tr… », recette
+   visuelle 16/11, GES-22): the hours stay on one line under it. */
 .sc-chip__who {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   max-width: 100%;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   font-weight: 650;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .sc-chip__name {
+  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 .sc-chip__who > svg,
 .sc-chip__who > .nv-dot {
@@ -619,7 +612,8 @@ button.sc-duty__one:active {
   flex: 0 0 auto;
   min-height: 32px;
 }
-/* An empty créneau ahead: dashed amber, a thing to do and no damage done yet. */
+/* An empty créneau ahead: dashed and quiet, so that the grid shows who works and the corner counts the places; in
+   amber only within the next day, a thing to do now (recette visuelle 16/11, GES-05). */
 .sc-slot__fill {
   appearance: none;
   flex: 1;
@@ -632,16 +626,24 @@ button.sc-duty__one:active {
   min-height: 40px;
   margin: 0;
   padding: 4px 8px;
-  border: 1px dashed color-mix(in srgb, var(--nv-warning) 60%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--nv-ink-faint) 45%, transparent);
   border-radius: var(--nv-radius-sm);
-  background: color-mix(in srgb, var(--nv-warning) 6%, transparent);
-  color: var(--nv-warning);
+  background: transparent;
+  color: var(--nv-ink-muted);
   font: inherit;
   text-align: left;
   cursor: pointer;
   transition: background-color var(--nv-dur-fast) var(--nv-ease-out);
 }
 .sc-slot__fill:hover {
+  background: var(--nv-plate-hover);
+}
+.sc-slot__fill[data-soon='true'] {
+  border-color: color-mix(in srgb, var(--nv-warning) 60%, transparent);
+  background: color-mix(in srgb, var(--nv-warning) 6%, transparent);
+  color: var(--nv-warning);
+}
+.sc-slot__fill[data-soon='true']:hover {
   background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
 }
 .sc-slot__fill:focus-visible {
@@ -656,8 +658,11 @@ button.sc-duty__one:active {
 .sc-slot__hours {
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
-  color: var(--nv-ink-muted);
+  color: var(--nv-ink-faint);
   white-space: nowrap;
+}
+.sc-slot__fill[data-soon='true'] .sc-slot__hours {
+  color: var(--nv-ink-muted);
 }
 /* An empty créneau gone by: grey, nothing to do about it now. */
 .sc-slot__gone {
@@ -683,7 +688,7 @@ button.sc-duty__one:active {
   flex-wrap: wrap;
   gap: var(--nv-space-2) var(--nv-space-5);
   margin: 0;
-  padding: var(--nv-space-3) var(--nv-space-5);
+  padding: var(--nv-space-3) var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
   font-size: var(--nv-text-caption);
   line-height: var(--nv-text-caption-leading);
@@ -794,6 +799,12 @@ button.sc-duty__one:active {
 }
 
 @media (max-width: 820px) {
+  /* The day as one list: a créneau gone by and empty is an empty box, and a shift's « suite » follows the shift itself
+     on the line above. Neither says anything here (recette visuelle 16/11, GES-05). */
+  .sc-slot:has(> .sc-slot__gone),
+  .sc-slot > .sc-chip[data-carried='true'] {
+    display: none;
+  }
   .sc-days {
     display: flex;
     gap: 2px;
@@ -1018,13 +1029,12 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 720px;
 }
 .sc-hero {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  padding: var(--nv-space-6);
+  padding: var(--nv-plate-pad);
 }
 .sc-hero--on {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 34%, transparent);
@@ -1062,10 +1072,6 @@ button.sc-duty__one:active {
 .sc-hero__title {
   margin: 0;
   /* Her name in Geist, bold: the serif is the whisper of an empty state, never a name (DASH-23). */
-  font-weight: 700;
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-  letter-spacing: var(--nv-text-title-1-tracking);
   text-wrap: balance;
 }
 .sc-hero--none .sc-hero__title {
@@ -1092,8 +1098,9 @@ button.sc-duty__one:active {
   font-weight: 650;
   color: var(--nv-ink-muted);
 }
+/* The time left runs the card's whole width, not to an arbitrary 420 px (ETA-20). */
 .sc-hero__gauge {
-  max-width: 420px;
+  width: 100%;
 }
 .sc-hero__note {
   margin: 0;
@@ -1111,7 +1118,7 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .sc-next__row {
   display: flex;
@@ -1138,38 +1145,32 @@ button.sc-duty__one:active {
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
-/* Its text on the cards' edge, its padding outside it (recette ADR 0073). */
-.sc-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: flex-start;
-  min-height: var(--nv-target-min);
-  margin-left: calc(-1 * var(--nv-space-2));
-  padding: 0 var(--nv-space-2);
-  border-radius: var(--nv-radius-full);
-  color: var(--nv-ink-muted);
-  font-size: var(--nv-text-footnote);
-  font-weight: 600;
-  text-decoration: none;
+/* A card that leads to Planning as a whole (a shift ahead, « Ensuite »): one link stretched over it, its hover and
+   focus on the card itself (recette visuelle 16/11, CHA-23). */
+.sc-linked {
+  position: relative;
   transition:
-    color var(--nv-dur-fast) var(--nv-ease-out),
-    background-color var(--nv-dur-fast) var(--nv-ease-out);
+    background-color var(--nv-dur-fast) var(--nv-ease-out),
+    transform var(--nv-dur-slow) var(--nv-ease-spring);
 }
-.sc-more:hover {
-  color: var(--nv-ink);
+.sc-linked:has(.sc-card-link:hover) {
   background: var(--nv-plate-hover);
 }
-.sc-more svg {
-  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+.sc-linked:has(.sc-card-link:active) {
+  transform: scale(0.985);
+  transition-duration: var(--nv-dur-instant);
 }
-.sc-more:hover svg {
-  transform: translateX(3px);
+.sc-card-link {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.sc-card-link:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
 }
 @media (max-width: 520px) {
-  .sc-hero {
-    padding: var(--nv-space-5);
-  }
   .sc-next__side {
     text-align: left;
   }
@@ -1180,7 +1181,6 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-5);
-  max-width: 820px;
 }
 .sc-mine__sum {
   margin: 0;
@@ -1194,10 +1194,6 @@ button.sc-duty__one:active {
 }
 .sc-mine__date {
   margin: 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  font-weight: 650;
-  color: var(--nv-ink-muted);
 }
 .sc-mine__day[data-today='true'] .sc-mine__date {
   color: var(--nv-ink);
@@ -1215,7 +1211,7 @@ button.sc-duty__one:active {
   grid-template-columns: minmax(96px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--nv-space-4);
-  padding: var(--nv-space-3) var(--nv-space-4);
+  padding: var(--nv-space-3) var(--nv-plate-pad);
   border-radius: var(--nv-radius-lg);
   transition:
     background-color var(--nv-dur-fast) var(--nv-ease-out),
@@ -1233,6 +1229,15 @@ button.sc-duty__one:active {
 }
 .sc-mine__earlier .nv-disclosure__body {
   padding-top: var(--nv-space-2);
+}
+/* The chevron on the card's right edge, as « Mes congés » and « Mes échanges » under it, with or without a summary
+   (recette visuelle 16/11, CHA-22). */
+.sc-mine__earlier > summary::after {
+  margin-left: auto;
+}
+/* Today stands out from the other days: its shifts on the selection's light (CHA-22). */
+.sc-mine__day[data-today='true'] .sc-mine__shift:not(:hover) {
+  background: var(--nv-select);
 }
 .sc-mine__shift[data-phase='live'] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nv-success) 40%, transparent);
@@ -1281,7 +1286,7 @@ button.sc-duty__one:active {
   display: flex;
   align-items: center;
   gap: var(--nv-space-4);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .sc-off__icon {
   flex: none;
@@ -1316,9 +1321,6 @@ button.sc-duty__one:active {
 }
 .sc-off__title {
   margin: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  font-weight: 650;
 }
 .sc-off__lead {
   margin: 2px 0 0;
@@ -1348,8 +1350,7 @@ button.sc-duty__one:active {
   .sc-chip:active,
   .sc-arrow:active,
   .sc-days__one:active,
-  button.sc-duty__one:active,
-  .sc-more:hover svg {
+  button.sc-duty__one:active {
     transform: none;
   }
   .sc-grid,
@@ -1357,8 +1358,8 @@ button.sc-duty__one:active {
   .sc-arrow,
   .sc-add,
   .sc-days__one,
-  .sc-more svg,
-  .sc-mine__shift {
+  .sc-mine__shift,
+  .sc-linked {
     transition: none;
   }
 }
@@ -1367,12 +1368,10 @@ button.sc-duty__one:active {
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .sc-fans__title {
   margin: 0;
-  font-size: var(--nv-text-callout);
-  font-weight: 650;
 }
 .sc-fans__line {
   margin: 0;
@@ -1396,7 +1395,7 @@ button.sc-duty__one:active {
   display: flex;
   align-items: center;
   gap: var(--nv-space-4);
-  padding: var(--nv-space-4) var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 .sc-decide__text {
   display: flex;

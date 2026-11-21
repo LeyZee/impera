@@ -79,20 +79,6 @@ export function useMemberTrophyCase(memberId: string, enabled: boolean): UseQuer
   });
 }
 
-/**
- * Her trophies and series on her sheet, agency side (ADR 0107 § 12): the owner's and an active manager's read, never a
- * chatter's. Read only; her reveals stay hers.
- */
-export function useCreatorTrophyCase(creatorId: string, enabled: boolean): UseQueryResult<TrophyCase> {
-  return useQuery({
-    queryKey: ['rewards', 'creator-trophy-case', creatorId],
-    queryFn: () =>
-      send('GET', `/v1/creators/${creatorId}/trophy-case`, null, (json) => TrophyCaseSchema.parse(json)),
-    enabled,
-    retry: false,
-  });
-}
-
 const LEVELS_KEY = ['rewards', 'level-thresholds'] as const;
 
 /** The ranks and the thresholds the owner set (§ 16): the owner's read. */

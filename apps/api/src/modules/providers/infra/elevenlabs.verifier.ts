@@ -9,6 +9,10 @@ import { getJson, isProviderTrouble, unreachableFrom, type FetchLike, type HttpR
 const SubscriptionSchema = z.object({
   character_count: z.number().int().nonnegative(),
   character_limit: z.number().int().nonnegative(),
+  /** `free`, `starter`, `creator`…: only the free one matters (no commercial use, ADR 0091 § 7). */
+  tier: z.string().optional(),
+  /** Seconds since the epoch. */
+  next_character_count_reset_unix: z.number().int().positive().nullable().optional(),
 });
 
 const VoicesSchema = z.object({
@@ -71,7 +75,8 @@ export function createElevenLabsVerifier(options: ElevenLabsVerifierOptions): Pr
       if (!subscription.success) return unreachableFrom(subscriptionReply);
       if (!voiceList.success) return unreachableFrom(voicesReply);
 
-      const { character_count: used, character_limit: limit } = subscription.data;
+      const { character_count: used, character_limit: limit, tier } = subscription.data;
+      const resetUnix = subscription.data.next_character_count_reset_unix;
       const left = Math.max(0, limit - used);
       const voices = voiceList.data.voices.map((v) => ({ id: v.voice_id, name: v.name }));
       const voice = pickVoice(voices, settings.voice);
@@ -82,6 +87,11 @@ export function createElevenLabsVerifier(options: ElevenLabsVerifierOptions): Pr
         settings: voice === undefined ? {} : { voice },
         voices,
         charactersLeft: left,
+        quota: {
+          limit,
+          resetsAt: resetUnix === undefined || resetUnix === null ? null : new Date(resetUnix * 1_000),
+          plan: tier === undefined ? null : tier === 'free' ? 'free' : 'paid',
+        },
         isLowCredit: limit > 0 && left < limit * LOW_CREDIT_SHARE,
       };
     },

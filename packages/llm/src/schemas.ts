@@ -1,11 +1,14 @@
 import {
   BriefIntentSchema,
+  CustomOrderReadingFromModelSchema,
+  CustomOrderReadingSchema,
   CHANNEL_POLL_OPTION_MAX,
   CHANNEL_POLL_OPTIONS_MAX,
   CHANNEL_POLL_OPTIONS_MIN,
   CHANNEL_POLL_QUESTION_MAX,
   DESIRE_BRAIN_SIGNALS,
   DropMediaDescriptionSchema,
+  OutfitSchema,
   MediaDescriptionSchema,
   ObjectionKindSchema,
   TrendCaptureDescriptionSchema,
@@ -76,6 +79,12 @@ export const BriefSchema = z.object({
   scriptPick: z.string().regex(BRAIN_SCRIPT_ID).optional(),
   /** What his last message does with the script step waiting for him, when the prompt says one waits. */
   scriptReply: z.enum(SCRIPT_REPLIES).optional(),
+  /**
+   * What his custom request asks (ADR 0159 § A.2), read into closed boxes when he asks for one or speaks of the one
+   * open: the format, her supplements by the ids the prompt gave, the minutes, the details he gave. Never a price; the
+   * code decides what is missing and when the card goes to her. Absent, nothing read.
+   */
+  customOrder: CustomOrderReadingSchema.optional(),
   action: z.enum(['reply', 'offer', 'wait', 'follow_up', 'handoff']),
   replyBrief: z.string().min(1),
   toneHints: z.array(z.string()),
@@ -85,6 +94,42 @@ export const BriefSchema = z.object({
   selfDisclosure: z.string().min(1).optional(),
 });
 export type Brief = z.infer<typeof BriefSchema>;
+
+/** The brief's lists: a model that writes `null` for one means none. */
+const BRIEF_LISTS = new Set(['factsProposed', 'kycMissing', 'risks', 'toneHints']);
+
+/**
+ * The brief as a model may write it (16/11, relevé du PC: the Mistral fallback failed the format 26 times in 26): a
+ * facultative field written `null` or `""`, or a list written `null`, reads as absent or empty, then the brief is read
+ * strictly. The model is shown this shape (`io: "input"`), so `null` is allowed to it; the code only ever sees a
+ * `Brief`.
+ */
+export const BriefFromModelSchema = BriefSchema.extend({
+  objection: ObjectionKindSchema.nullish(),
+  factsProposed: BriefSchema.shape.factsProposed.nullable(),
+  kycMissing: BriefSchema.shape.kycMissing.nullable(),
+  risks: BriefSchema.shape.risks.nullable(),
+  desireSignals: z.array(z.enum(DESIRE_BRAIN_SIGNALS)).max(DESIRE_BRAIN_SIGNALS.length).nullish(),
+  alertsSeen: z.array(z.string().regex(BRAIN_ALERT_ID)).max(BRAIN_ALERTS_MAX).nullish(),
+  scriptPick: z.union([z.string().regex(BRAIN_SCRIPT_ID), z.literal('')]).nullish(),
+  scriptReply: z.enum(SCRIPT_REPLIES).nullish(),
+  customOrder: CustomOrderReadingFromModelSchema.nullish(),
+  toneHints: BriefSchema.shape.toneHints.nullable(),
+  callback: z.string().nullish(),
+  selfDisclosure: z.string().nullish(),
+})
+  .transform((brief): unknown =>
+    Object.fromEntries(
+      Object.entries(brief).flatMap(([key, value]) =>
+        value === null || (typeof value === 'string' && value.trim() === '' && key !== 'replyBrief')
+          ? BRIEF_LISTS.has(key)
+            ? [[key, []]]
+            : []
+          : [[key, value]],
+      ),
+    ),
+  )
+  .pipe(BriefSchema);
 
 export const VoiceOutputSchema = z.object({
   bubbles: z.array(z.string().min(1)).min(1).max(6),
@@ -103,6 +148,9 @@ export const DropSenseOutputSchema = DropMediaDescriptionSchema.omit({
   vocabularyVersion: true,
   kind: true,
   durationS: true,
+}).extend({
+  // Always asked of the model (vocabulary 1.1.0): only a description written before may lack it.
+  outfit: OutfitSchema.nullable(),
 });
 
 /** What the judge scores a reply on (`evals/rubrics`, `evals/thresholds.json`). */

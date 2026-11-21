@@ -1,4 +1,6 @@
 import type {
+  CommentOutcome,
+  CommentPromptInput,
   DropMediaDescription,
   FanCardRead,
   FanFlags,
@@ -46,6 +48,11 @@ export interface ConversationTurn {
    * shown in brackets before his block, never inside it.
    */
   readonly timeNote?: string;
+  /**
+   * What an automation of the platform wrote, or what his message answers (ADR 0110), written by code: on his turn,
+   * shown in brackets before his block; on hers, read into « le moment » by the agent, never shown in her turn.
+   */
+  readonly originNote?: string;
 }
 
 export interface VideoFrame {
@@ -88,6 +95,8 @@ export interface CallTrace {
    * Absent is `chatting`, which only the daily cap stops.
    */
   readonly purpose?: LlmPurpose;
+  /** A voice call only: the ids of her examples it received (ADR 0102 § 6), to know which correction weighed. */
+  readonly voiceExampleIds?: readonly string[];
 }
 
 export interface SenseInput {
@@ -129,6 +138,8 @@ export interface ConversationInput {
   readonly personaSheet: string;
   /** What she knows about this fan; derived from the fan, so treated as untrusted. */
   readonly fanNotes: string;
+  /** Her bio on her platform profile, as last read (ADR 0154); none or empty: no section. */
+  readonly profileBio?: string | null;
   /** Her local time, day or night, how long they have known each other: written by code, trusted. */
   readonly situation?: string;
   readonly history: readonly ConversationTurn[];
@@ -139,6 +150,15 @@ export interface ConversationInput {
 export interface BrainAlert {
   readonly id: string;
   readonly phrase: string;
+}
+
+/**
+ * His custom request as the brain reads it (ADR 0159 § A.2): whether one of his is open, and the supplements of her
+ * grid it may name, each by the id it answers with and the name the owner gave it.
+ */
+export interface BrainCustomOrder {
+  readonly open: boolean;
+  readonly supplements: readonly { readonly id: string; readonly name: string }[];
 }
 
 /** A script she may open with him, as the brain reads it (ADR 0098 § 6): the id it answers with, what it is about. */
@@ -154,6 +174,8 @@ export interface BrainInput extends ConversationInput {
   readonly scripts?: readonly BrainScript[];
   /** A step of a script waits for his answer: the brain reads what his last message does with it (`scriptReply`). */
   readonly scriptStepWaiting?: boolean;
+  /** His custom request, for `customOrder`; absent, the brain reads one only when he asks for one, with no supplement. */
+  readonly customOrder?: BrainCustomOrder;
 }
 
 /**
@@ -168,6 +190,12 @@ export interface VoiceScriptStep {
   readonly mediaSheet: string | null;
 }
 
+/** A paid step sent to him and still locked, as the voice reads it to help him open it (ADR 0156 § 4). */
+export interface VoiceWaitingStep {
+  readonly price: Money;
+  readonly mediaSheet: string | null;
+}
+
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
   /**
@@ -177,6 +205,11 @@ export interface VoiceInput extends ConversationInput {
   readonly objectionReply?: string;
   /** The script step code decided to send now, in a typed block after the brief. Absent, none. */
   readonly scriptStep?: VoiceScriptStep;
+  /**
+   * The paid step he was sent and has not opened, when he asks how to pay for it (ADR 0156 § 4): its exact price and
+   * what it holds, in a typed block after the brief. Absent, none.
+   */
+  readonly waitingStep?: VoiceWaitingStep;
   /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
   readonly maxBubbles?: number;
 }
@@ -235,6 +268,25 @@ export interface ChannelPostInput {
   /** The agency's advice for this post (§ 2.3); null: none. */
   readonly advice: string | null;
   readonly trace?: CallTrace;
+}
+
+/**
+ * A comment under one of her Instagram posts (ADR 0122 § 2), for the outcome she gives it. `comment` is the block the
+ * code prepared (`CommentPromptInput`): no name nor handle has a field to enter by. The persona sheet holds her public
+ * panels only.
+ */
+export interface InstagramCommentInput {
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  /** Her validated replies of the bank « commentaire »; empty: none. */
+  readonly examples: readonly string[];
+  /** Her most recent replies, so that she does not write the same one twice; empty: none. */
+  readonly recentReplies: readonly string[];
+  readonly comment: CommentPromptInput;
+  /** What the guards refused in a first reply: this call is the one rewrite (§ 3). Rule names only, never a text. */
+  readonly refusedBy?: readonly string[];
+  /** Always a comment call: its purpose is set by the gateway. */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
 /** A media of a step, as its description tells it; a voice note is not described by the vision AI. */
@@ -337,12 +389,17 @@ export interface LlmFailure {
   }[];
 }
 
+/** The owner's « Essai réel » of a provider (ADR 0091 § 7). */
 export interface ConnectionTest {
   readonly provider: ProviderId;
   readonly isOk: boolean;
   readonly model?: string;
+  /** The model as the screen names it (« Grok 4.7 »). */
+  readonly modelLabel?: string;
+  /** Absent when no call was made. */
   readonly latencyMs?: number;
-  readonly outcome: CallOutcome;
+  /** `budget_reached`: the day's cap stopped it before any call. */
+  readonly outcome: CallOutcome | 'budget_reached';
 }
 
 export interface LlmGateway {
@@ -362,6 +419,11 @@ export interface LlmGateway {
   ): Promise<Result<LlmSuccess<TrendCaptureDescription>, LlmFailure>>;
   /** A post or a poll of her Telegram channel (ADR 0080 § 5, role `voice`). */
   channelPost(input: ChannelPostInput): Promise<Result<LlmSuccess<ChannelPostResult>, LlmFailure>>;
+  /**
+   * What she does of a comment under one of her Instagram posts (ADR 0122 § 2, role `voice`), journaled under the
+   * purpose `instagram_comment` and stopped by the daily cap. The guards run after, in the code.
+   */
+  instagramComment(input: InstagramCommentInput): Promise<Result<LlmSuccess<CommentOutcome>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
   /** A native script's identity (SC-04 lot c8, prompt `brain/script-identity`), under the daily cap. */
@@ -381,6 +443,10 @@ export interface LlmGateway {
     readonly scriptIdentity: string;
   };
   health(): HealthReport;
+  /**
+   * One tiny real call (« Réponds seulement : ok ») on the model the config uses for this provider: the owner's
+   * « Essai réel » (ADR 0091 § 7). Journaled under the purpose `probe`, stopped by the day's cap. Never throws.
+   */
   testConnection(provider: ProviderId): Promise<ConnectionTest>;
   /** The sound of a video or a voice note, as text for `sense`. */
   transcribe(audio: {
@@ -407,6 +473,7 @@ export interface LlmGatewayDeps {
     readonly trendCaptures?: PromptTemplate;
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
+    readonly instagramComment?: PromptTemplate;
     readonly scriptSummary?: PromptTemplate;
     readonly scriptIdentity?: PromptTemplate;
     readonly fanCard?: PromptTemplate;

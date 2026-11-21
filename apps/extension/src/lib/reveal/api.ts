@@ -4,6 +4,7 @@ import {
   CONNECTOR_SESSION_MEMBER_CONFLICT,
   ConnectorAccountsSchema,
   ConnectorSessionBodySchema,
+  ConnectorSessionStoredSchema,
   type ConnectorAccounts,
   type PlatformAccountId,
 } from '@impera/contracts';
@@ -34,9 +35,24 @@ export function fetchSyncableAccounts(
   );
 }
 
+/** When the session stored ends, and whether a new login to Reveal should come first (ADR 0147 § 5). */
+interface Stored {
+  readonly expiresAt: string | null;
+  readonly reconnectFirst: boolean;
+  /** The session in place held longer than the one sent, and stays. */
+  readonly kept: boolean;
+}
+
+/** A 2xx is a session stored, whatever its body says: an answer without its details only loses the hour. */
+const STORED_UNKNOWN: Stored = { expiresAt: null, reconnectFirst: false, kept: false };
+
 /** What became of a « Sync »: stored, or why not. */
 export type Synced =
-  'synced' | 'revoked' | 'not-owner' | 'other-model' | 'other-member' | 'refused' | 'unreachable';
+  | { readonly state: 'synced'; readonly stored: Stored }
+  | {
+      readonly state:
+        'revoked' | 'not-owner' | 'other-model' | 'other-member' | 'refused' | 'busy' | 'unreachable';
+    };
 
 export async function sendSession(
   origin: string,
@@ -46,25 +62,40 @@ export async function sendSession(
   fetchFn: Fetch = fetch,
 ): Promise<Synced> {
   const body = ConnectorSessionBodySchema.parse({ platformAccountId, session: JSON.stringify(session) });
-  // 204: no body to read, the answer is the status alone.
   const sent = await call(
     fetchFn,
     `${origin}/v1/connector/sessions`,
     token,
     { method: 'POST', body },
-    () => true,
+    (answer) => {
+      const parsed = ConnectorSessionStoredSchema.safeParse(answer);
+      return parsed.success
+        ? {
+            expiresAt: parsed.data.expiresAt,
+            reconnectFirst: parsed.data.reconnectFirst,
+            kept: parsed.data.kept,
+          }
+        : STORED_UNKNOWN;
+    },
   );
   switch (sent.kind) {
     case 'ok':
-      return 'synced';
+      return { state: 'synced', stored: sent.value };
     case 'revoked':
-      return 'revoked';
+      return { state: 'revoked' };
+    case 'busy':
+      return { state: 'busy' };
     case 'unreachable':
-      return 'unreachable';
+      return { state: 'unreachable' };
     case 'refused':
-      if (sent.code === CONNECTOR_LINK_FORBIDDEN) return 'not-owner';
-      if (sent.code === CONNECTOR_SESSION_CONFLICT) return 'other-model';
-      if (sent.code === CONNECTOR_SESSION_MEMBER_CONFLICT) return 'other-member';
-      return 'refused';
+      return { state: refusalOf(sent.code) };
   }
+}
+
+/** The server's refusal, told apart so that the popup says its cause and the gesture that mends it. */
+function refusalOf(code: string | null): 'not-owner' | 'other-model' | 'other-member' | 'refused' {
+  if (code === CONNECTOR_LINK_FORBIDDEN) return 'not-owner';
+  if (code === CONNECTOR_SESSION_CONFLICT) return 'other-model';
+  if (code === CONNECTOR_SESSION_MEMBER_CONFLICT) return 'other-member';
+  return 'refused';
 }

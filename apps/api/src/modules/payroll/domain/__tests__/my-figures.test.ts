@@ -1,4 +1,4 @@
-import { MY_FIGURES_MIN_SALES, PayPeriodSchema } from '@impera/contracts';
+import { MY_FIGURES_MIN_SALES, PayPeriodSchema, PlatformAccountIdSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { mainCurrencyOf, myFigures, weekHourAt, type FigureLine } from '../my-figures';
@@ -8,6 +8,7 @@ const P_OCT_2 = PayPeriodSchema.parse('2026-10-16');
 const P_NOV_1 = PayPeriodSchema.parse('2026-11-01');
 const PARIS = 'Europe/Paris';
 const NOW = new Date('2026-11-05T12:00:00.000Z');
+const ACCOUNT = PlatformAccountIdSchema.parse('00000000-0000-4000-8000-0000000000a1');
 
 const line = (
   period: FigureLine['period'],
@@ -16,10 +17,17 @@ const line = (
   currency: FigureLine['currency'] = 'EUR',
 ): FigureLine => ({
   period,
+  platformAccountId: ACCOUNT,
   event: netMinor < 0 ? 'refund' : 'sale',
   currency,
   netMinor,
   occurredAt: at === null ? null : new Date(at),
+  saleType: 'ppv',
+});
+
+const typed = (saleType: FigureLine['saleType'], netMinor: number, period = P_NOV_1): FigureLine => ({
+  ...line(period, '2026-11-03T20:00:00.000Z', netMinor),
+  saleType,
 });
 
 const figures = (lines: readonly FigureLine[], memberZone = PARIS) =>
@@ -35,8 +43,8 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     ]);
     expect(read.today).toBe('2026-11-05');
     expect(read.days).toEqual([
-      { day: '2026-11-02', sales: 1, refunds: 0, nets: [{ currency: 'EUR', netMinor: 3_000 }] },
-      { day: '2026-11-03', sales: 1, refunds: 1, nets: [{ currency: 'EUR', netMinor: 4_000 }] },
+      { day: '2026-11-02', sales: 1, refunds: 0, reports: 0, nets: [{ currency: 'EUR', netMinor: 3_000 }] },
+      { day: '2026-11-03', sales: 1, refunds: 1, reports: 0, nets: [{ currency: 'EUR', netMinor: 4_000 }] },
     ]);
     expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 7_000 }]);
   });
@@ -55,7 +63,7 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
       line(P_NOV_1, '2026-11-01T10:00:00.000Z', 1_000),
     ]);
     expect(read.days).toEqual([
-      { day: '2026-11-01', sales: 2, refunds: 1, nets: [{ currency: 'EUR', netMinor: 5_000 }] },
+      { day: '2026-11-01', sales: 2, refunds: 1, reports: 0, nets: [{ currency: 'EUR', netMinor: 5_000 }] },
     ]);
     expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 5_000 }]);
     // Le record garde le vrai jour de la vente.
@@ -146,5 +154,56 @@ describe('Les chiffres d’un chatteur (ADR 0104 § A)', () => {
     expect(none.previous).toBeNull();
     expect(none.hours.cells).toEqual([]);
     expect(none.records).toEqual({ bestDay: null, bestPeriod: null });
+  });
+
+  it('compte un shift au rapport validé dans le net, le jour et les records, jamais parmi les ventes ni les heures (ADR 0118 § 10)', () => {
+    const read = myFigures({
+      lines: [line(P_NOV_1, '2026-11-03T20:00:00.000Z', 5_000)],
+      reportLines: [
+        line(P_NOV_1, '2026-11-03T17:00:00.000Z', 8_000),
+        line(P_NOV_1, '2026-11-04T17:00:00.000Z', 20_000),
+      ],
+      now: NOW,
+      agencyZone: PARIS,
+      memberZone: PARIS,
+      period: P_NOV_1,
+    });
+    expect(read.days).toEqual([
+      { day: '2026-11-03', sales: 1, refunds: 0, reports: 1, nets: [{ currency: 'EUR', netMinor: 13_000 }] },
+      { day: '2026-11-04', sales: 0, refunds: 0, reports: 1, nets: [{ currency: 'EUR', netMinor: 20_000 }] },
+    ]);
+    expect(read.nets).toEqual([{ currency: 'EUR', netMinor: 33_000 }]);
+    expect(read.records.bestDay).toEqual({ day: '2026-11-04', currency: 'EUR', netMinor: 20_000 });
+    expect(read.records.bestPeriod).toEqual({ period: P_NOV_1, currency: 'EUR', netMinor: 33_000 });
+    // Un rapport donne un total, pas l'heure d'une vente : la grille ne lit que la vente relevée.
+    expect(read.hours).toMatchObject({ sales: 1, cells: [{ weekday: 2, hour: 21, sales: 1 }] });
+  });
+
+  it('dit d’où vient le net de la quinzaine par type de vente, un remboursement retiré de son type (ADR 0104 § 6)', () => {
+    const read = figures([
+      typed('ppv', 5_000),
+      typed('ppv', 3_000),
+      typed('ppv', -1_000),
+      typed('tip', 2_000),
+      // La quinzaine d'avant n'y entre pas.
+      typed('subscription', 9_000, P_OCT_2),
+    ]);
+    expect(read.kinds).toEqual({
+      untyped: 0,
+      items: [
+        { type: 'ppv', sales: 2, nets: [{ currency: 'EUR', netMinor: 7_000 }] },
+        { type: 'tip', sales: 1, nets: [{ currency: 'EUR', netMinor: 2_000 }] },
+      ],
+    });
+  });
+
+  it('compte à part une vente dont le relevé n’a pas gardé le type, jamais comme un zéro', () => {
+    // Le remboursement d'une vente sans type n'est pas une vente à compter.
+    const read = figures([typed('ppv', 5_000), typed(null, 4_000), typed(null, 1_000), typed(null, -500)]);
+    expect(read.kinds).toEqual({
+      untyped: 2,
+      items: [{ type: 'ppv', sales: 1, nets: [{ currency: 'EUR', netMinor: 5_000 }] }],
+    });
+    expect(figures([]).kinds).toEqual({ untyped: 0, items: [] });
   });
 });

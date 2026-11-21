@@ -4,9 +4,12 @@ import {
   CommissionChoiceSchema,
   CreateCommissionPresetBodySchema,
   CreateTeamMemberBodySchema,
+  FollowTimeZoneBodySchema,
   SetCommissionRateBodySchema,
   SetTeamRoleBodySchema,
   TeamMemberSchema,
+  TeamMemberTimeZoneHistorySchema,
+  TimeZoneChangesQuerySchema,
   UpdateTeamMemberBodySchema,
 } from './team-members';
 
@@ -107,5 +110,56 @@ describe('team members', () => {
     expect(body.name).toBe('Palier inventé');
     expect(CreateCommissionPresetBodySchema.safeParse({ ...body, name: ' ' }).success).toBe(false);
     expect(CreateCommissionPresetBodySchema.safeParse({ ...body, rateBps: 10_001 }).success).toBe(false);
+  });
+});
+
+describe('the zone a phone gives (recette CHT-01)', () => {
+  const follows = (timeZone: unknown) => FollowTimeZoneBodySchema.safeParse({ timeZone }).success;
+
+  it('takes a « Région/Ville » of the IANA regions, a city in a country included', () => {
+    for (const zone of [
+      'Europe/Paris',
+      'Africa/Porto-Novo',
+      'America/Argentina/Buenos_Aires',
+      'Asia/Ho_Chi_Minh',
+    ]) {
+      expect(follows(zone), zone).toBe(true);
+    }
+  });
+
+  it('refuses what is not a place: Etc/, posix/, UTC, Factory, localtime, an unknown city, a long text', () => {
+    for (const zone of [
+      'Etc/GMT+3',
+      'posix/Europe/Paris',
+      'UTC',
+      'Factory',
+      'localtime',
+      'Europe/Nulle_Part',
+      'Europe/Paris; drop',
+      `Europe/${'A'.repeat(60)}`,
+      '',
+      3,
+    ]) {
+      expect(follows(zone), String(zone)).toBe(false);
+    }
+  });
+
+  it('names no member: the body holds the zone and nothing else', () => {
+    expect(FollowTimeZoneBodySchema.safeParse({ timeZone: 'Europe/Paris', memberId: CREATOR }).success).toBe(
+      false,
+    );
+  });
+
+  it('pages the owner’s trace by the change it ends on', () => {
+    expect(TimeZoneChangesQuerySchema.safeParse({}).success).toBe(true);
+    expect(TimeZoneChangesQuerySchema.safeParse({ before: 'x' }).success).toBe(false);
+    expect(TimeZoneChangesQuerySchema.safeParse({ before: CREATOR, memberId: CREATOR }).success).toBe(false);
+    const page = {
+      changes: [
+        { id: CREATOR, from: 'Africa/Porto-Novo', to: 'Europe/Paris', at: '2026-11-16T17:00:00.000Z' },
+      ],
+      nextBefore: null,
+    };
+    expect(TeamMemberTimeZoneHistorySchema.parse(page)).toEqual(page);
   });
 });

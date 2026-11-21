@@ -28,6 +28,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { parisDay, weekdayOf } from './support/paris';
 import { activateDemoPersona } from './support/persona';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
@@ -206,6 +207,34 @@ describe('/v1/creators/:creatorId/ideas', () => {
         day: '2-digit',
       }).format(new Date()),
     );
+  });
+
+  it('leaves an unreadable idea out of her day rather than failing it (recette PIL-19)', async () => {
+    const day = '2026-11-02';
+    const readable = await seedIdea(nora, { title: 'Idée lisible' });
+    const unreadable = await seedIdea(nora, {
+      title: 'Fiche reel d’une autre forme',
+      category: 'instagram_reel',
+    });
+    // A reel sheet the code would never write: the base takes any object, the read refuses it.
+    await test.admin.db
+      .update(schema.contentIdeas)
+      .set({ reelBrief: { forme: 'inconnue' }, proposedOn: day })
+      .where(eq(schema.contentIdeas.id, unreadable));
+    await test.admin.db
+      .update(schema.contentIdeas)
+      .set({ proposedOn: day })
+      .where(eq(schema.contentIdeas.id, readable));
+    const list = await call('GET', `/v1/creators/${nora}/ideas?day=${day}`, cookies.owner);
+    expect(list.statusCode, list.body).toBe(200);
+    expect(ContentIdeaListSchema.parse(list.json()).items.map((idea) => idea.id)).toEqual([readable]);
+  });
+
+  it('refuses a script idea in the base: a script is never an idea of the day (recette PIL-19)', async () => {
+    const ideaId = await seedIdea(nora);
+    await expect(
+      test.admin.db.execute(sql`update content_ideas set category = 'script' where id = ${ideaId}`),
+    ).rejects.toHaveProperty('cause.constraint', 'content_ideas_category_check');
   });
 
   it('turns a corrected idea into a suggestion in her first room, its « à tourner » her sheet; replayed, nothing more', async () => {
@@ -427,9 +456,14 @@ describe('/v1/creators/:creatorId/ideas', () => {
       ending: null,
       seconds: 15,
     };
+    // Two weeks from today in Paris: the day is checked against the server's clock (a year back at most, CREA-14), so a
+    // fixed date would turn the 422 below into a 400 a year on.
+    const day = parisDay(14);
+    const monday = parisDay(14 - (weekdayOf(day) - 1));
+    const sunday = parisDay(14 + (7 - weekdayOf(day)));
     const body = (values: object) => ({
       id: newId(SuggestionIdSchema),
-      when: { kind: 'day', day: '2026-12-02' },
+      when: { kind: 'day', day },
       category: 'shoot',
       title: 'Reel café du matin',
       ...values,
@@ -467,7 +501,7 @@ describe('/v1/creators/:creatorId/ideas', () => {
     expect(made.statusCode, made.body).toBe(200);
     expect(made.json()).toMatchObject({ purpose: 'Pour : Reel Insta', reelBrief: sheet, shootBrief: null });
     const agenda = CreatorAgendaSchema.parse(
-      (await call('GET', '/v1/creator-space/agenda?from=2026-11-30&to=2026-12-06', cookies.nora)).json(),
+      (await call('GET', `/v1/creator-space/agenda?from=${monday}&to=${sunday}`, cookies.nora)).json(),
     );
     expect(agenda.suggestions.find((one) => one.title === 'Reel café du matin')?.reelBrief).toEqual(sheet);
   });

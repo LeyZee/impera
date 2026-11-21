@@ -18,23 +18,22 @@ import './scripts.css';
 import { useStructures } from '@/scripts/api';
 import { Dialog } from '@/shell/Dialog';
 import '@/creators/agenda/agency-agenda.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Scripts (SC-03 c2b, ADR 0056 § 7), the owner's and an active manager's: each script she sent, its
  * archive to download (the sheet first, then each card and each medium in the script's order) and « Copié dans
- * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2).
+ * Reveal » once the team has copied it: her originals of it go 30 days later (ADR 0044 § 2). Her Reveal vault is a view
+ * of Médias (ADR 0149 § 1).
  */
 export function ScriptsSection({
   creatorId,
   creatorName,
   timezone,
-  isOwner = false,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
-  /** Her switch of the descriptions is the owner's alone (ADR 0083 § 9): the owner is told where it stands. */
-  isOwner?: boolean;
 }): JSX.Element {
   const content = useCreatorContent(creatorId);
   const structures = useStructures();
@@ -43,19 +42,7 @@ export function ScriptsSection({
   const list = (): JSX.Element => {
     if (content.data === undefined) {
       if (content.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="aa-empty__title">Ses scripts ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void content.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+        return <Failure title="Ses scripts ne se chargent pas" onRetry={() => void content.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const rows = sentScripts(content.data, structures.data ?? []);
@@ -108,12 +95,10 @@ export function ScriptsSection({
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <p className="ps-title">Ses scripts</p>
+            <p className="ps-title">Scripts envoyés par {creatorName}</p>
             <p className="ps-muted">
-              Les scripts envoyés par {creatorName}, le plus récent d’abord. Télécharge l’archive, recopie-la
-              dans Reveal en suivant la fiche, puis confirme la copie.
-              {/* Her switch holds for every drop: it stands in Contenu (recette créatrice 6). */}
-              {isOwner ? ' Les descriptions par l’IA s’allument dans l’onglet Contenu.' : null}
+              Le plus récent d’abord. Télécharge l’archive, recopie-la dans Reveal en suivant la fiche, puis
+              confirme la copie.
             </p>
           </div>
         </div>
@@ -181,7 +166,7 @@ function ScriptCard({
         </span>
       </div>
       <div className="sx-card__body">
-        <h3 id={`${id}-title`} className="sx-title">
+        <h3 id={`${id}-title`} className="nv-h3 sx-title">
           {row.name ?? 'Structure retirée de la bibliothèque'}
         </h3>
         <p className="sx-meta nv-num">

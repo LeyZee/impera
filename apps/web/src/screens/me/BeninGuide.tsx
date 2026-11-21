@@ -8,7 +8,7 @@ import type { JSX } from 'react';
 export function BeninGuide({ year }: { year: string }): JSX.Element {
   return (
     <div className="cf-guide__body">
-      <h3>Ton attestation de domiciliation fiscale</h3>
+      <h3 className="nv-h3">Ton attestation de domiciliation fiscale</h3>
 
       <h4>Pourquoi on te la demande</h4>
       <p>

@@ -1,55 +1,158 @@
-import type { CreatorId } from '@impera/contracts';
-import { Link, useBlocker, useRouteContext } from '@tanstack/react-router';
-import { useState, type JSX } from 'react';
+import type { CreatorId, CreatorSummary, PreparedScriptView } from '@impera/contracts';
+import { Link, useBlocker, useNavigate, useRouteContext } from '@tanstack/react-router';
+import { useCallback, useEffect, useState, type JSX } from 'react';
 
 import { AccessSection } from './AccessSection';
 import { ArchivedCreators } from './ArchivedCreators';
 import { LeaveConfirm } from './LeaveConfirm';
 import { NewCreatorForm } from './NewCreatorForm';
 import { AgendaSection } from './agenda/AgendaSection';
+import { AlertsTab } from './alerts/AlertsTab';
 import { useCreators } from './api';
+import { CustomPricesSection } from './custom-prices/CustomPricesSection';
 import { DropsSection } from './drops/DropsSection';
 import { HoursSection } from './hours/HoursSection';
 import { IdeasSection } from './ideas/IdeasSection';
 import { CreatorsList } from './overview/CreatorsList';
+import { useCreatorsOverview } from './overview/api';
 import { PersonaSection } from './persona/PersonaSection';
+import { Segment } from './persona/fields';
 import { ProfileSection } from './profile/ProfileSection';
 import { AgencyRateSection } from './rate/AgencyRateSection';
 import { RequestsSection } from './requests/RequestsSection';
 import { ScriptsSection } from './scripts/ScriptsSection';
-import { creatorsSearch, sheetsFor, type CreatorSheet } from './search';
+import { PreparedScriptsView } from './scripts/prepared/PreparedScriptsView';
+import { ScriptsToCopyView } from './scripts/prepared/ScriptsToCopyView';
+import { usePreparedScripts } from './scripts/prepared/api';
+import {
+  CREATOR_TABS,
+  accountCardId,
+  creatorsSearch,
+  rememberCreatorTab,
+  sheetsFor,
+  tabOf,
+  type CreatorSheet,
+  type CreatorTabName,
+} from './search';
 import { TelegramChannelSection } from './telegram/TelegramChannelSection';
+import { VaultPage } from './vault/VaultPage';
+import './sheet.css';
 
+import { AgentSwitch } from '@/agent/AgentSwitch';
+import { canSwitch } from '@/agent/state';
+import { StructuresView } from '@/scripts/StructuresPage';
 import { CreatorSetupBlock } from '@/setup/SetupBlocks';
+import { CrownArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, SubNav } from '@/shell/layout';
+import { Empty, Failure, Skeleton, SkeletonCard } from '@/shell/states';
 
 export type CreatorTab = CreatorSheet;
 
+/** What each tab of her sheet is called (ADR 0149 § 1). */
+const TAB_LABELS: Readonly<Record<CreatorTabName, string>> = {
+  persona: 'Persona',
+  ai: 'IA',
+  media: 'Médias',
+  scripts: 'Scripts',
+  agenda: 'Agenda',
+  alerts: 'Alertes',
+  account: 'Compte',
+};
+
+/** The views inside a tab, in their order, and what the tab's selector is called; a tab of one page has none. */
+const TAB_VIEWS: Partial<
+  Readonly<
+    Record<
+      CreatorTabName,
+      { readonly label: string; readonly views: readonly (readonly [CreatorSheet, string])[] }
+    >
+  >
+> = {
+  media: {
+    label: 'Vue de ses médias',
+    views: [
+      ['vault', 'Coffre'],
+      ['content', 'Dépôts'],
+    ],
+  },
+  scripts: {
+    label: 'Vue de ses scripts',
+    views: [
+      ['scripts', 'Scripts'],
+      // Short, so four views share a phone's width; the view itself says « dans Reveal ».
+      ['copy', 'À copier'],
+      ['structures', 'Structures'],
+      ['custom', 'Sur mesure'],
+    ],
+  },
+  agenda: {
+    label: 'Vue de son agenda',
+    views: [
+      ['agenda', 'Agenda'],
+      ['ideas', 'Idées du jour'],
+      ['requests', 'Demandes'],
+    ],
+  },
+};
+
 /**
  * Créatrices: first the list of the creators, one card each with what the agency needs to know of her (« ok
- * liste-créatrices », Charles, 06/11), where the owner adds one; then, once one is picked, her sheet, starting with her
- * persona (revue 08: the persona belongs to the creator, not to the settings), then for the owner and an active manager
- * her agenda (CR-05 lot c), and for the owner alone her hours (P3-14), her access to her own space (CR-02) and the
- * agency's percentage (CR-04). Always the list first, even with one creator. The tab and the creator live in the
- * address (`?onglet=heures&creatrice=<id>`): no creator, or one the list does not hold, is the list. Changes not saved
- * are never lost silently: leaving asks first.
+ * liste-créatrices », Charles, 06/11), where the owner adds one; then, once one is picked, her sheet in seven tabs (ADR
+ * 0149 § 1): her persona (revue 08: the persona belongs to the creator, not to the settings), her AI (her hours, P3-14),
+ * her media (her vault, her other drops), her scripts, her agenda (CR-05 lot c, with her ideas of the day and what the
+ * agency asks of her), her alerts and her account (her Telegram channel, her access to her own space, CR-02, the
+ * agency's percentage, CR-04, her profile). The views inside a tab are one segmented selector, never a second bar of
+ * tabs (ADR 0149 § 3). Always the list first, even with one creator. The tab, the view and the creator live in the
+ * address (`?onglet=medias&vue=depots&creatrice=<id>`): no creator, or one the list does not hold, is the list.
+ * Changes not saved are never lost silently: leaving asks first.
  */
 export function CreatorsPage({
   tab,
   creatorId,
   onCreator,
+  folderId = null,
+  onFolder,
 }: {
   tab: CreatorTab;
   /** The creator in the address; none, or one the list does not hold, shows the list. */
   creatorId: CreatorId | null;
   onCreator: (id: CreatorId) => void;
+  /** Her vault folder opened in Médias, from the address (`dossier`). */
+  folderId?: string | null;
+  onFolder?: (id: string | null) => void;
 }): JSX.Element {
   const { user } = useRouteContext({ from: '__root__' });
   const query = useCreators();
   const creators = query.data ?? [];
   const [adding, setAdding] = useState(false);
-  /** The persona or the hours on screen hold changes not saved. */
-  const [dirty, setDirty] = useState(false);
+  const navigate = useNavigate();
+  /** The persona, the hours or a card of Compte on screen holds changes not saved: which ones. */
+  const [unsaved, setUnsaved] = useState<readonly string[]>([]);
+  const dirty = unsaved.length > 0;
+  // Stable ones: a section tells its state from an effect that follows the callback it was given.
+  const mark = useCallback((what: string, now: boolean): void => {
+    setUnsaved((before) =>
+      now === before.includes(what) ? before : now ? [...before, what] : before.filter((one) => one !== what),
+    );
+  }, []);
+  const setDirty = useCallback(
+    (now: boolean): void => {
+      mark('sheet', now);
+    },
+    [mark],
+  );
+  const setTelegramDirty = useCallback(
+    (now: boolean): void => {
+      mark('telegram', now);
+    },
+    [mark],
+  );
+  const setRateDirty = useCallback(
+    (now: boolean): void => {
+      mark('rate', now);
+    },
+    [mark],
+  );
   // Any navigation, a tab, « ← Créatrices », a link of the menu or a step back included, waits for the same confirmation; a
   // reload or a closed tab gets the browser's own.
   const blocker = useBlocker({
@@ -68,6 +171,20 @@ export function CreatorsPage({
   const sheets = sheetsFor(user);
   /** The sheet a card of the list opens, and the one on screen: the address's, when this member opens it. */
   const shown: CreatorTab = sheets.includes(tab) ? tab : (sheets[0] ?? 'persona');
+  const shownTab = tabOf(shown);
+  // The tab of her sheet on screen is the one Créatrices opens on next time, on this device (ADR 0149 § 2).
+  // A script opened from « À copier dans Reveal », for « Scripts » to open at once; forgotten on leaving « Scripts ».
+  const [opening, setOpening] = useState<PreparedScriptView | null>(null);
+  useEffect(() => {
+    if (shown !== 'scripts') return undefined;
+    return () => {
+      setOpening(null);
+    };
+  }, [shown, selected]);
+  const onSheet = current !== undefined;
+  useEffect(() => {
+    if (onSheet) rememberCreatorTab(shown);
+  }, [onSheet, shown]);
 
   const leaving = blocker.status === 'blocked';
   const stay = (): void => {
@@ -81,17 +198,7 @@ export function CreatorsPage({
     if (query.isError) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">La liste des créatrices ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={() => void query.refetch()} />
         </section>
       );
     }
@@ -99,10 +206,12 @@ export function CreatorsPage({
       // The list waits in the shape of its cards, so nothing jumps when they arrive (recette 11/11, ADM-21).
       if (creatorId === null)
         return (
-          <ul className="cl-grid" aria-busy="true" aria-label="Chargement des créatrices">
-            <li className="nv-plate cl-card cl-card--skeleton" />
-            <li className="nv-plate cl-card cl-card--skeleton" />
-          </ul>
+          <Skeleton label="Chargement des créatrices…">
+            <div className="cl-grid">
+              <SkeletonCard lines={2} height={136} />
+              <SkeletonCard lines={2} height={136} />
+            </div>
+          </Skeleton>
         );
       return (
         <section className="ps-page" aria-busy="true">
@@ -114,12 +223,9 @@ export function CreatorsPage({
     if (!isOwner && creators.length === 0) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">Aucune créatrice ne t’est confiée</p>
-            <p className="ps-muted">
-              Le propriétaire choisit les créatrices de chaque compte. Demande-lui de t’en confier une.
-            </p>
-          </div>
+          <Empty plate art={<CrownArt />} title="Aucune créatrice ne t’est confiée">
+            Le propriétaire choisit les créatrices de chaque compte. Demande-lui de t’en confier une.
+          </Empty>
         </section>
       );
     }
@@ -148,7 +254,8 @@ export function CreatorsPage({
         </section>
       );
     }
-    if (listing) return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} />;
+    if (listing)
+      return <CreatorsList creators={creators} sheet={shown} isOwner={isOwner} switches={canSwitch(user)} />;
     if (shown === 'agenda' && current !== undefined) {
       return (
         <AgendaSection
@@ -156,6 +263,7 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           timezone={current.timezone}
+          canValidate={isOwner}
         />
       );
     }
@@ -180,17 +288,67 @@ export function CreatorsPage({
         />
       );
     }
-    if (shown === 'scripts' && current !== undefined) {
+    if (shown === 'vault' && current !== undefined) {
       return (
-        <ScriptsSection
-          key={current.id}
+        <section className="ps-page" aria-label={`Coffre de ${current.displayName}`}>
+          <VaultPage
+            key={current.id}
+            creatorId={current.id}
+            creatorName={current.displayName}
+            isOwner={isOwner}
+            folderId={folderId}
+            {...(onFolder === undefined ? {} : { onFolder })}
+          />
+        </section>
+      );
+    }
+    if (shown === 'scripts' && current !== undefined) {
+      // Her scripts in preparation and their editor (ADR 0149 § 1); the editor sends to « À copier dans Reveal ».
+      return (
+        <PreparedScriptsView
+          key={`${current.id}:${opening?.id ?? ''}`}
           creatorId={current.id}
           creatorName={current.displayName}
-          timezone={current.timezone}
-          isOwner={isOwner}
+          opening={opening}
+          onCopy={() => {
+            setOpening(null);
+            void navigate({ to: '/creatrices', search: creatorsSearch('copy', current.id) });
+          }}
         />
       );
     }
+    if (shown === 'copy' && current !== undefined) {
+      // What is ready to copy by hand, then the scripts she sent; a script opened here shows in « Scripts ».
+      return (
+        <ScriptsToCopyView
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          sent={
+            <ScriptsSection
+              creatorId={current.id}
+              creatorName={current.displayName}
+              timezone={current.timezone}
+            />
+          }
+          onOpen={(script) => {
+            setOpening(script);
+            void navigate({ to: '/creatrices', search: creatorsSearch('scripts', current.id) });
+          }}
+        />
+      );
+    }
+    if (shown === 'custom' && current !== undefined) {
+      return (
+        <CustomPricesSection
+          key={current.id}
+          creatorId={current.id}
+          creatorName={current.displayName}
+          onDirty={setDirty}
+        />
+      );
+    }
+    if (shown === 'structures' && current !== undefined) return <StructuresView />;
     if (shown === 'content' && current !== undefined) {
       return (
         <DropsSection
@@ -198,28 +356,35 @@ export function CreatorsPage({
           creatorId={current.id}
           creatorName={current.displayName}
           timezone={current.timezone}
-          isOwner={isOwner}
         />
       );
     }
-    if (shown === 'telegram' && current !== undefined) {
-      return <TelegramChannelSection key={current.id} creatorId={current.id} onDirty={setDirty} />;
-    }
-    if (shown === 'access' && current !== undefined) {
-      return <AccessSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
-    }
-    if (shown === 'profile' && current !== undefined) {
-      return <ProfileSection key={current.id} creatorId={current.id} creatorName={current.displayName} />;
-    }
-    if (shown === 'rate' && current !== undefined) {
+    if (shownTab === 'account' && current !== undefined) {
+      // One page, a card per subject (ADR 0149 § 1): an address of before lands on its card (`#part`). The short
+      // ones first; her Telegram channel, the longest with its own cards, closes the page.
       return (
-        <AgencyRateSection
-          key={current.id}
-          creatorId={current.id}
-          creatorName={current.displayName}
-          onDirty={setDirty}
-        />
+        <div className="cr-account" key={current.id}>
+          <div id={accountCardId('access')} className="cr-account__card">
+            <AccessSection creatorId={current.id} creatorName={current.displayName} />
+          </div>
+          <div id={accountCardId('rate')} className="cr-account__card">
+            <AgencyRateSection
+              creatorId={current.id}
+              creatorName={current.displayName}
+              onDirty={setRateDirty}
+            />
+          </div>
+          <div id={accountCardId('profile')} className="cr-account__card">
+            <ProfileSection creatorId={current.id} creatorName={current.displayName} />
+          </div>
+          <div id={accountCardId('telegram')} className="cr-account__card">
+            <TelegramChannelSection creatorId={current.id} onDirty={setTelegramDirty} />
+          </div>
+        </div>
       );
+    }
+    if (shown === 'alerts' && current !== undefined) {
+      return <AlertsTab key={current.id} creatorId={current.id} creatorName={current.displayName} />;
     }
     return shown === 'hours' && current !== undefined ? (
       <HoursSection
@@ -241,41 +406,21 @@ export function CreatorsPage({
       />
     );
   };
-  // Persona · Agenda · Heures d'activité · Accès · Pourcentage are the views of the sheet, in the header like every
-  // section's sub-tabs (NAV-10); they say where one is.
+  // The seven tabs of her sheet, in the header like every section's sub-tabs (NAV-10); they say where one is. Each
+  // opens on the first of its views this member opens.
   const switchShown = sheets.length > 1 && current !== undefined && !showForm && query.isSuccess;
-  const labels: Readonly<Record<CreatorSheet, string>> = {
-    persona: 'Persona',
-    agenda: 'Agenda',
-    ideas: 'Idées du jour',
-    requests: 'Demandes',
-    scripts: 'Scripts',
-    content: 'Contenu',
-    telegram: 'Canal Telegram',
-    hours: 'Heures d’activité',
-    access: 'Accès',
-    rate: 'Part de l’agence',
-    profile: 'Profil',
-  };
-  // Her agenda right after her persona: the sheet a manager opens most (CR-05 lot c).
-  const order: readonly CreatorSheet[] = [
-    'persona',
-    'agenda',
-    'ideas',
-    'requests',
-    'scripts',
-    'content',
-    'telegram',
-    'hours',
-    'access',
-    'rate',
-    'profile',
-  ];
+  const tabs = CREATOR_TABS.flatMap((name) => {
+    const first = sheets.find((sheet) => tabOf(sheet) === name);
+    return first === undefined ? [] : [{ name, first }];
+  });
+  // The views of the tab on screen this member opens: one alone needs no selector.
+  const views = (TAB_VIEWS[shownTab]?.views ?? []).filter(([sheet]) => sheets.includes(sheet));
+  const viewsLabel = TAB_VIEWS[shownTab]?.label ?? '';
 
   const lead = isOwner
-    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche : persona, agenda, idées du jour, demandes, scripts, contenu, canal Telegram, heures d’activité, accès, pourcentage et profil.'
+    ? 'Tes créatrices d’un coup d’œil. Ouvre-en une pour sa fiche et tous ses réglages.'
     : sheets.includes('agenda')
-      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour son agenda, ses idées du jour, ses demandes, ses scripts et son contenu.'
+      ? 'Les créatrices qui te sont confiées. Ouvre-en une pour sa fiche.'
       : 'Les créatrices qui te sont confiées. Ouvre-en une pour sa persona.';
 
   return (
@@ -316,18 +461,19 @@ export function CreatorsPage({
             </Link>
           }
           title={current.displayName}
-          actions={
+          // Her AI's switch (ADR 0148 § 1) next to her name, on every tab of her sheet: the same setting as the
+          // Dashboard's control (avis Design, 19/11: in the header, not as a card of the tab).
+          actions={showForm ? undefined : <CreatorAgentSwitch creator={current} user={user} />}
+          tabs={
             switchShown ? (
               <SubNav
                 label="Fiche de la créatrice"
-                items={order
-                  .filter((sheet) => sheets.includes(sheet))
-                  .map((sheet) => ({
-                    to: '/creatrices',
-                    search: creatorsSearch(sheet, selected),
-                    current: shown === sheet,
-                    label: labels[sheet],
-                  }))}
+                items={tabs.map(({ name, first }) => ({
+                  to: '/creatrices',
+                  search: creatorsSearch(first, selected),
+                  current: shownTab === name,
+                  label: TAB_LABELS[name],
+                }))}
               />
             ) : undefined
           }
@@ -340,10 +486,102 @@ export function CreatorsPage({
         {isOwner && current !== undefined && !showForm ? (
           <CreatorSetupBlock key={`${current.id}:${shown}`} creatorId={current.id} />
         ) : null}
+        {switchShown && views.length > 1 ? (
+          <div className="cr-views">
+            <ViewsSelector
+              label={viewsLabel}
+              value={shown}
+              views={views}
+              // Scripts says how many of hers wait to be copied, on the view that holds them.
+              {...(shownTab === 'scripts' ? { readyOf: current.id } : {})}
+              onChange={(sheet) =>
+                void navigate({ to: '/creatrices', search: creatorsSearch(sheet, selected) })
+              }
+            />
+          </div>
+        ) : null}
         {body()}
         {/* The archived creators, folded at the foot of the list, the owner's alone (ADR 0071 § 2). */}
         {isOwner && listing && query.isSuccess ? <ArchivedCreators onRestored={onCreator} /> : null}
       </div>
     </Page>
+  );
+}
+
+/** The views of the tab on screen; with `readyOf`, « À copier » carries the count of her scripts ready to copy. */
+function ViewsSelector({
+  label,
+  value,
+  views,
+  readyOf,
+  onChange,
+}: {
+  label: string;
+  value: CreatorSheet;
+  views: readonly (readonly [CreatorSheet, string])[];
+  readyOf?: CreatorId;
+  onChange: (sheet: CreatorSheet) => void;
+}): JSX.Element {
+  return readyOf === undefined ? (
+    <Segment<CreatorSheet>
+      label={label}
+      value={value}
+      options={views.map(([sheet, name]) => ({ value: sheet, label: name }))}
+      onChange={onChange}
+    />
+  ) : (
+    <ScriptsViewsSelector label={label} value={value} views={views} creatorId={readyOf} onChange={onChange} />
+  );
+}
+
+function ScriptsViewsSelector({
+  label,
+  value,
+  views,
+  creatorId,
+  onChange,
+}: {
+  label: string;
+  value: CreatorSheet;
+  views: readonly (readonly [CreatorSheet, string])[];
+  creatorId: CreatorId;
+  onChange: (sheet: CreatorSheet) => void;
+}): JSX.Element {
+  const scripts = usePreparedScripts(creatorId);
+  const ready = (scripts.data ?? []).filter((one) => one.state === 'ready_to_copy').length;
+  return (
+    <Segment<CreatorSheet>
+      label={label}
+      value={value}
+      options={views.map(([sheet, name]) => ({
+        value: sheet,
+        label: sheet === 'copy' && ready > 0 ? `${name} · ${String(ready)}` : name,
+      }))}
+      onChange={onChange}
+    />
+  );
+}
+
+/** Her switch on her sheet, from her card of the list (`GET /v1/dashboard/creators`): nothing until it is read. */
+function CreatorAgentSwitch({
+  creator,
+  user,
+}: {
+  creator: CreatorSummary;
+  user: { readonly role: string; readonly teamScope: string | null };
+}): JSX.Element | null {
+  const overview = useCreatorsOverview();
+  const card = overview.data?.find((one) => one.creatorId === creator.id);
+  if (card === undefined) return null;
+  return (
+    <AgentSwitch
+      creatorId={creator.id}
+      creatorName={creator.displayName}
+      zone={creator.timezone}
+      state={card}
+      read={overview.dataUpdatedAt}
+      variant="header"
+      readOnly={!canSwitch(user)}
+    />
   );
 }

@@ -5,13 +5,15 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { addCredit, checkCredits, readUsage, type UsageDeps } from './application/usage';
 import type { Clock } from './domain/ports';
-import type { CapReading } from './domain/usage';
+import type { CapReading, VoiceQuotaReading } from './domain/usage';
 import {
   createPostgresCreditAlerts,
   createPostgresCreditLedger,
   createPostgresUsageReader,
 } from './infra/postgres';
 import { createAiUsageRoutes, type AiUsageRoutesOptions } from './infra/routes';
+
+export type { VoiceQuotaReading } from './domain/usage';
 
 export interface AiUsageModule {
   readonly name: 'ai-usage';
@@ -47,6 +49,8 @@ export interface AiUsageStartOptions {
   readonly timeZone: string;
   readonly usdPerEur: number;
   readonly clock?: Clock;
+  /** ElevenLabs' month as the providers module last read it (ADR 0091 § 7). */
+  readonly voice?: () => Promise<VoiceQuotaReading | null>;
 }
 
 export function startAiUsageModule(options: AiUsageStartOptions): AiUsageModule {
@@ -58,5 +62,6 @@ export function startAiUsageModule(options: AiUsageStartOptions): AiUsageModule 
     cap: options.cap,
     timeZone: options.timeZone,
     usdPerEur: options.usdPerEur,
+    ...(options.voice !== undefined && { voice: options.voice }),
   });
 }

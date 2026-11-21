@@ -34,6 +34,7 @@ export const READY_SECTIONS = [
   '/contenu',
   '/equipe',
   '/paie',
+  '/trafic',
   '/creatrices',
   '/moi',
   '/reglages',
@@ -63,6 +64,7 @@ const ICONS: Readonly<Record<Section, NavIconName>> = {
   '/contenu': 'content',
   '/equipe': 'team',
   '/paie': 'pay',
+  '/trafic': 'traffic',
   '/creatrices': 'creators',
   '/moi': 'me',
   '/reglages': 'settings',
@@ -166,14 +168,27 @@ const OFF_RAIL_OF_MOI: ReadonlySet<string> = new Set([
   '/notifications',
   '/aide/installer',
   '/aide/extension',
+  '/extension/lier',
+]);
+
+/** The guides (recette visuelle 16/11, T9): under Moi for whoever has it, under Réglages for the owner. */
+const GUIDES: ReadonlySet<string> = new Set([
+  '/aide/installer',
+  '/aide/extension',
+  '/extension/lier',
+  '/aide/reveal',
 ]);
 
 /**
- * The tab lit for an address of no section: Moi for those pages, when the rail holds it; none otherwise. Lit only: the
- * route guard and the stage keep `sectionOf`.
+ * The tab lit for an address of no section: Moi for those pages, when the rail holds it; Réglages for a guide on a rail
+ * without Moi that holds Réglages (the owner's); none otherwise. Lit only: the route guard and the stage keep
+ * `sectionOf`.
  */
 export function offRailSectionOf(pathname: string, rail: Rail): Section | null {
-  return OFF_RAIL_OF_MOI.has(pathname.replace(/\/+$/u, '')) && canOpen(rail, '/moi') ? '/moi' : null;
+  const path = pathname.replace(/\/+$/u, '');
+  if (OFF_RAIL_OF_MOI.has(path) && canOpen(rail, '/moi')) return '/moi';
+  if (GUIDES.has(path) && !canOpen(rail, '/moi') && canOpen(rail, '/reglages')) return '/reglages';
+  return null;
 }
 
 /** What a section is called, in the rail and in the tab's title. */
@@ -188,11 +203,12 @@ export function sectionLabel(section: Section): string {
 const SCREENS = {
   '/creatrices/structures': 'Structures',
   '/suivi': 'Conversations',
-  '/suivi/alertes': 'Historique des alertes',
+  '/suivi/fans': 'Fans',
+  '/suivi/alertes': 'Alertes',
   '/equipe/planning': 'Planning',
   '/equipe/rapports': 'Rapports',
   '/equipe/membres': 'Membres',
-  '/equipe/reveal': 'Reveal',
+  '/equipe/reveal': 'Comptes Reveal',
   '/paie/quinzaine': 'Quinzaine',
   '/paie/releves': 'Historique',
   '/paie/primes-malus': 'Primes et malus',
@@ -204,15 +220,16 @@ const SCREENS = {
   '/moi/trophees': 'Trophées',
   '/moi/dossier': 'Dossier',
   '/moi/persona': 'Persona',
+  '/moi/liens': 'Mes liens',
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
   '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
-  '/reglages/ventes': 'Ventes',
+  '/reglages/ventes': 'Plateformes',
   '/reglages/consommation-ia': 'Consommation IA',
   '/reglages/alertes': 'Alertes',
-  '/reglages/telegram': 'Telegram',
+  '/reglages/telegram': 'Bots Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',
   '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
@@ -239,6 +256,7 @@ const SCREEN_TITLES: ReadonlyMap<string, string> = new Map(Object.entries(SCREEN
 const OFF_RAIL_TITLES: ReadonlyMap<string, string> = new Map([
   ['/aide/installer', 'Installer Impera'],
   ['/aide/extension', 'Installer l’extension'],
+  ['/extension/lier', 'Relier l’extension'],
   ['/aide/reveal', 'Reconnecter Reveal'],
   ['/notifications', 'Notifications'],
   [ACCOUNT_SECURITY, 'Sécurité'],

@@ -77,7 +77,7 @@ export function SegmentEditor({
       <div className="ps-block st-sheet">
         <header className="st-sheet__head">
           <span className="nv-eyebrow st-sheet__eyebrow">{title}</span>
-          <h2 className="st-sheet__title">Le pont</h2>
+          <h2 className="nv-h2 st-sheet__title">Le pont</h2>
           <p className="ps-muted">
             Toujours offert : il fait comprendre au fan ce qui vient ensuite, avec une photo teasing.
           </p>
@@ -107,9 +107,9 @@ export function SegmentEditor({
     <div className="ps-block st-sheet">
       <header className="st-sheet__head">
         <span className="nv-eyebrow st-sheet__eyebrow">{title}</span>
-        <h2 className="st-sheet__title">{segment.name.trim() === '' ? 'Sans nom' : segment.name}</h2>
+        <h2 className="nv-h2 st-sheet__title">{segment.name.trim() === '' ? 'Sans nom' : segment.name}</h2>
       </header>
-      <h3 className="st-group__title">L’essentiel</h3>
+      <h3 className="nv-h3 st-group__title">L’essentiel</h3>
       <div className="st-grid">
         <Field label="Nom de l’étape" id={`${id}-name`}>
           <TextInput
@@ -152,7 +152,7 @@ export function SegmentEditor({
           }}
         />
       </Field>
-      <h3 className="st-group__title">Le tournage</h3>
+      <h3 className="nv-h3 st-group__title">Le tournage</h3>
       <div className="st-grid st-grid--three">
         <Field label="Ambiance" id={`${id}-mood`}>
           <TextInput

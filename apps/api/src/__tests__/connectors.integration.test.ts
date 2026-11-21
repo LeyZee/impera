@@ -421,7 +421,7 @@ describe('connectors module (P0-06)', () => {
     expect((await accountRow(id)).sessionCiphertext).toBeNull();
 
     const stored = await sync(id, secret);
-    expect(stored.statusCode, stored.body).toBe(204);
+    expect(stored.statusCode, stored.body).toBe(200);
 
     const row = await accountRow(id);
     expect(row.sessionState).toBe('valid');
@@ -451,7 +451,7 @@ describe('connectors module (P0-06)', () => {
   it('refuses a session of another creator, or of another member, than the one the account already holds', async () => {
     const id = await account('other-model', 'none');
     expect((await sync(id, revealSession('reveal-bearer-first-aaaa', 'model-test-pinned'))).statusCode).toBe(
-      204,
+      200,
     );
     const other = await sync(id, revealSession('reveal-bearer-second-bbb', 'model-test-b'));
     expect([other.statusCode, other.json<{ error: { code: string } }>().error.code]).toEqual([
@@ -460,7 +460,7 @@ describe('connectors module (P0-06)', () => {
     ]);
     // The same creator, a new token: a re-sync, taken.
     expect((await sync(id, revealSession('reveal-bearer-third-cccc', 'model-test-pinned'))).statusCode).toBe(
-      204,
+      200,
     );
     // The « bot » member is pinned at the first sync (P2-02): the owner's or a chatter's session is refused.
     const member = await sync(
@@ -498,7 +498,7 @@ describe('connectors module (P0-06)', () => {
     ]);
     expect((await accountRow(id)).sessionCiphertext).toBeNull();
     expect((await sync(id, revealSession('reveal-bearer-right-ffff', 'model-test-linked'))).statusCode).toBe(
-      204,
+      200,
     );
   });
 
@@ -517,7 +517,7 @@ describe('connectors module (P0-06)', () => {
       sessionState: 'none',
     });
     expect((await sync(hers, revealSession('reveal-bearer-held-gggg', 'model-test-held'))).statusCode).toBe(
-      204,
+      200,
     );
     // The same Reveal tab, « Sync » pressed on another creator's account: nothing stored to compare with there.
     const wrong = await sync(second, revealSession('reveal-bearer-held-gggg', 'model-test-held'));
@@ -537,7 +537,7 @@ describe('connectors module (P0-06)', () => {
     ).toMatchObject([{ details: { reason: 'owner_conflict' } }]);
     // Her own account still takes her session, and an expired session keeps the account hers.
     expect((await sync(hers, revealSession('reveal-bearer-held-hhhh', 'model-test-held'))).statusCode).toBe(
-      204,
+      200,
     );
     await test.admin.db
       .update(schema.platformAccounts)
@@ -576,7 +576,7 @@ describe('connectors module (P0-06)', () => {
       sessionState: 'none',
     });
     expect((await sync(old, revealSession('reveal-bearer-gone-kkkk', 'model-test-gone'))).statusCode).toBe(
-      204,
+      200,
     );
     const hers = await account('takes-over', 'none');
     // While she is in the agency, the identity is hers.
@@ -589,7 +589,7 @@ describe('connectors module (P0-06)', () => {
       .set({ archivedAt: new Date() })
       .where(eq(schema.creators.id, gone));
     expect((await sync(hers, revealSession('reveal-bearer-gone-llll', 'model-test-gone'))).statusCode).toBe(
-      204,
+      200,
     );
     expect(await accountRow(hers)).toMatchObject({ sessionOwner: 'model-test-gone', sessionState: 'valid' });
     expect(await accountRow(old)).toMatchObject({
@@ -628,6 +628,7 @@ describe('connectors module (P0-06)', () => {
       creatorName: 'Test',
       sessionState: 'none',
       sessionUpdatedAt: null,
+      modelId: null,
     });
     expect(listed.body).not.toContain('reveal-bearer-');
   });
@@ -636,7 +637,7 @@ describe('connectors module (P0-06)', () => {
     const id = await account('resent', 'none');
     const send = async (session: string) => {
       const sent = await sync(id, revealSession(session, 'model-test-dated'));
-      expect(sent.statusCode, sent.body).toBe(204);
+      expect(sent.statusCode, sent.body).toBe(200);
     };
     const longAgo = new Date('2026-01-01T00:00:00.000Z');
     const age = async () => {
@@ -690,5 +691,63 @@ describe('connectors module (P0-06)', () => {
       },
     ]);
     expect(JSON.stringify(alerts)).not.toContain('reveal-session');
+  });
+
+  it("says at the « Sync » how long the token still lives: yesterday's login, an hour left, is not valid (16/11)", async () => {
+    const id = await account('short-lived', 'none');
+    // An invented JWT-shaped bearer: only its `exp` is read, never a real token (CLAUDE.md).
+    const jwt = (hoursLeft: number, tag: string) =>
+      [
+        'eyJhbGciOiJIUzI1NiJ9',
+        Buffer.from(
+          JSON.stringify({ exp: Math.floor(Date.now() / 1_000 + hoursLeft * 3_600), tag }),
+        ).toString('base64url'),
+        'invented-signature',
+      ].join('.');
+
+    // The extension alone never brings an account's first session (ADR 0147).
+    const alone = await server.inject({
+      method: 'POST',
+      url: '/v1/connector/sessions',
+      remoteAddress: addressOf(id),
+      headers: { origin: 'chrome-extension://abcdef', 'x-extension-link': ownerLink },
+      payload: {
+        platformAccountId: id,
+        session: revealSession(jwt(23.9, 'z'), 'model-test-short'),
+        trigger: 'open',
+      },
+    });
+    expect([alone.statusCode, alone.json<{ error: { code: string } }>().error.code]).toEqual([
+      422,
+      'connector_session_auto_unprocessable',
+    ]);
+    expect((await accountRow(id)).sessionCiphertext).toBeNull();
+    expect(alone.body).not.toContain('invented-signature');
+
+    const old = await sync(id, revealSession(jwt(1, 'a'), 'model-test-short'));
+    expect(old.statusCode, old.body).toBe(200);
+    expect(old.json()).toMatchObject({ sessionState: 'warning', reconnectFirst: true });
+    expect(Date.parse(old.json<{ expiresAt: string }>().expiresAt) - Date.now()).toBeLessThan(
+      3_600_000 + 60_000,
+    );
+    expect((await accountRow(id)).sessionState).toBe('warning');
+    expect(old.body).not.toContain('invented-signature');
+
+    // Logged out and in again: a fresh login's token, valid, nothing more to do.
+    const freshSession = revealSession(jwt(23.9, 'b'), 'model-test-short');
+    const fresh = await sync(id, freshSession);
+    expect(fresh.json()).toMatchObject({ sessionState: 'valid', reconnectFirst: false, kept: false });
+    // Yesterday's token sent again: the one in place lives longer and stays (ADR 0147 § 7).
+    const again = await sync(id, revealSession(jwt(1, 'a'), 'model-test-short'));
+    expect(again.json()).toMatchObject({ sessionState: 'valid', reconnectFirst: false, kept: true });
+    expect(await app.modules.connectors.sessions.load(creatorId, id)).toBe(freshSession);
+    expect((await accountRow(id)).sessionState).toBe('valid');
+    for (const to of ['warning', 'valid'])
+      expect(
+        await count(
+          'domain_events',
+          sql`type = 'session_state_changed' and payload->>'platformAccountId' = ${id} and payload->>'to' = ${to}`,
+        ),
+      ).toBe(1);
   });
 });

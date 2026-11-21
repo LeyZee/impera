@@ -16,6 +16,7 @@ import { Card, Fact } from './parts';
 import '@/reports/reports.css';
 import '@/scheduling/scheduling.css';
 import '@/screens/team/team.css';
+import { Failure } from '@/shell/states';
 import './billing.css';
 
 interface Opened {
@@ -46,21 +47,11 @@ export function BillingSection(): JSX.Element {
   if (query.isError) {
     return (
       <section className="rp-rules bf">
-        <div className="nv-plate rp-rules__cover nv-enter">
-          <p className="rp-notice__title">Le serveur ne répond pas</p>
-          <p className="rp-notice__text">
-            Les réglages de facturation n’ont pas pu être lus. Réessaie dans un instant.
-          </p>
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft tm-self-start"
-            onClick={() => {
-              void query.refetch();
-            }}
-          >
-            Réessayer
-          </button>
-        </div>
+        <Failure
+          onRetry={() => {
+            void query.refetch();
+          }}
+        />
       </section>
     );
   }
@@ -107,18 +98,76 @@ export function BillingSection(): JSX.Element {
   );
 }
 
+/**
+ * Nothing saved yet (recette visuelle 16/11, GES-26): a one-line notice with the screen's one neon, then the cards the
+ * owner will fill, empty, so that what an invoice asks for is seen before it is asked. Each opens the first filling,
+ * which walks every step.
+ */
 function Setup({ onStart }: { onStart: () => void }): JSX.Element {
+  const missing = <span className="bf-missing">À remplir</span>;
   return (
-    <div className="rp-notice nv-enter" data-tone="warn" style={{ '--nv-i': 1 }}>
-      <p className="rp-notice__title">Aucune facture ne part</p>
-      <p className="rp-notice__text">
-        Tant que ces réglages ne sont pas enregistrés, un relevé validé reste sans facture. Garde le Kbis sous
-        la main, et les conditions de paiement validées par ton comptable.
-      </p>
-      <button type="button" className="nv-btn nv-btn--neon tm-self-start" onClick={onStart}>
-        Remplir les réglages
-      </button>
-    </div>
+    <>
+      <div className="rp-notice nv-enter" data-tone="warn" style={{ '--nv-i': 1 }}>
+        <div className="bf-setup">
+          <p className="rp-notice__title">
+            Aucune facture ne part tant que ces réglages ne sont pas enregistrés
+          </p>
+          <button type="button" className="nv-btn nv-btn--neon" onClick={onStart}>
+            Remplir les réglages
+          </button>
+        </div>
+      </div>
+      <Card
+        index={1}
+        title={CARDS.agency.title}
+        sub="En tête de chaque facture, et en pied de chaque page"
+        action="Remplir"
+        onChange={onStart}
+      >
+        <dl className="bf-facts">
+          <Fact label="Raison sociale">{missing}</Fact>
+          <Fact label="Siège">{missing}</Fact>
+          <Fact label="SIREN">{missing}</Fact>
+          <Fact label="TVA intracommunautaire">{missing}</Fact>
+        </dl>
+        <p className="tm-hint">Garde le Kbis sous la main.</p>
+      </Card>
+      <Card
+        index={2}
+        title={CARDS.service.title}
+        sub="Au-dessus des lignes de chaque facture"
+        action="Remplir"
+        onChange={onStart}
+      >
+        <p className="bf-missing">À écrire</p>
+      </Card>
+      <Card
+        index={3}
+        title={CARDS.payment.title}
+        sub="Sous le total de chaque facture"
+        action="Remplir"
+        onChange={onStart}
+      >
+        <dl className="bf-facts">
+          <Fact label="Échéance">{missing}</Fact>
+          <Fact label="Conditions">{missing}</Fact>
+        </dl>
+        <p className="tm-hint">Les conditions de paiement validées par ton comptable.</p>
+      </Card>
+      <Card
+        index={4}
+        title={CARDS.logo.title}
+        sub="En tête de chaque facture et de chaque avoir"
+        action="Remplir"
+        onChange={onStart}
+      >
+        <div className="bf-paper bf-paper--logo">
+          <p className="bf-paper__none">
+            Facultatif : sans logo, la facture imprime la raison sociale seule.
+          </p>
+        </div>
+      </Card>
+    </>
   );
 }
 

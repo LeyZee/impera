@@ -121,6 +121,6 @@ export function wireContractors(
         },
       ),
     },
-    routes: [module.routes(requireRole)],
+    routes: [module.routes(requireRole, shared.recentLogin)],
   };
 }

@@ -50,7 +50,14 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
         text: 'Texte inventé',
         priceMinor: 1_500,
         currency: 'EUR',
-        media: [{ ref: 'media_1', kind: 'image', vault: { mediaAssetId: null, descriptionId: 'desc_1' } }],
+        discount: null,
+        media: [
+          {
+            ref: 'media_1',
+            kind: 'image',
+            vault: { mediaAssetId: null, descriptionId: 'desc_1', imported: true, shown: null },
+          },
+        ],
         previewMedia: [],
       },
       {
@@ -61,11 +68,19 @@ function script(overrides: Partial<StoredPlatformScript> = {}): StoredPlatformSc
         text: 'Un vocal',
         priceMinor: 0,
         currency: 'EUR',
-        media: [{ ref: 'media_2', kind: 'audio', vault: { mediaAssetId: null, descriptionId: null } }],
+        discount: null,
+        media: [
+          {
+            ref: 'media_2',
+            kind: 'audio',
+            vault: { mediaAssetId: null, descriptionId: null, imported: true, shown: null },
+          },
+        ],
         previewMedia: [],
       },
     ],
     identities: [],
+    ours: null,
     ...overrides,
   };
 }
@@ -80,7 +95,6 @@ function harness(target: IdentityTarget | null, answer: Awaited<ReturnType<Scrip
       return Promise.resolve();
     },
     enqueueBacklog: () => Promise.resolve(0),
-    enqueue: () => Promise.resolve(),
   };
   const brain: ScriptIdentifier = {
     promptHash: 'prompt_now',
@@ -98,9 +112,8 @@ const identified = {
   model: 'brain-test',
   promptHash: 'prompt_now',
 };
-const target = (stored: StoredPlatformScript, describes = true): IdentityTarget => ({
+const target = (stored: StoredPlatformScript): IdentityTarget => ({
   script: stored,
-  describes,
   descriptions: new Map([['desc_1', 'Une photo inventée dans un salon.']]),
 });
 const request = (stored: StoredPlatformScript) => ({ creatorId, platformScriptId: stored.id });
@@ -148,11 +161,8 @@ describe('identifyPlatformScript', () => {
     ]);
   });
 
-  it('writes nothing while her switch is off, a photo is undescribed, or the script has branches', async () => {
+  it('writes nothing while a photo is undescribed, or the script has branches', async () => {
     const stored = script();
-    expect(
-      await identifyPlatformScript(harness(target(stored, false), identified).deps, request(stored)),
-    ).toBe('off');
     const undescribed = script({
       steps: script().steps.map((step) => ({
         ...step,
@@ -162,6 +172,26 @@ describe('identifyPlatformScript', () => {
     expect(
       await identifyPlatformScript(harness(target(undescribed), identified).deps, request(undescribed)),
     ).toBe('waiting');
+    // Every media described, one not chosen for the CRM (ADR 0145 § 5): the brain is not paid for it.
+    const notImported = script({
+      steps: script().steps.map((step) => ({
+        ...step,
+        media: step.media.map((media) => ({
+          ...media,
+          vault: media.vault === null ? null : { ...media.vault, imported: false },
+        })),
+      })),
+    });
+    expect(
+      await identifyPlatformScript(harness(target(notImported), identified).deps, request(notImported)),
+    ).toBe('waiting');
+    // No media at all: nothing of hers chosen, the brain is never paid of itself for its texts.
+    const textOnly = script({
+      steps: script().steps.map((step) => ({ ...step, media: [], previewMedia: [] })),
+    });
+    const quiet = harness(target(textOnly), identified);
+    expect(await identifyPlatformScript(quiet.deps, request(textOnly))).toBe('waiting');
+    expect(quiet.asked).toEqual([]);
     const branched = script({ steps: script().steps.map((step) => ({ ...step, platformIndex: 0 })) });
     const run = harness(target(branched), identified);
     expect(await identifyPlatformScript(run.deps, request(branched))).toBe('branched');

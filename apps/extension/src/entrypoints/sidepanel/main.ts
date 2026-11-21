@@ -2,6 +2,7 @@ import '@impera/design-system/styles.css';
 import './sidepanel.css';
 
 import {
+  CRM_RAILS,
   FanCardGroupSchema,
   type CopilotDraftView,
   type CopilotVerdictBody,
@@ -12,11 +13,16 @@ import {
 import { browser } from 'wxt/browser';
 
 import { readDraftView, readFanCard, readStanding, type CardRead } from '../../lib/copilot/api';
+import { newestOf } from '../../lib/copilot/card';
 import { openConversationOf } from '../../lib/copilot/open-conversation';
-import { standingOf, type Standing } from '../../lib/copilot/standing';
+import { standingOf, withheldOf, type Standing } from '../../lib/copilot/standing';
 import { VerdictSentSchema, type FromPanel } from '../../lib/copilot/verdict';
-import { storedOrigin } from '../../lib/crm-origin-store';
+import { changedOrigin, DEFAULT_CRM_ADDRESS } from '../../lib/crm-address';
+import { ADDRESS_KEY, BUILT_IN_CRM, storedOrigin } from '../../lib/crm-origin-store';
+import { readCrmSession } from '../../lib/session';
+import { kindOf } from '../../lib/who';
 
+import { drawnKey, keepsDone } from './redraw';
 import { render, type DraftPart, type GestureDone, type PanelScreen } from './view';
 
 /**
@@ -51,6 +57,11 @@ let card: CardRead | null = null;
 let cardReadAt = 0;
 let standing: Standing | null = null;
 let standingReadAt = 0;
+let fanName: string | null = null;
+/** The newest value of his card when the panel first read it: a value after it is marked « nouveau » (EXT-14). */
+let newSince: string | null = null;
+/** Whether the reader has Créatrices, read once, only when her card is off (EXT-17). */
+let opensCreators: boolean | null = null;
 let view: Extract<CopilotDraftView, { conversation: unknown }> | null = null;
 /** The chatter's gesture on the draft shown; dropped when another draft takes its place. */
 interface Gesture {
@@ -59,6 +70,8 @@ interface Gesture {
   readonly text: string;
   readonly reason: RejectReason | null;
   readonly done: GestureDone | null;
+  /** When the gesture was made: what it left stays a while after the draft leaves the CRM (EXT-23). */
+  readonly doneAt: number;
 }
 let gesture: Gesture | null = null;
 let openGroups = new Set<FanCardGroup>();
@@ -80,9 +93,19 @@ async function count(draftId: DraftId, body: CopilotVerdictBody): Promise<void> 
   setGesture({ ...gesture, done: { ...gesture.done, sent: sent.success ? sent.data : 'unreachable' } });
 }
 
-/** `a` or `e` (§ 4): the text goes to Reveal, here through the clipboard, and the chatter sends it himself. */
+const copy = (text: string): Promise<boolean> =>
+  navigator.clipboard.writeText(text).then(
+    () => false,
+    () => true,
+  );
+
+/**
+ * `a` or `e` (§ 4): the text goes to Reveal, here through the clipboard, and the chatter sends it himself, one bubble at
+ * a time as Reveal sends them (EXT-13). Never for a fan he must no longer write to (EXT-05), nor while his limits are
+ * not read.
+ */
 async function place(edited: boolean): Promise<void> {
-  if (view?.state !== 'ready' || gesture?.done !== null) return;
+  if (view?.state !== 'ready' || gesture?.done !== null || withheldOf(standing) !== null) return;
   const { draftId } = gesture;
   const bubbles = edited
     ? gesture.text
@@ -90,13 +113,27 @@ async function place(edited: boolean): Promise<void> {
         .map((line) => line.trim())
         .filter((line) => line !== '')
     : view.draft.bubbles;
-  if (bubbles.length === 0) return;
-  const copyFailed = await navigator.clipboard.writeText(bubbles.join('\n')).then(
-    () => false,
-    () => true,
-  );
-  setGesture({ ...gesture, mode: 'idle', done: { outcome: 'placed', copyFailed, sent: 'sending' } });
+  const [first] = bubbles;
+  if (first === undefined) return;
+  const copyFailed = await copy(first);
+  setGesture({
+    ...gesture,
+    mode: 'idle',
+    done: { outcome: 'placed', bubbles, copied: 1, copyFailed, sent: 'sending' },
+    doneAt: Date.now(),
+  });
   await count(draftId, { kind: 'placed', creatorId: view.conversation.creatorId, edited });
+}
+
+/** `a` again, after a placing: the next bubble. The gesture was counted once, with the first. */
+async function copyNext(): Promise<void> {
+  const done = gesture?.done;
+  if (gesture === null || done?.outcome !== 'placed' || withheldOf(standing) !== null) return;
+  const next = done.bubbles[done.copied];
+  if (next === undefined) return;
+  const copyFailed = await copy(next);
+  if (gesture.done !== done) return;
+  setGesture({ ...gesture, done: { ...done, copied: done.copied + 1, copyFailed }, doneAt: Date.now() });
 }
 
 const actions = {
@@ -109,8 +146,9 @@ const actions = {
     void browser.storage.local.set({ [GROUPS_KEY]: [...openGroups] }).catch(() => undefined);
   },
   place: (edited: boolean) => void place(edited),
+  copyNext: () => void copyNext(),
   edit: () => {
-    if (view?.state !== 'ready' || gesture?.done !== null) return;
+    if (view?.state !== 'ready' || gesture?.done !== null || withheldOf(standing) !== null) return;
     setGesture({ ...gesture, mode: 'editing', text: view.draft.bubbles.join('\n') });
     document.querySelector<HTMLTextAreaElement>('.cp-draft__area')?.focus();
   },
@@ -134,7 +172,14 @@ const actions = {
     setGesture({
       ...gesture,
       mode: 'idle',
-      done: { outcome: 'rejected', copyFailed: false, sent: 'sending' },
+      done: {
+        outcome: 'rejected',
+        bubbles: view.draft.bubbles,
+        copied: 0,
+        copyFailed: false,
+        sent: 'sending',
+      },
+      doneAt: Date.now(),
     });
     void count(draftId, {
       kind: 'rejected',
@@ -165,7 +210,8 @@ document.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey || gesture?.mode !== 'idle') return;
   const run = {
     a: () => {
-      actions.place(false);
+      if (gesture?.done?.outcome === 'placed') actions.copyNext();
+      else actions.place(false);
     },
     e: actions.edit,
     r: actions.reject,
@@ -175,12 +221,23 @@ document.addEventListener('keydown', (event) => {
   run();
 });
 
+/**
+ * What a gesture left, once its draft is gone from the CRM (refused, or sent and reconciled): said a while, and as long
+ * as bubbles are left to copy, so the chatter reads it and finishes (EXT-23).
+ */
+function leftPart(): DraftPart | null {
+  const done = gesture?.done;
+  if (gesture === null || done === null || done === undefined) return null;
+  if (!keepsDone(done, gesture.doneAt, Date.now())) return null;
+  return { kind: 'ready', bubbles: done.bubbles, placed: true, mode: 'idle', text: '', reason: null, done };
+}
+
 function draftPart(): DraftPart {
-  if (view === null || view.state === 'off' || view.state === 'none') return { kind: 'hidden' };
-  if (view.state === 'writing') return { kind: 'writing' };
+  if (view === null || view.state === 'off' || view.state === 'none') return leftPart() ?? { kind: 'hidden' };
+  if (view.state === 'writing') return leftPart() ?? { kind: 'writing' };
   const { draft } = view;
   if (gesture?.draftId !== draft.draftId)
-    gesture = { draftId: draft.draftId, mode: 'idle', text: '', reason: null, done: null };
+    gesture = { draftId: draft.draftId, mode: 'idle', text: '', reason: null, done: null, doneAt: 0 };
   return {
     kind: 'ready',
     bubbles: draft.bubbles,
@@ -195,14 +252,7 @@ function draftPart(): DraftPart {
 /** Draws only what changed: an answer equal to the last one leaves the panel as it is, under his eyes (§ 10). */
 function show(next: PanelScreen): void {
   screen = next;
-  // The text being retouched is not drawn again: it lives in its field (render keeps that field in place).
-  const drawnPart =
-    next.kind === 'conversation' && next.draft.kind === 'ready'
-      ? { ...next, draft: { ...next.draft, text: null } }
-      : next;
-  const key = JSON.stringify(drawnPart, (name, value: unknown) =>
-    name === 'now' ? undefined : value instanceof Set ? [...value] : value,
-  );
+  const key = drawnKey(next);
   if (key === drawn || root === null) return;
   drawn = key;
   render(root, screen, actions);
@@ -211,10 +261,13 @@ function show(next: PanelScreen): void {
 function cardScreen(cardOn: boolean): PanelScreen {
   return {
     kind: 'conversation',
+    fanName,
     standing,
     cardOn,
+    opensCreators: opensCreators === true,
     card: card === null ? null : card.kind === 'card' ? card.card : card.kind,
     openGroups,
+    newSince,
     draft: draftPart(),
     now: new Date(),
   };
@@ -238,6 +291,8 @@ async function refresh(): Promise<void> {
     fan = null;
     card = null;
     standing = null;
+    fanName = null;
+    newSince = null;
     view = null;
     gesture = null;
   }
@@ -261,14 +316,23 @@ async function refresh(): Promise<void> {
     fan = { creatorId, fanId };
     card = null;
     standing = null;
+    fanName = null;
+    newSince = null;
   }
   if (standing === null || Date.now() - standingReadAt >= STANDING_EVERY_MS) {
     const answer = await readStanding(origin, creatorId, read.view.conversation.conversationId, fanId);
     if (mine !== turn) return;
     standing = standingOf(answer.flags, answer.band);
+    fanName = answer.fanName ?? fanName;
     standingReadAt = Date.now();
   }
   if (!switches.fanCard) {
+    if (opensCreators === null) {
+      const session = await readCrmSession(origin);
+      if (mine !== turn) return;
+      if (session.kind === 'signed_in')
+        opensCreators = CRM_RAILS[kindOf(session.me)].sections.some(([section]) => section === '/creatrices');
+    }
     show(cardScreen(false));
     return;
   }
@@ -276,6 +340,8 @@ async function refresh(): Promise<void> {
     if (card === null) show(cardScreen(true));
     const answer = await readFanCard(origin, creatorId, fanId);
     if (mine !== turn) return;
+    if (newSince === null && answer.kind === 'card')
+      newSince = newestOf(answer.card.fields) ?? new Date().toISOString();
     card = answer;
     cardReadAt = Date.now();
   }
@@ -309,6 +375,15 @@ async function start(): Promise<void> {
   });
   browser.tabs.onUpdated.addListener((_id, change, tab) => {
     if (tab.active && tab.windowId === windowId && change.url !== undefined) void refresh();
+  });
+  // The popup saves another address: the panel follows it at once, from a clean slate (EXT-24).
+  browser.storage.onChanged.addListener((changes, area) => {
+    const next = changedOrigin(changes, area, ADDRESS_KEY, BUILT_IN_CRM ?? DEFAULT_CRM_ADDRESS);
+    if (next === null || next === origin) return;
+    origin = next;
+    conversationId = null;
+    opensCreators = null;
+    void refresh();
   });
   document.addEventListener('visibilitychange', schedule);
   schedule();

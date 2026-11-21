@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { MessageAuthorSchema, MessageDirectionSchema, PlatformSchema, SessionStateSchema } from './enums';
+import {
+  MessageAuthorSchema,
+  MessageDirectionSchema,
+  MessageOriginSchema,
+  PlatformSchema,
+  SessionStateSchema,
+} from './enums';
 import { PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
 
@@ -51,6 +57,8 @@ export const ExternalMessageSchema = z.object({
    * creator's side (`human`: the creator herself or a chatter). Absent when the platform does not say.
    */
   author: MessageAuthorSchema.optional(),
+  /** Written by an automation of the platform, or his answer to a story (ADR 0110); absent otherwise. */
+  origin: MessageOriginSchema.optional(),
   createdAt: z.iso.datetime(),
 });
 export type ExternalMessage = z.infer<typeof ExternalMessageSchema>;
@@ -124,6 +132,13 @@ export type FanNote = z.infer<typeof FanNoteSchema>;
 export const CreatorNoteSchema = z.object({ text: z.string().min(1) });
 export type CreatorNote = z.infer<typeof CreatorNoteSchema>;
 
+/**
+ * Her public profile on the platform (`getCreatorProfile`, ADR 0154): her bio as every subscriber could read it before
+ * writing to her; empty when she has none. Read only: Impera never writes it.
+ */
+export const CreatorProfileSchema = z.object({ bio: z.string() });
+export type CreatorProfile = z.infer<typeof CreatorProfileSchema>;
+
 /** One bundle the fan was offered in the conversation, bought or not. */
 const PpvOfferSchema = z.object({
   ref: ExternalRefSchema,
@@ -153,6 +168,19 @@ export const PlatformScriptMomentSchema = z.enum(['day', 'night']);
 export type PlatformScriptMoment = z.infer<typeof PlatformScriptMomentSchema>;
 
 /** One step of a platform script: its text, the media it sells, its previews and its price. */
+/** A platform's reduced price on a step: either part may be missing, a discount all the same, never both. */
+export const PlatformStepDiscountSchema = z
+  .object({
+    /** Minor units, VAT included. */
+    priceMinor: z.number().int().min(0).nullable(),
+    /** How long it lasts, in minutes. */
+    minutes: z.number().int().min(0).nullable(),
+  })
+  .refine((discount) => discount.priceMinor !== null || discount.minutes !== null, {
+    message: 'A discount says its price or its duration',
+  });
+export type PlatformStepDiscount = z.infer<typeof PlatformStepDiscountSchema>;
+
 export const PlatformScriptStepSchema = z.object({
   /** The step as the platform names it: what a send of this step refers to. */
   ref: ExternalRefSchema,
@@ -171,6 +199,11 @@ export const PlatformScriptStepSchema = z.object({
   /** Minor units, VAT included; 0 for a free step. */
   priceMinor: z.number().int().min(0),
   currency: CurrencySchema,
+  /**
+   * A reduced price for a time, set on the platform (Reveal's « Tarif réduit »), as it gives it; `null` when the step
+   * has none. Impera never sells at it: such a step is never sent and its script never offered (recette 16/11, Charles).
+   */
+  discount: PlatformStepDiscountSchema.nullable(),
 });
 export type PlatformScriptStep = z.infer<typeof PlatformScriptStepSchema>;
 
@@ -198,13 +231,24 @@ export type SentScriptStep = z.infer<typeof SentScriptStepSchema>;
  * came one after the other. The CRM does not keep that rank, which moves at each new upload: `media_platform_refs.
  * folder_position` keeps the rank among the media of the same folder uploaded at the same millisecond, in this list's
  * order (`vaultRefsOf`), and the order is rebuilt from the upload time, then that rank. `folder.moment`: ☀️ or 🌙 read in the folder's name, which is what decides. `description`:
- * the platform's text, a starting point never validated. `suggestedPriceMinor`: the platform's suggested range, in the
+ * the platform's text, a starting point never validated. `blurhash`: its blurred preview (`BlurhashSchema`). `suggestedPriceMinor`: the platform's suggested range, in the
  * platform's minor unit (euro cents on Reveal, like its other prices; to confirm at the first real read), only shown.
  */
 /** Longest vault folder name kept (`media_platform_refs.folder_name`, CHECK): longer, the connector cuts it. */
 export const VAULT_FOLDER_NAME_MAX = 200;
 /** Longest platform text on a vault media kept (`media_platform_refs.platform_description`, CHECK): longer, cut. */
 export const VAULT_DESCRIPTION_MAX = 2_000;
+/**
+ * A blurhash (base 83, at most 9 × 9 components: 4 + 2 × 81 characters), the platform's own blurred preview of a media:
+ * a few colours computed from the image, never the image nor a link to it (ADR 0030 § 4). The screen draws it as the
+ * media's blurred tile (`media_platform_refs.preview_blurhash`, CHECK).
+ */
+export const VAULT_BLURHASH_MAX = 166;
+export const BlurhashSchema = z
+  .string()
+  .min(6)
+  .max(VAULT_BLURHASH_MAX)
+  .regex(/^[0-9A-Za-z#$%*+,\-.:;=?@[\]^_{|}~]+$/);
 
 export const VaultMediaSchema = z.object({
   ref: ExternalRefSchema,
@@ -221,6 +265,8 @@ export const VaultMediaSchema = z.object({
   createdAt: z.iso.datetime(),
   description: z.string().max(VAULT_DESCRIPTION_MAX).nullable(),
   suggestedPriceMinor: z.object({ min: z.number().int().min(0), max: z.number().int().min(0) }).nullable(),
+  /** The platform's blurred preview; `null` when it gives none or one that does not read as a blurhash. */
+  blurhash: BlurhashSchema.nullable(),
 });
 export type VaultMedia = z.infer<typeof VaultMediaSchema>;
 
@@ -263,6 +309,10 @@ export const ConnectorCapabilitiesSchema = z.object({
   vault: z.boolean(),
   /** `fetchMedia`: a vault file read to a temporary file, never kept (ADR 0113). */
   mediaDownload: z.boolean(),
+  /** `readVaultPreview`: a vault media's small picture read on demand, never kept (ADR 0138). */
+  vaultPreview: z.boolean(),
+  /** `getCreatorProfile`: her public profile as every subscriber reads it, read only (ADR 0154). */
+  creatorProfile: z.boolean(),
 });
 export type ConnectorCapabilities = z.infer<typeof ConnectorCapabilitiesSchema>;
 
@@ -314,8 +364,30 @@ export type ConnectorConfig = z.infer<typeof ConnectorConfigSchema>;
 export const ConnectorSessionBodySchema = z.object({
   platformAccountId: PlatformAccountIdSchema,
   session: z.string().min(1).max(65_536),
+  /**
+   * The owner's gesture (ADR 0147): `click` on « Synchroniser », or `open`, the extension syncing alone when the popup
+   * opens. `open` only adds refusals: an account with no session yet, or none whose member is pinned.
+   */
+  trigger: z.enum(['click', 'open']).optional(),
 });
 export type ConnectorSessionBody = z.infer<typeof ConnectorSessionBodySchema>;
+
+/**
+ * What the « Sync » stored: its state and the token's own expiry. Reveal's token lives 24 h from the login to Reveal,
+ * never from the « Sync » (reveal-connector-spec.md § 2): `reconnectFirst` says it has under 20 h left, so the owner
+ * logs out of Reveal and in again, then syncs once more. Never a value of the session.
+ */
+export const ConnectorSessionStoredSchema = z.object({
+  sessionState: z.enum(['valid', 'warning']),
+  expiresAt: z.iso.datetime().nullable(),
+  reconnectFirst: z.boolean(),
+  /**
+   * The session in place was kept (ADR 0147 § 7): it still holds and expires later than the one sent. The answer then
+   * speaks of the session kept.
+   */
+  kept: z.boolean(),
+});
+export type ConnectorSessionStored = z.infer<typeof ConnectorSessionStoredSchema>;
 
 /**
  * `GET /v1/connector/accounts?platform=`: the accounts the extension may sync, for the owner's link only (ADR 0066 § 7).
@@ -328,6 +400,11 @@ export const ConnectorAccountChoiceSchema = z.object({
   creatorName: z.string(),
   sessionState: SessionStateSchema,
   sessionUpdatedAt: z.iso.datetime().nullable(),
+  /**
+   * The platform's id of the model the stored session speaks for, `null` before the first « Sync » (ADR 0147 § 4): the
+   * extension sends a session to the one account whose model the tab names. The owner's link only, never logged.
+   */
+  modelId: z.string().nullable().optional(),
 });
 export type ConnectorAccountChoice = z.infer<typeof ConnectorAccountChoiceSchema>;
 
@@ -342,3 +419,5 @@ export const CONNECTOR_SESSION_UNPROCESSABLE = 'connector_session_unprocessable'
 export const CONNECTOR_SESSION_CONFLICT = 'connector_session_conflict';
 /** The session of another team member than the « bot » member the account was first synced with (P2-02). */
 export const CONNECTOR_SESSION_MEMBER_CONFLICT = 'connector_session_member_conflict';
+/** A sync « à l'ouverture » on an account never synced by hand, or whose member is not pinned (ADR 0147 § 1, § 4). */
+export const CONNECTOR_SESSION_AUTO_UNPROCESSABLE = 'connector_session_auto_unprocessable';

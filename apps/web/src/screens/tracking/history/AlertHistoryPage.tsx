@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { useId, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { Reader } from '../Reader';
+import { suiviEyebrow } from '../SuiviNav';
 import '../tracking.css';
 
 import {
@@ -34,7 +35,10 @@ import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { useAlerts } from '@/settings/alerts/api';
 import { Select } from '@/shell/Select';
+import { BellArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
+import { Empty, Failure } from '@/shell/states';
 
 /** The conversation a line opened, with its creator: the reader needs both, and the list may change under it. */
 interface Opened {
@@ -91,8 +95,9 @@ export function AlertHistoryPage({
   return (
     <Page className={selected === null ? 'tr-page' : 'tr-page tr-is-reading'}>
       <PageHeader
-        eyebrow={creators.length === 1 ? creators[0]?.displayName : undefined}
-        title="Suivi"
+        // The section above, the open tab as the title (recette visuelle 16/11, T2).
+        eyebrow={suiviEyebrow(creators.length === 1 ? creators[0]?.displayName : undefined)}
+        title={screenLabel('/suivi/alertes')}
         lead={
           <>
             Chaque alerte qui a sonné, la plus récente d’abord. Ce qui demande une main est dans{' '}
@@ -102,32 +107,24 @@ export function AlertHistoryPage({
             .
           </>
         }
-        actions={nav}
+        tabs={nav}
       />
       {creatorsQuery.isError ? (
-        <Notice
-          title="Le serveur ne répond pas"
-          text="La liste n’a pas pu être lue. Réessaie dans un instant."
-        >
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            onClick={() => {
-              void creatorsQuery.refetch();
-            }}
-          >
-            Réessayer
-          </button>
-        </Notice>
+        <Failure
+          onRetry={() => {
+            void creatorsQuery.refetch();
+          }}
+        />
       ) : creatorsQuery.isPending ? (
         <Skeleton />
       ) : creators.length === 0 ? (
         <Notice
+          art={<BellArt />}
           title="Aucune créatrice pour l’instant"
           text="Ses alertes arrivent ici dès qu’une créatrice t’est confiée."
         />
       ) : (
-        <div className="tr-layout">
+        <div className="tr-layout hi-layout">
           <div className="tr-side">
             <History
               creators={creators}
@@ -168,11 +165,11 @@ export function AlertHistoryPage({
           </div>
           {selected === null ? (
             <section className="nv-plate tr-reader tr-reader--idle" aria-label="Conversation">
-              <p className="tr-reader__empty">Choisis une alerte à gauche : sa conversation s’ouvre ici.</p>
+              <Empty title="Choisis une alerte à gauche.">Sa conversation s’ouvre ici.</Empty>
             </section>
           ) : open === null ? (
             <section className="nv-plate tr-reader" aria-label="Conversation">
-              <p className="tr-reader__empty">Cette conversation n’est pas dans la liste.</p>
+              <Empty title="Cette conversation n’est pas dans la liste." />
             </section>
           ) : (
             <Reader
@@ -285,13 +282,59 @@ function History({
   };
 
   return (
-    <Panel
-      className="tr-panel hi-panel"
-      actions={
-        anyUnseen ? (
+    <Panel className="tr-panel hi-panel">
+      {/* The list's header: its filters on one row, « Tout marquer comme vu » at its end, on the list's own edges
+          (recette visuelle 16/11). */}
+      <div className="hi-head">
+        <div className="hi-filters" role="group" aria-label="Filtres">
           <button
             type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
+            className="nv-chip"
+            aria-pressed={unseen}
+            onClick={() => {
+              onUnseen(!unseen);
+            }}
+          >
+            Non vues
+          </button>
+          <label className="sr-only" htmlFor={`${id}-alert`}>
+            Alerte
+          </label>
+          <Select<string>
+            id={`${id}-alert`}
+            className="hi-select"
+            listWidth="options"
+            value={alert ?? ''}
+            options={[{ value: '', label: 'Toutes les alertes' }, ...choices]}
+            onChange={(value) => {
+              onAlert(choiceOf(value));
+            }}
+          />
+          {several ? (
+            <>
+              <label className="sr-only" htmlFor={`${id}-creator`}>
+                Créatrice
+              </label>
+              <Select<string>
+                id={`${id}-creator`}
+                className="hi-select"
+                listWidth="options"
+                value={creator ?? ''}
+                options={[
+                  { value: '', label: 'Toutes les créatrices' },
+                  ...creators.map((one) => ({ value: one.id, label: one.displayName })),
+                ]}
+                onChange={(value) => {
+                  onCreator(creators.find((one) => one.id === value)?.id ?? null);
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+        {anyUnseen ? (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm hi-head__all"
             // While another filter is read, the lines shown are the old one's: their newest is no `untilId` for it.
             disabled={markingAll || stale}
             aria-busy={markingAll}
@@ -301,50 +344,6 @@ function History({
           >
             {markingAll ? 'Marquage…' : 'Tout marquer comme vu'}
           </button>
-        ) : undefined
-      }
-    >
-      <div className="hi-filters" role="group" aria-label="Filtres">
-        <button
-          type="button"
-          className="nv-chip"
-          aria-pressed={unseen}
-          onClick={() => {
-            onUnseen(!unseen);
-          }}
-        >
-          Non vues
-        </button>
-        <label className="sr-only" htmlFor={`${id}-alert`}>
-          Alerte
-        </label>
-        <Select<string>
-          id={`${id}-alert`}
-          className="hi-select"
-          value={alert ?? ''}
-          options={[{ value: '', label: 'Toutes les alertes' }, ...choices]}
-          onChange={(value) => {
-            onAlert(choiceOf(value));
-          }}
-        />
-        {several ? (
-          <>
-            <label className="sr-only" htmlFor={`${id}-creator`}>
-              Créatrice
-            </label>
-            <Select<string>
-              id={`${id}-creator`}
-              className="hi-select"
-              value={creator ?? ''}
-              options={[
-                { value: '', label: 'Toutes les créatrices' },
-                ...creators.map((one) => ({ value: one.id, label: one.displayName })),
-              ]}
-              onChange={(value) => {
-                onCreator(creators.find((one) => one.id === value)?.id ?? null);
-              }}
-            />
-          </>
         ) : null}
       </div>
 
@@ -455,8 +454,12 @@ function Line({
           <span className="nv-convo__name hi-line__name">
             {seen ? null : <span className="sr-only">Non vue : </span>}
             {item.alertName}
-            {item.pausedAgent ? <span className="nv-tag hi-line__tag">Agent en pause</span> : null}
           </span>
+          {item.pausedAgent ? (
+            <span className="hi-line__tags">
+              <span className="nv-tag nv-tag--declared">Agent en pause</span>
+            </span>
+          ) : null}
           {reasonAddsSomething(item) ? <span className="hi-line__reason">{item.reason}</span> : null}
           <span className="nv-convo__preview">
             {creatorName === undefined ? fan : `${fan} · ${creatorName}`}
@@ -506,19 +509,18 @@ function Skeleton({ bare = false }: { bare?: boolean }): JSX.Element {
 function Notice({
   title,
   text,
+  art,
   children,
 }: {
   title: string;
   text: string;
+  /** The picture of the subject, when the whole screen is empty. */
+  art?: JSX.Element;
   children?: JSX.Element;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in tr-notice">
-        <h2>{title}</h2>
-        <p>{text}</p>
-        {children}
-      </div>
-    </Panel>
+    <Empty plate title={title} action={children} {...(art === undefined ? {} : { art })}>
+      {text}
+    </Empty>
   );
 }

@@ -21,11 +21,12 @@ import './me.css';
  */
 export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: () => void }): JSX.Element {
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Préférences"
-        actions={
+        lead="L’apparence d’Impera, et la façon dont il te prévient."
+        tabs={
           <MeNav
             manager={user.teamScope === 'agency'}
             creator={user.role === 'creator'}
@@ -89,6 +90,8 @@ export function MyPreferencesPage({ user, onSignOut }: { user: Me; onSignOut: ()
         )}
         <Panel className="nv-enter" eyebrow={user.name} title="Compte">
           <div className="me-prefs__body">
+            {/* The address she signs in with, under her name (recette visuelle 16/11, CRE-20). */}
+            <p className="me-prefs__text me-prefs__mail">{user.email}</p>
             <button type="button" className="nv-btn nv-btn--soft nv-btn--sm me-prefs__go" onClick={onSignOut}>
               Se déconnecter
             </button>

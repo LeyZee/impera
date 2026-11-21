@@ -109,7 +109,6 @@
 }
 .cf-guide__body h3 {
   margin: 0 0 var(--nv-space-2);
-  font-size: var(--nv-text-headline);
 }
 .cf-guide__body h4 {
   margin: var(--nv-space-3) 0 var(--nv-space-1);
@@ -163,6 +162,9 @@
   display: flex;
   gap: var(--nv-space-2);
   align-items: center;
+}
+.cf-prefix__number {
+  white-space: nowrap;
 }
 .cf-prefix__input {
   width: 10rem;

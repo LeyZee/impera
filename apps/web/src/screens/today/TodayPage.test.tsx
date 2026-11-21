@@ -147,7 +147,11 @@ describe('Aujourd’hui', () => {
     const hero = (await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 })).closest('section');
     expect(hero?.textContent).toContain('Prochain shift');
     expect(hero?.textContent).toContain('dans 22 h');
-    expect(hero?.textContent).toContain('Les passations qu’on te confie arriveront dans Suivi.');
+    // A shift ahead says nothing of the passations: the whole card opens Planning (CHA-23).
+    expect(hero?.textContent).not.toContain('passations');
+    expect(hero?.querySelector('a')?.getAttribute('href')).toBe('/planning');
+    expect(screen.getByRole('link', { name: 'Voir mon planning' })).toBeTruthy();
+    expect(screen.queryByText('Tout mon planning')).toBeNull();
     expect(hero?.textContent).not.toMatch(/s’ouvrir/u);
     expect(screen.queryByRole('link', { name: 'Ouvrir Suivi' })).toBeNull();
   });
@@ -185,7 +189,7 @@ describe('Aujourd’hui', () => {
       { name: 'Le serveur ne répond pas', level: 2 },
       { timeout: 4000 },
     );
-    expect(silent.closest('.nv-silent')).not.toBeNull();
+    expect(silent.closest('[role="alert"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
 

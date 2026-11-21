@@ -87,6 +87,29 @@ body {
   color: var(--nv-ink-muted);
   text-wrap: pretty;
 }
+.pp-steps {
+  margin: 0 0 var(--nv-space-2);
+  padding: 0;
+  list-style: none;
+  counter-reset: pp-step;
+  display: grid;
+  gap: var(--nv-space-2);
+  font-size: var(--nv-text-body);
+  line-height: var(--nv-text-body-leading);
+  color: var(--nv-ink-muted);
+}
+.pp-steps li {
+  counter-increment: pp-step;
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: baseline;
+  text-wrap: pretty;
+}
+.pp-steps li::before {
+  content: counter(pp-step) '.';
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
 .pp-fine {
   margin: var(--nv-space-1) 0 0;
   display: flex;
@@ -202,16 +225,22 @@ body {
   transform: translateX(2px);
 }
 
-/* ───────────── The open tab ───────────── */
+/* ───────────── The cards of the open tab (V-EXT-09 to 11) ───────────── */
 
-.pp-place {
+.pp-card {
   --_radius: var(--nv-radius-md);
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: var(--nv-space-3);
   padding: var(--nv-space-3);
 }
-.pp-place__icon,
+.pp-card__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-3);
+}
+.pp-card__icon,
 .pp-tile__icon,
 .pp-notice__icon {
   display: grid;
@@ -222,36 +251,80 @@ body {
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
   color: var(--nv-ink-muted);
 }
-.pp-place__icon {
-  width: 34px;
-  height: 34px;
+/* 40 px, as the avatar: the account's name and the card's title start on the same line (V-EXT-11). */
+.pp-card__icon {
+  width: 40px;
+  height: 40px;
 }
-.pp-place__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.pp-place__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-2);
-}
-.pp-place__title {
+.pp-card__title {
+  margin: 0;
   font-size: var(--nv-text-footnote);
   line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
-.pp-place__text {
+.pp-card__head .pp-pill {
+  height: 20px;
+  padding: 0 8px 0 6px;
+}
+.pp-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+/* The accounts of the session card breathe more than the lines of a sentence. */
+.pp-card[data-card='sync'] .pp-card__body {
+  gap: var(--nv-space-3);
+}
+.pp-card__part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin-top: var(--nv-space-1);
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-card__text {
+  margin: 0;
   font-size: var(--nv-text-caption);
   line-height: 16px;
   color: var(--nv-ink-muted);
   text-wrap: pretty;
 }
-.pp-place .pp-pill {
-  height: 20px;
-  padding: 0 8px 0 6px;
+
+/* The code and its button on one line (popup-recette-1). */
+.pp-link-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.pp-inline {
+  display: flex;
+  gap: var(--nv-space-2);
+}
+.pp-inline .pp-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pp-inline .pp-btn {
+  flex: none;
+  height: 40px;
+}
+.pp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.pp-code {
+  font-family: var(--nv-font-mono);
+  color: var(--nv-ink-muted);
+  overflow-wrap: anywhere;
 }
 
 /* ───────────── Shortcuts ───────────── */
@@ -276,8 +349,8 @@ body {
   display: flex;
   align-items: center;
   gap: var(--nv-space-2);
-  min-height: 52px;
-  padding: var(--nv-space-2) var(--nv-space-3) var(--nv-space-2) var(--nv-space-2);
+  min-height: 56px;
+  padding: var(--nv-space-2) var(--nv-space-3);
   border-radius: var(--nv-radius-md);
   background: var(--nv-plate);
   box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
@@ -288,8 +361,8 @@ body {
     box-shadow var(--nv-dur-base) var(--nv-ease-out);
 }
 .pp-tile__icon {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   transition:
     color var(--nv-dur-fast) var(--nv-ease-out),
     background-color var(--nv-dur-fast) var(--nv-ease-out),
@@ -332,6 +405,45 @@ body {
 .pp-tile:active {
   transform: scale(0.97);
   transition-duration: var(--nv-dur-instant);
+}
+
+/* With a card, the shortcuts fold into one row of four: icon above, label below (EXT-12, V-EXT-01). */
+.pp-tiles--compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.pp-tiles--compact[data-count='3'] .pp-tile:first-child {
+  grid-column: auto;
+}
+.pp-tiles--compact .pp-tile {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: var(--nv-space-2) 0;
+  text-align: center;
+}
+.pp-tiles--compact .pp-tile__icon {
+  width: auto;
+  height: auto;
+  background: none;
+  box-shadow: none;
+}
+.pp-tiles--compact .pp-tile__label {
+  font-size: 11px;
+  line-height: 14px;
+  /* « Commissions » whole on a 73 px tile (EXT-12). */
+  letter-spacing: -0.01em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-tiles--compact .pp-tile__go {
+  display: none;
+}
+.pp-tiles--compact .pp-tile:hover .pp-tile__icon {
+  background: none;
+  transform: translateY(-1px);
 }
 
 /* ───────────── Notices (unreachable, code, permission) ───────────── */
@@ -386,7 +498,6 @@ body {
   appearance: none;
   border: 0;
   font: inherit;
-  font-family: var(--nv-font-mono);
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink);
   height: 40px;
@@ -435,6 +546,26 @@ body {
   color: var(--nv-ink);
   text-decoration-color: currentColor;
 }
+/* A target a finger can take (V-EXT-23). */
+.pp-link {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+/* The way to Sécurité: in ink with its chevron, it reads as a link (popup-recette-2, Design). */
+.pp-link--go {
+  /* Its 32 px target overlaps the gaps around it, so the card keeps the height Design validated. */
+  margin-block: -6px -4px;
+  gap: 2px;
+  color: var(--nv-ink);
+  font-weight: 500;
+}
+.pp-link--go .popup-icon {
+  transition: transform var(--nv-dur-slow) var(--nv-ease-spring);
+}
+.pp-link--go:hover .popup-icon {
+  transform: translateX(2px);
+}
 
 /* ───────────── Loading ───────────── */
 
@@ -459,6 +590,16 @@ body {
 }
 .pp-skeleton--tiles {
   height: 112px;
+}
+/* The pill and the button of the screen that follows, so that nothing jumps (V-EXT-25). */
+.pp-skeleton--pill {
+  width: 84px;
+  height: 26px;
+  border-radius: var(--nv-radius-full);
+}
+.pp-skeleton--button {
+  height: 44px;
+  border-radius: var(--nv-radius-full);
 }
 @keyframes pp-shimmer {
   from {
@@ -485,12 +626,12 @@ body {
 .pp-address {
   appearance: none;
   border: 0;
-  margin: 0 0 0 -6px;
-  padding: 4px 6px;
+  margin: 0 0 0 -8px;
+  padding: 6px 8px;
   border-radius: var(--nv-radius-xs);
   background: transparent;
   font: inherit;
-  font-family: var(--nv-font-mono);
+  font-variant-numeric: tabular-nums;
   color: inherit;
   cursor: pointer;
   display: inline-flex;
@@ -516,14 +657,109 @@ body {
   opacity: 1;
   transform: none;
 }
+.pp-foot__where {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* A long host is cut with an ellipsis on the address alone, never mid-word nor over the way back (avis Design, 19/11). */
+.pp-foot__where .pp-address {
+  min-width: 0;
+  max-width: 100%;
+}
+.pp-address > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-address .popup-icon {
+  flex: none;
+}
+/* Another CRM than the built-in one (ADR 0067, second amendement): a warning, so amber, and the way back beside it. */
+.pp-address--changed,
+.pp-address--changed:hover {
+  color: var(--nv-warning);
+}
+.pp-revert {
+  flex: none;
+  font-size: var(--nv-text-caption);
+  white-space: nowrap;
+}
 .pp-version {
+  flex: none;
   font-variant-numeric: tabular-nums;
+}
+
+/* ───────────── Reveal's mark (demande de Charles du 19/11): its eyes, in ink, on the glass tile ───────────── */
+
+/* The neutral tile Charles chose (19/11): the red stays the button's and the urgencies'. */
+.pp-reveal {
+  --pp-reveal-white: var(--nv-ink);
+  --pp-reveal-pupil: var(--nv-surface-raised);
+  display: block;
+}
+[data-theme='light'] .pp-reveal {
+  --pp-reveal-white: var(--nv-surface-raised);
+  --pp-reveal-pupil: var(--nv-ink);
+}
+.pp-reveal__tile {
+  fill: var(--nv-glass-fill-strong);
+}
+.pp-reveal__rim {
+  stroke: var(--nv-hairline);
+  stroke-width: 1;
+}
+.pp-reveal__white {
+  fill: var(--pp-reveal-white);
+}
+/* By day, the white of the eyes would melt into the light tile: an ink line draws them. */
+[data-theme='light'] .pp-reveal__white {
+  stroke: var(--nv-ink);
+  stroke-width: 1.4;
+}
+.pp-reveal__pupil {
+  fill: var(--pp-reveal-pupil);
+}
+.pp-reveal__glint {
+  fill: var(--pp-reveal-white);
+}
+.pp-reveal__pupils {
+  transform-box: view-box;
+}
+/* While a session is on its way, the eyes read the tab, from one side to the other. */
+.pp-reveal.is-reading .pp-reveal__pupils {
+  animation: pp-reveal-read 1.6s var(--nv-ease-out, ease-in-out) infinite;
+}
+@keyframes pp-reveal-read {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  40%,
+  60% {
+    transform: translateX(-4.6px);
+  }
+}
+/* Its tile is the mark itself, flat: no glass behind it and no glow. */
+.pp-card__icon--mark {
+  background: none;
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .pp-mark,
-  .pp-skeleton {
+  .pp-skeleton,
+  .pp-sync__dot.is-live,
+  .pp-sync__gauge.is-fresh .nv-gauge__fill,
+  .pp-reveal.is-reading .pp-reveal__pupils {
     animation: none;
+  }
+  .pp-sync__check path {
+    animation: none;
+    stroke-dashoffset: 0;
   }
   .pp-tile,
   .pp-tile__icon,
@@ -531,6 +767,7 @@ body {
   .pp-account,
   .pp-account__go,
   .pp-btn .popup-icon,
+  .pp-link--go .popup-icon,
   .pp-address .popup-icon {
     transition: none;
   }
@@ -540,41 +777,13 @@ body {
   }
 }
 
-/* ───────────── Veille Instagram (VEI-02) ───────────── */
+/* ───────────── Veille Instagram (VEI-02): the body of its card ───────────── */
 
-.pp-watch {
-  --_radius: var(--nv-radius-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-3);
-  padding: var(--nv-space-3);
-}
-.pp-watch__head {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--nv-space-3);
-}
-.pp-watch__head .pp-place__icon {
-  width: 34px;
-  height: 34px;
-}
-.pp-watch__head .pp-pill {
-  height: 20px;
-  padding: 0 8px 0 6px;
-}
-.pp-watch__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-2);
-}
-.pp-watch__text,
 .pp-watch__time {
   margin: 0;
   font-size: var(--nv-text-caption);
   line-height: 16px;
   color: var(--nv-ink-muted);
-  text-wrap: pretty;
 }
 .pp-watch__figures {
   display: flex;
@@ -589,11 +798,6 @@ body {
 .pp-watch__figures [aria-hidden='true'] {
   color: var(--nv-ink-faint);
   font-weight: 400;
-}
-.pp-watch__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nv-space-3);
 }
 .pp-watch__mark {
   display: flex;
@@ -642,34 +846,25 @@ body {
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
   color: var(--nv-ink-muted);
 }
-.pp-watch .pp-btn:disabled,
-.pp-watch .nv-chip:disabled {
+.pp-card .pp-btn:disabled,
+.pp-card .nv-chip:disabled {
   cursor: progress;
 }
 
-/* ───────────── The owner's « Sync » of the Reveal session (P2-01) ───────────── */
+/* ───────────── The owner's Reveal session (P2-01): its own card, beside the copilot's ─────────────
+   One account per block, read top to bottom: who and the action; the state in a word with its dot and the hour it
+   holds until; a thin line of the time left; the gesture or the cause of a failure (demande de Charles du 19/11). */
 
-.pp-sync {
+.pp-sync__account {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-2);
-  margin-top: var(--nv-space-3);
+  gap: 6px;
+}
+.pp-sync__account + .pp-sync__account {
   padding-top: var(--nv-space-3);
   border-top: 1px solid var(--nv-hairline);
 }
-.pp-sync__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--nv-space-2);
-}
-.pp-sync__title {
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  font-weight: 600;
-  color: var(--nv-ink-muted);
-}
-.pp-sync__account {
+.pp-sync__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -694,9 +889,177 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pp-sync__who .pp-hint {
-  flex-basis: 100%;
-}
-.pp-sync__account .pp-btn {
+.pp-sync__top .pp-btn,
+.pp-sync__again {
   flex: none;
+}
+.pp-sync__again {
+  align-self: center;
+}
+.pp-sync__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  border-radius: var(--nv-radius-sm);
+}
+.pp-tipped {
+  cursor: default;
+}
+.pp-tipped:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 3px;
+}
+.pp-sync__dot {
+  --_c: var(--nv-ink-faint);
+  position: relative;
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--_c);
+}
+.pp-sync__dot--ok {
+  --_c: var(--nv-success);
+}
+.pp-sync__dot--amber {
+  --_c: var(--nv-warning);
+}
+.pp-sync__dot--red {
+  --_c: var(--nv-danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nv-danger) 22%, transparent);
+}
+/* On its way: the dot breathes, nothing else moves. */
+.pp-sync__dot.is-live {
+  --_c: var(--nv-ink-muted);
+  animation: pp-sync-breathe var(--nv-dur-breathe) var(--nv-ease-out) infinite;
+}
+@keyframes pp-sync-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+.pp-sync__word {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.pp-sync__word--amber {
+  color: var(--nv-warning);
+}
+.pp-sync__word--red {
+  color: var(--nv-danger);
+}
+.pp-sync__until,
+.pp-sync__step {
+  color: var(--nv-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+/* A session just stored: the tick draws itself once. */
+.pp-sync__check {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--nv-surface-raised);
+  background: var(--nv-success);
+}
+.pp-sync__check svg {
+  stroke-width: 3;
+}
+.pp-sync__check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: pp-sync-tick var(--nv-dur-slow) var(--nv-ease-out) var(--nv-dur-fast) forwards;
+}
+@keyframes pp-sync-tick {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* The time left: one thin line, never a full red bar (avis Design du 19/11). */
+.nv-gauge.pp-sync__gauge {
+  height: 2px;
+}
+.pp-sync__gauge--ok {
+  --_g: var(--nv-success);
+}
+.pp-sync__gauge--amber {
+  --_g: var(--nv-warning);
+}
+/* Fills from nothing once, when a session was just stored: the only motion at rest. */
+.pp-sync__gauge.is-fresh .nv-gauge__fill {
+  animation: pp-sync-fill var(--nv-dur-data) var(--nv-ease-spring) var(--nv-dur-base) both;
+}
+@keyframes pp-sync-fill {
+  from {
+    width: 0;
+  }
+}
+.pp-sync__advice,
+.pp-sync__fail {
+  margin: 0;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+/* An account's failure sits below the same hairline as the advice under the list (avis Design du 19/11). */
+.pp-sync__account .pp-sync__fail {
+  margin-top: 2px;
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__gauge + .pp-sync__fail {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.pp-sync__advice--all {
+  padding-top: var(--nv-space-2);
+  border-top: 1px solid var(--nv-hairline);
+}
+.pp-sync__retry {
+  display: flex;
+  justify-content: flex-end;
+}
+.pp-sync__cause {
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+
+/* ───────────── Relier l'extension depuis le CRM (ADR 0067, amendement du 19/11) ───────────── */
+
+/* The host in full: a long name wraps rather than hides its end. */
+.pp-offer__question,
+.pp-offer__from {
+  overflow-wrap: anywhere;
+}
+/* A host in a button's label: one line, cut with an ellipsis; the full host is in the question above. */
+.pp-offer .pp-btn {
+  max-width: 100%;
+  min-width: 0;
+}
+.pp-offer .pp-btn > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pp-offer__done {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  color: var(--nv-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.pp-offer__done .popup-icon {
+  flex: none;
+  color: var(--nv-success);
 }

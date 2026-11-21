@@ -28,6 +28,11 @@ export interface PersonaVersionStore {
    */
   version(creatorId: CreatorId, versionId: PersonaVersionId): Promise<ActivePersonaVersion | null>;
   overview(creatorId: CreatorId): Promise<PersonaOverview>;
+  /**
+   * A chatter's reading of her sheet on shift (ADR 0153), in the audit log (`persona.open`) before anything is read,
+   * once per quarter of an hour per account and creator, as for a conversation he opens (ADR 0025); never its content.
+   */
+  traceChatterOpening(creatorId: CreatorId, userId: string, ip: string): Promise<void>;
   /** Stores a new version, never active; throws `PersonaVersionConflict` when `basedOn` is stale or the number is taken. */
   create(
     creatorId: CreatorId,

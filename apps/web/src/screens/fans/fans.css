@@ -1,0 +1,261 @@
+/* Chatting › Fans (ADR 0124): lines in aligned columns on a computer, two lines a fan on a phone (avis Design 16/11). */
+.fa-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.fa-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.fa-search {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.fa-search input {
+  width: 100%;
+}
+/* No native control (design rule): the browser's own cross of a search field is hidden. */
+.fa-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.fa-select {
+  min-width: 0;
+}
+/* Single choice chips on one row that scrolls, faded at its edge. */
+.fa-chips {
+  display: flex;
+  gap: var(--nv-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* The next chip shows past the edge, faded: the row says it scrolls. */
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+.fa-chips::-webkit-scrollbar {
+  display: none;
+}
+.fa-chips .nv-chip {
+  flex: none;
+}
+.fa-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.fa-count {
+  margin: 0 auto 0 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--nv-ink-muted);
+}
+.fa-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: var(--nv-space-4) var(--nv-space-2);
+  color: var(--nv-ink-muted);
+}
+.fa-empty p {
+  margin: 0;
+}
+.fa-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+
+/* Columns: fan, states, holder, last message, last payment, the period, ever; then the chevron. */
+.fa-head,
+.fa-row {
+  display: grid;
+  grid-template-columns:
+    minmax(120px, 1.2fr) minmax(200px, 1.8fr) minmax(90px, 1fr) minmax(96px, 0.9fr) minmax(96px, 0.9fr)
+    minmax(90px, 0.9fr) minmax(100px, 1fr) 16px;
+  align-items: center;
+  column-gap: var(--nv-space-3);
+}
+.fa-head {
+  padding: 0 var(--nv-space-2);
+  font-size: 12px;
+  color: var(--nv-ink-faint);
+}
+.fa-head::after {
+  content: '';
+}
+.fa-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fa-list[aria-busy='true'] {
+  opacity: 0.6;
+}
+.fa-list > li + li {
+  border-top: 1px solid var(--nv-hairline);
+}
+.fa-row {
+  min-height: 44px;
+  padding: var(--nv-space-2);
+  color: var(--nv-ink);
+  text-decoration: none;
+  font-size: 14px;
+  border-radius: var(--nv-radius-md);
+}
+.fa-row--open {
+  cursor: pointer;
+}
+.fa-row--open:hover {
+  background: var(--nv-glass-fill);
+}
+.fa-row--open:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: -2px;
+}
+.fa-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-states {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  gap: 4px;
+  min-width: 0;
+}
+.fa-tag {
+  background: var(--nv-select-strong);
+  color: var(--nv-ink);
+}
+.fa-tag--bad {
+  background: color-mix(in srgb, var(--nv-danger) 16%, transparent);
+  color: var(--nv-danger);
+}
+.fa-tag--warn {
+  background: color-mix(in srgb, var(--nv-warning) 14%, transparent);
+  color: var(--nv-warning);
+}
+.fa-holder,
+.fa-when,
+.fa-paid-at {
+  color: var(--nv-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fa-amount {
+  display: block;
+}
+.fa-ever {
+  font-weight: 600;
+}
+.fa-states .fa-more-phone {
+  display: none;
+}
+.fa-zero {
+  font-weight: 400;
+  color: var(--nv-ink-faint);
+}
+.fa-chevron {
+  color: var(--nv-ink-faint);
+  text-align: right;
+}
+.fa-more {
+  display: flex;
+  justify-content: center;
+}
+/* The list on its way: three rows of the app's skeleton, as tall as a fan's line. */
+.fa-skeleton .nv-skeleton__shapes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.fa-skeleton .fa-skeleton__row {
+  width: 100%;
+  height: 44px;
+  border-radius: var(--nv-radius-lg);
+}
+
+/* Phone: two lines a fan. Pseudonym and what he paid ever; then his last message and holder, two states at most. */
+@media (max-width: 720px) {
+  .fa-bar {
+    flex-wrap: wrap;
+  }
+  .fa-count {
+    flex: 1 0 100%;
+  }
+  .fa-bar .fa-select {
+    flex: 2 1 0;
+  }
+  .fa-bar .fa-select:last-child {
+    flex: 3 1 0;
+  }
+  .fa-bar .fa-select:not(:last-child) {
+    min-width: 128px;
+  }
+  .fa-chips {
+    margin-right: calc(-1 * var(--nv-space-3));
+  }
+  .fa-states .fa-tag--second,
+  .fa-states .fa-more-wide {
+    display: none;
+  }
+  .fa-states .fa-more-phone {
+    display: inline-flex;
+  }
+  .fa-head {
+    display: none;
+  }
+  .fa-row {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      'name name ever'
+      'when holder states';
+    /* The amount ends the first line, at the right like the states. */
+    column-gap: var(--nv-space-2);
+    row-gap: 2px;
+  }
+  .fa-name {
+    grid-area: name;
+  }
+  .fa-ever {
+    grid-area: ever;
+    justify-self: end;
+  }
+  .fa-states {
+    grid-area: states;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+  .fa-when {
+    grid-area: when;
+    font-size: 13px;
+  }
+  .fa-holder {
+    grid-area: holder;
+    font-size: 13px;
+    /* Who holds him is never cut (avis Design 16/11, fans-1). */
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .fa-holder::before {
+    content: '· ';
+  }
+  .fa-paid-at,
+  .fa-period,
+  .fa-chevron {
+    display: none;
+  }
+}

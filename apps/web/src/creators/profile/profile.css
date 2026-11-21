@@ -1,10 +1,9 @@
 /*
  * Créatrices › Profil (ADR 0071): one plate as wide as the form it opens, so that « Renommer » never makes it jump, and
- * as wide as every sheet of hers (820px, ADM-14).
+ * as wide as every sheet of hers: the page's column (COH-02).
  */
 .cr-profile {
   width: 100%;
-  max-width: 820px;
   padding-top: 18px;
   gap: 12px;
 }

@@ -372,7 +372,9 @@ describe('SecuritySection (SEC-04)', () => {
     // The owner reads this page: his account is active now (PRO-18).
     expect(owner?.textContent).toContain('actif maintenant');
     expect(owner?.textContent).not.toContain('dernière activité');
-    expect(owner?.textContent).toContain('Code à 6 chiffres actif');
+    // Only the exception is said (recette visuelle 16/11, GES-11): an active code and no key go unsaid.
+    expect(owner?.textContent).not.toContain('Code à 6 chiffres');
+    expect(owner?.textContent).not.toContain('clé');
     // His own sessions are closed above, one by one.
     expect(within(present(owner)).queryByRole('button')).toBeNull();
     expect(team?.textContent).toContain('Membre de l’équipe');

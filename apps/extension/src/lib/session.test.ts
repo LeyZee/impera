@@ -26,6 +26,7 @@ describe('readCrmSession', () => {
     const [url, init] = fetchFn.mock.calls[0] ?? [];
     expect(url).toBe('http://localhost:5173/v1/me');
     expect(init?.credentials).toBe('include');
+    expect(init?.redirect).toBe('error');
     expect(init?.method ?? 'GET').toBe('GET');
     expect(JSON.stringify(init?.headers)).not.toMatch(/token|authorization/iu);
   });
@@ -44,18 +45,31 @@ describe('readCrmSession', () => {
 
   it.each([
     ['no answer', () => Promise.reject(new TypeError('Failed to fetch'))],
-    ['a server error that is not a gateway', () => Promise.resolve(json(500, {}))],
-    ['another 403', () => Promise.resolve(json(403, apiError('origin_forbidden')))],
-    ['an answer that is not the contract', () => Promise.resolve(json(200, { hello: 'world' }))],
-    ['a page that is not JSON', () => Promise.resolve(new Response('<html>', { status: 200 }))],
+    ['no answer in time', () => Promise.reject(new DOMException('timed out', 'TimeoutError'))],
   ])('is unreachable on %s', async (_, fetchFn: Fetch) => {
     expect(await readCrmSession('http://localhost:5173', fetchFn)).toEqual({ kind: 'unreachable' });
   });
 
-  it.each([502, 503, 504])('tells a CRM whose API is down (%i) from a wrong address', async (status) => {
+  // Recette du 16/11, EXT-08: something answers there, so « Rien à l’adresse » would be wrong.
+  it.each([
+    ['a page that is not JSON', () => Promise.resolve(new Response('<html>', { status: 200 }))],
+    ['an answer that is not the contract', () => Promise.resolve(json(200, { hello: 'world' }))],
+    ['a 404', () => Promise.resolve(new Response('Not Found', { status: 404 }))],
+  ])('is not a CRM on %s', async (_, fetchFn: Fetch) => {
+    expect(await readCrmSession('http://localhost:5173', fetchFn)).toEqual({ kind: 'not_crm' });
+  });
+
+  it.each([500, 502, 503, 504])('tells a CRM in error (%i) from a wrong address', async (status) => {
     const answer = new Response('<html>Bad Gateway</html>', { status });
     expect(await readCrmSession('http://localhost:5173', () => Promise.resolve(answer))).toEqual({
       kind: 'server_down',
+    });
+  });
+
+  it('is refused on another 403, never unreachable', async () => {
+    const answer = json(403, apiError('origin_forbidden'));
+    expect(await readCrmSession('http://localhost:5173', () => Promise.resolve(answer))).toEqual({
+      kind: 'refused',
     });
   });
 });

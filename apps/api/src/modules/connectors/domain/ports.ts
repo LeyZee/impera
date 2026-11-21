@@ -22,6 +22,8 @@ export interface ConnectorAccount extends BreakerState {
   readonly platform: Platform;
   readonly sessionState: SessionState;
   readonly lastPollAt: Date | null;
+  /** When her profile's bio was last read (ADR 0154); `null` or absent: never. */
+  readonly profileBioReadAt?: Date | null;
   readonly config: ConnectorConfig;
 }
 
@@ -75,6 +77,9 @@ export interface EventMeta {
   readonly at: Date;
 }
 
+/** Who sent a session, and by which gesture (ADR 0147: `click` or `open`), for the audit line. */
+type SessionMeta = EventMeta & { readonly userId: string | null; readonly trigger: 'click' | 'open' };
+
 /** `platform_accounts` and the account-level events. Tenant methods run under RLS. */
 export interface AccountStore {
   /** Every account the dispatcher may poll, all creators (owner role). */
@@ -89,6 +94,10 @@ export interface AccountStore {
   /** The encrypted session, or `null`. */
   sessionOf(creatorId: CreatorId, id: PlatformAccountId): Promise<Buffer | null>;
   recordPoll(creatorId: CreatorId, id: PlatformAccountId, at: Date): Promise<void>;
+  /** Her bio as just read on her profile (ADR 0154), and when: an empty one is kept as empty. */
+  recordProfileBio(creatorId: CreatorId, id: PlatformAccountId, bio: string, at: Date): Promise<void>;
+  /** Her bio last read on any of her accounts, the most recent read first (ADR 0154); `null`: none read or empty. */
+  profileBioOf(creatorId: CreatorId): Promise<string | null>;
   recordFailure(creatorId: CreatorId, id: PlatformAccountId, state: BreakerState): Promise<void>;
   /** Sets the state and publishes `session_state_changed` in one transaction; no event when it did not change. */
   setSessionState(
@@ -112,8 +121,10 @@ export interface AccountStore {
       readonly ciphertext: Buffer;
       readonly owner: string;
       readonly isSame: (stored: Buffer) => boolean;
+      /** What its expiry says now (`session-life.ts`): `warning` when it has under 2 h left. */
+      readonly state: 'valid' | 'warning';
     },
-    meta: EventMeta & { readonly userId: string | null },
+    meta: SessionMeta,
   ): Promise<void>;
   /**
    * The audit line of a refused « Sync » (`connector.session_refused`): the account, the reason and who, never a value
@@ -122,8 +133,8 @@ export interface AccountStore {
   recordRefusedSession(
     creatorId: CreatorId,
     id: PlatformAccountId,
-    reason: 'owner_conflict' | 'member_conflict',
-    meta: EventMeta & { readonly userId: string | null },
+    reason: 'owner_conflict' | 'member_conflict' | 'auto_unpinned' | 'auto_member_unread',
+    meta: SessionMeta,
   ): Promise<void>;
   publish(creatorId: CreatorId, body: EventBody, meta: EventMeta): Promise<void>;
 }
@@ -132,7 +143,14 @@ export interface AccountStore {
  * Reads a captured session's shape, platform by platform: `null` when the text is not a session of this platform, else
  * whose it is (`owner`: on Reveal, the creator's model id). Two sessions of one account must have the same owner.
  */
-export type SessionShape = (raw: string) => { readonly owner: string; readonly member?: string } | null;
+export type SessionShape = (raw: string) => {
+  readonly owner: string;
+  readonly member?: string;
+  /** The session's own expiry, when it carries one we can read (Reveal: the JWT's `exp`). */
+  readonly expiresAt?: Date | null;
+  /** The member is read in the token itself, not only declared beside it (ADR 0147 § 4). */
+  readonly memberInToken?: boolean;
+} | null;
 
 /** One reader per platform whose sessions the extension captures; a platform without one takes no session. */
 export type SessionShapes = Partial<Record<Platform, SessionShape>>;
@@ -145,6 +163,8 @@ interface SyncableAccount {
   readonly creatorName: string;
   readonly sessionState: SessionState;
   readonly sessionUpdatedAt: Date | null;
+  /** The platform's id of the model the stored session speaks for (`session_owner`); `null` before the first « Sync ». */
+  readonly modelId: string | null;
 }
 
 /** Owner-role enqueue for jobs that start outside any business transaction (the dispatcher). */

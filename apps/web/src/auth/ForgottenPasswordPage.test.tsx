@@ -3,7 +3,7 @@ import { PASSWORD_RESET_REQUESTED_MESSAGE } from '@impera/contracts';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ForgottenPasswordPage, keepUnits } from './ForgottenPasswordPage';
+import { ForgottenPasswordPage, NO_TELEGRAM_HINT, keepUnits } from './ForgottenPasswordPage';
 import { forgetTakenToken } from './api';
 
 const TOKEN = 'lien-invente-pour-les-tests';
@@ -73,6 +73,22 @@ describe('« Mot de passe oublié » without a link (SEC-05 lot 3)', () => {
     expect(callsTo(fake, 'request')).toEqual([
       { url: '/v1/auth/password-reset', body: { email: 'pas-une-adresse' } },
     ]);
+  });
+
+  /** Its non-breaking space kept: the default normalizer would make it a plain one. */
+  const asIs = (text: string) => text;
+  it('tells whoever has no Telegram to ask the agency, before and after the request (CRE-05, CHT-16)', async () => {
+    serve({ request: [[202, { message: PASSWORD_RESET_REQUESTED_MESSAGE }]] });
+    open();
+    const hint = screen.getByText(NO_TELEGRAM_HINT, { normalizer: asIs });
+    // Under the send button, not between the field and the button (Design, #829), and nothing to click in it.
+    const send = screen.getByRole('button', { name: 'Envoyer le lien' });
+    expect(send.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(hint.querySelector('a, button')).toBeNull();
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'nora@example.test' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer le lien' }));
+    expect(await screen.findByRole('heading', { name: 'Demande reçue' })).toBeDefined();
+    expect(screen.getByText(NO_TELEGRAM_HINT, { normalizer: asIs })).toBeDefined();
   });
 
   it('keeps the address to correct it, and goes back to the sign-in page', async () => {

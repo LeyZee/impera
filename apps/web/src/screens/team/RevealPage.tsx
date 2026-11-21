@@ -47,6 +47,7 @@ import { SignInAgain } from '@/settings/services/PasswordPrompt';
 import { isForbidden, type ShownError } from '@/settings/services/api';
 import { Select } from '@/shell/Select';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
 import '@/settings/services/services.css';
 import '@/settings/sales-feed/sales-feed.css';
 import './team.css';
@@ -67,7 +68,7 @@ type Busy =
   | null;
 
 /**
- * Équipe › Reveal (ADR 0076): each account of the platform's team with its link or a proposal, that the owner or an
+ * Équipe › Comptes Reveal (ADR 0076): each account of the platform's team with its link or a proposal, that the owner or an
  * active manager confirms, ticked rows in one batch, an invitation one row at a time. Nothing is linked or created
  * without a click; the server answers what this viewer may do on each row, and refuses the rest whatever shows.
  */
@@ -104,9 +105,10 @@ export function RevealPage({
 
   const header = (
     <PageHeader
-      title="Équipe"
-      lead={`Chaque compte de l’équipe ${name} se relie à un membre, à l’agent ou à personne. Rien n’est relié sans confirmation.`}
-      actions={<TeamNav />}
+      eyebrow="Équipe"
+      title={screenLabel('/equipe/reveal')}
+      lead={`Relie chaque compte de l’équipe ${name} à un membre, à l’agent ou à personne.`}
+      tabs={<TeamNav />}
     />
   );
 
@@ -319,7 +321,7 @@ export function RevealPage({
         {data.rows.length === 0 ? (
           <Notice
             title={`Aucun compte de l’équipe ${name} pour l’instant`}
-            text={`La liste arrive de ${name} quand la clé de l’API CRM est posée, par le propriétaire, dans Réglages › Ventes.`}
+            text={`La liste arrive de ${name} quand la clé de l’API CRM est posée, par le propriétaire, dans Réglages › Plateformes.`}
           />
         ) : null}
 
@@ -442,7 +444,7 @@ function Section({
   return (
     <section className="nv-plate sf-links sf-import" aria-labelledby={id}>
       <header className="sf-links__head">
-        <h2 id={id} className="sf-links__title">
+        <h2 id={id} className="nv-h2 sf-links__title">
           {title}
         </h2>
         {count === null ? null : (
@@ -637,6 +639,8 @@ function LinkedRow({
   const isOwn = row.actions.length === 0;
   return (
     <li className={isOwn ? 'sf-imp rv-linked rv-own' : 'sf-imp rv-linked'}>
+      {/* The box's column of the card above, empty: both cards share one grid (GES-10). */}
+      <span className="rv-tick-space" aria-hidden="true" />
       <Face row={row} />
       <Who
         row={row}

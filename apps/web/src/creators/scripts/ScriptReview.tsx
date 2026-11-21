@@ -39,6 +39,7 @@ import { useGrowingArea } from '@/lib/growing-area';
 import { Dialog } from '@/shell/Dialog';
 import { NavIcon } from '@/shell/NavIcon';
 import { useMediaBlur } from '@/shell/media-blur';
+import { Empty } from '@/shell/states';
 
 /**
  * The review of a sent script (SC-04 lot c3, ADR 0030 § 3, ADR 0083 § 7), under its card: the synthesis first, each
@@ -800,7 +801,7 @@ function MediaViewer({
         }}
       />
     ) : fallback && !media.thumbnail ? (
-      <p className="ps-muted sx-viewer__empty">Ce média ne s’affiche pas ici : son original est effacé.</p>
+      <Empty title="Ce média ne s’affiche pas ici.">Son original est effacé.</Empty>
     ) : (
       <img
         className="sx-viewer__media nv-blurrable"

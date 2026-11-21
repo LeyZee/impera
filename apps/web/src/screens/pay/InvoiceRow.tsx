@@ -21,6 +21,7 @@ import {
   type InvoiceOutcome,
   type InvoiceRefusal,
 } from '@/invoices/api';
+import { useConfirmedWrite } from '@/invoices/confirmed-write';
 import '@/invoices/invoices.css';
 import {
   acceptanceChip,
@@ -40,7 +41,9 @@ import {
 import { useGrowingArea } from '@/lib/growing-area';
 import { dayMonthText } from '@/payroll/model';
 import { amountText, parseAmount } from '@/reports/model';
+import { MONEY_LEAD } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 /**
  * A document of the invoices' lists (EQ-06 lot 8) and what is done from it: the contractor's answer, the owner's end of
@@ -188,31 +191,32 @@ export function InvoiceRow({
   );
 }
 
-/** A write's ending: done, the list read again; refused, its sentence, and the list read again when it lied. */
+/**
+ * A write's ending: done, the list read again; refused, its sentence, and the list read again when it lied. A contest
+ * and its end ask for the password and the code when the last ones are over 10 minutes old (EQ-15): `prompt` then
+ * stands where the form's foot or body was, and the answer is sent again once they are given.
+ */
 function useSend(onDone: () => void): {
   busy: boolean;
   refusal: InvoiceRefusal | null;
+  prompt: JSX.Element | null;
   send: (write: () => Promise<InvoiceOutcome<unknown>>) => void;
 } {
   const refresh = useRefreshInvoices();
-  const [busy, setBusy] = useState(false);
-  const [refusal, setRefusal] = useState<InvoiceRefusal | null>(null);
+  const { busy, refusal, prompt, send: confirmed } = useConfirmedWrite(MONEY_LEAD);
   const send = (write: () => Promise<InvoiceOutcome<unknown>>): void => {
-    setBusy(true);
-    setRefusal(null);
-    void write().then(async (outcome) => {
-      if (outcome.kind === 'ok') {
+    confirmed(
+      write,
+      async () => {
         await refresh();
-        setBusy(false);
         onDone();
-        return;
-      }
-      setBusy(false);
-      setRefusal(outcome);
-      if (readsAgain(outcome)) await refresh();
-    });
+      },
+      async (refused) => {
+        if (readsAgain(refused)) await refresh();
+      },
+    );
   };
-  return { busy, refusal, send };
+  return { busy, refusal, prompt, send };
 }
 
 function ReasonField({
@@ -334,7 +338,7 @@ export function AnswerDialog({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, refusal, send } = useSend(onClose);
+  const { busy, refusal, prompt, send } = useSend(onClose);
   const pdf = usePdf(item);
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
@@ -359,37 +363,41 @@ export function AnswerDialog({
       busy={busy}
       onClose={onClose}
     >
-      <form className="tm-dialog__body" noValidate onSubmit={submit}>
-        {answer === 'accept' ? (
-          <p className="tm-hint">
-            Tu confirmes que ce document dit juste. Ta réponse est définitive : relis le PDF avant si tu as un
-            doute.
-          </p>
-        ) : (
-          <ReasonField
-            id={`${id}-reason`}
-            label="Ce qui ne va pas"
-            hint="Lu par le propriétaire, qui tranche. Jamais le message ni le nom d’un fan."
-            placeholder="Le montant ne compte pas mon rapport du 12 octobre."
-            value={reason}
-            invalid={touched && !valid}
-            onChange={setReason}
-          />
-        )}
-        <Refusal refusal={refusal} />
-        <PdfFailure pdf={pdf} />
-        <div className="tm-dialog__foot">
-          {item.pdfReady ? (
-            <PdfButton pdf={pdf} className="nv-btn nv-btn--plain" label="Relire le PDF" />
-          ) : null}
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-            {busy ? 'Envoi…' : answer === 'accept' ? 'J’accepte' : 'Je conteste'}
-          </button>
-        </div>
-      </form>
+      {prompt === null ? (
+        <form className="tm-dialog__body" noValidate onSubmit={submit}>
+          {answer === 'accept' ? (
+            <p className="tm-hint">
+              Tu confirmes que ce document dit juste. Ta réponse est définitive : relis le PDF avant si tu as
+              un doute.
+            </p>
+          ) : (
+            <ReasonField
+              id={`${id}-reason`}
+              label="Ce qui ne va pas"
+              hint="Lu par le propriétaire, qui tranche. Jamais le message ni le nom d’un fan."
+              placeholder="Le montant ne compte pas mon rapport du 12 octobre."
+              value={reason}
+              invalid={touched && !valid}
+              onChange={setReason}
+            />
+          )}
+          <Refusal refusal={refusal} />
+          <PdfFailure pdf={pdf} />
+          <div className="tm-dialog__foot">
+            {item.pdfReady ? (
+              <PdfButton pdf={pdf} className="nv-btn nv-btn--plain" label="Relire le PDF" />
+            ) : null}
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+              {busy ? 'Envoi…' : answer === 'accept' ? 'J’accepte' : 'Je conteste'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
@@ -421,7 +429,7 @@ export function SettleDialog({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, refusal, send } = useSend(onClose);
+  const { busy, refusal, prompt, send } = useSend(onClose);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [correction, setCorrection] = useState<Correction>('amount');
   const [side, setSide] = useState<Side | null>(null);
@@ -473,33 +481,35 @@ export function SettleDialog({
             Motif lu par {who} : «&nbsp;{reason.trim()}&nbsp;». C’est définitif.
           </p>
           <Refusal refusal={refusal} />
-          <div className="tm-dialog__foot">
-            <button
-              type="button"
-              className="nv-btn nv-btn--plain"
-              disabled={busy}
-              onClick={() => {
-                setChecking(false);
-              }}
-            >
-              Modifier
-            </button>
-            <button
-              type="button"
-              className="nv-btn nv-btn--neon"
-              disabled={busy}
-              aria-busy={busy}
-              onClick={() => {
-                send(() =>
-                  decision === 'refuse'
-                    ? refuseContest(item.id, { reason: reason.trim() })
-                    : upholdContest(item.id, body()),
-                );
-              }}
-            >
-              {busy ? 'Envoi…' : decision === 'refuse' ? 'Refuser' : 'Donner raison'}
-            </button>
-          </div>
+          {prompt ?? (
+            <div className="tm-dialog__foot">
+              <button
+                type="button"
+                className="nv-btn nv-btn--plain"
+                disabled={busy}
+                onClick={() => {
+                  setChecking(false);
+                }}
+              >
+                Modifier
+              </button>
+              <button
+                type="button"
+                className="nv-btn nv-btn--neon"
+                disabled={busy}
+                aria-busy={busy}
+                onClick={() => {
+                  send(() =>
+                    decision === 'refuse'
+                      ? refuseContest(item.id, { reason: reason.trim() })
+                      : upholdContest(item.id, body()),
+                  );
+                }}
+              >
+                {busy ? 'Envoi…' : decision === 'refuse' ? 'Refuser' : 'Donner raison'}
+              </button>
+            </div>
+          )}
         </div>
       </Dialog>
     );
@@ -710,18 +720,9 @@ export function DetailDialog({
           <dd>{amountText(item.inclVatMinor, 'EUR')}</dd>
         </dl>
         {view.isError ? (
-          <div className="sc-empty">
-            <p className="tm-warn">Le serveur ne répond pas : l’historique n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                void view.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure inline onRetry={() => void view.refetch()}>
+            L’historique n’a pas pu être lu : réessaie dans un instant.
+          </Failure>
         ) : view.data === undefined ? (
           <p className="tm-hint">Lecture de l’historique…</p>
         ) : (

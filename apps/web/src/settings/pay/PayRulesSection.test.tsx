@@ -438,6 +438,37 @@ describe('Réglages › Règles de paie', () => {
     expect(writes).toEqual([{ path: '/v1/scheduling/report-gap', body: { bps: 250, minor: 0 } }]);
   });
 
+  it('asks for the password and the code before a threshold, then saves the same one (EQ-15)', async () => {
+    answer = REAUTH;
+    confirmIdentity.mockImplementation(() => {
+      answer = { status: 200, body: { bps: 250, minor: 0 } };
+      return Promise.resolve('ok');
+    });
+    renderSection();
+    const card = (await screen.findByText('Seuil d’écart des rapports')).closest<HTMLElement>('.rp-account');
+    if (card === null) throw new Error('No threshold');
+    fireEvent.click(await within(card).findByRole('button', { name: 'Changer' }));
+    const dialog = screen.getByRole('dialog', { name: 'Seuil d’écart' });
+    fireEvent.change(within(dialog).getByLabelText('Écart en pourcentage'), { target: { value: '2,5' } });
+    fireEvent.change(within(dialog).getByLabelText('Ou écart en montant'), { target: { value: '0' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer le seuil' }));
+    expect(
+      await within(dialog).findByText('Ce geste touche à l’argent : confirme ton mot de passe et ton code.'),
+    ).toBeTruthy();
+    // The recap stays above the prompt, and nothing is said refused.
+    expect(within(dialog).getByText(/^À partir de maintenant/u)).toBeTruthy();
+    expect(within(dialog).queryByRole('alert')).toBeNull();
+    confirmInside(dialog);
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(writes).toEqual([
+      { path: '/v1/scheduling/report-gap', body: { bps: 250, minor: 0 } },
+      { path: '/v1/scheduling/report-gap', body: { bps: 250, minor: 0 } },
+    ]);
+  });
+
   it('says a threshold at zero lets only a report equal to the platform through', async () => {
     threshold = { bps: 0, minor: 0 };
     renderSection();
@@ -491,7 +522,7 @@ describe('Réglages › Règles de paie', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Vérifier' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Poser ces règles' }));
     expect((await within(dialog).findByRole('alert')).textContent).toBe(
-      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+      'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Plateformes.',
     );
   });
 

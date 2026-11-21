@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  automationPattern,
   messageOf,
   momentOf,
+  NO_AUTOMATIONS,
+  originOf,
   scriptsOf,
   sentStepsOf,
   snapshotOf,
   transactionOf,
+  vaultMediaOf,
   type OwnMessages,
 } from '../mapping';
 import type { RevealAnswer } from '../wire';
@@ -20,6 +24,7 @@ type MessageItem = RevealAnswer<'messages.list'>['data'][number];
 type Media = MessageItem['medias'][number];
 type ScriptItem = RevealAnswer<'scripts.list'>['data'][number];
 type SequenceItem = RevealAnswer<'scriptSequences.list'>[number];
+type VaultItem = RevealAnswer<'vault.medias'>['data'][number];
 
 function media(id: string, type: Media['type'] = 'photo'): Media {
   const url = `https://files.test/${id}`;
@@ -244,6 +249,30 @@ describe('scriptsOf (spec § 6)', () => {
     ]);
   });
 
+  it('reads a « Tarif réduit » on a step as it is, never as its price (recette 16/11)', () => {
+    const discounted = (id: string, extra: Partial<ScriptItem['script']>): ScriptItem => ({
+      ...loose(id, { price: 2000 }),
+      script: { ...step(id, { price: 2000 }), ...extra },
+    });
+    const scripts = scriptsOf(
+      [],
+      [
+        discounted('step_both', { discountedPrice: 1500, discountDurationMinutes: 60 }),
+        // Reveal gives both or neither; one alone is a discount all the same, never read as none.
+        discounted('step_price_only', { discountedPrice: 1500 }),
+        discounted('step_minutes_only', { discountDurationMinutes: 30 }),
+        loose('step_none', { price: 2000 }),
+      ],
+      () => null,
+    );
+    expect(scripts.map((s) => [s.ref.id, s.steps[0]?.priceMinor, s.steps[0]?.discount])).toEqual([
+      ['step_both', 2000, { priceMinor: 1500, minutes: 60 }],
+      ['step_price_only', 2000, { priceMinor: 1500, minutes: null }],
+      ['step_minutes_only', 2000, { priceMinor: null, minutes: 30 }],
+      ['step_none', 2000, null],
+    ]);
+  });
+
   it('makes a step in no sequence a script of one step, and leaves an empty sequence out', () => {
     const scripts = scriptsOf(
       [sequence('seq_empty', 'Vide', []), sequence('seq_1', 'Séquence', [{ id: 'step_a', index: 0 }])],
@@ -372,5 +401,95 @@ describe('snapshotOf and transactionOf (spec § 4)', () => {
         }).kind,
     );
     expect(kinds).toEqual(['ppv', 'tip', 'subscription', 'other']);
+  });
+
+  describe('vault media preview (ADR 0030 § 4)', () => {
+    const vaultItem = (blurhash: string): VaultItem => ({
+      ...media('vault_test'),
+      blurhash,
+      status: [],
+      sentForFree: false,
+      description: null,
+      suggestedMinPrice: null,
+      suggestedMaxPrice: null,
+      tags: [],
+    });
+
+    it('keeps the platform’s blurhash, never a link', () => {
+      const kept = vaultMediaOf(vaultItem('LKO2?U%2Tw=w]~RBVZRi};RPxuwH'), null, 0);
+      expect(kept.blurhash).toBe('LKO2?U%2Tw=w]~RBVZRi};RPxuwH');
+      expect(JSON.stringify(kept)).not.toMatch(/https?:/u);
+    });
+
+    it('drops a preview that does not read as a blurhash, and keeps the media', () => {
+      for (const odd of ['', 'L0', 'pas un blurhash', 'L'.repeat(200)]) {
+        expect(vaultMediaOf(vaultItem(odd), null, 0)).toMatchObject({
+          ref: { id: 'vault_test' },
+          blurhash: null,
+        });
+      }
+    });
+  });
+});
+
+describe('origin of a message (ADR 0110)', () => {
+  const automations = {
+    hooks: [
+      automationPattern('Salut %NAME%, ton profil m’a donné envie de te parler'),
+      automationPattern('Coucou toi'),
+    ].filter((pattern) => pattern !== null),
+    welcome: automationPattern('Bienvenue  chez moi %NAME% !\nÉcris-moi'),
+    expirationReminder: automationPattern('Ton abonnement se termine bientôt'),
+  };
+
+  it('reads an opener the fan chose, whatever the name in place of %NAME%', () => {
+    const text = 'Salut Léa, ton profil m’a donné envie de te parler';
+    expect(originOf(message({ fanId: 'fan_test', content: text }), 'fan', automations)).toBe('hook');
+    expect(originOf(message({ fanId: 'fan_test', content: 'Coucou toi' }), 'fan', automations)).toBe('hook');
+    expect(originOf(message({ fanId: 'fan_test', content: 'Coucou toi, ça va ?' }), 'fan', automations)).toBe(
+      undefined,
+    );
+  });
+
+  it('reads a reply to a story before anything else, and nothing of a fan’s own words', () => {
+    const reply = { ...message({ fanId: 'fan_test', content: '' }), storyReply: { storyId: 'story_test' } };
+    expect(originOf(reply, 'fan', automations)).toBe('story_reply');
+    expect(originOf(message({ fanId: 'fan_test', content: 'Salut' }), 'fan', automations)).toBe(undefined);
+  });
+
+  it('reads her welcome and her reminder, spaces and line breaks aside, never on a message of ours', () => {
+    const welcome = message({ content: 'Bienvenue chez moi Max ! Écris-moi' });
+    expect(originOf(welcome, 'human', automations)).toBe('welcome');
+    expect(originOf(welcome, 'ai', automations)).toBe(undefined);
+    expect(originOf(message({ content: 'Ton abonnement se termine bientôt' }), 'human', automations)).toBe(
+      'expiration_reminder',
+    );
+    expect(originOf(message({ content: 'Bienvenue chez moi ! Écris-moi, vite' }), 'human', automations)).toBe(
+      undefined,
+    );
+  });
+
+  it('reads nothing without her automations, and an empty text is no pattern', () => {
+    expect(automationPattern('  ')).toBeNull();
+    expect(originOf(message({ content: 'Coucou toi' }), 'fan', NO_AUTOMATIONS)).toBe(undefined);
+  });
+
+  it('carries the origin on the message, and none when there is nothing to say', () => {
+    const hook = messageOf(
+      message({ fanId: 'fan_test', content: 'Coucou toi' }),
+      CONVERSATION,
+      NOBODY,
+      automations,
+    );
+    expect(hook.origin).toBe('hook');
+    expect(messageOf(message({ fanId: 'fan_test' }), CONVERSATION, NOBODY, automations)).not.toHaveProperty(
+      'origin',
+    );
+  });
+
+  it('takes a special character in her text as it is', () => {
+    const pattern = automationPattern('Prix (spécial) : 9.99 € ? *oui*');
+    expect(pattern?.test('Prix (spécial) : 9.99 € ? *oui*')).toBe(true);
+    expect(pattern?.test('Prix (spécial) : 9x99 € ? *oui*')).toBe(false);
   });
 });

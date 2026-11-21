@@ -7,6 +7,7 @@ import {
   disconnect,
   fetchOverview,
   isSessionExpired,
+  probeNow,
   ReauthRequired,
   ServicesError,
   showError,
@@ -29,6 +30,9 @@ const status = {
   facts: [{ label: 'Modèle', value: 'Grok 4.7' }],
   settings: {},
   voices: [],
+  probe: null,
+  activity: null,
+  quota: null,
 };
 
 function apiError(code: string): unknown {
@@ -148,5 +152,16 @@ describe('Services API client', () => {
     expect(await confirmIdentity('correct horse battery', '123456')).toBe('session_expired');
     answer(429, apiError('reauthentication_limited'));
     expect(await confirmIdentity('correct horse battery', '123456')).toBe('too_many_attempts');
+  });
+
+  it('sends an « Essai réel » and reads what it found', async () => {
+    const probed = {
+      ...status,
+      probe: { at: '2026-11-16T13:40:00.000Z', outcome: 'answers', latencyMs: 640, model: 'Grok 4.7' },
+    };
+    answer(200, probed);
+    expect(await probeNow('xai')).toEqual(probed);
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toMatch(/\/xai\/probe$/);
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]).toMatchObject({ method: 'POST' });
   });
 });

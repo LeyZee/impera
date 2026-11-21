@@ -46,7 +46,6 @@ PR B, mineures :
 - [x] Bandeau d'un jour à venir : « N choses prévues », jamais une routine pour commencer (Design).
 - [x] Une routine retirée reste due le jour même (`removedAt`), choix de Charles du 16/11.
 PR C : sa vitrine sur sa fiche côté agence (lot 2).
-- [x] Bloc « Jeu » en lecture sous Créatrices › sa fiche › Agenda (propriétaire, manager actif ; jamais un chatteur) : ses deux séries et la meilleure, sa plus haute médaille, ses trophées gagnés ; aucun dévoilement marqué vu (`GET /v1/creators/:creatorId/trophy-case`).
 
 ## Critères d'acceptation
 

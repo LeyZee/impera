@@ -7,6 +7,7 @@ import { initialOf } from '@/lib/utils';
 import { readerZone } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { bringIntoView } from '@/screens/tracking/scroll';
+import { Empty, Failure, Skeleton } from '@/shell/states';
 
 /**
  * One of her conversations, read only (ADR 0042 § 2: she never writes to a fan from here). Her fan's messages on one
@@ -62,35 +63,29 @@ export function CreatorReader({
             {initialOf(name)}
           </span>
           <span className="vt-reader__who">
-            <h2>{name}</h2>
+            <h2 className="nv-h3">{name}</h2>
             <span className="nv-meta">Lecture seule</span>
           </span>
         </header>
       </div>
       {gone ? (
-        <p className="vt-empty">Cette conversation n’est plus disponible.</p>
+        <Empty title="Cette conversation n’est plus disponible." />
       ) : (conversation.isError && conversation.data === undefined) ||
         (messages.isError && messages.data === undefined) ? (
-        <div className="vt-empty" role="status">
-          <p className="vt-warn">Le serveur ne répond pas</p>
-          <p>La conversation n’a pas pu être lue. Réessaie dans un instant.</p>
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            onClick={() => {
-              void conversation.refetch();
-              void messages.refetch();
-            }}
-          >
-            Réessayer
-          </button>
-        </div>
+        <Failure
+          inline
+          className="vt-reader__state"
+          onRetry={() => {
+            void conversation.refetch();
+            void messages.refetch();
+          }}
+        />
       ) : messages.data === undefined ? (
-        <div className="vt-skeleton" aria-busy="true" aria-label="Chargement de la conversation">
-          <i />
-          <i />
-          <i />
-        </div>
+        <Skeleton label="Chargement de la conversation…" className="vt-reader__state">
+          <i className="nv-skeleton__bar" />
+          <i className="nv-skeleton__bar" />
+          <i className="nv-skeleton__bar" />
+        </Skeleton>
       ) : (
         <div className="vt-reader__body" ref={bodyRef}>
           {messages.hasNextPage ? (
@@ -103,7 +98,7 @@ export function CreatorReader({
               {messages.isFetchingNextPage ? 'Chargement…' : 'Messages plus anciens'}
             </button>
           ) : null}
-          {days.length === 0 ? <p className="vt-empty">Aucun message pour l’instant.</p> : null}
+          {days.length === 0 ? <Empty title="Aucun message pour l’instant." /> : null}
           {days.map((day) => (
             <div key={day.day} className="vt-day">
               <p className="vt-day__label">{day.label}</p>

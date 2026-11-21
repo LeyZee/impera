@@ -1,5 +1,6 @@
 import {
   calendarDayAt,
+  type AfterSaleType,
   type Currency,
   type Platform,
   type PlatformAccountId,
@@ -159,6 +160,46 @@ export function refundsOfDay(lines: readonly RefundLine[], day: string): SalesRe
   return { day, rows: sorted.map(([, row]) => row) };
 }
 
+/** One refund of the register, as the agency's list says it (ADR 0092 § 4): one line, never summed. */
+export interface RefundListed {
+  readonly platform: Platform;
+  readonly saleType: SaleType;
+  readonly currency: Currency;
+  /** What the fan got back, VAT included, positive. */
+  readonly grossInclVatMinor: number;
+  readonly refundedAt: Date;
+  /** Its sale's instant; `null` when the sale is not in the register. */
+  readonly saleOccurredAt: Date | null;
+  /** Its sale's seller when the sale is recorded, as the totals count it. */
+  readonly seller: SaleSeller;
+}
+
+/**
+ * The refunds the totals of `range` take off (ADR 0092 § 4), one by one: each on its sale's day in its platform's
+ * zone, or on its own day when the sale is not in the register (the totals' « refunds without sale »). The latest
+ * refund first. Lines that are not refunds are left out. Pure.
+ */
+export function refundsListed(lines: readonly RefundLine[], range: TotalsRange): RefundListed[] {
+  const listed: RefundListed[] = [];
+  for (const line of lines) {
+    if (line.event !== 'refund') continue;
+    const timeZone = salesFeedTimeZone(line.platform);
+    if (timeZone === null) throw new Error(`sales refunds: no zone for the platform ${line.platform}`);
+    const day = calendarDayAt(line.saleOccurredAt ?? line.occurredAt, timeZone);
+    if (day < range.from || day > range.to) continue;
+    listed.push({
+      platform: line.platform,
+      saleType: line.saleType,
+      currency: line.currency,
+      grossInclVatMinor: line.grossInclVat,
+      refundedAt: line.occurredAt,
+      saleOccurredAt: line.saleOccurredAt,
+      seller: line.seller,
+    });
+  }
+  return listed.sort((a, b) => b.refundedAt.getTime() - a.refundedAt.getTime());
+}
+
 /**
  * How long after a sale its first reading still rings (CRM-04, Bilan): an older sale, read late (a webhook missed,
  * the cursor catching up), is late. It enters the totals and the evening digest, and alerts no one. Set in the code,
@@ -172,4 +213,24 @@ export function ringsWhenRecorded(
   recordedAt: Date,
 ): boolean {
   return line.event === 'sale' && recordedAt.getTime() - line.occurredAt.getTime() < SALE_RING_WINDOW_MS;
+}
+
+/**
+ * The sale that wakes his conversation for a word after it (ADR 0156 § 2): a step he bought or a tip; a subscription,
+ * a mass message or anything else does not. Read on a line that rings, so never a refund nor a sale read late.
+ */
+export function afterSaleOf(line: { readonly type: SaleType }): AfterSaleType | null {
+  switch (line.type) {
+    case 'ppv':
+    case 'tip':
+      return line.type;
+    case 'subscription':
+    case 'renewal':
+    case 'mass_dm':
+    case 'payment_link':
+    case 'boudoir':
+    case 'paid_message':
+    case 'other':
+      return null;
+  }
 }

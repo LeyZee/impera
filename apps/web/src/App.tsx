@@ -1,5 +1,5 @@
 import type { Me } from '@impera/contracts';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 
@@ -13,6 +13,8 @@ import { linkPageOf } from './auth/api';
 import { forgetChosenPassword } from './auth/chosen-password';
 import { readSession, SessionServerError, signOut } from './auth/session';
 import { watchSessionEnd } from './auth/session-end';
+import { listenForErrors } from './lib/error-reports';
+import { createQueryClient } from './lib/query-client';
 import { forgetDevice } from './pwa/device';
 import { keepSession, keptSession } from './pwa/keptSession';
 import { listenForNotificationOpens } from './pwa/notificationOpen';
@@ -49,7 +51,7 @@ export function App(): JSX.Element {
   const [linkPage, setLinkPage] = useState(() => linkPageOf(window.location.pathname));
   // A sign-out the server did not make: the session stays open, and the page says so instead of doing nothing.
   const [signOutFailed, setSignOutFailed] = useState(false);
-  // The session ended while the app was open (closed elsewhere, past its 12 h or 7 days): the sign-in page says so.
+  // The session ended while the app was open (closed elsewhere, idle too long or 7 days old): the sign-in page says so.
   const [hasEnded, setHasEnded] = useState(false);
   // A new password just chosen from the « mot de passe oublié » link: the sign-in page says so (SEC-05 lot 3).
   // Holds the account's address, so the sign-in page has it filled in.
@@ -233,7 +235,9 @@ export function App(): JSX.Element {
 /** The dashboard itself: one router per signed-in user, so a new session starts on a clean state. */
 function SignedIn({ user, onSignOut }: RouterContext): JSX.Element {
   const [router] = useState(() => createAppRouter({ user, onSignOut }));
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(createQueryClient);
+  // The page's own errors go to the API while signed in (OPS-18), each with the template of the route it happened on.
+  useEffect(() => listenForErrors(() => router.state.matches.at(-1)?.fullPath), [router]);
   // A touched notification opens its page here, without a reload (public/sw.js).
   useEffect(
     () =>

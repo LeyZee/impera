@@ -68,7 +68,7 @@ describe('Créatrices › Demandes: what the screen says (MED-09)', () => {
     });
     const old = requestOf({ state: 'refused', dueOn: '2026-11-02' });
     const groups = requestGroups(content([script, old]), [night], TODAY);
-    expect(groups.current[0]?.due).toEqual({ text: 'En retard depuis lundi', late: true });
+    expect(groups.current[0]?.due).toEqual({ text: 'En retard depuis lun. 2 nov.', late: true });
     expect(groups.current[0]?.structureName).toBe('Soirée inventée');
     expect(groups.closed[0]?.due).toEqual({ text: 'Pour le 2 nov.', late: false });
     expect(groups.closed[0]?.structureName).toBeNull();

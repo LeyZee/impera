@@ -247,7 +247,7 @@ describe('Agenda, the creator’s (CR-05)', () => {
     // Wednesday's, Friday's 22 h – 2 h, and its end on Saturday from 0 h (CREA-02).
     expect(screen.getAllByText(/Dispo pour l’agence/u).length).toBe(3);
     // The shooting sheet of a proposal, folded under its name until she opens it (VEI-01 d).
-    const brief = screen.getByText('🎬 Fiche de tournage');
+    const brief = screen.getByText('Fiche de tournage');
     expect(brief.tagName).toBe('SUMMARY');
     expect(brief.parentElement?.textContent).toContain('Ambiance Nuit, noir et dentelle');
   });
@@ -369,10 +369,8 @@ describe('Agenda, recette design du 11/11 (lot B)', () => {
     keepYesterday();
     serveAgenda(() => Promise.resolve(new Response('{}', { status: 500 })));
     show();
-    const silent = await screen.findByText(
-      /^Le serveur ne répond pas : tu vois ta dernière lecture, hier à 21\sh\.$/u,
-    );
-    expect(silent.closest('.ag-offline')).not.toBeNull();
+    const silent = await screen.findByText(/^Tu vois ta dernière lecture, hier à 21\sh\.$/u);
+    expect(silent.closest('[role="alert"]')?.textContent).toContain('Le serveur ne répond pas');
     expect(screen.queryByText(/Hors ligne/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeDefined();
   });
@@ -573,5 +571,55 @@ describe('Agenda, recette du 16/11', () => {
     serve(() => true);
     show();
     expect(await screen.findByRole('button', { name: 'Cocher Story du matin' })).toBeDefined();
+  });
+});
+
+describe('Agenda, recette visuelle du 16/11 (lot 7)', () => {
+  it('says in amber the tasks whose time is over and that she has not ticked, never « Plus rien » (CRE-05)', async () => {
+    // Wednesday 23 h in Paris: the shoot (14 h – 16 h) and the live (21 h – 22 h) are over, neither ticked.
+    vi.setSystemTime(new Date('2026-11-04T22:00:00Z'));
+    serve(() => true);
+    show();
+    const missed = await screen.findByText(/tâches passées pas cochées/u);
+    expect(missed.className).toBe('ag-glance__missed');
+    expect(missed.textContent).toBe('2 tâches passées pas cochées : 🎬Tournage tenue rouge, 📡Live du soir.');
+    expect(screen.queryByText(/Plus rien à heure/u)).toBeNull();
+    // In the Programme, each says it, greyed or not.
+    expect(screen.getAllByText('pas cochée')).toHaveLength(2);
+  });
+
+  it('shows her routine by its name in the week and the month of a computer, never « 0/1 routine » (CRE-06)', async () => {
+    wide();
+    serve(() => true);
+    show('week');
+    await screen.findByRole('button', { name: /^Tournage tenue rouge, 14\sh – 16\sh$/u });
+    expect(screen.getAllByText(stretch.title, { selector: '.ag-mini__title' }).length).toBe(3);
+    expect(screen.queryByText(/routine$/u)).toBeNull();
+    // The rows on top say what they hold, in words (CRE-24).
+    expect(screen.getByText('Sans heure')).toBeDefined();
+    expect(await screen.findByText('Qui répond')).toBeDefined();
+    cleanup();
+    show('month');
+    await screen.findAllByRole('gridcell');
+    expect(screen.getAllByText(stretch.title, { selector: '.ag-mini__title' }).length).toBeGreaterThan(3);
+  });
+
+  it('writes the hours of who answers her fans before the name in the week, and a dot in the month (CRE-04)', async () => {
+    wide();
+    serve(() => true);
+    show('week');
+    await screen.findByText('Qui répond');
+    const first = document.querySelector('.ag-replies__cell');
+    expect(first?.firstElementChild?.textContent).toMatch(/^14\sh – 18\sh$/u);
+    expect(first?.lastElementChild?.textContent).toBe('Kofi');
+    cleanup();
+    show('month');
+    await screen.findAllByRole('gridcell');
+    // No name in a cell: a dot, said once under the month.
+    await waitFor(() => {
+      expect(document.querySelectorAll('.ag-month__cell .ag-month__fans')).toHaveLength(2);
+    });
+    expect(screen.getByText('Les jours marqués d’un point, quelqu’un répond à tes fans.')).toBeDefined();
+    expect(document.querySelector('.ag-month__cell')?.textContent).not.toMatch(/Kofi|Awa/u);
   });
 });

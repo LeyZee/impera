@@ -1,4 +1,4 @@
-import { CREATOR_REPLIES_EMOJI, type CreatorAccountShift, type CreatorAgenda } from '@impera/contracts';
+import type { CreatorAccountShift, CreatorAgenda } from '@impera/contracts';
 import type { JSX, KeyboardEvent } from 'react';
 
 import { CATEGORY_EMOJI } from './category';
@@ -13,8 +13,9 @@ const LINES_SHOWN = 3;
 
 /**
  * Mois on a computer (CR-05 b2): her weeks of the month, what is planned each day (hours first, then the tasks of
- * the day, the agency's suggestions dashed). Her routine stays in Jour, where it is ticked. A day opens in Jour; the
- * arrows of the keyboard move from day to day, Entrée opens it.
+ * the day and her routine, the agency's suggestions dashed). A day someone answers her fans has a dot by its number,
+ * said once under the month (CRE-04). A day opens in Jour; the arrows of the keyboard move from day to day, Entrée
+ * opens it.
  */
 export function MonthView({
   agenda,
@@ -50,73 +51,78 @@ export function MonthView({
     event.preventDefault();
     cell.focus();
   };
+  const anyFans = days.some((one) => repliesOn(shifts, one, agenda.timeZone).length > 0);
   return (
-    <div className="ag-month nv-plate" role="grid" aria-label="Ton mois" onKeyDown={onKeyDown}>
-      <div className="ag-month__names" role="row">
-        {WEEKDAY_SHORT.map((name) => (
-          <span key={name} role="columnheader">
-            {name}
-          </span>
-        ))}
-      </div>
-      <div className="ag-month__days">
-        {days.map((one) => {
-          const lines = monthLinesOf(agenda, one);
-          const rest = lines.length - LINES_SHOWN;
-          // Names only, in the same order every day, so that the month reads at a glance.
-          const names = [
-            ...new Set(
-              repliesOn(shifts, one, agenda.timeZone).flatMap((line) =>
-                line.replies.map((reply) => reply.name),
+    <div className="ag-month nv-plate">
+      <div role="grid" aria-label="Ton mois" onKeyDown={onKeyDown}>
+        <div className="ag-month__names" role="row">
+          {WEEKDAY_SHORT.map((name) => (
+            <span key={name} role="columnheader">
+              {name}
+            </span>
+          ))}
+        </div>
+        <div className="ag-month__days">
+          {days.map((one) => {
+            const lines = monthLinesOf(agenda, one);
+            const rest = lines.length - LINES_SHOWN;
+            // Names only, in the same order every day, so that the month reads at a glance.
+            const names = [
+              ...new Set(
+                repliesOn(shifts, one, agenda.timeZone).flatMap((line) =>
+                  line.replies.map((reply) => reply.name),
+                ),
               ),
-            ),
-          ].sort((a, b) => a.localeCompare(b, 'fr'));
-          return (
-            <button
-              key={one}
-              type="button"
-              role="gridcell"
-              className="ag-month__cell"
-              data-day={one}
-              data-out={one.slice(0, 7) === month ? undefined : 'true'}
-              data-today={one === agenda.today ? 'true' : undefined}
-              tabIndex={one === day || (day.slice(0, 7) !== one.slice(0, 7) && one === days[0]) ? 0 : -1}
-              aria-label={`${longDay(one)} : ${lines.length === 0 ? 'rien de prévu' : lines.map((line) => line.title).join(', ')}${names.length === 0 ? '' : `. Qui répond à tes fans : ${names.join(', ')}`}`}
-              onClick={() => {
-                onOpenDay(one);
-              }}
-            >
-              <span className="ag-month__num nv-num" aria-hidden="true">
-                {dayNumber(one)}
-              </span>
-              {lines.slice(0, LINES_SHOWN).map((line) => (
-                <span
-                  key={line.key}
-                  className="ag-mini"
-                  data-cat={line.category}
-                  data-done={line.done ? 'true' : undefined}
-                  data-proposed={line.proposed ? 'true' : undefined}
-                  aria-hidden="true"
-                >
-                  <span>{CATEGORY_EMOJI[line.category]}</span>
-                  {line.start === null ? null : <span className="nv-num">{clockOf(line.start)}</span>}
-                  <span className="ag-mini__title">{line.title}</span>
+            ].sort((a, b) => a.localeCompare(b, 'fr'));
+            return (
+              <button
+                key={one}
+                type="button"
+                role="gridcell"
+                className="ag-month__cell"
+                data-day={one}
+                data-out={one.slice(0, 7) === month ? undefined : 'true'}
+                data-today={one === agenda.today ? 'true' : undefined}
+                tabIndex={one === day || (day.slice(0, 7) !== one.slice(0, 7) && one === days[0]) ? 0 : -1}
+                aria-label={`${longDay(one)} : ${lines.length === 0 ? 'rien de prévu' : lines.map((line) => line.title).join(', ')}${names.length === 0 ? '' : `. Qui répond à tes fans : ${names.join(', ')}`}`}
+                onClick={() => {
+                  onOpenDay(one);
+                }}
+              >
+                <span className="ag-month__head" aria-hidden="true">
+                  <span className="ag-month__num nv-num">{dayNumber(one)}</span>
+                  {names.length === 0 ? null : <i className="ag-month__fans" />}
                 </span>
-              ))}
-              {rest > 0 ? (
-                <span className="ag-month__more nv-num" aria-hidden="true">
-                  +{rest}
-                </span>
-              ) : null}
-              {names.length === 0 ? null : (
-                <span className="ag-month__fans" aria-hidden="true">
-                  {CREATOR_REPLIES_EMOJI} {names.join(', ')}
-                </span>
-              )}
-            </button>
-          );
-        })}
+                {lines.slice(0, LINES_SHOWN).map((line) => (
+                  <span
+                    key={line.key}
+                    className="ag-mini"
+                    data-cat={line.category}
+                    data-done={line.done ? 'true' : undefined}
+                    data-proposed={line.proposed ? 'true' : undefined}
+                    aria-hidden="true"
+                  >
+                    <span>{CATEGORY_EMOJI[line.category]}</span>
+                    {line.start === null ? null : <span className="nv-num">{clockOf(line.start)}</span>}
+                    <span className="ag-mini__title">{line.title}</span>
+                  </span>
+                ))}
+                {rest > 0 ? (
+                  <span className="ag-month__more nv-num" aria-hidden="true">
+                    +{rest}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
+      {anyFans ? (
+        <p className="ag-month__legend">
+          <i className="ag-month__fans" aria-hidden="true" />
+          Les jours marqués d’un point, quelqu’un répond à tes fans.
+        </p>
+      ) : null}
     </div>
   );
 }

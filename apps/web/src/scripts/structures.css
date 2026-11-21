@@ -15,7 +15,6 @@
   list-style: none;
 }
 .st-tile {
-  --_radius: var(--nv-radius-xl);
   appearance: none;
   border: 0;
   font: inherit;
@@ -69,15 +68,15 @@
   transform: translateX(120%);
 }
 .st-tile__moment {
-  font-size: var(--nv-text-caption);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  font-weight: 650;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
 }
 .st-tile__title {
-  font-family: var(--nv-font-serif);
-  font-size: 26px;
-  line-height: 1.1;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
 .st-tile__body {
@@ -149,9 +148,10 @@
   border: 0;
   background: none;
   font: inherit;
-  font-family: var(--nv-font-serif);
   font-size: var(--nv-text-title-2);
   line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
   color: var(--nv-ink);
   padding: 4px 8px;
   border-radius: var(--nv-radius-md);
@@ -200,11 +200,10 @@
 
 /* ── Moment and colour: how every card of the script looks ── */
 .st-look {
-  --_radius: var(--nv-radius-xl);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 20px 32px;
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
 }
 @media (max-width: 860px) {
   .st-look {
@@ -586,7 +585,6 @@
   flex: none;
   font-size: var(--nv-text-caption);
   letter-spacing: var(--nv-text-caption-tracking);
-  text-transform: uppercase;
   font-weight: 650;
   color: var(--nv-ink-faint);
 }
@@ -782,21 +780,11 @@
 }
 .st-sheet__title {
   margin: 0;
-  font-family: var(--nv-font-serif);
-  font-weight: 400;
-  font-size: var(--nv-text-title-1);
-  line-height: var(--nv-text-title-1-leading);
-  color: var(--nv-ink);
   overflow-wrap: anywhere;
 }
 .st-group__title {
   margin: 10px 0 -4px;
   padding: 0;
-  font-size: var(--nv-text-headline);
-  line-height: var(--nv-text-headline-leading);
-  letter-spacing: var(--nv-text-headline-tracking);
-  font-weight: 650;
-  color: var(--nv-ink);
 }
 .st-sheet > .st-group__title:first-of-type {
   margin-top: 0;
@@ -1159,6 +1147,14 @@
   margin-bottom: 4px;
 }
 
+/* ── As a view of a creator's sheet (Scripts › Structures): the views and « Nouvelle structure » on one row ── */
+.st-tabs--embedded {
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+
 /* ── Queues: the creators on the left, her queue beside ── */
 .st-queues {
   display: grid;
@@ -1172,7 +1168,6 @@
   }
 }
 .st-queues__who {
-  --_radius: var(--nv-radius-xl);
   position: sticky;
   top: 12px;
   display: flex;
@@ -1226,8 +1221,8 @@
   border-radius: var(--nv-radius-full);
   display: grid;
   place-items: center;
-  font-family: var(--nv-font-serif);
-  font-size: 17px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
   color: var(--nv-ink);
   background: var(--nv-glass-fill-strong);
   box-shadow: inset 0 0 0 1px var(--nv-glass-edge);
@@ -1253,10 +1248,6 @@
 }
 .st-queue__title {
   margin: 0;
-  font-family: var(--nv-font-serif);
-  font-weight: 400;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
 }
 .st-queue__state {
   display: flex;

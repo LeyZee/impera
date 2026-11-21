@@ -37,6 +37,7 @@ import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Select } from '@/shell/Select';
+import { Failure } from '@/shell/states';
 
 type Entry = AccountPayRulesList['accounts'][number];
 
@@ -86,21 +87,11 @@ export function PayRulesSection(): JSX.Element {
   if (list.isError) {
     return (
       <section className="rp-rules">
-        <div className="nv-plate rp-rules__cover nv-enter">
-          <p className="rp-notice__title">Le serveur ne répond pas</p>
-          <p className="rp-notice__text">
-            Les règles de paie n’ont pas pu être lues. Réessaie dans un instant.
-          </p>
-          <button
-            type="button"
-            className="nv-btn nv-btn--soft tm-self-start"
-            onClick={() => {
-              void list.refetch();
-            }}
-          >
-            Réessayer
-          </button>
-        </div>
+        <Failure
+          onRetry={() => {
+            void list.refetch();
+          }}
+        />
       </section>
     );
   }
@@ -489,7 +480,7 @@ function RulesPanel({
               {source === 'detected' && entry.checkedPeriod !== null
                 ? 'Les ventes relevées peuvent partir de la quinzaine vérifiée, tant qu’aucune quinzaine n’est clôturée depuis.'
                 : source === 'detected'
-                  ? 'Pour partir d’une quinzaine déjà commencée, lance d’abord la vérification de fiabilité de cette quinzaine dans Réglages › Ventes.'
+                  ? 'Pour partir d’une quinzaine déjà commencée, lance d’abord la vérification de fiabilité de cette quinzaine dans Réglages › Plateformes.'
                   : first
                     ? 'Les premières règles d’un compte peuvent partir de la quinzaine en cours.'
                     : 'De nouvelles règles partent d’une quinzaine qui n’a pas commencé.'}

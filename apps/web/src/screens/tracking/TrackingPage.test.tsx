@@ -203,6 +203,7 @@ function renderPage(
   canAddCreator = true,
   selfScope = false,
   nothingListed?: string,
+  only: string | null = null,
 ): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const root = createRootRoute();
@@ -220,6 +221,7 @@ function renderPage(
           onSelect={(id) => void navigate({ search: id === null ? {} : { conversation: id } })}
           canDecide={canDecide}
           canAddCreator={canAddCreator}
+          only={only}
           selfScope={selfScope}
           nothingListed={nothingListed}
         />
@@ -305,11 +307,11 @@ describe('TrackingPage', () => {
             },
     });
     renderPage();
-    const warning = await screen.findByText(/« À traiter » n’a pas pu être lu/u);
-    expect(warning.classList.contains('tr-warn')).toBe(true);
+    const warning = await screen.findByText(/Une urgence peut manquer ici/u);
+    expect(warning.closest('[role="alert"]')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(await screen.findByRole('list', { name: 'À traiter' })).toBeDefined();
-    expect(screen.queryByText(/« À traiter » n’a pas pu être lu/u)).toBeNull();
+    expect(screen.queryByText(/Une urgence peut manquer ici/u)).toBeNull();
   });
 
   it('never tells a chatter there is nothing for him while « À traiter » could not be read (relecture #538)', async () => {
@@ -319,7 +321,7 @@ describe('TrackingPage', () => {
       todos: { status: 500 },
     });
     renderPage('/suivi', true, false, true, 'Rien à suivre');
-    expect(await screen.findByText(/« À traiter » n’a pas pu être lu/u)).toBeDefined();
+    expect(await screen.findByText(/Une urgence peut manquer ici/u)).toBeDefined();
     expect(screen.queryByText('Rien à suivre')).toBeNull();
   });
 
@@ -387,6 +389,34 @@ describe('TrackingPage', () => {
       .map((row) => row.querySelector('.tr-row__creator')?.textContent.replace(' · ', ''));
     expect(names).toContain('Léa');
     expect(names).toContain('Nina');
+  });
+
+  it('reads one creator alone when the menu’s selector is set on her, as an account that has only her (ADR 0134 § 3)', async () => {
+    serve({
+      creators: { status: 200, body: { creators: [LEA, NINA] } },
+      conversations: {
+        [LEA.id]: { items: [conversation('1')], nextCursor: null },
+        [NINA.id]: { items: [conversation('2')], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, true, false, undefined, NINA.id);
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    // One creator on screen: her name is not said again on the row.
+    expect(list.querySelector('.tr-row__creator')).toBeNull();
+  });
+
+  it('reads every creator when the one chosen is no longer listed', async () => {
+    serve({
+      creators: { status: 200, body: { creators: [LEA, NINA] } },
+      conversations: {
+        [LEA.id]: { items: [conversation('1')], nextCursor: null },
+        [NINA.id]: { items: [conversation('2')], nextCursor: null },
+      },
+    });
+    renderPage('/suivi', true, true, false, undefined, '0192f3a0-0000-7000-8000-00000000dead');
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('opens a conversation outside every list when the link names its creator (Dashboard, fan reader)', async () => {
@@ -1569,6 +1599,26 @@ describe('Suivi says who acts, and a chatter reads what concerns him (recette 05
     renderPage('/suivi', true, false, true);
     const yours = await screen.findByRole('list', { name: 'À toi' });
     expect(yours.textContent).toContain('Tu as la main');
+  });
+
+  it('says a state all the lines of « À toi » share once, in its title, never on each line (PIL-10)', async () => {
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: {
+          items: [
+            conversation('1', { state: 'human', heldBy: 'other' }),
+            conversation('2', { state: 'human', heldBy: 'other' }),
+          ],
+          nextCursor: null,
+        },
+      },
+    });
+    renderPage('/suivi');
+    const yours = await screen.findByRole('list', { name: 'À toi' });
+    expect(yours.textContent).not.toContain('Un humain répond');
+    const title = yours.closest('section')?.querySelector('.tr-group__title');
+    expect(title?.textContent).toBe('À toi2un humain répond');
   });
 
   it('shows a chatter another person’s hand without a way to give it back (EQ-13)', async () => {

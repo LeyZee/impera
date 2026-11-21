@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+  CommentOutcomeSchema,
   err,
   FanCardReadSchema,
   MEDIA_VOCABULARY_VERSION,
@@ -14,19 +15,22 @@ import { generateText, transcribe as transcribeAudio } from 'ai';
 import { budgetStatus, type BudgetStatus } from './budget';
 import type { LlmCallLog } from './call-log';
 import { classify, createCallRunner } from './call-runner';
-import { acceptsInput, MODELS, TRANSCRIPTION_MODEL } from './catalog';
-import type { ProviderId } from './config';
+import { acceptsInput, costUsd, findModel, MODELS, TRANSCRIPTION_MODEL } from './catalog';
+import { LlmRoleSchema, type ProviderId } from './config';
 import {
   alertsBlock,
   describeBrief,
   judgeSituationBlock,
   notesBlock,
+  customOrderBlock,
+  profileBioBlock,
   scriptsBlock,
   toMessages,
 } from './conversation-messages';
 import type {
   ChannelPostInput,
   FanCardReadInput,
+  InstagramCommentInput,
   LlmFailure,
   LlmGateway,
   LlmGatewayDeps,
@@ -37,7 +41,7 @@ import type {
 import { computeHealth } from './health';
 import { loadPrompt, renderPrompt } from './prompts';
 import {
-  BriefSchema,
+  BriefFromModelSchema,
   ChannelPollOutputSchema,
   ChannelPostOutputSchema,
   JudgeOutputSchema,
@@ -51,6 +55,10 @@ import { wrapUntrusted } from './untrusted';
 
 export type * from './gateway-types';
 
+/** « Réponds seulement : ok » needs two; Grok's short reasoning shares the budget, and a cut answer still proves the call. */
+const PROBE_MAX_OUTPUT_TOKENS = 16;
+const PROBE_TIMEOUT_MS = 20_000;
+
 export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const now = deps.now ?? (() => new Date());
   const prompts = deps.prompts ?? {
@@ -62,6 +70,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
   const trendCapturesPrompt = prompts.trendCaptures ?? loadPrompt('sense', 'trend-captures');
   const creatorDropPrompt = prompts.creatorDrop ?? loadPrompt('sense', 'creator-drop');
   const channelPostPrompt = prompts.channelPost ?? loadPrompt('voice', 'telegram-channel');
+  const instagramCommentPrompt = prompts.instagramComment ?? loadPrompt('voice', 'instagram-comment');
   const scriptSummaryPrompt = prompts.scriptSummary ?? loadPrompt('brain', 'script-summary');
   const scriptIdentityPrompt = prompts.scriptIdentity ?? loadPrompt('brain', 'script-identity');
   const fanCardPrompt = prompts.fanCard ?? loadPrompt('brain', 'fan-card');
@@ -198,8 +207,10 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(prompts.brain, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         alerts: alertsBlock(input.alerts ?? []),
         scripts: scriptsBlock(input.scripts ?? [], input.scriptStepWaiting === true),
+        custom_order: customOrderBlock(input.customOrder),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
         canary,
@@ -209,7 +220,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         prompts.brain,
         system,
         () => Promise.resolve(toMessages(input.history)),
-        BriefSchema,
+        BriefFromModelSchema,
         input.trace,
       );
     },
@@ -218,9 +229,16 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(prompts.voice, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
-        brief: describeBrief(input.brief, input.objectionReply, input.scriptStep, input.maxBubbles),
+        brief: describeBrief(
+          input.brief,
+          input.objectionReply,
+          input.scriptStep,
+          input.maxBubbles,
+          input.waitingStep,
+        ),
         canary,
       });
       return run(
@@ -237,6 +255,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       const system = renderPrompt(judgePrompt, {
         creator_name: input.creatorName,
         persona_sheet: input.personaSheet,
+        profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         // What the agent saw (his age, his flags, the last offer): safety is read against it, not guessed.
         situation: judgeSituationBlock(input.situation),
@@ -371,6 +390,27 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
       return result.ok ? ok({ ...result.value, output: { kind: 'post', ...result.value.output } }) : result;
     },
 
+    async instagramComment(input) {
+      const system = renderPrompt(instagramCommentPrompt, {
+        creator_name: input.creatorName,
+        persona_sheet: input.personaSheet,
+        examples:
+          input.examples.length === 0
+            ? 'Aucun exemple pour l’instant.'
+            : wrapUntrusted('comment_examples', input.examples.join('\n\n---\n\n')),
+        canary,
+      });
+      const content = instagramCommentRequest(input);
+      return run(
+        'voice',
+        instagramCommentPrompt,
+        system,
+        () => Promise.resolve([{ role: 'user', content }]),
+        CommentOutcomeSchema,
+        { ...input.trace, purpose: 'instagram_comment' },
+      );
+    },
+
     async summarizeScript(input) {
       const system = renderPrompt(scriptSummaryPrompt, { canary });
       const content = scriptSummaryRequest(input);
@@ -425,32 +465,71 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     },
 
     async testConnection(provider) {
-      // Test the model the config actually uses for this provider, else the first one the catalog knows.
-      const configured = Object.values(deps.config.roles)
-        .flatMap((role) => [role, ...(role.fallback ? [role.fallback] : [])])
-        .find((ref) => ref.provider === provider);
-      const ref = configured ?? MODELS.find((m) => m.provider === provider);
-      if (ref === undefined) return { provider, isOk: false, outcome: 'unknown_model' };
+      // The owner's « Essai réel » (ADR 0091 § 7): the model the config actually uses for this provider (its first role
+      // or fallback), else the first one the catalog knows. One tiny call, journaled under `probe` so its cost counts,
+      // stopped by the day's cap like any other, and kept out of the agent's health (health.ts).
+      const configured = LlmRoleSchema.options
+        .flatMap((role) => {
+          const config = deps.config.roles[role];
+          return [
+            { role, ref: { provider: config.provider, model: config.model } },
+            ...(config.fallback ? [{ role, ref: config.fallback }] : []),
+          ];
+        })
+        .find(({ ref }) => ref.provider === provider);
+      const known = MODELS.find((m) => m.provider === provider);
+      const target = configured ?? (known === undefined ? undefined : { role: 'brain' as const, ref: known });
+      if (target === undefined) return { provider, isOk: false, outcome: 'unknown_model' };
+      const { role, ref } = target;
+      const named = { model: ref.model, modelLabel: findModel(ref)?.label ?? ref.model };
       const model = deps.resolveModel(ref);
-      if (model === undefined) return { provider, isOk: false, model: ref.model, outcome: 'missing_key' };
+      if (model === undefined) return { provider, isOk: false, ...named, outcome: 'missing_key' };
+      if (overBudget('probe') !== undefined)
+        return { provider, isOk: false, ...named, outcome: 'budget_reached' };
       const startedAt = now().getTime();
+      const base = {
+        role,
+        provider: ref.provider,
+        model: ref.model,
+        promptHash: 'probe',
+        isFallback: false,
+        purpose: 'probe',
+      } as const;
       try {
-        await generateText({
+        const answer = await generateText({
           model,
           prompt: 'Réponds seulement : ok',
-          maxOutputTokens: 5,
+          maxOutputTokens: PROBE_MAX_OUTPUT_TOKENS,
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(15_000),
+          abortSignal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+          ...(ref.provider === 'xai' && { providerOptions: { xai: { reasoningEffort: 'low' } } }),
         });
-        return {
-          provider,
-          isOk: true,
-          model: ref.model,
-          latencyMs: now().getTime() - startedAt,
+        const latencyMs = now().getTime() - startedAt;
+        const cost = costUsd(ref, answer.usage);
+        log.append({
+          ...base,
+          at: now(),
           outcome: 'ok',
-        };
+          latencyMs,
+          ...(answer.usage.inputTokens !== undefined && { inputTokens: answer.usage.inputTokens }),
+          ...(answer.usage.outputTokens !== undefined && { outputTokens: answer.usage.outputTokens }),
+          ...(cost !== undefined && { costUsd: cost }),
+        });
+        return { provider, isOk: true, ...named, latencyMs, outcome: 'ok' };
       } catch (error) {
-        return { provider, isOk: false, model: ref.model, outcome: classify(error).outcome };
+        const latencyMs = now().getTime() - startedAt;
+        const { outcome, message, usage, refusedStatus } = classify(error);
+        if (refusedStatus !== undefined) reportRefusal(ref.provider, refusedStatus);
+        const cost = usage === undefined ? undefined : costUsd(ref, usage);
+        log.append({
+          ...base,
+          at: now(),
+          outcome,
+          latencyMs,
+          errorMessage: message.slice(0, 200),
+          ...(cost !== undefined && { costUsd: cost }),
+        });
+        return { provider, isOk: false, ...named, latencyMs, outcome };
       }
     },
   };
@@ -481,6 +560,43 @@ function channelPostRequest(input: ChannelPostInput): string {
     );
   }
   if (input.advice !== null) lines.push('', wrapUntrusted('agency_advice', input.advice));
+  return lines.join('\n');
+}
+
+const MEDIA_KIND_WORDS = { reel: 'un Reel', photo: 'une photo', carousel: 'un carrousel' } as const;
+
+/** What this one comment is: the facts written by the code, the two texts in their blocks (CLAUDE.md rule 4). */
+function instagramCommentRequest(input: InstagramCommentInput): string {
+  const { comment } = input;
+  const lines = [
+    `Un commentaire sous ${MEDIA_KIND_WORDS[comment.mediaKind]} qu’elle a publié il y a ${String(comment.postAgeHours)} h.`,
+    comment.repliesToHer
+      ? 'Il répond à une de ses réponses.'
+      : 'Il est posé directement sous la publication.',
+    comment.authorCommentedBefore
+      ? 'Son auteur a déjà commenté ses publications.'
+      : 'C’est le premier commentaire de son auteur.',
+    '',
+    comment.caption.trim() === ''
+      ? 'La publication n’a pas de légende.'
+      : `La légende de la publication :\n${wrapUntrusted('instagram_caption', comment.caption)}`,
+    '',
+    `Le commentaire :\n${wrapUntrusted('instagram_comment', comment.comment)}`,
+  ];
+  if (input.recentReplies.length > 0)
+    lines.push(
+      '',
+      'Ses réponses récentes, à ne pas répéter :',
+      wrapUntrusted(
+        'recent_replies',
+        input.recentReplies.map((reply) => `- ${reply.replace(/\s+/gu, ' ').trim()}`).join('\n'),
+      ),
+    );
+  if (input.refusedBy !== undefined && input.refusedBy.length > 0)
+    lines.push(
+      '',
+      `Ta première réponse a été refusée (${input.refusedBy.join(', ')}). Écris-en une autre, plus simple, ou choisis une autre issue.`,
+    );
   return lines.join('\n');
 }
 

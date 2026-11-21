@@ -5,7 +5,7 @@
  */
 
 .al-page {
-  gap: var(--nv-space-5);
+  gap: var(--nv-group-gap);
 }
 .al-page > * {
   flex-shrink: 0;
@@ -40,12 +40,6 @@
 }
 .al-eyebrow {
   margin: 0;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-weight: 600;
-  color: var(--nv-ink-faint);
 }
 
 .al-list {
@@ -54,12 +48,11 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--nv-card-gap);
 }
 
 .al-empty {
-  --_radius: var(--nv-radius-xl);
-  padding: 18px 22px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -71,8 +64,7 @@
 
 /* ── A line: one alert, its creators, what it does, where it goes ── */
 .al-line {
-  --_radius: var(--nv-radius-xl);
-  padding: 16px 20px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -166,7 +158,6 @@
 .al-line__phrase {
   margin: 0;
   max-width: 62ch;
-  font-family: var(--nv-font-serif);
   font-style: italic;
   font-size: 15px;
   line-height: 21px;
@@ -220,7 +211,7 @@
   margin-top: 2px;
 }
 
-/* ── Where it goes on Telegram: read from Réglages › Telegram ── */
+/* ── Where it goes on Telegram: read from Réglages › Bots Telegram ── */
 /* The dot stays on the first line when the sentence wraps. */
 .al-telegram {
   margin: 0;
@@ -265,8 +256,7 @@
 
 /* ── The editor, in place of the line ── */
 .al-editor {
-  --_radius: var(--nv-radius-xl);
-  padding: 18px 22px 20px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -280,11 +270,6 @@
 }
 
 @media (max-width: 520px) {
-  .al-line,
-  .al-editor {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
   .al-head__action {
     width: 100%;
   }

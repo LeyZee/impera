@@ -3,7 +3,7 @@ import { DEFAULT_LLM_CONFIG } from '@impera/llm';
 
 import { defineTask } from '../jobs';
 import type { AppLlm } from '../llm';
-import { startAiUsageModule, type AiUsageModule } from '../modules/ai-usage';
+import { startAiUsageModule, type AiUsageModule, type VoiceQuotaReading } from '../modules/ai-usage';
 
 import type { Routes, Shared, TasksOf } from './shared';
 
@@ -14,7 +14,11 @@ export interface WiredAiUsage {
 }
 
 /** Réglages › Consommation IA (ADR 0091): the journal of the app's one gateway, and the credits ledger. */
-export function wireAiUsage(shared: Shared, llm: AppLlm): WiredAiUsage {
+export function wireAiUsage(
+  shared: Shared,
+  llm: AppLlm,
+  voice?: () => Promise<VoiceQuotaReading | null>,
+): WiredAiUsage {
   const { adminDb, logger, requireRole } = shared;
   const { timeZone, usdPerEur } = DEFAULT_LLM_CONFIG.dailyBudget;
   const module = startAiUsageModule({
@@ -22,6 +26,7 @@ export function wireAiUsage(shared: Shared, llm: AppLlm): WiredAiUsage {
     cap: () => llm.gateway.health().budget,
     timeZone,
     usdPerEur,
+    ...(voice !== undefined && { voice }),
   });
   return {
     module,

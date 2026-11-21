@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-import { PlatformScriptMomentSchema } from './connector';
-import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
+import { PlatformScriptMomentSchema, PlatformStepDiscountSchema } from './connector';
+import { CreatorIdSchema, MediaDescriptionIdSchema, PlatformAccountIdSchema } from './ids';
+import { DescriptionReviewReasonSchema } from './media';
 import { CurrencySchema } from './money';
 
 /**
@@ -631,10 +632,15 @@ export const SCRIPT_ERROR_CODES = [
   'script_card_not_found',
   /** No native script of hers by this id, or a reader who may not read her. */
   'platform_script_not_found',
-  /** Not an identity of this script's current version (its texts or media changed since): read the script again. */
-  'script_identity_stale_conflict',
   /** The branches given are not those the step has now (Reveal changed them since): read the script again. */
   'platform_script_branches_stale_conflict',
+  /**
+   * A description named is not the one a media of this script is told with now (a newer one came, or the media left
+   * the script): read the script again.
+   */
+  'platform_script_description_stale_conflict',
+  /** A description that waits for a human (ADR 0083 § 3 to 5) is validated alone, never with others. */
+  'platform_script_description_alone_conflict',
 ] as const;
 export type ScriptErrorCode = (typeof SCRIPT_ERROR_CODES)[number];
 
@@ -760,6 +766,8 @@ export const PLATFORM_SCRIPT_WARNING_CODES = [
 ] as const;
 export const PLATFORM_SCRIPT_GAPS = [
   'media_absent',
+  /** A media of a step in the vault but not imported into the CRM (ADR 0145 § 5): the agent does not see it. */
+  'media_not_imported',
   'media_not_described',
   'identity_not_validated',
   /** A branch of a step whose condition the agency has not set (ADR 0112 § 13): Reveal keeps its own unread. */
@@ -775,6 +783,8 @@ export const PLATFORM_SCRIPT_GAPS = [
    * prices).
    */
   'media_twice',
+  /** A step carries a « Tarif réduit » on the platform: never sold at a discount (recette 16/11, Charles). */
+  'step_discounted',
 ] as const;
 
 /** The longest condition in text (ADR 0112 § 5), as Reveal's own: one sentence the brain reads. */
@@ -812,13 +822,30 @@ export const BranchConditionSchema = z.discriminatedUnion('kind', [
 ]);
 export type BranchCondition = z.infer<typeof BranchConditionSchema>;
 
+/**
+ * The description a media of a native script is told with (ADR 0030 § 3, ADR 0099 § 4): the latest a person validated,
+ * else the latest written, by the vision or by hand, for the agency to validate. The platform's own text is never one.
+ */
+export const PlatformMediaDescriptionViewSchema = z.object({
+  id: MediaDescriptionIdSchema,
+  detailed: z.string(),
+  /** Why it waits for a person (ADR 0083 § 3 to 5): such a description is validated alone, never with others. */
+  reviewReasons: z.array(DescriptionReviewReasonSchema),
+  validated: z.boolean(),
+});
+export type PlatformMediaDescriptionView = z.infer<typeof PlatformMediaDescriptionViewSchema>;
+
 const PlatformStepMediaViewSchema = z.object({
   ref: z.string(),
   kind: MediaSlotKindSchema,
   /** `false`: absent from the vault, its step is incomplete. */
   inVault: z.boolean(),
+  /** In the vault and chosen for the CRM (ADR 0145 § 5): `false`, the script cannot be offered. */
+  imported: z.boolean(),
   mediaAssetId: z.uuid().nullable(),
   described: z.boolean(),
+  /** `null` while its media has none: not imported, not described yet, or the vision could not read it. */
+  description: PlatformMediaDescriptionViewSchema.nullable(),
 });
 
 /**
@@ -846,6 +873,8 @@ export const PlatformScriptViewSchema = z.object({
       /** Minor units, VAT included, as the platform gives it; 0 for an offered step. */
       priceMinor: z.number().int().min(0),
       currency: CurrencySchema,
+      /** A reduced price set on the platform, as read; `null` when none. Never sold at: the step is blocked. */
+      discount: PlatformStepDiscountSchema.nullable(),
       media: z.array(PlatformStepMediaViewSchema),
       previewMedia: z.array(PlatformStepMediaViewSchema),
       complete: z.boolean(),
@@ -885,10 +914,16 @@ export const SetScriptBranchesBodySchema = z.strictObject({
 });
 export type SetScriptBranchesBody = z.infer<typeof SetScriptBranchesBodySchema>;
 
-/** `POST …/platform-scripts/:scriptId/identity/validate`: the identity shown, validated as it is. */
-export const ValidateScriptIdentityBodySchema = z.strictObject({ identityId: ScriptIdentityIdSchema });
+/**
+ * `POST …/platform-scripts/:scriptId/descriptions/validate`: descriptions of its media, as shown, validated as they
+ * are (ADR 0030 § 3). Several at once only when none waits for a person for a reason.
+ */
+export const ValidatePlatformScriptDescriptionsBodySchema = z.strictObject({
+  descriptionIds: z.array(MediaDescriptionIdSchema).min(1).max(100),
+});
 
-/** `POST …/platform-scripts/:scriptId/identity/correct`: an identity written by hand, validated by whoever writes it. */
-export const CorrectScriptIdentityBodySchema = z.strictObject({
-  content: ScriptIdentityContentSchema.strict(),
+/** `POST …/platform-scripts/:scriptId/descriptions/correct`: a new row from this one, its words rewritten, validated. */
+export const CorrectPlatformScriptDescriptionBodySchema = z.strictObject({
+  descriptionId: MediaDescriptionIdSchema,
+  detailed: z.string().trim().min(1).max(6000),
 });

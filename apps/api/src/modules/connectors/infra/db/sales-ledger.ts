@@ -5,6 +5,7 @@ import {
   EVENT_PAYLOADS,
   EventIdSchema,
   JOB_MAX_ATTEMPTS,
+  JOB_PAYLOADS,
   newId,
   PlatformAccountIdSchema,
   PlatformModelStatusSchema,
@@ -33,7 +34,7 @@ import {
   type RecordedPage,
   type SalesLedger,
 } from '../../domain/sales-feed';
-import { ringsWhenRecorded } from '../../domain/sales-totals';
+import { afterSaleOf, ringsWhenRecorded } from '../../domain/sales-totals';
 
 import { sellerOf } from './seller';
 
@@ -253,6 +254,32 @@ export function createDrizzleSalesLedger(db: Database, adminDb: Database): Sales
                     job_key_mode => ${'preserve_run_at'}
                   )`,
                 );
+                // A step he bought or a tip wakes his conversation for a word after it (ADR 0156 § 2). A purchase
+                // without an account has no fan to find: nothing to wake.
+                const afterSale = afterSaleOf(sale);
+                if (afterSale !== null && sale.platformFanId !== null) {
+                  await tx.execute(
+                    sql`select public.enqueue_job(
+                      task => ${'conversation.after_sale'},
+                      payload => ${JSON.stringify(
+                        JOB_PAYLOADS['conversation.after_sale'].parse({
+                          creatorId: link.creatorId,
+                          platformAccountId: link.platformAccountId,
+                          platformFanId: sale.platformFanId,
+                          saleId: line.id,
+                          saleType: afterSale,
+                          occurredAt: values.occurredAt.toISOString(),
+                          correlationId,
+                        }),
+                      )}::jsonb,
+                      queue_name => null,
+                      run_at => null,
+                      max_attempts => ${JOB_MAX_ATTEMPTS['conversation.after_sale']}::int,
+                      job_key => ${`conversation.after_sale:${line.id}`},
+                      job_key_mode => ${'preserve_run_at'}
+                    )`,
+                  );
+                }
               }
               continue;
             }

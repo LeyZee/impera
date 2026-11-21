@@ -29,10 +29,17 @@ const member = (displayName: string) =>
   });
 
 describe('Avatar', () => {
-  it('keeps an emoji or an accented letter whole in the initial', () => {
+  it('keeps an emoji or an accented letter whole in the initials', () => {
     const { container, rerender } = render(<Avatar member={member('💋 Théo')} />);
-    expect(container.textContent).toBe('💋');
+    expect(container.textContent).toBe('💋T');
     rerender(<Avatar member={member('élodie')} />);
     expect(container.textContent).toBe('É');
+  });
+
+  it('tells apart members whose names share a first word, as Équipe › Comptes Reveal does (GES-21)', () => {
+    const { container, rerender } = render(<Avatar member={member('Chatteur Un')} />);
+    expect(container.textContent).toBe('CU');
+    rerender(<Avatar member={member('Chatteur Deux')} />);
+    expect(container.textContent).toBe('CD');
   });
 });

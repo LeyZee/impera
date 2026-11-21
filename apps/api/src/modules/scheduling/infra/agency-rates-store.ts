@@ -1,8 +1,11 @@
 import {
+  AGENCY_SHARE_ALERTS_MAX,
+  AgencyShareAlertSchema,
   BasisPointsSchema,
   CalendarDaySchema,
   CreatorAgencyRateIdSchema,
   CreatorIdSchema,
+  EVENT_PAYLOADS,
   payPeriodLastDay,
   payPeriodOfDay,
   previousPayPeriod,
@@ -50,6 +53,44 @@ const toRate = (row: unknown): StoredAgencyRate => StoredAgencyRateSchema.parse(
 
 const LinkedRowSchema = z.object({ linked: z.boolean() });
 
+const AlertRowSchema = z.object({
+  id: z.string(),
+  type: z.enum(['agency_share_mismatch', 'agency_share_changed']),
+  payload: z.unknown(),
+  // A Date or the server's text, as the driver gives a raw query's timestamp.
+  created_at: z.union([z.date(), z.string()]).transform((value) => new Date(value)),
+});
+
+/** A stored alert read again by its event's contract, then shaped for the sheet: no amount, no sale. */
+function toAlert(row: unknown): CreatorAgencyRateList['alerts'][number] {
+  const { id, type, payload, created_at } = AlertRowSchema.parse(row);
+  const base = { id, at: created_at.toISOString() };
+  if (type === 'agency_share_mismatch') {
+    const event = EVENT_PAYLOADS.agency_share_mismatch.parse(payload);
+    return AgencyShareAlertSchema.parse({
+      ...base,
+      kind: 'mismatch',
+      from: event.from,
+      to: event.to,
+      platform: event.platform,
+      platformAccountId: event.platformAccountId,
+      currency: event.currency,
+    });
+  }
+  const event = EVENT_PAYLOADS.agency_share_changed.parse(payload);
+  return AgencyShareAlertSchema.parse({
+    ...base,
+    kind: 'changed',
+    from: event.from,
+    to: event.to,
+    platform: event.platform,
+    platformAccountId: event.platformAccountId,
+    currency: event.currency,
+    previousAgencyBps: event.previousAgencyBps,
+    agencyBps: event.agencyBps,
+  });
+}
+
 const newestFirst = (a: StoredAgencyRate, b: StoredAgencyRate): number => b.fromDay.localeCompare(a.fromDay);
 
 /** The fortnight in course and the two before it, newest first (ADR 0054 § 4). */
@@ -90,7 +131,8 @@ export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotal
             .toSorted(newestFirst);
           const last30Days = await windowOf(tx, creatorId, addDays(today, -29), today, rates);
           const fortnights = [];
-          for (const period of lastFortnights(today)) {
+          const periods = lastFortnights(today);
+          for (const period of periods) {
             const last = payPeriodLastDay(period);
             // The fortnight in course is read up to today: a day to come has no sale.
             fortnights.push(await windowOf(tx, creatorId, period, last > today ? today : last, rates));
@@ -100,7 +142,22 @@ export function createDrizzleAgencyRatesStore(db: Database, totalsOf: SalesTotal
             sql`select exists (select 1 from sales_feed_models where creator_id = ${creatorId}) as linked`,
           );
           const linked = LinkedRowSchema.parse(feeds.rows[0]).linked;
-          return { today, rates, observed: { linked, last30Days, fortnights } };
+          // The alerts of the fortnights shown (PAY-04), under her RLS: the automatic check's events, newest first.
+          const published = await tx.execute(sql`
+            select id, type, payload, created_at
+              from domain_events
+             where creator_id = ${creatorId}
+               and type in ('agency_share_mismatch', 'agency_share_changed')
+               -- Published after its fortnight: bounded by time, as the table is never purged nor indexed by type.
+               and created_at >= ${periods.at(-1) ?? today}::date
+               and payload->>'from' in (${sql.join(
+                 periods.map((period) => sql`${period}`),
+                 sql`, `,
+               )})
+             order by created_at desc, id desc
+             limit ${AGENCY_SHARE_ALERTS_MAX}`);
+          const alerts = published.rows.map(toAlert);
+          return { today, rates, observed: { linked, last30Days, fortnights }, alerts };
         },
         SNAPSHOT_READ,
       ),

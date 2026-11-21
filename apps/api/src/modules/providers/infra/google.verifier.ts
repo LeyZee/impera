@@ -75,6 +75,7 @@ export function createGoogleVerifier(options: GoogleVerifierOptions): ProviderVe
         settings: { visionModel: vision.id },
         voices: [],
         charactersLeft: null,
+        quota: null,
         isLowCredit: false,
       };
     },

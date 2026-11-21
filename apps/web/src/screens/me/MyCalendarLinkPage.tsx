@@ -14,12 +14,12 @@ import { Page, PageHeader, Panel, PanelSection } from '@/shell/layout';
  */
 export function MyCalendarLinkPage({ user }: { user: Me }): JSX.Element {
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Calendrier"
         lead="Tes shifts dans le calendrier de ton téléphone, mis à jour tout seuls."
-        actions={<MeNav manager={user.teamScope === 'agency'} trophies={playsTheGame(user)} />}
+        tabs={<MeNav manager={user.teamScope === 'agency'} trophies={playsTheGame(user)} />}
       />
       {/* In a column, as Moi › Sécurité: the panel keeps its own height instead of filling the page. */}
       <div className="flex flex-col gap-4">

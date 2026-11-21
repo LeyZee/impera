@@ -8,9 +8,11 @@ import {
   earliestRegimeDay,
   fileReminders,
   fileToDos,
+  firstNumberOf,
   identityLines,
   olderDocuments,
   prefixOf,
+  profileToDo,
   profileBodyOf,
   profileDraftOf,
   profileFields,
@@ -314,6 +316,19 @@ describe('the form of the file', () => {
       businessId: '732 829 321',
     };
     expect(profileProblems(french, 'FR', false).businessId).toMatch(/n’en est pas un/u);
+    // Recette 16/11, CHT-23: an empty field asks for the number, nine zeros are no SIREN, an emoji is no name.
+    expect(profileProblems({ ...french, businessId: ' ' }, 'FR', false).businessId).toBe(
+      'Indique ton SIREN (9 chiffres) ou ton SIRET (14 chiffres).',
+    );
+    expect(profileProblems({ ...french, businessId: '000 000 000' }, 'FR', false).businessId).toMatch(
+      /n’en est pas un/u,
+    );
+    expect(profileProblems({ ...french, legalName: 'Basile 🎉' }, 'FR', false).legalName).toBe(
+      'Sans emoji ni pictogramme : ce nom s’imprime sur tes factures.',
+    );
+    expect(profileProblems({ ...french, legalName: 'Basile 🎉' }, 'FR', false).businessId).toMatch(
+      /n’en est pas un/u,
+    );
     const valid = { ...french, businessId: '732 829 320', vatNumber: 'FR00732829320' };
     expect(profileProblems(valid, 'FR', false).vatNumber).toBe(
       'Le numéro de TVA de ce SIREN est FR44732829320 : vérifie l’un ou l’autre.',
@@ -362,6 +377,13 @@ describe('the prefix', () => {
     expect(prefixOf(' nora ')).toBe('NORA');
     expect(prefixOf('N')).toBeNull();
     expect(prefixOf('NORA-1')).toBeNull();
+  });
+
+  it('opens the first number of the year with the prefix typed, the example’s while none is', () => {
+    const now = new Date('2026-11-16T12:00:00');
+    expect(firstNumberOf('INES', now)).toBe('INES-2026-0001');
+    expect(firstNumberOf(null, now)).toBe('NORA-2026-0001');
+    expect(firstNumberOf('INES', new Date('2027-01-02T12:00:00'))).toBe('INES-2027-0001');
   });
 });
 
@@ -473,5 +495,17 @@ describe('what one’s own file waits on, on Aujourd’hui (D-03)', () => {
         CONTRACT_V1,
       ]),
     ).toEqual([]);
+  });
+});
+
+describe('profileToDo (recette visuelle 16/11, CHA-09)', () => {
+  it('asks for an empty file, whatever the regime, and nothing once it is filled', () => {
+    expect(profileToDo({ profile: null })).toEqual({
+      key: 'profile',
+      title: 'Remplis ton dossier',
+      text: 'Sans lui, pas de facture à ton nom.',
+      go: 'profile',
+    });
+    expect(profileToDo({ profile: profileOf({ legalName: 'Théo Exemple' }) })).toBeNull();
   });
 });

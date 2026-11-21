@@ -158,6 +158,31 @@ describe('outbound sender: the write guard before every write (ADR 0018 § 3)', 
     expect(fake.state().messages).toEqual([]);
   });
 
+  it('a step with a « Tarif réduit » on the platform is refused, without a send (recette 16/11)', async () => {
+    const { sender, calls, fake } = senderOn(true);
+    await fake.app.inject({
+      method: 'POST',
+      url: '/__scenario',
+      payload: {
+        events: [
+          {
+            type: 'script_changed',
+            scriptId: 'script_1_1',
+            priceCents: price.amountMinor,
+            discount: { priceCents: 100, minutes: 60 },
+          },
+        ],
+      },
+    });
+    const error: unknown = await sender
+      .sendScriptStep(conversation, scriptRef, stepRef, price, 'k1')
+      .catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(SendRefused);
+    expect(error).toMatchObject({ code: 'script_step_discounted' });
+    expect(calls.filter((call) => call.startsWith('POST '))).toEqual([]);
+    expect(fake.state().messages).toEqual([]);
+  });
+
   it('a write the connector does not declare is `ConnectorUnavailable`, never tried', async () => {
     const fakeConnector = new FakeConnector();
     const { sender } = senderOn(true, () => fakeConnector);

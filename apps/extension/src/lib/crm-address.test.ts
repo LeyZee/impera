@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { crmOriginOf, isGrantedAtInstall, permissionPatternOf, shortAddress } from './crm-address';
+import {
+  changedOrigin,
+  crmOriginOf,
+  isGrantedAtInstall,
+  permissionPatternOf,
+  shortAddress,
+} from './crm-address';
 
 describe('crmOriginOf', () => {
   it.each([
@@ -37,5 +43,25 @@ describe('the browser permission', () => {
 
   it('shows the address without its scheme', () => {
     expect(shortAddress('https://crm.exemple.fr')).toBe('crm.exemple.fr');
+  });
+});
+
+// Recette du 16/11, EXT-24: the panel kept asking the old address until it was reloaded.
+describe('changedOrigin', () => {
+  it('reads the address the popup saved, and nothing else', () => {
+    expect(changedOrigin({ crmOrigin: { newValue: 'https://crm.exemple.fr' } }, 'local', 'crmOrigin')).toBe(
+      'https://crm.exemple.fr',
+    );
+    expect(changedOrigin({ crmOrigin: {} }, 'local', 'crmOrigin')).toBe('http://localhost:5173');
+    expect(changedOrigin({ watchLink: { newValue: 'x' } }, 'local', 'crmOrigin')).toBeNull();
+    expect(
+      changedOrigin({ crmOrigin: { newValue: 'https://crm.exemple.fr' } }, 'session', 'crmOrigin'),
+    ).toBeNull();
+  });
+
+  it('goes back to the built-in CRM of a hosted build when the saved address is removed (ADR 0067)', () => {
+    expect(changedOrigin({ crmOrigin: {} }, 'local', 'crmOrigin', 'https://crm.exemple.fr')).toBe(
+      'https://crm.exemple.fr',
+    );
   });
 });

@@ -6,7 +6,9 @@ import { CreatorIdSchema, PlatformAccountIdSchema, TeamMemberIdSchema } from './
 import {
   PLANNING_MAX_DAYS,
   PlanningAccountSchema,
+  PlanningAwaySchema,
   PlanningMemberSchema,
+  PlanningWithoutAccessSchema,
   SchedulingSettingsSchema,
 } from './scheduling';
 
@@ -20,8 +22,9 @@ import {
  *   them on the creators of his list for a manager (Charles, 06/11);
  * - `team`, an active chatter: every shift of the team and the agent, in reading, nothing more;
  * - `own`, a member who is not active (on leave, sick, travelling, suspended): his own shifts only, no agent.
- * A shift says who, on which creator, and when: never a leave, a rate, a country, a status or a report. The filters
- * narrow what is sent back, never what the reader may read.
+ * A shift says who, on which creator, and when: never a leave, a rate, a country or a report, and a status to the
+ * agency alone, as Planning says it (`away`, recette EQU-02). The filters narrow what is sent back, never what the
+ * reader may read.
  */
 export const CALENDAR_VIEWS = ['agency', 'team', 'own'] as const;
 export const CalendarViewSchema = z.enum(CALENDAR_VIEWS);
@@ -109,6 +112,13 @@ export const CalendarSchema = z.object({
   /** The members named by `shifts`: id, name in the team and colour, nothing else. */
   members: z.array(PlanningMemberSchema),
   shifts: z.array(CalendarShiftSchema),
+  /**
+   * For `agency` alone, as Planning (recette EQU-01, EQU-02): the members of `shifts` who are not at work, and a member
+   * with a creator of his shifts no longer on his list. Nobody holds those shifts: drawn, they leave their créneaux to
+   * fill. Empty for `team` and `own`, and in a calendar read before the fields, still in a cache.
+   */
+  away: z.array(PlanningAwaySchema).default([]),
+  withoutAccess: z.array(PlanningWithoutAccessSchema).default([]),
   /** Empty for `own`. */
   agent: z.array(CalendarAgentSchema),
   /** `null` but for `agency`. Never an archived creator's account: the agency's figures are about who to plan. */

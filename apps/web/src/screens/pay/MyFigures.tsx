@@ -1,12 +1,12 @@
-import type { BonusTier, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
+import type { BonusTier, CommissionStatement, Currency, MyFigures, PayrollPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import { useRef, useState, type JSX } from 'react';
 
 import { useCurrentPeriod } from './data';
 import './my-figures.css';
 
 import { useMyFigures, usePayPeriod } from '@/payroll/api';
-import { roundAmountText, tierProgress } from '@/payroll/model';
+import { besidesLine, roundAmountText, tierProgress } from '@/payroll/model';
 import {
   barHeight,
   barLabelled,
@@ -16,12 +16,14 @@ import {
   figuresCurrency,
   fortnightBars,
   fortnightChange,
+  hasMoneyKinds,
   hasOtherCurrency,
   hasRecords,
   heatGrid,
   heatSlots,
   hourEndText,
   hourText,
+  moneySlices,
   netIn,
   recordToday,
   slotWords,
@@ -34,7 +36,8 @@ import {
 import { amountText, periodLine } from '@/reports/model';
 import { Medal } from '@/rewards/Medal';
 import { tierMedals } from '@/rewards/metals';
-import { dayNumber, longDay } from '@/scheduling/time';
+import { cityOf, dayNumber, longDay } from '@/scheduling/time';
+import { arcs, sharesOf } from '@/screens/dashboard/agency/view';
 import { Chevron, CountUp, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
 import { Panel } from '@/shell/layout';
 
@@ -60,6 +63,23 @@ function Named({ kind, children }: { kind: 'sales' | 'tier' | 'record'; children
 const counted = (count: number, one: string, many: string): string =>
   `${String(count)}\u00a0${count > 1 ? many : one}`;
 
+/**
+ * Where a net comes from (ADR 0118 § 10): the sales read, and the shifts counted from their validated report. A report
+ * gives a total, never its sales: it is named for what it is, never added to the sales' count.
+ */
+function sourceRows(sales: number, reports: number): (readonly [string, string])[] {
+  return [
+    ...(sales > 0 || reports === 0 ? [['Ventes', String(sales)] as const] : []),
+    ...(reports === 0 ? [] : [['Rapports validés', String(reports)] as const]),
+  ];
+}
+
+const sourceText = (sales: number, reports: number): string =>
+  [
+    ...(sales > 0 || reports === 0 ? [counted(sales, 'vente', 'ventes')] : []),
+    ...(reports === 0 ? [] : [counted(reports, 'rapport validé', 'rapports validés')]),
+  ].join(' · ');
+
 /** What a day's bar says under the pointer. */
 function dayTip(bar: DayBar, currency: Currency): Parameters<FloatingTip['bind']>[0] {
   const day = longDay(bar.day);
@@ -67,9 +87,10 @@ function dayTip(bar: DayBar, currency: Currency): Parameters<FloatingTip['bind']
     title: `${day.charAt(0).toUpperCase()}${day.slice(1)}`,
     rows: [
       ['Net', amountText(bar.netMinor, currency)],
-      ['Ventes', String(bar.sales)],
+      ...sourceRows(bar.sales, bar.reports),
       ...(bar.refunds === 0 ? [] : [['Remboursements', String(bar.refunds)] as const]),
     ],
+    ...(bar.reports === 0 ? {} : { aside: 'Un rapport validé compte au jour de son shift, pour son total.' }),
   };
 }
 
@@ -101,7 +122,7 @@ function DayBars({
           data-ahead={bar.ahead}
           data-best={bar.netMinor === max && max > 0}
           style={{ '--_h': barHeight(bar.netMinor, max), '--nv-i': index }}
-          {...(bar.ahead ? {} : tip.bind(dayTip(bar, currency), { above: true }))}
+          {...(bar.ahead ? {} : tip.bind(dayTip(bar, currency), { beside: true }))}
           tabIndex={bar.ahead ? undefined : 0}
         >
           <span className="mf-bar__col">
@@ -230,6 +251,12 @@ const hasFortnight = (figures: MyFigures, period: PayrollPeriod | undefined): bo
  * Aujourd'hui › « Ma quinzaine » (ADR 0104 § 2, § 3, § 4): one compact card under the shift, what the member has
  * earned so far, the fortnight day by day and the way to the next tier. Nothing shows before their first line.
  */
+/** « 0,00 € de net · prime +30,00 € · malus −5,00 € »: what « Ma quinzaine » adds up to, net first. */
+const partsOf = (statement: CommissionStatement): string => {
+  const others = besidesLine(statement);
+  return `${amountText(statement.netMinor, 'EUR')} de net${others === null ? '' : ` · ${others}`}`;
+};
+
 export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX.Element | null {
   const figures = useMyFigures().data;
   const current = useCurrentPeriod();
@@ -242,12 +269,13 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
   const tiers = manager ? [] : tiersOf(period);
   const net = netIn(figures.nets, currency);
   const sales = figures.days.reduce((sum, day) => sum + day.sales, 0);
+  const reports = figures.days.reduce((sum, day) => sum + day.reports, 0);
   return (
     <Panel
       className="nv-enter mf mf-card"
       eyebrow={<Named kind="sales">Ma quinzaine</Named>}
       actions={
-        <Link to="/commissions" className="mf-more">
+        <Link to="/commissions" className="mf-more nv-hit">
           Mes chiffres
           <Chevron className="mf-more__chev" />
         </Link>
@@ -264,7 +292,7 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
                 'Net vendu',
                 amountText(statement?.netMinor ?? net, statement === undefined ? currency : 'EUR'),
               ],
-              ...(figures.days.length === 0 ? [] : [['Ventes', String(sales)] as const]),
+              ...(figures.days.length === 0 ? [] : sourceRows(sales, reports)),
               ...(statement === undefined
                 ? []
                 : [['Gagné', amountText(statement.totalMinor, 'EUR')] as const]),
@@ -292,6 +320,9 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
                 format={(value) => amountText(Math.round(value), 'EUR')}
               />
               <p className="mf-figure__label">gagné à ce jour, avant validation</p>
+              {/* Where the amount comes from, as « Mes relevés » says it: 25 € earned without a sale is never a riddle
+                  (Design, recette CHT-02). */}
+              <p className="mf-figure__parts nv-num">{partsOf(statement)}</p>
             </>
           )}
           <Change change={fortnightChange(figures, currency)} />
@@ -303,8 +334,8 @@ export function MyFortnightCard({ manager = false }: { manager?: boolean }): JSX
       </div>
       <div className="mf-card__bars">
         {figures.days.length === 0 ? (
-          // A statement paid on reports has no day to draw: one line, never fifteen flat bars.
-          <p className="mf-note">Le jour par jour arrive avec les ventes relevées.</p>
+          // Nothing read and no report validated yet: one line, never fifteen flat bars.
+          <p className="mf-note">Le jour par jour arrive avec tes rapports validés et tes ventes relevées.</p>
         ) : (
           <DayBars bars={fortnightBars(figures, currency)} currency={currency} tip={tip} tall={false} />
         )}
@@ -403,7 +434,151 @@ function Hours({
           <i />
           <span>plus</span>
         </div>
-        <p className="mf-note">Heures de ton fuseau ({figures.timeZone.replace(/_/gu, ' ')}).</p>
+        <p className="mf-note">Heures de ton fuseau ({cityOf(figures.timeZone)}).</p>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * « D'où vient mon argent » (§ 6): the net of the fortnight under way by what was sold, in the Dashboard's ring. A
+ * slice lit by the pointer, the keyboard or a tap shows in the middle with its count of sales, no tip over the legend
+ * (avis Design 20/11); at rest the middle says the total, « réparti » while some sales wait for their type. A sale
+ * whose statement kept no type yet is said « pas encore comptée », never drawn as a zero.
+ */
+function Money({ figures, currency }: { figures: MyFigures; currency: Currency }): JSX.Element {
+  const [lit, setLit] = useState<number | null>(null);
+  // The pointer that pressed a legend row: its focus and its click are that pointer's, not the keyboard's.
+  const pressedBy = useRef<string | null>(null);
+  const radius = 52;
+  const slices = moneySlices(figures, currency);
+  const total = slices.reduce((sum, slice) => sum + slice.cents, 0);
+  // Settled together, so the legend adds up to 100 % where each share rounded alone could say 99 or 101.
+  const shares = sharesOf(
+    slices.map((slice) => slice.cents),
+    total,
+  );
+  const geometry = arcs(
+    slices.map((slice) => slice.cents),
+    radius,
+  );
+  const litSlice = lit === null ? undefined : slices[lit];
+  const untyped = figures.kinds.untyped;
+  const totalText = roundAmountText(total, currency);
+  return (
+    <Panel
+      className="nv-enter mf"
+      eyebrow={<Named kind="sales">D’où vient mon argent</Named>}
+      title="Ta quinzaine par type de vente"
+    >
+      <div className="mf-sec">
+        {slices.length === 0 ? (
+          <p className="mf-note">
+            Pas encore compté : la répartition arrive avec ta prochaine vente relevée.
+          </p>
+        ) : (
+          <div className="mf-money">
+            <div
+              className="mf-donut"
+              data-lit={lit !== null}
+              role="img"
+              aria-label={`Ton net par type de vente : ${slices
+                .map((slice, i) => `${slice.label} ${String(shares[i] ?? 0)} %`)
+                .join(', ')}`}
+            >
+              <svg viewBox="0 0 132 132" aria-hidden="true">
+                <circle className="mf-donut__track" cx="66" cy="66" r={radius} />
+                {slices.map((slice, i) => {
+                  const arc = geometry[i];
+                  if (arc === undefined) return null;
+                  return (
+                    <circle
+                      key={slice.key}
+                      className="mf-donut__arc"
+                      data-on={lit === i}
+                      cx="66"
+                      cy="66"
+                      r={radius}
+                      style={{ '--_c': slice.colour, '--_dash': arc.dash, '--_i': i }}
+                      strokeDashoffset={arc.offset}
+                      onPointerEnter={() => {
+                        setLit(i);
+                      }}
+                      onPointerLeave={(event) => {
+                        if (event.pointerType === 'mouse') setLit(null);
+                      }}
+                    />
+                  );
+                })}
+              </svg>
+              <span className="mf-donut__middle" aria-hidden="true">
+                {litSlice === undefined ? (
+                  <>
+                    <b className="mf-donut__value nv-num" data-long={totalText.length > 7}>
+                      {totalText}
+                    </b>
+                    <span className="mf-donut__sub">{untyped > 0 ? 'de net réparti' : 'de net'}</span>
+                  </>
+                ) : (
+                  <>
+                    <b className="mf-donut__value nv-num">{String(shares[lit ?? 0] ?? 0)}&nbsp;%</b>
+                    <span className="mf-donut__sub">{litSlice.label}</span>
+                    <span className="mf-donut__sub">{counted(litSlice.sales, 'vente', 'ventes')}</span>
+                  </>
+                )}
+              </span>
+            </div>
+            <ul className="mf-kinds">
+              {slices.map((slice, i) => {
+                return (
+                  <li key={slice.key}>
+                    <button
+                      type="button"
+                      className="mf-kind"
+                      data-on={lit === i}
+                      // A mouse lights on entering and leaving puts out; a finger's tap lights or puts out
+                      // (`onClick`); the keyboard lights on focus.
+                      onPointerEnter={(event) => {
+                        if (event.pointerType === 'mouse') setLit(i);
+                      }}
+                      onPointerLeave={(event) => {
+                        if (event.pointerType === 'mouse') setLit(null);
+                      }}
+                      onPointerDown={(event) => {
+                        pressedBy.current = event.pointerType;
+                      }}
+                      onFocus={() => {
+                        if (pressedBy.current === null) setLit(i);
+                      }}
+                      onBlur={() => {
+                        pressedBy.current = null;
+                        setLit(null);
+                      }}
+                      onClick={() => {
+                        const by = pressedBy.current;
+                        pressedBy.current = null;
+                        if (by === 'mouse') setLit(i);
+                        else setLit(lit === i ? null : i);
+                      }}
+                    >
+                      <i className="mf-kind__key" style={{ '--_c': slice.colour }} aria-hidden="true" />
+                      <span className="mf-kind__label">{slice.label}</span>
+                      <span className="mf-kind__value nv-num">{roundAmountText(slice.cents, currency)}</span>
+                      <span className="mf-kind__share nv-num">{String(shares[i] ?? 0)}&nbsp;%</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {untyped > 0 && slices.length > 0 ? (
+          <p className="mf-note">
+            {untyped === 1
+              ? '1 vente pas encore comptée par type : elle arrive avec ta prochaine vente relevée.'
+              : `${String(untyped)} ventes pas encore comptées par type : elles arrivent avec ta prochaine vente relevée.`}
+          </p>
+        ) : null}
       </div>
     </Panel>
   );
@@ -499,6 +674,7 @@ export function MyDaysCard(): JSX.Element | null {
   const net = netIn(figures.nets, currency);
   const sales = figures.days.reduce((sum, day) => sum + day.sales, 0);
   const refunds = figures.days.reduce((sum, day) => sum + day.refunds, 0);
+  const reports = figures.days.reduce((sum, day) => sum + day.reports, 0);
   const before = figures.previous === null ? null : netIn(figures.previous.toDateNets, currency);
   return (
     <Panel
@@ -512,7 +688,7 @@ export function MyDaysCard(): JSX.Element | null {
             title: 'Ta quinzaine à ce jour',
             rows: [
               ['Net vendu', amountText(net, currency)],
-              ['Ventes', String(sales)],
+              ...sourceRows(sales, reports),
               ...(refunds === 0 ? [] : [['Remboursements', String(refunds)] as const]),
               ...(before === null
                 ? []
@@ -520,7 +696,7 @@ export function MyDaysCard(): JSX.Element | null {
             ],
           })}
         >
-          {amountText(net, currency)} de net · {counted(sales, 'vente', 'ventes')}
+          {amountText(net, currency)} de net · {sourceText(sales, reports)}
         </span>
       }
     >
@@ -539,7 +715,7 @@ export function MyDaysCard(): JSX.Element | null {
 }
 
 /**
- * Commissions › « Mes records » and « Quand je vends » (ADR 0104 § 5, § 8), in the column of the member's
+ * Commissions › « Mes records », « D'où vient mon argent » and « Quand je vends » (ADR 0104 § 5, § 6, § 8), in the column of the member's
  * performance. Each card shows only once it has something of theirs to say.
  */
 export function MyFiguresAside(): JSX.Element | null {
@@ -548,11 +724,14 @@ export function MyFiguresAside(): JSX.Element | null {
   if (figures === undefined) return null;
   const hours = figures.hours.sales > 0;
   const records = hasRecords(figures);
-  if (!hours && !records) return null;
+  const currency = figuresCurrency(figures);
+  const money = hasMoneyKinds(figures, currency);
+  if (!hours && !records && !money) return null;
   return (
     <>
       {records ? <Records figures={figures} tip={tip} /> : null}
-      {hours ? <Hours figures={figures} currency={figuresCurrency(figures)} tip={tip} /> : null}
+      {money ? <Money figures={figures} currency={currency} /> : null}
+      {hours ? <Hours figures={figures} currency={currency} tip={tip} /> : null}
       {tip.element}
     </>
   );

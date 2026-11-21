@@ -1,3 +1,4 @@
+import { ProviderOverviewSchema } from '@impera/contracts';
 import { eq, schema } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
@@ -81,5 +82,31 @@ describe('/v1/settings/providers in the app (P3-03)', () => {
       headers: { cookie, origin: 'https://evil.example' },
     });
     expect(response.statusCode).toBe(403);
+  });
+
+  it('runs no « Essai réel » for an operator nor on a service without a key (ADR 0091 § 7)', async () => {
+    const operator = await signIn(server, OPERATOR.email, OPERATOR.password);
+    const refused = await server.inject({
+      method: 'POST',
+      url: '/v1/settings/providers/mistral/probe',
+      headers: { cookie: operator, origin: DASHBOARD_ORIGIN },
+    });
+    expect(refused.statusCode).toBe(403);
+    const owner = await signIn(server, OWNER.email, OWNER.password);
+    const missing = await server.inject({
+      method: 'POST',
+      url: '/v1/settings/providers/mistral/probe',
+      headers: { cookie: owner, origin: DASHBOARD_ORIGIN },
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toMatchObject({ error: { code: 'provider_key_not_found' } });
+    const list = await server.inject({
+      method: 'GET',
+      url: '/v1/settings/providers',
+      headers: { cookie: owner },
+    });
+    const xai = ProviderOverviewSchema.parse(list.json()).services.find((s) => s.provider === 'xai');
+    // A service without a key has no health to show: nothing to read of it.
+    expect(xai).toMatchObject({ state: 'not_connected', activity: null, probe: null, quota: null });
   });
 });

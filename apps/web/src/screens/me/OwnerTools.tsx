@@ -13,6 +13,7 @@ import { assignRegime, setPrefix, verifyProfile } from '@/contractors/api';
 import {
   askedText,
   earliestRegimeDay,
+  firstNumberOf,
   prefixOf,
   regimeAhead,
   regimeInForce,
@@ -92,7 +93,7 @@ function VerifyDialog({
   name: string;
   onClose: () => void;
 }): JSX.Element {
-  const { busy, refusal, send } = useFileSend(onClose);
+  const { busy, refusal, prompt, send } = useFileSend(onClose);
   const profile = file.profile;
   return (
     <Dialog
@@ -101,29 +102,33 @@ function VerifyDialog({
       busy={busy}
       onClose={onClose}
     >
-      <form
-        className="tm-dialog__body"
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!busy && profile !== null) send(() => verifyProfile(file.memberId, profile.updatedAt));
-        }}
-      >
-        <p className="tm-hint">
-          Tu confirmes que le nom, l’adresse et les numéros affichés sont exacts, pièces à l’appui. S’il
-          change son dossier ensuite, il repasse à vérifier ; s’il l’a changé depuis que tu l’as ouvert, rien
-          n’est vérifié.
-        </p>
-        <Refusal refusal={refusal} />
-        <div className="tm-dialog__foot">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-            {busy ? 'Envoi…' : 'Vérifié'}
-          </button>
-        </div>
-      </form>
+      {prompt === null ? (
+        <form
+          className="tm-dialog__body"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!busy && profile !== null) send(() => verifyProfile(file.memberId, profile.updatedAt));
+          }}
+        >
+          <p className="tm-hint">
+            Tu confirmes que le nom, l’adresse et les numéros affichés sont exacts, pièces à l’appui. S’il
+            change son dossier ensuite, il repasse à vérifier ; s’il l’a changé depuis que tu l’as ouvert,
+            rien n’est vérifié.
+          </p>
+          <Refusal refusal={refusal} />
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+              {busy ? 'Envoi…' : 'Vérifié'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }
@@ -135,7 +140,7 @@ function PrefixForm({ file }: { file: ContractorFile }): JSX.Element {
   const [text, setText] = useState(current ?? '');
   const [tried, setTried] = useState(false);
   const [saved, setSaved] = useState(false);
-  const { busy, refusal, send } = useFileSend(() => {
+  const { busy, refusal, prompt, send } = useFileSend(() => {
     setSaved(true);
   });
   const prefix = prefixOf(text);
@@ -149,49 +154,64 @@ function PrefixForm({ file }: { file: ContractorFile }): JSX.Element {
     send(() => setPrefix(file.memberId, prefix));
   };
 
+  // While the password and the code are asked, the prefix stays as typed, locked: what is sent again is what was
+  // read.
   return (
-    <form className="cf-prefix" noValidate onSubmit={submit}>
-      <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
-        <label className="nv-field__label" htmlFor={`${id}-prefix`}>
-          Préfixe des factures
-        </label>
-        <div className="cf-prefix__row">
-          <input
-            id={`${id}-prefix`}
-            className="nv-field__control nv-glass nv-num cf-prefix__input"
-            maxLength={8}
-            value={text}
-            autoComplete="off"
-            aria-invalid={wrong}
-            aria-describedby={`${id}-prefix-hint`}
-            onChange={(event) => {
-              setText(event.target.value.toUpperCase());
-              setSaved(false);
-            }}
-          />
-          <button
-            type="submit"
-            className="nv-btn nv-btn--soft nv-btn--sm"
-            disabled={busy || (prefix !== null && prefix === current)}
-            aria-busy={busy}
+    <>
+      <form className="cf-prefix" noValidate onSubmit={submit}>
+        <div className="nv-field tm-field" data-invalid={wrong ? 'true' : undefined}>
+          <label className="nv-field__label" htmlFor={`${id}-prefix`}>
+            Préfixe des factures
+          </label>
+          <div className="cf-prefix__row">
+            <input
+              id={`${id}-prefix`}
+              className="nv-field__control nv-glass nv-num cf-prefix__input"
+              maxLength={8}
+              value={text}
+              autoComplete="off"
+              aria-invalid={wrong}
+              aria-describedby={`${id}-prefix-hint`}
+              disabled={prompt !== null}
+              onChange={(event) => {
+                setText(event.target.value.toUpperCase());
+                setSaved(false);
+              }}
+            />
+            {prompt === null ? (
+              <button
+                type="submit"
+                className="nv-btn nv-btn--soft nv-btn--sm"
+                disabled={busy || (prefix !== null && prefix === current)}
+                aria-busy={busy}
+              >
+                {busy ? 'Envoi…' : 'Enregistrer'}
+              </button>
+            ) : null}
+          </div>
+          <p
+            id={`${id}-prefix-hint`}
+            className={wrong ? 'tm-hint tm-hint--error' : 'tm-hint'}
+            aria-live="polite"
           >
-            {busy ? 'Envoi…' : 'Enregistrer'}
-          </button>
+            {wrong ? (
+              'De 2 à 8 majuscules ou chiffres, par exemple NORA.'
+            ) : saved ? (
+              'Préfixe enregistré.'
+            ) : (
+              // The number never breaks at its hyphens, nor parts from its colon.
+              <>
+                Ses numéros commencent par lui (
+                <span className="cf-prefix__number">{firstNumberOf(prefix)}</span>){'\u00a0'}: il se fige à sa
+                première facture.
+              </>
+            )}
+          </p>
         </div>
-        <p
-          id={`${id}-prefix-hint`}
-          className={wrong ? 'tm-hint tm-hint--error' : 'tm-hint'}
-          aria-live="polite"
-        >
-          {wrong
-            ? 'De 2 à 8 majuscules ou chiffres, par exemple NORA.'
-            : saved
-              ? 'Préfixe enregistré.'
-              : 'Ses numéros commencent par lui (NORA-2026-0001) : il se fige à sa première facture.'}
-        </p>
-      </div>
-      <Refusal refusal={refusal} />
-    </form>
+        <Refusal refusal={refusal} />
+      </form>
+      {prompt}
+    </>
   );
 }
 
@@ -314,7 +334,7 @@ function AssignDialog({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, refusal, send } = useFileSend(onClose);
+  const { busy, refusal, prompt, send } = useFileSend(onClose);
   const earliest = earliestRegimeDay(file);
   const [regimeId, setRegimeId] = useState(available[0]?.id ?? '');
   const [from, setFrom] = useState(earliest);
@@ -351,98 +371,102 @@ function AssignDialog({
       busy={busy}
       onClose={onClose}
     >
-      <form className="tm-dialog__body" noValidate onSubmit={submit}>
-        {available.length === 0 ? (
-          <p className="tm-warn">
-            Aucun régime n’est écrit pour {countryName(file.country)} : crée-le d’abord dans Réglages ›
-            Facturation.
-          </p>
-        ) : (
-          <>
-            <div className="nv-field tm-field">
-              {available.length <= CHIPS_AT_MOST ? (
-                <>
-                  {/* A country has a regime or two: chips, each one in sight, rather than a list to open. */}
-                  <span className="nv-field__label" id={`${id}-regime`}>
-                    Régime
-                  </span>
-                  <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-regime`}>
-                    {available.map((regime) => (
-                      <button
-                        key={regime.id}
-                        type="button"
-                        role="radio"
-                        className="nv-chip"
-                        aria-checked={regime.id === regimeId}
-                        onClick={() => {
-                          choose(regime.id);
-                        }}
-                      >
-                        {regime.name}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <label className="nv-field__label" htmlFor={`${id}-regime`}>
-                    Régime
-                  </label>
-                  <Select
-                    id={`${id}-regime`}
-                    value={regimeId}
-                    options={available.map((regime) => ({ value: regime.id, label: regime.name }))}
-                    onChange={choose}
-                  />
-                </>
-              )}
-              {chosen === null ? null : (
-                <p className={chosen.validatedOn === null ? 'tm-hint cf-amber' : 'tm-hint'}>
-                  {/* A sentence of its own under the chips: it starts with a capital. */}
-                  {upperFirst(validationText(chosen))}.
+      {prompt === null ? (
+        <form className="tm-dialog__body" noValidate onSubmit={submit}>
+          {available.length === 0 ? (
+            <p className="tm-warn">
+              Aucun régime n’est écrit pour {countryName(file.country)} : crée-le d’abord dans Réglages ›
+              Facturation.
+            </p>
+          ) : (
+            <>
+              <div className="nv-field tm-field">
+                {available.length <= CHIPS_AT_MOST ? (
+                  <>
+                    {/* A country has a regime or two: chips, each one in sight, rather than a list to open. */}
+                    <span className="nv-field__label" id={`${id}-regime`}>
+                      Régime
+                    </span>
+                    <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-regime`}>
+                      {available.map((regime) => (
+                        <button
+                          key={regime.id}
+                          type="button"
+                          role="radio"
+                          className="nv-chip"
+                          aria-checked={regime.id === regimeId}
+                          onClick={() => {
+                            choose(regime.id);
+                          }}
+                        >
+                          {regime.name}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className="nv-field__label" htmlFor={`${id}-regime`}>
+                      Régime
+                    </label>
+                    <Select
+                      id={`${id}-regime`}
+                      value={regimeId}
+                      options={available.map((regime) => ({ value: regime.id, label: regime.name }))}
+                      onChange={choose}
+                    />
+                  </>
+                )}
+                {chosen === null ? null : (
+                  <p className={chosen.validatedOn === null ? 'tm-hint cf-amber' : 'tm-hint'}>
+                    {/* A sentence of its own under the chips: it starts with a capital. */}
+                    {upperFirst(validationText(chosen))}.
+                  </p>
+                )}
+              </div>
+              <div className="nv-field tm-field" data-invalid={tried && !fromOk ? 'true' : undefined}>
+                <label className="nv-field__label" htmlFor={`${id}-from`}>
+                  À partir du
+                </label>
+                <DayField
+                  id={`${id}-from`}
+                  value={from}
+                  invalid={tried && !fromOk}
+                  describedBy={`${id}-from-hint`}
+                  onChange={(next) => {
+                    setFrom(next);
+                    setKey(crypto.randomUUID());
+                  }}
+                  today={earliest}
+                  onUnreadable={setFromUnreadable}
+                />
+                <p id={`${id}-from-hint`} className={tried && !fromOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
+                  {tried && fromUnreadable
+                    ? 'Un jour comme 01/12/2026, ou 1/12.'
+                    : tried && !fromOk
+                      ? earliest === file.today
+                        ? `Aujourd’hui au plus tôt, le ${fullDay(earliest)}.`
+                        : `Après le régime déjà prévu, le ${fullDay(earliest)} au plus tôt.`
+                      : 'Ses relevés en attente sont repris ce jour-là.'}
                 </p>
-              )}
-            </div>
-            <div className="nv-field tm-field" data-invalid={tried && !fromOk ? 'true' : undefined}>
-              <label className="nv-field__label" htmlFor={`${id}-from`}>
-                À partir du
-              </label>
-              <DayField
-                id={`${id}-from`}
-                value={from}
-                invalid={tried && !fromOk}
-                describedBy={`${id}-from-hint`}
-                onChange={(next) => {
-                  setFrom(next);
-                  setKey(crypto.randomUUID());
-                }}
-                today={earliest}
-                onUnreadable={setFromUnreadable}
-              />
-              <p id={`${id}-from-hint`} className={tried && !fromOk ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-                {tried && fromUnreadable
-                  ? 'Un jour comme 01/12/2026, ou 1/12.'
-                  : tried && !fromOk
-                    ? earliest === file.today
-                      ? `Aujourd’hui au plus tôt, le ${fullDay(earliest)}.`
-                      : `Après le régime déjà prévu, le ${fullDay(earliest)} au plus tôt.`
-                    : 'Ses relevés en attente sont repris ce jour-là.'}
-              </p>
-            </div>
-          </>
-        )}
-        <Refusal refusal={refusal} />
-        <div className="tm-dialog__foot">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          {available.length === 0 ? null : (
-            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-              {busy ? 'Envoi…' : 'Attribuer'}
-            </button>
+              </div>
+            </>
           )}
-        </div>
-      </form>
+          <Refusal refusal={refusal} />
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              Annuler
+            </button>
+            {available.length === 0 ? null : (
+              <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+                {busy ? 'Envoi…' : 'Attribuer'}
+              </button>
+            )}
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }

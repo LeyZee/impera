@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { EntryForm, type EntryAdded } from './EntryForm';
 import { PayNav } from './PayNav';
 import { useAgencySettingsDown, useCurrentPeriod, usePayNames, type PayMember } from './data';
-import { Chip, Empty, Loading, PeriodArrows, PeriodHeading, Swatch, Unreachable } from './parts';
+import { Chip, Empty, Loading, PeriodArrows, Swatch, Unreachable } from './parts';
 
 import {
   cancelBonus,
@@ -38,8 +38,8 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /**
  * Paie › Primes et malus (EQ-05, ADR 0024): a period's bonuses, penalties and adjustments, member by member, each with
- * its reason, its author and its sign. A cancelled one stays, struck through. « Ajouter » (the screen's one neon) adds
- * one in two steps; « Annuler » cancels a bonus or a penalty after a confirmation, while a period it counts in is open.
+ * its reason, its author and its sign. A cancelled one stays, struck through. « Ajouter une prime ou un malus » (the
+ * screen's one neon, in the card) adds one in two steps; « Annuler » cancels a bonus or a penalty after a confirmation, while a period it counts in is open.
  */
 export function EntriesPage({
   user,
@@ -52,6 +52,7 @@ export function EntriesPage({
 }): JSX.Element {
   const current = useCurrentPeriod();
   const down = useAgencySettingsDown();
+  // The quinzaine the tabs carry (GES-02); without one, the one under way.
   const period = chosen ?? current;
   const me = { id: user.id, name: user.name };
   const entries = usePayEntries(period);
@@ -107,22 +108,14 @@ export function EntriesPage({
   const head = (
     <PageHeader
       eyebrow="Paie"
-      title={period === null ? 'Primes et malus' : <PeriodHeading period={period} />}
+      title="Primes et malus"
       lead="Une prime, un malus ou un ajustement, toujours avec son motif."
+      tabs={<PayNav user={user} period={period} />}
       actions={
         <>
-          {period === null ? null : <PeriodArrows period={period} current={current} onPeriod={onPeriod} />}
-          <PayNav user={user} />
-          <button
-            type="button"
-            className="nv-btn nv-btn--neon"
-            onClick={() => {
-              setAdded(null);
-              setAdding('bonus');
-            }}
-          >
-            Ajouter
-          </button>
+          {period === null ? null : (
+            <PeriodArrows period={period} current={current} onPeriod={onPeriod} named />
+          )}
         </>
       }
     />
@@ -132,7 +125,24 @@ export function EntriesPage({
     <Page>
       {head}
       <div className="py-board">
-        <Panel className="nv-enter" eyebrow="Saisies">
+        {/* The screen's one neon, in the card it adds to, named for what it adds (recette visuelle 16/11, GES-13): never
+            beside the tabs, where it read as a seventh one. */}
+        <Panel
+          className="nv-enter"
+          title="Saisies"
+          actions={
+            <button
+              type="button"
+              className="nv-btn nv-btn--neon nv-btn--sm"
+              onClick={() => {
+                setAdded(null);
+                setAdding('bonus');
+              }}
+            >
+              Ajouter une prime ou un malus
+            </button>
+          }
+        >
           {period === null && down !== null ? (
             <Unreachable what="la quinzaine en cours" onRetry={down} />
           ) : period === null || (data === undefined && !entries.isError) ? (
@@ -154,7 +164,7 @@ export function EntriesPage({
               {rows.length === 0 ? (
                 <Empty
                   whisper="Aucune prime ni aucun malus sur cette quinzaine."
-                  text="« Ajouter » en pose un, toujours avec son motif : le membre le lit avec son relevé."
+                  text="Chacune a son motif, que le membre lit avec son relevé."
                 />
               ) : (
                 <ul className="py-rows">

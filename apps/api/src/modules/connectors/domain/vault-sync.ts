@@ -23,6 +23,8 @@ export interface VaultRefFields {
   readonly platformDescription: string | null;
   readonly suggestedMinMinor: number | null;
   readonly suggestedMaxMinor: number | null;
+  /** The platform's blurred preview (`BlurhashSchema`): a few colours, never the image. */
+  readonly previewBlurhash: string | null;
 }
 
 /** A stored row: the fields, and whether the platform had stopped listing it. */
@@ -66,6 +68,7 @@ export function vaultRefsOf(read: readonly VaultMedia[]): VaultRefFields[] {
       platformDescription: media.description,
       suggestedMinMinor: media.suggestedPriceMinor?.min ?? null,
       suggestedMaxMinor: media.suggestedPriceMinor?.max ?? null,
+      previewBlurhash: media.blurhash,
     });
   }
   return rows;
@@ -82,6 +85,7 @@ const FIELDS = [
   'platformDescription',
   'suggestedMinMinor',
   'suggestedMaxMinor',
+  'previewBlurhash',
 ] as const satisfies readonly (keyof VaultRefFields)[];
 
 const sameFields = (a: VaultRefFields, b: VaultRefFields): boolean =>
@@ -174,4 +178,20 @@ export interface VaultStore {
     now: Date,
   ): Promise<VaultSyncOutcome | null>;
   read(creatorId: CreatorId, userId: string): Promise<VaultRead | null>;
+  /**
+   * Where one media of her vault is, for its small picture (ADR 0138 § 4), as the person reading: `forbidden` when she
+   * is not theirs to read (the owner, an active manager of her list), `null` when no media of hers still listed by
+   * the platform has this id.
+   */
+  previewTarget(
+    creatorId: CreatorId,
+    userId: string,
+    platformMediaId: string,
+  ): Promise<VaultPreviewTarget | 'forbidden' | null>;
+}
+
+/** A vault media whose small picture may be read: its account and its folder (`null`: the vault's root). */
+interface VaultPreviewTarget {
+  readonly platformAccountId: PlatformAccountId;
+  readonly folderRef: string | null;
 }

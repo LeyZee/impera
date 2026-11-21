@@ -241,7 +241,17 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
 
   it('gives a reader whose scope is his own her mode alone, and a chatter no creator (ADR 0043 § 7)', async () => {
     expect(await cards('operator')).toEqual([
-      { creatorId: nora, mode: 'copilot', sales: null, onShift: null, requests: null },
+      {
+        creatorId: nora,
+        mode: 'copilot',
+        pausedUntil: null,
+        globalStop: false,
+        hoursNow: { open: true, changesAt: null },
+        resumesAs: 'copilot',
+        sales: null,
+        onShift: null,
+        requests: null,
+      },
     ]);
     expect(await cards('chatter')).toEqual([]);
   });

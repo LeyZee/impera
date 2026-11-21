@@ -20,12 +20,12 @@ export function MyFilePage({ user }: { user: Me }): JSX.Element {
   const manager = user.teamScope === 'agency';
 
   return (
-    <Page>
+    <Page width="narrow">
       <PageHeader
         eyebrow="Moi"
         title="Dossier"
         lead="Ce qu’il faut pour que l’agence émette tes factures en ton nom : ton identité, ton contrat et ton mandat, les pièces de ton régime."
-        actions={<MeNav manager={manager} trophies={playsTheGame(user)} />}
+        tabs={<MeNav manager={manager} trophies={playsTheGame(user)} />}
       />
       <div className="py-board">
         {me !== null ? (

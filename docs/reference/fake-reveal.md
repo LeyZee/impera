@@ -69,7 +69,7 @@ API de contrôle, absente du vrai Reveal, préfixée `/__` :
 | `server_error` (n fois, code) | 500, 502, 503 |
 | `latency` (ms, plage) | Délai sur chaque réponse |
 | `conversation_gone` | La conversation disparaît (fan désabonné, bloqué ou supprimé) |
-| `script_changed` | Un script change d'étapes ou de prix entre deux lectures |
+| `script_changed` | Un script change d'étapes ou de prix entre deux lectures ; avec `discount`, un « Tarif réduit » est posé (ou retiré par `null`) sur l'étape |
 | `sequence_removed` | Une séquence disparaît de `scriptSequences.list` ; ses étapes restent, comme des étapes hors séquence (import des scripts natifs, ADR 0099 § 1 temps 2) |
 | `sequence_branched` | Une étape existante entre dans une séquence au rang (`stepIndex`) d'une autre : une étape à branches, entre lesquelles une personne choisit. Forme provisoire tant qu'aucun enregistrement réel ne la montre ; un tel script n'est jamais proposable avant l'ADR 0112 (SC-04 lot c8) |
 | `shape_changed` | Un champ renommé ou ajouté dans une réponse : le connecteur doit lever une erreur typée, pas avaler la donnée (schémas Zod stricts aux frontières) |

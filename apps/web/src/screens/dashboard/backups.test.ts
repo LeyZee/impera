@@ -29,12 +29,12 @@ describe('the backup banner', () => {
         status({ state: 'overdue', lastSucceededAt: '2026-11-01T02:12:00.000Z' }),
         'Europe/Paris',
       )?.title,
-    ).toBe('Aucune sauvegarde réussie depuis le 1er novembre à 03:12');
+    ).toBe('Aucune sauvegarde réussie depuis le 1er novembre à 3\u00a0h\u00a012');
   });
 
   it('says since when no export succeeded, in the reader’s time', () => {
     expect(backupBannerOf(status({ state: 'overdue' }), 'Europe/Paris')).toEqual({
-      title: 'Aucune sauvegarde réussie depuis le 26 octobre à 03:12',
+      title: 'Aucune sauvegarde réussie depuis le 26 octobre à 3\u00a0h\u00a012',
       text: 'Elle doit réussir au moins toutes les 26 h : d’ici là, rien de récent n’est copié hors de la base.',
       restore: null,
     });

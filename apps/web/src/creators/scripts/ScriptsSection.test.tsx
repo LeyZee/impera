@@ -50,10 +50,10 @@ const CONTENT = `GET /creators/${CREATOR}/content`;
 const STRUCTURES = 'GET /script-structures';
 const CONFIRM = `POST /creators/${CREATOR}/drops/${SENT.id}/script-export/confirm`;
 
-function show(isOwner = false): void {
+function show(): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <ScriptsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" isOwner={isOwner} />
+      <ScriptsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" />
     </QueryClientProvider>,
   );
 }
@@ -178,7 +178,6 @@ describe('Créatrices › Scripts (SC-03 c2b)', () => {
 });
 
 describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
-  const SWITCH = `/creators/${CREATOR}/drop-descriptions`;
   const REVIEW = `/creators/${CREATOR}/drops/${SENT.id}/descriptions`;
   const FILES = [
     '0192f3a0-0000-7000-8000-000000000b01',
@@ -190,17 +189,11 @@ describe('Créatrices › Scripts, les descriptions (SC-04 lot c3)', () => {
     [STRUCTURES]: () => ({ status: 200, body: { structures: [NIGHT] } }),
   };
 
-  it('no longer holds her switch: it tells the owner it stands in Contenu (recette créatrice 6)', async () => {
-    const calls = serve(base);
-    show(true);
+  it('holds no switch of the descriptions: a drop is described on arrival (ADR 0145 § 5, 17/11)', async () => {
+    serve(base);
+    show();
     await screen.findByRole('listitem', { name: 'Soirée inventée' });
     expect(screen.queryByRole('switch')).toBeNull();
-    expect(screen.getByText(/Les descriptions par l’IA s’allument dans l’onglet Contenu/u)).toBeDefined();
-    expect(calls.some((call) => call.path === SWITCH)).toBe(false);
-    cleanup();
-    serve(base);
-    show(false);
-    await screen.findByRole('listitem', { name: 'Soirée inventée' });
     expect(screen.queryByText(/onglet Contenu/u)).toBeNull();
   });
 

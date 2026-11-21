@@ -197,7 +197,36 @@
   box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
 }
 .nv-plate--pad {
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
+}
+
+/* ───────────── Section titles: three classes, nothing else (COH-05) ───────────── */
+
+/* A section's title, in a card's head (Panel) or above a group. */
+.nv-h2 {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+/* A title inside a card: a block, a group of rows. */
+.nv-h3 {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  letter-spacing: var(--nv-text-headline-tracking);
+  font-weight: 650;
+  color: var(--nv-ink);
+}
+/* A quiet label above a title or a block: sentence case, never shouted in capitals. */
+.nv-eyebrow {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-ink-faint);
 }
 /* Open: the content sits directly on the page, grouped by space alone. */
 .nv-plate--bare {
@@ -368,6 +397,20 @@
   content: '';
   position: absolute;
   inset: calc((var(--nv-target-min) - 34px) / -2);
+}
+
+/* A text link smaller than a thumb (a card's « more », a line that leads elsewhere): the words keep their size, the
+   target grows to 44px around them (recette CHT-22). */
+.nv-hit {
+  position: relative;
+}
+.nv-hit::after {
+  content: '';
+  position: absolute;
+  inset-inline: calc(var(--nv-space-2) * -1);
+  top: 50%;
+  height: max(100%, var(--nv-target-min));
+  transform: translateY(-50%);
 }
 
 /* The round close of a sheet or a dialog: quiet (the neon stays on the action), 36px seen, 44px to touch. */
@@ -678,6 +721,20 @@
 .nv-check:checked::after {
   transform: rotate(-45deg) scale(1);
 }
+/* Some of what it stands for, not all (a folder with some of its media only): a dash, on the ink of a tick. */
+.nv-check:indeterminate {
+  background: var(--nv-ink);
+  box-shadow: none;
+}
+.nv-check:indeterminate::after {
+  width: 10px;
+  height: 0;
+  margin-top: 0;
+  border-left: 0;
+  border-bottom: 2px solid var(--nv-void);
+  border-radius: 1px;
+  transform: none;
+}
 .nv-check:focus-visible {
   outline: 2px solid var(--nv-focus);
   outline-offset: 2px;
@@ -881,7 +938,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 24px;
+  height: var(--nv-pill-info);
   padding: 0 10px 0 8px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -1246,7 +1303,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 22px;
+  height: var(--nv-pill-info);
   padding: 0 8px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-caption);
@@ -1264,6 +1321,25 @@
   outline: 1px dashed var(--nv-ink-faint);
   outline-offset: -1px;
   color: var(--nv-ink-muted);
+}
+/* A counter (what waits behind a tab, unread messages, a rank): 18 px, 11 px figures, ink on a quiet fill. Never an
+   alarm by itself: a screen that needs the amber or the red says so with a modifier of its own (COH-08). */
+.nv-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--nv-pill-count);
+  height: var(--nv-pill-count);
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: var(--nv-radius-full);
+  background: color-mix(in srgb, var(--nv-ink) 16%, transparent);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-caption);
+  line-height: 1;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .nv-conf {
@@ -1528,7 +1604,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: var(--nv-pill-choice);
   padding: 0 13px;
   border-radius: var(--nv-radius-full);
   font-size: var(--nv-text-footnote);
@@ -1932,14 +2008,12 @@
 .nv-sample {
   display: inline-flex;
   align-items: center;
-  height: 22px;
+  height: var(--nv-pill-info);
   padding: 0 9px;
   border-radius: var(--nv-radius-full);
   border: 1px dashed var(--nv-hairline);
-  font: 500 var(--nv-text-caption) / 1 var(--nv-font-sans);
+  font: 600 var(--nv-text-caption) / 1 var(--nv-font-sans);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   color: var(--nv-ink-faint);
   white-space: nowrap;
 }
@@ -2234,6 +2308,184 @@
   line-height: var(--nv-text-title-2-leading);
   color: var(--nv-ink-muted);
 }
+
+/* ───────────── States: empty, failure, loading (recette visuelle 16/11, T6) ───────────── */
+
+/*
+ * Nothing here yet (COH-04): one sentence in the whisper face (Instrument Serif italic 28/32, the only place the serif
+ * is a title), at most one line of muted text, at most one soft button. Centred in its card.
+ */
+.nv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nv-space-2);
+  max-width: 46ch;
+  margin: 0 auto;
+  padding: var(--nv-space-10) var(--nv-plate-pad);
+  text-align: center;
+}
+.nv-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-glass-fill);
+  box-shadow: inset 0 1px 0 var(--nv-glass-edge);
+  color: var(--nv-ink-muted);
+}
+.nv-empty__title {
+  margin: 0;
+  font-family: var(--nv-font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: var(--nv-text-whisper);
+  line-height: var(--nv-text-whisper-leading);
+  color: var(--nv-ink-muted);
+  text-wrap: balance;
+}
+.nv-empty__text {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: 18px;
+  color: var(--nv-ink-faint);
+  text-wrap: pretty;
+}
+.nv-empty__action {
+  margin-top: var(--nv-space-2);
+}
+
+/*
+ * The server is silent (ETA-04): one per screen, amber (someone must act, never the urgencies' red), the title, one
+ * line that says what to do, « Réessayer ». On a card of its own; `--inline` inside a card that is already there.
+ */
+.nv-failure {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--nv-space-4);
+}
+.nv-failure > .nv-orb {
+  /* Room for the warning ring, which grows to 1.35 times the orb, inside the card. */
+  margin-inline-start: var(--nv-space-1);
+}
+.nv-failure__body {
+  min-width: 0;
+}
+.nv-failure__title {
+  margin: 0;
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  letter-spacing: var(--nv-text-title-2-tracking);
+  font-weight: 650;
+  color: var(--nv-warning);
+  text-wrap: balance;
+}
+.nv-failure__text {
+  margin: var(--nv-space-1) 0 0;
+  color: var(--nv-ink-muted);
+  text-wrap: pretty;
+}
+.nv-failure__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+  justify-content: flex-end;
+}
+.nv-failure--inline {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--nv-space-3);
+}
+.nv-failure--inline .nv-failure__title {
+  font-size: var(--nv-text-body);
+  line-height: 20px;
+  letter-spacing: normal;
+}
+.nv-failure--inline .nv-failure__text {
+  margin-top: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: 18px;
+}
+@media (max-width: 560px) {
+  .nv-failure {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .nv-failure__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .nv-failure--inline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .nv-failure--inline .nv-failure__actions {
+    grid-column: 1;
+  }
+}
+
+/*
+ * Loading (ETA-14, ETA-15): the shapes of the screen to come, on the screen's own cards (radius 26, the plate's
+ * padding, 16 px between cards), one tint in both themes, breathing; still for reduced motion.
+ */
+.nv-skeleton {
+  /* The column's width, even where a sheet sets its children on their left (ETA-14). */
+  align-self: stretch;
+}
+.nv-skeleton__shapes {
+  display: grid;
+  gap: var(--nv-card-gap);
+}
+.nv-skeleton__shapes[data-columns='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.nv-skeleton__shapes[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 720px) {
+  .nv-skeleton__shapes[data-columns] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.nv-skeleton__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.nv-skeleton__bar {
+  display: block;
+  height: 12px;
+  width: 100%;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-fill-soft);
+  animation: nv-skeleton-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
+}
+.nv-skeleton__bar:nth-child(3n + 2) {
+  width: 82%;
+}
+.nv-skeleton__bar:nth-child(3n) {
+  width: 64%;
+}
+.nv-skeleton__bar.nv-skeleton__bar--title {
+  height: 20px;
+  width: 40%;
+  margin-bottom: var(--nv-space-1);
+}
+@keyframes nv-skeleton-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nv-skeleton__bar {
+    animation: none;
+  }
+}
 /* Touch has no hover: « Traité » stays visible. */
 @media (hover: none) {
   .nv-todo__done {
@@ -2483,6 +2735,10 @@
   gap: 14px;
   font-variant-numeric: tabular-nums;
 }
+.nv-tip__aside {
+  margin: 6px 0 0;
+  color: var(--nv-ink-faint);
+}
 .nv-tip__row > span {
   white-space: nowrap;
 }
@@ -2578,15 +2834,17 @@
   top: 50%;
   left: calc(50% + var(--nv-w, 0%) / 2 + 10px);
   transform: translateY(-50%);
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  height: var(--nv-pill-info);
+  padding: 0 8px;
+  box-sizing: border-box;
   border-radius: var(--nv-radius-full);
   background: var(--nv-warning);
   color: var(--nv-void);
-  font-size: 10.5px;
-  line-height: 14px;
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   white-space: nowrap;
   animation: nv-swap var(--nv-dur-slow) 700ms var(--nv-ease-out) both;
 }
@@ -2652,6 +2910,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* A face before the label, in the field and in the list: it never shrinks, the label is cut instead. */
+.nv-select__lead {
+  display: inline-flex;
+  flex: none;
 }
 .nv-select__value--empty {
   color: var(--nv-ink-faint);
@@ -2731,6 +2994,11 @@
   line-height: var(--nv-text-caption-leading);
   font-weight: 600;
   color: var(--nv-ink-faint);
+}
+/* A group after other options opens with a hairline above its heading. */
+.nv-select__group:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid var(--nv-hairline);
 }
 .nv-select__option {
   display: flex;

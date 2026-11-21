@@ -5,6 +5,7 @@ import {
   type CrmSection,
   type Me,
   type RailKind,
+  type TeamMemberStatus,
 } from '@impera/contracts';
 
 /**
@@ -26,35 +27,81 @@ const LABELS: Readonly<Record<Kind, string>> = {
 };
 
 /**
- * Who takes part in the Instagram watch from the extension: the owner and an active manager (ADR 0060 § 2, amended
- * 07/11). A creator watches from her PWA; a chatter, or a manager away or gone, never sees it (the server refuses them
- * too: 403 at linking, 401 on a link they hold).
+ * Who takes part in the Instagram watch from the extension: the owner alone (ADR 0024, amendement du 16/11, point 2).
+ * A creator watches from her PWA; a manager or a chatter keeps the copilot and is never shown the watch.
  */
-export const watchesInstagram = (kind: Kind): boolean => kind === 'owner' || kind === 'manager';
+export const watchesInstagram = (kind: Kind): boolean => kind === 'owner';
 
 export function kindLabel(kind: Kind): string {
   return LABELS[kind];
 }
 
-/** Two letters from the name (« Charles Altman » → « CA »), or the e-mail's first letter when there is no name. */
-export function initialsOf(me: Pick<Me, 'name' | 'email'>): string {
-  const words = me.name
+/** The words of a name that hold a letter or a digit: an emoji alone is no name (recette du 16/11, EXT-22). */
+function wordsOf(name: string): readonly string[] {
+  return name
     .trim()
     .split(/\s+/u)
-    .filter((word) => word !== '');
+    .filter((word) => /[\p{L}\p{N}]/u.test(word));
+}
+
+/** The first letter or digit of a word (« 🌸Lou » → « L »). */
+function letterOf(word: string): string {
+  return /[\p{L}\p{N}]/u.exec(word)?.[0] ?? '';
+}
+
+/** Two letters from the name (« Charles Altman » → « CA »), or the e-mail's first letter when there is no name. */
+export function initialsOf(me: Pick<Me, 'name' | 'email'>): string {
+  const words = wordsOf(me.name);
   const letters = words.length > 1 ? [words[0], words[words.length - 1]] : [words[0] ?? me.email];
   return letters
-    .map((word) => Array.from(word ?? '')[0] ?? '')
+    .map((word) => letterOf(word ?? ''))
     .join('')
     .toLocaleUpperCase('fr-FR');
 }
 
-/** The first name the greeting uses: the first word of the name, or nothing. */
+/** The first name the greeting uses: the first word of the name that holds a letter, or nothing. */
 export function firstNameOf(me: Pick<Me, 'name'>): string {
-  return me.name.trim().split(/\s+/u)[0] ?? '';
+  return wordsOf(me.name)[0] ?? '';
 }
 
-type ShortcutIcon = 'dashboard' | 'today' | 'tracking' | 'team' | 'creators' | 'planning' | 'pay' | 'me';
+/**
+ * A member who is not at work (recette du 16/11, EXT-10): his status in the team, the way the CRM writes it (Équipe,
+ * `STATUS_LABELS`), and the card the popup shows in place of the copilot. No shift can be set for him, so the copilot
+ * has nothing to open; the server refuses him anyway. Null for an active member, the owner and a creator.
+ */
+export type Away = Exclude<TeamMemberStatus, 'active'>;
+
+export function awayOf(me: Pick<Me, 'team'>): Away | null {
+  const status = me.team?.status ?? 'active';
+  return status === 'active' ? null : status;
+}
+
+const AWAY_LABELS: Readonly<Record<Away, string>> = {
+  on_leave: 'En congé',
+  sick: 'Malade',
+  travelling: 'En déplacement',
+  suspended: 'Suspendu',
+  left: 'Parti',
+};
+
+const AWAY_TITLES: Readonly<Record<Away, string>> = {
+  on_leave: 'Tu es en congé',
+  sick: 'Tu es noté malade',
+  travelling: 'Tu es en déplacement',
+  suspended: 'Ton compte est suspendu',
+  left: 'Tu as quitté l’équipe',
+};
+
+export function awayLabel(away: Away): string {
+  return AWAY_LABELS[away];
+}
+
+export function awayTitle(away: Away): string {
+  return AWAY_TITLES[away];
+}
+
+type ShortcutIcon =
+  'dashboard' | 'today' | 'tracking' | 'train' | 'team' | 'creators' | 'planning' | 'pay' | 'me' | 'settings';
 
 export interface Shortcut {
   readonly path: string;
@@ -68,7 +115,7 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/aujourdhui': 'today',
   '/agenda': 'planning',
   '/suivi': 'tracking',
-  '/entrainer': 'tracking',
+  '/entrainer': 'train',
   '/planning': 'planning',
   '/commissions': 'pay',
   '/ventes': 'pay',
@@ -76,15 +123,22 @@ const ICONS: Readonly<Record<CrmSection, ShortcutIcon>> = {
   '/contenu': 'today',
   '/equipe': 'team',
   '/paie': 'pay',
+  // Trafic is no role's shortcut today.
+  '/trafic': 'creators',
   '/creatrices': 'creators',
   '/moi': 'me',
-  '/reglages': 'me',
+  '/reglages': 'settings',
 };
+
+/** The icon of a section, the CRM menu's own (apps/web/src/shell/nav.ts): Entraîner a target, Réglages a gear. */
+export function shortcutIconOf(section: CrmSection): ShortcutIcon {
+  return ICONS[section];
+}
 
 export function shortcutsFor(kind: Kind): readonly Shortcut[] {
   return CRM_RAILS[kind].shortcuts.map((section) => ({
     path: section,
     label: CRM_SECTION_LABELS[section],
-    icon: ICONS[section],
+    icon: shortcutIconOf(section),
   }));
 }

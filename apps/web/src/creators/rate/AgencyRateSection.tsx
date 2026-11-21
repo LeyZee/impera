@@ -22,6 +22,7 @@ import {
   bpsOfPercent,
   confirmSentence,
   dayLabel,
+  alertText,
   gapText,
   earliestDay,
   percentOf,
@@ -181,11 +182,11 @@ function RateSheet({
 
   const head = sheetHead(list, creatorName);
   return (
-    <section className="ps-page">
+    <section className="ps-page ar-page">
       <div className="nv-plate ps-head">
         <div className="ps-head__top">
           <div className="ps-head__who">
-            <h2 className="ps-title">Part de l’agence</h2>
+            <h2 className="nv-h2 ps-title">Part de l’agence</h2>
           </div>
         </div>
         <div className="ps-head__state" aria-live="polite">
@@ -206,6 +207,7 @@ function RateSheet({
         )}
       </div>
 
+      <AlertsPanel list={list} />
       <ObservedPanel list={list} />
 
       <div className="nv-plate ps-panel">
@@ -346,6 +348,48 @@ function RateSheet({
               })}
             </ul>
           </section>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** The alerts shown before « Voir les précédentes »: the card never grows without end (avis Design, 16/11). */
+const ALERTS_SHOWN = 3;
+
+/**
+ * The alerts the automatic check sent on the fortnights shown (PAY-04), newest first, each dated: a record of what was
+ * found then, not the state of today, which the head and the shares below say. Nothing without an alert.
+ */
+function AlertsPanel({ list }: { list: CreatorAgencyRateList }): JSX.Element | null {
+  const id = useId();
+  const [all, setAll] = useState(false);
+  if (list.alerts.length === 0) return null;
+  const shown = all ? list.alerts : list.alerts.slice(0, ALERTS_SHOWN);
+  return (
+    <section className="nv-plate ps-panel ar-read-panel" aria-labelledby={`${id}-alerts`}>
+      <div className="ps-block">
+        <p className="nv-eyebrow" id={`${id}-alerts`}>
+          Alertes envoyées
+        </p>
+        <ul className="ar-alerts">
+          {shown.map((alert) => (
+            <li key={alert.id} className="ar-alert">
+              <span className="ps-dot" data-dot="warn" />
+              <span>{alertText(alert, list)}</span>
+            </li>
+          ))}
+        </ul>
+        {all || list.alerts.length <= ALERTS_SHOWN ? null : (
+          <button
+            type="button"
+            className="nv-btn nv-btn--plain nv-btn--sm ps-self-start"
+            onClick={() => {
+              setAll(true);
+            }}
+          >
+            Voir les précédentes
+          </button>
         )}
       </div>
     </section>

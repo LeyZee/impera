@@ -16,12 +16,14 @@ L'exécuteur vit dans `apps/api/src/scripts/evals.ts` (il appelle le code de l'a
 
 Commandes : `pnpm evals` (smoke : tout sauf `tier: full`), `pnpm evals -- --full`, `pnpm evals -- --file evals/adversarial/asks-if-bot.yaml` (chemin depuis la racine).
 
+Jeux : `pnpm evals -- --full --match compliment-` rejoue seuls les scénarios dont le nom de fichier contient `compliment-` (le jeu « compliments » de Charles, 20/11 : onze compliments sans rien de sexuel, accueillis avec assurance et un merci, sans commentaire sur l’audace ni le rythme du fan). On le rejoue à chaque changement du cerveau, de la voix ou de leurs consignes.
+
 Tirages : chaque scénario est tiré trois fois (`--draws`, de 1 à 5). La voix est réglée pour varier, et un seul tirage peut passer ou échouer par hasard. Un scénario échoue si un de ses tirages échoue ; ses notes sont la moyenne des tirages, et son minimum (`judge:` du scénario) se lit sur le pire tirage.
 
 Persona en vigueur : `pnpm evals -- --key-from-crm --persona-from-crm` fait passer les scénarios sur la persona active de la créatrice dans la base de `.env` (`--creator <id>` s'il y en a plusieurs), lue sur une connexion qui ne peut pas écrire. On ne le lance que sur le PC qui tient la base : les réponses affichées sont écrites dans sa voix, elles ne se collent ni dans une PR, ni dans le chat, ni dans `/mnt/project-files`. Seuls les comptes (scénarios passés, moyennes, échecs par nom de scénario) en sortent. Un scénario qui attend un fait de la persona de démo (son prénom, sa ville, ses goûts) échoue alors sans que l'agent ait tort : un tel échec se lit comme un faux rouge, pas comme une régression.
 
 Juge : il note mieux ce qu'un autre modèle a écrit. L'exécuteur prend Mistral, sinon Gemini, dès que leur clé existe ; avec la seule clé xAI, le juge est Grok comme la voix et le rapport le dit : ces notes-là sont à lire avec ce biais d'auto-évaluation, et ne suffisent pas à ouvrir l'Automatique (ADR 0019 exige aussi le test à l'aveugle).
 
-Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 20 €/jour de l'agent ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
+Coût : chaque passage a son propre plafond de 6 € (`EVALS_CAP_EUR`, relevé de 3 € pour les trois tirages, choix de Charles du 12/11), à part des 25 €/jour de l'agent (20 € jusqu'au 21/11, choix de Charles) ; au plafond, la suite s'arrête et échoue. Trois tirages de la suite smoke coûtent environ 3,40 USD.
 
 Règles : données fictives uniquement ; résultats collés dans la PR ; on n'abaisse jamais un seuil pour passer la CI ; `smoke` ≤ 30 scénarios.

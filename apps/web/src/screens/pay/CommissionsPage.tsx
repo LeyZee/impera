@@ -28,9 +28,11 @@ import {
   usePayrollSettings,
 } from '@/payroll/api';
 import {
+  besidesLine,
   fcfaText,
   gaugePercent,
   goalSpanBps,
+  growthWords,
   heroPeriodOf,
   mainLine,
   memberPeriodAmount,
@@ -46,6 +48,7 @@ import {
   tierProgress,
 } from '@/payroll/model';
 import '@/payroll/pay.css';
+import { useReports } from '@/reports/api';
 import '@/reports/reports.css';
 import {
   amountText,
@@ -55,6 +58,7 @@ import {
   periodTitle,
   signedAmountText,
 } from '@/reports/model';
+import { GameGauge } from '@/rewards/GameGauge';
 import { Medal } from '@/rewards/Medal';
 import { MyRankCard } from '@/rewards/MyRankCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
@@ -66,6 +70,7 @@ import { useNow } from '@/scheduling/useNow';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Commissions (EQ-05, the chatter's): what they touch for the period whose money is on its way — computed, being
@@ -98,14 +103,17 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const nowRead = usePayPeriod(current);
   const heroNames = usePayNames(hero, false);
   const nowNames = usePayNames(current, false);
+  // Their reports of the hero's period: one sent and not validated yet is said under the amount (CHT-30).
+  const heroReports = useReports(hero, hero !== null);
 
   // The period is the hero's own first word: said twice above the fold, it was read as two periods (D-03).
   const head = (): JSX.Element => (
     <PageHeader
-      eyebrow="Mon argent"
-      title="Commissions"
+      // The section above, the open tab as the title, as on Factures (recette visuelle 16/11, CHA-02).
+      eyebrow="Commissions"
+      title="Relevés"
       lead="Ce que tu as gagné sur la quinzaine, et comment ta commission se construit."
-      actions={<CommissionsNav />}
+      tabs={<CommissionsNav />}
     />
   );
 
@@ -163,16 +171,15 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
         {head()}
         <div className="py-board">
           <Panel className="nv-enter">
-            <div className="py-empty">
-              <p className="py-empty__whisper">Ton premier relevé arrive avec ton premier rapport validé.</p>
-              <p className="py-empty__text">
-                Chaque rapport de fin de shift que l’agence valide compte ici, compte par compte, de tes
-                ventes à ce que tu touches.
-              </p>
-              <Link to="/planning" className="nv-btn nv-btn--soft">
-                Voir mon planning
-              </Link>
-            </div>
+            <Empty
+              whisper="Ton premier relevé arrive avec ton premier rapport validé."
+              text="Chaque rapport de fin de shift que l’agence valide compte ici, compte par compte, de tes ventes à ce que tu touches."
+              action={
+                <Link to="/planning" className="nv-btn nv-btn--soft">
+                  Voir mon planning
+                </Link>
+              }
+            />
           </Panel>
         </div>
       </Page>
@@ -181,6 +188,9 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   const heroData = heroRead.data?.period === hero ? heroRead.data : undefined;
   const statement = heroData?.statements[0];
   const nowData = nowRead.data?.period === current ? nowRead.data : undefined;
+  // A manager, on leave too, takes neither a tier nor the team's goal (the pay engine gives them none): no card that
+  // promises one (recette CHT-03).
+  const chatter = user.team?.role !== 'manager';
   const past = summaries.filter((summary) => summary.window.period !== hero);
 
   // Nothing to follow in the period under way and no statement before: one quiet line under the path rather than a
@@ -189,7 +199,7 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
     hero === current &&
     statement !== undefined &&
     nowData !== undefined &&
-    !hasPerformance(nowData, user.team?.role !== 'manager') &&
+    !hasPerformance(nowData, chatter) &&
     past.length === 0 &&
     !periods.hasNextPage &&
     !periods.isError;
@@ -236,7 +246,19 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
           ) : (
             <>
               {heroData.blocked ? <MyBlockNotice block={heroData.blocked} /> : null}
-              <Hero statement={statement} period={heroData} now={now} />
+              <Hero
+                statement={statement}
+                period={heroData}
+                now={now}
+                pending={
+                  heroReports.data?.reports.filter(
+                    (report) =>
+                      report.memberId === statement.memberId &&
+                      report.period === hero &&
+                      report.status === 'submitted',
+                  ).length ?? 0
+                }
+              />
               <Panel className="nv-enter" eyebrow="Le parcours de ton argent">
                 <div className="rp-sec">
                   <MoneyPath
@@ -255,7 +277,8 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
               />
               {plain ? (
                 <p className="py-quiet py-me__none">
-                  Pas de palier ni d’objectif d’équipe sur cette quinzaine. Tes relevés passés viendront ici.
+                  {chatter ? 'Pas de palier ni d’objectif d’équipe sur cette quinzaine. ' : ''}Tes relevés
+                  passés viendront ici.
                 </p>
               ) : null}
             </>
@@ -266,30 +289,37 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
         </div>
         {plain ? null : (
           <div className="py-me__col">
-            <Panel
-              className="nv-enter"
-              eyebrow="Ma performance"
-              title={hero === current ? undefined : `Quinzaine ${periodLine(current)}`}
-            >
-              {nowData === undefined ? (
-                nowRead.isError ? (
-                  <Unreachable
-                    what="la quinzaine en cours"
-                    onRetry={() => {
-                      void nowRead.refetch();
-                    }}
-                  />
+            {chatter ? (
+              <Panel
+                className="nv-enter"
+                eyebrow={
+                  // One quiet sentence takes no strong title: the period goes with the eyebrow (Design, CHT-14).
+                  hero === current || nowData === undefined || !plainPerformance(nowData)
+                    ? 'Ma performance'
+                    : `Ma performance · quinzaine ${periodLine(current)}`
+                }
+                title={
+                  hero === current || (nowData !== undefined && plainPerformance(nowData))
+                    ? undefined
+                    : `Quinzaine ${periodLine(current)}`
+                }
+              >
+                {nowData === undefined ? (
+                  nowRead.isError ? (
+                    <Unreachable
+                      what="la quinzaine en cours"
+                      onRetry={() => {
+                        void nowRead.refetch();
+                      }}
+                    />
+                  ) : (
+                    <Loading rows={1} />
+                  )
                 ) : (
-                  <Loading rows={1} />
-                )
-              ) : (
-                <Performance
-                  period={nowData}
-                  account={nowNames.account}
-                  chatter={user.team?.role !== 'manager'}
-                />
-              )}
-            </Panel>
+                  <Performance period={nowData} account={nowNames.account} userId={user.id} />
+                )}
+              </Panel>
+            ) : null}
             <Panel className="nv-enter" eyebrow="Mes relevés">
               <div className="rp-sec">
                 {past.length === 0 ? (
@@ -306,6 +336,11 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                       >
                         <MyPeriodRow
                           summary={summary}
+                          running={
+                            summary.window.period === current && nowRead.data?.period === current
+                              ? nowRead.data.statements[0]
+                              : undefined
+                          }
                           onOpen={() => {
                             setOpened(summary.window.period);
                           }}
@@ -328,9 +363,9 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
                   </button>
                 ) : null}
                 {periods.isError && !lost ? (
-                  <p className="tm-warn" role="alert">
-                    Le serveur ne répond pas : les quinzaines plus anciennes n’ont pas pu être lues.
-                  </p>
+                  <Failure inline onRetry={() => void periods.fetchNextPage()}>
+                    Les quinzaines plus anciennes n’ont pas pu être lues : réessaie dans un instant.
+                  </Failure>
                 ) : null}
               </div>
             </Panel>
@@ -352,15 +387,20 @@ export function CommissionsPage({ user }: { user: Me }): JSX.Element {
   );
 }
 
-/** What the member touches for the period: the one lit surface of the screen. */
+/**
+ * What the member touches for the period: the one lit surface of the screen. Under the amount, their reports of the
+ * period sent and not validated yet, which it does not count (recette 16/11, CHT-30).
+ */
 function Hero({
   statement,
   period,
   now,
+  pending,
 }: {
   statement: CommissionStatement;
   period: PayrollPeriod;
   now: Date;
+  pending: number;
 }): JSX.Element {
   const delay = usePayrollSettings().data?.payoutDelayBusinessDays ?? null;
   const words = myStatementWords(statement, period.ended, now, delay);
@@ -388,16 +428,23 @@ function Hero({
           {note}
         </p>
       ))}
+      {pending === 0 ? null : (
+        <p className="py-hero__note nv-num">
+          + {pending} {pending === 1 ? 'rapport' : 'rapports'} en attente de validation, pas encore compté
+          {pending === 1 ? '' : 's'}
+        </p>
+      )}
       {words.hold === null ? null : <MyHoldNotice hold={words.hold} />}
     </section>
   );
 }
 
-/** Whether the period under way has a tier or, for a chatter, a team goal to follow. */
+/** Whether the period under way has, for a chatter, a tier or a team goal to follow; never for a manager. */
 function hasPerformance(period: PayrollPeriod, chatter: boolean): boolean {
+  if (!chatter) return false;
   const statement = period.statements[0];
   const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
-  const goal = chatter ? (statement?.rules.collectiveGoal ?? period.collectiveGoal) : null;
+  const goal = statement?.rules.collectiveGoal ?? period.collectiveGoal;
   return tiers.length > 0 || goal !== null;
 }
 
@@ -420,31 +467,40 @@ function MyHoldNotice({ hold }: { hold: MyPayoutHold }): JSX.Element {
 }
 
 /**
- * What is left to do in the period under way: the next individual tier, in net and roughly in sales on the account
- * that brings the most, then for a chatter their share of the team's goal, in percent only.
+ * What is left to do in the period under way, for a chatter: the next individual tier, in net and roughly in sales on
+ * the account that brings the most, then their share of the team's goal, in percent only.
  */
+/** A period with neither tier nor team goal: « Ma performance » is one quiet sentence. */
+function plainPerformance(period: PayrollPeriod): boolean {
+  const statement = period.statements[0];
+  const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
+  return tiers.length === 0 && (statement?.rules.collectiveGoal ?? period.collectiveGoal) === null;
+}
+
 function Performance({
   period,
   account,
-  chatter,
+  userId,
 }: {
   period: PayrollPeriod;
   account: (platformAccountId: string) => PlanningAccount | null;
-  chatter: boolean;
+  userId: string;
 }): JSX.Element {
   const statement = period.statements[0];
   const net = statement?.netMinor ?? 0;
   const tiers = statement?.rules.bonusTiers ?? period.bonusTiers?.tiers ?? [];
-  const goal = chatter ? (statement?.rules.collectiveGoal ?? period.collectiveGoal) : null;
-  if (tiers.length === 0 && goal === null)
+  const goal = statement?.rules.collectiveGoal ?? period.collectiveGoal;
+  if (plainPerformance(period)) {
+    const growth = growthWords(statement?.lines ?? []);
     return (
       <div className="rp-sec">
         <p className="py-quiet">
-          Pas de palier ni d’objectif d’équipe sur cette quinzaine : ta commission suit ton net, rapport après
-          rapport.
+          Pas de palier ni d’objectif d’équipe sur cette quinzaine : ta commission suit ton net
+          {growth === null ? '' : `, ${growth}`}.
         </p>
       </div>
     );
+  }
   return (
     <div className="rp-sec">
       {tiers.length === 0 ? null : (
@@ -454,6 +510,8 @@ function Performance({
           statement={statement}
           account={account}
           lastDay={payPeriodLastDay(period.period)}
+          userId={userId}
+          period={period.period}
         />
       )}
       {goal === null ? null : <GoalShare goal={goal} period={period} />}
@@ -483,12 +541,17 @@ function TierLeft({
   statement,
   account,
   lastDay,
+  userId,
+  period,
 }: {
   net: number;
   tiers: readonly BonusTier[];
   statement: CommissionStatement | undefined;
   account: (platformAccountId: string) => PlanningAccount | null;
   lastDay: string;
+  /** Whose gauge it is and of which fortnight: where it last stood is kept per account, per tier. */
+  userId: string;
+  period: string;
 }): JSX.Element | null {
   const { reached, next } = tierProgress(net, tiers);
   if (next === null && reached !== null)
@@ -515,7 +578,12 @@ function TierLeft({
       <p className="py-left__title nv-num">
         Palier {next.label} : encore {amountText(left, 'EUR')} de net
       </p>
-      <Gauge value={gaugePercent(net - from, next.thresholdMinor - from)} mark={null} />
+      <GameGauge
+        userId={userId}
+        name="tier"
+        scope={`${period}:${String(next.thresholdMinor)}`}
+        percent={gaugePercent(net - from, next.thresholdMinor - from)}
+      />
       <div className="py-gaugelabels nv-num">
         <span className="py-gaugelabels__tier">
           {reached === null ? null : <TierMedalMark tiers={tiers} tier={reached} earned size={24} />}
@@ -616,28 +684,55 @@ function MyBlockNotice({
 }
 
 /** One of the member's past periods: its state, its net and closing beneath, and one amount. */
-function MyPeriodRow({ summary, onOpen }: { summary: PayPeriodSummary; onOpen: () => void }): JSX.Element {
+function MyPeriodRow({
+  summary,
+  running,
+  onOpen,
+}: {
+  summary: PayPeriodSummary;
+  /** The member's statement of the period under way, when it is read. */
+  running?: CommissionStatement | undefined;
+  onOpen: () => void;
+}): JSX.Element {
   const { window } = summary;
   const chip = memberPhaseChip(summary);
+  // The period under way says what the member earned so far, as « Ma quinzaine » does, never what the minimum leaves
+  // to pay without a word: what it would carry is said under it (recette CHT-02).
+  const earning = running !== undefined && !summary.ended && summary.blocked === null ? running : undefined;
   // A period carried over pays nothing: its row says what went on the next one, the member's `carriedMinor` (#295).
   const amount =
-    chip.label === 'Reporté'
-      ? {
-          minor: summary.carriedMinor,
-          what: `reporté sur la quinzaine ${periodLine(followingPeriod(window.period))}`,
-        }
-      : memberPeriodAmount(summary);
-  const sub = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}`;
+    earning !== undefined
+      ? { minor: earning.totalMinor, what: 'gagné à ce jour' }
+      : chip.label === 'Reporté'
+        ? {
+            minor: summary.carriedMinor,
+            what: `reporté sur la quinzaine ${periodLine(followingPeriod(window.period))}`,
+          }
+        : memberPeriodAmount(summary);
+  const carry =
+    earning === undefined || earning.carryOverOutMinor === 0
+      ? null
+      : `${earning.totalMinor < 0 ? 'sous zéro' : 'sous le minimum'} : reporté si elle finit ainsi`;
+  // What the amount holds besides the commission (a bonus, a penalty…) is said beside the net: 30 € earned on 0 € of
+  // net is never left to be read as a mistake (Design, recette CHT-02).
+  // Two lines meant as such (Design, recette CHT-02): the net, then what else the amount holds; a fact's amount stays
+  // with its word, « prime » never left at a line's end with its « +30,00 € » on the next.
+  const net = `${amountText(summary.netMinor, 'EUR')} de net${summary.ended ? '' : ' à ce jour'}`;
+  const others = earning === undefined ? null : besidesLine(earning);
   return (
-    <button type="button" className="py-period nv-tap" onClick={onOpen}>
+    <button type="button" className="py-period py-period--mine nv-tap" onClick={onOpen}>
       <span>
-        <span className="py-period__name nv-num">{periodTitle(window.period, false)}</span>
-        <span className="py-period__sub nv-num">{sub}</span>
+        <span className="py-period__head">
+          <span className="py-period__name nv-num">{periodTitle(window.period, false)}</span>
+          <Chip chip={chip} />
+        </span>
+        <span className="py-period__sub nv-num">{net}</span>
+        {others === null ? null : <span className="py-period__sub nv-num">{others}</span>}
       </span>
-      <Chip chip={chip} />
       <span className="py-period__amount nv-num">
         {amountText(amount.minor, 'EUR')}
         <small>{amount.what}</small>
+        {carry === null ? null : <small>{carry}</small>}
       </span>
       <span className="py-period__go" aria-hidden="true" />
     </button>

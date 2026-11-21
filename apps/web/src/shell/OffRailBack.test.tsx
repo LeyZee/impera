@@ -31,13 +31,13 @@ const chatter: Me = {
 };
 const creator: Me = { ...base, role: 'creator', team: null, teamScope: 'self' };
 
-function renderAs(user: Me): void {
+function renderAs(user: Me, path = '/notifications'): void {
   const root = createRootRouteWithContext<{ user: Me }>()();
-  const page = createRoute({ getParentRoute: () => root, path: '/notifications', component: OffRailBack });
+  const page = createRoute({ getParentRoute: () => root, path, component: OffRailBack });
   const router = createRouter({
     routeTree: root.addChildren([page]),
     context: { user },
-    history: createMemoryHistory({ initialEntries: ['/notifications'] }),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   render(<RouterProvider router={router} />);
 }
@@ -65,5 +65,13 @@ describe('OffRailBack', () => {
     const home = railOf(owner).home;
     const back = await screen.findByRole('link', { name: `← ${sectionLabel(home)}` });
     expect(back.getAttribute('href')).toBe(home);
+  });
+
+  // Recette visuelle 16/11 (T9): the owner's guides light Réglages, and lead back there.
+  it('sends the owner back from a guide to Réglages, the tab it lights', async () => {
+    vi.stubGlobal('scrollTo', vi.fn());
+    renderAs(owner, '/aide/installer');
+    const back = await screen.findByRole('link', { name: '← Réglages' });
+    expect(back.getAttribute('href')).toBe('/reglages');
   });
 });

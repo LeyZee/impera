@@ -1,6 +1,7 @@
 import {
   CONNECTOR_LINK_FORBIDDEN,
   CONNECTOR_SESSION_CONFLICT,
+  CONNECTOR_SESSION_AUTO_UNPROCESSABLE,
   CONNECTOR_SESSION_MEMBER_CONFLICT,
   CONNECTOR_SESSION_UNPROCESSABLE,
   DomainError,
@@ -45,6 +46,22 @@ export class ConnectorLinkForbidden extends DomainError {
 export class SessionShapeUnprocessable extends DomainError {
   constructor() {
     super(CONNECTOR_SESSION_UNPROCESSABLE, 'Cette session ne correspond pas à la plateforme du compte');
+  }
+}
+
+/**
+ * A sync « à l'ouverture » (ADR 0147) on an account that has no session yet, or none whose member is pinned: the
+ * identity of the AI's Reveal account is only ever set by a click, never by the extension alone. 422.
+ */
+export class SessionAutoSyncUnprocessable extends DomainError {
+  /** Why, for the audit line: no pinned member yet, or a member the token itself does not name. */
+  readonly why: 'auto_unpinned' | 'auto_member_unread';
+  constructor(why: 'auto_unpinned' | 'auto_member_unread' = 'auto_unpinned') {
+    super(
+      CONNECTOR_SESSION_AUTO_UNPROCESSABLE,
+      'Ce compte se branche d’abord par un clic sur « Synchroniser » : la synchronisation seule ne fixe jamais son membre',
+    );
+    this.why = why;
   }
 }
 
@@ -254,6 +271,16 @@ export class ConnectorReadsRangeUnprocessable extends DomainError {
 export class VaultForbidden extends DomainError {
   constructor() {
     super('vault_forbidden', 'Réservé au propriétaire et au manager actif qui suit cette créatrice');
+  }
+}
+
+/**
+ * No small picture for this media (ADR 0138, 404): unknown to her vault, removed from the platform, a voice note, or
+ * a link the platform refused even fresh. The screen keeps the blurred preview.
+ */
+export class VaultPreviewNotFound extends DomainError {
+  constructor() {
+    super('vault_preview_not_found', 'Aucun aperçu net pour ce média');
   }
 }
 

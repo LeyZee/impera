@@ -1,8 +1,12 @@
 # Déploiement en production
 
-Mettre Impera en service sur le VPS (Hetzner, Coolify), le mettre à jour, revenir en arrière. Décisions : ADR 0027 (images, compose, limiteur) et ADR 0005 (Neon). Tout ce qui suit se fait dans Coolify, Neon et un terminal sur le serveur ; rien ne passe par un fichier du dépôt.
+Mettre Impera en service sur le VPS Hostinger (Coolify) avec la base chez Supabase, le mettre à jour, revenir en arrière. Décisions : ADR 0152 (Hostinger, Supabase, serveur fermé), ADR 0027 (images, compose, limiteur), ADR 0087 (trois rôles en base). Tout ce qui suit se fait dans le panneau Hostinger, Coolify, Supabase et un terminal sur le serveur ; rien ne passe par un fichier du dépôt.
 
-**Pas encore joué** : les étapes Neon et Coolify suivent leur documentation et la répétition locale (§ 6), pas une vraie mise en service. La première mise en service les vérifie ; tout écart se corrige ici, dans la même journée.
+**Pas encore joué** : ces étapes suivent la documentation de Hostinger, de Coolify et de Supabase, les essais faits sur un projet Supabase de test le 20/11 et la répétition locale (§ 6), pas une vraie mise en service. La première mise en service (OPS-19 lot c) les vérifie ; tout écart se corrige ici, dans la même journée.
+
+**Rien de réel dans ce fichier ni ailleurs dans le dépôt** : ni domaine, ni adresse IP, ni nom d'hôte, ni identifiant de projet, ni nom de compte, ni mot de passe. Les exemples disent `<domaine>`, `<ip du serveur>`, `<ref>` ; les vraies valeurs restent chez Charles. Les secrets se génèrent sur son PC et il les saisit lui-même dans Coolify, jamais dans un chat ni dans le dossier partagé.
+
+**Avant la mise en service** : le développement et la CI doivent tourner dans la même version majeure de Postgres que le projet Supabase (17 pour un projet neuf, fiche OPS-20), sinon l'image `backup` ne sait pas exporter la base.
 
 Rien n'envoie à un fan tant que `connector_config.writes` n'est pas ouvert pour son compte (ADR 0018) : une mise en service ne parle à personne.
 
@@ -14,7 +18,7 @@ Rien n'envoie à un fan tant que `connector_config.writes` n'est pas ouvert pour
 | `api` | même image | l'API, `/health` et `/ready` |
 | `worker` | même image, `node dist/worker.js` | les jobs (Graphile Worker), jamais de HTTP |
 | `web` | `apps/web/Dockerfile` | le dashboard, et `/v1/` renvoyé vers l'API : **seul service public** |
-| `backup` | `ops/db-export/Dockerfile` | l'export quotidien chiffré hors Neon, chaque nuit à 3 h (ADR 0028, § 4) |
+| `backup` | `ops/db-export/Dockerfile` | l'export quotidien chiffré hors Supabase, chaque nuit à 3 h (ADR 0028, § 4) |
 
 Le tout est décrit par `docker-compose.prod.yml`. L'API n'a pas de domaine : le navigateur l'atteint par `https://<domaine>/v1/`, à travers le nginx de `web`.
 
@@ -26,47 +30,123 @@ Le tout est décrit par `docker-compose.prod.yml`. L'API n'a pas de domaine : le
 
 ## 1. Première mise en service
 
-### 1.1 Base Neon
+Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (§ 1.3), le premier déploiement (§ 1.4), puis le verrouillage de la base (§ 1.4, étape 2), la persona (§ 1.5), la surveillance (§ 1.6). Charles fait chaque geste chez un fournisseur (commande, compte, secret) ; une session peut le guider pas à pas, sans jamais recevoir un secret.
 
-1. Neon → nouveau projet, région Europe (Francfort), Postgres 16. PITR : 7 jours au moins. « Scale to zero » **désactivé** (le worker écoute la base en continu).
-2. Le rôle propriétaire créé par Neon sert de rôle admin (`nirvana_admin` dans la doc). Noter sa chaîne de connexion **directe** (sans `-pooler` dans l'hôte) : c'est `DATABASE_ADMIN_URL`. Il possède les tables : il ne sert qu'aux migrations, à la sauvegarde et aux scripts `ops:*` lancés à la main. Ni l'API ni le worker ne se connectent avec lui (ADR 0087).
-3. Créer le rôle applicatif, sans contournement de RLS, dans l'éditeur SQL de Neon, connecté avec le rôle admin. Mot de passe : `openssl rand -base64 24`, jamais réutilisé.
+### 1.0 Le VPS Hostinger
 
-   ```sql
-   CREATE ROLE nirvana_app LOGIN PASSWORD '<mot de passe>' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
-   GRANT CONNECT ON DATABASE neondb TO nirvana_app;
-   GRANT USAGE ON SCHEMA public TO nirvana_app;
+1. **Commande** (Charles) : KVM 2, centre de données dans l'Union européenne au plus près de la région de la base, Ubuntu 24.04 LTS. La double authentification est active sur le compte Hostinger, chez le registraire et chez l'hébergeur DNS : chacun vaut root (console, réinstallation, instantanés).
+2. **Clé SSH** : sur le PC, `ssh-keygen -t ed25519`. La clé publique se colle dans le panneau Hostinger à la création (ou dans `~/.ssh/authorized_keys`) ; la clé privée ne quitte pas le PC.
+3. **Un compte nommé**, puis plus de root par SSH :
+
+   ```sh
+   adduser <compte>
+   usermod -aG sudo <compte>
+   install -d -m 700 -o <compte> -g <compte> /home/<compte>/.ssh
+   cp /root/.ssh/authorized_keys /home/<compte>/.ssh/ && chown <compte>: /home/<compte>/.ssh/authorized_keys
    ```
 
-   (Remplacer `neondb` par le nom de la base.) Les migrations donnent ensuite à `nirvana_app` ses droits table par table.
-4. Vérifier les attributs des deux rôles, dans le même éditeur, toujours connecté avec le rôle admin :
+   Dans un deuxième terminal, vérifier `ssh <compte>@<ip du serveur>` puis `sudo -v` **avant** de fermer le premier. Ensuite, `/etc/ssh/sshd_config.d/10-impera.conf` :
 
-   ```sql
-   SELECT rolname, rolbypassrls, rolsuper FROM pg_roles WHERE rolname IN (current_user, 'nirvana_app');
+   ```
+   PermitRootLogin no
+   PasswordAuthentication no
+   KbdInteractiveAuthentication no
    ```
 
-   Attendu : le rôle admin à `rolbypassrls = t`, `nirvana_app` à `f`, et `rolsuper = f` pour les deux. Les migrations posent `FORCE ROW LEVEL SECURITY`, qui s'applique aussi au propriétaire des tables : sans `BYPASSRLS`, le déploiement passe, mais chaque job multi-tenant et chaque lecture `withAdmin` ne voient plus aucune ligne, sans erreur. L'attribut ne s'hérite pas de `neon_superuser`. Le serveur et le worker refusent d'ailleurs de démarrer dans ce cas (et si `nirvana_app` contourne la RLS), avec un message qui renvoie ici. Si le rôle admin est à `f`, **on s'arrête et on demande** : c'est une question d'ADR (0005), pas un réglage à contourner.
-5. `DATABASE_URL` = la même chaîne directe, avec `nirvana_app` et son mot de passe, et `?sslmode=require`.
-6. Le rôle de service (ADR 0087), celui avec lequel l'API et le worker traversent les créatrices (`withAdmin`, la file des jobs). Dans le même éditeur, avec un autre mot de passe sorti de `openssl rand -base64 24` :
+   puis `sudo systemctl reload ssh`.
+4. **Essais répétés bloqués** : `sudo apt install fail2ban` (la prison `sshd` est active par défaut sur Ubuntu). `sudo fail2ban-client status sshd` donne les adresses bloquées.
+5. **Pare-feu Hostinger** (panneau → VPS → Pare-feu) : c'est lui qui fait foi, car Docker publie ses ports en passant sous le pare-feu du système. Règles entrantes : 22 (TCP), 80 (TCP), 443 (TCP), le reste refusé. Si Charles a une adresse IP fixe, la règle 22 ne vaut que pour elle. Les ports d'administration de Coolify (8000, 6001, 6002) restent **fermés**.
+6. **Mises à jour de sécurité automatiques** : `sudo apt install unattended-upgrades` puis `sudo dpkg-reconfigure -plow unattended-upgrades`, et dans `/etc/apt/apt.conf.d/50unattended-upgrades` : `Unattended-Upgrade::Automatic-Reboot "true";` et `Unattended-Upgrade::Automatic-Reboot-Time "04:30";` (après l'export de 3 h).
+7. **Instantanés Hostinger** : désactivés, ou laissés à Hostinger en sachant qu'ils contiennent les secrets de Coolify. Coolify a aussi sa propre sauvegarde (Settings → Backup) : la laisser coupée, ou ne l'envoyer que chiffrée.
+8. **Coolify** : installé par le catalogue Hostinger ou par son script officiel (documentation de Coolify, une ligne `curl … | bash` à lire avant de la lancer). Son tableau de bord n'est **jamais** ouvert au public : on y entre par un tunnel SSH, depuis le PC :
 
-   ```sql
-   CREATE ROLE impera_service LOGIN PASSWORD '<mot de passe>' NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
-   GRANT CONNECT ON DATABASE neondb TO impera_service;
+   ```sh
+   ssh -N -L 8000:127.0.0.1:8000 <compte>@<ip du serveur>
    ```
 
-   `DATABASE_SERVICE_URL` = la même chaîne directe, avec `impera_service` et son mot de passe, et `?sslmode=require`. Les migrations lui donnent ses droits table par table : lire, et écrire seulement là où le code de service écrit. Il ne possède aucune table, ne crée, ne modifie ni ne supprime aucun objet, et ne réécrit pas le journal d'audit. Si le rôle n'existe pas, la migration le crée sans connexion et `migrate` lui donne le mot de passe de `DATABASE_SERVICE_URL`, une seule fois : dès que le rôle peut se connecter, `migrate` ne touche plus à son mot de passe, qui se change ici, dans l'éditeur SQL, puis dans Coolify. Le créer ici d'abord reste la voie recommandée : son mot de passe ne passe alors par aucune commande. Le serveur et le worker refusent de démarrer si `DATABASE_SERVICE_URL` désigne un rôle qui possède des tables, qui est superutilisateur ou qui peut créer un rôle ou une base, avec un message qui renvoie ici.
+   puis `http://localhost:8000`. Premier écran : le compte administrateur, avec un mot de passe fort (gestionnaire de mots de passe) ; puis Profile → la double authentification. Coolify tient le socket Docker : son compte vaut root. Dans Settings : pas de domaine pour Coolify lui-même, « Registration » désactivée, mises à jour automatiques de Coolify désactivées (Charles les fait lui-même, sur un rappel).
 
-   **Sur une installation qui tournait avant ce rôle** : le créer et poser `DATABASE_SERVICE_URL` dans Coolify **avant** de déployer la version qui l'exige. Tous les services du compose la demandent, `migrate` compris ; sans elle, le déploiement s'arrête avant toute migration et l'ancienne version continue de tourner.
+### 1.1 La base Supabase
 
-Le pooler de Neon (hôte en `-pooler`) est interdit : Graphile Worker a besoin de `LISTEN/NOTIFY`.
+**Le projet.** La production est le projet Supabase que Charles a créé pour Impera et qui a servi aux essais (ADR 0152 § 9), sur son plan payant (un projet gratuit se met en pause et plafonne la base à 500 Mo), dans l'Union européenne. Charles est le seul membre de l'organisation, avec la double authentification. Le mot de passe du rôle `postgres` reste dans le gestionnaire de mots de passe et n'entre dans **aucune variable** de Coolify ni d'ailleurs.
+
+**0. La fin des essais : plus aucun outil sur le compte** (Charles, ADR 0152 § 9). C'est la première étape, avant toutes les autres : un connecteur encore branché relirait les clés régénérées à l'étape 2 et pourrait modifier les rôles créés à l'étape 6. Account → Access Tokens : supprimer tout jeton. Organisation → Integrations, et la liste des applications autorisées du compte (OAuth) : retirer tout connecteur d'assistant (MCP) et toute intégration ; le passer en lecture seule ne suffit pas. Un connecteur s'autorise pour toute une organisation : il ne se rebranche donc **plus jamais** sur celle-ci. Les essais qui doivent encore toucher ce projet (pooler, Postgres 17 de la fiche OPS-20) sont finis avant cette étape. Ensuite, tout le § 1.1 se joue par Charles seul, dans le SQL Editor et le tableau de bord ; un essai restant se fait depuis son PC ou le serveur, sans connecteur. Un essai qui a besoin de Supabase après la mise en ligne se fait dans un projet temporaire d'une **autre** organisation, supprimé ensuite.
+
+1. **Repartir d'une base vide** (Charles, dans le SQL Editor). Les essais ont laissé des rôles, des schémas et des tables. On ne les trie pas à la main : on les liste, puis on les efface en bloc, et les migrations repartent de zéro.
+
+   ```sql
+   select rolname from pg_roles where rolname in ('nirvana_admin', 'impera_service', 'nirvana_app');
+   select nspname from pg_namespace where nspname in ('drizzle', 'graphile_worker');
+   select tableowner, count(*) from pg_tables where schemaname = 'public' group by 1;
+   select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
+     and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e');
+   select count(*) from pg_type t where t.typnamespace = 'public'::regnamespace and t.typrelid = 0
+     and not exists (select 1 from pg_depend d where d.objid = t.oid and d.deptype = 'e');
+   select extname, extnamespace::regnamespace from pg_extension order by 1;
+   select pubname from pg_publication;
+   ```
+
+   La liste va dans le fil Hébergement. **Rien n'est supprimé sans le mot écrit de Charles.** Une fois ce mot donné, il joue lui-même, connecté en `postgres` :
+
+   ```sql
+   DROP OWNED BY nirvana_admin, impera_service, nirvana_app CASCADE;
+   DROP ROLE nirvana_admin, impera_service, nirvana_app;
+   ```
+
+   `DROP OWNED` emporte tout ce que nos rôles possèdent : nos tables de `public`, les schémas `drizzle` et `graphile_worker`, nos fonctions, et leurs droits. Les sept requêtes sont relancées. `DROP OWNED` n'emporte que ce que nos trois rôles possèdent : ce qu'un essai a créé connecté en `postgres` (une migration jouée par un outil, par exemple) reste. S'il reste un de nos schémas, une table, une fonction ou un type de `public`, ou une extension, un déclencheur ou une publication qui ne vient ni de Supabase ni de nos migrations, la liste repart dans le fil, et Charles les supprime sur le même mot écrit (`DROP SCHEMA drizzle, graphile_worker CASCADE`, puis les objets restants de `public` un par un), sans toucher aux schémas de Supabase. À la fin, aucun de nos rôles ni de nos schémas, aucune table, fonction ni type à nous dans `public`.
+
+   À constater pendant l'essai : chez Supabase, `postgres` n'est pas superutilisateur, et `DROP OWNED BY` un autre rôle demande d'en avoir les droits. Si c'est refusé, jouer d'abord `GRANT nirvana_admin, impera_service, nirvana_app TO postgres;`, puis recommencer. Les rôles sont recréés à neuf à l'étape 6, avec des mots de passe jamais utilisés en essai. Après le premier `migrate` (§ 1.4), le contrôle au démarrage refuse tout objet de nos schémas qui n'appartient pas à `nirvana_admin`.
+2. **Les restes des essais hors de la base** (Charles) : supprimer les branches Supabase, les fonctions Edge, leurs secrets et les notebooks SQL créés pendant les essais. Project Settings → API Keys : **régénérer** les clés (`anon`, `service_role`, clés publiables et secrètes) et le secret JWT, qui ont été visibles pendant les essais. Lire le journal d'audit de l'organisation (Organization → Audit Logs) : rien d'inattendu depuis la création du projet. Noter la rétention des sauvegardes de Supabase choisie ; les sauvegardes prises pendant les essais ne contiennent aucune donnée réelle, puisque les essais n'en utilisent jamais.
+3. **Ce qu'on n'utilise pas** : Project Settings → Data API, désactiver l'API de données (les clés `anon` et `service_role` ne servent alors à rien et ne sont copiées nulle part). Realtime : désactivé. Auth, Storage et Edge Functions : rien n'est configuré, aucune clé n'est sortie du tableau de bord.
+4. **TLS et réseau** : Database → Settings → SSL Configuration, « Enforce SSL on incoming connections » **activé**, et télécharger le certificat (`prod-ca-…crt`, public). Database → Settings → Network Restrictions : n'autoriser que l'adresse du serveur, en IPv4 (`<ip du serveur>/32`) et en IPv6 si le VPS en a une (`<ipv6 du serveur>/128`). Les restrictions valent pour la connexion directe comme pour le pooler. Le temps de la mise en service, ou d'une restauration (`restore.md`), Charles ajoute l'adresse de son PC, puis la retire dès la fin ; la liste revient alors à la seule adresse du serveur, et il le vérifie sur la même page.
+5. **Première vérification**, dans le SQL Editor (qui se connecte en `postgres`) :
+
+   ```sql
+   select rolsuper, rolcreaterole, rolbypassrls from pg_roles where rolname = current_user;
+   select version();
+   ```
+
+   Attendu : `f`, `t`, `t` (vu sur un projet de test le 20/11), et la version majeure de la fiche OPS-20. Si `postgres` ne peut pas créer de rôle `BYPASSRLS`, **on s'arrête et on revient à l'ADR 0152**.
+6. **Les trois rôles** (ADR 0087), toujours dans le SQL Editor, avec trois mots de passe sortis chacun de `openssl rand -base64 24`, jamais réutilisés, jamais les mêmes qu'en développement :
+
+   ```sql
+   CREATE ROLE nirvana_admin  LOGIN PASSWORD '<mot de passe 1>' NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+   CREATE ROLE impera_service LOGIN PASSWORD '<mot de passe 2>' NOSUPERUSER NOCREATEDB NOCREATEROLE BYPASSRLS;
+   CREATE ROLE nirvana_app    LOGIN PASSWORD '<mot de passe 3>' NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+   GRANT CONNECT ON DATABASE postgres TO nirvana_admin, impera_service, nirvana_app;
+   GRANT USAGE, CREATE ON SCHEMA public TO nirvana_admin;
+   GRANT USAGE ON SCHEMA public TO impera_service, nirvana_app;
+   GRANT CREATE ON DATABASE postgres TO nirvana_admin;
+   CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA extensions;
+   ```
+
+   `CREATE ON DATABASE` laisse `nirvana_admin` créer le schéma de la file de jobs (`graphile_worker`) et celui du journal des migrations (`drizzle`). `btree_gist` est créée ici par `postgres` : la migration 0021 fait `CREATE EXTENSION IF NOT EXISTS btree_gist` sans pouvoir la créer elle-même, et passe alors sans rien faire. Le serveur et le worker refusent de démarrer si un rôle de connexion a trop de droits ou appartient à un rôle plus puissant (`postgres`), avec un message qui renvoie ici.
+7. **Les chaînes de connexion.** Project → Connect → **Session pooler** (port 5432), jamais le mode transaction (port 6543) : Graphile Worker a besoin de `LISTEN/NOTIFY`, que seul le mode session garde. La connexion directe n'existe qu'en IPv6, ce que Docker sous Coolify ne gère pas sans réglage. Le nom d'utilisateur prend la forme qu'impose le pooler, `<rôle>.<ref>` :
+
+   ```
+   postgres://nirvana_app.<ref>:<mot de passe 3>@<hôte du pooler>:5432/postgres?sslmode=verify-full&sslrootcert=/data/supabase-ca.crt
+   ```
+
+   Même forme pour `DATABASE_SERVICE_URL` (`impera_service`) et `DATABASE_ADMIN_URL` (`nirvana_admin`). En production, l'API et le worker refusent une base distante sans `sslmode=verify-full` (`config.ts`). Le certificat de l'étape 4 se monte dans Coolify (§ 1.2, étape 4).
+8. **Vérifier chaque rôle par le pooler**, depuis le PC (si son adresse est autorisée) ou depuis le serveur : `psql "<chaîne du rôle>" -c "select current_user, rolsuper, rolbypassrls, rolcreaterole from pg_roles where rolname = current_user"`. Attendu : `nirvana_admin` à `f, t, f` ; `impera_service` à `f, t, f` ; `nirvana_app` à `f, f, f`.
+9. **Le budget de connexions.** En mode session, chaque connexion d'un de nos processus garde une connexion de Supavisor, le pooler de Supabase. Sa « Pool Size » (Database → Settings → Connection pooling) vaut **pour chaque couple rôle et base** : chacun de nos trois rôles a donc ce plafond à lui. S'y ajoute le plafond global de la taille de calcul (`max_connections`, affiché au même endroit), que partagent nos trois rôles et les services de Supabase. Chaque processus écrit son budget au démarrage (« database connection budget of this process » : `app` et `rateLimit` en `nirvana_app`, `service` en `impera_service`). Les trois règles :
+   - **`nirvana_app`** : (`DATABASE_POOL_MAX` + `RATE_LIMIT_POOL_MAX`) × 2 (`api` et `worker`) ≤ Pool Size. Défauts : (10 + 3) × 2 = 26.
+   - **`impera_service`** : `DATABASE_SERVICE_POOL_MAX` de `api` + celui de `worker` ≤ Pool Size. Graphile Worker tourne sur le pool de service du worker : il lui faut `WORKER_CONCURRENCY` + 3 (une connexion par job en cours, une pour `LISTEN`, de la marge), d'où `WORKER_DATABASE_SERVICE_POOL_MAX`, 8 par défaut pour une concurrence de 5 (`docker-compose.prod.yml`). Défauts : 5 + 8 = 13.
+   - **`nirvana_admin`** : `migrate` et `backup`, 2 chacun au plus, et le SQL Editor quand on s'en sert.
+   - **Au total** : 26 + 13 + 4 avec les défauts, soit 43, sous `max_connections` moins ce que Supabase garde pour lui (la page des réglages le dit).
+
+   Si un plafond ne tient pas, baisser d'abord `DATABASE_POOL_MAX` et `RATE_LIMIT_POOL_MAX` (§ 1.3), jamais le pool de service du worker sous `WORKER_CONCURRENCY` + 3 (baisser alors `WORKER_CONCURRENCY` avec lui). Monter la taille de calcul est une décision d'argent qui revient à Charles.
+
+**Ce que l'hébergeur garde.** Les rôles de lecture de Supabase (membres de `pg_read_all_data`, comme le rôle en lecture seule de son tableau de bord) lisent toutes nos tables quels que soient nos droits : c'est le risque accepté de l'ADR 0152. Le démarrage les nomme dans les journaux (« roles of the host that read every table »). Un rôle non superutilisateur qui pourrait **écrire** partout est, lui, refusé.
 
 ### 1.2 Coolify
 
-1. Coolify → Projet « Impera » → Ressource → **Docker Compose**, depuis le dépôt GitHub `LeyZee/impera`, branche `main`, fichier `docker-compose.prod.yml`.
-2. Domaine : sur le service **`web` seulement**, port 8080 (ex. `https://app.<domaine>`). Aucun domaine sur `api`, `worker`, `migrate`.
+1. Coolify → Projet « Impera » → Ressource → **Docker Compose**, depuis le dépôt GitHub `LeyZee/impera`, branche `main`, fichier `docker-compose.prod.yml`, avec une clé de déploiement en **lecture seule** limitée à ce dépôt (le dépôt est public : la clé ne sert qu'à ne pas dépendre d'un compte).
+2. Domaine : sur le service **`web` seulement**, port 8080 (`https://app.<domaine>`). Aucun domaine sur `api`, `worker`, `migrate`, `backup`. Le domaine définitif est choisi **avant** : il fixe les clés d'accès et l'adresse intégrée à l'extension.
 3. Cocher « Include Source Commit in Build » : `SOURCE_COMMIT` devient le tag de l'image et `RELEASE` (Sentry, battement du worker).
-4. Déploiement automatique sur push de `main` : oui. `main` ne change que par une PR verte.
-5. **Journal d'accès du proxy.** Le jeton d'un lien de calendrier est dans le chemin (`/v1/calendar-feed/<jeton>.ics`), et quiconque lit ce chemin lit les shifts de son titulaire. L'API ne le journalise pas, et le `nginx` de `web` non plus ; le Traefik de Coolify ne doit pas le garder non plus.
+4. **Le certificat de Supabase** : Storages → montage de fichier sur `api`, `worker`, `migrate` et `backup`, chemin `/data/supabase-ca.crt`, contenu = le fichier de § 1.1 étape 4 (public, ce n'est pas un secret).
+5. **Pas de déploiement automatique sur webhook** : le tableau de bord de Coolify est fermé, aucun webhook public ne l'atteint. Charles déclenche chaque déploiement (Deploy), ou laisse Coolify interroger le dépôt s'il le propose. **Aucun déploiement d'aperçu pour les PR** (Preview Deployments désactivés) : le dépôt est public, et une PR d'un inconnu construite sur le serveur verrait les secrets du build.
+6. **Journal d'accès du proxy.** Le jeton d'un lien de calendrier est dans le chemin (`/v1/calendar-feed/<jeton>.ics`), et quiconque lit ce chemin lit les shifts de son titulaire. L'API ne le journalise pas, et le `nginx` de `web` non plus ; le Traefik de Coolify ne doit pas le garder non plus.
    - Coolify → Servers → le serveur : **laisser « Traffic analytics » désactivé**. Activé, Coolify écrit un journal d'accès JSON (`/traefik/access.log`, chemin, User-Agent et Referer gardés). Tant qu'il est actif, Coolify retire aussi toute option `--accesslog…` ajoutée à la main : on ne peut alors pas en ôter le chemin.
    - Proxy → Configuration : par défaut, la commande de `traefik` n'a aucun `--accesslog`, et rien n'est à faire. Si quelqu'un en a ajouté un pour un dépannage, ajouter sous `command:` les deux lignes suivantes, puis « Save » et « Restart Proxy » (Traefik n'a pas de filtre par chemin : on retire le chemin de toutes les lignes) :
 
@@ -90,29 +170,38 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 | `SESSION_ENCRYPTION_KEYS` | `v1:` + `openssl rand -base64 32` |
 | `CREDENTIALS_ENCRYPTION_KEYS` | `v1:` + une **autre** sortie de `openssl rand -base64 32` |
 | `AUTH_SECRET` | `openssl rand -base64 32` |
-| `AUTH_BASE_URL`, `WEB_ORIGIN` | l'URL publique du dashboard, la même pour les deux (`https://app.<domaine>`). Son domaine est celui des clés d'accès (ADR 0053) : le changer rend toutes les clés inutilisables ; chacun se reconnecte avec son mot de passe et son code, puis ajoute une nouvelle clé |
-| `TRUST_PROXY_HOPS` | `2` (le proxy de Coolify, puis le nginx de `web`) ; défaut du compose |
+| `AUTH_BASE_URL`, `WEB_ORIGIN` | l'URL publique du dashboard, la même pour les deux (`https://app.<domaine>`). Son domaine est celui des clés d'accès (ADR 0053) : le changer rend toutes les clés inutilisables ; chacun se reconnecte avec son mot de passe et son code, puis ajoute une nouvelle clé. `WEB_ORIGIN` est aussi l'adresse intégrée à l'extension que sert le guide (ADR 0067, second amendement) : l'image `web` la reçoit en argument de build ; la changer demande de reconstruire cette image, et chaque membre recharge l'extension téléchargée à nouveau. `EXTENSION_CRM_ORIGIN`, si elle est posée, la remplace pour l'extension et doit nommer le même site, sinon le build échoue ; vide, l'extension n'a pas d'adresse intégrée (la CI, servie en http) |
+| `DATABASE_POOL_MAX`, `DATABASE_SERVICE_POOL_MAX`, `RATE_LIMIT_POOL_MAX`, `WORKER_DATABASE_SERVICE_POOL_MAX` | le budget de § 1.1 étape 9 (défauts 10, 5 et 3 par processus ; 8 pour le pool de service du worker) |
+| `WORKER_CPUS` | `1` (défaut) : le worker et son ffmpeg laissent un cœur à l'API sur les 2 du KVM 2 ; à revoir en conditions réelles |
+| `TRUST_PROXY_HOPS` | `2` (le proxy de Coolify, puis le nginx de `web`) ; défaut du compose, à vérifier sur le vrai serveur (§ 1.4) |
 | `PLAYGROUND_PERSONA_PATH` | facultatif : chemin **dans le conteneur** de la persona du playground (§ 1.5) ; démo sans lui. Les brouillons, les gardes et « À apprendre » ne le lisent pas |
 | `BACKUP_*` | § 4.1 ; sans elles, l'export de la nuit échoue et l'alerte le signale |
 | `S3_*` | § 4.4 ; sans elles, la créatrice ne peut pas envoyer de fichier (l'envoi répond « réessaie dans un moment ») |
-| `SENTRY_DSN`, `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
+| `SENTRY_DSN` | **obligatoire** : le DSN du projet Sentry de la région UE (`https://<clé>@<hôte>.de.sentry.io/<projet>`), créé par Charles ; sans lui l'API et le worker refusent de démarrer. Ce qui part et ce qui ne part jamais : `operations.md` § Observabilité |
+| `LINK_SERVICE_ORIGIN` | facultatif : l'origine du service de redirection lu par le connecteur de liens, `https://<domaine>` et rien après, saisie par Charles dans Coolify et jamais écrite dans le dépôt. Vide : le connecteur de liens est éteint, rien d'autre ne casse. Présente mais invalide (port, chemin, adresse IP, `localhost`, identifiants) : l'API et le worker refusent de démarrer (ADR 0120 § 3) |
+| `LANGFUSE_*`, `VAPID_*` | facultatifs, vides tant que le service n'existe pas |
 
 Les clés des services IA (xAI, Google, Mistral, ElevenLabs) ne sont **pas** des variables en production : elles se collent dans Réglages › Modèles IA › Services (ADR 0016). Les deux clés de chiffrement se gardent aussi hors du serveur (gestionnaire de mots de passe) : les perdre rend illisibles les sessions et les clés stockées.
 
 ### 1.4 Premier déploiement
 
-1. Coolify → Deploy. Ordre attendu dans les journaux : `migrate` « Migrations applied. » et sort avec 0, puis `api` et `worker`, puis `web`.
-2. Vérifier :
+1. Coolify → Deploy. Ordre attendu dans les journaux : `migrate` « Migrations applied. » et sort avec 0, puis `api` et `worker`, puis `web`. **Au premier déploiement, `api` et `worker` s'arrêtent** sur « Database not closed to other roles » : c'est attendu, la base n'est pas encore verrouillée.
+2. **Verrouiller la base** : dans le SQL Editor de Supabase (donc en `postgres`), coller et lancer `packages/db/supabase/lock-down.sql`, tel qu'il est sur `main`. Il retire à tout rôle autre que les nôtres ce qu'il avait sur nos schémas, et à PUBLIC l'usage de `public`. Le relancer ne change rien ; il se rejoue **après chaque mise à jour de Supabase** (version de Postgres, mise à niveau du projet). Puis Coolify → Restart. Le journal de `api` dit alors seulement « roles of the host that read every table (accepted, ADR 0152) : … », sans avertissement.
+3. Vérifier :
    - `https://app.<domaine>/` affiche l'écran de connexion ;
-   - Coolify → `api` → Terminal : `wget -qO- http://127.0.0.1:3000/ready` → `"status":"ready"` avec `database`, `migrations` et `worker` à `true`.
-3. Créer le compte propriétaire (pas d'inscription publique), Coolify → `api` → Terminal :
+   - Coolify → `api` → Terminal : `wget -qO- http://127.0.0.1:3000/ready` → `"status":"ready"` avec `database`, `migrations` et `worker` à `true` ;
+   - le budget de connexions (§ 1.1 étape 9) : la ligne « database connection budget of this process » de `api` et celle de `worker`, et dans Supabase → Database → Settings → Connection pooling, le nombre de connexions du pool reste sous sa taille ;
+   - `TRUST_PROXY_HOPS` : après la première connexion au dashboard (étape 5), dans le SQL Editor de Supabase, `select ip from audit_log order by created_at desc limit 1` donne l'adresse IP publique de Charles, et non celle d'un proxy (`10.x`, `172.x`, `192.168.x`). Sinon, corriger la valeur et redéployer avant d'inviter qui que ce soit ;
+   - le journal du proxy (§ 1.2 étape 6, dernière vérification).
+4. Créer le compte propriétaire (pas d'inscription publique), Coolify → `api` → Terminal :
 
    ```sh
    node dist/scripts/create-owner.js --email <e-mail> --name <nom>
    ```
 
-   Le mot de passe se tape deux fois, sans écho (12 caractères au moins).
-4. Se connecter au dashboard, créer la créatrice dans Créatrices (ou `node dist/scripts/create-creator.js --name <nom>`).
+   Le mot de passe se tape deux fois, sans écho (12 caractères au moins). L'e-mail, passé en argument, reste dans l'historique du terminal de Coolify : le vider ensuite (`history -c`), le script ne sachant pas encore le demander au clavier.
+5. Se connecter au dashboard, créer la créatrice dans Créatrices (ou `node dist/scripts/create-creator.js --name <nom>`).
+6. **Changer le mot de passe de `postgres`** une fois la mise en service finie (Database → Settings → Reset database password), et ne le garder que dans le gestionnaire de mots de passe. Retirer l'adresse du PC des restrictions réseau si elle y avait été ajoutée.
 
 ### 1.5 Persona réelle
 
@@ -123,9 +212,18 @@ node dist/scripts/persona-validate.js /data/persona/persona.yaml
 node dist/scripts/persona-load.js /data/persona/persona.yaml --activate
 ```
 
+### 1.6 Surveillance
+
+Hors du serveur, pour qu'une panne du VPS se voie (ADR 0152 § 7) :
+
+1. **Disponibilité** : un service de surveillance extérieur, gratuit au départ (UptimeRobot, ou un équivalent que Charles préfère), interroge toutes les 5 minutes `https://app.<domaine>/healthz` (le nginx de `web`, mot-clé `ok`) et prévient Charles par e-mail ou Telegram. Le compte du service a la double authentification ; il ne connaît que l'adresse publique. `/health` et `/ready` de l'API ne sont pas exposés par nginx : tant qu'ils ne le sont pas, une API arrêtée derrière un `web` vivant se voit dans Coolify (statut du service, redémarrages) et par les alertes de l'application, pas par ce service.
+2. **Disque** : Coolify → Notifications (e-mail ou Telegram), puis Servers → le serveur → seuil d'alerte du disque à 80 %. Les vidéos du worker demandent 30 Go libres (§ 4.4).
+3. **Connexions SSH refusées** : `sudo fail2ban-client status sshd` à chaque revue hebdomadaire ; un nombre d'adresses bloquées qui s'envole, ou une connexion réussie inconnue dans `last -a`, se traite comme un incident (`incident.md`).
+4. Charles met Coolify à jour lui-même (rappel mensuel), après avoir lu ses notes de version.
+
 ## 2. Mettre à jour
 
-Une PR fusionnée dans `main` déclenche le déploiement. Rien à faire à la main, sauf vérifier : Coolify → Deployments → dernier statut, puis `/ready`.
+Charles déclenche le déploiement après la fusion d'une PR dans `main` (Coolify → Deploy ; pas de webhook, § 1.2). Puis vérifier : Coolify → Deployments → dernier statut, et `/ready`.
 
 - Les migrations passent avant le nouveau code (`migrate`), en expand/contract (`operations.md`) : l'ancien code tourne encore sur le nouveau schéma pendant la bascule.
 - Un `migrate` en échec arrête le déploiement : l'ancienne version reste en ligne. Lire son journal, corriger par une nouvelle PR. Ne jamais modifier une migration déjà appliquée.
@@ -135,13 +233,13 @@ Une PR fusionnée dans `main` déclenche le déploiement. Rien à faire à la ma
 
 1. Coolify → Deployments → la version précédente → **Redeploy**. Le code revient ; le schéma reste (expand/contract : l'ancien code le supporte).
 2. `/ready`, puis une connexion au dashboard.
-3. Si une migration a abîmé des données (rare, et jamais sans un test qui l'aurait vu) : `restore.md` § A (retour à un instant T avec Neon).
+3. Si une migration a abîmé des données (rare, et jamais sans un test qui l'aurait vu) : `restore.md` § A (la sauvegarde du jour de Supabase) ou § B (notre export de la nuit).
 4. Noter l'incident (`docs/sessions/LOG.md`, section Incidents).
 
 ## 4. Sauvegardes
 
-- **PITR Neon** (§ 1.1) : retour à n'importe quel instant des 7 derniers jours ; procédure dans `restore.md` § A.
-- **Export quotidien chiffré hors Neon** (ADR 0028, service `backup`) : chaque nuit à 3 h, heure de Paris, un dump complet, relu avant envoi, chiffré pour une clé publique, envoyé chez Hetzner. Chaque export laisse une ligne dans `backup_runs`. Le propriétaire peut aussi demander un export tout de suite (Réglages › Sauvegardes, « Relancer la sauvegarde maintenant ») : l'API inscrit seulement la demande dans `backup_requests`, et le service `backup` la prend dans les 30 secondes pour lancer le même `export.sh` ; rien ne tourne dans l'API ni dans le worker. Restauration et essai trimestriel : `restore.md` § B et § C.
+- **Sauvegarde du jour de Supabase** : une par jour, gardée chez Supabase selon son plan ; `restore.md` § A. Le retour à n'importe quel instant (PITR) est une option payante, une décision d'argent de Charles (ADR 0152 § 2).
+- **Export quotidien chiffré hors Supabase**, la sauvegarde de référence (ADR 0028, service `backup`) : chaque nuit à 3 h, heure de Paris, un dump complet, relu avant envoi, chiffré pour une clé publique, envoyé chez Hetzner. Chaque export laisse une ligne dans `backup_runs`. Le propriétaire peut aussi demander un export tout de suite (Réglages › Sauvegardes, « Relancer la sauvegarde maintenant ») : l'API inscrit seulement la demande dans `backup_requests`, et le service `backup` la prend dans les 30 secondes pour lancer le même `export.sh` ; rien ne tourne dans l'API ni dans le worker. Restauration et essai trimestriel : `restore.md` § B et § C.
 - Les volumes du serveur ne contiennent rien d'irremplaçable : `training` (notes du playground) et la persona montée (dont l'original est hors serveur).
 
 ### 4.1 Mettre l'export en service
@@ -149,7 +247,7 @@ Une PR fusionnée dans `main` déclenche le déploiement. Rien à faire à la ma
 Une fois, avant toute donnée réelle qu'on ne pourrait pas recréer, et dans tous les cas avant la paie (EQ-17). Une session Remote Control peut faire les étapes 1 et 4 sur le PC ; Charles fait les étapes 2 et 3 dans les consoles.
 
 1. **La paire de clés `age`, sur le PC**, jamais sur le serveur : `age-keygen -o impera-backup.key`. La ligne `# public key: age1…` donne `BACKUP_AGE_RECIPIENT`. Le fichier `impera-backup.key` est la clé privée : deux copies, le gestionnaire de mots de passe et une copie papier, avec à côté `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` (sans elles, une restauration rend illisibles les sessions et les clés stockées). Chaque rotation de ces clés (`rotate-secrets.md`) met cette copie à jour.
-2. **Le bucket**, Hetzner → Object Storage, même région que le VPS : un bucket `impera-backups` avec le **versioning** et le **verrou d'objets** (Object Lock, mode gouvernance, 30 jours), une règle de cycle de vie qui supprime les objets de plus de 30 jours. Les factures sur dix ans ont **leurs propres buckets**, dans un autre projet (§ 4.3), jamais celui-ci.
+2. **Le bucket**, Hetzner → Object Storage, région dans l'Union européenne (le VPS n'est pas chez Hetzner, ADR 0152 § 4) : un bucket `impera-backups` avec le **versioning** et le **verrou d'objets** (Object Lock, mode gouvernance, 30 jours), une règle de cycle de vie qui supprime les objets de plus de 30 jours. Les factures sur dix ans ont **leurs propres buckets**, dans un autre projet (§ 4.3), jamais celui-ci.
 3. **Deux clés d'accès** : une pour le serveur, qui peut écrire et rien d'autre (ni lister, ni supprimer) ; une en lecture seule pour l'essai trimestriel, gardée avec la clé privée. Dans Coolify, avec la première : `BACKUP_S3_ENDPOINT` (`https://<région>.your-objectstorage.com`), `BACKUP_S3_REGION` (`fsn1`, `nbg1`…), `BACKUP_S3_BUCKET`, `BACKUP_S3_ACCESS_KEY_ID`, `BACKUP_S3_SECRET_ACCESS_KEY`, et `BACKUP_AGE_RECIPIENT`. `BACKUP_DATABASE_URL` reste vide : le service prend `DATABASE_ADMIN_URL`, dont le rôle a `BYPASSRLS` (§ 1.1), sans quoi `pg_dump` échoue sur les tables en `FORCE ROW LEVEL SECURITY`.
 4. **Premier export sans attendre la nuit** : Coolify → `backup` → Terminal, `/app/export.sh`. Il affiche `backup: backups/impera-<date>.tar.age (<taille> bytes, sha256 <empreinte>)` et la ligne de `backup_runs` passe à `succeeded`. Puis jouer tout de suite l'essai de `restore.md` § C.
 5. **Vérifier la copie des clés** (§ 4.2).
@@ -168,7 +266,7 @@ Coller les deux valeurs **de la copie gardée** quand la commande les demande (r
 
 Avant la première facture réelle (EQ-06 lot 4, ADR 0037). En production, l'API et le worker refusent de démarrer sans les dix réglages `INVOICES_*` : jamais un PDF gardé en mémoire. Charles ouvre le compte OVHcloud et crée le projet Hetzner (aucune commande à taper) ; la session de mise en service fait le reste, sans jamais coller une clé dans un chat.
 
-1. **Hetzner, un projet pour les factures seules** (`impera-factures`) : une clé S3 Hetzner vaut pour tous les buckets de son projet, donc la clé de l'application ne doit pas voir les sauvegardes, ni celle de `backup` les factures. Object Storage, même région que le VPS : un bucket avec le **versioning** et le **verrou d'objets** activés à la création (il ne s'active pas après), verrou par défaut en **mode conformité, 10 ans** (filet pour un objet arrivé sans date), et **aucune règle de cycle de vie**.
+1. **Hetzner, un projet pour les factures seules** (`impera-factures`) : une clé S3 Hetzner vaut pour tous les buckets de son projet, donc la clé de l'application ne doit pas voir les sauvegardes, ni celle de `backup` les factures. Object Storage, région dans l'Union européenne : un bucket avec le **versioning** et le **verrou d'objets** activés à la création (il ne s'active pas après), verrou par défaut en **mode conformité, 10 ans** (filet pour un objet arrivé sans date), et **aucune règle de cycle de vie**.
 2. **OVHcloud, la copie** : Object Storage S3 en France (Gravelines ou Paris), un bucket avec versioning et verrou d'objets, verrou par défaut en mode conformité, 10 ans, sans cycle de vie.
 3. **Une clé par hébergeur, pour l'application seule** (API et worker) : lire et écrire des objets, poser leur verrou et le prolonger, et lister le bucket. Lister est nécessaire : sans ce droit, un fournisseur répond « accès refusé » au lieu de « absent » pour une clé vide, et le job lit toujours avant d'écrire. Prolonger aussi : un PDF trouvé sous un verrou plus court que dix ans après son émission est prolongé avant d'être enregistré (le mode conformité refuse de toute façon de raccourcir un verrou). Jamais le droit de supprimer ni de contourner un verrou, là où le fournisseur permet de le retirer (OVHcloud) ; chez Hetzner, le projet séparé et le mode conformité en tiennent lieu.
 4. **Coolify**, sur `api` et `worker` (ils partagent leurs variables) : `INVOICES_S3_ENDPOINT` (`https://<région>.your-objectstorage.com`), `INVOICES_S3_REGION` (`fsn1`, `nbg1`…), `INVOICES_S3_BUCKET`, `INVOICES_S3_ACCESS_KEY_ID`, `INVOICES_S3_SECRET_ACCESS_KEY` ; puis `INVOICES_COPY_S3_ENDPOINT` (`https://s3.<région>.io.cloud.ovh.net`), `INVOICES_COPY_S3_REGION` (`gra`, `eu-west-par`…), `INVOICES_COPY_S3_BUCKET`, `INVOICES_COPY_S3_ACCESS_KEY_ID`, `INVOICES_COPY_S3_SECRET_ACCESS_KEY`. Les cinq d'un bucket ensemble, chaque adresse en `https`, et la copie chez un autre hôte que le premier bucket : sinon l'API refuse de démarrer en nommant le réglage.
@@ -200,7 +298,7 @@ Avant la première facture réelle (EQ-06 lot 4, ADR 0037). En production, l'API
 
 Avant le premier dépôt réel d'une créatrice (CR-06 b, ADR 0055 § 3). Son téléphone envoie chaque fichier **directement** au bucket, par morceaux de 8 Mio, chacun à une adresse que l'API signe pour une heure et pour sa taille exacte. Le fichier brut arrive sous `incoming/` ; le nettoyage (CR-06 b2) en retire les métadonnées, garde le fichier nettoyé, puis efface le brut. Charles crée le projet Hetzner (aucune commande à taper) ; la session de mise en service fait le reste, sans jamais coller une clé dans un chat.
 
-1. **Hetzner, un projet pour les médias** (`impera-medias`) : ni les sauvegardes ni les factures n'y vivent, la clé de l'application ne les voit donc pas. Object Storage, même région que le VPS, un bucket **privé**, sans versioning ni verrou (un fichier effacé doit l'être vraiment, CR-06 c).
+1. **Hetzner, un projet pour les médias** (`impera-medias`) : ni les sauvegardes ni les factures n'y vivent, la clé de l'application ne les voit donc pas. Object Storage, région dans l'Union européenne, un bucket **privé**, sans versioning ni verrou (un fichier effacé doit l'être vraiment, CR-06 c).
 2. **Deux règles de cycle de vie.** Sur le préfixe `incoming/`, l'expiration au bout d'**un jour** : tout brut disparaît en 24 h, même si le nettoyage n'a pas eu lieu. Sur **tout le bucket** (sans préfixe), l'abandon des envois par morceaux non terminés au bout d'un jour : ceux de son téléphone sous `incoming/`, et ceux du serveur sous `media/` quand il range un gros fichier nettoyé et s'arrête en chemin (relecture Bilan de #516 ; le serveur abandonne déjà lui-même un envoi qui échoue).
 
    ```json
@@ -233,7 +331,7 @@ node dist/scripts/ops-kill-switch.js --off --scope global --reason "<raison>"
 
 Les autres commandes d'exploitation des runbooks (`pnpm ops:revoke-sessions`, `pnpm ops:reset-second-factor`, `pnpm ops:reencrypt-sessions`, `pnpm ops:reencrypt-credentials`, `pnpm ops:check-keys`, `pnpm db:rebuild-projections`) ont leur équivalent dans l'image : `node dist/scripts/<nom>.js` (`ops-revoke-sessions`, `ops-reset-second-factor`, `ops-reencrypt-sessions`, `ops-reencrypt-credentials`, `ops-check-keys`, `rebuild-projections`), mêmes arguments.
 
-Si Neon ne répond plus, le limiteur de débit laisse passer les requêtes ordinaires (un `warn` « rate limit store unavailable » par requête dans les journaux de `api`), mais la connexion au dashboard répond 503 `service_unavailable` jusqu'au retour de la base (`security.md`). Ce n'est pas une panne de l'API : regarder `/ready` et Neon.
+Si Supabase ne répond plus, le limiteur de débit laisse passer les requêtes ordinaires (un `warn` « rate limit store unavailable » par requête dans les journaux de `api`), mais la connexion au dashboard répond 503 `service_unavailable` jusqu'au retour de la base (`security.md`). Ce n'est pas une panne de l'API : regarder `/ready` et la page d'état de Supabase.
 
 Arrêter tout le service, en dernier recours : Coolify → Stop. Les messages reçus pendant l'arrêt sont relus au redémarrage par la réconciliation.
 

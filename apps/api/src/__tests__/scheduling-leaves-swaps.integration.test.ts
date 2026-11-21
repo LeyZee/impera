@@ -520,6 +520,19 @@ describe('Équipe › Congés et échanges (/v1/scheduling, EQ-02, ADR 0031)', (
       const started = await propose(theoCookie, ShiftSchema.parse(underWay.json()), basile);
       expect([started.statusCode, codeOf(started)]).toEqual([409, 'shift_started_conflict']);
       expect((await propose(creator, theoA, basile)).statusCode).toBe(403);
+
+      // Suspended, Théo holds no shift any more: he offers none (recette 16/11, CHT-31); back at work, he does again.
+      const setTheo = (status: 'active' | 'suspended') =>
+        test.admin.db.update(schema.teamMembers).set({ status }).where(eq(schema.teamMembers.id, theo.id));
+      await setTheo('suspended');
+      try {
+        const away = await propose(theoCookie, theoA, nora);
+        expect([away.statusCode, codeOf(away)]).toEqual([403, 'role_forbidden']);
+      } finally {
+        await setTheo('active');
+      }
+      const back = await propose(theoCookie, theoA, basile);
+      expect([back.statusCode, codeOf(back)]).toEqual([409, 'shift_member_conflict']);
     });
 
     it('names the colleagues who could take a shift, by name and colour only, never one on leave', async () => {

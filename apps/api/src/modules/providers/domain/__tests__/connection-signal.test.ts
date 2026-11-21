@@ -19,6 +19,8 @@ const saved: StoredCredential = {
   state: 'connected',
   verifiedAt: new Date('2026-11-03T08:00:00Z'),
   charactersLeft: null,
+  quota: null,
+  probe: null,
   lastErrorKind: null,
   revision: 1,
 };

@@ -19,6 +19,8 @@ import {
   TOPICS,
 } from './model';
 
+import { Empty } from '@/shell/states';
+
 /** `add`: the four steps. `listen`: put a known bot in one more group (steps 3 and 4). `replace`: a new token. */
 export type SheetMode =
   { kind: 'add' } | { kind: 'listen'; bot: TelegramBot } | { kind: 'replace'; bot: TelegramBot };
@@ -145,7 +147,9 @@ function CreateStep({ onNext }: { onNext: () => void }): JSX.Element {
   const username = suggestedUsername(shownName);
   return (
     <>
-      <h2 id="tg-sheet-title">Crée ton bot</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        Crée ton bot
+      </h2>
       <p>Telegram ne laisse créer un bot que par @BotFather. Ça prend une minute.</p>
       <ol className="tg-ol">
         <li>
@@ -258,7 +262,9 @@ function TokenStep({
 
   return (
     <>
-      <h2 id="tg-sheet-title">{bot === null ? 'Colle le jeton' : `Nouveau jeton pour ${bot.displayName}`}</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        {bot === null ? 'Colle le jeton' : `Nouveau jeton pour ${bot.displayName}`}
+      </h2>
       <p>
         {bot === null
           ? 'Impera le vérifie auprès de Telegram, puis le garde chiffré. Personne ne pourra le relire, même toi.'
@@ -406,7 +412,9 @@ function ListenStep({
 
   return (
     <>
-      <h2 id="tg-sheet-title">Ajoute {bot.displayName} à ton groupe</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        Ajoute {bot.displayName} à ton groupe
+      </h2>
       <p>Choisis le groupe dans Telegram. Impera le verra arriver tout seul, rien à recopier.</p>
       {found.length === 0 ? (
         <div className="tg-listen" aria-live="polite">
@@ -416,12 +424,11 @@ function ListenStep({
               <path d="M3.5 19c.9-3 3-4.6 5.5-4.6s4.6 1.6 5.5 4.6M16 5.2a3 3 0 0 1 0 5.6M18 14.6c1.3.7 2.1 2.2 2.5 4.4" />
             </svg>
           </div>
-          <div className="tg-whisper">J’attends le groupe…</div>
-          <span className="tg-hint">
+          <Empty title="J’attends le groupe…">
             {isOffline
               ? 'Le serveur ne répond pas pour l’instant. La page réessaie toute seule.'
               : 'Garde cette fenêtre ouverte pendant que tu l’ajoutes.'}
-          </span>
+          </Empty>
         </div>
       ) : (
         <div className="tg-found-list" aria-live="polite">
@@ -536,7 +543,9 @@ function TopicsStep({
 
   return (
     <>
-      <h2 id="tg-sheet-title">Que doit recevoir « {chat.title} » ?</h2>
+      <h2 className="nv-h2" id="tg-sheet-title">
+        Que doit recevoir « {chat.title} » ?
+      </h2>
       <p>Pour toutes les créatrices. Tu affineras ensuite dans chaque onglet.</p>
       {chats.length > 1 ? (
         <div className="tg-scope" role="radiogroup" aria-label="Groupe">

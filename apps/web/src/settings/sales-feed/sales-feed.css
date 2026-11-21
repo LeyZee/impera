@@ -1,5 +1,5 @@
 /*
- * Réglages › Ventes (CRM-01). On top of the Services page's classes (`sv-`), which it shares for the key field, the
+ * Réglages › Plateformes (CRM-01). On top of the Services page's classes (`sv-`), which it shares for the key field, the
  * dots, the password prompt and the confirmations; only what is its own lives here, prefixed `sf-`. Content sits on
  * plates. Amber for something to do (a model to link, a webhook to register again); red only for reading stopped.
  */
@@ -11,7 +11,7 @@
 }
 
 .sf-key {
-  padding: 20px 22px;
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -100,8 +100,6 @@
 }
 .sf-hook__title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
 }
 .sf-hook__act {
   display: flex;
@@ -120,22 +118,20 @@
   animation: sv-rise var(--nv-dur-base) var(--nv-ease-out) both;
 }
 .sf-links__head {
-  padding: 0 22px 12px;
+  padding: 0 var(--nv-plate-pad) 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .sf-links__title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
 }
 .sf-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 260px);
   gap: 6px 14px;
   align-items: center;
-  padding: 12px 22px;
+  padding: 12px var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
 }
 .sf-row__name {
@@ -167,7 +163,7 @@
   animation: sv-rise var(--nv-dur-base) var(--nv-ease-out) both;
 }
 .sf-check__form {
-  padding: 0 22px;
+  padding: 0 var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -276,7 +272,7 @@
 
 .sf-report {
   margin-top: 16px;
-  padding: 18px 22px 0;
+  padding: 18px var(--nv-plate-pad) 0;
   border-top: 1px solid var(--nv-hairline);
   display: flex;
   flex-direction: column;
@@ -436,9 +432,6 @@
 
 /* A phone: the account under the model's name, full width. */
 @media (max-width: 560px) {
-  .sf-key {
-    padding: 18px 16px;
-  }
   .sf-links__head {
     padding: 0 16px 12px;
   }
@@ -474,7 +467,7 @@
   grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 260px) auto;
   gap: 8px 14px;
   align-items: center;
-  padding: 12px 22px;
+  padding: 12px var(--nv-plate-pad);
   border-top: 1px solid var(--nv-hairline);
 }
 .sf-imp--dismissed {
@@ -531,7 +524,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 16px;
-  padding: 16px 22px 12px;
+  padding: 16px var(--nv-plate-pad) 12px;
   border-top: 1px solid var(--nv-hairline);
 }
 .sf-import__count {
@@ -592,7 +585,7 @@
   align-items: center;
   gap: 8px;
   min-height: var(--nv-target-min);
-  padding: 8px 22px;
+  padding: 8px var(--nv-plate-pad);
   font-size: var(--nv-text-footnote);
   font-weight: 600;
   color: var(--nv-ink-muted);

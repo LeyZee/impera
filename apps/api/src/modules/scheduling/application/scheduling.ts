@@ -34,7 +34,14 @@ import type {
   StoredShift,
   StoredTemplate,
 } from '../domain/ports';
-import { accessWindow, assertPlanningRange, conflictsOf, myShiftsOf, plansCreator } from '../domain/shifts';
+import {
+  accessWindow,
+  assertPlanningRange,
+  conflictsOf,
+  myShiftsOf,
+  plansCreator,
+  unheldOf,
+} from '../domain/shifts';
 import { effectiveAtOf } from '../domain/slot-versions';
 import { addMinutes, calendarDayIn } from '../domain/time';
 
@@ -173,15 +180,11 @@ export function createSchedulingService(
         settings,
         accounts,
         members: read.members.filter((member) => named.has(member.id)).map(toPlanningMember),
-        // Who is not at work, for the agency alone (recette EQP-03): a member never reads a colleague's status.
-        away:
-          read.scope === 'self'
-            ? []
-            : read.members.flatMap((member) =>
-                named.has(member.id) && member.status !== 'active'
-                  ? [{ memberId: member.id, status: member.status }]
-                  : [],
-              ),
+        // Who holds none of his shifts, for the agency alone (recette EQP-03, EQU-01): a member is not at work, or a
+        // creator is no longer on his list. A member never reads a colleague's status or creators.
+        ...(read.scope === 'self'
+          ? { away: [], withoutAccess: [] }
+          : unheldOf(read.members, [...shifts, ...templates])),
         shifts: shifts.map(toShiftDto),
         conflicts:
           read.scope === 'self'

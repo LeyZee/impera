@@ -1,11 +1,14 @@
 import {
   CustomAlertGroupIdSchema,
+  SAFETY_EVENT_LABELS,
+  SAFETY_EVENTS,
   SYSTEM_ALERT_CODES,
   SYSTEM_ALERT_LABELS,
   type AlertTriggerItem,
   type CreatorId,
   type CustomAlertGroupId,
   type EventId,
+  type SafetyEvent,
   type SystemAlertCode,
 } from '@impera/contracts';
 
@@ -18,8 +21,11 @@ import { addDays, clockAt, dayMonth, dayOf } from '@/scheduling/time';
  * moment reads, and what the filters offer. The server writes each line (`reason`); this only orders and says it.
  */
 
-/** One alert to keep in the list: hers by its `groupId`, the system's by its code; absent, every alert. */
-export type AlertChoice = CustomAlertGroupId | SystemAlertCode;
+/**
+ * One alert to keep in the list: hers by its `groupId`, the system's by its code, one kind of the agent's safety
+ * (recette 16/11 AGE-05); absent, every alert.
+ */
+export type AlertChoice = CustomAlertGroupId | SystemAlertCode | SafetyEvent;
 
 /** What a creator's pages hold once read: her triggers newest first, and where the next page starts. */
 export interface CreatorTriggers {
@@ -29,11 +35,12 @@ export interface CreatorTriggers {
 }
 
 /**
- * Whether the server's line says more than the alert's name: the word that rang, or her own alert. A system alert
- * matched without a word only paraphrases its name (« Demande de service »), and its line is left out.
+ * Whether the server's line says more than the alert's name: the word that rang, her own alert, or what the agent's
+ * safety did and what it does now. A system alert matched without a word only paraphrases its name (« Demande de
+ * service »), and its line is left out.
  */
 export const reasonAddsSomething = (item: AlertTriggerItem): boolean =>
-  item.trigger.keyword !== undefined || item.trigger.alert.kind === 'custom';
+  item.trigger === null || item.trigger.keyword !== undefined || item.trigger.alert.kind === 'custom';
 
 /** The newest first, then by id: two triggers of the same millisecond keep one order from read to read. */
 const newestFirst = (a: AlertTriggerItem, b: AlertTriggerItem): number =>
@@ -99,8 +106,11 @@ export interface KnownAlert {
   readonly creatorId: string;
 }
 
+/** The heading of the agent's safety stops in the alert filter. */
+export const SAFETY_GROUP = 'Sécurité de l’agent';
+
 /**
- * The alerts the filter offers: the system's, then hers by name; an archived one stays while it has lines. With one
+ * The alerts the filter offers: the system's, the agent's safety, then hers by name; an archived one stays while it has lines. With one
  * creator chosen, only the alerts that watch her: another's would only answer « pas encore sonné ».
  */
 export function alertChoices(
@@ -108,15 +118,21 @@ export function alertChoices(
   creator: string | null = null,
   /** The alert chosen now: offered whatever the creator, so that the filter never shows another than it applies. */
   chosen: AlertChoice | null = null,
-): readonly { readonly value: AlertChoice; readonly label: string }[] {
+): readonly { readonly value: AlertChoice; readonly label: string; readonly group?: string }[] {
   const hers =
     creator === null ? known : known.filter((one) => one.creatorId === creator || one.groupId === chosen);
   const custom = [...new Map(hers.map((one) => [one.groupId, one.name])).entries()]
     .map(([value, label]) => ({ value, label }))
     .toSorted((a, b) => a.label.localeCompare(b.label, 'fr'));
+  // The agent's safety stops last, under their own heading: what the agent did, not an alert that rang.
   return [
     ...SYSTEM_ALERT_CODES.map((code) => ({ value: code, label: SYSTEM_ALERT_LABELS[code] })),
     ...custom,
+    ...SAFETY_EVENTS.map((event) => ({
+      value: event,
+      label: SAFETY_EVENT_LABELS[event],
+      group: SAFETY_GROUP,
+    })),
   ];
 }
 
@@ -124,6 +140,8 @@ export function alertChoices(
 export function choiceOf(value: string): AlertChoice | null {
   const system = SYSTEM_ALERT_CODES.find((code) => code === value);
   if (system !== undefined) return system;
+  const safety = SAFETY_EVENTS.find((event) => event === value);
+  if (safety !== undefined) return safety;
   const group = CustomAlertGroupIdSchema.safeParse(value);
   return group.success ? group.data : null;
 }

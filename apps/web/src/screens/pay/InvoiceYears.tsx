@@ -1,10 +1,12 @@
 import type { InvoiceList, InvoiceListItem } from '@impera/contracts';
 import type { InfiniteData, UseInfiniteQueryResult } from '@tanstack/react-query';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { Empty, Loading, Unreachable } from './parts';
 
-import { gapText, yearSlices } from '@/invoices/model';
+import { gapText, yearRange, yearSlices } from '@/invoices/model';
+import { InvoiceArt } from '@/shell/art/EmptyArt';
+import { Failure } from '@/shell/states';
 
 /**
  * One's documents read a year at a time (Commissions › Factures, a member in Paie › Factures): the documents, the
@@ -18,6 +20,8 @@ export function InvoiceYears({
   hint,
   first,
   older,
+  none,
+  since = null,
   row,
 }: {
   years: UseInfiniteQueryResult<InfiniteData<InvoiceList, number>>;
@@ -28,8 +32,18 @@ export function InvoiceYears({
   hint: string;
   /** Said when ten years hold no document. */
   first: string;
-  /** Said when a later year could not be read. */
+  /** Said when a later year could not be read: what is missing, and what to do. */
   older: string;
+  /**
+   * Said instead when the latest year, the only one read, holds no document: a sentence for the reader, not how
+   * « Plus anciennes » reads (CHA-18). Once he reads further, the years without a document are said by their days.
+   */
+  none?: { readonly whisper: string; readonly text: string; readonly action?: ReactNode };
+  /**
+   * The day the reader joined the team, when known: once the years read reach it, nothing lies before it, and
+   * « Plus anciennes » goes (recette visuelle 16/11, CHA-18).
+   */
+  since?: string | null;
   row: (item: InvoiceListItem) => JSX.Element;
 }): JSX.Element {
   if (years.isError && years.data === undefined)
@@ -45,17 +59,19 @@ export function InvoiceYears({
 
   const slices = yearSlices(today, years.data.pages, years.data.pageParams);
   const only = slices.length === 1 ? slices[0] : undefined;
+  const oldest = yearRange(today, years.data.pageParams.at(-1) ?? 0).from;
+  const further = years.hasNextPage && (since === null || oldest > since);
   let index = 0;
 
   return (
     <div className="rp-sec">
-      {only?.kind === 'gap' ? (
+      {only?.kind === 'gap' && none !== undefined && (years.data.pages.length === 1 || !further) ? (
+        <Empty whisper={none.whisper} text={none.text} action={none.action} art={<InvoiceArt />} />
+      ) : only?.kind === 'gap' ? (
         <Empty
           whisper={gapText(only.range)}
           text={
-            years.hasNextPage
-              ? `${hint} « Plus anciennes » remonte d’une année à la fois, jusqu’à dix ans.`
-              : first
+            further ? `${hint} « Plus anciennes » remonte d’une année à la fois, jusqu’à dix ans.` : first
           }
         />
       ) : (
@@ -75,7 +91,7 @@ export function InvoiceYears({
           )}
         </ul>
       )}
-      {years.hasNextPage ? (
+      {further ? (
         <button
           type="button"
           className="nv-btn nv-btn--plain nv-btn--sm iv-more"
@@ -89,9 +105,14 @@ export function InvoiceYears({
         </button>
       ) : null}
       {years.isError ? (
-        <p className="tm-warn" role="alert">
+        <Failure
+          inline
+          onRetry={() => {
+            void years.fetchNextPage();
+          }}
+        >
           {older}
-        </p>
+        </Failure>
       ) : null}
     </div>
   );

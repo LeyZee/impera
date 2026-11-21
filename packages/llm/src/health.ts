@@ -67,8 +67,13 @@ function roleHealth(
   now: Date,
 ): RoleHealth {
   const roleConfig = config.roles[role];
-  // A hedge's loser (OPS-15) was waited for by nobody: its cost counts in the day, not its latency nor its failure.
-  const records = today.filter((r) => r.role === role && r.hedge !== 'loser');
+  // A hedge's loser (OPS-15) was waited for by nobody: its cost counts in the day, not its latency nor its failure. An
+  // owner's « Essai réel » (ADR 0091 § 7) serves no fan, nor does a reply to an Instagram comment (ADR 0122): a failed
+  // one must not tell supervision the agent is down. Their cost stays counted.
+  const records = today.filter(
+    (r) =>
+      r.role === role && r.hedge !== 'loser' && r.purpose !== 'probe' && r.purpose !== 'instagram_comment',
+  );
   const lastHour = records.filter((r) => now.getTime() - r.at.getTime() <= HOUR_MS);
   const successes = records.filter((r) => r.outcome === 'ok');
   const failures = records.filter((r) => r.outcome !== 'ok');

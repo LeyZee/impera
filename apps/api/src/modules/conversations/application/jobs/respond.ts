@@ -8,25 +8,27 @@ import {
   queueNameFor,
   replyOpenAt,
   reopenJobKey,
-  type AgentHours,
   type AlertTrigger,
+  type ConversationId,
   type EventBody,
   type HandoffCause,
   type JobPayload,
 } from '@impera/contracts';
 
-import { safetySigns } from '../../../agent';
+import { declaredAdultAge, safetySigns } from '../../../agent';
 import type {
   Clock,
   ComposeInput,
   ComposeResult,
   Conversation,
   DraftComposer,
+  DraftScriptStep,
   DraftVoice,
   EventMeta,
   FanDirectory,
   HoldReason,
   JobLogger,
+  HerHours,
   ReplyHours,
   StoredScriptRun,
   Transaction,
@@ -94,26 +96,67 @@ const noteLine = (fact: {
 }): string => (fact.category === 'operator_note' ? `Note : ${fact.value}` : `${fact.key} : ${fact.value}`);
 
 /**
+ * An age on his card that confirms: noted by a human, or declared with the proof the direct path asks
+ * (`declaredAdultAge`): sure, and the number in his own message the brain cited, with no minor's age in it.
+ */
+function statedAge(
+  fact: {
+    readonly key: string;
+    readonly value: string;
+    readonly kind?: string;
+    readonly confidence?: number;
+    readonly sourceMessageId?: string | null;
+  },
+  history: readonly { readonly id: string; readonly author: string; readonly text: string }[],
+): boolean {
+  if (fact.kind === 'noted') return true;
+  if (
+    fact.kind !== 'declared' ||
+    fact.confidence === undefined ||
+    fact.sourceMessageId === undefined ||
+    fact.sourceMessageId === null
+  )
+    return false;
+  const source = history.find((message) => message.id === fact.sourceMessageId && message.author === 'fan');
+  if (source === undefined) return false;
+  const proof = { key: fact.key, value: fact.value, kind: fact.kind, confidence: fact.confidence };
+  return declaredAdultAge([proof], source.text) !== null;
+}
+
+/**
  * Her notes about the fan, split by who reads them (ADR 0085 § 9): when he has money, his attachment and his moods
  * go to the brain only (`brainNotes`), never to the voice; the rest to both.
  */
 export function fanNotesOf(
-  facts: readonly (Parameters<typeof isBrainOnlyFact>[0] & { readonly value: string })[],
+  facts: readonly (Parameters<typeof isBrainOnlyFact>[0] & {
+    readonly value: string;
+    readonly kind?: string;
+    readonly confidence?: number;
+    readonly sourceMessageId?: string | null;
+  })[],
+  /** The messages the engine reads: a declared age confirms only when the fan's own message that gave it is here. */
+  history: readonly { readonly id: string; readonly author: string; readonly text: string }[] = [],
 ): {
   readonly notes: string[];
   readonly brainNotes: string[];
   readonly cardAge?: number;
+  readonly cardAgeStated?: boolean;
 } {
   // His age on the card, in digits (the card refuses anything else): the youngest when several are active. A guessed
   // age counts as much as a confirmed one: under 18, the doubt goes against him (relecture Bilan, #784).
+  // Only one a human noted, or one he stated with the same proof as at the message (relecture Sécurité, #798), confirms
+  // an adult age (Charles, 16/11): never the brain's guess alone.
   const ages = facts.flatMap((fact) => {
     const digits = fact.key === 'age' ? /^\s*(\d{1,2})\s*(?:ans?)?\s*$/u.exec(fact.value)?.[1] : undefined;
-    return digits === undefined ? [] : [Number(digits)];
+    return digits === undefined ? [] : [{ years: Number(digits), stated: statedAge(fact, history) }];
   });
   return {
     notes: facts.filter((fact) => !isBrainOnlyFact(fact)).map(noteLine),
     brainNotes: facts.filter(isBrainOnlyFact).map(noteLine),
-    ...(ages.length > 0 && { cardAge: Math.min(...ages) }),
+    ...(ages.length > 0 && {
+      cardAge: Math.min(...ages.map((age) => age.years)),
+      cardAgeStated: ages.some((age) => age.stated),
+    }),
   };
 }
 
@@ -267,12 +310,9 @@ async function deferReply(
  * shift is not bound by her hours, but answers in Reveal (ADR 0025): a draft of the agent at 4:00 would serve nobody,
  * and her hours exist so that she does not answer at 4:00. `null` when she may answer now.
  */
-function closedUntil(
-  her: { readonly hours: AgentHours; readonly timeZone: string } | null,
-  now: Date,
-): Date | null {
-  if (her === null || replyOpenAt(her.hours, her.timeZone, now)) return null;
-  const opening = nextReplyOpening(her.hours, her.timeZone, now);
+function closedUntil(her: HerHours | null, now: Date): Date | null {
+  if (her === null || replyOpenAt(her.hours, her.timeZone, now, her.exceptions)) return null;
+  const opening = nextReplyOpening(her.hours, her.timeZone, now, her.exceptions);
   // Her hours always have an active slot (the contract); stored hours that had none never put a job off to now.
   return opening.getTime() > now.getTime() ? opening : null;
 }
@@ -307,8 +347,8 @@ async function recordScriptRuns(
   stored: StoredScriptRun | null,
   change: ScriptRunChange | undefined,
   meta: EventMeta,
-): Promise<Conversation> {
-  if (change === undefined) return conversation;
+): Promise<{ readonly conversation: Conversation; readonly step?: DraftScriptStep }> {
+  if (change === undefined) return { conversation };
   let current = conversation;
   const journal = async (id: StoredScriptRun['id'], events: readonly ScriptRunJournalEvent[]) => {
     for (const event of events) current = await appendEvent(tx, current, scriptEventOf(event, id), meta);
@@ -336,7 +376,27 @@ async function recordScriptRuns(
       meta,
     );
   }
-  return current;
+  // The step goes with the draft only once its run was written, like the offer.
+  return written && change.step !== undefined
+    ? { conversation: current, step: change.step }
+    : { conversation: current };
+}
+
+/**
+ * His runs before the latest that went cold, and her teases about the latest when it went cold too (Charles 20/11):
+ * read only when his latest run went cold, the one case she may tease him. `null`: nothing to read.
+ */
+async function scriptAbandonOf(
+  tx: Transaction,
+  conversationId: ConversationId,
+  latest: StoredScriptRun | null,
+): Promise<NonNullable<ComposeInput['scriptAbandon']> | null> {
+  if (latest?.run.status !== 'stalled') return null;
+  const stalled = await tx.scriptRuns.stalled(conversationId);
+  return {
+    earlier: stalled.filter((stored) => stored.id !== latest.id).map((stored) => stored.run),
+    teased: await tx.events.abandonTeases(conversationId, latest.id),
+  };
 }
 
 /**
@@ -366,12 +426,16 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         logger.info({ until: until.toISOString() }, 'respond: out of her hours, deferred');
         return null;
       }
+      const scriptRun = await tx.scriptRuns.latest(conversation.id);
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
         stats: await tx.messages.fanStats(conversation.fanId),
         sales: await tx.events.salesState(conversation.id),
-        scriptRun: await tx.scriptRuns.latest(conversation.id),
+        scriptRun,
+        scriptAbandon: await scriptAbandonOf(tx, conversation.id, scriptRun),
+        // His custom order kept by its module (ADR 0159 § A.2); undefined when no store is wired.
+        openCustomOrder: await tx.customOrders?.open(conversation.fanId),
         lastInbound: lastInboundKey(conversation),
       };
     });
@@ -389,9 +453,9 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       platformAccountId: read.conversation.platformAccountId,
       platformConversationId: read.conversation.platformConversationId,
       history: read.history,
-      fan: { ...read.stats, ...fanNotesOf(notes) },
+      fan: { ...read.stats, ...fanNotesOf(notes, read.history) },
       ...(waitedFor !== null && { waited: 1 }),
-      ...(hours !== null && { hours: hours.hours }),
+      ...(hours !== null && { hours: hours.hours, exceptions: hours.exceptions }),
       ...(read.conversation.desireScore !== null &&
         read.conversation.desireAt !== null && {
           desire: { score: read.conversation.desireScore, at: read.conversation.desireAt },
@@ -400,11 +464,14 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
         care: { since: read.conversation.careSince, helpGiven: read.conversation.careHelpAt !== null },
       }),
       ...(read.sales.customOrderOpen && { customOrderOpen: true }),
+      ...(read.openCustomOrder !== undefined && { openCustomOrder: read.openCustomOrder }),
       ...(read.sales.usedObjectionReplies.length > 0 && {
         usedObjectionReplies: read.sales.usedObjectionReplies,
       }),
       scriptRun: read.scriptRun?.run ?? null,
+      ...(read.scriptAbandon !== null && { scriptAbandon: read.scriptAbandon }),
       fanAvailability: read.conversation.fanAvailability,
+      saleTrouble: read.sales.saleTrouble,
     };
     const source = read.history.findLast((message) => message.author === 'fan') ?? null;
 
@@ -471,9 +538,46 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           meta,
         );
       }
+      // The turn on his custom order (ADR 0159 § A.2), kept once per message of his, whatever the answer becomes.
+      if (result.customOrderTurn !== undefined && source !== null && tx.customOrders !== undefined) {
+        await tx.customOrders.record({
+          fanId: conversation.fanId,
+          inboundMessageId: source.platformMessageId,
+          turn: result.customOrderTurn,
+          at: meta.at,
+        });
+      }
+      // No script left for him where one would open (ADR 0150 § 9): said once, until a script starts again for him.
+      if (result.scriptsExhausted === true && !(await tx.events.scriptsExhaustedSaid(conversation.id))) {
+        conversation = await appendEvent(
+          tx,
+          conversation,
+          { type: 'scripts_exhausted', payload: { conversationId: conversation.id } },
+          meta,
+        );
+      }
       // His script runs as his message and Reveal left them (ADR 0098); the step decided only with a draft.
-      conversation = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
+      const scripted = await recordScriptRuns(tx, conversation, read.scriptRun, result.scriptRun, meta);
+      conversation = scripted.conversation;
       if (result.kind === 'draft') {
+        // She answered a sale gone wrong: the same trouble again soon after goes to a human (ADR 0156 § 4 and § 7).
+        if (result.saleTrouble !== undefined) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'sale_trouble', payload: { conversationId: conversation.id, kind: result.saleTrouble } },
+            meta,
+          );
+        }
+        // She teased him about the run he left: counted, so that she never says it more than due (Charles 20/11).
+        if (result.abandonTeased === true && read.scriptRun !== null) {
+          conversation = await appendEvent(
+            tx,
+            conversation,
+            { type: 'script_abandon_teased', payload: { scriptRunId: read.scriptRun.id } },
+            meta,
+          );
+        }
         // The reply of her bank this draft was written with: never given to him again (ADR 0090 § B).
         if (result.objectionReply !== undefined) {
           conversation = await appendEvent(
@@ -501,6 +605,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
           ...(result.voice !== undefined && { voice: result.voice }),
           ...(result.personaVersionId !== undefined && { personaVersionId: result.personaVersionId }),
           facts: readProposedFacts(result.factsProposed ?? [], source, now),
+          ...(scripted.step !== undefined && { scriptStep: scripted.step }),
         });
         await appendEvent(
           tx,

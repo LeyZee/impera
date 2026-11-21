@@ -64,6 +64,8 @@ const teamMember = (memberId: string, name: string, status = 'active'): Record<s
 let team: { status: number; body: unknown };
 /** A period whose list the server does not answer. */
 let downPeriod: string | null;
+/** Reveal's team answers: the reader may open Équipe › Comptes Reveal (the owner, an active manager). */
+let revealOpen: boolean;
 
 const text = (element: Element | null | undefined): string =>
   (element?.textContent ?? '').replaceAll('\u00a0', ' ');
@@ -139,6 +141,8 @@ function serve(): void {
       switch (url.pathname) {
         case '/v1/scheduling/settings':
           return json(settingsOf());
+        case '/v1/settings/sales-feeds/reveal/team/counts':
+          return revealOpen ? json({ newCount: 0, removalCount: 0, abnormalRead: false }) : json(null, 403);
         case '/v1/team/members':
           return json(team.body, team.status);
         case '/v1/scheduling/shift-reports':
@@ -231,6 +235,7 @@ beforeEach(() => {
   writes.length = 0;
   team = { status: 200, body: { members: [teamMember(THEO, 'Théo'), teamMember(BASILE, 'Basile')] } };
   downPeriod = null;
+  revealOpen = false;
   open = [
     report(1, 0, { comment: 'Un pack a bien plu' }),
     report(2, 1, { incident: 'Le compte a été déconnecté une heure' }),
@@ -682,8 +687,23 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(late)).toContain('Délai passé sans explication : à toi de décider.');
     expect(late?.querySelector('input')?.disabled).toBe(false);
 
+    // A report with a gap is never swept by « Tout valider »: it is ticked by hand, once read.
+    expect(screen.queryByRole('button', { name: /^Tout valider/u })).toBeNull();
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));
     expect(screen.getByRole('button', { name: 'Valider (2)' })).toBeTruthy();
+  });
+
+  it('counts in « Tout valider » the reports without a gap only', async () => {
+    open = [
+      report(1, 0),
+      report(2, 1, {
+        check: gapOf(-3_000, 15_000, '2026-10-28T22:00:00.000Z'),
+        explanation: 'Un remboursement arrivé après le shift.',
+      }),
+      report(3, 2),
+    ];
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'Tout valider (2)' })).toBeTruthy();
   });
 
   it('says once when no sale of the platform is read yet: every report waits for a hand (recette EQP-05)', async () => {
@@ -717,12 +737,56 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(provisional)).toContain(
       'Reveal a lu 40,00 € pour l’instant : la comparaison se fait un quart d’heure après la fin du shift.',
     );
-    expect(text(unlinked)).toContain(
-      'Ce membre n’est relié à aucun chatteur de Reveal : relie-le dans Équipe › Reveal pour comparer ses rapports.',
-    );
+    // Said once above the list, not on his line (GES-25).
+    expect(text(unlinked)).not.toContain('relié');
+    expect(
+      screen.getByText('1 membre n’est pas relié à Reveal : ses rapports ne sont pas comparés.'),
+    ).toBeTruthy();
     // Nothing the comparison cannot say holds a validation back.
     fireEvent.click(screen.getByLabelText('Tout sélectionner'));
     expect(screen.getByRole('button', { name: 'Valider (3)' })).toBeTruthy();
+  });
+
+  it('says once who is not linked to Reveal, names the total declared, and offers « Tout valider » (GES-25)', async () => {
+    revealOpen = true;
+    const unlinked = { check: { state: 'unavailable', reason: 'chatter_unlinked' } };
+    open = [report(1, 0, unlinked), report(2, 1, unlinked), report(3, 2, unlinked), report(4, 3)];
+    answer = validatesAll;
+    renderPage();
+    const line = await screen.findByText(
+      '2 membres ne sont pas reliés à Reveal : leurs rapports ne sont pas comparés.',
+    );
+    expect(document.querySelectorAll('.rp-validate__unlinked')).toHaveLength(1);
+    const link = await within(line.parentElement ?? document.body).findByRole('link', { name: 'Relier' });
+    expect(link.getAttribute('href')).toBe('/equipe/reveal');
+    for (const row of document.querySelectorAll('.rp-review')) expect(text(row)).not.toContain('relié');
+    // 110 + 120 + 130 + 140 €, said for what it is.
+    expect(text(document.querySelector('.rp-validate__sum'))).toBe('500,00 € déclarés');
+
+    // The screen's action before anything is ticked: one neon, in the header.
+    const all = screen.getByRole('button', { name: 'Tout valider (4)' });
+    expect(all.classList.contains('nv-btn--neon')).toBe(true);
+    expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
+    // Once some are ticked, « Valider (N) » at the foot takes over: still one neon.
+    fireEvent.click(screen.getByLabelText('Tout sélectionner'));
+    expect(screen.queryByRole('button', { name: /^Tout valider/u })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Valider (4)' })).toBeTruthy();
+    expect(document.querySelectorAll('.nv-btn--neon')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Tout sélectionner/u }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tout valider (4)' }));
+    expect(await screen.findByText(/Validation de 4 rapports dans 5\ss/u)).toBeTruthy();
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(writes.map((one) => one.body)).toEqual([
+      { reports: [1, 2, 3, 4].map((n) => ({ id: id(300 + n), version: 1 })) },
+    ]);
+  });
+
+  it('says « Relier » only to who may open Équipe › Comptes Reveal (GES-25)', async () => {
+    open = [report(1, 0, { check: { state: 'unavailable', reason: 'chatter_unlinked' } })];
+    renderPage();
+    await screen.findByText('1 membre n’est pas relié à Reveal : ses rapports ne sont pas comparés.');
+    expect(screen.queryByRole('link', { name: 'Relier' })).toBeNull();
   });
 
   it('counts a member’s gaps on the period, and says a validation made by the check (§ 4, § 5)', async () => {

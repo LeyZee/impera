@@ -103,10 +103,18 @@ export interface CaptureVision {
   >;
 }
 
+/**
+ * Her ideas of a day, with the ids of those that cannot be read (a row the code would not have written): they are left
+ * out of the day rather than losing it all (recette PIL-19), and the caller logs them (docs/architecture/jsonb.md).
+ */
+interface IdeaDay extends ContentIdeaList {
+  readonly unreadable: readonly string[];
+}
+
 /** The ideas of « Idées du jour » (`content_ideas`), under the owner's or an active manager's account. */
 export interface IdeaStore {
   /** Her ideas proposed on her `day` (today in her zone when absent), the first proposed first, each with its signal. */
-  ofDay(creatorId: CreatorId, userId: UserId, day: string | undefined, now: Date): Promise<ContentIdeaList>;
+  ofDay(creatorId: CreatorId, userId: UserId, day: string | undefined, now: Date): Promise<IdeaDay>;
   /**
    * Validated, with its correction applied when it is still `proposed`; `check` reads the idea as it leaves and throws
    * to refuse it. Answers the idea as it stands: a validated or suggested idea comes back unchanged.

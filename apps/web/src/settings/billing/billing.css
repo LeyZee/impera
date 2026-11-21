@@ -41,6 +41,14 @@
 .bf-lines {
   white-space: pre-line;
 }
+/* The notice of a first filling, on one line with its button (GES-26); the button wraps under it on a phone. */
+.bf-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
 .bf-missing {
   color: var(--nv-warning);
   font-weight: 600;
@@ -49,10 +57,8 @@
 .bf-label {
   margin: 0;
   color: var(--nv-ink-faint);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: var(--nv-text-caption-tracking);
-  text-transform: uppercase;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
 }
 

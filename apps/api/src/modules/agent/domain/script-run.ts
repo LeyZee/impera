@@ -20,6 +20,8 @@ import type { DayPart } from './situation';
 
 /** A step of a platform script as the agent reads it: offered (no price), paid, or a bridge (offered). */
 interface PlatformScriptStepView {
+  /** The step as the platform names it: what is sent (ADR 0112, a branch has no stable index). */
+  readonly stepRef: string;
   readonly kind: ScriptStepKind;
   /** The platform's price in minor units, for a paid step only; `null` for an offered step or a bridge. */
   readonly priceMinor: number | null;
@@ -333,6 +335,7 @@ export function permittedScripts(
 export interface ScriptStepToSend {
   readonly scriptRef: string;
   readonly stepIndex: number;
+  readonly stepRef: string;
   readonly kind: ScriptStepKind;
   readonly priceMinor: number | null;
   /** One key per conversation, script and step: a replay never sends twice (ADR 0018 § 5). */
@@ -378,7 +381,15 @@ export interface NextScriptStepInput {
 }
 
 type NoScriptReason =
-  OfferBlock | 'held' | 'no_history' | 'no_script' | 'no_pick' | 'cold_session' | 'price_mismatch';
+  | OfferBlock
+  | 'held'
+  | 'no_history'
+  | 'no_script'
+  /** Her catalogue has scripts and none is left for him now (ADR 0150 § 9): the team adds one. */
+  | 'scripts_exhausted'
+  | 'no_pick'
+  | 'cold_session'
+  | 'price_mismatch';
 
 export type ScriptStepDecision =
   | { readonly kind: 'none'; readonly reason: NoScriptReason }
@@ -388,13 +399,21 @@ export type ScriptStepDecision =
   /** No script may start yet, or an open one pauses (ADR 0103 § 11-12): the first condition missing. */
   | { readonly kind: 'wait'; readonly reason: ScriptStartBlock }
   | { readonly kind: 'after_refusal'; readonly step: StepRecord }
-  | { readonly kind: 'end'; readonly status: Exclude<ScriptRunStatus, 'open' | 'refused'> };
+  | {
+      readonly kind: 'end';
+      readonly status: Exclude<ScriptRunStatus, 'open' | 'refused'>;
+      /** The paid step he left unopened when the run paused (ADR 0156 § 1): she reminds him of it once. */
+      readonly unopened?: StepRecord;
+    };
 
 const later = (a: Date | null, b: Date | null): Date | null => {
   if (a === null) return b;
   if (b === null) return a;
   return a.getTime() >= b.getTime() ? a : b;
 };
+
+/** A script is played once with a fan until the replay of ADR 0128: every key is of its first pass. */
+const FIRST_PASS = 1;
 
 function toSend(
   conversationRef: string,
@@ -406,9 +425,11 @@ function toSend(
   return {
     scriptRef: script.scriptRef,
     stepIndex,
+    stepRef: step.stepRef,
     kind: step.kind,
     priceMinor: step.priceMinor,
-    idempotencyKey: `script-step:${conversationRef}:${script.scriptRef}:${String(stepIndex)}`,
+    // The script's first pass with him (ADR 0128 brings the replay): a pass and a rank name one send.
+    idempotencyKey: `script-step:${conversationRef}:${script.scriptRef}:${String(FIRST_PASS)}:${String(stepIndex)}`,
   };
 }
 
@@ -426,6 +447,9 @@ export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
   if (status === 'open') return nextInOpenRun(input, run, script);
   if (run.endedAt?.getTime() === input.now.getTime()) {
     const last = current(run);
+    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message.
+    if (status === 'stalled' && last?.kind === 'paid' && last.outcome === 'sent')
+      return { kind: 'end', status, unopened: last };
     if (status !== 'refused') return { kind: 'end', status };
     if (last !== undefined) return { kind: 'after_refusal', step: last };
   }
@@ -472,7 +496,10 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
   }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
   const permitted = permittedScripts(input.catalogue, { moment: input.moment, history });
-  if (permitted.length === 0) return { kind: 'none', reason: 'no_script' };
+  if (permitted.length === 0) {
+    // Only where a script would open now (gate open, desire at the threshold, no pause): ADR 0150 § 9.
+    return { kind: 'none', reason: input.catalogue.length === 0 ? 'no_script' : 'scripts_exhausted' };
+  }
   // The brain picks the one that fits him; the code checks it is one of them, or nothing opens (fail closed).
   const script = permitted.find((candidate) => candidate.scriptRef === input.brainPick);
   if (script === undefined) return { kind: 'none', reason: 'no_pick' };

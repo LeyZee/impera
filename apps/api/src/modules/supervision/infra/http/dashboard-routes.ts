@@ -1,6 +1,10 @@
 import {
   AgencyInsightsQuerySchema,
+  agencySpanQueryOf,
   AgencyInsightsSchema,
+  AgencyObjectiveBodySchema,
+  AgencyObjectiveParamsSchema,
+  AgencyObjectiveSchema,
   CreatorIdSchema,
   CreatorSetupListSchema,
   CreatorsOverviewSchema,
@@ -18,7 +22,7 @@ import { startOfLocalDay } from '@impera/llm';
 import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
-import { agencyInsights, agencyRange, type AgencyCreatorRead } from '../../domain/agency-insights';
+import { readAgencyInsights } from '../../application/agency-reads';
 import { creatorOverview, fortnightDays } from '../../domain/creators-overview';
 import {
   assembleDashboard,
@@ -43,6 +47,7 @@ import type {
 } from '../../domain/dashboard-ports';
 import { revealSalesPanel, salesDays } from '../../domain/reveal-sales';
 import { creatorSetup, memberSetup, memberSetupSeenBy } from '../../domain/setup';
+import type { ObjectivesStore } from '../db/objectives-store';
 import type { AgencyInsightsReader } from '../views/agency-insights-reader';
 import type { SetupReader } from '../views/setup-reader';
 
@@ -78,6 +83,8 @@ export interface DashboardRouteDeps {
   readonly agency: AgencyInsightsReader;
   /** The zone the agency's days are counted in: the platforms' (Reveal's, Europe/Paris). */
   readonly agencyTimeZone: string;
+  /** The owner's monthly revenue objectives (ADR 0092 § 6). */
+  readonly objectives: ObjectivesStore;
   /** « Mise en route » of the creators and the members (pilotage plan W1), the owner's alone. */
   readonly setup: SetupReader;
   readonly now?: () => Date;
@@ -159,44 +166,70 @@ export function createDashboardRoutes(deps: DashboardRouteDeps): FastifyPluginAs
         schema: { querystring: AgencyInsightsQuerySchema, response: { 200: AgencyInsightsSchema } },
       },
       async (request) => {
-        const { period, creatorId } = request.query;
+        const { creatorId } = request.query;
         const { user } = request;
         if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
-        const userId = UserIdSchema.parse(user.id);
-        const every = await deps.allCreatorIds();
-        let asked: readonly CreatorId[];
-        if (creatorId !== undefined) {
-          if (user.role !== 'owner' && !user.creatorIds.includes(creatorId)) {
-            throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
-          }
-          asked = [creatorId];
-        } else {
-          // The agency's order (Créatrices), restricted to the account's own list for anyone but the owner.
-          asked = user.role === 'owner' ? every : every.filter((id) => user.creatorIds.includes(id));
+        const answer = await readAgencyInsights(
+          deps,
+          {
+            userId: UserIdSchema.parse(user.id),
+            role: user.role,
+            creatorIds: user.creatorIds.map((id) => CreatorIdSchema.parse(id)),
+          },
+          agencySpanQueryOf(request.query),
+          creatorId,
+        );
+        if (answer.kind === 'comparison_not_before') {
+          throw new DomainError('comparison_invalid', 'La comparaison doit finir avant la période lue');
         }
-        const now = (deps.now ?? (() => new Date()))();
-        const range = agencyRange(period, now, deps.agencyTimeZone);
-        // One tenant transaction per creator (RLS), one after the other: a read holds one connection of the pool.
-        const reads: AgencyCreatorRead[] = [];
-        let outOfScope = 0;
-        for (const id of asked) {
-          const answer = await deps.agency.read(id, userId, range);
-          if (answer.kind === 'out_of_scope') outOfScope += 1;
-          if (answer.kind === 'read') reads.push(answer.read);
+        if (answer.kind === 'creator_out_of_scope') {
+          throw new DomainError('creator_forbidden', 'Créatrice hors de ton périmètre');
         }
-        // Nothing read with the team's scope: these figures are not his (ADR 0043 § 7).
-        if (user.role !== 'owner' && (asked.length === 0 || outOfScope === asked.length)) {
+        if (answer.kind === 'team_out_of_scope') {
           throw new DomainError(
             'creator_forbidden',
             'Les chiffres de l’agence ne sont pas dans ton périmètre',
           );
         }
-        const [first] = reads;
-        const [names, rate] = await Promise.all([
-          first === undefined ? new Map<string, string>() : deps.agency.memberNames(first.creatorId, userId),
-          deps.usdRate.latest(userId),
-        ]);
-        return agencyInsights({ period, range, creators: reads, names, rate, timeZone: deps.agencyTimeZone });
+        return answer.insights;
+      },
+    );
+
+    // The month's revenue objective of a creator (ADR 0092 § 6): the owner's alone to set or take away, read with the
+    // agency's figures. Internal: never her account's, never a manager's to write.
+    app.put(
+      '/dashboard/agency/objectives/:creatorId/:month',
+      {
+        preValidation: deps.requireRole('owner'),
+        schema: {
+          params: AgencyObjectiveParamsSchema,
+          body: AgencyObjectiveBodySchema,
+          response: { 200: AgencyObjectiveSchema },
+        },
+      },
+      async (request) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const objective = { ...request.params, amountMinor: request.body.amountMinor };
+        const written = await deps.objectives.set(objective, UserIdSchema.parse(user.id));
+        if (written.kind === 'not_owner') {
+          throw new DomainError('role_forbidden', 'Réservé au propriétaire');
+        }
+        return objective;
+      },
+    );
+    app.delete(
+      '/dashboard/agency/objectives/:creatorId/:month',
+      { preValidation: deps.requireRole('owner'), schema: { params: AgencyObjectiveParamsSchema } },
+      async (request, reply) => {
+        const { user } = request;
+        if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
+        const { creatorId, month } = request.params;
+        const removed = await deps.objectives.remove(creatorId, month, UserIdSchema.parse(user.id));
+        if (removed.kind === 'not_owner') {
+          throw new DomainError('role_forbidden', 'Réservé au propriétaire');
+        }
+        return reply.code(204).send();
       },
     );
 

@@ -1,28 +1,27 @@
 # Restauration de la base
 
-Deux mécanismes : **PITR Neon** (retour à un instant T, rapide) et **export chiffré quotidien** hors Neon (si Neon est indisponible ou le compte compromis).
+Deux mécanismes (ADR 0152 § 2) : la **sauvegarde du jour de Supabase** (retour au jour précédent, sans rien télécharger) et notre **export chiffré quotidien** hors Supabase, la sauvegarde de référence (si Supabase est indisponible, le compte compromis, ou si l'instant voulu n'est pas dans ses sauvegardes). Le retour à n'importe quel instant (PITR) n'existe chez Supabase qu'en option payante, que Charles n'a pas prise.
 
-## A. Retour à un instant T (erreur humaine, migration ratée)
+## A. Retour à la sauvegarde du jour (erreur humaine, migration ratée)
 
-1. Kill switch global.
-2. Neon → projet → Restore → choisir l'instant (avant l'erreur). Neon crée une branche restaurée.
-3. Vérifier sur la branche (`psql`) : les données attendues sont là.
-4. Deux options : promouvoir la branche en principale (Neon), ou copier les tables touchées de la branche vers la principale (si l'erreur est localisée).
-5. Mettre à jour `DATABASE_URL` si la branche a changé, redémarrer, `/ready`.
-6. **Réconcilier** : `connector.reconcile` immédiat pour ré-ingérer les messages reçus entre T et maintenant ; vérifier qu'aucun draft `approved`/`sending` d'avant T ne sera renvoyé (les marquer `expired`).
-7. Rallumer par paliers (`incident.md` §4).
+1. Kill switch global, puis Coolify → Stop sur `api`, `worker` et `backup` : la restauration remplace toute la base.
+2. Supabase → Database → Backups → la sauvegarde d'avant l'erreur → Restore. Le projet est indisponible pendant la restauration ; ce qui a été écrit depuis cette sauvegarde est perdu. Si l'erreur est localisée et récente, préférer § B sur une base jetable, puis recopier les seules tables touchées.
+3. Rejouer `packages/db/supabase/lock-down.sql` (`deploy.md` § 1.4, étape 2) : une restauration remet les droits de l'instant sauvegardé.
+4. Coolify → Start, `/ready`.
+5. **Réconcilier** : `connector.reconcile` immédiat pour ré-ingérer les messages reçus entre T et maintenant ; vérifier qu'aucun draft `approved`/`sending` d'avant T ne sera renvoyé (les marquer `expired`).
+6. Rallumer par paliers (`incident.md` §4).
 
-## B. Depuis l'export (perte de Neon)
+## B. Depuis l'export (perte de Supabase ou du projet)
 
 L'export (ADR 0028, service `backup`) est un tar chiffré par `age` : le dump `pg_dump --format=custom` (schéma et données de tous les schémas, sans les données de `session`, `verification` et `rate_limit_counters`) et un `manifest.json` (comptes de lignes au moment du dump, version de `pg_dump`). Il se restaure dans une base **vide**, sans rejouer les migrations.
 
 1. Kill switch global si l'ancienne base répond encore.
-2. Créer une base vierge (nouveau projet Neon, § 1.1 de `deploy.md` : rôle `nirvana_app` créé d'abord, rôle admin avec `BYPASSRLS`).
+2. Créer une base vierge : un nouveau projet Supabase, `deploy.md` § 1.1 étapes 3 à 6 (services coupés, réseau, les trois rôles et `btree_gist`), dans une organisation sans aucun connecteur. À vérifier au premier essai sur Supabase : `pg_restore` dans un projet neuf, qui contient déjà les schémas de Supabase, ne doit toucher qu'aux nôtres. Puis, après la restauration, `lock-down.sql` (`deploy.md` § 1.4, étape 2).
 3. Sur le PC où se trouve la clé privée, récupérer le dernier export du bucket (clé d'accès en lecture seule), puis :
    `sh ops/db-export/restore-check.sh impera-<date>.tar.age impera-backup.key "<DATABASE_ADMIN_URL de la nouvelle base>"`.
    Le script déchiffre, restaure (`pg_restore --no-owner --single-transaction`), **vide la file `graphile_worker`** (aucun job d'avant le sinistre ne repart) et compare les comptes de lignes au manifeste.
 4. Le script a créé `nirvana_app` et `impera_service` sans connexion : leur donner un mot de passe neuf, dans l'éditeur SQL (`ALTER ROLE nirvana_app LOGIN PASSWORD '<mot de passe>';` puis `ALTER ROLE impera_service LOGIN PASSWORD '<un autre>' BYPASSRLS;`, et le `GRANT CONNECT` de `deploy.md` § 1.1), puis mettre `DATABASE_URL`, `DATABASE_SERVICE_URL` et `DATABASE_ADMIN_URL` à jour dans Coolify, avec les **mêmes** `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` qu'avant (copie gardée avec la clé privée), redéployer, `/ready`.
-5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.6 et A.7.
+5. Tout le monde se reconnecte (les sessions ne sont pas dans l'export). Étapes A.5 et A.6.
 
 ## C. Essai trimestriel (ADR 0028 § 6)
 

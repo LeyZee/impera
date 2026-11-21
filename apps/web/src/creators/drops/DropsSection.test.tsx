@@ -49,13 +49,12 @@ function serve(routes: Record<string, (body: unknown) => Reply>): { method: stri
 }
 
 const CONTENT = `GET /creators/${CREATOR}/content`;
-const SWITCH = `/creators/${CREATOR}/drop-descriptions`;
 const CONFIRM = `POST /creators/${CREATOR}/drops/${SEANCE.id}/export/confirm`;
 
-function show(isOwner = false): void {
+function show(): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <DropsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" isOwner={isOwner} />
+      <DropsSection creatorId={CREATOR} creatorName="Lina" timezone="Europe/Paris" />
     </QueryClientProvider>,
   );
 }
@@ -129,41 +128,17 @@ describe('Créatrices › Contenu (recette créatrice 1 et 6)', () => {
     expect(within(region).getAllByText(/Photo inventée/u)).toHaveLength(3);
   });
 
-  it('gives the owner alone her switch; turned on, it says so (recette créatrice 6)', async () => {
-    let on = false;
-    const calls = serve({
-      [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE] } }),
-      [`GET ${SWITCH}`]: () => ({ status: 200, body: { on } }),
-      [`PUT ${SWITCH}`]: () => {
-        on = true;
-        return { status: 200, body: { on } };
-      },
-    });
-    show(true);
-    const toggle = await screen.findByRole('switch', { name: 'Descriptions par l’IA' });
-    if (!(toggle instanceof HTMLInputElement)) throw new Error('the switch is an input');
-    await waitFor(() => {
-      expect(toggle.disabled).toBe(false);
-    });
-    expect(toggle.checked).toBe(false);
-    expect(screen.getByText(/Éteint : ses médias ne sont pas décrits/u)).toBeDefined();
-    fireEvent.click(toggle);
-    await waitFor(() => {
-      expect(toggle.checked).toBe(true);
-    });
-    expect(screen.getByText(/Chaque photo et vidéo de Lina est décrite/u)).toBeDefined();
-    expect(calls.filter((call) => call.method === 'PUT')).toHaveLength(1);
-    cleanup();
-    const asManager = serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE] } }) });
-    show(false);
+  it('holds no switch of the descriptions, for the owner nor a manager (ADR 0145 § 5, 17/11)', async () => {
+    serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SEANCE] } }) });
+    show();
     await screen.findByRole('listitem', { name: 'Feed · Séance boudoir' });
     expect(screen.queryByRole('switch')).toBeNull();
-    expect(asManager.some((call) => call.path === SWITCH)).toBe(false);
   });
 
   it('says when she has dropped nothing but scripts', async () => {
     serve({ [CONTENT]: () => ({ status: 200, body: { requests: [], drops: [SCRIPT] } }) });
     show();
     expect(await screen.findByText('Aucun dépôt')).toBeDefined();
+    expect(document.querySelector('.nv-empty__art svg')).not.toBeNull();
   });
 });

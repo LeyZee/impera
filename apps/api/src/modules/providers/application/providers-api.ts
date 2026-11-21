@@ -21,4 +21,6 @@ export interface ProvidersApi {
   reportRefusedKey(provider: AiProvider, kind: ProviderErrorKind): Promise<void>;
   updateSettings(provider: AiProvider, settings: ProviderSettings): Promise<ProviderStatus>;
   disconnect(provider: AiProvider, by?: KeyActor): Promise<ProviderStatus>;
+  /** « Essai réel » (ADR 0091 § 7): one tiny real call, on the owner's click only. */
+  probe(provider: AiProvider): Promise<ProviderStatus>;
 }

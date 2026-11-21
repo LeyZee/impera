@@ -70,6 +70,7 @@ import { distinctNames } from '@/settings/names';
 import { fetchOverview, TelegramOff } from '@/settings/telegram/api';
 import { TOPICS } from '@/settings/telegram/model';
 import { searchOfTab, TAB_OF_TOPIC } from '@/settings/telegram/search';
+import { Failure } from '@/shell/states';
 
 /**
  * Réglages › Alertes (P4-01), the owner's alone: the alerts she writes herself (a phrase the brain reads, words the
@@ -85,28 +86,22 @@ export function AlertsSection(): JSX.Element {
   if (alerts.data === undefined || creators.data === undefined) {
     if (alerts.isError || creators.isError) {
       const kind = alertsErrorKind(alerts.error);
+      if (kind === 'unavailable')
+        return (
+          <section className="ps-page al-page">
+            <Failure
+              onRetry={() => {
+                void alerts.refetch();
+                void creators.refetch();
+              }}
+            />
+          </section>
+        );
       return (
         <section className="ps-page al-page">
           <div className="nv-plate ps-head nv-enter">
-            {/* One wording for a silent server across Réglages: what it is, then what could not be read (REG-21). */}
-            <p className="ps-title">
-              {kind === 'unavailable' ? 'Le serveur ne répond pas' : 'Les alertes ne se chargent pas'}
-            </p>
-            <p className="ps-muted">
-              {kind === 'unavailable' ? 'Les alertes n’ont pas pu être lues.' : ALERTS_ERRORS[kind]}
-            </p>
-            {kind === 'unavailable' ? (
-              <button
-                type="button"
-                className="nv-btn nv-btn--soft ps-self-start"
-                onClick={() => {
-                  void alerts.refetch();
-                  void creators.refetch();
-                }}
-              >
-                Réessayer
-              </button>
-            ) : null}
+            <p className="ps-title">Les alertes ne se chargent pas</p>
+            <p className="ps-muted">{ALERTS_ERRORS[kind]}</p>
           </div>
         </section>
       );
@@ -128,7 +123,7 @@ export function AlertsSection(): JSX.Element {
       <header className="nv-plate ps-head nv-enter">
         <div className="al-head">
           <div className="al-head__text">
-            <h2 className="ps-title">Alertes</h2>
+            {/* The page's title says « Alertes » already (recette visuelle 16/11, GES-03): no second one here. */}
             <p className="ps-lead">
               Une alerte surveille ce que les fans écrivent. Quand elle sonne, l’équipe est prévenue ; si tu
               le choisis, l’agent se met en pause sur ce fan et passe la main.
@@ -176,7 +171,7 @@ export function AlertsSection(): JSX.Element {
       ) : null}
 
       <section className="al-group" aria-labelledby="al-own-title">
-        <h3 id="al-own-title" className="al-eyebrow">
+        <h3 id="al-own-title" className="nv-eyebrow al-eyebrow">
           Tes alertes
         </h3>
         {custom.length === 0 && editing !== 'new' ? (
@@ -223,7 +218,7 @@ export function AlertsSection(): JSX.Element {
       </section>
 
       <section className="al-group" aria-labelledby="al-system-title">
-        <h3 id="al-system-title" className="al-eyebrow">
+        <h3 id="al-system-title" className="nv-eyebrow al-eyebrow">
           Alertes du système
         </h3>
         <p className="ps-muted al-group__lede">
@@ -244,7 +239,7 @@ export function AlertsSection(): JSX.Element {
   );
 }
 
-/** The routing of Réglages › Telegram, as far as this page needs it: who has no group for which topic. */
+/** The routing of Réglages › Bots Telegram, as far as this page needs it: who has no group for which topic. */
 function useTelegramRouting(): { data: TelegramRouting | undefined } {
   return useQuery({
     queryKey: ['telegram', 'routing'],
@@ -280,7 +275,7 @@ function TelegramNote({ line }: { line: TelegramLine | null }): JSX.Element | nu
   );
 }
 
-/** Opens Réglages › Telegram on the tab that routes this topic. */
+/** Opens Réglages › Bots Telegram on the tab that routes this topic. */
 function ChooseGroup({ topic }: { topic: TelegramTopic }): JSX.Element {
   return (
     <Link to="/reglages/telegram" search={searchOfTab(TAB_OF_TOPIC[topic])} className="al-link">
@@ -566,7 +561,7 @@ function AlertEditor({
       }}
     >
       <FormContext.Provider value={formState}>
-        <p className="al-eyebrow">{saved === null ? 'Nouvelle alerte' : 'Modifier l’alerte'}</p>
+        <p className="nv-eyebrow al-eyebrow">{saved === null ? 'Nouvelle alerte' : 'Modifier l’alerte'}</p>
         <Field label="Nom" id={`${id}-name`} path="name" hint="Ce que l’équipe lira quand elle sonne.">
           <TextInput
             id={`${id}-name`}

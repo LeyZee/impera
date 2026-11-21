@@ -17,6 +17,7 @@ import { ReportPanel } from '@/reports/ReportPanel';
 import { MEMBER_STATUS, reportOf, toneOf, WITHOUT_PAY_EFFECT, withoutPayEffect } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import '@/reports/reports.css';
+import { MyProgressCard } from '@/rewards/MyProgressCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { ShiftChallengeCard } from '@/rewards/ShiftChallengeCard';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
@@ -37,8 +38,8 @@ import { useNow } from '@/scheduling/useNow';
 import { MyFortnightCard } from '@/screens/pay/MyFigures';
 import { useMembers } from '@/screens/team/api';
 import { todosAcrossQuery } from '@/screens/tracking/api';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
@@ -66,12 +67,11 @@ export function TodayPage({ user }: { user: Me }): JSX.Element {
   });
 
   return (
-    <Page>
+    <Page width="narrow">
       {/* The title and the day say it all: no sentence under them (D-03). */}
       <PageHeader eyebrow={longDay(today)} title="Aujourd’hui" />
       {mine.isError ? (
-        <ServerSilent
-          text="Tes shifts n’ont pas pu être lus. Rien ici n’est à jour en attendant."
+        <Failure
           onRetry={() => {
             void mine.refetch();
           }}
@@ -163,20 +163,16 @@ function Day({
         <MyAwayCard status={away} />
       )}
       {/* The shift's challenge, right under the shift it is for (ADR 0104 § 14); nothing without one. */}
-      {away === null ? <ShiftChallengeCard user={user} /> : null}
+      {away === null ? <ShiftChallengeCard user={user} zone={zone} /> : null}
       <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       {/* His own figures, one compact card under the shift (CHF-01, ADR 0104 § 2). */}
       {away === null ? <MyFortnightCard manager={user.team?.role === 'manager'} /> : null}
+      {/* Where he stands in the game, and the way to Moi › Trophées (ADR 0134, lot 1). */}
+      <MyProgressCard user={user} />
       {/* What he earned since his last visit greets him here, never over a conversation (ADR 0104 § 12). */}
       <RewardRevealGate user={user} />
       <MyReportsCard reports={reports} heroShiftId={heroShift?.id ?? null} zone={zone} onOpen={onReport} />
       {next === null ? null : <NextCard shift={next} now={now} zone={zone} today={today} />}
-      <Link to="/planning" className="sc-more">
-        Tout mon planning
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="m6 3.5 4.5 4.5-4.5 4.5" />
-        </svg>
-      </Link>
     </div>
   );
 }
@@ -217,7 +213,7 @@ function Hero({
     return (
       <Panel className="sc-hero sc-hero--none nv-enter">
         <p className="sc-hero__kicker">Aucun shift prévu</p>
-        <h2 className="sc-hero__title">Rien pour l’instant</h2>
+        <h2 className="nv-h2 sc-hero__title">Rien pour l’instant</h2>
         <p className="sc-hero__note">
           Ton responsable te place sur le planning : ton prochain shift s’affichera ici.
         </p>
@@ -233,7 +229,7 @@ function Hero({
   const urgent = urgencies(queue.data?.items ?? []);
   const toStart = new Date(shift.startsAt).getTime() - now.getTime();
   return (
-    <Panel className={`sc-hero sc-hero--${state.kind} nv-enter`}>
+    <Panel className={`sc-hero sc-hero--${state.kind}${state.kind === 'later' ? ' sc-linked' : ''} nv-enter`}>
       <div className="sc-hero__top">
         <span className={`nv-status sc-state sc-state--${state.kind}`}>
           <span
@@ -258,7 +254,7 @@ function Hero({
         </span>
       </div>
       <div className="sc-hero__who">
-        <h2 className="sc-hero__title">{shift.creatorName}</h2>
+        <h2 className="nv-h2 sc-hero__title">{shift.creatorName}</h2>
         <p className="sc-hero__where">{accountLine(shift)}</p>
       </div>
       <p className="sc-hero__hours nv-num">
@@ -280,7 +276,12 @@ function Hero({
           <span className="nv-gauge__fill" />
         </div>
       ) : null}
-      <p className="sc-hero__note">{noteOf(state, zone)}</p>
+      {state.kind === 'later' ? (
+        // A shift ahead opens Planning from the whole card: no « Tout mon planning » under the cards (CHA-23).
+        <ToPlanning />
+      ) : (
+        <p className="sc-hero__note">{noteOf(state, zone)}</p>
+      )}
       {urgent === 0 || state.kind === 'later' ? null : (
         <p className="td-urgent">
           <span className="nv-dot nv-tone--bad" aria-hidden="true" />
@@ -327,11 +328,17 @@ function Hero({
   );
 }
 
+/** The whole card leads to Planning: a link stretched over it, read as « Voir mon planning » (CHA-23). */
+function ToPlanning(): JSX.Element {
+  return <Link to="/planning" className="sc-card-link" aria-label="Voir mon planning" />;
+}
+
 /**
  * What Impera brings him around his shift, in one line: the account line already says the platform. Until EQ-13 opens a
- * shift's conversations in Suivi, only the passations handed to him arrive there: no window is promised (CHAT-02).
+ * shift's conversations in Suivi, only the passations handed to him arrive there: no window is promised (CHAT-02). A
+ * shift ahead says nothing of them: the card leads to Planning instead (CHA-23).
  */
-function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): string {
+function noteOf(state: Exclude<DayState, { kind: 'none' | 'later' }>, zone: string): string {
   const { shift } = state;
   switch (state.kind) {
     case 'on':
@@ -340,8 +347,6 @@ function noteOf(state: Exclude<DayState, { kind: 'none' }>, zone: string): strin
       return 'Ton shift est fini. Les passations qu’on t’a confiées restent dans Suivi.';
     case 'soon':
       return `Ton shift commence à ${clockAt(shift.startsAt, zone)}. Les passations qu’on te confie arrivent dans Suivi.`;
-    case 'later':
-      return 'Les passations qu’on te confie arriveront dans Suivi.';
   }
 }
 
@@ -358,7 +363,8 @@ function NextCard({
 }): JSX.Element {
   const soon = soonOf(new Date(shift.startsAt).getTime() - now.getTime());
   return (
-    <Panel className="sc-next nv-enter">
+    <Panel className="sc-next sc-linked nv-enter">
+      <ToPlanning />
       <p className="nv-eyebrow">Ensuite</p>
       <div className="sc-next__row">
         <div className="sc-next__main">

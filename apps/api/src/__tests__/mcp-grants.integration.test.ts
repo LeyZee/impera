@@ -88,6 +88,7 @@ describe('/v1/settings/mcp-grants', () => {
         dailyStats: () => Promise.reject(new Error('not read here')),
       },
       payroll: { periodState: () => Promise.reject(new Error('not read here')) },
+      stats: { agencyInsights: () => Promise.reject(new Error('not read here')) },
     });
     nora = newId(CreatorIdSchema);
     await test.admin.db

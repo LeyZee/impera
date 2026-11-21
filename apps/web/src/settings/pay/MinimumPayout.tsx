@@ -8,6 +8,7 @@ import { amountInput, amountText, parseAmount, periodLine, periodTitle } from '@
 import { useAgencyToday } from '@/screens/pay/data';
 import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 const STEPS = ['Remplir', 'Relire'] as const;
 
@@ -49,18 +50,12 @@ export function MinimumPayout(): JSX.Element {
       </div>
       {data === undefined ? (
         settings.isError ? (
-          <div className="rp-account__now">
-            <p className="tm-warn">Le serveur ne répond pas : le minimum n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm tm-self-start"
-              onClick={() => {
-                void settings.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure
+            inline
+            onRetry={() => {
+              void settings.refetch();
+            }}
+          />
         ) : (
           <div className="sc-skeleton" aria-hidden="true">
             <i />

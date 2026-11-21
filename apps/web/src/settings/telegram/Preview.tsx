@@ -38,7 +38,7 @@ export function GroupPreview({
           {children}
         </div>
         <div className="tg-preview__note">
-          <h3>{heading}</h3>
+          <h3 className="nv-h3">{heading}</h3>
           <ul>
             {points.map((point, index) => (
               <li key={index}>{point}</li>

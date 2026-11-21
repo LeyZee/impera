@@ -28,10 +28,12 @@ import {
   type PlatformAccountId,
   type Penalty,
   type ShiftReportId,
+  type UserId,
 } from '@impera/contracts';
 import { eq, schema, sql, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
+import type { ValidatedShift } from '../domain/game-facts';
 import type { CreatorReports } from '../domain/ports';
 import type { MemberForPay, PeriodSnapshot, ReportForPay } from '../domain/recalculation';
 
@@ -72,6 +74,11 @@ export interface PayInputReads {
     upTo: PayPeriod,
   ) => Promise<number>;
   readonly agencyTimeZone: (tx: Transaction) => Promise<string>;
+  /**
+   * The account's own shifts with a validated total, read as itself through the planning's door (ADR 0118 § 10):
+   * « Mes chiffres » counts them as the game does. Never a colleague's.
+   */
+  readonly ownValidatedShifts: (userId: UserId) => Promise<readonly ValidatedShift[]>;
   readonly members: (tx: Transaction, day: string) => Promise<readonly MemberForPay[]>;
   readonly creatorIds: () => Promise<readonly string[]>;
   readonly sales: PaySalesReads;

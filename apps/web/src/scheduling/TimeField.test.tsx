@@ -78,4 +78,28 @@ describe('TimeField', () => {
     rerender(<Harness />);
     expect(screen.getByRole('status').textContent).toBe('540');
   });
+
+  it('says the hour as the app writes it out of the field, and HH:MM while it is typed in (CHA-26)', () => {
+    function Spoken(): JSX.Element {
+      const [minute, setMinute] = useState(22 * 60);
+      const times = useUnreadableTimes();
+      return (
+        <TimeField
+          value={minute}
+          label="Début"
+          spoken
+          onChange={setMinute}
+          onUnreadable={times.onUnreadable}
+        />
+      );
+    }
+    render(<Spoken />);
+    const field = screen.getByLabelText('Début');
+    expect(field).toHaveProperty('value', '22\u00a0h');
+    fireEvent.focus(field);
+    expect(field).toHaveProperty('value', '22:00');
+    fireEvent.change(field, { target: { value: '830' } });
+    fireEvent.blur(field);
+    expect(field).toHaveProperty('value', '8\u00a0h\u00a030');
+  });
 });

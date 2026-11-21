@@ -1,6 +1,6 @@
 import type { CollectiveTier, CommissionStatement, PayPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import type { PayNames } from './data';
 
@@ -19,6 +19,7 @@ import {
 } from '@/payroll/model';
 import { followingPeriod, percentText, periodTitle, previousPeriod } from '@/reports/model';
 import { accountLine } from '@/scheduling/model';
+import { Empty as StateEmpty, Failure } from '@/shell/states';
 
 /** The pieces Paie's screens and Commissions share (EQ-05). */
 
@@ -72,15 +73,13 @@ export function PayoutHoldLine({
   );
 }
 
-/** A member's colour, or the swatch's own grey. */
-export function Swatch({ color }: { color: string | null }): JSX.Element {
-  return (
-    <span
-      className="sc-swatch"
-      style={color === null ? undefined : { '--sc-color': color }}
-      aria-hidden="true"
-    />
-  );
+/**
+ * A member's colour; nothing without one: the same grey dot before every name said nothing (recette visuelle 16/11,
+ * GES-19).
+ */
+export function Swatch({ color }: { color: string | null }): JSX.Element | null {
+  if (color === null) return null;
+  return <span className="sc-swatch" style={{ '--sc-color': color }} aria-hidden="true" />;
 }
 
 /** A change against the previous period, better or worse; « nouveau » when there is nothing to compare with. */
@@ -161,8 +160,8 @@ export function LockIcon(): JSX.Element {
 }
 
 /**
- * A page's title when it shows one period (Quinzaine, Primes et malus, Objectifs): the period itself, the screen's main
- * fact. Its arrows go in the page's actions, out of the heading, so the heading's name is the period alone.
+ * A page's title when it shows one period: the period itself, the screen's main fact. Its arrows go in the page's
+ * actions, out of the heading, so the heading's name is the period alone.
  */
 export function PeriodHeading({ period }: { period: PayPeriod }): JSX.Element {
   return (
@@ -172,15 +171,21 @@ export function PeriodHeading({ period }: { period: PayPeriod }): JSX.Element {
   );
 }
 
-/** The previous and next period around `period`; never past the one under way. */
+/**
+ * The previous and next period around `period`; never past the one under way. With `named`, the period itself between
+ * them, as Planning's week sits between its arrows: a screen that shows one period (Quinzaine, Primes et malus,
+ * Objectifs) says it here, its title being the tab's name (recette visuelle 16/11, GES-03).
+ */
 export function PeriodArrows({
   period,
   current,
   onPeriod,
+  named = false,
 }: {
   period: PayPeriod;
   current: PayPeriod | null;
   onPeriod: (period: PayPeriod) => void;
+  named?: boolean;
 }): JSX.Element {
   return (
     <span className="sc-week" role="group" aria-label="Quinzaine">
@@ -198,6 +203,11 @@ export function PeriodArrows({
           <path d="m10 3.5-4.5 4.5 4.5 4.5" />
         </svg>
       </button>
+      {named ? (
+        <p className="sc-week__label nv-swap" key={period} aria-live="polite">
+          {periodTitle(period)}
+        </p>
+      ) : null}
       <button
         type="button"
         className="sc-arrow"
@@ -233,22 +243,30 @@ export function Loading({ rows = 3 }: { rows?: number }): JSX.Element {
 export function Unreachable({ what, onRetry }: { what: string; onRetry: () => void }): JSX.Element {
   return (
     <div className="rp-sec">
-      <div className="sc-empty">
-        <p className="tm-warn">Le serveur ne répond pas : {what} n’a pas pu être lue.</p>
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onRetry}>
-          Réessayer
-        </button>
-      </div>
+      <Failure inline onRetry={onRetry}>
+        {`${what.charAt(0).toUpperCase()}${what.slice(1)} n’a pas pu être lue : réessaie dans un instant.`}
+      </Failure>
     </div>
   );
 }
 
-export function Empty({ whisper, text }: { whisper: string; text: string }): JSX.Element {
+/** Pay's empty state: the shell's `Empty` (COH-04), its sentence and one line, at most one soft button. */
+export function Empty({
+  whisper,
+  text,
+  action,
+  art,
+}: {
+  whisper: string;
+  text: string;
+  action?: ReactNode;
+  /** A picture above the sentence, when the whole screen is empty. */
+  art?: ReactNode;
+}): JSX.Element {
   return (
-    <div className="py-empty">
-      <p className="py-empty__whisper">{whisper}</p>
-      <p className="py-empty__text">{text}</p>
-    </div>
+    <StateEmpty title={whisper} action={action} art={art}>
+      {text}
+    </StateEmpty>
   );
 }
 

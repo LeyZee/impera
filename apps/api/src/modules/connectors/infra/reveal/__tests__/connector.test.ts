@@ -8,9 +8,14 @@ import {
 } from '@impera/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { createFakeReveal, type FakeReveal } from '../../../../../__tests__/fake-reveal/server';
+import {
+  FAKE_REVEAL_FILE_HOST,
+  createFakeReveal,
+  type FakeReveal,
+} from '../../../../../__tests__/fake-reveal/server';
 import { ConnectorError } from '../../../domain/platform-connector';
 import { MemorySendJournal } from '../../__tests__/memory-send-journal';
+import type { FileTransport } from '../../download/vault-file';
 import type { RevealCallLog, RevealFetch } from '../client';
 import { RevealApiConnector, revealApiConnectors } from '../connector';
 import type { RevealSession } from '../session';
@@ -313,6 +318,8 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
     expect((await connector.getFanNote(fan('fan_02'))).text).toContain('Prénom : Prénom02');
     expect(await connector.getFanNote(fan('fan_01'))).toEqual({ text: '' });
     expect(await connector.getCreatorNotes()).toEqual([{ text: 'Note du modèle de test' }]);
+    // Her bio, read only (ADR 0154): the profile's own text.
+    expect(await connector.getCreatorProfile()).toEqual({ bio: 'Description de test' });
     const ppv = await connector.getFanPpvStats(fan('fan_02'));
     expect(ppv).toMatchObject({ purchased: 2, offered: 3, highestPriceMinor: 3_000, lowestPriceMinor: 500 });
     // Sequence 1's last step, sent to fan 02 at minute 2 240 of the world, never bought.
@@ -373,6 +380,7 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       folder: { ref: { id: 'folder_1' }, name: 'SCRIPT 1 | ☀️', moment: 'day' },
       description: null,
       suggestedPriceMinor: null,
+      blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH',
     });
     // Each folder in Reveal's own order (newest first on FakeReveal), ranked from 0 as the pages came.
     expect(
@@ -439,5 +447,212 @@ describe('RevealApiConnector: reading (spec §§ 4, 6)', () => {
       ['ppv', 500],
     ]);
     expect(await connector.listTransactions({ since: new Date(all[1]?.createdAt ?? 0) })).toHaveLength(1);
+  });
+});
+
+describe('RevealApiConnector: her automations (ADR 0110)', () => {
+  it('marks the opener he chose, his reply to a story, her welcome and her reminder; reads them once', async () => {
+    const fake = world();
+    const state = fake.state();
+    state.model.hooks = ['Salut %NAME%, je passe te dire coucou', 'Hello toi'];
+    state.model.welcomeMessage = 'Bienvenue chez moi, %NAME% !';
+    state.model.expirationReminderMessage = 'Ton abonnement finit dans trois jours';
+    const ofConversation = state.messages.filter((m) => m.conversationId === 'conv_01');
+    const [first, second, third, fourth] = [
+      ofConversation.find((m) => m.direction === 'in'),
+      ofConversation.find((m) => m.direction === 'out'),
+      ofConversation.findLast((m) => m.direction === 'in'),
+      ofConversation.findLast((m) => m.direction === 'out'),
+    ];
+    if (first === undefined || second === undefined || third === undefined || fourth === undefined)
+      throw new Error('the default world has messages both ways in conv_01');
+    first.content = 'Salut Léa, je passe te dire coucou';
+    second.content = 'Bienvenue chez moi, Max !';
+    third.storyReply = {
+      storyId: 'story_test',
+      thumbnailUrl: 'https://media.example.test/story',
+      mediaType: 'video',
+      isExpired: false,
+    };
+    fourth.content = 'Ton abonnement finit dans trois jours';
+    const paths: string[] = [];
+    const connector = connect(fake, { log: (entry) => paths.push(entry.route) });
+
+    const all = await connector.fetchMessages(fan('conv_01'), {});
+    const originOfId = (id: string) => all.find((m) => m.ref.id === id)?.origin;
+    expect([first, second, third, fourth].map((m) => originOfId(m.id))).toEqual([
+      'hook',
+      'welcome',
+      'story_reply',
+      'expiration_reminder',
+    ]);
+    expect(all.filter((m) => m.origin !== undefined)).toHaveLength(4);
+
+    await connector.fetchMessages(fan('conv_01'), { limit: 5 });
+    expect(paths.filter((route) => route === 'models.sayHello')).toHaveLength(1);
+  });
+
+  it('reads the messages without marks when her automations cannot be read, and asks again 5 min later', async () => {
+    const fake = world();
+    fake.state().model.hooks = ['Hello toi'];
+    const first = fake.state().messages.find((m) => m.conversationId === 'conv_01' && m.direction === 'in');
+    if (first === undefined) throw new Error('the default world has a fan message in conv_01');
+    first.content = 'Hello toi';
+    let failing = true;
+    let sayHelloCalls = 0;
+    const fetch: RevealFetch = (url, init) => {
+      if (!url.includes('/say-hello')) return fake.fetch(url, init);
+      sayHelloCalls += 1;
+      return failing ? Promise.resolve(new Response('{}', { status: 500 })) : fake.fetch(url, init);
+    };
+    let now = new Date('2026-11-16T12:00:00.000Z');
+    const connector = connect(fake, { fetch, now: () => now });
+    const all = await connector.fetchMessages(fan('conv_01'), {});
+    expect(all).toHaveLength(320);
+    expect(all.some((m) => m.origin !== undefined)).toBe(false);
+
+    // Not asked again for 5 minutes, then read again.
+    const calls = sayHelloCalls;
+    failing = false;
+    now = new Date('2026-11-16T12:04:59.000Z');
+    await connector.fetchMessages(fan('conv_01'), { limit: 5 });
+    expect(sayHelloCalls).toBe(calls);
+    now = new Date('2026-11-16T12:05:01.000Z');
+    const later = await connector.fetchMessages(fan('conv_01'), {});
+    expect(sayHelloCalls).toBe(calls + 1);
+    expect(later.filter((m) => m.origin === 'hook')).toHaveLength(1);
+  });
+});
+
+describe('RevealApiConnector: a vault media’s sharp preview (ADR 0138)', () => {
+  const FOLDER_1 = { platform: 'reveal', id: 'folder_1' } as const;
+  const ref = (id: string) => ({ platform: 'reveal' as const, id });
+  const PNG = [0x89, 0x50, 0x4e, 0x47];
+
+  function previewer(
+    fake: FakeReveal,
+    extra: { transport?: FileTransport; hosts?: readonly string[]; listings?: string[] } = {},
+  ): RevealApiConnector {
+    return new RevealApiConnector({
+      session: sessionOf(fake),
+      fetch: fake.fetch,
+      baseUrl: BASE,
+      sleep: () => Promise.resolve(),
+      // The vault files' own reader and hosts (ADR 0113 § 2): one list, one transport.
+      fileTransport: extra.transport ?? fake.fileTransport,
+      fileHosts: extra.hosts ?? [FAKE_REVEAL_FILE_HOST],
+      fileHttpForTests: true,
+      log: (entry) => {
+        if (entry.route === 'vault.medias') extra.listings?.push(entry.route);
+      },
+    });
+  }
+
+  /** FakeReveal's transport, every link it is asked recorded. */
+  function counting(fake: FakeReveal, asked: string[]): FileTransport {
+    return {
+      lookup: fake.fileTransport.lookup,
+      get: (url, signal, pinned) => {
+        asked.push(url);
+        return fake.fileTransport.get(url, signal, pinned);
+      },
+    };
+  }
+
+  /** A transport answering `response` to anything, FakeReveal's public test address looked up. */
+  function answering(fake: FakeReveal, response: () => Response): FileTransport {
+    return { lookup: fake.fileTransport.lookup, get: () => Promise.resolve(response()) };
+  }
+
+  it('reads a photo’s small picture and a video’s poster, its folder listed once, by the vault files’ reader', async () => {
+    const fake = world();
+    const listings: string[] = [];
+    const asked: string[] = [];
+    const connector = previewer(fake, { transport: counting(fake, asked), listings });
+    const [photo, poster] = await Promise.all([
+      connector.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 }),
+      connector.readVaultPreview({ mediaRef: ref('media_03'), folderRef: FOLDER_1 }),
+    ]);
+    for (const picture of [photo, poster]) {
+      expect(picture.contentType).toBe('image/png');
+      expect([...picture.bytes.slice(0, 4)]).toEqual(PNG);
+    }
+    // Two pictures asked together: one listing of the folder, shared.
+    expect(listings).toHaveLength(1);
+    // The poster, not the video's playlist: a picture, one GET each.
+    expect(asked).toHaveLength(2);
+    expect(asked.some((url) => url.includes('/poster?'))).toBe(true);
+    expect(asked.some((url) => url.includes('/hls/'))).toBe(false);
+  });
+
+  it('says not_found for a media its folder does not list, and for a voice note', async () => {
+    const fake = createFakeReveal({ fixture: 'quiet' });
+    fakes.push(fake);
+    const connector = previewer(fake);
+    const missing = connector.readVaultPreview({ mediaRef: ref('media_99'), folderRef: FOLDER_1 });
+    expect((await rejection(missing)).code).toBe('not_found');
+    const voice = connector.readVaultPreview({
+      mediaRef: ref('media_voice_01'),
+      folderRef: { platform: 'reveal', id: 'folder_3' },
+    });
+    expect((await rejection(voice)).code).toBe('not_found');
+  });
+
+  it('refuses a picture from a host the files do not name, and anything but an image', async () => {
+    const fake = world();
+    const asked: string[] = [];
+    // No host written: refused before any call, the host alone said, never the signed link.
+    const nowhere = previewer(fake, { transport: counting(fake, asked), hosts: [] });
+    const refused = await rejection(
+      nowhere.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 }),
+    );
+    expect(refused.code).toBe('fatal');
+    expect(refused.message).toContain(FAKE_REVEAL_FILE_HOST);
+    expect(refused.message).not.toContain('sig=');
+    expect(asked).toEqual([]);
+    // A page instead of a picture.
+    const page = answering(fake, () => new Response('<!doctype html><p>non</p>', { status: 200 }));
+    const html = await rejection(
+      previewer(fake, { transport: page }).readVaultPreview({
+        mediaRef: ref('media_01'),
+        folderRef: FOLDER_1,
+      }),
+    );
+    expect(html.code).toBe('fatal');
+    // Past the bound: refused, nothing kept.
+    const huge = answering(fake, () => new Response(new Uint8Array(3 * 1024 * 1024), { status: 200 }));
+    const big = await rejection(
+      previewer(fake, { transport: huge }).readVaultPreview({
+        mediaRef: ref('media_01'),
+        folderRef: FOLDER_1,
+      }),
+    );
+    expect(big.code).toBe('fatal');
+    // A server error is transient: counted as any read's.
+    const down = answering(fake, () => new Response(null, { status: 502 }));
+    const failed = await rejection(
+      previewer(fake, { transport: down }).readVaultPreview({
+        mediaRef: ref('media_01'),
+        folderRef: FOLDER_1,
+      }),
+    );
+    expect(failed.code).toBe('transient');
+  });
+
+  it('lists the folder again once when the platform refuses a link kept, then reads it', async () => {
+    const fake = world();
+    const listings: string[] = [];
+    const connector = previewer(fake, { listings });
+    await connector.readVaultPreview({ mediaRef: ref('media_01'), folderRef: FOLDER_1 });
+    // FakeReveal's links live 10 minutes: past them, the link kept in memory is refused.
+    const moved = await fake.app.inject({
+      method: 'POST',
+      url: '/__clock',
+      payload: { advanceMs: 11 * 60_000 },
+    });
+    expect(moved.statusCode).toBe(200);
+    const again = await connector.readVaultPreview({ mediaRef: ref('media_02'), folderRef: FOLDER_1 });
+    expect(again.contentType).toBe('image/png');
+    expect(listings).toHaveLength(2);
   });
 });

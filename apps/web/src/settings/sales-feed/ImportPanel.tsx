@@ -138,7 +138,7 @@ export function ImportPanel({
   return (
     <section className="nv-plate sf-links sf-import" aria-labelledby={titleId}>
       <header className="sf-links__head">
-        <h3 id={titleId} className="sf-links__title">
+        <h3 id={titleId} className="nv-h3 sf-links__title">
           {foundTitle(candidates.length, name)}
         </h3>
         {candidates.length === 0 ? null : (

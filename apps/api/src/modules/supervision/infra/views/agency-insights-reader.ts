@@ -9,7 +9,12 @@ import {
 import { sql, withTenantMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
-import { shiftDay, type AgencyCreatorRead, type StatsDay } from '../../domain/agency-insights';
+import {
+  shiftDay,
+  type AgencyCreatorRead,
+  type RefundRead,
+  type StatsDay,
+} from '../../domain/agency-insights';
 
 import type { SalesTotalsOf } from './reveal-sales-reader';
 
@@ -22,6 +27,15 @@ export type DailyStatsOf = (
   range: { readonly from: string; readonly to: string },
 ) => Promise<readonly StatsDay[]>;
 
+/**
+ * The connectors' `salesFeedTotals.refundListOf` (ADR 0092 § 4), given by the composition root: the refunds the totals
+ * of the days take off, one by one, read in the caller's transaction.
+ */
+export type RefundListOf = (
+  tx: Transaction,
+  query: { readonly creatorId: CreatorId; readonly from: string; readonly to: string },
+) => Promise<readonly RefundRead[]>;
+
 /** What the route reads of one creator: nothing out of the account's team scope, nothing before a register is linked. */
 type AgencyCreatorAnswer =
   | { readonly kind: 'out_of_scope' }
@@ -33,7 +47,14 @@ export interface AgencyInsightsReader {
   read(
     creatorId: CreatorId,
     userId: UserId,
-    range: { readonly from: string; readonly previousFrom: string; readonly to: string },
+    range: {
+      readonly from: string;
+      readonly previousFrom: string;
+      readonly previousTo: string;
+      readonly to: string;
+    },
+    /** A calendar month's first day, to read her revenue objective for it (ADR 0092 § 6); null off a month. */
+    objectiveMonth?: string | null,
   ): Promise<AgencyCreatorAnswer>;
   /** Display names of the team, member id to name, read as `userId` through the first creator given. */
   memberNames(creatorId: CreatorId, userId: UserId): Promise<ReadonlyMap<string, string>>;
@@ -60,8 +81,10 @@ const FanSchema = z.array(
     seen_before: z.boolean(),
   }),
 );
+const SinceSchema = z.array(z.object({ since: z.iso.date().nullable() }));
 const CountSchema = z.array(z.object({ refunds: z.coerce.number().int().nonnegative() }));
 const AccountSchema = z.array(z.object({ id: z.string() }));
+const ObjectiveSchema = z.array(z.object({ amount_minor: z.coerce.number().int().positive() }));
 const MemberSchema = z.array(z.object({ id: z.string(), display_name: z.string() }));
 
 /**
@@ -74,9 +97,10 @@ export function createAgencyInsightsReader(
   totalsOf: SalesTotalsOf,
   timeZoneOf: (platform: Platform) => string | null,
   statsOf: DailyStatsOf,
+  refundListOf: RefundListOf,
 ): AgencyInsightsReader {
   return {
-    read: (creatorId, userId, range) =>
+    read: (creatorId, userId, range, objectiveMonth = null) =>
       withTenantMember(db, creatorId, userId, async (tx, scope): Promise<AgencyCreatorAnswer> => {
         if (scope === 'self') return { kind: 'out_of_scope' };
         const linked = LinkedSchema.parse(
@@ -93,10 +117,13 @@ export function createAgencyInsightsReader(
         );
         if (creator === undefined) return { kind: 'not_linked' };
         const totals = await totalsOf(tx, { creatorId, from: range.previousFrom, to: range.to });
+        const refunds = await refundListOf(tx, { creatorId, from: range.from, to: range.to });
         // The period's instants: from the first day's midnight to the midnight after today, in the platform's zone.
         const start = sql`((${range.from}::date)::timestamp at time zone ${zone})`;
         const end = sql`((${range.to}::date + 1)::timestamp at time zone ${zone})`;
         const previousStart = sql`((${range.previousFrom}::date)::timestamp at time zone ${zone})`;
+        // A comparison chosen may end well before the period (ADR 0146 § 3): the days between count in neither.
+        const previousEnd = sql`((${range.previousTo}::date + 1)::timestamp at time zone ${zone})`;
         const hours = HourSchema.parse(
           (
             await tx.execute(sql`
@@ -119,7 +146,8 @@ export function createAgencyInsightsReader(
                        s.currency, s.gross_incl_vat_minor as gross, s.occurred_at < ${start} as previous
                   from platform_sales s
                  where s.creator_id = ${creatorId}::uuid and s.event = 'sale' and s.platform_fan_id is not null
-                   and s.occurred_at >= ${previousStart} and s.occurred_at < ${end}),
+                   and ((s.occurred_at >= ${previousStart} and s.occurred_at < ${previousEnd})
+                     or (s.occurred_at >= ${start} and s.occurred_at < ${end}))),
               spent as (
                 select d.account, d.fan, d.currency, d.previous,
                        (sum(d.gross) - coalesce(sum(r.gross_incl_vat_minor), 0))::bigint as gross
@@ -137,6 +165,14 @@ export function createAgencyInsightsReader(
                      f.first_at < ${start} as seen_before
                 from spent p
                 join first f on f.account = p.account and f.fan = p.fan`)
+          ).rows,
+        );
+        // The register's first day, its oldest line in the platform's zone (ADR 0146 § 4).
+        const [first] = SinceSchema.parse(
+          (
+            await tx.execute(sql`
+              select (min(occurred_at) at time zone ${zone})::date::text as since
+                from platform_sales where creator_id = ${creatorId}::uuid`)
           ).rows,
         );
         // A refund of the period whose sale the register does not hold: counted apart, as the totals do.
@@ -167,6 +203,16 @@ export function createAgencyInsightsReader(
         const stats = (await statsOf(tx, { from: shiftDay(range.previousFrom, -1), to: range.to })).filter(
           (line) => mine.has(line.platformAccountId),
         );
+        const [objective] =
+          objectiveMonth === null
+            ? []
+            : ObjectiveSchema.parse(
+                (
+                  await tx.execute(sql`
+                    select amount_minor from creator_revenue_objectives
+                     where creator_id = ${creatorId}::uuid and month = ${objectiveMonth}::date`)
+                ).rows,
+              );
         return {
           kind: 'read',
           read: {
@@ -187,7 +233,10 @@ export function createAgencyInsightsReader(
               previous: row.previous,
               seenBefore: row.seen_before,
             })),
+            refunds,
             refundsWithoutSale: orphans?.refunds ?? 0,
+            objectiveMinor: objective?.amount_minor ?? null,
+            registerSince: first?.since ?? null,
             stats,
           },
         };

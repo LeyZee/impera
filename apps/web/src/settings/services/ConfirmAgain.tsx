@@ -2,9 +2,10 @@ import { useState, type JSX } from 'react';
 
 import { PasswordPrompt } from './PasswordPrompt';
 
-/** What a gesture on a member, a rate or pay says before the fields (EQ-15). */
+/** What a gesture on a member, a rate, pay or billing says before the fields (EQ-15). */
 export const MONEY_LEAD = 'Ce geste touche à l’argent : confirme ton mot de passe et ton code.';
 export const MEMBER_LEAD = 'Ce geste touche à un membre : confirme ton mot de passe et ton code.';
+export const BILLING_LEAD = 'Ce geste touche à la facturation : confirme ton mot de passe et ton code.';
 
 export interface ConfirmAgain {
   /** Whether a write waits for the password and the code. */

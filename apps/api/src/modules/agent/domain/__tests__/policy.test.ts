@@ -158,12 +158,15 @@ describe('maySulk', () => {
 });
 
 describe('offerSignals', () => {
-  it('reads his heat from the brain, and his own ask for paid content', () => {
+  it('reads his sexual advance from the brain, and his own ask for paid content', () => {
     expect(offerSignals({ intent: 'sexting', sentiment: 'neutral' })).toEqual({
       fanSexualizes: true,
       fanAsksForPaid: false,
     });
-    expect(offerSignals({ intent: 'small_talk', sentiment: 'aroused' }).fanSexualizes).toBe(true);
+    expect(
+      offerSignals({ intent: 'small_talk', sentiment: 'positive', desireSignals: ['explicit_language'] })
+        .fanSexualizes,
+    ).toBe(true);
     expect(offerSignals({ intent: 'asks_for_media', sentiment: 'neutral' })).toEqual({
       fanSexualizes: false,
       fanAsksForPaid: true,
@@ -172,5 +175,44 @@ describe('offerSignals', () => {
       fanSexualizes: false,
       fanAsksForPaid: false,
     });
+  });
+
+  it('never reads a compliment, his mood alone or a question on her outfit as an advance (Charles, 16/11)', () => {
+    expect(offerSignals({ intent: 'flirt', sentiment: 'positive' }).fanSexualizes).toBe(false);
+    expect(offerSignals({ intent: 'flirt', sentiment: 'aroused' }).fanSexualizes).toBe(false);
+    expect(
+      offerSignals({ intent: 'flirt', sentiment: 'positive', desireSignals: ['body_compliment'] })
+        .fanSexualizes,
+    ).toBe(false);
+    expect(
+      offerSignals({ intent: 'flirt', sentiment: 'positive', desireSignals: ['asks_about_her_body'] })
+        .fanSexualizes,
+    ).toBe(false);
+    expect(
+      offerSignals({ intent: 'sexting', sentiment: 'aroused', desireSignals: ['states_desire'] })
+        .fanSexualizes,
+    ).toBe(true);
+  });
+
+  it('reads a desire on a flirt only when his own words carry it (Charles, 20/11; relecture Bilan de #888)', () => {
+    const flirt = (signal: string, text?: string) =>
+      offerSignals(
+        { intent: 'flirt', sentiment: 'aroused', desireSignals: ['body_compliment', signal] },
+        text,
+      ).fanSexualizes;
+    for (const signal of ['states_desire', 'steers_to_intimate']) {
+      expect(flirt(signal), signal).toBe(false);
+      expect(flirt(signal, 'coucou toi, tu es super belle ! impossible de ne pas t’écrire'), signal).toBe(
+        false,
+      );
+      expect(flirt(signal, 'j’ai envie de te parler, t’as un sourire de fou'), signal).toBe(false);
+      expect(flirt(signal, 't’es trop belle, j’ai trop envie de toi là'), signal).toBe(true);
+      expect(flirt(signal, 'Tu m’EXCITES grave'), signal).toBe(true);
+    }
+    for (const signal of ['explicit_language', 'roleplay']) expect(flirt(signal), signal).toBe(true);
+    expect(
+      offerSignals({ intent: 'small_talk', sentiment: 'positive', desireSignals: ['states_desire'] })
+        .fanSexualizes,
+    ).toBe(true);
   });
 });

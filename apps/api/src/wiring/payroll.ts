@@ -37,6 +37,7 @@ export function payInputReadsOf(modules: {
     validatedReportsScoped: scheduling.pay.validatedReportsScoped,
     reportsAwaitingReviewScoped: scheduling.pay.reportsAwaitingReviewScoped,
     agencyTimeZone: scheduling.pay.agencyTimeZone,
+    ownValidatedShifts: scheduling.game.ownValidatedShifts,
     members: team.pay.members,
     creatorIds: async () => (await persona.creators.list('all')).map((creator) => creator.id),
     sales: {

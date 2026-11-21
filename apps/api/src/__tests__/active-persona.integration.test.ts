@@ -31,7 +31,7 @@ import {
   type ActivePersonaSource,
   type CalibrationRecord,
 } from '../modules/agent';
-import { createPlaygroundSession } from '../modules/playground';
+import { createDbVoiceExampleBank, createPlaygroundSession } from '../modules/playground';
 
 import { testConfig } from './support/config';
 
@@ -101,6 +101,7 @@ function recordingGateway() {
     describeTrendCaptures: () => Promise.reject(new Error('not used')),
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
+    instagramComment: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),
@@ -228,7 +229,9 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
           guardSettings: guardSettingsOf(demo),
         }),
       ).toEqual([]);
-      const examples = records.flatMap((r) => (r.verdict.kind === 'corrected' ? [r.verdict.text] : []));
+      const examples = records.flatMap((r) =>
+        r.verdict.kind === 'corrected' ? [{ id: r.id, text: r.verdict.text }] : [],
+      );
       await createPlaygroundSession({
         gateway,
         creatorName: demo.creatorName,
@@ -259,6 +262,88 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it('writes with her bank of examples, as the Playground chooses them, and names them on the voice call (ADR 0102)', async () => {
+    const her = await activePersonaForModels(activePersona, anna, new Date());
+    if (her?.versionId === undefined) throw new Error('Anna has an active version');
+    const example = (text: string, minutes: number, state: 'active' | 'withdrawn') => {
+      const ratedAt = new Date(Date.UTC(2026, 9, 28, 21, minutes));
+      return {
+        id: newId(CreatorIdSchema),
+        creatorId: anna,
+        source: 'playground',
+        sessionId: 'playground-bank',
+        ratedAt,
+        voicePrompt: '1.4.0',
+        voiceModel: 'grok-4.7',
+        verdictKind: 'corrected',
+        verdict: { kind: 'corrected', text },
+        destination: 'voice_example',
+        fanMessage: 'Salut toi',
+        bubbles: ['Bonjour'],
+        moment: { history: [], fanNotes: '' },
+        personaVersionId: her.versionId,
+        exampleState: state,
+        exampleStateAt: ratedAt,
+      };
+    };
+    const kept = example('Coucou toi, exemple gardé', 1, 'active');
+    const newest = example('Hey toi, exemple le plus récent', 3, 'active');
+    await test.admin.db
+      .insert(schema.calibrationRatings)
+      .values([
+        kept,
+        newest,
+        example('Exemple retiré par le propriétaire', 2, 'withdrawn'),
+        example('Je suis une IA, exemple que la garde arrête', 4, 'active'),
+      ]);
+    const { gateway, brain, voice } = recordingGateway();
+
+    await startDraftComposer({
+      gateway,
+      activePersona,
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voiceExamplesOf: createDbVoiceExampleBank(test.app.db),
+    }).compose({
+      creatorId: anna,
+      conversationId: 'conversation-3',
+      fanId: 'fan-3',
+      draftId: 'draft-3',
+      correlationId: 'correlation-3',
+      now: new Date('2026-10-29T10:00:00Z'),
+      history: [{ direction: 'inbound', text: 'Salut', at: new Date('2026-10-29T09:59:00Z') }],
+      fan: { notes: [], spentMinor: 0, firstMessageAt: new Date('2026-10-29T09:59:00Z') },
+    });
+
+    const sheet = voice.at(-1)?.personaSheet ?? '';
+    expect(sheet).toContain('Coucou toi, exemple gardé');
+    expect(sheet.indexOf('Hey toi')).toBeLessThan(sheet.indexOf('Coucou toi, exemple gardé'));
+    expect(sheet).not.toContain('Exemple retiré');
+    expect(sheet).not.toContain('Je suis une IA');
+    expect(voice.at(-1)?.trace?.voiceExampleIds).toEqual([newest.id, kept.id]);
+    expect(brain.at(-1)?.trace?.voiceExampleIds).toBeUndefined();
+
+    // Her bank unreadable: she writes from her sheet alone, and it is said.
+    const unread: string[] = [];
+    await startDraftComposer({
+      gateway,
+      activePersona,
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voiceExamplesOf: () => Promise.reject(new Error('down')),
+      onExamplesUnread: (event) => unread.push(event.creatorId),
+    }).compose({
+      creatorId: anna,
+      conversationId: 'conversation-4',
+      fanId: 'fan-4',
+      draftId: 'draft-4',
+      correlationId: 'correlation-4',
+      now: new Date('2026-10-29T10:00:00Z'),
+      history: [{ direction: 'inbound', text: 'Salut', at: new Date('2026-10-29T09:59:00Z') }],
+      fan: { notes: [], spentMinor: 0, firstMessageAt: new Date('2026-10-29T09:59:00Z') },
+    });
+    expect(voice.at(-1)?.personaSheet).toBe(her.personaSheet);
+    expect(unread).toEqual([anna]);
   });
 
   it('« Tester » reads the phrase with the active version of the creator it names', async () => {

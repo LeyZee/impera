@@ -27,4 +27,18 @@ describe('the playground client', () => {
     answer(500, null);
     await expect(createHttpClient().state()).rejects.toMatchObject({ code: 'failed' });
   });
+
+  it('blames the AI provider only on the server’s own word, and an unanswered server on the server (V-ETA-06)', async () => {
+    answer(503, null);
+    await expect(createHttpClient().state()).rejects.toMatchObject({ code: 'unreachable' });
+    answer(503, {
+      error: { code: 'llm_unavailable', message: 'Clé refusée.', details: {}, requestId: 'r1' },
+    });
+    await expect(createHttpClient().state()).rejects.toMatchObject({ code: 'llm_unavailable' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+    await expect(createHttpClient().state()).rejects.toMatchObject({ code: 'unreachable' });
+  });
 });

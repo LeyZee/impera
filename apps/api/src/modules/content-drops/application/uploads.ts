@@ -5,9 +5,13 @@ import { join } from 'node:path';
 
 import {
   DROP_PART_BYTES,
+  NOT_WHAT_IT_SAYS,
+  SNIFF_BYTES,
+  holds,
   kindOfMime,
   probedFileRefusal,
   slotDurationRefusal,
+  sniff,
   type DropFileUpload,
 } from '@impera/contracts';
 
@@ -26,7 +30,6 @@ import type {
   ReceiptTask,
   ScratchRoom,
 } from '../domain/ports';
-import { holds, sniff } from '../domain/sniff';
 import { completionRefusal, partsSplit, rawKeyOf } from '../domain/upload';
 
 /** Said when the bytes in the storage are not the size her phone declared: the raw file is erased, she sends again. */
@@ -107,8 +110,7 @@ export async function finishUpload(
   return true;
 }
 
-/** Said when the bytes are not of the type declared (a renamed file), or cannot be read at all. */
-const NOT_WHAT_IT_SAYS = 'Ce fichier n’est pas ce qu’il annonce : renvoie-le depuis ta galerie';
+/** Said when the bytes cannot be read at all (a renamed file is `NOT_WHAT_IT_SAYS`, from the contracts). */
 const UNREADABLE = 'Ce fichier ne se lit pas : renvoie-le depuis ta galerie';
 const UNREADABLE_VIDEO = 'Ce fichier n’est pas une vidéo qu’on sait lire : exporte-la en MP4';
 /** Said when the raw file is gone before its cleaning (24 hours, the storage's rule). */
@@ -131,8 +133,8 @@ async function sha256Of(path: string): Promise<{ readonly sha256: string; readon
 async function headOf(path: string): Promise<Uint8Array> {
   const file = await open(path, 'r');
   try {
-    const head = new Uint8Array(32);
-    const { bytesRead } = await file.read(head, 0, 32, 0);
+    const head = new Uint8Array(SNIFF_BYTES);
+    const { bytesRead } = await file.read(head, 0, SNIFF_BYTES, 0);
     return head.subarray(0, bytesRead);
   } finally {
     await file.close();

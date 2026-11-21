@@ -142,6 +142,13 @@ export function usageFixture(overrides: Partial<AiUsage> = {}): AiUsage {
         ],
       },
     ],
+    voice: {
+      used: 2_480,
+      limit: 10_000,
+      resetsAt: '2026-12-01T00:00:00.000Z',
+      plan: 'free',
+      readAt: '2026-11-11T13:21:00.000Z',
+    },
     ...overrides,
   });
 }

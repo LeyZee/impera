@@ -1,12 +1,15 @@
 import { CreatorIdSchema, JOB_PAYLOADS, PlatformAccountIdSchema } from '@impera/contracts';
 import type { LlmGateway } from '@impera/llm';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { defineTask } from '../jobs';
 import type { VaultFiles } from '../modules/connectors';
 import type { ContentDropsModule } from '../modules/content-drops';
 import {
   createDrizzleDescriptionReader,
+  createDrizzleVaultChoiceStore,
   createMediaModule,
+  createVaultChoiceRoutes,
   createVaultDescriptions,
   missingMediaBinaries,
   type MediaModule,
@@ -32,6 +35,8 @@ export async function wireMedia(shared: Shared): Promise<WiredMedia> {
 export interface WiredVaultDescriptions {
   readonly vault: VaultDescriptions;
   readonly tasks: TasksOf<'media'>;
+  /** The vault by choice (ADR 0145 § 5): its ticks, and the description of a selection after its cost was shown. */
+  readonly routes: readonly FastifyPluginAsyncZod[];
 }
 
 /**
@@ -43,10 +48,12 @@ export function wireVaultDescriptions(
   deps: {
     readonly vision: Pick<LlmGateway, 'describeDrop' | 'transcribe'>;
     readonly files: VaultFiles;
-    readonly drops: Pick<ContentDropsModule, 'picture'>;
+    readonly drops: Pick<ContentDropsModule, 'picture' | 'unpicture'>;
+    /** Today's spend against the AI cap, as the gateway counts it (`health().budget`). */
+    readonly budget: () => { readonly spentEur: number; readonly capEur: number };
   },
 ): WiredVaultDescriptions {
-  const { adminDb, logger } = shared;
+  const { adminDb, logger, requireRole } = shared;
   const vault = createVaultDescriptions({
     adminDb,
     gateway: deps.vision,
@@ -60,9 +67,16 @@ export function wireVaultDescriptions(
         logger,
       ),
     picture: (ask) => deps.drops.picture(ask),
+    unpicture: (key) => deps.drops.unpicture(key),
   });
   return {
     vault,
+    routes: [
+      createVaultChoiceRoutes(
+        { store: createDrizzleVaultChoiceStore(shared.db), budget: deps.budget },
+        { teamGuard: requireRole('owner', 'operator'), ownerGuard: requireRole('owner') },
+      ),
+    ],
     tasks: {
       'media.describe_vault': defineTask(
         'media.describe_vault',
@@ -72,17 +86,6 @@ export function wireVaultDescriptions(
           context.logger.info(
             { platformAccountId: payload.platformAccountId, ...(await vault.run(payload)) },
             'media: a lot of the vault described',
-          );
-        },
-      ),
-      'media.describe_vault_backlog': defineTask(
-        'media.describe_vault_backlog',
-        JOB_PAYLOADS['media.describe_vault_backlog'],
-        logger,
-        async (_payload, context) => {
-          context.logger.info(
-            { accounts: await vault.backlog(`job:${context.jobId}`) },
-            'media: the vaults still waiting queued',
           );
         },
       ),

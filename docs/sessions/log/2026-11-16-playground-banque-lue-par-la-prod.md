@@ -1,0 +1,13 @@
+# 2026-11-16 : la production lit sa banque d'exemples (ADR 0102, lot b1)
+
+- **Fiche** : ADR 0102 § 1, 2, 4 et 6, deuxième des cinq points « que chaque remarque serve vraiment » (fil Playground). Lot b1 ; l'écran « Sa banque » avec « Retirer » et le motif d'une correction arrêtée par une garde sont le lot b2.
+- **Fait** : `pickVoiceExamples` (module `agent`) choisit dans sa banque, du plus récent au plus ancien, les douze exemples que ses gardes dures laissent passer. Le Playground, sur une version de créatrice, lit sa banque par le même lecteur que la production (`createDbVoiceExampleBank`) et choisit par la même fonction ; sans base (terminal), il choisit dans les notes gardées (`voiceExamples`, qui passe aussi par elle). `startDraftComposer` lit sa banque, une par créatrice quelle que soit la version où l'exemple a été corrigé (§ 1, relecture Bilan du 20/11), et la version qui écrit choisit avec ses gardes (`voiceExamplesOf`, branché sur `calibration_ratings` en `active` par `createDbVoiceExampleBank`), les met dans sa fiche par `withExamples`, et l'appel de voix porte leurs ids jusqu'à `llm_calls.voice_example_ids` (l'appel du cerveau non). Banque illisible : elle écrit avec sa fiche seule et le journal le dit. Les textes de l'écran Entraîner disent maintenant qu'un exemple de voix sert aussi avec ses vrais fans.
+- **Tests** : unitaires (choix et plafond, ids sur l'appel de voix seulement, textes de l'écran) ; intégration (banque lue en base, exemple retiré et exemple arrêté par une garde exclus, ordre, ids, banque illisible).
+- **Reste** : rien ; migrations 0231 (`voice_example_ids`) et 0232 (« Retirer ») posées au tour de fusion du 20/11, avec b2.
+- **Découvertes** : une note du Playground a pour id `<session>-<n>`, que la table remplace par un id dérivé ; « Retirer » (b2) devra viser l'id de la table.
+
+## Lot b2 : « Sa banque » et « Retirer »
+
+- **Fait** : Entraîner montre « Sa banque » pour la version jouée (texte, date, message du fan, « Lu par sa voix », « En réserve » ou « Arrêté : » et la garde), avec « Retirer » confirmé sur place ; l'exemple retiré sort de ses vrais brouillons tout de suite et du Playground à la conversation suivante, et reste en base. Une correction rangée en Exemple de voix qu'une garde dure arrête est gardée comme correction (`example_state = 'blocked'`) et la ligne sous la conversation dit quelle garde. Routes `GET /v1/playground/bank` et `POST /v1/playground/bank/withdraw`.
+- **Tests** : unitaires (vue de la banque, retrait, réponse de la note, écran) ; intégration (rangée arrêtée, liste, retrait par sa créatrice seule, une fois, table toujours en ajout seul).
+- **Reste** : migration du déclencheur de `calibration_ratings` qui laisse passer le retrait, à écrire sur `main` au tour.

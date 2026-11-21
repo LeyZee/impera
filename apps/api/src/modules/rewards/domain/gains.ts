@@ -6,8 +6,9 @@ import { beatsRecord, trophiesOf, type TrophyKind } from './trophies';
 
 /*
  * What a chatter has earned, from the facts of today (ADR 0104 § 12, § 13 and § 15), pure. The job that calls this is
- * replayable: the same facts give the same gains, each under a key that is written once. A gain never names an
- * amount, and nothing here reaches pay (§ 17).
+ * replayable: the same facts give the same gains, each under a key that is written once while it holds. A gain a
+ * corrected net no longer justifies is taken back (ADR 0118 § 5). A trophy never names an amount, and nothing here
+ * reaches pay (§ 17).
  */
 
 /** How long after a shift's end its report still counts on time: until the second reminder rings. */
@@ -36,11 +37,44 @@ export type GainKind = TrophyKind | 'tier' | 'level';
 
 /**
  * A gain and the key it is written once under: empty for a trophy, the fortnight and the threshold for a tier, the
- * rank for a level.
+ * rank for a level. A level also keeps the threshold it was reached at (`basisMinor`).
  */
 export interface Gain {
   readonly kind: GainKind;
   readonly scopeKey: string;
+  readonly basisMinor?: number;
+}
+
+/** A gain that holds today, as the job reads it back: a level with the threshold it was reached at, when known. */
+export interface HeldGain {
+  readonly kind: GainKind;
+  readonly scopeKey: string;
+  readonly basisMinor: number | null;
+}
+
+/** The trophies a net gives: a corrected net may take them back. The others reward regularity and stay (ADR 0118 § 5). */
+const NET_TROPHIES: ReadonlySet<GainKind> = new Set(['first_sale', 'day_record', 'fortnight_record']);
+
+const keyOf = (gain: { readonly kind: GainKind; readonly scopeKey: string }): string =>
+  `${gain.kind} ${gain.scopeKey}`;
+
+/**
+ * The gains held that the facts of today no longer justify (ADR 0118 § 5): a trophy tied to a net, or a tier, that
+ * `earned` no longer gives; and a rank whose cumulated net fell back under the threshold it was reached at. A rank
+ * stays when only the thresholds moved (§ 7): one that today's threshold still gives, one the owner raised above a
+ * net that did not move, and one whose threshold at the time is not known.
+ */
+export function takenBackOf(input: {
+  readonly held: readonly HeldGain[];
+  readonly earned: readonly Gain[];
+  readonly cumulatedNetMinor: number;
+}): HeldGain[] {
+  const earned = new Set(input.earned.map(keyOf));
+  return input.held.filter((gain) => {
+    if (earned.has(keyOf(gain))) return false;
+    if (gain.kind === 'level') return gain.basisMinor !== null && input.cumulatedNetMinor < gain.basisMinor;
+    return gain.kind === 'tier' || NET_TROPHIES.has(gain.kind);
+  });
 }
 
 export function reportOf(shift: GameShift, now: Date): StreakReport {
@@ -92,9 +126,10 @@ export function gainsOf(input: {
     gains: [
       ...trophies.map((kind) => ({ kind, scopeKey: '' })),
       ...pay.tiers.map((tier) => ({ kind: 'tier' as const, scopeKey: tierScopeKey(tier) })),
-      ...ranksReached(pay.cumulatedNetMinor, levelSteps).map((rank) => ({
+      ...ranksReached(pay.cumulatedNetMinor, levelSteps).map((step) => ({
         kind: 'level' as const,
-        scopeKey: String(rank),
+        scopeKey: String(step.rank),
+        basisMinor: step.thresholdMinor,
       })),
     ],
     streak,

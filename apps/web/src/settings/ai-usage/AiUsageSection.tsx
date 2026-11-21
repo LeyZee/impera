@@ -1,4 +1,4 @@
-import type { AiCreditProvider, AiCredits, AiUsage } from '@impera/contracts';
+import type { AiCreditProvider, AiCredits, AiUsage, AiUsageVoice } from '@impera/contracts';
 import { niceTicks, placeSegmentThumb } from '@impera/design-system';
 import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 
@@ -27,6 +27,14 @@ import {
   sinceText,
   USAGE_HINT,
   useSlices,
+  charactersText,
+  VOICE_BADGE,
+  VOICE_FREE_NOTE,
+  voiceDetail,
+  voiceLeft,
+  voiceRunway,
+  voiceShare,
+  voiceTone,
   type Column,
   type Slice,
 } from './view';
@@ -36,7 +44,7 @@ import './ai-usage.css';
 
 import { arcs, OTHER } from '@/screens/dashboard/agency/view';
 import { CountUp, Section, useFloatingTip, type FloatingTip } from '@/screens/dashboard/parts';
-import { ServerSilent } from '@/shell/ServerSilent';
+import { Failure } from '@/shell/states';
 
 /*
  * Réglages › Consommation IA (ADR 0091): what the AI costs, live, and when to recharge. Every figure is the server's,
@@ -177,7 +185,7 @@ function CreditCard({
   return (
     <article className="nv-plate cia-credit nv-enter" style={{ '--nv-i': index }} data-tone={tone}>
       <header className="cia-credit__head">
-        <h3 className="cia-credit__name">{providerLabel(card.provider)}</h3>
+        <h3 className="nv-h3 cia-credit__name">{providerLabel(card.provider)}</h3>
         <span className={`cia-badge cia-badge--${tone}`}>{CREDIT_BADGE[card.state]}</span>
       </header>
       {card.mode === 'subscription' ? (
@@ -246,30 +254,72 @@ function CreditCard({
   );
 }
 
+/**
+ * ElevenLabs counts characters, not money (ADR 0091 § 7): the month as its last check read it, a vocal being about a
+ * hundred characters. Amber under 10 % left, red at nothing; the free offer is said, never blocked.
+ */
+function VoiceCard({ voice, index, now }: { voice: AiUsageVoice; index: number; now: Date }): JSX.Element {
+  const tone = voiceTone(voice);
+  return (
+    <article className="nv-plate cia-credit cia-voice nv-enter" style={{ '--nv-i': index }} data-tone={tone}>
+      <header className="cia-credit__head">
+        <h3 className="nv-h3 cia-credit__name">ElevenLabs</h3>
+        <span className={`cia-badge cia-badge--${tone}`}>{VOICE_BADGE[tone]}</span>
+      </header>
+      <p className="cia-credit__balance nv-num">
+        <CountUp value={voiceLeft(voice)} format={charactersText} />
+        <span className="cia-credit__unit">caractères restants</span>
+      </p>
+      <div
+        className="cia-runway"
+        role="meter"
+        aria-label="Caractères du mois encore disponibles"
+        aria-valuemin={0}
+        aria-valuemax={voice.limit}
+        aria-valuenow={voiceLeft(voice)}
+      >
+        <span className="cia-runway__fill" style={{ '--_w': `${String(voiceShare(voice))}%` }} />
+      </div>
+      <p className="cia-credit__runway">{voiceRunway(voice)}</p>
+      {voice.plan === 'free' ? <p className="cia-credit__runway cia-voice__plan">{VOICE_FREE_NOTE}</p> : null}
+      <p className="cia-credit__detail">{voiceDetail(voice, now)}</p>
+    </article>
+  );
+}
+
 function Credits({
   usage,
   onAdd,
+  now,
 }: {
   usage: AiUsage;
   onAdd: (provider?: AiCreditProvider) => void;
+  now: Date;
 }): JSX.Element {
+  const voice =
+    usage.voice === null ? null : (
+      <VoiceCard voice={usage.voice} index={usage.credits.length + 1} now={now} />
+    );
   if (usage.credits.length === 0) {
     return (
-      <div className="nv-plate cia-none nv-enter">
-        <p>
-          Aucun crédit noté pour l’instant. Note ta dernière recharge, ou le solde affiché dans la console du
-          service : le CRM décompte ensuite chaque appel et te dit quand recharger. Un service payé par ton
-          abonnement se note aussi ici, sans montant.
-        </p>
-        <button
-          type="button"
-          className="nv-btn nv-btn--soft"
-          onClick={() => {
-            onAdd();
-          }}
-        >
-          Mettre à jour les crédits
-        </button>
+      <div className="cia-credits">
+        <div className="nv-plate cia-none nv-enter">
+          <p>
+            Aucun crédit noté pour l’instant. Note ta dernière recharge, ou le solde affiché dans la console
+            du service : le CRM décompte ensuite chaque appel et te dit quand recharger. Un service payé par
+            ton abonnement se note aussi ici, sans montant.
+          </p>
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft"
+            onClick={() => {
+              onAdd();
+            }}
+          >
+            Mettre à jour les crédits
+          </button>
+        </div>
+        {voice}
       </div>
     );
   }
@@ -284,6 +334,7 @@ function Credits({
           onTopUp={onAdd}
         />
       ))}
+      {voice}
     </div>
   );
 }
@@ -508,7 +559,7 @@ function Ring({
   const litSlice = lit === null ? undefined : slices[lit];
   return (
     <article className="nv-plate ins-ring-card">
-      <h3 className="ins-card__title">
+      <h3 className="nv-h3 ins-card__title">
         {title}
         {total > 0 ? <span className="ins-card__total">{eurText(total)}</span> : null}
       </h3>
@@ -619,10 +670,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
     return (
       <div className="ins-body cia-body">
         {query.isError ? (
-          <ServerSilent
-            text="La consommation revient dès qu’il répond."
-            onRetry={() => void query.refetch()}
-          />
+          <Failure onRetry={() => void query.refetch()} />
         ) : (
           <div
             className="db-loading nv-plate ins-loading"
@@ -649,7 +697,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
 
       <Section
         title="Crédits"
-        sub="ce qu’il reste chez chaque service, décompté appel par appel, ou son abonnement"
+        sub="ce qu’il reste chez chaque service, décompté appel par appel, ou son abonnement ; les vocaux en caractères"
         index={2}
         control={
           usage.credits.length === 0 ? undefined : (
@@ -665,7 +713,7 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
           )
         }
       >
-        <Credits usage={usage} onAdd={open} />
+        <Credits usage={usage} onAdd={open} now={now()} />
       </Section>
 
       <Section
@@ -693,7 +741,8 @@ export function AiUsageSection({ now = () => new Date() }: { now?: () => Date } 
       </div>
       <p className="cia-foot">
         Montants en euros au taux prudent du plafond ({usage.usdPerEur.toLocaleString('fr-FR')} $ pour 1 €) :
-        les services facturent en dollars. Les vocaux ElevenLabs ne sont pas comptés ici.
+        les services facturent en dollars. ElevenLabs compte en caractères, sur sa carte : ses vocaux ne sont
+        pas dans ces montants.
       </p>
       {tip.element}
       {adding === null ? null : (

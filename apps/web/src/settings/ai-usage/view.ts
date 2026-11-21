@@ -7,6 +7,7 @@ import type {
   AiUsageProvider,
   AiUsageProviderSpend,
   AiUsageUse,
+  AiUsageVoice,
 } from '@impera/contracts';
 
 import { OTHER, SERIES, dayLabel, shortDay } from '@/screens/dashboard/agency/view';
@@ -47,8 +48,17 @@ export const USES: Readonly<
   },
   sense: { label: 'Regarder les médias', note: 'photos, vidéos et vocaux décrits', colour: SERIES[2] },
   trend_watch: { label: 'Veille des tendances', note: 'les idées de contenu', colour: SERIES[3] },
+  instagram_comment: {
+    label: 'Commentaires Instagram',
+    note: 'ses réponses sous ses publications',
+    colour: OTHER,
+  },
   judge: { label: 'Tests de qualité', note: 'les évaluations de l’agent', colour: OTHER },
+  probe: { label: 'Essais réels', note: 'tes essais des services', colour: OTHER },
 };
+
+/** The uses in the neutral colour share one slice: two slices of one colour could not be told apart. */
+const FOLDED_USES: readonly AiUsageUse[] = ['judge', 'probe', 'instagram_comment'];
 
 /** « 3,42 € », to the cent; under a cent « 0,004 € », so a cheap call never reads as free. */
 export function eurText(eur: number): string {
@@ -197,15 +207,41 @@ export function modelSlices(usage: AiUsage): Slice[] {
 }
 
 export function useSlices(usage: AiUsage): Slice[] {
-  return usage.uses
-    .filter((use) => use.eur > 0)
-    .map((use) => ({
-      key: use.use,
-      label: USES[use.use].label,
-      note: `${USES[use.use].note} · ${countText(use.calls)} appel${use.calls > 1 ? 's' : ''}`,
-      colour: USES[use.use].colour,
-      eur: use.eur,
-    }));
+  const billed = usage.uses.filter((use) => use.eur > 0);
+  const own = billed.filter((use) => !FOLDED_USES.includes(use.use));
+  const folded = billed.filter((use) => FOLDED_USES.includes(use.use));
+  const callsText = (calls: number): string => `${countText(calls)} appel${calls > 1 ? 's' : ''}`;
+  const slices: Slice[] = own.map((use) => ({
+    key: use.use,
+    label: USES[use.use].label,
+    note: `${USES[use.use].note} · ${callsText(use.calls)}`,
+    colour: USES[use.use].colour,
+    eur: use.eur,
+  }));
+  const [only] = folded;
+  if (folded.length === 1 && only !== undefined) {
+    slices.push({
+      key: only.use,
+      label: USES[only.use].label,
+      note: `${USES[only.use].note} · ${callsText(only.calls)}`,
+      colour: OTHER,
+      eur: only.eur,
+    });
+  } else if (folded.length > 1) {
+    const calls = folded.reduce((total, use) => total + use.calls, 0);
+    // A real spend never hides under a name of tests: with her Instagram comments in, the slice names what it holds.
+    const onlyTests = folded.every((use) => use.use === 'judge' || use.use === 'probe');
+    slices.push({
+      key: onlyTests ? 'tests' : 'others',
+      label: onlyTests ? 'Tests et essais' : 'Autres usages',
+      note: onlyTests
+        ? `évaluations de l’agent et essais des services · ${callsText(calls)}`
+        : `${folded.map((use) => USES[use.use].label).join(', ')} · ${callsText(calls)}`,
+      colour: OTHER,
+      eur: folded.reduce((total, use) => total + use.eur, 0),
+    });
+  }
+  return slices;
 }
 
 /** The share of `part` in `whole`, in %, rounded; 0 for an empty whole. */
@@ -320,4 +356,61 @@ export function runwayShare(card: AiCredits): number {
   if (card.mode === 'subscription') return 100;
   if (card.daysLeft === null) return 100;
   return Math.min(100, (card.daysLeft / 30) * 100);
+}
+
+/*
+ * ElevenLabs' card (ADR 0091 § 7): characters, not money. A vocal is about a hundred characters (the Services line
+ * counts them the same way, `describeVoiceAccount` on the API).
+ */
+
+const CHARACTERS_PER_VOICE_NOTE = 100;
+
+export type VoiceTone = 'ok' | 'warn' | 'bad';
+
+export const VOICE_BADGE: Readonly<Record<VoiceTone, string>> = {
+  ok: 'Disponible',
+  warn: 'Bientôt épuisé',
+  bad: 'Épuisé',
+};
+
+export const voiceLeft = (voice: AiUsageVoice): number => Math.max(0, voice.limit - voice.used);
+
+/** Share of the month still there, 0 to 100, as the credit cards' runway fills with what is left. */
+export function voiceShare(voice: AiUsageVoice): number {
+  return voice.limit === 0 ? 0 : Math.min(100, (voiceLeft(voice) / voice.limit) * 100);
+}
+
+export function voiceTone(voice: AiUsageVoice): VoiceTone {
+  const left = voiceLeft(voice);
+  if (left === 0) return 'bad';
+  return left < voice.limit * 0.1 ? 'warn' : 'ok';
+}
+
+export const charactersText = (n: number): string => Math.round(n).toLocaleString('fr-FR');
+
+/** « environ 75 vocaux, le mois revient le 1er décembre ». */
+export function voiceRunway(voice: AiUsageVoice): string {
+  const notes = Math.floor(voiceLeft(voice) / CHARACTERS_PER_VOICE_NOTE);
+  const reset =
+    voice.resetsAt === null
+      ? ''
+      : `, le mois revient le ${new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(voice.resetsAt)).replace(/^1 /u, '1er ')}`;
+  return notes === 0
+    ? `Plus aucun vocal possible ce mois${reset}`
+    : `Environ ${notes.toLocaleString('fr-FR')} ${notes > 1 ? 'vocaux' : 'vocal'} encore${reset}`;
+}
+
+export const VOICE_FREE_NOTE =
+  'Offre gratuite : l’usage commercial n’y est pas autorisé. Passe à une offre payante avant de lancer les vocaux.';
+
+/** What the card is read from: the check of the key, every 15 minutes. */
+export function voiceDetail(voice: AiUsageVoice, now: Date): string {
+  const minutes = Math.max(0, Math.floor((now.getTime() - Date.parse(voice.readAt)) / 60_000));
+  const ago =
+    minutes < 1
+      ? 'à l’instant'
+      : minutes < 60
+        ? `il y a ${String(minutes)} min`
+        : `il y a ${String(Math.floor(minutes / 60))} h`;
+  return `${charactersText(voice.used)} sur ${charactersText(voice.limit)} caractères utilisés ce mois · lu chez ElevenLabs ${ago}`;
 }

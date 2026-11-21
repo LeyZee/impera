@@ -1,7 +1,7 @@
 /**
  * How many bubbles she may send, and how long each takes her to type (Charles, 16/11 à 0 h 09 : « trois bulles…
  * mais il faut pas qu'elle les envoie en même temps… Trois rarement »). Decided by code, never by the voice: one by
- * default, two when he wrote several messages or a long one, three only when he wrote three or more. The typing
+ * default, two when he wrote long, three only when he wrote long in three messages or more. The typing
  * delays are the same for the real send and the playground, so the playground shows the rhythm the fan will see.
  */
 export type BubbleBudget = 1 | 2 | 3;
@@ -24,10 +24,12 @@ function fanBurst(history: readonly { readonly from: 'fan' | 'creator'; readonly
 export function bubbleBudget(
   history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[],
 ): BubbleBudget {
+  // On what he wrote, never on how many times he pressed send: « ok » then « 😂 » is one short answer (audit du
+  // 16/11, B1). Three only when he wrote long in three messages or more.
   const burst = fanBurst(history);
-  if (burst.length >= 3) return 3;
   const length = burst.reduce((sum, text) => sum + text.trim().length, 0);
-  return burst.length === 2 || length >= LONG_MESSAGE_CHARS ? 2 : 1;
+  if (length < LONG_MESSAGE_CHARS) return 1;
+  return burst.length >= 3 ? 3 : 2;
 }
 
 /**

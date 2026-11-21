@@ -13,9 +13,10 @@ import { CreatorFace } from '../CreatorFace';
 import { creatorsSearch, type CreatorSheet } from '../search';
 
 import { useCreatorsOverview } from './api';
-import { modeOf, onShiftOf, requestOf, salesOf, todosOf, type Tone } from './model';
+import { onShiftOf, requestOf, salesOf, todosOf, type Tone } from './model';
 import './list.css';
 
+import { AgentSwitch } from '@/agent/AgentSwitch';
 import { readerZone, dayOf } from '@/scheduling/time';
 import { todosAcrossQuery } from '@/screens/tracking/api';
 import { SetupLink } from '@/setup/SetupCard';
@@ -32,10 +33,13 @@ export function CreatorsList({
   creators,
   sheet,
   isOwner,
+  switches = false,
 }: {
   creators: readonly CreatorSummary[];
   sheet: CreatorSheet;
   isOwner: boolean;
+  /** The reader may turn her AI on, off or pause it from her card (ADR 0148 § 1). */
+  switches?: boolean;
 }): JSX.Element {
   const overview = useCreatorsOverview();
   const queue = useQuery(todosAcrossQuery);
@@ -60,6 +64,8 @@ export function CreatorsList({
             count={counts.get(creator.id)}
             sheet={sheet}
             setup={isOwner ? steps.get(creator.id) : undefined}
+            read={overview.dataUpdatedAt}
+            switches={switches}
           />
         ))}
       </ul>
@@ -74,6 +80,8 @@ function CreatorCard({
   count,
   sheet,
   setup,
+  read,
+  switches,
 }: {
   creator: CreatorSummary;
   card: CreatorOverview | undefined;
@@ -82,8 +90,9 @@ function CreatorCard({
   sheet: CreatorSheet;
   /** Her « Mise en route », the owner's alone. */
   setup: CreatorSetup | undefined;
+  read: number;
+  switches: boolean;
 }): JSX.Element {
-  const mode = card === undefined ? null : modeOf(card.mode);
   const todos = todosOf(count);
   const today = dayOf(new Date(), creator.timezone);
   const request = card?.requests == null ? null : requestOf(card.requests, today);
@@ -96,19 +105,25 @@ function CreatorCard({
           <Link to="/creatrices" search={creatorsSearch(sheet, creator.id)} className="cl-card__name">
             {creator.displayName}
           </Link>
-          {mode === null ? (
+          {card === undefined ? (
             <span className="cl-card__mode cl-card__mode--empty" aria-hidden="true" />
-          ) : (
-            <span className="cl-card__mode">
-              <span className={`nv-dot nv-tone--${mode.tone}`} aria-hidden="true" />
-              {mode.label}
-            </span>
-          )}
+          ) : null}
         </div>
         <svg className="cl-card__go" viewBox="0 0 16 16" aria-hidden="true">
           <path d="m6 3.5 4.5 4.5L6 12.5" />
         </svg>
       </div>
+      {card === undefined ? null : (
+        <AgentSwitch
+          creatorId={creator.id}
+          creatorName={creator.displayName}
+          zone={creator.timezone}
+          state={card}
+          read={read}
+          variant="card"
+          readOnly={!switches}
+        />
+      )}
       <dl className="cl-card__facts">
         {card === undefined || card.onShift === null ? null : (
           <Fact label="Chiffre d’affaires" {...salesOf(card.sales)} strong />

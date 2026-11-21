@@ -1,5 +1,6 @@
 import type { CommissionStatementId, InvoiceId, TeamMemberId } from '@impera/contracts';
 import type { Database } from '@impera/db';
+import type { preValidationAsyncHookHandler } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import type { InvoiceObjectStore } from '../contractors';
@@ -64,8 +65,11 @@ export { invoiceReadsForAccounting } from './infra/accounting-reads';
  */
 export interface InvoicingModule {
   readonly name: 'invoicing';
-  /** Mounted under `/v1` by the server: `/payroll/invoices/…` (contracts `payroll.ts`). */
-  routes(requireRole: RequireRole): FastifyPluginAsyncZod;
+  /**
+   * Mounted under `/v1` by the server: `/payroll/invoices/…` (contracts `payroll.ts`); `recentLogin` guards a contest
+   * and its end (EQ-15).
+   */
+  routes(requireRole: RequireRole, recentLogin: preValidationAsyncHookHandler): FastifyPluginAsyncZod;
   /**
    * A rendered PDF read back from the first bucket, or from the copy when the first one does not give it whole
    * (`checkedInvoicePdf`): the accountant's archive reads each document through it (`accounting`, ADR 0047 § 1).
@@ -175,11 +179,12 @@ export function createInvoicingModule(deps: InvoicingDeps): InvoicingModule {
   );
   return {
     name: 'invoicing',
-    routes: (requireRole) =>
+    routes: (requireRole, recentLogin) =>
       createInvoicingRoutes(
         (userId, invoiceId, logger) => downloadInvoicePdf(pdfs, userId, invoiceId, logger),
         createPayrollInvoiceAcceptance(acceptanceStore),
         requireRole,
+        recentLogin,
       ),
     checkedPdf: (pdf, logger) => checkedInvoicePdf(pdfs, pdf, logger),
     jobs: {

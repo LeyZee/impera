@@ -59,7 +59,7 @@ export function ArchivedCreators({
     setBusyId(null);
     if (result.kind === 'restored') {
       setNotice(
-        `Rouverte : ${result.creator.displayName}. Son agent reste à l’arrêt : relance-le depuis le Dashboard. Son espace se rouvre avec un nouveau lien, dans l’onglet Accès.`,
+        `Rouverte : ${result.creator.displayName}. Son agent reste à l’arrêt : relance-le depuis le Dashboard. Son espace se rouvre avec un nouveau lien, dans l’onglet Compte de sa fiche.`,
       );
       await client.invalidateQueries({ queryKey: ['creators'] });
       onRestored(result.creator.id);

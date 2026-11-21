@@ -1,4 +1,12 @@
-import type { BranchCondition, CreatorId, Currency, MediaSlotKind, UserRole } from '@impera/contracts';
+import type {
+  BranchCondition,
+  CreatorId,
+  Currency,
+  MediaSlotKind,
+  PlatformAccountId,
+  PlatformStepDiscount,
+  UserRole,
+} from '@impera/contracts';
 
 import { branchGaps, conditionOf, ranksOf, stepsWithoutDefault } from '../domain/branches';
 import {
@@ -9,11 +17,13 @@ import {
 } from '../domain/platform-scripts';
 import type {
   BranchInput,
-  IdentityReview,
+  DescriptionReview,
+  DiscountedPlatformScript,
   PlatformScriptReadStore,
   ScriptBranchStore,
   SetBranchesOutcome,
   ScriptIdentityReviewStore,
+  ShownDescription,
   StoredPlatformScript,
   StoredScriptIdentity,
   StoredStepMedia,
@@ -32,9 +42,13 @@ interface PlatformStepMediaView {
   readonly kind: MediaSlotKind;
   /** `false`: absent from the vault, the step is incomplete. */
   readonly inVault: boolean;
+  /** In the vault and chosen for the CRM (ADR 0145 § 5). */
+  readonly imported: boolean;
   /** The media it is once its file is read; `null` before, or absent from the vault. */
   readonly mediaAssetId: string | null;
   readonly described: boolean;
+  /** The description the agency reviews: the latest validated, else the latest written; `null` while none. */
+  readonly description: ShownDescription | null;
 }
 
 interface PlatformStepView {
@@ -48,6 +62,8 @@ interface PlatformStepView {
   /** As the platform gives it: minor units, VAT included; 0 for an offered step. Never recalculated. */
   readonly priceMinor: number;
   readonly currency: Currency;
+  /** A « Tarif réduit » set on the platform; `null` when none. The step is blocked while it has one. */
+  readonly discount: PlatformStepDiscount | null;
   readonly media: readonly PlatformStepMediaView[];
   readonly previewMedia: readonly PlatformStepMediaView[];
   /** Every media of the step is in the vault. */
@@ -108,8 +124,10 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     ref: media.ref,
     kind: media.kind,
     inVault: media.vault !== null,
+    imported: media.vault?.imported ?? false,
     mediaAssetId: media.vault?.mediaAssetId ?? null,
     described: (media.vault?.descriptionId ?? null) !== null,
+    description: media.vault?.shown ?? null,
   });
   // By rank, then the branches of a rank in the agency's order (ADR 0112 § 6): how the screen and the agent read them.
   const ranks = ranksOf(script.steps, script.branches);
@@ -133,7 +151,10 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     soldMediaRefs: step.media.map((media) => media.ref),
   }));
   const gaps = platformScriptGaps(
-    steps.map((step) => ({ media: [...step.media, ...step.previewMedia] })),
+    steps.map((step) => ({
+      discounted: step.discount !== null,
+      media: [...step.media, ...step.previewMedia],
+    })),
     identity?.validatedAt != null,
     branchGaps(branchSteps, script.branches),
   );
@@ -159,6 +180,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     gaps,
     proposable: script.active && gaps.length === 0,
     identity,
+    ours: script.ours,
   };
 }
 
@@ -172,6 +194,20 @@ export async function creatorPlatformScripts(
   const scripts = await deps.store.ofCreator(creatorId, reader.userId);
   if (scripts === null) return null;
   return scripts.map(viewOf);
+}
+
+/**
+ * Her active native scripts kept from being offered by a « Tarif réduit » on the platform (recette 16/11: bloquer et
+ * alerter), the longest waiting first: what « À traiter » warns of until the agency takes the discount off in Reveal.
+ * The owner and her active managers only, like `creatorPlatformScripts`; `null` for a reader who may not read her.
+ */
+export async function discountedPlatformScripts(
+  deps: Deps,
+  reader: PlatformScriptsReader,
+  creatorId: CreatorId,
+): Promise<readonly DiscountedPlatformScript[] | null> {
+  if (reader.role !== 'owner' && reader.role !== 'operator') return null;
+  return deps.store.discountedOf(creatorId, reader.userId);
 }
 
 /**
@@ -190,18 +226,30 @@ export async function platformScriptForJob(
 }
 
 /**
- * The agency validates the identity shown for the script's current version, or writes one by hand (SC-04 lot c8, ADR
- * 0030 § 3): the owner and the active managers of her list. An identity of another version is `stale`.
+ * Her native scripts on one account, out of any person and as the service role: what the agent decides a script on
+ * for a fan (ADR 0098), each with its `proposable` and its steps by rank. For a job only, like `platformScriptForJob`.
  */
-export async function reviewScriptIdentity(
+export async function accountPlatformScriptsForJob(
+  deps: Deps,
+  creatorId: CreatorId,
+  platformAccountId: PlatformAccountId,
+): Promise<readonly PlatformScriptView[]> {
+  return (await deps.store.ofAccountForJob(creatorId, platformAccountId)).map(viewOf);
+}
+
+/**
+ * The agency validates the descriptions of a native script's media as shown, or rewrites one by hand (ADR 0030 § 3,
+ * ADR 0099 § 4): the owner and the active managers of her list. No identity is asked after it any more (ADR 0161 § 5).
+ */
+export async function reviewScriptDescriptions(
   deps: { readonly store: ScriptIdentityReviewStore },
   reader: PlatformScriptsReader,
   creatorId: CreatorId,
   scriptId: string,
-  review: IdentityReview,
-): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found'> {
+  review: DescriptionReview,
+): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'alone' | 'not_found'> {
   if (reader.role !== 'owner' && reader.role !== 'operator') return 'not_found';
-  return deps.store.review(creatorId, scriptId, review, reader.userId, currentInputHash);
+  return deps.store.describe(creatorId, scriptId, review, reader.userId);
 }
 
 /**

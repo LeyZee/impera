@@ -71,6 +71,7 @@ import {
 import { fullDay } from '@/scheduling/time';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 import './persona.css';
 
 /**
@@ -113,13 +114,7 @@ export function PersonaSection({
     return (
       <section className="ps-page" aria-busy={load.kind === 'loading'}>
         {load.kind === 'failed' ? (
-          <div className="nv-plate ps-head">
-            <p className="ps-title">La persona ne se charge pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button type="button" className="nv-btn nv-btn--soft ps-self-start" onClick={reload}>
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={reload} />
         ) : (
           <>
             <div className="nv-plate ps-head ps-skeleton" />
@@ -835,7 +830,7 @@ function Head({
     <div className="nv-plate ps-head" ref={headRef}>
       <div className="ps-head__top">
         <div className="ps-head__who">
-          <h2 className="ps-title" data-placeholder={name === '' ? 'true' : undefined}>
+          <h2 className="nv-h2 ps-title" data-placeholder={name === '' ? 'true' : undefined}>
             {name === '' ? 'Surnom à remplir' : name}
           </h2>
           <p className="ps-head__meta">
@@ -1119,7 +1114,7 @@ function Tabs({
           >
             {tab.label}
             {errors[tab.id] > 0 ? (
-              <span className="nv-subnav__count" aria-label={`${String(errors[tab.id])} à corriger`}>
+              <span className="nv-count nv-subnav__count" aria-label={`${String(errors[tab.id])} à corriger`}>
                 {errors[tab.id]}
               </span>
             ) : edited(tab.id) ? (

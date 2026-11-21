@@ -2,7 +2,18 @@ import type { Me } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { placeOf } from './tab';
-import { firstNameOf, initialsOf, kindLabel, kindOf, shortcutsFor, watchesInstagram } from './who';
+import {
+  awayLabel,
+  awayOf,
+  awayTitle,
+  firstNameOf,
+  initialsOf,
+  kindLabel,
+  kindOf,
+  shortcutIconOf,
+  shortcutsFor,
+  watchesInstagram,
+} from './who';
 
 const me = (over: Partial<Me>): Me => ({
   id: 'u1',
@@ -43,17 +54,15 @@ describe('who is signed in', () => {
 
   it.each([
     [me({}), true],
-    [me({ role: 'operator', team: { role: 'manager', status: 'active' }, teamScope: 'agency' }), true],
+    // ADR 0024, amendement du 16/11: the manager no longer has the watch.
+    [me({ role: 'operator', team: { role: 'manager', status: 'active' }, teamScope: 'agency' }), false],
     [me({ role: 'operator', team: { role: 'manager', status: 'on_leave' }, teamScope: 'self' }), false],
     [me({ role: 'operator', team: { role: 'chatter', status: 'active' }, teamScope: 'self' }), false],
     [me({ role: 'operator', teamScope: 'self' }), false],
     [me({ role: 'creator', teamScope: 'self' }), false],
-  ])(
-    'offers the Instagram watch to the owner and an active manager only (ADR 0060 § 2)',
-    (account, watches) => {
-      expect(watchesInstagram(kindOf(account))).toBe(watches);
-    },
-  );
+  ])('offers the Instagram watch to the owner alone (ADR 0024, amendement du 16/11)', (account, watches) => {
+    expect(watchesInstagram(kindOf(account))).toBe(watches);
+  });
 
   it('takes the initials of the first and last names', () => {
     expect(initialsOf({ name: 'Alex de la Morel', email: 'a@exemple.fr' })).toBe('AM');
@@ -63,6 +72,27 @@ describe('who is signed in', () => {
 
   it('greets by the first name', () => {
     expect(firstNameOf({ name: ' Alex Morel ' })).toBe('Alex');
+  });
+
+  // Recette du 16/11, EXT-22: « 🌸 Lou 🌸 » gave « Bonsoir, 🌸. » and « 🌸🌸 ».
+  it('skips the words that hold no letter, in the name and the initials', () => {
+    expect(firstNameOf({ name: '🌸 Lou 🌸' })).toBe('Lou');
+    expect(initialsOf({ name: '🌸 Lou 🌸', email: 'a@exemple.fr' })).toBe('L');
+    expect(initialsOf({ name: '🌸Lou Morel', email: 'a@exemple.fr' })).toBe('LM');
+    expect(firstNameOf({ name: '🌸 🌸' })).toBe('');
+    expect(initialsOf({ name: '🌸 🌸', email: 'zoe@exemple.fr' })).toBe('Z');
+  });
+
+  // Recette du 16/11, EXT-10: a suspended chatter saw « Connecté » and the copilot.
+  it('tells a member away from work, in the words of the CRM', () => {
+    const chatter = (status: 'active' | 'suspended' | 'on_leave') =>
+      me({ role: 'operator', team: { role: 'chatter', status }, teamScope: 'self' });
+    expect(awayOf(chatter('active'))).toBeNull();
+    expect(awayOf(me({}))).toBeNull();
+    expect(awayOf(chatter('suspended'))).toBe('suspended');
+    expect(awayLabel('suspended')).toBe('Suspendu');
+    expect(awayTitle('suspended')).toBe('Ton compte est suspendu');
+    expect(awayLabel('on_leave')).toBe('En congé');
   });
 
   it('offers four shortcuts at most, read in the CRM menus (ADR 0066 § 6), the creator her Agenda', () => {
@@ -77,6 +107,14 @@ describe('who is signed in', () => {
     for (const kind of ['owner', 'manager', 'chatter', 'operator', 'creator'] as const) {
       expect(shortcutsFor(kind).length).toBeLessThanOrEqual(4);
     }
+  });
+
+  // Avis Design du 19/11 sur #872: Entraîner wore Suivi's icon and Réglages Moi's.
+  it('draws Entraîner and Réglages with their own icons, as the CRM menu does', () => {
+    expect(shortcutIconOf('/entrainer')).toBe('train');
+    expect(shortcutIconOf('/reglages')).toBe('settings');
+    expect(shortcutIconOf('/suivi')).toBe('tracking');
+    expect(shortcutIconOf('/moi')).toBe('me');
   });
 });
 

@@ -1,5 +1,5 @@
 import { PlatformSchema, type Platform } from '@impera/contracts';
-import { and, eq, schema, sql, withAdmin, type Database, type Transaction } from '@impera/db';
+import { and, eq, schema, sql, withAdmin, withTenantJob, type Database, type Transaction } from '@impera/db';
 
 import type { DailyStatsStore, LinkedAccount } from '../../domain/daily-stats';
 
@@ -12,12 +12,25 @@ const {
   salesFeedStatsCalls,
 } = schema;
 
+/** `rows` by the creator each belongs to, in the order they came. */
+function byCreator<Row extends { readonly creatorId: string }>(rows: readonly Row[]): Map<string, Row[]> {
+  const groups = new Map<string, Row[]>();
+  for (const row of rows) {
+    const group = groups.get(row.creatorId);
+    if (group === undefined) groups.set(row.creatorId, [row]);
+    else group.push(row);
+  }
+  return groups;
+}
+
 /**
- * The photo of the daily statistics, by account (ADR 0081) and by chatter (ADR 0092 § 1), and the calls counted,
- * through `withAdmin` only: `nirvana_app` has no write policy on any of them, and reads the photos inside
- * `withTenantMember` (`dailyStatsOf`, `chatterStatsOf`).
+ * The photo of the daily statistics, by account (ADR 0081) and by chatter (ADR 0092 § 1), and the calls counted.
+ * The photos are a creator's rows: written under the app role, one creator and one transaction at a time
+ * (`withTenantJob`, ADR 0087 lot c), so a day can only land in the creator it is written for. What belongs to the
+ * agency (the calls counted, the links, the date of the full reading) stays on the service connection. Accounts read
+ * the photos inside `withTenantMember` (`dailyStatsOf`, `chatterStatsOf`) and write nothing.
  */
-export function createDrizzleDailyStatsStore(adminDb: Database): DailyStatsStore {
+export function createDrizzleDailyStatsStore(db: Database, adminDb: Database): DailyStatsStore {
   return {
     fullReadAt: (platform) =>
       withAdmin(adminDb, async (tx) => {
@@ -70,72 +83,81 @@ export function createDrizzleDailyStatsStore(adminDb: Database): DailyStatsStore
         );
       }),
 
-    record: (platform, rows, readAt, full) =>
-      withAdmin(adminDb, async (tx) => {
-        for (const row of rows) {
-          const values = {
-            newSubscribers: row.newSubscribers,
-            unsubscribes: row.unsubscribes,
-            activeSubscribers: row.activeSubscribers,
-            renewals: row.renewals,
-            ppvSent: row.ppvSent,
-            ppvPurchased: row.ppvPurchased,
-            messagesSent: row.messagesSent,
-            messagesReceived: row.messagesReceived,
-            readAt,
-          };
-          await tx
-            .insert(platformDailyStats)
-            .values({
-              platform: row.platform,
-              platformAccountId: row.platformAccountId,
-              creatorId: row.creatorId,
-              day: row.day,
-              ...values,
-            })
-            .onConflictDoUpdate({
-              target: [platformDailyStats.platformAccountId, platformDailyStats.day],
-              // The platform's last word on the day (§ 1), its creator included should the model move.
-              set: { creatorId: row.creatorId, ...values },
-            });
-        }
-        if (full) {
-          await tx
+    record: async (platform, rows, readAt, full) => {
+      for (const [creatorId, hers] of byCreator(rows)) {
+        await withTenantJob(db, creatorId, 'daily_stats', async (tx) => {
+          for (const row of hers) {
+            const values = {
+              newSubscribers: row.newSubscribers,
+              unsubscribes: row.unsubscribes,
+              activeSubscribers: row.activeSubscribers,
+              renewals: row.renewals,
+              ppvSent: row.ppvSent,
+              ppvPurchased: row.ppvPurchased,
+              messagesSent: row.messagesSent,
+              messagesReceived: row.messagesReceived,
+              readAt,
+            };
+            await tx
+              .insert(platformDailyStats)
+              .values({
+                platform: row.platform,
+                platformAccountId: row.platformAccountId,
+                creatorId,
+                day: row.day,
+                ...values,
+              })
+              .onConflictDoUpdate({
+                target: [platformDailyStats.platformAccountId, platformDailyStats.day],
+                // The platform's last word on the day (§ 1). An account never changes creator while it has days.
+                set: values,
+              });
+          }
+        });
+      }
+      // Dated once every creator's days are in: a reading cut short is read again in full at the next hour.
+      if (full) {
+        await withAdmin(adminDb, (tx) =>
+          tx
             .insert(salesFeedCursors)
             .values({ platform, statsFullReadAt: readAt })
-            .onConflictDoUpdate({ target: salesFeedCursors.platform, set: { statsFullReadAt: readAt } });
-        }
-      }),
+            .onConflictDoUpdate({ target: salesFeedCursors.platform, set: { statsFullReadAt: readAt } }),
+        );
+      }
+    },
 
-    recordChatters: (rows, readAt) =>
-      withAdmin(adminDb, async (tx) => {
-        for (const row of rows) {
-          const values = {
-            ppvSent: row.ppvSent,
-            ppvPurchased: row.ppvPurchased,
-            messagesSent: row.messagesSent,
-            readAt,
-          };
-          await tx
-            .insert(platformChatterDailyStats)
-            .values({
-              platform: row.platform,
-              platformAccountId: row.platformAccountId,
-              creatorId: row.creatorId,
-              platformChatterId: row.platformChatterId,
-              day: row.day,
-              ...values,
-            })
-            .onConflictDoUpdate({
-              target: [
-                platformChatterDailyStats.platformAccountId,
-                platformChatterDailyStats.platformChatterId,
-                platformChatterDailyStats.day,
-              ],
-              set: { creatorId: row.creatorId, ...values },
-            });
-        }
-      }),
+    recordChatters: async (rows, readAt) => {
+      for (const [creatorId, hers] of byCreator(rows)) {
+        await withTenantJob(db, creatorId, 'daily_stats', async (tx) => {
+          for (const row of hers) {
+            const values = {
+              ppvSent: row.ppvSent,
+              ppvPurchased: row.ppvPurchased,
+              messagesSent: row.messagesSent,
+              readAt,
+            };
+            await tx
+              .insert(platformChatterDailyStats)
+              .values({
+                platform: row.platform,
+                platformAccountId: row.platformAccountId,
+                creatorId,
+                platformChatterId: row.platformChatterId,
+                day: row.day,
+                ...values,
+              })
+              .onConflictDoUpdate({
+                target: [
+                  platformChatterDailyStats.platformAccountId,
+                  platformChatterDailyStats.platformChatterId,
+                  platformChatterDailyStats.day,
+                ],
+                set: values,
+              });
+          }
+        });
+      }
+    },
   };
 }
 

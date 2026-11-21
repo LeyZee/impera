@@ -3,11 +3,14 @@ import {
   CommissionPresetSchema,
   CommissionRateSchema,
   CreatorIdSchema,
+  DomainError,
   newId,
   TeamMemberNoteSchema,
   TeamMemberSchema,
   TeamMemberStatusSchema,
+  TeamMemberTimeZoneHistorySchema,
   TeamRoleChangeSchema,
+  TIME_ZONE_CHANGES_PAGE,
   TeamRoleSchema,
   UserIdSchema,
   type CommissionRate,
@@ -31,12 +34,14 @@ import {
   type Database,
   type Transaction,
 } from '@impera/db';
+import { z } from 'zod';
 
 import {
   CommissionPresetConflict,
   CommissionRateConflict,
   MemberConflict,
   MemberNotFound,
+  OwnerProtected,
   OwnNotesForbidden,
   PlatformAccountLinked,
   RoleChangeConflict,
@@ -346,6 +351,9 @@ export function createDrizzleTeamStore(
         // Asked twice, the same status changes nothing and writes nothing.
         if (current.status === status) return;
         assertStillInTeam(current.status);
+        // An owner is never shut out by a status (ADR 0096 § 2): his sign-in reads it, his removal has its notice.
+        const [holder] = await tx.select({ role: user.role }).from(user).where(eq(user.id, current.userId));
+        if (holder?.role === 'owner') throw new OwnerProtected();
         const leaving = leavesTeam(current.status, status);
         await tx
           .update(teamMembers)
@@ -528,7 +536,80 @@ export function createDrizzleTeamStore(
           createdAt: createdAt.toISOString(),
         });
       }),
+
+    // The function holds the boundary (migration 0217): the session's account, his record, its zone alone. Its
+    // refusals abort the transaction, so they are read once it has ended.
+    followTimeZone: async (actor, zone) => {
+      try {
+        return await withMember(db, actor, async (tx) => {
+          const { rows } = await tx.execute(sql`select public.follow_own_time_zone(${zone}) as zone`);
+          return FollowedZoneSchema.parse(rows[0]).zone;
+        });
+      } catch (error) {
+        const code = postgresCodeOf(error);
+        if (code === 'P0002') return null;
+        if (code === '22023') throw new DomainError('request_invalid', 'Fuseau horaire inconnu du serveur');
+        throw error;
+      }
+    },
+
+    timeZoneChanges: (actor, id, before) =>
+      withMember(db, actor, async (tx, scope) => {
+        assertOwnerScope(scope);
+        const [member] = await tx
+          .select({ id: teamMembers.id })
+          .from(teamMembers)
+          .where(eq(teamMembers.id, id));
+        if (member === undefined) return null;
+        const ofMember = and(
+          eq(auditLog.action, TIME_ZONE_FOLLOW),
+          eq(auditLog.entity, 'team_member'),
+          eq(auditLog.entityId, id),
+        );
+        // A change of another member, or of anything else, as `before` ends the list: never another one's line.
+        const older =
+          before === null
+            ? undefined
+            : sql`(${auditLog.createdAt}, ${auditLog.id}) < (select a.created_at, a.id from audit_log a
+                where a.id = ${before} and a.action = ${TIME_ZONE_FOLLOW} and a.entity = 'team_member'
+                  and a.entity_id = ${id})`;
+        const rows = await tx
+          .select({ id: auditLog.id, details: auditLog.details, at: auditLog.createdAt })
+          .from(auditLog)
+          .where(and(ofMember, older))
+          .orderBy(sql`${auditLog.createdAt} desc, ${auditLog.id} desc`)
+          .limit(TIME_ZONE_CHANGES_PAGE + 1);
+        const page = rows.slice(0, TIME_ZONE_CHANGES_PAGE);
+        const last = page.at(-1);
+        return TeamMemberTimeZoneHistorySchema.parse({
+          changes: page.map((row) => ({
+            id: row.id,
+            ...ZoneChangeSchema.parse(row.details),
+            at: row.at.toISOString(),
+          })),
+          nextBefore: rows.length > TIME_ZONE_CHANGES_PAGE && last !== undefined ? last.id : null,
+        });
+      }),
   };
+}
+
+/** The action of `follow_own_time_zone`'s trace (migration 0217). */
+const TIME_ZONE_FOLLOW = 'team_member.time_zone_follow';
+
+const FollowedZoneSchema = z.object({ zone: z.string() });
+
+/** The trace's details: the zone before and after, nothing else. */
+const ZoneChangeSchema = z.object({ from: z.string(), to: z.string() });
+
+/** The SQLSTATE of a refusal from the database, Drizzle's wrapper or not. */
+function postgresCodeOf(error: unknown): string | null {
+  for (const candidate of [error, error instanceof Error ? error.cause : undefined]) {
+    if (typeof candidate === 'object' && candidate !== null && 'code' in candidate) {
+      const { code } = candidate;
+      if (typeof code === 'string') return code;
+    }
+  }
+  return null;
 }
 
 /** How a platform's team account is linked: to a member of the team, or to the agent (ADR 0050 § 5). */

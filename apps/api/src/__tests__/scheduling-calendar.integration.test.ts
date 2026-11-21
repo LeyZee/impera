@@ -289,6 +289,39 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     }
   });
 
+  it('says to the agency alone who holds none of his shifts, and counts their créneaux to fill (recette EQU-01, EQU-02)', async () => {
+    const stretch = (start: number, end: number) => [
+      { startsAt: parisInstant(day, start).toISOString(), endsAt: parisInstant(day, end).toISOString() },
+    ];
+    const annaToFill = (read: Awaited<ReturnType<typeof calendar>>) =>
+      read.agency?.toFill.filter((slot) => slot.platformAccountId === annaAccount).map((slot) => slot.open);
+    const wholeDay = [stretch(0, 360), stretch(360, 720), stretch(720, 1080), stretch(1080, 1440)];
+    expect((await calendar(owner)).away).toEqual([]);
+    expect(annaToFill(await calendar(owner))).not.toEqual(wholeDay);
+    await setStatus(theo, 'suspended');
+    try {
+      expect((await calendar(owner)).away).toEqual([{ memberId: theo.id, status: 'suspended' }]);
+      // A chatter reads the shifts of the team, never a colleague's status.
+      expect((await calendar(basileCookie)).away).toEqual([]);
+    } finally {
+      await setStatus(theo, 'active');
+    }
+    // Anna taken off Théo's list: he no longer reads her, his shift on her holds nothing.
+    await test.admin.db.update(schema.user).set({ creatorIds: [] }).where(eq(schema.user.id, theo.userId));
+    try {
+      const read = await calendar(owner);
+      expect(read.shifts.some((shift) => shift.memberId === theo.id)).toBe(true);
+      expect(read.withoutAccess).toEqual([{ memberId: theo.id, creatorId: anna }]);
+      expect(annaToFill(read)).toEqual(wholeDay);
+      expect((await calendar(basileCookie)).withoutAccess).toEqual([]);
+    } finally {
+      await test.admin.db
+        .update(schema.user)
+        .set({ creatorIds: [anna] })
+        .where(eq(schema.user.id, theo.userId));
+    }
+  });
+
   it('filters by creator and by member, never beyond what the reader may read', async () => {
     const annaOnly = await calendar(owner, { creatorId: anna });
     expect(annaOnly.shifts.map((shift) => shift.creatorId)).toEqual([anna]);
@@ -350,6 +383,47 @@ describe('Équipe › Calendrier (GET /v1/scheduling/calendar, CR-12)', () => {
     await expectSameModeAsDashboard(stopped);
     expect(stopped.agency?.aiAlone).toEqual([]);
     expect(stopped.agency?.toFill).toHaveLength(8);
+  });
+
+  it('reads a pause as the other readers do: ended, no longer Arrêt; under way, Arrêt (ADR 0148 § 1)', async () => {
+    const minutes = (count: number): Date => new Date(Date.now() + count * 60_000);
+    // The test above leaves the global switch on: lifted first, so only her pause decides.
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'global',
+      active: false,
+      reason: 'essai levé',
+      setBy: 'owner',
+    });
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'creator',
+      scopeId: ines,
+      creatorId: ines,
+      active: true,
+      activeUntil: minutes(-5),
+      reason: 'pause finie',
+      setBy: 'owner',
+      setAt: minutes(-65),
+    });
+    const ended = await calendar(owner);
+    expect(ended.agent.find((agent) => agent.creatorId === ines)?.mode).not.toBe('stop');
+    await expectSameModeAsDashboard(ended);
+
+    await test.admin.db.insert(schema.killSwitches).values({
+      id: newId(KillSwitchIdSchema),
+      scope: 'creator',
+      scopeId: ines,
+      creatorId: ines,
+      active: true,
+      activeUntil: minutes(60),
+      reason: 'pause en cours',
+      setBy: 'owner',
+      setAt: minutes(-1),
+    });
+    const paused = await calendar(owner);
+    expect(paused.agent.find((agent) => agent.creatorId === ines)?.mode).toBe('stop');
+    await expectSameModeAsDashboard(paused);
   });
 
   it('refuses a window over six weeks, and a creator', async () => {

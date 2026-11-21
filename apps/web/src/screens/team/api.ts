@@ -10,6 +10,7 @@ import {
   TeamMemberNoteListSchema,
   TeamMemberNoteSchema,
   TeamMemberSchema,
+  TeamMemberTimeZoneHistorySchema,
   TeamPlatformRemovalListSchema,
   type CommissionPreset,
   type CommissionRate,
@@ -21,10 +22,17 @@ import {
   type TeamMemberErrorCode,
   type TeamMemberNote,
   type TeamMemberStatus,
+  type TeamMemberTimeZoneHistory,
   type TeamPlatformRemoval,
   type UpdateTeamMemberBody,
 } from '@impera/contracts';
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+  type UseInfiniteQueryResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import type { TeamRefusalCode } from './model';
 
@@ -91,6 +99,32 @@ export function useRates(memberId: string, enabled = true): UseQueryResult<Commi
 
 export function useNotes(memberId: string): UseQueryResult<TeamMemberNote[]> {
   return useQuery({ queryKey: ['team', 'notes', memberId], queryFn: () => fetchNotes(memberId) });
+}
+
+const NEWEST_PAGE: string | null = null;
+
+/**
+ * The changes his phone made to a member's zone (recette CHT-01), newest first, a page at a time: the owner's alone.
+ * Apart from the team's key, like the notes: re-reading the team after a write does not wait for them.
+ */
+export function useTimeZoneChanges(
+  memberId: string,
+  enabled: boolean,
+): UseInfiniteQueryResult<InfiniteData<TeamMemberTimeZoneHistory>> {
+  return useInfiniteQuery({
+    queryKey: ['team', 'time-zones', memberId],
+    queryFn: ({ pageParam }) =>
+      read(
+        pageParam === null
+          ? `/v1/team/members/${memberId}/time-zones`
+          : `/v1/team/members/${memberId}/time-zones?before=${pageParam}`,
+        (body) => TeamMemberTimeZoneHistorySchema.parse(body),
+      ),
+    initialPageParam: NEWEST_PAGE,
+    getNextPageParam: (last) => last.nextBefore,
+    enabled,
+    retry: 1,
+  });
 }
 
 /** A refusal the screen says in its own words, or a server that does not answer. */

@@ -1,4 +1,5 @@
 import {
+  AgencyShareAlertSchema,
   CreatorAgencyRateSchema,
   ObservedAgencyShareSchema,
   type CreatorAgencyRateList,
@@ -7,6 +8,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import {
+  alertText,
   bpsOfPercent,
   confirmSentence,
   dayLabel,
@@ -79,16 +81,28 @@ describe('where a percentage stands', () => {
   const older = rate('0192f3a0-0000-7000-8000-0000000000e0', '2026-10-01', 4000);
 
   it('lets her first start today, and any later one tomorrow at the earliest', () => {
-    expect(earliestDay({ today: '2026-11-03', current: null, rates: [], observed: NOTHING_READ })).toBe(
-      '2026-11-03',
-    );
-    expect(earliestDay({ today: '2026-11-03', current: first, rates: [first], observed: NOTHING_READ })).toBe(
-      '2026-11-04',
-    );
+    expect(
+      earliestDay({ today: '2026-11-03', current: null, rates: [], observed: NOTHING_READ, alerts: [] }),
+    ).toBe('2026-11-03');
+    expect(
+      earliestDay({
+        today: '2026-11-03',
+        current: first,
+        rates: [first],
+        observed: NOTHING_READ,
+        alerts: [],
+      }),
+    ).toBe('2026-11-04');
   });
 
   it('marks the one the server says is in force, those to come, and those replaced', () => {
-    const list = { today: '2026-11-03', current: first, rates: [next, first, older], observed: NOTHING_READ };
+    const list = {
+      today: '2026-11-03',
+      current: first,
+      rates: [next, first, older],
+      observed: NOTHING_READ,
+      alerts: [],
+    };
     expect(standing(first, list)).toBe('current');
     expect(standing(next, list)).toBe('coming');
     expect(standing(older, list)).toBe('past');
@@ -143,6 +157,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
       current: null,
       rates: [],
       observed: { ...NOTHING_READ, last30Days: { ...NOTHING_READ.last30Days, shares } },
+      alerts: [],
     });
     expect(singleShare(list([share(A)]))).toEqual(share(A));
     expect(singleShare(list([share(A), share(B)]))).toBeNull();
@@ -160,6 +175,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
           today: '2026-11-03',
           current: null,
           rates: [],
+          alerts: [],
           ...patch,
           observed: { ...NOTHING_READ, ...observed },
         },
@@ -194,6 +210,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
           current,
           rates: current === null ? [] : [current],
           observed: { ...NOTHING_READ, linked: true, last30Days: { ...NOTHING_READ.last30Days, shares } },
+          alerts: [],
         },
         'Anna',
       );
@@ -221,6 +238,7 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
             shares: [share(A, { agencyBps: 3750, differsFromRate: true })],
           },
         },
+        alerts: [],
       },
       'Anna',
     );
@@ -238,5 +256,47 @@ describe('the agency’s share read at the platform (ADR 0054 § 4)', () => {
     );
     expect(head([share(A, { agencyBps: 4000, differsFromRate: false })]).dot).toBe('ok');
     expect(head([share(A, { differsFromRate: null })]).dot).toBe('ok');
+  });
+
+  it('says each alert of the automatic check on its fortnight, never an amount (PAY-04)', () => {
+    const base = {
+      id: '0192f3a0-0000-7000-8000-0000000000f1',
+      at: '2026-11-02T05:30:00.000Z',
+      from: '2026-10-16',
+      to: '2026-10-31',
+      platform: 'reveal',
+      platformAccountId: A,
+      currency: 'EUR',
+    };
+    const list = (alerts: CreatorAgencyRateList['alerts']): CreatorAgencyRateList => ({
+      today: '2026-11-16',
+      current: null,
+      rates: [],
+      observed: { ...NOTHING_READ, linked: true },
+      alerts,
+    });
+    const mismatch = AgencyShareAlertSchema.parse({ ...base, kind: 'mismatch' });
+    const changed = AgencyShareAlertSchema.parse({
+      ...base,
+      kind: 'changed',
+      previousAgencyBps: 3333,
+      agencyBps: 3750,
+    });
+    expect(alertText(mismatch, list([mismatch]))).toBe(
+      'Alerte du 2 novembre, quinzaine du 16 au 31 octobre : sa part lue s’écartait du pourcentage réglé.',
+    );
+    expect(alertText(changed, list([changed]))).toBe(
+      'Alerte du 2 novembre, quinzaine du 16 au 31 octobre : la part de l’agence est passée de 33,33\u00a0% à 37,5\u00a0%.',
+    );
+    // Two accounts: each alert names its own.
+    const other = AgencyShareAlertSchema.parse({
+      ...base,
+      kind: 'mismatch',
+      id: '0192f3a0-0000-7000-8000-0000000000f2',
+      platformAccountId: B,
+    });
+    expect(alertText(other, list([mismatch, other]))).toBe(
+      'Alerte du 2 novembre, quinzaine du 16 au 31 octobre, Reveal 2 : sa part lue s’écartait du pourcentage réglé.',
+    );
   });
 });

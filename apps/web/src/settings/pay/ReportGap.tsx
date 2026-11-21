@@ -13,8 +13,10 @@ import {
 } from '@/reports/model';
 import '@/reports/reports.css';
 import '@/payroll/pay.css';
+import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
 import '@/screens/team/team.css';
+import { Failure } from '@/shell/states';
 
 const STEPS = ['Remplir', 'Relire'] as const;
 
@@ -75,18 +77,12 @@ export function ReportGap(): JSX.Element {
       </div>
       {data === undefined ? (
         threshold.isError ? (
-          <div className="rp-account__now">
-            <p className="tm-warn">Le serveur ne répond pas : le seuil n’a pas pu être lu.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm tm-self-start"
-              onClick={() => {
-                void threshold.refetch();
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure
+            inline
+            onRetry={() => {
+              void threshold.refetch();
+            }}
+          />
         ) : (
           <div className="sc-skeleton" aria-hidden="true">
             <i />
@@ -134,6 +130,7 @@ function GapDialog({
   const minor = parseAmount(amount, false, MAX_MINOR);
   const next = bps === null || minor === null ? null : { bps, minor };
   const step = checking ? 1 : 0;
+  const confirm = useConfirmAgain();
 
   const send = async (): Promise<void> => {
     if (next === null || busy) return;
@@ -144,6 +141,13 @@ function GapDialog({
     setBusy(false);
     if (outcome.kind === 'ok') {
       onClose();
+      return;
+    }
+    if (outcome.kind === 'reauth') {
+      // Nothing was written: the password and the code (EQ-15), then the same threshold again.
+      confirm.ask(() => {
+        void send();
+      });
       return;
     }
     setRefusal(outcome);
@@ -172,30 +176,32 @@ function GapDialog({
               Les rapports déjà validés gardent le seuil qu’ils ont vu. Un rapport au-dessus des ventes lues
               attend toujours son membre, même d’un centime.
             </p>
-            <div className="tm-dialog__foot">
-              <button
-                type="button"
-                className="nv-btn nv-btn--plain"
-                disabled={busy}
-                onClick={() => {
-                  setChecking(false);
-                }}
-              >
-                Modifier
-              </button>
-              <button
-                type="button"
-                className="nv-btn nv-btn--neon"
-                data-autofocus
-                disabled={busy}
-                aria-busy={busy}
-                onClick={() => {
-                  void send();
-                }}
-              >
-                {busy ? 'Enregistrement…' : 'Enregistrer le seuil'}
-              </button>
-            </div>
+            {confirm.prompt({ lead: MONEY_LEAD, onBusyChange: setBusy }) ?? (
+              <div className="tm-dialog__foot">
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--plain"
+                  disabled={busy}
+                  onClick={() => {
+                    setChecking(false);
+                  }}
+                >
+                  Modifier
+                </button>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--neon"
+                  data-autofocus
+                  disabled={busy}
+                  aria-busy={busy}
+                  onClick={() => {
+                    void send();
+                  }}
+                >
+                  {busy ? 'Enregistrement…' : 'Enregistrer le seuil'}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <form

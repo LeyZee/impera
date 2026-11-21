@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
-/** Version of the closed vocabulary below (docs/reference/media-vocabulary.md). Stored with every description. */
-export const MEDIA_VOCABULARY_VERSION = '1.0.0';
+/**
+ * Version of the closed vocabulary below (docs/reference/media-vocabulary.md), written with every new description.
+ * 1.1.0 adds the outfit of a media she drops (ADR 0083 § 2, amendment of 20/11/2026); a description of 1.0.0 stays
+ * valid as it is, never described again for it.
+ */
+export const MEDIA_VOCABULARY_VERSION = '1.1.0';
+export const MEDIA_VOCABULARY_VERSIONS = ['1.0.0', MEDIA_VOCABULARY_VERSION] as const;
 
 const MoodSchema = z.enum([
   'playful',
@@ -20,7 +25,7 @@ const MoodSchema = z.enum([
  * It never sells, judges or recommends: the brain and the policy do that with it.
  */
 export const MediaDescriptionSchema = z.object({
-  vocabularyVersion: z.literal(MEDIA_VOCABULARY_VERSION),
+  vocabularyVersion: z.enum(MEDIA_VOCABULARY_VERSIONS),
   kind: z.enum(['image', 'video', 'audio']),
   /** One to four factual sentences, in French. */
   factualDescription: z.string().min(1).max(800),
@@ -70,8 +75,91 @@ export type MediaFlag = MediaDescription['flags'][number];
  * `detailed`, what a text written without seeing it needs: her look, her outfit, the room and its light, what she
  * does, her position, the framing, what is heard, and for a video the words said, in their order.
  */
+/**
+ * What she wears at the start of a media (ADR 0083 § 2, amendment of 20/11/2026), in a closed vocabulary: the style
+ * that tells lingerie from the rest, then each piece seen with its colours. Read by the code (her catalogue, the gifts
+ * matched to a fan's tastes) where the prose of `detailed` cannot be.
+ */
+export const OUTFIT_STYLES = [
+  'lingerie',
+  'nightwear',
+  'evening',
+  'casual',
+  'sportswear',
+  'swimwear',
+  'costume',
+  'nothing',
+  'other',
+] as const;
+export const OutfitStyleSchema = z.enum(OUTFIT_STYLES);
+export type OutfitStyle = z.infer<typeof OutfitStyleSchema>;
+
+export const OUTFIT_PIECES = [
+  'lingerie_top',
+  'lingerie_bottom',
+  'bodysuit',
+  'garter_belt',
+  'stockings',
+  'dress',
+  'skirt',
+  'top',
+  'shirt',
+  'sweater',
+  'jacket',
+  'trousers',
+  'shorts',
+  'swimsuit',
+  'robe',
+  'pyjamas',
+  'towel',
+  'heels',
+  'shoes',
+  'boots',
+  'accessory',
+  'other',
+] as const;
+export const OutfitPieceTypeSchema = z.enum(OUTFIT_PIECES);
+export type OutfitPieceType = z.infer<typeof OutfitPieceTypeSchema>;
+
+export const OUTFIT_COLOURS = [
+  'black',
+  'white',
+  'red',
+  'pink',
+  'purple',
+  'blue',
+  'green',
+  'yellow',
+  'orange',
+  'brown',
+  'beige',
+  'grey',
+  'gold',
+  'silver',
+  'nude',
+  'transparent',
+  'multicolour',
+] as const;
+export const OutfitColourSchema = z.enum(OUTFIT_COLOURS);
+export type OutfitColour = z.infer<typeof OutfitColourSchema>;
+
+export const OutfitSchema = z.object({
+  /** The outfit as a whole; `nothing` when she wears nothing from the start. */
+  style: OutfitStyleSchema,
+  /** Each piece seen at the start, its main colours first; empty with `nothing`. */
+  pieces: z
+    .array(z.object({ type: OutfitPieceTypeSchema, colours: z.array(OutfitColourSchema).min(1).max(3) }))
+    .max(10),
+});
+export type Outfit = z.infer<typeof OutfitSchema>;
+
 export const DropMediaDescriptionSchema = MediaDescriptionSchema.extend({
   detailed: z.string().min(1).max(6000),
+  /**
+   * Her outfit at the start of the media (the first frames of a video); `null` when it cannot be seen (a voice note,
+   * nothing visible). Absent from a description of vocabulary 1.0.0, read as not known.
+   */
+  outfit: OutfitSchema.nullable().optional(),
 });
 export type DropMediaDescription = z.infer<typeof DropMediaDescriptionSchema>;
 

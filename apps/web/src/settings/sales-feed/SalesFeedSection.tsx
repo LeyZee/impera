@@ -21,6 +21,7 @@ import { capabilityLabel, dotOf, lineOf, quarantineLine, webhookViewOf } from '.
 import { PasswordPrompt, SignInAgain } from '@/settings/services/PasswordPrompt';
 import { isForbidden, isSessionExpired, ReauthRequired, type ShownError } from '@/settings/services/api';
 import '@/settings/services/services.css';
+import { Failure } from '@/shell/states';
 import './sales-feed.css';
 
 /** The page refreshes on its own: a key revoked at Reveal turns red without a reload. */
@@ -32,7 +33,7 @@ type Load<T> =
   | { kind: 'ready'; value: T };
 
 /**
- * Réglages › Ventes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the creators to
+ * Réglages › Plateformes (CRM-01, ADR 0050 §§ 3–5): the key of each platform's sales feed, its webhook, the creators to
  * import from it (CRM-07, ADR 0069), the owner's links of its models and its team, and the reliability check (CRM-02,
  * § 8). Nothing on this page ever shows the
  * key, even masked.
@@ -62,8 +63,8 @@ export function SalesFeedSection(): JSX.Element {
   return (
     <section className="sv-page">
       <p className="sv-lede">
-        Les ventes et les remboursements arrivent de la plateforme elle-même, sans session ouverte. La clé est
-        vérifiée chez la plateforme puis gardée chiffrée ; elle ne se relit pas, même ici.
+        Les clés des services reliés au CRM. Chacune est vérifiée auprès de son service puis gardée chiffrée ;
+        elle ne se relit pas, même ici.
       </p>
       {load.value.map((feed) => (
         <FeedPanel key={feed.platform} platform={feed.platform} />
@@ -79,27 +80,14 @@ function Failed({
   load: { error: ShownError; isForbidden: boolean };
   onRetry: () => void;
 }): JSX.Element {
+  if (!load.isForbidden && !load.error.isSessionExpired) return <Failure onRetry={onRetry} />;
   return (
     <div className="nv-plate sv-next">
       <p className="sv-lead">
-        {load.isForbidden
-          ? 'Seul le propriétaire règle la lecture des ventes'
-          : load.error.isSessionExpired
-            ? 'Ta session a expiré'
-            : 'Le serveur ne répond pas'}
+        {load.isForbidden ? 'Seul le propriétaire règle la lecture des ventes' : 'Ta session a expiré'}
       </p>
-      <p className="sv-muted">
-        {load.isForbidden || load.error.isSessionExpired
-          ? load.error.message
-          : 'L’état de la lecture des ventes n’a pas pu être lu. Réessaie dans un instant.'}
-      </p>
-      {load.isForbidden ? null : load.error.isSessionExpired ? (
-        <SignInAgain />
-      ) : (
-        <button type="button" className="nv-btn nv-btn--soft sv-self-start" onClick={onRetry}>
-          Réessayer
-        </button>
-      )}
+      <p className="sv-muted">{load.error.message}</p>
+      {load.isForbidden ? null : <SignInAgain />}
     </div>
   );
 }
@@ -236,7 +224,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
         <div className="sf-head">
           <span className="sv-dot sv-dot--big" data-dot={dotOf(status)} />
           <div className="sf-head__text">
-            <h2 className="sv-lead">
+            <h2 className="nv-h2 sv-lead">
               {name} <small className="sf-sub">API CRM</small>
             </h2>
             <p className="sv-muted sf-line" data-state={status.state} aria-live="polite">
@@ -360,7 +348,7 @@ function FeedPanel({ platform }: { platform: Platform }): JSX.Element {
         {canWebhook ? (
           <div className="sf-hook" data-kind={webhook.kind}>
             <div className="sf-hook__text">
-              <h3 className="sf-hook__title">Réception instantanée</h3>
+              <h3 className="nv-h3 sf-hook__title">Réception instantanée</h3>
               <p className="sv-muted">
                 {webhook.kind === 'none'
                   ? `Sans webhook, une vente arrive dans la minute. Avec, ${name} la signale en quelques secondes.`

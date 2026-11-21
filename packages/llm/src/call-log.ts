@@ -45,6 +45,8 @@ export interface LlmCallRecord {
   readonly outputTokens?: number;
   readonly costUsd?: number;
   readonly errorMessage?: string;
+  /** Why an answer did not fit its schema, with no content: safe to store (`invalidOutputCode`). */
+  readonly errorCode?: string;
   /** Who paid for it: the real cost per creator, conversation and draft (llm_calls). */
   readonly creatorId?: string;
   readonly conversationId?: string;
@@ -53,6 +55,8 @@ export interface LlmCallRecord {
   readonly purpose?: LlmPurpose;
   /** Absent: the request was not hedged. */
   readonly hedge?: HedgeRole;
+  /** A voice call only: the ids of her examples it received (ADR 0102 § 6). */
+  readonly voiceExampleIds?: readonly string[];
 }
 
 /** Journal of calls; the llm_calls table implements it once the database exists (P0-03). */

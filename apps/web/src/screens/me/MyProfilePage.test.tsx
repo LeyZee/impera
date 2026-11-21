@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MyProfilePage } from './MyProfilePage';
 
-import { IRIS_ME, LEA_ONLYFANS, NORA_REVEAL, SCHEDULING_SETTINGS, THEO, THEO_ME } from '@/test/pay';
+import { IRIS_ME, LEA_ONLYFANS, NORA_REVEAL, THEO, THEO_ME } from '@/test/pay';
 
 const NBSP = /[\u00a0\u202f]/gu;
 
@@ -30,20 +30,15 @@ function serve(members: readonly TeamMember[]): void {
     vi.fn((input: string) => {
       const url = new URL(input, 'http://localhost');
       if (url.pathname === '/v1/team/members') return Promise.resolve(Response.json({ members }));
-      if (url.pathname === '/v1/scheduling/calendar')
+      // The creators of his account, whatever his shifts (recette 16/11, CHT-31): Léa is not on his list.
+      if (url.pathname === '/v1/creators')
         return Promise.resolve(
           Response.json({
-            view: 'team',
-            settings: SCHEDULING_SETTINGS,
             creators: [NORA_REVEAL, LEA_ONLYFANS].map(({ creatorId, creatorName }) => ({
               id: creatorId,
-              name: creatorName,
-              archived: false,
+              displayName: creatorName,
+              timezone: 'Europe/Paris',
             })),
-            members: [],
-            shifts: [],
-            agent: [],
-            agency: null,
           }),
         );
       return Promise.resolve(new Response(null, { status: 404 }));
@@ -101,7 +96,11 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
   it('says who he is in the team: his creators, his rate and since when, his country and zone', async () => {
     serve([THEO_HERE]);
     renderPage(THEO_ME);
-    expect(await screen.findByRole('heading', { name: 'Théo' })).toBeDefined();
+    // The tab is the page's title, his name the card's, which no longer says « Profil » again (recette visuelle 16/11,
+    // CHA-12).
+    expect(await screen.findByRole('heading', { level: 1, name: 'Profil' })).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Théo' })).toBeDefined();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Profil' })).toBeNull();
     const facts = await screen.findByText('Nora Vidal');
     const list = facts.closest('dl');
     if (list === null) throw new Error('No facts');
@@ -110,10 +109,11 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
     expect(text).not.toContain('Léa');
     expect(text).toContain('10 % · depuis le 1er octobre 2026');
     expect(text).toContain('Bénin');
-    expect(text).toContain('Porto-Novo');
+    expect(text).toContain('Porto-Novo · celui de ton téléphone, repris à chaque ouverture');
     expect(text).toContain('1er septembre 2026');
   });
 
+  // No « Calendrier »: a chatter's link is on Planning, « Dans mon téléphone » (ADR 0134, lot 1).
   it('opens Moi with Profil, before Dossier', async () => {
     serve([THEO_HERE]);
     renderPage(THEO_ME);
@@ -122,7 +122,7 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Sécurité', 'Préférences']);
   });
 
   it('gives a manager on leave no « Trophées » tab, which his routes would not open (recette 16/11, CHT-05)', async () => {
@@ -133,6 +133,6 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Dossier', 'Calendrier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Dossier', 'Sécurité', 'Préférences']);
   });
 });

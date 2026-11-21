@@ -1,6 +1,6 @@
 import {
   CONTENT_IDEA_STATES,
-  DROP_CATEGORIES,
+  IdeaDropCategorySchema,
   TREND_FORMATS,
   TREND_SIGNAL_KINDS,
   TREND_SIGNAL_SOURCES,
@@ -231,7 +231,8 @@ export const contentIdeas = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    enumCheck('content_ideas', t.category, DROP_CATEGORIES),
+    // A script is never an idea of the day (recette PIL-19): the base refuses what the read would refuse.
+    enumCheck('content_ideas', t.category, IdeaDropCategorySchema.options),
     check(
       'content_ideas_suggestion_check',
       sql`(${t.suggestionId} is not null) = (${t.state} in ('suggested', 'declined', 'deposited'))`,

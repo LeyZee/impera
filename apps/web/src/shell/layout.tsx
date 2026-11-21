@@ -3,42 +3,67 @@ import { Link, useRouterState, type LinkProps } from '@tanstack/react-router';
 import { useEffect, useLayoutEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
+import { Empty } from '@/shell/states';
 
 /**
- * Layout pieces shared by every screen of the dashboard. A screen is a `Page`: a header that says where
- * you are and what to do, then content `Panel`s (plates, not glass). Sections with several screens put a `SubNav` in the header.
+ * Layout pieces shared by every screen of the dashboard. A screen is a `Page`: a header that says where you are and
+ * what to do, then content `Panel`s (plates, not glass). Sections with several screens put a `SubNav` in the header's
+ * `tabs`, on a row of its own.
  */
+
+/**
+ * The two columns a screen may have (recette visuelle 16/11, COH-02): wide for tables, grids, Suivi and the Dashboard,
+ * narrow for settings, forms and reading. One per section, every tab of it alike; the stylesheet holds the tokens.
+ */
+export type PageWidth = 'wide' | 'narrow';
 
 export function Page({
   children,
   className,
+  width = 'wide',
 }: {
   children: ReactNode;
   className?: string | undefined;
+  width?: PageWidth;
 }): JSX.Element {
-  return <div className={cn('nv-page', className)}>{children}</div>;
+  return (
+    <div className={cn('nv-page', className)} data-width={width}>
+      {children}
+    </div>
+  );
 }
 
+/**
+ * The header of a screen, one template everywhere (recette visuelle 16/11, COH-01): the eyebrow names the section (on
+ * every screen of it or on none), the title the screen open, the lead what it is for. A section's tabs go in `tabs`, a
+ * row of their own under the title block, on its left edge: never in `actions`, which hold buttons only. The title
+ * block comes first and alone on its row, so the title sits at the same height with or without tabs and actions.
+ */
 export function PageHeader({
   eyebrow,
   title,
   lead,
   actions,
+  tabs,
 }: {
   eyebrow?: ReactNode;
   title: ReactNode;
   /** One sentence: what this screen is for, or the one thing to do here. */
   lead?: ReactNode;
+  /** Buttons for this screen (a period's arrows, the one neon action). */
   actions?: ReactNode;
+  /** The section's tabs: a `SubNav`. */
+  tabs?: ReactNode;
 }): JSX.Element {
   return (
-    <header className="nv-page__head">
+    <header className="nv-page__head" data-tabs={tabs === undefined ? undefined : ''}>
       <div className="nv-page__title">
         {eyebrow === undefined ? null : <p className="nv-eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         {lead === undefined ? null : <p className="nv-page__lead">{lead}</p>}
       </div>
       {actions === undefined ? null : <div className="nv-page__actions">{actions}</div>}
+      {tabs === undefined ? null : <div className="nv-page__tabs">{tabs}</div>}
     </header>
   );
 }
@@ -66,7 +91,7 @@ export function Panel({
         <div className="nv-panel__head">
           <div className="min-w-0 flex-1">
             {eyebrow === undefined ? null : <p className="nv-eyebrow">{eyebrow}</p>}
-            {title === undefined ? null : <h2>{title}</h2>}
+            {title === undefined ? null : <h2 className="nv-h2">{title}</h2>}
           </div>
           {actions}
         </div>
@@ -216,7 +241,7 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
     }
     placeStill(nav, from, thumb);
     placeTabBarLens(nav, active, thumb);
-    // `tabs` too: a tab that arrives after the server's answer (Équipe › Reveal) can be the lit one, and the glass is
+    // `tabs` too: a tab that arrives after the server's answer (Équipe › Comptes Reveal) can be the lit one, and the glass is
     // placed once it is there (recette 11/11, GES-04).
   }, [pathname, lit, label, tabs]);
 
@@ -353,10 +378,10 @@ export function SubNav({ items, label }: { items: readonly SubNavItem[]; label: 
           >
             {item.label}
             {item.count === undefined || item.count === 0 ? null : item.countLabel === undefined ? (
-              <span className="nv-subnav__count">{item.count}</span>
+              <span className="nv-count nv-subnav__count">{item.count}</span>
             ) : (
               <>
-                <span className="nv-subnav__count" aria-hidden="true" title={item.countLabel}>
+                <span className="nv-count nv-subnav__count" aria-hidden="true" title={item.countLabel}>
                   {item.count}
                 </span>
                 <span className="sr-only">{`, ${item.countLabel}`}</span>
@@ -380,12 +405,8 @@ export function ComingSoon({
   when: string;
 }): JSX.Element {
   return (
-    <Panel className="nv-coming">
-      <div className="nv-coming__in">
-        <p className="nv-eyebrow">{when}</p>
-        <h2>{title}</h2>
-        <p>{what}</p>
-      </div>
-    </Panel>
+    <Empty plate title={title}>
+      {what} {when}
+    </Empty>
   );
 }

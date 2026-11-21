@@ -360,8 +360,11 @@ describe('sales feed reliability check (CRM-02)', () => {
   });
 
   it('checks days that are over, a month at most, from before to', async () => {
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date());
-    const inProgress = await check({ from: '2026-10-20', to: today, export: null });
+    // Relative to today, within a month: a fixed start ran past the month on 20/11.
+    const paris = (at: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(at);
+    const today = paris(new Date());
+    const weekBefore = paris(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    const inProgress = await check({ from: weekBefore, to: today, export: null });
     expect(inProgress.statusCode).toBe(422);
     expect(inProgress.json()).toMatchObject({ error: { code: 'sales_feed_check_days_unprocessable' } });
     expect((await check({ from: '2026-10-01', to: '2026-11-15', export: null })).statusCode).toBe(400);

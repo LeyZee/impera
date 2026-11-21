@@ -1,9 +1,10 @@
 import { Link, useRouteContext } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
-import { NavIcon } from './NavIcon';
-import { Page, PageHeader, Panel } from './layout';
+import { CompassArt } from './art/EmptyArt';
+import { Page, PageHeader } from './layout';
 import { railOf, sectionLabel } from './nav';
+import { Empty } from './states';
 
 /**
  * An address that leads nowhere (a link mistyped, a screen moved): said plainly, with the way back to the account's
@@ -17,20 +18,19 @@ export function NotFoundPage(): JSX.Element {
   return (
     <Page>
       <PageHeader title="Page introuvable" />
-      <Panel className="nv-coming nv-notfound">
-        <div className="nv-coming__in">
-          <span className="nv-notfound__icon" aria-hidden="true">
-            <NavIcon name="compass" />
-          </span>
-          <h2>Cette page n’existe pas</h2>
-          <p className="nv-notfound__text">
-            L’adresse est peut-être mal écrite, ou la page a changé de place.
-          </p>
-          <Link to={home} className="nv-btn nv-btn--soft nv-btn--sm nv-notfound__back">
+      <Empty
+        plate
+        className="nv-notfound"
+        art={<CompassArt />}
+        title="Cette page n’existe pas"
+        action={
+          <Link to={home} className="nv-btn nv-btn--soft">
             Revenir à {sectionLabel(home)}
           </Link>
-        </div>
-      </Panel>
+        }
+      >
+        L’adresse est peut-être mal écrite, ou la page a changé de place.
+      </Empty>
     </Page>
   );
 }

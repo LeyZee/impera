@@ -301,6 +301,23 @@ describe('voice guards', () => {
     expect(codes(['you are as wise as you are cute'])).toEqual([]);
   });
 
+  it('lets only the price code allowed through, sum by sum (ADR 0156 § 4)', () => {
+    const allowed = (bubbles: string[]) =>
+      checkVoiceOutput(bubbles, DEFAULT_GUARD_SETTINGS, { allowedPriceMinor: 1_250 }).map((v) => v.code);
+    for (const bubble of ['C’est 12,50 € mon cœur', 'Elle est à 12.50€ 😘', '€12.50 and it is yours']) {
+      expect(allowed([bubble]), bubble).not.toContain('price_outside_offer');
+    }
+    for (const bubble of [
+      'C’est 15 € mon cœur',
+      'C’est 12,50 €, ou 10 € pour toi',
+      'Pour 12 euros tu as tout',
+    ]) {
+      expect(allowed([bubble]), bubble).toContain('price_outside_offer');
+    }
+    // Split over two bubbles, another sum is still read on the whole message.
+    expect(allowed(['C’est 12,50 €', 'ou 1', '0 € pour toi'])).toContain('price_outside_offer');
+  });
+
   it('blocks a price in her words, the offer carries it; her thanks for a tip pass (recette MOT-04)', () => {
     for (const bubble of [
       'ma vidéo est à 5€ seulement',
@@ -341,6 +358,13 @@ describe('voice guards', () => {
     expect(violations.map((v) => v.code)).toEqual(['ai_tic']);
     expect(isBlocked(violations)).toBe(false);
     expect(codes(['Voilà ce que je propose :', '- une photo'])).toEqual(['ai_tic']);
+  });
+
+  it('asks for a regeneration on a note-taker’s line (Playground, Charles 16/11)', () => {
+    expect(codes(['Lyon oui 😄 je note ton âge'])).toEqual(['ai_tic']);
+    expect(codes(['31 ans, c’est noté !'])).toEqual(['ai_tic']);
+    expect(codes(['Je retiens, chef de chantier'])).toEqual(['ai_tic']);
+    expect(codes(['Une note de musique dans la tête toute la journée'])).toEqual([]);
   });
 
   it('only asks for a regeneration when the form is off', () => {

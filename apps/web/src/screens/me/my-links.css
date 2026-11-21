@@ -1,0 +1,56 @@
+/* Moi › Mes liens (INS-03): one card per link, on a phone first. */
+.my-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  align-content: start;
+  gap: var(--nv-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.my-links__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  min-width: 0;
+}
+.my-links__card--loading {
+  min-height: 176px;
+  opacity: 0.55;
+}
+.my-links__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+}
+.my-links__name {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.my-links__note {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.my-links__address {
+  margin: 0;
+  overflow: hidden;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.my-links__copy {
+  align-self: stretch;
+  min-height: 44px;
+  margin-top: auto;
+  gap: var(--nv-space-2);
+}

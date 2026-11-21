@@ -216,13 +216,6 @@ export class ContentRequestDueUnprocessable extends DomainError {
   }
 }
 
-/** A creator the agency does not have (her switch, ADR 0083 § 9). */
-export class DropDescriptionsCreatorNotFound extends DomainError {
-  constructor() {
-    super('creator_not_found', 'Créatrice introuvable');
-  }
-}
-
 /** A synthesis corrected by hand that names a price (they come from the grid, ADR 0056 § 6), or other steps. */
 export class ScriptSummaryCorrectionUnprocessable extends DomainError {
   constructor(reason: 'price' | 'steps') {

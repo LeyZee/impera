@@ -67,11 +67,10 @@
   position: relative;
 }
 .tc-kicker {
-  font-size: 13px;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--tc-gold);
+  color: var(--nv-ink-faint);
 }
 .tc-hero__name {
   margin: 6px 0 10px;
@@ -120,9 +119,30 @@
   font-variant-numeric: tabular-nums;
 }
 .tc-level {
-  margin: 12px 0 0;
-  color: var(--nv-ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  color: var(--nv-ink-muted);
   font-size: 13px;
+  text-align: left;
+}
+.tc-level > span:last-child {
+  text-wrap: pretty;
+}
+.tc-level__art {
+  flex: none;
+  display: grid;
+}
+.tc-case__empty {
+  /* One alignment on every screen, at the left like the other cards (Design, 16/11). */
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 6px 12px 18px;
+  color: var(--nv-ink-faint);
+  font-size: 14px;
+  text-align: left;
+  text-wrap: pretty;
 }
 
 /* The shelves */
@@ -131,13 +151,10 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--nv-space-3);
-  margin: 0 4px 14px;
+  margin: 0 0 14px;
 }
 .tc-shelf__head h3 {
   margin: 0;
-  font-size: 21px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
 }
 .tc-shelf__count {
   color: var(--nv-ink-faint);
@@ -165,14 +182,14 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 30px 8px;
-  padding: 28px 20px 12px;
+  padding: 28px var(--nv-plate-pad) 12px;
   border-radius: 26px;
   background: linear-gradient(180deg, var(--nv-plate), transparent 70%);
   box-shadow:
     inset 0 0 0 1px var(--nv-plate-edge),
     inset 0 1px 0 var(--nv-hairline);
 }
-.tc-slot {
+.tc-place {
   width: 172px;
 }
 .tc-cell {
@@ -446,22 +463,22 @@
   .tc-hero__pct {
     font-size: 36px;
   }
+  .tc-level {
+    justify-content: center;
+  }
   .tc-chips {
     justify-content: center;
     gap: 8px;
-  }
-  .tc-shelf__head h3 {
-    font-size: 19px;
   }
   .tc-case {
     justify-content: flex-start;
     gap: 22px 0;
     padding: 20px 8px 10px;
   }
-  .tc-slot {
+  .tc-place {
     width: 33.33%;
   }
-  .tc-case:not([data-all='true']) .tc-slot[data-extra='true'] {
+  .tc-case:not([data-all='true']) .tc-place[data-extra='true'] {
     display: none;
   }
   .tc-stand {
@@ -470,11 +487,17 @@
   .tc-cell__name {
     margin-top: -4px;
     font-size: 13px;
-    /* Two lines kept for every name, so the meters of a row stand level. */
+    /* Two lines kept for every name, so the meters of a row stand level. A name breaks between its words only, two
+       lines at most, then « … » (recette visuelle 16/11): never in the middle of a word under its medal. */
     min-height: calc(2 * 1.25em);
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
   }
   .tc-wide {
     display: none;

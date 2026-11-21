@@ -1,4 +1,4 @@
-import type { AccountingJournal, AccountingPeriodQuery, Das2Export, Me } from '@impera/contracts';
+import type { AccountingJournal, AccountingPeriodQuery, Das2Export, Me, PayPeriod } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type SyntheticEvent, type JSX, type ReactNode } from 'react';
 
@@ -45,7 +45,14 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
  * the server made it. The journal and the DAS2 recap come in JSON with their file in base64, kept as bytes; the archive
  * comes as its ZIP, which the screen never opens. What a file leaves aside is said in amber beside it.
  */
-export function ExportsPage({ user }: { user: Me }): JSX.Element {
+export function ExportsPage({
+  user,
+  period = null,
+}: {
+  user: Me;
+  /** The quinzaine the other tabs showed, kept for them (GES-02): the exports run on dates of their own. */
+  period?: PayPeriod | null;
+}): JSX.Element {
   const today = useAgencyToday();
   const down = useAgencySettingsDown();
   const billing = useBillingSettings();
@@ -62,8 +69,8 @@ export function ExportsPage({ user }: { user: Me }): JSX.Element {
       <PageHeader
         eyebrow="Paie"
         title="Exports"
-        lead="Les trois fichiers du comptable, tels que le serveur les fait : le journal des prestataires, le récapitulatif DAS2 et l’archive des PDF."
-        actions={<PayNav user={user} />}
+        lead="Pour le comptable : journal des prestataires, récapitulatif DAS2 et archive des PDF."
+        tabs={<PayNav user={user} period={period} />}
       />
       <div className="py-board">
         {today === null && down !== null ? (
@@ -107,12 +114,13 @@ function JournalPanel({
   return (
     <Panel className="nv-enter" eyebrow="Journal" title="Journal des prestataires">
       <div className="ex-body">
-        <p className="py-quiet ex-lead">
+        <About summary="Les écritures des factures, des avoirs et des virements de la période.">
           Les écritures des factures, factures rectificatives et avoirs émis sur la période, et celles des
           virements, aux colonnes du FEC : un fichier d’import pour le comptable, pas le FEC de l’agence.
-        </p>
+        </About>
         <RangeForm
           name="journal"
+          neon
           years={years}
           action="Préparer le journal"
           busy={asked.kind === 'busy'}
@@ -212,10 +220,10 @@ function Das2Panel({ today, nameOf }: { today: string; nameOf: (memberId: string
   return (
     <Panel className="nv-enter" eyebrow="DAS2" title="Récapitulatif DAS2">
       <div className="ex-body">
-        <p className="py-quiet ex-lead">
+        <About summary="Chaque prestataire payé de plus de 2 400 € sur une année civile.">
           Chaque prestataire payé de plus de 2 400 € par les virements d’une année civile, sous l’identité que
           sa facture a figée. Un récapitulatif à vérifier : c’est le comptable qui dépose la déclaration.
-        </p>
+        </About>
         <form className="ex-form" onSubmit={onSubmit} noValidate>
           <div className="nv-field tm-field">
             <label className="nv-field__label" htmlFor={`${id}-year`}>
@@ -232,7 +240,7 @@ function Das2Panel({ today, nameOf }: { today: string; nameOf: (memberId: string
               }}
             />
           </div>
-          <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
+          <button type="submit" className="nv-btn nv-btn--soft ex-ask" disabled={busy} aria-busy={busy}>
             {busy ? 'Préparation…' : 'Préparer le récapitulatif'}
           </button>
         </form>
@@ -341,11 +349,11 @@ function ArchivePanel({ years }: { years: Years }): JSX.Element {
   return (
     <Panel className="nv-enter" eyebrow="Archive" title="Archive des PDF">
       <div className="ex-body">
-        <p className="py-quiet ex-lead">
+        <About summary="Le PDF de chaque facture et de chaque avoir de la période.">
           Le PDF de chaque facture, facture rectificative et avoir émis sur la période, sous son numéro.
           Dedans, manifeste.csv liste chaque document avec son empreinte, ou la raison de son absence. Une
           ligne « hébergeurs injoignables » n’abîme rien : relance l’export.
-        </p>
+        </About>
         <RangeForm
           name="archive"
           years={years}
@@ -400,6 +408,7 @@ function RangeForm({
   name,
   years,
   action,
+  neon = false,
   busy,
   onChange,
   onAsk,
@@ -407,6 +416,8 @@ function RangeForm({
   name: string;
   years: Years;
   action: string;
+  /** The screen's one neon: the journal's, the file the accountant asks for most (GES-06). */
+  neon?: boolean;
   busy: boolean;
   onChange: () => void;
   onAsk: (range: AccountingPeriodQuery) => Promise<void>;
@@ -497,10 +508,33 @@ function RangeForm({
               ? checked.reason
               : 'Deux jours compris, deux ans au plus.'}
       </p>
-      <button type="submit" className="nv-btn nv-btn--neon ex-ask" disabled={busy} aria-busy={busy}>
+      <button
+        type="submit"
+        className={neon ? 'nv-btn nv-btn--neon ex-ask' : 'nv-btn nv-btn--soft ex-ask'}
+        disabled={busy}
+        aria-busy={busy}
+      >
         {busy ? 'Préparation…' : action}
       </button>
     </form>
+  );
+}
+
+/**
+ * What an export holds: one sentence, the detail (columns, manifest, prints) behind « Ce que contient le fichier »
+ * (recette visuelle 16/11, GES-16).
+ */
+function About({ summary, children }: { summary: string; children: ReactNode }): JSX.Element {
+  return (
+    <div className="ex-lead">
+      <p className="py-quiet">{summary}</p>
+      <details className="nv-disclosure ex-about">
+        <summary>
+          <span className="nv-disclosure__title">Ce que contient le fichier</span>
+        </summary>
+        <p className="nv-disclosure__body py-quiet">{children}</p>
+      </details>
+    </div>
   );
 }
 
@@ -522,7 +556,7 @@ function FileLine({
         <p className="ex-file__name nv-num">{name}</p>
         <p className="ex-sub">{detail}</p>
       </div>
-      <button type="button" className="nv-btn nv-btn--neon nv-btn--sm" onClick={onSave}>
+      <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onSave}>
         {label}
       </button>
     </div>

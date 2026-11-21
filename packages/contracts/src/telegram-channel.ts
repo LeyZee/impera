@@ -213,9 +213,9 @@ export const ChannelRefusalKindSchema = z.enum([
   'too_many_posts',
   'slots_too_close',
   'two_main_posts',
-  'link_name_taken',
-  'link_url_taken',
   'channel_link_unknown',
+  /** Her links are set in « Liens » since INS-03: a save that changes them here is refused, never dropped. */
+  'links_moved',
   'chat_unknown',
   'chat_not_channel',
   'chat_taken',

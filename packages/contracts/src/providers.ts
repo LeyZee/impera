@@ -51,6 +51,66 @@ export const ProviderSettingsSchema = z.object({
 });
 export type ProviderSettings = z.infer<typeof ProviderSettingsSchema>;
 
+/**
+ * What went wrong with a service's calls, in the owner's words (ADR 0091 § 7): only what says something of the
+ * connection, never a model's refusal or a malformed answer.
+ * `no_credit`: no credit or quota left (402, or a body that says so); `key_refused`: 401/403; `model_missing`: the
+ * model is not on the account; `rate_limited`: too many calls (429); `timeout`; `not_answering`: 5xx, network.
+ */
+export const ProviderTroubleSchema = z.enum([
+  'no_credit',
+  'key_refused',
+  'model_missing',
+  'rate_limited',
+  'timeout',
+  'not_answering',
+]);
+export type ProviderTrouble = z.infer<typeof ProviderTroubleSchema>;
+
+/**
+ * « Essai réel » (ADR 0091 § 7): one tiny real call the owner asks for. `answers`: the service generated; `budget_reached`:
+ * the day's cap stopped it before any call; `no_voice`: ElevenLabs has no voice to speak with.
+ */
+export const ProviderProbeOutcomeSchema = z.enum([
+  'answers',
+  'budget_reached',
+  'no_voice',
+  ...ProviderTroubleSchema.options,
+]);
+export type ProviderProbeOutcome = z.infer<typeof ProviderProbeOutcomeSchema>;
+
+export const ProviderProbeSchema = z.object({
+  at: z.iso.datetime(),
+  outcome: ProviderProbeOutcomeSchema,
+  /** How long the provider took to answer; null when no call was made. */
+  latencyMs: z.number().int().nonnegative().nullable(),
+  /** The model tried (« Grok 4.7 »), as the screen names it; null when no call was made. */
+  model: z.string().min(1).nullable(),
+});
+export type ProviderProbe = z.infer<typeof ProviderProbeSchema>;
+
+/** A service's real calls over the last 24 hours (`llm_calls`, ADR 0091 § 7). ElevenLabs has none. */
+export const ProviderActivitySchema = z.object({
+  calls: z.number().int().nonnegative(),
+  /** Calls that failed for one of `ProviderTroubleSchema`'s reasons. */
+  troubled: z.number().int().nonnegative(),
+  /** Calls this service made in place of the main model (Mistral for Grok, Grok for Gemini). */
+  asFallback: z.number().int().nonnegative(),
+  lastSuccessAt: z.iso.datetime().nullable(),
+  /** The latest trouble, even older than 24 hours (7 days at most); null when there is none or a success came since. */
+  lastTrouble: z.object({ at: z.iso.datetime(), kind: ProviderTroubleSchema }).nullable(),
+});
+export type ProviderActivity = z.infer<typeof ProviderActivitySchema>;
+
+/** ElevenLabs' characters of the month, as its last check read them. */
+export const ProviderQuotaSchema = z.object({
+  used: z.number().int().nonnegative(),
+  limit: z.number().int().nonnegative(),
+  resetsAt: z.iso.datetime().nullable(),
+  plan: z.enum(['free', 'paid']).nullable(),
+});
+export type ProviderQuota = z.infer<typeof ProviderQuotaSchema>;
+
 /** One line of the Services section, as the dashboard reads it. */
 export const ProviderStatusSchema = z.object({
   provider: AiProviderSchema,
@@ -69,6 +129,12 @@ export const ProviderStatusSchema = z.object({
   settings: ProviderSettingsSchema,
   /** The voices of the ElevenLabs account, for the voice picker; empty for the other services. */
   voices: z.array(ProviderVoiceSchema),
+  /** The last « Essai réel », null before the first one or once the key changed. */
+  probe: ProviderProbeSchema.nullable(),
+  /** Its calls over 24 hours; null for a service the journal does not see (ElevenLabs) or not connected. */
+  activity: ProviderActivitySchema.nullable(),
+  /** ElevenLabs only: the month's characters. */
+  quota: ProviderQuotaSchema.nullable(),
 });
 export type ProviderStatus = z.infer<typeof ProviderStatusSchema>;
 

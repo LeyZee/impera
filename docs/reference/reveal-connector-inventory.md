@@ -97,7 +97,7 @@ Fenêtre « Envoyer des médias » : « Ajouter depuis le Vault » ou « Importe
 Dans Reveal, un PPV s'appelle un **bundle**. Fenêtre « Ajouter un bundle » :
 
 - **Prix TTC** ; la TVA est calculée selon la localisation du fan. **0 = offert** : le fan le voit sans payer.
-- **Tarif réduit TTC** (interrupteur) : prix barré. L'agent ne l'utilise pas : Charles a tranché « jamais de négociation ni de remise » (17/10, `chatting/methode-chatting.md` du dossier partagé).
+- **Tarif réduit TTC** (interrupteur) : prix barré. L'agent ne l'utilise pas : Charles a tranché « jamais de négociation ni de remise » (17/10, `chatting/methode-chatting.md` du dossier partagé). Posé sur une étape de script (`discountedPrice`, `discountDurationMinutes`), il bloque l'étape : jamais envoyée, son script jamais proposé, comme pour un prix changé (Charles, recette du 16/11/2026).
 - **Contenu vendu** : médias **floutés tant que le fan n'a pas payé**, depuis le Vault ou importés. **Au moins un média, sinon l'envoi est refusé.**
 - **Aperçu gratuit (teasing)** : optionnel, **10 médias au plus**, affichés non floutés dans un carrousel tant que le bundle n'est pas acheté. Ne jamais y mettre le contenu vendu.
 

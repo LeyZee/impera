@@ -4,6 +4,7 @@ import {
   RESUME_SPACING_SECONDS,
   SUGGESTED_REPLY_SLOTS,
   type AgentHours,
+  type DatedRanges,
   newId,
   PlatformAccountIdSchema,
   type ConversationId,
@@ -55,6 +56,9 @@ class FakeSender implements OutboundSender {
   sendMedia(): Promise<SendResult> {
     return Promise.reject(new Error('not used'));
   }
+  sendStep(): Promise<SendResult> {
+    return Promise.reject(new Error('not used'));
+  }
   verifySent(): Promise<{ status: 'not_found' }> {
     return Promise.resolve({ status: 'not_found' });
   }
@@ -101,8 +105,8 @@ describe('conversation.respond and her hours', () => {
   let platformAccountId: PlatformAccountId;
   let counter = 0;
 
-  function moduleWith(options: { hours?: AgentHours }): ConversationsModule {
-    const { hours } = options;
+  function moduleWith(options: { hours?: AgentHours; exceptions?: DatedRanges }): ConversationsModule {
+    const { hours, exceptions = [] } = options;
     return createConversationsModule({
       db: test.app.db,
       adminDb: test.service.db,
@@ -115,7 +119,7 @@ describe('conversation.respond and her hours', () => {
       composer,
       clock,
       ...(hours !== undefined && {
-        replyHours: { of: () => Promise.resolve({ hours, timeZone: PARIS }) },
+        replyHours: { of: () => Promise.resolve({ hours, timeZone: PARIS, exceptions }) },
       }),
     });
   }
@@ -292,6 +296,26 @@ describe('conversation.respond and her hours', () => {
     await respond(conversations, conversationId);
     expect(composer.inputs.map((input) => input.hours)).toEqual([SLOTS]);
     expect((await events(conversationId)).map((event) => event.type)).not.toContain('reply_deferred');
+  });
+
+  it('follows a date out of her week (ADR 0148 § 3): its range opens at 3:00, a day it closes waits for the next', async () => {
+    // Sunday 18/10 has an exception from 2:00 to 5:00: at 3:00 she answers, out of her slots.
+    const night = [{ date: '2026-10-18', ranges: [{ startMinute: 120, endMinute: 300 }] }];
+    const opened = moduleWith({ hours: SLOTS, exceptions: night });
+    const answered = await fanWrites(opened, 'ah-exception-open');
+    composer.results.push(draft);
+    await respond(opened, answered);
+    expect((await events(answered)).map((event) => event.type)).not.toContain('reply_deferred');
+    expect(composer.inputs.at(-1)?.exceptions).toEqual(night);
+
+    // Sunday 18/10 closed all day: the fan waits for Monday 9:00 in Paris, not for 9:00 on Sunday.
+    const closed = moduleWith({ hours: SLOTS, exceptions: [{ date: '2026-10-18', ranges: [] }] });
+    const waiting = await fanWrites(closed, 'ah-exception-closed');
+    await respond(closed, waiting);
+    expect((await events(waiting)).at(-1)).toEqual({
+      type: 'reply_deferred',
+      payload: { reason: 'outside_hours', until: '2026-10-19T07:00:00.000Z' },
+    });
   });
 
   it('answers at 3:00 as before when her hours are not wired', async () => {

@@ -1,4 +1,5 @@
 import {
+  BlurhashSchema,
   VAULT_DESCRIPTION_MAX,
   VAULT_FOLDER_NAME_MAX,
   type ConversationSnapshot,
@@ -8,6 +9,7 @@ import {
   type ExternalTransaction,
   type FanPpvStats,
   type FanProfile,
+  type MessageOrigin,
   type PlatformMedia,
   type PlatformScript,
   type PlatformScriptStep,
@@ -67,6 +69,52 @@ export interface OwnMessages {
 }
 
 /**
+ * What her automations write, read on Reveal (ADR 0110): the openers a new fan may send under his name, her welcome and
+ * her reminder before his subscription ends. Each text is a pattern: `%NAME%` stands for any short name, or none.
+ */
+export interface Automations {
+  readonly hooks: readonly RegExp[];
+  readonly welcome: RegExp | null;
+  readonly expirationReminder: RegExp | null;
+}
+
+const withOrigin = (origin: MessageOrigin | undefined) => (origin === undefined ? {} : { origin });
+
+export const NO_AUTOMATIONS: Automations = { hooks: [], welcome: null, expirationReminder: null };
+
+const collapse = (text: string): string => text.replace(/\s+/gu, ' ').trim();
+
+/** A text of hers as a pattern on a whole message: spaces collapsed, `%NAME%` any name of 0 to 40 characters. */
+export function automationPattern(text: string): RegExp | null {
+  const flat = collapse(text);
+  if (flat === '') return null;
+  const parts = flat.split(/ ?%NAME% ?/u).map((part) => part.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+  return new RegExp(`^${parts.join(' ?.{0,40}? ?')}$`, 'u');
+}
+
+const matches = (pattern: RegExp | null, text: string): boolean => pattern?.test(collapse(text)) === true;
+
+/**
+ * Where a message comes from (ADR 0110): his answer to a story; one of her openers sent under his name; her welcome or
+ * her reminder sent by Reveal on her side. Our own messages and a chatter's carry none.
+ */
+export function originOf(
+  item: Pick<MessageItem, 'message' | 'storyReply'>,
+  side: 'fan' | 'ai' | 'human',
+  automations: Automations,
+): MessageOrigin | undefined {
+  const text = item.message.content;
+  if (side === 'fan') {
+    if (item.storyReply !== null) return 'story_reply';
+    return automations.hooks.some((hook) => matches(hook, text)) ? 'hook' : undefined;
+  }
+  if (side === 'ai') return undefined;
+  if (matches(automations.welcome, text)) return 'welcome';
+  if (matches(automations.expirationReminder, text)) return 'expiration_reminder';
+  return undefined;
+}
+
+/**
  * `fetchMessages`: a message whose author carries a `memberId` is the fan's; any other was written on the creator's
  * side: by the « bot » member (ours, `ai`), or by the creator herself or a chatter (`human`). A bundle's media are
  * locked until it is bought (`isPaid` absent while locked).
@@ -75,6 +123,7 @@ export function messageOf(
   item: MessageItem,
   conversationRef: ExternalRef,
   own: OwnMessages,
+  automations: Automations = NO_AUTOMATIONS,
 ): ExternalMessage {
   const { message, authorMessage, bundleWithMedias } = item;
   const inbound = authorMessage.memberId !== undefined;
@@ -98,6 +147,7 @@ export function messageOf(
     isPaid,
     ...(inbound ? {} : { senderLabel: authorMessage.displayName }),
     author: inbound ? 'fan' : ours ? 'ai' : 'human',
+    ...withOrigin(originOf(item, inbound ? 'fan' : ours ? 'ai' : 'human', automations)),
     createdAt: message.createdAt,
   };
 }
@@ -201,6 +251,14 @@ function stepOf(source: StepSource, index: number, platformIndex: number): Platf
     // Absent = free (spec § 6).
     priceMinor: source.script.price ?? 0,
     currency: REVEAL_CURRENCY,
+    // « Tarif réduit » (2026-11-15): both or neither, but one alone is a discount all the same (never sold at).
+    discount:
+      source.script.discountedPrice === undefined && source.script.discountDurationMinutes === undefined
+        ? null
+        : {
+            priceMinor: source.script.discountedPrice ?? null,
+            minutes: source.script.discountDurationMinutes ?? null,
+          },
   };
 }
 
@@ -297,5 +355,7 @@ export function vaultMediaOf(media: VaultItem, folder: VaultFolder | null, posit
         ? null
         : cut(media.description, VAULT_DESCRIPTION_MAX),
     suggestedPriceMinor: min === null || max === null || min < 0 || max < 0 ? null : { min, max },
+    // A preview that does not read as a blurhash is dropped, never the media.
+    blurhash: BlurhashSchema.safeParse(media.blurhash).data ?? null,
   };
 }

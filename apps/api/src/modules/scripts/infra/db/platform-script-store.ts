@@ -2,14 +2,18 @@ import {
   BranchConditionSchema,
   CreatorIdSchema,
   CurrencySchema,
+  DescriptionReviewReasonSchema,
   MediaSlotKindSchema,
   newId,
   PlatformAccountIdSchema,
   PlatformScriptIdSchema,
   PlatformScriptMomentSchema,
+  PreparedScriptContentSchema,
+  PreparedScriptIdSchema,
   ScriptIdentityAuthorSchema,
   ScriptIdentityContentSchema,
   ScriptIdentityIdSchema,
+  type CreatorId,
   type PlatformScript,
 } from '@impera/contracts';
 import {
@@ -32,6 +36,7 @@ import {
   type PlatformScriptsPlan,
 } from '../../domain/platform-scripts';
 import type {
+  OurCopy,
   PlatformScriptImportStore,
   PlatformScriptReadStore,
   StoredPlatformScript,
@@ -62,6 +67,8 @@ async function writeSteps(
       text: step.text,
       priceMinor: step.priceMinor,
       currency: step.currency,
+      discountPriceMinor: step.discount?.priceMinor ?? null,
+      discountMinutes: step.discount?.minutes ?? null,
     })),
   );
   const media = script.steps.flatMap((step) => [
@@ -137,6 +144,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
             moment: script.moment,
             fingerprint: platformScriptFingerprint(script),
             syncedAt: now,
+            versionAt: now,
           });
           await writeSteps(tx, id, account.creatorId, script);
         }
@@ -151,6 +159,7 @@ export function createDrizzlePlatformScriptImportStore(adminDb: Database): Platf
               active: true,
               deactivatedAt: null,
               syncedAt: now,
+              versionAt: now,
             })
             .where(and(eq(scripts.id, id), eq(scripts.platformAccountId, account.id)));
           // Its media go with its steps (on delete cascade).
@@ -181,13 +190,20 @@ const LinkRowSchema = z.object({
   platform_media_id: z.string(),
   media_asset_id: z.uuid().nullable(),
   description_id: z.uuid().nullable(),
+  imported: z.boolean(),
+  shown_id: z.uuid().nullable(),
+  shown_detailed: z.string().nullable(),
+  shown_reasons: z.array(DescriptionReviewReasonSchema).nullable(),
+  shown_validated: z.boolean().nullable(),
 });
 
 /**
  * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
  * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
  * not in the vault. `description_id`: the latest description of its media a human validated (ADR 0083), with its
- * `detailed` text, as the script sheet reads it (SC-04 lot c4). Keyed by account and platform id.
+ * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5); `shown`,
+ * the description the agency reviews (the latest validated, else the latest written with a `detailed` text: never the
+ * platform's own, which has none, ADR 0099 § 4). Keyed by account and platform id.
  */
 async function vaultLinksOf(
   tx: Transaction,
@@ -208,8 +224,16 @@ async function vaultLinksOf(
       (select md.id from ${schema.mediaDescriptions} md
         where md.media_asset_id = l.media_asset_id and md.validated_at is not null and md.content ? 'detailed'
         order by md.validated_at desc, md.created_at desc, md.id desc
-        limit 1) as description_id
+        limit 1) as description_id,
+      ${schema.vaultImported({ account: sql`l.platform_account_id`, media: sql`l.platform_media_id`, folder: sql`l.folder_ref` })} as imported,
+      s.id as shown_id, s.content ->> 'detailed' as shown_detailed, s.review_reasons as shown_reasons,
+      s.validated_at is not null as shown_validated
     from ${schema.mediaPlatformRefs} l
+    left join lateral (
+      select md.id, md.content, md.review_reasons, md.validated_at from ${schema.mediaDescriptions} md
+        where md.media_asset_id = l.media_asset_id and md.content ? 'detailed'
+        order by md.validated_at is not null desc, md.validated_at desc nulls last, md.created_at desc, md.id desc
+        limit 1) s on true
     where l.platform_account_id in (${accounts})
       and l.platform_media_id in (${refs})
       and l.removed_at is null`);
@@ -219,7 +243,20 @@ async function vaultLinksOf(
       .parse(result.rows)
       .map((row) => [
         `${row.platform_account_id}:${row.platform_media_id}`,
-        { mediaAssetId: row.media_asset_id, descriptionId: row.description_id },
+        {
+          mediaAssetId: row.media_asset_id,
+          descriptionId: row.description_id,
+          imported: row.imported,
+          shown:
+            row.shown_id === null || row.shown_detailed === null
+              ? null
+              : {
+                  id: row.shown_id,
+                  detailed: row.shown_detailed,
+                  reviewReasons: row.shown_reasons ?? [],
+                  validated: row.shown_validated === true,
+                },
+        },
       ]),
   );
 }
@@ -252,6 +289,41 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
     .from(branches)
     .where(inArray(branches.platformScriptId, ids))
     .orderBy(branches.platformScriptId, branches.branchOrder, branches.platformStepRef);
+  // The scripts of ours they are the recognised copies of (ADR 0161 § 5), in the same transaction.
+  const oursRows = await tx
+    .select({
+      id: schema.preparedScripts.id,
+      content: schema.preparedScripts.content,
+      nativeId: schema.preparedScripts.matchedPlatformScriptId,
+    })
+    .from(schema.preparedScripts)
+    .where(
+      and(
+        inArray(schema.preparedScripts.matchedPlatformScriptId, ids),
+        eq(schema.preparedScripts.state, 'matched'),
+      ),
+    )
+    // Nothing keeps two of ours from naming the same native script: the last recognised wins, always the same one.
+    .orderBy(schema.preparedScripts.matchedAt, schema.preparedScripts.id);
+  const ours = new Map(
+    oursRows.map((row): [string | null, OurCopy] => {
+      const content = PreparedScriptContentSchema.parse(row.content);
+      return [
+        row.nativeId,
+        {
+          preparedScriptId: PreparedScriptIdSchema.parse(row.id),
+          description: content.description,
+          moment: content.moment,
+          steps: content.steps.map((step) => ({
+            branches: step.branches.map((branch) => ({
+              priceMinor: branch.priceMinor,
+              currency: branch.currency,
+            })),
+          })),
+        },
+      ];
+    }),
+  );
   const accountOf = new Map(rows.map((row) => [row.id, row.platformAccountId]));
   const mediaOf = (step: StepRow, role: 'sold' | 'preview'): StoredStepMedia[] =>
     mediaRows
@@ -285,6 +357,10 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
         text: step.text,
         priceMinor: step.priceMinor,
         currency: CurrencySchema.parse(step.currency),
+        discount:
+          step.discountPriceMinor === null && step.discountMinutes === null
+            ? null
+            : { priceMinor: step.discountPriceMinor, minutes: step.discountMinutes },
         media: mediaOf(step, 'sold'),
         previewMedia: mediaOf(step, 'preview'),
       })),
@@ -306,6 +382,7 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
         validatedAt: identity.validatedAt,
         createdAt: identity.createdAt,
       })),
+    ours: ours.get(row.id) ?? null,
   }));
 }
 
@@ -313,30 +390,74 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
  * The agency's reads of her native scripts: under her RLS and the team's scopes (the owner, an active manager of her
  * list, `onCreatorList`, as her vault is read); her own account is closed by the base. Anyone else gets the same `null`
  * for a creator who exists and one who does not, never her existence. Her vault links are read in the same
- * transaction, never by the service role. `oneForJob` alone is the service role's, for a job.
+ * transaction, never by the service role. `oneForJob` and `ofAccountForJob` alone are the service role's, for a job.
  */
+/**
+ * `run` as a person of the agency reads her native scripts: in his transaction, under her RLS and his scope. The owner
+ * reads every creator of hers; an active manager only those of his list, as her vault (fiche vault-sync). `creators` is
+ * out of RLS: a creator who does not exist answers like one he may not read (`null`).
+ */
+function asTeam<T>(
+  db: Database,
+  creatorId: CreatorId,
+  userId: string,
+  run: (tx: Transaction) => Promise<T>,
+): Promise<T | null> {
+  return withTenantMember(db, creatorId, userId, async (tx, scope) => {
+    if (scope !== 'owner' && scope !== 'agency') return null;
+    if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId))) return null;
+    const readable = await tx
+      .select({ id: schema.creators.id })
+      .from(schema.creators)
+      .where(eq(schema.creators.id, creatorId));
+    if (readable.length === 0) return null;
+    return run(tx);
+  });
+}
+
+const DiscountedRowSchema = z.object({
+  id: PlatformScriptIdSchema,
+  name: z.string(),
+  steps: z.number().int().positive(),
+  since: z.date(),
+});
+
 export function createDrizzlePlatformScriptReadStore(
   db: Database,
   adminDb: Database,
 ): PlatformScriptReadStore {
   return {
     ofCreator: (creatorId, userId) =>
-      withTenantMember(db, creatorId, userId, async (tx, scope) => {
-        if (scope !== 'owner' && scope !== 'agency') return null;
-        // The owner reads every creator of hers; an active manager only those of his list, as her vault (fiche
-        // vault-sync). `creators` is out of RLS: a creator who does not exist answers like one he may not read.
-        if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId))) return null;
-        const readable = await tx
-          .select({ id: schema.creators.id })
-          .from(schema.creators)
-          .where(eq(schema.creators.id, creatorId));
-        if (readable.length === 0) return null;
+      asTeam(db, creatorId, userId, async (tx) => {
         const rows = await tx
           .select()
           .from(scripts)
           .where(eq(scripts.creatorId, creatorId))
           .orderBy(scripts.platformAccountId, scripts.name, scripts.id);
         return storedOf(tx, rows);
+      }),
+
+    discountedOf: (creatorId, userId) =>
+      asTeam(db, creatorId, userId, async (tx) => {
+        const rows = await tx
+          .select({
+            id: scripts.id,
+            name: scripts.name,
+            since: scripts.versionAt,
+            steps: sql<number>`count(*)::int`,
+          })
+          .from(scripts)
+          .innerJoin(steps, eq(steps.platformScriptId, scripts.id))
+          .where(
+            and(
+              eq(scripts.creatorId, creatorId),
+              eq(scripts.active, true),
+              sql`(${steps.discountPriceMinor} is not null or ${steps.discountMinutes} is not null)`,
+            ),
+          )
+          .groupBy(scripts.id)
+          .orderBy(scripts.versionAt, scripts.id);
+        return rows.map((row) => DiscountedRowSchema.parse(row));
       }),
 
     oneForJob: (creatorId, scriptId) =>
@@ -347,6 +468,16 @@ export function createDrizzlePlatformScriptReadStore(
           .where(and(eq(scripts.id, scriptId), eq(scripts.creatorId, creatorId)));
         const [stored] = await storedOf(tx, rows);
         return stored ?? null;
+      }),
+
+    ofAccountForJob: (creatorId, platformAccountId) =>
+      withAdmin(adminDb, async (tx) => {
+        const rows = await tx
+          .select()
+          .from(scripts)
+          .where(and(eq(scripts.creatorId, creatorId), eq(scripts.platformAccountId, platformAccountId)))
+          .orderBy(scripts.name, scripts.id);
+        return storedOf(tx, rows);
       }),
   };
 }

@@ -1,4 +1,9 @@
-import { PERSONA_SHEET, type ChannelPostViolation, type StoredPersona } from '@impera/contracts';
+import {
+  COMMENT_REPLY_MAX,
+  PERSONA_SHEET,
+  type ChannelPostViolation,
+  type StoredPersona,
+} from '@impera/contracts';
 
 import { checkExplicit, checkVoiceOutput } from '../domain/guards';
 
@@ -24,27 +29,30 @@ interface StoredVersion {
   readonly persona: StoredPersona;
 }
 
-/**
- * Who she is for a post of her Telegram channel (ADR 0080 § 5), read as her drafts read her, and her guards on its
- * words: the agent's, and nothing explicit, since the channel is public (§ 5.4). The `telegram` module's port, wired
- * by the composition root.
- */
-export function channelWriterPersona(
-  stored: StoredVersion,
-  now: Date,
-): {
+interface PublicWriterPersona {
   readonly version: string;
   readonly creatorName: string;
   readonly personaSheet: string;
   check(texts: readonly string[]): ChannelPostViolation[];
-} {
+}
+
+/**
+ * Who she is for anything she writes in public, read as her drafts read her but without her intimacy, and her guards
+ * on its words: the agent's, and nothing explicit. One list of what stays private for every public surface, so that
+ * none drifts from the others; `maxChars` is the longest text the surface holds.
+ */
+function publicWriterPersona(
+  stored: StoredVersion,
+  now: Date,
+  options: { readonly maxChars: number },
+): PublicWriterPersona {
   const persona = personaForModels(
     stored.persona,
     stored.creatorName,
     now.toISOString().slice(0, 10),
     PRIVATE_ANSWERS,
   );
-  const settings = { ...guardSettingsOf(persona), maxBubbleChars: CHANNEL_GUARD_CHARS };
+  const settings = { ...guardSettingsOf(persona), maxBubbleChars: options.maxChars };
   return {
     version: stored.version,
     creatorName: persona.creatorName,
@@ -58,4 +66,20 @@ export function channelWriterPersona(
         }),
       ),
   };
+}
+
+/**
+ * Who she is for a post of her Telegram channel (ADR 0080 § 5): the channel is public (§ 5.4). The `telegram`
+ * module's port, wired by the composition root.
+ */
+export function channelWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
+  return publicWriterPersona(stored, now, { maxChars: CHANNEL_GUARD_CHARS });
+}
+
+/**
+ * Who she is for a reply to a comment under one of her Instagram posts (ADR 0122 § 2): her public panels only, and
+ * the same guards on a text as short as a reply. The `instagram-comments` module's port, wired by the composition root.
+ */
+export function commentWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
+  return publicWriterPersona(stored, now, { maxChars: COMMENT_REPLY_MAX });
 }

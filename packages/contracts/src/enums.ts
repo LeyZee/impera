@@ -45,6 +45,15 @@ export type MessageDirection = z.infer<typeof MessageDirectionSchema>;
 export const MessageAuthorSchema = z.enum(['fan', 'human', 'ai']);
 export type MessageAuthor = z.infer<typeof MessageAuthorSchema>;
 
+/**
+ * Where a message comes from when the platform wrote it for someone (ADR 0110): `hook`, an opener the platform offered
+ * the fan as he subscribed, sent under his name; `welcome`, the creator's welcome sent by the platform;
+ * `expiration_reminder`, the platform's reminder before his subscription ends; `story_reply`, his answer to one of her
+ * stories. Absent: written by its author.
+ */
+export const MessageOriginSchema = z.enum(['hook', 'welcome', 'expiration_reminder', 'story_reply']);
+export type MessageOrigin = z.infer<typeof MessageOriginSchema>;
+
 /** State of a captured platform session; `none` until the extension syncs one. */
 export const SessionStateSchema = z.enum(['none', 'valid', 'warning', 'expired']);
 export type SessionState = z.infer<typeof SessionStateSchema>;
@@ -78,9 +87,11 @@ export type LlmRole = z.infer<typeof LlmRoleSchema>;
 /**
  * What an LLM call is for, journaled in `llm_calls.purpose` (ADR 0060 § 7). `chatting` is every call that serves
  * the fans and their conversations; `trend_watch` is the trend watch, which has its own cap inside the daily one and
- * never deprives a fan's answer of budget.
+ * never deprives a fan's answer of budget; `probe` is the owner's « Essai réel » of a service (ADR 0091 § 7), one
+ * tiny call on his click, counted in the spend and left out of the agent's health. `instagram_comment` is a reply
+ * to a comment under one of her Instagram posts (ADR 0122), counted apart and stopped by the daily cap like any call.
  */
-export const LlmPurposeSchema = z.enum(['chatting', 'trend_watch']);
+export const LlmPurposeSchema = z.enum(['chatting', 'trend_watch', 'probe', 'instagram_comment']);
 export type LlmPurpose = z.infer<typeof LlmPurposeSchema>;
 
 /** Who wrote an event: the system, the AI, a dashboard user (`human:<userId>`) or the fan. */

@@ -180,7 +180,7 @@ export function createDrizzleConversationReader(
     sendingStopped: (creatorId) =>
       withTenant(db, creatorId, async (tx) => {
         const switches = await tx.execute(sql`
-          select distinct on (scope, scope_id) active
+          select distinct on (scope, scope_id) (active and (active_until is null or active_until > now())) as active
           from kill_switches
           where scope = 'global' or (scope = 'creator' and scope_id = ${creatorId})
           order by scope, scope_id, set_at desc`);

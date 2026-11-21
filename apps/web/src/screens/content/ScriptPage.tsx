@@ -25,7 +25,7 @@ import {
   withdrawDrop,
 } from './api';
 import { durationOf } from './media-length';
-import { UNKNOWN_TYPE, fileLine, isInterrupted, mimeOf, type LiveSend } from './model';
+import { UNKNOWN_TYPE, fileLine, isInterrupted, mimeOf, pickedHeadRefusal, type LiveSend } from './model';
 import {
   acceptOfSlot,
   cardDone,
@@ -40,8 +40,8 @@ import {
 import { holds, isSending, queueSend, retryNow, sendAgain, useLiveSends } from './sends';
 
 import { lookAgainAtHerCase } from '@/rewards/api';
-import { ServerSilent } from '@/shell/ServerSilent';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 import './content.css';
 import './script.css';
@@ -108,12 +108,13 @@ export function ScriptPage({ dropId, onBack }: { dropId: ContentDropId; onBack: 
         {script.error instanceof Refused && script.error.status === 404 ? (
           <p className="sk-gone">Ce script n’est plus là : il a peut-être été retiré.</p>
         ) : (
-          <ServerSilent
-            text="Ton script n’a pas pu être lu. Rien n’est perdu : ce que tu as envoyé est gardé."
+          <Failure
             onRetry={() => {
               void script.refetch();
             }}
-          />
+          >
+            Rien n’est perdu : ce que tu as envoyé est gardé.
+          </Failure>
         )}
       </Page>
     );
@@ -333,7 +334,7 @@ function CardStep({
         alt={`Carton ${String(number)} : ${card.title}`}
       />
       <div className="sk-card__work">
-        <h2 id="sk-card-title" className="sk-card__title">
+        <h2 id="sk-card-title" className="nv-h2 sk-card__title">
           {card.title}
         </h2>
         {card.detail === null ? null : <p className="sk-card__detail">{card.detail}</p>}
@@ -464,6 +465,12 @@ function SlotTile({
     setRefusal(null);
     // The same file again after a cut send: it goes on where it stopped (the server checks its bytes anyway).
     if (file !== undefined && interrupted && picked.size === file.bytes) {
+      // Its first bytes too (recette CRE-12): a file of the same size that is not what was declared never goes up.
+      const head = await pickedHeadRefusal(picked, file.mime);
+      if (head !== null) {
+        setRefusal(head);
+        return;
+      }
       onResumed(file.id, picked);
       return;
     }
@@ -480,6 +487,13 @@ function SlotTile({
     }
     // Busy from here: reading a video's length can take seconds, a second choice must wait for it.
     setBusy(true);
+    // Its first bytes before anything goes (recette CRE-12): a text renamed `.jpg` never fills a slot.
+    const head = await pickedHeadRefusal(picked, mime);
+    if (head !== null) {
+      setRefusal(head);
+      setBusy(false);
+      return;
+    }
     const kind = kindOfMime(mime);
     if (kind === 'video' || kind === 'audio') {
       const length = slotDurationRefusal(slotLengths(slot.slot), await durationOf(picked, kind));
@@ -607,7 +621,7 @@ function Preview({
 }): JSX.Element {
   return (
     <section className="sk-preview nv-enter" aria-labelledby="sk-preview-title">
-      <h2 id="sk-preview-title" className="sk-preview__title">
+      <h2 id="sk-preview-title" className="nv-h2 sk-preview__title">
         Aperçu de ton script
       </h2>
       <p className="sk-preview__lead">

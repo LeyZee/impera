@@ -1,12 +1,13 @@
 import {
-  CorrectScriptIdentityBodySchema,
+  CorrectPlatformScriptDescriptionBodySchema,
   CreatorIdSchema,
   DomainError,
+  MediaDescriptionIdSchema,
   PlatformScriptIdSchema,
   PlatformScriptListSchema,
   PlatformScriptViewSchema,
   SetScriptBranchesBodySchema,
-  ValidateScriptIdentityBodySchema,
+  ValidatePlatformScriptDescriptionsBodySchema,
   type CreatorId,
   type PlatformScriptViewDto,
   type ScriptErrorCode,
@@ -17,13 +18,13 @@ import { z } from 'zod';
 
 import {
   creatorPlatformScripts,
-  reviewScriptIdentity,
+  reviewScriptDescriptions,
   setScriptBranches,
   type PlatformScriptsReader,
   type PlatformScriptView,
 } from '../../application/platform-script-reads';
 import type {
-  IdentityReview,
+  DescriptionReview,
   PlatformScriptReadStore,
   ScriptBranchStore,
   ScriptIdentityReviewStore,
@@ -52,11 +53,20 @@ class ScriptBranchesStale extends DomainError {
   }
 }
 
-class ScriptIdentityStale extends DomainError {
+class ScriptDescriptionStale extends DomainError {
   constructor() {
     super(
-      'script_identity_stale_conflict' satisfies ScriptErrorCode,
-      'Le script a changé depuis ta lecture : recharge-le avant de valider son identité',
+      'platform_script_description_stale_conflict' satisfies ScriptErrorCode,
+      'Une description a changé depuis ta lecture : recharge le script avant de la valider',
+    );
+  }
+}
+
+class ScriptDescriptionAlone extends DomainError {
+  constructor() {
+    super(
+      'platform_script_description_alone_conflict' satisfies ScriptErrorCode,
+      'Une description à vérifier se valide seule, après l’avoir relue',
     );
   }
 }
@@ -64,6 +74,24 @@ class ScriptIdentityStale extends DomainError {
 function readerOf(user: { readonly id: string; readonly role: UserRole } | null): PlatformScriptsReader {
   if (user === null) throw new DomainError('session_unauthenticated', 'Connexion requise');
   return { userId: user.id, role: user.role };
+}
+
+type MediaView = PlatformScriptView['steps'][number]['media'][number];
+
+/** A media of a step as the wire carries it, with the description the agency reviews. */
+function mediaDtoOf(media: MediaView): PlatformScriptViewDto['steps'][number]['media'][number] {
+  return {
+    ...media,
+    description:
+      media.description === null
+        ? null
+        : {
+            id: MediaDescriptionIdSchema.parse(media.description.id),
+            detailed: media.description.detailed,
+            reviewReasons: [...media.description.reviewReasons],
+            validated: media.description.validated,
+          },
+  };
 }
 
 /** A native script as the wire carries it: dates in ISO, its identity with the script's moment (ADR 0098 § 6). */
@@ -85,8 +113,9 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
       text: step.text,
       priceMinor: step.priceMinor,
       currency: step.currency,
-      media: [...step.media],
-      previewMedia: [...step.previewMedia],
+      discount: step.discount,
+      media: step.media.map(mediaDtoOf),
+      previewMedia: step.previewMedia.map(mediaDtoOf),
       complete: step.complete,
       condition: step.condition,
       branches: step.branches,
@@ -110,7 +139,7 @@ function dtoOf(view: PlatformScriptView): PlatformScriptViewDto {
 /**
  * `/v1/creators/:creatorId/platform-scripts` (ADR 0099 § 1 time 2, SC-04 lot c8): her native scripts imported from
  * the platform, read by the owner and the active managers of her list, with what keeps each from being offered; the
- * identity of a script's current version validated, or written by hand, by the same. An operator who is not one of
+ * descriptions of their media validated, or rewritten by hand, by the same. An operator who is not one of
  * them reads nothing: the same 404 for a creator or a script that exists and one that does not.
  */
 export function createPlatformScriptRoutes(
@@ -124,18 +153,17 @@ export function createPlatformScriptRoutes(
     if (scripts === null) throw new PlatformScriptNotFound();
     return scripts;
   };
-  const reviewed = async (
+  const described = async (
     creatorId: CreatorId,
     scriptId: string,
     reader: PlatformScriptsReader,
-    review: IdentityReview,
+    review: DescriptionReview,
   ): Promise<PlatformScriptViewDto> => {
-    const outcome = await reviewScriptIdentity({ store: reviews }, reader, creatorId, scriptId, review);
+    const outcome = await reviewScriptDescriptions({ store: reviews }, reader, creatorId, scriptId, review);
     if (outcome === 'not_found') throw new PlatformScriptNotFound();
-    if (outcome === 'stale') throw new ScriptIdentityStale();
-    const script = (await listed(creatorId, reader)).find((each) => each.id === scriptId);
-    if (script === undefined) throw new PlatformScriptNotFound();
-    return dtoOf(script);
+    if (outcome === 'stale') throw new ScriptDescriptionStale();
+    if (outcome === 'alone') throw new ScriptDescriptionAlone();
+    return one(creatorId, scriptId, reader);
   };
 
   const one = async (creatorId: CreatorId, scriptId: string, reader: PlatformScriptsReader) => {
@@ -183,41 +211,44 @@ export function createPlatformScriptRoutes(
       async (request) => (await listed(request.params.creatorId, readerOf(request.user))).map(dtoOf),
     );
 
-    // The identity shown, validated as it is: idempotent, a second validation changes nothing.
+    // The descriptions of its media as shown, validated as they are (ADR 0099 § 4): idempotent; each write asks the
+    // script's identity again, which is told only from validated descriptions.
     app.post(
-      '/creators/:creatorId/platform-scripts/:scriptId/identity/validate',
+      '/creators/:creatorId/platform-scripts/:scriptId/descriptions/validate',
       {
         preValidation: requireRole('owner', 'operator'),
         schema: {
           params: ScriptParamsSchema,
-          body: ValidateScriptIdentityBodySchema,
+          body: ValidatePlatformScriptDescriptionsBodySchema,
           response: { 200: PlatformScriptViewSchema },
         },
       },
       (request) =>
-        reviewed(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
+        described(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
           kind: 'validate',
-          identityId: request.body.identityId,
+          descriptionIds: request.body.descriptionIds,
         }),
     );
 
-    // An identity written by hand for the script's current version, validated by whoever writes it.
+    // A description rewritten by hand from the one shown, validated by whoever writes it.
     app.post(
-      '/creators/:creatorId/platform-scripts/:scriptId/identity/correct',
+      '/creators/:creatorId/platform-scripts/:scriptId/descriptions/correct',
       {
         preValidation: requireRole('owner', 'operator'),
         schema: {
           params: ScriptParamsSchema,
-          body: CorrectScriptIdentityBodySchema,
+          body: CorrectPlatformScriptDescriptionBodySchema,
           response: { 200: PlatformScriptViewSchema },
         },
       },
       (request) =>
-        reviewed(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
+        described(request.params.creatorId, request.params.scriptId, readerOf(request.user), {
           kind: 'correct',
-          content: request.body.content,
+          descriptionId: request.body.descriptionId,
+          detailed: request.body.detailed,
         }),
     );
+
     return Promise.resolve();
   };
 }

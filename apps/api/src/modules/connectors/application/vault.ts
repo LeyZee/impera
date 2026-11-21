@@ -1,5 +1,7 @@
 import {
+  FanPpvStatsSchema,
   PlatformScriptSchema,
+  SentScriptStepSchema,
   VaultMediaSchema,
   VaultViewSchema,
   type CreatorId,
@@ -7,13 +9,19 @@ import {
   type Platform,
   type PlatformAccountId,
   type PlatformScript,
+  type SentScriptStep,
   type VaultFolderView,
   type VaultView,
 } from '@impera/contracts';
 import { z } from 'zod';
 
-import { PlatformAccountNotFound, PlatformReadUnavailable, VaultForbidden } from '../domain/errors';
-import { ConnectorError, type PlatformConnector } from '../domain/platform-connector';
+import {
+  PlatformAccountNotFound,
+  PlatformReadUnavailable,
+  VaultForbidden,
+  VaultPreviewNotFound,
+} from '../domain/errors';
+import { ConnectorError, type PlatformConnector, type VaultPreview } from '../domain/platform-connector';
 import type { AccountJobs, AccountStore, Clock, ConnectorAccount, JobLogger } from '../domain/ports';
 import {
   compareVaultFolders,
@@ -119,6 +127,7 @@ function mediaOf(row: VaultRefRow): VaultFolderView['media'][number] {
       row.suggestedMinMinor === null || row.suggestedMaxMinor === null
         ? null
         : { min: row.suggestedMinMinor, max: row.suggestedMaxMinor },
+    blurhash: row.previewBlurhash,
     removed: row.removedAt !== null,
   };
 }
@@ -164,12 +173,69 @@ export function createVaultReads(store: VaultStore): VaultReads {
 }
 
 /**
+ * ADR 0138: one small picture of her vault, read now at the platform and handed back, never kept. For the owner and an
+ * active manager of her list (`vault_forbidden`); `vault_preview_not_found` for a media she has not, or no longer, or
+ * without a picture; `platform_read_unavailable` when her account cannot be read now. A session the platform refused,
+ * or a platform that did not answer, counts as any other read does (the breaker); a single media's answer does not.
+ */
+export function createVaultPreview(deps: VaultDeps) {
+  return async (
+    creatorId: CreatorId,
+    userId: string,
+    platformMediaId: string,
+    logger: JobLogger,
+  ): Promise<VaultPreview> => {
+    const target = await deps.store.previewTarget(creatorId, userId, platformMediaId);
+    if (target === 'forbidden') throw new VaultForbidden();
+    if (target === null) throw new VaultPreviewNotFound();
+    const now = deps.clock.now();
+    const account = await loadActiveAccount(
+      deps,
+      { creatorId, platformAccountId: target.platformAccountId, correlationId: 'vault-preview' },
+      now,
+    );
+    if (account === 'unknown account') throw new VaultPreviewNotFound();
+    if (typeof account === 'string') throw new PlatformReadUnavailable('session');
+    const connector = await deps.resolver.forAccount(account);
+    if (connector?.capabilities.vaultPreview !== true || connector.readVaultPreview === undefined) {
+      throw new PlatformReadUnavailable('unsupported');
+    }
+    try {
+      return await connector.readVaultPreview({
+        mediaRef: { platform: account.platform, id: platformMediaId },
+        folderRef: target.folderRef === null ? null : { platform: account.platform, id: target.folderRef },
+      });
+    } catch (error) {
+      if (!(error instanceof ConnectorError)) throw error;
+      if (error.code === 'not_found') throw new VaultPreviewNotFound();
+      if (error.code === 'fatal') {
+        logger.warn({ platformAccountId: account.id, reason: error.message }, 'vault preview: refused');
+        throw new PlatformReadUnavailable('failed');
+      }
+      await recordConnectorFailure(deps.accounts, account, error, {
+        meta: { correlationId: 'vault-preview', at: now },
+        logger,
+        jobName: 'vault_preview',
+      });
+      throw new PlatformReadUnavailable(error.code === 'session_expired' ? 'session' : 'failed');
+    }
+  };
+}
+
+/**
  * Reads of the platform for another module's adapter (fiche vault-sync, asked for the import of the scripts by
  * `scripts`): through the resolver, as the jobs do, each behind its `capabilities` flag. Never a write.
  */
 export interface PlatformReads {
   /** The account's scripts as the platform lists them (`listPlatformScripts`); `platform_read_unavailable` otherwise. */
   scripts(platformAccountId: PlatformAccountId): Promise<PlatformScript[]>;
+  /**
+   * For the agent's script decision (ADR 0098, ADR 0018 § 5), the fan named by his platform id: the steps already sent
+   * to him (`getScriptHistory`), and when a priced bundle was last offered to him, bought or not (`getFanPpvStats`).
+   * `platform_read_unavailable` when the account's connector cannot tell: the agent then sells nothing.
+   */
+  scriptHistory(platformAccountId: PlatformAccountId, platformFanId: string): Promise<SentScriptStep[]>;
+  lastOfferAt(platformAccountId: PlatformAccountId, platformFanId: string): Promise<Date | null>;
 }
 
 export function createPlatformReads(deps: Omit<VaultDeps, 'store'>): PlatformReads {
@@ -191,20 +257,44 @@ export function createPlatformReads(deps: Omit<VaultDeps, 'store'>): PlatformRea
     return { account, connector };
   }
 
+  async function read<T>(read: () => Promise<T>): Promise<T> {
+    try {
+      return await read();
+    } catch (error) {
+      if (error instanceof ConnectorError) {
+        throw new PlatformReadUnavailable(error.code === 'session_expired' ? 'session' : 'failed');
+      }
+      throw error;
+    }
+  }
+
   return {
     async scripts(platformAccountId) {
       const { connector } = await connectorOf(platformAccountId);
       if (!connector.capabilities.scripts || connector.listPlatformScripts === undefined) {
         throw new PlatformReadUnavailable('unsupported');
       }
-      try {
-        return z.array(PlatformScriptSchema).parse(await connector.listPlatformScripts());
-      } catch (error) {
-        if (error instanceof ConnectorError) {
-          throw new PlatformReadUnavailable(error.code === 'session_expired' ? 'session' : 'failed');
-        }
-        throw error;
+      const list = connector.listPlatformScripts.bind(connector);
+      return read(async () => z.array(PlatformScriptSchema).parse(await list()));
+    },
+    async scriptHistory(platformAccountId, platformFanId) {
+      const { account, connector } = await connectorOf(platformAccountId);
+      if (!connector.capabilities.scriptHistory || connector.getScriptHistory === undefined) {
+        throw new PlatformReadUnavailable('unsupported');
       }
+      const history = connector.getScriptHistory.bind(connector);
+      const fanRef = { platform: account.platform, id: platformFanId };
+      return read(async () => z.array(SentScriptStepSchema).parse(await history(fanRef)));
+    },
+    async lastOfferAt(platformAccountId, platformFanId) {
+      const { account, connector } = await connectorOf(platformAccountId);
+      if (!connector.capabilities.ppvStats || connector.getFanPpvStats === undefined) {
+        throw new PlatformReadUnavailable('unsupported');
+      }
+      const stats = connector.getFanPpvStats.bind(connector);
+      const fanRef = { platform: account.platform, id: platformFanId };
+      const { lastOfferAt } = await read(async () => FanPpvStatsSchema.parse(await stats(fanRef)));
+      return lastOfferAt === null ? null : new Date(lastOfferAt);
     },
   };
 }

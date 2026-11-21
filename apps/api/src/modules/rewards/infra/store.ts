@@ -5,6 +5,8 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
   type Currency,
+  type PayPeriod,
+  type PlatformAccountId,
   type TeamMemberId,
   type UserId,
 } from '@impera/contracts';
@@ -12,13 +14,28 @@ import { and, eq, schema, sql, withAdmin, withMember, type Database, type Transa
 import { z } from 'zod';
 
 import type { ChallengeShift, TimedNet } from '../domain/challenge';
-import type { GamePay, GameShift } from '../domain/gains';
+import type { GamePay, GameShift, HeldGain } from '../domain/gains';
 import type { RewardsStore } from '../domain/ports';
 import type { Streak } from '../domain/streak';
 import { TROPHY_KINDS } from '../domain/trophies';
 import type { StoredGain } from '../domain/trophy-case';
 
 const { rewardGains, rewardLevelSettings, rewardStreaks, teamMembers } = schema;
+
+/**
+ * A shift whose reports the agency validated, as the planning gives it and pay counts it (ADR 0118): the game only
+ * carries it from one door to the other.
+ */
+interface ValidatedShift {
+  readonly platformAccountId: PlatformAccountId;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly period: PayPeriod;
+  readonly currency: Currency;
+  readonly grossMinor: number;
+  readonly vatBps: number;
+  readonly platformFeeBps: number;
+}
 
 /** What the game reads of the other modules, plugged by the composition root (ADR 0104): read only, never written. */
 export interface RewardsReads {
@@ -28,7 +45,12 @@ export interface RewardsReads {
     memberId: TeamMemberId,
     agencyZone: string,
     now: Date,
+    validatedShifts: readonly ValidatedShift[],
   ) => Promise<GamePay & { readonly currency: Currency | null; readonly timedNets: readonly TimedNet[] }>;
+  /** The member's shifts with a validated total, on every creator: the job's read (ADR 0118 § 1). */
+  readonly validatedShifts: (tx: Transaction, memberId: TeamMemberId) => Promise<ValidatedShift[]>;
+  /** The account's own, read as itself by the planning, creator by creator (its own transaction). */
+  readonly ownValidatedShifts: (userId: UserId) => Promise<ValidatedShift[]>;
   readonly shifts: (tx: Transaction, memberId: TeamMemberId, now: Date) => Promise<GameShift[]>;
   /** The member's own shifts begun, read as the member by the planning (its own transaction). */
   readonly shiftsBegun: (userId: UserId, now: Date) => Promise<ChallengeShift[]>;
@@ -46,6 +68,9 @@ async function thresholdsOf(tx: Transaction): Promise<number[]> {
   return parsed.success ? parsed.data : [];
 }
 
+/** A gain that holds: one the job did not take back (ADR 0118 § 5). A gain taken back is read by no screen. */
+const holds = sql`${rewardGains.takenBackAt} is null`;
+
 async function gainsAndStreakOf(
   tx: Transaction,
   userId: string,
@@ -56,9 +81,10 @@ async function gainsAndStreakOf(
       scopeKey: rewardGains.scopeKey,
       earnedAt: rewardGains.earnedAt,
       revealedAt: rewardGains.revealedAt,
+      basisMinor: rewardGains.basisMinor,
     })
     .from(rewardGains)
-    .where(eq(rewardGains.userId, userId))
+    .where(and(eq(rewardGains.userId, userId), holds))
     .orderBy(rewardGains.earnedAt, rewardGains.kind);
   const [streak] = await tx
     .select({ current: rewardStreaks.current, best: rewardStreaks.best })
@@ -73,7 +99,8 @@ const plays = and(eq(teamMembers.teamRole, 'chatter'), sql`${teamMembers.status}
 
 /**
  * The game's tables (`reward_gains`, `reward_streaks`). The job writes on the admin connection, the only writer of a
- * gain; an account reads its own rows as itself and changes one thing, the date its reveal was played.
+ * gain and the only one to take one back; an account reads its own rows that hold as itself and changes one thing,
+ * the date its reveal was played.
  */
 export function createDrizzleRewardsStore(
   db: Database,
@@ -94,16 +121,44 @@ export function createDrizzleRewardsStore(
     facts: (player, now) =>
       withAdmin(adminDb, async (tx) => {
         const agencyZone = await reads.agencyTimeZone(tx);
+        const validated = await reads.validatedShifts(tx, player.memberId);
+        const held = await tx
+          .select({
+            kind: rewardGains.kind,
+            scopeKey: rewardGains.scopeKey,
+            basisMinor: rewardGains.basisMinor,
+          })
+          .from(rewardGains)
+          .where(and(eq(rewardGains.userId, player.userId), holds));
         return {
           agencyZone,
-          pay: await reads.payFacts(tx, player.memberId, agencyZone, now),
+          pay: await reads.payFacts(tx, player.memberId, agencyZone, now, validated),
           shifts: await reads.shifts(tx, player.memberId, now),
           thresholdsMinor: await thresholdsOf(tx),
+          // A creator's kinds live in the same table (ADR 0107): the chatter's game reads its own only.
+          held: held.flatMap((row): HeldGain[] => {
+            const kind = GainKindSchema.safeParse(row.kind);
+            return kind.success ? [{ ...row, kind: kind.data }] : [];
+          }),
         };
       }),
 
-    record: (player, gains, streak, now) =>
+    record: (player, gains, takenBack, streak, now) =>
       withAdmin(adminDb, async (tx) => {
+        // First what no longer holds, then what holds today: a gain is never both in one run.
+        for (const gain of takenBack) {
+          await tx
+            .update(rewardGains)
+            .set({ takenBackAt: now })
+            .where(
+              and(
+                eq(rewardGains.userId, player.userId),
+                eq(rewardGains.kind, gain.kind),
+                eq(rewardGains.scopeKey, gain.scopeKey),
+                holds,
+              ),
+            );
+        }
         const written =
           gains.length === 0
             ? []
@@ -116,9 +171,13 @@ export function createDrizzleRewardsStore(
                     kind: gain.kind,
                     scopeKey: gain.scopeKey,
                     earnedAt: now,
+                    basisMinor: gain.basisMinor ?? null,
                   })),
                 )
-                .onConflictDoNothing({ target: [rewardGains.userId, rewardGains.kind, rewardGains.scopeKey] })
+                .onConflictDoNothing({
+                  target: [rewardGains.userId, rewardGains.kind, rewardGains.scopeKey],
+                  where: holds,
+                })
                 .returning({ id: rewardGains.id });
         await tx
           .insert(rewardStreaks)
@@ -139,6 +198,8 @@ export function createDrizzleRewardsStore(
     own: (userId) => withMember(db, userId, (tx) => gainsAndStreakOf(tx, userId)),
 
     ownFacts: async (userId, now) => {
+      // The planning reads his validated reports as himself, creator by creator, in a transaction of its own.
+      const validated = await reads.ownValidatedShifts(UserIdSchema.parse(userId));
       const own = await withMember(db, userId, async (tx) => {
         const [member] = await tx
           .select({ id: teamMembers.id })
@@ -147,7 +208,7 @@ export function createDrizzleRewardsStore(
         if (member === undefined) return null;
         const memberId = TeamMemberIdSchema.parse(member.id);
         const agencyZone = await reads.agencyTimeZone(tx);
-        const pay = await reads.payFacts(tx, memberId, agencyZone, now);
+        const pay = await reads.payFacts(tx, memberId, agencyZone, now, validated);
         return {
           agencyZone,
           currency: pay.currency,
@@ -193,6 +254,7 @@ export function createDrizzleRewardsStore(
                 eq(rewardGains.userId, userId),
                 eq(rewardGains.kind, key.kind),
                 eq(rewardGains.scopeKey, key.scopeKey),
+                holds,
                 sql`${rewardGains.revealedAt} is null`,
               ),
             );

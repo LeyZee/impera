@@ -27,7 +27,7 @@ const TROPHY_HOW: Readonly<Record<TrophyKind, string>> = {
   streak_5: '5 shifts d’affilée avec le rapport rendu à l’heure.',
   streak_10: '10 shifts d’affilée avec le rapport rendu à l’heure.',
   streak_25: '25 shifts d’affilée avec le rapport rendu à l’heure.',
-  ten_ppv_shift: 'Dix PPV achetés dans un même shift.',
+  ten_ppv_shift: 'Dix PPV achetés dans un même shift, comptés sur les ventes lues, pas sur les rapports.',
 };
 
 const isTrophy = (kind: string): kind is TrophyKind => Object.hasOwn(TROPHY_NAMES, kind);

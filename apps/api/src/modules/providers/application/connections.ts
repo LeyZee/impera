@@ -5,6 +5,7 @@ import {
   ProviderSettingsSchema,
   type AiProvider,
   type ConnectionSignal,
+  type ProviderActivity,
   type ProviderErrorKind,
   type ProviderRefusal,
   type ProviderSettings,
@@ -15,6 +16,7 @@ import {
 import { DASHBOARD_PROVIDERS } from '../domain/catalog';
 import { credentialSignal, unreachableSignal } from '../domain/connection-signal';
 import {
+  applyProbe,
   applyReverification,
   credentialFromVerification,
   markRefusedInProduction,
@@ -24,6 +26,7 @@ import {
 import { checkKeyShape } from '../domain/key-shape';
 import { describeRefusal, describeVoiceAccount } from '../domain/messages';
 import type { Clock, CredentialStore, KeyActor } from '../domain/ports';
+import type { ActivityReader, ProviderProbe } from '../domain/probe';
 import type { ProviderVerifier } from '../domain/verification';
 
 import type { KeyCache } from './key-cache';
@@ -68,6 +71,12 @@ export interface ConnectionsDeps {
    * only. Absent in tests that do not look at it.
    */
   readonly onSignal?: (provider: AiProvider, signal: ConnectionSignal) => Promise<void>;
+  /** The « Essai réel » of each service (ADR 0091 § 7); a service without one has no button. */
+  readonly probes?: readonly ProviderProbe[];
+  /** Each service's real calls of the last 24 hours; absent, the lines say nothing of them. */
+  readonly activity?: ActivityReader;
+  /** Activity not read (the journal unreachable): the lines are given without it rather than not at all. */
+  readonly onActivityError?: (error: unknown) => void;
 }
 
 /** A refusal as the sheet shows it, under the key field. */
@@ -297,11 +306,94 @@ function statusOf(deps: ConnectionsDeps, provider: AiProvider, stored: null): Pr
   return toStatus(provider, stored, source);
 }
 
+async function activityOf(deps: ConnectionsDeps): Promise<ReadonlyMap<AiProvider, ProviderActivity>> {
+  if (deps.activity === undefined) return new Map();
+  try {
+    return await deps.activity.last24h(deps.clock.now());
+  } catch (error) {
+    deps.onActivityError?.(error);
+    return new Map();
+  }
+}
+
+/** A service the journal sees, with or without a call yet: an empty day says « aucun appel ». */
+function activityFor(
+  provider: AiProvider,
+  activity: ReadonlyMap<AiProvider, ProviderActivity>,
+  deps: ConnectionsDeps,
+): ProviderActivity | null {
+  if (provider === 'elevenlabs' || deps.activity === undefined) return null;
+  return (
+    activity.get(provider) ?? {
+      calls: 0,
+      troubled: 0,
+      asFallback: 0,
+      lastSuccessAt: null,
+      lastTrouble: null,
+    }
+  );
+}
+
 /** The Services section, in reading order. */
 export async function listProviderStatuses(deps: ConnectionsDeps): Promise<readonly ProviderStatus[]> {
-  const saved = await deps.store.list();
+  const [saved, activity] = await Promise.all([deps.store.list(), activityOf(deps)]);
   return DASHBOARD_PROVIDERS.map((provider) => {
     const stored = saved.find((c) => c.provider === provider) ?? null;
-    return stored === null ? statusOf(deps, provider, null) : savedStatus(provider, stored);
+    const calls = activityFor(provider, activity, deps);
+    if (stored === null) {
+      const source = deps.hasEnvironmentKey?.(provider) === true ? 'environment' : null;
+      return toStatus(provider, null, source, calls);
+    }
+    return toStatus(provider, stored, 'dashboard', calls);
   });
+}
+
+class ProbeNotAvailable extends DomainError {
+  constructor(provider: AiProvider) {
+    super('provider_invalid', `Pas d’essai réel pour ${provider}`);
+  }
+}
+
+/** One « Essai réel » per service at a time: a double click waits for the first and gets its answer. */
+const runningProbes = new WeakMap<ConnectionsDeps, Map<AiProvider, Promise<ProviderStatus>>>();
+
+/**
+ * « Essai réel » (ADR 0091 § 7): one tiny real call on the owner's click, never by a job. What it found is kept with the
+ * key; a key refused on that call turns red at once. A key replaced meanwhile wins: the result is dropped.
+ */
+export function probeProvider(deps: ConnectionsDeps, provider: AiProvider): Promise<ProviderStatus> {
+  const running = runningProbes.get(deps) ?? new Map<AiProvider, Promise<ProviderStatus>>();
+  runningProbes.set(deps, running);
+  const pending = running.get(provider);
+  if (pending !== undefined) return pending;
+  const probe = runProbe(deps, provider).finally(() => {
+    running.delete(provider);
+  });
+  running.set(provider, probe);
+  return probe;
+}
+
+async function runProbe(deps: ConnectionsDeps, provider: AiProvider): Promise<ProviderStatus> {
+  const prober = deps.probes?.find((p) => p.provider === provider);
+  if (prober === undefined) throw new ProbeNotAvailable(provider);
+  const stored = await deps.store.find(provider);
+  const key = stored?.key ?? null;
+  if (stored === null || key === null) throw new ProviderNotConnected(provider);
+  const voiceId = stored.settings.voice?.id ?? stored.voices[0]?.id ?? null;
+  const result = await prober.probe(key, voiceId);
+  const now = deps.clock.now();
+  for (let attempt = 0; attempt < UPDATE_ATTEMPTS; attempt += 1) {
+    const current = attempt === 0 ? stored : await deps.store.find(provider);
+    // Replaced or removed meanwhile: this result was the old key's.
+    if (current?.key !== key) break;
+    const next = applyProbe(current, result, now);
+    if (await deps.store.update(next)) {
+      await changed(deps, provider, next);
+      break;
+    }
+  }
+  const [after, activity] = await Promise.all([deps.store.find(provider), activityOf(deps)]);
+  return after === null
+    ? statusOf(deps, provider, null)
+    : toStatus(provider, after, 'dashboard', activityFor(provider, activity, deps));
 }

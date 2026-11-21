@@ -45,6 +45,7 @@ function toAccount(row: typeof schema.platformAccounts.$inferSelect): ConnectorA
     platform: PlatformSchema.parse(row.platform),
     sessionState: SessionStateSchema.parse(row.sessionState),
     lastPollAt: row.lastPollAt,
+    profileBioReadAt: row.profileBioReadAt,
     consecutiveErrors: row.consecutiveErrors,
     pausedUntil: row.pausedUntil,
     // A bad configuration falls back to the defaults rather than stopping the account.
@@ -185,6 +186,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
             creatorName: schema.creators.displayName,
             sessionState: schema.platformAccounts.sessionState,
             sessionUpdatedAt: schema.platformAccounts.sessionUpdatedAt,
+            modelId: schema.platformAccounts.sessionOwner,
           })
           .from(schema.platformAccounts)
           .innerJoin(schema.creators, eq(schema.creators.id, schema.platformAccounts.creatorId))
@@ -199,6 +201,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           creatorName: row.creatorName,
           sessionState: SessionStateSchema.parse(row.sessionState),
           sessionUpdatedAt: row.sessionUpdatedAt,
+          modelId: row.modelId,
         }));
       }),
 
@@ -223,6 +226,31 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           .update(schema.platformAccounts)
           .set({ lastPollAt: at, consecutiveErrors: 0, pausedUntil: null })
           .where(byId(id));
+      }),
+
+    recordProfileBio: (creatorId, id, bio, at) =>
+      withTenant(db, creatorId, async (tx) => {
+        await tx
+          .update(schema.platformAccounts)
+          .set({ profileBio: bio, profileBioReadAt: at })
+          .where(byId(id));
+      }),
+
+    profileBioOf: (creatorId) =>
+      withTenant(db, creatorId, async (tx) => {
+        const [row] = await tx
+          .select({ bio: schema.platformAccounts.profileBio })
+          .from(schema.platformAccounts)
+          .where(
+            and(
+              eq(schema.platformAccounts.creatorId, creatorId),
+              sql`${schema.platformAccounts.profileBioReadAt} is not null`,
+            ),
+          )
+          .orderBy(sql`${schema.platformAccounts.profileBioReadAt} desc`)
+          .limit(1);
+        const bio = row?.bio?.trim() ?? '';
+        return bio === '' ? null : bio;
       }),
 
     recordFailure: (creatorId, id, state) =>
@@ -277,12 +305,12 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
               sessionCiphertext: session.ciphertext,
               sessionOwner: session.owner,
               ...(renewed ? { sessionUpdatedAt: meta.at } : {}),
-              sessionState: 'valid',
+              sessionState: session.state,
               consecutiveErrors: 0,
               pausedUntil: null,
             })
             .where(byId(id));
-          if (row.sessionState !== 'valid') {
+          if (row.sessionState !== session.state) {
             await insertEvent(
               tx,
               creatorId,
@@ -291,7 +319,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
                 payload: {
                   platformAccountId: id,
                   from: SessionStateSchema.parse(row.sessionState),
-                  to: 'valid',
+                  to: session.state,
                 },
               },
               meta,
@@ -304,7 +332,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
             action: 'connector.session_stored',
             entity: 'platform_account',
             entityId: id,
-            details: { correlationId: meta.correlationId },
+            details: { correlationId: meta.correlationId, trigger: meta.trigger },
             createdAt: meta.at,
           });
           // A valid session replaced by a different one (ADR 0046 § 8): the agent may now speak through another
@@ -352,7 +380,7 @@ export function createDrizzleAccountStore(db: Database, adminDb: Database): Acco
           action: 'connector.session_refused',
           entity: 'platform_account',
           entityId: id,
-          details: { correlationId: meta.correlationId, reason },
+          details: { correlationId: meta.correlationId, reason, trigger: meta.trigger },
           createdAt: meta.at,
         });
       }),

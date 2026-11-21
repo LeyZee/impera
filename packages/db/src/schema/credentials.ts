@@ -1,4 +1,9 @@
-import { AiProviderSchema, ProviderConnectionStateSchema, ProviderErrorKindSchema } from '@impera/contracts';
+import {
+  AiProviderSchema,
+  ProviderConnectionStateSchema,
+  ProviderErrorKindSchema,
+  ProviderProbeOutcomeSchema,
+} from '@impera/contracts';
 import { customType, integer, jsonb, pgTable, text } from 'drizzle-orm/pg-core';
 
 import { createdAt, enumCheck, enumText, timestampTz, updatedAt } from './columns';
@@ -26,6 +31,15 @@ export const providerCredentials = pgTable(
     settings: jsonb('settings').notNull().default({}),
     voices: jsonb('voices').notNull().default([]),
     charactersLeft: integer('characters_left'),
+    /** ElevenLabs' month (ADR 0091 § 7): its limit, when it comes back, and whether the offer is the free one. */
+    charactersLimit: integer('characters_limit'),
+    charactersResetAt: timestampTz('characters_reset_at'),
+    planTier: enumText('plan_tier'),
+    /** The last « Essai réel » (ADR 0091 § 7); all null before the first one, and again once the key is replaced. */
+    probedAt: timestampTz('probed_at'),
+    probeOutcome: enumText('probe_outcome'),
+    probeLatencyMs: integer('probe_latency_ms'),
+    probeModel: text('probe_model'),
     lastErrorKind: enumText('last_error_kind'),
     verifiedAt: timestampTz('verified_at').notNull(),
     createdAt: createdAt(),
@@ -39,5 +53,7 @@ export const providerCredentials = pgTable(
       ProviderConnectionStateSchema.options.filter((state) => state !== 'not_connected'),
     ),
     enumCheck('provider_credentials', t.lastErrorKind, ProviderErrorKindSchema.options),
+    enumCheck('provider_credentials', t.planTier, ['free', 'paid']),
+    enumCheck('provider_credentials', t.probeOutcome, ProviderProbeOutcomeSchema.options),
   ],
 );

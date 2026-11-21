@@ -1,0 +1,7 @@
+# 2026-11-20 — CR-16 La semaine de la créatrice, lot 1 (serveur) — in_progress
+Fait : contrats `creator-week.ts` ; migration 0235 (`creator_weeks`, `creator_shoot_items`, `creator_suggestions.week_role`, RLS forcée, droits par colonne) ; module `creator-week` (règles pures, job `creator_week.plan`, validation par le propriétaire, routes chez elle) ; porte `week` et `accept` de `creator-tasks` ; lectures du stock et des arrivées de `content-drops` par la racine ; glossaire (Jour de tournage, Livrer ma semaine, Semaine) ; README du module ; fiche CR-16.
+Pas fait : les écrans (lot 2) ; réglages par créatrice, rappels, Relance, idées, mesures, fiches rédigées par l'IA (lot 3).
+Décisions : réglages par bon sens dits à Charles le 20/11 (2 jours de 4 h ; script 1 h 30, séance 45 min, vidéo 30 min, story 10 min ; jours repris de la semaine d'avant, sinon dispos, sinon mercredi et samedi). Le brouillon se rafraîchit chaque heure du dimanche soir jusqu'à la validation. La livraison est comptée par les dépôts arrivés dans la semaine, sans nouvelle demande de contenu.
+Découvertes : la règle du refus de la semaine d'après ne s'applique pas aux cadres de la semaine (ADR 0140 § 23) : leur insertion passe par `suggestWeek`, qui ne la lit pas.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, tests unitaires du calcul ✓, intégration `creator-week` ✓ (7 tests), balayages d'authentification et d'origine ✓.

@@ -13,11 +13,12 @@ import { usePayPeriod } from '@/payroll/api';
 import '@/payroll/pay.css';
 import { useSchedulingSettings } from '@/reports/api';
 import '@/reports/reports.css';
-import { amountText, periodTitle, previousPeriod } from '@/reports/model';
+import { amountText, previousPeriod } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
 import '@/screens/team/team.css';
 import { Select } from '@/shell/Select';
+import { InvoiceArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
 
 /** What the reader opened on a document: an answer to his own, the end of a contest, or its detail. */
@@ -109,8 +110,23 @@ export function InvoicesPage({
       <PageHeader
         eyebrow="Paie"
         title="Factures"
-        lead="Les factures et avoirs émis au nom de chaque membre : les contestations à trancher, les échéances, puis chaque quinzaine."
-        actions={<PayNav user={user} />}
+        lead="Les factures et avoirs émis au nom de chaque membre : contestations, échéances, quinzaines."
+        tabs={<PayNav user={user} period={period} />}
+        {...(period === null
+          ? {}
+          : {
+              // One period bar for Paie, at one place (recette visuelle 16/11, GES-02): the header's.
+              actions: (
+                <PeriodArrows
+                  period={period}
+                  current={current}
+                  onPeriod={(next) => {
+                    onFilter({ quinzaine: next });
+                  }}
+                  named
+                />
+              ),
+            })}
       />
       <div className="py-board">
         {timeZone === null ? null : (
@@ -136,20 +152,7 @@ export function InvoicesPage({
         {period === null ? null : <AwaitingInvoices period={period} owner={owner} nameOf={nameOf} />}
         <Panel
           className="nv-enter iv-docs"
-          eyebrow="Documents"
-          title={
-            period === null ? (
-              chosenName === null ? (
-                'Quinzaine'
-              ) : (
-                `${chosenName}, sur l’année`
-              )
-            ) : (
-              <span className="nv-swap nv-num" key={period} aria-live="polite">
-                {periodTitle(period)}
-              </span>
-            )
-          }
+          title={chosenName === null ? 'Documents de la quinzaine' : `${chosenName}, sur l’année`}
           actions={
             <div className="iv-filter">
               <label className="sr-only" htmlFor={`${id}-member`}>
@@ -166,15 +169,6 @@ export function InvoicesPage({
                   onFilter(value === '' ? (period === null ? {} : { quinzaine: period }) : { membre: value });
                 }}
               />
-              {period === null ? null : (
-                <PeriodArrows
-                  period={period}
-                  current={current}
-                  onPeriod={(next) => {
-                    onFilter({ quinzaine: next });
-                  }}
-                />
-              )}
             </div>
           }
         >
@@ -192,6 +186,7 @@ export function InvoicesPage({
               <Loading rows={3} />
             ) : byPeriod.data.documents.length === 0 ? (
               <Empty
+                art={<InvoiceArt />}
                 whisper="Aucun document sur cette quinzaine."
                 text="Les factures s’émettent à la validation des relevés, pour chaque membre au dossier complet."
               />
@@ -207,7 +202,7 @@ export function InvoicesPage({
               what="la liste des documents"
               hint="Ses factures s’émettent à la validation de ses relevés, une fois son dossier complet."
               first={`${chosenName ?? 'Ce membre'} n’a aucun document sur les dix dernières années : ses factures s’émettent à la validation de ses relevés, une fois son dossier complet.`}
-              older="Le serveur ne répond pas : les documents plus anciens n’ont pas pu être lus."
+              older="Les documents plus anciens n’ont pas pu être lus : réessaie dans un instant."
               row={(item) => row(item, timeZone)}
             />
           )}

@@ -98,7 +98,7 @@ export function FanSheet({
     return (
       <>
         <header className="tr-aside__head">
-          <h3 className="tr-aside__title">Le fan</h3>
+          <h3 className="nv-h3 tr-aside__title">Le fan</h3>
           <span className="tr-aside__sum">{line}</span>
         </header>
         {alertList}

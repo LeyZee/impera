@@ -138,6 +138,7 @@ describe('fans.read_card', () => {
       sender: {
         sendText: () => Promise.reject(new Error('not used')),
         sendMedia: () => Promise.reject(new Error('not used')),
+        sendStep: () => Promise.reject(new Error('not used')),
         verifySent: () => Promise.resolve({ status: 'not_found' }),
       },
       requireRole: () => () => Promise.resolve(),

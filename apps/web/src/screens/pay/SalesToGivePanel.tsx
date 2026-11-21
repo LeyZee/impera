@@ -67,7 +67,7 @@ export function SalesToGivePanel({
   const counts = gifts.data?.period === period ? gifts.data.counts : [];
 
   return (
-    <Panel className="nv-enter py-held py-give" eyebrow="Donner une vente">
+    <Panel className="nv-enter py-held py-give" title="Donner une vente">
       <div className="rp-sec">
         <p className="py-quiet">
           Un autre membre a convaincu le fan ? Retrouve la vente par son jour : seules s’affichent celles où

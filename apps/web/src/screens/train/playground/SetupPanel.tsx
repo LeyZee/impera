@@ -3,8 +3,10 @@ import { useEffect, useState, type JSX } from 'react';
 
 import { DesireMarksFold } from './DesireMarks';
 import { PersonaPicker } from './PersonaPicker';
+import { VoiceBankFold } from './VoiceBank';
 import { clockAt, duration, money, scriptsHint } from './logic';
 import type { CreatorMedia as CreatorMediaInput, MediaKind } from './model';
+import { useTrainsAsOwner } from './trainer';
 import type { Playground } from './usePlayground';
 
 export const MEDIA_KINDS: readonly { kind: MediaKind; label: string }[] = [
@@ -30,6 +32,7 @@ export function SetupPanel({
   onCloseSheet: () => void;
 }): JSX.Element {
   const { situation } = state;
+  const asOwner = useTrainsAsOwner();
   const age = new Date(situation.now).getTime() - new Date(situation.relationshipStartedAt).getTime();
   const known = [
     ...state.fanNotes.slice(0, 2),
@@ -128,6 +131,8 @@ export function SetupPanel({
             />
           </div>
         </details>
+
+        <VoiceBankFold state={state} pg={pg} mayWithdraw={asOwner} />
 
         <DesireMarksFold state={state} pg={pg} />
       </div>

@@ -30,6 +30,13 @@ Vérifié le 16/11/2026 (documentation de Meta, journal des changements mis à j
 
 - Chaque nuit, et une heure après une publication connue, le connecteur lit les médias du compte et leurs statistiques. Un **relevé** (`media_insight_snapshot`) est gardé par média et par âge : 1 heure, 24 heures, 48 heures, 7 jours. Le couple média et âge est unique : un job rejoué n'écrit rien deux fois. Un âge est un **palier** : le relevé gardé est la première lecture faite après cet âge, avec l'heure réelle de la lecture ; une lecture plus tardive ne le remplace pas.
 - Les stories en ligne sont relevées par leur identifiant, leur heure et leurs nombres, pour savoir si la journée a sa story (les rappels relèvent d'une ADR à venir).
+*Avenant du 20/11/2026, accepté par Charles (carte de décision, 20/11, 12 h 35 heure de Paris : « Marquer le relevé comme manqué »). Il remplace la règle du palier ci-dessus (« la première lecture faite après cet âge ») :*
+
+- Un palier a une **fenêtre** : de son âge jusqu'au palier suivant (1 heure : jusqu'à 24 heures ; 24 heures : jusqu'à 48 heures ; 48 heures : jusqu'à 7 jours ; 7 jours : jusqu'à 14 jours). Une lecture remplit le palier dont la fenêtre contient l'âge du média au moment de la lecture, s'il n'a pas déjà son relevé. Elle remplit donc au plus un palier.
+- Un palier dont la fenêtre est passée sans lecture est **manqué** : sa ligne est gardée sans aucun nombre. Un chiffre lu plus tard n'y entre jamais : rangé dans la case « 1 heure », un chiffre lu à trois jours fausserait la comparaison entre deux Reels et le retour écrit pour la créatrice.
+- Un palier gardé, relevé ou manqué, n'est jamais remplacé. Le couple média et âge reste unique.
+- Un calcul qui a besoin d'un palier manqué ne l'invente pas : il dit que le relevé manque.
+
 - **Des nombres seulement.** Jamais le texte ni le nom d'un commentateur (ADR 0010), jamais un message privé. La légende et le format de ses propres médias sont lus.
 - La lecture nourrit la source 1 de l'ADR 0060 § 2 sans attendre la publication : VEI-05 ne dépend plus de PUB-02.
 
@@ -41,6 +48,16 @@ Vérifié le 16/11/2026 (documentation de Meta, journal des changements mis à j
 - Un lien de redirection (ADR 0080) porte désormais son **endroit** (`placement`), choisi dans une liste fermée : story à la une, story du jour, canal Telegram, autre réseau. Un lien enregistré avant cette ADR n'a pas d'endroit : l'écran affiche « à renseigner », et aucune attribution n'est fabriquée. C'est l'endroit, et non la provenance, qui attribue un clic ; l'écran recommande un lien par endroit.
 - Le connecteur relève, par lien et par heure, les pages vues et les clics. Le total d'une heure est unique par lien et par heure UTC : tant que l'heure n'est pas close, une nouvelle lecture le remplace ; une fois close, il est figé. Les visites marquées « robot » par le service sont **retirées par le code** avant tout calcul, et leur part est montrée à l'agence.
 - **Aucune donnée de visiteur n'est gardée** : ni adresse, ni ville, ni appareil d'une visite. Seuls des totaux par heure entrent en base.
+
+*Avenant du 20/11/2026, accepté par Charles (carte de décision, 20/11, 22 h 28 heure de Paris : « Hors du dépôt, dans le déploiement » ; relu par le fil Sécurité). Il remplace, pour le seul connecteur de liens, la règle « les hôtes de sortie sont écrits dans le code » :*
+
+- Le dépôt est public, et le nom de l'hôte du service de redirection dit quel outil l'agence utilise : **il n'entre pas dans le dépôt**. Ce que la règle protège reste tenu autrement : personne ne peut changer l'hôte depuis le CRM, et la clé ne part nulle part ailleurs.
+- 1. L'hôte vient de la configuration du déploiement, jamais d'un réglage du CRM, d'une table ni d'une requête. Le changer est un geste de déploiement, fait par le propriétaire.
+- 2. Hôte **absent** : le connecteur de liens est éteint, en ambre, et rien d'autre ne casse. Hôte **présent mais invalide** : le serveur refuse de démarrer. Est valide : `https`, un nom de domaine en ASCII, le port par défaut ; ni adresse IP, ni `localhost`, ni identifiants, ni chemin.
+- 3. L'adaptateur n'appelle que cet hôte, ne suit aucune redirection, et n'envoie la clé qu'à lui.
+- 4. Le dépôt ne porte qu'un hôte d'exemple dans les tests et un nom neutre dans `.env.example` ; le code, les commentaires et les documents disent « service de redirection ».
+- 5. Ni l'hôte ni la clé n'apparaissent dans un journal, un message d'erreur, une réponse de l'API ou l'audit. Une erreur du service se rapporte comme « service de redirection indisponible », sans son adresse.
+- L'adaptateur Instagram n'est pas concerné : ses hôtes sont ceux de Meta, publics, et restent écrits dans le code.
 
 ### 4. Le retour sur un Reel
 

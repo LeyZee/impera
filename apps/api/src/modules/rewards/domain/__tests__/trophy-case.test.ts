@@ -5,11 +5,18 @@ import { levelSteps } from '../levels';
 import { TROPHY_KINDS } from '../trophies';
 import { gainKeyOf, trophyCaseOf, type StoredGain } from '../trophy-case';
 
-const gain = (kind: StoredGain['kind'], earned: string, scopeKey = '', revealed?: string): StoredGain => ({
+const gain = (
+  kind: StoredGain['kind'],
+  earned: string,
+  scopeKey = '',
+  revealed?: string,
+  basisMinor: number | null = null,
+): StoredGain => ({
   kind,
   scopeKey,
   earnedAt: new Date(earned),
   revealedAt: revealed === undefined ? null : new Date(revealed),
+  basisMinor,
 });
 
 describe('trophyCaseOf (ADR 0104 § 13 and § 15)', () => {
@@ -89,6 +96,31 @@ describe('the rank in the case (ADR 0104 § 16)', () => {
       currency: 'EUR',
     });
     expect(trophyCaseOf([], streak, progress).nextLevel?.rank).toBe(1);
+  });
+
+  it('says the threshold a rank was earned at, to the account itself only', () => {
+    const noted = [
+      gain('level', '2026-11-03T10:00:00Z', '1', '2026-11-03T11:00:00Z'),
+      gain('level', '2026-11-09T10:00:00Z', '2', undefined, 500_000),
+    ];
+    const progress = { steps, cumulatedNetMinor: 800_000, currency: 'EUR' as const };
+    const own = trophyCaseOf(noted, streak, progress);
+    expect(own.items.find((item) => item.kind === 'level:2')?.basis).toEqual({
+      minor: 500_000,
+      currency: 'EUR',
+    });
+    expect(own.items.find((item) => item.kind === 'level:1')?.basis).toBeUndefined();
+    expect(TrophyCaseSchema.safeParse(own).success).toBe(true);
+    const seenByAnother = trophyCaseOf(noted, streak, null);
+    expect(seenByAnother.items.every((item) => item.basis === undefined)).toBe(true);
+  });
+
+  it('says the true net past a threshold the job has not noted yet', () => {
+    const progress = { steps, cumulatedNetMinor: 124_400, currency: 'EUR' as const };
+    const ahead = trophyCaseOf([], streak, progress).nextLevel;
+    expect(ahead?.rank).toBe(1);
+    expect(ahead?.currentMinor).toBe(124_400);
+    expect(ahead?.currentMinor).toBeGreaterThan(ahead?.thresholdMinor ?? Infinity);
   });
 
   it('keeps a rank a refund went back under, and never reads below zero', () => {

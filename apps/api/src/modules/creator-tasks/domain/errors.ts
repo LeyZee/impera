@@ -14,6 +14,9 @@ import {
   SUGGESTION_OPEN_CONFLICT,
   SUGGESTION_PAST_UNPROCESSABLE,
   SUGGESTION_UNDATED_UNPROCESSABLE,
+  SHOOT_ITEM_LATE_UNPROCESSABLE,
+  SHOOT_ITEM_NOT_ACCEPTED_UNPROCESSABLE,
+  SHOOT_ITEM_NOT_FOUND,
 } from '@impera/contracts';
 
 import type { ShootGuardFault } from './ports';
@@ -145,5 +148,26 @@ export class SuggestionGuarded extends DomainError {
     super(SUGGESTION_GUARD_UNPROCESSABLE, messages[fault.reason], {
       details: { reason: fault.reason, field: fault.field },
     });
+  }
+}
+
+/** A line of a shooting day that is not hers, or does not exist (ADR 0140 § 24). */
+export class ShootItemNotFound extends DomainError {
+  constructor() {
+    super(SHOOT_ITEM_NOT_FOUND, 'Cette ligne n’est pas dans ta semaine');
+  }
+}
+
+/** A line of a day she has not accepted: the day first. */
+export class ShootItemNotAccepted extends DomainError {
+  constructor() {
+    super(SHOOT_ITEM_NOT_ACCEPTED_UNPROCESSABLE, 'Accepte d’abord ce jour de tournage');
+  }
+}
+
+/** A line ticked or taken back more than two days after its day (ADR 0042 § 8). */
+export class ShootItemLate extends DomainError {
+  constructor() {
+    super(SHOOT_ITEM_LATE_UNPROCESSABLE, 'Ce jour de tournage est passé depuis plus de deux jours');
   }
 }

@@ -2,6 +2,7 @@ import type { AccountSecurity, OpenSession, Passkey } from '@impera/contracts';
 import { useCallback, useEffect, useId, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { ExtensionLinksPanel } from './ExtensionLinksPanel';
+import { OwnersPanel } from './OwnersPanel';
 import {
   closeAccountSessions,
   closeOtherSessions,
@@ -39,25 +40,27 @@ const MUTED = 'text-sm text-[var(--nv-ink-muted)]';
 const ROWS = 'flex flex-col divide-y divide-[var(--nv-hairline)]';
 
 /**
- * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, each account's second
- * factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
- * (no geographic base: Charles's choice of 02/11). The owner and the managers also link here the browsers where they
- * watch Instagram (`extensionLinks`, VEI-02): the watch is theirs.
+ * Réglages › Sécurité (ADR 0046 § 7, SEC-04): one's open sessions and backup codes; for the owner, the owners themselves
+ * (ADR 0096) and each account's second factor and keys (`ownerId` given). One's passkeys sit next to the sessions (ADR 0053 § 5). A session shows its device, its network and when it was last used: never a full address, never a country
+ * (no geographic base: Charles's choice of 02/11). The team links here the browsers where it uses the extension
+ * (`extensionLinks`, VEI-02, ADR 0109): `copilot` for the copilot's gestures, `watch` when the Instagram watch is theirs
+ * too, `none` for a creator.
  */
 export function SecuritySection({
   ownerId,
-  extensionLinks = false,
+  extensionLinks = 'none',
 }: {
   ownerId?: string;
-  extensionLinks?: boolean;
+  extensionLinks?: 'none' | 'copilot' | 'watch';
 }): JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <SessionsPanel />
       <PasskeysPanel />
       <BackupCodesPanel />
+      {ownerId === undefined ? null : <OwnersPanel />}
       {ownerId === undefined ? null : <AccountsPanel ownerId={ownerId} />}
-      {extensionLinks ? <ExtensionLinksPanel /> : null}
+      {extensionLinks === 'none' ? null : <ExtensionLinksPanel watches={extensionLinks === 'watch'} />}
     </div>
   );
 }
@@ -221,7 +224,8 @@ function SessionsPanel(): JSX.Element {
                 {group.current ? null : (
                   <button
                     type="button"
-                    className="nv-btn nv-btn--plain nv-btn--sm shrink-0"
+                    // The same tint as « Fermer toutes les autres » above it: both close sessions (CHA-14).
+                    className="nv-btn nv-btn--soft nv-btn--sm shrink-0"
                     disabled={busy !== null}
                     aria-label={
                       group.ids.length === 1
@@ -407,9 +411,12 @@ function PasskeysPanel(): JSX.Element {
             Ce navigateur ne sait pas créer de clé d’accès&nbsp;: ajoute-la depuis ton téléphone.
           </p>
         )}
-        <p className="text-sm text-[var(--nv-ink-faint)]">
-          Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
-        </p>
+        {/* Only once a key exists: before, there is nothing for it to say (CHA-14). */}
+        {keys === null || keys.length === 0 ? null : (
+          <p className="text-sm text-[var(--nv-ink-faint)]">
+            Fermer des sessions ne retire pas les clés&nbsp;: retire-les ici.
+          </p>
+        )}
         <Outcome error={error} notice={notice} />
       </PanelSection>
     </Panel>
@@ -593,15 +600,18 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
       <PanelSection>
         {accounts === null && error === null ? <p className={MUTED}>Chargement…</p> : null}
         {accounts === null ? null : (
-          <ul className={ROWS} aria-label="Comptes de l’agence">
+          <ul className={`${ROWS} @container`} aria-label="Comptes de l’agence">
             {accounts.map((account, index) => (
               <li
                 key={account.userId}
                 className="nv-enter flex flex-col gap-3 py-3 first:pt-0"
                 style={{ '--nv-i': index + 1 }}
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {/* Fixed columns (recette visuelle 16/11, GES-11): a cell stays, empty, where a line has nothing to
+                    say or no action, so that every line's columns start at one place. Only the exception is said: a
+                    second factor not turned on, keys that exist; what is true of every line goes unsaid. */}
+                <div className="flex flex-col gap-2 @2xl:grid @2xl:grid-cols-[minmax(0,1fr)_15rem_7rem_10rem] @2xl:items-center @2xl:gap-4">
+                  <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="flex flex-wrap items-baseline gap-x-2 font-semibold">
                       {account.name}
                       <span className="text-sm font-normal text-[var(--nv-ink-muted)]">
@@ -617,16 +627,18 @@ function AccountsPanel({ ownerId }: { ownerId: string }): JSX.Element {
                           : ` · dernière activité ${ago(account.lastActiveAt, now)}`}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <span
-                      className={`nv-status ${account.secondFactor ? 'nv-status--sent' : 'nv-status--awaiting-approval'}`}
-                    >
-                      <span className="nv-status__dot" />
-                      {account.secondFactor
-                        ? 'Code à 6 chiffres actif'
-                        : 'Code à 6 chiffres pas encore activé'}
-                    </span>
-                    <span className={MUTED}>{passkeysText(account.passkeys)}</span>
+                  <span className="empty:hidden @2xl:empty:block">
+                    {account.secondFactor ? null : (
+                      <span className="nv-status nv-status--awaiting-approval">
+                        <span className="nv-status__dot" />
+                        Code à 6 chiffres pas encore activé
+                      </span>
+                    )}
+                  </span>
+                  <span className={`${MUTED} empty:hidden @2xl:empty:block`}>
+                    {account.passkeys === 0 ? null : passkeysText(account.passkeys)}
+                  </span>
+                  <div className="flex flex-wrap items-start gap-2 empty:hidden @2xl:flex-col @2xl:empty:block">
                     {account.userId === ownerId || account.sessions === 0 ? null : (
                       <button
                         type="button"

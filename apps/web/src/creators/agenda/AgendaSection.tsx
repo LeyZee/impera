@@ -25,7 +25,7 @@ import './agency-agenda.css';
 
 import { ReelBriefFields } from '@/creators/reel/ReelBriefFields';
 import { emptyReelDraft, reelBriefOf, reelProblems, type ReelDraft } from '@/creators/reel/model';
-import { CreatorGameBlock } from '@/rewards/CreatorGameBlock';
+import { WeekPlanPanel } from '@/creators/week/WeekPlanPanel';
 import { useUnreadableTimes } from '@/scheduling/TimeField';
 import { addDays, cityOf, dayOf, mondayOf, readerZone, weekdayOf, weekLabel } from '@/scheduling/time';
 import {
@@ -45,6 +45,7 @@ import { Dialog } from '@/shell/Dialog';
 import { Select } from '@/shell/Select';
 import '@/screens/agenda/agenda.css';
 import '@/screens/team/team.css';
+import { Failure } from '@/shell/states';
 
 /**
  * Créatrices › Agenda (CR-05 lot c, ADR 0042 § 4), the owner's and an active manager's: propose a task for her agenda,
@@ -55,10 +56,13 @@ export function AgendaSection({
   creatorId,
   creatorName,
   timezone,
+  canValidate = false,
 }: {
   creatorId: CreatorId;
   creatorName: string;
   timezone: string;
+  /** The owner validates her week of shooting (ADR 0140 § 3); a manager reads it. */
+  canValidate?: boolean;
 }): JSX.Element {
   const today = dayOf(new Date(), timezone);
   const thisWeek = mondayOf(today);
@@ -69,20 +73,7 @@ export function AgendaSection({
 
   const list = (): JSX.Element => {
     if (query.data === undefined) {
-      if (query.isError)
-        return (
-          <div className="nv-plate aa-empty">
-            <p className="ps-title">Ses propositions ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void query.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
-        );
+      if (query.isError) return <Failure onRetry={() => void query.refetch()} />;
       return <div className="nv-plate ps-panel ps-skeleton ps-skeleton--tall" aria-busy="true" />;
     }
     const items = query.data.items;
@@ -173,9 +164,14 @@ export function AgendaSection({
           {notice}
         </p>
       )}
+      <WeekPlanPanel
+        creatorId={creatorId}
+        creatorName={creatorName}
+        timezone={timezone}
+        week={week}
+        canValidate={canValidate}
+      />
       {list()}
-      {/* Her series and trophies, read only (ADR 0107 § 12): this sheet is the owner's and an active manager's. */}
-      <CreatorGameBlock creatorId={creatorId} name={creatorName} />
       {proposing ? (
         <ProposeDialog
           creatorId={creatorId}
@@ -214,7 +210,7 @@ function Group({
   if (items.length === 0) return null;
   return (
     <section className="aa-group" aria-labelledby={id}>
-      <h3 className="aa-group__title" id={id}>
+      <h3 className="nv-h3 aa-group__title" id={id}>
         {title} <span className="nv-num">{items.length}</span>
       </h3>
       <ul className="aa-list">

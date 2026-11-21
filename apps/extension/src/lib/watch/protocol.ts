@@ -95,7 +95,7 @@ export const MarkableCreatorsSchema = z.strictObject({
 export type MarkableCreators = z.infer<typeof MarkableCreatorsSchema>;
 
 export const LinkSavedSchema = z.strictObject({
-  state: z.enum(['linked', 'refused', 'unreachable', 'malformed']),
+  state: z.enum(['linked', 'refused', 'busy', 'unreachable', 'malformed']),
 });
 export type LinkSaved = z.infer<typeof LinkSavedSchema>;
 
@@ -106,7 +106,7 @@ export type Marked = z.infer<typeof MarkedSchema>;
 
 /** The Reveal accounts the owner's « Sync » may fill (P2-01); `not-owner`: the link is a manager's or a chatter's. */
 export const RevealAccountsSchema = z.strictObject({
-  state: z.enum(['ok', 'none', 'revoked', 'not-owner', 'unreachable']),
+  state: z.enum(['ok', 'none', 'revoked', 'not-owner', 'busy', 'unreachable']),
   accounts: z.array(
     z.strictObject({
       id: PlatformAccountIdSchema,
@@ -114,25 +114,59 @@ export const RevealAccountsSchema = z.strictObject({
       creatorName: z.string(),
       sessionState: SessionStateSchema,
       sessionUpdatedAt: z.iso.datetime().nullable(),
+      /** When the stored session ends; null while the CRM does not say it. */
+      sessionExpiresAt: z.iso.datetime().nullable(),
     }),
   ),
 });
 export type RevealAccounts = z.infer<typeof RevealAccountsSchema>;
 
-/** What became of a « Sync ». `no-session`: the Reveal tab made no request to read in time. */
-export const RevealSyncedSchema = z.strictObject({
-  state: z.enum([
-    'synced',
-    'no-session',
-    'unlinked',
-    'revoked',
-    'not-owner',
-    'other-model',
-    'other-member',
-    'refused',
-    'unreachable',
-  ]),
-});
+/** The link of this extension, as the service worker holds it: the copilot's « Relier » (EXT-02). */
+export const LinkStateSchema = z.strictObject({ link: z.enum(['none', 'linked', 'revoked']) });
+
+/**
+ * The model the Reveal tab shows against the one of this account's last sync: `unknown` before its first one.
+ * Only the model's id is kept for that, never the session.
+ */
+const RevealSeenSchema = z.enum(['same', 'other', 'unknown']);
+export type RevealSeen = z.infer<typeof RevealSeenSchema>;
+
+/**
+ * What became of the reading of a session. `held`: read, kept by the service worker for one minute at most until the
+ * owner sends it or not; the popup learns the model's id alone. `no-session`: the tab made no request to read in time.
+ * `several`: the tab named several creators and none is the account's (19/11, 409).
+ */
+export const RevealReadSchema = z.discriminatedUnion('state', [
+  z.strictObject({ state: z.literal('held'), modelId: z.string().min(1).max(64), seen: RevealSeenSchema }),
+  z.strictObject({ state: z.enum(['no-session', 'unlinked', 'several']) }),
+]);
+export type RevealRead = z.infer<typeof RevealReadSchema>;
+
+/**
+ * What became of a « Sync ». `synced`: stored, with its end and whether a new login to Reveal should come first (ADR 0147
+ * § 5). `expired`: the session read is no longer held (a minute passed, or it was cancelled).
+ */
+export const RevealSyncedSchema = z.discriminatedUnion('state', [
+  z.strictObject({
+    state: z.literal('synced'),
+    expiresAt: z.iso.datetime().nullable(),
+    reconnectFirst: z.boolean(),
+    kept: z.boolean(),
+  }),
+  z.strictObject({
+    state: z.enum([
+      'expired',
+      'unlinked',
+      'revoked',
+      'not-owner',
+      'other-model',
+      'other-member',
+      'refused',
+      'busy',
+      'unreachable',
+    ]),
+  }),
+]);
 export type RevealSynced = z.infer<typeof RevealSyncedSchema>;
 
 /** Popup → service worker. The tab is always the one open when the popup opened. */
@@ -145,12 +179,16 @@ export const FromPopupSchema = z.discriminatedUnion('type', [
   /** The code pasted in « Relier »; it goes to the service worker and never comes back to the popup. */
   z.strictObject({ type: z.literal('popup/link'), token: z.string().max(200) }),
   z.strictObject({ type: z.literal('popup/unlink') }),
+  z.strictObject({ type: z.literal('popup/link-state') }),
   z.strictObject({ type: z.literal('popup/reveal-accounts') }),
-  /** The session is read from that Reveal tab's requests, sent, then forgotten: it never comes back to the popup. */
+  /** The session is read from that Reveal tab's requests and held: it never comes back to the popup. */
   z.strictObject({
-    type: z.literal('popup/reveal-sync'),
+    type: z.literal('popup/reveal-read'),
     tabId: z.number().int(),
     accountId: PlatformAccountIdSchema,
   }),
+  /** The held session goes to the CRM, then is forgotten. */
+  z.strictObject({ type: z.literal('popup/reveal-send'), accountId: PlatformAccountIdSchema }),
+  z.strictObject({ type: z.literal('popup/reveal-cancel') }),
 ]);
 export type FromPopup = z.infer<typeof FromPopupSchema>;

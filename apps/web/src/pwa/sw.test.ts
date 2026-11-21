@@ -216,11 +216,23 @@ describe('service worker', () => {
     expect(worker.showNotification).toHaveBeenLastCalledWith('Nouvelle vente', {
       body: 'x'.repeat(180),
       tag: 'sale',
+      silent: false,
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',
       lang: 'fr',
       data: { url: '/suivi' },
     });
+    // An alert « en sourdine » (ADR 0150): shown without sound; only a true `silent` mutes it.
+    await push({ title: 'Nora · Vente détectée', url: '/suivi', silent: true });
+    expect(worker.showNotification).toHaveBeenLastCalledWith(
+      'Nora · Vente détectée',
+      expect.objectContaining({ silent: true }),
+    );
+    await push({ title: 'Vente', url: '/suivi', silent: 'yes' });
+    expect(worker.showNotification).toHaveBeenLastCalledWith(
+      'Vente',
+      expect.objectContaining({ silent: false }),
+    );
     await push(null, true);
     expect(worker.showNotification).toHaveBeenLastCalledWith(
       'Impera',

@@ -1,5 +1,6 @@
 import type {
   AiProvider,
+  ProviderActivity,
   ProviderConnectionState,
   ProviderErrorKind,
   ProviderFact,
@@ -10,7 +11,8 @@ import type {
 
 import { profileOf } from './catalog';
 import { describeLowCredit, describeRefusedLine } from './messages';
-import type { VerificationOutcome, VerifiedKey } from './verification';
+import type { ProbeResult, StoredProbe } from './probe';
+import type { AccountQuota, VerificationOutcome, VerifiedKey } from './verification';
 
 /** A saved key with what its last verification found. The key itself never leaves the module. */
 export interface StoredCredential {
@@ -28,6 +30,10 @@ export interface StoredCredential {
   readonly state: Exclude<ProviderConnectionState, 'not_connected'>;
   readonly verifiedAt: Date;
   readonly charactersLeft: number | null;
+  /** ElevenLabs' month as its last check read it (ADR 0091 § 7). */
+  readonly quota: AccountQuota | null;
+  /** The last « Essai réel », null before the first one and once the key is replaced. */
+  readonly probe: StoredProbe | null;
   readonly lastErrorKind: ProviderErrorKind | null;
   /** The row's version as read; a status write only lands if the row is still at this version (store `update`). */
   readonly revision: number;
@@ -37,7 +43,7 @@ export interface StoredCredential {
 export type NewCredential = StoredCredential & { readonly key: string };
 
 /** What a verification says about a key, everything but the key, its settings and its version. */
-type VerifiedFields = Omit<StoredCredential, 'provider' | 'key' | 'settings' | 'revision'>;
+type VerifiedFields = Omit<StoredCredential, 'provider' | 'key' | 'settings' | 'revision' | 'probe'>;
 
 function verifiedFields(verified: VerifiedKey, now: Date): VerifiedFields {
   return {
@@ -48,6 +54,7 @@ function verifiedFields(verified: VerifiedKey, now: Date): VerifiedFields {
     state: verified.isLowCredit ? 'low_credit' : 'connected',
     verifiedAt: now,
     charactersLeft: verified.charactersLeft,
+    quota: verified.quota,
     lastErrorKind: null,
   };
 }
@@ -58,7 +65,23 @@ export function credentialFromVerification(
   verified: VerifiedKey,
   now: Date,
 ): NewCredential {
-  return { provider, key, settings: verified.settings, revision: 0, ...verifiedFields(verified, now) };
+  return {
+    provider,
+    key,
+    settings: verified.settings,
+    revision: 0,
+    probe: null,
+    ...verifiedFields(verified, now),
+  };
+}
+
+/**
+ * Keeps what an « Essai réel » found. A key refused on that real call turns the service red at once, as a refusal seen
+ * in production does; any other outcome leaves the state to the checks.
+ */
+export function applyProbe(stored: StoredCredential, result: ProbeResult, now: Date): StoredCredential {
+  const probed = { ...stored, probe: { ...result, at: now } };
+  return result.outcome === 'key_refused' ? markRefusedInProduction(probed, 'unauthorized') : probed;
 }
 
 /**
@@ -86,6 +109,7 @@ export function toStatus(
   provider: AiProvider,
   stored: StoredCredential | null,
   source: 'dashboard' | 'environment' | null,
+  activity: ProviderActivity | null = null,
 ): ProviderStatus {
   const profile = profileOf(provider);
   if (stored === null) {
@@ -101,6 +125,9 @@ export function toStatus(
       facts: [],
       settings: {},
       voices: [],
+      probe: null,
+      activity: source === 'environment' ? activity : null,
+      quota: null,
     };
   }
   const message =
@@ -120,5 +147,24 @@ export function toStatus(
     facts: [...stored.facts],
     settings: stored.settings,
     voices: [...stored.voices],
+    probe:
+      stored.probe === null
+        ? null
+        : {
+            at: stored.probe.at.toISOString(),
+            outcome: stored.probe.outcome,
+            latencyMs: stored.probe.latencyMs,
+            model: stored.probe.model,
+          },
+    activity,
+    quota:
+      stored.quota === null || stored.charactersLeft === null
+        ? null
+        : {
+            used: Math.max(0, stored.quota.limit - stored.charactersLeft),
+            limit: stored.quota.limit,
+            resetsAt: stored.quota.resetsAt?.toISOString() ?? null,
+            plan: stored.quota.plan,
+          },
   };
 }

@@ -56,7 +56,7 @@ export function Answers({
   const names = namesOf(list);
   return (
     <section className="sc-answers nv-swap" aria-labelledby="sc-answers-title">
-      <h2 id="sc-answers-title" className="sc-section__title">
+      <h2 id="sc-answers-title" className="nv-h2 sc-section__title">
         {swaps.length === 0
           ? 'Échanges'
           : swaps.length === 1

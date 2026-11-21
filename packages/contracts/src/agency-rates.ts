@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 import { PlatformSchema } from './enums';
-import { CreatorAgencyRateIdSchema, CreatorIdSchema, PlatformAccountIdSchema } from './ids';
+import { CreatorAgencyRateIdSchema, CreatorIdSchema, EventIdSchema, PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
+import { PayPeriodSchema } from './pay-periods';
 import { BasisPointsSchema } from './team';
 import { CalendarDaySchema } from './team-members';
 
@@ -70,12 +71,46 @@ export const ObservedAgencyWindowSchema = z.object({
 });
 export type ObservedAgencyWindow = z.infer<typeof ObservedAgencyWindowSchema>;
 
+const alertFields = {
+  /** The event's id, the key of the line. */
+  id: EventIdSchema,
+  /** When the automatic check published it. */
+  at: z.iso.datetime({ offset: true }),
+  /** The fortnight it is about, its first and last day. */
+  from: PayPeriodSchema,
+  to: CalendarDaySchema,
+  platform: PlatformSchema,
+  platformAccountId: PlatformAccountIdSchema,
+  currency: CurrencySchema,
+};
+
+/**
+ * An alert on the agency's share, as the automatic check published it (PAY-04 of the recette of 16/11): `mismatch`
+ * when her part read differs from her percentage (ADR 0054 § 2), `changed` when the agency's share moved by more than a
+ * point from the fortnight before (§ 5), with both shares. The owner reads it on her sheet and is told by a push
+ * notification; never a fan, a chatter nor a sale.
+ */
+export const AgencyShareAlertSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('mismatch'), ...alertFields }),
+  z.object({
+    kind: z.literal('changed'),
+    ...alertFields,
+    previousAgencyBps: BasisPointsSchema,
+    agencyBps: BasisPointsSchema,
+  }),
+]);
+export type AgencyShareAlert = z.infer<typeof AgencyShareAlertSchema>;
+
+/** At most an alert per kind, account and currency for each of the three fortnights shown. */
+export const AGENCY_SHARE_ALERTS_MAX = 60;
+
 /**
  * `GET /v1/creators/:creatorId/agency-rates` (owner only): her percentages newest first, the day it is now in the
  * agency's zone, and the one in force that day (`null` while none is: « à régler »). `observed` is the agency's share
  * read on the register (ADR 0054 § 4): the last 30 days to today, and the fortnight in course with the two before it,
  * newest first. `linked`: one of her accounts is linked to a platform's sales feed, so her share is read there even
- * on days without a sale. The screen picks nothing itself.
+ * on days without a sale. `alerts`: the alerts the automatic check published on those three fortnights, newest
+ * first. The screen picks nothing itself.
  */
 export const CreatorAgencyRateListSchema = z.object({
   today: CalendarDaySchema,
@@ -86,6 +121,7 @@ export const CreatorAgencyRateListSchema = z.object({
     last30Days: ObservedAgencyWindowSchema,
     fortnights: z.array(ObservedAgencyWindowSchema),
   }),
+  alerts: z.array(AgencyShareAlertSchema).max(AGENCY_SHARE_ALERTS_MAX),
 });
 export type CreatorAgencyRateList = z.infer<typeof CreatorAgencyRateListSchema>;
 

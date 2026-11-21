@@ -20,6 +20,7 @@ import {
 import './reel-fields.css';
 
 import { ReelBrief } from '@/screens/agenda/ReelBrief';
+import { NavIcon } from '@/shell/NavIcon';
 import '@/screens/agenda/agenda.css';
 import '@/screens/team/team.css';
 
@@ -172,7 +173,7 @@ export function ReelBriefFields({
   return (
     <section className="rb nv-plate" aria-labelledby={`${id}-title`}>
       <header className="rb__head">
-        <h3 className="rb__title" id={`${id}-title`}>
+        <h3 className="nv-h3 rb__title" id={`${id}-title`}>
           Fiche reel
         </h3>
         <p className="rb__help">
@@ -304,7 +305,10 @@ export function ReelBriefFields({
         <div className="rb__preview" aria-label="Ce qu’elle verra" role="group">
           <span className="rb__preview-label">Ce qu’elle verra</span>
           <div className="ag-brief rb__sheet">
-            <b className="ag-brief__title">🎬 Fiche de tournage</b>
+            <b className="ag-brief__title">
+              <NavIcon name="clapper" />
+              Fiche de tournage
+            </b>
             <ReelBrief brief={previewOf(draft)} />
           </div>
         </div>

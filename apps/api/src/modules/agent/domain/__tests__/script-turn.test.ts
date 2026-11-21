@@ -20,9 +20,9 @@ const NIGHT: PlatformScriptView = {
   moment: 'night',
   description: 'Soirée de démonstration',
   steps: [
-    { kind: 'free', priceMinor: null, mediaRefs: [] },
-    { kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
-    { kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'free', priceMinor: null, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'paid', priceMinor: 1_500, mediaRefs: [] },
+    { stepRef: 'step-ref', kind: 'paid', priceMinor: 2_500, mediaRefs: [] },
   ],
   mediaValidated: true,
   descriptionValidated: true,
@@ -128,6 +128,72 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
     const second = scriptTurn({ ...input, latest: first.moved?.run ?? null, history: history([0, 1]) });
     expect(second.decision.kind).toBe('after_refusal');
     expect(second.moved?.run.status).toBe('refused');
+  });
+
+  it('pauses an unopened step when he comes back cold, never a refusal, and reminds him once (ADR 0156 § 1)', () => {
+    // He fell asleep without opening it and writes « salut » the next day: the session cooled.
+    const back = scriptTurn({ ...input, latest: offered, history: history([0, 1]), hotSession: false });
+    expect(back.decision).toMatchObject({ kind: 'end', status: 'stalled', unopened: { stepIndex: 1 } });
+    expect(back.moved?.run.status).toBe('stalled');
+    expect(back.moved?.run.steps.at(-1)?.outcome).toBe('sent');
+    expect(back.moved?.events).toEqual([{ type: 'script_ended' }]);
+
+    // His next message: the reminder was once, nothing is left to remind.
+    const later = scriptTurn({
+      ...input,
+      now: new Date(NOW.getTime() + 60_000),
+      latest: back.moved?.run ?? null,
+      history: history([0, 1]),
+      hotSession: false,
+    });
+    expect(later.decision).not.toMatchObject({ kind: 'end' });
+
+    // A clear no stays one, even cold.
+    const no = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      hotSession: false,
+      reply: 'refused',
+    });
+    expect(no.decision.kind).toBe('after_refusal');
+  });
+
+  it('pauses an opened, unbought step without a reminder when he comes back cold (ADR 0156 § 1)', () => {
+    const opened = played([
+      { type: 'step_sent', stepIndex: 0, at: BEFORE },
+      { type: 'step_sent', stepIndex: 1, at: BEFORE },
+      { type: 'step_opened', stepIndex: 1, at: BEFORE },
+    ]);
+    const back = scriptTurn({ ...input, latest: opened, history: history([0, 1]), hotSession: false });
+    expect(back.decision).toEqual({ kind: 'end', status: 'stalled' });
+  });
+
+  it('pauses right after he came: no step goes, and his message neither answers nor refuses hers (ADR 0156 § 6)', () => {
+    const waiting = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      heCame: true,
+      mayAct: false,
+    });
+    expect(waiting.decision.kind).toBe('wait');
+    expect(waiting.moved).toBeNull();
+    // Even a message the brain reads as a no is no refusal right after he came.
+    const no = scriptTurn({
+      ...input,
+      latest: offered,
+      history: history([0, 1]),
+      heCame: true,
+      mayAct: false,
+      reply: 'refused',
+    });
+    expect(no.decision.kind).toBe('wait');
+    expect(no.moved).toBeNull();
+    // The next step would have gone: held.
+    const next = scriptTurn({ ...input, latest: teased, history: history([0]), heCame: true, mayAct: false });
+    expect(next.decision).toEqual({ kind: 'none', reason: 'held' });
+    expect(next.moved).toBeNull();
   });
 
   it('pauses while he is not free: his messages neither refuse nor ignore the step (ADR 0103 § 12)', () => {

@@ -112,6 +112,115 @@ describe('history of her alerts (P4-01, /v1/alerts/triggers)', () => {
     return id;
   }
 
+  /** An event of the agent's own, straight into the journal at the end of its sequence. */
+  async function journaled(
+    creatorId: CreatorId,
+    conversationId: ConversationId,
+    type: 'handoff_requested' | 'care_opened',
+    payload: Record<string, unknown>,
+    at: string,
+  ): Promise<string> {
+    const id = newId(EventIdSchema);
+    const [last] = await test.admin.db
+      .select({ seq: sql<number>`max(${schema.conversationEvents.seq})::int` })
+      .from(schema.conversationEvents)
+      .where(eq(schema.conversationEvents.conversationId, conversationId));
+    await test.admin.db.insert(schema.conversationEvents).values({
+      id,
+      creatorId,
+      conversationId,
+      seq: (last?.seq ?? 0) + 1,
+      type,
+      payload: { conversationId, ...payload },
+      actor: 'ai',
+      correlationId: 'history',
+      createdAt: new Date(at),
+    });
+    return id;
+  }
+
+  it('lists what the agent’s safety did beside her alerts, and filters on it (recette 16/11 AGE-05)', async () => {
+    const lea = await app.modules.persona.creators.create({ displayName: 'Léa' });
+    const owner = { cookie: await signIn(server, OWNER.email, OWNER.password), origin: DASHBOARD_ORIGIN };
+    const jules = await conversationOf(lea.id, 'Jules');
+    const minor = await journaled(
+      lea.id,
+      jules,
+      'handoff_requested',
+      { cause: 'minor', detail: ['safety_net'] },
+      '2026-11-16T09:00:00Z',
+    );
+    const care = await journaled(
+      lea.id,
+      jules,
+      'care_opened',
+      { signs: ['distress'] },
+      '2026-11-16T10:00:00Z',
+    );
+    const budget = await journaled(
+      lea.id,
+      jules,
+      'handoff_requested',
+      { cause: 'budget' },
+      '2026-11-16T11:00:00Z',
+    );
+    // A hand-off for another cause is not a line of the history.
+    await journaled(lea.id, jules, 'handoff_requested', { cause: 'guard' }, '2026-11-16T12:00:00Z');
+    const word = await triggered(
+      lea.id,
+      jules,
+      { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'model' },
+      '2026-11-16T13:00:00Z',
+    );
+
+    const list = async (query: string) => {
+      const response = await server.inject({
+        method: 'GET',
+        url: `/v1/alerts/triggers?creatorId=${lea.id}${query}`,
+        headers: owner,
+      });
+      expect(response.statusCode).toBe(200);
+      return PageSchema.parse(response.json());
+    };
+    const all = await list('');
+    expect(all.items.map((item) => [item.id, item.safety, item.alertName, item.pausedAgent])).toEqual([
+      [word, null, 'Demande de service', false],
+      [budget, 'budget', 'Budget IA atteint', true],
+      [care, 'care', 'Mode soin', false],
+      [minor, 'minor', 'Âge douteux', true],
+    ]);
+    expect(all.items.slice(1).every((item) => item.trigger === null && item.alertGroupId === null)).toBe(
+      true,
+    );
+    expect(all.items[2]?.reason).toContain('mode soin');
+    expect(JSON.stringify(all)).not.toContain('texte du fan');
+
+    for (const [alert, id] of [
+      ['minor', minor],
+      ['care', care],
+      ['budget', budget],
+    ] as const) {
+      expect((await list(`&alert=${alert}`)).items.map((item) => item.id)).toEqual([id]);
+    }
+    expect((await list('&alert=service_request')).items.map((item) => item.id)).toEqual([word]);
+
+    // Seen like any line, and « Tout marquer comme vu » under the filter marks only what it shows.
+    const one = await server.inject({
+      method: 'POST',
+      url: `/v1/alerts/triggers/${care}/seen?creatorId=${lea.id}`,
+      headers: owner,
+    });
+    expect(one.statusCode).toBe(204);
+    const marked = await server.inject({
+      method: 'POST',
+      url: '/v1/alerts/triggers/seen',
+      headers: owner,
+      payload: { creatorId: lea.id, untilId: word, alert: 'minor' },
+    });
+    expect(MarkAlertTriggersSeenResultSchema.parse(marked.json())).toEqual({ marked: 1 });
+    expect((await list('&seen=false')).items.map((item) => item.id)).toEqual([word, budget]);
+  });
+
   it('lists her triggers newest first, names her alert as it was, and keeps the « vu » of the agency', async () => {
     const nora = await app.modules.persona.creators.create({ displayName: 'Nora' });
     const iris = await app.modules.persona.creators.create({ displayName: 'Iris' });

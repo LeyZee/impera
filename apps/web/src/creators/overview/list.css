@@ -16,6 +16,8 @@
 }
 
 .cl-grid {
+  /* The whole column, even in a sheet that sets its children on their left (ETA-14). */
+  align-self: stretch;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: var(--nv-space-4);
@@ -30,7 +32,7 @@
   flex-direction: column;
   gap: var(--nv-space-4);
   min-width: 0;
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
   transition:
     background-color var(--nv-dur-fast) var(--nv-ease-out),
     box-shadow var(--nv-dur-fast) var(--nv-ease-out);
@@ -58,7 +60,7 @@
   border-radius: var(--nv-radius-full);
   background: linear-gradient(160deg, var(--nv-select-strong), var(--nv-plate));
   box-shadow: inset 0 1px 0 var(--nv-glass-edge);
-  font: italic 600 20px/1 var(--nv-font-wordmark);
+  font: 600 var(--nv-text-body) / 1 var(--nv-font-sans);
 }
 
 .cl-card__title {
@@ -169,17 +171,6 @@
   color: var(--nv-success);
 }
 
-/* While the list loads: two cards of a card's height, breathing (ADM-21). */
-.cl-card--skeleton {
-  min-height: 290px;
-  animation: cl-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite;
-}
-@keyframes cl-breathe {
-  50% {
-    opacity: 0.55;
-  }
-}
-
 /* What is left to set up: its links sit above the stretched one, so each opens its own tab. */
 .cl-card__setup {
   position: relative;
@@ -223,8 +214,5 @@
   .cl-card,
   .cl-card__go {
     transition: none;
-  }
-  .cl-card--skeleton {
-    animation: none;
   }
 }

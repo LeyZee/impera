@@ -1,6 +1,6 @@
 /*
- * The trophies (ADR 0104 § 15): a closed list written here, each tied to a fact one can check. A trophy earned is
- * never lost, even when a sale is refunded afterwards: this only says which ones the facts of today give.
+ * The trophies (ADR 0104 § 15): a closed list written here, each tied to a fact one can check. This only
+ * says which ones the facts of today give; which of them a corrected net takes back is said in `gains.ts` (ADR 0118).
  */
 
 export const TROPHY_KINDS = [

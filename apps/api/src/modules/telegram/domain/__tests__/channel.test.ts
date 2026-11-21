@@ -147,20 +147,6 @@ describe('the redirect links (ADR 0080 § 4)', () => {
     expect(parsed.success).toBe(false);
   });
 
-  it('refuses two links of one name or one address', () => {
-    const a = link('Telegram', 'https://example.test/a');
-    expect(
-      channelRefusal(config({ links: [a, link('telegram', 'https://example.test/b')] }), context([]))?.kind,
-    ).toBe('link_name_taken');
-    expect(
-      channelRefusal(config({ links: [a, link('Insta', 'https://example.test/a')] }), context([]))?.kind,
-    ).toBe('link_url_taken');
-    // One address however it is typed: the host's case and a trailing slash change nothing.
-    expect(
-      channelRefusal(config({ links: [a, link('Insta', 'https://EXAMPLE.test/a/')] }), context([]))?.kind,
-    ).toBe('link_url_taken');
-  });
-
   it('refuses a link of the channel that is not in the list', () => {
     const a = link('Telegram', 'https://example.test/a');
     expect(

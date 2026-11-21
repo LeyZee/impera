@@ -98,7 +98,7 @@ export function ProfileDialog({
   onClose: () => void;
 }): JSX.Element {
   const id = useId();
-  const { busy, refusal, send } = useFileSend(onClose);
+  const { busy, refusal, prompt, send } = useFileSend(onClose);
   const [draft, setDraft] = useState<ProfileDraft>(() => profileDraftOf(file.profile, file.country));
   const [tried, setTried] = useState(false);
   const addressArea = useGrowingArea(draft.address);
@@ -134,105 +134,109 @@ export function ProfileDialog({
       className="cf-profile"
       onClose={onClose}
     >
-      <form className="tm-dialog__body" noValidate onSubmit={submit}>
-        {french ? (
-          <div className="nv-field tm-field">
-            <span className="nv-field__label" id={`${id}-status`}>
-              Tu factures comme
-            </span>
-            <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-status`}>
-              {STATUSES.map(([one, label]) => (
-                <button
-                  key={one}
-                  type="button"
-                  role="radio"
-                  className="nv-chip"
-                  aria-checked={draft.status === one}
-                  onClick={() => {
-                    setDraft((before) => ({ ...before, status: one }));
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+      {prompt === null ? (
+        <form className="tm-dialog__body" noValidate onSubmit={submit}>
+          {french ? (
+            <div className="nv-field tm-field">
+              <span className="nv-field__label" id={`${id}-status`}>
+                Tu factures comme
+              </span>
+              <div className="tm-choices" role="radiogroup" aria-labelledby={`${id}-status`}>
+                {STATUSES.map(([one, label]) => (
+                  <button
+                    key={one}
+                    type="button"
+                    role="radio"
+                    className="nv-chip"
+                    aria-checked={draft.status === one}
+                    onClick={() => {
+                      setDraft((before) => ({ ...before, status: one }));
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null}
-        {fields.map((field) => (
-          <Field
-            key={field}
-            id={`${id}-${field}`}
-            label={LABELS[field]}
-            hint={hintOf(field, draft, taxIdRequired)}
-            problem={problems[field]}
-            after={
-              field === 'vatNumber' && vat !== null ? (
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--plain nv-btn--sm"
-                  onClick={() => {
-                    set('vatNumber')(vat);
+          ) : null}
+          {fields.map((field) => (
+            <Field
+              key={field}
+              id={`${id}-${field}`}
+              label={LABELS[field]}
+              hint={hintOf(field, draft, taxIdRequired)}
+              problem={problems[field]}
+              after={
+                field === 'vatNumber' && vat !== null ? (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--plain nv-btn--sm"
+                    onClick={() => {
+                      set('vatNumber')(vat);
+                    }}
+                  >
+                    Prendre {vat}
+                  </button>
+                ) : null
+              }
+            >
+              {field === 'address' ? (
+                <textarea
+                  ref={addressArea}
+                  id={`${id}-${field}`}
+                  className="nv-field__control nv-glass grow-area"
+                  rows={3}
+                  maxLength={MAX[field]}
+                  value={draft[field]}
+                  autoComplete="street-address"
+                  aria-invalid={problems[field] !== undefined}
+                  aria-describedby={`${id}-${field}-hint`}
+                  data-autofocus={file.profile === null ? undefined : true}
+                  onChange={(event) => {
+                    set(field)(event.target.value);
                   }}
-                >
-                  Prendre {vat}
-                </button>
-              ) : null
-            }
-          >
-            {field === 'address' ? (
-              <textarea
-                ref={addressArea}
-                id={`${id}-${field}`}
-                className="nv-field__control nv-glass grow-area"
-                rows={3}
-                maxLength={MAX[field]}
-                value={draft[field]}
-                autoComplete="street-address"
-                aria-invalid={problems[field] !== undefined}
-                aria-describedby={`${id}-${field}-hint`}
-                data-autofocus={file.profile === null ? undefined : true}
-                onChange={(event) => {
-                  set(field)(event.target.value);
-                }}
-              />
-            ) : (
-              <input
-                id={`${id}-${field}`}
-                className={
-                  field === 'businessId' || field === 'vatNumber' || field === 'shareCapital'
-                    ? 'nv-field__control nv-glass nv-num'
-                    : 'nv-field__control nv-glass'
-                }
-                type={field === 'email' ? 'email' : 'text'}
-                inputMode={field === 'businessId' || field === 'shareCapital' ? 'numeric' : undefined}
-                maxLength={MAX[field]}
-                value={draft[field]}
-                autoComplete={field === 'email' ? 'email' : field === 'legalName' ? 'name' : 'off'}
-                aria-invalid={problems[field] !== undefined}
-                aria-describedby={`${id}-${field}-hint`}
-                data-autofocus={file.profile === null && field === 'legalName' ? true : undefined}
-                onChange={(event) => {
-                  set(field)(event.target.value);
-                }}
-              />
-            )}
-          </Field>
-        ))}
-        {file.profile?.verifiedAt == null ? null : (
-          <p className="tm-hint">
-            Un changement repasse par la vérification du propriétaire avant ta prochaine facture.
-          </p>
-        )}
-        <Refusal refusal={refusal} />
-        <div className="tm-dialog__foot">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
-            {busy ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
-      </form>
+                />
+              ) : (
+                <input
+                  id={`${id}-${field}`}
+                  className={
+                    field === 'businessId' || field === 'vatNumber' || field === 'shareCapital'
+                      ? 'nv-field__control nv-glass nv-num'
+                      : 'nv-field__control nv-glass'
+                  }
+                  type={field === 'email' ? 'email' : 'text'}
+                  inputMode={field === 'businessId' || field === 'shareCapital' ? 'numeric' : undefined}
+                  maxLength={MAX[field]}
+                  value={draft[field]}
+                  autoComplete={field === 'email' ? 'email' : field === 'legalName' ? 'name' : 'off'}
+                  aria-invalid={problems[field] !== undefined}
+                  aria-describedby={`${id}-${field}-hint`}
+                  data-autofocus={file.profile === null && field === 'legalName' ? true : undefined}
+                  onChange={(event) => {
+                    set(field)(event.target.value);
+                  }}
+                />
+              )}
+            </Field>
+          ))}
+          {file.profile?.verifiedAt == null ? null : (
+            <p className="tm-hint">
+              Un changement repasse par la vérification du propriétaire avant ta prochaine facture.
+            </p>
+          )}
+          <Refusal refusal={refusal} />
+          <div className="tm-dialog__foot">
+            <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+              Annuler
+            </button>
+            <button type="submit" className="nv-btn nv-btn--neon" disabled={busy} aria-busy={busy}>
+              {busy ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="tm-dialog__body nv-swap">{prompt}</div>
+      )}
     </Dialog>
   );
 }

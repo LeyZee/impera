@@ -46,15 +46,15 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: var(--nv-pill-count);
+  height: var(--nv-pill-count);
+  padding: 0 5px;
   border-radius: var(--nv-radius-full);
   background: var(--nv-ink);
   color: var(--nv-void);
   font-size: var(--nv-text-caption);
   line-height: 1;
-  font-weight: 700;
+  font-weight: 650;
 }
 /* In « À traiter », why he waits follows his pseudo, quieter. */
 .tr-cause {
@@ -74,16 +74,6 @@
   color: var(--nv-ink-faint);
   text-align: center;
 }
-.tr-notice p {
-  margin: 0;
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
-}
-.tr-notice .nv-btn {
-  align-self: center;
-  margin-top: var(--nv-space-2);
-}
 .tr-skeleton {
   display: flex;
   flex-direction: column;
@@ -93,7 +83,7 @@
 .tr-skeleton i {
   height: 52px;
   border-radius: var(--nv-radius-lg);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: tr-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 .tr-skeleton i:nth-child(2) {
@@ -209,7 +199,7 @@
   flex-direction: column;
   gap: var(--nv-space-3);
   min-width: 0;
-  padding: var(--nv-space-4);
+  padding: var(--nv-plate-pad);
 }
 /* The fan's column: who he is and what forbids on top, his essentials unfolded, the rest folded under them. */
 .tr-aside {
@@ -217,7 +207,7 @@
   flex-direction: column;
   gap: var(--nv-space-3);
   min-width: 0;
-  padding: var(--nv-space-4);
+  padding: var(--nv-plate-pad);
 }
 /* The head lines up with the text inside the plates under it, not with their edges. */
 .tr-aside__head {
@@ -229,9 +219,6 @@
 }
 .tr-aside__title {
   margin: 0;
-  font-size: var(--nv-text-callout);
-  line-height: var(--nv-text-callout-leading);
-  font-weight: 600;
 }
 .tr-aside__sum {
   min-width: 0;
@@ -272,9 +259,6 @@
 }
 .tr-reader__who h2 {
   margin: 0;
-  font-size: var(--nv-text-title-3, 18px);
-  font-weight: 600;
-  line-height: 1.25;
 }
 /* A state wider than what the button leaves (« Pas parti : à envoyer dans Reveal » on a phone) is cut with « … »
  * inside its pill, never under the button: the thread right below says it in full (recette 11/11). */
@@ -339,25 +323,15 @@
 .tr-reader__foot {
   scroll-margin-bottom: var(--nv-tabbar-room, var(--nv-space-4));
 }
-.tr-reader__empty {
-  margin: 0;
-  padding: var(--nv-space-4);
-  color: var(--nv-ink-muted);
-  font-size: 14px;
-  line-height: 20px;
-}
-.tr-reader__empty p {
-  margin: 0;
-}
 /* Amber: the server does not answer, a decision did not go through. Red stays for urgencies. */
 .tr-warn {
   margin: 0;
   color: var(--nv-warning);
   font-weight: 600;
 }
-/* After .tr-warn, whose margin it overrides: « À traiter » unread keeps a gap above its Réessayer. */
+/* « À traiter » unread: its one line keeps the panel's inset. */
 .tr-queue-error {
-  margin: 0 0 8px;
+  padding: var(--nv-space-2) var(--nv-plate-pad) var(--nv-space-3);
 }
 .tr-line {
   font-size: var(--nv-text-footnote);
@@ -639,15 +613,20 @@
     flex-direction: row;
     align-items: center;
   }
-  /* A creator's long name gives way before the pseudo: cut with « … », her whole name in its title. */
+  /* A creator's name that does not fit beside the pseudo goes under it, whole: never cut three ways for one name
+     (« Lina Te… », « Maya … », PIL-10). Only a name wider than the whole list is cut, at its end. */
+  .tr-groups .tr-row__name {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
   .tr-groups .tr-row__pseudo {
     flex: 0 0 auto;
     max-width: 100%;
   }
   .tr-groups .tr-row__creator {
     display: block;
-    flex: 0 1 auto;
-    min-width: 3em;
+    flex: 0 0 auto;
+    max-width: 100%;
     line-height: 22px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -666,12 +645,6 @@
   gap: var(--nv-space-2);
   margin: 0;
   padding: var(--nv-space-1) var(--nv-space-4) 0;
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-  letter-spacing: var(--nv-text-caption-tracking);
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--nv-ink-faint);
 }
 .tr-group:first-child .tr-group__title {
   color: var(--nv-ink-muted);
@@ -826,10 +799,6 @@
   place-items: center;
   text-align: center;
 }
-.tr-reader--idle .tr-reader__empty {
-  max-width: 22rem;
-  color: var(--nv-ink-faint);
-}
 @media (max-width: 899px) {
   .tr-reader--idle {
     display: none;
@@ -847,7 +816,7 @@
 .nv-page.tr-page:has(> .sc-off) {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
-.tr-page > .nv-coming {
+.tr-page > .nv-empty-plate {
   align-self: start;
   justify-self: center;
   width: 100%;
@@ -884,8 +853,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--nv-space-1);
-    margin: calc(-1 * var(--nv-space-4)) calc(-1 * var(--nv-space-4)) 0;
-    padding: var(--nv-space-2) var(--nv-space-4) var(--nv-space-3);
+    margin: calc(-1 * var(--nv-plate-pad)) calc(-1 * var(--nv-plate-pad)) 0;
+    padding: var(--nv-space-2) var(--nv-plate-pad) var(--nv-space-3);
     border-radius: var(--nv-radius-lg) var(--nv-radius-lg) 0 0;
     background: var(--nv-surface-raised);
     box-shadow: 0 1px 0 var(--nv-hairline);

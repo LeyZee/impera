@@ -31,7 +31,7 @@ import type {
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
-import { createDrizzleDescribeSwitch, createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
+import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
@@ -69,15 +69,15 @@ export interface ContentDropsModule {
      * `content_drops.describe_file` (ADR 0083): a photo or a video she dropped, described by the vision AI with what
      * the drop says of it, kept for the agency to validate. What happened, for the log.
      */
-    describeFile(mediaAssetId: string, correlationId: string): Promise<DescribeOutcome>;
+    describeFile(creatorId: string, mediaAssetId: string, correlationId: string): Promise<DescribeOutcome>;
     /**
      * `content_drops.summarize_script` (ADR 0083 § 6): a script she sent, once each of its media is described, told
      * step by step and summed up by the brain, kept for the agency to validate. What happened, for the log.
      */
     summarizeScript(dropId: string, correlationId: string): Promise<SummarizeOutcome>;
     /**
-     * `content_drops.describe_backlog` (ADR 0083 § 2, § 9): each hour, and for one creator when her switch is turned
-     * on, what waits for the vision or the brain enqueued again. Counts, for the log.
+     * `content_drops.describe_backlog` (ADR 0083 § 2): each hour, what of her drops waits for the vision or the brain
+     * enqueued again. Counts, for the log.
      */
     describeBacklog(
       creatorId: string | null,
@@ -87,7 +87,7 @@ export interface ContentDropsModule {
      * `content_drops.make_thumbnail` (ADR 0030 § 4, SC-04 lot c4): a photo or a video of her library gets its reduced
      * picture for the agency's screen. What happened, for the log.
      */
-    makeThumbnail(mediaAssetId: string, correlationId: string): Promise<ThumbnailOutcome>;
+    makeThumbnail(creatorId: string, mediaAssetId: string, correlationId: string): Promise<ThumbnailOutcome>;
     /** `content_drops.thumbnail_backlog`, each hour: the media never tried enqueued. How many. */
     thumbnailBacklog(correlationId: string): Promise<number>;
   };
@@ -97,6 +97,8 @@ export interface ContentDropsModule {
    * not answer throws.
    */
   picture(ask: PictureAsk): Promise<string | null>;
+  /** That picture removed when no media came to carry it (ADR 0113 § 1); nothing when no storage is set. */
+  unpicture(key: string): Promise<void>;
   /**
    * The content request of a shoot she accepted from an idea (VEI-01 d2), written by the trend watch's job: origin
    * `idea`, under the idea's id, replayable.
@@ -130,6 +132,8 @@ export interface ContentDropsModule {
 export type { DropStorage, IdeaContentRequest, ScriptVersions } from './domain/ports';
 /** @public Her drops and requests as the creator's game counts them (ADR 0107), for the composition root. */
 export { dropsForGameUnscoped, type DropsForGame } from './infra/db/game-reads';
+/** @public Her stock, her open scripts and what of her delivery arrived (ADR 0140 § 4 and § 25), for the week's job and reads. */
+export { weekArrivals, weekStockUnscoped, type WeekStockFacts } from './infra/db/week-reads';
 
 export interface ContentDropsDeps {
   /** Application role: her own account's RLS, or the team's. */
@@ -161,7 +165,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
   const scratchDir = deps.scratchDir ?? tmpdir();
   const receipt = { storage, receipts, cleaner, scratchDir, room: createScratchRoom(scratchDir) };
   const summaries = createDrizzleScriptSummaryStore(deps.adminDb);
-  const thumbnails = createDrizzleThumbnailQueue(deps.adminDb);
+  const thumbnails = createDrizzleThumbnailQueue(deps.db, deps.adminDb);
   const agency = createDrizzleAgencyContentStore(deps.db);
   const scriptReads = { store: agency, versions: deps.scriptVersions };
   return {
@@ -171,7 +175,6 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       agency,
       storage,
       { store: createDrizzleScriptDropStore(deps.db, deps.adminDb), versions: deps.scriptVersions },
-      createDrizzleDescribeSwitch(deps.adminDb),
       createDrizzleDescriptionReview(deps.db),
       deps.requireRole,
       clock,
@@ -180,19 +183,20 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       receiveFile: (fileId, correlationId) => receiveFile(receipt, fileId, clock(), correlationId),
       convertFile: (fileId, correlationId) =>
         receiveFile(receipt, fileId, clock(), correlationId, 'content_drops.convert_file'),
-      describeFile: async (mediaAssetId, correlationId) =>
+      describeFile: async (creatorId, mediaAssetId, correlationId) =>
         deps.describer === undefined
           ? 'off'
           : describeFile(
               {
                 storage,
-                queue: createDrizzleDescriptionQueue(deps.adminDb),
+                queue: createDrizzleDescriptionQueue(deps.db),
                 describer: deps.describer,
                 summaries,
                 versions: deps.scriptVersions,
                 scratchDir,
                 room: receipt.room,
               },
+              creatorId,
               mediaAssetId,
               clock(),
               correlationId,
@@ -223,9 +227,10 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
               creatorId,
               correlationId,
             ),
-      makeThumbnail: (mediaAssetId, correlationId) =>
+      makeThumbnail: (creatorId, mediaAssetId, correlationId) =>
         makeThumbnail(
           { storage, queue: thumbnails, thumbnailer: createThumbnailer(), scratchDir, room: receipt.room },
+          creatorId,
           mediaAssetId,
           clock(),
           correlationId,
@@ -243,7 +248,13 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       scripts: (creatorId, reader) => creatorScripts(scriptReads, reader, creatorId),
       scriptSteps: (creatorId, reader, dropId) => creatorScriptSteps(scriptReads, reader, creatorId, dropId),
     },
-    picture: (ask) => pictureOf({ storage, thumbnailer: createThumbnailer(), scratchDir }, ask),
+    // No storage set (`S3_*` unset, as on a PC without one): the vault's media are kept described, without a picture.
+    picture: (ask) =>
+      pictureOf(
+        { storage: storage === NO_STORAGE ? null : storage, thumbnailer: createThumbnailer(), scratchDir },
+        ask,
+      ),
+    unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),

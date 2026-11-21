@@ -635,6 +635,80 @@ describe('invitation links (EQ-10)', () => {
     expect(codeOf(redeem).code).toBe('invitation_link_not_found');
   });
 
+  it('gives the owner alone the way back of a creator or a chatter without Telegram (CRE-05, CHT-16)', async () => {
+    const tokenOf = (response: { json: () => unknown }) =>
+      new URL(z.object({ url: z.string() }).parse(response.json()).url).hash.slice('#t='.length);
+    const creatorId = await addCreator('Zoé');
+    const invited = await inviteCreator(creatorId, { purpose: 'invitation', email: 'zoe@example.test' });
+    expect(
+      (await post('/v1/invitation-links/redeem', { token: tokenOf(invited), password: PASSWORD })).statusCode,
+    ).toBe(200);
+    const zoe = await signIn(server, 'zoe@example.test', PASSWORD);
+    const kenza = await addMember('kenza@example.test');
+    await post('/v1/invitation-links/redeem', {
+      token: (await newLink(kenza.memberId)).token,
+      password: PASSWORD,
+    });
+    const chatter = await signIn(server, 'kenza@example.test', PASSWORD);
+
+    // Neither she nor a chatter makes a reset link, not even for themselves.
+    for (const cookie of [zoe, chatter]) {
+      const hers = await post(`/v1/creators/${creatorId}/invitation-link`, { purpose: 'reset' }, { cookie });
+      expect([hers.statusCode, codeOf(hers).code]).toEqual([403, 'role_forbidden']);
+      const his = await post(
+        `/v1/team/members/${kenza.memberId}/invitation-link`,
+        { purpose: 'reset' },
+        { cookie },
+      );
+      expect([his.statusCode, codeOf(his).code]).toEqual([403, 'role_forbidden']);
+    }
+    // The owner too, without a recent sign-in.
+    await test.admin.db.update(schema.session).set({ reauthenticatedAt: sql`now() - interval '1 hour'` });
+    const stale = await inviteCreator(creatorId, { purpose: 'reset' });
+    expect([stale.statusCode, codeOf(stale).code]).toEqual([403, 'reauthentication_forbidden']);
+    owner = await signIn(server, OWNER.email, OWNER.password);
+
+    // Her link: once, every session of hers ended, the old password refused.
+    const zoePhone = await signIn(server, 'zoe@example.test', PASSWORD);
+    const reset = await inviteCreator(creatorId, { purpose: 'reset' });
+    expect(reset.statusCode, reset.body).toBe(200);
+    const token = tokenOf(reset);
+    expect((await post('/v1/invitation-links/inspect', { token })).json()).toMatchObject({
+      purpose: 'reset',
+      account: 'creator',
+      email: 'zoe@example.test',
+    });
+    const redeemed = await post('/v1/invitation-links/redeem', { token, password: `${PASSWORD} neuve` });
+    expect(redeemed.statusCode, redeemed.body).toBe(200);
+    expect((await post('/v1/invitation-links/redeem', { token, password: PASSWORD })).statusCode).toBe(404);
+    expect(
+      (await server.inject({ method: 'GET', url: '/v1/me', headers: { cookie: zoePhone } })).statusCode,
+    ).toBe(401);
+    await expect(signIn(server, 'zoe@example.test', PASSWORD)).rejects.toThrow(/Sign-in failed/);
+    await expect(signInWithoutCode(server, 'zoe@example.test', `${PASSWORD} neuve`)).resolves.toContain('=');
+    const made = await test.admin.db
+      .select({ userId: schema.auditLog.userId, details: schema.auditLog.details })
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, 'invitation_link.create'));
+    expect(made).toContainEqual(
+      expect.objectContaining({ details: { purpose: 'reset', creatorId, replaced: 0 } }),
+    );
+    expect(JSON.stringify(made)).not.toContain(token);
+
+    // His link, made before he left, opens nothing once he has.
+    const his = await newLink(kenza.memberId, 'reset');
+    await test.admin.db
+      .update(schema.teamMembers)
+      .set({ status: 'left', leftOn: '2025-03-10' })
+      .where(eq(schema.teamMembers.id, kenza.memberId));
+    const late = await post('/v1/invitation-links/redeem', {
+      token: his.token,
+      password: `${PASSWORD} neuve`,
+    });
+    expect([late.statusCode, codeOf(late).code]).toEqual([404, 'invitation_link_not_found']);
+    await expect(signIn(server, 'kenza@example.test', `${PASSWORD} neuve`)).rejects.toThrow(/Sign-in failed/);
+  });
+
   it('tells the owner where her account stands: none, invited, then in (CR-02)', async () => {
     const creatorId = await addCreator('Sara');
     const read = () =>

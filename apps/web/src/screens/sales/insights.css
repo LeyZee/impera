@@ -4,12 +4,6 @@
 .fi-panel {
   margin-bottom: var(--nv-space-4);
 }
-.fi-serif {
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: 0;
-}
 
 /* Three numbers, side by side. */
 .fi-stats {
@@ -17,6 +11,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--nv-space-3);
   margin-bottom: var(--nv-space-4);
+}
+.fi-stats--one {
+  grid-template-columns: minmax(0, 1fr);
 }
 .fi-stat {
   display: flex;
@@ -86,11 +83,6 @@
 }
 .fi-card__title {
   margin: 0;
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  color: var(--nv-ink-muted);
 }
 .fi-card__foot,
 .fi-note,
@@ -125,15 +117,6 @@
 }
 .fi-waiting + .fi-note {
   margin-top: var(--nv-space-2);
-}
-/* Under ten fans everywhere: one calm sentence, never six empty rings. */
-.fi-few {
-  margin: 0;
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  color: var(--nv-ink-muted);
 }
 .fi-card__foot {
   margin-top: auto;
@@ -434,7 +417,8 @@
   padding: 0;
   border: 0;
   border-radius: var(--nv-radius-xs);
-  background: color-mix(in srgb, var(--nv-agent) calc(var(--_h) * 90%), var(--nv-fill-track));
+  /* A series of data, gold like the other charts: the violet is the agent's alone (recette visuelle 16/11, CRE-12). */
+  background: color-mix(in srgb, var(--nv-data-2) calc(var(--_h) * 90%), var(--nv-fill-track));
   opacity: 0;
   cursor: pointer;
   animation: fi-fade var(--nv-dur-slow) var(--nv-ease-out) both;
@@ -452,23 +436,12 @@
   transform: scale(1.18);
   box-shadow:
     0 0 0 1.5px var(--nv-ink),
-    0 0 14px color-mix(in srgb, var(--nv-agent) 55%, transparent);
+    0 0 14px color-mix(in srgb, var(--nv-data-2) 55%, transparent);
 }
 @keyframes fi-fade {
   to {
     opacity: 1;
   }
-}
-
-.fi-skeleton {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
-  gap: var(--nv-space-3);
-}
-.fi-skeleton > i {
-  height: 180px;
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-plate-hover);
 }
 
 /* A phone: the stats stay three across, a card a row, the ring above its legend when it is too narrow. */

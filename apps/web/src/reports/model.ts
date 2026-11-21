@@ -42,6 +42,62 @@ export function parseAmount(text: string, signed = false, max = SHIFT_REPORT_MAX
   return sign === '-' || sign === '−' ? -minor : minor;
 }
 
+/**
+ * Whether `text` is an amount, but above what one report or correction can say (`SHIFT_REPORT_MAX_MINOR`): the panel
+ * then says the limit rather than how to type an amount (recette 16/11, CHT-29).
+ */
+export function amountTooLarge(text: string, signed = false): boolean {
+  const bare = text.replace(/[\s\u00a0\u202f€$]/gu, '').replace(/^(EUR|USD)|(EUR|USD)$/giu, '');
+  const match = /^([+\-−]?)\d+(?:[.,]\d{1,2})?$/u.exec(bare);
+  if (match === null || (match[1] !== '' && !signed)) return false;
+  return parseAmount(text, signed) === null;
+}
+
+/**
+ * An amount the panel asks to confirm before sending (recette 16/11, CHT-29): five times the member's usual report,
+ * and never below 1 000 in the account's currency; without three reports to compare with, from 2 000. A slip of the
+ * finger (a zero too many) is caught, a good shift is not questioned.
+ */
+const UNUSUAL_REPORT_FACTOR = 5;
+const UNUSUAL_REPORT_MIN_MINOR = 100_000;
+const UNUSUAL_REPORT_FLOOR_MINOR = 200_000;
+const USUAL_REPORT_MIN_COUNT = 3;
+
+/**
+ * The member's usual report: the median of their validated reports in `currency`, corrections left out; `null` with
+ * fewer than three.
+ */
+export function usualReport(
+  reports: readonly ShiftReport[],
+  memberId: string,
+  currency: Currency,
+): number | null {
+  const amounts = reports
+    .filter(
+      (report) =>
+        report.memberId === memberId &&
+        report.correctsId === null &&
+        report.status === 'validated' &&
+        report.amount.currency === currency,
+    )
+    .map((report) => report.amount.amountMinor)
+    .sort((left, right) => left - right);
+  if (amounts.length < USUAL_REPORT_MIN_COUNT) return null;
+  const middle = Math.floor(amounts.length / 2);
+  return amounts.length % 2 === 1
+    ? (amounts[middle] ?? 0)
+    : Math.round(((amounts[middle - 1] ?? 0) + (amounts[middle] ?? 0)) / 2);
+}
+
+/** Whether `minor`, a report or a correction, is far enough above the member's usual report to be confirmed first. */
+export function unusualAmount(minor: number, usual: number | null): boolean {
+  const threshold =
+    usual === null
+      ? UNUSUAL_REPORT_FLOOR_MINOR
+      : Math.max(usual * UNUSUAL_REPORT_FACTOR, UNUSUAL_REPORT_MIN_MINOR);
+  return Math.abs(minor) >= threshold;
+}
+
 const MONEY = new Map<string, Intl.NumberFormat>();
 
 /** An amount in French, the true minus sign « − » in place of the hyphen `Intl` gives. */
@@ -403,11 +459,11 @@ export const SOURCE_REFUSAL_TEXTS: Readonly<Record<PayRulesSourceRefusal, string
   platform_without_net:
     'La plateforme de ce compte ne donne pas de net : sa paie se lit dans les rapports validés.',
   model_unlinked:
-    'Aucun modèle de la plateforme n’est relié à ce compte : relie son modèle dans Réglages › Ventes, sinon ses ventes ne comptent nulle part.',
+    'Aucun modèle de la plateforme n’est relié à ce compte : relie son modèle dans Réglages › Plateformes, sinon ses ventes ne comptent nulle part.',
   check_missing:
-    'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Ventes, sur une quinzaine entière déjà finie.',
+    'Les ventes de cette plateforme n’ont jamais été vérifiées : lance la vérification de fiabilité dans Réglages › Plateformes, sur une quinzaine entière déjà finie.',
   check_not_clean:
-    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Ventes.',
+    'La dernière vérification de fiabilité ne peut pas porter la bascule : il en faut une sur une quinzaine entière, où les ventes lues concordent avec les statistiques par jour (et avec l’export, facultatif, s’il est joint) et où aucune note ne reste à régler. Refais-la dans Réglages › Plateformes.',
   check_not_before:
     'La dernière vérification ne porte ni sur cette quinzaine ni sur une quinzaine qui finit avant elle : fais partir ces règles de la quinzaine vérifiée ou d’une plus tardive.',
   period_closed:
@@ -461,11 +517,11 @@ export function uncheckedText(reason: ShiftReportCheckReason, platform: string, 
       return `Les ventes de ${platform} ne sont pas lues en ce moment : rien n’est comparé, la relecture se fait comme avant.`;
     case 'model_unlinked':
       return agency
-        ? `Ce compte n’est relié à aucun modèle de ${platform} : relie-le dans Réglages › Ventes pour comparer ses rapports.`
+        ? `Ce compte n’est relié à aucun modèle de ${platform} : relie-le dans Réglages › Plateformes pour comparer ses rapports.`
         : `Ce compte n’est pas encore comparé aux ventes de ${platform} : l’agence relit ton rapport.`;
     case 'chatter_unlinked':
       return agency
-        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Équipe › ${platform} pour comparer ses rapports.`
+        ? `Ce membre n’est relié à aucun chatteur de ${platform} : relie-le dans Équipe › Comptes ${platform} pour comparer ses rapports.`
         : `Ton compte de chatteur sur ${platform} n’est pas encore relié : l’agence relit ton rapport.`;
   }
 }

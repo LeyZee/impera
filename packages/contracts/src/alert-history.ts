@@ -48,32 +48,66 @@ export function alertTriggerReason(trigger: AlertTrigger, alertName: string): st
 }
 
 /**
- * One trigger. `id` is the event's. `alertGroupId` and `alertName` name her alert as it was, archived since or not;
+ * What the agent's own safety did, listed with her alerts (recette 16/11 AGE-05) though no alert of hers rang: a fan
+ * who might be a minor (`handoff_requested` of cause `minor`), a care mode opened (`care_opened`), her AI budget
+ * reached (`handoff_requested` of cause `budget`).
+ */
+export const SAFETY_EVENTS = ['minor', 'care', 'budget'] as const;
+export const SafetyEventSchema = z.enum(SAFETY_EVENTS);
+export type SafetyEvent = z.infer<typeof SafetyEventSchema>;
+
+/** What the screen and the history call each of them. */
+export const SAFETY_EVENT_LABELS: Readonly<Record<SafetyEvent, string>> = {
+  minor: 'Âge douteux',
+  care: 'Mode soin',
+  budget: 'Budget IA atteint',
+};
+
+/** The line the history shows for one of them, written by the code: never a word of the fan's. */
+export function safetyEventReason(event: SafetyEvent): string {
+  switch (event) {
+    case 'minor':
+      return 'Le fan pourrait être mineur : l’agent s’est arrêté et attend un humain.';
+    case 'care':
+      return 'Le fan semble aller mal : le mode soin est ouvert, chaque réponse attend la validation d’un humain.';
+    case 'budget':
+      return 'Le budget IA de la créatrice est atteint : l’agent s’est arrêté et attend un humain.';
+  }
+}
+
+/**
+ * One line. `id` is the event's. `trigger` is the alert that rang, `safety` what the agent's safety did instead: one
+ * of the two, never both. `alertGroupId` and `alertName` name her alert as it was, archived since or not;
  * `alertName` is the system's label for a system alert. `pausedAgent`: the alert handed the conversation to a human
  * (a `handoff_requested`), and its line is in « À traiter » too. `seenAt`: when someone of the agency marked it
  * seen.
  */
-export const AlertTriggerItemSchema = z.object({
-  id: EventIdSchema,
-  creatorId: CreatorIdSchema,
-  conversationId: ConversationIdSchema,
-  fanId: FanIdSchema,
-  fanDisplayName: z.string(),
-  trigger: AlertTriggerSchema,
-  alertGroupId: CustomAlertGroupIdSchema.nullable(),
-  alertName: z.string(),
-  pausedAgent: z.boolean(),
-  reason: z.string(),
-  at: z.iso.datetime(),
-  seenAt: z.iso.datetime().nullable(),
-});
+export const AlertTriggerItemSchema = z
+  .object({
+    id: EventIdSchema,
+    creatorId: CreatorIdSchema,
+    conversationId: ConversationIdSchema,
+    fanId: FanIdSchema,
+    fanDisplayName: z.string(),
+    trigger: AlertTriggerSchema.nullable(),
+    safety: SafetyEventSchema.nullable(),
+    alertGroupId: CustomAlertGroupIdSchema.nullable(),
+    alertName: z.string(),
+    pausedAgent: z.boolean(),
+    reason: z.string(),
+    at: z.iso.datetime(),
+    seenAt: z.iso.datetime().nullable(),
+  })
+  .refine((item) => (item.trigger === null) !== (item.safety === null), {
+    message: 'Exactly one of trigger and safety',
+  });
 export type AlertTriggerItem = z.infer<typeof AlertTriggerItemSchema>;
 
 /**
  * `GET /v1/alerts/triggers?creatorId=` (owner, an operator who reads the whole creator): her triggers, newest first,
  * by cursor pages. The cursor names the last trigger of its page, whose place is read again in the base: no date is
  * rounded. `seen` keeps the seen ones (`true`) or the others (`false`); `alert` keeps one alert, her own by its
- * `groupId` or the system's by its code. 400 `cursor_invalid` when the cursor names no trigger of hers.
+ * `groupId`, the system's by its code, or one kind of the agent's safety. 400 `cursor_invalid` when the cursor names no trigger of hers.
  */
 export const AlertTriggerQuerySchema = PageQuerySchema.extend({
   creatorId: CreatorIdSchema,
@@ -81,7 +115,7 @@ export const AlertTriggerQuerySchema = PageQuerySchema.extend({
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
-  alert: z.union([CustomAlertGroupIdSchema, SystemAlertCodeSchema]).optional(),
+  alert: z.union([CustomAlertGroupIdSchema, SystemAlertCodeSchema, SafetyEventSchema]).optional(),
 });
 export type AlertTriggerQuery = z.infer<typeof AlertTriggerQuerySchema>;
 
@@ -98,7 +132,7 @@ export const AlertTriggerSeenParamsSchema = z.object({ id: EventIdSchema });
 export const MarkAlertTriggersSeenBodySchema = z.object({
   creatorId: CreatorIdSchema,
   untilId: EventIdSchema,
-  alert: z.union([CustomAlertGroupIdSchema, SystemAlertCodeSchema]).optional(),
+  alert: z.union([CustomAlertGroupIdSchema, SystemAlertCodeSchema, SafetyEventSchema]).optional(),
 });
 export type MarkAlertTriggersSeenBody = z.infer<typeof MarkAlertTriggersSeenBodySchema>;
 export const MarkAlertTriggersSeenResultSchema = z.object({ marked: z.number().int().min(0) });

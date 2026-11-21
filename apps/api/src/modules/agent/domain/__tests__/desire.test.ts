@@ -46,6 +46,19 @@ describe('desireScore', () => {
     expect(all.score).toBe(100);
   });
 
+  it('comes back to his rest level once he came, higher for a client, never raised by it (ADR 0156 § 6)', () => {
+    const hot = { ...turn, previous: { score: 95, at: NOW }, signals: ['just_came'], intent: 'sexting' };
+    const fresh = desireScore(hot);
+    expect(fresh.score).toBe(10);
+    expect(fresh.signals.at(-1)).toBe('rest_new');
+    expect(recountDesire(fresh)).toBe(10);
+    const client = desireScore({ ...hot, hasBought: true });
+    expect(client.score).toBe(20);
+    expect(recountDesire(client)).toBe(20);
+    // Already calm: the rest level never raises him.
+    expect(desireScore({ ...hot, previous: { score: 5, at: NOW } }).score).toBe(0);
+  });
+
   it('counts each of the brain’s signals once, and ignores any it does not know', () => {
     expect(desireScore({ ...turn, signals: ['roleplay', 'roleplay', 'made_up'] }).signals).toEqual([
       'roleplay',
@@ -131,6 +144,7 @@ describe('measureDesire', () => {
       replySeconds: 60,
       suggestiveEmojis: 3,
       inARow: 2,
+      asksBack: false,
     });
   });
 
@@ -141,7 +155,22 @@ describe('measureDesire', () => {
       replySeconds: null,
       suggestiveEmojis: 0,
       inARow: 1,
+      asksBack: false,
     });
+  });
+
+  it('never counts a short answer against him when he asks her back (Playground, Charles 16/11)', () => {
+    const history = [
+      fan('coucou toi, tu es super belle, impossible de ne pas t’écrire', 10),
+      her('tu as quel âge ?', 5),
+    ];
+    const measured = measureDesire([...history, fan('j’ai 31 ans et toi ?', 1)]);
+    expect(measured).toMatchObject({ asksBack: true });
+    expect(measured.lengthRatio).toBeLessThan(0.5);
+    const counted = desireScore({ ...turn, measured });
+    expect(counted.signals).not.toContain('short_reply');
+    const cold = desireScore({ ...turn, measured: { ...measured, asksBack: false } });
+    expect(cold.signals).toContain('short_reply');
   });
 });
 

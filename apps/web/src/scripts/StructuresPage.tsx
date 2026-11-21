@@ -7,7 +7,7 @@ import {
   type ScriptStarter,
   type ScriptStructure,
 } from '@impera/contracts';
-import { useBlocker } from '@tanstack/react-router';
+import { Link, useBlocker } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
 import { Queues } from './Queues';
@@ -21,6 +21,7 @@ import { useCreators } from '@/creators/api';
 import { Segment } from '@/creators/persona/fields';
 import '@/creators/persona/persona.css';
 import { Page, PageHeader } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit', both: 'Jour et nuit' };
 
@@ -30,6 +31,18 @@ const MOMENT_LABELS: Record<ScriptMoment, string> = { day: 'Jour', night: 'Nuit'
  * asks first.
  */
 export function StructuresPage(): JSX.Element {
+  return <Structures embedded={false} />;
+}
+
+/**
+ * The same library as a view of a creator's sheet (Scripts › Structures, ADR 0149 § 1): no page nor header of its own,
+ * « Nouvelle structure » above the library.
+ */
+export function StructuresView(): JSX.Element {
+  return <Structures embedded />;
+}
+
+function Structures({ embedded }: { embedded: boolean }): JSX.Element {
   const structures = useStructures();
   const starters = useStarters();
   const creators = useCreators();
@@ -75,6 +88,15 @@ export function StructuresPage(): JSX.Element {
     } else setOpen(null);
   };
 
+  const create = (): void => {
+    setOpen({
+      id: newId(ScriptStructureIdSchema),
+      basedOnVersion: null,
+      frozen: false,
+      draft: emptyDraft(),
+    });
+  };
+
   const body = (): JSX.Element => {
     if (open !== null) {
       return <Workshop key={open.id} start={open} onClose={close} onDirty={setDirty} />;
@@ -82,17 +104,7 @@ export function StructuresPage(): JSX.Element {
     if (structures.isError) {
       return (
         <section className="ps-page">
-          <div className="nv-plate ps-head">
-            <p className="ps-title">Les structures ne se chargent pas</p>
-            <p className="ps-muted">Le serveur ne répond pas. Réessaie dans un instant.</p>
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft ps-self-start"
-              onClick={() => void structures.refetch()}
-            >
-              Réessayer
-            </button>
-          </div>
+          <Failure onRetry={() => void structures.refetch()} />
         </section>
       );
     }
@@ -103,10 +115,11 @@ export function StructuresPage(): JSX.Element {
         </section>
       );
     }
+    // Inside a creator's sheet the two views and « Nouvelle structure » share one row, under the tab's own selector.
     const tabs = (
-      <div className="st-tabs">
+      <div className={embedded ? 'st-tabs st-tabs--embedded' : 'st-tabs'}>
         <Segment
-          label="Vue"
+          label="Vue des structures"
           value={tab}
           options={[
             { value: 'library', label: 'Bibliothèque' },
@@ -114,6 +127,11 @@ export function StructuresPage(): JSX.Element {
           ]}
           onChange={setTab}
         />
+        {embedded ? (
+          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={create}>
+            Nouvelle structure
+          </button>
+        ) : null}
       </div>
     );
     if (tab === 'queues') {
@@ -200,47 +218,46 @@ export function StructuresPage(): JSX.Element {
     );
   };
 
+  const sheet = (
+    <div className="ps-sheet">
+      {leaving ? (
+        <LeaveConfirm
+          onLeave={() => {
+            if (blocker.status === 'blocked') blocker.proceed();
+            pending?.();
+            setPending(null);
+          }}
+          onStay={() => {
+            if (blocker.status === 'blocked') blocker.reset();
+            setPending(null);
+          }}
+        />
+      ) : null}
+      {body()}
+    </div>
+  );
+  if (embedded) return sheet;
+
   return (
     <Page>
       <PageHeader
-        eyebrow="Créatrices"
+        // The way back to the list, as on a creator's sheet: the same eyebrow on every screen of Créatrices (COH-01).
+        eyebrow={
+          <Link to="/creatrices" className="nv-btn nv-btn--plain nv-btn--sm">
+            ← Créatrices
+          </Link>
+        }
         title="Structures de script"
         lead="Les étapes que tes créatrices tournent, leurs cartons et leur couleur. Une structure se tourne carton par carton."
         actions={
           open === null ? (
-            <button
-              type="button"
-              className="nv-btn nv-btn--soft nv-btn--sm"
-              onClick={() => {
-                setOpen({
-                  id: newId(ScriptStructureIdSchema),
-                  basedOnVersion: null,
-                  frozen: false,
-                  draft: emptyDraft(),
-                });
-              }}
-            >
+            <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={create}>
               Nouvelle structure
             </button>
           ) : undefined
         }
       />
-      <div className="ps-sheet">
-        {leaving ? (
-          <LeaveConfirm
-            onLeave={() => {
-              if (blocker.status === 'blocked') blocker.proceed();
-              pending?.();
-              setPending(null);
-            }}
-            onStay={() => {
-              if (blocker.status === 'blocked') blocker.reset();
-              setPending(null);
-            }}
-          />
-        ) : null}
-        {body()}
-      </div>
+      {sheet}
     </Page>
   );
 }

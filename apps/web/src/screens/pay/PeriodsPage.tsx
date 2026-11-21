@@ -22,8 +22,10 @@ import '@/reports/reports.css';
 import { amountText, periodTitle } from '@/reports/model';
 import '@/scheduling/scheduling.css';
 import { useMembers } from '@/screens/team/api';
+import { InvoiceArt } from '@/shell/art/EmptyArt';
 import '@/screens/team/team.css';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { Failure } from '@/shell/states';
 
 /**
  * Paie › Historique (EQ-05; « Relevés » until 29/10, a statement being one member's computation): the periods, the most recent first, each with its state and one amount — what was paid, or
@@ -31,9 +33,12 @@ import { Page, PageHeader, Panel } from '@/shell/layout';
  */
 export function PeriodsPage({
   user,
+  period = null,
   onOpen,
 }: {
   user: Me;
+  /** The quinzaine the other tabs showed, kept for them (GES-02): this screen lists them all. */
+  period?: PayPeriod | null;
   onOpen: (period: PayPeriod) => void;
 }): JSX.Element {
   const periods = usePayPeriods();
@@ -56,29 +61,19 @@ export function PeriodsPage({
         eyebrow="Paie"
         title="Historique"
         lead="Chaque quinzaine, ce qui a été validé et versé."
-        actions={<PayNav user={user} />}
+        tabs={<PayNav user={user} period={period} />}
       />
       <div className="py-board">
         <Panel className="nv-enter">
           {periods.isError && !lost && items.length === 0 ? (
             <div className="rp-sec">
-              <div className="sc-empty">
-                <p className="tm-warn">Le serveur ne répond pas : les quinzaines n’ont pas pu être lues.</p>
-                <button
-                  type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
-                  onClick={() => {
-                    void periods.refetch();
-                  }}
-                >
-                  Réessayer
-                </button>
-              </div>
+              <Failure inline onRetry={() => void periods.refetch()} />
             </div>
           ) : periods.data === undefined ? (
             <Loading rows={4} />
           ) : items.length === 0 ? (
             <Empty
+              art={<InvoiceArt />}
               whisper="Aucune quinzaine pour l’instant."
               text="Une quinzaine apparaît ici dès qu’un rapport de fin de shift est validé : son relevé se calcule aussitôt."
             />
@@ -118,9 +113,9 @@ export function PeriodsPage({
                 </button>
               ) : null}
               {periods.isError && !lost && items.length > 0 ? (
-                <p className="tm-warn" role="alert">
-                  Le serveur ne répond pas : les quinzaines plus anciennes n’ont pas pu être lues.
-                </p>
+                <Failure inline onRetry={() => void periods.fetchNextPage()}>
+                  Les quinzaines plus anciennes n’ont pas pu être lues : réessaie dans un instant.
+                </Failure>
               ) : null}
             </div>
           )}
@@ -153,8 +148,9 @@ function PeriodRow({
         `se valide à partir du ${dayMonthText(opensOn(window))}`,
       ]
     : [
+        // Finished but not closed: the pill says it, the line does not repeat it (GES-20).
         summary.closedAt === null
-          ? 'Finie, pas encore close'
+          ? ''
           : `Close le ${dayAt(summary.closedAt, window.timeZone)}${closedBy === null ? '' : ` par ${closedBy}`}`,
         net,
         counts,

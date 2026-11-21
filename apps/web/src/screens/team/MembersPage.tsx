@@ -6,29 +6,43 @@ import type {
   TeamRole,
 } from '@impera/contracts';
 import { placeSegmentThumb } from '@impera/design-system';
-import { useLayoutEffect, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, useState, useSyncExternalStore, type JSX, type KeyboardEvent } from 'react';
 
 import { AddMemberPanel } from './AddMemberPanel';
 import { MemberSheet } from './MemberSheet';
 import { TeamNav } from './TeamNav';
 import { useMembers, usePlatformRemovals, usePresets } from './api';
-import {
-  creatorNames,
-  invitationState,
-  listMembers,
-  rateLine,
-  removalPill,
-  TAB_LABELS,
-  teamSummary,
-} from './model';
-import { Avatar, Notice, StatusPill, Unread } from './parts';
+import { creatorNames, invitationState, listMembers, rateLine, removalPill, TAB_LABELS } from './model';
+import { Avatar, Notice, StatusPill } from './parts';
 import './team.css';
 
 import { useCreators } from '@/creators/api';
-import { countryFlag, countryName } from '@/lib/country';
+import { countryName } from '@/lib/country';
+import { TeamArt } from '@/shell/art/EmptyArt';
 import { Page, PageHeader, Panel } from '@/shell/layout';
+import { screenLabel } from '@/shell/nav';
+import { Failure } from '@/shell/states';
 
 const TABS: readonly TeamRole[] = ['chatter', 'manager'];
+
+/** Wide enough for the list and a member's sheet side by side with room to spare: the first member opens there. */
+const WIDE = '(min-width: 1280px)';
+
+function subscribeWide(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia(WIDE);
+  // An old engine, or a stand-in, without the listener: read once, never followed.
+  if (typeof query.addEventListener !== 'function') return () => undefined;
+  query.addEventListener('change', onChange);
+  return () => {
+    query.removeEventListener('change', onChange);
+  };
+}
+
+const isWide = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(WIDE).matches;
+
+/** Whether the screen is wide (1280 px and more), kept up to date as the window changes. */
+const useWide = (): boolean => useSyncExternalStore(subscribeWide, isWide, () => false);
 
 /**
  * Équipe › Membres (EQ-01, ADR 0024): the agency's chatters and managers, a tab each, searched by name; a member
@@ -71,8 +85,12 @@ export function MembersPage({
   // A search that only finds members who left opens their fold, so the list and the fold do not contradict.
   const searching = query.trim() !== '';
   const onlyGone = searching && lists.current.length === 0 && lists.gone.length > 0;
-  const open = all.find((member) => member.id === selected) ?? null;
-  const summary = teamSummary(all, new Date());
+  // Nothing chosen on a wide screen: the first member of the list opens rather than a column that says « nothing »
+  // (recette visuelle 16/11, GES-21). The address stays the list's; closing that sheet leaves the column to its hint.
+  const wide = useWide();
+  const [dismissed, setDismissed] = useState(false);
+  const first = selected === null && wide && !dismissed ? (lists.current[0] ?? null) : null;
+  const open = all.find((member) => member.id === selected) ?? first;
   const known = presets.data ?? [];
   const names = creators.data ?? [];
 
@@ -91,18 +109,15 @@ export function MembersPage({
   return (
     <Page className={open === null ? '' : 'tm-is-reading'}>
       <PageHeader
-        title="Équipe"
-        lead={summary ?? 'Les chatteurs et les managers de l’agence, leurs créatrices et leur taux.'}
-        actions={
-          <>
-            <TeamNav />
-            {all.length === 0 ? null : add}
-          </>
-        }
+        eyebrow="Équipe"
+        title={screenLabel('/equipe/membres')}
+        // A sentence, as on the other tabs: who is active is counted in the capsule (GES-21).
+        lead="Qui travaille pour l’agence, à quel taux, sur quels comptes."
+        tabs={<TeamNav />}
+        {...(all.length === 0 || add === undefined ? {} : { actions: add })}
       />
       {members.isError ? (
-        <Unread
-          text="Le serveur ne répond pas : l’équipe n’a pas pu être lue."
+        <Failure
           onRetry={() => {
             void members.refetch();
           }}
@@ -118,6 +133,7 @@ export function MembersPage({
       ) : all.length === 0 ? (
         canManage ? (
           <Notice
+            art={<TeamArt />}
             title="Ton équipe commence ici"
             text="Ajoute un chatteur ou un manager : tu lui envoies ensuite son lien d’invitation, et il choisit son mot de passe."
           >
@@ -125,6 +141,7 @@ export function MembersPage({
           </Notice>
         ) : (
           <Notice
+            art={<TeamArt />}
             title="Personne dans l’équipe pour l’instant"
             text="Les membres ajoutés par l’agence arrivent ici."
           />
@@ -170,7 +187,7 @@ export function MembersPage({
                       presets={known}
                       creators={names}
                       removals={removalsOf(member)}
-                      isOpen={member.id === selected}
+                      isOpen={member.id === open?.id}
                       onOpen={() => {
                         onSelect(member.id);
                       }}
@@ -223,7 +240,9 @@ export function MembersPage({
               seesSetup={seesSetup}
               isSelf={open.userId === viewerId}
               onClose={() => {
-                onSelect(null);
+                // Closed by hand, a sheet leaves the column to its hint: the first member does not come back in it.
+                setDismissed(true);
+                if (selected !== null) onSelect(null);
               }}
             />
           )}
@@ -266,6 +285,29 @@ function Row({
   // Still to choose a password: one pill, « Invité » or « Lien expiré », in place of the status (EQ-05, EQ-06). A reset
   // link out for one who has a password is not an invitation (the summary says the same).
   const access = member.invitationPending ? invitationState(member, new Date()).kind : null;
+  const status =
+    access === 'expired' ? (
+      <span className="tm-invited tm-invited--expired">Lien expiré</span>
+    ) : access !== null ? (
+      <span className="tm-invited">Invité</span>
+    ) : member.status === 'active' ? null : (
+      <StatusPill member={member} />
+    );
+  const pills =
+    removals.length === 0 && status === null ? null : (
+      <>
+        {/* Amber, beside his status: removed on the platform, nothing is turned off here (ADR 0076 § 5). */}
+        {removals.map((removal) => (
+          <span
+            key={`${removal.platform}:${removal.platformChatterId}`}
+            className="tm-invited tm-invited--warn"
+          >
+            {removalPill(removal)}
+          </span>
+        ))}
+        {status}
+      </>
+    );
   return (
     <li className="nv-enter">
       <button
@@ -277,30 +319,14 @@ function Row({
         <Avatar member={member} />
         <span className="nv-convo__main">
           <span className="nv-convo__name tm-name">{member.displayName}</span>
+          {/* « Actif » is the rule, not news: a pill only for what is not (EQ-05), under his name, so that the line
+              of his creators keeps the row's width (recette visuelle 16/11, GES-21). */}
+          {pills === null ? null : <span className="tm-row__pills">{pills}</span>}
+          {/* The country in words: a flag is an emoji, read « FR » on some systems (GES-21). */}
           <span className="nv-convo__preview">
-            <span aria-hidden="true">{countryFlag(member.country)} </span>
             {countryName(member.country)} · {rateLine(member.commission, presets)}
             {theirs.length === 0 ? null : ` · ${theirs.join(', ')}`}
           </span>
-        </span>
-        {/* « Actif » is the rule, not news: a pill only for what is not (EQ-05). */}
-        <span className="nv-convo__side">
-          {/* Amber, beside his status: removed on the platform, nothing is turned off here (ADR 0076 § 5). */}
-          {removals.map((removal) => (
-            <span
-              key={`${removal.platform}:${removal.platformChatterId}`}
-              className="tm-invited tm-invited--warn"
-            >
-              {removalPill(removal)}
-            </span>
-          ))}
-          {access === 'expired' ? (
-            <span className="tm-invited tm-invited--expired">Lien expiré</span>
-          ) : access !== null ? (
-            <span className="tm-invited">Invité</span>
-          ) : member.status === 'active' ? null : (
-            <StatusPill member={member} />
-          )}
         </span>
       </button>
     </li>

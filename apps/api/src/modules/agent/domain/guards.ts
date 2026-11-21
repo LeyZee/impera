@@ -23,6 +23,11 @@ export interface GuardSettings {
   readonly petNames?: readonly string[];
   /** Emojis she never uses (`writing_style.emojis_forbidden`, P5-01): one in her answer is a `forbidden_term`. */
   readonly forbiddenEmojis?: readonly string[];
+  /**
+   * What she never does (`never_do`): no guard of her answers reads it, the custom order does (ADR 0090 § A, audit du
+   * 16/11, M3). Carried here as her other limits are, to every composer.
+   */
+  readonly neverDo?: readonly string[];
 }
 
 /**
@@ -42,6 +47,11 @@ export interface GuardContext {
    * never sent again (recette AGR-05). Absent, only `previousTurns` is read for it.
    */
   readonly sentBefore?: readonly string[];
+  /**
+   * The one price she may write, in minor units: the paid step she brings now or the one waiting for him (ADR 0156
+   * § 4), decided by code. Any other sum stays a `price_outside_offer`. Absent, no price passes.
+   */
+  readonly allowedPriceMinor?: number;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -323,6 +333,10 @@ const AI_TICS: readonly RegExp[] = [
   /\boh la la\b/,
   /\bje suis la pour toi\b/,
   /\bjuste pour toi\b/,
+  // A note-taker's line, never hers (Playground, Charles 16/11): « je note ton âge », « c'est noté ».
+  /\bje (te |le |l'|ca |bien )?(note|retiens)\b/,
+  /\b(c'est|bien) note\b/,
+  /\bje prends note\b/,
   /—/,
   /^\s*([-*•]|\d+[.)])\s/m,
 ];
@@ -642,10 +656,36 @@ export function touchesTerm(text: string, term: string): boolean {
  * The bubbles read as one message, as the fan reads them: « je suis une » then « IA », a number cut in two, « 1A »
  * or « b0t » (unmasked), a number in words, a forbidden word split or masked. Only what the bubble-by-bubble reading did not already catch.
  */
+/** A sum as written (« 15 € », « 12,50 € », « $10 »), in minor units. */
+function amountMinorOf(written: string): number | undefined {
+  const digits = /\d+([.,]\d{1,2})?/.exec(written)?.[0];
+  return digits === undefined ? undefined : Math.round(Number(digits.replace(',', '.')) * 100);
+}
+
+/**
+ * The first match of a blocking pattern in the text. A sum is read one by one: the price code allowed (ADR 0156 § 4)
+ * passes, any other one blocks.
+ */
+function blockingMatch(
+  code: GuardCode,
+  pattern: RegExp,
+  text: string,
+  allowedPriceMinor: number | undefined,
+): string | undefined {
+  if (code !== 'price_outside_offer' || allowedPriceMinor === undefined) return pattern.exec(text)?.[0];
+  for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
+    // « €12.50 » matches as « €1 »: the sum is read on, past the match.
+    if (amountMinorOf(text.slice(match.index, match.index + match[0].length + 8)) !== allowedPriceMinor)
+      return match[0];
+  }
+  return undefined;
+}
+
 function wholeMessage(
   bubbles: readonly string[],
   forbidden: readonly string[],
   found: readonly GuardViolation[],
+  allowedPriceMinor: number | undefined,
 ): GuardViolation[] {
   const joined = bubbles.join(' ');
   // Also glued (« je suis un b » then « ot ») and without emoji (« 06 12 34 🙈 56 78 »).
@@ -657,7 +697,9 @@ function wholeMessage(
   const has = (code: GuardCode) => [...found, ...violations].some((v) => v.code === code);
   for (const { code, pattern } of BLOCKING_PATTERNS) {
     if (has(code)) continue;
-    const match = readings.map((text) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
+    const match = readings
+      .map((text) => blockingMatch(code, pattern, text, allowedPriceMinor))
+      .find((m) => m !== undefined);
     if (match !== undefined) violations.push({ code, severity: 'blocking', match });
   }
   const emergency = has('fake_emergency')
@@ -689,8 +731,8 @@ export function checkVoiceOutput(
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
     for (const { code, pattern } of BLOCKING_PATTERNS) {
-      const match = pattern.exec(text);
-      if (match) violations.push({ code, severity: 'blocking', bubbleIndex, match: match[0] });
+      const match = blockingMatch(code, pattern, text, context.allowedPriceMinor);
+      if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
     const stage = STAGE_DIRECTION.map((pattern) => pattern.exec(bubble)?.[0]).find((m) => m !== undefined);
     if (stage !== undefined) {
@@ -743,7 +785,7 @@ export function checkVoiceOutput(
       violations.push({ code: 'bubble_too_long', severity: 'soft', bubbleIndex });
     }
   });
-  violations.push(...wholeMessage(bubbles, forbidden, violations));
+  violations.push(...wholeMessage(bubbles, forbidden, violations, context.allowedPriceMinor));
   if (context.previousTurns !== undefined)
     violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
   if (bubbles.length > settings.maxBubbles) violations.push({ code: 'too_many_bubbles', severity: 'soft' });

@@ -27,10 +27,39 @@ export function thresholdsTyped(fields: readonly string[]): number[] | null {
   return values;
 }
 
+/** Why the fields cannot be saved, and which one says it: one cause at a time, the first met (recette EQU-16). */
+export interface ThresholdFault {
+  readonly index: number;
+  readonly cause: 'gap' | 'amount' | 'max' | 'order';
+}
+
+export function thresholdFault(fields: readonly string[]): ThresholdFault | null {
+  const last = fields.findLastIndex((field) => field.trim() !== '');
+  let before = 0;
+  for (const [index, field] of fields.slice(0, last + 1).entries()) {
+    if (field.trim() === '') return { index, cause: 'gap' };
+    const value = parseAmount(field, false, Number.MAX_SAFE_INTEGER);
+    // `parseAmount` refuses past nine digits of euros: that reads as an amount too high, not as a badly typed one.
+    const tooLong = /^\d{10,}([.,]\d{1,2})?$/u.test(field.replace(/[\s\u00a0\u202f€]/gu, ''));
+    if (tooLong || (value !== null && value > THRESHOLD_MAX_MINOR)) return { index, cause: 'max' };
+    if (value === null || value < 1) return { index, cause: 'amount' };
+    if (value <= before) return { index, cause: 'order' };
+    before = value;
+  }
+  return null;
+}
+
+const FAULT_TEXT: Record<ThresholdFault['cause'], string> = {
+  gap: 'Pas de rang vide au milieu : remplis les rangs depuis le premier.',
+  amount: 'Un seuil est un montant en euros au-dessus de zéro, avec deux décimales au plus.',
+  max: `Un seuil ne dépasse pas ${amountText(THRESHOLD_MAX_MINOR, 'EUR')}.`,
+  order: 'Chaque seuil est plus haut que le précédent.',
+};
+
 /**
  * Paie › Objectifs › « Rangs des chatteurs » (ADR 0104 § 16): the owner sets the cumulated net that opens each rank;
- * the ranks, their names and their insignia are the game's. Honorary: no rate, tier or right hangs on a rank, and a
- * rank reached is never taken back. The owner's alone: a manager does not see the card.
+ * the ranks, their names and their insignia are the game's. Honorary: no rate, tier or right hangs on a rank. Moving
+ * the thresholds takes no rank back; a corrected net may (ADR 0118 § 5 and § 7). The owner's alone: a manager does not see the card.
  */
 export function LevelsPanel(): JSX.Element | null {
   const settings = useLevelSettings(true);
@@ -40,8 +69,7 @@ export function LevelsPanel(): JSX.Element | null {
   return (
     <Panel
       className="nv-enter rw-levels"
-      eyebrow="Rangs des chatteurs"
-      title={thresholdsMinor.length === 0 ? 'Aucun seuil réglé' : 'Net cumulé qui ouvre chaque rang'}
+      title="Rangs des chatteurs"
       actions={
         <button
           type="button"
@@ -55,26 +83,27 @@ export function LevelsPanel(): JSX.Element | null {
       }
     >
       <div className="rp-sec">
-        <ul className="rw-levels__list">
-          {ranks.map((rank, index) => {
-            const threshold = thresholdsMinor[index];
-            return (
-              <li key={rank.rank} className="rw-levels__rank" data-open={threshold !== undefined}>
-                <LevelInsignia rank={rank.rank} earned={threshold !== undefined} size={44} />
-                <p className="rw-levels__name">{rank.name}</p>
-                <p className="rw-levels__at nv-num">
-                  {threshold === undefined ? 'Pas de seuil' : `à ${amountText(threshold, 'EUR')}`}
-                </p>
-              </li>
-            );
-          })}
-        </ul>
+        {/* No threshold set: one sentence, not eight tiles that each say « Pas de seuil » (GES-18). */}
+        {thresholdsMinor.length === 0 ? null : (
+          <ul className="rw-levels__list">
+            {ranks.map((rank, index) => {
+              const threshold = thresholdsMinor[index];
+              return (
+                <li key={rank.rank} className="rw-levels__rank" data-open={threshold !== undefined}>
+                  <LevelInsignia rank={rank.rank} earned={threshold !== undefined} size={44} />
+                  <p className="rw-levels__name">{rank.name}</p>
+                  <p className="rw-levels__at nv-num">
+                    {threshold === undefined ? 'Pas de seuil' : `à ${amountText(threshold, 'EUR')}`}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
         <p className="py-quiet">
           {thresholdsMinor.length === 0
-            ? 'Sans seuil, aucun chatteur n’a de rang. '
-            : 'Un rang sans seuil reste fermé. '}
-          Un rang est honorifique : il ne change ni un taux, ni un palier, ni la paie, et un rang atteint ne
-          se reprend pas.
+            ? 'Sans seuil, aucun nouveau rang ne s’ouvre ; un rang déjà gagné reste.'
+            : 'Un rang sans seuil reste fermé. Honorifique : ni taux, ni palier, ni paie.'}
         </p>
       </div>
       {editing ? (
@@ -101,6 +130,7 @@ function LevelsDialog({ settings, onClose }: { settings: LevelSettings; onClose:
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const typed = thresholdsTyped(fields);
+  const fault = touched ? thresholdFault(fields) : null;
 
   const send = async (): Promise<void> => {
     setTouched(true);
@@ -132,7 +162,8 @@ function LevelsDialog({ settings, onClose }: { settings: LevelSettings; onClose:
         <ul className="rw-levelform">
           {settings.ranks.map((rank, index) => (
             <li key={rank.rank} className="rw-levelform__row">
-              <LevelInsignia rank={rank.rank} size={44} />
+              {/* Grey while its field is empty, as the list behind shows a rank with no threshold. */}
+              <LevelInsignia rank={rank.rank} size={44} earned={(fields[index] ?? '').trim() !== ''} />
               <span className="rw-levelform__name">{rank.name}</span>
               <span className="py-tierrow__field">
                 <input
@@ -140,7 +171,7 @@ function LevelsDialog({ settings, onClose }: { settings: LevelSettings; onClose:
                   inputMode="decimal"
                   autoComplete="off"
                   aria-label={`Net cumulé pour le rang ${rank.name}`}
-                  aria-invalid={touched && typed === null}
+                  aria-invalid={fault?.index === index}
                   value={fields[index] ?? ''}
                   onChange={(event) => {
                     setFields(fields.map((one, at) => (at === index ? event.target.value : one)));
@@ -153,10 +184,10 @@ function LevelsDialog({ settings, onClose }: { settings: LevelSettings; onClose:
             </li>
           ))}
         </ul>
-        <p className={touched && typed === null ? 'tm-hint tm-hint--error' : 'tm-hint'}>
-          {touched && typed === null
-            ? 'Chaque seuil est un montant en euros, plus haut que le précédent, sans rang vide au milieu.'
-            : 'Le seuil est compris. Laisse vides les rangs du haut pour les garder fermés. Monter un seuil ne reprend pas un rang déjà atteint.'}
+        <p className={fault === null ? 'tm-hint' : 'tm-hint tm-hint--error'}>
+          {fault !== null
+            ? FAULT_TEXT[fault.cause]
+            : 'Le seuil est compris. Laisse vides les rangs du haut pour les garder fermés. Monter ou vider un seuil ne reprend pas un rang déjà gagné. Un rang suit le net du chatteur : une vente remboursée ou un rapport corrigé peut le faire redescendre.'}
         </p>
         {failed ? (
           <p className="tm-warn nv-swap" role="alert">

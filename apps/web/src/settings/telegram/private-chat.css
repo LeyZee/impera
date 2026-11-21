@@ -1,5 +1,5 @@
 /*
- * « Mon chat privé » (SEC-05 lot 2): the same block in Réglages › Telegram and in Moi › Sécurité. Its state as a dot,
+ * « Mon chat privé » (SEC-05 lot 2): the same block in Réglages › Bots Telegram and in Moi › Sécurité. Its state as a dot,
  * never a coloured bar; the code in Geist with tabular figures, for whoever types it to the bot.
  */
 
@@ -182,9 +182,9 @@
   }
 }
 
-/* In Réglages › Telegram, the block sits on its own plate under the tab's eyebrow. */
+/* In Réglages › Bots Telegram, the block sits on its own plate under the tab's eyebrow. */
 .pc-plate {
-  padding: var(--nv-space-5);
+  padding: var(--nv-plate-pad);
 }
 
 /* No bot yet: the sentence, then its one way out, spaced like the other blocks. */

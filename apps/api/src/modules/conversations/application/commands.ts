@@ -1,4 +1,5 @@
 import {
+  AGENT_PAUSE_MAX_MS,
   BLIND_TEST_TARGET,
   ConversationIdSchema,
   DomainError,
@@ -6,6 +7,7 @@ import {
   jobKeyFor,
   MessageIdSchema,
   newId,
+  pauseEndJobKey,
   queueNameFor,
   resumeRunAt,
   type AgentMode,
@@ -26,10 +28,14 @@ import {
 
 import { safetySigns } from '../../agent';
 import {
+  AgeInDoubtConflict,
+  AgentPauseConflict,
+  AgentPauseInvalid,
   AutomaticLocked,
   CreatorNotFound,
   DraftGuarded,
   PersonaInactive,
+  ScriptStepCut,
   SendBlocked,
 } from '../domain/errors';
 import type {
@@ -43,7 +49,7 @@ import type {
   UnitOfWork,
 } from '../domain/ports';
 import { rebuildProjection, type ConversationProjection } from '../domain/projection';
-import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt } from '../domain/rules';
+import { FAN_MEDIA_MAX, boundFanText, fanAwaitsAnswer, respondAt, stepCutBy } from '../domain/rules';
 import { MAX_SEND_ATTEMPTS } from '../domain/state-machine';
 
 import { closeAutomaticIfLocked, readAutomaticGate, readAutomaticLock } from './automatic';
@@ -126,11 +132,12 @@ export interface ConversationCommands {
   /**
    * The Dashboard's control (Arrêt, Copilote, Automatique) for all her conversations. Returns the mode now in
    * force: Arrêt while the global switch stays on, whatever she asked. Automatique only behind its lock (ADR 0019).
-   * `reason` names a stop that does not come from the Dashboard (her archiving, ADR 0071 § 2).
+   * `reason` names a stop that does not come from the Dashboard (her archiving, ADR 0071 § 2). `until` makes Arrêt
+   * a pause that lifts itself then (ADR 0148 § 1): the fans who wrote meanwhile are answered at its end.
    */
   setAgentMode(
-    input: Omit<ConversationCommand, 'conversationId'> & { mode: AgentMode; reason?: string },
-  ): Promise<{ mode: AgentMode; globalStop: boolean }>;
+    input: Omit<ConversationCommand, 'conversationId'> & { mode: AgentMode; reason?: string; until?: Date },
+  ): Promise<{ mode: AgentMode; globalStop: boolean; pausedUntil: string | null }>;
   /**
    * Whether Automatique may open for her now, what is missing (ADR 0019), and the live rate it was decided on:
    * what the Dashboard shows.
@@ -263,6 +270,7 @@ export function createConversationCommands({
           platformMedia: isInbound ? message.media.slice(0, FAN_MEDIA_MAX) : message.media,
           platformCreatedAt: new Date(message.createdAt),
           draftId: null,
+          ...(message.origin === undefined ? {} : { origin: message.origin }),
         });
         if (!isNew) return { conversationId: conversation.id, isNew: false };
 
@@ -375,8 +383,14 @@ export function createConversationCommands({
             text: message.text,
           })),
           care: conversation.careSince !== null,
+          hasMedia: draft.scriptStep?.hasMedia === true,
         });
         if (verdict.isBlocked) throw new DraftGuarded(verdict.codes);
+        // A paid step leaves only if his limits, read now, still let it (relecture Sécurité de #812).
+        if (draft.scriptStep !== null) {
+          const cut = stepCutBy(await tx.gate.fanFlags(conversation), conversation.careSince);
+          if (cut !== null) throw new ScriptStepCut(cut);
+        }
         const meta = humanMeta(input);
         await appendEvent(
           tx,
@@ -496,7 +510,14 @@ export function createConversationCommands({
       });
     },
 
-    release(input) {
+    async release(input) {
+      // His age in doubt: the agent may not answer him, so the hand stays with the team (Charles, 16/11).
+      const fanId = await uow.inTenant(
+        input.creatorId,
+        async (tx) => (await lockConversation(tx, input.conversationId)).fanId,
+      );
+      if ((await fans.flags(input.creatorId, fanId)).ageDisputed !== undefined)
+        throw new AgeInDoubtConflict();
       return uow.inTenant(input.creatorId, async (tx) => {
         const conversation = await lockConversation(tx, input.conversationId);
         const meta = humanMeta(input);
@@ -570,6 +591,11 @@ export function createConversationCommands({
     setAgentMode(input) {
       const stop = input.mode === 'stop';
       const target = input.mode === 'auto' ? 'auto' : 'copilot';
+      const until = stop ? (input.until ?? null) : null;
+      if (until !== null) {
+        const ahead = until.getTime() - clock.now().getTime();
+        if (ahead <= 0 || ahead > AGENT_PAUSE_MAX_MS) throw new AgentPauseInvalid();
+      }
       return uow.inTenant(input.creatorId, async (tx) => {
         // Two clicks in a row apply in the order they took the lock, and the later one stays the latest row.
         if (!(await tx.switches.lockCreator())) throw new CreatorNotFound();
@@ -577,11 +603,26 @@ export function createConversationCommands({
         if (input.mode === 'auto') await requireAutomaticOpen(tx, voice);
         const meta = humanMeta(input);
         const switches = await tx.switches.isOn();
-        if (switches.creator !== stop) {
+        if (until !== null) {
+          // A pause never brings a stop's end closer (Sécurité, #865): resuming has its own checks.
+          if (await tx.switches.archived()) throw new AgentPauseConflict('archived');
+          if (switches.creator && switches.creatorUntil === null) throw new AgentPauseConflict('stopped');
+          if (switches.creatorUntil !== null && until < switches.creatorUntil) {
+            throw new AgentPauseConflict('sooner');
+          }
+        }
+        // A pause turned into an Arrêt, or pushed back, is a new row too: its end changes.
+        const endChanges = stop && switches.creator && switches.creatorUntil?.getTime() !== until?.getTime();
+        if (switches.creator !== stop || endChanges) {
           const reason = stop
-            ? (input.reason ?? 'Arrêt depuis le Dashboard')
+            ? (input.reason ?? (until === null ? 'Arrêt depuis le Dashboard' : 'Pause'))
             : `Reprise en ${target === 'auto' ? 'automatique' : 'copilote'} depuis le Dashboard`;
-          await tx.switches.setCreator({ active: stop, reason, setBy: meta.actor });
+          await tx.switches.setCreator({
+            active: stop,
+            reason,
+            setBy: meta.actor,
+            ...(until === null ? {} : { until }),
+          });
           await tx.events.publish(
             input.creatorId,
             {
@@ -595,8 +636,21 @@ export function createConversationCommands({
             action: stop ? 'kill_switch.on' : 'kill_switch.off',
             entity: 'kill_switch',
             entityId: input.creatorId,
-            details: { scope: 'creator', correlationId: input.correlationId },
+            details: {
+              scope: 'creator',
+              correlationId: input.correlationId,
+              ...(until === null ? {} : { until: until.toISOString() }),
+            },
           });
+          if (until !== null) {
+            // At its end the switch reads as off by itself: one reopening answers the fans who wrote meanwhile, the
+            // longest wait first, each at her hours (respond defers what falls out of them).
+            await tx.jobs.enqueue(
+              'conversation.reopen',
+              { creatorId: input.creatorId, correlationId: input.correlationId },
+              { jobKey: pauseEndJobKey(input.creatorId), runAt: until },
+            );
+          }
         }
         if (switches.creator && !stop && !switches.global) {
           // A fan who wrote during the stop was left `pending` (respond saw the switch and did nothing): each of
@@ -634,7 +688,11 @@ export function createConversationCommands({
             await automaticSwitchedOn(tx, input, 'creator', input.creatorId, meta);
           }
         }
-        return { mode: stop || switches.global ? 'stop' : target, globalStop: switches.global };
+        return {
+          mode: stop || switches.global ? 'stop' : target,
+          globalStop: switches.global,
+          pausedUntil: until?.toISOString() ?? null,
+        };
       });
     },
 

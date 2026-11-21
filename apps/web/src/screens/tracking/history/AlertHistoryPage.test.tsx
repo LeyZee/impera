@@ -32,6 +32,7 @@ const trigger = (n: number, creatorId: string, minutesAgo: number, patch: Record
   fanId: '0192f3a0-0000-7000-8000-0000000000f1',
   fanDisplayName: 'Théo',
   trigger: { alert: { kind: 'system', code: 'service_request' }, matchedBy: 'rule' },
+  safety: null,
   alertGroupId: null,
   alertName: 'Demande de service',
   pausedAgent: false,
@@ -212,7 +213,17 @@ describe('Suivi › Historique des alertes (P4-01)', () => {
     await waitFor(() => {
       expect(triggerReads(calls).some((call) => call.query['alert'] === GROUP)).toBe(true);
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Tout marquer comme vu' }));
+    const all = await screen.findByRole('button', { name: 'Tout marquer comme vu' });
+    // At the end of the list's header, after its filters, never alone above them (recette visuelle 16/11).
+    const head = all.parentElement;
+    expect(head?.className).toBe('hi-head');
+    expect(head?.lastElementChild).toBe(all);
+    expect(head?.firstElementChild?.getAttribute('aria-label')).toBe('Filtres');
+    // The filter's list opens as wide as its longest alert, never cutting it on two lines.
+    fireEvent.click(screen.getByRole('combobox', { name: 'Alerte' }));
+    expect(screen.getByRole('listbox').parentElement?.style.width).toBe('max-content');
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Alerte' }), { key: 'Escape' });
+    fireEvent.click(all);
     expect((await screen.findByRole('status')).textContent).toBe('2 alertes marquées comme vues.');
     expect(calls.filter((call) => call.method === 'POST').map((call) => call.body)).toEqual([
       { creatorId: NORA, untilId: '0192f3a0-0000-7000-8000-000000000001', alert: GROUP },

@@ -57,7 +57,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-describe('Réglages › Telegram when the page cannot load', () => {
+describe('Réglages › Bots Telegram when the page cannot load', () => {
   it('blames the server, not Telegram, when Impera itself does not answer', async () => {
     vi.mocked(fetchOverview).mockRejectedValue(new TypeError('Failed to fetch'));
     renderSection();
@@ -84,7 +84,7 @@ describe('Réglages › Telegram when the page cannot load', () => {
   });
 });
 
-describe('Réglages › Telegram with a bot Telegram refuses', () => {
+describe('Réglages › Bots Telegram with a bot Telegram refuses', () => {
   beforeEach(() => {
     vi.mocked(fetchOverview).mockResolvedValue({
       bots: [
@@ -160,21 +160,29 @@ describe('Réglages › Telegram with a bot Telegram refuses', () => {
   });
 });
 
-describe('Réglages › Telegram without a bot', () => {
+describe('Réglages › Bots Telegram without a bot', () => {
   beforeEach(() => {
     vi.mocked(fetchOverview).mockResolvedValue({ bots: [], routes: [], coverage: [], version: 0 });
   });
 
-  it('shows one empty state and its one action, no strip and no tabs', async () => {
+  it('shows one empty state and its one action, no strip, and keeps its tabs (recette visuelle 16/11, GES-15)', async () => {
     renderSection();
     expect(await screen.findByText('Personne n’est prévenu la nuit')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: 'Ajouter un bot' })).toHaveLength(1);
-    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(5);
     expect(screen.queryByRole('button', { name: 'Mettre un bot dans un groupe' })).toBeNull();
+  });
+
+  it('says on each tab what a bot would bring there, with the same one action', async () => {
+    renderSection();
+    fireEvent.click(await screen.findByRole('tab', { name: /Mon chat privé/u }));
+    expect(await screen.findByText('Ton chat privé attend un bot')).toBeTruthy();
+    expect(screen.queryByText('Personne n’est prévenu la nuit')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Ajouter un bot' }).className).toContain('nv-btn--neon');
   });
 });
 
-describe('Réglages › Telegram with its tab in the address', () => {
+describe('Réglages › Bots Telegram with its tab in the address', () => {
   /** Renders the page at `address`; gives what the address now holds and how many steps back it has. */
   function renderAt(address: string): () => { search: unknown; steps: number } {
     const rootRoute = createRootRoute();
@@ -251,7 +259,7 @@ describe('Réglages › Telegram with its tab in the address', () => {
   });
 });
 
-describe('Réglages › Telegram, her own alerts (P4-01)', () => {
+describe('Réglages › Bots Telegram, her own alerts (P4-01)', () => {
   const chatId = TelegramChatIdSchema.parse('01900000-0000-7000-8000-0000000000c1');
 
   beforeEach(() => {
@@ -320,7 +328,7 @@ describe('Réglages › Telegram, her own alerts (P4-01)', () => {
   });
 });
 
-describe('Réglages › Telegram with a group the bot was banned from (REG-28)', () => {
+describe('Réglages › Bots Telegram with a group the bot was banned from (REG-28)', () => {
   const gone = TelegramChatIdSchema.parse('01900000-0000-7000-8000-0000000000c9');
   beforeEach(() => {
     vi.mocked(fetchOverview).mockResolvedValue({
@@ -408,7 +416,7 @@ describe('Réglages › Telegram with a group the bot was banned from (REG-28)',
   });
 });
 
-describe('Réglages › Telegram, the sales settings (CRM-04)', () => {
+describe('Réglages › Bots Telegram, the sales settings (CRM-04)', () => {
   const creatorId = CreatorIdSchema.parse('01900000-0000-7000-8000-0000000000c1');
 
   beforeEach(() => {

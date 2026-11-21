@@ -4,11 +4,14 @@ import {
   type Calendar,
   type CalendarAgent,
   type CalendarShift,
+  type CalendarSlot,
   type PlanningMember,
 } from '@impera/contracts';
 
-import { leftOf, phaseOf } from './model';
+import { leftOf, phaseOf, unheldReader, type Unheld } from './model';
 import { addDays, clockAt, clockOf, mondayOf, zonedInstant } from './time';
+
+import { parsePlanningSearch, unheldLabel, type PlanningSearch } from '@/screens/team/model';
 
 /**
  * Équipe › Calendrier as the screens draw it (CR-12, ADR 0045 § 1, ADR 0048): each creator's day cut into the agency's
@@ -33,15 +36,30 @@ export interface AgentInSlot {
   readonly to: Date;
 }
 
+/** A shift in a créneau, and why nobody holds it when nobody does: the agency's alone (recette EQP-03, EQU-01). */
+export interface CellShift extends CalendarShift {
+  readonly unheld: Unheld | null;
+}
+
+/** What is left of a créneau to fill: for the agency, the server's count (`agency.toFill`, ADR 0049 § 2). */
+export interface CellToFill {
+  /** Its stretches ahead with a place free, in order, from the minute under way. */
+  readonly open: readonly Span[];
+  /** The places to fill: two on a créneau that wants two and has nobody. */
+  readonly places: number;
+  /** The first of two places is held: a second chatter is wanted. */
+  readonly second: boolean;
+}
+
 export interface CalendarCell {
   readonly from: Date;
   readonly to: Date;
   /**
    * The shifts that cover part of it, wherever they start, with their own hours: a shift across two créneaux is drawn
-   * on both (ADR 0049 § 1); the month marks the créneau with the first.
+   * on both (ADR 0049 § 1); the month marks the créneau with the first one held.
    */
-  readonly shifts: readonly CalendarShift[];
-  /** A shift covers part of it. */
+  readonly shifts: readonly CellShift[];
+  /** A shift its member holds covers part of it. */
   readonly held: boolean;
   /** `null` when he does not answer in it, or under Arrêt. */
   readonly agent: AgentInSlot | null;
@@ -49,11 +67,13 @@ export interface CalendarCell {
   readonly aiAlone: boolean;
   /** Her creator is archived (ADR 0071 § 2): the row is her history, nothing of it is free or to fill, even ahead. */
   readonly closed: boolean;
+  /**
+   * What is left of it to fill, `null` when nothing is. For the agency, the server's count, as Planning reads it: a
+   * créneau held in part keeps its hole, a shift nobody holds covers nothing, a second place counts (recette EQU-02).
+   * For a member, who cannot fill it, a créneau ahead nobody is on: « libre ».
+   */
+  readonly toFill: CellToFill | null;
 }
-
-/** Nobody on it yet and still ahead, on a creator one plans: « libre », a créneau to fill. */
-const isFree = (cell: CalendarCell, now: Date): boolean =>
-  !cell.held && !cell.aiAlone && !cell.closed && cell.to.getTime() > now.getTime();
 
 export interface CalendarRow {
   readonly creator: Calendar['creators'][number];
@@ -67,6 +87,42 @@ export const shownOn = (row: CalendarRow, day: string): boolean =>
 
 const spansOf = (list: readonly { readonly startsAt: string; readonly endsAt: string }[]): Span[] =>
   list.map((one) => ({ from: Date.parse(one.startsAt), to: Date.parse(one.endsAt) }));
+
+/** The next minute, where what is ahead starts (the server's `slotsToFill` rounds the same way). */
+const aheadOf = (now: Date): number => Math.ceil(now.getTime() / MINUTE_MS) * MINUTE_MS;
+
+/** A créneau ahead nobody is on, for a member: all that is left of it, « libre ». */
+function freeOf(cut: Span, taken: boolean, now: Date): CellToFill | null {
+  const from = Math.max(cut.from, aheadOf(now));
+  return taken || from >= cut.to ? null : { open: [{ from, to: cut.to }], places: 1, second: false };
+}
+
+/**
+ * The server's créneaux to fill that start with `cut`, on any of the creator's accounts, as one: their stretches
+ * joined and cut to what is still ahead, the most places any of them wants.
+ */
+function toFillAt(slots: readonly CalendarSlot[], cut: Span, now: Date): CellToFill | null {
+  const here = slots.filter((slot) => Date.parse(slot.startsAt) === cut.from);
+  const ahead = aheadOf(now);
+  const open: Span[] = [];
+  const stretches = here
+    .flatMap((slot) => spansOf(slot.open))
+    .map((gap) => ({ from: Math.max(gap.from, ahead), to: gap.to }))
+    .filter((gap) => gap.to > gap.from)
+    .toSorted((a, b) => a.from - b.from);
+  for (const gap of stretches) {
+    const last = open.at(-1);
+    if (last !== undefined && gap.from <= last.to)
+      open[open.length - 1] = { from: last.from, to: Math.max(last.to, gap.to) };
+    else open.push(gap);
+  }
+  if (open.length === 0) return null;
+  return {
+    open,
+    places: Math.max(...here.map((slot) => slot.places)),
+    second: here.every((slot) => slot.seats === 2 && slot.places === 1),
+  };
+}
 
 /** The part of `span` the spans (sorted, joined) cover, as one stretch: the first to the last minute covered. */
 function coveredPart(spans: readonly Span[], span: Span): Span | null {
@@ -146,10 +202,16 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
   }));
   // The creators one plans first, an archived one's history after them (ADR 0071 § 2).
   const creators = [...calendar.creators].sort((a, b) => Number(a.archived) - Number(b.archived));
+  // Who holds none of his shifts, for the agency (recette EQU-01, EQU-02): those shifts are drawn, and cover nothing.
+  const unheld = unheldReader(calendar, now);
   return creators.map((creator) => {
     const agent = calendar.agent.find((one) => one.creatorId === creator.id) ?? null;
-    const theirs = calendar.shifts.filter((shift) => shift.creatorId === creator.id);
-    const spans = spansOf(theirs);
+    const theirs = calendar.shifts
+      .filter((shift) => shift.creatorId === creator.id)
+      .map((shift): CellShift => ({ ...shift, unheld: unheld(shift) }));
+    const spans = spansOf(theirs.filter((shift) => shift.unheld === null));
+    // The agency fills from the server's count, the one Planning reads (ADR 0049 § 2); a member reads what is free.
+    const slots = calendar.agency?.toFill.filter((slot) => slot.creatorId === creator.id) ?? null;
     const cells = new Map<string, CalendarCell[]>();
     for (const { day, cuts } of windows) {
       cells.set(
@@ -160,14 +222,19 @@ export function calendarRows(calendar: Calendar, days: readonly string[], now: D
             (shift) => Date.parse(shift.startsAt) < cut.to && Date.parse(shift.endsAt) > cut.from,
           );
           const { agent: inSlot, aiAlone } = agentOnSlot(agent, cut, spans, now);
+          const held = over.some((shift) => shift.unheld === null);
           return {
             from: new Date(cut.from),
             to: new Date(cut.to),
             shifts: over,
-            held: over.length > 0,
+            held,
             agent: inSlot,
             aiAlone,
             closed: creator.archived,
+            toFill:
+              slots === null
+                ? freeOf(cut, held || aiAlone || creator.archived, now)
+                : toFillAt(slots, cut, now),
           };
         }),
       );
@@ -259,12 +326,13 @@ export type MonthMark =
   | { readonly kind: 'ai' }
   | { readonly kind: 'gap'; readonly ahead: boolean };
 
-export function monthMarks(cells: readonly CalendarCell[], now: Date): MonthMark[] {
+export function monthMarks(cells: readonly CalendarCell[]): MonthMark[] {
   return cells.map((cell) => {
-    const [first] = cell.shifts;
+    // A shift nobody holds marks nothing: its créneau reads to fill, as in the week (recette EQU-02).
+    const first = cell.shifts.find((shift) => shift.unheld === null);
     if (first !== undefined) return { kind: 'shift', memberId: first.memberId };
     if (cell.aiAlone) return { kind: 'ai' };
-    return { kind: 'gap', ahead: isFree(cell, now) };
+    return { kind: 'gap', ahead: cell.toFill !== null };
   });
 }
 
@@ -317,29 +385,80 @@ export function minutesOn(shifts: readonly CalendarShift[], memberId: string, fr
 }
 
 /**
- * Who holds a créneau, in words, then the agent: « Kofi, 12 h – 18 h, en poste, reste 3 h 40 ; l’IA en automatique dès
- * 14 h », « libre ».
+ * What is left to fill of a créneau, in words: « à pourvoir », « à pourvoir de 14 h à 18 h » when a shift holds the
+ * rest, « 2e chatteur à pourvoir », « à pourvoir, 2 places »; « libre » for a reader who cannot fill it (CR-12).
  */
+function toFillWords(cell: CalendarCell, toFill: CellToFill, zone: string, now: Date, fill: boolean): string {
+  if (!fill) return 'libre';
+  const what = toFill.second
+    ? '2e chatteur à pourvoir'
+    : toFill.places === 2
+      ? 'à pourvoir, 2 places'
+      : 'à pourvoir';
+  const [only] = toFill.open;
+  const rest = Math.max(cell.from.getTime(), aheadOf(now));
+  if (toFill.open.length === 1 && only !== undefined && only.from <= rest && only.to >= cell.to.getTime()) {
+    return what;
+  }
+  const hours = toFill.open.map(
+    (gap) => `de ${clockAt(new Date(gap.from), zone)} à ${clockAt(new Date(gap.to), zone)}`,
+  );
+  return `${what} ${hours.join(' et ')}`;
+}
+
+/** A piece of what a créneau says: `unheld` for a status that keeps a member from holding it, said in amber. */
+export interface WhoPart {
+  readonly text: string;
+  readonly unheld: boolean;
+}
+
+/**
+ * Who holds a créneau, in words, then what is left to fill and the agent: « Kofi, 12 h – 18 h, en poste, reste 3 h 40 ;
+ * l’IA en automatique dès 14 h », « Théo, 16 h – 22 h, suspendu ; à pourvoir », « à pourvoir », « libre ». `fill`: the
+ * reader can fill it (the agency). In pieces, so that the day's detail marks « suspendu » or « sans accès » in amber, as
+ * the week does (Design, 16/11).
+ */
+export function cellWhoParts(
+  cell: CalendarCell,
+  members: ReadonlyMap<string, PlanningMember>,
+  me: string | null,
+  zone: string,
+  now: Date,
+  fill = false,
+): WhoPart[] {
+  if (cell.aiAlone) return [{ text: 'l’IA seule', unheld: false }];
+  const parts: WhoPart[] = [];
+  const say = (text: string, unheld = false): void => {
+    if (text !== '') parts.push({ text, unheld });
+  };
+  cell.shifts.forEach((shift, index) => {
+    say(
+      `${index === 0 ? '' : ' ; '}${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}`,
+    );
+    if (shift.unheld !== null) {
+      say(', ');
+      say(unheldLabel(shift.unheld).toLowerCase(), true);
+    } else if (phaseOf(shift, now) === 'live') say(`, en poste, ${leftOf(shift, now)}`);
+  });
+  const open = cell.toFill === null ? null : toFillWords(cell, cell.toFill, zone, now, fill);
+  if (open !== null) say(`${parts.length === 0 ? '' : ' ; '}${open}`);
+  if (parts.length === 0) say('personne');
+  say(cellAgentWords(cell.agent, cell, zone));
+  return parts;
+}
+
+/** `cellWhoParts` as one sentence, for a label read aloud. */
 export function cellWho(
   cell: CalendarCell,
   members: ReadonlyMap<string, PlanningMember>,
   me: string | null,
   zone: string,
   now: Date,
+  fill = false,
 ): string {
-  if (cell.aiAlone) return 'l’IA seule';
-  const who =
-    cell.shifts.length > 0
-      ? cell.shifts
-          .map(
-            (shift) =>
-              `${nameFor(members.get(shift.memberId), me)}, ${clockAt(shift.startsAt, zone)} – ${clockAt(shift.endsAt, zone)}${phaseOf(shift, now) === 'live' ? `, en poste, ${leftOf(shift, now)}` : ''}`,
-          )
-          .join(' ; ')
-      : isFree(cell, now)
-        ? 'libre'
-        : 'personne';
-  return `${who}${cellAgentWords(cell.agent, cell, zone)}`;
+  return cellWhoParts(cell, members, me, zone, now, fill)
+    .map((part) => part.text)
+    .join('');
 }
 
 /** What a créneau says out loud (CR-12, Extension 02/11): its hours when nobody's name gives them, then who. */
@@ -349,8 +468,9 @@ export function cellWords(
   me: string | null,
   zone: string,
   now: Date,
+  fill = false,
 ): string {
-  const who = cellWho(cell, members, me, zone, now);
+  const who = cellWho(cell, members, me, zone, now, fill);
   return cell.shifts.length > 0 && !cell.aiAlone
     ? who
     : `${clockAt(cell.from, zone)} – ${clockAt(cell.to, zone)}, ${who}`;
@@ -366,13 +486,26 @@ export interface CalendarSearch {
   readonly mois?: string | undefined;
 }
 
+/** Each key said, `undefined` when thrown away, so that a broken one never reaches the page (recette CHT-06). */
 export function parseCalendarSearch(search: Record<string, unknown>): CalendarSearch {
   const { vue, affichage, mois } = search;
   return {
-    ...(vue === 'equipe' ? { vue } : {}),
-    ...(affichage === 'mois' ? { affichage } : {}),
-    ...(typeof mois === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/u.test(mois) ? { mois } : {}),
+    vue: vue === 'equipe' ? vue : undefined,
+    affichage: affichage === 'mois' ? affichage : undefined,
+    mois: typeof mois === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/u.test(mois) ? mois : undefined,
   };
+}
+
+/** `/equipe/planning`: the planning's keys and the calendar's, each one said (recette CHT-06). */
+export function teamPlanningSearch(search: Record<string, unknown>): PlanningSearch & CalendarSearch {
+  return { ...parsePlanningSearch(search), ...parseCalendarSearch(search) };
+}
+
+/** `/planning`, a member's own: their week and the calendar's keys, each one said, never a member. */
+export function myPlanningSearch(
+  search: Record<string, unknown>,
+): CalendarSearch & { readonly semaine?: string | undefined } {
+  return { semaine: parsePlanningSearch(search).semaine, ...parseCalendarSearch(search) };
 }
 
 const counted = (count: number, one: string, many: string): string =>
@@ -386,7 +519,6 @@ export function dayWords(
   rows: readonly CalendarRow[],
   day: string,
   me: string | null,
-  now: Date,
   fill = false,
 ): { said: string; mine: boolean } {
   const cells = rows.flatMap((row) => row.days.get(day) ?? []);
@@ -397,7 +529,7 @@ export function dayWords(
   );
   const mine = me !== null && [...shifts.values()].some((shift) => shift.memberId === me);
   const alone = cells.filter((cell) => cell.aiAlone).length;
-  const free = cells.filter((cell) => isFree(cell, now)).length;
+  const free = cells.filter((cell) => cell.toFill !== null).length;
   const said = [
     shifts.size === 0
       ? 'aucun shift'

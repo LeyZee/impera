@@ -9,6 +9,7 @@ import {
   liveRate,
   replyOpenedAt,
   type AgentHours,
+  type DatedRanges,
   type AgentMode,
   type AutomaticGate,
   type LiveRateReading,
@@ -52,9 +53,12 @@ const WHY: Readonly<Record<WaitingConversation['kind'], string>> = {
   custom_alert: 'Une de ses alertes personnalisées a sonné. L’agent attend un humain.',
   identity_doubt: 'Le fan doute que ce soit vraiment elle. Un chatteur en poste lui répond.',
   persona_inactive:
-    'Elle n’a pas de persona active : l’agent n’écrit rien. Active une version dans Créatrices › Persona.',
+    // Read by a chatter too, who cannot activate one (recette CHT-13): the sentence says who can.
+    'Elle n’a pas de persona active : l’agent n’écrit rien. Le propriétaire ou un manager en active une dans Créatrices › Persona.',
   custom_order:
     'Il demande quelque chose fait pour lui : un humain prend la commande, l’agent ne promet rien.',
+  sale_trouble:
+    'Une vente coince encore : il n’arrive pas à ouvrir son achat, ou il se plaint à nouveau de ce qu’il a acheté. Un humain doit lui répondre.',
   awaiting_approval: 'Un brouillon attend d’être validé depuis plus de 10 minutes.',
   send_failed: 'Un message n’a pas pu partir. L’agent ne réessaie plus, un humain doit le renvoyer.',
   unanswered: 'Son dernier message attend depuis plus de 30 minutes, sans brouillon ni réponse en cours.',
@@ -78,9 +82,9 @@ const UNANSWERED_AFTER_MINUTES = 30;
 export function unansweredSince(
   lastInboundAt: Date,
   now: Date,
-  her: { readonly hours: AgentHours; readonly timeZone: string },
+  her: { readonly hours: AgentHours; readonly timeZone: string; readonly exceptions?: DatedRanges },
 ): Date | null {
-  const opened = replyOpenedAt(her.hours, her.timeZone, now);
+  const opened = replyOpenedAt(her.hours, her.timeZone, now, her.exceptions);
   if (opened === null) return null;
   const counted = opened > lastInboundAt ? opened : lastInboundAt;
   return now.getTime() - counted.getTime() >= UNANSWERED_AFTER_MINUTES * MINUTE_MS ? lastInboundAt : null;
@@ -208,6 +212,7 @@ function guardsToday(handoffs: DashboardFacts['handoffsToday']): Record<HandoffC
     identity_doubt: 0,
     persona_inactive: 0,
     custom_order: 0,
+    sale_trouble: 0,
   };
   for (const { cause, count } of handoffs) counts[cause] += count;
   return counts;
@@ -251,6 +256,9 @@ export function assembleDashboard(input: {
     period: input.period,
     mode: modeOf(facts),
     globalStop: facts.switches.global,
+    pausedUntil: facts.switches.creator ? (facts.pausedUntil?.toISOString() ?? null) : null,
+    hoursNow: facts.hoursNow,
+    resumesAs: facts.autoConversations > 0 ? 'auto' : 'copilot',
     automatic: { open: gate.open, missing: [...gate.missing] },
     liveRate: {
       rate: asPercent(reading.rate),

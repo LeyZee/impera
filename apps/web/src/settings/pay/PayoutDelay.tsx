@@ -6,6 +6,7 @@ import { payoutDelayText, payRefusalText } from '@/payroll/model';
 import '@/payroll/pay.css';
 import { MONEY_LEAD, useConfirmAgain } from '@/settings/services/ConfirmAgain';
 import { Dialog } from '@/shell/Dialog';
+import { Failure } from '@/shell/states';
 
 /** A whole number of business days the owner may announce, or null for a typo. */
 function parseDelay(text: string): number | null {
@@ -49,7 +50,12 @@ export function PayoutDelay(): JSX.Element {
       </div>
       {data === undefined ? (
         settings.isError ? (
-          <p className="tm-warn">Le serveur ne répond pas : le délai n’a pas pu être lu.</p>
+          <Failure
+            inline
+            onRetry={() => {
+              void settings.refetch();
+            }}
+          />
         ) : (
           <div className="sc-skeleton" aria-hidden="true">
             <i />
@@ -57,6 +63,12 @@ export function PayoutDelay(): JSX.Element {
         )
       ) : (
         <div className="rp-account__now">
+          {/* A chip in the chip's column either way, so that the line starts where every card's does (GES-12). */}
+          {data.payoutDelayBusinessDays === null ? (
+            <span className="rp-chip rp-chip--neutral">Pas encore</span>
+          ) : (
+            <span className="rp-chip rp-chip--ok">En vigueur</span>
+          )}
           <p className="rp-account__rules">
             {data.payoutDelayBusinessDays === null
               ? 'Aucun délai annoncé'

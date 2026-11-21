@@ -27,3 +27,4 @@ Validation humaine des descriptions (écran), média envoyé par un fan.
 ## Notes de session
 
 - 16/11 (session vault-describe) : migration 0215 (provisoire), job `media.describe_vault` et son rattrapage horaire, lancé à la fin de chaque synchronisation. Reste : les tests d'intégration (`vault-describe.integration.test.ts`) n'ont pas tourné ici (pas de Docker), la CI les passe ; l'écran « décrits / à décrire » par dossier et la saisie du texte de l'agence pour un média sans fichier (hors périmètre) ; la liste d'hôtes et la validité réelle des liens à confirmer sur la première lecture réelle (L14, L15).
+- 16/11 (session vault-describe-folders) : sur décision de Charles, seuls les médias d'un dossier du coffre sont décrits ; un média de la racine ne l'est jamais, même tenu par un script, et le rattrapage horaire ne le relance pas (ADR 0113 § 5 amendé). Le balayage des dossiers laissés par une course coupée passe de 15 min à 1 h (suite demandée par Sécurité).

@@ -20,7 +20,7 @@ import { createLogger } from '../logger';
 import { revealApiConnectors } from '../modules/connectors';
 import { buildServer, type Server } from '../server';
 
-import { createFakeReveal, type FakeReveal } from './fake-reveal/server';
+import { FAKE_REVEAL_FILE_HOST, createFakeReveal, type FakeReveal } from './fake-reveal/server';
 import { fixedComposer } from './support/composer';
 import { testConfig } from './support/config';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
@@ -111,7 +111,11 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
       composer: fixedComposer,
       connectorsClock: () => now,
       connectorRegistry: {
-        reveal: revealApiConnectors({ fetch: fake.fetch, baseUrl: 'https://reveal.test' }),
+        reveal: revealApiConnectors({
+          fetch: fake.fetch,
+          baseUrl: 'https://reveal.test',
+          files: { transport: fake.fileTransport, hosts: [FAKE_REVEAL_FILE_HOST], httpForTests: true },
+        }),
       },
     });
     server = await buildServer({ config, logger, routes: app.routes, readiness: app.readiness });
@@ -218,6 +222,7 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
       uploadedAt: '2027-01-01T00:00:30.000Z',
       platformDescription: 'Texte inventé du coffre',
       suggestedPriceMinor: { min: 1_000, max: 2_000 },
+      blurhash: 'LKO2?U%2Tw=w]~RBVZRi};RPxuwH',
       removed: false,
     });
     // Folders by name, numbers read as numbers (« Divers » before « SCRIPT 1 »), the loose media last.
@@ -297,6 +302,47 @@ describe('vault sync on FakeReveal (fiche vault-sync)', () => {
     expect(await codeOf(app.modules.connectors.platformReads.scripts(newId(PlatformAccountIdSchema)))).toBe(
       'platform_account_not_found',
     );
+  });
+
+  it('gives the agent a fan’s script history and his last priced offer, and refuses an unknown account', async () => {
+    const reads = app.modules.connectors.platformReads;
+    const history = await reads.scriptHistory(accountId, 'fan_02');
+    expect(history.length).toBeGreaterThan(0);
+    expect(history.every((step) => step.stepRef.platform === 'reveal')).toBe(true);
+    expect(await reads.lastOfferAt(accountId, 'fan_02')).toBeInstanceOf(Date);
+    expect(await reads.lastOfferAt(accountId, 'fan_04')).toBeNull();
+    expect(await codeOf(reads.scriptHistory(newId(PlatformAccountIdSchema), 'fan_02'))).toBe(
+      'platform_account_not_found',
+    );
+  });
+
+  it('serves a media’s sharp preview to the owner and a manager of her list, never kept (ADR 0138)', async () => {
+    const cookies = {
+      owner: await signIn(server, 'owner@example.test', PASSWORD),
+      manager: await signIn(server, 'manager@example.test', PASSWORD),
+      outsider: await signIn(server, 'outsider@example.test', PASSWORD),
+      chatter: await signIn(server, 'chatter@example.test', PASSWORD),
+    };
+    const preview = (who: keyof typeof cookies, mediaId: string, creator: CreatorId = creatorId) =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/creators/${creator}/vault/media/${mediaId}/preview`,
+        headers: { cookie: cookies[who], origin: DASHBOARD_ORIGIN },
+      });
+    const shown = await preview('owner', 'vault_new_0');
+    expect(shown.statusCode).toBe(200);
+    expect(shown.headers['content-type']).toBe('image/png');
+    expect(shown.headers['cache-control']).toBe('no-store');
+    expect(shown.headers['x-content-type-options']).toBe('nosniff');
+    expect([...shown.rawPayload.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    // A video by its poster.
+    expect((await preview('manager', 'vault_tie_a')).headers['content-type']).toBe('image/png');
+    // Not hers to read: the outsider, a chatter of her list.
+    expect((await preview('outsider', 'vault_new_0')).statusCode).toBe(403);
+    expect((await preview('chatter', 'vault_new_0')).statusCode).toBe(403);
+    // Unknown to her vault, removed from Reveal, or another creator's id for it: nothing to show.
+    expect((await preview('owner', 'media_99')).statusCode).toBe(404);
+    expect((await preview('owner', 'media_02')).statusCode).toBe(404);
   });
 
   it('reads nothing of an archived creator', async () => {

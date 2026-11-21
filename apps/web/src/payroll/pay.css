@@ -5,15 +5,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-4);
-  max-width: 980px;
-}
-/* The header as wide as the board under it: its tabs end on the plates' right edge, not the page's (recette #567). */
-.nv-page:has(> .py-board) > .nv-page__head {
-  max-width: 980px;
 }
 /* A panel without a head (Relevés): its list as far from the top edge as from the bottom one. */
 .py-board > .nv-panel > .rp-sec:first-child {
-  padding-top: 22px;
+  padding-top: var(--nv-plate-pad);
 }
 
 /* ── The period on top: one figure leads, three at most beside it ── */
@@ -21,12 +16,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--nv-space-5);
-  padding: var(--nv-space-5) var(--nv-space-6) var(--nv-space-6);
-}
-@media (max-width: 640px) {
-  .py-sum {
-    padding: var(--nv-space-4);
-  }
+  padding: var(--nv-plate-pad);
 }
 .py-sum__head {
   display: flex;
@@ -53,7 +43,7 @@
 @media (min-width: 960px) {
   .py-sum__body {
     grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr);
-    align-items: center;
+    align-items: start;
   }
 }
 .py-hero {
@@ -102,35 +92,25 @@
 .py-figs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--nv-space-3);
+  gap: var(--nv-space-4) var(--nv-space-6);
 }
 @media (max-width: 640px) {
   .py-figs {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* A figure beside the hero is not a card in the card (GES-19): no frame, its label on the hero's label's line. */
 .py-fig {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: var(--nv-space-4);
-  border-radius: var(--nv-radius-lg);
-  background: var(--nv-plate);
-  box-shadow: inset 0 0 0 1px var(--nv-plate-edge);
-  transition:
-    background-color var(--nv-dur-fast) var(--nv-ease-out),
-    transform var(--nv-dur-slow) var(--nv-ease-spring);
-}
-.py-fig:hover {
-  background: var(--nv-plate-hover);
-  transform: translateY(-1px);
 }
 .py-fig__label {
   margin: 0;
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
   font-weight: 600;
 }
 .py-fig__value {
@@ -591,21 +571,26 @@
 .py-periods {
   display: flex;
   flex-direction: column;
-  gap: var(--nv-space-2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+/* A list in its card, not cards in the card (GES-20): rows parted by a hairline, the text on the card's own edge, the
+   pointer's tint reaching a little past it. */
+.py-periods > li + li {
+  border-top: 1px solid var(--nv-hairline);
 }
 .py-period {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--nv-space-1) var(--nv-space-4);
-  width: 100%;
-  padding: var(--nv-space-3) var(--nv-space-4);
+  width: calc(100% + 2 * var(--nv-space-3));
+  margin-inline: calc(-1 * var(--nv-space-3));
+  padding: var(--nv-space-3);
   border: 0;
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  background: none;
   color: inherit;
   font: inherit;
   text-align: left;
@@ -641,6 +626,18 @@
   line-height: var(--nv-text-caption-leading);
   font-weight: 500;
 }
+/* A member's own row (Commissions › Mes relevés): its state beside its title, so the net and what else the amount
+   holds keep their two lines (Design, recette CHT-02). */
+.py-period--mine {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.py-period__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-1) var(--nv-space-2);
+  margin-bottom: 2px;
+}
 .py-period__go {
   width: 8px;
   height: 8px;
@@ -650,15 +647,24 @@
   transform: rotate(-45deg);
 }
 @media (max-width: 560px) {
-  .py-period {
-    grid-template-columns: minmax(0, 1fr) auto;
+  /* On a phone the text takes the row's width; the state, the amount and the chevron share the line beneath, the
+     chevron kept as on a computer since the row opens (Design). */
+  .py-period,
+  .py-period--mine {
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
-  .py-period .rp-chip {
+  .py-period > span:first-child {
+    grid-column: 1 / -1;
+  }
+  .py-period > .rp-chip {
     grid-column: 1;
     justify-self: start;
   }
+  .py-period__amount {
+    grid-column: 2;
+  }
   .py-period__go {
-    display: none;
+    grid-column: 3;
   }
 }
 
@@ -940,7 +946,6 @@
 .py-me {
   display: grid;
   gap: var(--nv-space-4);
-  max-width: 980px;
 }
 @media (min-width: 1100px) {
   .py-me {
@@ -968,7 +973,7 @@
   min-width: 0;
 }
 .py-mehero {
-  padding: var(--nv-space-6);
+  padding: var(--nv-plate-pad);
   display: flex;
   flex-direction: column;
   gap: var(--nv-space-2);
@@ -1042,46 +1047,18 @@
   line-height: var(--nv-text-caption-leading);
 }
 
-/* Empty states: the serif whisper, then what to do. */
-.py-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--nv-space-3);
-  padding: var(--nv-space-10) var(--nv-space-6);
-  text-align: center;
-}
-.py-empty__whisper {
-  margin: 0;
-  max-width: 30ch;
-  font-family: var(--nv-font-serif);
-  font-style: italic;
-  font-size: var(--nv-text-whisper);
-  line-height: var(--nv-text-whisper-leading);
-  color: var(--nv-ink-muted);
-  text-wrap: balance;
-}
-.py-empty__text {
-  margin: 0;
-  max-width: 46ch;
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  text-wrap: pretty;
-}
-
 /* A plate's own skeleton while the period loads: the shapes of what comes, breathing. */
 .py-skel {
   display: grid;
   gap: var(--nv-space-3);
-  padding: var(--nv-space-5) var(--nv-space-6);
+  padding: var(--nv-space-5) var(--nv-plate-pad);
 }
 .py-skel i {
   display: block;
   height: var(--py-h, 18px);
   width: var(--py-w, 100%);
   border-radius: var(--nv-radius-md);
-  background: var(--nv-glass-fill);
+  background: var(--nv-fill-soft);
   animation: py-breathe var(--nv-dur-breathe) var(--nv-ease-in-out) infinite alternate;
 }
 @keyframes py-breathe {
@@ -1218,6 +1195,13 @@
 }
 .py-mehero__top .py-quiet {
   margin-left: auto;
+}
+/* On a phone the line goes under the period, at the left like the label under it: pushed right, it read as a fault. */
+@media (max-width: 640px) {
+  .py-mehero__top .py-quiet {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
 }
 
 /* Paie › Quinzaine: the sales a period holds or a decision settles (CRM-03 lot b4b). One card a sale: who and when on

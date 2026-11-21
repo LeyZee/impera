@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { aroundPlacement, besidePlacement } from './parts';
+import { aroundPlacement, besidePlacement, markerPlacement } from './parts';
 
 const phone = { width: 390, height: 844 };
 const tip = { width: 180, height: 110 };
@@ -39,5 +39,21 @@ describe('aroundPlacement', () => {
     const placed = aroundPlacement({ left: 200, right: 370, top: 600, bottom: 760 }, tip, view);
     expect(placed.top + tip.height).toBeLessThanOrEqual(600);
     expect(placed.left).toBe(390 - 300 - 12);
+  });
+});
+
+describe('markerPlacement', () => {
+  const plot = { left: 20, right: 370, top: 300, bottom: 420 };
+  const tip = { width: 180, height: 80 };
+  const phone = { width: 390, height: 844 };
+
+  it('sits right of the curve’s marker, inside the chart, its middle on the chart’s', () => {
+    expect(markerPlacement(plot, 100, tip, phone)).toEqual({ left: 108, top: 320 });
+  });
+
+  it('goes to the marker’s other side near the chart’s right edge, never over the figures above', () => {
+    const place = markerPlacement(plot, 300, tip, phone);
+    expect(place.left).toBe(300 - 8 - 180);
+    expect(place.top).toBeGreaterThanOrEqual(plot.top);
   });
 });

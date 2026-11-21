@@ -65,6 +65,7 @@ export function createXaiVerifier(options: XaiVerifierOptions): ProviderVerifier
         settings: {},
         voices: [],
         charactersLeft: null,
+        quota: null,
         isLowCredit: false,
       };
     },
