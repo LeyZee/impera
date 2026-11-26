@@ -4,7 +4,7 @@ Le code pose une **décision** à une créatrice sur un de ses contenus : une qu
 
 **Peut dépendre de.** Aucun autre module.
 
-**État.** Lot a : contrat (`packages/contracts`, `creator-decisions.ts`), table et RLS (`creator_decisions`), routes, porte `asking`. Aucun code ne demande encore : rien ne s'affiche. La notification, les légendes proposées et « D'autres idées » viennent au lot b (fiche INS-05).
+**État.** Lot a : contrat (`packages/contracts`, `creator-decisions.ts`), table et RLS (`creator_decisions`), routes, porte `asking`. Premier code qui demande : `instagram-captions` (les légendes d'un Reel déposé). La notification et « D'autres idées » viennent ensuite (fiche INS-05).
 
 ## Pour le code qui demande (`asking`)
 
