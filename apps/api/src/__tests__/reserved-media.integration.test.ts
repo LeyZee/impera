@@ -226,6 +226,9 @@ describe('pickReservedMedia and recordReservedMediaSent', () => {
   it('notes nothing for a medium the AI does not send, nor for another creator’s', async () => {
     expect(await sent(feed[0] ?? '', 'theo')).toBe(false);
     expect(await sent(inesBeep[0] ?? '', 'theo')).toBe(false);
+    // Asked as Ines, Nora's media are neither read nor noted: Ines has no gift, and Nora's beep is not hers.
+    expect(await pick({ creatorId: ines, category: 'whale_gift', fanId: fans.theo.fanId })).toBeNull();
+    expect(await sent(beeps[1] ?? '', 'theo', ines)).toBe(false);
     // Under Ines's tenant, Nora's media are not there to pick.
     expect(await pick({ creatorId: ines, category: 'voice_beep', fanId: fans.theo.fanId })).toEqual({
       mediaAssetId: inesBeep[0],
