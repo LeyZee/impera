@@ -147,10 +147,10 @@ export const SIGNAL_CATEGORIES: Readonly<
 
 /** The closed question on the corrected drafts (ADR 0170 § 1), each answer as the chatter reads it. */
 export const DRAFT_REASON_WORDS: Readonly<Record<DraftReason, string>> = {
-  too_long: 'Trop longs',
+  too_long: 'Trop longues',
   not_her_voice: 'Pas dans sa façon d’écrire',
   sale_too_early: 'Une vente proposée trop tôt',
-  forgot_fan: 'Il oubliait ce que le fan avait dit',
+  forgot_fan: 'Elle oubliait ce que le fan avait dit',
   other: 'Autre chose',
 };
 

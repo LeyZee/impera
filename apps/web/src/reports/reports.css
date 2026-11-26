@@ -1736,10 +1736,79 @@ a.sc-sheet__report:focus-visible,
   --_c: var(--nv-success);
 }
 
-/* His shift in figures (the system's tiles, set on the dialog's glass with the strong fill) and « Lier à un fan »
-   (ADR 0170 §§ 1 and 2). */
-.rp-shift-figs .nv-tile {
-  background: var(--nv-tile-fill-strong);
+/* His shift as he ends it (ADR 0170 § 1, Charles, 26/11): what he sold first and large, then the AI in one sentence
+   on one bar, then what to report. Tones of the system: sent as is green, touched up amber, refused quiet. */
+.rp-shift {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-shift__eyebrow {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.rp-shift__amount {
+  margin: 0;
+  font-size: var(--nv-text-title-1);
+  line-height: var(--nv-text-title-1-leading);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--nv-ink);
+}
+.rp-shift__amount--quiet {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  color: var(--nv-ink-muted);
+}
+.rp-shift__sub {
+  margin: 0;
+  color: var(--nv-ink-muted);
+}
+.rp-ai {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+}
+.rp-ai__line {
+  margin: 0;
+  text-wrap: pretty;
+}
+.rp-ai__bar {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+}
+.rp-ai__part {
+  flex: 1 1 0;
+  min-width: 6px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-ink-faint);
+}
+.rp-ai__part[data-part='as-is'] {
+  background: var(--nv-success);
+}
+.rp-ai__part[data-part='edited'] {
+  background: var(--nv-warning);
+}
+.rp-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.rp-report-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--nv-space-3);
+  border-top: 1px solid var(--nv-hairline);
+}
+.rp-report-head__title {
+  margin: 0;
+  font-size: var(--nv-text-headline);
+  line-height: var(--nv-text-headline-leading);
+  font-weight: 650;
 }
 .rp-option-tick {
   margin-left: auto;

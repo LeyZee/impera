@@ -177,14 +177,20 @@ describe('Mon retour de fin de shift (ADR 0050 § 10, trous béants n° 1)', () 
   it('shows his shift in figures, read by Impera, and asks why only when he corrected many drafts', async () => {
     renderPanel();
     await screen.findByRole('button', { name: 'Rien à signaler' });
-    expect(screen.getByText('ventes · 86,00 €')).toBeTruthy();
-    expect(screen.getByText('passations')).toBeTruthy();
-    expect(screen.queryByRole('radiogroup', { name: /brouillons corrigés/u })).toBe(null);
+    expect(screen.getByText('86,00 €')).toBeTruthy();
+    expect(screen.getByText(/3 ventes relevées · 2 fans t’ont écrit/u)).toBeTruthy();
+    expect(screen.getByText(/L’IA t’a fait/u).textContent).toBe(
+      'L’IA t’a fait 9 propositions : 9 envoyées telles quelles, 0 retouchée, 0 refusée.',
+    );
+    expect(screen.getByText('Elle a passé 2 conversations à l’humain.')).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: /clochait/u })).toBe(null);
     cleanup();
 
     digest = digestOf({ drafts: { asIs: 9, edited: 12, rejected: 2 } });
     renderPanel();
-    const question = await screen.findByRole('radiogroup', { name: /brouillons corrigés/u });
+    const question = await screen.findByRole('radiogroup', {
+      name: /Tu en as retouché ou refusé 14 : qu’est-ce qui clochait surtout/u,
+    });
     fireEvent.click(within(question).getByRole('radio', { name: 'Pas dans sa façon d’écrire' }));
     fireEvent.click(screen.getByRole('button', { name: 'Rien à signaler' }));
     await waitFor(() => {

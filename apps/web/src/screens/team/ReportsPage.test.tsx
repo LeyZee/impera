@@ -925,6 +925,6 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     if (panel === null) throw new Error('no panel');
     expect(text(panel)).toContain('1sans retour');
     expect(text(panel)).toContain('Sans retour');
-    expect(text(panel)).toContain('surtout : trop longs');
+    expect(text(panel)).toContain('surtout : trop longues');
   });
 });

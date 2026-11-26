@@ -337,7 +337,7 @@ export function FeedbacksPanel({
                     {line.comment === null ? null : <p className="rp-fb__comment">« {line.comment} »</p>}
                     {line.draftReason === null ? null : (
                       <p className="rp-fb__comment">
-                        Brouillons de l’agent corrigés, surtout :{' '}
+                        Propositions de l’IA retouchées ou refusées, surtout :{' '}
                         {DRAFT_REASON_WORDS[line.draftReason].toLowerCase()}
                       </p>
                     )}

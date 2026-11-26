@@ -3,6 +3,7 @@ import {
   draftReasonAsked,
   newId,
   REPORT_SIGNAL_CATEGORIES,
+  SHIFT_DIGEST_FANS_MAX,
   SHIFT_FEEDBACK_SIGNALS_MAX,
   ShiftFeedbackIdSchema,
   type ConversationId,
@@ -250,39 +251,82 @@ function Choice({
   );
 }
 
-/** His shift in figures (ADR 0170 § 1): read by Impera, nothing to type. */
-function ShiftFigures({ digest }: { digest: ShiftDigest }): JSX.Element {
-  const { sales, drafts } = digest;
-  const figures: readonly (readonly [string, string, string])[] = [
-    sales.feed === 'read'
-      ? [
-          'sales',
-          String(sales.count),
-          `${sales.count === 1 ? 'vente' : 'ventes'} · ${amountText(sales.grossInclVatMinor, sales.currency)}`,
-        ]
-      : ['sales', '–', 'ventes non relevées'],
-    ['as-is', String(drafts.asIs), drafts.asIs === 1 ? 'gardé tel quel' : 'gardés tels quels'],
-    [
-      'edited',
-      String(drafts.edited + drafts.rejected),
-      drafts.edited + drafts.rejected === 1 ? 'corrigé ou jeté' : 'corrigés ou jetés',
-    ],
-    ['handoffs', String(digest.handoffs), digest.handoffs === 1 ? 'passation' : 'passations'],
-  ];
+/**
+ * His shift as a chatter ending it reads it (ADR 0170 § 1, Charles, 26/11): what he sold first, in large, then who
+ * wrote to him. Read by Impera, nothing to type.
+ */
+function ShiftSummary({ digest }: { digest: ShiftDigest }): JSX.Element {
+  const { sales } = digest;
+  const fans = digest.fans.length;
+  const fansLine =
+    fans === 0
+      ? 'aucun fan ne t’a écrit'
+      : `${fans >= SHIFT_DIGEST_FANS_MAX ? `${String(fans)} fans et plus` : fans === 1 ? '1 fan' : `${String(fans)} fans`} t’${fans === 1 ? 'a' : 'ont'} écrit`;
   return (
-    <div>
-      <p className="nv-field__label">
-        Ton shift en chiffres <span className="sc-optional">lu par Impera, rien à saisir</span>
-      </p>
-      {/* The system's tiles, as in Équipe › Rapports (Design, 26/11). */}
-      <div className="nv-tiles rp-fbs__tiles rp-shift-figs">
-        {figures.map(([key, value, words]) => (
-          <p key={key} className="nv-tile">
-            <span className="nv-tile__value rp-fbs__value">{value}</span>
-            <span className="nv-tile__label">{words}</span>
+    <section className="rp-shift" aria-label="Ton shift">
+      <p className="rp-shift__eyebrow">Ton shift</p>
+      {sales.feed === 'read' ? (
+        <>
+          <p className="rp-shift__amount nv-num">{amountText(sales.grossInclVatMinor, sales.currency)}</p>
+          <p className="rp-shift__sub">
+            {sales.count === 0
+              ? 'Aucune vente relevée'
+              : `${String(sales.count)} ${sales.count === 1 ? 'vente relevée' : 'ventes relevées'}`}{' '}
+            · {fansLine}
           </p>
-        ))}
-      </div>
+        </>
+      ) : (
+        <>
+          <p className="rp-shift__amount rp-shift__amount--quiet">Ventes pas encore relevées</p>
+          <p className="rp-shift__sub">Impera les lira avec Reveal · {fansLine}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/**
+ * What the AI did with him, in one sentence a chatter reads at once (ADR 0170 § 1, Charles, 26/11): its proposals
+ * sent as they were, touched up, refused, on one bar; the conversations it passed to a human.
+ */
+function AiSummary({ digest }: { digest: ShiftDigest }): JSX.Element {
+  const { asIs, edited, rejected } = digest.drafts;
+  const total = asIs + edited + rejected;
+  // French: 0 and 1 take the singular.
+  const plural = (n: number, one: string, many: string): string => `${String(n)} ${n < 2 ? one : many}`;
+  return (
+    <div className="rp-ai">
+      <p className="rp-ai__line">
+        {total === 0 ? (
+          'L’IA ne t’a fait aucune proposition sur ce shift.'
+        ) : (
+          <>
+            L’IA t’a fait <b>{plural(total, 'proposition', 'propositions')}</b> :{' '}
+            {plural(asIs, 'envoyée', 'envoyées')} telle{asIs < 2 ? '' : 's'} quelle{asIs < 2 ? '' : 's'},{' '}
+            {plural(edited, 'retouchée', 'retouchées')}, {plural(rejected, 'refusée', 'refusées')}.
+          </>
+        )}
+      </p>
+      {total === 0 ? null : (
+        <div className="rp-ai__bar" aria-hidden="true">
+          {(
+            [
+              ['as-is', asIs],
+              ['edited', edited],
+              ['rejected', rejected],
+            ] as const
+          ).map(([key, n]) =>
+            n === 0 ? null : (
+              <span key={key} className="rp-ai__part" data-part={key} style={{ flexGrow: n }} />
+            ),
+          )}
+        </div>
+      )}
+      {digest.handoffs === 0 ? null : (
+        <p className="tm-hint">
+          Elle a passé {plural(digest.handoffs, 'conversation', 'conversations')} à l’humain.
+        </p>
+      )}
     </div>
   );
 }
@@ -307,6 +351,7 @@ function Form({
   const [signals, setSignals] = useState<readonly SignalDraft[]>([]);
   const [reason, setReason] = useState<DraftReason | null>(null);
   const asked = draftReasonAsked(digest.drafts);
+  const { edited, rejected } = digest.drafts;
   const [touched, setTouched] = useState(false);
   const [sending, setSending] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -367,45 +412,40 @@ function Form({
         void submit();
       }}
     >
-      <ShiftFigures digest={digest} />
+      <ShiftSummary digest={digest} />
+      <AiSummary digest={digest} />
 
       {asked ? (
         <div>
           <p className="nv-field__label" id={`${id}-reason`}>
-            Les brouillons corrigés, c’était surtout parce qu’ils étaient…{' '}
+            Tu en as retouché ou refusé {edited + rejected} : qu’est-ce qui clochait surtout ?{' '}
             <span className="sc-optional">facultatif</span>
           </p>
-          <div className="sc-options" role="radiogroup" aria-labelledby={`${id}-reason`}>
+          {/* Chips, not cards: a side question, lighter than what he sold (Charles, 26/11). */}
+          <div className="rp-reasons" role="radiogroup" aria-labelledby={`${id}-reason`}>
             {DRAFT_REASONS.map((one) => (
-              <Choice
+              <button
                 key={one}
-                title={DRAFT_REASON_WORDS[one]}
-                on={reason === one}
-                onPick={() => {
+                type="button"
+                role="radio"
+                className="nv-chip"
+                aria-checked={reason === one}
+                onClick={() => {
                   setReason((before) => (before === one ? null : one));
                 }}
-              />
+              >
+                {DRAFT_REASON_WORDS[one]}
+              </button>
             ))}
           </div>
         </div>
       ) : null}
 
-      <div className="nv-field tm-field">
-        <label className="nv-field__label" htmlFor={`${id}-comment`}>
-          Un mot pour l’agence <span className="sc-optional">facultatif</span>
-        </label>
-        <textarea
-          id={`${id}-comment`}
-          className="nv-field__control nv-glass sc-note"
-          rows={2}
-          maxLength={TEXT_MAX}
-          value={comment}
-          placeholder="Soirée calme, un pack qui a plu…"
-          data-autofocus
-          onChange={(event) => {
-            setComment(event.target.value);
-          }}
-        />
+      <div className="rp-report-head">
+        <p className="rp-report-head__title">À signaler</p>
+        <p className="tm-hint">
+          Seulement ce qu’Impera ne voit pas. Rien de spécial ? Appuie sur «&nbsp;Rien à signaler&nbsp;».
+        </p>
       </div>
 
       <div className="rp-incident" data-on={incidentOn ? 'true' : undefined}>
@@ -531,10 +571,26 @@ function Form({
           </button>
         ) : null}
         <p className="tm-hint">
-          Ce qu’Impera ne voit pas : un souci hors du chat, l’agent qui déraille, une idée. Jamais le nom d’un
-          fan dans le texte : lie-le plutôt, ce qui le touche va dans sa fiche, marqué «&nbsp;par un
-          chatteur&nbsp;».
+          Une demande d’un fan, l’IA qui déraille, une idée. Jamais le nom d’un fan dans le texte : lie-le
+          plutôt, ce qui le touche va dans sa fiche, marqué «&nbsp;par un chatteur&nbsp;».
         </p>
+      </div>
+
+      <div className="nv-field tm-field">
+        <label className="nv-field__label" htmlFor={`${id}-comment`}>
+          Un mot pour l’agence <span className="sc-optional">facultatif</span>
+        </label>
+        <textarea
+          id={`${id}-comment`}
+          className="nv-field__control nv-glass sc-note"
+          rows={2}
+          maxLength={TEXT_MAX}
+          value={comment}
+          placeholder="Soirée calme, un pack qui a plu…"
+          onChange={(event) => {
+            setComment(event.target.value);
+          }}
+        />
       </div>
 
       {refusal === null ? null : (
