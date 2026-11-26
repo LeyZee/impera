@@ -74,6 +74,7 @@ export function wirePayroll(
     adminDb,
     reads: payInputReadsOf({ scheduling, team, persona }),
     shiftFacts: scheduling.pay.shiftFacts,
+    endedShifts: scheduling.pay.endedShifts,
     rateJobSince: deps.rateJobSince,
     payouts: payoutGate,
     afterValidation: { ...invoicesAfterValidation, lockPayoutCertificate: enqueuePayoutCertificateLock },

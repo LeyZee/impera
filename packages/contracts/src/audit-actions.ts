@@ -830,6 +830,24 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
     z.object({ period }),
     (d) => `a signalé une vente (quinzaine ${frenchPeriod(d.period)})`,
   ),
+  'sale_claim.create': action(
+    'money',
+    z.object({ period }),
+    (d) => `a dit avoir été décisif sur une vente (quinzaine ${frenchPeriod(d.period)})`,
+  ),
+  'sale_claim.answer': action(
+    'money',
+    z.object({ period, outcome: code, memberId: id }),
+    (d, c) => {
+      const who = c.member(d.memberId);
+      if (d.outcome === 'withdrawn')
+        return `a retiré son signalement d’une vente décisive (quinzaine ${frenchPeriod(d.period)})`;
+      if (d.outcome === 'settled')
+        return `a réglé le signalement de vente de ${who} (quinzaine ${frenchPeriod(d.period)})`;
+      return `n’a pas retenu le signalement de vente de ${who} (quinzaine ${frenchPeriod(d.period)})`;
+    },
+    (d) => memberLink(d.memberId),
+  ),
   'invoice.issue': action('money', issued, (d) =>
     d.reissuedInvoiceId === undefined
       ? `a émis la facture ${d.number}`

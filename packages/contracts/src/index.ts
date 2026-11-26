@@ -83,6 +83,7 @@ export * from './password-reset';
 export * from './security';
 export * from './settings';
 export * from './setup';
+export * from './sale-claims';
 export * from './shift-feedback';
 export * from './shift-reports';
 export * from './team';

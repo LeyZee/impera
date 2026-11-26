@@ -23,6 +23,7 @@ import { createDrizzlePayrollReadStore } from './infra/read-store';
 import { createReportEstimate, type ShiftFactsRead } from './infra/report-estimate';
 import { createPayrollRoutes, type RequireRole } from './infra/routes';
 import { createDrizzlePayrollRuleStore } from './infra/rule-store';
+import { createDrizzleSaleClaimStore, type EndedShiftsRead } from './infra/sale-claim-store';
 import { createDrizzleSaleDecisionStore } from './infra/sale-decision-store';
 import { createDrizzleSaleSignalStore } from './infra/sale-signal-store';
 import type { PayInputReads } from './infra/snapshot';
@@ -124,6 +125,8 @@ export interface PayrollDeps {
   readonly reads: PayInputReads;
   /** The shift of a report as the estimate reads it (reco 19): the `scheduling` module's `pay.shiftFacts`. */
   readonly shiftFacts: ShiftFactsRead;
+  /** A member's ended shifts, for « J'ai été décisif sur une vente » (ADR 0101 § 18): `scheduling`'s `pay.endedShifts`. */
+  readonly endedShifts: EndedShiftsRead;
   readonly now?: () => Date;
   /** The ECB is reached through it (ADR 0033); the global `fetch` unless a test gives a fake one. */
   readonly fetch?: GetLike;
@@ -161,6 +164,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
   const rules = createDrizzlePayrollRuleStore(deps.db, deps.reads, now);
   const decisions = createDrizzleSaleDecisionStore(deps.db, deps.reads);
   const signals = createDrizzleSaleSignalStore(deps.db, deps.adminDb, deps.reads, now);
+  const claims = createDrizzleSaleClaimStore(deps.db, deps.endedShifts, now);
   const rateJob = {
     source: createEcbSource({ fetch: deps.fetch ?? ((url, init) => fetch(url, init)) }),
     store: createDrizzlePayrollRateStore(deps.adminDb),
@@ -178,6 +182,7 @@ export function createPayrollModule(deps: PayrollDeps): PayrollModule {
         rules,
         decisions,
         signals,
+        claims,
         createReportEstimate(deps.db, deps.reads.members, deps.shiftFacts),
         requireRole,
         recentLogin,
