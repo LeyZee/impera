@@ -1401,6 +1401,13 @@
       "when": 1795711493789,
       "tag": "0268_drop_redo",
       "breakpoints": true
+    },
+    {
+      "idx": 200,
+      "version": "7",
+      "when": 1795717780662,
+      "tag": "0269_content_stock",
+      "breakpoints": true
     }
   ]
 }
