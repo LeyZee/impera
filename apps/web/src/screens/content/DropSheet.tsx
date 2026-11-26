@@ -85,6 +85,8 @@ export function DropSheet({
   const typed = category === 'sale_video';
   const readyTypes = useReadyVideoTypes(typed);
   const [readyVideoId, setReadyVideoId] = useState<ReadyVideoId | null>(null);
+  // No type to give (none yet, or not read): nothing to pick, so no gallery to open.
+  const untypable = typed && (readyTypes.data?.types.length ?? 0) === 0;
 
   const countRefusal = chosen.length === 0 ? null : dropCountRefusal(category, chosen.length);
   const total = chosen.reduce((sum, item) => sum + item.file.size, 0);
@@ -212,14 +214,16 @@ export function DropSheet({
             add(picked);
           }}
         />
-        <button
-          type="button"
-          className={chosen.length === 0 ? 'nv-btn nv-btn--neon ct-pick' : 'nv-btn nv-btn--soft ct-pick'}
-          disabled={busy}
-          onClick={() => picker.current?.click()}
-        >
-          {chosen.length === 0 ? 'Choisir dans ma galerie' : 'Ajouter des fichiers'}
-        </button>
+        {untypable ? null : (
+          <button
+            type="button"
+            className={chosen.length === 0 ? 'nv-btn nv-btn--neon ct-pick' : 'nv-btn nv-btn--soft ct-pick'}
+            disabled={busy}
+            onClick={() => picker.current?.click()}
+          >
+            {chosen.length === 0 ? 'Choisir dans ma galerie' : 'Ajouter des fichiers'}
+          </button>
+        )}
 
         {chosen.length === 0 ? null : (
           <ul className="ct-chosen">
@@ -301,18 +305,20 @@ export function DropSheet({
           </p>
         ) : null}
 
-        <label className="nv-field">
-          <span className="nv-field__label">Un mot sur ce que tu as fait (facultatif)</span>
-          <input
-            className="nv-field__control"
-            maxLength={200}
-            value={sentence}
-            disabled={busy}
-            onChange={(event) => {
-              setSentence(event.target.value);
-            }}
-          />
-        </label>
+        {untypable ? null : (
+          <label className="nv-field">
+            <span className="nv-field__label">Un mot sur ce que tu as fait (facultatif)</span>
+            <input
+              className="nv-field__control"
+              maxLength={200}
+              value={sentence}
+              disabled={busy}
+              onChange={(event) => {
+                setSentence(event.target.value);
+              }}
+            />
+          </label>
+        )}
 
         {failed === null ? null : (
           <p className="ct-warn" role="alert">

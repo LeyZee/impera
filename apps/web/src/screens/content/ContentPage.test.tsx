@@ -507,6 +507,8 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const dialog = screen.getByRole('dialog');
     expect(await within(dialog).findByText(/L’agence n’a pas encore créé de types de vidéo/u)).toBeDefined();
     expect(within(dialog).queryByRole('radiogroup')).toBeNull();
+    // Nothing to pick while no type can be given.
+    expect(within(dialog).queryByRole('button', { name: 'Choisir dans ma galerie' })).toBeNull();
   });
 
   it('asks no type for any other drop', async () => {
