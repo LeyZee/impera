@@ -8,6 +8,8 @@
 
 **Vente de la créatrice** (CRM-04 lot d2, ADR 0042 § 7). Le registre des ventes met en file `notifications.creator_sale` dans la transaction qui publie `sale_detected`, une fois par vente fraîche. Le job relit l'événement par le rôle admin et n'en garde que la clé de la ligne, sa part (`creatorMinor`, le `modelRevenue` de Reveal) et sa devise ; le vendeur n'en sort jamais. Il prévient chacun de ses comptes (rôle `creator`, lié à sa seule créatrice) dans le fuseau de sa créatrice, sous les règles d'une vente : « Nouvelle vente », « 12,40 € pour toi », qui ouvre `/ventes`. Jamais le fan, le chatteur, l'agent ni le prix payé. Un remboursement ou une vente lue tard ne publient rien, donc ne préviennent personne. Lu, jamais écrit : `domain_events`, `creators`, `user`.
 
+**Question de la créatrice** (ADR 0164 § 9). `creator-decisions` appelle `notify` avec le motif `decision` quand une question l'attend sur sa carte « À décider » : chacun de ses comptes, une fois par question (`decision:<genre>:<sujet>`), « Une question pour toi » avec la question elle-même, qui ouvre `/aujourdhui`. Règles ordinaires : heures calmes et plafond quotidien.
+
 **Tables possédées** (migration `push_notifications`) :
 
 - `push_server_keys`. La paire VAPID du serveur, créée au premier usage sous un verrou consultatif, sans aucune saisie (ADR 0016). La clé privée est scellée avec `CREDENTIALS_ENCRYPTION_KEYS` (contexte `push:vapid`). La table est hors RLS et retirée au rôle applicatif.

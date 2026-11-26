@@ -205,7 +205,7 @@
   gap: var(--nv-space-2);
 }
 .sc-ask__hints .nv-chip {
-  min-height: 36px;
+  min-height: 44px;
 }
 .sc-ask__foot {
   display: flex;

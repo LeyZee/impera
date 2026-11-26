@@ -1,7 +1,9 @@
 /** Public entry point of the `instagram-captions` module (INS-05 lot b, ADR 0164 § 9). Other modules import this file only. */
+import type { DecisionAnswer } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { LlmGateway } from '@impera/llm';
 
+import { otherCaptions, type OtherCaptionsAsk } from './application/other-ideas';
 import { proposeCaptions, type ProposeOutcome } from './application/propose';
 import type { CaptionAsking, CaptionPersona, DescribedReel } from './domain/ports';
 import { enqueueCaptions } from './infra/db/queue';
@@ -16,6 +18,8 @@ export interface InstagramCaptionsDeps {
   readonly gateway: Pick<LlmGateway, 'proposeCaptions'>;
   /** `content-drops`: the live drops that hold a medium, described. */
   readonly drops: (creatorId: string, mediaAssetId: string) => Promise<readonly DescribedReel[]>;
+  /** `content-drops`: one live drop, described; `null` when it is gone. */
+  readonly reel: (creatorId: string, dropId: string) => Promise<DescribedReel | null>;
   /** Her active persona for a public text; `null` without one. */
   readonly persona: (creatorId: string) => Promise<CaptionPersona | null>;
   /** Her past captions that did well; empty until her account is read. */
@@ -30,6 +34,11 @@ export interface InstagramCaptionsModule {
   readonly name: 'instagram-captions';
   /** A medium of hers was described: its captions are asked for, once per medium waiting. Replayable. */
   described(creatorId: string, mediaAssetId: string, correlationId: string): Promise<void>;
+  /**
+   * « D'autres idées » on a caption card: other captions for the same Reel, `unavailable` when none can be proposed
+   * for now. Called by `creator-decisions`, which read her right and counts her requests.
+   */
+  otherIdeas(ask: OtherCaptionsAsk): Promise<DecisionAnswer[] | 'unavailable'>;
   readonly jobs: {
     /** `instagram_captions.propose`: what happened, for the log. */
     propose(creatorId: string, mediaAssetId: string, correlationId: string): Promise<ProposeOutcome>;
@@ -43,6 +52,8 @@ export function createInstagramCaptionsModule(deps: InstagramCaptionsDeps): Inst
     name: 'instagram-captions',
     described: (creatorId, mediaAssetId, correlationId) =>
       enqueueCaptions(deps.db, { creatorId, mediaAssetId, correlationId }, null),
+    otherIdeas: (ask) =>
+      otherCaptions({ reel: deps.reel, persona: deps.persona, examples: deps.examples, writer }, ask),
     jobs: {
       propose: async (creatorId, mediaAssetId, correlationId) => {
         const now = clock();

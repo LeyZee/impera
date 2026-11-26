@@ -139,6 +139,11 @@ export const NOTIFICATION_REASONS = [
    * even in the quiet hours and outside the daily cap: the notice only protects an owner who hears of it.
    */
   'owner_change',
+  /**
+   * A question put to a creator on her « À décider » card (ADR 0164 § 9): once per question, held in the quiet hours,
+   * within the daily cap like a reminder.
+   */
+  'decision',
 ] as const;
 export const NotificationReasonSchema = z.enum(NOTIFICATION_REASONS);
 export type NotificationReason = z.infer<typeof NotificationReasonSchema>;
