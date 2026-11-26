@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
+import { MessagesTodo } from './MessagesTodo';
 import { backupBannerOf, useBackupStatus } from './backups';
 import { paperworkLines } from './paperwork';
 import { reportItems, TODO_SHOWN, todoItems, type TodoItem } from './todo';
@@ -9,6 +10,7 @@ import { usePendingDocuments } from '@/contractors/api';
 import { useInvoices } from '@/invoices/api';
 import { useReports } from '@/reports/api';
 import { useNow } from '@/scheduling/useNow';
+import { useWaitingMessages } from '@/screens/today/to-agency/api';
 
 /**
  * « À faire » (pilotage 12/11, W3): one card for what waits on the reader, in place of a banner per subject. The
@@ -28,6 +30,8 @@ export function TodoCard({
   const contests = useInvoices(forOwner ? { acceptance: ['contested'] } : null);
   const pending = usePendingDocuments(forOwner);
   const open = useReports(null, reviewsReports);
+  // What her creators wrote to the agency (trous béants n° 13): the owner answers, an active manager reads.
+  const written = useWaitingMessages(forOwner || reviewsReports).data?.messages ?? [];
   const now = useNow();
   // The most pressing lines first; the rest one tap away, so the figures stay close on a busy day.
   const [isOpen, setIsOpen] = useState(false);
@@ -39,7 +43,8 @@ export function TodoCard({
       : [],
     reviewsReports && open.data !== undefined ? reportItems(open.data.reports, now) : [],
   );
-  if (items.length === 0) return null;
+  if (items.length === 0 && written.length === 0) return null;
+  const count = items.length + written.length;
   const shown = isOpen ? items : items.slice(0, TODO_SHOWN);
   const hidden = items.length - shown.length;
 
@@ -49,17 +54,20 @@ export function TodoCard({
         <h2 id="db-todo-title" className="nv-h3">
           À faire
         </h2>
-        <span className="db-todo__count nv-num" aria-label={`${String(items.length)} à traiter`}>
-          {items.length}
+        <span className="db-todo__count nv-num" aria-label={`${String(count)} à traiter`}>
+          {count}
         </span>
       </header>
-      <ul className="db-todo__list">
-        {shown.map((item) => (
-          <li key={item.key} className="db-todo__item" data-tone={item.tone}>
-            <Row item={item} />
-          </li>
-        ))}
-      </ul>
+      <MessagesTodo messages={written} canAnswer={forOwner} />
+      {shown.length === 0 ? null : (
+        <ul className="db-todo__list">
+          {shown.map((item) => (
+            <li key={item.key} className="db-todo__item" data-tone={item.tone}>
+              <Row item={item} />
+            </li>
+          ))}
+        </ul>
+      )}
       {hidden === 0 ? null : (
         <button
           type="button"

@@ -264,6 +264,21 @@ describe('Aujourd’hui, her day (CREA-19)', () => {
     expect(screen.getByRole('link', { name: 'Déposer' })).toBeDefined();
   });
 
+  it('opens on « L’essentiel du jour », counting her tasks and what she owes, before anything else (Charles, 21/11)', async () => {
+    serve({ current: [], next: [] }, 200, agendaOf(), {
+      requests: [requestOf({ dueOn: '2026-11-01', reason: 'La séance promise' })],
+      drops: [],
+    });
+    show();
+    const hero = (await screen.findByRole('heading', { level: 2, name: 'Ce qu’on attend de toi' })).closest(
+      'section',
+    );
+    expect(await screen.findByText('1 envoi à faire')).toBeDefined();
+    expect(screen.getByRole('button', { name: /^Tâches\s*\d+\/\d+$/u })).toBeDefined();
+    const send = (await screen.findByRole('heading', { level: 2, name: 'À envoyer' })).closest('section');
+    expect(send === null ? null : hero?.compareDocumentPosition(send)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it('counts what the agency waits on her for, and takes her to her week to answer', async () => {
     serve({ current: [], next: [] }, 200, agendaOf());
     show();

@@ -5,8 +5,10 @@ import type {
   DatedRanges,
   AlertTrigger,
   CopilotTrace,
+  DraftTranslation,
   FanFlags,
   HandoffCause,
+  Language,
   MediaDescription,
   MediaFlag,
   MessageOrigin,
@@ -50,6 +52,7 @@ import {
   type HoldDecision,
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
+import type { LanguageDecision } from '../domain/language';
 import type { MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
 import { originNote } from '../domain/origin';
@@ -283,6 +286,8 @@ type AgentComposeResult = (
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /** What the code decided with the draft, as the copilot panel reads it (ADR 0141 lot a): kept with the draft. */
   readonly copilot?: CopilotTrace;
+  /** Her draft in French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+  readonly translation?: DraftTranslation;
   /**
    * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
    * draft, only what his message and Reveal changed: a step not written was not sent.
@@ -772,6 +777,7 @@ async function quietTurn(
   if ('missing' in her) return NOT_FOLLOWED_UP(`${prefix}_${her.missing}`);
   if (voiceUnavailable(deps.gateway)) return NOT_FOLLOWED_UP(`${prefix}_no_voice`);
   const composed = await composeTurn(deps.gateway, her.deps.persona, {
+    keptLanguage: await keptLanguageOf(deps.limits, input),
     history: input.history.map((m) => ({
       from: m.direction === 'inbound' ? 'fan' : 'creator',
       text: m.text,
@@ -822,6 +828,7 @@ async function quietTurn(
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
+    ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: [],
@@ -910,8 +917,44 @@ const copilotOf = (
     ...(composed.desireRead !== undefined && { desireRead: composed.desireRead }),
     care: composed.care === true,
     rewritten: composed.rewritten === true,
+    ...(composed.language !== undefined && { language: composed.language }),
   });
 };
+
+/**
+ * Her draft in French for the team (ADR 0168 § 9), one bubble per bubble of hers: the voice's French, and the code's
+ * own bubble after it when one is added. None when the voice gave none that fits.
+ */
+function translationFor(
+  composed: Pick<ComposedTurn, 'translation'>,
+  added?: string,
+): { readonly translation?: DraftTranslation } {
+  if (composed.translation === undefined) return {};
+  const bubbles = added === undefined ? [...composed.translation] : [...composed.translation, added];
+  return { translation: { language: 'french', bubbles } };
+}
+
+/** His kept language (ADR 0168 § 3); `null` when none, without his limits, or when it does not read. */
+async function keptLanguageOf(
+  limits: FanLimits | undefined,
+  input: AgentComposeInput,
+): Promise<{ readonly value: Language; readonly source: 'detected' | 'set' } | null> {
+  if (limits?.language === undefined) return null;
+  return limits.language(input.creatorId, input.fanId).catch(() => null);
+}
+
+/**
+ * Keeps the language code read on his message (ADR 0168 § 3). Not kept is no harm: the next message reads it again,
+ * and the language of this answer was decided on his words.
+ */
+async function keepLanguage(
+  limits: FanLimits | undefined,
+  input: AgentComposeInput,
+  decision: LanguageDecision | undefined,
+): Promise<void> {
+  if (limits?.keepLanguage === undefined || decision?.keep === undefined || decision.keep === null) return;
+  await limits.keepLanguage(input.creatorId, input.fanId, decision.keep).catch(() => undefined);
+}
 
 /** A result with the notices of her alerts that went off, when there are any. */
 const withNotices = (result: AgentComposeResult, notices: readonly AlertNotice[]): AgentComposeResult =>
@@ -954,7 +997,11 @@ async function settleCare(
     .join('\n');
   return {
     kind: 'draft',
-    bubbles: help ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText))] : composed.bubbles,
+    bubbles: help
+      ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText, composed.language?.reply ?? null))]
+      : composed.bubbles,
+    // The help bubble is the code's own: its French beside the voice's (ADR 0168 § 9).
+    ...translationFor(composed, help ? helpBubble('french') : undefined),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
@@ -1056,6 +1103,7 @@ async function settle(
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
+    ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: withoutOrders(composed.brief.factsProposed),
@@ -1098,7 +1146,9 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // He says plainly he is a minor (recette AGT-01): a human answers him before any model, whatever the brain would
       // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
-      const signs = safetySigns(fanText, input.now);
+      // His kept language (ADR 0168 § 4): a bare number in a short message of his is read by his covered language.
+      const keptLanguage = await keptLanguageOf(deps.limits, input);
+      const signs = safetySigns(fanText, input.now, keptLanguage?.value ?? null);
       if (signs.includes('minor_suspected')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
@@ -1155,6 +1205,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       const timeZone = await deps.timeZoneOf(input.creatorId);
       const composed = await composeTurn(deps.gateway, withHer.persona, {
         history,
+        keptLanguage,
         fanText: ownText,
         media,
         fanNotes: input.fan.notes.join('\n'),
@@ -1228,6 +1279,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
           hasBought: input.fan.spentMinor > 0 || paidStepOf(input.scriptRun),
         },
       });
+      await keepLanguage(deps.limits, input, composed.language);
       const fired = firedWith(coded, composed.brief, asked, settings, chatter);
       const alerts = settleAlerts(fired);
       // A risk of his outranks her alert: the handoff keeps the risk's cause, and the alert is a notice of its own.

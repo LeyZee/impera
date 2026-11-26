@@ -20,6 +20,7 @@ import {
   type GatewaySeen as Seen,
 } from '../../../../__tests__/support/llm';
 import type { AlertSettings } from '../../domain/alerts';
+import { helpBubble } from '../../domain/care';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
 import {
@@ -169,6 +170,8 @@ describe('createDraftComposer', () => {
         sale: null,
         saleMoment: null,
         desireTrend: null,
+        // ADR 0168: he writes French, the one language of her persona.
+        language: { reply: 'french', fan: 'french', humanOnly: false },
       },
     });
     expect(seen.traces[0]).toEqual({
@@ -245,6 +248,35 @@ describe('createDraftComposer', () => {
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).not.toContain('snap');
 
     const still = composer({ voice: { bubbles: ['Écris-moi sur mon snap 😘'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('never lets the voice give a help number itself: written once more, then a human; the code adds its own bubble (ADR 0088 § 4)', async () => {
+    const says = (text: string): AgentComposeInput => ({
+      ...INPUT,
+      history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
+    });
+    const fixed = composer(
+      {
+        voice: { bubbles: ['je suis là, appelle le 988 si ça va pas'] },
+        voiceAfter: { bubbles: ['je suis là, je t’écoute'] },
+      },
+      undefined,
+      limitsOf({}).limits,
+    );
+    const answered = await fixed.draftComposer.compose(
+      says('des fois je me demande à quoi ça sert de continuer'),
+    );
+    expect(answered).toMatchObject({ kind: 'draft', care: { signs: ['self_harm'], help: true } });
+    expect(fixed.seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('posé par le code');
+    // The guard read the voice's bubbles; the code's help bubble comes after it, untouched.
+    expect(answered.kind === 'draft' && answered.bubbles).toEqual([
+      'je suis là, je t’écoute',
+      helpBubble('french'),
+    ]);
+
+    const still = composer({ voice: { bubbles: ['call 988, ok?'] } });
     expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
     expect(still.seen.voiceCalls).toBe(2);
   });
@@ -1189,7 +1221,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     );
     const answered = await low.draftComposer.compose(says('j’en peux plus, je veux en finir'));
     expect(answered).toMatchObject({ kind: 'draft', care: { signs: ['self_harm'], help: true } });
-    expect(answered.kind === 'draft' && answered.bubbles.at(-1)).toContain('3114');
+    expect(answered.kind === 'draft' && answered.bubbles.at(-1)).toContain('numéro d’urgence de ton pays');
     expect(distress.protections.map((p) => p.protection)).toEqual([
       { unconfirmAge: false, stopContact: false, care: true, freezeSales: false, because: ['self_harm'] },
     ]);
@@ -3268,5 +3300,102 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     ]);
     const off = composer({ brief: answers }, undefined, limitsOf(ADULT).limits, deps(repriced));
     expect((await off.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toBeUndefined();
+  });
+});
+
+describe('the fan’s language (ADR 0168)', () => {
+  const kept: { creatorId: string; fanId: string; language: string }[] = [];
+  const limits: FanLimits = {
+    flags: () => Promise.resolve({}),
+    protect: () => Promise.resolve(),
+    confirmAge: () => Promise.resolve(),
+    language: () => Promise.resolve({ value: 'french', source: 'detected' }),
+    keepLanguage: (creatorId, fanId, language) => {
+      kept.push({ creatorId, fanId, language });
+      return Promise.resolve();
+    },
+  };
+  const compose = (text: string, voice?: VoiceOutput) => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draftComposer = createDraftComposer({
+      gateway: gateway(voice === undefined ? {} : { voice }, seen),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        spokenLanguages: ['french', 'english'],
+        languageExamples: { english: ['hey you 😘'] },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits,
+    });
+    const history = [
+      {
+        direction: 'outbound' as const,
+        text: 'coucou toi, tu vas bien ce soir ?',
+        at: new Date('2026-10-17T09:57:00Z'),
+      },
+      { direction: 'inbound' as const, text, at: new Date('2026-10-17T09:59:00Z') },
+    ];
+    return { seen, result: draftComposer.compose({ ...INPUT, history }) };
+  };
+
+  it('answers in his language when she speaks it, with her examples in it, and keeps it', async () => {
+    kept.length = 0;
+    const { seen, result } = compose('hey, how are you doing tonight? you look amazing');
+    const draft = await result;
+    expect(seen.voiceInputs?.[0]?.language).toEqual({
+      reply: 'english',
+      notSpoken: null,
+      examples: ['hey you 😘'],
+    });
+    expect(draft.kind === 'draft' && draft.copilot?.language).toEqual({
+      reply: 'english',
+      fan: 'english',
+      humanOnly: false,
+    });
+    expect(kept.map((k) => k.language)).toEqual(['english']);
+  });
+
+  it('stays in their language and says once she does not speak his; a human only lets it leave', async () => {
+    kept.length = 0;
+    const { seen, result } = compose('مرحبا كيف حالك اليوم يا جميلة');
+    const draft = await result;
+    expect(seen.voiceInputs?.[0]?.language).toEqual({ reply: 'french', notSpoken: 'arabic' });
+    expect(draft.kind === 'draft' && draft.copilot?.language).toEqual({
+      reply: 'french',
+      fan: 'arabic',
+      humanOnly: true,
+    });
+  });
+
+  it('keeps her French for the team from the same call when she writes in English, never in what leaves', async () => {
+    const { seen, result } = compose('hey, how are you doing tonight? you look amazing', {
+      bubbles: ['hey you 😘', 'missed me?'],
+      translation: ['coucou toi 😘', 'je t’ai manqué ?'],
+    });
+    const draft = await result;
+    expect(seen.voiceCalls).toBe(1);
+    // One French bubble for each bubble that leaves, in the same order.
+    expect(draft).toMatchObject({
+      kind: 'draft',
+      bubbles: ['hey you 😘', 'missed me?'],
+      translation: { language: 'french', bubbles: ['coucou toi 😘', 'je t’ai manqué ?'] },
+    });
+  });
+
+  it('keeps none when she writes in French, or when the French does not match her bubbles', async () => {
+    const french = await compose('salut toi, tu fais quoi ce soir ? tu es trop belle', {
+      bubbles: ['coucou toi'],
+      translation: ['coucou toi'],
+    }).result;
+    expect(french.kind === 'draft' && 'translation' in french).toBe(false);
+    const short = await compose('hey, how are you doing tonight? you look amazing', {
+      bubbles: ['hey you 😘', 'missed me?'],
+      translation: ['coucou toi 😘'],
+    }).result;
+    expect(short.kind).toBe('draft');
+    expect(short.kind === 'draft' && 'translation' in short).toBe(false);
   });
 });

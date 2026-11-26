@@ -6,6 +6,9 @@ import {
   type GuardCode,
 } from '@impera/contracts';
 
+import { emojisOnly } from './love';
+import { asksAQuestion } from './questions';
+
 /**
  * The guards of a public reply (ADR 0122 § 3), in the code: a reply is read by anyone, from the age of 13. It passes
  * the Instagram guard of her captions, the chatting guards that still apply in public, and two of its own:
@@ -36,7 +39,14 @@ export interface ReplyGuardContext {
   readonly recentReplies: readonly string[];
   /** The blocking codes the chatting guards raise on this text: each one refuses the reply. */
   readonly chatGuardCodes: readonly GuardCode[];
+  /** The code allowed a question in this reply (`mayAskQuestion`). */
+  readonly mayAsk: boolean;
+  /** He declared his love: emojis only (`declaresLove`). */
+  readonly emojiOnly: boolean;
 }
+
+/** Her emojis in public: one, the same one doubled, or two side by side in a flirt (voix de Messa, 26/11). */
+const EMOJIS_MAX = 2;
 
 const EMOJI = /\p{Extended_Pictographic}/gu;
 // Anywhere in the text, full-width forms folded: a public mention notifies a third party.
@@ -68,6 +78,25 @@ const SEDUCTION = [
   'fantasmes',
   'te montrer plus',
   'voir plus de moi',
+  // ADR 0168 § 4: English, Italian, Spanish.
+  'horny',
+  'naughty',
+  'in my bed',
+  'in private',
+  'in dm',
+  'babe',
+  'show you more',
+  'eccitata',
+  'eccitato',
+  'nel mio letto',
+  'in privato',
+  'tesoro',
+  'mutandine',
+  'cachonda',
+  'caliente',
+  'en mi cama',
+  'en privado',
+  'lenceria',
 ];
 
 function fold(text: string): string {
@@ -103,12 +132,17 @@ export function checkReply(text: string, context: ReplyGuardContext): ReplyViola
   const reply = text.trim();
   if (reply === '' || reply.length > COMMENT_REPLY_MAX)
     violations.push({ code: 'comment_format', detail: 'length' });
-  if ((reply.match(EMOJI) ?? []).length > 1) violations.push({ code: 'comment_format', detail: 'emojis' });
+  if ((reply.match(EMOJI) ?? []).length > EMOJIS_MAX)
+    violations.push({ code: 'comment_format', detail: 'emojis' });
   if (HASHTAG_OR_MENTION.test(reply.normalize('NFKC')))
     violations.push({ code: 'comment_format', detail: 'hashtag_or_mention' });
   for (const fault of instagramFaults(reply)) violations.push({ code: 'instagram_text', detail: fault });
   const explicit = nudityIn(reply) ?? seductionIn(reply);
   if (explicit !== null) violations.push({ code: 'public_explicit', detail: explicit });
+  if (!context.mayAsk && asksAQuestion(reply))
+    violations.push({ code: 'unwanted_question', detail: 'question' });
+  if (context.emojiOnly && !emojisOnly(reply))
+    violations.push({ code: 'words_in_emoji_reply', detail: 'words' });
   if (context.recentReplies.some((earlier) => nearlySame(earlier, reply)))
     violations.push({ code: 'repeated_reply', detail: 'recent_reply' });
   for (const code of new Set(context.chatGuardCodes)) violations.push({ code, detail: code });

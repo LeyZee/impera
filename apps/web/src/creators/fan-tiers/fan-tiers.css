@@ -1,0 +1,42 @@
+/* Créatrices › Compte › Paliers de ses fans (Charles, 21/11). */
+.ft-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.ft-title {
+  margin: 0;
+}
+.ft-lead,
+.ft-notice {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.ft-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--nv-space-3);
+}
+.ft-amount {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.ft-unit {
+  color: var(--nv-ink-muted);
+}
+.ft-problem {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+.ft-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-3);
+}

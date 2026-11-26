@@ -279,6 +279,7 @@ function cardScreen(cardOn: boolean): PanelScreen {
   return {
     kind: 'conversation',
     fanName,
+    money: view?.conversation.standing ?? null,
     standing,
     cardOn,
     opensCreators: opensCreators === true,

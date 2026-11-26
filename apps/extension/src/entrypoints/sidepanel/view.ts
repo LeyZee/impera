@@ -1,4 +1,5 @@
 import {
+  FAN_TIER_WORDS,
   REJECT_REASONS,
   type CopilotAssist,
   type CopilotCut,
@@ -9,6 +10,7 @@ import {
   type FanCardGroup,
   type FanCardValue,
   type FanCardView,
+  type FanStanding,
   type RejectReason,
 } from '@impera/contracts';
 
@@ -72,6 +74,8 @@ export type PanelScreen =
       readonly kind: 'conversation';
       /** His name on the platform, so the panel says which conversation it shows (EXT-14); null until read. */
       readonly fanName: string | null;
+      /** What he spent, his tier, his last purchase (Charles, 21/11); null while unread. Never a commission. */
+      readonly money: FanStanding | null;
       /** « Où on en est » (§ 3.1); null while it is read the first time. */
       readonly standing: Standing | null;
       /** Her switch « Fiche du fan dans l'extension » (§ 6). */
@@ -542,6 +546,8 @@ function statusBand(
   assist: CopilotAssist | null,
   cut: CopilotCut | null,
   open: boolean,
+  money: FanStanding | null,
+  now: Date,
 ): HTMLElement {
   const badges = h('div', { class: 'cp-badges', 'aria-label': 'Où on en est' });
   let calm = false;
@@ -565,12 +571,27 @@ function statusBand(
         ),
       );
   }
-  return h(
-    'header',
-    { class: 'cp-band', 'data-halo': calm ? 'true' : undefined },
-    fanName === null ? null : h('span', { class: 'cp-band__fan' }, fanName),
-    badges,
-  );
+  const tier = money?.tier ?? null;
+  // Who he is, on the left: his name (cut if long) and his tier (never cut) on one line, what he spent right under
+  // (Charles, 21/11). The badges sit on the right of that first line and are the ones to go under when it is narrow
+  // (avis Design, 26/11).
+  const who =
+    fanName === null && money === null
+      ? null
+      : h(
+          'div',
+          { class: 'cp-band__id' },
+          h(
+            'div',
+            { class: 'cp-band__who' },
+            fanName === null ? null : h('span', { class: 'cp-band__fan' }, fanName),
+            tier === null
+              ? null
+              : h('span', { class: 'cp-band__tier', 'data-tier': tier }, FAN_TIER_WORDS[tier]),
+          ),
+          money === null ? null : h('span', { class: 'cp-band__money' }, moneyWords(money, now)),
+        );
+  return h('header', { class: 'cp-band', 'data-halo': calm ? 'true' : undefined }, who, badges);
 }
 
 /**
@@ -1362,6 +1383,21 @@ function refocus(root: HTMLElement, selector: string | null): void {
   if (target !== null && root.ownerDocument.activeElement !== target) target.focus({ preventScroll: true });
 }
 
+/** « 250 € dépensés · dernier achat il y a 3 j », « rien dépensé ». */
+export function moneyWords(money: FanStanding, now: Date): string {
+  if (money.spentMinor === 0) return 'rien dépensé';
+  const spent = `${new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: money.spentMinor % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(money.spentMinor / 100)}\u00a0€ dépensés`;
+  if (money.lastPurchaseAt === null) return spent;
+  const days = Math.max(
+    0,
+    Math.floor((now.getTime() - new Date(money.lastPurchaseAt).getTime()) / 86_400_000),
+  );
+  return `${spent} · ${days === 0 ? 'achat aujourd’hui' : `dernier achat il y a ${String(days)}\u00a0j`}`;
+}
+
 /**
  * A cut the draft already says in its own line, right under it (« Ne plus lui écrire », limits not read): said once.
  * With no draft shown, the cut stands alone.
@@ -1409,7 +1445,15 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       sale: cut === null && assist?.nextMove?.kind === 'offer_step',
       salePrice: cut === null && assist?.nextMove?.kind === 'offer_step' ? assist.nextMove.priceMinor : null,
     };
-    const band = statusBand(screen.fanName, screen.standing, assist, cut, screen.signalsOpen);
+    const band = statusBand(
+      screen.fanName,
+      screen.standing,
+      assist,
+      cut,
+      screen.signalsOpen,
+      screen.money,
+      screen.now,
+    );
     const pinned = move === null ? [] : [move];
     const key = draftKey(screen.draft, stops);
     const shown = root.querySelector(':scope > .cp-draft');

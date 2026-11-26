@@ -247,3 +247,35 @@ export type DayItemDoneBody = z.infer<typeof DayItemDoneBodySchema>;
 
 /** A line of a day other than today or yesterday in her zone: her day does not change after the fact. */
 export const DAY_ITEM_LATE_UNPROCESSABLE = 'day_item_late_unprocessable';
+
+/*
+ * « Où elle en est » (Charles, 21/11, trous béants n° 11): her agency reads what she ticked of each day of a week and
+ * how far her validated week went (lines shot, delivery received), as she reads them herself, never more.
+ */
+
+/** One day of « Où elle en est »: her essentials and her whole day, done against asked. */
+export const ProgressDaySchema = z.strictObject({
+  day: CalendarDaySchema,
+  essentialsDone: z.number().int().min(0),
+  essentialsAsked: z.number().int().min(0),
+  done: z.number().int().min(0),
+  asked: z.number().int().min(0),
+  /** After today in her zone: nothing to read yet. */
+  ahead: z.boolean(),
+});
+export type ProgressDay = z.infer<typeof ProgressDaySchema>;
+
+/** `/v1/creators/:creatorId/progress?week=` (owner; an active manager reads): any day of the week reads her week. */
+export const CreatorProgressParamsSchema = z.strictObject({ creatorId: CreatorIdSchema });
+
+/** `GET /v1/creators/:creatorId/progress?week=`: her seven days from her Monday, and her validated week's progress. */
+export const CreatorProgressSchema = z.strictObject({
+  week: CalendarDaySchema,
+  today: CalendarDaySchema,
+  days: z.array(ProgressDaySchema).length(7),
+  /** The lines of her shooting days shot, against those of the days not declined; `null` without a validated week. */
+  shoot: z.strictObject({ done: z.number().int().min(0), asked: z.number().int().min(0) }).nullable(),
+  /** « Livrer ma semaine » as she reads it; `null` without one. */
+  delivery: HerDeliverySchema.nullable(),
+});
+export type CreatorProgress = z.infer<typeof CreatorProgressSchema>;

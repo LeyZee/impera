@@ -225,6 +225,10 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/creator-space/decisions/:id/other-ideas':
     'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
+  'POST /v1/creator-space/stops/:id/withdraw':
+    'creator space: creator-limits tests (another creator’s line stays)',
+  'POST /v1/creator-space/absences/:id/cancel':
+    'creator space: creator-limits tests (another creator’s absence stays)',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
   'GET /v1/creator-space/drops/:id/descriptions':
@@ -243,6 +247,8 @@ const RESIDUAL: Readonly<Record<string, string>> = {
     'contractor documents: contractor tests',
   'POST /v1/payroll/contractors/:memberId/documents/:documentId/review':
     'contractor documents: contractor tests',
+  'POST /v1/payroll/sale-claims/:saleClaimId/answer':
+    'a claim on a sale, kept to its creator: payroll-sale-claims tests (a manager of another creator neither reads nor answers it)',
   'POST /v1/payroll/statements/:statementId/validate': 'statements: payroll tests',
   'POST /v1/payroll/statements/:statementId/pay': 'statements: payroll tests',
   'GET /v1/payroll/invoices/:invoiceId/pdf': 'invoices: invoicing tests',
