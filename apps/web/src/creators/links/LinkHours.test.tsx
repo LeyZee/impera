@@ -65,7 +65,7 @@ afterEach(() => {
 });
 
 describe('Trafic › Ses clics, heure par heure (INS-02 lot e3)', () => {
-  it('answers first with the clicks of the day against the day before, then ranks her links', async () => {
+  it("answers first with the clicks of the day against the day before, then lists her links in the stack's order", async () => {
     serve([STORY, CANAL], [hour(STORY.id, 30, 4), hour(STORY.id, 2, 3, 1), hour(CANAL.id, 1, 5)]);
     renderHours();
     expect(await screen.findByText('contre 4 clics la veille')).toBeDefined();
@@ -75,8 +75,8 @@ describe('Trafic › Ses clics, heure par heure (INS-02 lot e3)', () => {
       'listitem',
     );
     expect(ranked.map((row) => row.textContent)).toEqual([
-      expect.stringContaining('Canal'),
       expect.stringContaining('Story du jour'),
+      expect.stringContaining('Canal'),
     ]);
   });
 

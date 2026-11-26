@@ -87,8 +87,9 @@
   border-top: 1px solid var(--nv-hairline);
 }
 @media (max-width: 640px) {
+  /* « Relier » and « Modifier » side by side, one alone takes the row. */
   .cl-row > .nv-btn {
-    flex: 1 1 100%;
+    flex: 1 1 calc(50% - 8px);
     min-height: 44px;
   }
 }
@@ -242,6 +243,10 @@
   white-space: nowrap;
 }
 @media (max-width: 520px) {
+  /* On a phone the ranked links sit right under the columns, in the same order: the legend would say them twice. */
+  .clh-hours > .nv-keys {
+    display: none;
+  }
   .clh-link {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }

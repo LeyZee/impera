@@ -52,9 +52,12 @@ export interface HoursView {
   readonly robots: number;
   /** The places that had a click in the columns drawn, in the legend's order. */
   readonly placements: readonly LinkPlacement[];
-  /** Her linked links, the most clicked first. */
+  /** Her linked links, by place in the stack's order, then the most clicked first. */
   readonly links: readonly LinkDay[];
 }
+
+const placeRank = (link: AgencyRedirectLink): number =>
+  link.placement === null ? LINK_PLACEMENTS.length : LINK_PLACEMENTS.indexOf(link.placement);
 
 const startOfHour = (at: Date): number => Math.floor(at.getTime() / HOUR_MS) * HOUR_MS;
 
@@ -109,7 +112,13 @@ export function hoursView(
       const curve = curves.get(link.id) ?? Array.from({ length: HOURS_DRAWN }, () => 0);
       return { link, curve, clicks: curve.reduce((total, value) => total + value, 0) };
     })
-    .sort((one, other) => other.clicks - one.clicks || one.link.name.localeCompare(other.link.name, 'fr'));
+    // The order of the stack and its legend (Design, 26/11): by place, then the most clicked first.
+    .sort(
+      (one, other) =>
+        placeRank(one.link) - placeRank(other.link) ||
+        other.clicks - one.clicks ||
+        one.link.name.localeCompare(other.link.name, 'fr'),
+    );
   return {
     columns: drawn,
     clicks: sum((column) => column.total),

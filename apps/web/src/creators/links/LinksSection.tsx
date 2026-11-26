@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
+import { Chain } from './Chain';
 import {
   attachLink,
   detectLinks,
@@ -38,23 +39,6 @@ interface Draft {
   readonly placement: LinkPlacement | '';
   readonly usageNote: string;
   readonly enabled: boolean;
-}
-
-/** A chain: the link is read hour by hour (readable without its word, Charles's rule of 21/11). */
-function Chain(): JSX.Element {
-  return (
-    <svg
-      className="cl-chain"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      aria-hidden="true"
-    >
-      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" strokeLinecap="round" />
-      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 const BLANK: Draft = { name: '', url: '', destination: '', placement: '', usageNote: '', enabled: true };
@@ -161,20 +145,6 @@ export function LinksSection({
                     <Chain />
                     Relié
                   </span>
-                ) : canEdit ? (
-                  <button
-                    type="button"
-                    className="nv-btn nv-btn--soft nv-btn--sm"
-                    disabled={busyId === link.id}
-                    aria-busy={busyId === link.id}
-                    aria-label={`Relier le lien « ${link.name} » pour lire ses clics chaque heure`}
-                    onClick={() => {
-                      void attach(link);
-                    }}
-                  >
-                    <Chain />
-                    Relier
-                  </button>
                 ) : null}
                 {canEdit ? (
                   <>
@@ -192,6 +162,21 @@ export function LinksSection({
                         }}
                       />
                     </label>
+                    {link.attached ? null : (
+                      <button
+                        type="button"
+                        className="nv-btn nv-btn--soft nv-btn--sm"
+                        disabled={busyId === link.id}
+                        aria-busy={busyId === link.id}
+                        aria-label={`Relier le lien « ${link.name} » pour lire ses clics chaque heure`}
+                        onClick={() => {
+                          void attach(link);
+                        }}
+                      >
+                        <Chain />
+                        Relier
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="nv-btn nv-btn--soft nv-btn--sm"

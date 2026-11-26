@@ -52,10 +52,10 @@ describe('her clicks hour by hour (INS-02 lot e3)', () => {
     expect(view.clicksBefore).toBe(7);
     expect(view.robots).toBe(3);
     expect(view.placements).toEqual(['story_daily', 'telegram_channel']);
-    // Only linked links are ranked, the most clicked first.
+    // Only linked links, in the stack's order of places, whatever their clicks.
     expect(view.links.map((one) => [one.link.name, one.clicks])).toEqual([
-      ['canal', 4],
       ['story', 3],
+      ['canal', 4],
     ]);
   });
 

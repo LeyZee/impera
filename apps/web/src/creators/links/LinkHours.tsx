@@ -2,6 +2,7 @@ import { LINK_PLACEMENTS } from '@impera/contracts';
 import { niceTicks } from '@impera/design-system';
 import { useMemo, type JSX } from 'react';
 
+import { Chain } from './Chain';
 import { useLinkHours, useRedirectLinks } from './api';
 import {
   changePercent,
@@ -16,7 +17,7 @@ import { PLACEMENT_LABELS, sameWords } from './model';
 
 import { CountUp, useFloatingTip } from '@/screens/dashboard/parts';
 import { Columns, Spark } from '@/shell/figures/figures';
-import { Failure } from '@/shell/states';
+import { Empty, Failure } from '@/shell/states';
 
 import './links.css';
 
@@ -60,10 +61,9 @@ export function LinkHours({ creatorId, now }: { creatorId: string; now?: Date })
           Ses clics, heure par heure
         </h3>
         {view.links.length === 0 ? (
-          <p className="ps-hint">
-            Aucun lien relié pour l’instant. Relie un lien dans {'« Ses liens »'} : ses clics arrivent ici à
-            chaque heure.
-          </p>
+          <Empty icon={<Chain />} title="Aucun lien relié pour l’instant">
+            Relie un lien dans {'«\u00a0Ses liens\u00a0»'} : ses clics arrivent ici à chaque heure.
+          </Empty>
         ) : (
           <>
             <Answer view={view} />
@@ -157,6 +157,9 @@ function Hours({ view, tip }: { view: HoursView; tip: ReturnType<typeof useFloat
             handlers: tip.bind(
               {
                 title,
+                rowColours: LINK_PLACEMENTS.flatMap((placement, p) =>
+                  (column.clicks[p] ?? 0) > 0 ? [PLACEMENT_COLOURS[placement]] : [],
+                ),
                 rows: [
                   ...LINK_PLACEMENTS.flatMap((placement, p) => {
                     const clicks = column.clicks[p] ?? 0;
@@ -176,7 +179,7 @@ function Hours({ view, tip }: { view: HoursView; tip: ReturnType<typeof useFloat
   );
 }
 
-/** Her linked links, the most clicked first, each with its place's colour and its small curve. */
+/** Her linked links in the columns' order (by place, as stacked), each with its place's colour and its small curve. */
 function Ranked({ view }: { view: HoursView }): JSX.Element {
   return (
     <ol className="clh-links" aria-label="Clics par lien sur 24 h">
@@ -196,7 +199,11 @@ function Ranked({ view }: { view: HoursView }): JSX.Element {
             )}
           </span>
           <span className="clh-link__spark" aria-hidden="true">
-            <Spark values={curve} tone="up" />
+            <Spark
+              values={curve}
+              tone="up"
+              colour={link.placement === null ? 'var(--nv-ink-muted)' : PLACEMENT_COLOURS[link.placement]}
+            />
           </span>
           <span className="clh-link__clicks nv-num">{clicksText(clicks)}</span>
         </li>
