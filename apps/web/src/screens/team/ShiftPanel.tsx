@@ -11,7 +11,14 @@ import { useId, useState, type JSX } from 'react';
 
 import { DayField } from '@/scheduling/DayField';
 import { TimeField, useUnreadableTimes } from '@/scheduling/TimeField';
-import { createShift, createTemplate, useRefreshPlanning, type Refusal } from '@/scheduling/api';
+import {
+  createShift,
+  createTemplate,
+  useRefreshPlanning,
+  useTeamAvailability,
+  type Refusal,
+} from '@/scheduling/api';
+import { disposOn, silentText, type Cover } from '@/scheduling/availability';
 import { accountLine, ERROR_MESSAGES, type Fill } from '@/scheduling/model';
 import {
   addDays,
@@ -87,7 +94,7 @@ export function ShiftPanel({
   const [accountId, setAccountId] = useState(start.accountId ?? accounts[0]?.id ?? '');
   const account = accounts.find((one) => one.id === accountId) ?? null;
   const fill = start.fill;
-  const eligible = (members ?? [])
+  const mates = (members ?? [])
     .filter(
       (member) =>
         member.status === 'active' &&
@@ -97,7 +104,6 @@ export function ShiftPanel({
     )
     .sort((a, b) => a.displayName.localeCompare(b.displayName, 'fr'));
   const [memberId, setMemberId] = useState('');
-  const chosen = eligible.find((member) => member.id === memberId) ?? eligible[0] ?? null;
   // The first slot still ahead: today's evening rather than a night already gone, else tomorrow's first. A stretch
   // to fill, or a shift to fill, keeps its own day and hours: one of the slots when they match, else the hours typed.
   const given = fill ?? start.hours;
@@ -163,6 +169,38 @@ export function ShiftPanel({
         : moved.end !== endMinute
           ? `${clockOf(endMinute)} n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à ${clockOf(moved.end)}.`
           : null;
+  // Who is dispo on these hours (ADR 0168 § 5, trou 16): the whole of them first, part of them after, with what their
+  // week covers at the agency's hour; nobody is chosen for the manager beyond the first of the list.
+  const weeks = useTeamAvailability(true);
+  const place =
+    hoursOk && dayOk && account !== null
+      ? {
+          creatorId: account.creatorId,
+          from: zonedInstant(day, startMinute, zone),
+          to: zonedInstant(crosses ? addDays(day, 1) : day, endMinute, zone),
+        }
+      : null;
+  const dispos =
+    place === null || weeks.data === undefined
+      ? null
+      : disposOn(place, mates, weeks.data.members, (member) =>
+          planning.shifts.some(
+            (shift) =>
+              shift.memberId === member &&
+              new Date(shift.startsAt) < place.to &&
+              new Date(shift.endsAt) > place.from,
+          ),
+        );
+  const covers = new Map<string, Cover>(
+    [...(dispos?.full ?? []), ...(dispos?.part ?? [])].map((one) => [one.member.id, one.cover]),
+  );
+  const rank = (member: TeamMember): number => {
+    const kind = covers.get(member.id)?.kind;
+    return kind === 'full' ? 0 : kind === 'part' ? 1 : 2;
+  };
+  const eligible = mates.toSorted((a, b) => rank(a) - rank(b));
+  const chosen = eligible.find((member) => member.id === memberId) ?? eligible[0] ?? null;
+  const silent = dispos === null ? null : silentText(dispos.silent);
   // No shift before the member's first day (the server reads it in their zone, the panel in the agency's).
   const notJoined = chosen !== null && dayOk && day < chosen.joinedOn;
   const ready = account !== null && chosen !== null && hoursFit && onceOk && dayOk && !notJoined && !busy;
@@ -261,10 +299,13 @@ export function ShiftPanel({
                     aria-hidden="true"
                   />
                   {member.displayName}
+                  {covers.has(member.id) ? ' ' : null}
+                  <CoverNote cover={covers.get(member.id)} zone={zone} />
                 </button>
               ))}
             </div>
           )}
+          {silent === null || eligible.length === 0 ? null : <span className="tm-hint">{silent}</span>}
           {members === null ? (
             <span className="tm-hint tm-hint--error">
               L’équipe n’a pas pu être lue. Réessaie dans un instant.
@@ -437,5 +478,21 @@ export function ShiftPanel({
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** On a member's chip: « dispo » when his week covers the whole of the hours, what it covers when only part of them. */
+function CoverNote({ cover, zone }: { cover: Cover | undefined; zone: string }): JSX.Element | null {
+  if (cover === undefined || cover.kind === 'none') return null;
+  if (cover.kind === 'full')
+    return (
+      <span className="sc-cover" data-cover="full">
+        dispo
+      </span>
+    );
+  return (
+    <span className="sc-cover nv-num" data-cover="part">
+      {`${clockOf(minuteOf(cover.from, zone))} – ${clockOf(minuteOf(cover.to, zone))}`}
+    </span>
   );
 }

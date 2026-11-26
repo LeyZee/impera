@@ -1,4 +1,7 @@
 import type {
+  MemberAvailability,
+  SetAvailabilityBody,
+  TeamAvailability,
   CreatorAgencyRateList,
   AccountPayRulesId,
   CreatorAgencyRateId,
@@ -850,4 +853,19 @@ export interface ReportReminderSource {
   candidatesUnscoped(now: Date): Promise<ShiftId[]>;
   /** One shift's facts, read again just before its reminder rings (§ 5); null when it no longer exists. */
   factsUnscoped(shiftId: ShiftId): Promise<ReportReminderFacts | null>;
+}
+
+/**
+ * A member's weeks of availability (ADR 0168, trou 16), under `withMember`: his own for any member, every active
+ * member's for the owner and an active manager. `set` writes a whole week, which replaces the one in force; the same
+ * `id` sent again is the same week.
+ */
+export interface AvailabilityStore {
+  mine(userId: string): Promise<MemberAvailability>;
+  team(userId: string): Promise<TeamAvailability>;
+  set(
+    actor: Actor,
+    memberId: TeamMemberId | 'self',
+    body: SetAvailabilityBody,
+  ): Promise<{ readonly value: MemberAvailability; readonly created: boolean }>;
 }

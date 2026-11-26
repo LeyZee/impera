@@ -1,5 +1,10 @@
 import {
   ApiErrorSchema,
+  MemberAvailabilitySchema,
+  TeamAvailabilitySchema,
+  type MemberAvailability,
+  type SetAvailabilityBody,
+  type TeamAvailability,
   CalendarLinkCreatedSchema,
   CalendarLinkStateSchema,
   CalendarSchema,
@@ -244,7 +249,7 @@ async function refusalOf(response: Response): Promise<Refusal> {
 }
 
 async function send<T>(
-  method: 'POST' | 'PATCH' | 'DELETE',
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   url: string,
   body: unknown,
   parse: (json: unknown) => T,
@@ -337,6 +342,29 @@ export const chooseCalendarShifts = (withShifts: boolean): Promise<Outcome<Calen
   send('PATCH', '/v1/scheduling/calendar-link', { withShifts }, (json) =>
     CalendarLinkStateSchema.parse(json),
   );
+
+/** The reader's own week of availability (ADR 0168, trou 16), « Mes dispos ». */
+export function useMyAvailability(): UseQueryResult<MemberAvailability> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'availability', 'mine'],
+    queryFn: () => read('/v1/scheduling/availability/mine', (body) => MemberAvailabilitySchema.parse(body)),
+    retry: 1,
+  });
+}
+
+/** Every active member's week in force, for the owner and an active manager filling a place. */
+export function useTeamAvailability(enabled: boolean): UseQueryResult<TeamAvailability> {
+  return useQuery({
+    queryKey: [...SCHEDULING_KEY, 'availability', 'team'],
+    queryFn: () => read('/v1/scheduling/availability', (body) => TeamAvailabilitySchema.parse(body)),
+    enabled,
+    retry: 1,
+  });
+}
+
+/** The reader's whole week, which replaces the one in force; the same `id` sent twice is one week. */
+export const setMyAvailability = (body: SetAvailabilityBody): Promise<Outcome<MemberAvailability>> =>
+  send('PUT', '/v1/scheduling/availability/mine', body, (json) => MemberAvailabilitySchema.parse(json));
 
 /**
  * After a write, and after a refusal that says « la liste est relue »: the week, who is on shift, the templates, the

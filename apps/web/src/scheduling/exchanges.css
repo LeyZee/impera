@@ -514,3 +514,140 @@
 .sc-fold__ask {
   align-self: flex-start;
 }
+
+/* ── « Mes dispos » (ADR 0168, trou 16): his week, a line a day ── */
+.sc-dispo-week {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  font-size: 14px;
+}
+.sc-dispo-week__day {
+  display: contents;
+}
+.sc-dispo-week__name {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.sc-dispo-week__ranges {
+  min-width: 0;
+  color: var(--nv-ink-muted);
+}
+.sc-dispo-week__day[data-empty='true'] > span {
+  color: var(--nv-ink-faint);
+  font-weight: 400;
+}
+.sc-dispo__stale {
+  margin: 0;
+  color: var(--nv-warning);
+}
+
+/* The editor: the day, its plages side by side, « Ajouter » at the end of the line, as the creator's hours. */
+.sc-dispo-dialog {
+  width: min(720px, 100%);
+}
+.sc-dispo-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sc-dispo-day {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.sc-dispo-day:first-child {
+  border-top: 0;
+}
+.sc-dispo-day__name {
+  padding-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.sc-dispo-day__ranges {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sc-dispo-day[data-empty='true'] .sc-dispo-day__ranges {
+  padding-top: 13px;
+}
+.sc-dispo-day__add {
+  margin-top: 6px;
+}
+.sc-dispo-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
+}
+.sc-dispo-range__time {
+  width: 112px;
+}
+.sc-dispo-range__next {
+  white-space: nowrap;
+}
+.sc-dispo-range__remove {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--nv-ink-muted);
+  background: color-mix(in srgb, var(--nv-ink) 6%, transparent);
+  cursor: pointer;
+  transition: background var(--nv-dur-fast) var(--nv-ease-out);
+}
+.sc-dispo-range__remove:hover {
+  background: color-mix(in srgb, var(--nv-ink) 12%, transparent);
+}
+.sc-dispo-range__remove:focus-visible {
+  outline: none;
+  box-shadow: var(--nv-shadow-focus);
+}
+
+/* A phone: the day and « Ajouter » on one line, its plages under them. */
+@media (max-width: 520px) {
+  .sc-dispo-day {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name add'
+      'ranges ranges';
+  }
+  .sc-dispo-day__name {
+    grid-area: name;
+    padding-top: 6px;
+  }
+  .sc-dispo-day__add {
+    grid-area: add;
+    margin-top: 0;
+  }
+  .sc-dispo-day__ranges {
+    grid-area: ranges;
+  }
+  .sc-dispo-day[data-empty='true'] .sc-dispo-day__ranges {
+    padding-top: 0;
+  }
+  .sc-dispo-range__time {
+    width: 96px;
+  }
+}

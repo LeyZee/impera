@@ -453,6 +453,9 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
   'leave_request.refuse': team('a refusé une demande de congé'),
   'leave_request.withdraw': team('a retiré sa demande de congé'),
   'leave_request.cancel': team('a annulé un congé'),
+  'member_availability.set': action('team', z.object({ forMember: z.boolean() }), (d) =>
+    d.forMember ? 'a posé les dispos d’un membre' : 'a posé ses dispos de la semaine',
+  ),
   'shift_swap.propose': team('a proposé un échange de shift'),
   'shift_swap.decline': team('a décliné un échange de shift'),
   'shift_swap.accept': team('a accepté un échange de shift'),

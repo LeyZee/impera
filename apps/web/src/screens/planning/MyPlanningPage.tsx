@@ -13,6 +13,7 @@ import { useState, type JSX } from 'react';
 
 import { Answers, MyLeaves, MySwaps, namesOf } from './Exchanges';
 import { LeavePanel } from './LeavePanel';
+import { AvailabilityPanel, MyAvailability } from './MyAvailability';
 import { SwapPanel } from './SwapPanel';
 
 import { ReportPanel } from '@/reports/ReportPanel';
@@ -34,7 +35,7 @@ import { CalendarLinkBody, SHIFT_LINK_WORDS } from '@/scheduling/CalendarLinkBod
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
 import { MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
-import { useCalendar, useLeaves, usePlanning, useSwaps } from '@/scheduling/api';
+import { useCalendar, useLeaves, useMyAvailability, usePlanning, useSwaps } from '@/scheduling/api';
 import { monthWindow, type CalendarSearch } from '@/scheduling/calendar';
 import '@/scheduling/exchanges.css';
 import { accountLine, leaveDaysLine, phaseOf, type MyAwayStatus, type Phase } from '@/scheduling/model';
@@ -64,6 +65,8 @@ export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | un
 
 type Open =
   | { readonly kind: 'leave' }
+  /** « Mes dispos »: the week he can work (ADR 0168, trou 16). */
+  | { readonly kind: 'dispos' }
   /** « Dans mon téléphone »: the link that puts his shifts in his phone's calendar (CR-12; Moi › Calendrier before). */
   | { readonly kind: 'phone' }
   | { readonly kind: 'swap'; readonly shift: Shift; readonly creatorName: string | undefined }
@@ -126,6 +129,7 @@ export function MyPlanningPage({
   };
   const team = shown.vue === 'equipe';
   const [open, setOpen] = useState<Open | null>(null);
+  const availability = useMyAvailability();
   const days = weekOf(monday);
   const planning = usePlanning({
     from: zonedInstant(monday, 0, zone).toISOString(),
@@ -374,6 +378,12 @@ export function MyPlanningPage({
               />
             )}
             {swaps.data === undefined ? null : <MySwaps list={swaps.data} memberId={me.id} zone={zone} />}
+            <MyAvailability
+              now={now}
+              onEdit={() => {
+                setOpen({ kind: 'dispos' });
+              }}
+            />
           </div>
         )}
         {open?.kind === 'phone' ? (
@@ -386,6 +396,14 @@ export function MyPlanningPage({
           >
             <CalendarLinkBody words={SHIFT_LINK_WORDS} />
           </Dialog>
+        ) : null}
+        {open?.kind === 'dispos' && availability.data !== undefined ? (
+          <AvailabilityPanel
+            week={availability.data}
+            onClose={() => {
+              setOpen(null);
+            }}
+          />
         ) : null}
         {open?.kind === 'leave' && me !== null ? (
           <LeavePanel

@@ -294,6 +294,7 @@ export async function audit(
       | 'scheduling_settings'
       | 'scheduling_slot_version'
       | 'leave_request'
+      | 'member_availability_week'
       | 'shift_swap'
       | 'shift_report'
       | 'shift_feedback'

@@ -1,5 +1,6 @@
 import type {
   CalendarAgent,
+  MemberAvailability,
   OnDuty,
   Planning,
   Shift,
@@ -24,7 +25,16 @@ import { incidentsOf, periodAt } from '@/reports/model';
 import { useReopening, type ReportDraft } from '@/reports/reopen';
 import { AgencyLoad, AgentLabel, MonthNav, TeamPanel } from '@/scheduling/TeamCalendar';
 import { WeekNav } from '@/scheduling/WeekNav';
-import { useCalendar, useLeaves, usePlanning, useOnDuty, useSwaps, useTemplates } from '@/scheduling/api';
+import {
+  useCalendar,
+  useLeaves,
+  usePlanning,
+  useOnDuty,
+  useSwaps,
+  useTeamAvailability,
+  useTemplates,
+} from '@/scheduling/api';
+import { disposCountText, disposOn } from '@/scheduling/availability';
 import {
   agentOnSlot,
   agentSlotLabel,
@@ -151,6 +161,8 @@ export function PlanningPage({
   const days = weekOf(monday);
   const shown = usePlanning(rangeOf(monday, zone));
   const members = useMembers();
+  // Who is dispo on each place to fill (ADR 0168 § 5, trou 16): their weeks, read with the team.
+  const weeks = useTeamAvailability(true);
   const toolbar = useRef<HTMLDivElement>(null);
   const templates = useTemplates(true);
   const onDuty = useOnDuty(true);
@@ -414,6 +426,11 @@ export function PlanningPage({
             <Grid
               planning={data}
               agents={agents}
+              dispos={
+                members.data === undefined || weeks.data === undefined
+                  ? null
+                  : dispoReader(data, members.data, weeks.data.members)
+              }
               rows={gridOf(data, days, zone).filter(
                 (row) => creatorId === null || row.account.creatorId === creatorId,
               )}
@@ -808,6 +825,7 @@ function Conflicts({
 function Grid({
   planning,
   agents,
+  dispos,
   rows,
   days,
   today,
@@ -825,6 +843,8 @@ function Grid({
   planning: Planning;
   /** Each creator's agent (ADR 0048), from the team's calendar; `null` until it is read. */
   agents: ReadonlyMap<string, CalendarAgent> | null;
+  /** « 2 dispos » on a place to fill; `null` while the team or its weeks are not read. */
+  dispos: DispoReader | null;
   rows: readonly GridRow[];
   days: readonly string[];
   today: string;
@@ -999,6 +1019,7 @@ function Grid({
                 ai={ai[rowIndex]?.get(day) ?? null}
                 agency={planning.settings.timeZone}
                 accountId={row.account.id}
+                dispos={dispos === null ? null : (from, to) => dispos(row.account.creatorId, from, to)}
                 where={`${row.account.creatorName}, ${accountLine(row.account)}`}
                 today={day === today}
                 picked={index === picked}
@@ -1055,6 +1076,7 @@ function Cell({
   ai,
   agency,
   accountId,
+  dispos,
   where,
   today,
   picked,
@@ -1078,6 +1100,7 @@ function Cell({
   /** The agency's zone: the hours a new shift is made in. */
   agency: string;
   accountId: string;
+  dispos: ((from: Date, to: Date) => string | null) | null;
   /** The creator and the account (« Nora Vidal, @nora sur Reveal »): two accounts of hers never read the same. */
   where: string;
   today: boolean;
@@ -1150,6 +1173,7 @@ function Cell({
                     zone={zone}
                     where={where}
                     agentWords={cellAgentWords(agent, slot, zone)}
+                    dispos={dispos?.(slot.open.from, slot.open.to) ?? null}
                     onAdd={(start) => {
                       onAdd({ accountId, ...start });
                     }}
@@ -1209,6 +1233,7 @@ function OpenStretch({
   zone,
   where,
   agentWords = '',
+  dispos = null,
   onAdd,
 }: {
   open: { readonly from: Date; readonly to: Date; readonly now: boolean };
@@ -1223,6 +1248,8 @@ function OpenStretch({
   where: string;
   /** The agent on that créneau, said after it (« ; l’IA en copilote »), empty when he is not there. */
   agentWords?: string;
+  /** « 2 dispos »: members whose week covers the whole of it (ADR 0168 § 5); `null` for none or not read. */
+  dispos?: string | null;
   onAdd: (hours: Pick<ShiftStart, 'day' | 'hours'>) => void;
 }): JSX.Element {
   const hours = open.now
@@ -1234,7 +1261,7 @@ function OpenStretch({
       className="sc-slot__fill"
       data-second={second ? 'true' : undefined}
       data-soon={soon ? 'true' : undefined}
-      aria-label={`${second ? '2e chatteur à pourvoir' : places === 2 ? 'À pourvoir, 2 places' : 'À pourvoir'} : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}${agentWords}`}
+      aria-label={`${second ? '2e chatteur à pourvoir' : places === 2 ? 'À pourvoir, 2 places' : 'À pourvoir'} : ${hours}, le ${longDay(dayOf(open.from, zone))} sur ${where}${agentWords}${dispos === null ? '' : `, ${dispos}`}`}
       onClick={() => {
         onAdd({
           day: dayOf(open.from, agency),
@@ -1246,6 +1273,11 @@ function OpenStretch({
         {second ? '+ 2e chatteur' : places === 2 ? 'À pourvoir · 2 places' : 'À pourvoir'}
       </span>
       <span className="sc-slot__hours nv-num">{hours}</span>
+      {dispos === null ? null : (
+        <span className="sc-slot__dispos" aria-hidden="true">
+          {dispos}
+        </span>
+      )}
     </button>
   );
 }
@@ -1376,4 +1408,23 @@ function ShiftChip({
       {shift.templateId === null ? null : <RepeatIcon className="sc-chip__repeat" titled />}
     </button>
   );
+}
+
+type DispoReader = (creatorId: string, from: Date, to: Date) => string | null;
+
+/** « 2 dispos » on a place of a creator: her active members whose week covers all of it, with no shift over it. */
+function dispoReader(
+  planning: Planning,
+  members: readonly TeamMember[],
+  weeks: readonly MemberAvailability[],
+): DispoReader {
+  return (creatorId, from, to) =>
+    disposCountText(
+      disposOn({ creatorId, from, to }, members, weeks, (memberId) =>
+        planning.shifts.some(
+          (shift) =>
+            shift.memberId === memberId && new Date(shift.startsAt) < to && new Date(shift.endsAt) > from,
+        ),
+      ),
+    );
 }
