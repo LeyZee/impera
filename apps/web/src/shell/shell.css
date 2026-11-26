@@ -2582,3 +2582,16 @@ label.nv-notif__row {
     line-height: var(--nv-text-metric-leading);
   }
 }
+
+/* The screen's guides under its title (demande de Charles du 21/11) : one quiet line, « Pas à pas », on a row of
+   its own; opened, the guides, each folded. */
+.nv-page__guides {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  margin-top: 12px;
+}
+.nv-page__guides-list {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
