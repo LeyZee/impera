@@ -13,7 +13,7 @@ import type { ModelResolver } from './providers';
 import { wrapUntrusted } from './untrusted';
 
 /**
- * The simulated fan's test (ADR « fan simulé », Charles 26/11/2026): an invented fan, played by a model of another
+ * The simulated fan's test (ADR 0172, Charles 26/11/2026): an invented fan, played by a model of another
  * family than her voice's, talks with the playground over weeks of simulated days; a third model judges the
  * relationship. Both calls run on the `judge` role of their own configuration: the role that is never her voice.
  * Nothing here ever reaches a platform: the fan's words go to the playground session only.

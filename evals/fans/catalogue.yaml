@@ -1,4 +1,4 @@
-# Catalogue inventé des fans simulés (ADR « fan simulé ») : chaque script a un thème, pour vérifier que l'IA choisit
+# Catalogue inventé des fans simulés (ADR 0172) : chaque script a un thème, pour vérifier que l'IA choisit
 # celui qui colle au fantasme du fan, ou un sur-mesure quand aucun ne colle. Rien de réel : ni média, ni prix, ni texte
 # de l'agence. Thèmes volontairement absents : les pieds, l'anal, le jeu de rôle d'infirmière.
 scripts:

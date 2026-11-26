@@ -12,7 +12,7 @@ Mesurer si l'agent lit un fan, trouve son fantasme et vend au bon moment sur des
 
 - Demande de Charles du 26/11/2026 : une IA joue un fan complet (arrivé par un reel, s'abonne un soir) face à l'IA de la créatrice, comme au Playground ; puis un casting de 8 fans très différents ; « le but c'est l'argent », l'IA doit parler au fantasme précis du fan.
 - Les passes 1 et 2 (évals courtes) plafonnent à 73-76 % et ne mesurent pas la relation dans la durée.
-- Décision : brouillon d'ADR « fan simulé », numéroté par le fil Bilan.
+- Décision : brouillon d'ADR 0172, numéroté par le fil Bilan.
 
 ## À faire (liste vérifiable)
 

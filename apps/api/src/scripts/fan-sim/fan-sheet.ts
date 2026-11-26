@@ -2,7 +2,7 @@ import { parse } from 'yaml';
 import { z } from 'zod';
 
 /**
- * A simulated fan (ADR « fan simulé », Charles 26/11/2026): an invented man, his whole life, how he writes, what turns
+ * A simulated fan (ADR 0172, Charles 26/11/2026): an invented man, his whole life, how he writes, what turns
  * him on, his money and the days the code makes things happen to him. Nothing real (ADR 0010): the sheets live in
  * `evals/fans/`, written from general traits of how fans write, never from a real fan's words.
  */

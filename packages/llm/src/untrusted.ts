@@ -55,7 +55,7 @@ export type UntrustedKind =
   | 'creator_sentence'
   | 'caption_hints'
   /**
-   * The simulated fan's test (ADR « fan simulé »): her messages as the invented fan reads them, which may try to steer
+   * The simulated fan's test (ADR 0172): her messages as the invented fan reads them, which may try to steer
    * him; the whole conversation and his inner journal as the relationship judge reads them. Data, never an order.
    */
   | 'creator_message'

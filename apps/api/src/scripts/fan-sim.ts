@@ -1,6 +1,6 @@
 /**
  * `pnpm fan-sim`: an invented fan, played by a model of another family than her voice's, talks with the playground
- * over simulated days (ADR « fan simulé », Charles 26/11/2026); a third model judges the relationship and the sale.
+ * over simulated days (ADR 0172, Charles 26/11/2026); a third model judges the relationship and the sale.
  * Nothing is sent to any platform: the playground has no connector. The demo persona by default (« Fiche de démo
  * d'abord », Charles 26/11): its outputs may be read off the PC. Everything goes under `.scratch/`, which git ignores.
  * Usage: `pnpm fan-sim --fan evals/fans/julien.yaml [--days 7] [--cap-eur 5] [--rubric <barème hors dépôt>]
@@ -36,7 +36,7 @@ import { runSimulation, sessionTime, type SimEvent } from './fan-sim/run';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const COMMAND = 'fan-sim';
-/** One run never spends more than this, whatever is asked (ADR « fan simulé » § 10). */
+/** One run never spends more than this, whatever is asked (ADR 0172 § 10). */
 const MAX_CAP_EUR = 15;
 
 const { values } = parseArgs({

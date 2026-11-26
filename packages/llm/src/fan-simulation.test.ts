@@ -76,7 +76,7 @@ const FAN_CONFIG: LlmConfig = {
   },
 };
 
-describe('the simulated fan (ADR « fan simulé », Charles 26/11)', () => {
+describe('the simulated fan (ADR 0172, Charles 26/11)', () => {
   it('ships its prompt and the invented example rubric on the judge role', () => {
     const fan = loadPrompt('judge', 'fan-simulation');
     expect(fan.header).toMatchObject({ role: 'judge', output_schema: 'FanSimulationOutput' });
