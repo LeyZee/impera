@@ -12,7 +12,7 @@ export interface CommentExample {
 }
 
 /** How many of her pairs go with one comment: enough to show a tone, few enough to keep the call short. */
-export const NEAR_EXAMPLES = 5;
+const NEAR_EXAMPLES = 5;
 
 function fold(text: string): string {
   return text
