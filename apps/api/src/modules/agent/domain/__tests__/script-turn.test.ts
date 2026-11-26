@@ -216,10 +216,39 @@ describe('one message of his, for scripts (ADR 0098 § 4)', () => {
       hotSession: false,
     });
     expect(later.decision).not.toMatchObject({ kind: 'end' });
-    // The next step would have gone: held.
+    // Only the teasing went: the run ends too, and the next step never goes.
     const next = scriptTurn({ ...input, latest: teased, history: history([0]), heCame: true, mayAct: false });
-    expect(next.decision).toEqual({ kind: 'none', reason: 'held' });
-    expect(next.moved).toBeNull();
+    expect(next.decision).toEqual({ kind: 'end', status: 'stalled' });
+    expect(next.moved?.run.status).toBe('stalled');
+  });
+
+  it('il a joui après une étape achetée: nothing more is offered that evening (ADR 0156 § 6)', () => {
+    // He bought step 1, nothing waits, and he says he came: the run ends there.
+    const bought = played([
+      { type: 'step_sent', stepIndex: 0, at: BEFORE },
+      { type: 'step_sent', stepIndex: 1, at: BEFORE },
+      { type: 'step_bought', stepIndex: 1, at: BEFORE },
+    ]);
+    const came = scriptTurn({
+      ...input,
+      latest: bought,
+      history: history([0, 1], [1]),
+      heCame: true,
+      mayAct: false,
+    });
+    expect(came.decision).toEqual({ kind: 'end', status: 'stalled' });
+    expect(came.moved?.run.status).toBe('stalled');
+    // His heat climbs again a little later the same evening: step 2 never goes, and no script opens.
+    const later = new Date(NOW.getTime() + 30 * 60_000);
+    const again = scriptTurn({
+      ...input,
+      now: later,
+      offer: { ...offer, now: later },
+      latest: came.moved?.run ?? null,
+      history: history([0, 1], [1]),
+    });
+    expect(again.decision.kind).not.toBe('send_step');
+    expect(again.decision.kind).not.toBe('start');
   });
 
   it('pauses while he is not free: his messages neither refuse nor ignore the step (ADR 0103 § 12)', () => {

@@ -147,7 +147,8 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
     // answer to the step nor a refusal.
     if (input.countsHisMessage && input.availability !== 'no' && input.heCame !== true)
       run = afterHisMessage(run, storedScript, input.reply, input.hotSession, now);
-    if (input.heCame === true && paidWaiting(run) !== undefined) {
+    // Whether a step waits or he just bought one, the evening's script ends when he came (ADR 0156 § 6).
+    if (input.heCame === true) {
       const over = applyScriptRunEvent(run, storedScript, { type: 'session_cooled', at: now });
       if (over.ok) run = over.run;
     }
