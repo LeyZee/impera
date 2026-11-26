@@ -9,7 +9,7 @@ const currentUser: SQL = sql`nullif(current_setting('app.user_id', true), '')`;
 const isOwner: SQL = sql`nullif(current_setting('app.team_scope', true), '') = 'owner'`;
 
 /**
- * The agency's base style (ADR 0171): its versions, each saved by the owner and never active at birth, one active at a
+ * The agency's base style (ADR 0173): its versions, each saved by the owner and never active at birth, one active at a
  * time, activated by the owner. The owner alone reads and writes them (`withMember`); the agent reads the active one on
  * the service connection. The app may only set the activation's columns (column grant, migration); never deleted.
  * Closed to a creator's account. Its texts are the agency's, never the repo's.

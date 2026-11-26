@@ -14,14 +14,14 @@ import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
 const OPERATOR = { email: 'operator@example.test', name: 'Operator', password: 'staple battery horse' };
 
-// Invented texts only: the agency's real style lives in its base, never in the repo (ADR 0171).
+// Invented texts only: the agency's real style lives in its base, never in the repo (ADR 0173).
 const CONTENT = {
   privateStyle: 'Phrase de style inventée',
   publicStyle: 'Phrase de style publique inventée',
   form: { capitalization: 'capital', strip_final_period: true },
 };
 
-describe('the agency’s base style (GET, PUT /v1/agency/style, POST …/activate; ADR 0171)', () => {
+describe('the agency’s base style (GET, PUT /v1/agency/style, POST …/activate; ADR 0173)', () => {
   let test: TestDb;
   let app: App;
   let server: Server;

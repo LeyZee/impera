@@ -67,7 +67,7 @@ const audit = (tx: Transaction, action: string, row: Row, userId: string): Promi
   });
 
 /**
- * The base style (ADR 0171): the owner's writes on the app's connection under his own policies (`withMember`), the
+ * The base style (ADR 0173): the owner's writes on the app's connection under his own policies (`withMember`), the
  * agent's read on the service connection (`activeUnscoped`).
  */
 export function createDrizzleAgencyStyleStore(db: Database, adminDb: Database): AgencyStyleStore {

@@ -75,7 +75,7 @@ export function wireAgent(
     startDraftComposer({
       gateway: deps.llm.gateway,
       activePersona,
-      // The agency's base style, read at each draft beside her persona (ADR 0171).
+      // The agency's base style, read at each draft beside her persona (ADR 0173).
       baseStyleOf: () => persona.agencyStyle.activeUnscoped(),
       fans: deps.fans,
       onDroppedNotes: (event) => {

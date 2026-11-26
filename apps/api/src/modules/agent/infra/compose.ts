@@ -147,7 +147,7 @@ export interface ComposerPersona {
    * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
    */
   readonly voiceExamples?: readonly VoiceExample[];
-  /** The agency's base style (ADR 0171), before her sheet in the voice's prompt; her sheet wins. Absent: none. */
+  /** The agency's base style (ADR 0173), before her sheet in the voice's prompt; her sheet wins. Absent: none. */
   readonly agencyStyle?: AgencyStyleText;
 }
 

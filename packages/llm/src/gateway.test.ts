@@ -693,7 +693,7 @@ describe('LlmGateway', () => {
     expect(systems[2]).not.toContain('profile_bio');
   });
 
-  it('gives the voice the agency’s base style before her sheet, public then private, her sheet first (ADR 0171)', async () => {
+  it('gives the voice the agency’s base style before her sheet, public then private, her sheet first (ADR 0173)', async () => {
     const xai = scripted([
       { text: JSON.stringify({ bubbles: ['coucou'] }) },
       { text: JSON.stringify({ bubbles: ['coucou'] }) },

@@ -22,7 +22,7 @@ function ownerOf(request: FastifyRequest): CurrentUser {
 }
 
 /**
- * `/v1/agency/style` (ADR 0171): the agency's base style, the owner's alone. `GET` reads the active version and the
+ * `/v1/agency/style` (ADR 0173): the agency's base style, the owner's alone. `GET` reads the active version and the
  * latest ones; `PUT` saves a new version, never active; `POST …/versions/:versionId/activate` makes it the one the agent
  * writes with, with a recent sign-in, as her persona's activation (it changes what the agent writes to every fan).
  */

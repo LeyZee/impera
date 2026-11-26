@@ -4,7 +4,7 @@ import { AgencyStyleIdSchema } from './ids';
 import { VoiceFormSettingsSchema } from './voice-form';
 
 /**
- * The agency's base style (ADR 0171, Charles 26/11): how every creator of the agency writes unless her persona says
+ * The agency's base style (ADR 0173, Charles 26/11): how every creator of the agency writes unless her persona says
  * otherwise, kept in the base and never in the repo. Two texts, free and in French: her private messages, and her
  * public replies (comments under her posts). Beside them, the default form of her bubbles; her persona wins on each
  * rule. Written by the owner alone: a version saved, then activated, one active at a time.

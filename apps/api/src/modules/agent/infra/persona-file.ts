@@ -222,7 +222,7 @@ function formOf(behavior: VoiceFormSettings): VoiceFormSettings {
 
 /**
  * The guards with her disgusts, her forbidden words and emojis, her pet names, and her form: her persona's settings
- * first, then her agency's base style's (ADR 0171), then the code's.
+ * first, then her agency's base style's (ADR 0173), then the code's.
  */
 export function guardSettingsOf(persona: PersonaForModels, baseStyle: VoiceFormSettings = {}): GuardSettings {
   const { form, emojiStreakMax } = resolveForm([persona.form ?? {}, baseStyle]);

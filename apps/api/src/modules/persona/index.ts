@@ -33,7 +33,7 @@ export interface PersonaModule {
    */
   readonly versions: PersonaVersionStore;
   /**
-   * The agency's base style (ADR 0171): written by the owner at `/agency/style`; `agencyStyle.activeUnscoped` is the
+   * The agency's base style (ADR 0173): written by the owner at `/agency/style`; `agencyStyle.activeUnscoped` is the
    * port the agent writes with, wired by the composition root.
    */
   readonly agencyStyle: AgencyStyleStore;
@@ -51,7 +51,7 @@ export interface PersonaModule {
 export interface PersonaDeps {
   /** Application role: `creators` is the tenant root and has no RLS of its own. */
   readonly db: Database;
-  /** The service connection: the agent's read of the active base style, across every creator (ADR 0171). */
+  /** The service connection: the agent's read of the active base style, across every creator (ADR 0173). */
   readonly adminDb: Database;
   readonly requireRole: RequireRole;
   /** A recent sign-in, for a change of her hours (P3-14). */

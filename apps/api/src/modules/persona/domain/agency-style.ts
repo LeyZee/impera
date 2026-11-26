@@ -8,7 +8,7 @@ import {
 } from '@impera/contracts';
 
 /**
- * The agency's base style (ADR 0171): versions saved by the owner, one active, activated by the owner; every write is
+ * The agency's base style (ADR 0173): versions saved by the owner, one active, activated by the owner; every write is
  * audited with him. The agent reads the active one at each draft, on the service connection.
  */
 export interface AgencyStyleStore {

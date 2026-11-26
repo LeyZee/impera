@@ -171,13 +171,13 @@ export interface DraftComposerStartOptions {
   /** Her bank could not be read: she wrote from her sheet alone, the log says so. */
   readonly onExamplesUnread?: (event: { readonly creatorId: string }) => void;
   /**
-   * The agency's active base style (ADR 0171, `persona` module), read at each draft: its texts before her sheet, its
+   * The agency's active base style (ADR 0173, `persona` module), read at each draft: its texts before her sheet, its
    * form under hers. `null`: none. A failed read writes without it, never stops the draft.
    */
   readonly baseStyleOf?: BaseStyleSource;
 }
 
-/** Reads the agency's active base style (ADR 0171); `null` without one. */
+/** Reads the agency's active base style (ADR 0173); `null` without one. */
 export type BaseStyleSource = () => Promise<AgencyStyleContent | null>;
 
 /** The active base style, or none when there is none or it cannot be read: a draft never waits on it. */
@@ -191,7 +191,7 @@ async function baseStyleOrNone(source: BaseStyleSource | undefined): Promise<Age
 }
 
 /**
- * @public The public part of the agency's base style (ADR 0171), for her public replies (Instagram comments): trimmed, `null`
+ * @public The public part of the agency's base style (ADR 0173), for her public replies (Instagram comments): trimmed, `null`
  * when empty, absent or unreadable. The private part never leaves the chat.
  */
 export async function publicBaseStyleOf(source: BaseStyleSource): Promise<string | null> {
@@ -210,7 +210,7 @@ function composerFields(
   profileBio: string | null = null,
   baseStyle: AgencyStyleContent | null = null,
 ): ComposerPersonaFields {
-  // Her persona's form first, then the base style's, then the code's (ADR 0171).
+  // Her persona's form first, then the base style's, then the code's (ADR 0173).
   const guardSettings = guardSettingsOf(persona, baseStyle?.form);
   // Each turn takes the twelve this fan may read among them (`examplesForTurn`): his age decides the explicit ones.
   const examples = pickVoiceExamples(bank, guardSettings, bank.length);

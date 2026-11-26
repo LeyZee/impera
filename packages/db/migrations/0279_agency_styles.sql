@@ -25,7 +25,7 @@ CREATE POLICY "owner_read" ON "agency_styles" AS PERMISSIVE FOR SELECT TO public
 CREATE POLICY "owner_insert" ON "agency_styles" AS PERMISSIVE FOR INSERT TO public WITH CHECK (nullif(current_setting('app.team_scope', true), '') = 'owner' and "agency_styles"."created_by" = nullif(current_setting('app.user_id', true), '') and not "agency_styles"."is_active");--> statement-breakpoint
 CREATE POLICY "owner_activate" ON "agency_styles" AS PERMISSIVE FOR UPDATE TO public USING (nullif(current_setting('app.team_scope', true), '') = 'owner') WITH CHECK (nullif(current_setting('app.team_scope', true), '') = 'owner' and (not "agency_styles"."is_active" or "agency_styles"."activated_by" = nullif(current_setting('app.user_id', true), '')));--> statement-breakpoint
 CREATE POLICY "creator_closed" ON "agency_styles" AS RESTRICTIVE FOR ALL TO public USING (current_setting('app.account_role', true) is distinct from 'creator');--> statement-breakpoint
--- Style de base de l'agence (ADR 0171): the owner's alone. Forced, so that even the table's owner goes through RLS.
+-- Style de base de l'agence (ADR 0173): the owner's alone. Forced, so that even the table's owner goes through RLS.
 ALTER TABLE "agency_styles" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 -- From nothing, whatever the default privileges gave: the app reads and adds versions, sets only the activation,
 -- deletes none; the service role reads the active one for the agent.

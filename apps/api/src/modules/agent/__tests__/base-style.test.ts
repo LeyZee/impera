@@ -48,7 +48,7 @@ async function draftWith(baseStyleOf?: BaseStyleSource) {
   return { draft: await composer.compose(INPUT), seen };
 }
 
-describe('the agency’s base style in a draft (ADR 0171)', () => {
+describe('the agency’s base style in a draft (ADR 0173)', () => {
   it('gives the voice its texts and the form it sets, under her persona’s', async () => {
     const { draft, seen } = await draftWith(() => Promise.resolve(STYLE));
     expect(seen.voiceInputs?.[0]?.agencyStyle).toEqual({

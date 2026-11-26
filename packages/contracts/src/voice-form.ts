@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * The form of her bubbles (Charles 26/11, ADR 0158 § O): rules applied by code to what she sends, after the guards and
  * before the send, never by a prompt (CLAUDE.md rule 3). Each one is a setting of her persona, or of her agency's base
- * style (ADR 0171), with a default in code; her persona wins.
+ * style (ADR 0173), with a default in code; her persona wins.
  */
 
 /** The first letter of a bubble: always a capital, always lower case, or as the voice wrote it. */

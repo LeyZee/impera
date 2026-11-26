@@ -24,10 +24,10 @@ async function failure(promise: Promise<unknown>): Promise<string> {
 }
 
 /**
- * The agency's base style (ADR 0171): the owner alone reads, saves and activates its versions; nobody changes a text or
+ * The agency's base style (ADR 0173): the owner alone reads, saves and activates its versions; nobody changes a text or
  * removes a version; the service role reads it for the agent. Invented people and texts only (ADR 0010).
  */
-describe('the agency’s base style (ADR 0171): the owner’s alone', () => {
+describe('the agency’s base style (ADR 0173): the owner’s alone', () => {
   let test: TestDb;
   const owner = newId(UserIdSchema);
   const manager = newId(UserIdSchema);

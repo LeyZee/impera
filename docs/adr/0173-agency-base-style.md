@@ -1,4 +1,4 @@
-# 0171. Style de base de l'agence en base, la fiche le complète
+# 0173. Style de base de l'agence en base, la fiche le complète
 
 Statut : accepted (choix de Charles, 26/11/2026 20:03 : un style de base de l'agence gardé en base, pas dans le dépôt)
 Date : 2026-11-26

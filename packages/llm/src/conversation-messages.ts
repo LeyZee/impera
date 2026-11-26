@@ -171,7 +171,7 @@ export function profileBioBlock(profileBio: string | null | undefined): string {
 }
 
 /**
- * The agency's base style (ADR 0171, Charles 26/11): how every creator of the agency writes, public then private, each
+ * The agency's base style (ADR 0173, Charles 26/11): how every creator of the agency writes, public then private, each
  * in its typed block, before her sheet; her sheet wins on any point where they differ. Both empty: no section at all.
  */
 export function agencyStyleBlock(style: AgencyStyleText | undefined): string {

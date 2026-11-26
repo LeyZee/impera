@@ -72,7 +72,7 @@ export function checkForm(bubbles: readonly string[], settings: FormSettings): F
 }
 
 /**
- * Her form, layer by layer (ADR 0171): the first layer that sets a rule wins, her persona before her agency's base
+ * Her form, layer by layer (ADR 0173): the first layer that sets a rule wins, her persona before her agency's base
  * style, then the code's default. The emoji streak is read the same way.
  */
 export function resolveForm(layers: readonly VoiceFormSettings[]): {

@@ -31,7 +31,7 @@ describe('her close-only words and emoji streak, to the guards (Charles 26/11)',
     expect(settings.emojiStreakMax).toBeUndefined();
   });
 
-  it('takes her form from her persona first, then her agency’s base style, then the code (ADR 0171)', () => {
+  it('takes her form from her persona first, then her agency’s base style, then the code (ADR 0173)', () => {
     const settings = guardSettingsOf(demo('v0.7.0'), {
       capitalization: 'capital',
       mark_spacing: 'space',

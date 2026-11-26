@@ -43,7 +43,7 @@ export type UntrustedKind =
   | 'comment_examples'
   /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
   | 'profile_bio'
-  /** The agency's base style (ADR 0171): the owner's text on how she writes in public and in private, data. */
+  /** The agency's base style (ADR 0173): the owner's text on how she writes in public and in private, data. */
   | 'agency_public_style'
   | 'agency_private_style'
   /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */

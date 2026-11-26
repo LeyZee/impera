@@ -215,13 +215,13 @@ export interface VoiceInput extends ConversationInput {
   /** The most bubbles she may write this turn, decided by code (1 to 3). Absent, the prompt's own rule. */
   readonly maxBubbles?: number;
   /**
-   * The agency's base style (ADR 0171), its public then its private part, in typed blocks before her sheet, which
+   * The agency's base style (ADR 0173), its public then its private part, in typed blocks before her sheet, which
    * wins where they differ. Absent or both empty: no section.
    */
   readonly agencyStyle?: AgencyStyleText;
 }
 
-/** The two texts of the agency's base style (ADR 0171), as the owner wrote them. */
+/** The two texts of the agency's base style (ADR 0173), as the owner wrote them. */
 export interface AgencyStyleText {
   readonly publicStyle: string;
   readonly privateStyle: string;

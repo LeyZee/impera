@@ -11,10 +11,10 @@ import {
 import { AUDIT_ACTIONS } from './audit-actions';
 import { ErrorCodeSchema } from './errors';
 
-// Invented texts only: the agency's real style lives in its base (ADR 0171).
+// Invented texts only: the agency's real style lives in its base (ADR 0173).
 const body = { privateStyle: 'Phrase de style inventée', publicStyle: '', form: {} };
 
-describe('the agency’s base style (ADR 0171)', () => {
+describe('the agency’s base style (ADR 0173)', () => {
   it('takes two bounded texts, trimmed, and the form settings of a persona', () => {
     expect(
       SaveAgencyStyleBodySchema.parse({ ...body, publicStyle: '  Autre phrase inventée  ' }).publicStyle,
