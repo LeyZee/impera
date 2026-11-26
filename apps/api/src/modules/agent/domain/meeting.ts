@@ -1,3 +1,5 @@
+import type { MeetingTierSettings } from '@impera/contracts';
+
 /**
  * He asks to see her (Charles, 21/11 à 19 h 50, Paris): never a yes, never a dry no. She gives one reason per message,
  * never aimed at him, chosen by where they are, never above it however much he insists, and never the same reason
@@ -16,23 +18,20 @@ export interface Relationship {
   readonly hasBought: boolean;
 }
 
-const DAY_HOURS = 24;
-/** Under this, a brand new fan (guide 26/11). */
-const NEW_FAN_HOURS = 3 * DAY_HOURS;
-/** A payer known this long is close (guide 26/11: three weeks of exchanges). */
-const CLOSE_FAN_HOURS = 21 * DAY_HOURS;
-/** A payer known this long is very close (guide 26/11: two months). */
-const VERY_CLOSE_FAN_HOURS = 60 * DAY_HOURS;
-
 /**
  * His tier, 1 to 5, judged by code from seniority and purchases (guide 26/11): brand new, a few days, a regular who
- * paid, close, very close. A fan who never paid never goes past the second.
+ * paid, close, very close. A fan who never paid never goes past the second; without her settings, nobody does (a
+ * payer counts as a few days, the others as brand new).
  */
-export function relationshipTier(relationship: Relationship): number {
+export function relationshipTier(
+  relationship: Relationship,
+  settings: MeetingTierSettings | undefined,
+): number {
   const { knownHours, hasBought } = relationship;
-  if (!hasBought) return knownHours >= NEW_FAN_HOURS ? 2 : 1;
-  if (knownHours >= VERY_CLOSE_FAN_HOURS) return 5;
-  return knownHours >= CLOSE_FAN_HOURS ? 4 : 3;
+  if (settings === undefined) return hasBought ? 2 : 1;
+  if (!hasBought) return knownHours >= settings.newFanHours ? 2 : 1;
+  if (knownHours >= settings.veryCloseFanHours) return 5;
+  return knownHours >= settings.closeFanHours ? 4 : 3;
 }
 
 export type MeetingAnswer =

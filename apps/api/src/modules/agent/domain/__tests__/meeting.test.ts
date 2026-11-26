@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { meetingAnswer, relationshipTier, type MeetingReason, type Relationship } from '../meeting';
 
-const DAY = 24;
 const fan = (over: Partial<Relationship> = {}): Relationship => ({
   knownHours: 2,
   hasBought: false,
@@ -16,16 +15,23 @@ const turn = (tier: number, given: MeetingReason[] = [], teased = false) => ({
 });
 
 describe('relationshipTier (guide 26/11): seniority and purchases, never his insisting', () => {
+  // Fictional settings: hers are typed by the owner, never written in the repo.
+  const settings = { newFanHours: 10, closeFanHours: 100, veryCloseFanHours: 1_000 };
   it('reads brand new, a few days, a regular who paid, close, very close', () => {
-    expect(relationshipTier(fan())).toBe(1);
-    expect(relationshipTier(fan({ knownHours: 3 * DAY }))).toBe(2);
-    expect(relationshipTier(fan({ hasBought: true }))).toBe(3);
-    expect(relationshipTier(fan({ hasBought: true, knownHours: 21 * DAY }))).toBe(4);
-    expect(relationshipTier(fan({ hasBought: true, knownHours: 60 * DAY }))).toBe(5);
+    expect(relationshipTier(fan(), settings)).toBe(1);
+    expect(relationshipTier(fan({ knownHours: 10 }), settings)).toBe(2);
+    expect(relationshipTier(fan({ hasBought: true }), settings)).toBe(3);
+    expect(relationshipTier(fan({ hasBought: true, knownHours: 100 }), settings)).toBe(4);
+    expect(relationshipTier(fan({ hasBought: true, knownHours: 1_000 }), settings)).toBe(5);
   });
 
   it('never takes a fan who never paid past the second tier', () => {
-    expect(relationshipTier(fan({ knownHours: 365 * DAY }))).toBe(2);
+    expect(relationshipTier(fan({ knownHours: 100_000 }), settings)).toBe(2);
+  });
+
+  it('takes nobody past the second tier without her settings', () => {
+    expect(relationshipTier(fan({ hasBought: true, knownHours: 100_000 }), undefined)).toBe(2);
+    expect(relationshipTier(fan({ knownHours: 100_000 }), undefined)).toBe(1);
   });
 });
 

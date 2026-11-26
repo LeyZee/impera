@@ -6,6 +6,7 @@ import {
   type CustomPriceGrid,
   type FanFlags,
   type MediaDescription,
+  type MeetingTierSettings,
   type ObjectionReplies,
   type OpenCustomOrder,
 } from '@impera/contracts';
@@ -265,6 +266,8 @@ export interface ComposeTurnInput {
     readonly given: readonly MeetingReason[];
     readonly teased: boolean;
   };
+  /** Her settings for the meeting tiers (guide 26/11), typed by the owner; absent, nobody goes past the second. */
+  readonly meetingTiers?: MeetingTierSettings;
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -1212,11 +1215,14 @@ export async function composeTurn(
   const meeting: MeetingAnswer | undefined =
     brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
       ? meetingAnswer({
-          tier: relationshipTier({
-            knownHours:
-              (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-            hasBought: input.situation.spentCents > 0,
-          }),
+          tier: relationshipTier(
+            {
+              knownHours:
+                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+              hasBought: input.situation.spentCents > 0,
+            },
+            input.meetingTiers,
+          ),
           given: input.meeting?.given ?? [],
           teased: input.meeting?.teased ?? false,
           herNextParty: brief.asksHerNextParty === true,
