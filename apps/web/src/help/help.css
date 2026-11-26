@@ -1,6 +1,8 @@
 /* Moi › Aide (Réglages › Aide for the owner): one colour per page, the person's (--_c), set on the stack. */
 .hp__stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   gap: 44px;
 }
 @media (max-width: 560px) {

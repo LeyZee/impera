@@ -2,7 +2,7 @@ import { railKindOf, type Me } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
-import { Guide, withKeys } from './Guide';
+import { french, Guide, withKeys } from './Guide';
 import { HELP, type HelpAudience } from './guides';
 
 import { playsTheGame } from '@/rewards/api';
@@ -66,12 +66,12 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
           <i aria-hidden="true" />
           L’essentiel
         </p>
-        <p className="hp__lead">{book.lead}</p>
+        <p className="hp__lead">{french(book.lead)}</p>
         <ol className="hp__day">
           {book.day.map((beat) => (
             <li key={beat.title} className="nv-tile">
-              <b>{beat.title}</b>
-              {beat.text}
+              <b>{french(beat.title)}</b>
+              {withKeys(beat.text)}
             </li>
           ))}
         </ol>
@@ -101,7 +101,7 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
               }}
             >
               <i aria-hidden="true" />
-              {guide.title}
+              {french(guide.title)}
             </a>
           ))}
         </nav>
@@ -141,7 +141,7 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
           {book.faq.map((item) => (
             <details key={item.q} className="nv-disclosure">
               <summary>
-                <span className="hp__q">{item.q}</span>
+                <span className="hp__q">{french(item.q)}</span>
               </summary>
               <div className="nv-disclosure__body">
                 <p className="hp__a">{withKeys(item.a)}</p>

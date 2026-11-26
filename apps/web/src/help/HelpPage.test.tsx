@@ -9,6 +9,7 @@ import {
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { french } from './Guide';
 import { HelpContent } from './HelpPage';
 import { HELP, type HelpAudience } from './guides';
 
@@ -38,7 +39,7 @@ describe('HelpPage', () => {
     expect(guides).toHaveLength(HELP[audience].guides.length);
     expect(guides[0]?.open).toBe(true);
     expect([...guides].slice(1).every((one) => !one.open)).toBe(true);
-    expect(screen.getByText(HELP[audience].lead)).toBeTruthy();
+    expect(document.querySelector('.hp__lead')?.textContent).toBe(french(HELP[audience].lead));
   });
 
   it('paints the page in the person’s colour, one for every guide', async () => {
@@ -61,6 +62,19 @@ describe('HelpPage', () => {
     expect(target.open).toBe(false);
     fireEvent.click(screen.getByRole('link', { name: last.title }));
     expect(target.open).toBe(true);
+  });
+
+  it('sets French in French: a no-break space before ; : ? ! » and after «', () => {
+    expect(french('Tu tiens les conversations ; le copilote')).toBe(
+      'Tu tiens les conversations\u00A0; le copilote',
+    );
+    expect(french('Partager, « Sur l’écran » ?')).toBe('Partager, «\u00A0Sur l’écran\u00A0»\u00A0?');
+  });
+
+  it.each(AUDIENCES)('never lets a French sign start a line alone in the %s’s guide', async (audience) => {
+    await renderPage(audience);
+    for (const guide of document.querySelectorAll<HTMLDetailsElement>('details')) guide.open = true;
+    expect(document.body.textContent.match(/.{30}(?: [;:?!»]|« ).{10}/gu) ?? []).toEqual([]);
   });
 
   it('writes a key as a key', async () => {

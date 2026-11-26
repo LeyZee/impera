@@ -4,10 +4,18 @@ import type { HelpGuide, HelpTone } from './guides';
 
 import { NavIcon } from '@/shell/NavIcon';
 
-/** `<kbd>X</kbd>` in a guide's text becomes the design system's key; everything else stays plain text. */
+/**
+ * French typography, once at render: the space before ; : ? ! » and after « becomes a no-break space, so the sign never
+ * starts a line alone on a phone (« Tu tiens les conversations / ; le copilote… », recette Design du 26/11).
+ */
+export function french(text: string): string {
+  return text.replace(/\s+([;:?!»])/gu, '\u00A0$1').replace(/«\s+/gu, '«\u00A0');
+}
+
+/** `<kbd>X</kbd>` in a guide's text becomes the design system's key; the rest is plain text, set in French. */
 export function withKeys(text: string): ReactNode {
-  const parts = text.split(/<kbd>(.*?)<\/kbd>/u);
-  if (parts.length === 1) return text;
+  const parts = french(text).split(/<kbd>(.*?)<\/kbd>/u);
+  if (parts.length === 1) return parts[0];
   return parts.map((part, index) =>
     index % 2 === 1 ? (
       <kbd key={index} className="nv-kbd">
@@ -86,7 +94,7 @@ export function Guide({
         </span>
         <span className="nv-guide__head">
           <span className="nv-guide__title">
-            {guide.title}
+            {french(guide.title)}
             {guide.essential === true ? (
               <span className="nv-tag nv-tag--tint nv-guide__key" style={{ '--_c': 'var(--nv-content-6)' }}>
                 {STAR}
@@ -94,18 +102,18 @@ export function Guide({
               </span>
             ) : null}
           </span>
-          <span className="nv-guide__sum">{guide.summary}</span>
+          <span className="nv-guide__sum">{french(guide.summary)}</span>
         </span>
         <span className="nv-guide__time">{guide.minutes}</span>
         <span className="nv-guide__chev" aria-hidden="true" />
       </summary>
       <div className="nv-guide__body">
-        {guide.why === undefined ? null : <p className="nv-guide__why">{guide.why}</p>}
+        {guide.why === undefined ? null : <p className="nv-guide__why">{withKeys(guide.why)}</p>}
         {guide.chips === undefined ? null : (
           <div className="nv-guide__chips">
             {guide.chips.map((chip) => (
               <span key={chip.text} className="nv-tag nv-tag--tint" style={{ '--_c': TONE[chip.tone] }}>
-                {chip.text}
+                {french(chip.text)}
               </span>
             ))}
           </div>
@@ -116,7 +124,7 @@ export function Guide({
               <div>
                 <span className="nv-guide__do">{withKeys(step.do)}</span>
                 <span className="nv-guide__see">
-                  <span className="nv-guide__see-label">Tu dois voir :</span> {withKeys(step.see)}
+                  <span className="nv-guide__see-label">{french('Tu dois voir :')}</span> {withKeys(step.see)}
                 </span>
               </div>
             </li>
