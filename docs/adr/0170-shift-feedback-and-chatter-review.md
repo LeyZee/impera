@@ -29,7 +29,7 @@ Précise : 0050 § 10 (le mini feedback), 0042 § 5 (les remontées lues par le 
    - Les gardes du code, rejouées sur chaque message humain : sans appel au modèle, objectives.
    - Une relecture par le modèle de chaque conversation du shift, contre la grille de l'agence et la fiche courte de la persona.
    - Le bilan, écrit seulement à partir de ces relectures et des chiffres calculés par le code. Un chiffre que le modèle écrirait sans l'avoir reçu est refusé.
-9. **La grille vit en base, pas dans le dépôt.** Une remarque cite sa règle par un code générique (par exemple `relation.kyc_before_sale`). Le libellé lisible et la règle elle-même sont saisis hors dépôt, en base. Les tests utilisent des règles et des phrases inventées.
+9. **La grille vit en base, pas dans le dépôt.** Une remarque cite sa règle par un code générique (par exemple `rule.example_1`). Le libellé lisible et la règle elle-même sont saisis hors dépôt, en base. Les tests utilisent des règles et des phrases inventées.
 10. **Jugé sur les règles, jamais sur le style.** Un chatteur n'est jamais comparé à ce que l'agent aurait écrit, ni aux autres chatteurs. La forme de ses messages ne compte jamais dans un dossier : elle peut seulement apparaître comme un conseil.
 11. **Ventes faites et manquées.** Une occasion manquée n'est relevée que là où des signaux lus par le code montrent qu'une vente était possible. Chaque remarque cite la règle qui la fonde.
 12. **Le bilan.** C'est une page dans l'espace du chatteur, lue le même jour que le propriétaire. Il y trouve :
