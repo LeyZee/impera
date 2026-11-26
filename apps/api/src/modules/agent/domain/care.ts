@@ -90,12 +90,12 @@ export function helpLanguageOf(fanText: string, kept: Language | null = null): H
 
 /**
  * The help bubble of each language, written here in her casual voice, never by a model (wording approved by Charles,
- * 26/11): one bubble, tutoiement, no emoji. Only French names a number, the 3114 of ADR 0088 § 4; the others send him
- * to someone close or his country's emergency number, with no number picked by his language.
+ * 26/11): one bubble, tutoiement, no emoji. None names a number: each sends him to someone close or his country's
+ * emergency number, since no number is ever picked by his language, French included (Charles, 26/11).
  */
 const HELP_BUBBLES: Readonly<Record<HelpLanguage, string>> = {
   french:
-    'et promets-moi un truc : si ça redevient trop lourd la nuit, appelle le 3114. c’est gratuit, jour et nuit, et quelqu’un t’écoute vraiment. je préfère te savoir pas tout seul',
+    'et promets-moi un truc : si ça redevient trop lourd la nuit, parles-en à quelqu’un de proche ou appelle le numéro d’urgence de ton pays. je préfère te savoir pas tout seul',
   english:
     'and promise me something: if it gets too heavy again at night, talk to someone close to you or call your country’s emergency number. i’d rather know you’re not alone',
   italian:
@@ -119,8 +119,8 @@ const NATIONAL_BUBBLES: Readonly<Record<HelpLanguage, (line: HelpLine) => string
 /**
  * The fixed bubble that closes the first care answer to dark thoughts, once per episode (ADR 0088 § 4): written here,
  * never by a model. A national number only when his country is a confirmed fact of his card and the table has a row
- * a person verified for it (ADR 0168 § 8, `HELP_LINES`); never a number picked by his language. Otherwise the French
- * bubble keeps the 3114 of ADR 0088 § 4, and the others send him to someone close or his country's emergency number.
+ * a person verified for it (ADR 0168 § 8, `HELP_LINES`); never a number picked by his language. Otherwise, in every
+ * language, French included, it sends him to someone close or his country's emergency number.
  */
 export function helpBubble(
   language: HelpLanguage,

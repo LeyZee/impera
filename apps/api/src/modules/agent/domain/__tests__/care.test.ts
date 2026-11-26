@@ -43,12 +43,11 @@ describe('checkCare (ADR 0088 § 3)', () => {
 });
 
 describe('the help bubble (ADR 0088 § 4)', () => {
-  it('gives the 3114 to a fan who writes in French, and never a national number to another (ADR 0168 § 8)', () => {
+  it('never picks a number by his language, French included (ADR 0168 § 8)', () => {
     expect(helpLanguageOf('je veux plus vivre, j’en peux plus')).toBe('french');
     expect(helpLanguageOf('I want to die, I can’t take it anymore')).toBe('english');
     expect(helpLanguageOf('')).toBe('french');
-    expect(helpBubble('french')).toContain('3114');
-    for (const language of ['english', 'italian', 'spanish'] as const)
+    for (const language of ['french', 'english', 'italian', 'spanish'] as const)
       expect(helpBubble(language)).not.toMatch(/\d/u);
   });
 
@@ -72,7 +71,7 @@ describe('the help bubble (ADR 0088 § 4)', () => {
       },
     ];
     expect(helpBubble('italian', 'ZZ', lines)).toContain('0000 (ligne d’écoute inventée)');
-    expect(helpBubble('french', 'ZZ', lines)).not.toContain('3114');
+    expect(helpBubble('french', 'ZZ', lines)).toContain('appelle le 0000 (ligne d’écoute inventée)');
     // Unknown country, or no verified row: the bubble without a national number.
     expect(helpBubble('italian', null, lines)).toBe(helpBubble('italian'));
     expect(helpBubble('italian', 'YY', lines)).toBe(helpBubble('italian'));
@@ -111,7 +110,7 @@ describe('the help bubble (ADR 0088 § 4)', () => {
         expect(bubble).not.toContain('\n');
       }
     }
-    expect(helpBubble('french')).toContain('appelle le 3114');
+    expect(helpBubble('french')).toContain('numéro d’urgence de ton pays');
   });
 
   it('passes its own guard: the code writes nothing the care mode would refuse', () => {

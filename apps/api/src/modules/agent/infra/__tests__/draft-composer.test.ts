@@ -985,7 +985,7 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     );
     const answered = await low.draftComposer.compose(says('j’en peux plus, je veux en finir'));
     expect(answered).toMatchObject({ kind: 'draft', care: { signs: ['self_harm'], help: true } });
-    expect(answered.kind === 'draft' && answered.bubbles.at(-1)).toContain('3114');
+    expect(answered.kind === 'draft' && answered.bubbles.at(-1)).toContain('numéro d’urgence de ton pays');
     expect(distress.protections.map((p) => p.protection)).toEqual([
       { unconfirmAge: false, stopContact: false, care: true, freezeSales: false, because: ['self_harm'] },
     ]);
