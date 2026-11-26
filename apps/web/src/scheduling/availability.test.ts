@@ -155,5 +155,11 @@ describe('« Mes dispos » : les plages comme il les écrit', () => {
     ).toBe('Deux plages se chevauchent le mardi.');
     expect(draftsIssue([{ key: 0, weekday: 1, startMinute: 18 * 60, endMinute: 0 }])).toBeNull();
     expect(weekSum([])).toBe('Pas encore données');
+    expect(
+      weekSum([
+        { weekday: 5, startMinute: 18 * 60, endMinute: 24 * 60 },
+        { weekday: 6, startMinute: 0, endMinute: 120 },
+      ]),
+    ).toBe('1 jour');
   });
 });

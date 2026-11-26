@@ -593,11 +593,15 @@
   min-width: 0;
   animation: nv-enter var(--nv-dur-base) var(--nv-ease-out) both;
 }
-.sc-dispo-range__time {
-  width: 112px;
+.sc-dispo-range .sc-dispo-range__time {
+  flex: none;
+  width: 120px;
 }
+/* « le lendemain » under the two hours, so that the × keeps its place at the end of the line. */
 .sc-dispo-range__next {
-  white-space: nowrap;
+  order: 10;
+  flex-basis: 100%;
+  margin-top: -2px;
 }
 .sc-dispo-range__remove {
   position: relative;
@@ -647,7 +651,7 @@
   .sc-dispo-day[data-empty='true'] .sc-dispo-day__ranges {
     padding-top: 0;
   }
-  .sc-dispo-range__time {
+  .sc-dispo-range .sc-dispo-range__time {
     width: 96px;
   }
 }

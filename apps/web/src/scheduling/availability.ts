@@ -231,6 +231,7 @@ export function draftsIssue(drafts: readonly DraftRange[]): string | null {
 /** « 4 plages, du lundi au vendredi » would say too much: the count and the days, as the fold sums it. */
 export function weekSum(ranges: readonly AvailabilityRange[]): string {
   if (ranges.length === 0) return 'Pas encore données';
-  const days = new Set(ranges.map((range) => range.weekday)).size;
+  // Counted as he gave them: Friday night to 2 h is Friday's, not a day more.
+  const days = new Set(draftsOf(ranges).map((draft) => draft.weekday)).size;
   return days === 1 ? '1 jour' : `${String(days)} jours`;
 }
