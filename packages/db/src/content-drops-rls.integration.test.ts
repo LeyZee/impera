@@ -357,6 +357,17 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
         ),
       ),
     ).toMatch(/content_drop_files_redo_check/u);
+    // Signed by whoever asks, never in the owner's name.
+    expect(
+      await failure(
+        asTeam(manager, (tx) =>
+          tx
+            .update(s.contentDropFiles)
+            .set({ ...ask('Trop sombre'), redoBy: owner })
+            .where(eq(s.contentDropFiles.id, medium.id)),
+        ),
+      ),
+    ).toMatch(/row-level security/u);
     await asTeam(manager, (tx) =>
       tx.update(s.contentDropFiles).set(ask('Trop sombre')).where(eq(s.contentDropFiles.id, medium.id)),
     );

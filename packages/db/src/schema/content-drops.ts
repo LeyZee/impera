@@ -440,7 +440,8 @@ export const contentDropFiles = pgTable(
         select 1 from content_drops d where d.id = ${t.dropId} and d.creator_id = ${t.creatorId}
           and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
       )`,
-      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.replacedAt} is null`,
+      withCheck: sql`${ofHerTeam(t.creatorId)} and ${t.replacedAt} is null
+        and (${t.redoBy} is null or ${t.redoBy} = nullif(current_setting('app.user_id', true), ''))`,
     }),
   ],
 );

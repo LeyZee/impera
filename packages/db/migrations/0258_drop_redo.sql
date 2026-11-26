@@ -31,7 +31,8 @@ ALTER TABLE "content_drop_files" ADD CONSTRAINT "content_drop_files_slot_check" 
 CREATE POLICY "team_redo" ON "content_drop_files" AS PERMISSIVE FOR UPDATE TO public USING (current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."replaced_at" is null and exists (
         select 1 from content_drops d where d.id = "content_drop_files"."drop_id" and d.creator_id = "content_drop_files"."creator_id"
           and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')
-      )) WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."replaced_at" is null);--> statement-breakpoint
+      )) WITH CHECK (current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and "content_drop_files"."creator_id" = nullif(current_setting('app.creator_id', true), '')::uuid and "content_drop_files"."replaced_at" is null
+        and ("content_drop_files"."redo_by" is null or "content_drop_files"."redo_by" = nullif(current_setting('app.user_id', true), '')));--> statement-breakpoint
 GRANT UPDATE ("redo_sentence", "redo_at", "redo_by") ON "content_drop_files" TO nirvana_app;--> statement-breakpoint
 CREATE FUNCTION "guard_content_drop_file_redo"() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
