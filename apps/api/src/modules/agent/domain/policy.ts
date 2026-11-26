@@ -31,6 +31,8 @@ export interface OfferContext {
   readonly flags: FanFlags;
   /** Hers, read from her persona (`PersonaForModels.offerLimits`). */
   readonly limits: OfferLimits;
+  /** Her time zone: the same evening never ends before her next day. Absent, only her cooldown counts. */
+  readonly timeZone?: string;
 }
 
 export type OfferBlock =
@@ -48,32 +50,89 @@ export const NO_SALE_RISKS: readonly string[] = [
   'dangerous_request',
   'real_abuse',
   'harassment',
+  'insult',
   'dispute',
 ];
 
 const HOUR_MS = 3_600_000;
+
+/**
+ * « Jamais deux scripts le même soir » (ADR 0158 § 42, guide 26/11): the same evening lasts at least her cooldown
+ * between two scripts, and never ends before the next day where she lives. His asking lifts neither.
+ */
+export function sameEvening(
+  now: Date,
+  at: Date,
+  cooldownHours: number,
+  timeZone: string | undefined,
+): boolean {
+  if (now.getTime() - at.getTime() < cooldownHours * HOUR_MS) return true;
+  return timeZone !== undefined && localDay(now, timeZone) === localDay(at, timeZone);
+}
+
+function localDay(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
 
 export function offerDecision(context: OfferContext): OfferDecision {
   const { flags, limits } = context;
   if (flags.doNotContact === true) return { allowed: false, reason: 'do_not_contact' };
   if (context.risks.some((risk) => NO_SALE_RISKS.includes(risk))) return { allowed: false, reason: 'risk' };
   // Frozen because he said he cannot pay: that one lifts when he comes back to paid content himself, like `hasNoBudget`.
-  const noBudget = context.hasNoBudget || flags.salesFrozen?.reason === 'money_trouble';
+  // « À sec » until his pay (ADR 0158 § M 52): no sale while the brain still reads it, and no flag set on him.
+  const noBudget =
+    context.hasNoBudget ||
+    context.risks.includes('no_budget') ||
+    flags.salesFrozen?.reason === 'money_trouble';
   if (flags.salesFrozen !== undefined && !noBudget) return { allowed: false, reason: 'sales_frozen' };
   // A script is explicit content: never before he is confirmed an adult.
   if (flags.ageConfirmedAt === undefined) return { allowed: false, reason: 'age_unconfirmed' };
-  // He came back to paid content himself: no waiting on the cooldown or on his budget.
-  if (context.fanAsksForPaid) return { allowed: true };
-  if (noBudget) return { allowed: false, reason: 'no_budget' };
+  // Never two scripts the same evening, his asking or not.
   if (
     context.lastOfferAt !== null &&
-    context.now.getTime() - context.lastOfferAt.getTime() < limits.cooldownHours * HOUR_MS
-  ) {
+    sameEvening(context.now, context.lastOfferAt, limits.cooldownHours, context.timeZone)
+  )
     return { allowed: false, reason: 'cooldown' };
-  }
+  // He came back to paid content himself: no waiting on his budget nor his heat.
+  if (context.fanAsksForPaid) return { allowed: true };
+  if (noBudget) return { allowed: false, reason: 'no_budget' };
   // His heat replaces « he sexualizes now » (P3-12): a single flirty line is not a hot fan.
   if (context.desire < limits.minDesire) return { allowed: false, reason: 'low_desire' };
   return { allowed: true };
+}
+
+/**
+ * He asks for more paid content within the evening of her last script (passe 18, Charles 21/11): nothing more is
+ * offered tonight; she steers him to a custom request instead, never a yes nor a price before the creator agrees.
+ */
+export function asksMoreSameEvening(
+  context: Pick<OfferContext, 'now' | 'lastOfferAt' | 'fanAsksForPaid' | 'limits' | 'timeZone'>,
+): boolean {
+  return (
+    context.fanAsksForPaid &&
+    context.lastOfferAt !== null &&
+    sameEvening(context.now, context.lastOfferAt, context.limits.cooldownHours, context.timeZone)
+  );
+}
+
+/**
+ * Broke until his pay but a fan who already paid (passe 11a, Charles 21/11): she keeps him warm, words only. No offer
+ * and no media this time, no freeze and no flag on him. A fan who never paid keeps the plain no-budget stop.
+ */
+export function keepsWarm(context: {
+  readonly risks: readonly string[];
+  readonly hasBought: boolean;
+}): boolean {
+  return (
+    context.hasBought &&
+    context.risks.includes('no_budget') &&
+    !context.risks.some((risk) => NO_SALE_RISKS.includes(risk))
+  );
 }
 
 /**

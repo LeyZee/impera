@@ -53,6 +53,7 @@ import {
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
 import type { LanguageDecision } from '../domain/language';
+import type { MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
 import { originNote } from '../domain/origin';
 import type { OfferLimits } from '../domain/policy';
@@ -66,6 +67,7 @@ import { handoffCauseOf } from '../domain/traps';
 import {
   composeTurn,
   type ComposedTurn,
+  type ComposeTurnInput,
   type ComposerPersona,
   type OfferInput,
   type ScriptsInput,
@@ -182,6 +184,8 @@ export interface AgentComposeInput {
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
   /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7), as the journal keeps it. */
   readonly saleTrouble?: SaleTroubleSeen;
+  /** What she already answered him about meeting her, and how close he is (Charles 21/11); absent, nothing given. */
+  readonly meeting?: ComposeTurnInput['meeting'];
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -274,6 +278,8 @@ type AgentComposeResult = (
   readonly saleTrouble?: SaleTroubleKind;
   /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
   readonly abandonTeased?: true;
+  /** What she answered in this draft to his asking to see her (Charles 21/11): the reason given, never twice. */
+  readonly meetingAnswer?: MeetingAnswer;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /** What the code decided with the draft, as the copilot panel reads it (ADR 0141 lot a): kept with the draft. */
@@ -870,6 +876,8 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
     ...(composed.saleTrouble?.kind === 'answer' &&
       result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
     ...(composed.abandonTeased !== undefined && result.kind === 'draft' && { abandonTeased: true }),
+    ...(composed.meetingAnswer !== undefined &&
+      result.kind === 'draft' && { meetingAnswer: composed.meetingAnswer }),
     ...(composed.customOrderTurn !== undefined && { customOrderTurn: composed.customOrderTurn }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
@@ -1251,6 +1259,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
+        ...(input.meeting !== undefined && { meeting: input.meeting }),
         saleTrouble: {
           seen: input.saleTrouble ?? NO_SALE_TROUBLE,
           // He bought from her: Reveal's spending, or a step of hers recorded paid.

@@ -4,7 +4,10 @@
  * only reads the hints it gets (CLAUDE.md rule 3).
  */
 
-/** At most this many words, he writes little: she keeps it going with an open question on what he said. */
+/**
+ * At most this many words, he writes little: she writes little too, and asks only when the conversation does not go on
+ * by itself (Charles 21/11: no question every message, the questionnaire effect).
+ */
 const QUIET_WORDS = 6;
 /** At least this many words, he tells a lot: she bounces on it and gives a bit of herself, asking little. */
 const TALKATIVE_WORDS = 25;
@@ -12,7 +15,10 @@ const TALKATIVE_WORDS = 25;
 const EMOJI_STREAK = 2;
 
 export const QUIET_FAN_HINT =
-  'il écrit peu : finis sur une question ouverte à propos de ce qu’il vient de dire, pas une nouvelle question pour faire connaissance';
+  'il écrit peu : elle écrit court aussi ; une question ouverte sur ce qu’il vient de dire seulement si la conversation ne repart pas d’elle-même';
+/** Her last answer asked him something: no question this time (Charles 21/11). */
+export const NO_QUESTION_HINT =
+  'elle lui a posé une question à son dernier message : pas de question cette fois, une réaction, une taquinerie ou un peu d’elle';
 export const TALKATIVE_FAN_HINT =
   'il raconte volontiers : rebondis sur ce qu’il dit et confie un peu de toi, une question seulement si elle vient toute seule';
 
@@ -31,8 +37,14 @@ function emojisOf(texts: readonly string[]): Set<string> {
  */
 export function paceHints(fanText: string, herTurns: readonly (readonly string[])[]): string[] {
   const words = wordsOf(fanText);
-  const asking =
-    words <= QUIET_WORDS ? [QUIET_FAN_HINT] : words >= TALKATIVE_WORDS ? [TALKATIVE_FAN_HINT] : [];
+  const herLastAsked = herTurns.at(-1)?.some((text) => text.includes('?')) === true;
+  const asking = herLastAsked
+    ? [NO_QUESTION_HINT]
+    : words <= QUIET_WORDS
+      ? [QUIET_FAN_HINT]
+      : words >= TALKATIVE_WORDS
+        ? [TALKATIVE_FAN_HINT]
+        : [];
   const last = herTurns.slice(-EMOJI_STREAK);
   if (last.length < EMOJI_STREAK) return asking;
   const [first, ...rest] = last.map(emojisOf);

@@ -441,6 +441,24 @@ describe('nextScriptStep', () => {
     });
   });
 
+  it('keeps him a few messages in the tension after he bought, before the next paid step (passe 04, guide 26/11)', () => {
+    const bought = play([
+      sent(0, -4),
+      sent(1, -3),
+      sent(2, -2),
+      { type: 'step_bought', stepIndex: 2, at: at(-1) },
+    ]);
+    const latest = { run: bought, script: NIGHT };
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 1 })).toEqual({
+      kind: 'none',
+      reason: 'in_tension',
+    });
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 2 })).toEqual({
+      kind: 'send_step',
+      step: toSend(NIGHT, 3),
+    });
+  });
+
   it('holds the next step of a cold session, a held fan, or a paid step the policy refuses', () => {
     const teased = play([sent(0, -2)]);
     const latest = { run: teased, script: NIGHT };
@@ -504,6 +522,62 @@ describe('nextScriptStep', () => {
         brainPick: 'script-both',
       }),
     ).toEqual({ kind: 'start', script: BOTH, step: toSend(BOTH, 0) });
+  });
+});
+
+describe('nextScriptStep after a script he bought out (eval passe-1, 21/11)', () => {
+  /** He bought the whole night script, `minutesAgo` before now: its run, as Reveal and our journal hold it. */
+  const boughtOut = (minutesAgo: number): ScriptRun => {
+    const run = play([
+      sent(0, -minutesAgo),
+      sent(1, -minutesAgo + 1),
+      sent(2, -minutesAgo + 2),
+      { type: 'step_bought', stepIndex: 2, at: at(-minutesAgo + 3) },
+      sent(3, -minutesAgo + 4),
+      { type: 'step_bought', stepIndex: 3, at: at(-minutesAgo + 5) },
+    ]);
+    return { ...run, startedAt: at(-minutesAgo) };
+  };
+  const bought = history(['script-night', [0, 1, 2, 3], [2, 3]]);
+  const after = (minutesAgo: number): NextScriptStepInput => ({
+    ...base,
+    latest: { run: boughtOut(minutesAgo), script: NIGHT },
+    catalogue: [NIGHT, BOTH],
+    history: bought,
+    brainPick: 'script-both',
+    offer: {
+      ...offer,
+      lastOfferAt: at(-minutesAgo),
+      desire: 85,
+      limits: { cooldownHours: 12, minDesire: 75 },
+    },
+  });
+
+  it('opens the next script on its first step a week later, at night, a script for any hour (passe-13)', () => {
+    expect(boughtOut(7 * 24 * 60).status).toBe('bought_out');
+    expect(nextScriptStep(after(7 * 24 * 60))).toEqual({
+      kind: 'start',
+      script: BOTH,
+      step: toSend(BOTH, 0),
+    });
+    // What the eval saw: the brain picked nothing, or his heat fell under her score on this message.
+    expect(nextScriptStep({ ...after(7 * 24 * 60), brainPick: null })).toEqual({
+      kind: 'none',
+      reason: 'no_pick',
+    });
+    const cooled = after(7 * 24 * 60);
+    expect(nextScriptStep({ ...cooled, offer: { ...cooled.offer, desire: 74 } })).toEqual({
+      kind: 'none',
+      reason: 'low_desire',
+    });
+  });
+
+  it('never opens a second script the same evening, even when he asks for more (ADR 0158 § 42, passe-18)', () => {
+    const asks = after(90);
+    expect(nextScriptStep({ ...asks, offer: { ...asks.offer, fanAsksForPaid: true } })).toEqual({
+      kind: 'none',
+      reason: 'cooldown',
+    });
   });
 });
 

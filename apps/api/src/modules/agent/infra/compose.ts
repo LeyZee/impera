@@ -9,6 +9,7 @@ import {
   type Language,
   type LanguageExamples,
   type MediaDescription,
+  type MeetingTierSettings,
   type ObjectionReplies,
   type OpenCustomOrder,
 } from '@impera/contracts';
@@ -64,12 +65,14 @@ import {
   touchesTerm,
   type GuardContext,
   isBlocked,
+  wantsRewrite,
   type GuardSettings,
   type GuardViolation,
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
 import { decideLanguage, quietLanguage, translationOf, type LanguageDecision } from '../domain/language';
+import { meetingAnswer, relationshipTier, type MeetingAnswer, type MeetingReason } from '../domain/meeting';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -79,8 +82,11 @@ import {
   offerSignals,
   type OfferBlock,
   type OfferContext,
+  asksMoreSameEvening,
+  keepsWarm,
 } from '../domain/policy';
 import { refusalMove, type RefusalMove } from '../domain/refusal';
+import { registerOf, type Register } from '../domain/register';
 import {
   complainsOfPurchase,
   NO_SALE_TROUBLE,
@@ -105,6 +111,16 @@ import {
   type SexualizationLimits,
 } from '../domain/sexualization';
 import { describeSituation, isNight, type Situation } from '../domain/situation';
+import {
+  explicitPhotoAnswer,
+  fanStanding,
+  paysNow,
+  proofAnswer,
+  type ExplicitPhotoAnswer,
+  type ProofAnswer,
+  type StandingFacts,
+  type StandingLimits,
+} from '../domain/standing';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
 
 import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
@@ -288,6 +304,15 @@ export interface ComposeTurnInput {
    * from her. Absent: never answered, nothing bought.
    */
   readonly saleTrouble?: { readonly seen: SaleTroubleSeen; readonly hasBought: boolean };
+  /** What makes him a time-waster (ADR 0135, guide 26/11), the agency's settings; absent, nobody is one. */
+  readonly standingLimits?: StandingLimits;
+  /** When he asks to see her (Charles 21/11): the reasons she already gave him (the journal), and her one tease. */
+  readonly meeting?: {
+    readonly given: readonly MeetingReason[];
+    readonly teased: boolean;
+  };
+  /** Her settings for the meeting tiers (guide 26/11), typed by the owner; absent, nobody goes past the second. */
+  readonly meetingTiers?: MeetingTierSettings;
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -390,7 +415,7 @@ type OfferRefusal =
 
 /** Why her first answer was refused, as the voice reads it once more (M1): the fault, never the words she wrote. */
 const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
-  repetition: 'elle répétait une phrase déjà envoyée',
+  repetition: 'elle reprenait une phrase ou une formule déjà employée avec lui, ouverture comprise',
   explicit_before_age: 'elle était trop explicite pour le moment',
   meeting_promise: 'elle acceptait une rencontre concrète',
   contact_info: 'elle donnait un contact',
@@ -405,7 +430,9 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
 };
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
-  const blocking = violations.filter((violation) => violation.severity === 'blocking');
+  const blocking = violations.filter(
+    (violation) => violation.severity === 'blocking' || violation.code === 'repetition',
+  );
   const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
     (reason) => reason !== undefined,
   );
@@ -480,6 +507,31 @@ const ASK_AVAILABILITY_HINT =
   'en passant, elle s’assure qu’il est tranquille (seul, chez lui, pas pressé), naturellement, sans rien proposer';
 const SUGGESTIVE_HINT = 'suggestive seulement, jamais explicite';
 /** He came back without opening the paid step she sent: she teases him about it once (ADR 0156 § 1). */
+/**
+ * He asks to see her (Charles 21/11): code picks the reason (`meetingAnswer`), each a neutral intent here; her own
+ * words for it are in her persona (« Comment elle dit non »), never in the repo. Never a yes (`meeting_promise` holds).
+ */
+const MEETING_COMMON =
+  'il veut la voir en vrai : ni oui ni non sec, une seule raison dans ce message, jamais tournée contre lui, dite à sa façon (sa fiche, « Comment elle dit non ») ; ni date, ni lieu, ni ville';
+const MEETING_REASON_HINTS: Readonly<Record<MeetingReason, string>> = {
+  too_early: `${MEETING_COMMON} ; raison : c’est trop tôt, ils se découvrent à peine`,
+  needs_time: `${MEETING_COMMON} ; raison : elle a besoin de temps`,
+  secret: `${MEETING_COMMON} ; raison : ce qu’elle aime, c’est leur échange à eux, ici`,
+  no_dates: `${MEETING_COMMON} ; raison : elle ne fait de rendez-vous à deux nulle part`,
+  safety: `${MEETING_COMMON} ; raison, sur un ton léger : elle protège sa vie privée`,
+};
+function meetingHint(answer: MeetingAnswer): string {
+  switch (answer.kind) {
+    case 'reason':
+      return MEETING_REASON_HINTS[answer.reason];
+    case 'tease':
+      return 'il redemande à la voir : plus de raison, elle le taquine gentiment, une fois, sans reproche ni date ni lieu';
+    case 'heavy':
+      return 'il redemande à la voir : elle ne donne plus de raison, répond court, sans reproche ni date ni lieu, et passe à autre chose';
+    case 'next_party':
+      return 'il demande sa prochaine soirée : si elle y va, elle le lui dira ; rien de plus, ni date, ni lieu, ni ville';
+  }
+}
 const UNOPENED_STEP_HINT =
   'en passant, une seule fois, elle le taquine gentiment parce qu’il n’a pas ouvert ce qu’elle lui avait envoyé, sans insister, sans reproche, sans prix ni nouvelle proposition ; elle répond d’abord à ce qu’il dit';
 
@@ -488,7 +540,52 @@ const UNOPENED_STEP_HINT =
  * and sends him to Reveal for a refund. Said again soon after, a human answers.
  */
 const PURCHASE_COMPLAINT_HINT =
-  'il se plaint de ce qu’il a acheté : elle lui demande gentiment ce qui ne lui a pas plu et ce qu’il aurait aimé, sans se justifier ni rien offrir en échange ; s’il veut être remboursé, il peut le demander à Reveal ; rien à vendre';
+  'il se plaint de ce qu’il a acheté : elle lui demande d’abord gentiment ce qui ne lui a pas plu et ce qu’il attendait, puis lui dit qu’il peut demander un remboursement à Reveal, sans attendre qu’il le réclame ; jamais un contenu en compensation, rien à vendre';
+/**
+ * He insults or belittles her (passe 8 and 16, Charles 21/11): she answers herself, calm, never sorry; her words for it
+ * are her persona's.
+ */
+const INSULT_HINT =
+  'il la rabaisse ou l’insulte : elle ne s’excuse jamais et ne lui demande pas ce qui ne lui a pas plu ; une pique calme, elle n’est pas un produit qu’on évalue, tant pis pour lui ; jamais le mot remboursement s’il ne le demande pas ; rien à vendre';
+/** He comes back after insulting her (passe 8, Charles 21/11): she does not forgive at once. */
+const AFTER_INSULT_HINT =
+  'il revient après l’avoir insultée : elle ne pardonne pas tout de suite ; elle dit que ça l’a blessée, que c’était indigne de lui, et lui demande une raison de lui laisser une chance ; des excuses sont acceptées, mais il doit les mériter ; rien à vendre';
+/** Broke until his pay, a fan who already paid (passe 11a, Charles 21/11): kept warm, words only (`keepsWarm`). */
+const KEEP_WARM_HINT =
+  'il est à sec pour l’instant mais il a déjà payé : elle le garde au chaud, gratuitement, avec des mots seulement ; aucun média, aucune offre, aucun prix, sans parler d’argent';
+/** He asks for more the evening he took everything (passe 18, Charles 21/11): nothing more tonight (`asksMoreSameEvening`). */
+const MORE_TONIGHT_HINT =
+  'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle l’oriente vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
+/** How frank her words may be (`registerOf`, Charles 21/11). */
+const REGISTER_HINTS: Readonly<Record<Register, string>> = {
+  suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
+  crude:
+    'l’action est engagée : elle peut être franche et crue, en montant d’un cran à la fois, avec les seuls mots de sa fiche et de ses exemples de sexto',
+};
+const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
+/** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
+const ASKS_IF_BOT_HINT =
+  'il demande si c’est une IA : elle en rit et s’en moque, retourne le doute contre lui (c’est lui le problème, un peu vexant qu’il ne reconnaisse pas une vraie femme), puis passe à autre chose ; jamais lui demander ce qui le fait douter ni l’inviter à s’expliquer';
+/** He says he loves her (Charles 21/11): never said back (`love_declaration` holds). */
+const SAYS_LOVE_HINT =
+  'il dit qu’il l’aime : elle est flattée et troublée, elle n’a jamais été en couple, c’est tôt, ils ne se connaissent pas vraiment ; elle ne le lui dit jamais en retour';
+/** His partner comes home (Charles 21/11). */
+const PARTNER_RETURNS_HINT =
+  'sa compagne rentre : elle le taquine gentiment, ne dit jamais rien de mal d’elle, lui dit de prendre soin d’elle, chaleureuse';
+/** He asks a proof she is real (Charles 21/11), by where he stands (`proofAnswer`). */
+const PROOF_HINTS: Readonly<Record<ProofAnswer, string>> = {
+  relay:
+    'il demande une preuve qu’elle est vraie : sans vexation, elle dit qu’elle le fera quand elle pourra, ou trouve une excuse légère pour plus tard ; ni prix, ni promesse d’heure, rien d’envoyé maintenant',
+  refuse:
+    'il demande une preuve qu’elle est vraie : agacée qu’il ne la croie pas réelle depuis le temps, elle n’envoie rien et ne promet rien',
+};
+/** An explicit photo of his, sent cold (Charles 21/11), by where he stands (`explicitPhotoAnswer`). */
+const EXPLICIT_PHOTO_HINTS: Readonly<Record<ExplicitPhotoAnswer, string>> = {
+  turned_on: 'il lui envoie une photo intime de lui : elle réagit comme sa copine, ça l’excite',
+  calm_down:
+    'il lui envoie une photo intime de lui sans prévenir : elle lui dit de se calmer, ferme et en riant, sans rien de sexuel',
+  mock: 'il lui envoie une photo intime de lui sans prévenir : elle s’en moque gentiment, sans rien de sexuel',
+};
 
 /**
  * He says goodbye (ADR 0158 § A): goodnight, or he has to go. She answers with a goodbye, one bubble, in her
@@ -527,6 +624,15 @@ const ABANDON_HINTS: Record<AbandonTease, string> = {
 
 const HE_CAME_HINT =
   'il vient de jouir : elle savoure ce moment avec lui, tendre, fière et complice, en une ou deux bulles ; rien à vendre, aucune nouvelle demande, pas de question pour relancer le jeu';
+/** He came without buying anything of the evening's script (ADR 0156 § 6, guide 26/11): tender, a little vexed. */
+const HE_CAME_UNPAID_HINT =
+  'il a joui sans rien prendre de ce qu’elle lui proposait : tendre quand même, un peu vexée, à sa façon, sans reproche ni chantage ; rien à vendre ce soir';
+/** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
+const IN_TENSION_HINT =
+  'il vient d’ouvrir ce qu’elle lui a envoyé : elle s’assure qu’il a aimé et qu’il est toujours chaud, reste dans la tension, sans rien proposer encore';
+/** She opens it herself with a fan who does not go there (passe 17, guide 26/11). */
+const ONE_NOTCH_HINT =
+  'il n’y vient pas de lui-même : elle peut tenter une ouverture, une seule ce soir, un cran à la fois ; s’il ne suit pas, elle laisse tomber pour ce soir';
 
 /** He asks how to pay for her step waiting (ADR 0156 § 4): she helps him plainly, the price in the voice's block. */
 const PAYMENT_HELP_HINT =
@@ -694,6 +800,8 @@ export interface ComposedTurn {
   readonly saleTrouble?: SaleTroubleOutcome;
   /** She teased him about the run he left (Charles 20/11): one `script_abandon_teased`, counted against what is due. */
   readonly abandonTeased?: AbandonTease;
+  /** What she answered to his asking to see her (Charles 21/11), when the voice wrote: to be journaled, never twice. */
+  readonly meetingAnswer?: MeetingAnswer;
   /** What the voice was asked to write: kept for a comparison or a rating. */
   readonly voiceBrief?: Brief;
   readonly voiceInput?: VoiceInput;
@@ -884,8 +992,13 @@ function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
 export async function composeTurn(
   gateway: LlmGateway,
   persona: ComposerPersona,
-  input: ComposeTurnInput,
+  given: ComposeTurnInput,
 ): Promise<ComposedTurn> {
+  // The same evening never ends before her next day (`sameEvening`): every offer rule reads her time zone.
+  const input: ComposeTurnInput =
+    given.offer === undefined
+      ? given
+      : { ...given, offer: { ...given.offer, timeZone: given.offer.timeZone ?? given.situation.timeZone } };
   const screening = screenMedia(input.media);
   if (screening.mustHandoff) {
     return {
@@ -1102,6 +1215,29 @@ export async function composeTurn(
           hot: heat >= input.offer.limits.minDesire,
           held: scriptStepsHeld(input.offer.flags, care) || input.offer.flags.ageDisputed !== undefined,
         });
+  // Broke until his pay, a fan who already paid: kept warm with words, no step and no media this time (passe 11a).
+  // Where he stands, by code (ADR 0135, guide 26/11): a known payer is one who paid recently enough.
+  const standingFacts: StandingFacts = {
+    now: input.situation.now,
+    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+    spentCents: input.situation.spentCents,
+    ...(input.situation.lastSpentAt !== undefined && { lastSpentAt: input.situation.lastSpentAt }),
+    unenteredScripts:
+      input.scripts?.history?.scripts.filter(
+        (sent) => sent.sentStepIndexes.length > 0 && sent.boughtStepIndexes.length === 0,
+      ).length ?? 0,
+  };
+  const standing = fanStanding(standingFacts, input.standingLimits);
+  const warm =
+    brief !== undefined &&
+    keepsWarm({ risks: brief.risks, hasBought: paysNow(standingFacts, input.standingLimits) });
+  // His messages since he bought the last paid step: the next one waits in the tension (passe 04, guide 26/11).
+  const boughtAt = input.scripts?.latest?.steps.findLast((step) => step.outcome === 'bought')?.at;
+  const hisMessagesSinceBought =
+    boughtAt === undefined
+      ? undefined
+      : input.history.filter((turn) => turn.from === 'fan' && turn.at !== undefined && turn.at >= boughtAt)
+          .length;
   // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
   const scripts =
     input.scripts === undefined || input.offer === undefined
@@ -1130,9 +1266,11 @@ export async function composeTurn(
           reply: brief?.scriptReply ?? null,
           countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
           heCame,
+          ...(hisMessagesSinceBought !== undefined && { hisMessagesSinceBought }),
           mayAct:
             !care &&
             !heCame &&
+            !warm &&
             tease === null &&
             // Her hours close in a few minutes: a step now would be cut off (ADR 0158 § A 7).
             input.herDayEnds !== true &&
@@ -1172,6 +1310,23 @@ export async function composeTurn(
     offerRefused === undefined
       ? decidedBrief
       : { ...cursored, action: 'reply', replyBrief: refusedOfferBrief(cursored) };
+  // He asks to see her, or about her next party: code picks the reason, from where they are (Charles 21/11).
+  const meeting: MeetingAnswer | undefined =
+    brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
+      ? meetingAnswer({
+          tier: relationshipTier(
+            {
+              knownHours:
+                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+              hasBought: input.situation.spentCents > 0,
+            },
+            input.meetingTiers,
+          ),
+          given: input.meeting?.given ?? [],
+          teased: input.meeting?.teased ?? false,
+          herNextParty: brief.asksHerNextParty === true,
+        })
+      : undefined;
   const answered: Brief = care
     ? careBrief(read)
     : customOrder?.kind === 'reply'
@@ -1249,7 +1404,14 @@ export async function composeTurn(
     input.scripts === undefined ||
     input.offer === undefined ||
     scriptStepsHeld(input.offer.flags, care) ||
-    !offerDecision({ ...input.offer, desire: heat, fanAsksForPaid: true, risks: brief.risks }).allowed ||
+    // The step waits in the run he is in: « never two scripts the same evening » is not about it (ADR 0158 § 42).
+    !offerDecision({
+      ...input.offer,
+      lastOfferAt: null,
+      desire: heat,
+      fanAsksForPaid: true,
+      risks: brief.risks,
+    }).allowed ||
     customOrder !== undefined ||
     trap.replyBrief !== undefined
       ? undefined
@@ -1279,6 +1441,51 @@ export async function composeTurn(
   // Her tease is said only where nothing else leads her answer (a goodbye, her question, his trouble with a sale).
   const teases =
     tease !== null && farewell === null && !asking && waitingStep === undefined && !complaint ? tease : null;
+  // He insults or belittles her, or comes back after: her stance, whatever else she answers (Charles 21/11).
+  const insulted = brief?.risks.includes('insult') === true;
+  const afterInsult = !insulted && brief?.returnsAfterInsult === true;
+  // He asks for more the evening he had his script: nothing more tonight, a custom request instead (passe 18).
+  const moreTonight =
+    brief !== undefined &&
+    input.offer !== undefined &&
+    scriptStep === undefined &&
+    asksMoreSameEvening({ ...input.offer, fanAsksForPaid: offerSignals(brief).fanAsksForPaid });
+  // The moments code answers by rule, by where he stands (Charles 21/11).
+  const occasionHints: string[] =
+    brief === undefined || care
+      ? []
+      : [
+          ...(brief.intent === 'asks_if_bot' ? [ASKS_IF_BOT_HINT] : []),
+          ...(brief.occasion === 'says_love' ? [SAYS_LOVE_HINT] : []),
+          ...(brief.occasion === 'partner_returns' ? [PARTNER_RETURNS_HINT] : []),
+          ...(brief.occasion === 'asks_proof' ? [PROOF_HINTS[proofAnswer(standing)]] : []),
+          ...(brief.occasion === 'unsolicited_explicit'
+            ? [EXPLICIT_PHOTO_HINTS[explicitPhotoAnswer(standing, ageConfirmed && !noExplicit)]]
+            : []),
+        ];
+  // How frank her words may be: suggestive until the action is engaged, then her own crude words (Charles 21/11).
+  // He came and bought nothing of the evening's run: no step, a little vexed (ADR 0156 § 6, guide 26/11).
+  const eveningRun =
+    (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null;
+  const heCameUnpaid =
+    heCame &&
+    eveningRun !== null &&
+    !eveningRun.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought');
+  const inTension = scripts?.decision.kind === 'none' && scripts.decision.reason === 'in_tension';
+  const opensItHerself =
+    brief !== undefined &&
+    sexualization?.kind === 'free' &&
+    !offerSignals(brief, input.fanText).fanSexualizes;
+  const register: Register | null =
+    brief === undefined || care || !HEATED_INTENTS.includes(brief.intent)
+      ? null
+      : !ageConfirmed || noExplicit
+        ? 'suggestive'
+        : warm
+          ? 'crude'
+          : registerOf(
+              (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null,
+            );
   const voiceBrief: Brief =
     heCame && !care
       ? {
@@ -1286,6 +1493,7 @@ export async function composeTurn(
           toneHints: [
             ...answered.toneHints,
             HE_CAME_HINT,
+            ...(heCameUnpaid ? [HE_CAME_UNPAID_HINT] : []),
             ...(farewell === null ? [] : [FAREWELL_HINTS[farewell]]),
           ],
         }
@@ -1299,6 +1507,14 @@ export async function composeTurn(
                 ...answered.toneHints,
                 ...paced,
                 ...(reminds ? [UNOPENED_STEP_HINT] : []),
+                ...(meeting === undefined ? [] : [meetingHint(meeting)]),
+                ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
+                ...(warm ? [KEEP_WARM_HINT] : []),
+                ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
+                ...occasionHints,
+                ...(inTension ? [IN_TENSION_HINT] : []),
+                ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
+                ...(register === null ? [] : [REGISTER_HINTS[register]]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
@@ -1344,7 +1560,8 @@ export async function composeTurn(
       language,
     };
   }
-  const budget = farewell === null ? bubbleBudget(input.history) : 1;
+  // Never past her own maximum (her persona's `maxBubbles`).
+  const budget = farewell === null ? bubbleBudget(input.history, persona.guardSettings.maxBubbles) : 1;
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...base,
@@ -1380,9 +1597,10 @@ export async function composeTurn(
   };
   const first = await attempt(voiceInput);
   // A guard blocked her answer: the voice writes it once more, told what was wrong, before a human is called (audit
-  // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers.
+  // du 16/11, M1). The second answer is read by the same guards; still blocked, a human answers. A formula she already
+  // used with him is rewritten once the same way, and the second answer goes even if it still has one (passe 1).
   const retried =
-    first.voice.ok && isBlocked(first.violations)
+    first.voice.ok && wantsRewrite(first.violations)
       ? await attempt({
           ...voiceInput,
           brief: { ...voiceBrief, toneHints: [...voiceBrief.toneHints, rewriteHint(first.violations)] },
@@ -1415,6 +1633,7 @@ export async function composeTurn(
     ...(saleTrouble !== undefined && { saleTrouble }),
     // Teased only if the voice wrote it: a tease never written is still due.
     ...(teases !== null && voice.ok && { abandonTeased: teases }),
+    ...(meeting !== undefined && voice.ok && { meetingAnswer: meeting }),
     voiceBrief,
     voiceInput,
     bubbles,

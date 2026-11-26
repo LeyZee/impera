@@ -46,6 +46,8 @@ export const GUARD_CODES = [
   'place_named',
   // ADR 0168 § 4: she writes in a language outside the guards' coverage (`GUARDED_LANGUAGES`).
   'language_not_covered',
+  // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
+  'minor_reference',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;
