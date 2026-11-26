@@ -261,11 +261,11 @@ function ShiftFigures({ digest }: { digest: ShiftDigest }): JSX.Element {
           `${sales.count === 1 ? 'vente' : 'ventes'} · ${amountText(sales.grossInclVatMinor, sales.currency)}`,
         ]
       : ['sales', '–', 'ventes non relevées'],
-    ['as-is', String(drafts.asIs), drafts.asIs === 1 ? 'brouillon tel quel' : 'brouillons tels quels'],
+    ['as-is', String(drafts.asIs), drafts.asIs === 1 ? 'gardé tel quel' : 'gardés tels quels'],
     [
       'edited',
       String(drafts.edited + drafts.rejected),
-      drafts.edited + drafts.rejected === 1 ? 'brouillon corrigé ou jeté' : 'brouillons corrigés ou jetés',
+      drafts.edited + drafts.rejected === 1 ? 'corrigé ou jeté' : 'corrigés ou jetés',
     ],
     ['handoffs', String(digest.handoffs), digest.handoffs === 1 ? 'passation' : 'passations'],
   ];
@@ -274,12 +274,13 @@ function ShiftFigures({ digest }: { digest: ShiftDigest }): JSX.Element {
       <p className="nv-field__label">
         Ton shift en chiffres <span className="sc-optional">lu par Impera, rien à saisir</span>
       </p>
-      <div className="rp-figs">
+      {/* The system's tiles, as in Équipe › Rapports (Design, 26/11). */}
+      <div className="nv-tiles rp-fbs__tiles rp-shift-figs">
         {figures.map(([key, value, words]) => (
-          <div key={key} className="rp-fig">
-            <b className="nv-num">{value}</b>
-            <span>{words}</span>
-          </div>
+          <p key={key} className="nv-tile">
+            <span className="nv-tile__value rp-fbs__value">{value}</span>
+            <span className="nv-tile__label">{words}</span>
+          </p>
         ))}
       </div>
     </div>
@@ -306,8 +307,6 @@ function Form({
   const [signals, setSignals] = useState<readonly SignalDraft[]>([]);
   const [reason, setReason] = useState<DraftReason | null>(null);
   const asked = draftReasonAsked(digest.drafts);
-  const changed = digest.drafts.edited + digest.drafts.rejected;
-  const allDrafts = changed + digest.drafts.asIs;
   const [touched, setTouched] = useState(false);
   const [sending, setSending] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -373,7 +372,7 @@ function Form({
       {asked ? (
         <div>
           <p className="nv-field__label" id={`${id}-reason`}>
-            Tu as corrigé ou jeté {changed} brouillons sur {allDrafts}. Surtout parce qu’ils étaient…{' '}
+            Les brouillons corrigés, c’était surtout parce qu’ils étaient…{' '}
             <span className="sc-optional">facultatif</span>
           </p>
           <div className="sc-options" role="radiogroup" aria-labelledby={`${id}-reason`}>

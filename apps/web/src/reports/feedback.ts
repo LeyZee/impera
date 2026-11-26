@@ -126,16 +126,23 @@ export const FEEDBACK_ERRORS: Readonly<Record<FeedbackRefusalCode, string>> = {
   request_invalid: 'Ces mots ne conviennent pas : vérifie les textes.',
 };
 
-/** A signal's category, as the chatter picks it and the agency reads it; each its colour of the design system's categorical palette (--nv-series-*). */
+/**
+ * A signal's category, as the chatter picks it and the agency reads it: `kind` 1 to 6 is its `data-kind`, and `content`
+ * its own hue of the design system's content palette (--nv-content-*, Design, 26/11), the same on chips, labels and
+ * the donut. None is the red, amber or cyan the incidents and « sans souci » read by.
+ */
 export const SIGNAL_CATEGORIES: Readonly<
-  Record<ReportSignalCategory, { readonly label: string; readonly kind: 1 | 2 | 3 | 4 }>
+  Record<
+    ReportSignalCategory,
+    { readonly label: string; readonly kind: 1 | 2 | 3 | 4 | 5 | 6; readonly content: 1 | 2 | 3 | 4 | 5 | 10 }
+  >
 > = {
-  fan_request: { label: 'Demande d’un fan', kind: 1 },
-  missing_script: { label: 'Script manquant', kind: 2 },
-  missing_content: { label: 'Contenu manquant', kind: 3 },
-  agent: { label: 'L’agent', kind: 2 },
-  idea: { label: 'Une idée', kind: 1 },
-  other: { label: 'Autre', kind: 4 },
+  fan_request: { label: 'Demande d’un fan', kind: 1, content: 3 },
+  missing_script: { label: 'Script manquant', kind: 2, content: 1 },
+  missing_content: { label: 'Contenu manquant', kind: 3, content: 2 },
+  agent: { label: 'L’agent', kind: 4, content: 5 },
+  idea: { label: 'Une idée', kind: 5, content: 4 },
+  other: { label: 'Autre', kind: 6, content: 10 },
 };
 
 /** The closed question on the corrected drafts (ADR 0170 § 1), each answer as the chatter reads it. */

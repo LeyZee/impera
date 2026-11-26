@@ -179,12 +179,12 @@ describe('Mon retour de fin de shift (ADR 0050 § 10, trous béants n° 1)', () 
     await screen.findByRole('button', { name: 'Rien à signaler' });
     expect(screen.getByText('ventes · 86,00 €')).toBeTruthy();
     expect(screen.getByText('passations')).toBeTruthy();
-    expect(screen.queryByRole('radiogroup', { name: /brouillons sur/u })).toBe(null);
+    expect(screen.queryByRole('radiogroup', { name: /brouillons corrigés/u })).toBe(null);
     cleanup();
 
     digest = digestOf({ drafts: { asIs: 9, edited: 12, rejected: 2 } });
     renderPanel();
-    const question = await screen.findByRole('radiogroup', { name: /14 brouillons sur 23/u });
+    const question = await screen.findByRole('radiogroup', { name: /brouillons corrigés/u });
     fireEvent.click(within(question).getByRole('radio', { name: 'Pas dans sa façon d’écrire' }));
     fireEvent.click(screen.getByRole('button', { name: 'Rien à signaler' }));
     await waitFor(() => {

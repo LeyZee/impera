@@ -189,7 +189,7 @@ function SignalDonut({ list }: { list: ShiftFeedbackList }): JSX.Element | null 
   const total = counts.reduce((sum, one) => sum + one.count, 0);
   if (total === 0) return null;
   const colour = (category: ReportSignalCategory): string =>
-    `var(--nv-series-${String(SIGNAL_CATEGORIES[category].kind)})`;
+    `var(--nv-content-${String(SIGNAL_CATEGORIES[category].content)})`;
   const litOne = lit === null ? undefined : counts[lit];
   return (
     <div className="rp-sigs">

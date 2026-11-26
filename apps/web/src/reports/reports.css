@@ -1386,7 +1386,7 @@ a.sc-sheet__report:focus-visible,
 
 /* ── Mini feedback of a shift (ADR 0050 § 10) and its incident followed « Vu », « Réglé » (trous béants n° 1) ──
    An incident reads by its stage: red while nobody saw it, amber seen, green « Réglé ». A signal reads by its
-   category, each its colour of the design system (--nv-series-1…4, its categorical palette). Never a bar on a card's side. */
+   category, each its own hue of the design system's content palette (--nv-content-*, as feedback.ts maps them). Never a bar on a card's side. */
 
 .rp-incident-sent {
   --_c: var(--nv-danger);
@@ -1426,19 +1426,31 @@ a.sc-sheet__report:focus-visible,
 }
 .rp-signal,
 .rp-cat {
-  --rp-kind: var(--nv-series-4);
+  --rp-kind: var(--nv-content-10);
 }
 .rp-signal[data-kind='1'],
 .rp-cat[data-kind='1'] {
-  --rp-kind: var(--nv-series-1);
+  --rp-kind: var(--nv-content-3);
 }
 .rp-signal[data-kind='2'],
 .rp-cat[data-kind='2'] {
-  --rp-kind: var(--nv-series-2);
+  --rp-kind: var(--nv-content-1);
 }
 .rp-signal[data-kind='3'],
 .rp-cat[data-kind='3'] {
-  --rp-kind: var(--nv-series-3);
+  --rp-kind: var(--nv-content-2);
+}
+.rp-signal[data-kind='4'],
+.rp-cat[data-kind='4'] {
+  --rp-kind: var(--nv-content-5);
+}
+.rp-signal[data-kind='5'],
+.rp-cat[data-kind='5'] {
+  --rp-kind: var(--nv-content-4);
+}
+.rp-signal[data-kind='6'],
+.rp-cat[data-kind='6'] {
+  --rp-kind: var(--nv-content-10);
 }
 .rp-signal {
   display: flex;
@@ -1724,30 +1736,10 @@ a.sc-sheet__report:focus-visible,
   --_c: var(--nv-success);
 }
 
-/* His shift in figures and « Lier à un fan » (ADR 0170 §§ 1 and 2): read-only tiles on the row ground of #1025. */
-.rp-figs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--nv-space-2);
-}
-.rp-fig {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--nv-space-3);
-  border-radius: var(--nv-radius-md);
-  background: var(--nv-tile-fill);
-  min-width: 0;
-}
-.rp-fig b {
-  font-size: var(--nv-text-title-2);
-  line-height: var(--nv-text-title-2-leading);
-  color: var(--nv-ink);
-}
-.rp-fig span {
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  color: var(--nv-ink-muted);
+/* His shift in figures (the system's tiles, set on the dialog's glass with the strong fill) and « Lier à un fan »
+   (ADR 0170 §§ 1 and 2). */
+.rp-shift-figs .nv-tile {
+  background: var(--nv-tile-fill-strong);
 }
 .rp-option-tick {
   margin-left: auto;
@@ -1771,9 +1763,4 @@ a.sc-sheet__report:focus-visible,
 }
 .rp-fans > .nv-btn {
   align-self: flex-start;
-}
-@media (max-width: 520px) {
-  .rp-figs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
