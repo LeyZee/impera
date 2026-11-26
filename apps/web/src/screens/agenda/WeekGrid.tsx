@@ -365,12 +365,13 @@ export function WeekGrid({
                 <div
                   key={window.id}
                   className="ag-wk__dispo"
+                  data-opens-to={window.opensTo}
                   style={{
                     top: top(window.start),
                     height: height(window.start, Math.min(window.end, hours.last * 60)),
                   }}
                 >
-                  <span>Dispo</span>
+                  <span>{window.opensTo === 'cam' ? '📹 Cam' : 'Dispo'}</span>
                 </div>
               ))}
               <Column

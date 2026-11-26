@@ -12,7 +12,7 @@ import { ShortReplies } from './ReplyLines';
 import { SuggestionCard, UndatedSuggestions } from './SuggestionCard';
 import { AGENDA_KEY, archiveAvailability } from './api';
 import { CategoryMark } from './category';
-import { planOf, proposedRoutinesOf, type DayWindow } from './model';
+import { DISPO_TITLES, planOf, proposedRoutinesOf, type DayWindow } from './model';
 import { repliesOn } from './replies';
 
 import { clockOf, dayNumber, weekOf } from '@/scheduling/time';
@@ -153,15 +153,15 @@ export function WeekList({
   );
 }
 
-/** « Dispo pour l'agence 14 h – 20 h », and how to take it back. A weekly dispo goes for every week. */
+/** « Dispo pour l'agence 14 h – 20 h » or « Dispo cam 21 h – 23 h », and how to take it back. A weekly dispo goes for every week. */
 function Dispo({ window }: { window: DayWindow }): JSX.Element {
   const client = useQueryClient();
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   return (
-    <span className="ag-dispo">
+    <span className="ag-dispo" data-opens-to={window.opensTo}>
       <i aria-hidden="true" />
-      Dispo pour l’agence{' '}
+      {DISPO_TITLES[window.opensTo]}{' '}
       <span className="nv-num">
         {clockOf(window.start)} – {clockOf(window.end)}
       </span>

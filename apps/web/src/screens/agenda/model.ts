@@ -1,4 +1,5 @@
 import type {
+  AvailabilityOpensTo,
   AvailabilityView,
   CreatorAgenda,
   CreatorSuggestion,
@@ -43,11 +44,19 @@ export interface TimedTask extends DayTask {
   readonly length: number;
 }
 
+/** What a dispo is called on her screens, by what it opens to. */
+export const DISPO_TITLES: Readonly<Record<AvailabilityOpensTo, string>> = {
+  agency: 'Dispo pour l’agence',
+  cam: 'Dispo cam',
+};
+
 /** A dispo on one of her days, in minutes from her midnight. */
 export interface DayWindow {
   readonly id: string;
   readonly start: number;
   readonly end: number;
+  /** Open to the agency, or to a fan's cam. */
+  readonly opensTo: AvailabilityOpensTo;
 }
 
 export interface DayPlan {
@@ -103,7 +112,7 @@ export function windowsOn(
   const windows: DayWindow[] = [];
   const weekday = weekdayOf(day);
   const dayBefore = weekdayOf(addDays(day, -1));
-  for (const { id, when } of availabilities) {
+  for (const { id, when, opensTo } of availabilities) {
     if (when.kind === 'weekly') {
       const overnight = when.endMinute <= when.startMinute;
       if (when.weekday === weekday)
@@ -111,13 +120,19 @@ export function windowsOn(
           id,
           start: when.startMinute,
           end: overnight ? when.endMinute + MINUTES_PER_DAY : when.endMinute,
+          opensTo,
         });
       if (overnight && when.weekday === dayBefore && when.endMinute > 0)
-        windows.push({ id: `${id}:carried`, start: 0, end: when.endMinute });
+        windows.push({ id: `${id}:carried`, start: 0, end: when.endMinute, opensTo });
     } else if (dayOf(when.startsAt, zone) === day) {
-      windows.push({ id, start: minuteOf(when.startsAt, zone), end: minutesFrom(day, when.endsAt, zone) });
+      windows.push({
+        id,
+        start: minuteOf(when.startsAt, zone),
+        end: minutesFrom(day, when.endsAt, zone),
+        opensTo,
+      });
     } else if (carriedInto(when.startsAt, when.endsAt, day, zone)) {
-      windows.push({ id: `${id}:carried`, start: 0, end: minutesFrom(day, when.endsAt, zone) });
+      windows.push({ id: `${id}:carried`, start: 0, end: minutesFrom(day, when.endsAt, zone), opensTo });
     }
   }
   return windows.sort((a, b) => a.start - b.start);
@@ -244,7 +259,13 @@ export interface ProposedAt {
 export type ProgramRow =
   | { readonly kind: 'task'; readonly item: TimedTask }
   | { readonly kind: 'proposed'; readonly at: ProposedAt }
-  | { readonly kind: 'free'; readonly start: number; readonly end: number; readonly open: boolean }
+  | {
+      readonly kind: 'free';
+      readonly start: number;
+      readonly end: number;
+      /** Which dispo covers it: a cam's before the agency's; null, none. */
+      readonly open: AvailabilityOpensTo | null;
+    }
   | { readonly kind: 'now'; readonly at: number };
 
 /** The program starts at 8 h at the latest, and ends at midnight. */
@@ -273,9 +294,14 @@ export function programOf(
     const cuts = [...new Set([start, ...edges, to])].sort((a, b) => a - b);
     for (let index = 0; index + 1 < cuts.length; index += 1) {
       const [a, b] = [cuts[index] ?? start, cuts[index + 1] ?? to];
-      const open = plan.windows.some((window) => window.start < b && window.end > a);
+      const covering = plan.windows.filter((window) => window.start < b && window.end > a);
+      const open = covering.some((window) => window.opensTo === 'cam')
+        ? 'cam'
+        : covering.length > 0
+          ? 'agency'
+          : null;
       // A short stretch is not worth a row of its own, unless it is all of a dispo she opened.
-      if (b - a < SHORTEST_FREE && !open) continue;
+      if (b - a < SHORTEST_FREE && open === null) continue;
       const last = rows.at(-1);
       // Two stretches side by side that say the same thing are one row (a dispo after another, a short gap skipped).
       if (last?.kind === 'free' && last.end === a && last.open === open)

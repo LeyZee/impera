@@ -269,7 +269,20 @@ export const AvailabilityWhenSchema = z
   );
 export type AvailabilityWhen = z.infer<typeof AvailabilityWhenSchema>;
 
-export const AvailabilitySchema = z.strictObject({ id: AvailabilityIdSchema, when: AvailabilityWhenSchema });
+/**
+ * What a dispo is open to: the agency (its suggestions fall in it), or a fan's cam (ADR 0159 § 5, Charles 21/11 and
+ * 26/11): the AI proposes a cam only in one of these, after her yes, and the hour holds once he paid in full.
+ */
+export const AVAILABILITY_OPENS_TO = ['agency', 'cam'] as const;
+export const AvailabilityOpensToSchema = z.enum(AVAILABILITY_OPENS_TO);
+export type AvailabilityOpensTo = z.infer<typeof AvailabilityOpensToSchema>;
+
+/** A dispo; one saved before cams existed is the agency's. */
+export const AvailabilitySchema = z.strictObject({
+  id: AvailabilityIdSchema,
+  when: AvailabilityWhenSchema,
+  opensTo: AvailabilityOpensToSchema.default('agency'),
+});
 export type AvailabilityView = z.infer<typeof AvailabilitySchema>;
 
 /** `POST /v1/creator-space/availabilities` (creator): a dispo, its id drawn by her phone like a task's. */

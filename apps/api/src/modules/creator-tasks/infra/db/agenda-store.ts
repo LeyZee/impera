@@ -417,7 +417,13 @@ export function createDrizzleCreatorAgendaStore(db: Database): CreatorAgendaStor
 
     createAvailability: (userId, body) =>
       withCreatorAccount(db, userId, async (tx, creatorId) => {
-        const values = { id: body.id, creatorId, ...availabilityColumns(body.when), createdBy: userId };
+        const values = {
+          id: body.id,
+          creatorId,
+          ...availabilityColumns(body.when),
+          opensTo: body.opensTo,
+          createdBy: userId,
+        };
         const [inserted] = await tx.insert(availabilities).values(values).onConflictDoNothing().returning();
         if (inserted !== undefined) return availabilityViewOf(inserted);
         const [stored] = await tx.select().from(availabilities).where(eq(availabilities.id, body.id));

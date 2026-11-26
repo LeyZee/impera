@@ -11,6 +11,7 @@ import {
   type CreateCreatorTaskBody,
   type CreatorTaskCategory,
   type CreatorTaskWhen,
+  type AvailabilityOpensTo,
 } from '@impera/contracts';
 
 import { addDays, zonedInstant } from '@/scheduling/time';
@@ -43,6 +44,8 @@ export interface AvailabilityDraft {
   readonly weekdays: readonly number[];
   readonly start: number;
   readonly end: number;
+  /** Open to the agency, or to a fan's cam. */
+  readonly opensTo: AvailabilityOpensTo;
 }
 
 const MORNING = 10 * 60;
@@ -155,6 +158,7 @@ export function availabilityBodiesOf(
       CreateAvailabilityBodySchema.parse({
         id: idFor('once'),
         when: { kind: 'once', ...spanOf(draft.day, draft.start, draft.end, zone) },
+        opensTo: draft.opensTo,
       }),
     ];
   return [...draft.weekdays]
@@ -163,6 +167,7 @@ export function availabilityBodiesOf(
       CreateAvailabilityBodySchema.parse({
         id: idFor(String(weekday)),
         when: { kind: 'weekly', weekday, startMinute: draft.start, endMinute: draft.end },
+        opensTo: draft.opensTo,
       }),
     );
 }

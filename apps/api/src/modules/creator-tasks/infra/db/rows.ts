@@ -1,6 +1,7 @@
 import {
   AgencySuggestionSchema,
   AvailabilityIdSchema,
+  AvailabilityOpensToSchema,
   CreatorSuggestionSchema,
   CreatorTaskIdSchema,
   CreatorTaskSchema,
@@ -90,6 +91,7 @@ function availabilityWhenOf(row: AvailabilityRow): AvailabilityWhen {
 export const availabilityViewOf = (row: AvailabilityRow): AvailabilityView => ({
   id: AvailabilityIdSchema.parse(row.id),
   when: availabilityWhenOf(row),
+  opensTo: AvailabilityOpensToSchema.parse(row.opensTo),
 });
 
 /** A dispo as the pure rules read it. */

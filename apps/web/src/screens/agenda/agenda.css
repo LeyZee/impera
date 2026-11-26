@@ -10,7 +10,7 @@
 :is(.ag-page, .ag-scope) [data-cat='shoot'] {
   --ag-c: #f07a94;
 }
-:is(.ag-page, .ag-scope) [data-cat='live'] {
+:is(.ag-page, .ag-scope) :is([data-cat='live'], [data-opens-to='cam'], [data-open='cam']) {
   --ag-c: #e6c65c;
 }
 :is(.ag-page, .ag-scope) [data-cat='post'] {
@@ -33,7 +33,9 @@
 :root[data-theme='light'] :is(.ag-page, .ag-scope) [data-cat='shoot'] {
   --ag-c: #c8385a;
 }
-:root[data-theme='light'] :is(.ag-page, .ag-scope) [data-cat='live'] {
+:root[data-theme='light']
+  :is(.ag-page, .ag-scope)
+  :is([data-cat='live'], [data-opens-to='cam'], [data-open='cam']) {
   --ag-c: #8a6d00;
 }
 :root[data-theme='light'] :is(.ag-page, .ag-scope) [data-cat='post'] {
@@ -756,8 +758,18 @@
   font-size: var(--nv-text-caption);
   color: var(--nv-ink-muted);
 }
-/* Open to the agency: hatched, as on the prototype. */
-.ag-free[data-open] {
+/* Open to the agency: hatched, as on the prototype. A dispo cam: the same hatch in the colour of a live (ADR 0159 § 5). */
+.ag-free[data-open='cam'] {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    color-mix(in srgb, var(--ag-c) 22%, transparent) 6px 7px
+  );
+}
+.ag-free[data-open='cam'] em {
+  color: var(--nv-ink);
+}
+.ag-free[data-open='agency'] {
   background: repeating-linear-gradient(
     135deg,
     transparent 0 6px,
@@ -1041,8 +1053,19 @@
 /* ── « Ajouter »: what she adds, seen as her agenda will show it ───────────────────────────────────────────────── */
 .ag-kinds {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--nv-space-2);
+}
+/* Three kinds side by side where there is room, each emoji over its label; one under the other on a phone. */
+@media (min-width: 560px) {
+  .ag-kinds {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ag-kinds > .ag-kind {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'emoji' 'label' 'hint';
+    row-gap: 4px;
+  }
 }
 .ag-kind {
   appearance: none;
@@ -1139,8 +1162,15 @@
   font-size: var(--nv-text-footnote);
   color: var(--nv-ink-muted);
 }
-.ag-mark--dispo {
+.ag-mark--dispo:not([data-opens-to='cam']) {
   --ag-c: var(--nv-ink-muted);
+}
+.ag-dispo[data-opens-to='cam'] {
+  color: var(--nv-ink);
+}
+.ag-dispo[data-opens-to='cam'] > i {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 55%, transparent);
+  background: repeating-linear-gradient(135deg, transparent 0 2px, var(--ag-c) 2px 3px);
 }
 @keyframes ag-rise {
   from {
@@ -1540,6 +1570,17 @@
   background: repeating-linear-gradient(135deg, var(--nv-hairline) 0 6px, transparent 6px 12px);
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
   pointer-events: none;
+}
+.ag-wk__dispo[data-opens-to='cam'] {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ag-c) 16%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 45%, transparent);
+}
+.ag-wk__dispo[data-opens-to='cam'] span {
+  color: var(--nv-ink);
 }
 .ag-wk__dispo span {
   position: absolute;

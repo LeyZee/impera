@@ -286,6 +286,8 @@ export async function dispoMinutesByWeekdayUnscoped(
       and(
         eq(schema.creatorAvailabilities.creatorId, creatorId),
         eq(schema.creatorAvailabilities.kind, 'weekly'),
+        // A dispo cam is not time for the agency's shoots (ADR 0159 § 5).
+        eq(schema.creatorAvailabilities.opensTo, 'agency'),
         sql`${schema.creatorAvailabilities.archivedAt} is null`,
       ),
     );

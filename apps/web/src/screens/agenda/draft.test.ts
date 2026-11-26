@@ -73,12 +73,14 @@ describe('« Ajouter » (CR-05)', () => {
       weekdays: [5, 1],
       start: 22 * 60,
       end: 2 * 60,
+      opensTo: 'cam' as const,
     };
     const first = availabilityBodiesOf(dispo, ZONE, idFor);
     expect(first.map((body) => body.when)).toEqual([
       { kind: 'weekly', weekday: 1, startMinute: 1320, endMinute: 120 },
       { kind: 'weekly', weekday: 5, startMinute: 1320, endMinute: 120 },
     ]);
+    expect(first.map((body) => body.opensTo)).toEqual(['cam', 'cam']);
     expect(availabilityBodiesOf(dispo, ZONE, idFor).map((body) => body.id)).toEqual(
       first.map((body) => body.id),
     );

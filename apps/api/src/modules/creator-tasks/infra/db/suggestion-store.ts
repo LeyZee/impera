@@ -114,7 +114,8 @@ async function windowsBetween(
   const open = await tx
     .select()
     .from(availabilities)
-    .where(sql`${availabilities.archivedAt} is null`);
+    // The agency's suggestions fall only in a dispo she opened to the agency, never in a dispo cam (ADR 0159 § 5).
+    .where(sql`${availabilities.archivedAt} is null and ${availabilities.opensTo} = 'agency'`);
   return availabilityWindows(open.map(availabilityOf), firstDay, lastDay, zone);
 }
 

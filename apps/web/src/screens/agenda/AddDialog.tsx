@@ -1,4 +1,8 @@
-import { CREATOR_TASK_CATEGORIES, CREATOR_TASK_CATEGORY_LABELS } from '@impera/contracts';
+import {
+  CREATOR_TASK_CATEGORIES,
+  CREATOR_TASK_CATEGORY_LABELS,
+  type AvailabilityOpensTo,
+} from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useId, useState, type JSX, type ReactNode, type SyntheticEvent } from 'react';
 
@@ -19,6 +23,7 @@ import {
   type TaskDraft,
   type TaskWhenKind,
 } from './draft';
+import { DISPO_TITLES } from './model';
 import { whenWords } from './words';
 
 import { DayField, NO_SUCH_DAY } from '@/scheduling/DayField';
@@ -231,9 +236,10 @@ export function AgendaDay({
 }
 
 /**
- * « Ajouter » (CR-05, Charles 02/11, 20 h 17): « Une tâche » or « Une dispo », nothing else. A task has its hours, a
- * day, or its days of the week (her routine); a dispo is time she opens to the agency, every week or once. Created
- * online: offline, the form says so and keeps what she typed.
+ * « Ajouter » (CR-05, Charles 02/11, 20 h 17): « Une tâche », « Une dispo » or « Une dispo cam », nothing else. A task
+ * has its hours, a day, or its days of the week (her routine); a dispo is time she opens to the agency, a dispo cam
+ * time she opens to a fan's cam (ADR 0159 § 5), every week or once. Created online: offline, the form says so and
+ * keeps what she typed.
  */
 export function AddDialog({
   zone,
@@ -244,7 +250,7 @@ export function AddDialog({
   preset: AddPreset;
   onClose: () => void;
 }): JSX.Element {
-  const [what, setWhat] = useState<'task' | 'dispo'>('task');
+  const [what, setWhat] = useState<AddKind>('task');
   const [opened] = useState(() => new Date());
   const start = preset.start ?? defaultStart(preset.day, dayOf(opened, zone), minuteOf(opened, zone));
   const end = preset.end ?? (start + 60) % 1440;
@@ -270,8 +276,17 @@ export function AddDialog({
           />
         ) : (
           <DispoForm
+            key={what}
             zone={zone}
-            initial={{ kind: 'weekly', day: preset.day, weekdays: [weekdayOf(preset.day)], start, end }}
+            initial={{
+              kind: 'weekly',
+              day: preset.day,
+              weekdays: [weekdayOf(preset.day)],
+              // A cam is an evening's: 21 h – 23 h unless she touched an hour of her agenda.
+              start: what === 'cam' && preset.start === undefined ? CAM_START : start,
+              end: what === 'cam' && preset.start === undefined ? CAM_END : end,
+              opensTo: what === 'cam' ? 'cam' : 'agency',
+            }}
             onClose={onClose}
           />
         )}
@@ -280,19 +295,19 @@ export function AddDialog({
   );
 }
 
-const KINDS: readonly (readonly ['task' | 'dispo', string, string, string])[] = [
+type AddKind = 'task' | 'dispo' | 'cam';
+
+const CAM_START = 21 * 60;
+const CAM_END = 23 * 60;
+
+const KINDS: readonly (readonly [AddKind, string, string, string])[] = [
   ['task', '✅', 'Une tâche', 'Ce que tu fais : un tournage, un live, un post…'],
   ['dispo', '🕐', 'Une dispo', 'Le temps que tu ouvres à l’agence'],
+  ['cam', '📹', 'Une dispo cam', 'Quand tu acceptes une cam avec un fan'],
 ];
 
-/** « Une tâche » or « Une dispo », as two cards: what each one is, said under it. */
-function KindPicker({
-  value,
-  onPick,
-}: {
-  value: 'task' | 'dispo';
-  onPick: (value: 'task' | 'dispo') => void;
-}): JSX.Element {
+/** « Une tâche », « Une dispo » or « Une dispo cam », as cards: what each one is, said under it. */
+function KindPicker({ value, onPick }: { value: AddKind; onPick: (value: AddKind) => void }): JSX.Element {
   const id = useId();
   return (
     <div className="ag-kinds" role="radiogroup" aria-label="Ce que tu ajoutes">
@@ -576,6 +591,11 @@ function TaskForm({
   );
 }
 
+const DISPO_EXPLAINS: Readonly<Record<AvailabilityOpensTo, string>> = {
+  agency: 'L’agence n’y propose une tâche que là, et tu choisis toujours.',
+  cam: 'Une cam ne t’est proposée que là, et tu dis oui ou non à chaque demande. L’heure n’est donnée au fan qu’une fois tout payé.',
+};
+
 function DispoForm({
   zone,
   initial,
@@ -628,14 +648,19 @@ function DispoForm({
     <form className="tm-dialog__body" noValidate onSubmit={submit}>
       <Preview
         mark={
-          <span className="ag-mark ag-mark--dispo" data-size="lg" aria-hidden="true">
-            🕐
+          <span
+            className="ag-mark ag-mark--dispo"
+            data-opens-to={draft.opensTo}
+            data-size="lg"
+            aria-hidden="true"
+          >
+            {draft.opensTo === 'cam' ? '📹' : '🕐'}
           </span>
         }
-        title="Dispo pour l’agence"
+        title={DISPO_TITLES[draft.opensTo]}
         when={dispoWhen(draft)}
       />
-      <p className="ag-explain">L’agence n’y propose une tâche que là, et tu choisis toujours.</p>
+      <p className="ag-explain">{DISPO_EXPLAINS[draft.opensTo]}</p>
       <Choices
         label="Quand"
         options={DISPO_KINDS}

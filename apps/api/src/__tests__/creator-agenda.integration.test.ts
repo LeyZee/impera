@@ -271,6 +271,30 @@ describe('/v1/creator-space/agenda and the agency’s suggestions', () => {
     expect(JSON.stringify(seen)).not.toMatch(/origin|agency|manager/u);
   });
 
+  it('keeps a dispo cam out of the agency’s suggestions, and reads it back as a cam’s (ADR 0159 § 5)', async () => {
+    const thursday = addDays(nextWednesday, 1);
+    const cam = {
+      id: newId(AvailabilityIdSchema),
+      when: { kind: 'weekly', weekday: 4, startMinute: 21 * 60, endMinute: 23 * 60 },
+      opensTo: 'cam',
+    };
+    expect((await call('POST', '/v1/creator-space/availabilities', 'nora', cam)).statusCode).toBe(200);
+    expect((await agenda()).availabilities.find((one) => one.id === cam.id)).toMatchObject({
+      opensTo: 'cam',
+    });
+    const suggested = AgencySuggestionSchema.parse(
+      (
+        await call('POST', `/v1/creators/${nora}/suggestions`, 'owner', {
+          id: newId(SuggestionIdSchema),
+          when: { kind: 'timed', startsAt: at(thursday, 21), endsAt: at(thursday, 22) },
+          category: 'live',
+          title: 'Live du jeudi soir',
+        })
+      ).json(),
+    );
+    expect(suggested).toMatchObject({ when: null, minutes: 60 });
+  });
+
   it('lets her accept or decline once, and keeps a declined task away the week after', async () => {
     const seen = (await agenda()).suggestions;
     const placed = seen.find((one) => one.title === 'Live du mercredi');
