@@ -3,6 +3,8 @@ import { useState, type JSX } from 'react';
 import { closeCare } from './api';
 import { careSinceText } from './reader-model';
 
+import { NavIcon } from '@/shell/NavIcon';
+
 /**
  * His care mode, at the top of the conversation (ADR 0088, trou béant 4): since when, what it means, and « Il va
  * mieux » for whoever reads the whole creator (the owner, an active manager), asked twice since it lets the agent
@@ -44,7 +46,9 @@ export function CareBanner({
     <div className="tr-hand tr-care" role="status">
       <p>
         <strong>
-          <CareIcon />
+          <span className="tr-care__icon">
+            <NavIcon name="heart" />
+          </span>
           {careSinceText(since, new Date())}
         </strong>
         <span>
@@ -102,23 +106,5 @@ export function CareBanner({
         </p>
       )}
     </div>
-  );
-}
-
-/** A heart drawn in the menu icons' stroke (`NavIcon`): his care mode at a glance. */
-function CareIcon(): JSX.Element {
-  return (
-    <svg
-      className="tr-care__icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 20s-7.5-4.6-7.5-10.1A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20Z" />
-    </svg>
   );
 }
