@@ -24,6 +24,8 @@ import {
   type OrderTone,
 } from './model';
 
+import { Steps } from '@/shell/figures/figures';
+
 import '../custom-prices/custom-prices.css';
 import './custom-orders.css';
 
@@ -76,26 +78,18 @@ export function OrderCard({
         <h3 className="nv-h3 cso-card__fan" id={titleId}>
           {order.fanName}
         </h3>
-        <span className="nv-tag cso-state">{STATE_LABELS[order.state]}</span>
+        <span className="nv-tag nv-tag--tint cso-state" style={{ '--_c': TONE_COLOURS[tone] }}>
+          {STATE_LABELS[order.state]}
+        </span>
       </header>
       <p className="cso-card__what">{headlineOf(order)}</p>
 
-      {/* Equal segments, full once reached, each word centred under its own (Design, as #992 draws steps). */}
-      <ol
-        className="cso-track"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={steps.length}
-        aria-valuenow={done}
-        aria-valuetext={`${String(done)} étapes sur ${String(steps.length)}`}
-      >
-        {steps.map((step) => (
-          <li key={step.label} className="cso-track__step" data-done={step.done ? 'true' : undefined}>
-            <span className="cso-track__seg" aria-hidden="true" />
-            <span className="cso-track__word">{step.label}</span>
-          </li>
-        ))}
-      </ol>
+      <Steps
+        steps={steps}
+        reached={done - 1}
+        label={`Étapes de la commande : ${String(done)} sur ${String(steps.length)}`}
+        colour={TONE_COLOURS[tone]}
+      />
 
       {supplements.length === 0 && details.length === 0 ? null : (
         <dl className="cso-details">

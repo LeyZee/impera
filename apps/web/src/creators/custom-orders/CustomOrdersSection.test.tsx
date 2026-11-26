@@ -88,7 +88,7 @@ describe('Créatrices › Sur mesure › Commandes en cours', () => {
     expect(await screen.findByText('50 € · acompte 25 €')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Acompte reçu' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Rien n’attend, 1 commande avance' })).toBeTruthy();
-    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('2');
+    expect(screen.getByRole('list', { name: 'Étapes de la commande : 2 sur 4' })).toBeDefined();
   });
 
   it('a manager reads the same card without a button', async () => {

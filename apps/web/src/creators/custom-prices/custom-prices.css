@@ -74,6 +74,15 @@
 .smp-rows--ready > .smp-row {
   grid-template-columns: minmax(0, 1fr) 7rem 7rem 8.5rem 4.5rem;
 }
+/* A type of video: every cell on the top of its field, so a message under one never shifts its pair; the switch and
+   « Retirer » sit on the field's height, not on a field with its message. */
+.smp-rows--ready > .smp-row {
+  align-items: start;
+}
+.smp-rows--ready .smp-offered,
+.smp-rows--ready .smp-row__remove {
+  min-height: var(--nv-target-min);
+}
 .smp-row[data-off='true'] .smp-row__label {
   color: var(--nv-ink-muted);
 }
@@ -294,8 +303,9 @@
   .smp-rows--ready > .smp-row {
     align-items: flex-start;
   }
+  /* « Retirer » beside the name's field, under its label. */
   .smp-rows--ready .smp-row__remove {
-    align-self: flex-end;
+    margin-top: calc(var(--nv-text-caption-leading) + 2px);
   }
   .smp-rows--ready .smp-unit {
     flex: 0 0 6.5rem;

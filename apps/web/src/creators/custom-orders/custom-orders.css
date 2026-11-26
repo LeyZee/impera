@@ -1,7 +1,7 @@
 /*
  * Créatrices › Sur mesure › Commandes en cours, and the card « Demande sur mesure » of « À traiter » (ADR 0159 § A).
  * Prefixed `cso-`. One card per order; its state's colour (amber waits on her, blue runs, green delivered, grey
- * closed) tints its pill, its meter and its steps. Red stays for urgencies; the one neon is « Elle accepte ».
+ * closed) tints its pill (`nv-tag--tint`) and its steps (`Steps`). Red stays for urgencies; the one neon is « Elle accepte ».
  */
 .cso-section {
   display: flex;
@@ -62,17 +62,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cso-state {
-  background: color-mix(in srgb, var(--cso-c) 18%, transparent);
-  color: var(--cso-c);
-}
 .cso-card[data-tone='warn'] .cso-state::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: cso-pulse 1.6s ease-in-out infinite;
+  animation: cso-pulse var(--nv-dur-breathe) ease-in-out infinite;
 }
 @keyframes cso-pulse {
   50% {
@@ -81,7 +72,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .cso-card,
-  .cso-track__seg,
   .cso-card[data-tone='warn'] .cso-state::before {
     animation: none;
     transition: none;
@@ -90,43 +80,6 @@
 .cso-card__what {
   margin: 0;
   font-weight: 600;
-}
-
-.cso-track {
-  display: grid;
-  grid-auto-columns: minmax(0, 1fr);
-  grid-auto-flow: column;
-  gap: var(--nv-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.cso-track__step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 0;
-  text-align: center;
-  color: var(--nv-ink-faint);
-  font-size: var(--nv-text-caption);
-  line-height: var(--nv-text-caption-leading);
-}
-.cso-track__seg {
-  align-self: stretch;
-  height: 6px;
-  margin-bottom: var(--nv-space-1);
-  border-radius: var(--nv-radius-full);
-  background: var(--nv-fill-track);
-  transition: background-color var(--nv-dur-base) var(--nv-ease-out);
-}
-.cso-track__step[data-done='true'] {
-  color: var(--nv-ink);
-}
-.cso-track__step[data-done='true'] .cso-track__seg {
-  background: var(--cso-c);
-}
-.cso-track__step[data-done='true'] .cso-track__word {
-  font-weight: 650;
 }
 
 .cso-details {
