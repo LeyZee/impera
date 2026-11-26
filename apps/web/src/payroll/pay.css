@@ -1601,3 +1601,9 @@
 .py-give__anchor {
   scroll-margin-top: calc(env(safe-area-inset-top, 0px) + var(--nv-space-6));
 }
+/* The member who signals, his initial beside his name, as on Équipe › Rapports. */
+.py-claim .py-held__who {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+}

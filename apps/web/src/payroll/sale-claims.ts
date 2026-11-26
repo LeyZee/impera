@@ -43,15 +43,18 @@ export function claimBlockedText(
 /** The validator's head of the panel: « 2 en attente ». */
 export const pendingCountText = (count: number): string => `${String(count)}${NBSP}en attente`;
 
-/** What the member reads under a claim answered: who settled it is not his to know, the word of a refusal is. */
+/**
+ * What the member reads under his claim, beside its state's tag: who answered is not his to know, the word of a refusal
+ * is. The tag already says the state: the line never repeats it.
+ */
 export function claimAnswerText(claim: Pick<SaleClaim, 'state' | 'answerNote'>): string | null {
   switch (claim.state) {
     case 'waiting':
       return 'Un manager regarde les ventes de ce shift.';
     case 'settled':
-      return 'Réglé : la vente apparaît « Reçue de … » sur ton relevé.';
+      return 'La vente apparaît « Reçue de … » sur ton relevé.';
     case 'not_retained':
-      return claim.answerNote === null ? 'Pas retenu.' : `Pas retenu : « ${claim.answerNote} »`;
+      return claim.answerNote === null ? null : `Réponse : « ${claim.answerNote} »`;
     case 'withdrawn':
       return null;
   }

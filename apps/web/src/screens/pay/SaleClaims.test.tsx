@@ -113,7 +113,7 @@ describe('Commissions › « J’ai été décisif sur une vente » (trou 15)', 
     await waitFor(() => {
       expect(screen.getByText('Pas retenu')).toBeTruthy();
     });
-    expect(text()).toContain('Pas retenu : « La vente est arrivée avant ton shift »');
+    expect(text()).toContain('Réponse : « La vente est arrivée avant ton shift »');
     expect(text()).toContain('Nora Vidal · @nora sur Reveal · sam. 21 nov. · 14 h 05 – 20 h 05');
     fireEvent.click(screen.getByRole('button', { name: 'Signaler un shift' }));
     const dialog = await screen.findByRole('dialog');
