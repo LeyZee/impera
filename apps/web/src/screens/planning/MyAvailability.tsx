@@ -30,13 +30,25 @@ const WEEK = [1, 2, 3, 4, 5, 6, 7] as const;
  * « Mes dispos » (ADR 0171, trou 16): the week he can work, folded with his leaves and swaps. The agency reads it on
  * each free place; nothing is booked from it.
  */
-export function MyAvailability({ now, onEdit }: { now: Date; onEdit: () => void }): JSX.Element | null {
+export function MyAvailability({
+  now,
+  color,
+  onEdit,
+}: {
+  now: Date;
+  /** His colour on the team calendar: his plages are drawn in it. */
+  color: string | null;
+  onEdit: () => void;
+}): JSX.Element | null {
   const week = useMyAvailability();
   if (week.data === undefined) return null;
   const drafts = draftsOf(week.data.ranges);
   const stale = isStale(week.data, now);
   return (
-    <details className="nv-disclosure nv-plate sc-fold">
+    <details
+      className="nv-disclosure nv-plate sc-fold"
+      style={color === null ? undefined : { '--sc-color': color }}
+    >
       <summary>
         <span className="nv-disclosure__title">Mes dispos</span>
         <span className="nv-disclosure__sum">{weekSum(week.data.ranges)}</span>
@@ -57,16 +69,44 @@ export function MyAvailability({ now, onEdit }: { now: Date; onEdit: () => void 
         ) : (
           <ul className="sc-dispo-week" aria-label="Mes dispos de la semaine">
             {WEEK.map((weekday) => {
+              const name = WEEKDAYS[weekday - 1] ?? '';
               const day = drafts.filter((draft) => draft.weekday === weekday);
+              // The track draws the plages as kept, so a night past midnight goes on at the left of the next day.
+              const bars = week.data.ranges.filter((range) => range.weekday === weekday);
+              // A morning that is only the end of the night before: said as such, not as a day of its own.
+              const before = (WEEKDAYS[(weekday + 5) % 7] ?? '').toLowerCase();
+              const shown =
+                day.length > 0
+                  ? day.map((draft) => rangeText(draft)).join(' · ')
+                  : bars.length > 0
+                    ? `suite du ${before}`
+                    : '—';
+              const said = shown === '—' ? 'pas dispo' : shown;
               return (
                 <li
                   key={weekday}
                   className="sc-dispo-week__day"
-                  data-empty={day.length === 0 ? 'true' : undefined}
+                  data-empty={bars.length === 0 ? 'true' : undefined}
+                  aria-label={`${name} : ${said}`}
                 >
-                  <span className="sc-dispo-week__name">{WEEKDAYS[weekday - 1]}</span>
-                  <span className="nv-num sc-dispo-week__ranges">
-                    {day.length === 0 ? '—' : day.map((draft) => rangeText(draft)).join(' · ')}
+                  <span className="sc-dispo-week__name" aria-hidden="true">
+                    {name.slice(0, 3)}
+                  </span>
+                  <span className="sc-dispo-track" aria-hidden="true">
+                    {bars.map((range) => (
+                      <span
+                        key={`${String(range.startMinute)}-${String(range.endMinute)}`}
+                        className="sc-dispo-track__bar"
+                        title={`${name} : ${rangeText(range)}`}
+                        style={{
+                          '--_x': `${String((range.startMinute / DAY_MINUTES) * 100)}%`,
+                          '--_w': `${String(((range.endMinute - range.startMinute) / DAY_MINUTES) * 100)}%`,
+                        }}
+                      />
+                    ))}
+                  </span>
+                  <span className="nv-num sc-dispo-week__ranges" aria-hidden="true">
+                    {shown}
                   </span>
                 </li>
               );
@@ -211,13 +251,15 @@ export function AvailabilityPanel({
                       ) : null}
                       <button
                         type="button"
-                        className="sc-dispo-range__remove"
+                        className="nv-close sc-dispo-range__remove"
                         aria-label={`Retirer la plage du ${name}`}
                         onClick={() => {
                           remove(draft.key);
                         }}
                       >
-                        ×
+                        <svg viewBox="0 0 16 16" aria-hidden="true">
+                          <path d="m4 4 8 8M12 4l-8 8" />
+                        </svg>
                       </button>
                     </div>
                   ))}

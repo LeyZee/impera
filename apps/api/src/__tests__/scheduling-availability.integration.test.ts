@@ -5,7 +5,7 @@ import {
   TeamAvailabilitySchema,
   type TeamMember,
 } from '@impera/contracts';
-import { schema, sql } from '@impera/db';
+import { eq, schema, sql } from '@impera/db';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
@@ -116,6 +116,32 @@ describe('Équipe › Planning : les dispos de la semaine (ADR 0171, trou 16)', 
       return tx.select().from(schema.memberAvailabilityWeeks);
     });
     expect(seen).toEqual([]);
+  });
+
+  it('bounds a manager to the members of his creators: he reads no other and writes for none', async () => {
+    const ines = await team.addMember('ines@example.test', 'Inès', 'manager');
+    const zoe = await team.addMember('zoe@example.test', 'Zoé');
+    // Inès follows Béa alone, Zoé chats for Anna alone; Théo has both.
+    await team.test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [team.bea] })
+      .where(eq(schema.user.id, ines.member.userId));
+    await team.test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [team.anna] })
+      .where(eq(schema.user.id, zoe.member.userId));
+    const response = await team.call('GET', '/scheduling/availability', ines.cookie);
+    expect(response.statusCode, response.body).toBe(200);
+    const read = TeamAvailabilitySchema.parse(response.json()).members.map((one) => one.memberId);
+    expect(read).toContain(theo.id);
+    expect(read).not.toContain(zoe.member.id);
+    expect((await put(ines.cookie, zoe.member.id, evenings)).statusCode).toBe(404);
+    expect((await put(ines.cookie, theo.id, evenings)).statusCode).toBe(201);
+    // The owner keeps the whole agency.
+    const all = await team.call('GET', '/scheduling/availability', team.owner);
+    expect(TeamAvailabilitySchema.parse(all.json()).members.map((one) => one.memberId)).toContain(
+      zoe.member.id,
+    );
   });
 
   it('keeps every week as written: no change, no removal', async () => {

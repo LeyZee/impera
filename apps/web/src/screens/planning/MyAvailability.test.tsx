@@ -56,7 +56,9 @@ describe('« Mes dispos » (ADR 0171, trou 16)', () => {
   it('folds his week a line a day, at his hour, and asks again after a month', async () => {
     stub();
     render(
-      withClient(<MyAvailability now={new Date('2026-11-26T10:00:00.000Z')} onEdit={() => undefined} />),
+      withClient(
+        <MyAvailability now={new Date('2026-11-26T10:00:00.000Z')} color={null} onEdit={() => undefined} />,
+      ),
     );
     const week = await screen.findByRole('list', { name: 'Mes dispos de la semaine' });
     expect(within(week).getByText(/^18.h – 2.h$/u)).toBeTruthy();

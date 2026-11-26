@@ -380,6 +380,7 @@ export function MyPlanningPage({
             {swaps.data === undefined ? null : <MySwaps list={swaps.data} memberId={me.id} zone={zone} />}
             <MyAvailability
               now={now}
+              color={me.color}
               onEdit={() => {
                 setOpen({ kind: 'dispos' });
               }}

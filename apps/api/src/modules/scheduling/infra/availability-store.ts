@@ -5,9 +5,10 @@ import {
   TeamAvailabilitySchema,
   TeamMemberIdSchema,
   type AvailabilityRange,
+  type TeamScope,
   type MemberAvailability,
 } from '@impera/contracts';
-import { eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
+import { and, eq, inArray, schema, sql, withMember, type Database, type Transaction } from '@impera/db';
 import { z } from 'zod';
 
 import { AvailabilityConflict, MemberNotActive, MemberNotFound, PlanningForbidden } from '../domain/errors';
@@ -16,6 +17,8 @@ import type { AvailabilityStore } from '../domain/ports';
 import { audit } from './rows';
 
 const { memberAvailabilityWeeks, teamMembers } = schema;
+
+type SQL = ReturnType<typeof sql>;
 
 type WeekRow = typeof memberAvailabilityWeeks.$inferSelect;
 
@@ -68,9 +71,19 @@ const memberColumns = {
 };
 
 /**
+ * Who a reader may see beside himself: everyone for the owner; for a manager, the members who share at least one
+ * creator of his own list (Sécurité on #1030, as the shift feedbacks). The table has no creator, so the store bounds it.
+ */
+function reachOf(userId: string, scope: TeamScope): SQL | undefined {
+  if (scope !== 'agency') return undefined;
+  return sql`exists (select 1 from "user" u, "user" me where u.id = ${teamMembers.userId} and me.id = ${userId} and u.creator_ids && me.creator_ids)`;
+}
+
+/**
  * The weeks of availability (ADR 0171, trou 16) under `withMember`. A member reads and writes his own; the owner and an
- * active manager read every active member's and write one for a member (the journal says it). The policies hold the
- * same rule: a row is read by its member or the scope `owner` | `agency`, written only under the writer's own name.
+ * active manager read the active members' and write one for a member (Charles, 26/11 : « Oui, journalisé » ; the
+ * journal says it). A manager reaches only the members of his creators (`reachOf`). The policies hold the rest: a row
+ * is read by its member or the scope `owner` | `agency`, written only under the writer's own name.
  */
 export function createDrizzleAvailabilityStore(db: Database): AvailabilityStore {
   return {
@@ -91,7 +104,7 @@ export function createDrizzleAvailabilityStore(db: Database): AvailabilityStore 
         const members = await tx
           .select(memberColumns)
           .from(teamMembers)
-          .where(eq(teamMembers.status, 'active'))
+          .where(and(eq(teamMembers.status, 'active'), reachOf(userId, scope)))
           .orderBy(teamMembers.displayName);
         const latest = await latestOf(
           tx,
@@ -111,6 +124,17 @@ export function createDrizzleAvailabilityStore(db: Database): AvailabilityStore 
         if (member === undefined) throw new MemberNotFound();
         const own = member.userId === actor.userId;
         if (!own && scope === 'self') throw new PlanningForbidden();
+        if (!own) {
+          const reach = reachOf(actor.userId, scope);
+          if (reach !== undefined) {
+            const [inReach] = await tx
+              .select({ id: teamMembers.id })
+              .from(teamMembers)
+              .where(and(eq(teamMembers.id, member.id), reach));
+            // Outside his creators the member is not his to see: the same answer as a member that does not exist.
+            if (inReach === undefined) throw new MemberNotFound();
+          }
+        }
         if (member.status !== 'active') throw new MemberNotActive();
         const ranges = ordered(body.ranges);
         const [sent] = await tx
