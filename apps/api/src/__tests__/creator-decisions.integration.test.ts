@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import {
   CreatorDecisionsSchema,
   CreatorIdSchema,
@@ -29,6 +31,7 @@ describe('her decisions (ADR 0164)', () => {
   let app: App;
   let server: Server;
   let nora: CreatorId;
+  let noraUser = '';
   let ines: CreatorId;
   let now = new Date('2026-11-21T10:00:00Z');
   const cookies: Record<'owner' | 'manager' | 'chatter' | 'nora' | 'ines', string> = {
@@ -95,7 +98,12 @@ describe('her decisions (ADR 0164)', () => {
 
   beforeAll(async () => {
     test = await createTestDb(inject('pgSuperuserUrl'));
-    const config = testConfig({ DATABASE_URL: test.appUrl, DATABASE_SERVICE_URL: test.serviceUrl });
+    const config = testConfig({
+      DATABASE_URL: test.appUrl,
+      DATABASE_SERVICE_URL: test.serviceUrl,
+      // Push on: a new question is told to her accounts (no device, so nothing leaves; the delivery is recorded).
+      CREDENTIALS_ENCRYPTION_KEYS: `v1:${randomBytes(32).toString('base64')}`,
+    });
     const logger = createLogger(config);
     app = await createApp(config, logger, { decisionsClock: () => now });
     server = await buildServer({ config, logger, routes: app.routes, readiness: app.readiness });
@@ -132,7 +140,9 @@ describe('her decisions (ADR 0164)', () => {
       });
       cookies[who] = member.cookie;
     }
-    cookies.nora = (await account('nora@example.test', { role: 'creator', creatorIds: [nora] })).cookie;
+    const noraAccount = await account('nora@example.test', { role: 'creator', creatorIds: [nora] });
+    cookies.nora = noraAccount.cookie;
+    noraUser = noraAccount.userId;
     cookies.ines = (await account('ines@example.test', { role: 'creator', creatorIds: [ines] })).cookie;
   });
 
@@ -152,6 +162,39 @@ describe('her decisions (ADR 0164)', () => {
     expect(list.map((one) => one.kind)).toEqual(['publish_time', 'caption']);
     expect(list[1]?.answers.map((one) => one.label)).toEqual(['Une question', 'Taquine', 'Très courte']);
     expect((await hers('ines')).map((one) => one.kind)).toEqual(['caption']);
+  });
+
+  it('tells her accounts of a new question once, by its words, never another creator, nor once it is answered', async () => {
+    const told = () =>
+      test.admin.db
+        .select({
+          userId: schema.notificationDeliveries.userId,
+          objectKey: schema.notificationDeliveries.objectKey,
+          title: schema.notificationDeliveries.title,
+          url: schema.notificationDeliveries.url,
+        })
+        .from(schema.notificationDeliveries)
+        .where(eq(schema.notificationDeliveries.reason, 'decision'))
+        .orderBy(schema.notificationDeliveries.objectKey);
+    // The first test asked two of hers and one of Inès's: each of hers told once, replays included.
+    expect((await told()).filter((row) => row.userId === noraUser)).toEqual([
+      {
+        userId: noraUser,
+        objectKey: `decision:caption:${subject(1)}`,
+        title: 'Une question pour toi',
+        url: '/aujourdhui',
+      },
+      {
+        userId: noraUser,
+        objectKey: `decision:publish_time:${subject(2)}`,
+        title: 'Une question pour toi',
+        url: '/aujourdhui',
+      },
+    ]);
+    expect((await told()).filter((row) => row.objectKey.endsWith(subject(3)))).toHaveLength(1);
+    expect((await told()).some((row) => row.userId === noraUser && row.objectKey.endsWith(subject(3)))).toBe(
+      false,
+    );
   });
 
   it('refuses a decision that does not hold: answers that do not fit the layout', async () => {

@@ -308,6 +308,26 @@ export function createDrizzleDecisionAsking(db: Database): DecisionAsking {
         return row === undefined ? null : toRead(toDecision(row));
       }),
 
+    phones: (creatorId) =>
+      asking(creatorId, async (tx) => {
+        const [creator] = await tx
+          .select({ timeZone: schema.creators.timezone })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, creatorId));
+        // Her accounts: role `creator`, linked to her alone (one link per account since CR-02).
+        const accounts = await tx
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(
+            and(
+              eq(schema.user.role, 'creator'),
+              sql`${schema.user.creatorIds} = array[${creatorId}]::uuid[]`,
+            ),
+          )
+          .orderBy(schema.user.id);
+        return { accounts: accounts.map((one) => one.id), timeZone: creator?.timeZone ?? 'Europe/Paris' };
+      }),
+
     read: (creatorId, kind, subject, now) =>
       asking(creatorId, async (tx): Promise<AskedDecision | null> => {
         const [row] = await tx

@@ -1,8 +1,9 @@
 /** Public entry point of the `creator-decisions` module (ADR 0164, « À décider »). Other modules import this file only. */
-import type { CreatorDecisionKind } from '@impera/contracts';
+import type { CreatorDecisionKind, NotificationOutcome, NotificationRequest } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
+import { askAndTell } from './application/ask';
 import { otherIdeas } from './application/other-ideas';
 import type { DecisionAsking, OtherIdeasWriter } from './domain/ports';
 import { createDrizzleDecisionAsking, createDrizzleDecisionStore } from './infra/db/decision-store';
@@ -25,13 +26,21 @@ export interface CreatorDecisionsDeps {
    * nothing of what a caption is.
    */
   readonly otherIdeas?: Partial<Record<CreatorDecisionKind, OtherIdeasWriter>>;
+  /** The `notifications` module's `notify`, to tell her of a new question; `null` or absent when push is off. */
+  readonly notify?: ((request: NotificationRequest, at: Date) => Promise<NotificationOutcome>) | null;
   /** Tests only: another clock than the server's. */
   readonly clock?: () => Date;
 }
 
 export function createCreatorDecisionsModule(deps: CreatorDecisionsDeps): CreatorDecisionsModule {
   const store = createDrizzleDecisionStore(deps.db);
-  const asking = createDrizzleDecisionAsking(deps.db);
+  const clock = deps.clock ?? (() => new Date());
+  const stored = createDrizzleDecisionAsking(deps.db);
+  const asking: DecisionAsking = {
+    ...stored,
+    ask: (creatorId, decision) =>
+      askAndTell({ asking: stored, notify: deps.notify ?? null }, creatorId, decision, clock()),
+  };
   const writers = deps.otherIdeas ?? {};
   return {
     name: 'creator-decisions',

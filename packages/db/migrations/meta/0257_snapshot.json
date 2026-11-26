@@ -1,5 +1,5 @@
 {
-  "id": "5322e2eb-a8be-499c-88e1-d79c388124f4",
+  "id": "b170fb7b-37ef-445f-a064-4de17a22ee5f",
   "prevId": "b7fe8cf4-b7c7-4f26-9210-e1706ad37413",
   "version": "7",
   "dialect": "postgresql",
@@ -10788,7 +10788,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision')"
         }
       },
       "isRLSEnabled": false

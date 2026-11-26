@@ -96,6 +96,8 @@ export interface DecisionAsking {
     id: CreatorDecisionId,
     answers: readonly DecisionAnswer[],
   ): Promise<CreatorDecision | null>;
+  /** Her own accounts and her time zone, to tell her of a question; read in her creator under the same door. */
+  phones(creatorId: CreatorId): Promise<{ readonly accounts: readonly string[]; readonly timeZone: string }>;
   /** Where a question stands; `null` when it was never asked. */
   read(
     creatorId: CreatorId,
