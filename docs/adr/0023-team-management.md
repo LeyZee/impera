@@ -104,6 +104,8 @@ Un onglet **Équipe** (Membres, Planning, Rapports, Paie) pour le propriétaire 
 
 Lot 0 (cet ADR, le glossaire, les fiches) → 1 Équipe → 2 Planning → 3 Rapports, paie, factures, puis import de l'historique → 4 Hybride (après la capture Reveal et les clés) → 5 PWA de la créatrice → ensuite, les autres fonctions d'Imperium, reprises elles aussi : facturation des créatrices et pénalités de retard, rapprochement bancaire, ventes Telegram Stars, trafic des liens, coaching, gamification. Les lots 1 à 3 n'attendent que du code.
 
+**Amendement du 21/11/2026 (Charles).** La validation d'un régime par le comptable n'est plus une condition d'émission. Charles l'a retirée : « Il n'y a vraiment pas besoin. J'ai peur que ça me bloque. » Le propriétaire peut toujours noter le jour où le comptable a validé un régime, mais aucune facture ne l'attend, ni dans le domaine (`issueDecision`) ni dans la base (migration 0255, fonction `keep_invoice`). Le reste ne change pas : mandat accepté, régime du pays de la fiche affecté au jour d'émission, dossier complet et vérifié. Un régime mal rédigé imprime de mauvaises mentions ; on les corrige par une facture rectificative (ADR 0040).
+
 ## Conséquences
 
 - Les nouveaux chatteurs sont gérés dans le même outil que l'agent, avec la même authentification et le même design.

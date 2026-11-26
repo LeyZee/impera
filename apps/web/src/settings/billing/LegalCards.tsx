@@ -143,7 +143,7 @@ export function LegalCards({
           <p className="tm-hint">Lecture des régimes…</p>
         ) : regimes.data.regimes.length === 0 ? (
           <p className="tm-hint cf-amber">
-            Aucun régime : sans régime validé, aucune facture ne part. Écris celui que ton comptable a rédigé.
+            Aucun régime : sans régime, aucune facture ne part. Écris celui que ton comptable a rédigé.
           </p>
         ) : (
           <ul className="bf-regimes">
@@ -251,11 +251,8 @@ function RegimeItem({
     <li className="bf-regime">
       <div className="bf-version__head">
         <span className="bf-version__name">{regime.name}</span>
-        {regime.validatedOn === null ? (
-          <span className="rp-chip rp-chip--warn">À valider</span>
-        ) : (
-          <span className="rp-chip rp-chip--ok">Validé</span>
-        )}
+        {/* The accountant's validation is a note, never a gate (Charles, 21/11/2026): no chip says « à valider ». */}
+        {regime.validatedOn === null ? null : <span className="rp-chip rp-chip--ok">Validé</span>}
       </div>
       <dl className="bf-facts bf-facts--tight">
         <Fact label="Pays">{countriesText(regime.countries)}</Fact>
@@ -266,11 +263,9 @@ function RegimeItem({
         </Fact>
         <Fact label="Identifiant fiscal">{regime.taxIdRequired ? 'Exigé' : 'Pas exigé'}</Fact>
         <Fact label="Validation">
-          {regime.validatedOn === null ? (
-            <span className="cf-amber">Pas encore notée : aucune facture ne part sous ce régime.</span>
-          ) : (
-            `Par le comptable, le ${fullDay(regime.validatedOn)}`
-          )}
+          {regime.validatedOn === null
+            ? 'Pas notée. Facultative : les factures partent sans elle.'
+            : `Par le comptable, le ${fullDay(regime.validatedOn)}`}
         </Fact>
       </dl>
       {showsResidenceWithoutTreaty(regime) ? (

@@ -1373,6 +1373,13 @@
       "when": 1795283858403,
       "tag": "0254_vault_sent_for_free",
       "breakpoints": true
+    },
+    {
+      "idx": 196,
+      "version": "7",
+      "when": 1795705323525,
+      "tag": "0255_invoice_without_accountant_gate",
+      "breakpoints": true
     }
   ]
 }

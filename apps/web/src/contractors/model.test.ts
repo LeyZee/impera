@@ -69,7 +69,7 @@ describe('the regime of a file', () => {
       BENIN_REGIME.name,
     ]);
     expect(validationText(BENIN_REGIME)).toBe('validé par le comptable le 30 octobre 2026');
-    expect(validationText(BENIN_DRAFT)).toMatch(/^pas encore validé par le comptable/u);
+    expect(validationText(BENIN_DRAFT)).toBe('validation du comptable non notée, facultative');
     expect(askedText(BENIN_REGIME)).toBe('attestation de résidence fiscale');
     expect(askedText({ documents: ['tax_residence', 'urssaf_vigilance'] })).toBe(
       'attestation de résidence fiscale et attestation de vigilance',

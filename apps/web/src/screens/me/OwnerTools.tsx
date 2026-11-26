@@ -285,9 +285,7 @@ export function RegimePanel({
               </div>
               <div>
                 <dt>Comptable</dt>
-                <dd className={current.validatedOn === null ? 'cf-amber' : undefined}>
-                  {validationText(current)}
-                </dd>
+                <dd>{validationText(current)}</dd>
               </div>
               <div>
                 <dt>Pièces</dt>
@@ -418,7 +416,7 @@ function AssignDialog({
                   </>
                 )}
                 {chosen === null ? null : (
-                  <p className={chosen.validatedOn === null ? 'tm-hint cf-amber' : 'tm-hint'}>
+                  <p className="tm-hint">
                     {/* A sentence of its own under the chips: it starts with a capital. */}
                     {upperFirst(validationText(chosen))}.
                   </p>

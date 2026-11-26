@@ -246,9 +246,11 @@ describe('Réglages › Facturation, régimes', () => {
       'Micro-entrepreneur France',
     ]);
     const draft = items[0] ?? card;
-    // Its chip and its words say it, never a coloured edge (Charles: pastilles only).
-    expect(within(draft).getByText(/^Pas encore notée/u).className).toBe('cf-amber');
-    expect(within(draft).getByText('À valider').className).toBe('rp-chip rp-chip--warn');
+    // The accountant's validation is a note, never a gate (Charles, 21/11/2026): no amber, no « À valider ».
+    expect(
+      within(draft).getByText('Pas notée. Facultative : les factures partent sans elle.').className,
+    ).toBe('');
+    expect(within(draft).queryByText('À valider')).toBeNull();
     expect(draft.textContent).toContain('Bénin, Madagascar');
     expect(draft.textContent).toContain('Autoliquidée par l’agence, 20');
     expect(draft.textContent).toContain('Écartée par la convention fiscale');
@@ -330,7 +332,7 @@ describe('Réglages › Facturation, régimes', () => {
     const card = await waitFor(() => cardOf('Régimes de facturation'));
     expect(
       await within(card).findByText(
-        'Aucun régime : sans régime validé, aucune facture ne part. Écris celui que ton comptable a rédigé.',
+        'Aucun régime : sans régime, aucune facture ne part. Écris celui que ton comptable a rédigé.',
       ),
     ).toBeTruthy();
     expect(card.textContent).toContain(
