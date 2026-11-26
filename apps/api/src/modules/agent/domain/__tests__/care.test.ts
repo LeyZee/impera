@@ -1,7 +1,7 @@
 import { HELP_LINES, HelpLinesSchema, type HelpLine } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { CARE_BRIEF, checkCare, helpBubble, helpLanguageOf } from '../care';
+import { CARE_BRIEF, checkCare, checkHelpNumber, helpBubble, helpLanguageOf } from '../care';
 
 describe('checkCare (ADR 0088 § 3)', () => {
   it('lets a gentle answer through, a hug and a kiss included', () => {
@@ -117,5 +117,56 @@ describe('the help bubble (ADR 0088 § 4)', () => {
     expect(
       checkCare([helpBubble('french'), helpBubble('english'), helpBubble('italian'), helpBubble('spanish')]),
     ).toEqual([]);
+  });
+});
+
+describe('a help number the model writes itself (ADR 0088 § 4, eval pass 2)', () => {
+  const blocked = (text: string) => checkHelpNumber([text]).some((v) => v.code === 'help_number_from_model');
+
+  it.each([
+    'appelle le 988',
+    'call 988',
+    'chiama il 112',
+    'llama al 024',
+    'tu peux appeler le 3114 tu sais',
+    'compose le 15 si ça va pas',
+    '116 123, ils écoutent',
+    'call 1-800-000-0000',
+    'appelle SOS Amitié',
+    'the samaritans can help',
+    'chiama il telefono amico',
+    'llama al teléfono de la esperanza',
+  ])('refuses « %s »', (text) => {
+    expect(blocked(text)).toBe(true);
+  });
+
+  it.each([
+    'on se voit le 15',
+    'j’ai 18 ans de plus que toi',
+    'appelle-moi à 18h',
+    'ça coûte 15 €',
+    'je suis là',
+  ])('lets « %s » through', (text) => {
+    expect(blocked(text)).toBe(false);
+  });
+
+  it('lets the code’s help bubble through in every language, and says so in the care brief', () => {
+    for (const language of ['french', 'english', 'italian', 'spanish'] as const)
+      expect(checkHelpNumber([helpBubble(language)])).toEqual([]);
+    expect(CARE_BRIEF).toContain('jamais elle-même de numéro');
+  });
+
+  it('lets the code’s national bubble with a test row through; the composer reads only the model’s bubbles anyway', () => {
+    // An invented row, for the test only (ADR 0010). The composer runs this guard on the voice's bubbles, then appends
+    // the help bubble (draft-composer test « never lets the voice give a help number itself »).
+    const line: HelpLine = {
+      country: 'ZZ',
+      number: '0000',
+      label: 'ligne inventée',
+      sourceUrl: 'https://example.test/ligne',
+      verifiedAt: '2026-11-26',
+    };
+    expect(helpBubble('french', 'ZZ', [line])).toContain('appelle le 0000');
+    expect(checkHelpNumber([helpBubble('french', 'ZZ', [line])])).toEqual([]);
   });
 });

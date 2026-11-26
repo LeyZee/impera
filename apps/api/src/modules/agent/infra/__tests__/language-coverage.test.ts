@@ -216,6 +216,66 @@ describe('the safety nets in every covered language (ADR 0168 § 4)', () => {
   });
 });
 
+/**
+ * « What's the point of going on » and its cousins, in each covered language (eval pass 2, 26/11): read as self-harm,
+ * unless a thing follows (« continuer la série »). Invented messages (ADR 0010).
+ */
+describe('self-harm said as « what is the point of going on » (ADR 0088, ADR 0168 § 4)', () => {
+  const POINT_OF_GOING_ON: Record<GuardedLanguage, { caught: string[]; left: string[] }> = {
+    french: {
+      caught: [
+        'Des fois je me demande à quoi ça sert de continuer',
+        'à quoi bon continuer',
+        'ça sert à rien de continuer',
+        'sa sert a rien de continuer',
+        'a quoi ca sert de continuer a vivre',
+        'j’en peux plus de vivre',
+        'jpp de vivre',
+        'envie de tout arrêter',
+        'envie d’en finir',
+      ],
+      left: [
+        'à quoi ça sert de continuer la série ?',
+        'ça sert à rien de continuer ce jeu',
+        'à quoi ça sert de continuer à regarder',
+        'on peut continuer ?',
+      ],
+    },
+    italian: {
+      caught: ['a che serve continuare', 'non ha senso andare avanti', 'che senso ha vivere'],
+      left: ['a che serve continuare questo gioco', 'non ha senso andare avanti con il film'],
+    },
+    spanish: {
+      caught: [
+        'para qué seguir',
+        'no tiene sentido seguir',
+        'para que seguir viviendo',
+        'de qué sirve vivir',
+      ],
+      left: ['para qué seguir con el juego', 'no tiene sentido seguir la serie'],
+    },
+    english: {
+      caught: [
+        "what's the point of going on",
+        'no point in living',
+        'i want to end it all',
+        'whats the point in living',
+      ],
+      left: ["what's the point of going on with the show", 'no point in waiting'],
+    },
+  };
+
+  for (const language of GUARDED_LANGUAGES) {
+    const { caught, left } = POINT_OF_GOING_ON[language];
+    it.each(caught)(`reads « %s » as self-harm (${language})`, (text) => {
+      expect(safetySigns(text, NOW)).toContain('self_harm');
+    });
+    it.each(left)(`leaves « %s » (${language})`, (text) => {
+      expect(safetySigns(text, NOW)).not.toContain('self_harm');
+    });
+  }
+});
+
 /** The languages a persona file lists, in its older (`identity.languages`) or newer (`spoken_languages`) shape. */
 function languagesOf(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(languagesOf);

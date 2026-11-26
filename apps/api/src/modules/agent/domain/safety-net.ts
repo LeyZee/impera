@@ -111,6 +111,15 @@ function bornMinor(text: string, year: number): boolean {
     )?.[1];
   return born !== undefined && Number(born) >= year - 18 && Number(born) <= year;
 }
+/**
+ * Not a thing he goes on with: « continuer la série », « continuare questo gioco », « seguir con el juego », « going on
+ * with the show ». « continuer à vivre » is no thing: it stays read.
+ */
+const NOT_A_THING_AFTER =
+  "(?!\\s+(?:la|le|les|l'|ce|cet|cette|ces|mon|ma|mes|ton|ta|tes|son|ses|notre|votre|leur|un|une|des|du|au|aux|" +
+  'il|lo|gli|i|questo|questa|quel\\w*|el|los|las|este|esta|ese|esa|mi|su|the|this|that|my|your|an|with|' +
+  'con (?!(?:la|mi) vida)|a (?!vivre|vivir|vivere|exister|avancer|respirer|me battre|tenir)\\w+)\\b)';
+
 // He speaks of ending his life or hurting himself, in his own words.
 const SELF_HARM = [
   /\b(?:me|m') ?suicider\b/u,
@@ -130,6 +139,32 @@ const SELF_HARM = [
   /\b(?:end|take) my (?:own )?life\b|\b(?:hurt|cut) myself\b|\bdon'?t want to (?:live|be alive) anymore\b|\bsuicidal\b/u,
   /\b(?:suicidarmi|suicidio|uccidermi|ammazzarmi)\b|\b(?:voglio|vorrei) morire\b|\bfarla finita\b|\bnon ho piu voglia di vivere\b|\bfarmi del male\b|\btagliarmi le vene\b/u,
   /\b(?:suicidarme|suicidio|matarme)\b|\b(?:quiero|me quiero) morir(?:me)?\b|\bno quiero (?:seguir )?viv(?:ir|iendo)\b|\bquitarme la vida\b|\bacabar con (?:todo|mi vida)\b|\bhacerme dano\b|\bcortarme las venas\b/u,
+  // « À quoi ça sert de continuer », « à quoi bon continuer », « j'en peux plus de vivre », « envie de tout arrêter »
+  // (eval pass 2, 26/11), and their cousins. Not « continuer la série », « continuer ce jeu »: a thing after it.
+  new RegExp(
+    `\\b(?:a quoi (?:bon|(?:ca|sa|c) (?:sert|sers)(?: de)?)|(?:ca|sa|c) (?:sert|sers) a ?rien(?: de)?|` +
+      `(?:ca|sa) vaut (?:plus )?pas la peine de|plus la peine de) (?:continuer|vivre|exister|avancer)\\b${NOT_A_THING_AFTER}`,
+    'u',
+  ),
+  /\b(?:j'?en peux (?:plus|pu|pas)|jpp|j'?en ai marre) de (?:vivre|la vie|exister|ma vie)\b/u,
+  /\benvie de tout (?:arreter|lacher|abandonner|stopper)\b/u,
+  // Italian, Spanish, English: « a che serve continuare », « para qué seguir », « what's the point of going on ».
+  new RegExp(
+    `\\b(?:a che (?:serve|pro)|che senso ha|non (?:ha|ha piu) senso|perche) (?:continuare|andare avanti|vivere|esistere)\\b` +
+      `${NOT_A_THING_AFTER}|\\bnon ce la faccio piu a vivere\\b|\\bvoglio (?:mollare tutto|farla finita con tutto)\\b`,
+    'u',
+  ),
+  new RegExp(
+    `\\b(?:para que|de que sirve|que sentido tiene|no tiene sentido|ya no tiene sentido) (?:seguir|vivir|continuar|existir)\\b` +
+      `${NOT_A_THING_AFTER}|\\bno puedo mas con (?:la|mi) vida\\b|\\bquiero (?:dejarlo todo|terminar con todo)\\b`,
+    'u',
+  ),
+  new RegExp(
+    `\\b(?:what'?s|whats|what is) the point (?:of|in) (?:going on|carrying on|continuing|living|being alive|existing)\\b` +
+      `${NOT_A_THING_AFTER}|\\bno point (?:in |of )?(?:living|going on|carrying on|being alive)\\b` +
+      `|\\b(?:want|wanna|going) to end it all\\b|\\bcan'?t go on (?:anymore|living|like this)\\b|\\btired of living\\b`,
+    'u',
+  ),
 ];
 
 /**

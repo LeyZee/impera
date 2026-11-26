@@ -201,6 +201,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Pont | `bridge` | Segment d'une structure entre deux étapes, qui teaser la suivante et les désigne par leur clé (ADR 0056). |
 | Emplacement | `media_slot` | Un média attendu dans une étape : photo, vidéo avec durée minimale et maximale, ou vocal (ADR 0056). Jamais `slot` seul. |
 | Emplacement de script | `script_slot` | Un emplacement d'un dépôt de script, pour une série : nommé `<segment>:<série>:<rang>` (`slot_key`), il garde sa position quand son fichier est remplacé (SC-02, ADR 0056 § 4). |
+| Numéro d'aide écrit par le modèle | garde `help_number_from_model` | Garde bloquante sur les bulles écrites par le modèle seulement : un numéro d'urgence ou d'écoute près d'un mot pour l'appeler, ou une ligne d'écoute nommée. Le numéro d'aide est posé par le code (bulle d'aide), jamais par le modèle ; un humain peut en écrire un (ADR 0088 § 4). |
 | Numéro de script | `script_number` | Le rang d'un script envoyé parmi ceux de sa créatrice : 1 pour le premier, sans trou, donné à « Envoyer le script » et gardé ensuite ; le `S<nnn>` de son dossier (SC-03, ADR 0056 § 5). |
 | Variante | `script_variant` | Une des versions A, B ou C d'une même étape, qui partagent son numéro (ADR 0056). Distincte de la série de jours cochés (`streak`). Sur un carton, elle s'écrit « Série A », comme dans OnlyScript (ADR 0064). |
 | File de structures | `script_structure_queue` | Les prochaines structures que l'agence demandera à une créatrice, dans l'ordre (ADR 0056). |

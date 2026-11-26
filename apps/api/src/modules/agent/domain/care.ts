@@ -19,7 +19,7 @@ import { detectLanguage } from './language';
 
 /** What the voice writes in the care mode (ADR 0088 § 3): listening, in her voice, without selling or seducing. */
 export const CARE_BRIEF =
-  'Il ne va pas bien. Elle lui répond avec douceur et chaleur, en restant elle-même : elle l’écoute, reprend ce qu’il a dit, lui dit qu’elle est là pour lui et l’invite à en parler à quelqu’un de proche. Court, sans séduction ni sous-entendu, sans promesse, sans conseil médical, sans rien proposer, sans parler de prix, de contenu, de photo ni de rendez-vous.';
+  'Il ne va pas bien. Elle lui répond avec douceur et chaleur, en restant elle-même : elle l’écoute, reprend ce qu’il a dit, lui dit qu’elle est là pour lui et l’invite à en parler à quelqu’un de proche. Elle ne donne jamais elle-même de numéro ni de nom de ligne d’aide : le code le pose. Court, sans séduction ni sous-entendu, sans promesse, sans conseil médical, sans rien proposer, sans parler de prix, de contenu, de photo ni de rendez-vous.';
 
 /** How the voice writes in the care mode, beside the brief. */
 export const CARE_TONE_HINTS: readonly string[] = [
@@ -69,6 +69,46 @@ export function checkCare(bubbles: readonly string[]): GuardViolation[] {
     const emoji = SUGGESTIVE_EMOJIS.find((e) => bubble.includes(e));
     if (emoji !== undefined)
       violations.push({ code: 'care_breach', severity: 'blocking', bubbleIndex, match: emoji });
+  });
+  return violations;
+}
+
+/** A number a help line or an emergency service answers on (ADR 0088 § 4): never an hour, an age or a sum. */
+const HELP_NUMBER =
+  '(?<![\\d.,:/€$])(?:988|112|911|999|15|17|18|114|115|119|3114|3919|116 ?117|116 ?123|024\\d*|' +
+  '1[- .]?8\\d\\d[- .]?\\d{3}[- .]?\\d{4})' +
+  '(?![\\d.,:/]?\\d)(?!\\s*(?:h\\b|h\\d|ans|anni|anos|years?|heures?|min\\w*|€|euros?|\\$|ore|horas?))';
+
+/** The words around a number to call: call it, its line, listening, an emergency. */
+const CALL_WORD =
+  '(?:appelle\\w*|appeler|appelez|appel|compose\\w*|numeros?|num|call\\w*|dial\\w*|text|chiama\\w*|chiamare|' +
+  'llama\\w*|llamar|marca\\w*|linea|ligne|ecout\\w*|ascolt\\w*|escuch\\w*|urgences?|urgenz\\w*|emergenc\\w*|' +
+  'emergencias?|hotline|helpline|lifeline|sos|suicid\\w*|crisis|crise|samu|pompiers|police|polizia|policia)';
+
+/** A help or listening line the model names itself: its name alone is enough. */
+const HELP_LINE_NAME =
+  /\b(?:sos amitie|samaritans|telefono amico|telefono de la esperanza|suicide (?:hotline|lifeline|line)|crisis (?:text )?line|fil sante jeunes|suicide ecoute)\b/u;
+
+const HELP_NUMBER_NEAR = [
+  new RegExp(`\\b${CALL_WORD}\\b[^\\d\\n]{0,40}?${HELP_NUMBER}`, 'u'),
+  new RegExp(`${HELP_NUMBER}[^\\d\\n]{0,40}?\\b${CALL_WORD}\\b`, 'u'),
+];
+
+/**
+ * The help number is posed by code, never by the model (ADR 0088 § 4, eval pass 2): a help or emergency number near a
+ * word to call it, or a listening line named, in a bubble the model wrote. Read on model text only, the voice's
+ * bubbles before the code adds its help bubble: a chatter may write a number on purpose, and the code's bubble is its
+ * own (`helpBubble`). Blocking: the voice writes once more, told why, then a human answers.
+ */
+export function checkHelpNumber(bubbles: readonly string[]): GuardViolation[] {
+  const violations: GuardViolation[] = [];
+  bubbles.forEach((bubble, bubbleIndex) => {
+    const text = normalise(bubble);
+    const match =
+      HELP_LINE_NAME.exec(text)?.[0] ??
+      HELP_NUMBER_NEAR.map((pattern) => pattern.exec(text)?.[0]).find((m) => m !== undefined);
+    if (match !== undefined)
+      violations.push({ code: 'help_number_from_model', severity: 'blocking', bubbleIndex, match });
   });
   return violations;
 }

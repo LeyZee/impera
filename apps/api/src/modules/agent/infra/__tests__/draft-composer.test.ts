@@ -20,6 +20,7 @@ import {
   type GatewaySeen as Seen,
 } from '../../../../__tests__/support/llm';
 import type { AlertSettings } from '../../domain/alerts';
+import { helpBubble } from '../../domain/care';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
 import {
@@ -247,6 +248,35 @@ describe('createDraftComposer', () => {
     expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).not.toContain('snap');
 
     const still = composer({ voice: { bubbles: ['Écris-moi sur mon snap 😘'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('never lets the voice give a help number itself: written once more, then a human; the code adds its own bubble (ADR 0088 § 4)', async () => {
+    const says = (text: string): AgentComposeInput => ({
+      ...INPUT,
+      history: [...INPUT.history, { direction: 'inbound', text, at: new Date('2026-10-17T09:59:30Z') }],
+    });
+    const fixed = composer(
+      {
+        voice: { bubbles: ['je suis là, appelle le 988 si ça va pas'] },
+        voiceAfter: { bubbles: ['je suis là, je t’écoute'] },
+      },
+      undefined,
+      limitsOf({}).limits,
+    );
+    const answered = await fixed.draftComposer.compose(
+      says('des fois je me demande à quoi ça sert de continuer'),
+    );
+    expect(answered).toMatchObject({ kind: 'draft', care: { signs: ['self_harm'], help: true } });
+    expect(fixed.seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('posé par le code');
+    // The guard read the voice's bubbles; the code's help bubble comes after it, untouched.
+    expect(answered.kind === 'draft' && answered.bubbles).toEqual([
+      'je suis là, je t’écoute',
+      helpBubble('french'),
+    ]);
+
+    const still = composer({ voice: { bubbles: ['call 988, ok?'] } });
     expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
     expect(still.seen.voiceCalls).toBe(2);
   });

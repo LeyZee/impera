@@ -48,6 +48,9 @@ export const GUARD_CODES = [
   'language_not_covered',
   // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
   'minor_reference',
+  // ADR 0088 § 4 (eval pass 2, 26/11): a help or emergency number, or a listening line, the model wrote itself. The
+  // help bubble is the code's, never the model's.
+  'help_number_from_model',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

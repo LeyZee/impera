@@ -40,7 +40,7 @@ import {
   type ScriptStartBlock,
 } from '../domain/availability';
 import { bubbleBudget, fitBubbles, type BubbleBudget } from '../domain/bubbles';
-import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
+import { CARE_BRIEF, CARE_TONE_HINTS, checkCare, checkHelpNumber } from '../domain/care';
 import {
   checkNoCommitment,
   customOrderDecision,
@@ -431,6 +431,7 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
     'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
   media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
+  help_number_from_model: 'le numéro d’aide est posé par le code, jamais par toi',
 };
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
@@ -947,6 +948,8 @@ async function writeFollowUp(
   const violations = [
     ...checkVoiceOutput(written, persona.guardSettings, { ...guardContextOf(base.history), languages }),
     ...checkExplicit(written),
+    // Model text only: the help number is the code's (ADR 0088 § 4).
+    ...checkHelpNumber(written),
   ];
   return {
     ...(droppedNotes.length > 0 && { droppedNotes }),
@@ -1592,6 +1595,8 @@ export async function composeTurn(
       }),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
+      // Model text only, care or not: the help number is the code's, added after these guards (ADR 0088 § 4).
+      ...checkHelpNumber(written),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),
       // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
       // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
