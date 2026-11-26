@@ -102,11 +102,49 @@ describe('permitted phrases that must always pass, output guards', () => {
     'j’adore Paris au printemps',
     'je rentre vers 21 h',
     'that’s wise of you',
+    'je scrollais insta',
+    'j’ai pas snap désolé',
+    't’as vu ma story insta ?',
     'ci sentiamo qui',
     'hablamos aquí',
   ])('contact_info lets « %s » through', (bubble) => {
     expect(raised(bubble)).not.toContain('contact_info');
   });
+
+  it.each(['tu bosses dans la crypto ?', 'j’attends le virement de ma paie', 'pas de paypal ici'])(
+    'off_platform_payment lets « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('off_platform_payment');
+    },
+  );
+
+  it.each(['je t’aime bien toi', 'j’aime bien ta façon de parler'])(
+    'love_declaration lets « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('love_declaration');
+    },
+  );
+
+  it.each(['j’ai rdv chez le coiffeur demain', 'j’ai rendez-vous chez le dentiste'])(
+    'meeting_promise lets « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('meeting_promise');
+    },
+  );
+
+  it.each(['je m’en branle', 'tu sais me toucher avec tes mots'])(
+    'explicit_before_age lets « %s » through',
+    (bubble) => {
+      expect(checkExplicit([bubble])).toEqual([]);
+    },
+  );
+
+  it.each(['je te retiens, pas tout de suite', 'je retiens mon souffle'])(
+    'ai_tic lets « %s » through',
+    (bubble) => {
+      expect(raised(bubble)).not.toContain('ai_tic');
+    },
+  );
 
   it.each(['je fais pas de promo', 'pas de réduc avec moi 😌', 'il me reste 10 % de batterie'])(
     'discount lets « %s » through',
@@ -122,7 +160,7 @@ describe('permitted phrases that must always pass, output guards', () => {
     },
   );
 
-  it.each(['petit menteur va 😏', 'tu es adorable', 'quel charmeur'])(
+  it.each(['petit menteur va 😏', 'tu es adorable', 'quel charmeur', 'pauvre type celui qui t’a fait ça'])(
     'contempt lets « %s » through',
     (bubble) => {
       expect(raised(bubble)).not.toContain('contempt');

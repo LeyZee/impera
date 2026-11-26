@@ -120,6 +120,13 @@ function minorNamed(bubble: string): string | undefined {
   return MINOR_REFERENCE.exec(withoutProcreation(normaliseWords(bubble)))?.[0];
 }
 
+// A means of paying outside Reveal (recette MOT-04). « Wise » counts only as a means: « that's wise » is innocent.
+const PAYMENT_MEANS =
+  '(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|wise|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)';
+// A network or another platform, where he could find or pay her elsewhere.
+const NETWORK =
+  '(snap(chat)?|whatsapp|insta(gram)?|telegram|fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)';
+
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'ai_disclosure',
@@ -199,14 +206,16 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   },
   {
     code: 'love_declaration',
-    pattern: /\b(je t'?\s?aime|j'?t'?aime|jtm|je suis amoureuse de toi|i love you|te (quiero|amo))\b/,
+    // « Je t'aime bien » is no declaration (Charles 27/11).
+    pattern:
+      /\b(je t'?\s?aime|j'?t'?aime|jtm|je suis amoureuse de toi|i love you|te (quiero|amo))\b(?! bien)/,
   },
   // A concrete meeting (a day, a place, a visit) is blocked; the playful « un jour, peut-être » stays allowed, and
   // so do the live, the DMs and the bed: « on se voit au prochain live », « viens me voir en privé ».
   {
     code: 'meeting_promise',
     pattern:
-      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|mon adresse|rendez-vous (a |au |chez ))/,
+      /\b(on se (voit|retrouve|rejoint) (demain|ce soir|ce week-end|samedi|dimanche|lundi|mardi|mercredi|jeudi|vendredi|chez |a (la gare|l'hotel|paris|lyon)|au (cafe|bar|resto|restaurant))|je (viens|passe|monte) chez toi|viens chez moi|je te rejoins(?! (dans (tes|mes) (reves|pensees|bras)|en (pensee|reve)|au lit|dans (ton|mon) lit|sous la couette))|mon adresse|(?<!(j'?ai|j'avais|j'aurai|t'?as|tu as|il a|elle a|un|mon|ton) )rendez-vous (a |au |chez ))/,
   },
   {
     code: 'meeting_promise',
@@ -235,7 +244,8 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
         `\\bon (se )?(fait|donne|fixe|prend) (un )?(rdv|rendez ?-? ?vous)\\b`,
         `\\bje te donne (un )?(rdv|rendez ?-? ?vous)(?!${ONLINE})\\b`,
         `\\b(rdv|rendez ?-? ?vous) (le \\d|(le )?(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|cette semaine|ce week-end)\\b)`,
-        `\\brdv (a|au|chez|devant)(?!${ONLINE})\\b`,
+        // A meeting of hers with someone else passes: « j'ai rdv chez le coiffeur » (Charles 27/11).
+        `(?<!(j'?ai|j'avais|j'aurai|t'?as|tu as|il a|elle a|un|mon|ton) )\\brdv (a|au|chez|devant)(?!${ONLINE})\\b`,
         `\\bon (pourrait |peut |va |devrait )?se (voit|voie|voir|verra|retrouve|retrouver|retrouvera|rencontre|rencontrer|rencontrera) (en vrai|pour de vrai|irl|en personne|en chair et en os|dans la vraie vie)\\b`,
       ].join('|'),
     ),
@@ -243,12 +253,20 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   { code: 'contact_info', pattern: /\b(https?:\/\/|www\.)\S+/ },
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
-  { code: 'contact_info', pattern: /\b(snap(chat)?|whatsapp|insta(gram)?|telegram)\b/ },
-  // Another platform, where he could find or pay her elsewhere.
+  // A network or another platform where he could find or pay her elsewhere (Charles 27/11, banc de la Sécurité): its
+  // name alone passes (« je scrollais insta », « j'ai pas snap »); a handle, an invitation or her own account there
+  // never does (« ajoute-moi sur snap », « viens sur telegram », « mon insta c'est… », « rejoins-moi sur discord »).
   {
     code: 'contact_info',
-    pattern:
-      /\b(fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)\b/,
+    pattern: new RegExp(
+      [
+        `\\b(ajoute[sz]?|add|viens|venez|rejoins|rejoignez|retrouve[sz]?|ecris|parle[sz]?|contacte[sz]?|suis|follow|abonne|cherche|trouve[sz]?|passons|passe[sz]?|continue[sz]?)([ -]?(moi|me|toi|nous))?\\b[^.!?]{0,25}\\b(sur|on|en|via|par)? ?${NETWORK}\\b`,
+        `\\b(je suis|j'?suis|tu me trouves|on se parle|on parle|on continue|on se retrouve|find me|i'?m) (sur|on|en|via) ${NETWORK}\\b`,
+        `\\b(mon|ma|mes|my|mi|il mio|la mia) (compte |account |cuenta )?${NETWORK}\\b`,
+        `\\b${NETWORK} ?(:|=|c'?est|est|is|es|e) ?@?[a-z0-9_.]{3,}`,
+        `(^|\\s)@[a-z0-9_.]{3,}`,
+      ].join('|'),
+    ),
   },
   // A link without its scheme: « monsite.com », « linktr.ee/lina », « t.me/lina ». Endings that are also French words
   // (« .me », « .co », « .de ») are read only with a path.
@@ -276,7 +294,8 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   {
     code: 'contempt',
     pattern:
-      /\b(sale|espece de|t'?es (qu'?)?une?|tu es (qu'?)?une?|quel|quelle) (radin|radine|rapiat|rapiate|menteur|menteuse|mendiant|mendiante|crevard|crevarde|minable|pauvre type)s?\b|\b(mendiant|mendiante|crevard|crevarde|pauvre type)s?\b/,
+      // Only said to him (Charles 27/11): « pauvre type celui qui t'a fait ça » passes.
+      /\b(sale|espece de|t'?es (qu'?)?une?|tu es (qu'?)?une?|t'?es (qu'?)?|tu es (qu'?)?|toi,? ) ?(radin|radine|rapiat|rapiate|menteur|menteuse|mendiant|mendiante|crevard|crevarde|minable|pauvre type)s?\b/,
   },
   // Her laugh is never « mdr », stretched or not (ADR 0052 § 2, Charles; eval passe-15): a written tic of the chat.
   { code: 'forbidden_term', pattern: /\bmdr+\b/ },
@@ -289,10 +308,19 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   // A payment outside the platform (recette MOT-04): Reveal is the only till, as it is the only inbox. Even her refusal
   // (« pas de paypal 😘 ») names the means, so it is blocked too, like a contact. « Wise » counts only as a means
   // (« par Wise », « wise transfer »): « that's wise » to an English-speaking fan is innocent (review of #529).
+  // Since 27/11 (Charles, banc de la Sécurité), only a payment between her and him: the means after a word of paying
+  // or of hers (« envoie par paypal », « mon iban », « paie-moi en crypto »). « Tu bosses dans la crypto ? », « le
+  // virement de ma paie » or her refusal « pas de paypal ici » pass.
   {
     code: 'off_platform_payment',
-    pattern:
-      /\b(pay ?pal|lydia|sumeria|virements?|iban|rib|revolut|(par|sur|via|avec|mon|ton|en|t'?as|tu as|on|by|through|my|your|got) wise|wise (transfer|account|compte|tag)|cash ?app|venmo|zelle|western union|moneygram|paysafe ?(card)?|neosurf|transcash|crypto|bitcoins?|btc|usdt|apple pay|google pay|paylib|wero|cartes? cadeaux?|gift ?cards?)\b/,
+    pattern: new RegExp(
+      [
+        `\\b(pay\\w*|paie\\w*|regle\\w*|envoi\\w*|envoy\\w*|vers\\w*|vire\\w*|transfer\\w*|accept\\w*|prend\\w*|send\\w*|fais[ -]moi|par|via|avec|through|by|voici|voila|here'?s)\\b[^.!?]{0,25}\\b${PAYMENT_MEANS}\\b`,
+        `\\b(mon|ma|mes|ton|ta|tes|my|your|mi|tu|il mio|il tuo|un|une) ${PAYMENT_MEANS}\\b`,
+        `\\b${PAYMENT_MEANS} ?(:|=|c'?est|est|is) ?[a-z0-9@+]`,
+        `\\b(t'?as|tu as|on|got) wise\\b|\\bwise (transfer|account|compte|tag)\\b`,
+      ].join('|'),
+    ),
   },
   // A price is the script's, set in code and carried by the offer itself: never a sum in her words (recette MOT-04,
   // Charles 05/11). Her thanks for a tip (« merci pour les 20 € 🥰 ») pass.
@@ -373,7 +401,8 @@ const AI_TICS: readonly RegExp[] = [
   /\bje suis la pour toi\b/,
   /\bjuste pour toi\b/,
   // A note-taker's line, never hers (Playground, Charles 16/11): « je note ton âge », « c'est noté ».
-  /\bje (te |le |l'|ca |bien )?(note|retiens)\b/,
+  // « Je te retiens » in a sexto is her holding him back (Charles 26/11): only a note-taker's « je retiens ça ».
+  /\bje (te |le |l'|ca |bien )?note\b|\bje (le |l'|ca |bien )?retiens\b(?! (mon|ton|ma|ta) (souffle|envie))/,
   /\b(c'est|bien) note\b/,
   /\bje prends note\b/,
   /—/,
@@ -905,7 +934,7 @@ export function wantsRewrite(violations: readonly GuardViolation[]): boolean {
 
 // Explicit words, on the normalised text: « un baiser », « la queue au cinéma » or « ma chatte Moka » are not.
 const EXPLICIT =
-  /\b(bite|queue (dure|raide|en moi)|ta queue(?! de)|ma queue(?! de)|chatte (mouillee|trempee|humide)|ma chatte (te |pour toi|mouille|a envie|est trempee)|sucer|suce|te sucer|me baiser|te baiser|baise[- ]moi|on baise|baiser fort|jouir|jouis|orgasme|levrette|fellation|sodomie|branler|branle|me toucher|je me touche|mouillee pour toi|trempee pour toi|bander|tu bandes|je te fais bander|toute nue|tout nu|a poil|seins nus|mes seins|tes seins|mon cul|ton cul|clito|gode|sextoy)\b/;
+  /\b(bite|queue (dure|raide|en moi)|ta queue(?! de)|ma queue(?! de)|chatte (mouillee|trempee|humide)|ma chatte (te |pour toi|mouille|a envie|est trempee)|sucer|suce|te sucer|me baiser|te baiser|baise[- ]moi|on baise|baiser fort|jouir|jouis|orgasme|levrette|fellation|sodomie|branler|(?<!m'en |m en |s'en |t'en |j'm'en )branle|me toucher(?! (avec|par) (tes|ces|des|mes|les) mots| le (coeur|cœur)| au (coeur|cœur))|je me touche|mouillee pour toi|trempee pour toi|bander|tu bandes|je te fais bander|toute nue|tout nu|a poil|seins nus|mes seins|tes seins|mon cul|ton cul|clito|gode|sextoy)\b/;
 
 /**
  * Nothing explicit before his age is confirmed (P3-09, méthode de chatting): blocking, checked by the composer only

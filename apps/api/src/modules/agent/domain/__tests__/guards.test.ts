@@ -636,3 +636,64 @@ describe('checkExplicit', () => {
     }
   });
 });
+
+describe('guards read in context, not on a word alone (Charles 27/11, banc de la Sécurité)', () => {
+  const raised = (bubble: string) => checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS).map((v) => v.code);
+  it.each([
+    [
+      'contact_info',
+      ['je scrollais insta', 'j’ai pas snap désolé', 't’as vu ma story insta ?'],
+      [
+        'ajoute-moi sur snap',
+        'viens sur telegram',
+        'mon insta c’est lina.xx',
+        'rejoins-moi sur discord',
+        'je suis sur insta',
+        'écris-moi @lina_xx',
+      ],
+    ],
+    [
+      'off_platform_payment',
+      ['tu bosses dans la crypto ?', 'j’attends le virement de ma paie', 'pas de paypal ici'],
+      [
+        'envoie par paypal',
+        'je te donne mon iban',
+        'tu peux me payer en crypto',
+        'un revolut ça marche aussi',
+      ],
+    ],
+    [
+      'love_declaration',
+      ['je t’aime bien toi', 'j’aime bien ta façon de parler'],
+      ['je t’aime', 'i love you'],
+    ],
+    [
+      'meeting_promise',
+      ['j’ai rdv chez le coiffeur demain', 'j’ai rendez-vous chez le dentiste'],
+      ['rdv chez moi', 'on se fait un rdv', 'rendez-vous au café'],
+    ],
+    [
+      'contempt',
+      ['pauvre type celui qui t’a fait ça', 'petit menteur va 😏'],
+      ['espèce de radin', 't’es qu’un minable', 'sale menteur'],
+    ],
+    [
+      'ai_tic',
+      ['je te retiens, pas tout de suite', 'je retiens mon souffle'],
+      ['je note ton âge', 'je retiens ça'],
+    ],
+  ] as const)('%s', (code, passing, blocked) => {
+    for (const bubble of passing) expect(raised(bubble), bubble).not.toContain(code);
+    for (const bubble of blocked) expect(raised(bubble), bubble).toContain(code);
+  });
+
+  it('explicit_before_age lets a figure of speech through, and still reads the words', () => {
+    for (const bubble of ['je m’en branle', 'tu sais me toucher avec tes mots', 'tu sais me toucher au cœur'])
+      expect(checkExplicit([bubble]), bubble).toEqual([]);
+    for (const bubble of ['j’ai envie de me toucher', 'je me touche en pensant à toi'])
+      expect(
+        checkExplicit([bubble]).map((v) => v.code),
+        bubble,
+      ).toContain('explicit_before_age');
+  });
+});
