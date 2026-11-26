@@ -21,7 +21,9 @@ describe('a declaration of love in a comment', () => {
   it('is not a compliment nor what he loves in the post', () => {
     for (const comment of [
       'J’aime trop cette photo',
+      'J’adore ta robe',
       'Je t’adore',
+      'Je t’aime bien, ta photo est top',
       'I love this',
       'Magnifique',
       'On aime ❤️',

@@ -5,9 +5,9 @@
 
 // On the folded text: accents dropped, apostrophes and punctuation as spaces.
 const LOVE = [
-  /\bje t ?aime\b/u,
+  /\bje t ?aime\b(?! bien)/u,
   /\bje t ai (toujours )?aimee?\b/u,
-  /\bj t aime\b/u,
+  /\bj t aime\b(?! bien)/u,
   /\bjtm\b/u,
   /\bje suis (tombe )?amoureux de toi\b/u,
   /\bi (love|luv) (you|u)\b/u,
