@@ -6,12 +6,14 @@ import {
   type FanCardEntry,
   type FanCardValue,
   type FanCardView,
+  type FanStanding,
 } from '@impera/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
 import { standingOf, type Standing } from '../../lib/copilot/standing';
 
 import {
+  moneyWords,
   panelTabs,
   render,
   type DraftPart,
@@ -73,6 +75,7 @@ const onCard = (
     draft?: DraftPart;
     standing?: PanelScreenStanding;
     fanName?: string | null;
+    money?: FanStanding | null;
     newSince?: string | null;
     now?: Date;
     assist?: CopilotAssist | null;
@@ -82,6 +85,7 @@ const onCard = (
 ): PanelScreen => ({
   kind: 'conversation',
   fanName: patch.fanName ?? null,
+  money: patch.money ?? null,
   standing: patch.standing === undefined ? standingOf({}, null) : patch.standing,
   cardOn: true,
   opensCreators: true,
@@ -508,6 +512,22 @@ describe('the copilot side panel (ADR 0086, lot b)', () => {
     expect(place.compareDocumentPosition(scroll) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(scroll.contains(place)).toBe(false);
     expect(scroll.firstElementChild?.classList.contains('cp-brief')).toBe(true);
+  });
+
+  it('says what he spent, his tier and his last purchase beside his name, never a commission', () => {
+    const at = new Date('2026-11-21T14:00:00Z');
+    const { root } = draw(
+      onCard(card({}), [], {
+        fanName: 'fan_invente',
+        now: at,
+        money: { tier: 'very_good', spentMinor: 25_000, lastPurchaseAt: '2026-11-18T09:00:00Z' },
+      }),
+    );
+    expect(root.querySelector('.cp-band__tier')?.textContent).toBe('Très bon payeur');
+    expect(root.querySelector('.cp-band__money')?.textContent).toBe(
+      '250\u00a0€ dépensés · dernier achat il y a 3\u00a0j',
+    );
+    expect(moneyWords({ tier: null, spentMinor: 0, lastPurchaseAt: null }, at)).toBe('rien dépensé');
   });
 
   it('says where things stand as badges: red forbids, amber holds back, then his desire', () => {
