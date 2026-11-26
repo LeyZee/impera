@@ -1,0 +1,139 @@
+import type { JSX, ReactNode } from 'react';
+
+import type { HelpGuide, HelpTone } from './guides';
+
+import { NavIcon } from '@/shell/NavIcon';
+
+/**
+ * French typography, once at render: the space before ; : ? ! » and after « becomes a no-break space, so the sign never
+ * starts a line alone on a phone (« Tu tiens les conversations / ; le copilote… », recette Design du 26/11).
+ */
+export function french(text: string): string {
+  return text.replace(/\s+([;:?!»])/gu, '\u00A0$1').replace(/«\s+/gu, '«\u00A0');
+}
+
+/** `<kbd>X</kbd>` in a guide's text becomes the design system's key; the rest is plain text, set in French. */
+export function withKeys(text: string): ReactNode {
+  const parts = french(text).split(/<kbd>(.*?)<\/kbd>/u);
+  if (parts.length === 1) return parts[0];
+  return parts.map((part, index) =>
+    index % 2 === 1 ? (
+      <kbd key={index} className="nv-kbd">
+        {part}
+      </kbd>
+    ) : (
+      part
+    ),
+  );
+}
+
+/** A chip's tone, as the dot of its tinted tag: go in the rising green, ok in cyan, warn in amber, danger in red. */
+const TONE: Readonly<Record<HelpTone, string>> = {
+  go: 'var(--nv-trend-up)',
+  warn: 'var(--nv-warning)',
+  danger: 'var(--nv-danger)',
+  ok: 'var(--nv-success)',
+};
+
+const STAR = (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" d="M12 2.8l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17l-5.6 3 1.1-6.2L3 9.4l6.2-.9z" />
+  </svg>
+);
+
+function Box({
+  kind,
+  title,
+  lines,
+}: {
+  kind: 'rule' | 'never' | 'stuck';
+  title: string;
+  lines: readonly string[] | undefined;
+}): JSX.Element | null {
+  if (lines === undefined || lines.length === 0) return null;
+  return (
+    <div className={`nv-guide__box nv-guide__box--${kind}`}>
+      <h4>{title}</h4>
+      <ul>
+        {lines.map((line) => (
+          <li key={line}>{withKeys(line)}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * One guide, folded: its icon, its title, why it matters in a line, its time. Opened: the steps, each with what proves
+ * it worked, then « À savoir », « Jamais » and « Si ça coince ». The colour is the page's (`colour`), never the guide's
+ * own (choix de Charles du 21/11 : une couleur par page, celle de la personne).
+ */
+export function Guide({
+  guide,
+  colour,
+  index = 0,
+  open = false,
+}: {
+  guide: HelpGuide;
+  /** A CSS colour: the person's, the same for every guide of the page. */
+  colour: string;
+  /** Its rank on the page, for the entrance one stagger apart. */
+  index?: number;
+  open?: boolean;
+}): JSX.Element {
+  return (
+    <details
+      className="nv-guide"
+      id={`guide-${guide.id}`}
+      style={{ '--_c': colour, '--nv-i': index }}
+      open={open}
+    >
+      <summary>
+        <span className="nv-guide__icon" aria-hidden="true">
+          <NavIcon name={guide.icon} />
+        </span>
+        <span className="nv-guide__head">
+          <span className="nv-guide__title">
+            {french(guide.title)}
+            {guide.essential === true ? (
+              <span className="nv-tag nv-tag--tint nv-guide__key" style={{ '--_c': 'var(--nv-content-6)' }}>
+                {STAR}
+                Essentiel
+              </span>
+            ) : null}
+          </span>
+          <span className="nv-guide__sum">{french(guide.summary)}</span>
+        </span>
+        <span className="nv-guide__time">{guide.minutes}</span>
+        <span className="nv-guide__chev" aria-hidden="true" />
+      </summary>
+      <div className="nv-guide__body">
+        {guide.why === undefined ? null : <p className="nv-guide__why">{withKeys(guide.why)}</p>}
+        {guide.chips === undefined ? null : (
+          <div className="nv-guide__chips">
+            {guide.chips.map((chip) => (
+              <span key={chip.text} className="nv-tag nv-tag--tint" style={{ '--_c': TONE[chip.tone] }}>
+                {french(chip.text)}
+              </span>
+            ))}
+          </div>
+        )}
+        <ol className="nv-guide__steps">
+          {guide.steps.map((step) => (
+            <li key={step.do}>
+              <div>
+                <span className="nv-guide__do">{withKeys(step.do)}</span>
+                <span className="nv-guide__see">
+                  <span className="nv-guide__see-label">{french('Tu dois voir :')}</span> {withKeys(step.see)}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <Box kind="rule" title="À savoir" lines={guide.rule} />
+        <Box kind="never" title="Jamais" lines={guide.never} />
+        <Box kind="stuck" title="Si ça coince" lines={guide.stuck} />
+      </div>
+    </details>
+  );
+}
