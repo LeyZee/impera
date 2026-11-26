@@ -4,6 +4,7 @@ import {
   FAN_CARD_INTENSITY_LABELS,
   FAN_CARD_ITEMS_MAX,
   FAN_CARD_LEAD_LABELS,
+  FAN_CARD_OTHER_NOT_FOUND,
   FAN_CARD_VALUE_INVALID,
   FAN_CARD_VALUE_MAX,
   FAN_CARD_VALUE_UNPROCESSABLE,
@@ -23,9 +24,10 @@ import {
  */
 
 export const CARD_GROUPS: readonly { readonly group: FanCardGroup; readonly title: string }[] = [
-  { group: 'him', title: 'Lui' },
+  // A group some of whose fields stand among the essentials on top names what its fold holds (Design 21/11).
+  { group: 'him', title: 'Le reste sur lui' },
   { group: 'about_her', title: 'Ce qu’il aime chez elle' },
-  { group: 'intimate', title: 'Intime' },
+  { group: 'intimate', title: 'Le reste, côté intime' },
 ];
 
 /** The two fields whose values are a closed list: chosen in one tap, never typed. */
@@ -111,7 +113,12 @@ export function entryOf(entries: readonly FanCardEntry[], field: FanCardField): 
   return entries.find((one) => one.field === field) ?? { field, current: null, toCheck: [] };
 }
 
-/** « 4 sur 9 », and how many wait for a chatter: the folded line of a group, on the fields it holds. */
+/**
+ * « 0 sur 9 », and how many wait for a chatter: the folded line of a group, on the fields the fold shows when opened
+ * (the essentials stand on top, outside it). The fold that leaves essentials out says so in its title (« Le reste sur
+ * lui »), so its count never reads as « nothing known » under a first name (Design, recette du 21/11), the same count
+ * as the extension's panel.
+ */
 export function groupLine(
   entries: readonly FanCardEntry[],
   group: FanCardGroup,
@@ -161,6 +168,7 @@ export function cardError(status: number, body: unknown): string {
     return 'La fiche ne garde ni adresse, ni numéro, ni e‑mail, ni compte ailleurs : rien n’a été écrit.';
   if (code === FAN_CARD_VALUE_INVALID || status === 400)
     return 'Cette valeur ne va pas dans cette case : rien n’a été écrit.';
+  if (code === FAN_CARD_OTHER_NOT_FOUND) return 'Cette ligne n’est déjà plus sur sa fiche.';
   if (status === 404) return 'Ce fan n’existe plus.';
   if (status === 403) return 'Tu ne peux plus ouvrir ce fan : rien n’a été écrit.';
   if (status === 401) return 'Ta session a expiré : reconnecte-toi.';
