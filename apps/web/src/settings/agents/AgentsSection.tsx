@@ -18,12 +18,13 @@ import {
   type Duration,
   type Preset,
 } from './capabilities';
-import './agents.css';
+import './connected-agents.css';
 
 import { CopyButton } from '@/auth/BackupCodesList';
 import { useCreators } from '@/creators/api';
 import { SwitchRow } from '@/creators/persona/fields';
 import '@/creators/persona/persona.css';
+import '@/scheduling/exchanges.css';
 import { ago, dayText } from '@/security/view';
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
 import { Panel, PanelSection } from '@/shell/layout';
@@ -99,6 +100,7 @@ export function AgentsSection(): JSX.Element {
   const [created, setCreated] = useState<McpGrantCreated | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
+  const [fresh, setFresh] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reauth, setReauth] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +164,7 @@ export function AgentsSection(): JSX.Element {
     try {
       const made = await createGrant({ label: label.trim(), creatorId, capabilities: [...ticked], days });
       setCreated(made);
+      setFresh(made.id);
       reset();
       await load();
     } catch (failure) {
@@ -247,25 +250,25 @@ export function AgentsSection(): JSX.Element {
               </p>
             </div>
           ) : (
-            <ul className="ag-list" aria-label="Agents connectés">
+            <ul className="mca-list" aria-label="Agents connectés">
               {live.map((grant) => {
                 const left = daysLeft(grant, now);
                 return (
-                  <li key={grant.id} className="ag-row">
+                  <li key={grant.id} className={grant.id === fresh ? 'mca-row nv-enter' : 'mca-row'}>
                     <span
                       className={calledToday(grant, now) ? 'nv-dot nv-tone--ok' : 'nv-dot'}
                       aria-hidden="true"
                     />
                     <div className="min-w-0">
-                      <p className="ag-row__name">{grant.label}</p>
-                      <p className="ag-row__meta">
+                      <p className="mca-row__name">{grant.label}</p>
+                      <p className="mca-row__meta">
                         {scopeText(grant.creatorId, creators)} ·{' '}
                         {grant.lastUsedAt === null
                           ? 'aucun appel encore'
                           : `dernier appel ${ago(grant.lastUsedAt, now)}`}{' '}
                         ·{' '}
                         <span data-soon={left <= SOON_DAYS ? '' : undefined}>
-                          {left === 0 ? 'expire aujourd’hui' : `expire dans ${String(left)} j`}
+                          {left === 0 ? 'expire aujourd’hui' : `expire dans ${String(left)}\u00a0j`}
                         </span>
                       </p>
                       <div className="nv-tags" aria-label="Ce qu’il lit">
@@ -276,7 +279,7 @@ export function AgentsSection(): JSX.Element {
                         ))}
                       </div>
                     </div>
-                    <div className="ag-row__end">
+                    <div className="mca-row__end">
                       {confirming === grant.id ? (
                         <>
                           <span className="text-sm">Révoquer pour de bon&nbsp;?</span>
@@ -362,7 +365,7 @@ export function AgentsSection(): JSX.Element {
             </div>
           </div>
           <form
-            className="nv-panel__sec ag-steps"
+            className="nv-panel__sec mca-steps"
             noValidate
             aria-label="Connecter un agent"
             onSubmit={(event) => void create(event)}
@@ -370,33 +373,35 @@ export function AgentsSection(): JSX.Element {
               if (event.key === 'Escape' && !busy) reset();
             }}
           >
-            <div className="ag-step">
-              <p className="ag-step__title">
-                <span className="ag-step__num">1</span>Pour quoi faire&nbsp;?
+            <div className="mca-step">
+              <p className="mca-step__title">
+                <span className="mca-step__num">1</span>Pour quoi faire&nbsp;?
               </p>
-              <div className="ag-presets" role="radiogroup" aria-label="Pour quoi faire">
+              <div className="sc-options" role="radiogroup" aria-label="Pour quoi faire">
                 {PRESETS.map((one) => (
                   <button
                     key={one.id}
                     type="button"
                     role="radio"
-                    className="ag-preset"
+                    className="sc-option"
                     aria-checked={preset === one.id}
                     disabled={busy || reauth}
                     onClick={() => {
                       choose(one);
                     }}
                   >
-                    <span className="ag-preset__title">{one.title}</span>
-                    <span className="ag-preset__detail">{one.detail}</span>
+                    <span className="sc-option__text">
+                      <span className="sc-option__title">{one.title}</span>
+                      <span className="sc-option__sub">{one.detail}</span>
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="ag-step">
-              <p className="ag-step__title">
-                <span className="ag-step__num">2</span>Son nom et ce qu’il voit
+            <div className="mca-step">
+              <p className="mca-step__title">
+                <span className="mca-step__num">2</span>Son nom et ce qu’il voit
               </p>
               <label className="nv-field" htmlFor={labelId}>
                 <span className="nv-field__label">Nom de l’agent</span>
@@ -433,17 +438,17 @@ export function AgentsSection(): JSX.Element {
               </div>
             </div>
 
-            <div className="ag-step">
-              <p className="ag-step__title">
-                <span className="ag-step__num">3</span>Ce qu’il peut lire
+            <div className="mca-step">
+              <p className="mca-step__title">
+                <span className="mca-step__num">3</span>Ce qu’il peut lire
               </p>
               <div>
                 {CAPABILITY_GROUPS.map((group) => (
-                  <div key={group.title} className="ag-group">
-                    <p className="nv-eyebrow ag-group__title">
+                  <div key={group.title} className="mca-group">
+                    <p className="nv-eyebrow mca-group__title">
                       {group.title}
                       {group.sensitive === true ? (
-                        <span className="ag-group__sensitive">· sensible</span>
+                        <span className="mca-group__sensitive">· sensible</span>
                       ) : null}
                     </p>
                     <div className="ps-switches">
@@ -468,9 +473,9 @@ export function AgentsSection(): JSX.Element {
               </div>
             </div>
 
-            <div className="ag-step">
-              <p className="ag-step__title">
-                <span className="ag-step__num">4</span>Combien de temps
+            <div className="mca-step">
+              <p className="mca-step__title">
+                <span className="mca-step__num">4</span>Combien de temps
               </p>
               <div className="ps-chips" role="radiogroup" aria-label="Durée du jeton">
                 {DURATIONS.map((one) => (
@@ -538,14 +543,39 @@ export function AgentsSection(): JSX.Element {
   );
 }
 
+/** One value of the new token's card, with its own copy button beside it. */
+function CopyField({
+  name,
+  value,
+  small = false,
+}: {
+  name: string;
+  value: string;
+  small?: boolean;
+}): JSX.Element {
+  const shown = useRef<HTMLElement>(null);
+  return (
+    <div className="mca-field">
+      <span className="text-xs text-[var(--nv-ink-muted)]">{name}</span>
+      <div className="mca-field__row">
+        <code
+          ref={shown}
+          className={small ? 'nv-glass mca-code text-xs' : 'nv-glass mca-code'}
+          aria-label={name}
+        >
+          {value}
+        </code>
+        <CopyButton text={value} label="Copier" shown={shown} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * The token of the access just made, shown this once, first on the page: where to paste it, in a software (the
- * server's address and the token) or in Claude Code (one line).
+ * server's address and the token) or in Claude Code (one line). Each value has its copy beside it.
  */
 function CreatedToken({ created, onDone }: { created: McpGrantCreated; onDone: () => void }): JSX.Element {
-  const shownToken = useRef<HTMLElement>(null);
-  const shownUrl = useRef<HTMLElement>(null);
-  const shownCommand = useRef<HTMLElement>(null);
   const card = useRef<HTMLElement>(null);
   const url = serverUrl(window.location.origin);
   const command = claudeCodeCommand(url, created.token);
@@ -553,7 +583,7 @@ function CreatedToken({ created, onDone }: { created: McpGrantCreated; onDone: (
     card.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }, []);
   return (
-    <section ref={card} className="nv-plate nv-panel" aria-label={`Jeton de ${created.label}`}>
+    <section ref={card} className="nv-plate nv-panel nv-enter" aria-label={`Jeton de ${created.label}`}>
       <div className="nv-panel__head">
         <div className="min-w-0 flex-1">
           <p className="nv-eyebrow">Jeton créé</p>
@@ -565,36 +595,18 @@ function CreatedToken({ created, onDone }: { created: McpGrantCreated; onDone: (
           Montré une seule fois. Colle-le seulement dans ton agent, jamais dans un fil de discussion.
           Perdu&nbsp;: révoque cet agent et crée-en un autre.
         </p>
-        <div className="ag-pair">
-          <div>
-            <p className="nv-eyebrow">Dans un logiciel (Clairière…)</p>
-            <span className="text-xs text-[var(--nv-ink-muted)]">Adresse du serveur</span>
-            <code ref={shownUrl} className="nv-glass ag-code" aria-label="Adresse du serveur">
-              {url}
-            </code>
-            <span className="text-xs text-[var(--nv-ink-muted)]">Jeton</span>
-            <code ref={shownToken} className="nv-glass ag-code" aria-label="Jeton de l’agent">
-              {created.token}
-            </code>
-            <div className="flex flex-wrap gap-2">
-              <CopyButton text={url} label="Copier l’adresse" shown={shownUrl} />
-              <CopyButton text={created.token} label="Copier le jeton" shown={shownToken} />
-            </div>
-          </div>
-          <div>
-            <p className="nv-eyebrow">Dans Claude Code, sur ce PC</p>
-            <span className="text-xs text-[var(--nv-ink-muted)]">Colle cette ligne dans un terminal</span>
-            <code ref={shownCommand} className="nv-glass ag-code" aria-label="Commande pour Claude Code">
-              {command}
-            </code>
-            <div className="flex flex-wrap gap-2">
-              <CopyButton text={command} label="Copier la commande" shown={shownCommand} />
-            </div>
-          </div>
+        <p className="nv-eyebrow">Dans un logiciel (Clairière…)</p>
+        <CopyField name="Adresse du serveur" value={url} />
+        <CopyField name="Jeton de l’agent" value={created.token} />
+        <p className="nv-eyebrow">Ou dans Claude Code, sur ce PC</p>
+        <CopyField name="Commande pour Claude Code" value={command} small />
+      </PanelSection>
+      <PanelSection>
+        <div className="mca-foot">
+          <button type="button" className="nv-btn nv-btn--soft nv-btn--sm" onClick={onDone}>
+            C’est fait, masquer le jeton
+          </button>
         </div>
-        <button type="button" className="nv-btn nv-btn--soft nv-btn--sm self-start" onClick={onDone}>
-          C’est fait, masquer le jeton
-        </button>
       </PanelSection>
     </section>
   );

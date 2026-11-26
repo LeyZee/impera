@@ -18,7 +18,10 @@ ADR 0026 § 3 et § 5, ADR 0105 § 1 et § 4, ADR 0144 ; `apps/api/src/modules/m
 - [x] Guide « Brancher un agent IA » dans Aide, et à côté de l'écran.
 - [x] Tests de l'écran ; listes de Réglages mises à jour.
 - [x] Maquette Nuit/Jour, PC/téléphone, données inventées.
-- [ ] OK de Charles sur la maquette ; avis Design et Sécurité sur la PR.
+- [x] OK de Charles sur la maquette (26/11, « ok »).
+- [x] Sécurité : OK sur 28b2b22c1 ; avertissement « lit et résume, jamais un agent qui agit » sur les textes des fans, deux lignes au guide (jeton en clair dans le terminal, durée la plus courte). Claude Desktop par un pont tiers : fermé.
+- [x] Design : retouches (préfixe `mca-`, `sc-option`, jetons de durée, bouton Copier à côté de chaque valeur, entrées animées, alignement téléphone).
+- [ ] OK de Design sur le dernier commit.
 
 ## Critères d'acceptation
 - Aucune capacité cochée d'office ; aucun geste (`write:*`, `prepare:*`) proposé.

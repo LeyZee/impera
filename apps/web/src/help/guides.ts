@@ -386,10 +386,13 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
           'Un agent ne fait que lire : il n’écrit à aucun fan, n’approuve rien, ne touche ni aux prix ni à la paie.',
           'Aucun montant par chatteur ni aucune part ne sort, quoi que tu coches.',
           'Tant qu’Impera tourne sur ton PC, seul un agent sur ce PC le joint.',
+          'La commande collée laisse le jeton en clair dans l’historique du terminal et dans la configuration de Claude Code : seulement sur ton PC personnel, verrouillé, et « Révoquer » au moindre doute.',
+          'Choisis la durée la plus courte qui suffit.',
         ],
         never: [
           'Coller un jeton dans un fil de discussion, un e-mail ou un fichier partagé.',
           'Cocher « Messages et brouillons » ou « Texte des scripts » pour un agent dont tu ne connais pas le fournisseur.',
+          'Donner les messages ou les fiches des fans à un agent qui agit (commandes, e-mails, écritures) : les mots d’un inconnu peuvent le diriger.',
         ],
         stuck: [
           'Jeton perdu ou montré par erreur : « Révoquer », puis crée-en un autre.',

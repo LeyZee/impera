@@ -45,12 +45,15 @@ export const CAPABILITY_CHOICES: readonly CapabilityChoice[] = [
     capability: 'read:conversation_content',
     label: 'Messages et brouillons',
     detail: 'Le texte des messages des fans et des brouillons en attente.',
-    warning: 'Les mots des fans partent chez le fournisseur du modèle de cet agent.',
+    warning:
+      'Les mots des fans partent chez le fournisseur du modèle de cet agent. Écrits par des inconnus, ils peuvent diriger un agent qui agit : à ne donner qu’à un agent qui lit et résume, jamais à un agent qui lance des commandes, envoie un e-mail ou écrit quelque part.',
   },
   {
     capability: 'read:fans',
     label: 'Fiches des fans',
     detail: 'Fiche d’un fan et ses limites : jamais les notes des chatteurs.',
+    warning:
+      'La fiche d’un fan reprend ses propres mots. Écrits par un inconnu, ils peuvent diriger un agent qui agit : à ne donner qu’à un agent qui lit et résume, jamais à un agent qui lance des commandes, envoie un e-mail ou écrit quelque part.',
   },
   {
     capability: 'read:media',

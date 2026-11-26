@@ -177,8 +177,8 @@ describe('Réglages › Agents connectés', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Connecter un agent' }));
     expect(screen.queryByRole('note')).toBeNull();
     fireEvent.click(screen.getByRole('switch', { name: /^Messages et brouillons/u }));
-    expect(screen.getByRole('note').textContent).toBe(
-      'Les mots des fans partent chez le fournisseur du modèle de cet agent.',
+    expect(screen.getByRole('note').textContent).toContain(
+      'jamais à un agent qui lance des commandes, envoie un e-mail ou écrit quelque part.',
     );
   });
 
