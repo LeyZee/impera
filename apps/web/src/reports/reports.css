@@ -1737,7 +1737,7 @@ a.sc-sheet__report:focus-visible,
 }
 
 /* His shift as he ends it (ADR 0170 § 1, Charles, 26/11): what he sold first and large, then the AI in one sentence
-   on one bar, then what to report. Tones of the system: sent as is green, touched up amber, refused quiet. */
+   on one bar, then what to report. Sent as is green, touched up violet, refused quiet (Design, 26/11). */
 .rp-shift {
   display: flex;
   flex-direction: column;
@@ -1779,18 +1779,40 @@ a.sc-sheet__report:focus-visible,
   display: flex;
   gap: 3px;
   height: 8px;
+  animation: rp-ai-fill var(--nv-dur-data) var(--nv-ease-out) both;
 }
+@keyframes rp-ai-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-ai__bar {
+    animation: none;
+  }
+}
+/* Its three parts and the keys of the sentence, one tone each: touching up is what he is asked, never amber. */
 .rp-ai__part {
   flex: 1 1 0;
   min-width: 6px;
   border-radius: var(--nv-radius-full);
-  background: var(--nv-ink-faint);
+  background: var(--_c);
 }
-.rp-ai__part[data-part='as-is'] {
-  background: var(--nv-success);
+:is(.rp-ai__part, .rp-ai__key)[data-part='as-is'] {
+  --_c: var(--nv-success);
 }
-.rp-ai__part[data-part='edited'] {
-  background: var(--nv-warning);
+:is(.rp-ai__part, .rp-ai__key)[data-part='edited'] {
+  --_c: var(--nv-content-5);
+}
+:is(.rp-ai__part, .rp-ai__key)[data-part='rejected'] {
+  --_c: var(--nv-ink-faint);
+}
+.rp-ai__key {
+  margin-right: 0.3em;
+  vertical-align: 0.05em;
 }
 .rp-reasons {
   display: flex;

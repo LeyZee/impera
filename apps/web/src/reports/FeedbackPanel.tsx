@@ -302,8 +302,12 @@ function AiSummary({ digest }: { digest: ShiftDigest }): JSX.Element {
         ) : (
           <>
             L’IA t’a fait <b>{plural(total, 'proposition', 'propositions')}</b> :{' '}
+            <span className="nv-key rp-ai__key" data-part="as-is" aria-hidden="true" />
             {plural(asIs, 'envoyée', 'envoyées')} telle{asIs < 2 ? '' : 's'} quelle{asIs < 2 ? '' : 's'},{' '}
-            {plural(edited, 'retouchée', 'retouchées')}, {plural(rejected, 'refusée', 'refusées')}.
+            <span className="nv-key rp-ai__key" data-part="edited" aria-hidden="true" />
+            {plural(edited, 'retouchée', 'retouchées')},{' '}
+            <span className="nv-key rp-ai__key" data-part="rejected" aria-hidden="true" />
+            {plural(rejected, 'refusée', 'refusées')}.
           </>
         )}
       </p>
