@@ -1,7 +1,6 @@
 import { normalise, normaliseWords } from '@impera/contracts';
 
-import { namesYouth } from './forbidden-themes';
-import { checkExplicit } from './guards';
+import { checkExplicit, withoutProcreation } from './guards';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -87,7 +86,7 @@ const SELF_HARM = [
 // A sexual message of his, in neutral words (fr/en/it/es), or one explicit by the guards' own words. A role he asks
 // her to play counts: « joue une … pour moi ».
 const SEXUAL_WORDS =
-  /\b(sexe|sexuel(le)?s?|sexy|faire l amour|coucher avec|couche avec|nue?s?|excitee?s?|envie de toi|caresser|au lit|fantasmes?|fantasmer|fantasme sur|joue[rsz]? (une?|la|le)|jeu de role|sex|sexual|make love|making love|naked|nude|horny|in bed|turned on|fantasy|fantasize|fantasise|roleplay|role play|fare l amore|nud[ao]|eccitat[oa]|a letto|sesso|fantasia|gioco di ruolo|hacer el amor|desnud[oa]|excitad[oa]|en la cama|sexo|fantasias?|juego de rol)\b/u;
+  /\b(sexe|sexuel(le)?s?|sexy|faire l amour|coucher avec|couche avec|nue?s?|excitee?s?|envie de toi|caresser|au lit|fantasmes?|fantasmer|fantasme sur|joue[rsz]? (une?|la|le)|jeu de role|sex|sexual|make love|making love|naked|nude|horny|in bed|turned on|fantasy|fantasize|fantasise|roleplay|role play|fare l amore|nud[ao]|eccitat[oa]|ecciti|mi ecciti|excitas|me excitas|turn me on|tu m excites|a letto|sesso|fantasia|gioco di ruolo|hacer el amor|desnud[oa]|excitad[oa]|en la cama|sexo|fantasias?|juego de rol)\b/u;
 // A length of time is no age: « marié depuis 15 ans », « 15 ans de mariage », « for 15 years », « hace 15 años ».
 const AGE_NUMBER =
   '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix sept|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)';
@@ -97,16 +96,51 @@ const DURATION = new RegExp(
   'gu',
 );
 
+// A minor or an age under 18, as the object of a verb or a role (Sécurité, #1043): the word, with its article.
+const MINOR_TERM =
+  '(?:(?:une?|a|an|una?|uno|des|la|le|les|the|une petite|a una|a un) )?(?:enfants?|gamine?s?|gosses?|momes?|fillettes?|petites? filles?|petit garcon|mineure?s?|ados?|adolescente?s?|collegien(?:ne)?s?|lyceen(?:ne)?s?|ecolier(?:e)?s?|eleves?|jeunettes?|lolitas?|kids?|child(?:ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?|young girls?|ragazzin[aeio]|bambin[aeio]|scolarett[ae]|liceal[ei]|nin[ao]s?|jovencitas?|colegialas?|(?:fille|girl|ragazza|chica|garcon|boy|one|una|uno) (?:de |of |di )?(?:1[0-7]|[1-9])(?: ?(?:ans|years? old|yo|anni|anos))?|(?:1[0-7]|[1-9]) ?(?:ans|year old|years old|yo|anni|anos))';
+// A sexual act or a desire carried onto him or her: « toucher », « baiser », « fantasmer sur » (fr/en/it/es).
+const SEX_VERBS =
+  '(?:baiser|baise|baises|baiserais|baiserai|niquer|nique|toucher|touche|tripoter|caresser|caresse|sucer|lecher|leche|deshabiller|coucher avec|couche avec|faire l amour (?:a|avec)|bander (?:sur|pour)|bande (?:sur|pour)|fantasme (?:sur|de)|fantasmer (?:sur|de)|fantasmes (?:sur|de)|mater|fuck|fucking|touch|touching|kiss|kissing|lick|licking|sleep with|have sex with|bang|fantasi[sz]e (?:about|on)|scopare|scopo|toccare|tocco|baciare|leccare|follar|follo|coger|tocar|toco|besar|lamer)';
+// A wish, read only in a sexual message: « j'ai envie d'une … », « je veux une … ».
+const DESIRE_VERBS =
+  '(?:veux|voudrais|envie (?:de|d)|desire|reve (?:de|d)|want|wanna|would love|voglio|vorrei|desidero|quiero|querria|deseo)';
+// A role he asks of her: « joue une écolière », « déguise-toi en … », « play a … », « disfrázate de … ».
+const ROLE_VERBS =
+  '(?:joue|jouer|joues|fais|faire|sois|deguise toi en|habille toi en|deguisee en|habillee en|be|play|pretend to be|act like|dress up as|dress as|roleplay|role play|interpreta|fai|fare|vestiti da|sii|haz|hacer|juega a ser|disfrazate de|vistete de)';
+const BETWEEN = "(?: [\\p{L}\\d']+){0,4}?";
+const SEX_ONTO_MINOR = new RegExp(`\\b${SEX_VERBS}\\b${BETWEEN} ${MINOR_TERM}\\b`, 'u');
+const DESIRE_ONTO_MINOR = new RegExp(`\\b${DESIRE_VERBS}\\b${BETWEEN} ${MINOR_TERM}\\b`, 'u');
+const MINOR_ROLE = new RegExp(
+  `\\b${ROLE_VERBS}(?: (?:moi|me|pour moi|for me|per me|para mi|la|le))?(?: (?:une?|a|an|la|una?|uno))? ${MINOR_TERM}\\b`,
+  'u',
+);
+// « T'as 16 ans ? », « you're 16 », « hai 16 anni », « tienes 16 años », said to her in a sexual message.
+const HER_AGE_UNDER_18 = new RegExp(
+  `\\b(?:t as|tu as|t es|tu es|you re|you are|ur|hai|tienes) (?:que |only |solo |juste )?${AGE_NUMBER}(?: ?${AGE_UNIT})?\\b`,
+  'u',
+);
+// What is never his fantasy: his own children (« mes gosses dorment », « je dépose mon fils »), a memory of his
+// (« quand j'étais ado », « as a teen »).
+const HIS_OWN_CHILDREN =
+  /\b(?:mon|ma|mes|nos|notre|my|our|mio|mia|miei|mie|mi|mis|nuestros?|nuestras?) (?:fils|fille|filles|enfants?|gosses?|gamins?|gamines?|petits?|petites?|bebes?|ados?|kids?|children|sons?|daughters?|figli[oa]?|figlie|bambin[aeio]|hij[oa]s?|nin[ao]s?)\b|\b(?:j ai|j avais|i have|i ve got|i got|ho|tengo) (?:un |une |deux |trois |quatre |des |\d+ |a |two |three |due |tre |dos |tres )?(?:enfants?|gosses?|fils|filles?|kids?|children|sons?|daughters?|figli|figlie|hij[oa]s)\b/gu;
+const HIS_MEMORY =
+  /\b(?:quand j etais|quand j avais|lorsque j etais|a l epoque|as a|when i was|back when|da ragazz[oa]|quando ero|cuando era|de petite?|de jeune|plus jeune)\b[^.!?\n,;]*/gu;
+
 /**
- * He puts a child or a minor in a sexual act, told, wished or asked of her as a role, of himself or of someone else: a
- * word of youth or of a minor, a school role or an age under 18, in a sexual message. Procreation between adults
- * (« te faire un enfant »), « ma petite » said to her, a « petite robe » or a game of age with no minor's word (« prof
- * et étudiante ») are left. In doubt, a human: a false alarm costs a handoff.
+ * He puts a child or a minor in a sexual act (Sécurité, #1043): only on a direct link, a sexual verb or, in a sexual
+ * message, a verb of desire carried onto a minor's word or an age under 18; a minor's role he asks of her; « t'as 16
+ * ans ? » in a sexual message. Never his own children nor a memory of his, never procreation between adults. What code
+ * does not decide, the brain classes (in doubt, a handoff).
  */
 function minorFantasy(fanText: string): boolean {
-  const words = normaliseWords(fanText);
+  const words = withoutProcreation(normaliseWords(fanText))
+    .replace(HIS_OWN_CHILDREN, ' ')
+    .replace(HIS_MEMORY, ' ')
+    .replace(DURATION, ' ');
+  if (SEX_ONTO_MINOR.test(words) || MINOR_ROLE.test(words)) return true;
   const sexual = SEXUAL_WORDS.test(words) || checkExplicit([fanText]).length > 0;
-  return sexual && namesYouth(words.replace(DURATION, ' '), fanText);
+  return sexual && (DESIRE_ONTO_MINOR.test(words) || HER_AGE_UNDER_18.test(words));
 }
 
 /**

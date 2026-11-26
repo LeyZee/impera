@@ -370,7 +370,14 @@ describe('voice guards', () => {
   });
 
   it('lets an adult fantasy of making a baby through, and blocks a minor named on a sexual turn (Charles 27/11 at 0:06)', () => {
-    for (const text of ['fais-moi un bébé', 'tu vas me mettre enceinte', 'je veux porter ton enfant']) {
+    for (const text of [
+      'fais-moi un bébé',
+      'tu vas me mettre enceinte',
+      'je veux porter ton enfant',
+      'je veux que tu me fasses un enfant',
+      'mi farai un bambino',
+      'quiero que me hagas un hijo',
+    ]) {
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
       expect(checkYouthWords([text], true), text).toEqual([]);
     }

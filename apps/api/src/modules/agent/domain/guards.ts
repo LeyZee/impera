@@ -99,14 +99,15 @@ const MINOR_COMPARISON =
   /\b(t'?es qu'|tu (n'?)?es qu'|comme|on dirait|celle d'|celui d'|ceux d'|celles d'|l'air d'|digne d'|taille d'|like|come|como)\s?(une?|a|an|una?|uno|des|les)? ?(enfants?|gamine?s?|gosses?|momes?|fillettes?|petite fille|petit garcon|ados?|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|little girls?|bambin[aeio]|ragazzin[aeio]|nin[ao]s?)\b/;
 
 // Procreation between adults is no minor (Charles 26/11): a child or a baby right after a verb of making one (« te
-// faire un enfant », « porter ton enfant », « te remplir pour te faire un bébé », « give you a baby », « hacerte un
-// bebé »). Only a pronoun, « pour te faire » and an article may stand between; « une enfant » is a girl, never a birth.
+// faire un enfant », « que tu me fasses un enfant », « porter ton enfant », « te remplir pour te faire un bébé », « give
+// you a baby », « mi farai un bambino », « me harás un hijo »), in the present, the subjunctive and the future. Only a pronoun, « pour te faire » and an article may stand between; « une enfant » is a girl, never a birth.
 // Read on `normaliseWords` (apostrophes and hyphens as spaces).
 const PROCREATION = new RegExp(
   [
-    '\\b(?:fais|faire|fait|ferai|ferais|avoir|aurai|veux|voudrais|porter|porte|porterai|mettre|mets|met|remplir|remplis',
-    '|engrosser|donner|donne|donnerai|make|making|have|having|give|giving|carry|carrying|fare|avere|dare|hacer|hacerte',
-    '|tener|dar|darte)',
+    '\\b(?:fais|faire|fait|ferai|ferais|feras|fera|ferez|fasse|fasses|fassiez|faites|avoir|aurai|veux|voudrais|envie d',
+    '|porter|porte|portes|porterai|porteras|mettre|mets|met|remplir|remplis|engrosser|donner|donne|donnes|donnerai',
+    '|donneras|make|making|have|having|give|giving|carry|carrying|want|wanna|fare|faccia|farai|fara|fai|avere|dare',
+    '|darai|dai|voglio|vorrei|hacer|hacerte|hagas|haga|haras|hara|tener|dar|darte|daras|quiero)',
     '(?: (?:te|me|lui|vous|nous|t|m|you|me|her|ti|mi|le|toi|moi))?',
     '(?: pour (?:te|me|lui|vous|nous|t|m) faire)?',
     '(?: (?:un|des|mon|ton|son|notre|votre|nos|vos|a|an|your|my|our|uno|tuo|mio|nostro|tu|mi|nuestro))?',

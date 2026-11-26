@@ -71,6 +71,11 @@ describe('permitted phrases that must always pass, output guards', () => {
     ['toute jeune dans ma tête', true],
     ['je veux porter ton enfant', true],
     ['je veux te faire un enfant', true],
+    ['je veux que tu me fasses un enfant', true],
+    ['tu me feras un bébé', true],
+    ['you’ll give me a baby', true],
+    ['mi farai un bambino', true],
+    ['me harás un hijo', true],
   ] as const)('youth_word_in_sex lets « %s » through (sexual turn: %s)', (bubble, sexual) => {
     expect(checkYouthWords([bubble], sexual)).toEqual([]);
   });
@@ -219,6 +224,11 @@ describe('permitted phrases that must always pass, input nets', () => {
 
   it.each([
     'je veux te faire un enfant ce soir au lit',
+    't’es sexy, moi j’ai deux enfants',
+    'mes gosses dorment, t’es nue ?',
+    'j’ai envie de toi, je dépose mon fils à l’école et je reviens',
+    'j’ai été marié 15 ans, j’ai envie de toi',
+    'i was horny as a teen',
     'te remplir pour te faire un bébé, j’ai envie de toi',
     'tu vas tomber enceinte',
     'j’ai envie de toi ma petite',

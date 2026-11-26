@@ -103,33 +103,49 @@ describe('safetySigns (recette AGT-01)', () => {
   });
 });
 
-describe('a fantasy of his on minors (Charles 26/11 at 23:45)', () => {
-  // The two families side by side, by language: taken, a minor or an age under 18 in a sexual message; left, adults.
+describe('a fantasy of his on minors, on a direct link only (Charles 26/11 at 23:45, Sécurité #1043)', () => {
+  // One sober sentence per pattern, by language: a sexual verb onto a minor, a desire onto one in a sexual message, a
+  // minor's role asked of her, « t'as 16 ans ? » in a sexual message.
   it.each([
-    ['fr', 'je fantasme sur une écolière', 'je veux te faire un enfant ce soir au lit'],
-    ['fr', 'joue une collégienne pour moi', 'te remplir pour te faire un bébé, j’ai envie de toi'],
-    ['fr', 'j’ai envie de toi en jouant une ado', 'tu vas tomber enceinte, j’ai trop envie de toi'],
-    ['fr', 'je fantasme sur une fille de 15 ans', 'j’ai envie de toi ma petite'],
-    ['fr', 'j’ai envie de toi habillée en tenue d’école', 'tu es sexy dans cette petite robe'],
-    ['fr', 'jeu de rôle avec une mineure', 'jeu de rôle prof et étudiante, ça t’excite ?'],
-    ['fr', 'au lit avec une gamine', 'marié depuis 15 ans et j’ai envie de toi'],
-    ['en', 'roleplay a schoolgirl for me', 'I want to make a baby with you in bed'],
-    ['en', 'I fantasize about a 15 year old', 'you look sexy in that little dress'],
-    ['it', 'fantasia con una ragazzina', 'voglio farti un figlio a letto'],
-    ['it', 'a letto con una di 16 anni', 'sei sexy, piccola mia'],
-    ['es', 'fantasía con una niña', 'quiero hacerte un bebé en la cama'],
-    ['es', 'en la cama con una jovencita', 'estás sexy, cariño'],
-  ])('%s: takes « %s », leaves « %s »', (_language, taken, left) => {
-    expect(safetySigns(taken)).toContain('minor_fantasy');
-    expect(safetySigns(left)).not.toContain('minor_fantasy');
+    ['fr', 'je veux toucher une ado'],
+    ['fr', 'je fantasme sur une écolière'],
+    ['fr', 'j’ai envie d’une gamine, je suis tout excité'],
+    ['fr', 'joue une collégienne pour moi'],
+    ['fr', 't’as 16 ans ? tu m’excites'],
+    ['en', 'I want to touch a teen'],
+    ['en', 'roleplay a schoolgirl for me'],
+    ['it', 'voglio toccare una ragazzina'],
+    ['it', 'hai 16 anni? mi ecciti'],
+    ['es', 'quiero tocar a una niña'],
+    ['es', 'disfrázate de colegiala'],
+  ])('%s: takes « %s »', (_language, text) => {
+    expect(safetySigns(text)).toContain('minor_fantasy');
   });
 
   it.each([
-    'quand j’étais ado je faisais du foot',
-    'mon fils est en 4e, il a 14 ans',
+    // A father, a memory of his, a length of time (Sécurité's false alarms).
+    't’es sexy, moi j’ai deux enfants',
+    'mes gosses dorment, t’es nue ?',
+    'j’ai envie de toi, je dépose mon fils à l’école et je reviens',
+    'j’ai été marié 15 ans, j’ai envie de toi',
+    'i was horny as a teen',
+    // Procreation between adults, in the present, the subjunctive and the future.
+    'je veux te faire un enfant ce soir au lit',
+    'je veux que tu me fasses un enfant',
+    'te remplir pour te faire un bébé, j’ai envie de toi',
+    'tu vas tomber enceinte',
+    'I want to give you a baby in bed',
+    'voglio che tu mi faccia un figlio',
+    'quiero que me hagas un bebé',
+    // Words for her, a dress, an adult game of age.
+    'j’ai envie de toi ma petite',
+    'tu es sexy dans cette petite robe',
+    'jeu de rôle prof et étudiante, ça t’excite ?',
     'j’ai envie de toi mon bébé',
-    'j’ai 15 ans d’expérience au lit',
-  ])('leaves « %s »: no minor in a sexual message', (text) => {
+    'quand j’étais ado je faisais du foot',
+    'sei sexy, piccola mia',
+    'estás sexy, cariño',
+  ])('leaves « %s »', (text) => {
     expect(safetySigns(text)).not.toContain('minor_fantasy');
   });
 });
