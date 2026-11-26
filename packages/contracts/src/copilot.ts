@@ -45,8 +45,11 @@ export const CopilotConversationSchema = z.strictObject({
   conversationId: ConversationIdSchema,
   fanId: FanIdSchema,
   switches: CopilotSwitchesSchema,
-  /** What he spent, his tier and his last purchase, as Reveal shows chatters (Charles, 21/11); never a commission. */
-  standing: FanStandingSchema.nullable(),
+  /**
+   * What he spent, his tier and his last purchase, as Reveal shows chatters (Charles, 21/11); never a commission. A
+   * server that does not send it yet reads as unknown.
+   */
+  standing: FanStandingSchema.nullable().default(null),
 });
 
 const DraftBubblesSchema = z.array(z.string().trim().min(1).max(2_000)).min(1).max(10);
