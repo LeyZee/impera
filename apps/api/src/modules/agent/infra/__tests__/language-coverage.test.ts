@@ -9,6 +9,7 @@ import { alertKeywordsIn } from '../../domain/alerts';
 import { checkCare } from '../../domain/care';
 import { checkExplicit, checkVoiceOutput, DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import { detectInjection } from '../../domain/injection';
+import { decideLanguage, detectLanguage } from '../../domain/language';
 import { safetySigns } from '../../domain/safety-net';
 
 /**
@@ -225,3 +226,64 @@ function languagesOf(value: unknown): string[] {
       : languagesOf(inner),
   );
 }
+
+/**
+ * Closed by default (ADR 0168 § 1 and § 4): a Latin-script language the guards do not read is never read as a
+ * covered one, nor kept on him; a number of a minor in it raises the age doubt. Invented messages (ADR 0010).
+ */
+describe('a language the guards do not read (ADR 0168 § 4, closed by default)', () => {
+  const OUTSIDE = [
+    'to jest bardzo ladne i ja to lubie na serio do tego',
+    'ce faci frumoaso, vreau sa te vad in seara asta',
+    'jest bardzo ladne i lubie to',
+    'hej snygg vad gor du ikvall jag vill se dig',
+  ];
+  const spoken = ['french', 'english'] as const;
+
+  it.each(OUTSIDE)('reads « %s » as a language it does not read, for a human, and keeps nothing', (text) => {
+    expect(detectLanguage(text)).toBe('unknown');
+    const decided = decideLanguage({ fanTexts: [text], kept: null, spoken: [...spoken] });
+    expect(decided).toMatchObject({ fan: 'unknown', keep: null, humanOnly: true });
+  });
+
+  it('reads his last messages together when this one says nothing alone and no language is kept', () => {
+    const decided = decideLanguage({
+      fanTexts: ['hej snygg'],
+      earlierFanTexts: ['vad gor du ikvall', 'jag vill se dig'],
+      kept: null,
+      spoken: [...spoken],
+    });
+    expect(decided).toMatchObject({ fan: 'unknown', keep: null, humanOnly: true });
+  });
+
+  it.each([
+    ['hey how are you', 'english'],
+    ['salut ça va toi ?', 'french'],
+    ['ciao come stai', 'italian'],
+    ['hola guapa como estas', 'spanish'],
+    ['si on se voyait, je te battrais à plate couture', 'french'],
+  ])('still reads a short message of a covered language: « %s »', (text, language) => {
+    expect(detectLanguage(text)).toBe(language);
+  });
+
+  it('refuses her long text in a language no list reads plainly, and lets her short words through', () => {
+    const blocked = (text: string) =>
+      checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS, { languages: ['french'] }).some(
+        (v) => v.code === 'language_not_covered',
+      );
+    expect(blocked('to jest bardzo ladne i ja to lubie na serio do tego')).toBe(true);
+    expect(blocked('un assistant virtuel m’a répondu à la banque')).toBe(false);
+    expect(blocked('mdr grave 😘')).toBe(false);
+  });
+
+  it.each(['mam 15 lat', 'tenho 15 anos', 'ich bin 15'])('raises the age doubt on « %s »', (text) => {
+    expect(safetySigns(text, NOW)).toContain('minor_suspected');
+  });
+
+  it.each(['15h', '15 €', '15 cm', 'à 15 min', 'rdv à 15', '15/20', 'dans 15 min', 'ich bin 25'])(
+    'leaves « %s »: an hour, a sum, a measure, a rank or an adult',
+    (text) => {
+      expect(safetySigns(text, NOW)).not.toContain('minor_suspected');
+    },
+  );
+});

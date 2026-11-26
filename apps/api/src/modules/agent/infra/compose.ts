@@ -144,9 +144,11 @@ function languageOfTurn(persona: ComposerPersona, input: ComposeTurnInput): Lang
   const herLastText = input.history.findLast((turn) => turn.from === 'creator')?.text;
   if (input.followUp !== undefined || input.aftercare !== undefined)
     return quietLanguage(kept?.value ?? null, spoken, herLastText);
-  const earlierFanText = earlierFanTexts(input.history).at(-1);
+  const earlier = earlierFanTexts(input.history);
+  const earlierFanText = earlier.at(-1);
   return decideLanguage({
     fanTexts: [input.fanText],
+    earlierFanTexts: earlier,
     kept,
     spoken,
     ...(earlierFanText !== undefined && { earlierFanText }),

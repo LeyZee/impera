@@ -1,4 +1,6 @@
-import { normalise } from '@impera/contracts';
+import { isGuardedLanguage, normalise } from '@impera/contracts';
+
+import { detectLanguage } from './language';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -131,6 +133,31 @@ const SELF_HARM = [
 ];
 
 /**
+ * A bare number from 10 to 17 in a message whose language the guards do not read (ADR 0168 § 4, closed by default):
+ * without a word of his language to say it is an age, it is one until a human says otherwise. Not a number that is an
+ * hour, a sum, a measure, a rank or a range (« 15h », « 15 € », « 15 cm », « à 15 min », « 15/20 »).
+ */
+const BARE_TEEN = new RegExp(
+  '(?<![\\d.,:/+\\-x#€$£])' +
+    '(?<!\\b(?:a|at|alle|alla|a las|las|um|vers|top|no|nr|n|num|numero|page|p|dans|in|tra|fra|en|entre|between|' +
+    'after|apres|dopo|despues|until|avant|before)\\s)' +
+    '\\b1[0-7]\\b' +
+    '(?![.,:/\\-]?\\d)(?!\\s*(?:h\\b|h\\d|%|€|\\$|£|°|x\\b|e\\b|eme\\b|er\\b|th\\b|st\\b|' +
+    '(?:min|mins|minut\\w*|sec\\w*|s|cm|mm|m|km|kg|g|l|ml|cl|euros?|eur|dollars?|usd|bucks|pounds?|zl\\w*|' +
+    'reais|lei|kr|chf|hours?|heures?|ore|horas?|uhr|stunden?|godz\\w*|jours?|days?|giorni|dias|tage|fois|times|' +
+    'volte|veces|mal|pages?|photos?|pics?|videos?|messages?|followers?|likes?)\\b))' +
+    // Years of something else, not his age: « 16 anni di esperienza », « 15 años de casado ».
+    `(?!\\s*${UNIT}\\s*(?:${NOT_AGE_ANY}))`,
+  'u',
+);
+
+/** Whether the guards read the language of his message: a covered one, read plainly. */
+function readByTheGuards(fanText: string): boolean {
+  const read = detectLanguage(fanText);
+  return read !== null && read !== 'unknown' && isGuardedLanguage(read);
+}
+
+/**
  * The signs his own words carry, the gravest first; none when nothing is written plainly. A birth year is read
  * against `now`'s year.
  */
@@ -143,7 +170,8 @@ export function safetySigns(fanText: string, now: Date = new Date()): SafetySign
     his.some(
       (clause) =>
         MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
-    )
+    ) ||
+    (!readByTheGuards(fanText) && BARE_TEEN.test(text))
   )
     signs.push('minor_suspected');
   if (SELF_HARM.some((pattern) => pattern.test(text))) signs.push('self_harm');

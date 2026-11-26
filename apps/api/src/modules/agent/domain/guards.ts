@@ -1,6 +1,6 @@
 import { isGuardedLanguage, normalise, unmask, type GuardCode, type Language } from '@impera/contracts';
 
-import { detectLanguage, isMostlyLatin } from './language';
+import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
 
 /**
  * Guards on the voice output, before anything can be sent (docs/architecture/ai-engine.md, « Les gardes »).
@@ -863,8 +863,11 @@ function languageMatch(
 ): string | undefined {
   const text = bubbles.join(' ');
   const read = detectLanguage(text);
-  // Latin words code finds no language in are hers (slang, names, numbers): only a script or a language read blocks.
-  if (read === null || (read === 'unknown' && isMostlyLatin(text))) return undefined;
+  // A short Latin text no language reads plainly is hers (slang, names, a word or two); a long one is not read by the
+  // guards and does not pass (ADR 0168 § 4, closed by default).
+  if (read === null) return undefined;
+  if (read === 'unknown' && isMostlyLatin(text) && latinWordCount(text) < OUTPUT_UNKNOWN_FROM_WORDS)
+    return undefined;
   if (read === 'unknown' || !isGuardedLanguage(read)) return read;
   return allowed === undefined || allowed.includes(read) ? undefined : read;
 }

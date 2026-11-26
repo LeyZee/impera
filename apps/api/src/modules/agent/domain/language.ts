@@ -16,8 +16,15 @@ export type DetectedLanguage = Language | 'unknown' | null;
 const MIN_WORDS = 3;
 /** The leading language needs at least this weight of its words, and more than any other. */
 const MIN_HITS = 2;
-/** A message of this many words or more, with no word of any language read, is in one code does not read. */
-const UNKNOWN_FROM_WORDS = 8;
+/**
+ * The leading language needs this share of his words (ADR 0168 § 1): two common words of a covered language lost in a
+ * long sentence of another never make it that language.
+ */
+const MIN_SHARE = 0.2;
+/** From this many words, a message no language reads plainly is in one code does not read (`'unknown'`). */
+const UNKNOWN_FROM_WORDS = 5;
+/** Her own text, read by the output guard: from this many words, a text no language reads plainly does not pass. */
+export const OUTPUT_UNKNOWN_FROM_WORDS = 8;
 
 // Short, common words of each language. A word in several lists is shared between them.
 const WORDS: Readonly<Record<Exclude<Language, 'arabic'>, readonly string[]>> = {
@@ -27,7 +34,8 @@ const WORDS: Readonly<Record<Exclude<Language, 'arabic'>, readonly string[]>> = 
     'peux jamais toujours bonjour salut coucou merci bisous ca cest jai jsuis chui ouais mdr ptdr ' +
     'beaucoup aujourd demain soir quand parce qu au aux un une que de la le en il me te se qui on y ' +
     'faut plus rien tout vais va vas sais dis dit ici sont ont avez etes peut veut chez apres avant ' +
-    'deja vraiment envie ou lui leur sa son ses nos vos ces cet pourquoi alors donc tellement'
+    'deja vraiment envie ou lui leur sa son ses nos vos ces cet pourquoi alors donc tellement ' +
+    'deux trois quatre cinq six sept huit neuf dix compte reste faut si a'
   ).split(' '),
   english: (
     'i you he she we they the and is are was not but with for this that my your me yes yeah what how ' +
@@ -40,7 +48,7 @@ const WORDS: Readonly<Record<Exclude<Language, 'arabic'>, readonly string[]>> = 
     'anche ancora molto troppo cosa come perche quando oggi domani stasera ciao grazie bella bello ' +
     'amore tesoro voglio vuoi posso puoi hai ho ha abbiamo essere avere fare fatto sempre mai tutto ' +
     'tutti niente nulla adesso ora dove chi bene piu gia sto stai sta qui cosi davvero proprio ' +
-    'allora baci un una uno'
+    'allora baci un una uno di nel nella al alla'
   ).split(' '),
   spanish: (
     'yo eres soy el los las del que no pero con por para este esta esto mi tu te me si tambien ' +
@@ -67,15 +75,43 @@ const WORDS: Readonly<Record<Exclude<Language, 'arabic'>, readonly string[]>> = 
   ).split(' '),
 };
 
-const LISTED = Object.entries(WORDS).flatMap(([language, words]) =>
+/**
+ * Common words of Latin-script languages outside `LANGUAGES`: read only so that a message in one of them leads to
+ * `'unknown'`, never to the covered language a few of its short words also belong to (ADR 0168 § 1).
+ */
+const OTHER_WORDS: Readonly<Record<string, readonly string[]>> = {
+  polish: (
+    'jest nie sie ze mam masz jestem jestes bardzo dzien dobry czesc dzieki tego tej cie moj moja twoj ' +
+    'twoja lubie chce lat wiem moze juz tylko teraz gdzie kiedy dlaczego jak'
+  ).split(' '),
+  romanian: (
+    'faci sunt esti eu si nu cu pe mai foarte asta acum vreau vrei vad seara buna frumoasa frumoaso ' +
+    'iubire multumesc ani este care cand unde'
+  ).split(' '),
+  swedish: (
+    'jag hon vi det och att inte ar ett vill pa som vad hur hej tack mycket bra ikvall idag imorgon ' +
+    'alskar gillar vacker snygg ocksa'
+  ).split(' '),
+  czech: 'jsem jsi ano proc kdy kde dekuji moc rad chci'.split(' '),
+  turkish: (
+    'ben sen biz siz bir ve bu nasil neden evet hayir cok guzel seni seviyorum merhaba tesekkur ' +
+    'yasindayim istiyorum var yok'
+  ).split(' '),
+};
+
+const LISTED = [...Object.entries(WORDS), ...Object.entries(OTHER_WORDS)].flatMap(([language, words]) =>
   words.map((word) => ({ language, word })),
 );
-const LANGUAGES_OF = new Map<string, Language[]>();
+/** For each word, the languages that write it, covered or not. */
+const LANGUAGES_OF = new Map<string, string[]>();
 for (const { language, word } of LISTED) {
-  const found = LANGUAGES.find((known) => known === language);
   const languages = LANGUAGES_OF.get(word) ?? [];
-  if (found !== undefined && !languages.includes(found)) LANGUAGES_OF.set(word, [...languages, found]);
+  if (!languages.includes(language)) LANGUAGES_OF.set(word, [...languages, language]);
 }
+
+/** A language of `LANGUAGES`, or `'unknown'` for one of the others code knows a few words of. */
+const asDetected = (language: string): Language | 'unknown' =>
+  LANGUAGES.find((known) => known === language) ?? 'unknown';
 
 const LATIN = /\p{Script=Latin}/u;
 
@@ -112,16 +148,26 @@ export function detectLanguage(text: string): DetectedLanguage {
   const words = wordsOf(text).filter((word) => LATIN.test(word));
   if (words.length < MIN_WORDS) return null;
   // A word several languages write counts for each, shared: « que » is a third of French, Spanish and Portuguese.
-  const hits = new Map<Language, number>();
+  const hits = new Map<string, number>();
   for (const word of words) {
     const languages = LANGUAGES_OF.get(word) ?? [];
     for (const language of languages) hits.set(language, (hits.get(language) ?? 0) + 1 / languages.length);
   }
   const ranked = [...hits.entries()].toSorted((a, b) => b[1] - a[1]);
   const [first, second] = ranked;
-  if (first === undefined) return words.length >= UNKNOWN_FROM_WORDS ? 'unknown' : null;
-  if (first[1] < MIN_HITS || (second !== undefined && second[1] >= first[1])) return null;
-  return first[0];
+  // A reading is plain or it is none: a weak one is never his language (ADR 0168 § 1, closed by default).
+  const plain =
+    first !== undefined &&
+    first[1] >= MIN_HITS &&
+    first[1] >= words.length * MIN_SHARE &&
+    (second === undefined || second[1] < first[1]);
+  if (plain) return asDetected(first[0]);
+  return words.length >= UNKNOWN_FROM_WORDS ? 'unknown' : null;
+}
+
+/** How many words of the text code reads as words (Latin letters): what the output guard measures. */
+export function latinWordCount(text: string): number {
+  return wordsOf(text).filter((word) => LATIN.test(word)).length;
 }
 
 /** What code decided for her answer (ADR 0168 § 2). */
@@ -149,6 +195,11 @@ export interface LanguageDecisionInput {
   readonly fanTexts: readonly string[];
   /** His message before this run, to know whether she already said she does not speak his language. */
   readonly earlierFanText?: string;
+  /**
+   * His messages before this run, oldest first: read together with this one when it says nothing alone and no
+   * language is kept (ADR 0168 § 1).
+   */
+  readonly earlierFanTexts?: readonly string[];
   /** Her last message to him, to keep the language they already speak. */
   readonly herLastText?: string;
   /** His kept language, `null` before any; `set` by a person, code never overwrites it. */
@@ -170,8 +221,15 @@ function latestDetected(texts: readonly string[]): DetectedLanguage {
  * The language of her answer (ADR 0168 § 2): his, when she speaks it; else the one they already speak, and she tells
  * him once she does not speak his; else English when her persona has it, else her first language.
  */
+/** His last messages read together: the few before this run pooled with it. */
+const POOLED_MESSAGES = 5;
+
 export function decideLanguage(input: LanguageDecisionInput): LanguageDecision {
-  const detected = latestDetected(input.fanTexts);
+  const alone = latestDetected(input.fanTexts);
+  const detected =
+    alone === null && input.kept === null && input.earlierFanTexts !== undefined
+      ? detectLanguage([...input.earlierFanTexts.slice(-POOLED_MESSAGES), ...input.fanTexts].join('\n'))
+      : alone;
   const fan: Language | 'unknown' | null = detected ?? input.kept?.value ?? null;
   const speaks = (language: Language | 'unknown' | null): language is Language =>
     language !== null && language !== 'unknown' && input.spoken.includes(language);
