@@ -116,9 +116,22 @@ export function Weekdays({
   const id = useId();
   return (
     <div className="nv-field tm-field" data-invalid={invalid ? 'true' : undefined}>
-      <span className="nv-field__label" id={id}>
-        Les jours
-      </span>
+      <div className="ag-weekdays__head">
+        <span className="nv-field__label" id={id}>
+          Les jours
+        </span>
+        {/* Every day in one tap, or back to choosing them one by one (Charles, 26/11). */}
+        <button
+          type="button"
+          className="nv-chip"
+          aria-pressed={value.length === WEEKDAYS.length}
+          onClick={() => {
+            onChange(value.length === WEEKDAYS.length ? [] : WEEKDAYS.map(([weekday]) => weekday));
+          }}
+        >
+          Tous les jours
+        </button>
+      </div>
       <div className="ag-weekdays" role="group" aria-labelledby={id}>
         {WEEKDAYS.map(([weekday, letter, name]) => (
           <button

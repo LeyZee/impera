@@ -1012,6 +1012,15 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
+.ag-weekdays__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ag-weekdays__head .nv-chip {
+  min-height: 32px;
+}
 .ag-weekdays .nv-chip {
   justify-content: center;
   min-height: 40px;

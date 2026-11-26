@@ -299,6 +299,20 @@ describe('Agenda, the creator’s (CR-05)', () => {
     expect(screen.getByText(/Le temps que tu ouvres à l’agence/u)).toBeDefined();
   });
 
+  it('opens a dispo cam on every day in one tap, from 21 h to 23 h', async () => {
+    serve(() => true);
+    show();
+    await screen.findByText('4 choses à faire');
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter/u }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Une dispo cam' }));
+    const everyDay = screen.getByRole('button', { name: 'Tous les jours' });
+    fireEvent.click(everyDay);
+    expect(everyDay.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText(/^Chaque jour, 21\sh – 23\sh$/u)).toBeDefined();
+    fireEvent.click(everyDay);
+    expect(screen.getByText('Choisis les jours')).toBeDefined();
+  });
+
   it('on a computer, shows her week as a grid of hours and her month', async () => {
     wide();
     serve(() => true);
