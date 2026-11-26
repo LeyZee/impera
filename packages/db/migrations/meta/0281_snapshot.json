@@ -22722,12 +22722,6 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "draft_reason": {
-          "name": "draft_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -22837,10 +22831,6 @@
         }
       },
       "checkConstraints": {
-        "shift_feedbacks_draft_reason_check": {
-          "name": "shift_feedbacks_draft_reason_check",
-          "value": "\"shift_feedbacks\".\"draft_reason\" in ('too_long', 'not_her_voice', 'sale_too_early', 'forgot_fan', 'other')"
-        },
         "shift_feedbacks_period_check": {
           "name": "shift_feedbacks_period_check",
           "value": "extract(day from \"shift_feedbacks\".\"period\") in (1, 16)"
@@ -26603,6 +26593,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "d4cea7f1-ed14-4b3a-94dc-343f27565cb0",
-  "prevId": "a664b2b8-d2b5-4d44-86a3-cc7c52fc5f13"
+  "id": "a664b2b8-d2b5-4d44-86a3-cc7c52fc5f13",
+  "prevId": "fb832924-64f8-4cc8-9348-d44d7286fcf4"
 }
