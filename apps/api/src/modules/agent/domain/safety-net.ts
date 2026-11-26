@@ -165,13 +165,22 @@ const NOT_COUNTED =
 
 /**
  * His age without its unit, read whatever his kept language (ADR 0168 § 4): after a first-person word of a covered
- * language (« j'ai 15 », « moi 16 », « ho 15 », « io 16 », « tengo 15 », « yo 16 »), a message that is only the
+ * language (« j'ai 15 », « j'en ai 15 », « moi c'est 16 », « moi 16 », « ho 15 », « io 16 », « tengo 15 », « yo 16 »),
+ * alone or with a question back (« io 16 e tu », « j'ai 15 et toi »), a message that is only the
  * number, alone or with a question back (« 15 », « ok 16 », « 16 et toi », « 15 e tu », « 17 y tu », « 15 and you »),
  * or about to turn it (« bientôt 17 », « quasi 17 », « casi 17 », « almost 17 »). Not « j'ai 15 min », « j'ai 15
  * photos », « tengo 15 euros », « presque 15h ».
  */
 const AGE_WITHOUT_UNIT = [
   new RegExp(`\\b(?:j'?ai|moi|ho|io|tengo|yo)\\s*:?\\s*${TEEN_NOT_A_THING}${NOT_COUNTED}`, 'u'),
+  // « j'en ai 15 », « moi c 16 », « moi c'est 16 (ans) ».
+  new RegExp(`\\b(?:j'?en ai|moi c'?est|moi c)\\s*:?\\s*${TEEN_NOT_A_THING}${NOT_COUNTED}`, 'u'),
+  // First person, the number, then a question back: « io 16 e tu », « j'ai 15 et toi », « yo 16 y tu ».
+  new RegExp(
+    `\\b(?:j'?ai|j'?en ai|moi c'?est|moi c|moi|ho|io|tengo|yo|i'?m|i am)\\s*:?\\s*1[0-7]` +
+      `(?:\\s*(?:ans?|anni|anos|years?|yo))?[\\s,.!]*(?:et|e|y|and|&)\\s*(?:toi|tu|te|vous|you|u|usted)\\b`,
+    'u',
+  ),
   new RegExp(
     `^[\\s\\p{P}]*(?:(?:ok|oui|ouais|si|yes|yeah|yep|bah|euh|eh|ben)[\\s\\p{P}]*)?1[0-7]` +
       `(?:\\s*(?:ans?|anni|anos|years?|yo))?[\\s\\p{P}]*` +
