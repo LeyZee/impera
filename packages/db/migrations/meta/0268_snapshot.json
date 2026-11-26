@@ -1,5 +1,5 @@
 {
-  "id": "35c2fc04-5fdd-4795-b874-b0ca58095c2a",
+  "id": "18426be0-b95c-4e91-bb1b-c76bc16dbd17",
   "prevId": "2046e9a3-3108-4194-9765-df8e8e7fe241",
   "version": "7",
   "dialect": "postgresql",
@@ -1543,6 +1543,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "redo_sentence": {
+          "name": "redo_sentence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_at": {
+          "name": "redo_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_by": {
+          "name": "redo_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1654,6 +1672,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "content_drop_files_redo_by_user_id_fk": {
+          "name": "content_drop_files_redo_by_user_id_fk",
+          "tableFrom": "content_drop_files",
+          "tableTo": "user",
+          "columnsFrom": ["redo_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "content_drop_files_drop_fk": {
           "name": "content_drop_files_drop_fk",
           "tableFrom": "content_drop_files",
@@ -1689,6 +1716,21 @@
           "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'filling'\n      )",
           "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
         },
+        "creator_redo_replace": {
+          "name": "creator_redo_replace",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_sentence\" is not null or \"content_drop_files\".\"state\" = 'refused') and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
+        },
+        "creator_redo_insert": {
+          "name": "creator_redo_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and \"content_drop_files\".\"replaced_at\" is null\n        and \"content_drop_files\".\"redo_sentence\" is null and \"content_drop_files\".\"media_asset_id\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      ) and exists (\n        select 1 from content_drop_files old where old.drop_id = \"content_drop_files\".\"drop_id\" and old.creator_id = \"content_drop_files\".\"creator_id\"\n          and old.position = \"content_drop_files\".\"position\" and old.slot_key is not distinct from \"content_drop_files\".\"slot_key\"\n          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')\n      )"
+        },
         "team_read": {
           "name": "team_read",
           "as": "PERMISSIVE",
@@ -1709,6 +1751,14 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'uploading'\n      )"
+        },
+        "team_redo": {
+          "name": "team_redo",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_by\" is null or \"content_drop_files\".\"redo_by\" = nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {
@@ -1730,7 +1780,11 @@
         },
         "content_drop_files_slot_check": {
           "name": "content_drop_files_slot_check",
-          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))\n        and (\"content_drop_files\".\"replaced_at\" is null or \"content_drop_files\".\"slot_key\" is not null)"
+          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))"
+        },
+        "content_drop_files_redo_check": {
+          "name": "content_drop_files_redo_check",
+          "value": "(\"content_drop_files\".\"redo_sentence\" is null) = (\"content_drop_files\".\"redo_at\" is null) and (\"content_drop_files\".\"redo_at\" is null) = (\"content_drop_files\".\"redo_by\" is null)\n        and coalesce(char_length(\"content_drop_files\".\"redo_sentence\"), 1) between 1 and 200"
         },
         "content_drop_files_bytes_check": {
           "name": "content_drop_files_bytes_check",
@@ -1845,6 +1899,12 @@
         "withdrawn_at": {
           "name": "withdrawn_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_sentence": {
+          "name": "redo_sentence",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2069,6 +2129,10 @@
         "content_drops_withdrawn_check": {
           "name": "content_drops_withdrawn_check",
           "value": "(\"content_drops\".\"state\" = 'withdrawn') = (\"content_drops\".\"withdrawn_at\" is not null)\n        and (\"content_drops\".\"withdrawn_at\" is null) = (\"content_drops\".\"withdrawn_by\" is null)"
+        },
+        "content_drops_redo_check": {
+          "name": "content_drops_redo_check",
+          "value": "\"content_drops\".\"redo_sentence\" is null or (\"content_drops\".\"state\" = 'withdrawn' and char_length(\"content_drops\".\"redo_sentence\") between 1 and 200)"
         },
         "content_drops_script_check": {
           "name": "content_drops_script_check",
@@ -13202,301 +13266,6 @@
         "pay_periods_window_check": {
           "name": "pay_periods_window_check",
           "value": "\"pay_periods\".\"ends_at\" > \"pay_periods\".\"starts_at\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.pay_sale_claim_answers": {
-      "name": "pay_sale_claim_answers",
-      "schema": "",
-      "columns": {
-        "claim_id": {
-          "name": "claim_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "outcome": {
-          "name": "outcome",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "answered_by": {
-          "name": "answered_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "pay_sale_claim_answers_claim_id_pay_sale_claims_id_fk": {
-          "name": "pay_sale_claim_answers_claim_id_pay_sale_claims_id_fk",
-          "tableFrom": "pay_sale_claim_answers",
-          "tableTo": "pay_sale_claims",
-          "columnsFrom": ["claim_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pay_sale_claim_answers_answered_by_user_id_fk": {
-          "name": "pay_sale_claim_answers_answered_by_user_id_fk",
-          "tableFrom": "pay_sale_claim_answers",
-          "tableTo": "user",
-          "columnsFrom": ["answered_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "member_read": {
-          "name": "member_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "exists (select 1 from pay_sale_claims c where c.id = \"pay_sale_claim_answers\".\"claim_id\")"
-        },
-        "member_insert": {
-          "name": "member_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"pay_sale_claim_answers\".\"answered_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from pay_sale_claims c where c.id = \"pay_sale_claim_answers\".\"claim_id\" and case when \"pay_sale_claim_answers\".\"outcome\" = 'withdrawn' then exists (select 1 from team_members m where m.id = c.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')) else nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and not exists (select 1 from team_members m where m.id = c.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')) end)"
-        }
-      },
-      "checkConstraints": {
-        "pay_sale_claim_answers_outcome_check": {
-          "name": "pay_sale_claim_answers_outcome_check",
-          "value": "\"pay_sale_claim_answers\".\"outcome\" in ('settled', 'not_retained', 'withdrawn')"
-        },
-        "pay_sale_claim_answers_note_check": {
-          "name": "pay_sale_claim_answers_note_check",
-          "value": "(\"pay_sale_claim_answers\".\"note\" is null or char_length(\"pay_sale_claim_answers\".\"note\") between 1 and 500) and (\"pay_sale_claim_answers\".\"outcome\" <> 'not_retained' or \"pay_sale_claim_answers\".\"note\" is not null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.pay_sale_claims": {
-      "name": "pay_sale_claims",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "member_id": {
-          "name": "member_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "shift_id": {
-          "name": "shift_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform_account_id": {
-          "name": "platform_account_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period": {
-          "name": "period",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "shift_starts_at": {
-          "name": "shift_starts_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "shift_ends_at": {
-          "name": "shift_ends_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "platform": {
-          "name": "platform",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "handle": {
-          "name": "handle",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_name": {
-          "name": "creator_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "pay_sale_claims_member_idx": {
-          "name": "pay_sale_claims_member_idx",
-          "columns": [
-            {
-              "expression": "member_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "pay_sale_claims_member_id_team_members_id_fk": {
-          "name": "pay_sale_claims_member_id_team_members_id_fk",
-          "tableFrom": "pay_sale_claims",
-          "tableTo": "team_members",
-          "columnsFrom": ["member_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pay_sale_claims_creator_id_creators_id_fk": {
-          "name": "pay_sale_claims_creator_id_creators_id_fk",
-          "tableFrom": "pay_sale_claims",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pay_sale_claims_platform_account_id_platform_accounts_id_fk": {
-          "name": "pay_sale_claims_platform_account_id_platform_accounts_id_fk",
-          "tableFrom": "pay_sale_claims",
-          "tableTo": "platform_accounts",
-          "columnsFrom": ["platform_account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pay_sale_claims_created_by_user_id_fk": {
-          "name": "pay_sale_claims_created_by_user_id_fk",
-          "tableFrom": "pay_sale_claims",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "pay_sale_claims_shift_fk": {
-          "name": "pay_sale_claims_shift_fk",
-          "tableFrom": "pay_sale_claims",
-          "tableTo": "shifts",
-          "columnsFrom": ["shift_id", "creator_id", "platform_account_id", "member_id"],
-          "columnsTo": ["id", "creator_id", "platform_account_id", "member_id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "pay_sale_claims_shift_unique": {
-          "name": "pay_sale_claims_shift_unique",
-          "nullsNotDistinct": false,
-          "columns": ["shift_id"]
-        }
-      },
-      "policies": {
-        "member_read": {
-          "name": "member_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"pay_sale_claims\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
-        },
-        "member_insert": {
-          "name": "member_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"pay_sale_claims\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"pay_sale_claims\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '') and m.status = 'active')"
-        }
-      },
-      "checkConstraints": {
-        "pay_sale_claims_period_check": {
-          "name": "pay_sale_claims_period_check",
-          "value": "extract(day from \"pay_sale_claims\".\"period\") in (1, 16)"
-        },
-        "pay_sale_claims_platform_check": {
-          "name": "pay_sale_claims_platform_check",
-          "value": "\"pay_sale_claims\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
-        },
-        "pay_sale_claims_hours_check": {
-          "name": "pay_sale_claims_hours_check",
-          "value": "\"pay_sale_claims\".\"shift_starts_at\" < \"pay_sale_claims\".\"shift_ends_at\""
-        },
-        "pay_sale_claims_names_check": {
-          "name": "pay_sale_claims_names_check",
-          "value": "char_length(\"pay_sale_claims\".\"handle\") between 1 and 200 and char_length(\"pay_sale_claims\".\"creator_name\") between 1 and 200"
-        },
-        "pay_sale_claims_note_check": {
-          "name": "pay_sale_claims_note_check",
-          "value": "char_length(\"pay_sale_claims\".\"note\") between 1 and 500"
         }
       },
       "isRLSEnabled": false

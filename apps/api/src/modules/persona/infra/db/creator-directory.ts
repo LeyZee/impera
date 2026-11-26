@@ -6,6 +6,7 @@ import {
   CreatorIdSchema,
   creatorNameKey,
   CreatorSettingsSchema,
+  type CreatorSettings,
   DayRangeSchema,
   DEFAULT_AGENT_HOURS,
   JOB_MAX_ATTEMPTS,
@@ -399,7 +400,49 @@ export function createDrizzleCreatorDirectory(
         return after;
       });
     },
+
+    async fanTiers(id) {
+      const [row] = await db
+        .select({ settings: schema.creators.settings })
+        .from(schema.creators)
+        .where(eq(schema.creators.id, id));
+      return row === undefined ? null : settingsOf(row.settings).fanTiers;
+    },
+
+    setFanTiers(id, tiers, userId) {
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ settings: schema.creators.settings })
+          .from(schema.creators)
+          .where(eq(schema.creators.id, id))
+          .for('update');
+        if (row === undefined) return null;
+        const before = settingsOf(row.settings).fanTiers;
+        // Only her `fanTiers` key is written: the rest of her settings stays as stored.
+        await tx
+          .update(schema.creators)
+          .set({
+            settings: sql`${schema.creators.settings} || jsonb_build_object('fanTiers', ${JSON.stringify(tiers)}::jsonb)`,
+          })
+          .where(eq(schema.creators.id, id));
+        await tx.insert(schema.auditLog).values({
+          id: newId(AuditEntryIdSchema),
+          userId,
+          action: 'creator.fan_tiers',
+          entity: 'creator',
+          entityId: id,
+          details: { from: before, to: tiers },
+        });
+        return tiers;
+      });
+    },
   };
+}
+
+/** Her settings as they read, the defaults for what no longer reads. */
+function settingsOf(settings: unknown): CreatorSettings {
+  const parsed = CreatorSettingsSchema.safeParse(settings);
+  return parsed.success ? parsed.data : CreatorSettingsSchema.parse({});
 }
 
 /** Her copilot switches (ADR 0086 § 6); settings that no longer read give the defaults: the card on, the drafts off. */

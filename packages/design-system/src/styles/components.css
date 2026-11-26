@@ -1468,7 +1468,16 @@
 .nv-stat__spark .nv-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: nv-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
+  animation: nv-stat-draw var(--nv-dur-data) var(--nv-ease-out) forwards;
+}
+/* The sparkline is stretched to the tile (preserveAspectRatio="none") with a non-scaling stroke, and the browser
+   then measures the dash on screen: a dash of 1 stops at the viewBox's own width, short of the edge of any wider
+   tile. The draw therefore ends on a pattern with no gap, which is a whole line at every width. */
+@keyframes nv-stat-draw {
+  to {
+    stroke-dasharray: 1 0;
+    stroke-dashoffset: 0;
+  }
 }
 /* The one stat that matters most on the screen: lit by the neon, like the single neon button. */
 .nv-stat--hero {
@@ -4016,6 +4025,10 @@
   .nv-stat__spark .nv-draw,
   .nv-chart__line {
     stroke-dashoffset: 0;
+  }
+  /* Same reason as nv-stat-draw: without the draw, no dash at all, so the line reaches the edge of a wide tile. */
+  .nv-stat__spark .nv-draw {
+    stroke-dasharray: none;
   }
   .nv-btn,
   .nv-iconbtn,
