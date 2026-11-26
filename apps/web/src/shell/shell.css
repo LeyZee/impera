@@ -2584,14 +2584,32 @@ label.nv-notif__row {
 }
 
 /* The screen's guides under its title (demande de Charles du 21/11) : one quiet line, « Pas à pas », on a row of
-   its own; opened, the guides, each folded. */
+   its own; opened, the guides, each folded. Everything keeps to the page's column (recette Design du 26/11): the line's
+   14 px inset and the body's are pulled back, here only, so « Pas à pas » stands under the title's first letter and
+   the guides take the width of the screen's cards; the names of the guides follow the words, the chevron after them. */
 .nv-page__guides {
   grid-column: 1 / -1;
   grid-row: 4;
   margin-top: 12px;
 }
-.nv-page__guides-list {
+.nv-page__guides > summary {
+  margin-inline: -14px;
+}
+.nv-page__guides .nv-disclosure__sum {
+  flex: 0 1 auto;
+  text-align: left;
+}
+.nv-page__guides-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--nv-ink-faint);
+}
+.nv-page__guides-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.nv-page__guides-list.nv-disclosure__body {
   display: grid;
   gap: 8px;
-  padding-top: 8px;
+  padding: 8px 0 0;
 }

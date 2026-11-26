@@ -4,6 +4,8 @@ import { createContext, useContext, useMemo, type JSX, type ReactNode } from 're
 import { french, Guide } from './Guide';
 import { HELP, type HelpAudience, type HelpGuide } from './guides';
 
+import { NavIcon } from '@/shell/NavIcon';
+
 /**
  * The person's colour, the only one of the help (choix de Charles du 21/11) : or pour le propriétaire, bleu pour le
  * manager, violet pour le chatteur, rose pour la modèle, taken from the content hues so both themes hold.
@@ -92,6 +94,9 @@ export function GuidesBeside(): JSX.Element | null {
   return (
     <details className="nv-disclosure nv-page__guides">
       <summary>
+        <span className="nv-page__guides-icon" aria-hidden="true">
+          <NavIcon name="help" />
+        </span>
         <span className="nv-disclosure__title">Pas à pas</span>
         <span className="nv-disclosure__sum">
           {beside.guides.map((guide) => french(guide.title)).join(' · ')}
