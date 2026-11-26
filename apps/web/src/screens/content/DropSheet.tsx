@@ -181,7 +181,7 @@ export function DropSheet({
                 <p className="ct-note">Vérifie ta connexion, puis réessaie.</p>
                 <button
                   type="button"
-                  className="nv-btn nv-btn--soft nv-btn--sm"
+                  className="nv-btn nv-btn--soft nv-btn--sm ct-retry"
                   onClick={() => {
                     void readyTypes.refetch();
                   }}

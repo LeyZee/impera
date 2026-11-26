@@ -351,6 +351,11 @@
   flex-wrap: wrap;
   gap: var(--nv-space-2);
 }
+/* « Réessayer » in a note: the size of its word, under the sentence, never as wide as the way out. */
+.ct-retry {
+  justify-self: start;
+  margin-top: var(--nv-space-2);
+}
 .ct-chosen {
   list-style: none;
   margin: 0;
