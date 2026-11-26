@@ -1,4 +1,4 @@
-# 26/11/2026 — INS-02 lot e3 : clics par heure dans Trafic
+# 2026-11-26 — INS-02 lot e3 : clics par heure dans Trafic
 
 - Fiche : INS-02 (lot e3).
 - Fait : route de lecture des heures (agence de la créatrice seule, test d'intégration et balayage d'isolation), carte « Ses clics, heure par heure » dans Trafic, bouton « Relier » sur les liens, tests unitaires du calcul et de l'écran.
