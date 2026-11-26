@@ -27,6 +27,7 @@ import {
   type Transaction,
 } from '@impera/db';
 
+import { camSlotOf, needsCamSlot, type CamSlotPorts } from '../../domain/cam';
 import type { CustomPriceActor } from '../../domain/ports';
 
 type SQL = ReturnType<typeof sql>;
@@ -81,6 +82,8 @@ const COLUMNS = {
   createdAt: customOrders.createdAt,
   updatedAt: customOrders.updatedAt,
   decidedAt: customOrders.decidedAt,
+  camStartsAt: customOrders.camStartsAt,
+  camEndsAt: customOrders.camEndsAt,
   // His latest conversation with her, to open from the card.
   conversationId: sql<
     string | null
@@ -104,8 +107,13 @@ type Row = Awaited<ReturnType<typeof select>>[number];
 /** A row as the contract has it: written by this module and the agent's turn, still parsed on the way out. */
 function viewOf(row: Row): CustomOrderView {
   const card = row.card === null ? null : CustomOrderCardSchema.safeParse(row.card);
+  const { camStartsAt, camEndsAt, ...rest } = row;
   return CustomOrderViewSchema.parse({
-    ...row,
+    ...rest,
+    cam:
+      camStartsAt === null || camEndsAt === null
+        ? null
+        : { startsAt: camStartsAt.toISOString(), endsAt: camEndsAt.toISOString() },
     // A card the contract cannot read stays out rather than breaking the list: the boxes beside it still show.
     card: !card?.success ? null : card.data,
     createdAt: row.createdAt.toISOString(),
@@ -123,7 +131,61 @@ async function one(tx: Transaction, creatorId: CreatorId, orderId: CustomOrderId
   return row;
 }
 
-export function createDrizzleCustomOrderAgencyStore(db: Database): CustomOrderAgencyStore {
+/** Where her cams are looked for: her dispos cam and her absence, read by the modules that own them. */
+export interface CamAgenda {
+  readonly room: (
+    creatorId: CreatorId,
+    ask: Parameters<CamSlotPorts['room']>[0],
+  ) => ReturnType<CamSlotPorts['room']>;
+  readonly absence: (creatorId: CreatorId, at: Date) => ReturnType<CamSlotPorts['absence']>;
+}
+
+/** The cams booked with her and still to happen or happening: what a new one never falls on. */
+export async function bookedCams(
+  tx: Transaction,
+  creatorId: CreatorId,
+  now: Date,
+): Promise<{ startsAt: Date; endsAt: Date }[]> {
+  const rows = await tx
+    .select({ startsAt: customOrders.camStartsAt, endsAt: customOrders.camEndsAt })
+    .from(customOrders)
+    .where(
+      and(
+        eq(customOrders.creatorId, creatorId),
+        eq(customOrders.state, 'deposit_paid'),
+        sql`${customOrders.camEndsAt} > ${now}`,
+      ),
+    );
+  return rows.flatMap((row) =>
+    row.startsAt === null || row.endsAt === null ? [] : [{ startsAt: row.startsAt, endsAt: row.endsAt }],
+  );
+}
+
+/**
+ * The slot booked for a call or a video call paid in full (ADR 0159 § 5): her first room in her dispos cam, or none.
+ * Two payments for her at once wait for each other, so two cams never share a slot.
+ */
+async function bookCam(
+  tx: Transaction,
+  agenda: CamAgenda,
+  creatorId: CreatorId,
+  minutes: number,
+  now: Date,
+): Promise<{ camStartsAt: Date; camEndsAt: Date } | Record<string, never>> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`cam:${creatorId}`}))`);
+  const slot = await camSlotOf(
+    {
+      room: (ask) => agenda.room(creatorId, ask),
+      absence: (at) => agenda.absence(creatorId, at),
+      booked: () => bookedCams(tx, creatorId, now),
+    },
+    minutes,
+    now,
+  );
+  return slot === null ? {} : { camStartsAt: slot.startsAt, camEndsAt: slot.endsAt };
+}
+
+export function createDrizzleCustomOrderAgencyStore(db: Database, agenda: CamAgenda): CustomOrderAgencyStore {
   /** `fn` under her RLS when the actor may: `read` the owner or an active manager who follows her; else the owner. */
   const as = <T>(
     creatorId: CreatorId,
@@ -157,9 +219,15 @@ export function createDrizzleCustomOrderAgencyStore(db: Database): CustomOrderAg
     // A deposit to receive only when her price asks one.
     if (to === 'deposit_paid' && before.depositMinor === null) return { kind: 'refused', state: from };
     const at = new Date();
+    // A call or a video call paid in full takes its slot in her dispos cam now, never before (ADR 0159 § 5).
+    const format = CustomFormatSchema.nullable().parse(before.format);
+    const cam =
+      to === 'deposit_paid' && needsCamSlot(format) && before.minutes !== null
+        ? await bookCam(tx, agenda, creatorId, before.minutes, at)
+        : {};
     await tx
       .update(customOrders)
-      .set({ ...set, state: to, updatedAt: at })
+      .set({ ...set, ...cam, state: to, updatedAt: at })
       .where(and(eq(customOrders.id, orderId), eq(customOrders.creatorId, creatorId)));
     // The audit says who moved which order where, never a price (methods of the agency).
     await tx.insert(auditLog).values({
@@ -169,7 +237,7 @@ export function createDrizzleCustomOrderAgencyStore(db: Database): CustomOrderAg
       entity: 'custom_order',
       entityId: orderId,
       ip: actor.ip,
-      details: { from, to, ...details },
+      details: { from, to, ...details, ...('camStartsAt' in cam && { cam: true }) },
     });
     const after = await one(tx, creatorId, orderId);
     if (after === undefined) throw new Error('custom order vanished after its move');

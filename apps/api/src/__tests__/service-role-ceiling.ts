@@ -19,7 +19,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/content-drops': 14,
   'modules/contractors': 6,
   'modules/conversations': 1,
-  'modules/creator-tasks': 1,
+  // A fan's cam looks for room in her dispos cam and her tasks (ADR 0159 § 5): one creator per call, read only, every
+  // query bounded by her `creator_id`; those tables have no policy for the server's own reads.
+  'modules/creator-tasks': 2,
   'modules/creator-week': 2,
   // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.
   'modules/custom-orders': 1,

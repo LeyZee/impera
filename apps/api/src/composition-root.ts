@@ -396,7 +396,6 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const persona = wirePersona(shared);
   const redirectLinks = wireRedirectLinks(shared, { detectLinks: connectors.module.detectedLinks });
-  const customOrders = wireCustomOrders(shared);
   const telegram = await wireTelegram(shared, {
     alerts: alerts.module,
     channelLinks: (creatorId) => redirectLinks.module.channelLinks(creatorId),
@@ -415,6 +414,10 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
   });
   const creatorWeek = wireCreatorWeek(shared, { creatorTasks: creatorTasks.module });
   const creatorLimits = wireCreatorLimits(shared);
+  const customOrders = wireCustomOrders(shared, {
+    creatorTasks: creatorTasks.module,
+    creatorLimits: creatorLimits.module,
+  });
   const creatorMessages = wireCreatorMessages(shared, { allCreatorIds: persona.allCreatorIds });
   const creatorDecisions = createCreatorDecisionsModule({
     db: shared.db,

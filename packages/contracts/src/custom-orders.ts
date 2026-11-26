@@ -180,6 +180,10 @@ export function customDepositMinor(format: CustomFormat | null, priceMinor: numb
   return null;
 }
 
+/** A cam's slot, as instants. */
+export const CustomOrderCamSchema = z.object({ startsAt: z.iso.datetime(), endsAt: z.iso.datetime() });
+export type CustomOrderCam = z.infer<typeof CustomOrderCamSchema>;
+
 /** His order as the agency reads it: the card, her answer and price, and where it stands up to delivery. */
 export const CustomOrderViewSchema = z.object({
   id: CustomOrderIdSchema,
@@ -198,6 +202,11 @@ export const CustomOrderViewSchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   decidedAt: z.iso.datetime().nullable(),
+  /**
+   * A call's or a video call's slot, booked by the code in her dispos cam once he paid it all (ADR 0159 § 5); null
+   * before, for anything else, or when none of her dispos cam had room (the hour is then set with her).
+   */
+  cam: CustomOrderCamSchema.nullable().default(null),
 });
 export type CustomOrderView = z.infer<typeof CustomOrderViewSchema>;
 

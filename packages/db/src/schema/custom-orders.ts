@@ -62,6 +62,9 @@ export const customOrders = pgTable(
     /** Who entered her answer, and when. */
     decidedBy: text('decided_by').references(() => user.id, { onDelete: 'set null' }),
     decidedAt: timestampTz('decided_at'),
+    /** A call's or a video call's slot in her dispos cam, booked by the code with his full payment (ADR 0159 § 5). */
+    camStartsAt: timestampTz('cam_starts_at'),
+    camEndsAt: timestampTz('cam_ends_at'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -75,6 +78,10 @@ export const customOrders = pgTable(
     check(
       'custom_orders_deposit_check',
       sql`${t.depositMinor} is null or (${t.priceMinor} is not null and ${t.depositMinor} between 0 and ${t.priceMinor})`,
+    ),
+    check(
+      'custom_orders_cam_check',
+      sql`(${t.camStartsAt} is null and ${t.camEndsAt} is null) or ${t.camEndsAt} > ${t.camStartsAt}`,
     ),
     check('custom_orders_card_check', sql`${t.card} is null or jsonb_typeof(${t.card}) = 'object'`),
     uniqueIndex('custom_orders_open_per_fan')

@@ -9,15 +9,19 @@ import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
 import { remind } from './application/remind';
+import type { Interval } from './domain/availability';
 import type { AgendaFeedEntry } from './domain/feed';
 import type { ShootGuard, ShootSuggestion, WeekAgendaStore } from './domain/ports';
 import { createDrizzleCreatorAgendaStore } from './infra/db/agenda-store';
+import { createCamRoomReader } from './infra/db/cam-reads';
 import { createDrizzleAgendaFeed } from './infra/db/feed-reads';
 import { createReminderSource } from './infra/db/reminder-source';
 import { createDrizzleSuggestionStore } from './infra/db/suggestion-store';
 import { createDrizzleWeekAgendaStore } from './infra/db/week-store';
 import { createCreatorTaskRoutes, type RequireRole } from './infra/http/routes';
 
+/** @public An interval of her time, as instants. */
+export type { Interval } from './domain/availability';
 export type {
   GuardedShoot,
   HerWeekFrame,
@@ -54,6 +58,20 @@ export interface CreatorTasksModule {
     userId: string,
     window: { readonly from: Date; readonly to: Date },
   ) => Promise<readonly AgendaFeedEntry[]>;
+  /**
+   * The first room of `minutes` in her dispos cam from `from`, over none of her timed tasks nor of `busy`, past the
+   * day `after` when given (ADR 0159 § 5): where a fan's cam may fall. Read as the owner role, bounded to her, for the server's own
+   * callers.
+   */
+  readonly camRoom: (
+    creatorId: string,
+    ask: {
+      readonly minutes: number;
+      readonly from: Date;
+      readonly busy: readonly Interval[];
+      readonly after: string | null;
+    },
+  ) => Promise<Interval | null>;
   /** Her week in her agenda (ADR 0140 § 22 to § 27): written by the owner's validation, read and ticked by her. */
   readonly week: WeekAgendaStore;
   /**
@@ -100,6 +118,7 @@ export function createCreatorTasksModule(deps: CreatorTasksDeps): CreatorTasksMo
     routes: createCreatorTaskRoutes(agenda, suggestions, deps.guardShoot, deps.requireRole, deps.clock),
     feedOf: createDrizzleAgendaFeed(deps.db),
     suggestShoot: (creatorId, userId, shoot, now) => suggestions.suggestShoot(creatorId, userId, shoot, now),
+    camRoom: createCamRoomReader(deps.adminDb),
     week: createDrizzleWeekAgendaStore(deps.db),
     accept: (userId, suggestionId, now) => agenda.accept(userId, suggestionId, {}, now),
     remind: notify === null ? null : (payload, at) => remind({ source, notify }, payload, at),

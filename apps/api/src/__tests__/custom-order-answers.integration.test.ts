@@ -1,4 +1,5 @@
 import {
+  AvailabilityIdSchema,
   CreatorIdSchema,
   CustomOrderListSchema,
   CustomOrderViewSchema,
@@ -8,6 +9,7 @@ import {
   TeamMemberIdSchema,
   type CreatorId,
   type FanId,
+  type CustomOrderReading,
   type OpenCustomOrder,
 } from '@impera/contracts';
 import { eq, schema, withAdmin, withTenant } from '@impera/db';
@@ -61,13 +63,20 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
     return { userId, cookie: await signIn(server, email, PASSWORD) };
   }
 
-  /** The agent's turn opens his order and sends her the card (format video, every essential box filled). */
-  async function cardReady(): Promise<string> {
+  const VIDEO: CustomOrderReading = {
+    format: 'video',
+    supplements: [],
+    minutes: 3,
+    details: { what: 'test', when: 'test' },
+  };
+
+  /** The agent's turn opens his order and sends her the card (a video unless said, every essential box filled). */
+  async function cardReady(reading: CustomOrderReading = VIDEO): Promise<string> {
     counter += 1;
     const order: OpenCustomOrder | null = null;
     const turn = customOrderTurn({
       asksForService: true,
-      reading: { format: 'video', supplements: [], minutes: 3, details: { what: 'test', when: 'test' } },
+      reading,
       order,
       stop: 'none',
       chatterOnShift: false,
@@ -83,7 +92,9 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
       }),
     );
     const listed = CustomOrderListSchema.parse((await call('GET', `${nora}/custom-orders`, 'owner')).json());
-    const open = listed.orders.find((one) => one.state === 'awaiting_creator');
+    const open = listed.orders.find(
+      (one) => one.state === 'awaiting_creator' && one.format === reading.format,
+    );
     if (open === undefined) throw new Error('no card');
     return open.id;
   }
@@ -202,6 +213,46 @@ describe('/v1/creators/:creatorId/custom-orders', () => {
       (await call('GET', `${nora}/custom-orders?scope=all`, 'owner')).json(),
     );
     expect(all.orders.find((one) => one.id === id)?.state).toBe('delivered');
+  });
+
+  it('a video call paid in full takes its slot in her dispo cam, the next one waits its margin (ADR 0159 § 5)', async () => {
+    const hour = 3_600_000;
+    const opens = new Date(Math.ceil((Date.now() + 2 * hour) / hour) * hour);
+    const dispo = await server.inject({
+      method: 'POST',
+      url: '/v1/creator-space/availabilities',
+      headers: { cookie: cookies.nora, origin: DASHBOARD_ORIGIN },
+      payload: {
+        id: newId(AvailabilityIdSchema),
+        when: {
+          kind: 'once',
+          startsAt: opens.toISOString(),
+          endsAt: new Date(opens.getTime() + 2 * hour).toISOString(),
+        },
+        opensTo: 'cam',
+      },
+    });
+    expect(dispo.statusCode).toBe(200);
+    const cam: CustomOrderReading = {
+      format: 'video_call_talk',
+      supplements: [],
+      minutes: 30,
+      details: { duration: 'test', availability: 'test' },
+    };
+    const paidCam = async (): Promise<unknown> => {
+      const id = await cardReady(cam);
+      const yes = await call('POST', `${nora}/custom-orders/${id}/decision`, 'owner', {
+        decision: 'yes',
+        priceMinor: 5000,
+      });
+      // A video call is paid in full first.
+      expect(CustomOrderViewSchema.parse(yes.json())).toMatchObject({ depositMinor: 5000, cam: null });
+      const paid = await call('POST', `${nora}/custom-orders/${id}/advance`, 'owner', { to: 'deposit_paid' });
+      return CustomOrderViewSchema.parse(paid.json()).cam;
+    };
+    const at = (minutes: number): string => new Date(opens.getTime() + minutes * 60_000).toISOString();
+    expect(await paidCam()).toEqual({ startsAt: at(0), endsAt: at(30) });
+    expect(await paidCam()).toEqual({ startsAt: at(45), endsAt: at(75) });
   });
 
   it('her no closes the order; a price out of bounds is refused', async () => {

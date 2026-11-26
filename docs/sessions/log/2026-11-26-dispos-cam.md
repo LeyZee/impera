@@ -1,0 +1,7 @@
+# 2026-11-26 — Dispos cam : la créatrice ouvre ses créneaux de cam, le code y place une cam payée — doing
+Fait : « Une dispo cam » dans « Ajouter » de son Agenda (préremplie 21 h – 23 h, « Tous les jours » en un geste), vues Jour et Semaine (maquette validée par Design et par Charles, 26/11) ; `opens_to` sur les dispos (migration 0274), suggestions et semaine de l'agence hors des dispos cam ; `camSlotOf` (préavis, marge entre deux cams, absence, « tout de suite » dans l'heure) ; créneau réservé au paiement complet d'un appel ou d'une visio (migration 0275) ; ADR 0159, Mise en œuvre § 5 ; glossaire « Dispo cam ».
+Pas fait : la demande à la créatrice avec le type de cam et l'envie du fan, la proposition du créneau au fan, le pseudo Instagram (lot suivant, avec le fil Agent) ; la cam réservée dans son Agenda (maquette d'abord).
+Décisions : ADR 0159, Mise en œuvre § 5 (Charles, 21/11 et 26/11).
+Découvertes : « habillée » n'est pas encore un format de la grille (seulement « discuter » et « sexuelle ») ; dispos et tâches n'ont pas de politique pour une lecture du serveur sous `withTenant`, d'où un accès de plus au rôle de service (plafond relevé, à relire par Sécurité).
+Candidats à suppression : aucun.
+Vérifié : tests unitaires et d'intégration touchés, pnpm check.
