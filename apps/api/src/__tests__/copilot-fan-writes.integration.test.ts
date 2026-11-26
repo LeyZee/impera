@@ -1,6 +1,6 @@
 import {
-  CopilotFanCardFieldSchema,
-  CopilotFanNoteSchema,
+  FanCardEntrySchema,
+  FanCardOtherSchema,
   ExtensionLinkCreatedSchema,
   ExtensionLinkStatusSchema,
   FanIdSchema,
@@ -244,7 +244,7 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
     const written = await correct(token, { items: ['Annecy'] });
     expect(written.statusCode).toBe(200);
     // The field written alone: nothing else of the fan.
-    expect(CopilotFanCardFieldSchema.parse(written.json())).toMatchObject({
+    expect(FanCardEntrySchema.parse(written.json())).toMatchObject({
       field: 'location',
       current: { items: ['Annecy'], source: 'noted', notedBy: chatter.userId },
     });
@@ -253,7 +253,7 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
 
     const noted = await note(token, '  Préfère qu’on lui écrive le soir  ');
     expect(noted.statusCode).toBe(201);
-    const first = CopilotFanNoteSchema.parse(noted.json());
+    const first = FanCardOtherSchema.parse(noted.json());
     expect(first).toMatchObject({
       value: 'Préfère qu’on lui écrive le soir',
       source: 'noted',
@@ -263,7 +263,7 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
     expect(first.key).toMatch(/^note_\d+$/);
     // Notes add up, never replace one another.
     await new Promise((resolve) => setTimeout(resolve, 5));
-    const second = CopilotFanNoteSchema.parse((await note(token, 'Aime le jazz')).json());
+    const second = FanCardOtherSchema.parse((await note(token, 'Aime le jazz')).json());
     expect(second.key).not.toBe(first.key);
     const others = (await app.modules.fans.card(anna, fan)).others.map((other) => other.value);
     expect(others).toEqual(expect.arrayContaining(['Préfère qu’on lui écrive le soir', 'Aime le jazz']));

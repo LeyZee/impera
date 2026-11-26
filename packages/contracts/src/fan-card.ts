@@ -345,27 +345,18 @@ export const SetFanCardFieldBodySchema = z.union([
 ]);
 export type SetFanCardFieldBody = z.infer<typeof SetFanCardFieldBodySchema>;
 
-/**
- * `PUT /v1/copilot/fans/:id/card/:field?creatorId=` (ADR 0109): the same gesture from the extension's panel, by the
- * person's link with the `fan_card` scope, on shift on her. It answers the field written alone, never the whole card.
- */
-export const CopilotFanCardFieldSchema = FanCardEntrySchema;
-export type CopilotFanCardField = z.infer<typeof CopilotFanCardFieldSchema>;
-
 /** A chatter's note on a fan, as « Rendre la main » keeps it: one line (ADR 0109 amendment § 9). */
 export const FAN_NOTE_MAX = 300;
 
 /**
  * `POST /v1/copilot/fans/:id/notes?creatorId=` (ADR 0109 amendment § 9): a note on the fan from the extension's panel,
  * by the person's link with the `operator_note` scope, on shift on her. Never changed nor cleared from there: a new
- * note is written.
+ * note is written. It answers the note written alone (201, `FanCardOtherSchema`), as « Autres » shows it. Its sister
+ * `PUT /v1/copilot/fans/:id/card/:field` takes `SetFanCardFieldBodySchema` and answers the field written alone
+ * (`FanCardEntrySchema`), never the whole card.
  */
 export const CopilotFanNoteBodySchema = z.strictObject({ note: z.string().trim().min(1).max(FAN_NOTE_MAX) });
 export type CopilotFanNoteBody = z.infer<typeof CopilotFanNoteBodySchema>;
-
-/** Its answer (201): the note written, as « Autres » shows it on the card; nothing else of the fan. */
-export const CopilotFanNoteSchema = FanCardOtherSchema;
-export type CopilotFanNote = z.infer<typeof CopilotFanNoteSchema>;
 
 /**
  * `POST /v1/fans/:id/card/others/retract?creatorId=` (trou béant 17): a person takes a line of « Autres » off the

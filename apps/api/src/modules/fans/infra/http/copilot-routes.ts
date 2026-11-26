@@ -1,7 +1,7 @@
 import {
-  CopilotFanCardFieldSchema,
+  FanCardEntrySchema,
   CopilotFanNoteBodySchema,
-  CopilotFanNoteSchema,
+  FanCardOtherSchema,
   CreatorIdSchema,
   DomainError,
   EXTENSION_LINK_ROUTES,
@@ -116,7 +116,7 @@ export function createCopilotFanRoutes(
           params: z.object({ id: FanIdSchema, field: FanCardFieldSchema }),
           querystring: CreatorQuerySchema,
           body: SetFanCardFieldBodySchema,
-          response: { 200: CopilotFanCardFieldSchema },
+          response: { 200: FanCardEntrySchema },
         },
       },
       async (request) => {
@@ -148,7 +148,7 @@ export function createCopilotFanRoutes(
           params: z.object({ id: FanIdSchema }),
           querystring: CreatorQuerySchema,
           body: CopilotFanNoteBodySchema,
-          response: { 201: CopilotFanNoteSchema },
+          response: { 201: FanCardOtherSchema },
         },
       },
       async (request, reply) => {
