@@ -5,6 +5,7 @@ import {
   desireMapOf,
   EMPTY_DESIRE_MAP,
   fantasyMatchOf,
+  mentions,
   rankByFantasy,
   withoutHerLimits,
   type DesireMap,
@@ -115,13 +116,10 @@ describe('the script closest to his fantasy', () => {
   });
 
   it('matches an adult fantasy he brings like any other, by its words only', () => {
-    const scripts = [
-      script('a', 'Elle le supplie de jouir en elle, de lui faire un bébé'),
-      script('b', 'Au réveil'),
-    ];
-    const { ranked, uncovered } = rankByFantasy(scripts, map({ desires: ['lui faire un bébé'] }));
+    const scripts = [script('a', 'Elle rêve qu’il lui fasse un bébé'), script('b', 'Au réveil')];
+    const { ranked, uncovered } = rankByFantasy(scripts, map({ desires: ['lui fasse un bébé'] }));
     expect(ranked[0]?.script.ref).toBe('a');
-    expect(ranked[0]?.matches).toEqual(['lui faire un bébé']);
+    expect(ranked[0]?.matches).toEqual(['lui fasse un bébé']);
     expect(uncovered).toEqual([]);
   });
 });
@@ -144,5 +142,12 @@ describe('what her persona refuses wins over his fantasy (Charles 26/11 at 21:22
     const { ranked, uncovered } = rankByFantasy([script('a', 'Elle joue au bureau, tenue en cuir')], kept);
     expect(ranked[0]?.matches).toEqual([]);
     expect(uncovered).toEqual(['qu’elle prenne les devants']);
+  });
+});
+
+describe('his message speaks of a fantasy of his card', () => {
+  it('reads his words like a script’s: half the item at least, accents and plurals aside', () => {
+    expect(mentions('jeu de rôle au bureau', 'tu as une vidéo de jeux de role au bureau ?')).toBe(true);
+    expect(mentions('jeu de rôle au bureau', 'tu as une vidéo ?')).toBe(false);
   });
 });

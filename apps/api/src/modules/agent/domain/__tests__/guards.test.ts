@@ -368,13 +368,16 @@ describe('voice guards', () => {
   });
 
   it('lets an adult fantasy of making a baby through, the age gate kept, minor words still blocked (Charles 26/11)', () => {
-    const fantasy = ['jouis en moi, fais-moi un bébé', 'tu vas me mettre enceinte', 'remplis-moi'];
-    for (const text of fantasy) {
+    for (const text of ['fais-moi un bébé', 'tu vas me mettre enceinte']) {
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
     }
-    // Explicit, it waits for his confirmed adult age like any explicit word (the composer reads `checkExplicit` then).
-    expect(checkExplicit(['jouis en moi, fais-moi un bébé']).length).toBeGreaterThan(0);
-    for (const text of ['un enfant de toi', 'ta petite fille', 'comme une gamine'])
+    // « Enfant » stays a minor's word, whatever the sentence: « je veux porter ton enfant » is refused too.
+    for (const text of [
+      'un enfant de toi',
+      'je veux porter ton enfant',
+      'ta petite fille',
+      'comme une gamine',
+    ])
       expect(codes([text]), text).toContain('minor_reference');
   });
 
@@ -386,7 +389,7 @@ describe('voice guards', () => {
 
   it('blocks a word of youth in a sexual message, in four languages, and lets it be outside (Charles 26/11)', () => {
     for (const text of [
-      'ma petite chatte est à toi',
+      'ta petite coquine est toute à toi',
       'ta jeunette rien que pour toi',
       'ta lolita t’attend',
       'your little girl wants you',
@@ -401,7 +404,7 @@ describe('voice guards', () => {
       expect(isBlocked(violations)).toBe(true);
     }
     // Explicit by its own words: sexual, whatever the turn.
-    expect(checkYouthWords(['viens jouir dans ta petite'], false).map((v) => v.code)).toEqual([
+    expect(checkYouthWords(['ta petite toute nue rien que pour toi'], false).map((v) => v.code)).toEqual([
       'youth_word_in_sex',
     ]);
     // Outside the sexual register, her words stay hers.

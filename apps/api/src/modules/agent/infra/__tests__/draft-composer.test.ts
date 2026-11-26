@@ -2743,31 +2743,46 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       expect(unknown.seen.voiceInputs?.[0]?.fantasy).toBeUndefined();
     });
 
-    it('offers no distant script when none meets his fantasies: the custom path instead (méthode § 10.22)', async () => {
+    it('keeps her scripts when none meets his fantasy; the custom path only when he asks for it (Charles 21:22)', async () => {
+      const notes = ['desires : jeu de rôle au bureau'];
+      const hot = composer({ brief: HOT }, undefined, limitsOf(ADULT).limits, deps(lingerie));
+      await hot.draftComposer.compose(withNotes(notes));
+      // She does with what she has: every permitted script goes to the brain, in the usual order.
+      expect(hot.seen.brainInputs?.[0]?.scripts?.map((one) => one.id)).toEqual(['s1', 's2']);
+      expect(
+        hot.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.startsWith('il réclame un média')),
+      ).toBe(false);
+
+      const asks: Brief = { ...BRIEF, intent: 'asks_for_media', sentiment: 'aroused', action: 'reply' };
+      const asking: AgentComposeInput = {
+        ...withNotes(notes),
+        history: [
+          {
+            direction: 'inbound',
+            text: 'tu aurais une vidéo de jeu de rôle au bureau ?',
+            at: new Date('2026-10-17T09:59:00Z'),
+          },
+        ],
+      };
       const custom = composer(
-        { brief: { ...HOT, action: 'reply' }, voice: { bubbles: ['J’ai une idée rien que pour toi 😏'] } },
+        { brief: asks, voice: { bubbles: ['J’ai une idée rien que pour toi 😏'] } },
         undefined,
         limitsOf(ADULT).limits,
         deps(lingerie),
       );
-      const result = await custom.draftComposer.compose(withNotes(['desires : jeu de rôle au bureau']));
-      expect(custom.seen.brainInputs?.[0]?.scripts).toBeUndefined();
+      expect((await custom.draftComposer.compose(asking)).kind).toBe('draft');
       const voice = custom.seen.voiceInputs?.[0];
       expect(voice?.scriptStep).toBeUndefined();
-      expect(voice?.brief.toneHints.some((hint) => hint.startsWith('aucun de ses scripts ne colle'))).toBe(
-        true,
-      );
-      expect(result.kind).toBe('draft');
+      expect(voice?.brief.toneHints.some((hint) => hint.startsWith('il réclame un média'))).toBe(true);
 
       // She commits to nothing there: a yes or a date is refused, as for any custom request (ADR 0090 § A).
       const promising = composer(
-        { brief: { ...HOT, action: 'reply' }, voice: { bubbles: ['ok je te fais ça demain'] } },
+        { brief: asks, voice: { bubbles: ['ok je te fais ça demain'] } },
         undefined,
         limitsOf(ADULT).limits,
         deps(lingerie),
       );
-      const held = await promising.draftComposer.compose(withNotes(['desires : jeu de rôle au bureau']));
-      expect(held.kind).toBe('held');
+      expect((await promising.draftComposer.compose(asking)).kind).toBe('held');
     });
 
     it('steers the sexting onto the fantasy the running script meets', async () => {

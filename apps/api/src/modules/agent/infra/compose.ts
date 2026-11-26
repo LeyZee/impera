@@ -60,6 +60,7 @@ import { gapNotes, timingLines } from '../domain/elapsed';
 import {
   desireMapOf,
   fantasyMatchOf,
+  mentions,
   rankByFantasy,
   withoutHerLimits,
   type DesireMap,
@@ -314,23 +315,16 @@ function scriptChoices(
     readonly matches: readonly string[];
   }[];
   readonly uncovered: readonly string[];
-  /** He has fantasies and no permitted script meets any (méthode § 10.22): no distant script, the custom path. */
-  readonly customInstead: boolean;
 } {
-  if (scripts?.history === undefined || scripts.history === null)
-    return { choices: [], uncovered: [], customInstead: false };
+  if (scripts?.history === undefined || scripts.history === null) return { choices: [], uncovered: [] };
   const permitted = permittedScripts(scripts.catalogue, {
     moment: isNight(situation) ? 'night' : 'day',
     history: scripts.history,
   });
   const { ranked, uncovered } = rankByFantasy(permitted, map);
-  // The closest playable script still leads the sale (Charles 21:22); only when none shares anything with his map
-  // does the custom path take its place (méthode § 10.22).
-  const customInstead =
-    ranked.length > 0 && map.desires.length > 0 && ranked.every((one) => one.matches.length === 0);
+  // Even when none shares anything with his map, the brain gets them all: she does with what she has (Charles 21:22).
   return {
-    customInstead,
-    choices: (customInstead ? [] : ranked)
+    choices: ranked
       .slice(0, BRAIN_SCRIPTS_MAX)
       .map(({ script, matches }, index) => ({ id: brainScriptId(index), script, matches })),
     uncovered,
@@ -658,14 +652,14 @@ const HE_CAME_UNPAID_HINT =
 /** He is about to come during her script (Charles 26/11): she slows him down; the run goes on. */
 const CLOSE_TO_COMING_HINT = 'freine-le : demande-lui de se retenir (« retiens-toi »), pas tout de suite';
 /**
- * No script of hers comes close to his fantasy (méthode § 10.22, Charles 26/11): rather than a distant script, the custom
- * path; she promises nothing, names no price and says no yes before the creator agrees (ADR 0090 § A).
+ * He asks himself for a media of a fantasy no script of hers serves (méthode § 10.22, Charles 26/11 at 21:22): the
+ * custom path; she promises nothing, names no price and says no yes before the creator agrees (ADR 0090 § A).
  */
 const CUSTOM_INSTEAD_HINT =
-  'aucun de ses scripts ne colle à son fantasme : plutôt qu’un autre script, elle peut lui suggérer quelque chose fait rien que pour lui, sans prix, sans dire oui ni quand';
+  'il réclame un média d’un fantasme qu’aucun de ses scripts ne sert : elle peut lui suggérer quelque chose fait rien que pour lui, sans prix, sans dire oui ni quand';
 /** Her gauge in the middle of the action (Charles 26/11): the intention only, her words never the same. */
 const GAUGE_HINT =
-  'jauge-le : vérifie où il en est, s’il est toujours dur, avec tes mots à toi et jamais les mêmes que la dernière fois';
+  'jauge-le : vérifie où il en est, s’il est toujours aussi excité, avec tes mots à toi et jamais les mêmes que la dernière fois';
 /** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
 const IN_TENSION_HINT =
   'il vient d’ouvrir ce qu’elle lui a envoyé : elle s’assure qu’il a aimé et qu’il est toujours chaud, reste dans la tension, sans rien proposer encore';
@@ -1055,7 +1049,7 @@ export async function composeTurn(
   const desireMap = withoutHerLimits(desireMapOf(notes.kept), (item) =>
     herRefusals.some((term) => touchesTerm(item, term)),
   );
-  const { choices, uncovered, customInstead } = scriptChoices(input.scripts, input.situation, desireMap);
+  const { choices, uncovered } = scriptChoices(input.scripts, input.situation, desireMap);
   const brainScripts: BrainScript[] = choices.map(({ id, script, matches }) => ({
     id,
     description: script.description,
@@ -1528,12 +1522,11 @@ export async function composeTurn(
       ? undefined
       : visibleStepSheet(running, runningScript);
   const sexualTurn = register !== null || running !== null;
-  // No script near his fantasy: the custom path, on a heated turn where no step and no custom answer already lead.
+  // He asks himself for a media of a fantasy no script serves: the custom path, where no step and no custom answer lead.
   const suggestsCustom =
-    customInstead &&
     fantasyAllowed &&
-    register !== null &&
-    running === null &&
+    brief?.intent === 'asks_for_media' &&
+    uncovered.some((item) => mentions(item, input.fanText)) &&
     scriptStep === undefined &&
     customOrder === undefined;
   const fantasy: VoiceFantasy | undefined =

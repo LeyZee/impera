@@ -306,6 +306,11 @@ function share(item: string, words: ReadonlySet<string>): number {
 
 const hits = (item: string, words: ReadonlySet<string>): boolean => share(item, words) >= MATCH_SHARE;
 
+/** Whether his message speaks of an item of his map: half its words at least, as a script would meet it. */
+export function mentions(item: string, text: string): boolean {
+  return hits(item, contentWords(text));
+}
+
 /** The weight of each part of his map: his fantasies and outfits lead, the words that work on him tip the balance. */
 const WEIGHTS = { desires: 1, outfits: 1, wordsThatWork: 0.5, coolsHim: -1 } as const;
 
