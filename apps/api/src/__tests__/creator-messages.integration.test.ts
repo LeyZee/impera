@@ -186,8 +186,10 @@ describe('what she writes to the agency, and the owner’s answer', () => {
       .set({ creatorIds: [ines] })
       .where(eq(schema.user.id, managerUserId));
     try {
-      // He follows only Inès, who wrote nothing: none of the creators he may read, so he is refused.
-      expect((await call('GET', '/v1/creator-messages/waiting', 'manager')).statusCode).toBe(403);
+      // He follows only Inès, who wrote nothing: he reads her (nothing waits), never Nora's message.
+      const waiting = await call('GET', '/v1/creator-messages/waiting', 'manager');
+      expect(waiting.statusCode).toBe(200);
+      expect(WaitingToAgencyMessagesSchema.parse(waiting.json()).messages).toEqual([]);
       const seen = await withTenantMember(app.db.db, nora, managerUserId, (tx) =>
         tx.select().from(schema.creatorMessages).where(eq(schema.creatorMessages.creatorId, nora)),
       );
