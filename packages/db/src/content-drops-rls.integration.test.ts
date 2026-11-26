@@ -204,6 +204,47 @@ describe('her drops and the agency’s requests (CR-06): narrow writes for her, 
     );
   });
 
+  it('she withdraws a blocked drop, its reason kept: her guard never lets her clear it (grande recette du 21/11)', async () => {
+    const blocked = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(blocked));
+    await withAdmin(test.admin.db, (tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'blocked', blockedReason: 'Aucun fichier gardé' })
+        .where(eq(s.contentDrops.id, blocked.id)),
+    );
+    expect(
+      await failure(
+        asNora((tx) =>
+          tx.update(s.contentDrops).set({ blockedReason: null }).where(eq(s.contentDrops.id, blocked.id)),
+        ),
+      ),
+    ).toMatch(/only withdraws|permission denied/u);
+    await asNora((tx) =>
+      tx
+        .update(s.contentDrops)
+        .set({ state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: noraUser })
+        .where(eq(s.contentDrops.id, blocked.id)),
+    );
+    expect(await stateOf(blocked.id)).toMatchObject({
+      state: 'withdrawn',
+      blockedReason: 'Aucun fichier gardé',
+    });
+    // A reason still never stands on a drop that is neither blocked nor withdrawn.
+    const ready = drop(nora, noraUser);
+    await asNora((tx) => tx.insert(s.contentDrops).values(ready));
+    expect(
+      await failure(
+        withAdmin(test.admin.db, (tx) =>
+          tx
+            .update(s.contentDrops)
+            .set({ state: 'ready', blockedReason: 'Aucun fichier gardé' })
+            .where(eq(s.contentDrops.id, ready.id)),
+        ),
+      ),
+    ).toMatch(/content_drops_blocked_check/u);
+  });
+
   it('she never withdraws a scheduled drop, never touches a file, never deletes', async () => {
     const mine = drop(nora, noraUser);
     await asNora(async (tx) => {

@@ -523,7 +523,7 @@ script_structure_queue    creator_id, position 1–20, structure_id (unique par 
                           (clé : creator_id, position ; RLS de la créatrice et portée de l'équipe ; remplacée en entier)
                           (la tâche horaire `scripts.ask_scripts` lit la bibliothèque, retire de la file la structure
                           demandée, remonte les suivantes et écrit la cadence dans la créatrice, sous `withTenantJob`
-                          (`ask_scripts`, migration 0254) : jamais une structure réservée à une autre)
+                          (`ask_scripts`, migration 0264) : jamais une structure réservée à une autre)
 platform_scripts          id, creator_id, platform_account_id → platform_accounts, platform_script_ref (unique par
                           compte, ≤ 200), name (celui de la plateforme, ≤ 200), moment? (day|night), fingerprint, active,
                           deactivated_at? (présent si et seulement si inactif), synced_at, version_at (l'import qui a

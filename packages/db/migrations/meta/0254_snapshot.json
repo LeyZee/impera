@@ -1,5 +1,5 @@
 {
-  "id": "005db210-923a-41ff-9882-9c81bf238349",
+  "id": "fce21862-b0a7-414a-9871-0c85bdde57a5",
   "prevId": "4cc027ce-8100-45e5-a928-add6e16423c7",
   "version": "7",
   "dialect": "postgresql",
@@ -2060,7 +2060,7 @@
         },
         "content_drops_blocked_check": {
           "name": "content_drops_blocked_check",
-          "value": "(\"content_drops\".\"state\" = 'blocked') = (\"content_drops\".\"blocked_reason\" is not null)\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
+          "value": "(\"content_drops\".\"state\" <> 'blocked' or \"content_drops\".\"blocked_reason\" is not null)\n        and (\"content_drops\".\"blocked_reason\" is null or \"content_drops\".\"state\" in ('blocked', 'withdrawn'))\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
         },
         "content_drops_correction_check": {
           "name": "content_drops_correction_check",
@@ -9630,6 +9630,12 @@
         "preview_blurhash": {
           "name": "preview_blurhash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_for_free_at": {
+          "name": "sent_for_free_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -20982,28 +20988,6 @@
           "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
           "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_cadences\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
         },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
-        "job_insert": {
-          "name": "job_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts' and \"script_cadences\".\"updated_by\" is null"
-        },
-        "job_update": {
-          "name": "job_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'",
-          "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
         "creator_closed": {
           "name": "creator_closed",
           "as": "RESTRICTIVE",
@@ -21368,28 +21352,6 @@
           "to": ["public"],
           "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
         },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
-        "job_delete": {
-          "name": "job_delete",
-          "as": "PERMISSIVE",
-          "for": "DELETE",
-          "to": ["public"],
-          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
-        "job_update": {
-          "name": "job_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'",
-          "withCheck": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
-        },
         "creator_closed": {
           "name": "creator_closed",
           "as": "RESTRICTIVE",
@@ -21517,13 +21479,6 @@
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
         },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.job', true), '') = 'ask_scripts' and exists (select 1 from script_structures s where s.id = \"script_structure_versions\".\"structure_id\"\n        and (s.reserved_creator_id is null or s.reserved_creator_id = nullif(current_setting('app.creator_id', true), '')::uuid))"
-        },
         "owner_insert": {
           "name": "owner_insert",
           "as": "PERMISSIVE",
@@ -21637,13 +21592,6 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
-        },
-        "job_read": {
-          "name": "job_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "nullif(current_setting('app.job', true), '') = 'ask_scripts' and (\"script_structures\".\"reserved_creator_id\" is null or \"script_structures\".\"reserved_creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid)"
         },
         "owner_insert": {
           "name": "owner_insert",

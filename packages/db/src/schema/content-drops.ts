@@ -209,7 +209,10 @@ export const contentDrops = pgTable(
     ),
     check(
       'content_drops_blocked_check',
-      sql`(${t.state} = 'blocked') = (${t.blockedReason} is not null)
+      // A withdrawn drop keeps why it was blocked (grande recette du 21/11): she may withdraw it, and her guard never
+      // lets her clear the reason.
+      sql`(${t.state} <> 'blocked' or ${t.blockedReason} is not null)
+        and (${t.blockedReason} is null or ${t.state} in ('blocked', 'withdrawn'))
         and coalesce(char_length(${t.blockedReason}), 1) between 1 and 200`,
     ),
     check(
