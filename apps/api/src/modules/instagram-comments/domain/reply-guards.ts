@@ -6,6 +6,7 @@ import {
   type GuardCode,
 } from '@impera/contracts';
 
+import { emojisOnly } from './love';
 import { asksAQuestion } from './questions';
 
 /**
@@ -40,6 +41,8 @@ export interface ReplyGuardContext {
   readonly chatGuardCodes: readonly GuardCode[];
   /** The code allowed a question in this reply (`mayAskQuestion`). */
   readonly mayAsk: boolean;
+  /** He declared his love: emojis only (`declaresLove`). */
+  readonly emojiOnly: boolean;
 }
 
 /** Her emojis in public: one, the same one doubled, or two side by side in a flirt (voix de Messa, 26/11). */
@@ -138,6 +141,8 @@ export function checkReply(text: string, context: ReplyGuardContext): ReplyViola
   if (explicit !== null) violations.push({ code: 'public_explicit', detail: explicit });
   if (!context.mayAsk && asksAQuestion(reply))
     violations.push({ code: 'unwanted_question', detail: 'question' });
+  if (context.emojiOnly && !emojisOnly(reply))
+    violations.push({ code: 'words_in_emoji_reply', detail: 'words' });
   if (context.recentReplies.some((earlier) => nearlySame(earlier, reply)))
     violations.push({ code: 'repeated_reply', detail: 'recent_reply' });
   for (const code of new Set(context.chatGuardCodes)) violations.push({ code, detail: code });

@@ -47,6 +47,30 @@ export function pairOfCorpusLine(line: CorpusLine): CalibrationPair | null {
   };
 }
 
+/** A period of her corpus written by someone else (assistants, Charles 26/11), bounds included, ISO dates. */
+export interface ExcludedPeriod {
+  readonly from: string;
+  readonly to: string;
+}
+
+const PERIOD = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/u;
+
+/** `2025-07-01..2025-08-15` as a period; null when it does not read or ends before it starts. */
+export function periodOf(text: string): ExcludedPeriod | null {
+  const match = PERIOD.exec(text.trim());
+  const from = match?.[1];
+  const to = match?.[2];
+  if (from === undefined || to === undefined || to < from) return null;
+  if (!z.iso.date().safeParse(from).success || !z.iso.date().safeParse(to).success) return null;
+  return { from, to };
+}
+
+/** Whether her first reply to this comment was written in one of the excluded periods: then it is not hers to learn from. */
+export function writtenInExcludedPeriod(line: CorpusLine, periods: readonly ExcludedPeriod[]): boolean {
+  const date = line.reponses[0]?.date ?? line.date;
+  return periods.some((period) => period.from <= date && date <= period.to);
+}
+
 /** A deterministic shuffle (mulberry32): the same seed sets the same pairs aside, so two runs compare. */
 function shuffled<T>(items: readonly T[], seed: number): T[] {
   let state = seed >>> 0;

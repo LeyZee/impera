@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CHAT_GUARDS_ON_A_REPLY, checkReply, type ReplyGuardContext } from '../reply-guards';
 
-const calm: ReplyGuardContext = { recentReplies: [], chatGuardCodes: [], mayAsk: true };
+const calm: ReplyGuardContext = { recentReplies: [], chatGuardCodes: [], mayAsk: true, emojiOnly: false };
 const codes = (text: string, context: ReplyGuardContext = calm) =>
   checkReply(text, context).map((v) => v.code);
 
@@ -48,6 +48,12 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Merci 😏', { ...calm, mayAsk: false })).toEqual([]);
   });
 
+  it('answers a declaration of love with emojis only', () => {
+    expect(codes('Merci 🫶🏻', { ...calm, emojiOnly: true })).toEqual(['words_in_emoji_reply']);
+    expect(codes('🫶🏻🫶🏻', { ...calm, emojiOnly: true })).toEqual([]);
+    expect(codes('☺️', { ...calm, emojiOnly: true })).toEqual([]);
+  });
+
   it('refuses a reply identical or nearly so to a recent one', () => {
     const context = { ...calm, recentReplies: ['Merci beaucoup, trop gentil de ta part'] };
     expect(codes('merci beaucoup trop gentil de ta part !', context)).toContain('repeated_reply');
@@ -65,6 +71,7 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     const context: ReplyGuardContext = {
       recentReplies: [],
       mayAsk: true,
+      emojiOnly: false,
       chatGuardCodes: [
         'ai_disclosure',
         'asks_for_nudes',
