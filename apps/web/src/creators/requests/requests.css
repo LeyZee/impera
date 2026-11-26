@@ -141,6 +141,12 @@
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--nv-ink);
 }
+.rq-state[data-tone='redo'] {
+  color: var(--nv-warning);
+}
+.rq-state[data-tone='redo']::before {
+  background: var(--nv-warning);
+}
 .rq-state[data-tone='dropped'] {
   color: var(--nv-ink);
 }
