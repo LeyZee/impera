@@ -28,7 +28,8 @@ export type NavIconName =
   | 'compass'
   | 'clapper'
   | 'traffic'
-  | 'heart';
+  | 'heart'
+  | 'help';
 
 const PEOPLE = (
   <>
@@ -188,6 +189,14 @@ const PATHS: Readonly<Record<NavIconName, JSX.Element>> = {
     <>
       <path d="M9.5 20.5H6A2.5 2.5 0 0 1 3.5 18V6A2.5 2.5 0 0 1 6 3.5h3.5" />
       <path className="nav-out" d="M10 12h10.5M16.5 8l4 4-4 4" />
+    </>
+  ),
+  // The help (« Pas à pas » under a screen's title, Moi › Aide): a question in a ring, after Lucide's circle-help.
+  help: (
+    <>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M9.4 9.2a2.7 2.7 0 0 1 5.2.9c0 1.8-2.6 2.5-2.6 2.5" />
+      <path d="M12 16.6h.01" />
     </>
   ),
   // A page that leads nowhere (recette 11/11, CRE-35).

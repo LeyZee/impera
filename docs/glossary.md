@@ -571,6 +571,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Pastille | `nv-status`, `nv-tag`, `nv-chip`, `nv-count`, jetons `--nv-pill-*` | Une capsule de texte court, de trois sortes seulement : d'information (22px), de choix (32px), compteur (18px). |
 | Titre de section | `nv-h2`, `nv-h3` | Le titre d'une section (22/28) ou d'un bloc dans une carte (17/22), en minuscules, jamais en capitales espacées ; le surtitre au-dessus est `nv-eyebrow`. |
 | Aide, guide | `HelpContent`, `HELP`, `HelpGuide`, classe `nv-guide` | Moi › Aide (Réglages › Aide pour le propriétaire) : le guide de la personne, rangé par rôle (propriétaire, manager, chatteur, modèle), d'une seule couleur, la sienne. Un guide est un geste difficile replié : pourquoi, les étapes avec « Tu dois voir », puis « À savoir », « Jamais », « Si ça coince ». Le texte n'écrit que ce qui est à l'écran sur main ; une règle métier vit dans le code qui l'applique. Style validé par Charles le 21/11. |
+| Pas à pas | `GUIDES_BESIDE`, `GuidesBeside`, classe `nv-page__guides` | La ligne discrète sous le titre d'un écran qui nomme ses guides ; ouverte, ces guides repliés, ceux du livre de la personne. Seulement les écrans où le geste se fait, et pas là où l'écran l'explique déjà. |
 
 ## Noms à ne pas utiliser
 

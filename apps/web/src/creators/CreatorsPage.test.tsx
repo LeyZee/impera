@@ -643,7 +643,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
     renderAt(anna, '/moi/persona');
     expect(await screen.findByRole('heading', { level: 1, name: 'Persona' })).toBeDefined();
     // She reads her sheet; the agency changes it (recette CREA-01).
-    await screen.findByText(/Ta fiche/);
+    await screen.findByText(/^Ta fiche, panneau par panneau/);
     expect(screen.queryByRole('button', { name: 'Enregistrer une version' })).toBeNull();
     cleanup();
 
