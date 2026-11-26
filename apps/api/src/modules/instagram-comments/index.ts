@@ -37,6 +37,8 @@ export {
   type AutonomyReadiness,
   type AutonomyThresholds,
 } from './domain/autonomy';
+/** @public Her real replies as examples, picked by closeness of text, wired with the jobs at lot b. */
+export { NEAR_EXAMPLES, nearExamples, type CommentExample } from './domain/examples';
 /** @public Her questions in public, one reply in a few at most, wired with the jobs at lot b. */
 export {
   asksAQuestion,

@@ -57,6 +57,7 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
   it('refuses on every blocking code the chatting guards raise, not on a whitelist', () => {
     const context: ReplyGuardContext = {
       recentReplies: [],
+      mayAsk: true,
       chatGuardCodes: [
         'ai_disclosure',
         'asks_for_nudes',
@@ -77,7 +78,7 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
   it('names the five chatting guards of a public reply, staying in character first', () => {
     expect(CHAT_GUARDS_ON_A_REPLY).toContain('ai_disclosure');
     for (const code of CHAT_GUARDS_ON_A_REPLY)
-      expect(codes('Merci à toi', { recentReplies: [], chatGuardCodes: [code] })).toEqual([code]);
+      expect(codes('Merci à toi', { ...calm, chatGuardCodes: [code] })).toEqual([code]);
   });
 
   it('never carries the text in a violation: a rule name or word only', () => {

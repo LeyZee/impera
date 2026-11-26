@@ -1,0 +1,287 @@
+/**
+ * `pnpm comment-calibration`: her replies to Instagram comments, the model's against hers (Charles, 26/11). Some of
+ * her real pairs « comment, her reply » are set aside; the model answers their comments on the production path (her
+ * public sheet, her closest pairs among the others, the room for a question, the guards and their one rewrite).
+ * Nothing is sent to Instagram. Run on the PC only, with her active persona read from the CRM: her words stay in the
+ * output folder, under `.scratch/`, which git ignores. The console and `chiffres.json` hold numbers only.
+ * Usage: `pnpm comment-calibration --pairs <file.jsonl> [--count 40] [--seed 1] [--creator <id>] [--key-from-crm]
+ * [--cap-eur 3] [--out .scratch/calibration-commentaires]`, one pair `{"comment": "…", "reply": "…"}` per line.
+ */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+
+import { CreatorIdSchema, StoredPersonaSchema, type CommentOutcome } from '@impera/contracts';
+import { eq, schema } from '@impera/db';
+import {
+  createInMemoryCallLog,
+  createLlmGateway,
+  createModelResolver,
+  DEFAULT_LLM_CONFIG,
+  readProviderCredentials,
+} from '@impera/llm';
+import { z } from 'zod';
+
+import { commentWriterPersona } from '../modules/agent/index';
+import {
+  afterGuards,
+  checkReply,
+  commentForPrompt,
+  mayAskQuestion,
+  nearExamples,
+  QUESTION_EVERY_BOUNDS,
+  asksAQuestion,
+  type GuardedAttempt,
+} from '../modules/instagram-comments/index';
+
+import {
+  blindLines,
+  CalibrationPairSchema,
+  setAside,
+  shapeOf,
+  type CalibrationPair,
+} from './comment-calibration/calibration';
+import { crmKeys, readOnlyAdminDb } from './crm-read';
+
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+const COMMAND = 'comment-calibration';
+const MAX_CAP_EUR = 25;
+const RECENT_REPLIES = 5;
+
+const { values } = parseArgs({
+  args: process.argv.slice(2).filter((arg) => arg !== '--'),
+  options: {
+    pairs: { type: 'string' },
+    count: { type: 'string', default: '40' },
+    seed: { type: 'string', default: '1' },
+    creator: { type: 'string' },
+    'key-from-crm': { type: 'boolean', default: false },
+    'cap-eur': { type: 'string', default: '3' },
+    out: { type: 'string', default: '.scratch/calibration-commentaires' },
+  },
+});
+
+function fail(message: string): never {
+  console.error(`${COMMAND} : ${message}`);
+  process.exit(1);
+}
+
+const count = z.coerce.number().int().min(1).max(200).safeParse(values.count);
+const seed = z.coerce.number().int().nonnegative().safeParse(values.seed);
+const capEur = z.coerce.number().positive().max(MAX_CAP_EUR).safeParse(values['cap-eur']);
+if (!count.success) fail('--count : un nombre de 1 à 200.');
+if (!seed.success) fail('--seed : un entier positif.');
+if (!capEur.success) fail(`--cap-eur : un montant en euros, ${String(MAX_CAP_EUR)} au plus.`);
+if (values.pairs === undefined) fail('--pairs : le fichier de ses paires, une par ligne.');
+const out = resolve(ROOT, values.out);
+// Her words go to a folder git ignores, never anywhere else.
+if (!out.startsWith(resolve(ROOT, '.scratch'))) fail('--out : un dossier sous .scratch/, que git ignore.');
+
+/** Her pairs, handles removed as the import removes them; a line that does not read is counted, never shown. */
+function readPairs(path: string): CalibrationPair[] {
+  const pairs: CalibrationPair[] = [];
+  let unread = 0;
+  for (const line of readFileSync(resolve(ROOT, path), 'utf8').split('\n')) {
+    if (line.trim() === '') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      unread += 1;
+      continue;
+    }
+    const pair = CalibrationPairSchema.safeParse(parsed);
+    if (!pair.success) {
+      unread += 1;
+      continue;
+    }
+    const comment = commentForPrompt(pair.data.comment);
+    if (comment !== '') pairs.push({ comment, reply: pair.data.reply });
+  }
+  console.log(
+    `Paires lues : ${String(pairs.length)}${unread > 0 ? `, ${String(unread)} lignes illisibles` : ''}`,
+  );
+  return pairs;
+}
+
+/** Her active persona, read on a connection that cannot write; only her version number is printed. */
+async function herPersona(now: Date): Promise<ReturnType<typeof commentWriterPersona>> {
+  const admin = readOnlyAdminDb(`${COMMAND} (persona)`, false);
+  try {
+    const rows = await admin.db
+      .select({
+        creatorId: schema.personaVersions.creatorId,
+        version: schema.personaVersions.version,
+        content: schema.personaVersions.content,
+        creatorName: schema.creators.displayName,
+      })
+      .from(schema.personaVersions)
+      .innerJoin(schema.creators, eq(schema.creators.id, schema.personaVersions.creatorId))
+      .where(eq(schema.personaVersions.isActive, true));
+    const wanted = values.creator === undefined ? undefined : CreatorIdSchema.parse(values.creator);
+    const among = wanted === undefined ? rows : rows.filter((row) => row.creatorId === wanted);
+    const [row, other] = among;
+    if (row === undefined) fail('aucune persona active pour cette créatrice.');
+    if (wanted === undefined && other !== undefined)
+      fail('précise --creator : plusieurs créatrices ont une persona.');
+    console.log(`Persona : version ${row.version} (en vigueur dans le CRM)`);
+    return commentWriterPersona(
+      { version: row.version, creatorName: row.creatorName, persona: StoredPersonaSchema.parse(row.content) },
+      now,
+    );
+  } finally {
+    await admin.close();
+  }
+}
+
+const now = new Date();
+const pairs = readPairs(values.pairs);
+if (pairs.length <= count.data) fail('il faut plus de paires que --count : le reste sert d’exemples.');
+const { test, bank } = setAside(pairs, count.data, seed.data);
+const examples = bank.map((pair, index) => ({ id: String(index), ...pair }));
+const persona = await herPersona(now);
+
+const credentials = readProviderCredentials(
+  values['key-from-crm'] ? { ...process.env, ...(await crmKeys(`${COMMAND} --key-from-crm`)) } : process.env,
+);
+if (credentials.LLM_XAI_API_KEY === undefined) fail('aucune clé xAI, rien ne peut être mesuré.');
+const log = createInMemoryCallLog();
+const gateway = createLlmGateway({
+  config: DEFAULT_LLM_CONFIG,
+  credentials,
+  resolveModel: createModelResolver(credentials),
+  log,
+  dailyCapEur: () => capEur.data,
+});
+
+interface Row {
+  readonly comment: string;
+  readonly hers: string;
+  readonly outcome: CommentOutcome;
+  readonly mayAsk: boolean;
+  readonly rewritten: boolean;
+  readonly refusedBy: readonly string[];
+}
+
+const rows: Row[] = [];
+const day = { replies: 0, questions: 0 };
+for (const pair of test) {
+  const mayAsk = mayAskQuestion(day, QUESTION_EVERY_BOUNDS.default);
+  const recentReplies = rows
+    .flatMap((row) => (row.outcome.kind === 'reply' ? [row.outcome.text] : []))
+    .slice(-RECENT_REPLIES);
+  const attempts: GuardedAttempt[] = [];
+  let refusedBy: string[] = [];
+  for (;;) {
+    const result = await gateway.instagramComment({
+      creatorName: persona.creatorName,
+      personaSheet: persona.personaSheet,
+      examples: [],
+      recentReplies,
+      nearExamples: nearExamples(pair.comment, examples),
+      comment: {
+        comment: pair.comment,
+        mediaKind: 'reel',
+        caption: '',
+        postAgeHours: 2,
+        repliesToHer: false,
+        authorCommentedBefore: false,
+        mayAsk,
+      },
+      ...(refusedBy.length > 0 ? { refusedBy } : {}),
+      trace: {},
+    });
+    if (!result.ok) {
+      attempts.push({
+        outcome: { kind: 'handoff', handoff: 'other', reason: result.error.code },
+        violations: [],
+      });
+      break;
+    }
+    const outcome = result.value.output;
+    const violations =
+      outcome.kind === 'reply'
+        ? checkReply(outcome.text, {
+            recentReplies,
+            mayAsk,
+            chatGuardCodes: persona
+              .check([outcome.text])
+              .filter((violation) => violation.blocking)
+              .map((violation) => violation.code),
+          })
+        : [];
+    attempts.push({ outcome, violations });
+    const next = afterGuards(attempts, true);
+    if (next.step === 'settled') break;
+    refusedBy = next.refusedBy.map((violation) => violation.code);
+  }
+  const settled = afterGuards(attempts, true);
+  const outcome: CommentOutcome =
+    settled.step === 'settled' ? settled.outcome : { kind: 'skip', reason: 'refused_by_guards' };
+  if (outcome.kind === 'reply') {
+    day.replies += 1;
+    if (asksAQuestion(outcome.text)) day.questions += 1;
+  }
+  rows.push({
+    comment: pair.comment,
+    hers: pair.reply,
+    outcome,
+    mayAsk,
+    rewritten: attempts.length > 1,
+    refusedBy: attempts.flatMap((attempt) => attempt.violations.map((violation) => violation.code)),
+  });
+  process.stdout.write('.');
+}
+process.stdout.write('\n');
+
+const modelReplies = rows.flatMap((row) => (row.outcome.kind === 'reply' ? [row.outcome.text] : []));
+const outcomes: Record<string, number> = {};
+const refusals: Record<string, number> = {};
+for (const row of rows) {
+  const key = row.outcome.kind === 'handoff' ? `handoff:${row.outcome.handoff}` : row.outcome.kind;
+  outcomes[key] = (outcomes[key] ?? 0) + 1;
+  for (const code of row.refusedBy) refusals[code] = (refusals[code] ?? 0) + 1;
+}
+const costUsd = log.since(new Date(0)).reduce((sum, record) => sum + (record.costUsd ?? 0), 0);
+const numbers = {
+  seed: seed.data,
+  testPairs: test.length,
+  bankPairs: bank.length,
+  outcomes,
+  rewritten: rows.filter((row) => row.rewritten).length,
+  refusals,
+  hers: shapeOf(test.map((pair) => pair.reply)),
+  model: shapeOf(modelReplies),
+  costUsd: Math.round(costUsd * 1000) / 1000,
+};
+
+mkdirSync(out, { recursive: true });
+const replied = rows.flatMap((row) =>
+  row.outcome.kind === 'reply' ? [{ comment: row.comment, hers: row.hers, model: row.outcome.text }] : [],
+);
+const lines = blindLines(replied, seed.data);
+writeFileSync(
+  resolve(out, 'aveugle.md'),
+  [
+    '# Laquelle est la sienne ?',
+    '',
+    'Pour chaque commentaire, deux réponses : la sienne et celle de l’IA, dans un ordre tiré au sort. Note A ou B, puis compare avec cle.md.',
+    '',
+    ...lines.flatMap((line, index) => [
+      `## ${String(index + 1)}. ${line.comment}`,
+      '',
+      `- A : ${line.a}`,
+      `- B : ${line.b}`,
+      '',
+    ]),
+  ].join('\n'),
+);
+writeFileSync(
+  resolve(out, 'cle.md'),
+  ['# Clé', '', ...lines.map((line, index) => `${String(index + 1)}. ${line.hers}`)].join('\n'),
+);
+writeFileSync(resolve(out, 'reponses.jsonl'), rows.map((row) => JSON.stringify(row)).join('\n'));
+writeFileSync(resolve(out, 'chiffres.json'), JSON.stringify(numbers, null, 2));
+console.log(JSON.stringify(numbers, null, 2));
+console.log(`Fichiers dans ${values.out} (aveugle.md, cle.md, reponses.jsonl, chiffres.json).`);
