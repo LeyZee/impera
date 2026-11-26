@@ -117,6 +117,7 @@ describe('Aujourd’hui, the creator’s (CR-02)', () => {
         { key: 'change', label: 'Changer l’heure', text: null, noted: 'On change l’heure.' },
       ],
       otherIdeasLeft: 0,
+      expiresAt: '2026-11-21T17:30:00.000Z',
     };
     const sent: string[] = [];
     vi.stubGlobal(
