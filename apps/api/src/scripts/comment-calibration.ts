@@ -8,7 +8,7 @@
  * [--cap-eur 3] [--out .scratch/calibration-commentaires]`, her prepared corpus, one comment and her replies per line.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -78,8 +78,9 @@ if (!seed.success) fail('--seed : un entier positif.');
 if (!capEur.success) fail(`--cap-eur : un montant en euros, ${String(MAX_CAP_EUR)} au plus.`);
 if (values.corpus === undefined) fail('--corpus : son fichier Corpus.jsonl.');
 const out = resolve(ROOT, values.out);
-// Her words go to a folder git ignores, never anywhere else.
-if (!out.startsWith(resolve(ROOT, '.scratch'))) fail('--out : un dossier sous .scratch/, que git ignore.');
+// Her words go to a folder git ignores: one named `.scratch` on the path (this checkout's, or the main one's when run
+// from a worktree), never a sibling whose name only starts the same.
+if (!out.split(sep).includes('.scratch')) fail('--out : un dossier sous un .scratch/, que git ignore.');
 
 /** Her pairs, handles removed; a line that does not read is counted, never shown. */
 function readPairs(path: string): CalibrationPair[] {

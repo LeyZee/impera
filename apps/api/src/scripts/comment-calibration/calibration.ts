@@ -31,7 +31,8 @@ export interface CalibrationPair {
 }
 
 const MENTION = /@[\p{L}\p{N}_.]+/gu;
-const tidy = (text: string): string => text.replace(MENTION, ' ').replace(/\s+/gu, ' ').trim();
+const tidy = (text: string): string =>
+  text.normalize('NFKC').replace(MENTION, ' ').replace(/\s+/gu, ' ').trim();
 
 /** Her first reply to each comment: the one the blind test compares with; a comment left empty by the cleaning is dropped. */
 export function pairOfCorpusLine(line: CorpusLine): CalibrationPair | null {
@@ -74,7 +75,15 @@ export function setAside(
   count: number,
   seed: number,
 ): { readonly test: CalibrationPair[]; readonly bank: CalibrationPair[] } {
-  const all = shuffled(pairs, seed);
+  // A pair she gave twice counts once: the test never finds its own words among the examples.
+  const seen = new Set<string>();
+  const unique = pairs.filter((pair) => {
+    const key = `${pair.comment}\u0000${pair.reply}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const all = shuffled(unique, seed);
   return { test: all.slice(0, count), bank: all.slice(count) };
 }
 

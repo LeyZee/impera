@@ -24,7 +24,7 @@ describe('the calibration of her replies to comments (Charles, 26/11)', () => {
       date: '2025-03-14',
       support: 'Photo ou carrousel',
       publication: 'Dimanche @amie',
-      commentaire: '@elle trop belle',
+      commentaire: '＠elle trop belle',
       reponses: [
         { date: '2025-03-14', destinataire: 'quelquun', texte: '@quelquun Merciii 🫶🏻' },
         { date: '2025-03-15', destinataire: 'quelquun', texte: 'Encore merci' },
@@ -47,6 +47,9 @@ describe('the calibration of her replies to comments (Charles, 26/11)', () => {
     expect(first.bank).toHaveLength(7);
     for (const pair of first.test) expect(first.bank).not.toContainEqual(pair);
     expect(setAside(pairs, 3, 8).test).not.toEqual(first.test);
+    const twice = setAside([...pairs, ...pairs], 3, 7);
+    expect(twice.bank).toHaveLength(7);
+    for (const pair of twice.test) expect(twice.bank).not.toContainEqual(pair);
   });
 
   it('says the shape of replies in numbers, without a word of them', () => {
