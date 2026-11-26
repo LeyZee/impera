@@ -67,6 +67,13 @@ const CRON_JOBS: readonly CronJob[] = [
     match: '* * * * *',
     options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['conversation.release_unavailable'] },
   },
+  // The week's re-read of the fan cards (ADR 0085 § 7, amendement du 21/11): Monday at 4 h, when the night spends
+  // least; each conversation's batches then wait for the day's room. No backfill: a missed week waits for the next.
+  {
+    task: 'fans.reread_cards',
+    match: '0 4 * * 1',
+    options: { backfillPeriod: 0, maxAttempts: JOB_MAX_ATTEMPTS['fans.reread_cards'] },
+  },
   // Re-checks the saved AI service keys (ADR 0016): credit, revoked keys, recovery after a refusal. No backfill:
   // the next run checks everything anyway.
   {

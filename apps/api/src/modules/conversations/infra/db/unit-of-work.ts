@@ -17,6 +17,7 @@ import {
   newId,
   type CreatorId,
   type FanId,
+  type MessageId,
   type OpenCustomOrder,
 } from '@impera/contracts';
 import {
@@ -31,6 +32,12 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
+import {
+  cardReadLatestWindow,
+  cardReadWindow,
+  cardRereadWindow,
+  type CardReadRow,
+} from '../../domain/card-read-window';
 import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
 import { heldBy } from './holds';
@@ -49,6 +56,50 @@ const SwitchStateRowsSchema = z.array(
 function bind(tx: DbTransaction, creatorId: string): Transaction {
   // Her active persona, read inside the statement that needs it: part of the version Automatique is proved on (ADR 0022).
   const activePersona = sql`(select id from persona_versions where creator_id = ${creatorId} and is_active)`;
+  /** Every message of the conversation with words, in the platform's order, without their texts (ADR 0085 § 7). */
+  const cardRows = async (conversationId: string): Promise<CardReadRow<MessageId>[]> => {
+    const rows = await tx
+      .select({
+        id: schema.messages.id,
+        author: schema.messages.author,
+        createdAt: schema.messages.createdAt,
+      })
+      .from(schema.messages)
+      .where(and(eq(schema.messages.conversationId, conversationId), sql`${schema.messages.text} <> ''`))
+      .orderBy(sql`${schema.messages.platformCreatedAt} asc, ${schema.messages.id} asc`);
+    return rows.map((row) => ({
+      id: MessageIdSchema.parse(row.id),
+      fromFan: MessageAuthorSchema.parse(row.author) === 'fan',
+      ingestedAt: row.createdAt,
+    }));
+  };
+  /** The texts of a read's messages, in the platform's order, those it reads marked new. */
+  const cardMessages = async (
+    ids: readonly MessageId[],
+    newIds: ReadonlySet<MessageId>,
+  ): Promise<CardReadMessage[]> => {
+    if (ids.length === 0) return [];
+    const rows = await tx
+      .select({
+        id: schema.messages.id,
+        author: schema.messages.author,
+        text: schema.messages.text,
+        at: schema.messages.platformCreatedAt,
+      })
+      .from(schema.messages)
+      .where(inArray(schema.messages.id, [...ids]))
+      .orderBy(sql`${schema.messages.platformCreatedAt} asc, ${schema.messages.id} asc`);
+    return rows.map((row) => {
+      const id = MessageIdSchema.parse(row.id);
+      return {
+        id,
+        from: MessageAuthorSchema.parse(row.author) === 'fan' ? 'fan' : 'creator',
+        text: row.text,
+        isNew: newIds.has(id),
+        at: row.at,
+      };
+    });
+  };
   return {
     conversations: {
       async lockOrCreate(key) {
@@ -248,41 +299,35 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
           );
         return { unread: count?.unread ?? 0, lastReadAt: row?.lastReadAt ?? null };
       },
-      async toRead(conversationId, limit) {
+      async toRead(conversationId, limits, mode) {
         const [conversation] = await tx
           .select({ through: schema.conversations.cardReadThrough })
           .from(schema.conversations)
           .where(eq(schema.conversations.id, conversationId));
-        const readThrough = conversation?.through ?? null;
-        const rows = await tx
-          .select({
-            id: schema.messages.id,
-            author: schema.messages.author,
-            text: schema.messages.text,
-            at: schema.messages.platformCreatedAt,
-            createdAt: schema.messages.createdAt,
-          })
-          .from(schema.messages)
-          .where(and(eq(schema.messages.conversationId, conversationId), sql`${schema.messages.text} <> ''`))
-          .orderBy(sql`${schema.messages.platformCreatedAt} desc, ${schema.messages.id} desc`)
-          .limit(limit);
-        const messages: CardReadMessage[] = rows.reverse().map((row) => {
-          const isFan = MessageAuthorSchema.parse(row.author) === 'fan';
-          return {
-            id: MessageIdSchema.parse(row.id),
-            from: isFan ? 'fan' : 'creator',
-            text: row.text,
-            isNew: isFan && (readThrough === null || row.createdAt.getTime() > readThrough.getTime()),
-            at: row.at,
-          };
-        });
-        const newest = Math.max(
-          ...rows
-            .filter((row, index) => messages[index]?.isNew === true)
-            .map((row) => row.createdAt.getTime()),
+        const rows = await cardRows(conversationId);
+        const through = conversation?.through ?? null;
+        const window =
+          mode === 'oldest'
+            ? cardReadWindow(rows, through, limits)
+            : cardReadLatestWindow(rows, through, limits);
+        if (window === null) return null;
+        return {
+          messages: await cardMessages(window.ids, window.newIds),
+          through: window.through,
+          left: window.left,
+        };
+      },
+      async reread(conversationId, after, limits) {
+        const window = cardRereadWindow(
+          await cardRows(conversationId),
+          after === null ? null : { id: after },
+          limits,
         );
-        const through = Number.isFinite(newest) ? new Date(newest) : null;
-        return { messages, through };
+        if (window === null) return null;
+        return {
+          messages: await cardMessages(window.ids, window.newIds),
+          next: window.next?.id ?? null,
+        };
       },
       async markRead(conversationId, through, at) {
         await tx

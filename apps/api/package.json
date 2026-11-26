@@ -27,6 +27,7 @@
     "ops:reencrypt-sessions": "tsx --env-file-if-exists=../../.env src/scripts/ops-reencrypt-sessions.ts",
     "ops:reencrypt-credentials": "tsx --env-file-if-exists=../../.env src/scripts/ops-reencrypt-credentials.ts",
     "ops:check-keys": "tsx --env-file-if-exists=../../.env src/scripts/ops-check-keys.ts",
+    "card:first-pass-cost": "tsx --env-file-if-exists=../../.env src/scripts/card-first-pass-cost.ts",
     "sandbox:world": "tsx --env-file-if-exists=../../.env src/__tests__/sandbox-world/main.ts"
   },
   "dependencies": {

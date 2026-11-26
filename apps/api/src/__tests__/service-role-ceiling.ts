@@ -18,7 +18,9 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/connectors': 40,
   'modules/content-drops': 14,
   'modules/contractors': 6,
-  'modules/conversations': 1,
+  // +1 for the week's re-read of the fan cards (ADR 0085 § 7, amendement du 21/11): a job over every creator that lists
+  // the conversations where the fan wrote this week and her card switch, identifiers only, read only.
+  'modules/conversations': 2,
   'modules/creator-tasks': 1,
   'modules/creator-week': 2,
   // The agent's turn reads the creator's own custom price grid (ADR 0159): one creator per call, read only.

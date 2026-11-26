@@ -106,6 +106,12 @@ const configSchema = z
      * development or a recette only (recette MOT-14); production refuses to start with it (below).
      */
     PASSWORD_BREACH_CHECK: z.enum(['on', 'off']).default('on'),
+    /**
+     * The full reading of the fan cards (ADR 0085 § 7, amendement du 21/11): `on` reads every conversation to its start,
+     * chains the reads, reads caught-up history and re-reads the week's conversations each Monday. `off` (default) reads
+     * as before, the newest messages only, so nothing more is spent before Charles turns it on at go-live.
+     */
+    FAN_CARD_FULL_READ: z.enum(['on', 'off']).default('off'),
     /** Development only: AI service keys read from the environment, ignored in production (ADR 0016). Empty = unset. */
     LLM_XAI_API_KEY: optionalValue,
     LLM_GOOGLE_API_KEY: optionalValue,

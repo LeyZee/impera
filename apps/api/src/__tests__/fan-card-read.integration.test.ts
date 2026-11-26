@@ -1,6 +1,7 @@
 import {
   CreatorIdSchema,
   FanIdSchema,
+  MessageIdSchema,
   newId,
   PlatformAccountIdSchema,
   UserIdSchema,
@@ -62,12 +63,20 @@ describe('fans.read_card', () => {
   let platformAccountId: PlatformAccountId;
   let fans: FansModule;
   let conversations: ConversationsModule;
+  /** The same module with the full reading off, as on every instance until go-live. */
+  let off: ConversationsModule;
   const reader = new ScriptedReader();
+  let room = true;
   let counter = 0;
 
-  async function fanWrites(conversation: string, text: string): Promise<ConversationId> {
+  async function fanWrites(
+    conversation: string,
+    text: string,
+    catchUp = false,
+    module: ConversationsModule = conversations,
+  ): Promise<ConversationId> {
     counter += 1;
-    const { conversationId } = await conversations.ingestMessage({
+    const { conversationId } = await module.ingestMessage({
       creatorId,
       platformAccountId,
       platformConversationId: conversation,
@@ -85,9 +94,24 @@ describe('fans.read_card', () => {
         createdAt: new Date(Date.now() + counter).toISOString(),
       },
       correlationId: 'test',
+      ...(catchUp && { catchUp: true }),
     });
     return conversationId;
   }
+
+  /** The waiting jobs of a task for a conversation, with their payloads. */
+  async function jobsOf(task: string, conversationId: ConversationId) {
+    const result = await test.admin.db.execute(
+      sql`select j.payload, j.run_at as "runAt" from graphile_worker._private_jobs j
+          join graphile_worker._private_tasks t on t.id = j.task_id
+          where t.identifier = ${task} and j.payload->>'conversationId' = ${conversationId}`,
+    );
+    return result.rows.map((row) => z.object({ payload: z.unknown(), runAt: z.coerce.date() }).parse(row));
+  }
+
+  /** His messages a read was given as new. */
+  const newTexts = (input: ReadInput | undefined) =>
+    (input?.messages ?? []).filter((message) => message.isNew).map((message) => message.text);
 
   const read = (conversationId: ConversationId) =>
     conversations.jobs.readCard({ creatorId, conversationId, correlationId: 'test' }, NO_LOG);
@@ -131,7 +155,7 @@ describe('fans.read_card', () => {
       .insert(schema.user)
       .values({ id: CHATTER, name: 'Léa', email: 'lea@nirvana.test', creatorIds: [creatorId] });
     fans = createFansModule({ db: test.app.db, adminDb: test.service.db });
-    conversations = createConversationsModule({
+    const deps = {
       db: test.app.db,
       adminDb: test.service.db,
       fans,
@@ -146,7 +170,11 @@ describe('fans.read_card', () => {
       voice: { voicePrompt: 'voice@test', voiceModel: 'model-test' },
       guard: PASS_GUARD,
       cardReader: reader,
-    });
+      cardRereadRoom: () => room,
+    } satisfies Parameters<typeof createConversationsModule>[0];
+    // The tests run with the full reading on, as at go-live; `off` is the default (FAN_CARD_FULL_READ).
+    conversations = createConversationsModule({ ...deps, fanCardFullRead: true });
+    off = createConversationsModule(deps);
   });
 
   afterAll(async () => {
@@ -263,5 +291,98 @@ describe('fans.read_card', () => {
     expect(reader.inputs.at(-1)?.messages).toEqual([
       { number: 1, from: 'fan', text: 'J’aime les séries', isNew: true },
     ]);
+  });
+
+  it('reads a long history caught up, oldest first, in batches chained at once, each message of his once', async () => {
+    const texts = Array.from({ length: 70 }, (_, n) => `Histoire ${String(n)}`);
+    let id: ConversationId | undefined;
+    for (const text of texts) id = await fanWrites('c-history', text, true);
+    if (id === undefined) throw new Error('no conversation');
+    // Caught up: nothing answers it, but his card reads it.
+    expect(await readJob(id)).toHaveLength(1);
+    reader.next = { ok: true, read: { facts: [] } };
+    const calls = reader.inputs.length;
+
+    await read(id);
+    const first = reader.inputs.at(-1);
+    expect(first?.messages.length).toBeLessThanOrEqual(40);
+    expect(newTexts(first)[0]).toBe('Histoire 0');
+    // Some are left: the next read is chained, at once, under the same key.
+    const [chained, ...others] = await readJob(id);
+    expect(others).toEqual([]);
+    expect(chained?.runAt.getTime()).toBeLessThanOrEqual(Date.now() + 1_000);
+
+    for (let n = 0; n < 5; n += 1) await read(id);
+    const seen = reader.inputs.slice(calls).flatMap(newTexts);
+    expect(seen).toEqual(texts);
+  });
+
+  it('reads the week’s conversations again from their start, within the day’s room, batch after batch', async () => {
+    const texts = Array.from({ length: 50 }, (_, n) => `Semaine ${String(n)}`);
+    let id: ConversationId | undefined;
+    for (const text of texts) id = await fanWrites('c-week', text, true);
+    if (id === undefined) throw new Error('no conversation');
+    const conversationId = id;
+    await conversations.jobs.rereadCards({}, NO_LOG);
+    const [enqueued] = await jobsOf('fans.reread_card', conversationId);
+    const payload = z
+      .object({ after: z.string().nullable(), startedAt: z.string() })
+      .parse(enqueued?.payload);
+    expect(payload.after).toBeNull();
+
+    // No room in the day: nothing read, the same batch put off.
+    room = false;
+    const calls = reader.inputs.length;
+    const job = {
+      creatorId,
+      conversationId,
+      correlationId: 'test',
+      after: null,
+      startedAt: payload.startedAt,
+    };
+    await conversations.jobs.rereadCard(job, NO_LOG);
+    expect(reader.inputs).toHaveLength(calls);
+    const [putOff] = await jobsOf('fans.reread_card', conversationId);
+    expect(putOff?.runAt.getTime()).toBeGreaterThan(Date.now() + 50 * 60_000);
+
+    room = true;
+    reader.next = { ok: true, read: { facts: [] } };
+    let next: string | null = null;
+    for (let n = 0; n < 5; n += 1) {
+      await conversations.jobs.rereadCard(
+        { ...job, after: next === null ? null : MessageIdSchema.parse(next) },
+        NO_LOG,
+      );
+      const [queued] = await jobsOf('fans.reread_card', conversationId);
+      const after = z.object({ after: z.string().nullable() }).parse(queued?.payload).after;
+      if (after === next) break;
+      next = after;
+    }
+    const reread = reader.inputs.slice(calls).flatMap(newTexts);
+    expect(reread).toEqual(texts);
+  });
+
+  it('with the full reading off: the last messages only, nothing chained, no caught-up read, no Monday re-read', async () => {
+    let caught: ConversationId | undefined;
+    for (let n = 0; n < 5; n += 1) caught = await fanWrites('c-off-caught', `Ancien ${String(n)}`, true, off);
+    if (caught === undefined) throw new Error('no conversation');
+    expect(await readJob(caught)).toEqual([]);
+
+    let id: ConversationId | undefined;
+    for (let n = 0; n < 45; n += 1) id = await fanWrites('c-off', `Direct ${String(n)}`, false, off);
+    if (id === undefined) throw new Error('no conversation');
+    const conversationId = id;
+    await test.admin.db.execute(
+      sql`delete from graphile_worker._private_jobs where payload->>'conversationId' = ${conversationId}`,
+    );
+    reader.next = { ok: true, read: { facts: [] } };
+    await off.jobs.readCard({ creatorId, conversationId, correlationId: 'test' }, NO_LOG);
+    const input = reader.inputs.at(-1);
+    expect(input?.messages).toHaveLength(40);
+    expect(newTexts(input).at(-1)).toBe('Direct 44');
+    expect(await readJob(conversationId)).toEqual([]);
+
+    await off.jobs.rereadCards({}, NO_LOG);
+    expect(await jobsOf('fans.reread_card', conversationId)).toEqual([]);
   });
 });

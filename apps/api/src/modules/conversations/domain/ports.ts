@@ -200,6 +200,19 @@ export interface AwayHolds {
   list(limit: number): Promise<readonly AwayHold[]>;
 }
 
+/**
+ * The conversations of the week's re-read of the fan card (ADR 0085 § 7, amendement du 21/11), across creators: where he
+ * wrote since `since`, for creators not archived whose fan card is on (`settings.copilot.fanCard`). Read only.
+ */
+export interface CardRereadScan {
+  active(
+    since: Date,
+  ): Promise<readonly { readonly creatorId: CreatorId; readonly conversationId: ConversationId }[]>;
+}
+
+/** Whether the day's AI spend leaves room for the weekly re-read (`FAN_CARD_REREAD.maxShareOfCap`). */
+export type CardRereadRoom = () => boolean;
+
 interface MessageRepository {
   /** `false` when the platform message is already known (unique per account): ingestion is idempotent. A known outbound
    * message still empty (a script step, recorded at send before the platform wrote it) takes the synced text and media;
@@ -397,13 +410,29 @@ interface CardReads {
     conversationId: ConversationId,
   ): Promise<{ readonly unread: number; readonly lastReadAt: Date | null }>;
   /**
-   * The conversation's last `limit` messages with words, oldest first, his not read yet marked new; `through` is when
-   * the newest of those new ones came in, null when none did.
+   * The next read of his card (ADR 0085 § 7, amendement du 21/11, `cardReadWindow`): his oldest messages not read yet,
+   * with what lies between them and a few before, in the platform's order, those it reads marked new. `through` is
+   * when the last of them came in; `left` counts his messages still unread after it. Null when none is unread.
    */
   toRead(
     conversationId: ConversationId,
-    limit: number,
-  ): Promise<{ readonly messages: readonly CardReadMessage[]; readonly through: Date | null }>;
+    limits: { readonly window: number; readonly context: number },
+    /** `latest`: the last messages only, as before the full reading (`cardReadLatestWindow`, `left` always 0). */
+    window: 'oldest' | 'latest',
+  ): Promise<{
+    readonly messages: readonly CardReadMessage[];
+    readonly through: Date;
+    readonly left: number;
+  } | null>;
+  /**
+   * A batch of the weekly re-read (`cardRereadWindow`): from the start, or after the message `after`, every message of
+   * his marked new. `next` is where the following batch starts after, null at the end. Null when nothing of his is left.
+   */
+  reread(
+    conversationId: ConversationId,
+    after: MessageId | null,
+    limits: { readonly window: number; readonly context: number },
+  ): Promise<{ readonly messages: readonly CardReadMessage[]; readonly next: MessageId | null } | null>;
   /** His messages in up to `through` are read, at `at`. */
   markRead(conversationId: ConversationId, through: Date, at: Date): Promise<void>;
 }

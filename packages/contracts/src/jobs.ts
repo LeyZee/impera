@@ -15,6 +15,7 @@ import {
   FanIdSchema,
   InvoiceIdSchema,
   MediaAssetIdSchema,
+  MessageIdSchema,
   PlatformAccountIdSchema,
   SalesLineIdSchema,
   SuggestionIdSchema,
@@ -55,6 +56,8 @@ export const JOB_NAMES = [
   'connector.vault_sync',
   'fans.refresh_summary',
   'fans.read_card',
+  'fans.reread_cards',
+  'fans.reread_card',
   'fans.purge_facts',
   'rate_limit.purge',
   'backups.check',
@@ -141,6 +144,8 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'connector.vault_sync': 'Synchronisation du coffre Reveal',
   'fans.refresh_summary': 'Résumé des fans',
   'fans.read_card': 'Fiche des fans remplie par l’IA',
+  'fans.reread_cards': 'Relecture de la semaine des fiches des fans',
+  'fans.reread_card': 'Relecture d’une conversation pour la fiche du fan',
   'fans.purge_facts': 'Nettoyage de la mémoire des fans',
   'rate_limit.purge': 'Nettoyage des limites de connexion',
   'backups.check': 'Vérification des sauvegardes',
@@ -309,6 +314,20 @@ export const JOB_PAYLOADS = {
    * last read stopped, and the facts it proposes are written once.
    */
   'fans.read_card': conversationJob,
+  /**
+   * Each week (crontab, ADR 0085 § 7, amendement du 21/11): one `fans.reread_card` per conversation where he wrote in
+   * the last `FAN_CARD_REREAD.activeDays`, for creators whose fan card is on, spaced `FAN_CARD_REREAD.spacingSeconds`.
+   */
+  'fans.reread_cards': z.object({}),
+  /**
+   * A batch of the weekly re-read of one conversation, from its start (`after` null) or after the message `after`;
+   * the next batch is enqueued under the same key, so the pass goes on to the end. `startedAt` is when the week's pass
+   * began: out of the day's room, it tries again later, and gives up `FAN_CARD_REREAD.giveUpDays` after.
+   */
+  'fans.reread_card': conversationJob.extend({
+    after: MessageIdSchema.nullable(),
+    startedAt: z.iso.datetime(),
+  }),
   'fans.purge_facts': z.object({}),
   'rate_limit.purge': z.object({}),
   'backups.check': z.object({}),
@@ -652,6 +671,10 @@ export const JOB_MAX_ATTEMPTS = {
   'fans.refresh_summary': 3,
   // Replayable: it reads from where the last read stopped (`conversations.card_read_through`).
   'fans.read_card': 3,
+  // Each week: the next week is the retry; a conversation's own job carries the pass.
+  'fans.reread_cards': 1,
+  // Replayable: a batch read twice writes the same values once, and its cursor is in its payload.
+  'fans.reread_card': 3,
   'fans.purge_facts': 1,
   'rate_limit.purge': 1,
   'backups.check': 1,

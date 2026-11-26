@@ -26,6 +26,7 @@ import {
 } from '@impera/contracts';
 
 import { safetySigns } from '../../agent';
+import { cardReadPlan, type CardReadPlan } from '../domain/card-read-window';
 import {
   AgeInDoubtConflict,
   AgentPauseConflict,
@@ -170,6 +171,8 @@ export interface CommandDeps {
   readonly voice: DraftVoice;
   /** The hard guards, read again on every approval: nothing leaves without them. */
   readonly guard: BubbleGuard;
+  /** What the full reading of the fan cards turns on (`FAN_CARD_FULL_READ`); absent, it is off. */
+  readonly cardRead?: CardReadPlan;
 }
 
 const NEW_FAN_MESSAGE = 'Nouveau message du fan';
@@ -282,6 +285,7 @@ export function createConversationCommands({
   fans,
   voice,
   guard,
+  cardRead = cardReadPlan(false),
 }: CommandDeps): ConversationCommands {
   const humanMeta = (input: { userId: UserId; correlationId: string }): EventMeta => ({
     actor: `human:${input.userId}`,
@@ -402,9 +406,10 @@ export function createConversationCommands({
         // sign the safety net answers (a minor, self-harm): that one is treated as fresh, so it is never left unread.
         const isFresh = input.catchUp !== true || (isInbound && safetySigns(message.text).length > 0);
         if (isInbound) {
-          // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off.
+          // His card is read whoever answers him (ADR 0085 § 7): each message of his puts the next read off. With the
+          // full reading on, caught-up history too: read once, it is what the card is made of (amendement du 21/11).
           const pace = await tx.cardReads.pace(conversation.id);
-          if (isFresh)
+          if (isFresh || cardRead.readsCaughtUp)
             await tx.jobs.enqueue(
               'fans.read_card',
               {
