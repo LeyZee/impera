@@ -345,13 +345,14 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         facts,
         scriptStep,
         copilot,
+        translation,
         ...draft
       }) {
         await tx.insert(schema.drafts).values({
           ...draft,
           creatorId,
-          ...((scriptStep !== undefined || copilot !== undefined) && {
-            policyTrace: toStoredPolicyTrace({ scriptStep, copilot }),
+          ...((scriptStep !== undefined || copilot !== undefined || translation !== undefined) && {
+            policyTrace: toStoredPolicyTrace({ scriptStep, copilot, translation }),
           }),
           ...(facts !== undefined && facts.length > 0 && { brief: toStoredBrief(facts) }),
           bubbles: [...(bubbles ?? [])],

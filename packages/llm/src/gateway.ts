@@ -21,6 +21,7 @@ import { LlmRoleSchema, type ProviderId } from './config';
 import {
   alertsBlock,
   describeBrief,
+  describeLanguage,
   judgeSituationBlock,
   notesBlock,
   customOrderBlock,
@@ -235,6 +236,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
+        language: describeLanguage(input.language),
         brief: describeBrief(
           input.brief,
           input.objectionReply,
@@ -623,6 +625,12 @@ function captionProposalsRequest(input: CaptionProposalsInput): string {
   return lines.join('\n');
 }
 
+const EMOJI_SHAPE_WORDS = {
+  0: 'aucun emoji',
+  1: 'un seul emoji',
+  2: 'deux emojis',
+} as const;
+
 /** What this one comment is: the facts written by the code, the two texts in their blocks (CLAUDE.md rule 4). */
 function instagramCommentRequest(input: InstagramCommentInput): string {
   const { comment } = input;
@@ -641,10 +649,17 @@ function instagramCommentRequest(input: InstagramCommentInput): string {
     '',
     `Le commentaire :\n${wrapUntrusted('instagram_comment', comment.comment)}`,
     '',
-    comment.mayAsk
-      ? 'Tu peux finir ta réponse par une question, seulement si le commentaire ouvre vraiment une discussion.'
-      : 'Pas de question dans ta réponse cette fois.',
+    comment.emojiOnly
+      ? 'Il lui dit qu’il l’aime : si tu réponds, seulement un ou deux emojis, sans aucun mot ni question.'
+      : comment.mayAsk
+        ? 'Tu peux finir ta réponse par une question, seulement si le commentaire ouvre vraiment une discussion.'
+        : 'Pas de question dans ta réponse cette fois.',
   ];
+  const shape = input.replyShape;
+  if (shape !== undefined && !comment.emojiOnly)
+    lines.push(
+      `Cette fois, comme dans sa réponse la plus proche : ${shape.words <= 3 ? 'quelques mots' : `environ ${String(shape.words)} mots`}, ${EMOJI_SHAPE_WORDS[shape.emojis]}${shape.exclaims ? ', et un point d’exclamation' : ''}.`,
+    );
   const near = input.nearExamples ?? [];
   if (near.length > 0)
     lines.push(

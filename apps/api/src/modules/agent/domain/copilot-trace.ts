@@ -8,6 +8,7 @@ import {
 } from '@impera/contracts';
 
 import type { DesireReading } from './desire';
+import type { LanguageDecision } from './language';
 import { paidWaiting, type PlatformScriptView, type ScriptRun } from './script-run';
 import type { ScriptTurn } from './script-turn';
 
@@ -31,6 +32,8 @@ export interface CopilotTraceInput {
   readonly care: boolean;
   /** Her first answer was refused by a guard and written once more. */
   readonly rewritten: boolean;
+  /** The language code decided for the draft (ADR 0168). */
+  readonly language?: LanguageDecision;
 }
 
 /** The blocks of the script gate, as the moment to sell names them (§ 4 bis). */
@@ -169,5 +172,12 @@ export function copilotTrace(input: CopilotTraceInput): CopilotTrace {
     sale: input.care ? null : saleOf(input, run),
     saleMoment: momentOf(input, block, run),
     desireTrend: trendOf(input.desireRead),
+    ...(input.language !== undefined && {
+      language: {
+        reply: input.language.reply,
+        fan: input.language.fan,
+        humanOnly: input.language.humanOnly,
+      },
+    }),
   };
 }

@@ -1,6 +1,7 @@
 import type {
   FanAvailabilityState,
   FanFlags,
+  Language,
   ScriptRunStatus,
   ScriptStart,
   ScriptStartBlock,
@@ -50,6 +51,42 @@ export interface PlatformScriptView {
   readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
+  /** The language its texts are written in (ADR 0168 § 8). Absent: French, as every script before its versions. */
+  readonly language?: Language;
+  /**
+   * Its family: the script it is a version of in another language, or itself (`versionOf ?? id`). A family plays once
+   * with him, whatever its language (ADR 0168 § 8). Absent: its own ref.
+   */
+  readonly family?: string;
+}
+
+/** A script's language: French when it says none (ADR 0168 § 8). */
+function languageOfScript(script: PlatformScriptView): Language {
+  return script.language ?? 'french';
+}
+
+/** A script's family: the one it is a version of, or itself (ADR 0168 § 8). */
+function familyOf(script: PlatformScriptView): string {
+  return script.family ?? script.scriptRef;
+}
+
+/**
+ * The families of her playable scripts written in his language (ADR 0168 § 8): what « enough scripts to sell » counts,
+ * a family once, never a version in another language. Played or not by him: this is her stock in his language.
+ */
+export function playableFamiliesIn(catalogue: readonly PlatformScriptView[], language: Language): number {
+  return new Set(
+    catalogue
+      .filter(
+        (script) =>
+          languageOfScript(script) === language &&
+          script.mediaValidated &&
+          script.descriptionValidated &&
+          !script.touchesLimits &&
+          platformScriptFaults(script).length === 0,
+      )
+      .map(familyOf),
+  ).size;
 }
 
 type PlatformScriptFault =
@@ -315,14 +352,28 @@ export function scriptStepsHeld(flags: FanFlags, careMode: boolean): boolean {
  */
 export function permittedScripts(
   catalogue: readonly PlatformScriptView[],
-  options: { readonly moment: DayPart; readonly history: ScriptHistoryView },
+  options: {
+    readonly moment: DayPart;
+    readonly history: ScriptHistoryView;
+    /**
+     * His language (ADR 0168 § 8): only a script written in it opens. Absent: French. `null`, a language code does
+     * not read: no script opens.
+     */
+    readonly language?: Language | null;
+  },
 ): PlatformScriptView[] {
+  if (options.language === null) return [];
   const played = playedScriptRefs(options.history);
+  const familyByRef = new Map(catalogue.map((script) => [script.scriptRef, familyOf(script)]));
+  const playedFamilies = new Set([...played].map((ref) => familyByRef.get(ref) ?? ref));
   const received = receivedMediaRefs(catalogue, options.history);
+  const language = options.language ?? 'french';
   return catalogue.filter(
     (script) =>
       (script.moment === null || script.moment === options.moment) &&
+      languageOfScript(script) === language &&
       !played.has(script.scriptRef) &&
+      !playedFamilies.has(familyOf(script)) &&
       !script.steps.some((step) => step.mediaRefs.some((ref) => received.has(ref))) &&
       script.mediaValidated &&
       script.descriptionValidated &&
@@ -378,6 +429,11 @@ export interface NextScriptStepInput {
   readonly startGate?: ScriptStart;
   /** His availability as code holds it: « non » pauses an open run, no step and no refusal counted (§ 12). */
   readonly availability?: FanAvailabilityState;
+  /**
+   * His language (ADR 0168 § 8): no script opens without a version in it. Absent: French. `null`, a language code does
+   * not read: no script opens.
+   */
+  readonly language?: Language | null;
   /**
    * His messages since he bought the last paid step (passe 04, guide): the next paid step waits for a few of them,
    * kept in the tension. Absent, not counted: no wait (the evals and tests that predate it).
@@ -522,7 +578,11 @@ function startDecision(input: NextScriptStepInput, history: ScriptHistoryView): 
     return { kind: 'wait', reason: gate.missing[0] ?? 'availability_unconfirmed' };
   }
   if (!decision.allowed) return { kind: 'none', reason: decision.reason };
-  const permitted = permittedScripts(input.catalogue, { moment: input.moment, history });
+  const permitted = permittedScripts(input.catalogue, {
+    moment: input.moment,
+    history,
+    ...(input.language !== undefined && { language: input.language }),
+  });
   if (permitted.length === 0) {
     // Only where a script would open now (gate open, desire at the threshold, no pause): ADR 0150 § 9.
     return { kind: 'none', reason: input.catalogue.length === 0 ? 'no_script' : 'scripts_exhausted' };

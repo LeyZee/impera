@@ -39,7 +39,11 @@ describe('what the code prepares for the model (ADR 0122 § 2)', () => {
       repliesToHer: false,
       authorCommentedBefore: true,
       mayAsk: false,
+      emojiOnly: false,
     });
+    expect(promptInputOf({ ...base, text: 'Je t’aime depuis toujours', postedAt: base.now }).emojiOnly).toBe(
+      true,
+    );
     expect(promptInputOf({ ...base, postedAt: new Date('2026-11-19T13:00:00Z') }).postAgeHours).toBe(0);
   });
 });

@@ -25,6 +25,8 @@ Les contrats sont dans `packages/contracts/src/instagram-comments.ts`, avec la l
 
 - `domain/examples.ts` : les cinq paires « commentaire, sa réponse » de sa banque les plus proches du commentaire, par proximité de texte, sans modèle ; rendues dans le bloc `her_replies` du message.
 - `domain/questions.ts` : une réponse sur trois au plus peut porter une question (`mayAsk`), décidé par le code ; la garde `unwanted_question` refuse les autres. Deux emojis au plus.
+- `domain/examples.ts` donne aussi la forme de sa réponse la plus proche (`replyShapeOf`) : nombre d'emojis et point d'exclamation, dits au modèle.
+- `domain/love.ts` : un commentaire qui dit « je t'aime » (`declaresLove`) ne reçoit que des emojis (`emojiOnly`) ; la garde `words_in_emoji_reply` refuse une réponse avec des mots.
 - `pnpm comment-calibration` : sur le PC seulement, ses paires mises de côté, réponses du modèle comparées aux siennes à l'aveugle ; les textes restent sous `.scratch/`, seuls des chiffres en sortent.
 
 ## À venir

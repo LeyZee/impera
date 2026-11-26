@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeBrief, PROFILE_BIO_MAX, profileBioBlock, toMessages } from './conversation-messages';
+import {
+  describeBrief,
+  describeLanguage,
+  PROFILE_BIO_MAX,
+  profileBioBlock,
+  toMessages,
+} from './conversation-messages';
 import type { Brief } from './schemas';
 
 describe('toMessages', () => {
@@ -81,5 +87,30 @@ describe('profileBioBlock (ADR 0154)', () => {
     const block = profileBioBlock('a'.repeat(PROFILE_BIO_MAX + 50));
     expect(block).toContain('a'.repeat(PROFILE_BIO_MAX));
     expect(block).not.toContain('a'.repeat(PROFILE_BIO_MAX + 1));
+  });
+});
+
+describe('describeLanguage, the language code decided (ADR 0168)', () => {
+  it('gives the voice a fixed language, and his she does not speak, said once', () => {
+    expect(describeLanguage({ reply: 'italian', notSpoken: null })).toContain('Elle répond en italien');
+    const notSpoken = describeLanguage({ reply: 'french', notSpoken: 'arabic' });
+    expect(notSpoken).toContain('Il écrit en arabe');
+    expect(notSpoken).toContain('une fois');
+    expect(describeLanguage({ reply: 'english', notSpoken: 'unknown' })).toContain(
+      'une langue qu’elle ne parle pas',
+    );
+  });
+
+  it('adds her examples in that language only when given', () => {
+    expect(describeLanguage({ reply: 'italian', notSpoken: null, examples: ['ciao bello'] })).toContain(
+      '- ciao bello',
+    );
+    expect(describeLanguage({ reply: 'italian', notSpoken: null })).not.toContain('pour le ton');
+  });
+
+  it('asks the French for the team in the same call only when she does not write in French (ADR 0168 § 9)', () => {
+    expect(describeLanguage({ reply: 'english', notSpoken: null })).toContain('`translation`');
+    expect(describeLanguage({ reply: 'french', notSpoken: 'arabic' })).not.toContain('translation');
+    expect(describeLanguage(undefined)).not.toContain('translation');
   });
 });
