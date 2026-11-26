@@ -46,6 +46,11 @@ export const GUARD_CODES = [
   'place_named',
   // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
   'minor_reference',
+  // Charles 26/11 (« go voix »): her emojis, at the end of a bubble, one kind a message (two in a flirt), never three,
+  // and not on every message. Soft: rewritten once, then her answer goes.
+  'emoji_misuse',
+  // Charles 26/11: a word of hers kept for close fans (`rules.close_only_words`), written to a fan below its tier.
+  'close_only_word',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

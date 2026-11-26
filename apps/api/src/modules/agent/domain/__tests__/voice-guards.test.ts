@@ -196,6 +196,11 @@ describe('voice guards (P3-13)', () => {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],
       }),
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
+      ...read(['😏 coucou'], { previousTurns: [] }),
+      ...checkVoiceOutput(['bonne nuit mon cœur'], {
+        ...settings,
+        closeOnlyWords: [{ words: ['mon cœur'], minTier: 4 }],
+      }).map((v) => v.code),
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),

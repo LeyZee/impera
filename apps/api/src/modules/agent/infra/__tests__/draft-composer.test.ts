@@ -278,6 +278,41 @@ describe('createDraftComposer', () => {
     expect(still.seen.voiceCalls).toBe(2);
   });
 
+  it('writes once more an answer whose emojis break her rules, then lets the second go (Charles 26/11)', async () => {
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] },
+      voiceAfter: { bubbles: ['Tranquille, et toi ? 😌'] },
+    });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Tranquille, et toi ? 😌'],
+    });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('ses emojis');
+
+    // Still misused once rewritten: it goes, nobody is called for it.
+    const still = composer({ voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('never sends a word she keeps for close fans while his tier cannot be computed (Charles 26/11)', async () => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draft = await createDraftComposer({
+      gateway: gateway({ voice: { bubbles: ['Bonne nuit mon coeur'] } }, seen),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: { ...DEFAULT_GUARD_SETTINGS, closeOnlyWords: [{ words: ['mon cœur'], minTier: 2 }] },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(draft).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+    expect(seen.voiceCalls).toBe(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain('garde pour ses proches');
+  });
+
   it('answers his asking to meet with one reason his relationship allows, never twice (Charles 21/11)', async () => {
     const meet: Brief = { ...BRIEF, intent: 'asks_to_meet', risks: ['meet_request'] };
     const first = composer({ brief: meet });

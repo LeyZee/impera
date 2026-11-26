@@ -331,6 +331,11 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
   /** The only pet names she gives fans: guards refuse any other. */
   pet_names: PersonaSchema.shape.behavior.shape.pet_names,
   response_delay_minutes: PersonaSchema.shape.behavior.shape.response_delay_minutes,
+  /**
+   * Her last this-many messages all carried an emoji: the next one carries none (guard `emoji_misuse`, Charles 26/11).
+   * Absent: the code's default (`DEFAULT_EMOJI_STREAK_MAX`).
+   */
+  emoji_streak_max: z.int().min(1).max(10).optional(),
 });
 
 /** « Réglages de l'agent » (ADR 0079 § 4): versioned with the sheet, applied by the code, never a question of hers. */

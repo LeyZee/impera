@@ -50,6 +50,10 @@ export interface PersonaForModels {
   readonly alertKeywords: readonly string[];
   /** Emojis she never uses (`agent.rules.emojis_forbidden`): a guard blocks them. */
   readonly forbiddenEmojis: readonly string[];
+  /** Her words kept for close fans (`agent.rules.close_only_words`, Charles 26/11): a guard refuses them below the tier. */
+  readonly closeOnlyWords?: GuardSettings['closeOnlyWords'];
+  /** Her last this-many answers all carried an emoji: the next carries none (`agent.behavior.emoji_streak_max`). */
+  readonly emojiStreakMax?: number;
   /** The canvas lines she tries to learn of each fan, in her order (`strategies.kyc.collect`, P5-01). */
   readonly kycSlots: readonly KycSlot[];
   /**
@@ -187,6 +191,16 @@ export function personaForModels(
     petNames: agent.behavior.pet_names.filter((term) => !isPlaceholder(term)),
     alertKeywords: agent.notifications.alert_keywords.filter((term) => !isPlaceholder(term)),
     forbiddenEmojis: rules.emojis_forbidden,
+    ...(rules.close_only_words !== undefined &&
+      rules.close_only_words.length > 0 && {
+        closeOnlyWords: rules.close_only_words.map((group) => ({
+          words: group.words.filter((word) => !isPlaceholder(word)),
+          minTier: group.min_tier,
+        })),
+      }),
+    ...(agent.behavior.emoji_streak_max !== undefined && {
+      emojiStreakMax: agent.behavior.emoji_streak_max,
+    }),
     kycSlots,
     objectionReplies: agent.objection_replies,
   };
@@ -200,5 +214,7 @@ export function guardSettingsOf(persona: PersonaForModels): GuardSettings {
     forbiddenEmojis: persona.forbiddenEmojis,
     ...(persona.neverDo !== undefined && persona.neverDo.length > 0 && { neverDo: persona.neverDo }),
     ...(persona.petNames.length > 0 && { petNames: persona.petNames }),
+    ...(persona.closeOnlyWords !== undefined && { closeOnlyWords: persona.closeOnlyWords }),
+    ...(persona.emojiStreakMax !== undefined && { emojiStreakMax: persona.emojiStreakMax }),
   };
 }

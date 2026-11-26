@@ -61,13 +61,20 @@ import {
   touchesTerm,
   type GuardContext,
   isBlocked,
+  REWRITTEN_SOFT,
   wantsRewrite,
   type GuardSettings,
   type GuardViolation,
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
-import { meetingAnswer, relationshipTier, type MeetingAnswer, type MeetingReason } from '../domain/meeting';
+import {
+  meetingAnswer,
+  relationshipTier,
+  type MeetingAnswer,
+  type MeetingReason,
+  type Relationship,
+} from '../domain/meeting';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -375,11 +382,14 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
     'elle le freinait alors qu’il lui faisait un compliment : elle le reçoit avec plaisir et le remercie',
   media_not_sent: 'elle annonçait un média qu’elle n’envoie pas',
   stage_direction: 'elle décrivait un geste entre astérisques ou parenthèses',
+  emoji_misuse:
+    'ses emojis : seulement en fin de bulle, une seule sorte par message (deux en plein flirt), jamais trois, et pas d’emoji du tout s’il y en avait dans ses derniers messages',
+  close_only_word: 'elle employait un mot qu’elle garde pour ses proches',
 };
 
 function rewriteHint(violations: readonly GuardViolation[]): string {
   const blocking = violations.filter(
-    (violation) => violation.severity === 'blocking' || violation.code === 'repetition',
+    (violation) => violation.severity === 'blocking' || REWRITTEN_SOFT.includes(violation.code),
   );
   const reasons = [...new Set(blocking.map((violation) => REWRITE_REASONS[violation.code]))].filter(
     (reason) => reason !== undefined,
@@ -783,10 +793,14 @@ export function guardContextOf(
   history: readonly ConversationTurn[],
   hasMedia = false,
   allowedPriceMinor?: number,
+  /** Whether they flirt now, and his meeting tier when her settings let code compute it (Charles 26/11). */
+  about: Pick<GuardContext, 'flirting' | 'fanTier'> = {},
 ): GuardContext {
   return {
     hasMedia,
     ...(allowedPriceMinor !== undefined && { allowedPriceMinor }),
+    ...(about.flirting !== undefined && { flirting: about.flirting }),
+    ...(about.fanTier !== undefined && { fanTier: about.fanTier }),
     previousTurns: previousTurnsOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
@@ -855,13 +869,18 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
   exampleIds: readonly string[],
+  fanTier: number | undefined,
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
   const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
+    ...checkVoiceOutput(
+      written,
+      persona.guardSettings,
+      guardContextOf(base.history, false, undefined, fanTier === undefined ? {} : { fanTier }),
+    ),
     ...checkExplicit(written),
   ];
   return {
@@ -908,6 +927,14 @@ function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
   return { kind: 'reply', brief: turn.brief, opens: turn.event?.type === 'custom_order_card_ready' };
 }
 
+/** Where they are, as the meeting tiers read it: how long they have talked, and whether he paid her. */
+function relationshipOf(input: ComposeTurnInput): Relationship {
+  return {
+    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+    hasBought: input.situation.spentCents > 0,
+  };
+}
+
 export async function composeTurn(
   gateway: LlmGateway,
   persona: ComposerPersona,
@@ -952,10 +979,31 @@ export async function composeTurn(
     history: withTimeNotes(input.history, input.situation.timeZone),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
+  // His meeting tier, only when her settings let code compute it: otherwise none, and her close-only words stay closed.
+  const fanTier =
+    input.meetingTiers === undefined
+      ? undefined
+      : relationshipTier(relationshipOf(input), input.meetingTiers);
   if (input.followUp !== undefined)
-    return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped, exampleIds);
+    return writeFollowUp(
+      gateway,
+      persona,
+      base,
+      followUpBrief(input.followUp),
+      notes.dropped,
+      exampleIds,
+      fanTier,
+    );
   if (input.aftercare !== undefined)
-    return writeFollowUp(gateway, persona, base, aftercareBrief(input.aftercare), notes.dropped, exampleIds);
+    return writeFollowUp(
+      gateway,
+      persona,
+      base,
+      aftercareBrief(input.aftercare),
+      notes.dropped,
+      exampleIds,
+      fanTier,
+    );
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   const choices = scriptChoices(input.scripts, input.situation);
@@ -1215,14 +1263,7 @@ export async function composeTurn(
   const meeting: MeetingAnswer | undefined =
     brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
       ? meetingAnswer({
-          tier: relationshipTier(
-            {
-              knownHours:
-                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-              hasBought: input.situation.spentCents > 0,
-            },
-            input.meetingTiers,
-          ),
+          tier: relationshipTier(relationshipOf(input), input.meetingTiers),
           given: input.meeting?.given ?? [],
           teased: input.meeting?.teased ?? false,
           herNextParty: brief.asksHerNextParty === true,
@@ -1484,7 +1525,11 @@ export async function composeTurn(
       ...checkVoiceOutput(
         written,
         persona.guardSettings,
-        guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor),
+        guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor, {
+          // A heated reading of his message, outside care: the same test as her register's.
+          flirting: register !== null,
+          ...(fanTier !== undefined && { fanTier }),
+        }),
       ),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),

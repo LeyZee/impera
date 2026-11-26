@@ -1,5 +1,7 @@
 import { normalise, unmask, type GuardCode } from '@impera/contracts';
 
+import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
+
 /**
  * Guards on the voice output, before anything can be sent (docs/architecture/ai-engine.md, « Les gardes »).
  * Pure code: a blocking violation forbids sending, a soft one asks for a regeneration. Their codes are a closed list
@@ -28,6 +30,13 @@ export interface GuardSettings {
    * 16/11, M3). Carried here as her other limits are, to every composer.
    */
   readonly neverDo?: readonly string[];
+  /**
+   * Her words kept for close fans (`rules.close_only_words`, Charles 26/11): one written to a fan below its `minTier`
+   * is a `close_only_word`. Absent or empty: none.
+   */
+  readonly closeOnlyWords?: readonly { readonly words: readonly string[]; readonly minTier: number }[];
+  /** Her last this-many answers all carried an emoji: this one carries none (`behavior.emoji_streak_max`). */
+  readonly emojiStreakMax?: number;
 }
 
 /**
@@ -52,6 +61,13 @@ export interface GuardContext {
    * § 4), decided by code. Any other sum stays a `price_outside_offer`. Absent, no price passes.
    */
   readonly allowedPriceMinor?: number;
+  /** They flirt now (a heated reading of his message, outside care): two kinds of emoji instead of one. */
+  readonly flirting?: boolean;
+  /**
+   * His meeting tier (`relationshipTier`), read against her close-only words. Absent, not computable (her tier
+   * settings not stored): below every tier, closed by default.
+   */
+  readonly fanTier?: number;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -824,7 +840,39 @@ export function checkVoiceOutput(
   if (context.previousTurns !== undefined)
     violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
   if (bubbles.length > settings.maxBubbles) violations.push({ code: 'too_many_bubbles', severity: 'soft' });
+  // Her emojis are read on an answer to him, in a conversation: not on a lone sample of her bank.
+  if (context.previousTurns !== undefined)
+    violations.push(
+      ...checkEmojis(bubbles, {
+        flirting: context.flirting === true,
+        previousTurns: context.previousTurns,
+        streakMax: settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX,
+      }),
+    );
+  violations.push(...closeOnlyWords(bubbles, settings, context.fanTier));
   return violations;
+}
+
+/** « cœur » and « coeur » are one word: no Unicode normal form unties the ligature. */
+const foldLigatures = (text: string): string => text.replace(/[œŒ]/gu, 'oe').replace(/[æÆ]/gu, 'ae');
+
+/**
+ * Her words kept for close fans (Charles 26/11, ADR 0158 § O): written to a fan below the word's tier, her answer is
+ * refused, as a forbidden word is (blocking: rewritten once, then a human). A tier not computable is below every one.
+ */
+function closeOnlyWords(
+  bubbles: readonly string[],
+  settings: GuardSettings,
+  fanTier: number | undefined,
+): GuardViolation[] {
+  const text = foldLigatures(bubbles.join('\n'));
+  return (settings.closeOnlyWords ?? []).flatMap((group) =>
+    fanTier !== undefined && fanTier >= group.minTier
+      ? []
+      : group.words
+          .filter((word) => touchesTerm(text, foldLigatures(word)))
+          .map((word): GuardViolation => ({ code: 'close_only_word', severity: 'blocking', match: word })),
+  );
 }
 
 /** How far back her messages count against a repetition: the last twenty messages of the conversation. */
@@ -853,9 +901,12 @@ export function isBlocked(violations: readonly GuardViolation[]): boolean {
   return violations.some((v) => v.severity === 'blocking');
 }
 
-/** Blocked, or a formula she already used with him: her answer is written once more, then goes (passe 1, 21/11). */
+/** The soft guards that ask for one more writing of her answer (passe 1, 21/11; emojis, 26/11). */
+export const REWRITTEN_SOFT: readonly GuardCode[] = ['repetition', 'emoji_misuse'];
+
+/** Blocked, a formula she already used with him or her emojis misused: her answer is written once more, then goes (passe 1, 21/11). */
 export function wantsRewrite(violations: readonly GuardViolation[]): boolean {
-  return isBlocked(violations) || violations.some((v) => v.code === 'repetition');
+  return isBlocked(violations) || violations.some((v) => REWRITTEN_SOFT.includes(v.code));
 }
 
 // Explicit words, on the normalised text: « un baiser », « la queue au cinéma » or « ma chatte Moka » are not.

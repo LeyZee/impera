@@ -38,4 +38,7 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   place_named: 'le nom d’un lieu où elle vit (sa ville, son quartier)',
   minor_reference: 'un enfant ou un mineur nommé, pour rire ou dans un contexte sexuel',
   unwarranted_brake: 'un frein (« tu y vas un peu fort », « tu vises direct ») sur un simple compliment',
+  emoji_misuse:
+    'des emojis hors règle : ailleurs qu’en fin de bulle, trop de sortes, trois ou plus, ou à chaque message',
+  close_only_word: 'un mot qu’elle garde pour ses fans proches, écrit à un fan qui ne l’est pas encore',
 };
