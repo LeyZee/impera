@@ -34,7 +34,7 @@ import { z } from 'zod';
 
 import type { CardReadMessage, KeptCustomOrderTurn, Transaction, UnitOfWork } from '../../domain/ports';
 
-import { fanStanding } from './fan-standing';
+import { fanStanding, timeWasterSettingOf } from './fan-standing';
 import { heldBy } from './holds';
 import { toConversation, toDraft, toStoredBrief, toStoredEvent, toStoredPolicyTrace } from './rows';
 import { bindScriptRuns } from './script-runs';
@@ -220,13 +220,16 @@ function bind(tx: DbTransaction, creatorId: string): Transaction {
         const firstMessageAt = totals?.firstMessageAt ?? null;
         // His tier and last purchase from her sales register (ADR 0132 § 1), the figures « Fans » shows.
         const standing = await fanStanding(tx, CreatorIdSchema.parse(creatorId), fanId, now);
+        const timeWaster = await timeWasterSettingOf(tx, CreatorIdSchema.parse(creatorId));
         return {
           spentMinor: totals?.spentMinor ?? 0,
           firstMessageAt: firstMessageAt === null ? null : new Date(firstMessageAt),
           ...(standing !== null && {
             tier: standing.tier,
             lastPurchaseAt: standing.lastPurchaseAt === null ? null : new Date(standing.lastPurchaseAt),
+            registerSpentMinor: standing.spentMinor,
           }),
+          ...(timeWaster !== undefined && { timeWaster }),
         };
       },
     },

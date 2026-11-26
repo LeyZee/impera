@@ -427,6 +427,20 @@ describe('createDraftComposer', () => {
     );
   });
 
+  it('writes one short bubble, busy and kind, to a time-waster (ADR 0135 § 7, Charles 26/11)', async () => {
+    const slowed = composer({ brief: BRIEF });
+    await slowed.draftComposer.compose({ ...INPUT, timeWaster: 'slowed' });
+    const hints = slowed.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('très sollicitée'))).toBe(true);
+    expect(slowed.seen.voiceInputs?.[0]?.maxBubbles).toBe(1);
+
+    const usual = composer({ brief: BRIEF });
+    await usual.draftComposer.compose(INPUT);
+    expect(usual.seen.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('sollicitée'))).toBe(
+      false,
+    );
+  });
+
   it('is closer with those who count: girlfriend with a whale, close with a very good payer (ADR 0132, Charles 26/11)', async () => {
     const hintsFor = async (tier: 'whale' | 'very_good' | 'good' | null) => {
       const run = composer({ brief: BRIEF });

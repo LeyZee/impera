@@ -36,6 +36,13 @@ export { withoutOrders } from './domain/injection';
 /** The safety net in code, read by `conversation.respond` to answer a fan in distress out of her hours (ADR 0088). */
 export { safetySigns } from './domain/safety-net';
 export { declaredAdultAge } from './domain/sexualization';
+export { fanStanding } from './domain/standing';
+export {
+  slowedReplyAt,
+  timeWasterLevel,
+  TIRESOME_WINDOW_DAYS,
+  type TimeWasterLevel,
+} from './domain/attention';
 export { bubbleDelays } from './domain/bubbles';
 /** @public */
 export { offerDecision, offerSignals, type OfferContext, type OfferLimits } from './domain/policy';

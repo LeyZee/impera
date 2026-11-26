@@ -29,6 +29,7 @@ import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
 
 import { customOrderTurn, type CustomOrderTurn } from '../../custom-orders';
 import { abandonTease, type AbandonTease } from '../domain/abandon';
+import type { TimeWasterLevel } from '../domain/attention';
 import {
   asksAvailability,
   availabilityChanged,
@@ -233,6 +234,8 @@ export interface ComposeTurnInput {
    * everyone. The brain never reads his tier.
    */
   readonly spenderRegister?: SpenderRegister;
+  /** He is a time-waster at this level (ADR 0135 § 7): one short bubble, busy and kind. Absent, he is not. */
+  readonly timeWaster?: TimeWasterLevel;
   /**
    * When she may go sexual (`sexualizationDecision`): her limits, and whether his age is confirmed. Absent, it is
    * as if his age were unknown: she does not open it, and steers back a fan who does.
@@ -595,6 +598,16 @@ const SPENDER_REGISTER_HINTS: Readonly<Record<Exclude<SpenderRegister, 'warm'>, 
     'il compte pour elle : elle se souvient de ce qu’il lui a raconté et y revient quand le moment s’y prête, prend de ses nouvelles, peut lui dire qu’il lui a manqué ; jamais un reproche sur une absence, jamais pressante',
   girlfriend:
     'avec lui elle est comme une petite amie complice : tendre, attentionnée, plus intime et plus présente qu’avec les autres ; elle lui montre qu’il compte, qu’elle pense à lui, se souvient de sa vie et prend de ses nouvelles ; le « nous » est celui de leur conversation, jamais celui d’un couple ; jamais pressante, jamais un reproche sur une absence, jamais « je t’aime »',
+};
+/**
+ * A time-waster's scarce attention (ADR 0135 § 7-8, Charles 26/11): she is much in demand, never cold; he feels it
+ * without a word on money, on what he does not buy or on the others.
+ */
+const TIME_WASTER_HINTS: Readonly<Record<TimeWasterLevel, string>> = {
+  slowed:
+    'elle est très sollicitée en ce moment et a moins de temps pour lui : une seule bulle, courte et douce, contente de le lire ; elle cherche ce qui le retient encore et crée un peu de proximité, sans insister ni rien proposer ; jamais un mot sur l’argent, sur ce qu’il n’achète pas ni sur les autres',
+  dormant:
+    'elle est très prise et lui répond en passant : une bulle courte, gentille, sans question ni relance ; elle laisse sentir qu’on lui écrit beaucoup et qu’elle est toute à ceux qui s’investissent, sans jamais le dire ; jamais froide ni méprisante, jamais un mot sur l’argent, sur ce qu’il n’achète pas ni sur les autres',
 };
 const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
 /** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
@@ -1562,6 +1575,7 @@ export async function composeTurn(
                 ...(inTension ? [IN_TENSION_HINT] : []),
                 ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
+                ...(care || input.timeWaster === undefined ? [] : [TIME_WASTER_HINTS[input.timeWaster]]),
                 ...(care || input.spenderRegister === undefined || input.spenderRegister === 'warm'
                   ? []
                   : [SPENDER_REGISTER_HINTS[input.spenderRegister]]),
@@ -1619,7 +1633,11 @@ export async function composeTurn(
   // He says he loves her or asks to see her: her rule's answer slows him down, and is no brake on a compliment.
   const slowsByRule = brief?.occasion === 'says_love' || meeting !== undefined;
   // Never past her own maximum (her persona's `maxBubbles`).
-  const budget = farewell === null ? bubbleBudget(input.history, persona.guardSettings.maxBubbles) : 1;
+  // A time-waster gets one bubble (ADR 0135 § 7), as a farewell does.
+  const budget =
+    farewell === null && input.timeWaster === undefined
+      ? bubbleBudget(input.history, persona.guardSettings.maxBubbles)
+      : 1;
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...base,

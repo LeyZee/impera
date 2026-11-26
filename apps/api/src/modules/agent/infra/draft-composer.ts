@@ -37,6 +37,7 @@ import {
   type FiredAlert,
   type PhraseAlert,
 } from '../domain/alerts';
+import type { TimeWasterLevel } from '../domain/attention';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
 import { copilotTrace } from '../domain/copilot-trace';
@@ -98,6 +99,8 @@ function withOriginNote(origin: MessageOrigin | null | undefined): { originNote?
 }
 
 export interface AgentComposeInput {
+  /** He is a time-waster at this level (ADR 0135), read by code before the AI; absent, he is not. */
+  readonly timeWaster?: TimeWasterLevel;
   readonly creatorId: string;
   readonly conversationId: string;
   readonly fanId: string;
@@ -1251,6 +1254,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         ...(input.fan.brainNotes !== undefined &&
           input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
+        ...(input.timeWaster !== undefined && { timeWaster: input.timeWaster }),
         spenderRegister: spenderRegisterOf(input.fan.tier, {
           fragile: stop.flags?.fragile === true,
           care: careForced,

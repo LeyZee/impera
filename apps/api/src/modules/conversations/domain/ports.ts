@@ -3,6 +3,7 @@ import type {
   FanStanding,
   FanTier,
   FanTiersSetting,
+  TimeWasterSetting,
   AfterSaleType,
   AlertTrigger,
   BankedObjectionKind,
@@ -483,6 +484,8 @@ interface ScriptRunRepository {
   save(stored: StoredScriptRun): Promise<boolean>;
   /** His runs that went cold (`stalled`), latest first: a run he left there makes her tease him (Charles 20/11). */
   stalled(conversationId: ConversationId): Promise<StoredScriptRun[]>;
+  /** His ended runs where he bought nothing: her scripts he never entered (ADR 0135 § 1). */
+  unbought(conversationId: ConversationId): Promise<number>;
 }
 
 /** Who did what from the dashboard (`audit_log`, security.md), in the same transaction as the act. */
@@ -655,6 +658,10 @@ interface FanStats {
   readonly tier?: FanTier | null;
   /** His last purchase in her sales register (ADR 0128 § 1); `null` never; absent, not read. */
   readonly lastPurchaseAt?: Date | null;
+  /** What he spent in her sales register, refunds out (ADR 0132 § 1); absent, not read. */
+  readonly registerSpentMinor?: number;
+  /** Her time-waster rule (ADR 0135), as the agency set it; absent, nobody is a time-waster. */
+  readonly timeWaster?: TimeWasterSetting;
 }
 
 interface FanContext extends FanStats {
@@ -678,6 +685,8 @@ export interface ProposedFact {
 }
 
 export interface ComposeInput {
+  /** He is a time-waster at this level (ADR 0135), as code read it before the AI: she writes short, busy, kind. */
+  readonly timeWaster?: 'slowed' | 'dormant';
   readonly creatorId: CreatorId;
   readonly conversationId: ConversationId;
   readonly fanId: FanId;
