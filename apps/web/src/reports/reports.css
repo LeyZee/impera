@@ -1810,6 +1810,9 @@ a.sc-sheet__report:focus-visible,
 :is(.rp-ai__part, .rp-ai__key)[data-part='rejected'] {
   --_c: var(--nv-ink-faint);
 }
+.rp-ai__group {
+  white-space: nowrap;
+}
 .rp-ai__key {
   margin-right: 0.3em;
   vertical-align: 0.05em;
