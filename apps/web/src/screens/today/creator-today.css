@@ -80,6 +80,30 @@
 .sc-ask__count {
   margin-left: auto;
 }
+/* Whose question and when it ends, for a reader who is not her (the owner): placement only, the bricks draw. */
+.sc-ask__who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.sc-ask__who .nv-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.sc-ask__due {
+  flex: none;
+}
+.sc-ask__count + .sc-ask__due {
+  margin-left: 0;
+}
+.sc-ask__head > .sc-ask__due:not(.sc-ask__count + .sc-ask__due) {
+  margin-left: auto;
+}
 .sc-ask__question {
   margin: 0;
   text-wrap: balance;
