@@ -52,6 +52,8 @@ interface TipContent {
   readonly rows?: readonly (readonly [string, string])[];
   /** A line chart's rows: each row's series drawn as a short stroke before its label (dataviz: line keys). */
   readonly rowKeys?: readonly ('solid' | 'dashed')[];
+  /** A stacked chart's rows: each row's layer colour as the legend's dot before its label. */
+  readonly rowColours?: readonly (string | undefined)[];
   /** As narrow as its words: a phone's curve tip, which must not hide the curve it reads. */
   readonly compact?: boolean;
   readonly text?: string;
@@ -331,6 +333,13 @@ export function useFloatingTip(): FloatingTip {
               <span>
                 {content.rowKeys?.[i] === undefined ? null : (
                   <i className="db-tip-key" data-key={content.rowKeys[i]} aria-hidden="true" />
+                )}
+                {content.rowColours?.[i] === undefined ? null : (
+                  <i
+                    className="nv-key"
+                    style={{ '--_c': content.rowColours[i], marginRight: 8, verticalAlign: 'middle' }}
+                    aria-hidden="true"
+                  />
                 )}
                 {label}
               </span>

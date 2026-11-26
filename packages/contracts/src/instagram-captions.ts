@@ -37,19 +37,6 @@ export const CAPTION_HINT_LABELS: Readonly<Record<CaptionHint, string>> = {
   about_place: 'Parle du décor',
 };
 
-/** Her own words beside the hints: one line, read as a data by the model, never as an instruction. */
-export const CAPTION_NOTE_MAX = 140;
-
-/** `POST /v1/creator-space/decisions/:id/other-ideas`: at least a hint or a few words. */
-export const OtherCaptionIdeasBodySchema = z
-  .strictObject({
-    hints: z.array(CaptionHintSchema).max(CAPTION_HINTS.length),
-    note: z.string().trim().max(CAPTION_NOTE_MAX),
-  })
-  .refine((body) => new Set(body.hints).size === body.hints.length, { message: 'each hint once' })
-  .refine((body) => body.hints.length > 0 || body.note !== '', { message: 'a hint or a few words' });
-export type OtherCaptionIdeasBody = z.infer<typeof OtherCaptionIdeasBodySchema>;
-
 /** What the model gives back for one card: captions with their style, read again by the code (guard, one per style). */
 export const CaptionProposalsSchema = z.strictObject({
   captions: z

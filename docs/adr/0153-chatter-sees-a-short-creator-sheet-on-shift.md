@@ -24,6 +24,10 @@ Côté serveur, la route de la persona est déjà ouverte au rôle `operator`, m
 5. **Où** : un pli « Elle » dans le panneau du fan, là où il travaille. Le chatteur chatte dans Reveal (ADR 0025) : le pli est dans le panneau de l'extension à côté de la conversation Reveal, et dans la fiche du fan de Suivi. Pas d'onglet de plus dans son rail. Le pli s'ouvre sur ses limites. Design relit l'emplacement ; les captures (Nuit/Jour, PC/téléphone) sont validées par Charles avant la fusion.
 6. **Ce que le code vérifie** : la route refuse hors shift et hors créatrice (test d'isolation), la réponse ne contient aucun champ hors liste (test sur le schéma), et les balayages d'authentification et d'origine couvrent la route.
 
+## Amendement du 21/11/2026 : la fiche entière, propriétaire et manager actif seulement
+
+Charles l'a tranché le 21/11 sur une carte du fil Sécurité (« Oui, fiche courte pour le chatteur ») : seuls le propriétaire et un manager actif, sur les créatrices de sa liste, lisent sa fiche entière (`GET /v1/creators/:creatorId/persona`). Le manager la lit sans pouvoir la changer : écrire une version et l'activer restent au propriétaire. Tout autre opérateur, chatteur compris et même sans fiche d'équipe, reçoit 403 `persona_full_forbidden` et lit la fiche courte de cette ADR. Le serveur le vérifie par la portée d'équipe (`agency`, ADR 0024), pas seulement l'écran.
+
 ## Conséquences
 
 - Positives : le chatteur écrit dans sa voix et ne franchit plus ses limites par ignorance ; la méthode de l'agence ne sort pas.
