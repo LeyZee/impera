@@ -13,10 +13,9 @@ export function drawnKey(screen: PanelScreen): string {
     screen.kind === 'conversation' && screen.draft.kind === 'ready'
       ? { ...screen, draft: { ...screen.draft, text: null } }
       : screen;
-  return JSON.stringify(drawn, (name, value: unknown) => {
-    if (name === 'now') return typeof value === 'string' ? value.slice(0, 16) : undefined;
-    return value instanceof Set ? [...value] : value;
-  });
+  return JSON.stringify(drawn, (name, value: unknown) =>
+    name === 'now' ? (typeof value === 'string' ? value.slice(0, 16) : undefined) : value,
+  );
 }
 
 /**

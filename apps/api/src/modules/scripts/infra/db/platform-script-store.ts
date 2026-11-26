@@ -31,6 +31,7 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
+import { readingKey, type DailyReading, type MeasuredScript } from '../../domain/performance';
 import {
   platformScriptFingerprint,
   type KnownPlatformScript,
@@ -228,6 +229,7 @@ const LinkRowSchema = z.object({
   media_asset_id: z.uuid().nullable(),
   description_id: z.uuid().nullable(),
   imported: z.boolean(),
+  offered: z.boolean(),
   shown_id: z.uuid().nullable(),
   shown_detailed: z.string().nullable(),
   shown_reasons: z.array(DescriptionReviewReasonSchema).nullable(),
@@ -238,9 +240,10 @@ const LinkRowSchema = z.object({
  * Where the media of these scripts stand in her vault (`media_platform_refs`, written by the vault sync, fiche
  * vault-sync), in the caller's transaction and so under its RLS: a link the platform no longer lists (`removed_at`) is
  * not in the vault. `description_id`: the latest description of its media a human validated (ADR 0083), with its
- * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5); `shown`,
- * the description the agency reviews (the latest validated, else the latest written with a `detailed` text: never the
- * platform's own, which has none, ADR 0099 § 4). Keyed by account and platform id.
+ * `detailed` text, as the script sheet reads it (SC-04 lot c4); `imported`, chosen for the CRM (ADR 0145 § 5);
+ * `offered`, offered once (§ 2, `vaultOffered`); `shown`, the description the agency reviews (the latest validated,
+ * else the latest written with a `detailed` text: never the platform's own, which has none, ADR 0099 § 4). Keyed by
+ * account and platform id.
  */
 async function vaultLinksOf(
   tx: Transaction,
@@ -263,6 +266,7 @@ async function vaultLinksOf(
         order by md.validated_at desc, md.created_at desc, md.id desc
         limit 1) as description_id,
       ${schema.vaultImported({ account: sql`l.platform_account_id`, media: sql`l.platform_media_id`, folder: sql`l.folder_ref` })} as imported,
+      ${schema.vaultOffered({ sentForFreeAt: sql`l.sent_for_free_at`, mediaAsset: sql`l.media_asset_id` })} as offered,
       s.id as shown_id, s.content ->> 'detailed' as shown_detailed, s.review_reasons as shown_reasons,
       s.validated_at is not null as shown_validated
     from ${schema.mediaPlatformRefs} l
@@ -284,6 +288,7 @@ async function vaultLinksOf(
           mediaAssetId: row.media_asset_id,
           descriptionId: row.description_id,
           imported: row.imported,
+          offered: row.offered,
           shown:
             row.shown_id === null || row.shown_detailed === null
               ? null
@@ -505,6 +510,87 @@ export function createDrizzlePlatformScriptReadStore(
           .where(and(eq(scripts.id, scriptId), eq(scripts.creatorId, creatorId)));
         const [stored] = await storedOf(tx, rows);
         return stored ?? null;
+      }),
+
+    performanceOf: (creatorId, userId) =>
+      asTeam(db, creatorId, userId, async (tx) => {
+        // Her active scripts recognised as ours (ADR 0161: the native ones of another tool are not measured).
+        const ours = await tx
+          .selectDistinct({
+            id: scripts.id,
+            platformAccountId: scripts.platformAccountId,
+            ref: scripts.platformScriptRef,
+            name: scripts.name,
+            moment: scripts.moment,
+          })
+          .from(scripts)
+          .innerJoin(schema.preparedScripts, eq(schema.preparedScripts.matchedPlatformScriptId, scripts.id))
+          .where(
+            and(
+              eq(scripts.creatorId, creatorId),
+              eq(scripts.active, true),
+              eq(schema.preparedScripts.state, 'matched'),
+            ),
+          );
+        const ids = ours.map((one) => one.id);
+        const stepRows =
+          ids.length === 0
+            ? []
+            : await tx
+                .select({
+                  scriptId: steps.platformScriptId,
+                  platformIndex: steps.platformIndex,
+                  ref: steps.platformStepRef,
+                  priceMinor: steps.priceMinor,
+                  currency: steps.currency,
+                })
+                .from(steps)
+                .where(inArray(steps.platformScriptId, ids))
+                .orderBy(steps.platformScriptId, steps.platformIndex, steps.position);
+        const readingRows =
+          ids.length === 0
+            ? []
+            : await tx
+                .select({
+                  platformAccountId: daily.platformAccountId,
+                  ref: daily.platformStepRef,
+                  day: daily.day,
+                  sent: daily.sent,
+                  purchased: daily.purchased,
+                  paidMinor: daily.paidMinor,
+                })
+                .from(daily)
+                .where(eq(daily.creatorId, creatorId))
+                .orderBy(daily.day);
+        const readings = new Map<string, DailyReading[]>();
+        for (const row of readingRows) {
+          const key = readingKey(row.platformAccountId, row.ref);
+          readings.set(key, [...(readings.get(key) ?? []), row]);
+        }
+        const measured = ours.flatMap((one): MeasuredScript[] => {
+          const own = stepRows.filter((row) => row.scriptId === one.id);
+          const first = own[0];
+          if (first === undefined) return [];
+          const ranks = [...new Set(own.map((row) => row.platformIndex))].sort((a, b) => a - b);
+          return [
+            {
+              id: PlatformScriptIdSchema.parse(one.id),
+              ref: one.ref,
+              name: one.name,
+              moment: one.moment === null ? null : PlatformScriptMomentSchema.parse(one.moment),
+              currency: CurrencySchema.parse(first.currency),
+              steps: ranks.map((platformIndex, rank) => {
+                const branchRows = own.filter((row) => row.platformIndex === platformIndex);
+                return {
+                  rank,
+                  refs: branchRows.map((row) => readingKey(one.platformAccountId, row.ref)),
+                  paid: branchRows.some((row) => row.priceMinor > 0),
+                };
+              }),
+            },
+          ];
+        });
+        return { scripts: measured, readings };
       }),
 
     ofAccountForJob: (creatorId, platformAccountId) =>

@@ -19,6 +19,7 @@ import {
   SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
@@ -99,6 +100,7 @@ export const JOB_NAMES = [
   'content_drops.describe_backlog',
   'content_drops.make_thumbnail',
   'content_drops.thumbnail_backlog',
+  'instagram_captions.propose',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
   'providers.check_credentials',
@@ -182,6 +184,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'content_drops.describe_backlog': 'Rattrapage des descriptions',
+  'instagram_captions.propose': 'Légendes proposées pour ses Reels',
   'content_drops.make_thumbnail': 'Vignettes des médias déposés',
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
@@ -250,6 +253,8 @@ export const JOB_PAYLOADS = {
         kind: z.literal('operator_note'),
         note: z.string().min(1).max(300),
         at: z.iso.datetime(),
+        /** Who left it, shown on his card (trou béant 17); absent from a job queued before 21/11. */
+        userId: UserIdSchema.optional(),
       }),
     ]),
   }),
@@ -527,6 +532,16 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * A medium of hers was described: three captions are proposed for each live Reel that holds it, on a decision card
+   * (ADR 0164 § 9). Enqueued after each description under `instagram_captions.propose:<id>`; put off by itself when the
+   * day's budget is spent. Replayable: a Reel already asked is left alone.
+   */
+  'instagram_captions.propose': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
    * A script she sent, told step by step with its synthesis once each of its media is described (ADR 0083 § 6).
    * Enqueued when she sends it and after each of its media is described, under `content_drops.summarize_script:<id>`;
    * waits for the last description, puts itself off when the day's budget is spent. Nothing while her switch is off.
@@ -711,6 +726,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.drop_received': 5,
   // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
   'content_drops.describe_file': 5,
+  // Every model failed: a few tries; a spent budget is not a failure, the job puts itself off.
+  'instagram_captions.propose': 5,
   // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
   'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.
