@@ -531,6 +531,8 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
            and md.content ? 'detailed'
          order by md.validated_at desc, md.created_at desc, md.id desc
          limit 1)`,
+      // « Un média de script n'est jamais gratuit » (ADR 0145 § 2): the plan leaves it out.
+      inScript: schema.mediaInScript(sql`${schema.mediaAssets.id}`),
     })
     .from(contentDropFiles)
     .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, contentDropFiles.mediaAssetId))
@@ -556,6 +558,7 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
       bytes: file.bytes,
       storageKey: file.storageKey,
       description: file.description,
+      inScript: file.inScript,
     })),
   };
 }
