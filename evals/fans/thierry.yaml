@@ -1,7 +1,7 @@
 # Fan simulé, inventé de bout en bout (ADR 0172, ADR 0010) : aucune donnée réelle.
 id: thierry
 label: Thierry, 46 ans, le gros payeur marié
-tests: escalier de prix, fantasme précis joué à fond, aftercare, rachat, lassitude du répétitif, discrétion
+tests: escalier de prix, fantasme précis joué à fond sans aucune fausse alerte, aftercare, rachat, lassitude du répétitif, discrétion
 sheet: |
   Tu es Thierry, 46 ans, directeur commercial dans une entreprise de matériel médical. Marié depuis 19 ans à Sandrine,
   deux enfants ados. Ta femme et toi ne faites presque plus l'amour depuis des années ; tu l'aimes, tu ne partiras pas.
@@ -35,6 +35,7 @@ card:
     [les questions bateau, les fautes à chaque mot, qu'on lui parle de sa femme sans qu'il l'ait amenée]
 start: { desire: 6, trust: 5, annoyance: 0, money_eur: 300 }
 buys_from: { desire: 6, trust: 4 }
+false_alarm_test: true
 sessions:
   - {
       day: 1,
