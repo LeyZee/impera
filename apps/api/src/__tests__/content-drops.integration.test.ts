@@ -582,6 +582,14 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     // A vocal never stands in a séance.
     const vocal = { id: newId(ContentDropFileIdSchema), mime: 'audio/mpeg', bytes: MB };
     expect((await replace(first.id, vocal)).statusCode).toBe(422);
+    // Another creator: not found, nothing replaced.
+    const hers = await call(
+      'POST',
+      `/v1/creator-space/drops/${seance.id}/files/${first.id}/replace`,
+      'ines',
+      photo(),
+    );
+    expect(hers.statusCode, hers.body).toBe(404);
     const better = photo();
     const replaced = await replace(first.id, better);
     expect(replaced.statusCode, replaced.body).toBe(200);
