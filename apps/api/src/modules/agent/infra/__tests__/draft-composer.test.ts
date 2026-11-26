@@ -1128,6 +1128,30 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     ]);
   });
 
+  it('hands a fantasy of his on minors to a human before any model, as a doubt on his age (Charles 26/11 at 23:45)', async () => {
+    const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
+    const { draftComposer, seen } = composer({}, undefined, minor.limits);
+    const held = await draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'je fantasme sur une écolière', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    expect(held).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_fantasy'],
+      costUsd: 0,
+    });
+    // No model read it: nothing of it reaches his card, his notes or a brief, and the alert carries no word of his.
+    expect(seen.traces).toHaveLength(0);
+    expect(JSON.stringify(held)).not.toContain('écolière');
+    expect(minor.protections.map((p) => p.protection)).toEqual([
+      { unconfirmAge: true, stopContact: false, care: false, freezeSales: false, because: ['minor_fantasy'] },
+    ]);
+  });
+
   it('keeps the net when no model has a key: the minor is still a minor', async () => {
     const { draftComposer } = composer({ hasKey: false });
     const held = await draftComposer.compose({

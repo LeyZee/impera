@@ -185,7 +185,7 @@ for (const pair of test) {
     {
       fromOwnAccount: false,
       authorAgeDoubtOpen: false,
-      ageDoubtDetected: signs.includes('minor_suspected'),
+      ageDoubtDetected: signs.includes('minor_suspected') || signs.includes('minor_fantasy'),
       distressDetected: signs.includes('self_harm'),
       repliesToAuthorToday: 0,
       repliesInThread: 0,

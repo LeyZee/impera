@@ -1088,7 +1088,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
       // have read, and his limits are set until a human decides. He says he wants to hurt himself: she answers him
       // with care, a human validating it (ADR 0088), as she does while a care episode is open.
       const signs = safetySigns(fanText, input.now);
-      if (signs.includes('minor_suspected')) {
+      // A fantasy of his on minors: the same, the alert names the reason, never his words (Charles 26/11 at 23:45).
+      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         const held: Held = { ...HANDOFF, cause: 'minor', detail: ['safety_net', ...signs] };
         return protect(deps.limits, input, signs, held);
       }
