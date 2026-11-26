@@ -237,6 +237,8 @@ const RESIDUAL: Readonly<Record<string, string>> = {
     'creator space: content-stock tests (another creator gets 404)',
   'GET /v1/creator-space/drops/:id/files/:fileId/media':
     'creator space: content-stock tests (same file read)',
+  'POST /v1/creator-space/drops/:id/files/:fileId/replace':
+    'creator space: content-drops tests (another creator gets 404)',
   'GET /v1/payroll/contractors/:memberId/documents/:documentId/file':
     'contractor documents: contractor tests',
   'POST /v1/payroll/contractors/:memberId/documents/:documentId/review':

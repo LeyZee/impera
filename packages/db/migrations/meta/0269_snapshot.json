@@ -1,6 +1,6 @@
 {
-  "id": "288a129e-92db-47f7-b6d0-e6df09b569d0",
-  "prevId": "2046e9a3-3108-4194-9765-df8e8e7fe241",
+  "id": "ccf6c1f5-a726-4861-9ea3-f750a4cb34c4",
+  "prevId": "18426be0-b95c-4e91-bb1b-c76bc16dbd17",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1543,6 +1543,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "redo_sentence": {
+          "name": "redo_sentence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_at": {
+          "name": "redo_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_by": {
+          "name": "redo_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1654,6 +1672,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "content_drop_files_redo_by_user_id_fk": {
+          "name": "content_drop_files_redo_by_user_id_fk",
+          "tableFrom": "content_drop_files",
+          "tableTo": "user",
+          "columnsFrom": ["redo_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "content_drop_files_drop_fk": {
           "name": "content_drop_files_drop_fk",
           "tableFrom": "content_drop_files",
@@ -1689,6 +1716,21 @@
           "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'filling'\n      )",
           "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
         },
+        "creator_redo_replace": {
+          "name": "creator_redo_replace",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_sentence\" is not null or \"content_drop_files\".\"state\" = 'refused') and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
+        },
+        "creator_redo_insert": {
+          "name": "creator_redo_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and \"content_drop_files\".\"replaced_at\" is null\n        and \"content_drop_files\".\"redo_sentence\" is null and \"content_drop_files\".\"media_asset_id\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      ) and exists (\n        select 1 from content_drop_files old where old.drop_id = \"content_drop_files\".\"drop_id\" and old.creator_id = \"content_drop_files\".\"creator_id\"\n          and old.position = \"content_drop_files\".\"position\" and old.slot_key is not distinct from \"content_drop_files\".\"slot_key\"\n          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')\n      )"
+        },
         "team_read": {
           "name": "team_read",
           "as": "PERMISSIVE",
@@ -1709,6 +1751,14 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'uploading'\n      )"
+        },
+        "team_redo": {
+          "name": "team_redo",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_by\" is null or \"content_drop_files\".\"redo_by\" = nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {
@@ -1730,7 +1780,11 @@
         },
         "content_drop_files_slot_check": {
           "name": "content_drop_files_slot_check",
-          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))\n        and (\"content_drop_files\".\"replaced_at\" is null or \"content_drop_files\".\"slot_key\" is not null)"
+          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))"
+        },
+        "content_drop_files_redo_check": {
+          "name": "content_drop_files_redo_check",
+          "value": "(\"content_drop_files\".\"redo_sentence\" is null) = (\"content_drop_files\".\"redo_at\" is null) and (\"content_drop_files\".\"redo_at\" is null) = (\"content_drop_files\".\"redo_by\" is null)\n        and coalesce(char_length(\"content_drop_files\".\"redo_sentence\"), 1) between 1 and 200"
         },
         "content_drop_files_bytes_check": {
           "name": "content_drop_files_bytes_check",
@@ -1845,6 +1899,12 @@
         "withdrawn_at": {
           "name": "withdrawn_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_sentence": {
+          "name": "redo_sentence",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2069,6 +2129,10 @@
         "content_drops_withdrawn_check": {
           "name": "content_drops_withdrawn_check",
           "value": "(\"content_drops\".\"state\" = 'withdrawn') = (\"content_drops\".\"withdrawn_at\" is not null)\n        and (\"content_drops\".\"withdrawn_at\" is null) = (\"content_drops\".\"withdrawn_by\" is null)"
+        },
+        "content_drops_redo_check": {
+          "name": "content_drops_redo_check",
+          "value": "\"content_drops\".\"redo_sentence\" is null or (\"content_drops\".\"state\" = 'withdrawn' and char_length(\"content_drops\".\"redo_sentence\") between 1 and 200)"
         },
         "content_drops_script_check": {
           "name": "content_drops_script_check",

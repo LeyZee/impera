@@ -3,20 +3,33 @@ import {
   type ContentDrop,
   type ContentDropFile,
   type ContentRequest,
+  ContentDropFileIdSchema,
   ContentDropIdSchema,
   type ContentDropId,
   type DropCategory,
+  replacementRefusal,
+  type RedoneDrop,
 } from '@impera/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 
 import { DropSheet } from './DropSheet';
-import { CONTENT_KEY, refuseRequest, startScriptDrop, useContent, useScriptDrop, withdrawDrop } from './api';
+import {
+  CONTENT_KEY,
+  Refused,
+  refuseRequest,
+  replaceDropFile,
+  startScriptDrop,
+  useContent,
+  useScriptDrop,
+  withdrawDrop,
+} from './api';
 import {
   CATEGORY_EMOJIS,
   CATEGORY_HINTS,
   DROP_OUTPUTS,
-  STATE_WORDS,
+  UNKNOWN_TYPE,
+  acceptOfReplacing,
   contentsOf,
   dropName,
   droppedOn,
@@ -25,15 +38,19 @@ import {
   fileLine,
   isInterrupted,
   matchResumed,
+  mimeOf,
   onTheirWay,
   pickedHeadRefusal,
   outLine,
   published,
   mayWithdrawHere,
-  refusedOf,
+  linesOf,
   routeFirst,
   shotMomentOf,
   stateTone,
+  stateWord,
+  toRedo,
+  toReplaceOf,
   toShoot,
   type LiveSend,
 } from './model';
@@ -104,6 +121,8 @@ export function ContentPage({
   };
 
   const asked = content.data === undefined ? [] : toShoot(content.data.requests, content.data.drops);
+  // What the agency sent back without a request (trou 7 du 21/11): above what is asked, she redoes it first.
+  const redo = content.data === undefined ? [] : toRedo(content.data.redone, content.data.drops);
   // The first thing due, late or for today, carries the screen's one neon (recette visuelle 16/11, CRE-13).
   const first = dueNow(asked, today)[0];
   const firstKey = first === undefined ? null : first.kind === 'script' ? first.drop.id : first.request.id;
@@ -171,12 +190,23 @@ export function ContentPage({
         </div>
       ) : (
         <div className="ct-sections nv-enter">
-          {asked.length === 0 ? null : (
+          {asked.length === 0 && redo.length === 0 ? null : (
             <section className="ct-section" aria-labelledby="ct-asked">
               <h2 id="ct-asked" className="nv-h2 ct-section__title">
                 À tourner
               </h2>
               <ul className="ct-list">
+                {redo.map((one, index) => (
+                  <RedoneCard
+                    key={one.dropId}
+                    // The screen's one neon goes to what is due first; without one, to the latest sent back.
+                    first={firstKey === null && index === 0}
+                    redone={one}
+                    onDrop={() => {
+                      setOpened({ category: one.category, request: null });
+                    }}
+                  />
+                ))}
                 {asked.map((item) =>
                   item.kind === 'script' ? (
                     <StartedScriptCard
@@ -346,6 +376,9 @@ function RequestCard({
         </span>
       </div>
       <p className="ct-card__why">{request.reason}</p>
+      {request.redo === null || request.dropId !== null ? null : (
+        <RedoNote sentence={request.redo.sentence} />
+      )}
       {request.dropId === null ? (
         <div className="ct-card__foot">
           <button type="button" className="nv-btn nv-btn--plain nv-btn--sm ct-card__cant" onClick={onRefuse}>
@@ -393,6 +426,51 @@ function RequestCard({
           {failed}
         </p>
       )}
+    </li>
+  );
+}
+
+/** The agency's « À refaire » on her card (trou 7 du 21/11): amber, she has something to do; its words as written. */
+function RedoNote({ sentence }: { sentence: string }): JSX.Element {
+  return (
+    <div className="ct-redo">
+      <span className="ct-redo__tag">À refaire</span>
+      <p className="ct-redo__why">{sentence}</p>
+    </div>
+  );
+}
+
+/** A drop of hers the agency sent back without a request (trou 7 du 21/11): what it was, why, and « Déposer » again. */
+function RedoneCard({
+  first,
+  redone,
+  onDrop,
+}: {
+  first: boolean;
+  redone: RedoneDrop;
+  onDrop: () => void;
+}): JSX.Element {
+  return (
+    <li className="nv-plate ct-card">
+      <div className="ct-card__head">
+        <span className="ct-card__emoji" aria-hidden="true">
+          {CATEGORY_EMOJIS[redone.category]}
+        </span>
+        <span className="ct-card__titles">
+          <span className="ct-card__name">{DROP_CATEGORY_LABELS[redone.category]}</span>
+          <span className="ct-due">Ton dernier envoi est revenu</span>
+        </span>
+      </div>
+      <RedoNote sentence={redone.redo.sentence} />
+      <div className="ct-card__foot">
+        <button
+          type="button"
+          className={`nv-btn ${first ? 'nv-btn--neon' : 'nv-btn--soft'} nv-btn--sm`}
+          onClick={onDrop}
+        >
+          Déposer à nouveau
+        </button>
+      </div>
     </li>
   );
 }
@@ -502,7 +580,7 @@ function DropCard({
   // A file picked again whose first bytes are not what it was declared as (recette CRE-12): never sent, said here.
   const [notIt, setNotIt] = useState<string | null>(null);
   const tone = stateTone(drop);
-  const refused = refusedOf(drop);
+  const lines = linesOf(drop);
   const sending = drop.files.some((file) => {
     const live = sends.get(file.id);
     return (
@@ -512,6 +590,50 @@ function DropCard({
   const interrupted = drop.files.filter((file) => isInterrupted(file, sends.get(file.id)));
   // Cut while this page was open: the phone still holds every file, « Réessayer » sends them again.
   const allHeld = interrupted.length > 0 && interrupted.every((file) => holds(file.id));
+  // « Remplacer » (trou 7 du 21/11): a medium asked again or refused, swapped where it is, its bytes sent as any file's.
+  const replacer = useRef<HTMLInputElement>(null);
+  // The medium her gallery's choice replaces; a picker closed without a choice leaves it, the next tap sets another.
+  const replacing = useRef<ContentDropFile | null>(null);
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  const [replaceNote, setReplaceNote] = useState<string | null>(null);
+  const replaceable = new Set(toReplaceOf(drop).map((file) => file.id));
+  const replaceOn = (file: ContentDropFile): (() => void) | undefined =>
+    replaceable.has(file.id) && !replaceBusy
+      ? () => {
+          replacing.current = file;
+          setReplaceNote(null);
+          if (replacer.current === null) return;
+          replacer.current.accept = acceptOfReplacing(drop, file);
+          replacer.current.click();
+        }
+      : undefined;
+  const replaceWith = async (old: ContentDropFile, picked: File): Promise<void> => {
+    const mime = mimeOf(picked);
+    if (mime === null) {
+      setReplaceNote(UNKNOWN_TYPE);
+      return;
+    }
+    const declared = { id: ContentDropFileIdSchema.parse(crypto.randomUUID()), mime, bytes: picked.size };
+    // Said before anything goes: the server says it again.
+    const refusal =
+      replacementRefusal(drop.category, { kind: old.kind, slotKey: old.slotKey }, declared) ??
+      (await pickedHeadRefusal(picked, mime));
+    if (refusal !== null) {
+      setReplaceNote(refusal);
+      return;
+    }
+    try {
+      const after = await replaceDropFile(drop.id, old.id, declared);
+      void queueSend(after.id, declared.id, picked, onSettled);
+      onSettled();
+    } catch (error) {
+      setReplaceNote(
+        error instanceof Refused && error.sentences.length > 0
+          ? error.message
+          : 'Ce n’est pas parti : vérifie ta connexion et réessaie.',
+      );
+    }
+  };
 
   useEffect(() => {
     if (!landed) return;
@@ -526,7 +648,7 @@ function DropCard({
           {CATEGORY_EMOJIS[drop.category]}
         </span>
         <span className="ct-card__name">{dropName(drop)}</span>
-        <span className={`ct-state ct-state--${tone}`}>{STATE_WORDS[drop.state]}</span>
+        <span className={`ct-state ct-state--${tone}`}>{stateWord(drop)}</span>
       </div>
       <p className="ct-card__meta nv-num">
         {when} · {drop.files.length === 0 ? 'Rien d’ajouté encore' : contentsOf(drop.files)}
@@ -596,18 +718,39 @@ function DropCard({
       {drop.state === 'uploading' || drop.state === 'received' ? (
         <ul className="ct-files">
           {drop.files.map((file) => (
-            <FileLine key={file.id} file={file} live={sends.get(file.id)} />
+            <FileLine key={file.id} file={file} live={sends.get(file.id)} onReplace={replaceOn(file)} />
           ))}
         </ul>
-      ) : refused.length > 0 ? (
+      ) : lines.length > 0 ? (
         // Ready or blocked, each refused file keeps its line and its reason: she knows what to shoot again and why,
-        // never only « Aucun fichier n'a pu être gardé » (recette MED-03).
+        // never only « Aucun fichier n'a pu être gardé » (recette MED-03); the one she sent in its place shows its send.
         <ul className="ct-files">
-          {refused.map((file) => (
-            <FileLine key={file.id} file={file} live={undefined} />
+          {lines.map((file) => (
+            <FileLine key={file.id} file={file} live={sends.get(file.id)} onReplace={replaceOn(file)} />
           ))}
         </ul>
       ) : null}
+      <input
+        ref={replacer}
+        type="file"
+        hidden
+        onChange={(event) => {
+          const picked = event.target.files?.[0];
+          event.target.value = '';
+          const old = replacing.current;
+          replacing.current = null;
+          if (picked === undefined || old === null) return;
+          setReplaceBusy(true);
+          void replaceWith(old, picked).finally(() => {
+            setReplaceBusy(false);
+          });
+        }}
+      />
+      {replaceNote === null ? null : (
+        <p className="ct-file__hint" role="alert">
+          {replaceNote}
+        </p>
+      )}
       {mayWithdrawHere(drop) && !sending ? (
         <div className="ct-card__actions">
           {confirming ? (
@@ -670,7 +813,16 @@ function DropCard({
  * A file's line: its progress while it goes up here; when the server keeps answering with an error, it says so in
  * amber with « Réessayer » (recette CRE-10). A cut send is resumed once, at the head of its card.
  */
-function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | undefined }): JSX.Element {
+function FileLine({
+  file,
+  live,
+  onReplace,
+}: {
+  file: ContentDropFile;
+  live: LiveSend | undefined;
+  /** « Remplacer », for a medium asked again or refused (trou 7 du 21/11). */
+  onReplace?: (() => void) | undefined;
+}): JSX.Element {
   const line = fileLine(file, live);
   const percent =
     live === undefined || live.total === 0 ? 0 : Math.min(100, Math.floor((100 * live.sent) / live.total));
@@ -679,13 +831,25 @@ function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | unde
     live !== undefined &&
     (live.phase === 'sending' || live.phase === 'waiting' || live.phase === 'stalled');
   const stalled = file.state === 'awaiting' && live?.phase === 'stalled';
-  const warn = file.state === 'refused' || stalled || isInterrupted(file, live);
+  const warn = file.state === 'refused' || file.redo !== null || stalled || isInterrupted(file, live);
   const label = `${file.kind === 'image' ? 'Photo' : file.kind === 'video' ? 'Vidéo' : 'Vocal'} ${String(file.position + 1)}`;
   return (
     <li className="ct-file">
       <div className="ct-file__row">
-        <span className="ct-file__name">{label}</span>
-        <span className={warn ? 'ct-file__line ct-file__line--warn' : 'ct-file__line nv-num'}>{line}</span>
+        {onReplace === undefined ? (
+          <>
+            <span className="ct-file__name">{label}</span>
+            <span className={warn ? 'ct-file__line ct-file__line--warn' : 'ct-file__line nv-num'}>
+              {line}
+            </span>
+          </>
+        ) : (
+          // To replace: its name, the reason under it, « Remplacer » alone on the right (Design, 21/11).
+          <span className="ct-file__what">
+            <span className="ct-file__name">{label}</span>
+            <span className="ct-file__why">{line}</span>
+          </span>
+        )}
         {stalled ? (
           <button
             type="button"
@@ -697,6 +861,16 @@ function FileLine({ file, live }: { file: ContentDropFile; live: LiveSend | unde
             Réessayer
           </button>
         ) : null}
+        {onReplace === undefined ? null : (
+          <button
+            type="button"
+            className="nv-btn nv-btn--soft nv-btn--sm"
+            aria-label={`Remplacer ${label}`}
+            onClick={onReplace}
+          >
+            Remplacer
+          </button>
+        )}
       </div>
       {showsBar ? (
         <div

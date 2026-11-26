@@ -197,6 +197,7 @@ const EXPORT_SENTENCES: Readonly<Record<ScriptExportRefusal, string>> = {
   moment_unknown:
     'Cette structure se tourne de jour comme de nuit : le moment de ce script n’est pas encore fixé',
   too_large: 'Ce script pèse plus de 4 Go : il ne tient pas dans une seule archive',
+  redo_pending: 'Un média de ce dépôt est à refaire : l’archive attend son remplacement',
 };
 
 /** A script's archive refused (SC-03 c): `details.reason` says why, the sentence says it to the agency. */

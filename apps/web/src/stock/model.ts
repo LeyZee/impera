@@ -58,7 +58,7 @@ export const STOCK_RULES: Partial<Readonly<Record<DropCategory, string>>> = {
   whale_gift: 'Jamais de nu, jamais revendu',
   voice_beep: 'Une fois par fan, jamais vendu',
   voice_real: 'Une fois par fan, jamais vendu',
-  sale_video: 'Jamais offerte, jamais revendue au même fan',
+  sale_video: 'Jamais offerte ni revendue deux fois',
 };
 
 /** Each category's colour: the design system's thirteen content hues, in their fixed order (Charles, 21/11). */
