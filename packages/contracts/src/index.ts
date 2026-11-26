@@ -90,6 +90,7 @@ export * from './security';
 export * from './settings';
 export * from './to-talk';
 export * from './setup';
+export * from './sale-claims';
 export * from './shift-feedback';
 export * from './shift-reports';
 export * from './team';
