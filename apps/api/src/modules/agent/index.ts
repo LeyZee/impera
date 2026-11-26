@@ -158,6 +158,8 @@ export interface DraftComposerStartOptions {
   readonly scripts?: ScriptSource;
   /** When a priced bundle was last offered to him (the policy's cooldown); without it, she offers nothing. */
   readonly lastOfferAt?: DraftComposerDeps['lastOfferAt'];
+  /** When he last bought a priced step (the pause after a purchase, ADR 0128); without it, no pause. */
+  readonly lastPurchaseAt?: DraftComposerDeps['lastPurchaseAt'];
   /** Her grid of custom prices (`custom-orders`, ADR 0159 § C), read when his order is kept. */
   readonly gridOf?: DraftComposerDeps['gridOf'];
   /**
@@ -240,6 +242,7 @@ export function startDraftComposer(options: DraftComposerStartOptions): AgentDra
     ...(options.chatterOnShift !== undefined && { chatterOnShift: options.chatterOnShift }),
     ...(options.scripts !== undefined && { scripts: options.scripts }),
     ...(options.lastOfferAt !== undefined && { lastOfferAt: options.lastOfferAt }),
+    ...(options.lastPurchaseAt !== undefined && { lastPurchaseAt: options.lastPurchaseAt }),
     ...(options.gridOf !== undefined && { gridOf: options.gridOf }),
   });
 }

@@ -78,6 +78,7 @@ import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
 import {
   NO_SALE_RISKS,
+  inPauseAfterPurchase,
   offerDecision,
   offerSignals,
   type OfferBlock,
@@ -416,7 +417,7 @@ interface DesireInput {
 }
 
 /** The policy's facts on him for an offer; his heat comes from his desire score, the risks from the brain. */
-export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'risks'>;
+export type OfferInput = Omit<OfferContext, 'desire' | 'fanAsksForPaid' | 'fanSexualizes' | 'risks'>;
 
 /**
  * Why the brain's offer was not written: the policy's reason, nothing to decide on, or, with her scripts read, no step
@@ -474,8 +475,8 @@ function refusedOfferBrief(brief: Brief): string {
 
 function offerRefusal(brief: Brief, offer: OfferInput | undefined, desire: number): OfferRefusal | undefined {
   if (offer === undefined) return 'no_offer_context';
-  const { fanAsksForPaid } = offerSignals(brief);
-  const decision = offerDecision({ ...offer, desire, fanAsksForPaid, risks: brief.risks });
+  const { fanAsksForPaid, fanSexualizes } = offerSignals(brief);
+  const decision = offerDecision({ ...offer, desire, fanAsksForPaid, fanSexualizes, risks: brief.risks });
   return decision.allowed ? undefined : decision.reason;
 }
 
@@ -1142,6 +1143,7 @@ export async function composeTurn(
           fanSexualizes: offerSignals(brief, input.fanText).fanSexualizes,
           desire: heat,
           limits: input.sexualization?.limits ?? NO_LIMITS,
+          afterPurchase: input.offer !== undefined && inPauseAfterPurchase(input.offer),
         });
   const within =
     sexualization === undefined || trap.replyBrief !== undefined
@@ -1282,6 +1284,7 @@ export async function composeTurn(
             ...input.offer,
             desire: heat,
             fanAsksForPaid: brief !== undefined && offerSignals(brief).fanAsksForPaid,
+            fanSexualizes: brief !== undefined && offerSignals(brief, input.fanText).fanSexualizes,
             risks: brief?.risks ?? [],
           },
           // In care, the run still follows his message and Reveal, and no step goes (ADR 0088 § 2).

@@ -358,6 +358,11 @@ export interface DraftComposerDeps {
    * the cooldown cannot be read, so she offers nothing.
    */
   readonly lastOfferAt?: (creatorId: string, fanId: string) => Promise<Date | null>;
+  /**
+   * When he last bought a priced step of hers (ADR 0128 § 1), for the pause after a purchase. Without it, or unreadable,
+   * no pause: she sells as before.
+   */
+  readonly lastPurchaseAt?: (creatorId: string, fanId: string) => Promise<Date | null>;
   /** A limit the policy could not save without holding the draft (his declared age): counted, never silent. */
   readonly onLimitsNotSaved?: (event: {
     readonly conversationId: string;
@@ -669,6 +674,19 @@ function ageInDoubt(input: AgentComposeInput, lastFanAt: Date | undefined): Agen
   return { ...held, desire: { before, score, signals, weightsVersion } };
 }
 
+/** His last purchase, or `undefined` when it cannot be read: the pause is then not applied (ADR 0128 § 1). */
+async function lastPurchaseOf(
+  deps: DraftComposerDeps,
+  input: AgentComposeInput,
+): Promise<Date | null | undefined> {
+  if (deps.lastPurchaseAt === undefined) return undefined;
+  try {
+    return await deps.lastPurchaseAt(input.creatorId, input.fanId);
+  } catch {
+    return undefined;
+  }
+}
+
 /** What the policy needs to let her offer; any of it unknown, there is no offer to decide on (fail closed). */
 async function offerInput(
   deps: DraftComposerDeps,
@@ -679,7 +697,15 @@ async function offerInput(
     return undefined;
   try {
     const lastOfferAt = await deps.lastOfferAt(input.creatorId, input.fanId);
-    return { now: input.now, lastOfferAt, hasNoBudget: false, flags, limits: deps.offerLimits };
+    const lastPurchaseAt = await lastPurchaseOf(deps, input);
+    return {
+      now: input.now,
+      lastOfferAt,
+      ...(lastPurchaseAt !== undefined && { lastPurchaseAt }),
+      hasNoBudget: false,
+      flags,
+      limits: deps.offerLimits,
+    };
   } catch {
     return undefined;
   }
