@@ -1,6 +1,8 @@
 import {
   CUSTOM_SUPPLEMENTS_MAX,
   isPerMinute,
+  READY_VIDEO_LABEL_MAX,
+  READY_VIDEOS_MAX,
   type CreatorId,
   type CustomFormat,
   type CustomPriceGridView,
@@ -24,12 +26,14 @@ import {
   draftOf,
   FORMAT_HINTS,
   FORMAT_LABELS,
+  newReadyVideo,
   newSupplement,
   readDraft,
   savedLine,
   type DraftProblems,
   type FormatDraft,
   type GridDraft,
+  type ReadyVideoDraft,
   type SupplementDraft,
 } from './model';
 import { Card, Offered, UnitInput } from './parts';
@@ -41,7 +45,7 @@ import { SignInAgain } from '@/settings/services/PasswordPrompt';
  * Créatrices › Sur mesure (ADR 0159 § C), the owner's alone: her grid of custom prices. A price per format, then
  * supplements in percent that add up whatever the format; « Elle le fait » off, the AI declines without asking her.
  * The calculator reads the same sum as the server (`quoteCustomOrder`). One card per subject: Formats, Suppléments,
- * Calculateur. No price is made up: an empty field is « pas encore de prix », and an order that needs it goes to her
+ * Vidéos déjà tournées (kinds he names, each with the range its price is drawn in), Calculateur. No price is made up: an empty field is « pas encore de prix », and an order that needs it goes to her
  * without a price.
  */
 export function CustomPricesSection({
@@ -146,6 +150,14 @@ function GridSheet({
       supplements: current.supplements.map((line) =>
         line.id === supplementId ? { ...line, ...patch } : line,
       ),
+    }));
+  };
+
+  const setReadyVideo = (lineId: string, patch: Partial<ReadyVideoDraft>): void => {
+    setProblem(null);
+    setDraft((current) => ({
+      ...current,
+      readyVideos: current.readyVideos.map((line) => (line.id === lineId ? { ...line, ...patch } : line)),
     }));
   };
 
@@ -302,6 +314,57 @@ function GridSheet({
           }}
         >
           <span aria-hidden="true">+</span> Ajouter un supplément
+        </button>
+      </Card>
+
+      <Card
+        title="Vidéos déjà tournées"
+        lead="Celles qu’elle vend hors des scripts, par type nommé par toi. Chaque vidéo prend un prix rond tiré dans la fourchette de son type, puis le garde. Jamais offerte, jamais deux fois au même fan."
+      >
+        {draft.readyVideos.length === 0 ? (
+          <p className="ps-muted smp-empty">
+            Aucun type pour l’instant. Ajoute chaque type de vidéo qu’elle a déjà tournée, avec sa fourchette
+            : elle choisit le type en déposant la vidéo.
+          </p>
+        ) : (
+          <>
+            <div className="smp-colhead smp-colhead--ready" aria-hidden="true">
+              <span>Type de vidéo</span>
+              <span>De</span>
+              <span>À</span>
+              <span />
+              <span />
+            </div>
+            <ul className="smp-rows smp-rows--ready">
+              {draft.readyVideos.map((line) => (
+                <ReadyVideoRow
+                  key={line.id}
+                  line={line}
+                  problems={read.problems}
+                  disabled={saving}
+                  onChange={(patch) => {
+                    setReadyVideo(line.id, patch);
+                  }}
+                  onRemove={() => {
+                    setDraft((current) => ({
+                      ...current,
+                      readyVideos: current.readyVideos.filter((one) => one.id !== line.id),
+                    }));
+                  }}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+        <button
+          type="button"
+          className="nv-btn nv-btn--soft nv-btn--sm ps-self-start smp-add"
+          disabled={saving || draft.readyVideos.length >= READY_VIDEOS_MAX}
+          onClick={() => {
+            setDraft((current) => ({ ...current, readyVideos: [...current.readyVideos, newReadyVideo()] }));
+          }}
+        >
+          <span aria-hidden="true">+</span> Ajouter un type de vidéo
         </button>
       </Card>
 
@@ -466,6 +529,91 @@ function SupplementRow({
         label={label}
         checked={line.offered}
         disabled={disabled}
+        onChange={(offered) => {
+          onChange({ offered });
+        }}
+      />
+      <button
+        type="button"
+        className="nv-btn nv-btn--plain nv-btn--sm smp-row__remove"
+        disabled={disabled}
+        aria-label={`Retirer ${label}`}
+        onClick={onRemove}
+      >
+        Retirer
+      </button>
+    </li>
+  );
+}
+
+const FOR_SALE = { on: 'En vente', off: 'Jamais', aria: 'en vente' };
+
+function ReadyVideoRow({
+  line,
+  problems,
+  disabled,
+  onChange,
+  onRemove,
+}: {
+  line: ReadyVideoDraft;
+  problems: DraftProblems;
+  disabled: boolean;
+  onChange: (patch: Partial<ReadyVideoDraft>) => void;
+  onRemove: () => void;
+}): JSX.Element {
+  const nameId = useId();
+  const label = line.label.trim() || 'Nouveau type';
+  const nameProblem = problems.get(`${line.id}.label`);
+  return (
+    <li className="smp-row smp-row--ready" data-off={line.offered ? undefined : 'true'}>
+      <div className="smp-row__name">
+        <label className="smp-unit__label" htmlFor={nameId}>
+          Type de vidéo
+        </label>
+        <input
+          id={nameId}
+          className="nv-glass nv-field__control ps-input smp-row__nameinput"
+          placeholder="Type de vidéo"
+          maxLength={READY_VIDEO_LABEL_MAX}
+          value={line.label}
+          disabled={disabled}
+          aria-invalid={nameProblem !== undefined}
+          aria-describedby={nameProblem === undefined ? undefined : `${nameId}-error`}
+          onChange={(event) => {
+            onChange({ label: event.target.value });
+          }}
+        />
+        {nameProblem === undefined ? null : (
+          <p className="ps-error" id={`${nameId}-error`}>
+            {nameProblem}
+          </p>
+        )}
+      </div>
+      <UnitInput
+        label="De"
+        value={line.min}
+        unit="€"
+        problem={problems.get(`${line.id}.min`)}
+        disabled={disabled}
+        onChange={(min) => {
+          onChange({ min });
+        }}
+      />
+      <UnitInput
+        label="À"
+        value={line.max}
+        unit="€"
+        problem={problems.get(`${line.id}.max`)}
+        disabled={disabled}
+        onChange={(max) => {
+          onChange({ max });
+        }}
+      />
+      <Offered
+        label={label}
+        checked={line.offered}
+        disabled={disabled}
+        words={FOR_SALE}
         onChange={(offered) => {
           onChange({ offered });
         }}
