@@ -43,6 +43,10 @@ export type MediaDescriptionId = z.infer<typeof MediaDescriptionIdSchema>;
 export const PersonaVersionIdSchema = uuid.brand<'PersonaVersionId'>();
 export type PersonaVersionId = z.infer<typeof PersonaVersionIdSchema>;
 
+/** A version of the agency's base style (ADR 0171). */
+export const AgencyStyleIdSchema = uuid.brand<'AgencyStyleId'>();
+export type AgencyStyleId = z.infer<typeof AgencyStyleIdSchema>;
+
 export const PersonaCorrectionIdSchema = uuid.brand<'PersonaCorrectionId'>();
 export type PersonaCorrectionId = z.infer<typeof PersonaCorrectionIdSchema>;
 

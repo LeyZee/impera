@@ -75,6 +75,8 @@ export function wireAgent(
     startDraftComposer({
       gateway: deps.llm.gateway,
       activePersona,
+      // The agency's base style, read at each draft beside her persona (ADR 0171).
+      baseStyleOf: () => persona.agencyStyle.activeUnscoped(),
       fans: deps.fans,
       onDroppedNotes: (event) => {
         logger.warn(event, 'fan notes shaped like an order kept out of the prompt');

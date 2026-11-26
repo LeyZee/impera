@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX, emojisIn } from '../emojis';
+import { checkEmojis, checkEmojiUse, DEFAULT_EMOJI_STREAK_MAX, emojisIn } from '../emojis';
 import { checkVoiceOutput, DEFAULT_GUARD_SETTINGS, isBlocked, wantsRewrite } from '../guards';
 
 // Invented messages (CLAUDE.md: no real fan or creator data).
@@ -99,5 +99,17 @@ describe('her emojis in the voice guards', () => {
     expect(codes(false)).toContain('emoji_misuse');
     expect(codes(true)).not.toContain('emoji_misuse');
     expect(codes(true, 2)).toContain('emoji_misuse');
+  });
+});
+
+describe('checkEmojiUse, for another surface of hers', () => {
+  it('reads the same rule from her recent answers given as booleans', () => {
+    const use = { flirting: false, recentWithEmoji: [true, true, true], streakMax: 3 };
+    expect(checkEmojiUse(['merci 🙏'], use)).toHaveLength(1);
+    expect(checkEmojiUse(['merci 🙏'], { ...use, recentWithEmoji: [true, false, true] })).toEqual([]);
+    expect(checkEmojiUse(['🙏 merci'], { ...use, recentWithEmoji: [] })).toHaveLength(1);
+    expect(checkEmojiUse(['merci 😏', 'bisous 🙈'], { ...use, recentWithEmoji: [], flirting: true })).toEqual(
+      [],
+    );
   });
 });

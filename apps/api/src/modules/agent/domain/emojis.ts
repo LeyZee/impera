@@ -34,13 +34,13 @@ const PICTOGRAPHIC = /\p{Extended_Pictographic}|\p{Regional_Indicator}/u;
 
 /**
  * The emojis of a text, as typed, one per grapheme: a joined sequence (👩‍💻), a skin tone (👍🏽) or a flag is one. The
- * variation selector some keyboards add is left out, so « ❤ » and « ❤️ » are the same.
+ * variation selector some keyboards add is left out, so « ❤ » and « ❤\uFE0F » are the same.
  */
 export function emojisIn(text: string): string[] {
   return [...segmenter.segment(text)]
     .map((part) => part.segment)
     .filter((grapheme) => PICTOGRAPHIC.test(grapheme))
-    .map((grapheme) => grapheme.replace(/️/gu, ''));
+    .map((grapheme) => grapheme.replace(/\uFE0F/gu, ''));
 }
 
 /** The first emoji of a bubble with anything but an emoji or a space after it; undefined when all sit at the end. */
@@ -49,7 +49,17 @@ function misplacedEmoji(bubble: string): string | undefined {
   const first = graphemes.findIndex((grapheme) => PICTOGRAPHIC.test(grapheme));
   if (first === -1) return undefined;
   const tailIsEmojis = graphemes.slice(first).every((g) => PICTOGRAPHIC.test(g) || /^\s+$/u.test(g));
-  return tailIsEmojis ? undefined : graphemes[first]?.replace(/️/gu, '');
+  return tailIsEmojis ? undefined : graphemes[first]?.replace(/\uFE0F/gu, '');
+}
+
+/** Whether each of her answers carried an emoji, oldest first: what the streak reads. */
+function withEmoji(turns: readonly (readonly string[])[]): boolean[] {
+  return turns.map((turn) => turn.some((text) => emojisIn(text).length > 0));
+}
+
+function streakReached(recentWithEmoji: readonly boolean[], streakMax: number): boolean {
+  const recent = recentWithEmoji.slice(-streakMax);
+  return recent.length === streakMax && recent.every(Boolean);
 }
 
 /** Her last `streakMax` answers all carried an emoji: this one carries none (told to the voice before it writes). */
@@ -57,11 +67,30 @@ export function emojiStreakReached(
   previousTurns: readonly (readonly string[])[],
   streakMax: number,
 ): boolean {
-  const recent = previousTurns.slice(-streakMax);
-  return recent.length === streakMax && recent.every((turn) => turn.some((t) => emojisIn(t).length > 0));
+  return streakReached(withEmoji(previousTurns), streakMax);
+}
+
+/** What `checkEmojiUse` reads besides her bubbles: any surface of hers (chat, a public reply) gives the same. */
+export interface EmojiUse {
+  readonly flirting: boolean;
+  /** Whether each of her last answers carried an emoji, oldest first; fewer than `streakMax`, the streak is not read. */
+  readonly recentWithEmoji: readonly boolean[];
+  readonly streakMax: number;
 }
 
 export function checkEmojis(bubbles: readonly string[], rules: EmojiRules): EmojiViolation[] {
+  return checkEmojiUse(bubbles, {
+    flirting: rules.flirting,
+    recentWithEmoji: withEmoji(rules.previousTurns ?? []),
+    streakMax: rules.streakMax,
+  });
+}
+
+/**
+ * The emoji rule as one pure function (Charles 26/11): placement, kinds, three at most, the streak. The chat reads it
+ * through `checkEmojis`; another surface of hers (her public replies) calls it with her own recent answers.
+ */
+export function checkEmojiUse(bubbles: readonly string[], use: EmojiUse): EmojiViolation[] {
   const violations: EmojiViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
     const misplaced = misplacedEmoji(bubble);
@@ -71,10 +100,10 @@ export function checkEmojis(bubbles: readonly string[], rules: EmojiRules): Emoj
   const all = bubbles.flatMap(emojisIn);
   if (all.length === 0) return violations;
   const kinds = [...new Set(all)];
-  if (all.length > EMOJIS_MAX || kinds.length > (rules.flirting ? KINDS_MAX_FLIRTING : KINDS_MAX)) {
+  if (all.length > EMOJIS_MAX || kinds.length > (use.flirting ? KINDS_MAX_FLIRTING : KINDS_MAX)) {
     violations.push({ code: 'emoji_misuse', severity: 'soft', match: all.join('') });
   }
-  if (emojiStreakReached(rules.previousTurns ?? [], rules.streakMax)) {
+  if (streakReached(use.recentWithEmoji, use.streakMax)) {
     violations.push({ code: 'emoji_misuse', severity: 'soft', match: kinds.join('') });
   }
   return violations;

@@ -2,6 +2,7 @@
 export const CONTRACTS_PACKAGE = '@impera/contracts';
 
 export * from './agency-rates';
+export * from './agency-style';
 export * from './agent-hours';
 export * from './alert-history';
 export * from './alerts';

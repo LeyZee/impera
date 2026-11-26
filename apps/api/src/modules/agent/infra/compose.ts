@@ -12,6 +12,7 @@ import {
 } from '@impera/contracts';
 import type {
   BrainAlert,
+  AgencyStyleText,
   Brief,
   BrainScript,
   CallTrace,
@@ -146,6 +147,8 @@ export interface ComposerPersona {
    * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
    */
   readonly voiceExamples?: readonly VoiceExample[];
+  /** The agency's base style (ADR 0171), before her sheet in the voice's prompt; her sheet wins. Absent: none. */
+  readonly agencyStyle?: AgencyStyleText;
 }
 
 /**
@@ -1003,6 +1006,7 @@ export async function composeTurn(
       examples.map((e) => e.text),
     ),
     ...(bio.kept.trim() !== '' && { profileBio: bio.kept }),
+    ...(persona.agencyStyle !== undefined && { agencyStyle: persona.agencyStyle }),
     fanNotes: notes.kept,
     situation: describeMoment(input.situation, input.history),
     history: withTimeNotes(input.history, input.situation.timeZone),

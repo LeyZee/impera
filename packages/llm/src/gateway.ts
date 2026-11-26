@@ -25,6 +25,7 @@ import {
   notesBlock,
   customOrderBlock,
   profileBioBlock,
+  agencyStyleBlock,
   scriptsBlock,
   toMessages,
 } from './conversation-messages';
@@ -231,6 +232,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
     voice(input) {
       const system = renderPrompt(prompts.voice, {
         creator_name: input.creatorName,
+        agency_style: agencyStyleBlock(input.agencyStyle),
         persona_sheet: input.personaSheet,
         profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
