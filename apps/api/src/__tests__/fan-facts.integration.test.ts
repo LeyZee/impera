@@ -134,6 +134,8 @@ describe('fan facts from the conversations', () => {
     queue = await createJobQueue(test.admin.pool);
     creatorId = newId(CreatorIdSchema);
     platformAccountId = newId(PlatformAccountIdSchema);
+    // The chatter who leaves a note: it is kept in their name (trou béant 17).
+    await test.admin.db.insert(schema.user).values({ id: USER, name: 'Léa', email: 'lea@example.test' });
     await test.admin.db.insert(schema.creators).values({
       id: creatorId,
       nameKey: creatorId,
@@ -257,7 +259,13 @@ describe('fan facts from the conversations', () => {
 
     const facts = await fans.activeFacts(creatorId, await fanOf(id));
     expect(facts).toMatchObject([
-      { category: 'operator_note', value: 'Aime qu’on lui parle de foot', kind: 'declared', confidence: 1 },
+      {
+        category: 'operator_note',
+        value: 'Aime qu’on lui parle de foot',
+        kind: 'noted',
+        notedBy: USER,
+        confidence: 1,
+      },
     ]);
     expect(await factEvents(id)).toHaveLength(1);
 

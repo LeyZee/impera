@@ -2,7 +2,7 @@ import type { CreatorDecision, DecisionAnswer } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
 /** What she may ask of other ideas in one touch; her own words come beside them. */
-const HINTS = ['Plus courte', 'Plus drôle', 'Plus coquine', 'Avec une question', 'Parle du lieu'] as const;
+const HINTS = ['Plus courte', 'Plus drôle', 'Plus coquine', 'Avec une question', 'Parle du décor'] as const;
 
 /** Three other answers for a decision, from what she asked for. */
 export type OtherIdeas = (

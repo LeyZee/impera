@@ -36,15 +36,18 @@ import { createDrizzleAwayHolds } from './infra/db/away-holds';
 import { createDrizzleCardRereadScan } from './infra/db/card-reread-scan';
 import { createDrizzleCopilotReader } from './infra/db/copilot-reader';
 import { createDrizzleCreatorSpaceReader } from './infra/db/creator-reader';
+import { readDraftCorrections } from './infra/db/draft-corrections';
 import { createDrizzleConversationReader } from './infra/db/reader';
 import { createDrizzleUnitOfWork, type CustomOrderStorePort } from './infra/db/unit-of-work';
 import { createAlertHistoryRoutes } from './infra/http/alert-history-routes';
 import { createCopilotRoutes, type CopilotRouteDeps } from './infra/http/copilot-routes';
 import { createCreatorSpaceRoutes } from './infra/http/creator-routes';
+import { createDraftCorrectionsRoutes } from './infra/http/draft-corrections-routes';
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
 export { cardReadBatches, type CardReadRow } from './domain/card-read-window';
+export { scriptRunsForTeam } from './infra/db/script-runs';
 export type {
   BubbleGuard,
   CardReader,
@@ -205,6 +208,11 @@ export function createConversationsModule(deps: ConversationsDeps): Conversation
         createDrizzleAlertHistory(deps.db),
         deps.alertNames ?? noAlertNames,
         deps.requireRole,
+      )(app, options);
+      await createDraftCorrectionsRoutes(
+        (creatorId, since) => readDraftCorrections(deps.db, creatorId, since),
+        deps.requireRole,
+        clock,
       )(app, options);
       if (deps.copilot !== undefined)
         await createCopilotRoutes({

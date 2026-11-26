@@ -299,14 +299,21 @@ export const FanCardEntrySchema = z
   .strict();
 export type FanCardEntry = z.infer<typeof FanCardEntrySchema>;
 
-/** Something useful outside the fields (§ 1), or a chatter's note when he gave the conversation back: « Autres ». */
+/**
+ * Something useful outside the fields (§ 1), or a chatter's note when he gave the conversation back: « Autres ». A
+ * person retracts one by its `factId` (`RetractFanCardOtherBodySchema`).
+ */
 export const FanCardOtherSchema = z
   .object({
+    factId: z.uuid(),
     key: z.string().min(1),
     value: z.string().min(1),
     /** `noted` for a chatter's note left at the hand-back. */
     source: FanCardSourceSchema,
     observedAt: z.iso.datetime(),
+    /** Who wrote a note, when it was kept (notes left before 21/11 do not say); null for what the AI read. */
+    notedBy: UserIdSchema.nullable(),
+    notedByName: z.string().min(1).nullable(),
   })
   .strict();
 export type FanCardOther = z.infer<typeof FanCardOtherSchema>;
@@ -337,6 +344,17 @@ export const SetFanCardFieldBodySchema = z.union([
   z.object({ clear: z.literal(true) }).strict(),
 ]);
 export type SetFanCardFieldBody = z.infer<typeof SetFanCardFieldBodySchema>;
+
+/**
+ * `POST /v1/fans/:id/card/others/retract?creatorId=` (trou béant 17): a person takes a line of « Autres » off the
+ * card. Nothing is deleted: an empty line written in its name supersedes it, so the AI no longer reads it and the
+ * history keeps who retracted what. Answers the card; a line that is not his, or no longer active, is 404.
+ */
+export const RetractFanCardOtherBodySchema = z.object({ factId: z.uuid() }).strict();
+export type RetractFanCardOtherBody = z.infer<typeof RetractFanCardOtherBodySchema>;
+
+/** The line to retract is not one of his active « Autres » (404). */
+export const FAN_CARD_OTHER_NOT_FOUND = 'fan_card_other_not_found';
 
 /** Refusals of the `PUT` (400): a list for a one-value field, a value outside a closed list, too long. */
 export const FAN_CARD_VALUE_INVALID = 'fan_card_value_invalid';

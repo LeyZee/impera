@@ -20,3 +20,24 @@ describe('nv-chip', () => {
     expect(css.slice(0, start)).not.toContain('.nv-chip:hover');
   });
 });
+
+describe('nv-tag--tint', () => {
+  it('takes its colour from --_c for the fill and the dot, and keeps its words in ink', () => {
+    const rule = /\.nv-tag--tint \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(rule).toContain('var(--_c');
+    expect(rule).toContain('16%');
+    expect(rule).toContain('color: var(--nv-ink);');
+    const dot = /\.nv-tag--tint::before \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(dot).toContain('background: var(--_c');
+  });
+});
+
+describe('nv-tag--lg', () => {
+  it('is the larger information pill: its own height token, footnote text, a 7 px dot when tinted', () => {
+    const rule = /\.nv-tag--lg \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(rule).toContain('min-height: var(--nv-pill-info-lg);');
+    expect(rule).toContain('font-size: var(--nv-text-footnote);');
+    const dot = /\.nv-tag--lg\.nv-tag--tint::before \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(dot).toContain('width: 7px;');
+  });
+});

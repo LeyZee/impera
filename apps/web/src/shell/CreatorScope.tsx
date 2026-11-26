@@ -20,7 +20,7 @@ export function scopesCreators(me: Pick<Me, 'role' | 'teamScope'>): boolean {
 }
 
 /** The screens the selector applies to: elsewhere it stays in the menu and only keeps the choice. */
-const SCOPED = ['/', '/creatrices', '/suivi', '/suivi/fans', '/trafic'] as const;
+const SCOPED = ['/', '/creatrices', '/suivi', '/suivi/fans', '/trafic', '/entrainer/corrections'] as const;
 export function isScoped(pathname: string): boolean {
   return SCOPED.some((path) => path === pathname);
 }

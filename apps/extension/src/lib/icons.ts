@@ -186,6 +186,8 @@ const SHAPES = {
     ['circle', { cx: '12', cy: '10', r: '3' }],
     ['path', { d: 'M6.6 18.6c1.2-2 3.1-3.1 5.4-3.1s4.2 1.1 5.4 3.1' }],
   ],
+  // The copilot's « L’essentiel » tab (Charles 21/11, piste C).
+  star: [['path', { d: 'M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z' }]],
   pencil: [
     [
       'path',
