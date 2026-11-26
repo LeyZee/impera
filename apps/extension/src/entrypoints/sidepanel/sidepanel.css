@@ -79,7 +79,25 @@ body {
   line-height: var(--nv-text-callout-leading);
   font-weight: 500;
 }
-/* His tier beside his name, and what he spent on a line under (Charles, 21/11): the same pills as in the CRM. */
+/* Who he is (avis Design, 26/11): his name and his tier on one line, the name cut first, never the tier; what he
+   spent right under. The badges keep the right of the first line and go under the block when the panel is narrow. */
+.cp-band__id {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cp-band__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cp-band__who .cp-band__fan {
+  margin-right: 0;
+}
+/* His tier, the same pills as in the CRM (Charles, 21/11). */
 .cp-band__tier {
   --_tier: var(--nv-ink-muted);
   flex: none;
@@ -103,7 +121,6 @@ body {
   --_tier: var(--nv-data-2);
 }
 .cp-band__money {
-  flex-basis: 100%;
   color: var(--nv-ink-muted);
   font-size: var(--nv-text-footnote);
   font-variant-numeric: tabular-nums;

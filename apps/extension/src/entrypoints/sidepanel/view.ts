@@ -572,15 +572,26 @@ function statusBand(
       );
   }
   const tier = money?.tier ?? null;
-  return h(
-    'header',
-    { class: 'cp-band', 'data-halo': calm ? 'true' : undefined },
-    fanName === null ? null : h('span', { class: 'cp-band__fan' }, fanName),
-    // His tier beside his name, and what he spent under it, as Reveal shows it to chatters (Charles, 21/11).
-    tier === null ? null : h('span', { class: 'cp-band__tier', 'data-tier': tier }, FAN_TIER_WORDS[tier]),
-    badges,
-    money === null ? null : h('span', { class: 'cp-band__money' }, moneyWords(money, now)),
-  );
+  // Who he is, on the left: his name (cut if long) and his tier (never cut) on one line, what he spent right under
+  // (Charles, 21/11). The badges sit on the right of that first line and are the ones to go under when it is narrow
+  // (avis Design, 26/11).
+  const who =
+    fanName === null && money === null
+      ? null
+      : h(
+          'div',
+          { class: 'cp-band__id' },
+          h(
+            'div',
+            { class: 'cp-band__who' },
+            fanName === null ? null : h('span', { class: 'cp-band__fan' }, fanName),
+            tier === null
+              ? null
+              : h('span', { class: 'cp-band__tier', 'data-tier': tier }, FAN_TIER_WORDS[tier]),
+          ),
+          money === null ? null : h('span', { class: 'cp-band__money' }, moneyWords(money, now)),
+        );
+  return h('header', { class: 'cp-band', 'data-halo': calm ? 'true' : undefined }, who, badges);
 }
 
 /**
