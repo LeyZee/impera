@@ -32,6 +32,11 @@ interface PlatformScriptStepView {
   readonly mediaSheet?: string;
   /** The vault media the step sends, by their platform ref: a media he already received rules out a script (§ 6). */
   readonly mediaRefs: readonly string[];
+  /**
+   * What the step's media carry in the closed vocabulary, when the catalogue gives it (lot Scripts, after #1029): its
+   * intensities set how frank she may be once he has seen it (`registerOf`). Absent today.
+   */
+  readonly carries?: ScriptCarriesView;
 }
 
 /**

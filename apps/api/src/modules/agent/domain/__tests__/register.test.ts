@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { registerOf, type RegisterInput } from '../register';
+import { REGISTER_LADDER, registerOf, type RegisterInput } from '../register';
 
 const AT = new Date('2026-10-17T21:00:00Z');
 const step = (kind: 'free' | 'paid', outcome: 'sent' | 'opened' | 'bought' | 'refused') => ({
@@ -14,42 +14,60 @@ const step = (kind: 'free' | 'paid', outcome: 'sent' | 'opened' | 'bought' | 're
 
 const BASE: RegisterInput = {
   run: null,
+  seenIntensities: [],
   hot: false,
   heIsCrude: false,
+  afterFinale: false,
   ageConfirmed: true,
   noExplicit: false,
 };
 const teased = { status: 'open' as const, steps: [step('free', 'sent')] };
 
-describe('how frank her words may be (Charles 21/11, 26/11 at 21:16)', () => {
-  it('stays suggestive with no run, a run over, or a warm fan who saw no teaser', () => {
+describe('how frank her words may be: a ladder (Charles 21/11, 26/11 at 21:16 and 22:47)', () => {
+  it('keeps its rungs in order, with neutral names', () => {
+    expect(REGISTER_LADDER).toEqual(['suggestive', 'sensual', 'explicit', 'very_explicit']);
+  });
+
+  it('before any script, follows his level, capped at explicit', () => {
     expect(registerOf(BASE)).toBe('suggestive');
-    expect(registerOf({ ...BASE, hot: true })).toBe('suggestive');
+    expect(registerOf({ ...BASE, hot: true })).toBe('sensual');
+    expect(registerOf({ ...BASE, heIsCrude: true })).toBe('explicit');
+    expect(registerOf({ ...BASE, heIsCrude: true, seenIntensities: ['hardcore'] })).toBe('explicit');
     expect(registerOf({ ...BASE, run: { status: 'bought_out', steps: [step('paid', 'bought')] } })).toBe(
       'suggestive',
     );
+  });
+
+  it('opens explicit once he is hot and saw the free teaser, without a purchase; not a warm fan', () => {
+    expect(registerOf({ ...BASE, run: teased, hot: true })).toBe('explicit');
     expect(registerOf({ ...BASE, run: teased })).toBe('suggestive');
   });
 
-  it('may be crude once he is hot and saw the free teaser, without a purchase', () => {
-    expect(registerOf({ ...BASE, run: teased, hot: true })).toBe('crude');
+  it('climbs with the intensity of each step he has seen, never prim on an explicit one', () => {
+    const at = (seenIntensities: string[]) => registerOf({ ...BASE, run: teased, seenIntensities });
+    expect(at(['soft'])).toBe('suggestive');
+    expect(at(['soft', 'suggestive'])).toBe('sensual');
+    expect(at(['soft', 'suggestive', 'explicit'])).toBe('explicit');
+    expect(at(['soft', 'hardcore'])).toBe('very_explicit');
+    expect(at(['not_visible'])).toBe('suggestive');
   });
 
-  it('may be crude as soon as he is crude first', () => {
-    expect(registerOf({ ...BASE, heIsCrude: true })).toBe('crude');
+  it('says nothing of a gesture not shown yet: only what he has seen counts, not a step still to come', () => {
+    // The steps he has seen showed nothing explicit: his own heat cannot take her past explicit.
+    expect(registerOf({ ...BASE, run: teased, hot: true, heIsCrude: true, seenIntensities: ['soft'] })).toBe(
+      'explicit',
+    );
+    expect(registerOf({ ...BASE, run: teased, hot: true, seenIntensities: ['suggestive'] })).not.toBe(
+      'very_explicit',
+    );
   });
 
-  it('may be crude once a paid step of the open run is bought', () => {
-    expect(
-      registerOf({
-        ...BASE,
-        run: { status: 'open', steps: [step('free', 'opened'), step('paid', 'bought')] },
-      }),
-    ).toBe('crude');
+  it('turns tender after the last step and his orgasm', () => {
+    expect(registerOf({ ...BASE, afterFinale: true, seenIntensities: ['hardcore'] })).toBe('tender');
   });
 
-  it('is never crude before his adult age is confirmed, nor when he asked for nothing explicit', () => {
-    const hottest = { ...BASE, run: teased, hot: true, heIsCrude: true };
+  it('is never past suggestive before his adult age is confirmed, nor when he asked for nothing explicit', () => {
+    const hottest = { ...BASE, run: teased, hot: true, heIsCrude: true, seenIntensities: ['hardcore'] };
     expect(registerOf({ ...hottest, ageConfirmed: false })).toBe('suggestive');
     expect(registerOf({ ...hottest, noExplicit: true })).toBe('suggestive');
   });

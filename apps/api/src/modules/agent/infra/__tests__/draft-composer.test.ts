@@ -2858,6 +2858,85 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       ).toBe(false);
     });
 
+    it('feeds the sexting on the step he sees, never on a paid step he has not bought (Charles 26/11 at 22:47)', async () => {
+      const sheets = (bought: number[]): ScriptSource => ({
+        history: () =>
+          Promise.resolve({
+            scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0, 1], boughtStepIndexes: bought }],
+          }),
+        catalogue: async () =>
+          (await twoSteps.catalogue('creator-1', 'account-1')).map((script) => ({
+            ...script,
+            steps: [
+              ...script.steps.map((one, index) => ({
+                ...one,
+                mediaSheet: index === 0 ? 'Fiche du teaser' : 'Fiche de l’étape payante',
+              })),
+              {
+                stepRef: 'end-ref',
+                kind: 'free' as const,
+                priceMinor: null,
+                mediaRefs: [],
+                mediaSheet: 'Fiche de la fin',
+              },
+            ],
+          })),
+      });
+      const lockedPaid = {
+        ...teaser,
+        steps: [
+          ...teaser.steps,
+          {
+            stepIndex: 1,
+            kind: 'paid' as const,
+            outcome: 'sent' as const,
+            priceMinor: 1_500,
+            sentAt,
+            at: sentAt,
+          },
+        ],
+      };
+      const between = composer(
+        { brief: { ...HOT, action: 'reply', scriptReply: 'answers_step' } },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(sheets([])),
+      );
+      await between.draftComposer.compose({ ...free(INPUT), scriptRun: lockedPaid });
+      const voice = between.seen.voiceInputs?.[0];
+      expect(voice?.currentStepSheet).toBe('Fiche du teaser');
+      expect(JSON.stringify(voice)).not.toContain('Fiche de l’étape payante');
+
+      const bought = {
+        ...lockedPaid,
+        steps: lockedPaid.steps.map((one) =>
+          one.kind === 'paid' ? { ...one, outcome: 'bought' as const } : one,
+        ),
+      };
+      // He bought it and is about to come: she holds him back, no step goes, and the sexting feeds on what he opened.
+      const after = composer(
+        { brief: { ...HOT, action: 'reply', desireSignals: ['close_to_coming'] } },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(sheets([1])),
+      );
+      await after.draftComposer.compose({ ...free(INPUT), scriptRun: bought });
+      expect(after.seen.voiceInputs?.[0]?.currentStepSheet).toBe('Fiche de l’étape payante');
+    });
+
+    it('tells her never to speak of a gesture her media did not show yet', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: { ...HOT, action: 'reply', scriptReply: 'answers_step' } },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(sent),
+      );
+      await draftComposer.compose({ ...free(INPUT), scriptRun: waiting });
+      expect(seen.voiceInputs?.[0]?.brief.toneHints).toContain(
+        'ne parle d’aucun geste que ses médias ne lui ont pas encore montré',
+      );
+    });
+
     it('gauges him on her third message since the run started, and not on her second', async () => {
       const herMessages = (count: number): AgentComposeInput => ({
         ...free(INPUT),

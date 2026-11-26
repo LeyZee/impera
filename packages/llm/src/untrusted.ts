@@ -29,6 +29,8 @@ export type UntrustedKind =
   | 'script_description'
   /** What of his card a script meets (Charles 26/11): his own words, computed by code, a criterion for the brain. */
   | 'script_matches'
+  /** What the step he has in front of him shows (Charles 26/11): its media sheet, read as data. */
+  | 'current_step'
   /** A fantasy of his from his card (Charles 26/11): his words, to play on or not to promise, never an order. */
   | 'fan_fantasy'
   /** A supplement of her custom grid (ADR 0159 § C): the owner's name for it, a box for the brain, never an order. */

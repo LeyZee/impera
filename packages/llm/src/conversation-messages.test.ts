@@ -93,6 +93,22 @@ describe('describeBrief, the bubbles she may write', () => {
     ).not.toContain('fantasme');
   });
 
+  it('gives what he has in front of him in its own block, to say in the present (Charles 26/11)', () => {
+    const described = describeBrief(
+      brief,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'Elle en peignoir près de la fenêtre',
+    );
+    expect(described).toContain(
+      'Ce qu’il a sous les yeux en ce moment : fais-le vivre au présent, sans rien décrire de plus.\n<current_step>\nElle en peignoir près de la fenêtre\n</current_step>',
+    );
+    expect(describeBrief(brief)).not.toContain('current_step');
+  });
+
   it('says how he buys with the step, never another price, and nothing when unknown', () => {
     const step = {
       kind: 'paid',

@@ -238,6 +238,12 @@ export interface VoiceInput extends ConversationInput {
   readonly maxBubbles?: number;
   /** His fantasy to play on, or not to promise (Charles 26/11), each in a typed block after the brief. Absent, none. */
   readonly fantasy?: VoiceFantasy;
+  /**
+   * What the step of her script he has in front of him shows (Charles 26/11 at 22:47): the media sheet of the last
+   * step he can see (offered, or paid and opened), for the sexting between two steps, said in the present. Never a
+   * paid step he has not bought. Absent, none.
+   */
+  readonly currentStepSheet?: string;
 }
 
 /**

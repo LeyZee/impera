@@ -550,17 +550,46 @@ const KEEP_WARM_HINT =
 /** He asks for more the evening he took everything (passe 18, Charles 21/11): nothing more tonight (`asksMoreSameEvening`). */
 const MORE_TONIGHT_HINT =
   'il en redemande alors qu’il a déjà eu son script ce soir : jamais un second script ; elle vient de jouir, c’était génial, elle n’a besoin de rien de plus, mais elle aimerait le faire jouir lui ; elle l’oriente vers une cam ou une vidéo faite pour lui, sans dire oui ni donner de prix : elle doit d’abord voir ce qui est possible';
-/** A run as he has seen it: the steps sent before now. */
-function seenRun(run: ScriptRun | null, now: Date): Pick<ScriptRun, 'status' | 'steps'> | null {
-  return run === null ? null : { status: run.status, steps: run.steps.filter((step) => step.sentAt < now) };
+/** The media intensities of the steps he has seen, from the catalogue's tags of his run's script. */
+function intensitiesSeen(
+  run: (Pick<ScriptRun, 'steps'> & { readonly scriptRef?: string }) | null,
+  catalogue: readonly PlatformScriptView[],
+): readonly string[] {
+  if (run?.scriptRef === undefined) return [];
+  const script = catalogue.find((one) => one.scriptRef === run.scriptRef);
+  return run.steps.flatMap((step) => script?.steps[step.stepIndex]?.carries?.intensities ?? []);
 }
 
-/** How frank her words may be (`registerOf`, Charles 21/11). */
+/** The media sheet of the last step he can see in his run: an offered one, or a paid one he bought or opened. */
+function visibleStepSheet(run: ScriptRun, script: PlatformScriptView | undefined): string | undefined {
+  const visible = run.steps.findLast(
+    (step) => step.kind !== 'paid' || step.outcome === 'bought' || step.outcome === 'opened',
+  );
+  return visible === undefined ? undefined : script?.steps[visible.stepIndex]?.mediaSheet;
+}
+
+/** A run as he has seen it: the steps sent before now. */
+function seenRun(run: ScriptRun | null, now: Date): Pick<ScriptRun, 'status' | 'steps' | 'scriptRef'> | null {
+  return run === null
+    ? null
+    : { scriptRef: run.scriptRef, status: run.status, steps: run.steps.filter((step) => step.sentAt < now) };
+}
+
+/**
+ * How frank her words may be (`registerOf`, Charles 21/11 and 26/11): each rung in intention only; her words for it are
+ * her sheet's, her sexting examples' or, failing them, the agency's base style.
+ */
 const REGISTER_HINTS: Readonly<Record<Register, string>> = {
   suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
-  crude:
+  sensual: 'sensuelle : chaude, elle parle de son corps et de ce qu’elle ressent, sans mot cru',
+  explicit:
     'l’action est engagée : elle peut être franche et crue, en montant d’un cran à la fois, avec les seuls mots de sa fiche et de ses exemples de sexto, ou à défaut ceux du style de base de l’agence',
+  very_explicit:
+    'au plus fort de l’action : elle peut être très crue, à la hauteur de ce que ses médias lui montrent, avec les mots de sa fiche et de ses exemples de sexto, ou à défaut ceux du style de base de l’agence',
+  tender: 'c’est fini : tendre, douce et complice, plus rien de cru',
 };
+/** In her script (Charles 26/11 at 22:47): she never speaks of a gesture her media did not show him yet. */
+const NOT_SHOWN_YET_HINT = 'ne parle d’aucun geste que ses médias ne lui ont pas encore montré';
 const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
 /** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
 const ASKS_IF_BOT_HINT =
@@ -1448,18 +1477,18 @@ export async function composeTurn(
     brief !== undefined &&
     sexualization?.kind === 'free' &&
     !offerSignals(brief, input.fanText).fanSexualizes;
+  const seenOfEvening = seenRun(eveningRun, input.situation.now);
   const register: Register | null =
     brief === undefined || care || !HEATED_INTENTS.includes(brief.intent)
       ? null
       : warm && ageConfirmed && !noExplicit
-        ? 'crude'
+        ? 'explicit'
         : registerOf({
             // What he has seen: a step going with this very answer is not seen yet.
-            run: seenRun(
-              (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null,
-              input.situation.now,
-            ),
+            run: seenOfEvening,
+            seenIntensities: intensitiesSeen(seenOfEvening, input.scripts?.catalogue ?? []),
             hot: desireBandOf(heat) === 'hot',
+            afterFinale: boughtOut || (heCame && eveningRun?.status === 'bought_out'),
             heIsCrude: brief.desireSignals?.includes('explicit_language') === true,
             ageConfirmed,
             noExplicit,
@@ -1492,6 +1521,12 @@ export async function composeTurn(
         (turn) => turn.from === 'creator' && turn.at !== undefined && turn.at >= running.startedAt,
       ).length,
     );
+  // Between two steps, the sexting feeds on what he has in front of him (Charles 26/11 at 22:47): the last step he can
+  // see, offered or bought, never a paid step still locked.
+  const currentStepSheet =
+    running === null || scriptStep !== undefined || !fantasyAllowed
+      ? undefined
+      : visibleStepSheet(running, runningScript);
   const sexualTurn = register !== null || running !== null;
   // No script near his fantasy: the custom path, on a heated turn where no step and no custom answer already lead.
   const suggestsCustom =
@@ -1535,6 +1570,7 @@ export async function composeTurn(
                 ...(suggestsCustom ? [CUSTOM_INSTEAD_HINT] : []),
                 ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
+                ...(register !== null && running !== null ? [NOT_SHOWN_YET_HINT] : []),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
@@ -1590,6 +1626,7 @@ export async function composeTurn(
       ...(scriptStep !== undefined && { scriptStep }),
       ...(waitingStep !== undefined && { waitingStep }),
       ...(fantasy !== undefined && { fantasy }),
+      ...(currentStepSheet !== undefined && { currentStepSheet }),
     },
     exampleIds,
   );
