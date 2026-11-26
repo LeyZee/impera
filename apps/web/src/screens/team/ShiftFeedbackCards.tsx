@@ -299,7 +299,7 @@ export function FeedbacksPanel({
               </p>
               <p className="nv-tile nv-tone--ok">
                 <span className="nv-tile__value rp-fbs__value">{quiet}</span>
-                <span className="nv-tile__label">rien à signaler</span>
+                <span className="nv-tile__label">sans souci</span>
               </p>
             </div>
             <SignalDonut list={list} />
@@ -322,8 +322,9 @@ export function FeedbacksPanel({
                       )}
                     </div>
                     {line.incident === null ? null : (
-                      <p className="rp-review__incident">
-                        <span className="rp-review__flag">Incident</span> {line.incident}
+                      // The pill says « Incident » and its stage: the text takes the stage's colour, never a word again.
+                      <p className="rp-fb__incident" data-stage={stage ?? undefined}>
+                        {line.incident}
                       </p>
                     )}
                     {line.comment === null ? null : <p className="rp-fb__comment">« {line.comment} »</p>}

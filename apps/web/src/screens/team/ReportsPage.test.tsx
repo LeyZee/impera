@@ -896,7 +896,7 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     if (panel === null) throw new Error('no panel');
     expect(screen.queryByText(/incidents? à suivre/u)).toBe(null);
     expect(text(panel)).toContain('1incident');
-    expect(text(panel)).toContain('1rien à signaler');
+    expect(text(panel)).toContain('1sans souci');
     expect(text(panel)).toContain('Incident · Vu');
     expect(text(panel)).toContain('Contenu manquant');
     expect(text(panel)).toContain('Demande d’un fan');

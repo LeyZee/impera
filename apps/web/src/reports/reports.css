@@ -1689,3 +1689,26 @@ a.sc-sheet__report:focus-visible,
     transition: none;
   }
 }
+
+/* The track of an incident keeps to its text on a wide screen, left, as in the chatter's window (Design, 21/11). */
+.rp-incidents .nv-steps {
+  max-width: 420px;
+}
+/* An incident in the list of feedbacks, tinted by its stage like rp-incident-sent: its pill already says the word. */
+.rp-fb__incident {
+  --_c: var(--nv-danger);
+  margin: 2px 0 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: color-mix(in srgb, var(--_c) 10%, transparent);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rp-fb__incident[data-stage='seen'] {
+  --_c: var(--nv-warning);
+}
+.rp-fb__incident[data-stage='resolved'] {
+  --_c: var(--nv-success);
+}
