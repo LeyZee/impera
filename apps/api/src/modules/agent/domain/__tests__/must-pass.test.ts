@@ -146,6 +146,18 @@ describe('permitted phrases that must always pass, output guards', () => {
     },
   );
 
+  it.each([
+    ['t’as gagné 100 euros au poker ?', {}],
+    ['5 € mon café ce matin', {}],
+    ['50 € ? c’est beaucoup pour toi ça 😏', { fanAmountsMinor: [5_000] }],
+    ['pour toi c’est 15 euros', { allowedPriceMinor: 1_500 }],
+    ['merci pour les 20 € mon cœur 🥰', {}],
+  ] as const)('price_outside_offer lets « %s » through', (bubble, context) => {
+    expect(checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code)).not.toContain(
+      'price_outside_offer',
+    );
+  });
+
   it.each(['je fais pas de promo', 'pas de réduc avec moi 😌', 'il me reste 10 % de batterie'])(
     'discount lets « %s » through',
     (bubble) => {

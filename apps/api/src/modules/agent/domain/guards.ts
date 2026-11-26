@@ -52,6 +52,11 @@ export interface GuardContext {
    * § 4), decided by code. Any other sum stays a `price_outside_offer`. Absent, no price passes.
    */
   readonly allowedPriceMinor?: number;
+  /**
+   * The sums he wrote since her last answer, in minor units (Charles 27/11): she may say one back without agreeing to
+   * it. Agreeing to a sum (« ok 10 € ») is never read as saying it back.
+   */
+  readonly fanAmountsMinor?: readonly number[];
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -756,21 +761,68 @@ function amountMinorOf(written: string): number | undefined {
   return digits === undefined ? undefined : Math.round(Number(digits.replace(',', '.')) * 100);
 }
 
+// What she sells, around a sum (Charles 27/11): a sum in such a sentence is a price of hers. Without it, a sum is
+// everyday life (« 5 € mon café », « t'as gagné 100 euros au poker ? ») and passes.
+const SALE_WORDS =
+  /\b(pour toi|c'?est|ca fait|ca te fait|ca (te )?coute|coute|prix|tarif|je te (le |la |les )?(fais|laisse|propose|vends|envoie|debloque|mets)|debloquer?|unlock|photos?|videos?|vids?|packs?|contenus?|medias?|ppv|exclus?|appels?|call|visio|facetime|vocal|vocaux|audio|it'?s|for you|price|tu as tout|t'?as tout|(elle|il|elles|ils) (est|sont) a|yours|seulement)\b|\bpour (\d|€|\$)/;
+// A made-to-measure, priced in any way, without her accord: never a sum.
+const CUSTOM_WORDS =
+  /\b(custom|sur[- ]mesure|perso|personnalise(e|s|es)?|rien que pour toi|fait pour toi|just for you)\b/;
+// She agrees to a sum: « ok 10 € », « d'accord pour 10 », « va pour 10 », « deal ».
+const AGREEMENT_WORDS =
+  /\b(ok|okay|d'?accord|dac|deal|va pour|vendu|ca marche|c'?est bon|allez|banco|marche)\b/;
+
+/** The sentence of a text around a position: what a sum is said with. */
+function sentenceAround(text: string, at: number): string {
+  const start = Math.max(...['.', '!', '?', '\n'].map((mark) => text.lastIndexOf(mark, at - 1))) + 1;
+  const ends = ['.', '!', '?', '\n'].map((mark) => text.indexOf(mark, at)).filter((index) => index >= 0);
+  return text.slice(start, ends.length === 0 ? text.length : Math.min(...ends));
+}
+
 /**
- * The first match of a blocking pattern in the text. A sum is read one by one: the price code allowed (ADR 0156 § 4)
- * passes, any other one blocks.
+ * Whether a sum she writes is a price outside her offer (Charles 27/11): a made-to-measure priced, a sum agreed to that
+ * is not her offer's, or a price for what she sells that is not her offer's (no offer: any). Her offer's price said as
+ * it is, a sum of everyday life, or a sum of his said back without agreeing to it pass.
  */
+function priceOutsideOffer(
+  text: string,
+  at: number,
+  amount: number | undefined,
+  context: GuardContext,
+): boolean {
+  const sentence = sentenceAround(text, at);
+  if (CUSTOM_WORDS.test(sentence)) return true;
+  const offered = amount !== undefined && amount === context.allowedPriceMinor;
+  if (AGREEMENT_WORDS.test(sentence)) return !offered;
+  if (!SALE_WORDS.test(sentence)) return false;
+  return !offered && !(amount !== undefined && (context.fanAmountsMinor ?? []).includes(amount));
+}
+
+/** The sums a text names, in minor units: what he wrote, for `GuardContext.fanAmountsMinor`. */
+export function sumsMinorOf(written: string): number[] {
+  const text = normalise(written);
+  return [
+    ...text.matchAll(
+      /(\d+([.,]\d{1,2})?) ?(€|\$|euros?\b|eur\b|balles\b|dollars?\b|usd\b)|(€|\$) ?(\d+([.,]\d{1,2})?)/g,
+    ),
+  ].flatMap((match) => {
+    const digits = match[1] ?? match[5];
+    return digits === undefined ? [] : [Math.round(Number(digits.replace(',', '.')) * 100)];
+  });
+}
+
+/** The first match of a blocking pattern in the text; a sum is read one by one (`priceOutsideOffer`). */
 function blockingMatch(
   code: GuardCode,
   pattern: RegExp,
   text: string,
-  allowedPriceMinor: number | undefined,
+  context: GuardContext,
 ): string | undefined {
-  if (code !== 'price_outside_offer' || allowedPriceMinor === undefined) return pattern.exec(text)?.[0];
+  if (code !== 'price_outside_offer') return pattern.exec(text)?.[0];
   for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
     // « €12.50 » matches as « €1 »: the sum is read on, past the match.
-    if (amountMinorOf(text.slice(match.index, match.index + match[0].length + 8)) !== allowedPriceMinor)
-      return match[0];
+    const amount = amountMinorOf(text.slice(match.index, match.index + match[0].length + 8));
+    if (priceOutsideOffer(text, match.index, amount, context)) return match[0];
   }
   return undefined;
 }
@@ -779,7 +831,7 @@ function wholeMessage(
   bubbles: readonly string[],
   forbidden: readonly string[],
   found: readonly GuardViolation[],
-  allowedPriceMinor: number | undefined,
+  context: GuardContext,
 ): GuardViolation[] {
   const joined = bubbles.join(' ');
   // Also glued (« je suis un b » then « ot ») and without emoji (« 06 12 34 🙈 56 78 »).
@@ -792,7 +844,7 @@ function wholeMessage(
   for (const { code, pattern } of BLOCKING_PATTERNS) {
     if (has(code)) continue;
     const match = readings
-      .map((text) => blockingMatch(code, pattern, text, allowedPriceMinor))
+      .map((text) => blockingMatch(code, pattern, text, context))
       .find((m) => m !== undefined);
     if (match !== undefined) violations.push({ code, severity: 'blocking', match });
   }
@@ -825,7 +877,7 @@ export function checkVoiceOutput(
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
     for (const { code, pattern } of BLOCKING_PATTERNS) {
-      const match = blockingMatch(code, pattern, text, context.allowedPriceMinor);
+      const match = blockingMatch(code, pattern, text, context);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
     const compared = MINOR_COMPARISON.exec(text)?.[0];
@@ -894,7 +946,7 @@ export function checkVoiceOutput(
       )
         violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named });
     });
-  violations.push(...wholeMessage(bubbles, forbidden, violations, context.allowedPriceMinor));
+  violations.push(...wholeMessage(bubbles, forbidden, violations, context));
   if (context.previousTurns !== undefined)
     violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
   if (bubbles.length > settings.maxBubbles) violations.push({ code: 'too_many_bubbles', severity: 'soft' });

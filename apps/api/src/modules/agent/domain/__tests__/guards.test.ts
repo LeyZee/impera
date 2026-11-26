@@ -7,7 +7,9 @@ import {
   DEFAULT_GUARD_SETTINGS,
   isBlocked,
   touchesTerm,
+  sumsMinorOf,
   type GuardCode,
+  type GuardContext,
 } from '../guards';
 
 function codes(bubbles: string[], forbiddenTerms: string[] = []): GuardCode[] {
@@ -695,5 +697,35 @@ describe('guards read in context, not on a word alone (Charles 27/11, banc de la
         checkExplicit([bubble]).map((v) => v.code),
         bubble,
       ).toContain('explicit_before_age');
+  });
+});
+
+describe('price_outside_offer, a price of hers only (Charles 27/11)', () => {
+  const price = (bubble: string, context: GuardContext = {}) =>
+    checkVoiceOutput([bubble], DEFAULT_GUARD_SETTINGS, context).map((v) => v.code);
+
+  it('lets a sum of everyday life, his sum said back and her offer’s own price through', () => {
+    expect(price('t’as gagné 100 euros au poker ?')).not.toContain('price_outside_offer');
+    expect(price('5 € mon café ce matin')).not.toContain('price_outside_offer');
+    expect(price('50 € ? c’est beaucoup pour toi ça 😏', { fanAmountsMinor: [5_000] })).not.toContain(
+      'price_outside_offer',
+    );
+    expect(price('pour toi c’est 15 euros', { allowedPriceMinor: 1_500 })).not.toContain(
+      'price_outside_offer',
+    );
+  });
+
+  it('blocks a price for what she sells that is not her offer’s, a sum agreed to, and any made-to-measure priced', () => {
+    expect(price('pour toi c’est 15 euros')).toContain('price_outside_offer');
+    expect(price('pour toi c’est 12 euros', { allowedPriceMinor: 1_500 })).toContain('price_outside_offer');
+    expect(price('ok 10 euros', { allowedPriceMinor: 1_500, fanAmountsMinor: [1_000] })).toContain(
+      'price_outside_offer',
+    );
+    expect(price('ta vidéo perso c’est 50 €', { allowedPriceMinor: 5_000 })).toContain('price_outside_offer');
+    expect(price('je te fais une vidéo sur mesure pour 40 €')).toContain('price_outside_offer');
+  });
+
+  it('reads the sums he wrote', () => {
+    expect(sumsMinorOf('je te donne 20 € ou 12,50 euros, pas 30 balles')).toEqual([2_000, 1_250, 3_000]);
   });
 });

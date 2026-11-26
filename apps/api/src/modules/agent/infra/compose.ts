@@ -71,6 +71,7 @@ import {
   checkExplicit,
   checkVoiceOutput,
   checkYouthWords,
+  sumsMinorOf,
   previousTurnsOf,
   touchesTerm,
   type GuardContext,
@@ -885,6 +886,11 @@ export function guardContextOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
     sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
+    // The sums he wrote since her last answer: she may say one back without agreeing to it (Charles 27/11).
+    fanAmountsMinor: history
+      .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
+      .filter((turn) => turn.from === 'fan')
+      .flatMap((turn) => sumsMinorOf(turn.text)),
   };
 }
 
