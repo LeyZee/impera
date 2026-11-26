@@ -1,7 +1,7 @@
 import { CreatorIdSchema, NewAbsenceBodySchema, NewStopBodySchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { canTellAbsence, limitsOf } from '../limits';
+import { absenceOn, canTellAbsence, limitsOf } from '../limits';
 import { readsLimits } from '../reader';
 
 const CREATOR = CreatorIdSchema.parse('00000000-0000-4000-8000-0000000000c1');
@@ -72,5 +72,32 @@ describe('her absences and what she no longer does (Charles, 21/11)', () => {
     expect(readsLimits({ role: 'operator', creatorIds: [CREATOR], shiftCreatorIds: [] }, CREATOR)).toBe(true);
     expect(readsLimits({ role: 'operator', creatorIds: [], shiftCreatorIds: [CREATOR] }, CREATOR)).toBe(true);
     expect(readsLimits({ role: 'operator', creatorIds: [OTHER], shiftCreatorIds: [] }, CREATOR)).toBe(false);
+  });
+});
+
+describe('absenceOn: she is away, and until when (Charles, 26/11)', () => {
+  const away = (startsOn: string, endsOn: string) => ({
+    id: '00000000-0000-4000-8000-00000000000a',
+    startsOn,
+    endsOn,
+    note: null,
+    createdAt: '2026-11-20T10:00:00.000Z',
+  });
+  it('is null when no absence covers today, even one starting tomorrow', () => {
+    expect(absenceOn({ today: '2026-11-26', absences: [] })).toBeNull();
+    expect(absenceOn({ today: '2026-11-26', absences: [away('2026-11-27', '2026-11-29')] })).toBeNull();
+  });
+  it('gives her last day away, on the first and on the last day', () => {
+    const one = [away('2026-11-26', '2026-11-28')];
+    expect(absenceOn({ today: '2026-11-26', absences: one })).toEqual({ until: '2026-11-28' });
+    expect(absenceOn({ today: '2026-11-28', absences: one })).toEqual({ until: '2026-11-28' });
+  });
+  it('carries through the absences that follow without a day between, never past a gap', () => {
+    const chained = [
+      away('2026-12-03', '2026-12-05'),
+      away('2026-11-25', '2026-11-28'),
+      away('2026-11-29', '2026-11-30'),
+    ];
+    expect(absenceOn({ today: '2026-11-26', absences: chained })).toEqual({ until: '2026-11-30' });
   });
 });

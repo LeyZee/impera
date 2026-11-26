@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createOwner } from '../auth';
 import { createApp, type App } from '../composition-root';
 import { createLogger } from '../logger';
+import { createCreatorLimitsModule } from '../modules/creator-limits';
 import { addDays, calendarDayIn } from '../modules/scheduling/pure';
 import { buildServer, type Server } from '../server';
 
@@ -154,5 +155,16 @@ describe('what she tells the agency: her absences and what she no longer does', 
     expect((await call('POST', `/v1/creator-space/stops/${id}/withdraw`, 'ines')).statusCode).toBe(204);
     const mine = CreatorLimitsSchema.parse((await call('GET', '/v1/creator-space/limits', 'nora')).json());
     expect(mine.stops.map((s) => s.id)).toContain(id);
+  });
+  it('tells the agent she is away and until when, and what she no longer does, under her tenant (Charles, 26/11)', async () => {
+    const { reads } = createCreatorLimitsModule({ db: app.db.db, requireRole: app.requireRole });
+    // « Voyage », told above: from today + 3 to today + 5 in her zone.
+    expect(await reads.creatorAbsence(nora, new Date())).toBeNull();
+    expect(await reads.creatorAbsence(nora, new Date(`${addDays(today, 4)}T12:00:00Z`))).toEqual({
+      until: addDays(today, 5),
+    });
+    const stops = await reads.creatorNoLongerDoes(nora);
+    expect(stops.map((s) => s.what)).toContain('Plus de tenues de sport');
+    expect(await reads.creatorNoLongerDoes(ines)).toEqual([]);
   });
 });

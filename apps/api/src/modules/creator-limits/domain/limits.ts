@@ -49,3 +49,31 @@ export function limitsOf(
 export function canTellAbsence(absence: Pick<NewAbsenceBody, 'startsOn'>, today: string): boolean {
   return absence.startsOn >= today;
 }
+
+/**
+ * Whether she is away on `today` in her zone (Charles, 26/11: the AI chats, but promises nothing that needs her), and
+ * until which day included: an absence that covers today, carried through the ones that follow it without a day
+ * between. `null` when she is here. Reads what `limitsOf` kept: taken back absences are already gone.
+ */
+export function absenceOn(
+  limits: Pick<CreatorLimits, 'today' | 'absences'>,
+): { readonly until: string } | null {
+  const ordered = limits.absences.toSorted((a, b) => a.startsOn.localeCompare(b.startsOn));
+  let until: string | null = null;
+  for (const absence of ordered) {
+    if (until === null) {
+      if (absence.startsOn <= limits.today && absence.endsOn >= limits.today) until = absence.endsOn;
+      continue;
+    }
+    if (absence.startsOn > nextDay(until)) break;
+    if (absence.endsOn > until) until = absence.endsOn;
+  }
+  return until === null ? null : { until };
+}
+
+/** The calendar day after `day` (YYYY-MM-DD), by the UTC calendar: no clock, no zone. */
+function nextDay(day: string): string {
+  const next = new Date(`${day}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
