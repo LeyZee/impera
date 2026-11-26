@@ -131,14 +131,17 @@ export function isActive(fact: StoredFact, now: Date): boolean {
 }
 
 /**
- * A chatter's note on the fan (P3-02), as « Rendre la main » leaves it: a fact of its own whose slot is its date, so
- * that notes add up instead of replacing each other, and the same note at the same instant is not written twice. Kept
- * in its author's name (`noted`), as the hand-back's.
+ * A chatter's note on the fan written from the extension's panel (ADR 0109 amendment § 9), as « Rendre la main » leaves
+ * one: a fact of its own, so that notes add up instead of replacing each other, kept in its author's name (`noted`).
+ * Its slot is the gesture's idempotency key (the hand-back's is its date): a retry finds its own note, and two notes
+ * of the same instant never share a slot.
  */
-export function operatorNote(note: string, at: Date, author: UserId): FactProposal {
+export const operatorNoteKey = (idempotencyKey: string): string => `note_${idempotencyKey}`;
+
+export function operatorNote(note: string, at: Date, author: UserId, idempotencyKey: string): FactProposal {
   return {
     category: 'operator_note',
-    key: `note_${String(at.getTime())}`,
+    key: operatorNoteKey(idempotencyKey),
     value: note,
     kind: 'declared',
     confidence: 1,

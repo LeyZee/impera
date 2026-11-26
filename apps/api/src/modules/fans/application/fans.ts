@@ -14,10 +14,11 @@ import {
 
 import { cardOf, planCardEdit, planOtherRetraction, type Card, type CardEdit } from '../domain/card';
 import { cardLinesOf, proposalsOfRead, type ReadSource } from '../domain/card-read';
-import { FanNotFound } from '../domain/errors';
+import { FanNotFound, FanNoteConflict } from '../domain/errors';
 import {
   kycSlotsToLearn,
   operatorNote,
+  operatorNoteKey,
   planFacts,
   selectActiveFacts,
   type FactProposal,
@@ -80,10 +81,16 @@ export interface FansService {
   ): Promise<Card>;
   /**
    * A note on the fan, the one « Rendre la main » leaves (an `operator_note` fact, its slot its date: notes add up),
-   * written from the extension's panel (ADR 0109 amendment § 9) with its trace. Returns it, or null when the same
-   * note at the same instant was already there.
+   * written from the extension's panel (ADR 0109 amendment § 9) with its trace. A key already used writes nothing and
+   * returns the note it wrote; with another text, `FanNoteConflict`.
    */
-  addNote(creatorId: CreatorId, fanId: FanId, note: string, trace: WriteTrace): Promise<StoredFact | null>;
+  addNote(
+    creatorId: CreatorId,
+    fanId: FanId,
+    note: string,
+    idempotencyKey: string,
+    trace: WriteTrace,
+  ): Promise<StoredFact>;
 
   /**
    * A person takes a line of « Autres » off his card (trou béant 17) and gets the card back: an empty line in their
@@ -194,15 +201,27 @@ export function createFansService(
       const { active, pending, names } = await facts.card(creatorId, fanId);
       return cardOf(active, pending, at, names);
     },
-    addNote: async (creatorId, fanId, note, trace) => {
+    addNote: async (creatorId, fanId, note, idempotencyKey, trace) => {
       const at = now();
+      const key = operatorNoteKey(idempotencyKey);
+      const own = (fact: StoredFact) => fact.category === 'operator_note' && fact.key === key;
+      let replayed: StoredFact | undefined;
       const [written] = await facts.write(
         creatorId,
         fanId,
-        (current, pending) => planFacts(current, [operatorNote(note, at, trace.userId)], at, pending),
+        (current, pending) => {
+          // Under the fan's lock: a retry of the same gesture finds its note and writes nothing, not even a trace.
+          replayed = current.find(own);
+          return replayed === undefined
+            ? planFacts(current, [operatorNote(note, at, trace.userId, idempotencyKey)], at, pending)
+            : [];
+        },
         trace,
       );
-      return written ?? null;
+      const kept = written ?? replayed;
+      if (kept === undefined) throw new Error('fan note not written');
+      if (kept.value !== note) throw new FanNoteConflict();
+      return kept;
     },
 
     retractOther: async (creatorId, fanId, factId, author) => {

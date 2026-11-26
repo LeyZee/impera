@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   FanCardEntrySchema,
   FanCardOtherSchema,
@@ -137,12 +139,16 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
       payload,
     });
 
-  const note = (token: string | null, text: string, opts: { creatorId?: string; fanId?: string } = {}) =>
+  const note = (
+    token: string | null,
+    text: string,
+    opts: { creatorId?: string; fanId?: string; key?: string } = {},
+  ) =>
     server.inject({
       method: 'POST',
       url: `/v1/copilot/fans/${opts.fanId ?? fan}/notes?creatorId=${opts.creatorId ?? anna}`,
       headers: token === null ? {} : { 'x-extension-link': token },
-      payload: { note: text },
+      payload: { note: text, idempotencyKey: opts.key ?? randomUUID() },
     });
 
   const auditOf = (action: string, userId: string) =>
@@ -260,11 +266,17 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
       notedBy: chatter.userId,
       notedByName: 'Prénom 2',
     });
-    expect(first.key).toMatch(/^note_\d+$/);
-    // Notes add up, never replace one another.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(first.key).toMatch(/^note_[0-9a-f-]{36}$/);
+    // Notes add up, never replace one another, even at the same instant.
     const second = FanCardOtherSchema.parse((await note(token, 'Aime le jazz')).json());
     expect(second.key).not.toBe(first.key);
+    // A retry with the same key writes nothing and answers the same note; another text under it is refused.
+    const key = first.key.slice('note_'.length);
+    const retried = await note(token, 'Préfère qu’on lui écrive le soir', { key });
+    expect(retried.statusCode).toBe(201);
+    expect(FanCardOtherSchema.parse(retried.json()).factId).toBe(first.factId);
+    const changed = await note(token, 'Autre texte', { key });
+    expect([changed.statusCode, codeOf(changed)]).toEqual([409, 'fan_note_conflict']);
     const others = (await app.modules.fans.card(anna, fan)).others.map((other) => other.value);
     expect(others).toEqual(expect.arrayContaining(['Préfère qu’on lui écrive le soir', 'Aime le jazz']));
 
@@ -285,6 +297,7 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
   });
 
   it('refuses out of shift, without a link, on another creator and on a fan she does not have', async () => {
+    // His account names Anna (`user.creatorIds`), as every chatter's does: it never lifts the shift (§ 3).
     const later = await member('chatter', { from: 120, to: 240 });
     const token = await linkOf(later.cookie);
     const off = await correct(token, { items: ['Annecy'] });

@@ -56,7 +56,10 @@ const bodiesFor = (
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
   // The extension's panel (ADR 0109): the person's link, its scope and the shift, then the same right as the CRM's.
   'PUT /v1/copilot/fans/:id/card/:field': { items: ['Prénom inventé'] },
-  'POST /v1/copilot/fans/:id/notes': { note: 'Note inventée' },
+  'POST /v1/copilot/fans/:id/notes': {
+    note: 'Note inventée',
+    idempotencyKey: '00000000-0000-4000-8000-000000000000',
+  },
   'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
     descriptionIds: ['00000000-0000-4000-8000-000000000000'],

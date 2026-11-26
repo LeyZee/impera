@@ -351,12 +351,23 @@ export const FAN_NOTE_MAX = 300;
 /**
  * `POST /v1/copilot/fans/:id/notes?creatorId=` (ADR 0109 amendment § 9): a note on the fan from the extension's panel,
  * by the person's link with the `operator_note` scope, on shift on her. Never changed nor cleared from there: a new
- * note is written. It answers the note written alone (201, `FanCardOtherSchema`), as « Autres » shows it. Its sister
+ * note is written. A key already used answers the note it wrote, and 409 `fan_note_conflict` if the text differs. It
+ * answers the note written alone (201, `FanCardOtherSchema`), as « Autres » shows it. Its sister
  * `PUT /v1/copilot/fans/:id/card/:field` takes `SetFanCardFieldBodySchema` and answers the field written alone
  * (`FanCardEntrySchema`), never the whole card.
  */
-export const CopilotFanNoteBodySchema = z.strictObject({ note: z.string().trim().min(1).max(FAN_NOTE_MAX) });
+export const CopilotFanNoteBodySchema = z.strictObject({
+  note: z.string().trim().min(1).max(FAN_NOTE_MAX),
+  /**
+   * Drawn by the extension once per note, sent again with it on a retry: the same key never writes a second note, and
+   * two notes of the same instant never share a slot.
+   */
+  idempotencyKey: z.uuid(),
+});
 export type CopilotFanNoteBody = z.infer<typeof CopilotFanNoteBodySchema>;
+
+/** The key of a note already written with another text (409). */
+export const FAN_NOTE_CONFLICT = 'fan_note_conflict';
 
 /**
  * `POST /v1/fans/:id/card/others/retract?creatorId=` (trou béant 17): a person takes a line of « Autres » off the

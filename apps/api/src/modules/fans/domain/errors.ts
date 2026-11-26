@@ -5,6 +5,7 @@ import {
   FAN_CARD_OTHER_NOT_FOUND,
   FAN_CARD_VALUE_INVALID,
   FAN_CARD_VALUE_UNPROCESSABLE,
+  FAN_NOTE_CONFLICT,
 } from '@impera/contracts';
 
 /** Error codes of the module (api.md § Erreurs): the suffix gives the HTTP status. */
@@ -52,5 +53,12 @@ export class FanCardValueRefused extends DomainError {
 export class FanCardOtherNotFound extends DomainError {
   constructor() {
     super(FAN_CARD_OTHER_NOT_FOUND, 'Cette ligne n’est plus sur sa fiche');
+  }
+}
+
+/** A note's idempotency key already wrote another text (ADR 0109 amendment § 9): a note is never changed. */
+export class FanNoteConflict extends DomainError {
+  constructor() {
+    super(FAN_NOTE_CONFLICT, 'Cette note a déjà été écrite avec un autre texte');
   }
 }

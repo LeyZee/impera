@@ -65,6 +65,9 @@ const CreatorQuerySchema = z.object({ creatorId: CreatorIdSchema });
 /**
  * § 3: only on shift, on the creators of the shift (`shiftCreatorIds`, its margin included); the owner and an active
  * manager who reads her whole are not bounded by a shift. Out of it, a conversation he still holds opens nothing here.
+ * Through a link, `creatorIds` is never a chatter's: the session moves a `self` member's list to `routedCreatorIds`
+ * (`userOf` in auth.ts), and a link names only the owner, an active manager, a chatter at work or a creator (`personOf`
+ * in the trends module), so « reads her whole » is the owner or an active manager with her on his list.
  */
 function assertOnShift(user: CurrentUser, creatorId: CreatorId): void {
   if (user.role !== 'owner' && user.role !== 'operator') throw new CopilotForbidden();
@@ -157,12 +160,12 @@ export function createCopilotFanRoutes(
         const fanId = request.params.id;
         assertOnShift(user, creatorId);
         const author = await readerOf(user, request.ip, creatorId, fanId, access, 'card');
-        const note = await fans.addNote(creatorId, fanId, request.body.note, {
+        // A retry with the same key answers the note it wrote, as the first answer did.
+        const note = await fans.addNote(creatorId, fanId, request.body.note, request.body.idempotencyKey, {
           userId: author,
           ip: request.ip,
           action: 'fan_note.create',
         });
-        if (note === null) throw new Error('fan note not written');
         // The note as « Autres » shows it on the card, with its author's name: nothing else of the fan.
         const view = await cardView(access, creatorId, fanId, await fans.card(creatorId, fanId));
         const written = view.others.find((other) => other.factId === note.id);
