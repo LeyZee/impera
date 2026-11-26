@@ -3891,6 +3891,87 @@ describe('createDraftComposer, the sexting calibrated by the creator (Charles 26
     });
   });
 
+  describe('one script an evening (Charles 27/11 at 0:28)', () => {
+    const asks: Brief = { ...HOT, intent: 'asks_for_media', action: 'reply' };
+    const tonight = (scripts: ScriptSource, voice?: string[]) =>
+      composer(
+        { brief: asks, ...(voice !== undefined && { voice: { bubbles: voice } }) },
+        undefined,
+        limitsOf(ADULT).limits,
+        {
+          ...deps(scripts, never),
+          // Her last script went out earlier this evening.
+          lastOfferAt: () => Promise.resolve(new Date('2026-10-17T08:00:00Z')),
+        },
+      );
+
+    it('lists no script when he asks for more the same evening, and leads him to the custom path', async () => {
+      const { draftComposer, seen } = tonight(PACK_SOURCE);
+      await draftComposer.compose(says('encore une ?'));
+      expect(seen.brainInputs?.[0]?.scripts).toBeUndefined();
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+      expect(
+        hints(seen).some((hint) =>
+          hint.startsWith('il en redemande alors qu’il a déjà eu son script ce soir'),
+        ),
+      ).toBe(true);
+    });
+
+    it('commits to nothing there: a yes or a date goes to a human', async () => {
+      const { draftComposer } = tonight(PACK_SOURCE, ['ok je te fais ça demain']);
+      expect((await draftComposer.compose(says('encore une ?'))).kind).toBe('held');
+    });
+
+    it('lists her scripts on another evening', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: asks },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await draftComposer.compose(says('encore une ?'));
+      expect(seen.brainInputs?.[0]?.scripts).toEqual([{ id: 's1', description: 'Pack de démonstration' }]);
+    });
+  });
+
+  describe('her sulk (Charles 27/11 at 0:28)', () => {
+    it('would rather sulk, whine or prick his ego than insult him', async () => {
+      const at = new Date('2026-10-17T09:30:00Z');
+      const running = {
+        scriptRef: 'script-demo',
+        status: 'open' as const,
+        steps: [
+          {
+            stepIndex: 0,
+            kind: 'paid' as const,
+            outcome: 'sent' as const,
+            priceMinor: 1_500,
+            sentAt: at,
+            at,
+          },
+        ],
+        ignoredMessages: 0,
+        startedAt: at,
+        endedAt: null,
+      };
+      const playing: Brief = { ...HOT, action: 'reply', scriptReply: 'answers_step' };
+      const { draftComposer, seen } = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await draftComposer.compose({ ...says('tu me la fais gratuite ?'), scriptRun: running });
+      expect(
+        hints(seen).some(
+          (hint) =>
+            hint.startsWith('il marchande') &&
+            hint.endsWith('plutôt bouder, chouiner ou une pique détournée sur son ego qu’une insulte'),
+        ),
+      ).toBe(true);
+    });
+  });
+
   describe('a media he finds disappointing', () => {
     const at = new Date('2026-10-17T09:30:00Z');
     const withSheet: ScriptSource = {

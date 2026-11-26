@@ -96,6 +96,7 @@ import {
   type OfferContext,
   asksMoreSameEvening,
   keepsWarm,
+  sameEvening,
 } from '../domain/policy';
 import { refusalMove, type RefusalMove } from '../domain/refusal';
 import { registerOf, type Register } from '../domain/register';
@@ -454,6 +455,12 @@ function rewriteHint(violations: readonly GuardViolation[]): string {
     : `sa première réponse a été refusée (${reasons.join(', ')}) : réécris-la autrement`;
 }
 
+/**
+ * When she sulks or refuses (Charles 27/11 at 0:28): she would rather sulk, whine or prick his ego sideways than insult
+ * him; the intention only, her words are hers (`contempt` still blocks).
+ */
+const SULK_NOT_INSULT = ' ; plutôt bouder, chouiner ou une pique détournée sur son ego qu’une insulte';
+
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
 const NO_OFFER_BRIEF =
   'Réponds à ce qu’il vient de dire et garde la complicité, sans rien proposer de payant, sans parler de prix ni de contenu à acheter.';
@@ -722,8 +729,7 @@ const DEGRADING_FROM_HIM_HINT =
 const HE_CAME_EARLY_HINT =
   'il a joui avant la fin, sans l’attendre : une petite moue, il ne l’a pas attendue alors que c’est un échange, tendre au fond, sans reproche ni chantage ; rien à vendre ce soir';
 /** He haggles or asks for it free in the middle of the action (Charles 26/11): she sulks, the price never moves. */
-const HAGGLE_HINT =
-  'il marchande ou demande du gratuit en plein jeu : elle boude, lui rappelle qu’elle n’est pas un marché, sans insulte ni mépris ; le prix ne bouge pas';
+const HAGGLE_HINT = `il marchande ou demande du gratuit en plein jeu : elle boude, lui rappelle qu’elle n’est pas un marché, sans insulte ni mépris ; le prix ne bouge pas${SULK_NOT_INSULT}`;
 /** A bare murmur in the middle of the action (Charles 26/11). */
 const MURMUR_HINT = 'il n’a écrit qu’un murmure sans rien dire : demande-lui ce que ça veut dire';
 /** What kills the sexting while her script runs (Charles 26/11): never brought up by her. */
@@ -734,8 +740,7 @@ const MOOD_KILLER_OTHER_MAN_HINT = 'ni d’un autre homme';
 const DISAPPOINTED_MEDIA_HINT =
   'elle lui pose des questions sur ce qui l’a déçu et compare avec ce que la description du média annonçait';
 /** He insists for something more after a disappointing media (Charles 26/11): sulk, then whine, never angry. */
-const INSISTS_FOR_MORE_HINT =
-  'il insiste pour avoir quelque chose en plus : elle boude, puis chouine un peu, sans colère ; jamais de remise, jamais de média offert';
+const INSISTS_FOR_MORE_HINT = `il insiste pour avoir quelque chose en plus : elle boude, puis chouine un peu, sans colère ; jamais de remise, jamais de média offert${SULK_NOT_INSULT}`;
 /** Written sounds of pleasure (Charles 26/11): only at the frankest rung. */
 const NO_MOANS_HINT = 'pas de bruits de plaisir écrits à ce stade';
 /** In the middle of the action she may write longer bubbles to tell what she feels (Charles 26/11 at 23:09). */
@@ -830,7 +835,7 @@ const REFUSAL_HINTS: Readonly<Record<RefusalMove, string>> = {
     'il vient de dire non à ce qu’elle lui proposait : elle le prend bien, sans reproche, et lui demande avec curiosité ce qui ne lui a pas plu, sans prix ni nouvelle proposition',
   insist:
     'elle insiste un tout petit peu, une seule fois, avec légèreté, en rebondissant sur ce qu’il a dit, sans prix, sans pression ni reproche',
-  sulk: 'elle boude un peu pour jouer, une bulle courte, un brin vexée, jamais de reproche ni de culpabilisation, puis elle passe à autre chose',
+  sulk: `elle boude un peu pour jouer, une bulle courte, un brin vexée, jamais de reproche ni de culpabilisation, puis elle passe à autre chose${SULK_NOT_INSULT}`,
 };
 
 /** Her answers since the run ended: which move of the refusal comes next. */
@@ -1129,7 +1134,20 @@ export async function composeTurn(
   const desireMap = withoutHerLimits(desireMapOf(notes.kept), (item) =>
     herRefusals.some((term) => touchesTerm(item, term)),
   );
-  const { choices, uncovered } = scriptChoices(input.scripts, input.situation, desireMap);
+  // One script an evening (Charles 21/11 and 27/11 at 0:28): the same evening as her last one, none is listed to the
+  // brain, whatever he asks; asking for more leads to the custom path (`asksMoreSameEvening`).
+  const evening =
+    input.offer?.lastOfferAt !== undefined &&
+    input.offer.lastOfferAt !== null &&
+    sameEvening(
+      input.situation.now,
+      input.offer.lastOfferAt,
+      input.offer.limits.cooldownHours,
+      input.offer.timeZone ?? input.situation.timeZone,
+    );
+  const ranked = scriptChoices(input.scripts, input.situation, desireMap);
+  const choices = evening ? [] : ranked.choices;
+  const { uncovered } = ranked;
   const brainScripts: BrainScript[] = choices.map(({ id, script, matches }) => ({
     id,
     description: script.description,
@@ -1854,7 +1872,7 @@ export async function composeTurn(
       ...(sexualTurn ? checkMoans(written, register === 'very_explicit') : []),
       ...(inPlay ? checkMoodKillers(written, otherManWanted) : []),
       ...(care ? checkCare(written) : []),
-      ...(customOrder === undefined && !suggestsCustom ? [] : checkNoCommitment(written)),
+      ...(customOrder === undefined && !suggestsCustom && !moreTonight ? [] : checkNoCommitment(written)),
       // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
       // intimate is open, « pas si vite 😏 » is a tease of hers (relecture Bilan de #876).
       ...(sexualization?.kind === 'no_opening' && !care ? checkWelcome(written) : []),
