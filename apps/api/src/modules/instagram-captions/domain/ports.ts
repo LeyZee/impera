@@ -28,6 +28,12 @@ export interface CaptionRequest {
   readonly mediaDescription: string;
   readonly durationS: number | null;
   readonly sentence: string | null;
+  /** « D'autres idées »: the hints she touched, in her screen's words, her own line, and the captions she already read. */
+  readonly otherIdeas?: {
+    readonly hints: readonly string[];
+    readonly note: string;
+    readonly seen: readonly string[];
+  };
   /** What refused captions of a first answer: rule names only. */
   readonly refusedBy?: readonly string[];
 }
@@ -52,4 +58,12 @@ export interface ProposeDeps {
   readonly examples: (creatorId: string) => Promise<readonly string[]>;
   readonly writer: CaptionWriter;
   readonly asking: CaptionAsking;
+}
+
+export interface OtherCaptionsDeps {
+  /** The live drop named, described; `null` when it is gone or not described. */
+  readonly reel: (creatorId: string, dropId: string) => Promise<DescribedReel | null>;
+  readonly persona: ProposeDeps['persona'];
+  readonly examples: ProposeDeps['examples'];
+  readonly writer: CaptionWriter;
 }
