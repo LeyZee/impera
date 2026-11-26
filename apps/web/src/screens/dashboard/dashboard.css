@@ -953,3 +953,20 @@ div.db-fan {
   min-width: 0;
   padding: 8px 10px;
 }
+/* « Elle n'a pas encore répondu » (INS-05): the number first, then her card of « À décider ». */
+.db-decisions {
+  display: grid;
+  gap: var(--nv-space-3);
+}
+.db-decisions__head {
+  display: grid;
+  gap: 2px;
+}
+.db-decisions__head h2 {
+  margin: 0;
+}
+.db-decisions__sub {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}

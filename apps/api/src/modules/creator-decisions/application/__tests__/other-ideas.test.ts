@@ -29,6 +29,7 @@ const decision: CreatorDecision = {
   layout: 'rows',
   answers: [row('question', 'Une ?'), row('funny', 'Deux')],
   otherIdeasLeft: 2,
+  expiresAt: '2026-11-21T17:30:00.000Z',
 };
 const other = [row('short', 'Trois'), row('story', 'Quatre')];
 const wish = { hints: ['shorter'], note: '' };

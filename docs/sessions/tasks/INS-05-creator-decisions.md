@@ -23,7 +23,7 @@ Lot b, les légendes :
 - [x] Notification d'une question nouvelle, sous les plafonds de `notifications` (motif `decision`, lot b2).
 - [x] Premier code qui demande (lot b1) : trois légendes proposées pour une vidéo déposée, depuis la description du média ; son choix gardé. Module `instagram-captions`, tâche `instagram_captions.propose`, usage IA `instagram_caption`.
 - [x] « D'autres idées » (lot b2) : route, indications en puces et en mots, trois demandes au plus, jamais comptée quand rien ne vient ; appels au modèle comptés dans la conso IA (usage `instagram_caption`).
-- [ ] Écran du propriétaire pour répondre à sa place (captures d'abord).
+- [ ] Écran du propriétaire pour répondre à sa place (captures d'abord). En cours le 26/11 : pas de nouvelle page (accord de Design) ; carte « N questions sans réponse » dans la zone « à faire » du Dashboard (sur « Toutes » et sur la créatrice choisie), qui reprend DecisionStack avec trois variantes (`onLater` facultatif, `who`, `due`, `notice`) ; la question lue porte maintenant son `expiresAt`. Captures quand la brique nv-note de Design est sur main.
 
 Lot c, la publication (attend le compte professionnel et l'application Meta) :
 - [ ] Confirmation de l'heure, publication d'essai qui marche.

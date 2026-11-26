@@ -7,6 +7,7 @@ import { AutomaticConfirm } from './AutomaticConfirm';
 import { CreatorPicker } from './CreatorPicker';
 import { AGENT_PATH, FunnelPanel } from './Funnel';
 import { ModeControl } from './ModeControl';
+import { OwnerDecisions } from './OwnerDecisions';
 import { RevealSalesPanel } from './RevealSales';
 import { PeriodControl, SalesPanel, salesSub } from './Sales';
 import { TodoCard } from './TodoCard';
@@ -456,6 +457,10 @@ function Loaded({
       {/* The export, the invoices and the documents are the owner's to settle (OPS-02, EQ-06 lot 8d), the reports that
           wait are their reviewer's (ADR 0073): one card, « À faire » (W3). */}
       {agency === undefined ? <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} /> : null}
+      {/* What she has not answered yet, the owner answering in her place (INS-05): nothing if nothing waits. */}
+      {forOwner ? (
+        <OwnerDecisions creators={creators?.filter((one) => one.id === creatorId) ?? []} showWho={false} />
+      ) : null}
 
       {tip.element}
     </div>

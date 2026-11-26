@@ -2,6 +2,7 @@ import type { JSX } from 'react';
 
 import { AgencyStrip } from '../AgencyStrip';
 import { NoCreator } from '../DashboardPage';
+import { OwnerDecisions } from '../OwnerDecisions';
 import { TodoCard } from '../TodoCard';
 import { useFloatingTip } from '../parts';
 import { useDashboard } from '../useDashboard';
@@ -12,6 +13,7 @@ import { SteeringPanel } from './Steering';
 import { UrgentCard } from './Urgent';
 import type { AgencySelection } from './period';
 
+import { useCreators } from '@/creators/api';
 import { PageHeader } from '@/shell/layout';
 
 /**
@@ -44,6 +46,7 @@ export function AgencyPage({
   // The followed creator's Dashboard also carries what is the agency's (the day's AI budget, the stuck jobs), and
   // says when there is no creator yet: then the screen leads to Créatrices, never to empty charts.
   const view = useDashboard('week', forOwner ? 'owner' : 'team');
+  const creators = useCreators();
   if (view.status === 'empty') return <NoCreator canAddCreator={canAddCreator} />;
   return (
     <div className="db">
@@ -54,6 +57,8 @@ export function AgencyPage({
       {/* The fans who wait, before anything else (grande recette 21/11, point 2): red the grave, amber the rest. */}
       <UrgentCard opensTracking={opensTracking} />
       <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} />
+      {/* What her creators have not answered yet, the owner answering in their place (INS-05): nothing if nothing waits. */}
+      {forOwner ? <OwnerDecisions creators={creators.data ?? []} showWho /> : null}
       {/* What the owner steers with, each card tied to a decision (pilotage 21/11), then the period's figures. */}
       <SteeringPanel creatorId={null} opensTracking={opensTracking} tip={tip} />
       <AgencyInsightsPanel

@@ -7,7 +7,7 @@ import {
 } from '@impera/contracts';
 
 /** A decision as the base keeps it: what she reads, and where it stands. */
-export interface StoredDecision extends CreatorDecision {
+export interface StoredDecision extends Omit<CreatorDecision, 'expiresAt'> {
   readonly state: DecisionState;
   readonly answerKey: string | null;
   readonly laterUntil: Date | null;
@@ -52,5 +52,6 @@ export function toRead(decision: StoredDecision): CreatorDecision {
     layout: decision.layout,
     answers: decision.answers,
     otherIdeasLeft: decision.otherIdeasLeft,
+    expiresAt: decision.expiresAt.toISOString(),
   };
 }
