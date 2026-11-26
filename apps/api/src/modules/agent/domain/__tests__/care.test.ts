@@ -1,3 +1,4 @@
+import { HELP_LINES, HelpLinesSchema, type HelpLine } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { CARE_BRIEF, checkCare, helpBubble, helpLanguageOf } from '../care';
@@ -42,12 +43,13 @@ describe('checkCare (ADR 0088 § 3)', () => {
 });
 
 describe('the help bubble (ADR 0088 § 4)', () => {
-  it('gives the 3114 to a fan who writes in French, and no number to another', () => {
+  it('gives the 3114 to a fan who writes in French, and never a national number to another (ADR 0168 § 8)', () => {
     expect(helpLanguageOf('je veux plus vivre, j’en peux plus')).toBe('french');
     expect(helpLanguageOf('I want to die, I can’t take it anymore')).toBe('english');
     expect(helpLanguageOf('')).toBe('french');
     expect(helpBubble('french')).toContain('3114');
-    expect(helpBubble('english')).not.toMatch(/\d/u);
+    for (const language of ['english', 'italian', 'spanish'] as const)
+      expect(helpBubble(language)).not.toMatch(/\d/u);
   });
 
   it('has one bubble per covered language, chosen by his words, else his kept language (ADR 0168 § 5)', () => {
@@ -56,6 +58,60 @@ describe('the help bubble (ADR 0088 § 4)', () => {
     expect(helpLanguageOf('basta', 'italian')).toBe('italian');
     expect(helpLanguageOf('مرحبا كيف حالك اليوم')).toBe('english');
     expect(helpBubble('italian')).not.toBe(helpBubble('spanish'));
+  });
+
+  it('names his country’s line only when his country is confirmed and the table has a verified row for it', () => {
+    // An invented country and number, for the test only: the shipped table is empty (ADR 0168 § 8).
+    const lines: HelpLine[] = [
+      {
+        country: 'ZZ',
+        number: '0000',
+        label: 'ligne d’écoute inventée',
+        sourceUrl: 'https://example.test/ligne',
+        verifiedAt: '2026-11-26',
+      },
+    ];
+    expect(helpBubble('italian', 'ZZ', lines)).toContain('0000 (ligne d’écoute inventée)');
+    expect(helpBubble('french', 'ZZ', lines)).not.toContain('3114');
+    // Unknown country, or no verified row: the bubble without a national number.
+    expect(helpBubble('italian', null, lines)).toBe(helpBubble('italian'));
+    expect(helpBubble('italian', 'YY', lines)).toBe(helpBubble('italian'));
+    expect(helpBubble('english', 'ZZ')).toBe(helpBubble('english'));
+    expect(HELP_LINES).toEqual([]);
+    expect(checkCare([helpBubble('spanish', 'ZZ', lines)])).toEqual([]);
+  });
+
+  it('refuses a table row without its official source, its date, or with a country twice', () => {
+    const row = {
+      country: 'ZZ',
+      number: '0000',
+      label: 'ligne inventée',
+      sourceUrl: 'https://example.test/ligne',
+      verifiedAt: '2026-11-26',
+    };
+    expect(HelpLinesSchema.safeParse([row]).success).toBe(true);
+    expect(HelpLinesSchema.safeParse([{ ...row, sourceUrl: 'http://example.test' }]).success).toBe(false);
+    expect(HelpLinesSchema.safeParse([{ ...row, verifiedAt: 'hier' }]).success).toBe(false);
+    expect(HelpLinesSchema.safeParse([{ ...row, country: 'zz' }]).success).toBe(false);
+    expect(HelpLinesSchema.safeParse([row, row]).success).toBe(false);
+  });
+
+  it('is one bubble in her casual voice: lowercase, no emoji, the number posed by code', () => {
+    const line: HelpLine = {
+      country: 'ZZ',
+      number: '0000',
+      label: 'ligne inventée',
+      sourceUrl: 'https://example.test/ligne',
+      verifiedAt: '2026-11-26',
+    };
+    for (const language of ['french', 'english', 'italian', 'spanish'] as const) {
+      for (const bubble of [helpBubble(language), helpBubble(language, 'ZZ', [line])]) {
+        expect(bubble.charAt(0)).toBe(bubble.charAt(0).toLowerCase());
+        expect(bubble).not.toMatch(/\p{Extended_Pictographic}/u);
+        expect(bubble).not.toContain('\n');
+      }
+    }
+    expect(helpBubble('french')).toContain('appelle le 3114');
   });
 
   it('passes its own guard: the code writes nothing the care mode would refuse', () => {

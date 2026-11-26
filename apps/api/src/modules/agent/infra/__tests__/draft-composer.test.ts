@@ -2968,10 +2968,10 @@ describe('the fan’s language (ADR 0168)', () => {
       return Promise.resolve();
     },
   };
-  const compose = (text: string) => {
+  const compose = (text: string, voice?: VoiceOutput) => {
     const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
     const draftComposer = createDraftComposer({
-      gateway: gateway({}, seen),
+      gateway: gateway(voice === undefined ? {} : { voice }, seen),
       persona: {
         creatorName: 'Lina',
         personaSheet: 'fiche',
@@ -3021,5 +3021,34 @@ describe('the fan’s language (ADR 0168)', () => {
       fan: 'arabic',
       humanOnly: true,
     });
+  });
+
+  it('keeps her French for the team from the same call when she writes in English, never in what leaves', async () => {
+    const { seen, result } = compose('hey, how are you doing tonight? you look amazing', {
+      bubbles: ['hey you 😘', 'missed me?'],
+      translation: ['coucou toi 😘', 'je t’ai manqué ?'],
+    });
+    const draft = await result;
+    expect(seen.voiceCalls).toBe(1);
+    // One short message of his: one bubble leaves, and its French is cut the same way.
+    expect(draft).toMatchObject({
+      kind: 'draft',
+      bubbles: ['hey you 😘'],
+      translation: { language: 'french', bubbles: ['coucou toi 😘'] },
+    });
+  });
+
+  it('keeps none when she writes in French, or when the French does not match her bubbles', async () => {
+    const french = await compose('salut toi, tu fais quoi ce soir ? tu es trop belle', {
+      bubbles: ['coucou toi'],
+      translation: ['coucou toi'],
+    }).result;
+    expect(french.kind === 'draft' && 'translation' in french).toBe(false);
+    const short = await compose('hey, how are you doing tonight? you look amazing', {
+      bubbles: ['hey you 😘', 'missed me?'],
+      translation: ['coucou toi 😘'],
+    }).result;
+    expect(short.kind).toBe('draft');
+    expect(short.kind === 'draft' && 'translation' in short).toBe(false);
   });
 });

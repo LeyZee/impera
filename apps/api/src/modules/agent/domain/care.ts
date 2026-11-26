@@ -1,4 +1,11 @@
-import { isGuardedLanguage, normalise, type GuardedLanguage, type Language } from '@impera/contracts';
+import {
+  HELP_LINES,
+  isGuardedLanguage,
+  normalise,
+  type GuardedLanguage,
+  type HelpLine,
+  type Language,
+} from '@impera/contracts';
 
 import { SUGGESTIVE_EMOJIS } from './desire';
 import type { GuardViolation } from './guards';
@@ -81,23 +88,46 @@ export function helpLanguageOf(fanText: string, kept: Language | null = null): H
   return read === null ? 'french' : 'english';
 }
 
-/** The help bubble of each language, written here, never by a model. Only French names a number it knows to be right. */
+/**
+ * The help bubble of each language, written here in her casual voice, never by a model (wording approved by Charles,
+ * 26/11): one bubble, tutoiement, no emoji. Only French names a number, the 3114 of ADR 0088 § 4; the others send him
+ * to someone close or his country's emergency number, with no number picked by his language.
+ */
 const HELP_BUBBLES: Readonly<Record<HelpLanguage, string>> = {
   french:
-    'Et si les idées noires reviennent, tu peux appeler le 3114, jour et nuit, c’est gratuit et quelqu’un t’écoutera vraiment.',
+    'et promets-moi un truc : si ça redevient trop lourd la nuit, appelle le 3114. c’est gratuit, jour et nuit, et quelqu’un t’écoute vraiment. je préfère te savoir pas tout seul',
   english:
-    'And if the dark thoughts come back, please talk to someone close to you, or call your country’s emergency number.',
+    'and promise me something: if it gets too heavy again at night, talk to someone close to you or call your country’s emergency number. i’d rather know you’re not alone',
   italian:
-    'E se i pensieri brutti tornano, parlane con qualcuno di vicino a te, o chiama il numero di emergenza del tuo paese.',
+    'e promettimi una cosa: se di notte torna a essere troppo pesante, parlane con qualcuno di vicino o chiama il numero di emergenza del tuo paese. preferisco saperti non da solo',
   spanish:
-    'Y si los pensamientos oscuros vuelven, habla con alguien cercano, o llama al número de emergencias de tu país.',
+    'y prométeme una cosa: si por la noche vuelve a pesarte demasiado, habla con alguien cercano o llama al número de emergencias de tu país. prefiero saber que no estás solo',
+};
+
+/** The bubble that names his country's line, in the same voice: the number and what it is, posed by code. */
+const NATIONAL_BUBBLES: Readonly<Record<HelpLanguage, (line: HelpLine) => string>> = {
+  french: (line) =>
+    `et promets-moi un truc : si ça redevient trop lourd la nuit, appelle le ${line.number} (${line.label}). quelqu’un t’écoute vraiment. je préfère te savoir pas tout seul`,
+  english: (line) =>
+    `and promise me something: if it gets too heavy again at night, call ${line.number} (${line.label}). someone will really listen. i’d rather know you’re not alone`,
+  italian: (line) =>
+    `e promettimi una cosa: se di notte torna a essere troppo pesante, chiama il ${line.number} (${line.label}). qualcuno ti ascolta davvero. preferisco saperti non da solo`,
+  spanish: (line) =>
+    `y prométeme una cosa: si por la noche vuelve a pesarte demasiado, llama al ${line.number} (${line.label}). alguien te escucha de verdad. prefiero saber que no estás solo`,
 };
 
 /**
  * The fixed bubble that closes the first care answer to dark thoughts, once per episode (ADR 0088 § 4): written here,
- * never by a model. In French it gives the 3114, France's national suicide prevention line; in the other languages it
- * points him to someone close or his country's emergency number.
+ * never by a model. A national number only when his country is a confirmed fact of his card and the table has a row
+ * a person verified for it (ADR 0168 § 8, `HELP_LINES`); never a number picked by his language. Otherwise the French
+ * bubble keeps the 3114 of ADR 0088 § 4, and the others send him to someone close or his country's emergency number.
  */
-export function helpBubble(language: HelpLanguage): string {
-  return HELP_BUBBLES[language];
+export function helpBubble(
+  language: HelpLanguage,
+  confirmedCountry: string | null = null,
+  lines: readonly HelpLine[] = HELP_LINES,
+): string {
+  const line =
+    confirmedCountry === null ? undefined : lines.find((each) => each.country === confirmedCountry);
+  return line === undefined ? HELP_BUBBLES[language] : NATIONAL_BUBBLES[language](line);
 }

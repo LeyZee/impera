@@ -107,4 +107,10 @@ describe('describeLanguage, the language code decided (ADR 0168)', () => {
     );
     expect(describeLanguage({ reply: 'italian', notSpoken: null })).not.toContain('pour le ton');
   });
+
+  it('asks the French for the team in the same call only when she does not write in French (ADR 0168 § 9)', () => {
+    expect(describeLanguage({ reply: 'english', notSpoken: null })).toContain('`translation`');
+    expect(describeLanguage({ reply: 'french', notSpoken: 'arabic' })).not.toContain('translation');
+    expect(describeLanguage(undefined)).not.toContain('translation');
+  });
 });

@@ -1,4 +1,4 @@
-import type { KycSlot } from '@impera/contracts';
+import type { KycSlot, Language } from '@impera/contracts';
 import { loadPrompt, type LlmGateway } from '@impera/llm';
 
 import type { FansModule } from '../fans';
@@ -288,6 +288,19 @@ export function startKycSlots(options: {
   const now = options.now ?? (() => new Date());
   return async (creatorId) =>
     (await activePersonaForModels(options.activePersona, creatorId, now()))?.kycSlots ?? null;
+}
+
+/**
+ * The languages her active persona speaks, in her order (ADR 0168), for his language on his card: empty without an
+ * active version. @public Wired by the composition root on the `fans` routes.
+ */
+export function startPersonaLanguages(options: {
+  readonly activePersona: ActivePersonaSource;
+  readonly now?: () => Date;
+}): (creatorId: string) => Promise<readonly Language[]> {
+  const now = options.now ?? (() => new Date());
+  return async (creatorId) =>
+    (await activePersonaForModels(options.activePersona, creatorId, now()))?.spokenLanguages ?? [];
 }
 
 /** The guards of a creator's approvals: her active version's hard limits, `null` without one (fail closed). */

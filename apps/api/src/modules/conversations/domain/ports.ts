@@ -4,6 +4,7 @@ import type {
   AlertTrigger,
   BankedObjectionKind,
   CopilotTrace,
+  DraftTranslation,
   CustomAlertGroupId,
   CustomAlertId,
   EventId,
@@ -253,6 +254,8 @@ interface DraftRepository {
     scriptStep?: DraftScriptStep;
     /** What the code decided with it, as the copilot panel reads it (ADR 0141 lot a). */
     copilot?: CopilotTrace;
+    /** Its French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+    translation?: DraftTranslation;
   }): Promise<void>;
   setStatus(id: DraftId, status: DraftStatus, decision?: DraftDecision): Promise<void>;
   /**
@@ -822,6 +825,8 @@ export type ComposeResult =
       readonly care?: ComposedCare;
       /** What the code decided with it, kept with the draft for the copilot panel (ADR 0141 lot a). */
       readonly copilot?: CopilotTrace;
+      /** Its French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+      readonly translation?: DraftTranslation;
     }
   | {
       readonly kind: 'held';
@@ -1042,6 +1047,8 @@ export interface CopilotRead {
     readonly bubbles: readonly string[];
     readonly createdAt: Date;
     readonly placedAt: Date | null;
+    /** Its French for the team (ADR 0168 § 9); `null` without one. */
+    readonly translation: DraftTranslation | null;
   } | null;
   /** What the code decided and what holds now, for the panel's lines (ADR 0141 lot a). */
   readonly live: CopilotLive;

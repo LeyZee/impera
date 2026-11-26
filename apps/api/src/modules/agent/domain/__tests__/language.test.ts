@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decideLanguage, detectLanguage, languageWithout } from '../language';
+import { decideLanguage, detectLanguage, languageWithout, translationOf } from '../language';
 
 // Messages invented for the test (ADR 0010): no real fan.
 describe('detectLanguage', () => {
@@ -140,5 +140,24 @@ describe('languageWithout', () => {
     expect(languageWithout('arabic', ['french', 'english'])).toBe('english');
     expect(languageWithout(null, ['french'])).toBe('french');
     expect(languageWithout('arabic', ['french', 'english'], 'coucou, tu vas bien ce soir ?')).toBe('french');
+  });
+});
+
+describe('translationOf: her answer in French for the team (ADR 0168 § 9)', () => {
+  it('gives none when she writes in French, whatever the voice added', () => {
+    expect(translationOf('french', ['coucou toi'], ['coucou toi'])).toBeNull();
+  });
+
+  it('keeps one French bubble per bubble of hers', () => {
+    expect(translationOf('english', ['hey you', 'miss me?'], [' coucou toi ', 'je t’ai manqué ?'])).toEqual([
+      'coucou toi',
+      'je t’ai manqué ?',
+    ]);
+  });
+
+  it('drops a translation that does not fit, never the answer', () => {
+    expect(translationOf('english', ['hey you', 'miss me?'], ['coucou toi'])).toBeNull();
+    expect(translationOf('english', ['hey you'], ['  '])).toBeNull();
+    expect(translationOf('english', ['hey you'], undefined)).toBeNull();
   });
 });

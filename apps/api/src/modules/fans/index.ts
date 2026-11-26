@@ -1,4 +1,4 @@
-import { KycSlotSchema, type CreatorId, type KycSlot } from '@impera/contracts';
+import { KycSlotSchema, type CreatorId, type KycSlot, type Language } from '@impera/contracts';
 import type { Database } from '@impera/db';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 
@@ -34,7 +34,7 @@ export interface FansModule extends FansService {
   };
   /**
    * Mounted under `/v1` by the server: `/fans/:id/flags`, read by the dashboard and set by a chatter, and
-   * `/fans/:id/card`, his card read and corrected (ADR 0085), `/fans/:id/language`, his kept language (ADR 0168), and `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
+   * `/fans/:id/card`, his card read and corrected (ADR 0085), `/fans/:id/language`, his kept language with her active persona's languages (`personaLanguagesOf`, ADR 0168), and `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
    * request; all of them when she has none, or without it). `fanAccess` (the `conversations` module) lets a member
    * whose scope is `self` read, never write, the sheet of a fan of a creator his window opens or of a conversation he
    * holds, each read in the audit log (ADR 0025). `/fans?creatorId=…`, every fan of a creator for the agency (ADR
@@ -45,8 +45,12 @@ export interface FansModule extends FansService {
     kycSlotsOf?: KycSlotsOf,
     fanAccess?: FanAccess,
     usdRateMicrosOf?: UsdRateMicrosOf,
+    personaLanguagesOf?: PersonaLanguagesOf,
   ): FastifyPluginAsyncZod;
 }
+
+/** The languages her active persona speaks, in her order (ADR 0168); none without an active version. */
+type PersonaLanguagesOf = (creatorId: CreatorId) => Promise<readonly Language[]>;
 
 /** Her persona's canvas lines (P5-01), in her order; `null` when she has no active persona version. */
 type KycSlotsOf = (creatorId: CreatorId) => Promise<readonly KycSlot[] | null>;
@@ -74,12 +78,13 @@ export function createFansModule(deps: FansDeps): FansModule {
         kycSlotsOf = () => Promise.resolve(null),
         fanAccess = noFanAccess,
         usdRateMicrosOf = () => Promise.resolve(null),
+        personaLanguagesOf = () => Promise.resolve([]),
       ) =>
       async (app) => {
         await app.register(createListRoutes(createFanListReader(deps.db, usdRateMicrosOf), requireRole));
         await app.register(createFlagRoutes(service, requireRole, undefined, fanAccess));
         await app.register(createCardRoutes(service, requireRole, fanAccess));
-        await app.register(createLanguageRoutes(service, requireRole, fanAccess));
+        await app.register(createLanguageRoutes(service, requireRole, personaLanguagesOf, fanAccess));
         await app.register(
           createKycRoutes(
             service,

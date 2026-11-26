@@ -23,7 +23,7 @@ import type { CopilotLive } from '../../domain/copilot-assist';
 import type { CopilotReader } from '../../domain/ports';
 
 import { openedLately, writeOpening } from './openings';
-import { readCopilotTrace, toStoredEvent } from './rows';
+import { readCopilotTrace, readDraftTranslation, toStoredEvent } from './rows';
 
 /** A fan's message waits for the agent: queued, or being written. */
 const WRITING_STATES = new Set(['pending', 'drafting']);
@@ -176,6 +176,7 @@ export function createDrizzleCopilotReader(db: Database): CopilotReader {
                   bubbles: draft.bubbles,
                   createdAt: draft.createdAt,
                   placedAt: draft.placedAt,
+                  translation: readDraftTranslation(draft.policyTrace),
                 },
           live,
         };

@@ -5,6 +5,7 @@ import type {
   DatedRanges,
   AlertTrigger,
   CopilotTrace,
+  DraftTranslation,
   FanFlags,
   HandoffCause,
   Language,
@@ -277,6 +278,8 @@ type AgentComposeResult = (
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
   /** What the code decided with the draft, as the copilot panel reads it (ADR 0141 lot a): kept with the draft. */
   readonly copilot?: CopilotTrace;
+  /** Her draft in French for the team when she writes in another language (ADR 0168 § 9): shown, never sent. */
+  readonly translation?: DraftTranslation;
   /**
    * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
    * draft, only what his message and Reveal changed: a step not written was not sent.
@@ -811,6 +814,7 @@ async function quietTurn(
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
+    ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: [],
@@ -901,6 +905,19 @@ const copilotOf = (
   });
 };
 
+/**
+ * Her draft in French for the team (ADR 0168 § 9), one bubble per bubble of hers: the voice's French, and the code's
+ * own bubble after it when one is added. None when the voice gave none that fits.
+ */
+function translationFor(
+  composed: Pick<ComposedTurn, 'translation'>,
+  added?: string,
+): { readonly translation?: DraftTranslation } {
+  if (composed.translation === undefined) return {};
+  const bubbles = added === undefined ? [...composed.translation] : [...composed.translation, added];
+  return { translation: { language: 'french', bubbles } };
+}
+
 /** His kept language (ADR 0168 § 3); `null` when none, without his limits, or when it does not read. */
 async function keptLanguageOf(
   limits: FanLimits | undefined,
@@ -967,6 +984,8 @@ async function settleCare(
     bubbles: help
       ? [...composed.bubbles, helpBubble(helpLanguageOf(fanText, composed.language?.reply ?? null))]
       : composed.bubbles,
+    // The help bubble is the code's own: its French beside the voice's (ADR 0168 § 9).
+    ...translationFor(composed, help ? helpBubble('french') : undefined),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: composed.brief === undefined ? [] : withoutOrders(composed.brief.factsProposed),
@@ -1065,6 +1084,7 @@ async function settle(
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
+    ...translationFor(composed),
     softViolations: composed.violations.map((v) => v.code),
     costUsd,
     factsProposed: withoutOrders(composed.brief.factsProposed),

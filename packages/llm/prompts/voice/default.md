@@ -1,5 +1,5 @@
 ---
-version: 1.14.0
+version: 1.15.0
 role: voice
 model_hint: grok-4.7
 output_schema: VoiceOutput
@@ -93,3 +93,5 @@ Quand un bloc <waiting_step> suit la consigne, c'est ce qu'elle lui a déjà env
 # Sortie
 
 Un objet JSON : {"bubbles": ["première bulle", "deuxième bulle"]}.
+
+Quand la consigne de langue le demande, ajoute `translation` : la même réponse en français, une bulle pour chaque bulle, dans le même ordre ({"bubbles": […], "translation": […]}). Elle est lue par l'équipe seulement, jamais envoyée. Sinon, pas de `translation`.

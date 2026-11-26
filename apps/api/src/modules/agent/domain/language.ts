@@ -231,3 +231,19 @@ export function quietLanguage(
     humanOnly: (kept !== null && !isGuardedLanguage(kept)) || !isGuardedLanguage(reply),
   };
 }
+
+/**
+ * Her answer in French for the team (ADR 0168 § 9), from the voice's own call: only when she writes in another
+ * language, and only one French bubble per bubble of hers, none empty. Anything else is no translation (`null`):
+ * the answer never depends on it, and it is never sent.
+ */
+export function translationOf(
+  reply: Language,
+  bubbles: readonly string[],
+  translation: readonly string[] | undefined,
+): readonly string[] | null {
+  if (reply === 'french' || translation === undefined) return null;
+  if (translation.length !== bubbles.length || bubbles.length === 0) return null;
+  const cleaned = translation.map((bubble) => bubble.trim());
+  return cleaned.some((bubble) => bubble === '') ? null : cleaned;
+}

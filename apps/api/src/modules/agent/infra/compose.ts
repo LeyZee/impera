@@ -38,7 +38,7 @@ import {
   type ScriptStart,
   type ScriptStartBlock,
 } from '../domain/availability';
-import { bubbleBudget, fitBubbles } from '../domain/bubbles';
+import { bubbleBudget, fitBubbles, type BubbleBudget } from '../domain/bubbles';
 import { CARE_BRIEF, CARE_TONE_HINTS, checkCare } from '../domain/care';
 import {
   checkNoCommitment,
@@ -69,7 +69,7 @@ import {
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
-import { decideLanguage, quietLanguage, type LanguageDecision } from '../domain/language';
+import { decideLanguage, quietLanguage, translationOf, type LanguageDecision } from '../domain/language';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -304,15 +304,22 @@ export interface ScriptsInput {
   readonly teased?: number;
 }
 
+/** His language for her scripts (ADR 0168 § 8): the one this message keeps, else his kept one, else French. */
+function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): Language {
+  return language.keep ?? input.keptLanguage?.value ?? 'french';
+}
+
 /** The scripts the brain may pick from, by the short ids it answers with (`s1`…). */
 function scriptChoices(
   scripts: ScriptsInput | undefined,
   situation: Situation,
+  language: Language,
 ): readonly { readonly id: string; readonly script: PlatformScriptView }[] {
   if (scripts?.history === undefined || scripts.history === null) return [];
   return permittedScripts(scripts.catalogue, {
     moment: isNight(situation) ? 'night' : 'day',
     history: scripts.history,
+    language,
   })
     .slice(0, BRAIN_SCRIPTS_MAX)
     .map((script, index) => ({ id: brainScriptId(index), script }));
@@ -704,6 +711,26 @@ export interface ComposedTurn {
   readonly rewritten?: true;
   /** The language code decided for this turn (ADR 0168): absent only when a media handed him to a human first. */
   readonly language?: LanguageDecision;
+  /**
+   * Her bubbles in French for the team, one per bubble that leaves, when she writes in another language (ADR 0168
+   * § 9): from the same voice call, never sent, never read by a guard. Absent when none fits.
+   */
+  readonly translation?: readonly string[];
+}
+
+/**
+ * Her answer in French as the bubbles that leave are cut (ADR 0168 § 9): the voice's French, kept only one per bubble
+ * it wrote, then fitted and joined like them. Absent when she writes in French or it does not fit.
+ */
+function translationOfVoice(
+  voice: Awaited<ReturnType<LlmGateway['voice']>>,
+  reply: Language,
+  budget: BubbleBudget,
+  splitMessages: boolean | undefined,
+): { readonly translation?: readonly string[] } {
+  if (!voice.ok) return {};
+  const french = translationOf(reply, voice.value.output.bubbles, voice.value.output.translation);
+  return french === null ? {} : { translation: asSent(fitBubbles(french, budget), splitMessages) };
 }
 
 /** The languages her output guard lets through (ADR 0168 § 4): hers that the guards cover. */
@@ -813,6 +840,7 @@ async function writeFollowUp(
     voiceBrief: brief,
     voiceInput,
     bubbles: asSent(written, persona.splitMessages),
+    ...translationOfVoice(voice, base.language?.reply ?? 'french', 1, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
     isBlocked: isBlocked(violations) || !voice.ok,
@@ -912,7 +940,8 @@ export async function composeTurn(
   }
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
-  const choices = scriptChoices(input.scripts, input.situation);
+  const scriptLanguage = scriptLanguageOf(language, input);
+  const choices = scriptChoices(input.scripts, input.situation, scriptLanguage);
   const brainScripts: BrainScript[] = choices.map(({ id, script }) => ({
     id,
     description: script.description,
@@ -1081,6 +1110,7 @@ export async function composeTurn(
           latest: input.scripts.latest,
           catalogue: input.scripts.catalogue,
           history: input.scripts.history,
+          language: scriptLanguage,
           moment: isNight(input.situation) ? 'night' : 'day',
           hotSession: heat >= input.offer.limits.minDesire,
           // Only an id it was given: anything else picks nothing.
@@ -1386,6 +1416,7 @@ export async function composeTurn(
     voiceBrief,
     voiceInput,
     bubbles,
+    ...translationOfVoice(voice, voiceLanguage.reply, budget, persona.splitMessages),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
     isBlocked: isBlocked(violations) || !voice.ok,

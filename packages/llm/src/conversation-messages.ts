@@ -137,6 +137,11 @@ export function describeLanguage(language: VoiceLanguage | undefined): string {
       `Ses messages en ${name(language.reply)}, pour le ton : un ${name(language.reply)} courant, quelques touches de sa région, jamais un dialecte plein.`,
       ...language.examples.map((example) => `- ${example}`),
     );
+  // The team reads French (ADR 0168 § 9): the same call writes her answer in French beside it, never sent.
+  if (language.reply !== 'french')
+    lines.push(
+      'Pour l’équipe, ajoute `translation` : sa réponse en français, une bulle pour chaque bulle, dans le même ordre.',
+    );
   return lines.join('\n');
 }
 

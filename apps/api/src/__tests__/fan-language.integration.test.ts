@@ -16,6 +16,7 @@ import { createLogger } from '../logger';
 import { buildServer, type Server } from '../server';
 
 import { testConfig } from './support/config';
+import { activateDemoPersona } from './support/persona';
 import { DASHBOARD_ORIGIN, signIn } from './support/sign-in';
 
 const OWNER = { email: 'owner@example.test', name: 'Owner', password: 'correct horse battery' };
@@ -61,6 +62,8 @@ describe('the fan’s language (GET and PUT /v1/fans/:id/language, ADR 0168 § 3
     await createOwner(app.auth, app.db.db, OWNER);
     anna = (await app.modules.persona.creators.create({ displayName: 'Anna' })).id;
     bea = (await app.modules.persona.creators.create({ displayName: 'Bea' })).id;
+    // Her languages come from her active version: the demo persona (french, spanish, english), for Anna only.
+    await activateDemoPersona(app, anna);
     // An invented fan of Anna (ADR 0010).
     const accountId = newId(PlatformAccountIdSchema);
     fan = newId(FanIdSchema);
@@ -98,7 +101,11 @@ describe('the fan’s language (GET and PUT /v1/fans/:id/language, ADR 0168 § 3
   });
 
   it('is empty at first, then what code read on his messages', async () => {
-    expect(FanLanguageViewSchema.parse((await get(operator)).json())).toEqual({ fanId: fan, language: null });
+    expect(FanLanguageViewSchema.parse((await get(operator)).json())).toEqual({
+      fanId: fan,
+      language: null,
+      personaLanguages: ['french', 'spanish', 'english'],
+    });
     await app.modules.fans.keepDetectedLanguage(anna, fan, 'italian');
     expect(FanLanguageViewSchema.parse((await get(owner)).json()).language).toMatchObject({
       value: 'italian',
@@ -110,6 +117,11 @@ describe('the fan’s language (GET and PUT /v1/fans/:id/language, ADR 0168 § 3
   it('is set by a chatter, audited, and code never overwrites it', async () => {
     const written = await put(operator, { language: 'english' });
     expect(written.statusCode).toBe(200);
+    expect(FanLanguageViewSchema.parse(written.json()).personaLanguages).toEqual([
+      'french',
+      'spanish',
+      'english',
+    ]);
     expect(FanLanguageViewSchema.parse(written.json()).language).toMatchObject({
       value: 'english',
       source: 'set',

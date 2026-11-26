@@ -54,8 +54,28 @@ export type FanLanguage = z.infer<typeof FanLanguageSchema>;
 export const SetFanLanguageBodySchema = z.object({ language: LanguageSchema }).strict();
 export type SetFanLanguageBody = z.infer<typeof SetFanLanguageBodySchema>;
 
-/** The answer of `GET` and `PUT /v1/fans/:id/language`. */
+/**
+ * The answer of `GET` and `PUT /v1/fans/:id/language`: his kept language, and the languages her active persona speaks,
+ * in her order (`spoken_languages`), empty without an active persona.
+ */
 export const FanLanguageViewSchema = z
-  .object({ fanId: FanIdSchema, language: FanLanguageSchema.nullable() })
+  .object({
+    fanId: FanIdSchema,
+    language: FanLanguageSchema.nullable(),
+    personaLanguages: z.array(LanguageSchema),
+  })
   .strict();
 export type FanLanguageView = z.infer<typeof FanLanguageViewSchema>;
+
+/**
+ * Her draft in French for the chatter, when she writes to him in another language (ADR 0168 § 9): written by the
+ * voice in the same call, one French bubble per bubble of hers, read by the team only. Never sent, never guarded in
+ * her place: the guards read her own bubbles.
+ */
+export const DraftTranslationSchema = z
+  .object({
+    language: z.literal('french'),
+    bubbles: z.array(z.string().trim().min(1).max(2_000)).min(1).max(10),
+  })
+  .strict();
+export type DraftTranslation = z.infer<typeof DraftTranslationSchema>;

@@ -100,6 +100,7 @@ function viewOf(creatorId: CreatorId, read: CopilotRead, now: Date): CopilotDraf
         bubbles: [...read.draft.bubbles],
         createdAt: read.draft.createdAt.toISOString(),
         placedAt: read.draft.placedAt?.toISOString() ?? null,
+        translation: read.draft.translation,
       },
       assist: copilotAssist(read.live, now, true),
     };
