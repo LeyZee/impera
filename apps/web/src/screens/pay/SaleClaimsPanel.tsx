@@ -103,7 +103,7 @@ export function SaleClaimsPanel({
                     {claim.memberName}
                   </p>
                   <ShiftLine shift={claim.shift} zone={zone} />
-                  <p className="py-claim__note">{quoted(claim.note)}</p>
+                  <p className="nv-note">{quoted(claim.note)}</p>
                   {failed === null ? null : (
                     <p className="tm-warn sc-refusal nv-swap" role="alert">
                       {payRefusalText(failed, { memberName: () => claim.memberName })}

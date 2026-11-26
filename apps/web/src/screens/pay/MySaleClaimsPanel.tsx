@@ -94,7 +94,7 @@ export function MySaleClaimsPanel(): JSX.Element | null {
                 <li key={claim.id} className="py-held__row py-claim">
                   <div className="py-held__main">
                     <ShiftLine shift={claim.shift} zone={zone} />
-                    <p className="py-claim__note">{quoted(claim.note)}</p>
+                    <p className="nv-note">{quoted(claim.note)}</p>
                     {answer === null ? null : <p className="py-held__reason">{answer}</p>}
                   </div>
                   <div className="py-held__side">

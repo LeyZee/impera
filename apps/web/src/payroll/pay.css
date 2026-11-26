@@ -1546,18 +1546,6 @@
 
 /* ───────────── « J'ai été décisif sur une vente » (ADR 0101 §§ 18 to 22, trou 15) ───────────── */
 
-/* The member's note, quoted as he wrote it: a datum, the validator reads it before he looks for the sale. */
-.py-claim__note {
-  margin: var(--nv-space-1) 0 0;
-  padding: var(--nv-space-2) var(--nv-space-3);
-  border-radius: var(--nv-radius-sm);
-  background: var(--nv-fill-soft);
-  color: var(--nv-ink);
-  font-size: var(--nv-text-footnote);
-  line-height: var(--nv-text-footnote-leading);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 /* Where a claim stands: amber while it waits, the success colour settled; not retained and withdrawn are closed,
    never an alarm: quiet ink (Design, #1026). */
 .py-claim__state {

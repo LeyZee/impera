@@ -252,6 +252,16 @@ describe('voice guards', () => {
     expect(codes(['Cette vidéo, tu l’ouvres en touchant le cadenas'])).toEqual([]);
   });
 
+  it('blocks « mdr » and its stretched forms, never a word that only starts like it (eval passe-15)', () => {
+    for (const laugh of ['mdr t’es bête', 'Mdrr', 'MDRRR 😂', 'non mais mdrrrr']) {
+      expect(codes([laugh]), laugh).toContain('forbidden_term');
+    }
+    const blocked = checkVoiceOutput(['mdrr'], DEFAULT_GUARD_SETTINGS);
+    expect(isBlocked(blocked)).toBe(true);
+    expect(codes(['T’es bête toi 😅'])).toEqual([]);
+    expect(codes(['On dit mdrine en Bretagne ?'])).toEqual([]);
+  });
+
   it('blocks a discount or a negotiation, and lets her refusal of one through', () => {
     for (const bubble of [
       'Allez je te fais un petit prix 😘',
@@ -343,6 +353,17 @@ describe('voice guards', () => {
     expect(violations.map((v) => [v.code, v.severity])).toEqual([['guilt_trip', 'soft']]);
     expect(codes(['Tant pis, une prochaine fois 😌'])).toEqual([]);
     expect(codes(['Tu me déçois pas 😏'])).toEqual([]);
+  });
+
+  it('blocks any child or minor she names, joking or sexual, never « beau gosse » (Charles 21/11)', () => {
+    for (const text of [
+      'T’es qu’un gamin',
+      'Comme une écolière 😏',
+      'On dirait un ado',
+      'like a little girl',
+    ])
+      expect(codes([text])).toContain('minor_reference');
+    expect(codes(['Salut beau gosse 😏'])).not.toContain('minor_reference');
   });
 
   it('asks for a regeneration on a pet name she never gives, and lets hers through', () => {

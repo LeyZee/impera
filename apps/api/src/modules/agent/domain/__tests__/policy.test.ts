@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { maySulk, offerableScripts, offerDecision, offerSignals, type OfferContext } from '../policy';
+import {
+  asksMoreSameEvening,
+  keepsWarm,
+  sameEvening,
+  maySulk,
+  offerableScripts,
+  offerDecision,
+  offerSignals,
+  type OfferContext,
+} from '../policy';
 
 const NOW = new Date('2026-10-17T20:00:00Z');
 const hoursAgo = (hours: number): Date => new Date(NOW.getTime() - hours * 3_600_000);
@@ -70,11 +79,47 @@ describe('offerDecision', () => {
     expect(offerDecision({ ...base, risks: ['meet_request'] })).toEqual({ allowed: true });
   });
 
-  it('lifts the cooldown, the no-budget stop and his score when he asks for paid content himself, never a risk', () => {
+  it('lifts the no-budget stop and his score when he asks for paid content himself, never a risk nor the evening', () => {
     const asks = { ...base, fanAsksForPaid: true, desire: 0 };
-    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(1) })).toEqual({ allowed: true });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(11) })).toEqual({ allowed: true });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(7) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
     expect(offerDecision({ ...asks, hasNoBudget: true })).toEqual({ allowed: true });
     expect(offerDecision({ ...asks, risks: ['money_trouble'] })).toEqual({ allowed: false, reason: 'risk' });
+  });
+
+  it('never two scripts the same evening, even when he asks again (ADR 0158 § 42, eval passe-18)', () => {
+    // A big spender bought a whole script an hour and a half ago and asks for more: nothing new opens tonight.
+    const asks = { ...base, fanAsksForPaid: true, desire: 85 };
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(1.5) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(5.9) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    // Not 6 h any more (guide 26/11): her cooldown at least, and never before her next day.
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(9) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(11) })).toEqual({ allowed: true });
+  });
+
+  it('sells nothing to a fan « à sec » until his pay, and lifts it when he asks himself (eval passe-11a)', () => {
+    // The brain reads `no_budget`, not `money_trouble`: no sale, and nothing frozen on him (`protectionFor`).
+    expect(offerDecision({ ...base, risks: ['no_budget'] })).toEqual({ allowed: false, reason: 'no_budget' });
+    expect(offerDecision({ ...base, risks: ['no_budget'], fanAsksForPaid: true })).toEqual({ allowed: true });
+  });
+
+  it('never sells to a fan who insults her, even when he asks (ADR 0158 § 18 and § 25)', () => {
+    expect(offerDecision({ ...base, risks: ['insult'], fanAsksForPaid: true })).toEqual({
+      allowed: false,
+      reason: 'risk',
+    });
   });
 });
 
@@ -214,5 +259,37 @@ describe('offerSignals', () => {
       offerSignals({ intent: 'small_talk', sentiment: 'positive', desireSignals: ['states_desire'] })
         .fanSexualizes,
     ).toBe(true);
+  });
+});
+
+describe('the same evening (passe 18, guide 26/11): at least her cooldown, never before her next day', () => {
+  const limits = { cooldownHours: 10, minDesire: 0 };
+  const now = new Date('2026-10-17T21:00:00Z'); // 23:00 in Paris
+  const at = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
+  it('counts only his own asking within the same evening', () => {
+    const ask = (lastOfferAt: Date | null, fanAsksForPaid: boolean) =>
+      asksMoreSameEvening({ now, lastOfferAt, fanAsksForPaid, limits, timeZone: 'Europe/Paris' });
+    expect(ask(at(1), true)).toBe(true);
+    expect(ask(at(1), false)).toBe(false);
+    expect(ask(at(7), true)).toBe(true);
+    expect(ask(null, true)).toBe(false);
+  });
+
+  it('lasts her cooldown, and past it still until her next day', () => {
+    expect(sameEvening(now, at(9), 10, undefined)).toBe(true);
+    expect(sameEvening(now, at(11), 10, undefined)).toBe(false);
+    // 11 h ago in Paris was 12:00 the same day: still the same day there.
+    expect(sameEvening(now, at(11), 10, 'Europe/Paris')).toBe(true);
+    expect(sameEvening(now, at(24), 10, 'Europe/Paris')).toBe(false);
+  });
+});
+
+describe('a broke fan kept warm (passe 11a, Charles 21/11)', () => {
+  it('keeps warm only a fan who already paid and is broke for now, never a fan in real trouble', () => {
+    expect(keepsWarm({ risks: ['no_budget'], hasBought: true })).toBe(true);
+    expect(keepsWarm({ risks: ['no_budget'], hasBought: false })).toBe(false);
+    expect(keepsWarm({ risks: [], hasBought: true })).toBe(false);
+    expect(keepsWarm({ risks: ['no_budget', 'money_trouble'], hasBought: true })).toBe(false);
+    expect(keepsWarm({ risks: ['no_budget', 'distress'], hasBought: true })).toBe(false);
   });
 });

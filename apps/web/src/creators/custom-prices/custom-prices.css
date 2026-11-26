@@ -70,6 +70,19 @@
 .smp-rows--supplements .smp-row__never {
   margin: 0;
 }
+.smp-colhead--ready,
+.smp-rows--ready > .smp-row {
+  grid-template-columns: minmax(0, 1fr) 7rem 7rem 8.5rem 4.5rem;
+}
+/* A type of video: every cell on the top of its field, so a message under one never shifts its pair; the switch and
+   « Retirer » sit on the field's height, not on a field with its message. */
+.smp-rows--ready > .smp-row {
+  align-items: start;
+}
+.smp-rows--ready .smp-offered,
+.smp-rows--ready .smp-row__remove {
+  min-height: var(--nv-target-min);
+}
 .smp-row[data-off='true'] .smp-row__label {
   color: var(--nv-ink-muted);
 }
@@ -244,7 +257,8 @@
     display: none;
   }
   .smp-rows--formats > .smp-row,
-  .smp-rows--supplements > .smp-row {
+  .smp-rows--supplements > .smp-row,
+  .smp-rows--ready > .smp-row {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
@@ -283,6 +297,24 @@
     order: -2;
   }
   .smp-rows--supplements .smp-row__remove {
+    order: -1;
+  }
+  /* A type of video: its name and « Retirer », then its range and the switch; a message never shifts its pair. */
+  .smp-rows--ready > .smp-row {
+    align-items: flex-start;
+  }
+  /* « Retirer » beside the name's field, under its label. */
+  .smp-rows--ready .smp-row__remove {
+    margin-top: calc(var(--nv-text-caption-leading) + 2px);
+  }
+  .smp-rows--ready .smp-unit {
+    flex: 0 0 6.5rem;
+  }
+  .smp-rows--ready .smp-row__name {
+    flex: 1 1 calc(100% - 6rem - var(--nv-space-3));
+    order: -2;
+  }
+  .smp-rows--ready .smp-row__remove {
     order: -1;
   }
   .smp-calc {
