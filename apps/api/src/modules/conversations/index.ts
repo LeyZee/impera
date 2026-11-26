@@ -42,6 +42,7 @@ import { createDraftCorrectionsRoutes } from './infra/http/draft-corrections-rou
 import { createConversationRoutes, type RequireRole } from './infra/http/routes';
 
 export { SendRefused } from './domain/errors';
+export { scriptRunsForTeam } from './infra/db/script-runs';
 export type {
   BubbleGuard,
   CardReader,
