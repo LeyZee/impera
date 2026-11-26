@@ -1,6 +1,6 @@
 import { normaliseWords } from '@impera/contracts';
 
-import { MINOR_REFERENCE, YOUTH_WORDS, YOUTH_WORDS_ACCENTED } from './guards';
+import { MINOR_REFERENCE, withoutProcreation, YOUTH_WORDS, YOUTH_WORDS_ACCENTED } from './guards';
 
 /**
  * Themes no desire map ever plays (Sécurité, #1043): youth, the absence of consent, the family, an animal. Universal,
@@ -28,36 +28,6 @@ const FAMILY =
 const ANIMAL =
   /\b(animal|animale|animaux|zoophilie|bestialite|chiens?|chevaux|cheval|animals?|bestiality|zoophilia|dogs?|horses?|animali|zoofilia|cavallo|animales|perros?|caballos?)\b/;
 
-// Procreation between adults stays playable (Charles 26/11 at 23:45): a child or a baby right after a verb of making
-// one (« te faire un enfant », « te remplir pour te faire un bébé », « give you a baby », « hacerte un bebé ») is no
-// minor. Only a pronoun, « pour te faire » and an article may stand between: a longer phrase is read as it is. « Une
-// enfant » is a girl, never a birth: the feminine article is left out.
-const PROCREATION = new RegExp(
-  [
-    '\\b(?:fais|faire|fait|ferai|ferais|avoir|aurai|veux|voudrais|porter|porte|porterai|mettre|mets|met|remplir|remplis',
-    '|engrosser|donner|donne|donnerai|make|making|have|having|give|giving|carry|carrying|fare|avere|dare|hacer|hacerte',
-    '|tener|dar|darte)',
-    '(?: (?:te|me|lui|vous|nous|t|m|you|me|her|ti|mi|le|toi|moi))?',
-    '(?: pour (?:te|me|lui|vous|nous|t|m) faire)?',
-    '(?: (?:un|des|mon|ton|son|notre|votre|nos|vos|a|an|your|my|our|uno|tuo|mio|nostro|tu|mi|nuestro))?',
-    ' (?:enfants?|bebes?|babies|baby|child|children|kids?|figli[oa]?|bambin[aeio]|hij[oa]s?)\\b',
-  ].join(''),
-  'gu',
-);
-
-/** His words without what speaks of making a child between adults: procreation is no word of youth. */
-function withoutProcreation(words: string): string {
-  return words.replace(PROCREATION, ' ');
-}
-
-/**
- * Words of youth, « petite » alone left out in each language (« piccola », « pequeña »): a « petite robe » is a dress,
- * « ma petite » a pet name of hers.
- */
-const youthWords = new RegExp(YOUTH_WORDS.source, 'g');
-const BARE_SMALL = /^(petites?|piccol[ae]|pequeñ[ao]s?)$/iu;
-const isBarePetite = (word: string) => BARE_SMALL.test(word);
-
 /**
  * Whether a text names youth: a word of youth or of a minor, a school role, an age under 18; procreation between
  * adults and « petite » alone left out. `raw` is the text as written, for the accented words `normalise` would blur.
@@ -66,8 +36,8 @@ export function namesYouth(text: string, raw: string = text): boolean {
   const adultWords = withoutProcreation(normaliseWords(text));
   return (
     MINOR_REFERENCE.test(adultWords) ||
-    [...adultWords.matchAll(youthWords)].some((match) => !isBarePetite(match[0])) ||
-    !isBarePetite(YOUTH_WORDS_ACCENTED.exec(raw)?.[2] ?? 'petite') ||
+    YOUTH_WORDS.test(adultWords) ||
+    YOUTH_WORDS_ACCENTED.test(raw) ||
     YOUTH_ROLES.test(adultWords) ||
     MINOR_AGE_WORDS.test(adultWords)
   );

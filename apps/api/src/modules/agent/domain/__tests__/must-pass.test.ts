@@ -33,6 +33,19 @@ describe('permitted phrases that must always pass, output guards', () => {
     'my baby, I missed you',
     'piccola mia, che bella giornata',
     'mi bebé, te extrañé',
+    't’as des enfants ?',
+    'tes gosses ce week-end ?',
+    'quand j’étais ado',
+    'un détail mineur',
+    't’es un grand enfant',
+    'je veux porter ton enfant',
+    'enfant, j’étais comme ça',
+    'quand j’étais petite j’adorais la mer',
+    't’étais comment enfant ?',
+    'mon enfance à la campagne',
+    'have you got kids?',
+    'hai figli?',
+    '¿tienes hijos?',
   ])('minor_reference lets « %s » through', (bubble) => {
     expect(raised(bubble)).not.toContain('minor_reference');
   });
@@ -46,6 +59,18 @@ describe('permitted phrases that must always pass, output guards', () => {
     ['je t’envoie une petite photo', false],
     ['ma petite robe noire te plaît ?', false],
     ['una piccola foto per te', false],
+    ['mes petits seins n’attendent que toi', true],
+    ['je garde ma petite culotte pour toi', true],
+    ['ma petite robe noire glisse', true],
+    ['viens mon petit cœur', true],
+    ['ma piccola gonna nera', true],
+    ['mi pequeña cintura es tuya', true],
+    ['ta petite coquine est toute à toi', true],
+    ['la mia piccola', true],
+    ['ven aquí nena', true],
+    ['toute jeune dans ma tête', true],
+    ['je veux porter ton enfant', true],
+    ['je veux te faire un enfant', true],
   ] as const)('youth_word_in_sex lets « %s » through (sexual turn: %s)', (bubble, sexual) => {
     expect(checkYouthWords([bubble], sexual)).toEqual([]);
   });
@@ -123,6 +148,10 @@ describe('permitted phrases that must always pass, input nets', () => {
     'when I was in high school I was shy',
     'da ragazzo giocavo a calcio',
     'cuando era joven jugaba al fútbol',
+    'enfant, j’étais comme ça',
+    'quand j’étais petit j’adorais la mer',
+    't’étais comment enfant ?',
+    'mon enfance à la campagne',
   ])('safetySigns finds no minor in « %s »', (text) => {
     expect(safetySigns(text, new Date('2026-11-26T12:00:00Z'))).not.toContain('minor_suspected');
   });

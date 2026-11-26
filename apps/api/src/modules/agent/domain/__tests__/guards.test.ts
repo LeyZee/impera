@@ -367,18 +367,26 @@ describe('voice guards', () => {
     expect(codes(['Salut beau gosse 😏'])).not.toContain('minor_reference');
   });
 
-  it('lets an adult fantasy of making a baby through, the age gate kept, minor words still blocked (Charles 26/11)', () => {
-    for (const text of ['fais-moi un bébé', 'tu vas me mettre enceinte']) {
+  it('lets an adult fantasy of making a baby through, and blocks a minor named on a sexual turn (Charles 27/11 at 0:06)', () => {
+    for (const text of ['fais-moi un bébé', 'tu vas me mettre enceinte', 'je veux porter ton enfant']) {
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
+      expect(checkYouthWords([text], true), text).toEqual([]);
     }
-    // « Enfant » stays a minor's word, whatever the sentence: « je veux porter ton enfant » is refused too.
+    // Outside the sexual register, her family, his and her memories pass.
     for (const text of [
-      'un enfant de toi',
-      'je veux porter ton enfant',
-      'ta petite fille',
-      'comme une gamine',
+      't’as des enfants ?',
+      'tes gosses ce week-end ?',
+      'quand j’étais ado',
+      'un détail mineur',
     ])
-      expect(codes([text]), text).toContain('minor_reference');
+      expect(codes([text]), text).not.toContain('minor_reference');
+    // On a sexual turn, a child or a minor named is blocked; a comparison, everywhere.
+    for (const text of ['je pense à un enfant', 'comme une ado', 'enfant, j’étais déjà comme ça'])
+      expect(
+        checkYouthWords([text], true).map((v) => v.code),
+        text,
+      ).toContain('minor_reference');
+    expect(codes(['comme une gamine'])).toContain('minor_reference');
   });
 
   it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
@@ -387,31 +395,47 @@ describe('voice guards', () => {
     expect(codes(['on dirait celle d’un enfant'])).toContain('minor_reference');
   });
 
-  it('blocks a word of youth in a sexual message, in four languages, and lets it be outside (Charles 26/11)', () => {
+  it('blocks a word that says she is young in a sexual message, in four languages, and lets it be outside (Charles 26/11, 27/11)', () => {
     for (const text of [
-      'ta petite coquine est toute à toi',
+      'je suis ta petite fille sage',
+      'ta gamine t’attend',
+      'ton ado est là',
+      'ta lycéenne t’attend',
+      'ton écolière t’attend',
       'ta jeunette rien que pour toi',
       'ta lolita t’attend',
+      'j’ai l’air d’avoir 15 ans',
       'your little girl wants you',
-      'sono la tua piccola',
+      'sono la tua ragazzina',
       'soy tu niña',
+      'tu colegiala te espera',
     ]) {
       const violations = checkYouthWords([text], true);
       expect(
-        violations.map((v) => [v.code, v.severity]),
+        violations.map((v) => v.code),
         text,
-      ).toEqual([['youth_word_in_sex', 'blocking']]);
+      ).toContain('youth_word_in_sex');
       expect(isBlocked(violations)).toBe(true);
     }
     // Explicit by its own words: sexual, whatever the turn.
-    expect(checkYouthWords(['ta petite toute nue rien que pour toi'], false).map((v) => v.code)).toEqual([
+    expect(checkYouthWords(['ta jeunette toute nue'], false).map((v) => v.code)).toEqual([
       'youth_word_in_sex',
     ]);
+    // « Petite » before a part of the body, a piece of clothing, a thing or a sweet word; a figure of speech.
+    for (const text of [
+      'ta petite coquine est toute à toi',
+      'mes petits seins n’attendent que toi',
+      'je garde ma petite culotte pour toi',
+      'viens mon petit cœur, je te veux',
+      'toute jeune dans ma tête',
+      'la mia piccola',
+      'ven aquí nena',
+      'tu connais Nina ?',
+    ])
+      expect(checkYouthWords([text], true), text).toEqual([]);
     // Outside the sexual register, her words stay hers.
     expect(checkYouthWords(['je t’envoie une petite photo de mon café ☕'], false)).toEqual([]);
     expect(checkYouthWords(['ma petite sœur passe ce soir'], false)).toEqual([]);
-    expect(checkYouthWords(['tu connais Nina ?'], true)).toEqual([]);
-    expect(checkYouthWords(['viens mon petit cœur, je te veux'], true)).toEqual([]);
   });
 
   it('asks for a regeneration on a pet name she never gives, and lets hers through', () => {

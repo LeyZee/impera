@@ -1,4 +1,4 @@
-import { normalise, unmask, type GuardCode } from '@impera/contracts';
+import { normalise, normaliseWords, unmask, type GuardCode } from '@impera/contracts';
 
 /**
  * Guards on the voice output, before anything can be sent (docs/architecture/ai-engine.md, « Les gardes »).
@@ -87,10 +87,40 @@ const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche
 export const MINOR_REFERENCE =
   /\b(enfants?|gamine?s?|(?<!beau )gosses?|momes?|fillettes?|petite fille|petit garcon|mineure?s?|ados|ado|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?)\b/;
 
+// Charles 21/11, a hard rule: she never compares anyone to a child or a minor, to mock him or otherwise (« on dirait
+// celle d'un enfant », « comme une gamine », « t'es qu'un gamin »). Read on every text. « T'es un grand enfant » is a
+// figure of speech, no comparison.
+const MINOR_COMPARISON =
+  /\b(t'?es qu'|tu (n'?)?es qu'|comme|on dirait|celle d'|celui d'|ceux d'|celles d'|l'air d'|digne d'|taille d'|like|come|como)\s?(une?|a|an|una?|uno|des|les)? ?(enfants?|gamine?s?|gosses?|momes?|fillettes?|petite fille|petit garcon|ados?|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|little girls?|bambin[aeio]|ragazzin[aeio]|nin[ao]s?)\b/;
+
+// Procreation between adults is no minor (Charles 26/11): a child or a baby right after a verb of making one (« te
+// faire un enfant », « porter ton enfant », « te remplir pour te faire un bébé », « give you a baby », « hacerte un
+// bebé »). Only a pronoun, « pour te faire » and an article may stand between; « une enfant » is a girl, never a birth.
+// Read on `normaliseWords` (apostrophes and hyphens as spaces).
+const PROCREATION = new RegExp(
+  [
+    '\\b(?:fais|faire|fait|ferai|ferais|avoir|aurai|veux|voudrais|porter|porte|porterai|mettre|mets|met|remplir|remplis',
+    '|engrosser|donner|donne|donnerai|make|making|have|having|give|giving|carry|carrying|fare|avere|dare|hacer|hacerte',
+    '|tener|dar|darte)',
+    '(?: (?:te|me|lui|vous|nous|t|m|you|me|her|ti|mi|le|toi|moi))?',
+    '(?: pour (?:te|me|lui|vous|nous|t|m) faire)?',
+    '(?: (?:un|des|mon|ton|son|notre|votre|nos|vos|a|an|your|my|our|uno|tuo|mio|nostro|tu|mi|nuestro))?',
+    ' (?:enfants?|bebes?|babies|baby|child|children|kids?|figli[oa]?|bambin[aeio]|hij[oa]s?)(?: (?:avec|with|con) (?:toi|moi|you|me|te|ti))?\\b',
+  ].join(''),
+  'gu',
+);
+
+/** A text's words (`normaliseWords`) without what speaks of making a child between adults. */
+export function withoutProcreation(words: string): string {
+  return words.replace(PROCREATION, ' ');
+}
+
+/** A child or a minor named in a text, procreation between adults left out: the word, or `undefined`. */
+function minorNamed(bubble: string): string | undefined {
+  return MINOR_REFERENCE.exec(withoutProcreation(normaliseWords(bubble)))?.[0];
+}
+
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
-  // Charles 21/11, a hard rule: she never names a child or a minor, to mock him or in anything sexual. Read on every
-  // text, whatever the context: an innocent one is rewritten once, then goes to a human.
-  { code: 'minor_reference', pattern: MINOR_REFERENCE },
   {
     code: 'ai_disclosure',
     // « je suis modèle photo », « je suis assistante dentaire » are jobs: the article is required for those words.
@@ -769,6 +799,9 @@ export function checkVoiceOutput(
       const match = blockingMatch(code, pattern, text, context.allowedPriceMinor);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
+    const compared = MINOR_COMPARISON.exec(text)?.[0];
+    if (compared !== undefined)
+      violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: compared });
     const stage = STAGE_DIRECTION.map((pattern) => pattern.exec(bubble)?.[0]).find((m) => m !== undefined);
     if (stage !== undefined) {
       violations.push({ code: 'stage_direction', severity: 'blocking', bubbleIndex, match: stage });
@@ -820,6 +853,18 @@ export function checkVoiceOutput(
       violations.push({ code: 'bubble_too_long', severity: 'soft', bubbleIndex });
     }
   });
+  // A child or a minor named in a message explicit by its own words (Charles 27/11 at 0:06): blocked. Outside the
+  // sexual register, « t'as des enfants ? » or « quand j'étais ado » are hers; on a sexual turn the composer reads
+  // them with `checkYouthWords`.
+  if (checkExplicit(bubbles).length > 0)
+    bubbles.forEach((bubble, bubbleIndex) => {
+      const named = minorNamed(bubble);
+      if (
+        named !== undefined &&
+        !violations.some((v) => v.code === 'minor_reference' && v.bubbleIndex === bubbleIndex)
+      )
+        violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named });
+    });
   violations.push(...wholeMessage(bubbles, forbidden, violations, context.allowedPriceMinor));
   if (context.previousTurns !== undefined)
     violations.push(...againstHistory(bubbles, context.previousTurns, context.sentBefore ?? []));
@@ -880,25 +925,39 @@ export function checkExplicit(bubbles: readonly string[]): GuardViolation[] {
   return violations;
 }
 
-// Words of youth, on the normalised text (Charles 26/11): never in a sexual message, whoever they describe. « Petit »
-// alone stays (« mon petit cœur » to him); the list reads French, English, Italian and Spanish.
+// Words that describe her, or a character, as young (Charles 26/11, narrowed 27/11 at 0:05): never in a sexual message.
+// « Petite » before a part of the body, a piece of clothing, a thing or a sweet word passes (« ta petite coquine », « la
+// mia piccola »), and so does a figure of speech (« toute jeune dans ma tête »). French, English, Italian and Spanish.
 export const YOUTH_WORDS =
-  /\b(petites?|gamines?|ados?|adolescentes?|lolitas?|jeunettes?|fillettes?|toute jeune|si jeune|jeune fille|little girls?|young girls?|teens?|teenagers?|schoolgirls?|barely legal|piccol[ae]|ragazzin[ae]|bambin[ae]|jovencitas?|nenas?)\b/;
+  /\b(petites? filles?|petit garcon|gamines?|ados?|adolescentes?|lolitas?|jeunettes?|fillettes?|ecolieres?|collegiennes?|lyceennes?|si jeune|jeune fille|little girls?|young girls?|teens?|teenagers?|schoolgirls?|barely legal|ragazzin[ae]|bambin[ae]|liceal[ei]|scolarett[ae]|jovencitas?|colegialas?)\b/;
 // Read before `normalise`, which would make « niña » the first name Nina.
-export const YOUTH_WORDS_ACCENTED = /(^|[^\p{L}])(niñ[ao]s?|pequeñ[ao]s?)($|[^\p{L}])/iu;
+export const YOUTH_WORDS_ACCENTED = /(^|[^\p{L}])(niñ[ao]s?)($|[^\p{L}])/iu;
+// She looks or plays an age under 18: « j'ai l'air d'avoir 15 ans », « comme si j'avais 16 ans ».
+const YOUTH_AGE =
+  /\b(l'?air d'avoir|comme si j'?avais|look(s|ing)? like|sembr[oa] (di )?avere|parezco tener|aparento) (1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix-sept|dix sept|fifteen|sixteen|seventeen)\b/;
 
 /**
  * No word of youth in a sexual message (Charles 26/11): blocking, so her answer is written once more, then a human
  * answers. `sexual`: the composer knows the turn is (a heated exchange, a script running); a message explicit by its
- * own words is sexual anyway. Outside, « une petite photo » stays hers.
+ * own words is sexual anyway. Outside, « une petite photo » stays hers. On a sexual turn a child or a minor named is
+ * blocked too (`minor_reference`), procreation between adults left out.
  */
 export function checkYouthWords(bubbles: readonly string[], sexual: boolean): GuardViolation[] {
-  const explicit = sexual || checkExplicit(bubbles).length > 0;
-  if (!explicit) return [];
+  const ownWords = checkExplicit(bubbles).length > 0;
+  if (!sexual && !ownWords) return [];
   return bubbles.flatMap((bubble, bubbleIndex) => {
-    const match = YOUTH_WORDS.exec(normalise(bubble))?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
-    if (match === undefined) return [];
-    const violation: GuardViolation = { code: 'youth_word_in_sex', severity: 'blocking', bubbleIndex, match };
-    return [violation];
+    const text = normalise(bubble);
+    const match =
+      YOUTH_WORDS.exec(text)?.[0] ?? YOUTH_AGE.exec(text)?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
+    const youth: GuardViolation[] =
+      match === undefined ? [] : [{ code: 'youth_word_in_sex', severity: 'blocking', bubbleIndex, match }];
+    // A child or a minor named on a sexual turn (Charles 27/11 at 0:06), procreation between adults left out. A
+    // message explicit by its own words is read by `checkVoiceOutput` already.
+    const named = ownWords ? undefined : minorNamed(bubble);
+    const minor: GuardViolation[] =
+      named === undefined
+        ? []
+        : [{ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named }];
+    return [...youth, ...minor];
   });
 }
