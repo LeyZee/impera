@@ -5,7 +5,7 @@ import {
   TeamMemberIdSchema,
   UserIdSchema,
 } from '@impera/contracts';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 import { withAdmin, withCreatorAccount, withTenant, withTenantJob, withTenantMember } from './client';
@@ -239,7 +239,6 @@ describe('her decisions (ADR 0164): asked by the code, answered by her or by the
     );
     for (const run of [
       () => withCreatorAccount(test.app.db, noraUser, (tx) => tx.update(d).set({ question: 'Autre ?' })),
-      () => withTenantMember(test.app.db, nora, owner, (tx) => tx.update(d).set({ answers: [] })),
       () => asking(nora, (tx) => tx.update(d).set({ expiresAt: new Date() })),
       () => withCreatorAccount(test.app.db, noraUser, (tx) => tx.delete(d)),
       () => asking(nora, (tx) => tx.delete(d)),
@@ -257,5 +256,98 @@ describe('her decisions (ADR 0164): asked by the code, answered by her or by the
         ),
       ),
     ).toMatch(/creator_decisions_answers_check|permission denied/u);
+  });
+
+  it('lets only the code that asked give other answers, on an open question, for a request counted', async () => {
+    const fresh = newId(CreatorDecisionIdSchema);
+    const other = [
+      { key: 'maybe', label: 'Peut-être', text: null, noted: 'C’est noté.' },
+      { key: 'never', label: 'Jamais', text: null, noted: 'C’est noté.' },
+    ];
+    await asking(nora, (tx) =>
+      tx.insert(d).values({ ...row(fresh, nora, 'publish_time'), otherIdeasLeft: 2 }),
+    );
+    const mine = eq(d.id, fresh);
+    const at = new Date('2026-11-21T10:00:00Z');
+    const fewer = sql`${d.otherIdeasLeft} - 1`;
+    const more = sql`${d.otherIdeasLeft} + 1`;
+    const state = { left: d.otherIdeasLeft, askedAt: d.ideasAskedAt, state: d.state };
+    const refused = /other answers come from the code that asked/u;
+
+    // Neither her account nor the owner's rewrites what she is offered, counts a request or gives herself more.
+    for (const run of [
+      () =>
+        withCreatorAccount(test.app.db, noraUser, (tx) => tx.update(d).set({ answers: other }).where(mine)),
+      () =>
+        withCreatorAccount(test.app.db, noraUser, (tx) =>
+          tx.update(d).set({ otherIdeasLeft: 3 }).where(mine),
+        ),
+      () =>
+        withCreatorAccount(test.app.db, noraUser, (tx) =>
+          tx.update(d).set({ otherIdeasLeft: fewer, ideasAskedAt: at }).where(mine),
+        ),
+      () =>
+        withTenantMember(test.app.db, nora, owner, (tx) =>
+          tx.update(d).set({ answers: other, otherIdeasLeft: 1 }).where(mine),
+        ),
+      // The code that asked: no answer without a request counted, nothing counted unmarked, none given back unasked.
+      () => asking(nora, (tx) => tx.update(d).set({ answers: other }).where(mine)),
+      () => asking(nora, (tx) => tx.update(d).set({ answers: other, otherIdeasLeft: fewer }).where(mine)),
+      () => asking(nora, (tx) => tx.update(d).set({ otherIdeasLeft: fewer }).where(mine)),
+      () => asking(nora, (tx) => tx.update(d).set({ otherIdeasLeft: more }).where(mine)),
+      () => asking(nora, (tx) => tx.update(d).set({ otherIdeasLeft: 0, ideasAskedAt: at }).where(mine)),
+    ])
+      expect(await failure(run())).toMatch(refused);
+
+    // Another creator's job touches nothing of hers.
+    const elsewhere = await asking(ines, (tx) =>
+      tx.update(d).set({ otherIdeasLeft: fewer, ideasAskedAt: at }).where(mine).returning(all),
+    );
+    expect(elsewhere).toEqual([]);
+
+    // Counted, then given back: nothing could be proposed.
+    const counted = () =>
+      asking(nora, (tx) =>
+        tx.update(d).set({ otherIdeasLeft: fewer, ideasAskedAt: at }).where(mine).returning(state),
+      );
+    expect(await counted()).toEqual([{ left: 1, askedAt: at, state: 'open' }]);
+    // Counted and other answers at once in the giving back: refused.
+    expect(
+      await failure(
+        asking(nora, (tx) =>
+          tx.update(d).set({ answers: other, otherIdeasLeft: more, ideasAskedAt: null }).where(mine),
+        ),
+      ),
+    ).toMatch(refused);
+    expect(
+      await asking(nora, (tx) =>
+        tx.update(d).set({ otherIdeasLeft: more, ideasAskedAt: null }).where(mine).returning(state),
+      ),
+    ).toEqual([{ left: 2, askedAt: null, state: 'open' }]);
+
+    // Counted, then filled.
+    await counted();
+    expect(
+      await asking(nora, (tx) =>
+        tx.update(d).set({ answers: other, ideasAskedAt: null }).where(mine).returning(state),
+      ),
+    ).toEqual([{ left: 1, askedAt: null, state: 'open' }]);
+    // Answers that do not hold are still refused by the table.
+    await counted();
+    expect(
+      await failure(asking(nora, (tx) => tx.update(d).set({ answers: [], ideasAskedAt: null }).where(mine))),
+    ).toMatch(/creator_decisions_answers_check/u);
+
+    // Once answered, the question is no longer open: nothing more is offered.
+    await withCreatorAccount(test.app.db, noraUser, (tx) =>
+      tx
+        .update(d)
+        .set({ ...answer(noraUser), answerKey: 'maybe' })
+        .where(mine),
+    );
+    const late = await asking(nora, (tx) =>
+      tx.update(d).set({ answers: other, ideasAskedAt: null }).where(mine).returning(all),
+    );
+    expect(late).toEqual([]);
   });
 });

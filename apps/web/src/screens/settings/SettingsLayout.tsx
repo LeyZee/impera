@@ -57,6 +57,7 @@ const GROUPS: readonly SettingsGroup[] = [
     title: 'Sécurité',
     items: [item('/reglages/alertes'), item('/reglages/sauvegardes'), item('/reglages/securite')],
   },
+  { title: 'Aide', items: [item('/reglages/aide')] },
 ];
 
 /** The section Réglages opens on, on a computer: the list's first. */
