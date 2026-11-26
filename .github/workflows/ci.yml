@@ -226,6 +226,16 @@ jobs:
           curl -fsSI http://127.0.0.1:8080/manifest.webmanifest | grep -i "cache-control: no-cache" >/dev/null
           curl -fsS http://127.0.0.1:8080/manifest.webmanifest | grep '"display": "standalone"' >/dev/null
           curl -fsSI http://127.0.0.1:8080/icons/icon-512.png | grep -i "content-type: image/png" >/dev/null
+      # Least privilege: the owner's URL reaches only the services that run as the owner, never the API nor the worker.
+      - name: The owner's URL only where migrations and ops scripts run
+        run: |
+          for service in api worker; do
+            if $COMPOSE exec -T "$service" printenv DATABASE_ADMIN_URL >/dev/null; then
+              echo "$service receives DATABASE_ADMIN_URL" >&2
+              exit 1
+            fi
+          done
+          $COMPOSE --profile ops run --rm --no-deps ops printenv DATABASE_ADMIN_URL >/dev/null
       # The daily export (ADR 0028) end to end, but to a folder instead of the bucket: dump, check, encrypt, then a
       # restore into an empty database with the queue emptied, and the same row counts.
       - name: Backup export and restore

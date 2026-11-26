@@ -5,7 +5,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { linkServiceOriginOf, loadConfig, mediaBucket } from '../config';
+import { linkServiceOriginOf, loadConfig, mediaBucket, ownerDatabaseUrl } from '../config';
 import { createLogger } from '../logger';
 import type { Readiness } from '../readiness';
 import { buildServer, statusForCode } from '../server';
@@ -700,6 +700,19 @@ describe('loadConfig', () => {
         }),
       ).not.toThrow();
       expect(() => testConfig({ DATABASE_URL: remote('nirvana_app', '') })).not.toThrow();
+    });
+
+    it('starts in production without the owner URL, which only the scripts run as the owner ask for (ADR 0087)', () => {
+      const config = testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY });
+      expect(config.NODE_ENV).toBe('production');
+      expect(config.DATABASE_ADMIN_URL).toBeUndefined();
+      // Left empty in an environment file, it is unset as well.
+      expect(
+        testConfig({ ...PRODUCTION, ...PRIMARY, ...COPY, DATABASE_ADMIN_URL: '' }).DATABASE_ADMIN_URL,
+      ).toBeUndefined();
+      expect(() => ownerDatabaseUrl(config)).toThrow(
+        /DATABASE_ADMIN_URL is missing, this script runs as the owner role/u,
+      );
     });
 
     it('takes both buckets whole, or none outside production, never half of one', () => {

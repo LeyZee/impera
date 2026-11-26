@@ -23,8 +23,8 @@ x-api-env: &api-env
   DATABASE_URL: ${DATABASE_URL:?}
   # The role the API and the worker cross creators with (ADR 0087): rows only, it owns nothing.
   DATABASE_SERVICE_URL: ${DATABASE_SERVICE_URL:?}
-  # The owner: `migrate` and the ops scripts run by hand in this image. The API and the worker never connect with it.
-  DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
+  # No DATABASE_ADMIN_URL here: the API and the worker never connect as the owner. `migrate`, `ops` and `backup` alone
+  # receive it.
   SESSION_ENCRYPTION_KEYS: ${SESSION_ENCRYPTION_KEYS:?}
   CREDENTIALS_ENCRYPTION_KEYS: ${CREDENTIALS_ENCRYPTION_KEYS:?}
   AUTH_SECRET: ${AUTH_SECRET:?}
@@ -69,7 +69,30 @@ services:
   migrate:
     <<: *api-image
     command: ['node', 'dist/scripts/migrate.js']
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # The owner, which the migrations run as.
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
+    restart: 'no'
+    healthcheck: { disable: true }
+
+  # The scripts run by hand as the owner (`ops-*`, deploy.md § 5): one container per command, removed after it, never
+  # started with the stack (profile `ops`):
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod --profile ops run --rm ops \
+  #     node dist/scripts/ops-kill-switch.js --on --scope global --reason "<raison>"
+  # Started without a command, it only prints how to use it and exits.
+  ops:
+    <<: *api-image
+    profiles: [ops]
+    command:
+      [
+        'node',
+        '-e',
+        'console.log("ops: docker compose --profile ops run --rm ops node dist/scripts/<script>.js")',
+      ]
+    environment:
+      <<: *api-env
+      DATABASE_ADMIN_URL: ${DATABASE_ADMIN_URL:?}
     restart: 'no'
     healthcheck: { disable: true }
 
