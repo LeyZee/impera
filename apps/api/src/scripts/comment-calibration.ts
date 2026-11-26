@@ -5,7 +5,9 @@
  * Nothing is sent to Instagram. Run on the PC only, with her active persona read from the CRM: her words stay in the
  * output folder, under `.scratch/`, which git ignores. The console and `chiffres.json` hold numbers only.
  * Usage: `pnpm comment-calibration --corpus <Corpus.jsonl> [--count 40] [--seed 1] [--creator <id>] [--key-from-crm]
- * [--cap-eur 3] [--out .scratch/calibration-commentaires]`, her prepared corpus, one comment and her replies per line.
+ * [--cap-eur 3] [--out .scratch/calibration-commentaires] [--exclude 2025-07-01..2025-08-15]`, her prepared corpus,
+ * one comment and her replies per line; `--exclude`, repeatable, drops the replies written in a period when someone else
+ * answered for her (assistants, Charles 26/11).
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
@@ -31,6 +33,7 @@ import {
   checkReply,
   commentForPrompt,
   mayAskQuestion,
+  declaresLove,
   nearExamples,
   QUESTION_EVERY_BOUNDS,
   asksAQuestion,
@@ -41,6 +44,9 @@ import {
   blindLines,
   CorpusLineSchema,
   pairOfCorpusLine,
+  periodOf,
+  writtenInExcludedPeriod,
+  type ExcludedPeriod,
   setAside,
   shapeOf,
   type CalibrationPair,
@@ -62,6 +68,7 @@ const { values } = parseArgs({
     'key-from-crm': { type: 'boolean', default: false },
     'cap-eur': { type: 'string', default: '3' },
     out: { type: 'string', default: '.scratch/calibration-commentaires' },
+    exclude: { type: 'string', multiple: true, default: [] },
   },
 });
 
@@ -77,6 +84,9 @@ if (!count.success) fail('--count : un nombre de 1 à 200.');
 if (!seed.success) fail('--seed : un entier positif.');
 if (!capEur.success) fail(`--cap-eur : un montant en euros, ${String(MAX_CAP_EUR)} au plus.`);
 if (values.corpus === undefined) fail('--corpus : son fichier Corpus.jsonl.');
+const excluded: ExcludedPeriod[] = values.exclude.map(
+  (text) => periodOf(text) ?? fail('--exclude : une période AAAA-MM-JJ..AAAA-MM-JJ.'),
+);
 const out = resolve(ROOT, values.out);
 // Her words go to a folder git ignores: one named `.scratch` on the path (this checkout's, or the main one's when run
 // from a worktree), never a sibling whose name only starts the same.
@@ -86,6 +96,7 @@ if (!out.split(sep).includes('.scratch')) fail('--out : un dossier sous un .scra
 function readPairs(path: string): CalibrationPair[] {
   const pairs: CalibrationPair[] = [];
   let unread = 0;
+  let notHers = 0;
   for (const text of readFileSync(resolve(ROOT, path), 'utf8').split('\n')) {
     if (text.trim() === '') continue;
     let parsed: unknown;
@@ -96,6 +107,10 @@ function readPairs(path: string): CalibrationPair[] {
       continue;
     }
     const line = CorpusLineSchema.safeParse(parsed);
+    if (line.success && writtenInExcludedPeriod(line.data, excluded)) {
+      notHers += 1;
+      continue;
+    }
     const pair = line.success ? pairOfCorpusLine(line.data) : null;
     if (pair === null) unread += 1;
     else
@@ -106,7 +121,7 @@ function readPairs(path: string): CalibrationPair[] {
       });
   }
   console.log(
-    `Paires lues : ${String(pairs.length)}${unread > 0 ? `, ${String(unread)} lignes écartées` : ''}`,
+    `Paires lues : ${String(pairs.length)}${unread > 0 ? `, ${String(unread)} lignes écartées` : ''}${notHers > 0 ? `, ${String(notHers)} dans une période écartée` : ''}`,
   );
   return pairs;
 }
@@ -210,6 +225,7 @@ for (const pair of test) {
           repliesToHer: false,
           authorCommentedBefore: false,
           mayAsk,
+          emojiOnly: declaresLove(pair.comment),
         },
         ...(refusedBy.length > 0 ? { refusedBy } : {}),
         trace: {},
@@ -227,6 +243,7 @@ for (const pair of test) {
           ? checkReply(outcome.text, {
               recentReplies,
               mayAsk,
+              emojiOnly: declaresLove(pair.comment),
               chatGuardCodes: persona
                 .check([outcome.text])
                 .filter((violation) => violation.blocking)
