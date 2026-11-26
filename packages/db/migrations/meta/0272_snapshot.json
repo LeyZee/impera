@@ -15284,6 +15284,301 @@
       },
       "isRLSEnabled": false
     },
+    "public.pay_sale_claim_answers": {
+      "name": "pay_sale_claim_answers",
+      "schema": "",
+      "columns": {
+        "claim_id": {
+          "name": "claim_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "answered_by": {
+          "name": "answered_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "pay_sale_claim_answers_claim_id_pay_sale_claims_id_fk": {
+          "name": "pay_sale_claim_answers_claim_id_pay_sale_claims_id_fk",
+          "tableFrom": "pay_sale_claim_answers",
+          "tableTo": "pay_sale_claims",
+          "columnsFrom": ["claim_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_sale_claim_answers_answered_by_user_id_fk": {
+          "name": "pay_sale_claim_answers_answered_by_user_id_fk",
+          "tableFrom": "pay_sale_claim_answers",
+          "tableTo": "user",
+          "columnsFrom": ["answered_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "member_read": {
+          "name": "member_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "exists (select 1 from pay_sale_claims c where c.id = \"pay_sale_claim_answers\".\"claim_id\")"
+        },
+        "member_insert": {
+          "name": "member_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"pay_sale_claim_answers\".\"answered_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from pay_sale_claims c where c.id = \"pay_sale_claim_answers\".\"claim_id\" and case when \"pay_sale_claim_answers\".\"outcome\" = 'withdrawn' then exists (select 1 from team_members m where m.id = c.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')) else nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and not exists (select 1 from team_members m where m.id = c.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')) end)"
+        }
+      },
+      "checkConstraints": {
+        "pay_sale_claim_answers_outcome_check": {
+          "name": "pay_sale_claim_answers_outcome_check",
+          "value": "\"pay_sale_claim_answers\".\"outcome\" in ('settled', 'not_retained', 'withdrawn')"
+        },
+        "pay_sale_claim_answers_note_check": {
+          "name": "pay_sale_claim_answers_note_check",
+          "value": "(\"pay_sale_claim_answers\".\"note\" is null or char_length(\"pay_sale_claim_answers\".\"note\") between 1 and 500) and (\"pay_sale_claim_answers\".\"outcome\" <> 'not_retained' or \"pay_sale_claim_answers\".\"note\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pay_sale_claims": {
+      "name": "pay_sale_claims",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shift_id": {
+          "name": "shift_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_account_id": {
+          "name": "platform_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period": {
+          "name": "period",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shift_starts_at": {
+          "name": "shift_starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "shift_ends_at": {
+          "name": "shift_ends_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "handle": {
+          "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creator_name": {
+          "name": "creator_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pay_sale_claims_member_idx": {
+          "name": "pay_sale_claims_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pay_sale_claims_member_id_team_members_id_fk": {
+          "name": "pay_sale_claims_member_id_team_members_id_fk",
+          "tableFrom": "pay_sale_claims",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_sale_claims_creator_id_creators_id_fk": {
+          "name": "pay_sale_claims_creator_id_creators_id_fk",
+          "tableFrom": "pay_sale_claims",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_sale_claims_platform_account_id_platform_accounts_id_fk": {
+          "name": "pay_sale_claims_platform_account_id_platform_accounts_id_fk",
+          "tableFrom": "pay_sale_claims",
+          "tableTo": "platform_accounts",
+          "columnsFrom": ["platform_account_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_sale_claims_created_by_user_id_fk": {
+          "name": "pay_sale_claims_created_by_user_id_fk",
+          "tableFrom": "pay_sale_claims",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pay_sale_claims_shift_fk": {
+          "name": "pay_sale_claims_shift_fk",
+          "tableFrom": "pay_sale_claims",
+          "tableTo": "shifts",
+          "columnsFrom": ["shift_id", "creator_id", "platform_account_id", "member_id"],
+          "columnsTo": ["id", "creator_id", "platform_account_id", "member_id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "pay_sale_claims_shift_unique": {
+          "name": "pay_sale_claims_shift_unique",
+          "nullsNotDistinct": false,
+          "columns": ["shift_id"]
+        }
+      },
+      "policies": {
+        "member_read": {
+          "name": "member_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"pay_sale_claims\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "member_insert": {
+          "name": "member_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"pay_sale_claims\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"pay_sale_claims\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '') and m.status = 'active')"
+        }
+      },
+      "checkConstraints": {
+        "pay_sale_claims_period_check": {
+          "name": "pay_sale_claims_period_check",
+          "value": "extract(day from \"pay_sale_claims\".\"period\") in (1, 16)"
+        },
+        "pay_sale_claims_platform_check": {
+          "name": "pay_sale_claims_platform_check",
+          "value": "\"pay_sale_claims\".\"platform\" in ('reveal', 'onlyfans', 'instagram', 'impera')"
+        },
+        "pay_sale_claims_hours_check": {
+          "name": "pay_sale_claims_hours_check",
+          "value": "\"pay_sale_claims\".\"shift_starts_at\" < \"pay_sale_claims\".\"shift_ends_at\""
+        },
+        "pay_sale_claims_names_check": {
+          "name": "pay_sale_claims_names_check",
+          "value": "char_length(\"pay_sale_claims\".\"handle\") between 1 and 200 and char_length(\"pay_sale_claims\".\"creator_name\") between 1 and 200"
+        },
+        "pay_sale_claims_note_check": {
+          "name": "pay_sale_claims_note_check",
+          "value": "char_length(\"pay_sale_claims\".\"note\") between 1 and 500"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.pay_sale_decisions": {
       "name": "pay_sale_decisions",
       "schema": "",
@@ -22722,12 +23017,6 @@
           "notNull": true,
           "default": "'[]'::jsonb"
         },
-        "draft_reason": {
-          "name": "draft_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -22837,10 +23126,6 @@
         }
       },
       "checkConstraints": {
-        "shift_feedbacks_draft_reason_check": {
-          "name": "shift_feedbacks_draft_reason_check",
-          "value": "\"shift_feedbacks\".\"draft_reason\" in ('too_long', 'not_her_voice', 'sale_too_early', 'forgot_fan', 'other')"
-        },
         "shift_feedbacks_period_check": {
           "name": "shift_feedbacks_period_check",
           "value": "extract(day from \"shift_feedbacks\".\"period\") in (1, 16)"
@@ -22856,103 +23141,6 @@
         "shift_feedbacks_said_check": {
           "name": "shift_feedbacks_said_check",
           "value": "\"shift_feedbacks\".\"nothing_to_report\" = (\"shift_feedbacks\".\"comment\" is null and \"shift_feedbacks\".\"incident\" is null and jsonb_array_length(\"shift_feedbacks\".\"signals\") = 0)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.shift_incident_steps": {
-      "name": "shift_incident_steps",
-      "schema": "",
-      "columns": {
-        "shift_feedback_id": {
-          "name": "shift_feedback_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "step": {
-          "name": "step",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "said_by": {
-          "name": "said_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "said_at": {
-          "name": "said_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "shift_incident_steps_shift_feedback_id_shift_feedbacks_id_fk": {
-          "name": "shift_incident_steps_shift_feedback_id_shift_feedbacks_id_fk",
-          "tableFrom": "shift_incident_steps",
-          "tableTo": "shift_feedbacks",
-          "columnsFrom": ["shift_feedback_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "shift_incident_steps_creator_id_creators_id_fk": {
-          "name": "shift_incident_steps_creator_id_creators_id_fk",
-          "tableFrom": "shift_incident_steps",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "shift_incident_steps_said_by_user_id_fk": {
-          "name": "shift_incident_steps_said_by_user_id_fk",
-          "tableFrom": "shift_incident_steps",
-          "tableTo": "user",
-          "columnsFrom": ["said_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "shift_incident_steps_shift_feedback_id_step_pk": {
-          "name": "shift_incident_steps_shift_feedback_id_step_pk",
-          "columns": ["shift_feedback_id", "step"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "feedback_read": {
-          "name": "feedback_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"shift_incident_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and exists (select 1 from shift_feedbacks f where f.id = \"shift_incident_steps\".\"shift_feedback_id\")"
-        },
-        "agency_insert": {
-          "name": "agency_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"shift_incident_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"creator_id\" = any(u.creator_ids)))) and \"shift_incident_steps\".\"said_by\" = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"said_at\" = now() and exists (select 1 from shift_feedbacks f where f.id = \"shift_incident_steps\".\"shift_feedback_id\" and f.creator_id = \"shift_incident_steps\".\"creator_id\" and f.incident is not null and not exists (select 1 from team_members m where m.id = f.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')))"
-        }
-      },
-      "checkConstraints": {
-        "shift_incident_steps_step_check": {
-          "name": "shift_incident_steps_step_check",
-          "value": "\"shift_incident_steps\".\"step\" in ('seen', 'resolved')"
         }
       },
       "isRLSEnabled": false
@@ -26603,6 +26791,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "d4cea7f1-ed14-4b3a-94dc-343f27565cb0",
-  "prevId": "a664b2b8-d2b5-4d44-86a3-cc7c52fc5f13"
+  "id": "ec6c8215-01e7-46e3-a784-f572ded6eb39",
+  "prevId": "fb832924-64f8-4cc8-9348-d44d7286fcf4"
 }

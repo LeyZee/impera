@@ -8,7 +8,7 @@ Branche : claude/project-thread-cohhca-shift-feedback
 Sur un compte dont la paie lit les ventes relevées, le chatteur fait son mini feedback depuis l'écran (il n'en avait pas : « Rien à déclarer »). Un incident prévient tout de suite le propriétaire et les managers actifs sur leur téléphone, se lit en tête d'Équipe › Rapports, et revient au chatteur en « Vu » puis « Réglé ».
 
 ## À faire
-- [x] Table `shift_incident_steps` en ajout seul (FORCE RLS, refuse_change, lecture seule pour le rôle de service), migration provisoire 0255 à renuméroter au train.
+- [x] Table `shift_incident_steps` en ajout seul (FORCE RLS, refuse_change, lecture seule pour le rôle de service), migration 0274 (numéro donné par Bilan le 26/11).
 - [x] Job `scheduling.notify_incident` mis en file dans la transaction du feedback ; message pur `incidentNotices` : qui et où, jamais le texte de l'incident.
 - [x] `GET /v1/scheduling/shift-feedback` (une quinzaine, ou les incidents non réglés) et `POST /v1/scheduling/shift-feedback/:id/incident` (« Vu », « Réglé », jamais sur son propre incident, journalisé).
 - [x] Écrans : panneau « Mon retour de fin de shift » (rien à signaler en un geste, mot, incident, remontées en couleur) ; carte rouge « Incidents à suivre » en tête d'Équipe › Rapports ; carte « Retours de fin de shift » de la quinzaine.

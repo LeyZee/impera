@@ -1,11 +1,13 @@
-import type {
-  CreatorId,
-  CreatorPlanned,
-  PayPeriod,
-  PlatformAccountId,
-  ShiftFeedbackId,
-  ShiftId,
-  UserId,
+import {
+  payPeriodAt,
+  type CreatorId,
+  type CreatorPlanned,
+  type PayPeriod,
+  type Platform,
+  type PlatformAccountId,
+  type ShiftFeedbackId,
+  type ShiftId,
+  type UserId,
 } from '@impera/contracts';
 import type { Database, Transaction } from '@impera/db';
 import type { preValidationAsyncHookHandler } from 'fastify';
@@ -81,6 +83,19 @@ export { shiftsForGameUnscoped, validatedShiftsForGameUnscoped } from './infra/g
 export type { DetectedAccountForCheck } from './domain/sales-checks';
 /** @public What pay's estimate of a report reads of its shift (reco 19). */
 export type { ShiftFactsForPay } from './domain/reports';
+
+/** @public One of a member's ended shifts, as pay reads it for a claim on a sale (ADR 0101 § 18). */
+export interface EndedShiftForPay {
+  readonly shiftId: ShiftId;
+  readonly creatorId: CreatorId;
+  readonly creatorName: string;
+  readonly platformAccountId: PlatformAccountId;
+  readonly platform: Platform;
+  readonly handle: string;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
+  readonly period: PayPeriod;
+}
 /** @public What another door (the MCP, ADR 0026 § 1) reads of the planning and the reports. */
 export type { SchedulingReads } from './application/team-reads';
 /** @public A shift as that door reads it. */
@@ -167,6 +182,12 @@ export interface SchedulingModule {
      * `shift_not_found`, 403 `shift_report_forbidden` to anyone else.
      */
     readonly shiftFacts: (actor: UserId, shiftId: ShiftId) => Promise<ShiftFactsForPay>;
+    /**
+     * For « J'ai été décisif sur une vente » (ADR 0101 § 18), in a transaction of its own as `actor`: his own shifts
+     * not cancelled, begun since `since` and ended by now (their stop when stopped), the newest first, with the account
+     * and the pay period each starts in. Empty for an account with no member row.
+     */
+    readonly endedShifts: (actor: UserId, since: Date) => Promise<EndedShiftForPay[]>;
   };
   readonly jobs: {
     /**
@@ -346,6 +367,32 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       shiftFacts: async (actor, shiftId) => {
         const { shift, period, rules } = await reportStore.context(actor, shiftId, now());
         return { memberId: shift.memberId, period, rules };
+      },
+      endedShifts: async (actor, since) => {
+        const at = now();
+        const { timeZone } = await admin.settingsUnscoped();
+        const creators = await deps.creators.list();
+        const mine = await planning.memberShifts(
+          actor,
+          creators.map((creator) => creator.id),
+          since,
+        );
+        if (mine === null) return [];
+        const names = new Map(creators.map((creator) => [creator.id, creator.displayName]));
+        return mine.shifts
+          .filter((shift) => shift.startsAt >= since && (shift.stoppedAt ?? shift.endsAt) <= at)
+          .toSorted((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
+          .map((shift) => ({
+            shiftId: shift.id,
+            creatorId: shift.creatorId,
+            creatorName: names.get(shift.creatorId) ?? '—',
+            platformAccountId: shift.platformAccountId,
+            platform: shift.platform,
+            handle: shift.handle,
+            startsAt: shift.startsAt,
+            endsAt: shift.stoppedAt ?? shift.endsAt,
+            period: payPeriodAt(shift.startsAt, timeZone),
+          }));
       },
     },
     routes: (requireRole, recentLogin) => async (app, options) => {

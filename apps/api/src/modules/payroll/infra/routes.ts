@@ -1,5 +1,11 @@
 import {
+  AnswerSaleClaimBodySchema,
   BonusIdSchema,
+  CreateSaleClaimBodySchema,
+  MySaleClaimsSchema,
+  PendingSaleClaimsSchema,
+  SaleClaimParamsSchema,
+  SaleClaimSchema,
   BonusSchema,
   BonusTierSetSchema,
   CollectiveGoalSchema,
@@ -52,7 +58,12 @@ import type { Actor } from '../../contractors/pure';
 import type { PayrollEntries } from '../application/entries';
 import type { PayrollReads } from '../application/periods';
 import type { PayrollValidation } from '../application/validation';
-import type { PayrollRuleStore, PayrollSaleDecisionStore, PayrollSaleSignalStore } from '../domain/ports';
+import type {
+  PayrollRuleStore,
+  PayrollSaleClaimStore,
+  PayrollSaleDecisionStore,
+  PayrollSaleSignalStore,
+} from '../domain/ports';
 
 import type { ReportEstimate } from './report-estimate';
 
@@ -91,6 +102,7 @@ export function createPayrollRoutes(
   rules: PayrollRuleStore,
   decisions: PayrollSaleDecisionStore,
   signals: PayrollSaleSignalStore,
+  claims: PayrollSaleClaimStore,
   estimate: ReportEstimate,
   requireRole: RequireRole,
   recentLogin: preValidationAsyncHookHandler,
@@ -211,6 +223,45 @@ export function createPayrollRoutes(
         const { value, created } = await signals.signal(actorOf(request), request.body);
         return reply.code(created ? 201 : 200).send(value);
       },
+    );
+
+    // ADR 0101 §§ 18 to 22: « J'ai été décisif sur une vente ». A member writes and withdraws his own; the owner and an
+    // active manager read those waiting and answer, never their own. No step-up: a claim gives no sale.
+    app.get(
+      '/payroll/sale-claims/mine',
+      { preValidation: ownerOrMember, schema: { response: { 200: MySaleClaimsSchema } } },
+      (request) => claims.mine(userOf(request)),
+    );
+
+    app.get(
+      '/payroll/sale-claims',
+      { preValidation: ownerOrMember, schema: { response: { 200: PendingSaleClaimsSchema } } },
+      (request) => claims.pending(userOf(request)),
+    );
+
+    app.post(
+      '/payroll/sale-claims',
+      {
+        preValidation: ownerOrMember,
+        schema: { body: CreateSaleClaimBodySchema, response: { 200: SaleClaimSchema, 201: SaleClaimSchema } },
+      },
+      async (request, reply) => {
+        const { value, created } = await claims.create(actorOf(request), request.body);
+        return reply.code(created ? 201 : 200).send(value);
+      },
+    );
+
+    app.post(
+      '/payroll/sale-claims/:saleClaimId/answer',
+      {
+        preValidation: ownerOrMember,
+        schema: {
+          params: SaleClaimParamsSchema,
+          body: AnswerSaleClaimBodySchema,
+          response: { 200: SaleClaimSchema },
+        },
+      },
+      (request) => claims.answer(actorOf(request), request.params.saleClaimId, request.body),
     );
 
     app.get(

@@ -9,7 +9,7 @@ Le retour de fin de shift devient obligatoire sans s'accumuler : il ne demande q
 
 ## À faire
 - [x] Contrat : chiffres du shift (ventes relevées, brouillons tels quels / corrigés / rejetés, passages à l'équipe, fans écrits), question fermée sur les brouillons quand assez sont corrigés, remontées « l'IA » et « une idée », lier une remontée à un fan du shift.
-- [x] Colonne `draft_reason` (migration provisoire 0282, à renuméroter au train).
+- [x] Colonne `draft_reason` (migration 0275, numéro donné par Bilan le 26/11).
 - [x] Lecture `conversationReadsForShifts.activity` exposée par l'`index.ts` des conversations, lue dans la transaction de la planification.
 - [x] Domaine pur `feedback-due` : retour dû, expiré, garde de la prise de poste, « sans retour ».
 - [x] `GET /v1/scheduling/shift-feedback/pending` ; « Je prends mon poste » refusé (`shift_check_in_feedback_due_conflict`) tant que le retour dû n'est pas fait ; un retour d'un shift expiré refusé.
