@@ -52,6 +52,15 @@ function misplacedEmoji(bubble: string): string | undefined {
   return tailIsEmojis ? undefined : graphemes[first]?.replace(/️/gu, '');
 }
 
+/** Her last `streakMax` answers all carried an emoji: this one carries none (told to the voice before it writes). */
+export function emojiStreakReached(
+  previousTurns: readonly (readonly string[])[],
+  streakMax: number,
+): boolean {
+  const recent = previousTurns.slice(-streakMax);
+  return recent.length === streakMax && recent.every((turn) => turn.some((t) => emojisIn(t).length > 0));
+}
+
 export function checkEmojis(bubbles: readonly string[], rules: EmojiRules): EmojiViolation[] {
   const violations: EmojiViolation[] = [];
   bubbles.forEach((bubble, bubbleIndex) => {
@@ -65,8 +74,7 @@ export function checkEmojis(bubbles: readonly string[], rules: EmojiRules): Emoj
   if (all.length > EMOJIS_MAX || kinds.length > (rules.flirting ? KINDS_MAX_FLIRTING : KINDS_MAX)) {
     violations.push({ code: 'emoji_misuse', severity: 'soft', match: all.join('') });
   }
-  const recent = rules.previousTurns?.slice(-rules.streakMax) ?? [];
-  if (recent.length === rules.streakMax && recent.every((turn) => turn.some((t) => emojisIn(t).length > 0))) {
+  if (emojiStreakReached(rules.previousTurns ?? [], rules.streakMax)) {
     violations.push({ code: 'emoji_misuse', severity: 'soft', match: kinds.join('') });
   }
   return violations;

@@ -54,6 +54,8 @@ import {
   type DesireState,
 } from '../domain/desire';
 import { gapNotes, timingLines } from '../domain/elapsed';
+import { DEFAULT_EMOJI_STREAK_MAX, emojiStreakReached } from '../domain/emojis';
+import { DEFAULT_FORM_SETTINGS, formBubbles, type FormSettings } from '../domain/form';
 import {
   checkExplicit,
   checkVoiceOutput,
@@ -161,9 +163,17 @@ function voiceTraced<T extends { readonly trace?: CallTrace }>(input: T, ids: re
   return ids.length === 0 ? input : { ...input, trace: { ...input.trace, voiceExampleIds: ids } };
 }
 
-/** What the fan receives: her bubbles, or one message when she does not split hers. */
-export function asSent(bubbles: readonly string[], splitMessages = true): readonly string[] {
-  return splitMessages || bubbles.length <= 1 ? bubbles : [bubbles.join('\n')];
+/**
+ * What the fan receives: her bubbles in her form (`formBubbles`, once the guards have read them), or one message when
+ * she does not split hers. Only the voice's bubbles come here: a bubble the code writes (care's help) is added after.
+ */
+export function asSent(
+  bubbles: readonly string[],
+  splitMessages = true,
+  form: FormSettings = DEFAULT_FORM_SETTINGS,
+): readonly string[] {
+  const formed = formBubbles(bubbles, form);
+  return splitMessages || formed.length <= 1 ? formed : [formed.join('\n')];
 }
 
 export interface ComposeTurnInput {
@@ -397,6 +407,22 @@ function rewriteHint(violations: readonly GuardViolation[]): string {
   return reasons.length === 0
     ? 'sa première réponse a été refusée : réécris-la autrement, plus simple et plus naturelle'
     : `sa première réponse a été refusée (${reasons.join(', ')}) : réécris-la autrement`;
+}
+
+/** Her last answers all carried an emoji (`emojiStreakReached`, Charles 26/11): told before she writes, not after. */
+export const NO_EMOJI_HINT =
+  'pas d’emoji du tout cette fois : ses derniers messages en portaient tous un, et elle n’en met pas à chaque message';
+
+/** The brief with `NO_EMOJI_HINT` when her emoji streak is reached, so the guard never asks a paid rewrite for it. */
+function withoutEmojiIfDue(
+  brief: Brief,
+  history: readonly ConversationTurn[],
+  settings: GuardSettings,
+): Brief {
+  const turns = previousTurnsOf(history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })));
+  return emojiStreakReached(turns, settings.emojiStreakMax ?? DEFAULT_EMOJI_STREAK_MAX)
+    ? { ...brief, toneHints: [...brief.toneHints, NO_EMOJI_HINT] }
+    : brief;
 }
 
 /** What the voice writes instead of an offer the policy refused: an answer, nothing to buy. */
@@ -872,7 +898,10 @@ async function writeFollowUp(
   fanTier: number | undefined,
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
-  const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
+  const voiceInput: VoiceInput = voiceTraced(
+    { ...base, brief: withoutEmojiIfDue(brief, base.history, persona.guardSettings), maxBubbles: 1 },
+    exampleIds,
+  );
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
@@ -888,7 +917,7 @@ async function writeFollowUp(
     brief,
     voiceBrief: brief,
     voiceInput,
-    bubbles: asSent(written, persona.splitMessages),
+    bubbles: asSent(written, persona.splitMessages, persona.guardSettings.form),
     ...(!voice.ok && { voiceFailure: voice.error }),
     violations,
     isBlocked: isBlocked(violations) || !voice.ok,
@@ -1428,7 +1457,7 @@ export async function composeTurn(
           : registerOf(
               (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null,
             );
-  const voiceBrief: Brief =
+  const toldBrief: Brief =
     heCame && !care
       ? {
           ...answered,
@@ -1463,6 +1492,7 @@ export async function composeTurn(
                 ...(teases === null ? [] : [ABANDON_HINTS[teases]]),
               ],
             };
+  const voiceBrief = withoutEmojiIfDue(toldBrief, input.history, persona.guardSettings);
   const availabilityOut = (record: FanAvailabilityRecord | undefined) =>
     record === undefined
       ? {}
@@ -1553,7 +1583,7 @@ export async function composeTurn(
       : undefined;
   const { voice, written, violations } = retried ?? first;
   const firstCostUsd = retried !== undefined && first.voice.ok ? (first.voice.value.meta.costUsd ?? 0) : 0;
-  const bubbles = asSent(written, persona.splitMessages);
+  const bubbles = asSent(written, persona.splitMessages, persona.guardSettings.form);
   return {
     ...(customOrder !== undefined && { customOrder }),
     ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),

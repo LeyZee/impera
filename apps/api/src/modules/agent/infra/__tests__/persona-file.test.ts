@@ -31,6 +31,25 @@ describe('her close-only words and emoji streak, to the guards (Charles 26/11)',
     expect(settings.emojiStreakMax).toBeUndefined();
   });
 
+  it('takes her form from her persona first, then her agency’s base style, then the code (ADR 0171)', () => {
+    const settings = guardSettingsOf(demo('v0.6.0'), {
+      capitalization: 'capital',
+      mark_spacing: 'space',
+      emoji_streak_max: 5,
+    });
+    expect(settings.emojiStreakMax).toBe(3);
+    expect(settings.form).toEqual({
+      capitalization: 'capital',
+      stripFinalPeriod: true,
+      markSpacing: 'space',
+    });
+    expect(guardSettingsOf(demo('v0.5.0')).form).toEqual({
+      capitalization: 'free',
+      stripFinalPeriod: true,
+      markSpacing: 'free',
+    });
+  });
+
   it('never tells the model her close-only words: code applies them', () => {
     expect(demo('v0.6.0').personaSheet).not.toContain('close_only_words');
   });

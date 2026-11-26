@@ -15,6 +15,7 @@ import {
   PersonaStrategiesSchema,
   type Persona,
 } from './persona';
+import { VoiceFormSettingsSchema } from './voice-form';
 
 /**
  * The persona sheet at format 2 (ADR 0079): Desirali's sheet, section by section and question by question, with its
@@ -332,10 +333,10 @@ export const PersonaAgentBehaviorSchema = z.strictObject({
   pet_names: PersonaSchema.shape.behavior.shape.pet_names,
   response_delay_minutes: PersonaSchema.shape.behavior.shape.response_delay_minutes,
   /**
-   * Her last this-many messages all carried an emoji: the next one carries none (guard `emoji_misuse`, Charles 26/11).
-   * Absent: the code's default (`DEFAULT_EMOJI_STREAK_MAX`).
+   * The form of her bubbles (Charles 26/11): first letter, final period, space before « ? » and « ! », and her emoji
+   * streak (`emoji_misuse`). Each absent: her agency's base style decides, then the code's default.
    */
-  emoji_streak_max: z.int().min(1).max(10).optional(),
+  ...VoiceFormSettingsSchema.shape,
 });
 
 /** « Réglages de l'agent » (ADR 0079 § 4): versioned with the sheet, applied by the code, never a question of hers. */

@@ -295,5 +295,15 @@ describe('her close-only words and her emoji streak (Charles 26/11)', () => {
         agent: { ...raw.agent, behavior: { ...raw.agent.behavior, emoji_streak_max: 0 } },
       }).success,
     ).toBe(false);
+    const withBehavior = (extra: Record<string, unknown>) =>
+      PersonaV2Schema.safeParse({
+        ...raw,
+        agent: { ...raw.agent, behavior: { ...raw.agent.behavior, ...extra } },
+      }).success;
+    expect(
+      withBehavior({ capitalization: 'lowercase', strip_final_period: false, mark_spacing: 'space' }),
+    ).toBe(true);
+    expect(withBehavior({ capitalization: 'shout' })).toBe(false);
+    expect(withBehavior({ mark_spacing: 'thin' })).toBe(false);
   });
 });

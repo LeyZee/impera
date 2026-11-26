@@ -196,7 +196,7 @@ describe('voice guards (P3-13)', () => {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],
       }),
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
-      ...read(['😏 coucou'], { previousTurns: [] }),
+      ...read(['😏 coucou', 'à demain.'], { previousTurns: [] }),
       ...checkVoiceOutput(['bonne nuit mon cœur'], {
         ...settings,
         closeOnlyWords: [{ words: ['mon cœur'], minTier: 4 }],

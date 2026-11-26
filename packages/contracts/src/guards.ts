@@ -51,6 +51,9 @@ export const GUARD_CODES = [
   'emoji_misuse',
   // Charles 26/11: a word of hers kept for close fans (`rules.close_only_words`), written to a fan below its tier.
   'close_only_word',
+  // Charles 26/11: a bubble of the voice outside her form (first letter, final period, space before « ? » « ! »); soft,
+  // the code puts it right before the send.
+  'form_rule',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

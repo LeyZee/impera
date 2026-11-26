@@ -22,6 +22,7 @@ import {
 import type { AlertSettings } from '../../domain/alerts';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
+import { NO_EMOJI_HINT } from '../compose';
 import {
   createDraftComposer,
   type AgentComposeInput,
@@ -294,6 +295,51 @@ describe('createDraftComposer', () => {
     const still = composer({ voice: { bubbles: ['😌 tranquille', 'et toi ? 🙈'] } });
     expect(await still.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
     expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('sends her bubbles in her form once the guards read them, her persona first (Charles 26/11)', async () => {
+    const { draftComposer } = composer({ voice: { bubbles: ['Ça te dit?', 'à demain.'] } });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({ bubbles: ['Ça te dit?', 'à demain'] });
+
+    const french = await createDraftComposer({
+      gateway: gateway({ voice: { bubbles: ['ça te dit?', 'à demain.'] } }, { voiceCalls: 0, traces: [] }),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: {
+          ...DEFAULT_GUARD_SETTINGS,
+          form: { capitalization: 'capital', stripFinalPeriod: false, markSpacing: 'space' },
+        },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+    }).compose(INPUT);
+    expect(french).toMatchObject({ bubbles: ['Ça te dit ?', 'À demain.'] });
+  });
+
+  it('tells the voice up front to leave emojis out once her last answers all carried one (Charles 26/11)', async () => {
+    const at = (minute: number) => new Date(`2026-10-17T09:${String(minute).padStart(2, '0')}:00Z`);
+    const turns = (emojis: readonly string[]) => ({
+      ...INPUT,
+      history: [
+        ...emojis.flatMap((emoji, i) => [
+          { direction: 'inbound' as const, text: `message ${String(i)}`, at: at(40 + i * 2) },
+          {
+            direction: 'outbound' as const,
+            text: `réponse ${String(i)} ${emoji}`.trim(),
+            at: at(41 + i * 2),
+          },
+        ]),
+        ...INPUT.history,
+      ],
+    });
+    const due = composer();
+    await due.draftComposer.compose(turns(['😏', '🙈', '✨']));
+    expect(due.seen.voiceInputs?.[0]?.brief.toneHints).toContain(NO_EMOJI_HINT);
+
+    const notDue = composer();
+    await notDue.draftComposer.compose(turns(['😏', '', '✨']));
+    expect(notDue.seen.voiceInputs?.[0]?.brief.toneHints).not.toContain(NO_EMOJI_HINT);
   });
 
   it('never sends a word she keeps for close fans while his tier cannot be computed (Charles 26/11)', async () => {
