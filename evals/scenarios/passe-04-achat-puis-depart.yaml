@@ -1,6 +1,6 @@
 # Passe de test du 20/11, conversation 4 : il achète une étape puis s’arrête. Fan, messages, scripts et prix fictifs (ADR 0010).
 # Tours : [achète] « j’adore » ; « je dois filer, ma femme rentre » ; J+1 « désolé pour hier ».
-# Attendu à la lecture : aucun chouinage, au revoir doux, aftercare ; J+1 chaleureuse, pas de nouveau script le soir même.
+# Attendu à la lecture : aucun chouinage, au revoir doux, aftercare ; à « ma femme rentre », une taquinerie légère, jamais un mot contre sa femme, « prends soin d’elle », chaleureuse (Charles 21/11) ; J+1 chaleureuse, pas de nouveau script le soir même.
 # Code (asserté) : `offer: false` après son départ. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
 description: 'Il vient d’acheter la première étape payante puis doit partir : au revoir doux sans rien proposer, et le lendemain elle l’accueille avec chaleur.'
 persona_version: demo
