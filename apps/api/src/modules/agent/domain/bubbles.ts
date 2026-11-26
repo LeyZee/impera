@@ -44,12 +44,21 @@ function budgetFor(
 }
 
 /**
- * Her bubbles within the budget: the first ones, what goes past it is left out. Glued to the last one, they would
+ * Her bubbles within the budget, hollow ones dropped first: the first ones, what goes past it is left out. Glued to the last one, they would
  * make one bubble without punctuation, sometimes with two questions, which no one writes; a reply a little short is
  * human. The guards read what leaves, so nothing they should see escapes them.
  */
 export function fitBubbles(bubbles: readonly string[], budget: BubbleBudget): readonly string[] {
-  return bubbles.length <= budget ? bubbles : bubbles.slice(0, budget);
+  const kept = bubbles.filter(saysSomething);
+  return kept.length <= budget ? kept : kept.slice(0, budget);
+}
+
+/**
+ * A bubble says something when it holds a letter, a digit or an emoji: « . », « … » or an empty one never leaves
+ * (passe 2 du 26/11, conversation 37). Dropped before the budget and the guards; none left, the voice writes again.
+ */
+export function saysSomething(bubble: string): boolean {
+  return /[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(bubble);
 }
 
 /** The pause before she starts typing a bubble, then her typing speed on a phone, then the longest wait. */

@@ -16,14 +16,13 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import {
-  AiProviderSchema,
   CreatorIdSchema,
   desireBandOf,
   MessageIdSchema,
   newId,
   StoredPersonaSchema,
 } from '@impera/contracts';
-import { createDbClient, eq, parseEncryptionKeys, schema } from '@impera/db';
+import { eq, schema } from '@impera/db';
 import {
   brainAlertId,
   createInMemoryCallLog,
@@ -31,13 +30,11 @@ import {
   createModelResolver,
   DEFAULT_LLM_CONFIG,
   JudgeCriterionSchema,
-  PROVIDERS,
   readProviderCredentials,
   type ConversationTurn,
 } from '@impera/llm';
 import { z } from 'zod';
 
-import { READ_ONLY_POOL_OPTIONS } from '../key-check';
 import {
   activePersonaForModels,
   composeTurn,
@@ -52,8 +49,8 @@ import {
   type SaleTroubleSeen,
 } from '../modules/agent/index';
 import { proposalsOfRead } from '../modules/fans/index';
-import { readSavedProviderKeys } from '../modules/providers/index';
 
+import { crmKeys, readOnlyAdminDb } from './crm-read';
 import { checkCardScenario, readCardScenario, type CardScenario } from './evals/card-scenario';
 import { checkScenario, judgeSuite, type Outcome, type ScenarioResult } from './evals/check';
 import { afterTurn, beforeTurn, type DialogueState, type TurnLeft } from './evals/dialogue';
@@ -61,7 +58,7 @@ import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { scriptsInputOf } from './evals/scripts-input';
-import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
+import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow } from './evals/situation';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
@@ -101,45 +98,8 @@ if (!capArg.success) {
 }
 const capEur = capArg.data;
 
-/** The admin database named in `.env`, on a connection that cannot write. */
-function readOnlyAdmin(flag: string, needsSealing: boolean): ReturnType<typeof createDbClient> {
-  const adminUrl = z.url({ protocol: /^postgres(ql)?$/ }).safeParse(process.env['DATABASE_ADMIN_URL']);
-  const sealing = process.env['CREDENTIALS_ENCRYPTION_KEYS'];
-  if (!adminUrl.success || (needsSealing && (sealing === undefined || sealing === ''))) {
-    console.error(
-      `evals ${flag} : DATABASE_ADMIN_URL${needsSealing ? ' ou CREDENTIALS_ENCRYPTION_KEYS' : ''} manque dans .env.`,
-    );
-    process.exit(1);
-  }
-  return createDbClient(adminUrl.data, READ_ONLY_POOL_OPTIONS);
-}
-
-/**
- * The keys saved in the CRM, under the names the gateway reads (`LLM_XAI_API_KEY`…): read once on a read-only
- * connection, never shown. Only the services found are said, by name.
- */
-async function crmKeys(): Promise<Record<string, string>> {
-  const admin = readOnlyAdmin('--key-from-crm', true);
-  try {
-    const saved = await readSavedProviderKeys(
-      admin.db,
-      parseEncryptionKeys(process.env['CREDENTIALS_ENCRYPTION_KEYS'] ?? '', 'CREDENTIALS_ENCRYPTION_KEYS'),
-    );
-    const found = PROVIDERS.flatMap((provider) => {
-      const id = AiProviderSchema.safeParse(provider.id);
-      const key = id.success ? saved[id.data] : undefined;
-      return key === undefined ? [] : [{ provider, key }];
-    });
-    const names = found.map(({ provider }) => provider.label).join(', ');
-    console.log(`Clés lues dans le CRM : ${names === '' ? 'aucune' : names}`);
-    return Object.fromEntries(found.map(({ provider, key }) => [provider.apiKeyEnv, key]));
-  } finally {
-    await admin.close();
-  }
-}
-
 const credentials = readProviderCredentials(
-  values['key-from-crm'] ? { ...process.env, ...(await crmKeys()) } : process.env,
+  values['key-from-crm'] ? { ...process.env, ...(await crmKeys('evals --key-from-crm')) } : process.env,
 );
 if (credentials.LLM_XAI_API_KEY === undefined) {
   console.error(
@@ -177,7 +137,7 @@ const today = '2026-11-06';
  * `--creator` names. Read on a connection that cannot write; only her name and version number are printed.
  */
 async function crmPersona(): Promise<PersonaForModels> {
-  const admin = readOnlyAdmin('--persona-from-crm', false);
+  const admin = readOnlyAdminDb('evals --persona-from-crm', false);
   try {
     const rows = await admin.db
       .select({
@@ -221,7 +181,7 @@ async function crmPersona(): Promise<PersonaForModels> {
 
 const persona = values['persona-from-crm']
   ? await crmPersona()
-  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.5.0.yaml'), 'utf8'), 'Elena', today);
+  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.6.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
 const gateway = createLlmGateway({
   config,
@@ -316,8 +276,8 @@ function scriptOutcome(
 /** Where the scenario starts: her clock, the history written, his score, availability and scripts as stored. */
 function initialState(scenario: Scenario): DialogueState {
   const { situation } = scenario;
-  // Paris in October is UTC+2: her local time as the scenario says.
-  const now = new Date(`${today}T${situation.local_time}:00+02:00`);
+  // Her local time as the scenario says, on her clock in Paris (summer or winter time).
+  const now = scenarioNow(today, situation.local_time);
   return {
     now,
     history: scenario.history.map(({ from, text, minutes_ago }): ConversationTurn => ({

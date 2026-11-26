@@ -1422,6 +1422,20 @@
       "when": 1795719390805,
       "tag": "0271_creator_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 203,
+      "version": "7",
+      "when": 1795719450805,
+      "tag": "0272_sale_claims",
+      "breakpoints": true
+    },
+    {
+      "idx": 204,
+      "version": "7",
+      "when": 1795726436717,
+      "tag": "0273_fan_language",
+      "breakpoints": true
     }
   ]
 }

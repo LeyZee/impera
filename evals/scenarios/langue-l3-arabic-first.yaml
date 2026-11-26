@@ -1,0 +1,14 @@
+# Langue du fan, L3 (ADR 0168) : il écrit dans une langue qu'elle ne parle pas dès le premier message ; elle répond en
+# anglais, sans une lettre de l'écriture qu'elle ne lit pas. Fan et messages fictifs (ADR 0010).
+description: Premier message dans une langue hors de sa fiche ; elle répond en anglais.
+persona_version: demo
+tier: full
+inbound: مرحبا يا جميلة، كيف حالك اليوم؟ صورك رائعة جدا
+expect:
+  voice:
+    bubbles_min: 1
+    must_match_any:
+      - \b(you|my|the|and|i|don'?t|speak|english)\b
+    must_not_match:
+      - '[؀-ۿ]'
+      - \b(je|toi|et|pas|une|les|c’est|c'est)\b

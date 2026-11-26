@@ -172,4 +172,6 @@ Date : AAAA-MM-JJ
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
 | 0163 | Coffre Impera : le stock de ce qu'elle dépose, compté par usage, décrit et relu par les trois | accepted (précise 0055, 0044, 0159, 0161) |
 | 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
+| 0168 | La langue du fan décidée par le code, donnée à la voix comme une consigne fixe ; couverture des langues par les gardes, fermée par défaut | accepted |
 | 0170 | Les retours de shift servent à l'IA, et l'IA relit les shifts des chatteurs pour un bilan de coach | accepted (précise 0050 § 10, 0042 § 5, 0102, 0109, 0025) |
+| 0172 | Des fans simulés testent l'agent sur des semaines fictives | proposed (précise 0009, 0103) |

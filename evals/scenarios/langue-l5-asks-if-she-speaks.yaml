@@ -1,0 +1,17 @@
+# Langue du fan, L5 (ADR 0168) : il demande en français si elle parle une autre langue de sa fiche ; elle répond oui en
+# français, sans basculer tant qu'il ne continue pas dans cette langue. La spécification le dit pour l'italien ; la
+# persona de démonstration parle espagnol, le scénario le joue donc en espagnol. Fan et messages fictifs (ADR 0010).
+description: « Tu parles espagnol ? » en français ; elle dit oui en français, sans basculer.
+persona_version: demo
+tier: full
+history:
+  - from: fan
+    text: salut toi, j’adore ton profil
+  - from: creator
+    text: Merci c’est trop mignon, tu viens d’où ?
+inbound: tu parles espagnol ?
+expect:
+  voice:
+    bubbles_min: 1
+    must_match_any:
+      - \b(oui|je|un peu|ma|mon)\b
