@@ -27,7 +27,7 @@ export function createRecordFactsJob({ uow, clock, fans }: RecordFactsDeps) {
         const draft = await tx.drafts.lock(source.draftId);
         facts = draft?.conversationId === conversation.id ? draft.facts : [];
       } else {
-        facts = [operatorNoteFact(source.note, new Date(source.at))];
+        facts = [operatorNoteFact(source.note, new Date(source.at), source.userId)];
       }
       return { fanId: conversation.fanId, facts };
     });

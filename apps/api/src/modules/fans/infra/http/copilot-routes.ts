@@ -163,12 +163,11 @@ export function createCopilotFanRoutes(
           action: 'fan_note.create',
         });
         if (note === null) throw new Error('fan note not written');
-        return reply.code(201).send({
-          key: note.key,
-          value: note.value,
-          source: 'noted' as const,
-          observedAt: note.observedAt.toISOString(),
-        });
+        // The note as « Autres » shows it on the card, with its author's name: nothing else of the fan.
+        const view = await cardView(access, creatorId, fanId, await fans.card(creatorId, fanId));
+        const written = view.others.find((other) => other.factId === note.id);
+        if (written === undefined) throw new Error('fan note not on the card');
+        return reply.code(201).send(written);
       },
     );
     return Promise.resolve();

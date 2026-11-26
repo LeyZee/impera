@@ -12,7 +12,7 @@ import {
   type UserId,
 } from '@impera/contracts';
 
-import { cardOf, planCardEdit, type Card, type CardEdit } from '../domain/card';
+import { cardOf, planCardEdit, planOtherRetraction, type Card, type CardEdit } from '../domain/card';
 import { cardLinesOf, proposalsOfRead, type ReadSource } from '../domain/card-read';
 import { FanNotFound } from '../domain/errors';
 import {
@@ -84,6 +84,12 @@ export interface FansService {
    * note at the same instant was already there.
    */
   addNote(creatorId: CreatorId, fanId: FanId, note: string, trace: WriteTrace): Promise<StoredFact | null>;
+
+  /**
+   * A person takes a line of « Autres » off his card (trou béant 17) and gets the card back: an empty line in their
+   * name supersedes it. Not one of his active « Autres »: `FanCardOtherNotFound`.
+   */
+  retractOther(creatorId: CreatorId, fanId: FanId, factId: string, author: UserId): Promise<Card>;
   /** His card as the AI's read gets it (ADR 0085 § 7): one line per field it shows, with where it comes from. */
   cardLines(creatorId: CreatorId, fanId: FanId): Promise<string[]>;
   /**
@@ -193,10 +199,17 @@ export function createFansService(
       const [written] = await facts.write(
         creatorId,
         fanId,
-        (current, pending) => planFacts(current, [operatorNote(note, at)], at, pending),
+        (current, pending) => planFacts(current, [operatorNote(note, at, trace.userId)], at, pending),
         trace,
       );
       return written ?? null;
+    },
+
+    retractOther: async (creatorId, fanId, factId, author) => {
+      const at = now();
+      await facts.write(creatorId, fanId, (current) => planOtherRetraction(factId, current, author, at));
+      const { active, pending, names } = await facts.card(creatorId, fanId);
+      return cardOf(active, pending, at, names);
     },
     activeFacts: async (creatorId, fanId) => selectActiveFacts(await facts.current(creatorId, fanId), now()),
     kycToLearn: async (creatorId, fanId, slots) =>

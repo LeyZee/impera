@@ -48,6 +48,11 @@ export interface FactProposal {
   readonly observedAt: Date;
   /** Only for what stops being true (« en vacances jusqu'à lundi »); retention is the purge's (security.md). */
   readonly expiresAt?: Date | null;
+  /**
+   * A person wrote it (a chatter's note left at the hand-back, trou béant 17): it is kept `noted`, in their name,
+   * whatever `kind` says, so the card names its author and no guess replaces it.
+   */
+  readonly notedBy?: UserId;
 }
 
 /**
@@ -127,9 +132,10 @@ export function isActive(fact: StoredFact, now: Date): boolean {
 
 /**
  * A chatter's note on the fan (P3-02), as « Rendre la main » leaves it: a fact of its own whose slot is its date, so
- * that notes add up instead of replacing each other, and the same note at the same instant is not written twice.
+ * that notes add up instead of replacing each other, and the same note at the same instant is not written twice. Kept
+ * in its author's name (`noted`), as the hand-back's.
  */
-export function operatorNote(note: string, at: Date): FactProposal {
+export function operatorNote(note: string, at: Date, author: UserId): FactProposal {
   return {
     category: 'operator_note',
     key: `note_${String(at.getTime())}`,
@@ -138,6 +144,7 @@ export function operatorNote(note: string, at: Date): FactProposal {
     confidence: 1,
     sourceMessageId: null,
     observedAt: at,
+    notedBy: author,
   };
 }
 
@@ -172,11 +179,12 @@ export function planFacts(
       category: field === null ? proposal.category : fanCardFieldSpec(field).category,
       key,
       value,
-      kind: proposal.kind,
+      kind: proposal.notedBy === undefined ? proposal.kind : 'noted',
       confidence: proposal.confidence,
       sourceMessageId: proposal.sourceMessageId,
       observedAt: proposal.observedAt,
       expiresAt: proposal.expiresAt ?? null,
+      ...(proposal.notedBy !== undefined && { notedBy: proposal.notedBy }),
     };
     const id = slot(fact);
     const before = current.get(id);

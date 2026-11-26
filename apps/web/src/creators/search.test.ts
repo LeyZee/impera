@@ -30,6 +30,8 @@ describe('the sheets of a creator a member opens', () => {
       'agenda',
       'ideas',
       'requests',
+      // Her persona to read, last: Médias stays first (trou béant 18).
+      'persona',
     ]);
   });
 

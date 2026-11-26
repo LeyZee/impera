@@ -652,7 +652,12 @@ export function createConversationCommands({
               creatorId: input.creatorId,
               conversationId: conversation.id,
               correlationId: input.correlationId,
-              source: { kind: 'operator_note', note: input.note, at: meta.at.toISOString() },
+              source: {
+                kind: 'operator_note',
+                note: input.note,
+                at: meta.at.toISOString(),
+                userId: input.userId,
+              },
             },
             {},
           );

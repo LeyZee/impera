@@ -254,7 +254,12 @@ describe('the copilot panel writes on a fan (ADR 0109)', () => {
     const noted = await note(token, '  Préfère qu’on lui écrive le soir  ');
     expect(noted.statusCode).toBe(201);
     const first = CopilotFanNoteSchema.parse(noted.json());
-    expect(first).toMatchObject({ value: 'Préfère qu’on lui écrive le soir', source: 'noted' });
+    expect(first).toMatchObject({
+      value: 'Préfère qu’on lui écrive le soir',
+      source: 'noted',
+      notedBy: chatter.userId,
+      notedByName: 'Prénom 2',
+    });
     expect(first.key).toMatch(/^note_\d+$/);
     // Notes add up, never replace one another.
     await new Promise((resolve) => setTimeout(resolve, 5));
