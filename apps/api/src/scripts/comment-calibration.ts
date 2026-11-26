@@ -23,9 +23,10 @@ import {
 } from '@impera/llm';
 import { z } from 'zod';
 
-import { commentWriterPersona } from '../modules/agent/index';
+import { commentWriterPersona, safetySigns } from '../modules/agent/index';
 import {
   afterGuards,
+  beforeModel,
   captionForPrompt,
   checkReply,
   commentForPrompt,
@@ -177,49 +178,65 @@ for (const pair of test) {
     .slice(-RECENT_REPLIES);
   const attempts: GuardedAttempt[] = [];
   let refusedBy: string[] = [];
-  for (;;) {
-    const result = await gateway.instagramComment({
-      creatorName: persona.creatorName,
-      personaSheet: persona.personaSheet,
-      examples: [],
-      recentReplies,
-      nearExamples: nearExamples(pair.comment, examples),
-      comment: {
-        comment: pair.comment,
-        mediaKind: pair.mediaKind,
-        caption: pair.caption,
-        postAgeHours: 2,
-        repliesToHer: false,
-        authorCommentedBefore: false,
-        mayAsk,
-      },
-      ...(refusedBy.length > 0 ? { refusedBy } : {}),
-      trace: {},
-    });
-    if (!result.ok) {
-      attempts.push({
-        outcome: { kind: 'handoff', handoff: 'other', reason: result.error.code },
-        violations: [],
+  // As in production: the code's own detectors run first, and an age doubt or a distress never reaches the model.
+  const signs = safetySigns(pair.comment, now);
+  const before = beforeModel(
+    {
+      fromOwnAccount: false,
+      authorAgeDoubtOpen: false,
+      ageDoubtDetected: signs.includes('minor_suspected'),
+      distressDetected: signs.includes('self_harm'),
+      repliesToAuthorToday: 0,
+      repliesInThread: 0,
+    },
+    { perAuthorPerDay: 1, perThread: 1 },
+  );
+  if (before.step === 'handoff')
+    attempts.push({ outcome: { kind: 'handoff', handoff: before.handoff, reason: 'code' }, violations: [] });
+  else
+    for (;;) {
+      const result = await gateway.instagramComment({
+        creatorName: persona.creatorName,
+        personaSheet: persona.personaSheet,
+        examples: [],
+        recentReplies,
+        nearExamples: nearExamples(pair.comment, examples),
+        comment: {
+          comment: pair.comment,
+          mediaKind: pair.mediaKind,
+          caption: pair.caption,
+          postAgeHours: 2,
+          repliesToHer: false,
+          authorCommentedBefore: false,
+          mayAsk,
+        },
+        ...(refusedBy.length > 0 ? { refusedBy } : {}),
+        trace: {},
       });
-      break;
+      if (!result.ok) {
+        attempts.push({
+          outcome: { kind: 'handoff', handoff: 'other', reason: result.error.code },
+          violations: [],
+        });
+        break;
+      }
+      const outcome = result.value.output;
+      const violations =
+        outcome.kind === 'reply'
+          ? checkReply(outcome.text, {
+              recentReplies,
+              mayAsk,
+              chatGuardCodes: persona
+                .check([outcome.text])
+                .filter((violation) => violation.blocking)
+                .map((violation) => violation.code),
+            })
+          : [];
+      attempts.push({ outcome, violations });
+      const next = afterGuards(attempts, true);
+      if (next.step === 'settled') break;
+      refusedBy = next.refusedBy.map((violation) => violation.code);
     }
-    const outcome = result.value.output;
-    const violations =
-      outcome.kind === 'reply'
-        ? checkReply(outcome.text, {
-            recentReplies,
-            mayAsk,
-            chatGuardCodes: persona
-              .check([outcome.text])
-              .filter((violation) => violation.blocking)
-              .map((violation) => violation.code),
-          })
-        : [];
-    attempts.push({ outcome, violations });
-    const next = afterGuards(attempts, true);
-    if (next.step === 'settled') break;
-    refusedBy = next.refusedBy.map((violation) => violation.code);
-  }
   const settled = afterGuards(attempts, true);
   const outcome: CommentOutcome =
     settled.step === 'settled' ? settled.outcome : { kind: 'skip', reason: 'refused_by_guards' };
