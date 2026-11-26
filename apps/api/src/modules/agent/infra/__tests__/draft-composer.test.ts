@@ -278,6 +278,68 @@ describe('createDraftComposer', () => {
     expect(still.seen.voiceCalls).toBe(2);
   });
 
+  it('drops a hollow bubble, and writes again an answer left with none (passe 2, conversation 37)', async () => {
+    const dotted = composer({ voice: { bubbles: ['Trop fière de toi', '.'] } });
+    expect(await dotted.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Trop fière de toi'],
+    });
+    expect(dotted.seen.voiceCalls).toBe(1);
+
+    const hollow = composer({ voice: { bubbles: ['.'] }, voiceAfter: { bubbles: ['Raconte 😏'] } });
+    expect(await hollow.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Raconte 😏'],
+    });
+    expect(hollow.seen.voiceCalls).toBe(2);
+
+    const still = composer({ voice: { bubbles: ['…'] } });
+    expect(await still.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'llm_unavailable',
+      detail: ['no_voice'],
+    });
+    expect(still.seen.voiceCalls).toBe(2);
+  });
+
+  it('lets her say « on se connaît à peine » to his love, never to a compliment (passe 2, conversation 21)', async () => {
+    const slow = { bubbles: ['Ça me touche 🙈', 'mais on se connaît à peine toi'] };
+    const love = composer({ brief: { ...BRIEF, intent: 'flirt', occasion: 'says_love' }, voice: slow });
+    expect(await love.draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft' });
+    expect(love.seen.voiceCalls).toBe(1);
+
+    const compliment = composer({ brief: { ...BRIEF, intent: 'flirt' }, voice: slow });
+    expect(await compliment.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['unwarranted_brake'],
+    });
+  });
+
+  it('names her phrases worn across her fans to the voice, and writes once more an answer that says one (passe 2)', async () => {
+    // Invented lines of hers to other fans.
+    const herRecent = Array.from(
+      { length: 5 },
+      (_, i) => `Soirée tranquille ${String(i)}, un verre de vin et Churro`,
+    );
+    const { draftComposer, seen } = composer({
+      voice: { bubbles: ['Un verre de vin sous la couette 😌'] },
+      voiceAfter: { bubbles: ['Je dessine un peu, et toi ?'] },
+    });
+    expect(await draftComposer.compose({ ...INPUT, herRecent })).toMatchObject({
+      kind: 'draft',
+      bubbles: ['Je dessine un peu, et toi ?'],
+    });
+    expect(seen.voiceCalls).toBe(2);
+    const hint = seen.voiceInputs?.[0]?.brief.toneHints.at(-1) ?? '';
+    expect(hint).toContain('churro');
+    expect(hint).toContain('verre de vin');
+
+    const fresh = composer({ voice: { bubbles: ['Un verre de vin sous la couette 😌'] } });
+    await fresh.draftComposer.compose(INPUT);
+    expect(fresh.seen.voiceCalls).toBe(1);
+  });
+
   it('answers his asking to meet with one reason his relationship allows, never twice (Charles 21/11)', async () => {
     const meet: Brief = { ...BRIEF, intent: 'asks_to_meet', risks: ['meet_request'] };
     const first = composer({ brief: meet });
@@ -351,8 +413,13 @@ describe('createDraftComposer', () => {
     expect(love.some((hint) => hint.includes('jamais en retour'))).toBe(true);
     const partner = await hintsFor({ ...BRIEF, occasion: 'partner_returns' });
     expect(partner.some((hint) => hint.includes('prendre soin d’elle'))).toBe(true);
-    const proof = await hintsFor({ ...BRIEF, occasion: 'asks_proof' });
-    expect(proof.some((hint) => hint.includes('sans vexation'))).toBe(true);
+    // A proof made for him is a custom order (passe 2 du 26/11): its brief leads, never a promise of hers.
+    const { draftComposer: proving, seen: proved } = composer({
+      brief: { ...BRIEF, occasion: 'asks_proof' },
+    });
+    await proving.compose(INPUT);
+    expect(proved.voiceInputs?.[0]?.brief.replyBrief).toContain('sans rien promettre');
+    expect(proved.voiceInputs?.[0]?.brief.toneHints.some((hint) => hint.includes('preuve'))).toBe(false);
     // A new fan, his age not confirmed: told to calm down, nothing sexual.
     const photo = await hintsFor({ ...BRIEF, intent: 'sexting', occasion: 'unsolicited_explicit' });
     expect(photo.some((hint) => hint.includes('se calmer'))).toBe(true);
@@ -2494,11 +2561,15 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       readonly chatter?: boolean;
       readonly voice?: VoiceOutput;
       readonly neverDo?: readonly string[];
+      readonly brief?: Brief;
     } = {},
   ) => {
     const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
     const draftComposer = createDraftComposer({
-      gateway: gateway({ brief: ORDER, ...(options.voice !== undefined && { voice: options.voice }) }, seen),
+      gateway: gateway(
+        { brief: options.brief ?? ORDER, ...(options.voice !== undefined && { voice: options.voice }) },
+        seen,
+      ),
       persona: {
         creatorName: 'Lina',
         personaSheet: 'fiche',
@@ -2533,6 +2604,40 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
     const { draftComposer, seen } = ordering({ voice: { bubbles: ['oh j’adore l’idée 🙈', 'je te redis'] } });
     expect(await draftComposer.compose(INPUT)).toMatchObject({ kind: 'draft', customOrderOpened: true });
     expect(seen.voiceInputs?.[0]?.brief.replyBrief).toContain('sans dire oui ni non');
+  });
+
+  it('hands a proof made for him to the chatter on shift, as a custom order (passe 2, conversation 31)', async () => {
+    const proof: Brief = { ...BRIEF, intent: 'other', occasion: 'asks_proof' };
+    const { draftComposer, seen } = ordering({ chatter: true, brief: proof });
+    expect(await draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'custom_order',
+      customOrderOpened: true,
+    });
+    expect(seen.voiceCalls).toBe(0);
+  });
+
+  it('with nobody on shift, keeps a proof without promising it, and holds a promise', async () => {
+    const proof: Brief = { ...BRIEF, intent: 'other', occasion: 'asks_proof' };
+    const waiting = ordering({ brief: proof, voice: { bubbles: ['t’es mignon toi 🙈', 'je garde ça'] } });
+    expect(await waiting.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'draft',
+      customOrderOpened: true,
+    });
+    const hints = waiting.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(hints.some((hint) => hint.includes('preuve'))).toBe(false);
+    expect(waiting.seen.voiceInputs?.[0]?.brief.replyBrief).toContain('sans rien promettre');
+
+    const promised = ordering({
+      brief: proof,
+      voice: { bubbles: ['je te le ferai quand je pourrai, promis'] },
+    });
+    expect(await promised.draftComposer.compose(INPUT)).toMatchObject({
+      kind: 'held',
+      reason: 'guard_blocked',
+      detail: ['no_commitment'],
+    });
   });
 
   it('holds an answer that commits to his order, and opens it all the same', async () => {
@@ -2593,6 +2698,35 @@ describe('createDraftComposer, a custom order and a price objection (ADR 0090)',
       objectionReply: { objection: 'too_expensive', replyId: 'testbbbbbbbb' },
     });
     expect(seen.voiceInputs?.[0]?.objectionReply).toBe('Réplique de test B');
+  });
+
+  it('reads « fais-moi un prix » as a discount asked, whatever the brain read (passe 2, conversation 23)', async () => {
+    const answer = async (text: string) => {
+      const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+      const draftComposer = createDraftComposer({
+        gateway: gateway({ brief: { ...BRIEF, intent: 'small_talk' } }, seen),
+        personaOf: () =>
+          Promise.resolve({
+            persona: { creatorName: 'Lina', personaSheet: 'fiche', guardSettings: DEFAULT_GUARD_SETTINGS },
+            followUpSpirit: null,
+            offerLimits: { cooldownHours: 10, minDesire: 70 },
+            sexualizationLimits: { initiateAfterHours: 36, minHoursBeforeFollowing: 2, minDesireToOpen: 40 },
+            alertKeywords: [],
+            objectionReplies: { asks_discount: [{ id: 'testcccccccc', text: 'Réplique de test C' }] },
+          }),
+        timeZoneOf: () => Promise.resolve('Europe/Paris'),
+        voicePrompt: '1.2.0',
+      });
+      return draftComposer.compose({
+        ...INPUT,
+        history: [{ direction: 'inbound', text, at: INPUT.now }],
+      });
+    };
+    expect(await answer('Fais-moi un prix stp')).toMatchObject({
+      kind: 'draft',
+      objectionReply: { objection: 'asks_discount', replyId: 'testcccccccc' },
+    });
+    expect(await answer('Tu fais quoi ce soir ?')).not.toHaveProperty('objectionReply');
   });
 });
 
@@ -2910,6 +3044,21 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     expect(result.scriptRun).toBeUndefined();
     expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
     expect(result.fanAvailability).toMatchObject({ state: 'no', signal: 'someone_nearby' });
+  });
+
+  it('offers nothing while he says he is exhausted, even hot and free before (passe 2, conversation 40)', async () => {
+    const tired: Brief = { ...HOT, desireSignals: [...(HOT.desireSignals ?? []), 'tired'] };
+    const { draftComposer, seen } = composer(
+      { brief: tired },
+      undefined,
+      limitsOf(ADULT).limits,
+      deps(PACK_SOURCE),
+    );
+    const result = await draftComposer.compose(free(INPUT));
+    expect(result.scriptRun).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    expect(seen.voiceInputs?.[0]?.brief.action).toBe('reply');
+    expect(result.fanAvailability).toMatchObject({ state: 'no', signal: 'tired' });
   });
 
   it('sells nothing without her scripts, or when Reveal’s history cannot be read (fail closed)', async () => {

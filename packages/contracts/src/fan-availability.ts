@@ -19,6 +19,8 @@ export const FAN_AVAILABILITY_NEGATIVE_SIGNALS = [
   'leaving_soon',
   // He says goodnight (ADR 0158 § A): she says goodbye, and her next follow-up waits for the next day.
   'says_goodnight',
+  // He says he is exhausted (passe 2 du 26/11): no step goes, as when he is busy; no goodbye for that.
+  'tired',
 ] as const;
 export const FAN_AVAILABILITY_SIGNALS = [
   ...FAN_AVAILABILITY_POSITIVE_SIGNALS,

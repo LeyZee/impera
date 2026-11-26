@@ -144,7 +144,21 @@ describe('voice guards (P3-13)', () => {
       ['Ah oui ? et tu comptes faire quoi de ton week-end'],
       ...Array.from({ length: 6 }, () => ['Hey']),
     ];
-    expect(codes(['Et tu comptes faire quoi de ton week-end'], { previousTurns: old })).toEqual([]);
+    expect(codes(['Et ton week-end, tu comptes faire quoi ?'], { previousTurns: old })).toEqual([]);
+  });
+
+  it('warns on a line of hers copied, however far back she wrote it (passe 2 du 26/11)', () => {
+    // Invented line, sent long before her last turns.
+    const sentBefore = [
+      'Avoue tu penses à moi depuis tout à l’heure 😏',
+      ...Array.from({ length: 8 }, () => 'Hey'),
+    ];
+    const previousTurns = Array.from({ length: 6 }, () => ['Hey']);
+    expect(
+      severities(['Mmh tu penses à moi depuis tout à l’heure toi'], { previousTurns, sentBefore }),
+    ).toEqual([['repetition', 'soft']]);
+    // Six words of it are hers to say again.
+    expect(codes(['Tu penses à moi depuis ce matin ?'], { previousTurns, sentBefore })).toEqual([]);
   });
 
   it('warns on a third closed question in a row, and not when one of them was open', () => {

@@ -566,14 +566,19 @@ const OPENING_STREAK = 3;
  */
 const REUSED_WORDS = 4;
 const REUSED_TURNS = 6;
+/**
+ * A line of hers copied: seven words in a row of any message she already sent him, however far back (passe 2 du 26/11,
+ * « tu penses à moi depuis tout à l'heure » said again). Soft, like a formula: rewritten once, then goes.
+ */
+const COPIED_WORDS = 7;
 
-function wordRuns(text: string): string[] {
+function wordRuns(text: string, size = REUSED_WORDS): string[] {
   const words = plain(text)
     .split(' ')
     .filter((word) => word !== '');
   return words
-    .slice(0, Math.max(0, words.length - REUSED_WORDS + 1))
-    .map((_, i) => words.slice(i, i + REUSED_WORDS).join(' '));
+    .slice(0, Math.max(0, words.length - size + 1))
+    .map((_, i) => words.slice(i, i + size).join(' '));
 }
 
 const openingOf = (turn: readonly string[]): string | undefined => {
@@ -617,6 +622,12 @@ function againstHistory(
     ) {
       violations.push({ code: 'repetition', severity: 'blocking', bubbleIndex, match: text });
     }
+  });
+  const copied = new Set([...sentBefore, ...turns.flat()].flatMap((text) => wordRuns(text, COPIED_WORDS)));
+  bubbles.forEach((bubble, bubbleIndex) => {
+    if (violations.some((v) => v.bubbleIndex === bubbleIndex)) return;
+    const match = wordRuns(bubble, COPIED_WORDS).find((run) => copied.has(run));
+    if (match !== undefined) violations.push({ code: 'repetition', severity: 'soft', bubbleIndex, match });
   });
   const opening = openingOf(bubbles);
   const lastOpenings = turns.slice(-(OPENING_STREAK - 1)).map(openingOf);
@@ -697,6 +708,24 @@ function amountMinorOf(written: string): number | undefined {
   return digits === undefined ? undefined : Math.round(Number(digits.replace(',', '.')) * 100);
 }
 
+// « On se retrouve demain » said as she goes to bed: to talk again here, the next day (passe 2 du 26/11, conversation
+// 40). Only « retrouve », only a moment without a day of the week or an hour, and only beside a goodnight or « ici »:
+// « on se voit demain », « on se retrouve demain au café », « … samedi », « … à 20 h » stay meetings.
+const LATER_HERE = /^on se retrouve (demain|plus tard|tout a l'heure)$/;
+const GOODNIGHT = /\b(bonne nuit|dors bien|douce nuit|beaux reves|repose[- ]toi|a demain)\b/;
+const HERE_AFTER = /^ ?(ici|sur (ma|mon) (page|messagerie)|en (message|messages|dm|mp|prive))\b/;
+const PLACE_AFTER = new RegExp(
+  `^[^.!?]*\\b(chez|au|aux|a la|a l'|devant|en ville|dans (un|une|le|la)|gare|hotel|bar|cafe|resto|restaurant|${CITY})\\b|^[^.!?]*\\d`,
+);
+
+/** A meeting word that only says they will talk again here, as she goes to bed. */
+function chatGoodbye(text: string, match: string, index: number, message: string): boolean {
+  if (!LATER_HERE.test(match)) return false;
+  const after = text.slice(index + match.length);
+  if (PLACE_AFTER.test(after)) return false;
+  return HERE_AFTER.test(after) || GOODNIGHT.test(message);
+}
+
 /**
  * The first match of a blocking pattern in the text. A sum is read one by one: the price code allowed (ADR 0156 § 4)
  * passes, any other one blocks.
@@ -706,7 +735,15 @@ function blockingMatch(
   pattern: RegExp,
   text: string,
   allowedPriceMinor: number | undefined,
+  /** The whole message, normalised, when `text` is one bubble of it: a goodnight may be in another bubble. */
+  message: string = text,
 ): string | undefined {
+  if (code === 'meeting_promise') {
+    for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
+      if (!chatGoodbye(text, match[0], match.index, message)) return match[0];
+    }
+    return undefined;
+  }
   if (code !== 'price_outside_offer' || allowedPriceMinor === undefined) return pattern.exec(text)?.[0];
   for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
     // « €12.50 » matches as « €1 »: the sum is read on, past the match.
@@ -763,10 +800,11 @@ export function checkVoiceOutput(
   const violations: GuardViolation[] = [];
   const forbidden = settings.forbiddenTerms.map(normalise).filter((term) => term !== '');
 
+  const message = normalise(bubbles.join(' '));
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
     for (const { code, pattern } of BLOCKING_PATTERNS) {
-      const match = blockingMatch(code, pattern, text, context.allowedPriceMinor);
+      const match = blockingMatch(code, pattern, text, context.allowedPriceMinor, message);
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
     const stage = STAGE_DIRECTION.map((pattern) => pattern.exec(bubble)?.[0]).find((m) => m !== undefined);
