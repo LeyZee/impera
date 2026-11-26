@@ -29,6 +29,8 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/media': 10,
   'modules/notifications': 3,
   'modules/payroll': 10,
+  // The agent reads the agency's active base style (ADR 0171) out of any session: one row, read only, no creator's data.
+  'modules/persona': 1,
   'modules/providers': 7,
   'modules/redirect-links': 2,
   'modules/rewards': 7,
