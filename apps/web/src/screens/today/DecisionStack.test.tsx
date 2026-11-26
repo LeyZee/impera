@@ -136,7 +136,7 @@ describe('« À décider », hers (ADR 0164)', () => {
       />,
     );
     expect(container.querySelector('.sc-ask__who')?.textContent).toBe('NNora');
-    expect(screen.getByText('Plus que 40 min').className).toContain('nv-tag--warn');
+    expect(screen.getByText('Plus que 40 min').className).toContain('nv-tag--tint');
     expect(screen.getByText('Tu réponds à la place de Nora.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Plus tard' })).toBeNull();
     // Nothing left in the foot: no empty footer keeps its margin.

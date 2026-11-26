@@ -122,7 +122,12 @@ export function DecisionStack({
             </span>
           ) : null}
           {shownDue === undefined ? null : (
-            <span className={shownDue.soon ? 'nv-tag nv-tag--warn sc-ask__due' : 'nv-tag sc-ask__due'}>
+            <span
+              className={
+                shownDue.soon ? 'nv-tag nv-tag--tint sc-ask__due' : 'nv-tag nv-tag--declared sc-ask__due'
+              }
+              style={shownDue.soon ? { '--_c': 'var(--nv-warning)' } : undefined}
+            >
               {shownDue.label}
             </span>
           )}
