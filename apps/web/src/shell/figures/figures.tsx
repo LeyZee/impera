@@ -239,6 +239,52 @@ export function Ring({
   );
 }
 
+export interface Step {
+  readonly label: string;
+  /** When it was reached, as the screen says it (« à 16 h 46 »). */
+  readonly when?: string | null;
+}
+
+/**
+ * Steps: where something stands on a short path (sent, seen, settled). `reached` is the index of the step it stands
+ * on: every step up to it is filled and ticked, that one wears the halo, the rest stay hollow. `label` says the whole
+ * to a screen reader. `colour` is a CSS colour, the data's ink by default.
+ */
+export function Steps({
+  steps,
+  reached,
+  label,
+  colour,
+}: {
+  steps: readonly Step[];
+  reached: number;
+  label: string;
+  colour?: string;
+}): JSX.Element {
+  return (
+    <ol className="nv-steps" aria-label={label} style={colour === undefined ? undefined : { '--_c': colour }}>
+      {steps.map((step, index) => (
+        <li
+          key={step.label}
+          className="nv-steps__step"
+          data-done={index <= reached ? 'true' : undefined}
+          aria-current={index === reached ? 'step' : undefined}
+        >
+          <span className="nv-steps__node" aria-hidden="true">
+            {index <= reached ? (
+              <svg viewBox="0 0 12 12">
+                <path d="M2.5 6.4l2.3 2.3 4.7-5" />
+              </svg>
+            ) : null}
+          </span>
+          <span className="nv-steps__label">{step.label}</span>
+          {step.when == null ? null : <span className="nv-steps__when nv-num">{step.when}</span>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 /**
  * The small curve at a tile's foot: 1.5px, no axis, no point, a fill of 12 % at most, in the trend's colour.
  * Decorative: the tile's figure and its change say it, so it is hidden from assistive technologies.

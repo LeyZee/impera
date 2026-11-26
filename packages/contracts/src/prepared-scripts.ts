@@ -108,6 +108,8 @@ export const PREPARED_SCRIPT_GAP_CODES = [
   'media_absent',
   /** A photo or video without a description a human validated. */
   'media_not_described',
+  /** A paid branch sells a media offered once (ADR 0145 § 2: « un média offert n'est jamais revendu »). */
+  'media_offered',
   'branch_unsettled',
   'branch_two_defaults',
   'branch_cheaper_on_spend',

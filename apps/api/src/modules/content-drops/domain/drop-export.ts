@@ -23,6 +23,11 @@ export interface DropExportFile {
   readonly storageKey: string;
   /** Its validated description, for the sheet; `null` while none is (an audio note never has one). */
   readonly description: string | null;
+  /**
+   * Sold by one of her scripts (`mediaInScript`): never offered (ADR 0145 § 2, « un média de script n'est jamais
+   * gratuit »), so left out of the archive, and the sheet says so.
+   */
+  readonly inScript: boolean;
 }
 
 /** A drop of hers as its archive reads it. */
@@ -111,11 +116,14 @@ const longDay = (at: Date, timezone: string): string =>
 
 /**
  * Her drop's folder: `feed-seance-2026-11-11/`, the sheet first (`00-fiche.txt`), then each medium as `01-photo.jpg`,
- * `02-video.mp4`… in her order. A medium waiting for its description says so in the sheet, never a guessed one.
+ * `02-video.mp4`… in her order. A medium waiting for its description says so in the sheet, never a guessed one. A
+ * medium one of her scripts sells is never in it: the sheet counts those left out, so the team knows why.
  */
 export function dropExportPlan(drop: SentDrop): DropExportPlan {
   const folder = `${FOLDERS[drop.category]}-${dayOf(drop.createdAt, drop.timezone)}`;
-  const named = drop.files.map((file, index) => ({
+  const kept = drop.files.filter((file) => !file.inScript);
+  const left = drop.files.length - kept.length;
+  const named = kept.map((file, index) => ({
     file,
     name: `${String(index + 1).padStart(2, '0')}-${KIND_NAMES[file.kind]}.${extensionOf(file.mime)}`,
   }));
@@ -125,6 +133,14 @@ export function dropExportPlan(drop: SentDrop): DropExportPlan {
     '',
     OUTPUTS[drop.category],
     '',
+    ...(left === 0
+      ? []
+      : [
+          left === 1
+            ? 'Un média est laissé de côté : il est vendu dans un de ses scripts, il ne part jamais offert.'
+            : `${String(left)} médias sont laissés de côté : ils sont vendus dans ses scripts, ils ne partent jamais offerts.`,
+          '',
+        ]),
   ];
   for (const { file, name } of named) {
     lines.push(name);

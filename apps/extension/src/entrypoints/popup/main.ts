@@ -23,6 +23,7 @@ import {
   MarkedSchema,
   RevealAccountsSchema,
   RevealReadSchema,
+  RevealAutoSchema,
   RevealSyncedSchema,
   WatchStatusSchema,
   type FromPopup,
@@ -266,8 +267,33 @@ async function sendSession(): Promise<void> {
           expiresAt: synced.data.expiresAt,
           reconnectFirst: synced.data.reconnectFirst,
           kept: synced.data.kept,
+          auto: false,
         }
       : { kind: 'failed', accountId, failure: synced.data.state };
+  await redrawReveal();
+}
+
+/** Asked once per opening of the popup (ADR 0147 § 7), even when the first answer was nothing. */
+let autoAsked = false;
+
+/**
+ * The sync at the opening (ADR 0147): the owner on a Reveal tab, an account whose session is over or ends soon. The
+ * service worker decides the rest and says nothing unless a session was stored; the button stays as it is.
+ */
+async function syncAtOpening(view: SyncView): Promise<void> {
+  if (autoAsked || tabId === undefined) return;
+  if (
+    !view.accounts.accounts.some(
+      (account) => account.sessionState === 'expired' || account.sessionState === 'warning',
+    )
+  )
+    return;
+  autoAsked = true;
+  const answer = RevealAutoSchema.safeParse(await ask({ type: 'popup/reveal-auto', tabId }));
+  // A gesture of the owner since then speaks louder: his outcome stays.
+  if (answer.data?.state !== 'synced' || syncPending !== null || syncConfirm !== null) return;
+  const { accountId, expiresAt, reconnectFirst, kept } = answer.data;
+  syncOutcome = { kind: 'synced', accountId, expiresAt, reconnectFirst, kept, auto: true };
   await redrawReveal();
 }
 
@@ -300,14 +326,16 @@ async function refresh(): Promise<void> {
       // The copilot is every member's but the creator's (EXT-09, ADR 0086 § 7); the « Sync » the owner's alone.
       const copilot = atWork && place === 'reveal' && kind !== 'creator';
       const syncs = copilot && kind === 'owner';
+      const sync = syncs ? await syncViewFor() : null;
       show({
         kind: 'signed_in',
         me: session.me,
         place,
         copilot: copilot ? await copilotViewFor() : null,
         watch: watched ? await watchViewFor() : null,
-        sync: syncs ? await syncViewFor() : null,
+        sync,
       });
+      if (sync !== null) void syncAtOpening(sync);
       return;
     }
     case 'signed_out':

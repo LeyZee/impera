@@ -161,6 +161,12 @@ export const mediaPlatformRefs = pgTable(
     descriptionFailures: smallint('description_failures').notNull().default(0),
     /** The platform's blurred preview (a blurhash, `BlurhashSchema`): a few colours, never the image (ADR 0030 § 4). */
     previewBlurhash: text('preview_blurhash'),
+    /**
+     * When a sync first read it as sent for free by the platform (Reveal's `sentForFree`: offered in a message or a
+     * Mass DM), `null` until then. Kept once set, whatever a later read says: a media once offered is never sold again
+     * (ADR 0145 § 2, the media's mark).
+     */
+    sentForFreeAt: timestampTz('sent_for_free_at'),
     lastSyncedAt: timestampTz('last_synced_at').notNull(),
     removedAt: timestampTz('removed_at'),
     createdAt: createdAt(),
@@ -320,6 +326,38 @@ const mediumAwaitsAgency = (t: { readonly mediaAssetId: PgColumn }): SQL =>
        where w.media_asset_id = ${t.mediaAssetId} and w.validated_at is null
          and (cardinality(w.review_reasons) > 0
               or jsonb_array_length(coalesce(w.content -> 'flags', '[]'::jsonb)) > 0))`;
+
+/**
+ * Whether a vault media was offered (ADR 0145 § 2, « un média offert n'est jamais revendu »): the platform read it as
+ * sent for free once (`sent_for_free_at`), or its file is kept by a live drop of hers that leaves for free (any drop
+ * but a script: feed, stories, Instagram, Telegram, Mass DM). Given the columns of a `media_platform_refs` row, in the
+ * caller's query and RLS. A media whose file is not read yet (`media_asset_id` null) answers by the platform's mark.
+ */
+export function vaultOffered(ref: { readonly sentForFreeAt: SQL; readonly mediaAsset: SQL }): SQL<boolean> {
+  return sql<boolean>`(${ref.sentForFreeAt} is not null or exists (
+    select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
+     where f.media_asset_id = ${ref.mediaAsset} and f.state in ('kept', 'duplicate') and f.replaced_at is null
+       and d.category <> 'script' and d.state <> 'withdrawn'))`;
+}
+
+/**
+ * Whether a media of hers is sold by a script (ADR 0145 § 2, « un média de script n'est jamais gratuit »): its file is
+ * kept by a live script drop of hers, or it is a sold media of a paid step of one of her active native scripts. Given
+ * a `media_assets` id, in the caller's query and RLS.
+ */
+export function mediaInScript(mediaAsset: SQL): SQL<boolean> {
+  return sql<boolean>`(exists (
+    select 1 from content_drop_files f join content_drops d on d.id = f.drop_id
+     where f.media_asset_id = ${mediaAsset} and f.state in ('kept', 'duplicate') and f.replaced_at is null
+       and d.category = 'script' and d.state <> 'withdrawn')
+    or exists (
+    select 1 from media_platform_refs l
+      join platform_scripts ps on ps.platform_account_id = l.platform_account_id and ps.active
+      join platform_script_step_media sm on sm.platform_script_id = ps.id and sm.role = 'sold'
+        and sm.platform_media_ref = l.platform_media_id
+      join platform_script_steps st on st.platform_script_id = sm.platform_script_id and st.position = sm.position
+     where l.media_asset_id = ${mediaAsset} and st.price_minor > 0))`;
+}
 
 /**
  * A media of the vault the owner asked to describe (ADR 0145 § 5, amendment of 17/11), after the count and the cost

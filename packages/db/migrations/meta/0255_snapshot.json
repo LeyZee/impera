@@ -1,6 +1,6 @@
 {
-  "id": "ecc4db4d-a490-4653-b5b1-388de2e75261",
-  "prevId": "e8d386b2-4bce-45cf-8501-d3f9d7dc7880",
+  "id": "b8bdd217-8b25-4e72-accf-21f09a4aae98",
+  "prevId": "fce21862-b0a7-414a-9871-0c85bdde57a5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2060,7 +2060,7 @@
         },
         "content_drops_blocked_check": {
           "name": "content_drops_blocked_check",
-          "value": "(\"content_drops\".\"state\" = 'blocked') = (\"content_drops\".\"blocked_reason\" is not null)\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
+          "value": "(\"content_drops\".\"state\" <> 'blocked' or \"content_drops\".\"blocked_reason\" is not null)\n        and (\"content_drops\".\"blocked_reason\" is null or \"content_drops\".\"state\" in ('blocked', 'withdrawn'))\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
         },
         "content_drops_correction_check": {
           "name": "content_drops_correction_check",
@@ -2527,6 +2527,20 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media' and \"script_drop_summaries\".\"author\" = 'brain' and \"script_drop_summaries\".\"validated_by\" is null"
         },
         "team_validate": {
           "name": "team_validate",
@@ -9617,6 +9631,12 @@
         "preview_blurhash": {
           "name": "preview_blurhash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_for_free_at": {
+          "name": "sent_for_free_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
