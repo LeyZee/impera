@@ -26,6 +26,7 @@ import {
   createAlertTester,
   createJsonlCalibrationStore,
   guardSettingsOf,
+  languagesOf,
   startDraftComposer,
   voiceExamples,
   type ActivePersonaSource,
@@ -239,6 +240,7 @@ describe('the agent writes with her active persona version (recette G4, M13; ADR
         personaSheet: demo.personaSheet,
         guardSettings: guardSettingsOf(demo),
         voiceExamples: examples,
+        languages: languagesOf(demo),
       }).handleFanMessage('Salut');
       expect(voice[0]?.personaSheet).toContain('Okidoki, réponse corrigée sur la persona fictive');
 

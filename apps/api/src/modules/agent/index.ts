@@ -16,7 +16,7 @@ import {
   type ScriptSource,
 } from './infra/draft-composer';
 import { createFanLimits } from './infra/fan-limits';
-import { guardSettingsOf, type PersonaForModels } from './infra/persona-file';
+import { guardSettingsOf, languagesOf, type PersonaForModels } from './infra/persona-file';
 
 /** Public entry point of the `agent` module (ADR 0002). Other modules import this file only. */
 export {
@@ -86,13 +86,20 @@ export { CalibrationRecordSchema, createJsonlCalibrationStore } from './infra/js
 export {
   asSent,
   composeTurn,
+  FRENCH_ONLY,
   guardContextOf,
   withExamples,
   type ComposedTurn,
   type OfferInput,
   type ScriptsInput,
 } from './infra/compose';
-export { guardSettingsOf, readPersonaFile, type PersonaForModels } from './infra/persona-file';
+export {
+  guardSettingsOf,
+  languagesOf,
+  readPersonaFile,
+  type PersonaForModels,
+  type PersonaLanguages,
+} from './infra/persona-file';
 /** @public Her active persona version, the port the composition root wires to `persona` (ADR 0010, 0022). */
 export { activePersonaForModels, type ActivePersonaSource } from './infra/active-persona';
 /** @public Her scripts as the agent reads them (ADR 0098), for the adapter the composition root builds. */
@@ -190,8 +197,7 @@ function composerFields(
       splitMessages: persona.splitMessages,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(examples.length > 0 && { voiceExamples: examples }),
-      ...(persona.spokenLanguages !== undefined && { spokenLanguages: persona.spokenLanguages }),
-      ...(persona.languageExamples !== undefined && { languageExamples: persona.languageExamples }),
+      ...languagesOf(persona),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,

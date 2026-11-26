@@ -25,7 +25,7 @@ import {
 } from '@impera/llm';
 import { z } from 'zod';
 
-import { guardSettingsOf } from '../modules/agent/index';
+import { guardSettingsOf, languagesOf } from '../modules/agent/index';
 import { createPlaygroundSession, readPersonaFile } from '../modules/playground/index';
 
 import { crmKeys } from './crm-read';
@@ -147,6 +147,7 @@ const session = createPlaygroundSession({
   guardSettings: guardSettingsOf(persona),
   splitMessages: persona.splitMessages,
   voiceExamples: [],
+  languages: languagesOf(persona),
   timeZone: 'Europe/Paris',
   now: () => sessionTime(first),
   offerLimits: persona.offerLimits,
