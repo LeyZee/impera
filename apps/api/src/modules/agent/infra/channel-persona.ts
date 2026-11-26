@@ -1,5 +1,6 @@
 import {
   asPersonaV2,
+  CAPTION_MAX,
   COMMENT_REPLY_MAX,
   PERSONA_SHEET,
   type ChannelPostViolation,
@@ -89,4 +90,12 @@ export function channelWriterPersona(stored: StoredVersion, now: Date): PublicWr
  */
 export function commentWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
   return publicWriterPersona(stored, now, { maxChars: COMMENT_REPLY_MAX });
+}
+
+/**
+ * Who she is for the caption of one of her Reels (ADR 0164 § 9): her public panels only, and the same guards on a text
+ * as long as Instagram lets a caption be. The `instagram-captions` module's port, wired by the composition root.
+ */
+export function captionWriterPersona(stored: StoredVersion, now: Date): PublicWriterPersona {
+  return publicWriterPersona(stored, now, { maxChars: CAPTION_MAX });
 }

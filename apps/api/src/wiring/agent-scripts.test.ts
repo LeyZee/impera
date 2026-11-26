@@ -33,6 +33,7 @@ const media = (ref: string, described = true) => ({
   imported: true,
   mediaAssetId: null,
   described,
+  offered: false,
   description: null,
 });
 
