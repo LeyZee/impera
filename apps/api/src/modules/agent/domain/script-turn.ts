@@ -37,8 +37,9 @@ export interface ScriptTurnInput extends Omit<NextScriptStepInput, 'latest'> {
   /** False on a second pass over the same message (a wait, a replay): it was already counted against the step. */
   readonly countsHisMessage: boolean;
   /**
-   * He says he just came (ADR 0156 § 6): his run pauses where it is. This message neither answers nor refuses the step
-   * waiting; when he comes back cold, the run ends `stalled` and her step is recalled once (§ 1).
+   * He says he just came (ADR 0156 § 6): this message neither answers nor refuses the step waiting. The evening's
+   * script is over (ADR 0158 § 42): a run with a paid step waiting ends `stalled` here, and the step he left is never
+   * recalled to him, now or later (passes 1 du 21/11, conversations 2 et 13).
    */
   readonly heCame?: boolean;
   /**
@@ -146,9 +147,17 @@ export function scriptTurn(input: ScriptTurnInput): ScriptTurn {
     // answer to the step nor a refusal.
     if (input.countsHisMessage && input.availability !== 'no' && input.heCame !== true)
       run = afterHisMessage(run, storedScript, input.reply, input.hotSession, now);
+    // Whether a step waits or he just bought one, the evening's script ends when he came (ADR 0156 § 6).
+    if (input.heCame === true) {
+      const over = applyScriptRunEvent(run, storedScript, { type: 'session_cooled', at: now });
+      if (over.ok) run = over.run;
+    }
   }
   const latest = run === null || storedScript === null ? null : { run, script: storedScript };
-  const decided = nextScriptStep({ ...input, latest });
+  const next = nextScriptStep({ ...input, latest });
+  // After he came, she gives him tenderness, never the step he left (ADR 0158 § 44).
+  const decided: ScriptStepDecision =
+    input.heCame === true && next.kind === 'end' ? { kind: 'end', status: next.status } : next;
   const decision: ScriptStepDecision =
     !input.mayAct && !noStep(decided) ? { kind: 'none', reason: 'held' } : decided;
 
