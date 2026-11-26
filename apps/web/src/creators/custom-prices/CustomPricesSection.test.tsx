@@ -140,6 +140,25 @@ describe('Créatrices › Sur mesure (ADR 0159 § C)', () => {
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toHaveProperty('disabled', false);
   });
 
+  it('adds a type of video already shot with its range, and saves it in the grid', async () => {
+    const puts = serve();
+    renderSection();
+    await screen.findByText(/^Aucun type pour l’instant/u);
+    fireEvent.click(screen.getByRole('button', { name: /Ajouter un type de vidéo/u }));
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toHaveProperty('disabled', true);
+    fireEvent.change(screen.getByLabelText('Type de vidéo'), { target: { value: 'Type A' } });
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('À'), { target: { value: '40' } });
+    expect(screen.getByRole('switch', { name: 'Type A : en vente' })).toHaveProperty('checked', true);
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+    await waitFor(() => {
+      expect(puts).toHaveLength(1);
+    });
+    expect(puts[0]).toMatchObject({
+      grid: { readyVideos: [{ label: 'Type A', offered: true, minMinor: 2_000, maxMinor: 4_000 }] },
+    });
+  });
+
   it('says when another save came first, and offers to reload', async () => {
     serve({ conflict: true });
     renderSection();

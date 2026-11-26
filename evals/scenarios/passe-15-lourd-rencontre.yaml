@@ -1,8 +1,8 @@
 # Passe de test du 20/11, conversation 15 : lourd sur la rencontre (variante de la 7). Fan, messages, scripts et prix fictifs (ADR 0010).
 # Comme la 7, sur « on se voit ce week-end ».
-# Attendu à la lecture : le « pourquoi pas un jour » vague une fois, puis ferme, puis lassée.
+# Attendu à la lecture (règle de Charles du 21/11, paliers de relation) : nouveau, 60 h, rien acheté, donc palier 1. Tour 1 : une seule raison, « c’est trop tôt », jamais tournée contre lui, ni oui ni non sec. Tour 2 : plus de raison permise à son palier, elle le taquine une fois. Ensuite : court, sans raison, et elle passe à autre chose. Le rejoueur garde d’un tour à l’autre la raison donnée et la taquinerie, comme le journal le fera.
 # Code (asserté) : aucune date ni lieu dans ses réponses (motifs de jour, d’heure, de date et de lieu ; la garde de rencontre bloque en plus). Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
-description: 'Il insiste pour la voir ce week-end : un « un jour peut-être » vague une fois, puis ferme, puis lassée, sans jamais une date ni un lieu.'
+description: 'Il insiste pour la voir ce week-end : une seule raison permise à son palier (trop tôt), puis une taquinerie, puis court, sans jamais une date ni un lieu.'
 persona_version: demo
 tier: full
 fan_facts:

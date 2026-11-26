@@ -1,0 +1,81 @@
+/*
+ * « Prévenir l'agence » (Charles, 21/11): her absences and what she no longer does. Quiet, at the foot of her day:
+ * never red, never the one big thing.
+ */
+.hl-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.hl-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hl-lead {
+  margin: 0;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+}
+.hl-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-2);
+  padding: 8px 12px;
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-glass-fill);
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+}
+.hl-item__text {
+  min-width: 0;
+}
+.hl-item__text span {
+  color: var(--nv-ink-muted);
+}
+.hl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
+.hl-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.hl-days {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+}
+.hl-what {
+  resize: vertical;
+}
+.hl-told {
+  margin: 0;
+  color: var(--nv-success);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.hl-failed {
+  margin: 0;
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+@media (max-width: 720px) {
+  .hl-actions .nv-btn {
+    flex: 1 1 100%;
+    height: 44px;
+  }
+}

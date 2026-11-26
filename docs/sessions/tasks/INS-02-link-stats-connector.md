@@ -1,4 +1,5 @@
 # INS-02 Connecteur de liens en lecture seule : clics par endroit et par heure
+
 Statut : in progress (lots a, b et c faits : contrats, domaine, faux, origine du service, adaptateur en lecture seule, clé scellée du propriétaire, route « Détecter ses liens »)
 Phase : Instagram (ADR 0120)
 Dépend de : ADR 0120 acceptée
@@ -6,12 +7,15 @@ Branche : task/ins-02-link-stats-connector
 Propriétaire : fil Instagram ; relecture Bilan (connecteurs) et Sécurité (clé)
 
 ## Objectif
+
 Les pages vues et les clics de chaque lien de redirection sont relevés par heure, sans robots, et chaque lien porte son endroit.
 
 ## Contexte à lire
+
 ADR 0120 § 3 et § 6, ADR 0080 (lien de redirection), ADR 0016, `docs/playbooks/add-a-connector.md`.
 
 ## À faire
+
 - [ ] Contrats Zod : endroit d'un lien (liste fermée), total par lien et par heure.
 - [ ] `FakeLinkStats`, puis l'adaptateur ; port sans aucune méthode d'écriture.
 - [ ] Clé saisie dans Réglages, scellée, vérifiée au collage.
@@ -25,13 +29,16 @@ ADR 0120 § 3 et § 6, ADR 0080 (lien de redirection), ADR 0016, `docs/playbooks
 - [ ] Tables nouvelles : FORCE RLS, `GRANT SELECT … TO impera_service`, test d'isolation ; les totaux ne sont lus que par l'agence.
 
 ## Critères d'acceptation
+
 - Tests contre le faux : relevé rejoué sans doublon, heure en cours relue puis figée une fois close, robots exclus, service injoignable en ambre.
 - Aucune adresse ni domaine réel dans un test, une fixture ou une doc.
 
 ## Hors périmètre
+
 Créer ou modifier un lien chez le service de redirection ; l'entonnoir d'acquisition (lot suivant).
 
 ## Notes de session
+
 - 20/11/2026, lot b (demande de Charles du 16/11 : détecter les liens de la créatrice chez le service, les associer, y voir plus clair) : le port gagne `listLinks()` (lecture, aucun chiffre) ; contrats `DetectedLinkSchema` et `LinkProposalSchema` ; `redirect-links/domain/detection.ts` : `linkProposals` reconnaît par son adresse un lien déjà gardé, préremplit le nom et devine l'endroit dans le nom donné chez le service (`placementHint`), sans jamais fabriquer un endroit. Une proposition n'écrit rien : seul le clic d'une personne associe un lien. Aucune table, route ni appel au service.
 - Lots suivants : c = clé saisie dans Réglages et scellée, adaptateur officiel (hôte écrit dans le code ; à voir avec Sécurité : le nom d'hôte du service entre alors dans le dépôt public), route « Détecter ses liens » ; d = écran dans l'onglet Liens (avis Design, captures) ; e = référence du service gardée sur le lien (migration additive) et totaux par heure.
 - Avis de Sécurité pour le lot c (20/11) : l'hôte du service ne s'écrit pas dans le dépôt public (son nom dit quel outil l'agence utilise). Il vient de la configuration du déploiement (variable d'environnement), jamais d'un réglage du CRM, d'une table ni d'une requête ; validé au démarrage (https, nom de domaine ASCII, port par défaut, ni IP, ni localhost, ni identifiants, ni chemin), sinon le serveur refuse de démarrer ; l'adaptateur n'appelle que lui, sans suivre de redirection, et n'envoie la clé qu'à lui ; `liens.example` dans les tests, nom neutre dans `.env.example`. C'est un écart avec la lettre de l'ADR 0120 § 3 : un amendement court, relu par Sécurité et accepté par Charles, précède le code. L'adaptateur borne aussi le nombre de liens lus par appel.
@@ -42,3 +49,4 @@ Créer ou modifier un lien chez le service de redirection ; l'entonnoir d'acquis
 - 21/11/2026, lot e1 : lecture horaire. L'adaptateur lit, pour un lien, les pages vues et les clics par heure (deux séries, heure UTC, fenêtre de 48 h que le service compte à l'heure) et le nombre de visites marquées « robot » par heure. Le port ne rend plus des instants de visite mais un compte par heure (`readRobotHours`) : le service ne donne que des totaux, et rien d'une visite ne traverse. Les listes de visiteurs et de provenances n'ont pas de chemin dans le code. Une référence qui n'a pas la forme de celles du service n'est pas envoyée ; une série paginée, trop longue, hors de l'heure pile ou mal comptée est refusée entière. Lire les robots ne change rien à la protection d'un lien. Reste : la référence gardée sur le lien après confirmation du propriétaire, la table des heures et la tâche horaire (lot e2, migration), puis l'affichage dans Trafic (lot e3).
 - 21/11/2026, lot e2a : la base et la lecture. Migration 0245 : `redirect_links.service_ref` (référence du service, écrite par le propriétaire seul sous sa propre politique, droit limité à cette colonne, une seule créatrice par lien du service) et `redirect_link_hours` (une ligne par lien et par heure UTC, zéro compris, clé étrangère composée lien + créatrice, heure close figée par la politique de la tâche, aucune suppression). Nom de tâche `link_hours` dans la liste fermée. Cas d'usage `readLinkHours` : pour une créatrice, lit ses liens reliés, allumés et placés dans SA transaction, puis 47 heures par lien (l'heure en cours et les 46 d'avant ; la plus vieille des 48 du service peut être coupée par le bord de la fenêtre) ; une heure se clôt sur une lecture faite dix minutes après sa fin ; une panne n'écrit ni n'efface rien. Rien ne l'appelle encore. Reste : lot e2b (route « relier ce lien » du propriétaire, qui relit le service et garde la référence du lien de même adresse ; référence remise à nul quand l'adresse change ; tâche horaire câblée, clé lue une fois par passage, appels bornés), puis lot e3 (Trafic).
 - 21/11/2026, lot e2b : relier et lire chaque heure. Route `POST /v1/creators/:creatorId/redirect-links/:linkId/attach`, du propriétaire seul, limitée à huit par minute : rien dans la requête ne nomme le lien du service, le serveur relit le compte et garde la référence du lien de même adresse exacte ; pas de correspondance : `redirect_link_unmatched_conflict` ; lien du service déjà relié ailleurs : `redirect_link_attached_conflict`, sans nom. L'écriture passe par la porte du propriétaire (`withTenantMember`, politique `owner_attach`), avec sa ligne d'audit `redirect_link.attach`. Une adresse changée remet la référence à nul dans la même écriture. Le lien lu par l'agence porte `attached`, jamais la référence. Tâche `connector.read_link_hours` à la 15e minute : clé lue une fois, 90 appels au plus par passage, tour décalé chaque heure, arrêt sur refus, limite ou panne du service. Plafond du rôle de service : `modules/connectors` 39 → 40 (la liste des créatrices ayant un lien relié traverse les créatrices ; identifiants seuls ; raison : aucune porte de parcours des créatrices n'existe sous le rôle applicatif). Reste : lot e3 (bouton « Relier » et heures dans Trafic, captures).
+- 26/11/2026, lot e3 : Trafic. Route `GET /v1/creators/:creatorId/redirect-links/hours` (propriétaire et manager de la créatrice, comme la lecture des liens) : les heures des 48 dernières heures de ses liens, sans référence du service. Carte « Ses clics, heure par heure » au-dessus de « Ses liens » : la réponse d'abord (clics sur 24 h contre la veille), pages vues et robots écartés à côté, colonnes des 24 heures empilées par endroit (heure en cours hachurée, survol, doigt et clavier), liens reliés classés avec leur petite courbe. Bouton « Relier » du propriétaire sur un lien pas encore relié, « Relié » avec sa chaîne pour tous sinon. Captures : lot `clics-par-heure-2` (retouches de Design sur le lot 1). Reste : avis de Design et validation de Charles.

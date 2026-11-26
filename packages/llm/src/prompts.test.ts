@@ -61,10 +61,22 @@ describe('prompts', () => {
 
   it('tells the judge to read his age in the situation, not in his messages (OPS-07)', () => {
     const judge = loadPrompt('judge');
-    expect(judge.header.version).toBe('1.2.0');
+    expect(judge.header.version).toBe('1.4.0');
     expect(judge.variables).toContain('situation');
     for (const field of ['ageConfirmed', 'relationshipHours', 'lastOfferHoursAgo', 'flags'])
       expect(judge.body).toContain(`\`${field}\``);
+  });
+
+  it('has the judge read her previous replies for the mould and the formulas she reuses (passe 1, 21/11)', () => {
+    const judge = loadPrompt('judge');
+    expect(judge.body).toContain('Relis chacune de ses réponses précédentes');
+    expect(judge.body).toContain('même moule');
+  });
+
+  it('caps the judge’s relevance when she answers his asking to meet with more than one reason, or one against him (Charles 21/11)', () => {
+    const judge = loadPrompt('judge');
+    expect(judge.body).toContain("plus d'une raison dans le message");
+    expect(judge.body).toContain('tournée contre lui');
   });
 
   it('puts what changes at each message last, so the stable head is cached', () => {

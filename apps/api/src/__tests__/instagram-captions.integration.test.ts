@@ -8,6 +8,7 @@ import {
   MediaAssetIdSchema,
   newId,
   ok,
+  OtherIdeasSchema,
   type CaptionProposals,
   type CreatorId,
   type DropMediaDescription,
@@ -58,6 +59,15 @@ const THREE: CaptionProposals = {
   ],
 };
 
+const OTHER: CaptionProposals = {
+  captions: [
+    { style: 'short', text: 'Réveil salé' },
+    { style: 'story', text: 'J’ai mis trois réveils pour ce lever de soleil' },
+    // One she already reads: never offered again.
+    { style: 'funny', text: 'Mon café a refroidi trois fois pendant ce Reel' },
+  ],
+};
+
 /**
  * The captions proposed for a Reel she dropped (ADR 0164 § 9) through the real app: a medium described, the job, the
  * decision she reads and answers. A fake voice, invented people and videos only (ADR 0010).
@@ -70,14 +80,19 @@ describe('the captions proposed for her Reels (ADR 0164 § 9)', () => {
   let noraUser = '';
   let cookie = '';
   const seen: CaptionProposalsInput[] = [];
-  const voice = { budget: false };
+  const voice: { budget: boolean; other: CaptionProposals[]; gate: Promise<void> | null } = {
+    budget: false,
+    other: [],
+    gate: null,
+  };
   const captionVoice: Pick<LlmGateway, 'proposeCaptions'> = {
-    proposeCaptions: (input) => {
+    proposeCaptions: async (input) => {
       seen.push(input);
+      if (voice.gate !== null) await voice.gate;
       if (voice.budget) return Promise.resolve(err({ code: 'budget_reached', attempts: [] }));
       return Promise.resolve(
         ok({
-          output: THREE,
+          output: input.otherIdeas === undefined ? THREE : (voice.other.shift() ?? OTHER),
           meta: { provider: 'xai', model: 'voice-test', isFallback: false, latencyMs: 1, promptHash: 'c-v1' },
         }),
       );
@@ -229,10 +244,130 @@ describe('the captions proposed for her Reels (ADR 0164 § 9)', () => {
     });
   });
 
-  it('proposes nothing for a photo, a drop withdrawn, nor a medium of another creator', async () => {
+  it('gives her other ideas three times at most, from her hints and her words, never spent when none comes', async () => {
+    const { mediaAssetId, dropId } = await drop('instagram_reel');
+    await propose(mediaAssetId);
+    const decision = (await hers()).find((one) => one.otherIdeasLeft === 3);
+    const ask = (payload: { hints: string[]; note: string }, as = cookie) =>
+      server.inject({
+        method: 'POST',
+        url: `/v1/creator-space/decisions/${decision?.id ?? ''}/other-ideas`,
+        headers: { cookie: as, origin: DASHBOARD_ORIGIN },
+        payload,
+      });
+
+    // Neither a hint nor a word, a hint her screen does not offer: refused before any call.
+    const before = seen.length;
+    expect((await ask({ hints: [], note: '  ' })).statusCode).toBe(400);
+    expect((await ask({ hints: ['louder'], note: '' })).statusCode).toBe(422);
+    expect(seen).toHaveLength(before);
+
+    // The day's budget spent: nothing for now, and her request is not counted.
+    voice.budget = true;
+    expect((await ask({ hints: ['shorter'], note: '' })).statusCode).toBe(503);
+    voice.budget = false;
+    expect((await hers()).find((one) => one.id === decision?.id)?.otherIdeasLeft).toBe(3);
+
+    const first = await ask({ hints: ['shorter', 'about_place'], note: 'Parle du café' });
+    expect(first.statusCode).toBe(200);
+    const renewed = OtherIdeasSchema.parse(first.json()).decision;
+    expect(renewed.otherIdeasLeft).toBe(2);
+    expect(renewed.answers.map((answer) => [answer.key, answer.text])).toEqual([
+      ['short', 'Réveil salé'],
+      ['story', 'J’ai mis trois réveils pour ce lever de soleil'],
+    ]);
+    expect(seen.at(-1)).toMatchObject({
+      mediaDescription: DESCRIBED.detailed,
+      otherIdeas: {
+        hints: ['Plus courte', 'Parle du décor'],
+        note: 'Parle du café',
+        seen: THREE.captions.map((one) => one.text),
+      },
+    });
+    expect((await hers()).find((one) => one.id === decision?.id)).toEqual(renewed);
+
+    // Only what she already reads comes back: nothing to offer, her request stays.
+    expect((await ask({ hints: ['funnier'], note: '' })).statusCode).toBe(503);
+    voice.other = [2, 3].map((round) => ({
+      captions: OTHER.captions.map(({ style, text }) => ({ style, text: `${text} (${String(round)})` })),
+    }));
+    expect((await ask({ hints: ['funnier'], note: '' })).statusCode).toBe(200);
+    expect((await ask({ hints: ['funnier'], note: '' })).statusCode).toBe(200);
+    const calls = seen.length;
+    const fourth = await ask({ hints: ['funnier'], note: '' });
+    expect(fourth.statusCode).toBe(409);
+    expect(seen).toHaveLength(calls);
+
+    // She still answers with one of the captions she reads now.
+    const answered = await server.inject({
+      method: 'POST',
+      url: `/v1/creator-space/decisions/${decision?.id ?? ''}/answer`,
+      headers: { cookie, origin: DASHBOARD_ORIGIN },
+      payload: { answer: 'short' },
+    });
+    expect(answered.statusCode).toBe(200);
+    expect((await ask({ hints: ['funnier'], note: '' })).statusCode).toBe(404);
+    expect(await app.modules.creatorDecisions.asking.read(nora, 'caption', `drop:${dropId}`, NOW)).toEqual({
+      state: 'answered',
+      answerKey: 'short',
+    });
+  });
+
+  it('pays once for two touches at once: the second is told other ideas are coming', async () => {
+    const { mediaAssetId } = await drop('instagram_reel');
+    await propose(mediaAssetId);
+    const decision = (await hers()).find((one) => one.otherIdeasLeft === 3);
+    const ask = () =>
+      server.inject({
+        method: 'POST',
+        url: `/v1/creator-space/decisions/${decision?.id ?? ''}/other-ideas`,
+        headers: { cookie, origin: DASHBOARD_ORIGIN },
+        payload: { hints: ['shorter'], note: '' },
+      });
+    const before = seen.length;
+    let open = (): void => undefined;
+    voice.gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const first = ask();
+    while (seen.length === before) await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = await ask();
+    expect(second.statusCode).toBe(409);
+    open();
+    voice.gate = null;
+    expect((await first).statusCode).toBe(200);
+    expect(seen).toHaveLength(before + 1);
+    expect((await hers()).find((one) => one.id === decision?.id)?.otherIdeasLeft).toBe(2);
+  });
+
+  it('gives no other idea to anyone but her', async () => {
+    const { mediaAssetId } = await drop('instagram_reel');
+    await propose(mediaAssetId);
+    const decision = (await hers()).find((one) => one.otherIdeasLeft === 3);
+    const before = seen.length;
+    const owner = await signIn(server, 'owner@example.test', PASSWORD);
+    for (const headers of [{ origin: DASHBOARD_ORIGIN }, { cookie: owner, origin: DASHBOARD_ORIGIN }]) {
+      const refused = await server.inject({
+        method: 'POST',
+        url: `/v1/creator-space/decisions/${decision?.id ?? ''}/other-ideas`,
+        headers,
+        payload: { hints: ['shorter'], note: '' },
+      });
+      expect([401, 403]).toContain(refused.statusCode);
+    }
+    expect(seen).toHaveLength(before);
+  });
+
+  it('proposes nothing for a photo, a drop withdrawn, a medium to redo, nor a medium of another creator', async () => {
     const before = seen.length;
     expect(await propose((await drop('instagram_post')).mediaAssetId)).toBe('nothing');
     expect(await propose((await drop('instagram_reel', 'withdrawn')).mediaAssetId)).toBe('nothing');
+    const redone = await drop('instagram_reel');
+    await test.admin.db
+      .update(schema.contentDropFiles)
+      .set({ redoSentence: 'Trop sombre', redoAt: NOW, redoBy: noraUser })
+      .where(eq(schema.contentDropFiles.mediaAssetId, redone.mediaAssetId));
+    expect(await propose(redone.mediaAssetId)).toBe('nothing');
     const { mediaAssetId } = await drop('instagram_reel');
     expect(
       await app.modules.instagramCaptions.jobs.propose(newId(CreatorIdSchema), mediaAssetId, 'test'),
