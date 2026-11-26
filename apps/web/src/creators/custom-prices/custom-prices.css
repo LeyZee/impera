@@ -290,7 +290,13 @@
   .smp-rows--supplements .smp-row__remove {
     order: -1;
   }
-  /* A type of video: its name and « Retirer », then its range and the switch. */
+  /* A type of video: its name and « Retirer », then its range and the switch; a message never shifts its pair. */
+  .smp-rows--ready > .smp-row {
+    align-items: flex-start;
+  }
+  .smp-rows--ready .smp-row__remove {
+    align-self: flex-end;
+  }
   .smp-rows--ready .smp-unit {
     flex: 0 0 6.5rem;
   }
