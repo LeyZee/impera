@@ -37,6 +37,13 @@ export {
   type AutonomyReadiness,
   type AutonomyThresholds,
 } from './domain/autonomy';
+/** @public Her questions in public, one reply in a few at most, wired with the jobs at lot b. */
+export {
+  asksAQuestion,
+  boundedQuestionEvery,
+  mayAskQuestion,
+  QUESTION_EVERY_BOUNDS,
+} from './domain/questions';
 /** @public What the code prepares for the model and does without it, wired with the jobs at lot b. */
 export {
   captionForPrompt,
