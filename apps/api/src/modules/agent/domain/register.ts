@@ -1,11 +1,10 @@
 import type { ScriptRun } from './script-run';
 
 /**
- * How frank her words may be (Charles 21/11, decided again 26/11 at 21:16 and 22:47): a ladder, not a switch. Before
- * any script, it follows his own level, capped at `explicit`: suggestive by default, sensual once he is hot, explicit
- * once he is crude first. In her script, it climbs with the intensity of what he has already seen (the media's closed
- * tags), never lower than explicit on an explicit step and never past what a media showed; after the last step and his
- * orgasm, tenderness. Never past suggestive before his adult age is confirmed or when he asked for nothing explicit.
+ * How frank her words may be (Charles 21/11, decided again 26/11 at 21:16, 22:47 and 23:09): a ladder, not a switch.
+ * Before his first paid step, playful with tension, `sensual` at most, even hot with the teaser seen; explicit only when
+ * he is clearly crude first. Then it climbs with the intensity of what he has already seen (the media's closed tags),
+ * never lower than explicit on an explicit step and never past what a media showed; after the last step, tenderness. Never past suggestive before his adult age is confirmed or when he asked for nothing explicit.
  * The names are neutral: her words for each level are her persona's or the agency's base style, never the repo's.
  */
 export const REGISTER_LADDER = ['suggestive', 'sensual', 'explicit', 'very_explicit'] as const;
@@ -44,15 +43,10 @@ export function registerOf(input: RegisterInput): Register {
   if (input.afterFinale) return 'tender';
   const { run } = input;
   const open = run?.status === 'open';
-  const teaserSeen = open && run.steps.some((step) => step.kind === 'free' && step.outcome !== 'refused');
   const bought = open && run.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought');
-  // His own level, capped at explicit: what she may follow without any media.
-  const his: Rung =
-    input.heIsCrude || (input.hot && teaserSeen) || bought
-      ? 'explicit'
-      : input.hot
-        ? 'sensual'
-        : 'suggestive';
+  // His own level, capped at explicit: what she may follow without any media. Before his first paid step, sensual at
+  // most unless he is crude first, even hot with the teaser seen (Charles 23:09).
+  const his: Rung = input.heIsCrude || bought ? 'explicit' : input.hot ? 'sensual' : 'suggestive';
   if (!open) return his;
   // What he has seen sets the floor and lets her go further: never prim on an explicit step.
   const seen = input.seenIntensities

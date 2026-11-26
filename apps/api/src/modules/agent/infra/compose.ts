@@ -659,7 +659,15 @@ const CUSTOM_INSTEAD_HINT =
   'il réclame un média d’un fantasme qu’aucun de ses scripts ne sert : elle peut lui suggérer quelque chose fait rien que pour lui, sans prix, sans dire oui ni quand';
 /** Her gauge in the middle of the action (Charles 26/11): the intention only, her words never the same. */
 const GAUGE_HINT =
-  'jauge-le : vérifie où il en est, s’il est toujours aussi excité, avec tes mots à toi et jamais les mêmes que la dernière fois';
+  'jauge-le : fais-lui dire ou décrire dans quel état il est, avec tes mots à toi et jamais les mêmes que la dernière fois ; jamais de photo à lui demander';
+/** The message right after he bought her step (Charles 26/11 at 23:09): she asks whether he liked it. */
+const AFTER_PURCHASE_HINT =
+  'il vient de prendre ce qu’elle lui a envoyé : demande-lui s’il a aimé, ce que ça lui fait';
+/** A compliment that is no advance (Charles 26/11 at 23:09): she draws him out, the sexting is not opened for him. */
+const COMPLIMENT_HINT =
+  'il lui fait un compliment, pas une avance : elle le reçoit avec plaisir et lui fait dire ce qui lui plaît, ce qu’il imagine';
+/** In the middle of the action she may write longer bubbles to tell what she feels (Charles 26/11 at 23:09). */
+const ACTION_BUBBLE_FACTOR = 2;
 /** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
 const IN_TENSION_HINT =
   'il vient d’ouvrir ce qu’elle lui a envoyé : elle s’assure qu’il a aimé et qu’il est toujours chaud, reste dans la tension, sans rien proposer encore';
@@ -1522,6 +1530,17 @@ export async function composeTurn(
       ? undefined
       : visibleStepSheet(running, runningScript);
   const sexualTurn = register !== null || running !== null;
+  // In the middle of the action: her script runs and her words are frank; longer bubbles pass (Charles 23:09).
+  const inAction = running !== null && (register === 'explicit' || register === 'very_explicit');
+  // The first message of his after he bought her step: she asks whether he liked it, unless the tension already does.
+  const justBought = running !== null && !inTension && hisMessagesSinceBought === 1 && !holdsBack;
+  // A compliment is no advance (Charles 23:09): she draws him out without opening the sexting for him.
+  const compliment =
+    brief !== undefined &&
+    brief.desireSignals?.includes('body_compliment') === true &&
+    !offerSignals(brief, input.fanText).fanSexualizes &&
+    running === null &&
+    !care;
   // He asks himself for a media of a fantasy no script serves: the custom path, where no step and no custom answer lead.
   const suggestsCustom =
     fantasyAllowed &&
@@ -1558,6 +1577,8 @@ export async function composeTurn(
                 ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
                 ...occasionHints,
                 ...(inTension ? [IN_TENSION_HINT] : []),
+                ...(justBought ? [AFTER_PURCHASE_HINT] : []),
+                ...(compliment ? [COMPLIMENT_HINT] : []),
                 ...(holdsBack ? [CLOSE_TO_COMING_HINT] : []),
                 ...(gauge ? [GAUGE_HINT] : []),
                 ...(suggestsCustom ? [CUSTOM_INSTEAD_HINT] : []),
@@ -1633,7 +1654,12 @@ export async function composeTurn(
     const violations = [
       ...checkVoiceOutput(
         written,
-        persona.guardSettings,
+        inAction
+          ? {
+              ...persona.guardSettings,
+              maxBubbleChars: persona.guardSettings.maxBubbleChars * ACTION_BUBBLE_FACTOR,
+            }
+          : persona.guardSettings,
         guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor),
       ),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),

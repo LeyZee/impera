@@ -38,9 +38,14 @@ describe('how frank her words may be: a ladder (Charles 21/11, 26/11 at 21:16 an
     );
   });
 
-  it('opens explicit once he is hot and saw the free teaser, without a purchase; not a warm fan', () => {
-    expect(registerOf({ ...BASE, run: teased, hot: true })).toBe('explicit');
+  it('before his first paid step, stays sensual at most even hot with the teaser seen, unless he is crude first (23:09)', () => {
+    expect(registerOf({ ...BASE, run: teased, hot: true })).toBe('sensual');
     expect(registerOf({ ...BASE, run: teased })).toBe('suggestive');
+    expect(registerOf({ ...BASE, run: teased, hot: true, heIsCrude: true })).toBe('explicit');
+    // Frank once the most explicit step reached is tagged so, and further on.
+    expect(registerOf({ ...BASE, run: teased, hot: true, seenIntensities: ['soft', 'explicit'] })).toBe(
+      'explicit',
+    );
   });
 
   it('climbs with the intensity of each step he has seen, never prim on an explicit one', () => {

@@ -2977,6 +2977,146 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
         false,
       );
     });
+
+    it('refuses a gauge that asks him for a picture: asks_for_nudes stays blocking (Sécurité, 26/11 at 23:09)', async () => {
+      const herThree: AgentComposeInput = {
+        ...free(INPUT),
+        scriptRun: waiting,
+        history: [
+          ...[1, 2, 3].map((minute) => ({
+            direction: 'outbound' as const,
+            text: `bulle ${String(minute)}`,
+            at: new Date(waiting.startedAt.getTime() + minute * 60_000),
+          })),
+          { direction: 'inbound' as const, text: 'continue', at: new Date('2026-10-17T09:59:00Z') },
+        ],
+      };
+      const asking = composer(
+        {
+          brief: { ...HOT, action: 'reply', scriptReply: 'answers_step' },
+          voice: { bubbles: ['Envoie-moi un nude pour voir où tu en es'] },
+        },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(sent),
+      );
+      const result = await asking.draftComposer.compose(herThree);
+      const gauge = asking.seen.voiceInputs?.[0]?.brief.toneHints.find((hint) => hint.startsWith('jauge-le'));
+      expect(gauge).toContain('fais-lui dire ou décrire dans quel état il est');
+      expect(gauge).toContain('jamais de photo');
+      expect(result).toMatchObject({ kind: 'held', reason: 'guard_blocked' });
+      expect(result.kind === 'held' ? result.detail : []).toContain('asks_for_nudes');
+    });
+
+    it('lets a bubble run twice as long in the action, and only there (Charles 26/11 at 23:09)', async () => {
+      const long = (length: number) => `Continue comme ça ${'encore '.repeat(length)}`.slice(0, length);
+      const writing = (bubble: string, signals: Brief['desireSignals'], source?: ScriptSource) =>
+        composer(
+          {
+            brief: { ...HOT, action: 'reply', scriptReply: 'answers_step', desireSignals: signals },
+            voice: { bubbles: [bubble] },
+          },
+          undefined,
+          limitsOf(ADULT).limits,
+          deps(source),
+        );
+      const soft = (result: Awaited<ReturnType<ReturnType<typeof composer>['draftComposer']['compose']>>) =>
+        result.kind === 'draft' ? result.softViolations : [];
+
+      const inAction = await writing(long(400), ['explicit_language'], sent).draftComposer.compose({
+        ...free(INPUT),
+        scriptRun: waiting,
+      });
+      expect(inAction.kind).toBe('draft');
+      expect(soft(inAction)).not.toContain('bubble_too_long');
+
+      const tooLong = await writing(long(600), ['explicit_language'], sent).draftComposer.compose({
+        ...free(INPUT),
+        scriptRun: waiting,
+      });
+      expect(soft(tooLong)).toContain('bubble_too_long');
+
+      const outside = await writing(long(400), ['explicit_language']).draftComposer.compose(free(INPUT));
+      expect(soft(outside)).toContain('bubble_too_long');
+    });
+
+    it('asks him whether he liked it on his first message after a purchase, not when the tension holds (Charles 26/11 at 23:09)', async () => {
+      const afterPurchase = (next: 'free' | 'paid'): ScriptSource => ({
+        history: () =>
+          Promise.resolve({
+            scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0], boughtStepIndexes: [0] }],
+          }),
+        catalogue: async () =>
+          (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
+            ...script,
+            steps: [
+              ...script.steps,
+              { stepRef: 'next-ref', kind: next, priceMinor: next === 'paid' ? 2_500 : null, mediaRefs: [] },
+            ],
+          })),
+      });
+      const bought = {
+        ...waiting,
+        steps: waiting.steps.map((step) => ({ ...step, outcome: 'bought' as const })),
+      };
+      const his = (count: number): AgentComposeInput => ({
+        ...free(INPUT),
+        scriptRun: bought,
+        history: Array.from({ length: count }, (_, index) => ({
+          direction: 'inbound' as const,
+          text: `message ${String(index)}`,
+          at: new Date(sentAt.getTime() + (index + 1) * 60_000),
+        })),
+      });
+      const liked = (hints: readonly string[] | undefined) =>
+        hints?.includes(
+          'il vient de prendre ce qu’elle lui a envoyé : demande-lui s’il a aimé, ce que ça lui fait',
+        );
+      const reply = { brief: { ...HOT, action: 'reply' as const, scriptReply: 'answers_step' as const } };
+
+      const first = composer(reply, undefined, limitsOf(ADULT).limits, deps(afterPurchase('free')));
+      await first.draftComposer.compose(his(1));
+      expect(liked(first.seen.voiceInputs?.[0]?.brief.toneHints)).toBe(true);
+
+      const second = composer(reply, undefined, limitsOf(ADULT).limits, deps(afterPurchase('free')));
+      await second.draftComposer.compose(his(2));
+      expect(liked(second.seen.voiceInputs?.[0]?.brief.toneHints)).toBe(false);
+
+      const tension = composer(reply, undefined, limitsOf(ADULT).limits, deps(afterPurchase('paid')));
+      await tension.draftComposer.compose(his(1));
+      expect(liked(tension.seen.voiceInputs?.[0]?.brief.toneHints)).toBe(false);
+    });
+  });
+
+  describe('a compliment is no advance (Charles 26/11 at 23:09)', () => {
+    const DRAWS_HIM_OUT =
+      'il lui fait un compliment, pas une avance : elle le reçoit avec plaisir et lui fait dire ce qui lui plaît, ce qu’il imagine';
+    const ADULT_FLAGS: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
+
+    it('draws him out on a compliment, and leaves a sexual message to the sexting', async () => {
+      const compliment = composer(
+        { brief: { ...BRIEF, intent: 'flirt', sentiment: 'positive', desireSignals: ['body_compliment'] } },
+        undefined,
+        limitsOf(ADULT_FLAGS).limits,
+      );
+      await compliment.draftComposer.compose(INPUT);
+      expect(compliment.seen.voiceInputs?.[0]?.brief.toneHints).toContain(DRAWS_HIM_OUT);
+
+      const sexual = composer(
+        {
+          brief: {
+            ...BRIEF,
+            intent: 'sexting',
+            sentiment: 'aroused',
+            desireSignals: ['body_compliment', 'states_desire'],
+          },
+        },
+        undefined,
+        limitsOf(ADULT_FLAGS).limits,
+      );
+      await sexual.draftComposer.compose(INPUT);
+      expect(sexual.seen.voiceInputs?.[0]?.brief.toneHints).not.toContain(DRAWS_HIM_OUT);
+    });
   });
 
   it('lets her announce the media her step sends, and still refuses one no step carries (ADR 0098, P3-13)', async () => {
