@@ -228,6 +228,8 @@ const RESIDUAL: Readonly<Record<string, string>> = {
     'contractor documents: contractor tests',
   'POST /v1/payroll/contractors/:memberId/documents/:documentId/review':
     'contractor documents: contractor tests',
+  'POST /v1/payroll/sale-claims/:saleClaimId/answer':
+    'a claim on a sale, kept to its creator: payroll-sale-claims tests (a manager of another creator neither reads nor answers it)',
   'POST /v1/payroll/statements/:statementId/validate': 'statements: payroll tests',
   'POST /v1/payroll/statements/:statementId/pay': 'statements: payroll tests',
   'GET /v1/payroll/invoices/:invoiceId/pdf': 'invoices: invoicing tests',

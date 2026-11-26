@@ -39,7 +39,7 @@ describe('« J’ai été décisif sur une vente », les textes (trou 15)', () =
   it('tells the member where his claim stands, with the word of a refusal', () => {
     expect(claimAnswerText({ state: 'settled', answerNote: null })).toContain('Reçue de');
     expect(claimAnswerText({ state: 'not_retained', answerNote: 'Vente avant ton shift' })).toBe(
-      'Réponse : « Vente avant ton shift »',
+      'Réponse : «\u00a0Vente avant ton shift\u00a0»',
     );
     expect(claimAnswerText({ state: 'withdrawn', answerNote: null })).toBeNull();
     expect(pendingCountText(2)).toBe('2 en attente');

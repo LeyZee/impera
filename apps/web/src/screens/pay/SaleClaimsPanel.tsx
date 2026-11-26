@@ -1,13 +1,14 @@
 import type { PayPeriod, PendingSaleClaim } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
+import { ShiftLine } from './ClaimShiftLine';
 import type { PayNames } from './data';
 import { Unreachable } from './parts';
 
 import { useGrowingArea } from '@/lib/growing-area';
 import { answerSaleClaim, usePendingSaleClaims, useRefreshPayroll, type PayRefusal } from '@/payroll/api';
 import { payRefusalText } from '@/payroll/model';
-import { CLAIM_NOTE_MAX, claimShiftLine, pendingCountText } from '@/payroll/sale-claims';
+import { CLAIM_NOTE_MAX, claimShiftLine, pendingCountText, quoted } from '@/payroll/sale-claims';
 import { useSchedulingSettings } from '@/reports/api';
 import { periodLine } from '@/reports/model';
 import { dayOf } from '@/scheduling/time';
@@ -78,7 +79,9 @@ export function SaleClaimsPanel({
     <Panel
       className="nv-enter py-held py-claims"
       title="Signalements de chatteurs"
-      actions={<span className="py-held__count nv-num">{pendingCountText(claims.length)}</span>}
+      actions={
+        <span className="nv-tag nv-tag--tint nv-num py-claims__count">{pendingCountText(claims.length)}</span>
+      }
     >
       <div className="rp-sec">
         <p className="py-quiet">
@@ -99,8 +102,8 @@ export function SaleClaimsPanel({
                     </span>
                     {claim.memberName}
                   </p>
-                  <p className="py-member__line nv-num">{claimShiftLine(claim.shift, zone)}</p>
-                  <p className="py-claim__note">« {claim.note} »</p>
+                  <ShiftLine shift={claim.shift} zone={zone} />
+                  <p className="py-claim__note">{quoted(claim.note)}</p>
                   {failed === null ? null : (
                     <p className="tm-warn sc-refusal nv-swap" role="alert">
                       {payRefusalText(failed, { memberName: () => claim.memberName })}

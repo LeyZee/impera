@@ -189,6 +189,31 @@ describe('Équipe › Paie : « J’ai été décisif sur une vente » arrive ch
     expect((await answer(team.owner, id, 'settled')).statusCode).toBe(200);
   });
 
+  it('keeps a claim to its creator: a manager of another creator neither reads nor answers it (Sécurité, #1026)', async () => {
+    const ines = await team.addMember('ines@example.test', 'Inès', 'manager');
+    // Inès follows Béa alone: Théo's claims are all on Anna.
+    await team.test.admin.db
+      .update(schema.user)
+      .set({ creatorIds: [team.bea] })
+      .where(eq(schema.user.id, ines.member.userId));
+    const waiting = await pending();
+    expect(waiting.length).toBeGreaterThan(0);
+    expect(await pending(ines.cookie)).toEqual([]);
+    expect((await answer(ines.cookie, waiting[0]?.id ?? '', 'settled')).statusCode).toBe(404);
+    expect((await pending()).map((one) => one.id)).toEqual(waiting.map((one) => one.id));
+    // Outside a creator, the base shows the agency no claim and no answer at all.
+    const seen = await team.test.app.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select set_config('app.user_id', ${team.ownerId}, true), set_config('app.team_scope', 'owner', true)`,
+      );
+      return [
+        ...(await tx.select().from(schema.paySaleClaims)),
+        ...(await tx.select().from(schema.paySaleClaimAnswers)),
+      ];
+    });
+    expect(seen).toEqual([]);
+  });
+
   it('refuses a claim in a period already validated and stops offering its shifts', async () => {
     const last = theirs[4] ?? ongoing;
     const [row] = await team.test.admin.db

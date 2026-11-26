@@ -1,5 +1,5 @@
 {
-  "id": "81208f17-469f-473e-be4f-703d1b8524cb",
+  "id": "3da153da-e9b3-4355-8971-eebeabbe7ad9",
   "prevId": "fce21862-b0a7-414a-9871-0c85bdde57a5",
   "version": "7",
   "dialect": "postgresql",
@@ -13257,7 +13257,7 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from pay_sale_claims c where c.id = \"pay_sale_claim_answers\".\"claim_id\" and exists (select 1 from team_members m where m.id = c.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')))"
+          "using": "exists (select 1 from pay_sale_claims c where c.id = \"pay_sale_claim_answers\".\"claim_id\")"
         },
         "member_insert": {
           "name": "member_insert",
@@ -13453,14 +13453,14 @@
           "as": "PERMISSIVE",
           "for": "SELECT",
           "to": ["public"],
-          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+          "using": "\"pay_sale_claims\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')))"
         },
         "member_insert": {
           "name": "member_insert",
           "as": "PERMISSIVE",
           "for": "INSERT",
           "to": ["public"],
-          "withCheck": "exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '')) and \"pay_sale_claims\".\"created_by\" = nullif(current_setting('app.user_id', true), '')"
+          "withCheck": "\"pay_sale_claims\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"pay_sale_claims\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from team_members m where m.id = \"pay_sale_claims\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '') and m.status = 'active')"
         }
       },
       "checkConstraints": {

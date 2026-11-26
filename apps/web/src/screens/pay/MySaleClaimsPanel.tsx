@@ -1,6 +1,7 @@
 import { newId, SaleClaimIdSchema, type SaleClaim, type SaleClaimShift } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
+import { ShiftLine } from './ClaimShiftLine';
 import { Unreachable } from './parts';
 
 import { useGrowingArea } from '@/lib/growing-area';
@@ -18,8 +19,11 @@ import {
   claimAnswerText,
   claimBlockedText,
   claimShiftLine,
+  claimShiftParts,
+  quoted,
 } from '@/payroll/sale-claims';
 import { useSchedulingSettings } from '@/reports/api';
+import '@/scheduling/exchanges.css';
 import { Dialog } from '@/shell/Dialog';
 import { Panel } from '@/shell/layout';
 
@@ -89,8 +93,8 @@ export function MySaleClaimsPanel(): JSX.Element | null {
               return (
                 <li key={claim.id} className="py-held__row py-claim">
                   <div className="py-held__main">
-                    <p className="py-member__line nv-num">{claimShiftLine(claim.shift, zone)}</p>
-                    <p className="py-claim__note">« {claim.note} »</p>
+                    <ShiftLine shift={claim.shift} zone={zone} />
+                    <p className="py-claim__note">{quoted(claim.note)}</p>
                     {answer === null ? null : <p className="py-held__reason">{answer}</p>}
                   </div>
                   <div className="py-held__side">
@@ -193,22 +197,37 @@ function ClaimDialog({
           <span className="nv-field__label" id={`${id}-shift`}>
             Ton shift
           </span>
-          <div className="tm-choices py-claims__shifts" role="radiogroup" aria-labelledby={`${id}-shift`}>
-            {shifts.map((one) => (
-              <button
-                key={one.shiftId}
-                type="button"
-                role="radio"
-                className="nv-chip nv-num"
-                aria-checked={picked === one.shiftId}
-                onClick={() => {
-                  setPicked(one.shiftId);
-                  setRefusal(null);
-                }}
-              >
-                {claimShiftLine(one, zone)}
-              </button>
-            ))}
+          <div className="sc-options py-claims__shifts" role="radiogroup" aria-labelledby={`${id}-shift`}>
+            {shifts.map((one) => {
+              const { when, where } = claimShiftParts(one, zone);
+              const checked = picked === one.shiftId;
+              return (
+                <button
+                  key={one.shiftId}
+                  type="button"
+                  role="radio"
+                  className="sc-option"
+                  aria-checked={checked}
+                  onClick={() => {
+                    setPicked(one.shiftId);
+                    setRefusal(null);
+                  }}
+                >
+                  <span className="sc-option__text">
+                    <span className="sc-option__title nv-num py-claims__when">{when}</span>
+                    <span className="sc-option__sub">{where}</span>
+                  </span>
+                  <svg
+                    className="py-claims__check"
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                    data-on={checked ? 'true' : undefined}
+                  >
+                    <path d="M3.5 8.5l3 3 6-7" />
+                  </svg>
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="nv-field tm-field">

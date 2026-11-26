@@ -995,10 +995,15 @@ export const paySaleClaims = pgTable(
       sql`char_length(${t.handle}) between 1 and 200 and char_length(${t.creatorName}) between 1 and 200`,
     ),
     check('pay_sale_claims_note_check', sql`char_length(${t.note}) between 1 and ${claimNoteMax}`),
-    memberRead(t.memberId),
+    // Inside the claim's creator (Sécurité, #1026): the team reads it there, a manager only within his creators, which
+    // the store checks against his list as for the shift feedbacks; a member reads his own and writes it while active.
+    pgPolicy('member_read', {
+      for: 'select',
+      using: sql`${t.creatorId} = ${currentCreator} and (${readsTeam} or ${isMine(t.memberId)})`,
+    }),
     pgPolicy('member_insert', {
       for: 'insert',
-      withCheck: sql`${isMine(t.memberId)} and ${t.createdBy} = ${currentUser}`,
+      withCheck: sql`${t.creatorId} = ${currentCreator} and ${t.createdBy} = ${currentUser} and exists (select 1 from team_members m where m.id = ${t.memberId} and m.user_id = ${currentUser} and m.status = 'active')`,
     }),
   ],
 );
@@ -1028,7 +1033,8 @@ export const paySaleClaimAnswers = pgTable(
     ),
     pgPolicy('member_read', {
       for: 'select',
-      using: sql`${readsTeam} or exists (select 1 from pay_sale_claims c where c.id = ${t.claimId} and ${isMine(sql`c.member_id`)})`,
+      // The claim as its own policy shows it, so inside its creator: an answer is read where its claim is.
+      using: sql`exists (select 1 from pay_sale_claims c where c.id = ${t.claimId})`,
     }),
     pgPolicy('member_insert', {
       for: 'insert',

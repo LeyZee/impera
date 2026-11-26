@@ -21,6 +21,20 @@ export const CLAIM_STATE_LABELS: Readonly<Record<SaleClaimState, string>> = {
 };
 
 /** « Nora Vidal · @nora sur Reveal · sam. 21 nov. · 14 h 05 – 20 h 05 »: the shift a claim is about. */
+/** The two lines of a shift to choose: its day and hours first, its creator and account under them. */
+export function claimShiftParts(
+  shift: SaleClaimShift,
+  zone: string,
+): { readonly when: string; readonly where: string } {
+  return {
+    when: swapShiftLine(shift.startsAt, shift.endsAt, undefined, zone),
+    where: `${shift.creatorName} · ${accountLine(shift)}`,
+  };
+}
+
+/** A member's note as quoted: French guillemets held to their words, never a « » alone on a line. */
+export const quoted = (note: string): string => `«${NBSP}${note}${NBSP}»`;
+
 export function claimShiftLine(shift: SaleClaimShift, zone: string): string {
   return `${shift.creatorName} · ${accountLine(shift)} · ${swapShiftLine(shift.startsAt, shift.endsAt, undefined, zone)}`;
 }
@@ -54,7 +68,7 @@ export function claimAnswerText(claim: Pick<SaleClaim, 'state' | 'answerNote'>):
     case 'settled':
       return 'La vente apparaît « Reçue de … » sur ton relevé.';
     case 'not_retained':
-      return claim.answerNote === null ? null : `Réponse : « ${claim.answerNote} »`;
+      return claim.answerNote === null ? null : `Réponse : ${quoted(claim.answerNote)}`;
     case 'withdrawn':
       return null;
   }
