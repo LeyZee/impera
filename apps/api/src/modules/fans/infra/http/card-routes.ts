@@ -25,7 +25,7 @@ const CreatorQuerySchema = z.object({ creatorId: CreatorIdSchema });
  * The card as the contract says it (`strict`, the same on the CRM and the extension, ADR 0085 § 10), each value with
  * the words of his message it was read in (§ 5), read from `conversations` in one call.
  */
-async function cardView(
+export async function cardView(
   access: FanAccess,
   creatorId: CreatorId,
   fanId: FanId,

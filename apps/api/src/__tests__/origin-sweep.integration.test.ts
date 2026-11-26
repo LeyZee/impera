@@ -17,6 +17,10 @@ import { MethodSchema, namesOf, routesOf } from './support/routes';
 const NO_ORIGIN_CHECK: Readonly<Record<string, string>> = {
   'POST /v1/connector/sessions': 'the extension’s « Sync », by the owner’s link token',
   'POST /v1/copilot/drafts/:draftId/verdict': 'the extension’s copilot panel, by its link token',
+  'PUT /v1/copilot/fans/:id/card/:field':
+    'the extension’s « Corriger », by its link token and its scope (ADR 0109)',
+  'POST /v1/copilot/fans/:id/notes':
+    'the extension’s note on a fan, by its link token and its scope (ADR 0109)',
   'POST /v1/trends/readings': 'the extension, by its link token',
   'POST /v1/trends/readings/captures': 'the extension, by its link token',
   'POST /v1/webhooks/sales-feeds/:platform': 'the platform’s webhook, checked by its signature',

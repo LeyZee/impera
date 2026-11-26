@@ -17,12 +17,13 @@ import { cardLinesOf, proposalsOfRead, type ReadSource } from '../domain/card-re
 import { FanNotFound } from '../domain/errors';
 import {
   kycSlotsToLearn,
+  operatorNote,
   planFacts,
   selectActiveFacts,
   type FactProposal,
   type StoredFact,
 } from '../domain/facts';
-import type { Fan, FanSighting, FanStore, FactStore, FlagStore } from '../domain/fan';
+import type { Fan, FanSighting, FanStore, FactStore, FlagStore, WriteTrace } from '../domain/fan';
 import {
   withAgeDisputed,
   withDeclaredAge,
@@ -75,7 +76,14 @@ export interface FansService {
     field: FanCardField,
     edit: CardEdit,
     author: UserId,
+    trace?: WriteTrace,
   ): Promise<Card>;
+  /**
+   * A note on the fan, the one « Rendre la main » leaves (an `operator_note` fact, its slot its date: notes add up),
+   * written from the extension's panel (ADR 0109 amendment § 9) with its trace. Returns it, or null when the same
+   * note at the same instant was already there.
+   */
+  addNote(creatorId: CreatorId, fanId: FanId, note: string, trace: WriteTrace): Promise<StoredFact | null>;
   /** His card as the AI's read gets it (ADR 0085 § 7): one line per field it shows, with where it comes from. */
   cardLines(creatorId: CreatorId, fanId: FanId): Promise<string[]>;
   /**
@@ -168,14 +176,27 @@ export function createFansService(
       const { active, pending, names } = await facts.card(creatorId, fanId);
       return cardOf(active, pending, now(), names);
     },
-    editCard: async (creatorId, fanId, field, edit, author) => {
+    editCard: async (creatorId, fanId, field, edit, author, trace) => {
       const at = now();
       // Planned under the fan's lock (404 unknown); a refused value throws there and nothing is written.
-      await facts.write(creatorId, fanId, (current, pending) =>
-        planCardEdit(field, edit, current, pending, author, at),
+      await facts.write(
+        creatorId,
+        fanId,
+        (current, pending) => planCardEdit(field, edit, current, pending, author, at),
+        trace,
       );
       const { active, pending, names } = await facts.card(creatorId, fanId);
       return cardOf(active, pending, at, names);
+    },
+    addNote: async (creatorId, fanId, note, trace) => {
+      const at = now();
+      const [written] = await facts.write(
+        creatorId,
+        fanId,
+        (current, pending) => planFacts(current, [operatorNote(note, at)], at, pending),
+        trace,
+      );
+      return written ?? null;
     },
     activeFacts: async (creatorId, fanId) => selectActiveFacts(await facts.current(creatorId, fanId), now()),
     kycToLearn: async (creatorId, fanId, slots) =>

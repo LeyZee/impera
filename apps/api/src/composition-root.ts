@@ -709,6 +709,14 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
         },
         // The order of the list of fans in euros: dollars at pay's last ECB rate, as the Dashboard ranks them.
         async (userId) => (await payroll.module.latestRate(userId, 'USD'))?.rateMicros ?? null,
+        // The panel's writes on a fan (ADR 0109): the person the link names, read as a session would read him (his
+        // creators and his shift's at each gesture), with what the link allows.
+        async (token) => {
+          const holder = await trends.module.linkHolder(token);
+          if (holder === null) return null;
+          const user = await currentUserById(db.db, shiftCreators, holder.userId);
+          return user === null ? null : { user, scopes: holder.scopes };
+        },
       ),
       ...team.routes,
       ...scheduling.routes,

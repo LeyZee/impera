@@ -314,6 +314,53 @@ export const ExtensionLinkCreatorsSchema = z.strictObject({
 });
 export type ExtensionLinkCreators = z.infer<typeof ExtensionLinkCreatorsSchema>;
 
+/**
+ * What a link allows beyond what every link did before (ADR 0109): writing a field of a fan's card (`fan_card`), and
+ * writing a note on the fan (`operator_note`, amendment of 21/11). A closed list, fixed when the link is made and never
+ * widened afterwards: a link made before these existed has none, and the person links the browser again (§ 5).
+ */
+export const ExtensionLinkScopeSchema = z.enum(['fan_card', 'operator_note']);
+export type ExtensionLinkScope = z.infer<typeof ExtensionLinkScopeSchema>;
+
+/**
+ * The routes a link may open, each with the scope it asks (`null`: any live link, what every link did before ADR
+ * 0109). The proof of a link stands in for the dashboard's Origin check on these routes only: the server refuses to
+ * start with any other route that declares a link, and a test pins this list against the routes it serves.
+ */
+export const EXTENSION_LINK_ROUTES = {
+  'GET /v1/connector/accounts': null,
+  'POST /v1/connector/sessions': null,
+  'POST /v1/copilot/drafts/:draftId/verdict': null,
+  'PUT /v1/copilot/fans/:id/card/:field': 'fan_card',
+  'POST /v1/copilot/fans/:id/notes': 'operator_note',
+  'GET /v1/extension/link': null,
+  'GET /v1/trends/readings/creators': null,
+  'POST /v1/trends/readings': null,
+  'POST /v1/trends/readings/captures': null,
+} as const satisfies Readonly<Record<string, ExtensionLinkScope | null>>;
+export type ExtensionLinkRoute = keyof typeof EXTENSION_LINK_ROUTES;
+
+/** Whether `METHOD /path` (Fastify's pattern, `/v1` included) is one of the routes a link opens. */
+export function isExtensionLinkRoute(route: string): route is ExtensionLinkRoute {
+  return Object.hasOwn(EXTENSION_LINK_ROUTES, route);
+}
+
+/** Who a link names, as the popup says it: the owner, a manager, a chatter, a creator. */
+export const ExtensionLinkRoleSchema = z.enum(['owner', 'manager', 'chatter', 'creator']);
+export type ExtensionLinkRole = z.infer<typeof ExtensionLinkRoleSchema>;
+
+/**
+ * `GET /v1/extension/link`, with `x-extension-link`: who the link names, what it allows and when it stops naming
+ * anyone if nobody uses it (`EXTENSION_LINK_IDLE_DAYS` after this use). Nothing else: never a creator, a fan, a token.
+ */
+export const ExtensionLinkStatusSchema = z.strictObject({
+  role: ExtensionLinkRoleSchema,
+  displayName: z.string(),
+  scopes: z.array(ExtensionLinkScopeSchema),
+  expiresAt: z.iso.datetime(),
+});
+export type ExtensionLinkStatus = z.infer<typeof ExtensionLinkStatusSchema>;
+
 /** `POST /v1/trends/readings`: how many posts of the batch were kept, new or seen again. */
 export const TrendReadingsAcceptedSchema = z.strictObject({ accepted: z.number().int().min(0) });
 export type TrendReadingsAccepted = z.infer<typeof TrendReadingsAcceptedSchema>;

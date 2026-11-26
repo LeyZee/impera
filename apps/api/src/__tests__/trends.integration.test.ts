@@ -313,23 +313,32 @@ describe('/v1/trends', () => {
     if (account === undefined) throw new Error('no account');
     const memberOf = eq(schema.teamMembers.userId, account.id);
     await test.admin.db.update(schema.teamMembers).set({ teamRole: 'chatter' }).where(memberOf);
-    const asChatter = await server.inject({
+    // His role changed: the link made for a manager's rights is revoked with it (ADR 0109 § 7).
+    const revoked = await server.inject({
       method: 'GET',
       url: '/v1/trends/readings/creators',
       headers: { 'x-extension-link': token },
     });
+    expect(revoked.statusCode).toBe(401);
+    // Linked again as a chatter, the watch stays shut to him.
+    const asChatter = await server.inject({
+      method: 'GET',
+      url: '/v1/trends/readings/creators',
+      headers: { 'x-extension-link': await newToken(cookie, 'Edge') },
+    });
     expect([asChatter.statusCode, codeOf(asChatter)]).toEqual([403, 'trend_watch_forbidden']);
     const paste = await call('POST', '/v1/trends/links', cookie, link(nora, 'Cx9AbCdEf'));
     expect([paste.statusCode, codeOf(paste)]).toEqual([403, 'trend_link_forbidden']);
-    await test.admin.db
-      .update(schema.teamMembers)
-      .set({ teamRole: 'manager', status: 'on_leave' })
-      .where(memberOf);
+    // Manager again, linked again, then away.
+    await test.admin.db.update(schema.teamMembers).set({ teamRole: 'manager' }).where(memberOf);
+    const again = await newToken(cookie, 'Edge');
+    expect((await readingsCreators(again)).length).toBeGreaterThan(0);
+    await test.admin.db.update(schema.teamMembers).set({ status: 'on_leave' }).where(memberOf);
     // Away, his link names nobody any more, for the watch as for the panel.
     const away = await server.inject({
       method: 'GET',
       url: '/v1/trends/readings/creators',
-      headers: { 'x-extension-link': token },
+      headers: { 'x-extension-link': again },
     });
     expect(away.statusCode).toBe(401);
   });

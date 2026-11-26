@@ -174,7 +174,7 @@ export function createCopilotRoutes(deps: CopilotRouteDeps): FastifyPluginAsyncZ
       {
         // Its secret is in a header: nothing below `warn` is logged, and the extension has its own origin.
         logLevel: 'warn',
-        config: { originCheck: false, rateLimit: GESTURE_LIMIT },
+        config: { originCheck: false, extensionLink: true, rateLimit: GESTURE_LIMIT },
         preParsing: async (request, _reply, payload) => {
           const token = ExtensionLinkTokenSchema.safeParse(request.headers['x-extension-link']);
           const user = token.success ? await deps.linkUser(token.data) : null;

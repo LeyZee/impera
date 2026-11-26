@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit, { type FastifyRateLimitStoreCtor } from '@fastify/rate-limit';
-import { DomainError, limitKeyOf, type ApiError } from '@impera/contracts';
+import { DomainError, isExtensionLinkRoute, limitKeyOf, type ApiError } from '@impera/contracts';
 import Fastify, {
   LogController,
   type FastifyError,
@@ -51,6 +51,11 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** `false` exempts a route from the dashboard's Origin check: it authenticates otherwise (device token). */
     originCheck?: boolean;
+    /**
+     * `true`: the route reads an extension's link (`x-extension-link`, ADR 0066 § 7). Only the routes of
+     * `EXTENSION_LINK_ROUTES` may say it (ADR 0109): the server refuses to start otherwise.
+     */
+    extensionLink?: boolean;
   }
 }
 
@@ -309,6 +314,19 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
       throw new Error(
         `${route.method.toString()} ${route.url}: declare route guards as preValidation, not preHandler`,
       );
+    }
+  });
+
+  // The closed list of the routes a link opens (ADR 0109): a route that declares a link and is not on it, or that
+  // reads one without saying so while exempt from the Origin check, stops the server at startup.
+  server.addHook('onRoute', (route) => {
+    if (route.config?.extensionLink !== true) return;
+    for (const method of [route.method].flat()) {
+      if (method === 'HEAD') continue;
+      if (!isExtensionLinkRoute(`${method} ${route.url}`))
+        throw new Error(
+          `${method} ${route.url}: an extension link opens only the routes of EXTENSION_LINK_ROUTES`,
+        );
     }
   });
 

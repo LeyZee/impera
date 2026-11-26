@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { FactCategorySchema, MessageIdSchema, StoredFactKindSchema, UserIdSchema } from '@impera/contracts';
+import {
+  AuditEntryIdSchema,
+  FactCategorySchema,
+  MessageIdSchema,
+  newId,
+  StoredFactKindSchema,
+  UserIdSchema,
+} from '@impera/contracts';
 import { and, eq, inArray, schema, sql, withTenant, type Database, type Transaction } from '@impera/db';
 
 import { FanNotFound } from '../domain/errors';
@@ -81,7 +88,7 @@ export function createDrizzleFactStore(db: Database): FactStore {
         const waiting = await pending(tx, creatorId, fanId);
         return { active, pending: waiting, names: await namesOf(tx, [...active, ...waiting]) };
       }),
-    write: (creatorId, fanId, plan) =>
+    write: (creatorId, fanId, plan, trace) =>
       withTenant(db, creatorId, async (tx) => {
         const [fan] = await tx
           .select({ id: schema.fans.id })
@@ -116,6 +123,20 @@ export function createDrizzleFactStore(db: Database): FactStore {
           }
           written.push(toFact(row));
         }
+        if (trace !== undefined && written.length > 0)
+          await tx.insert(schema.auditLog).values({
+            id: newId(AuditEntryIdSchema),
+            userId: trace.userId,
+            action: trace.action,
+            entity: 'fan',
+            entityId: fanId,
+            ip: trace.ip,
+            details: {
+              creatorId,
+              via: 'extension',
+              ...(trace.field !== undefined && { field: trace.field }),
+            },
+          });
         return written;
       }),
   };

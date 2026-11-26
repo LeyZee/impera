@@ -338,6 +338,28 @@ export const SetFanCardFieldBodySchema = z.union([
 ]);
 export type SetFanCardFieldBody = z.infer<typeof SetFanCardFieldBodySchema>;
 
+/**
+ * `PUT /v1/copilot/fans/:id/card/:field?creatorId=` (ADR 0109): the same gesture from the extension's panel, by the
+ * person's link with the `fan_card` scope, on shift on her. It answers the field written alone, never the whole card.
+ */
+export const CopilotFanCardFieldSchema = FanCardEntrySchema;
+export type CopilotFanCardField = z.infer<typeof CopilotFanCardFieldSchema>;
+
+/** A chatter's note on a fan, as « Rendre la main » keeps it: one line (ADR 0109 amendment § 9). */
+export const FAN_NOTE_MAX = 300;
+
+/**
+ * `POST /v1/copilot/fans/:id/notes?creatorId=` (ADR 0109 amendment § 9): a note on the fan from the extension's panel,
+ * by the person's link with the `operator_note` scope, on shift on her. Never changed nor cleared from there: a new
+ * note is written.
+ */
+export const CopilotFanNoteBodySchema = z.strictObject({ note: z.string().trim().min(1).max(FAN_NOTE_MAX) });
+export type CopilotFanNoteBody = z.infer<typeof CopilotFanNoteBodySchema>;
+
+/** Its answer (201): the note written, as « Autres » shows it on the card; nothing else of the fan. */
+export const CopilotFanNoteSchema = FanCardOtherSchema;
+export type CopilotFanNote = z.infer<typeof CopilotFanNoteSchema>;
+
 /** Refusals of the `PUT` (400): a list for a one-value field, a value outside a closed list, too long. */
 export const FAN_CARD_VALUE_INVALID = 'fan_card_value_invalid';
 /** What the card never keeps (§ 8), 422: an address, a number, an e-mail, an account elsewhere. Nothing is written. */

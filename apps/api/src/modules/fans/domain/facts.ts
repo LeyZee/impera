@@ -126,6 +126,22 @@ export function isActive(fact: StoredFact, now: Date): boolean {
 }
 
 /**
+ * A chatter's note on the fan (P3-02), as « Rendre la main » leaves it: a fact of its own whose slot is its date, so
+ * that notes add up instead of replacing each other, and the same note at the same instant is not written twice.
+ */
+export function operatorNote(note: string, at: Date): FactProposal {
+  return {
+    category: 'operator_note',
+    key: `note_${String(at.getTime())}`,
+    value: note,
+    kind: 'declared',
+    confidence: 1,
+    sourceMessageId: null,
+    observedAt: at,
+  };
+}
+
+/**
  * What to write for these proposals, against her active facts (append-only, data-model.md):
  * - a new slot is written; a card field is written in its card category (ADR 0085 § 3);
  * - the same value is not written again, unless a declared fact confirms an inferred one;
