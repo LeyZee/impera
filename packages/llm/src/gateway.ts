@@ -640,7 +640,26 @@ function instagramCommentRequest(input: InstagramCommentInput): string {
       : `La légende de la publication :\n${wrapUntrusted('instagram_caption', comment.caption)}`,
     '',
     `Le commentaire :\n${wrapUntrusted('instagram_comment', comment.comment)}`,
+    '',
+    comment.mayAsk
+      ? 'Tu peux finir ta réponse par une question, seulement si le commentaire ouvre vraiment une discussion.'
+      : 'Pas de question dans ta réponse cette fois.',
   ];
+  const near = input.nearExamples ?? [];
+  if (near.length > 0)
+    lines.push(
+      '',
+      'Ce qu’elle a répondu à des commentaires proches, pour le ton (jamais à recopier) :',
+      wrapUntrusted(
+        'her_replies',
+        near
+          .map(
+            (pair) =>
+              `Commentaire : ${pair.comment.replace(/\s+/gu, ' ').trim()}\nSa réponse : ${pair.reply.replace(/\s+/gu, ' ').trim()}`,
+          )
+          .join('\n---\n'),
+      ),
+    );
   if (input.recentReplies.length > 0)
     lines.push(
       '',

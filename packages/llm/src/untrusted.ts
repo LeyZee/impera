@@ -43,6 +43,8 @@ export type UntrustedKind =
   | 'comment_examples'
   /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
   | 'profile_bio'
+  /** Her real replies to comments close to the one at hand (Charles, 26/11): imported by the owner, read as data. */
+  | 'her_replies'
   /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
   | 'recent_replies'
   /**

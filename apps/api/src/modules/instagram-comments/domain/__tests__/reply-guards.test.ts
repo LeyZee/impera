@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CHAT_GUARDS_ON_A_REPLY, checkReply, type ReplyGuardContext } from '../reply-guards';
 
-const calm: ReplyGuardContext = { recentReplies: [], chatGuardCodes: [] };
+const calm: ReplyGuardContext = { recentReplies: [], chatGuardCodes: [], mayAsk: true };
 const codes = (text: string, context: ReplyGuardContext = calm) =>
   checkReply(text, context).map((v) => v.code);
 
@@ -11,10 +11,12 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Merci, ça me fait plaisir 🌸')).toEqual([]);
   });
 
-  it('refuses a reply that is empty, too long, with two emojis, a hashtag or a mention', () => {
+  it('refuses a reply that is empty, too long, with three emojis, a hashtag or a mention', () => {
     expect(codes('   ')).toContain('comment_format');
     expect(codes('a'.repeat(151))).toContain('comment_format');
-    expect(codes('Merci 🌸🌸')).toContain('comment_format');
+    expect(codes('Merci 🌸🌸🌸')).toContain('comment_format');
+    expect(codes('Merci 🌸🌸')).toEqual([]);
+    expect(codes('Tu dis ça à toutes 😏🔥')).toEqual([]);
     expect(codes('Merci #dimanche')).toContain('comment_format');
     expect(codes('Merci @quelquun')).toContain('comment_format');
   });
@@ -30,6 +32,13 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Tu me verras toute nue')).toContain('public_explicit');
     expect(codes('Tu es trop sexy toi')).toContain('public_explicit');
     expect(codes('Viens en privé')).toContain('public_explicit');
+  });
+
+  it('refuses a question when the code gave no room for one, and lets it pass when it did', () => {
+    expect(codes('Tu dis ça à toutes ? 😏', { ...calm, mayAsk: false })).toContain('unwanted_question');
+    expect(codes('Tu dis ça à toutes ？', { ...calm, mayAsk: false })).toContain('unwanted_question');
+    expect(codes('Tu dis ça à toutes ? 😏')).toEqual([]);
+    expect(codes('Merci 😏', { ...calm, mayAsk: false })).toEqual([]);
   });
 
   it('refuses a reply identical or nearly so to a recent one', () => {
@@ -48,6 +57,7 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
   it('refuses on every blocking code the chatting guards raise, not on a whitelist', () => {
     const context: ReplyGuardContext = {
       recentReplies: [],
+      mayAsk: true,
       chatGuardCodes: [
         'ai_disclosure',
         'asks_for_nudes',
@@ -68,7 +78,7 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
   it('names the five chatting guards of a public reply, staying in character first', () => {
     expect(CHAT_GUARDS_ON_A_REPLY).toContain('ai_disclosure');
     for (const code of CHAT_GUARDS_ON_A_REPLY)
-      expect(codes('Merci à toi', { recentReplies: [], chatGuardCodes: [code] })).toEqual([code]);
+      expect(codes('Merci à toi', { ...calm, chatGuardCodes: [code] })).toEqual([code]);
   });
 
   it('never carries the text in a violation: a rule name or word only', () => {

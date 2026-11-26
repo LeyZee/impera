@@ -28,6 +28,7 @@ describe('what the code prepares for the model (ADR 0122 § 2)', () => {
       now: new Date('2026-11-19T12:30:00Z'),
       repliesToHer: false,
       authorCommentedBefore: true,
+      mayAsk: false,
     };
     const input = promptInputOf({ ...base, postedAt: new Date('2026-11-19T09:00:00Z') });
     expect(CommentPromptInputSchema.parse(input)).toEqual({
@@ -37,6 +38,7 @@ describe('what the code prepares for the model (ADR 0122 § 2)', () => {
       postAgeHours: 3,
       repliesToHer: false,
       authorCommentedBefore: true,
+      mayAsk: false,
     });
     expect(promptInputOf({ ...base, postedAt: new Date('2026-11-19T13:00:00Z') }).postAgeHours).toBe(0);
   });
