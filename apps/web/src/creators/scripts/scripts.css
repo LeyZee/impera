@@ -428,6 +428,7 @@
 .sx-hand {
   gap: var(--nv-space-3);
 }
+.sx-redo__starts,
 .sx-levels {
   display: flex;
   flex-wrap: wrap;

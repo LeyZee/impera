@@ -1,4 +1,5 @@
 import type {
+  ReplaceDropFileBody,
   ContentDrop,
   DropDescriptionsReview,
   ContentDropFileId,
@@ -46,6 +47,17 @@ export interface CreatorContentStore {
    * once), and the drop answered as it is. A file already past `awaiting` answers the same.
    */
   markSent(userId: string, dropId: string, fileId: string, correlationId: string): Promise<ContentDrop>;
+  /**
+   * The file she sends in place of a medium the team asked again, or one refused (trou 7 du 21/11): it takes its
+   * place, waits for its bytes, and the drop is received again. The same file replayed answers the drop as it is.
+   */
+  replaceFile(
+    userId: string,
+    dropId: string,
+    fileId: string,
+    body: ReplaceDropFileBody,
+    now: Date,
+  ): Promise<ContentDrop>;
 }
 
 /** Her script drop, the frozen version it shoots and the moment its request fixed (`null` before SC-03 c2). */
@@ -329,6 +341,20 @@ export interface AgencyContentStore {
     now: Date,
   ): Promise<ContentDrop>;
   withdraw(creatorId: string, userId: string, dropId: string, now: Date): Promise<void>;
+  /**
+   * « À refaire » (trou 7 du 21/11): withdrawn as `withdraw` does, with the agency's sentence for her; its request opens
+   * again. A drop already withdrawn answers, whatever its sentence.
+   */
+  redo(creatorId: string, userId: string, dropId: string, sentence: string, now: Date): Promise<void>;
+  /** « À refaire » on one medium of a drop received and not out: the drop stays, she replaces it. Replayed, it answers. */
+  redoFile(
+    creatorId: string,
+    userId: string,
+    dropId: string,
+    fileId: string,
+    sentence: string,
+    now: Date,
+  ): Promise<void>;
   /**
    * A script names a frozen version of its structure (SC-02 lot b): `freeze` gives it, once the structure is checked
    * usable for her and before the request is written; `null` refuses it like a structure out of reach.

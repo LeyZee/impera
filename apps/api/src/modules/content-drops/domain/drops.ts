@@ -36,3 +36,48 @@ export function mayWithdraw(state: DropState, by: 'creator' | 'agency'): boolean
   if (by === 'creator') return WITHDRAWABLE_DROP_STATES.has(state);
   return state !== 'published' && state !== 'withdrawn';
 }
+
+/** A drop answering a request, as the request's reading needs it. */
+export interface RequestDrop {
+  readonly id: string;
+  readonly state: DropState;
+  readonly blockedReason: string | null;
+  /** The agency's « À refaire », on a withdrawn drop only. */
+  readonly redoSentence: string | null;
+  readonly withdrawnAt: Date | null;
+  readonly updatedAt: Date;
+}
+
+/**
+ * What answers a request (trou 7 du 21/11): its live drop, unless nothing of it could be kept (blocked): then nothing
+ * answers it and the reason says why. With no live drop, the agency's « À refaire » on the last one withdrawn says why
+ * it is hers again; one she withdrew herself last says nothing.
+ */
+export function requestAnswer(drops: readonly RequestDrop[]): {
+  readonly dropId: string | null;
+  readonly redo: { readonly sentence: string; readonly at: Date } | null;
+} {
+  const live = drops.find((drop) => drop.state !== 'withdrawn');
+  if (live !== undefined)
+    return live.state === 'blocked'
+      ? { dropId: null, redo: { sentence: live.blockedReason ?? NOTHING_KEPT, at: live.updatedAt } }
+      : { dropId: live.id, redo: null };
+  const last = drops
+    .filter((drop) => drop.withdrawnAt !== null)
+    .toSorted((a, b) => (b.withdrawnAt?.getTime() ?? 0) - (a.withdrawnAt?.getTime() ?? 0))[0];
+  if (last === undefined || last.redoSentence === null || last.withdrawnAt === null)
+    return { dropId: null, redo: null };
+  return { dropId: null, redo: { sentence: last.redoSentence, at: last.withdrawnAt } };
+}
+
+/** Why a drop is blocked when the cleaning kept none of its files. */
+export const NOTHING_KEPT = 'Aucun fichier de ce dépôt n’a pu être gardé';
+
+/** A drop takes a file's bytes while it sends, while she fills her script, or once settled for a replacement. */
+export const TAKES_BYTES_STATES: ReadonlySet<DropState> = new Set([
+  'uploading',
+  'filling',
+  'received',
+  'ready',
+  'blocked',
+]);

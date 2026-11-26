@@ -17,11 +17,16 @@ import {
   DropStateSchema,
   kindOfMime,
   newId,
+  replacementRefusal,
+  RedoneDropSchema,
+  REDOABLE_DROP_STATES,
+  REDONE_SHOWN_DAYS,
   type ContentDrop,
   type ContentRequest,
   type CreateContentDropBody,
   type CreateContentRequestBody,
   type CreatorContent,
+  type ReplaceDropFileBody,
   type DropCategory,
   ScriptMomentSchema,
   ShotMomentSchema,
@@ -41,7 +46,15 @@ import {
 } from '@impera/db';
 
 import type { SentDrop } from '../../domain/drop-export';
-import { dropRefusals, mayWithdraw, needsRequest } from '../../domain/drops';
+import {
+  dropRefusals,
+  mayWithdraw,
+  needsRequest,
+  NOTHING_KEPT,
+  requestAnswer,
+  TAKES_BYTES_STATES,
+  type RequestDrop,
+} from '../../domain/drops';
 import {
   ContentDropExportUnprocessable,
   ContentDropFileNotFound,
@@ -142,6 +155,10 @@ function dropOf(row: DropRow, files: readonly FileRow[]): ContentDrop {
         state: file.state,
         refusal: file.refusal,
         slotKey: file.slotKey,
+        redo:
+          file.redoSentence === null || file.redoAt === null
+            ? null
+            : { sentence: file.redoSentence, at: file.redoAt.toISOString() },
       })),
     scriptNumber: row.scriptNumber,
     exportedAt: row.exportedAt?.toISOString() ?? null,
@@ -149,7 +166,9 @@ function dropOf(row: DropRow, files: readonly FileRow[]): ContentDrop {
   });
 }
 
-function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
+const UNANSWERED = { dropId: null, redo: null } as const;
+
+function requestOf(row: RequestRow, answer: ReturnType<typeof requestAnswer>): ContentRequest {
   return ContentRequestSchema.parse({
     id: row.id,
     category: row.category,
@@ -161,7 +180,8 @@ function requestOf(row: RequestRow, dropId: string | null): ContentRequest {
     origin: row.origin,
     state: row.state,
     refusalReason: row.refusalReason,
-    dropId,
+    dropId: answer.dropId,
+    redo: answer.redo === null ? null : { sentence: answer.redo.sentence, at: answer.redo.at.toISOString() },
     createdAt: row.createdAt.toISOString(),
   });
 }
@@ -215,21 +235,59 @@ async function contentIn(tx: Transaction, forCreator: boolean): Promise<CreatorC
     .from(contentRequests)
     .where(forCreator ? sql`${contentRequests.state} <> 'cancelled'` : sql`true`)
     .orderBy(contentRequests.dueOn, contentRequests.createdAt);
-  // The drop that answers each request, wherever it falls in the latest ones.
+  // The drops of each request, wherever they fall in the latest ones: the live one answers it, or the agency's
+  // « À refaire » on the last one withdrawn says why it is hers again (trou 7 du 21/11).
   const answers = await tx
-    .select({ id: contentDrops.id, requestId: contentDrops.requestId })
+    .select({
+      id: contentDrops.id,
+      requestId: contentDrops.requestId,
+      state: contentDrops.state,
+      blockedReason: contentDrops.blockedReason,
+      redoSentence: contentDrops.redoSentence,
+      withdrawnAt: contentDrops.withdrawnAt,
+      updatedAt: contentDrops.updatedAt,
+    })
     .from(contentDrops)
-    .where(sql`${contentDrops.requestId} is not null and ${contentDrops.state} <> 'withdrawn'`);
-  const answerOf = new Map(
-    answers.flatMap((row) => (row.requestId === null ? [] : [[row.requestId, row.id]])),
-  );
+    .where(sql`${contentDrops.requestId} is not null`);
+  const dropsOf = new Map<string, RequestDrop[]>();
+  for (const row of answers) {
+    if (row.requestId === null) continue;
+    const list = dropsOf.get(row.requestId) ?? [];
+    list.push({ ...row, state: DropStateSchema.parse(row.state) });
+    dropsOf.set(row.requestId, list);
+  }
+  // Her drops without a request the agency asked again lately: her screen says so, with its sentence.
+  const redone = await tx
+    .select({
+      id: contentDrops.id,
+      category: contentDrops.category,
+      redoSentence: contentDrops.redoSentence,
+      withdrawnAt: contentDrops.withdrawnAt,
+    })
+    .from(contentDrops)
+    .where(
+      sql`${contentDrops.requestId} is null and ${contentDrops.redoSentence} is not null
+        and ${contentDrops.withdrawnAt} > now() - make_interval(days => ${REDONE_SHOWN_DAYS})`,
+    )
+    .orderBy(sql`${contentDrops.withdrawnAt} desc`);
   const files = await filesOf(
     tx,
     drops.map((row) => row.id),
   );
   return {
-    requests: requests.map((row) => requestOf(row, answerOf.get(row.id) ?? null)),
+    requests: requests.map((row) => requestOf(row, requestAnswer(dropsOf.get(row.id) ?? []))),
     drops: drops.map((row) => dropOf(row, files)),
+    redone: redone.flatMap((row) =>
+      row.redoSentence === null || row.withdrawnAt === null
+        ? []
+        : [
+            RedoneDropSchema.parse({
+              dropId: row.id,
+              category: row.category,
+              redo: { sentence: row.redoSentence, at: row.withdrawnAt.toISOString() },
+            }),
+          ],
+    ),
   };
 }
 
@@ -274,6 +332,7 @@ async function dropIn(
     // Locked, so that her refusal and her drop never cross: the one that waits finds the other done.
     if (request.state !== 'open' || (await readRequest(tx, body.requestId, true)) === undefined)
       throw new ContentDropRequestUnprocessable();
+    await nothingKeptGivesWay(tx, userId, body.requestId);
   }
   try {
     await tx.insert(contentDrops).values({
@@ -308,16 +367,42 @@ async function dropIn(
   return viewOf(tx, row);
 }
 
+/**
+ * A drop of this request where nothing could be kept (blocked) no longer answers it (trou 7 du 21/11): her new drop for
+ * it withdraws it first, with nothing to erase but its trace. Locked; a drop the job moved meanwhile is left as it is.
+ */
+export async function nothingKeptGivesWay(tx: Transaction, userId: string, requestId: string): Promise<void> {
+  const [blocked] = await tx
+    .select({ id: contentDrops.id })
+    .from(contentDrops)
+    .where(and(eq(contentDrops.requestId, requestId), eq(contentDrops.state, 'blocked')))
+    .for('update');
+  if (blocked === undefined) return;
+  await tx
+    .update(contentDrops)
+    .set({ state: 'withdrawn', withdrawnAt: sql`now()`, withdrawnBy: userId, updatedAt: sql`now()` })
+    .where(and(eq(contentDrops.id, blocked.id), eq(contentDrops.state, 'blocked')));
+  await tx.insert(auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId,
+    action: 'content_drop.withdraw',
+    entity: 'content_drop',
+    entityId: blocked.id,
+    details: { by: 'replaced', reason: 'nothing_kept' },
+  });
+}
+
 async function withdrawIn(
   tx: Transaction,
   userId: string,
   dropId: string,
   by: 'creator' | 'agency',
   now: Date,
+  redo: string | null = null,
 ): Promise<void> {
   const seen = await readDrop(tx, dropId);
   if (seen === undefined) throw new ContentDropNotFound();
-  // Withdrawing twice is no error: her phone may replay it.
+  // Withdrawing twice is no error: her phone may replay it; « À refaire » replayed answers it too.
   if (seen.state === 'withdrawn') return;
   // A script the team copied into Reveal is out, as a published drop is (recette MED-08): withdrawn, its request would
   // reopen for her to shoot again and its originals would go within the hour.
@@ -329,15 +414,15 @@ async function withdrawIn(
     throw new ContentDropSettled();
   await tx
     .update(contentDrops)
-    .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, updatedAt: now })
+    .set({ state: 'withdrawn', withdrawnAt: now, withdrawnBy: userId, redoSentence: redo, updatedAt: now })
     .where(eq(contentDrops.id, dropId));
   await tx.insert(auditLog).values({
     id: newId(AuditEntryIdSchema),
     userId,
-    action: 'content_drop.withdraw',
+    action: redo === null ? 'content_drop.withdraw' : 'content_drop.redo',
     entity: 'content_drop',
     entityId: dropId,
-    details: { by },
+    details: redo === null ? { by } : { by, sentence: redo },
   });
 }
 
@@ -378,8 +463,7 @@ async function markSentIn(
 ): Promise<ContentDrop> {
   const target = await fileTargetIn(tx, dropId, fileId);
   if (target.fileState === 'awaiting') {
-    if (target.dropState !== 'uploading' && target.dropState !== 'filling')
-      throw new ContentDropFileSettled();
+    if (!TAKES_BYTES_STATES.has(target.dropState)) throw new ContentDropFileSettled();
     await tx.execute(
       sql`select public.enqueue_job(
         task => 'content_drops.receive_file',
@@ -395,8 +479,133 @@ async function markSentIn(
   return viewOf(tx, drop);
 }
 
+/**
+ * A drop a medium of which may be asked again and replaced: received and not out, or a script already copied into
+ * Reveal (Charles, 21/11: it is copied again once replaced, the AI waits for it).
+ */
+const mayRedo = (drop: DropRow): boolean =>
+  REDOABLE_DROP_STATES.has(DropStateSchema.parse(drop.state)) &&
+  (drop.exportedAt === null || drop.category === 'script');
+
+/**
+ * « À refaire » on one medium (trou 7 du 21/11, coffre), by the team's policies: a live file of a drop received and not
+ * out. Replayed, the first sentence stays.
+ */
+async function redoFileIn(
+  tx: Transaction,
+  userId: string,
+  dropId: string,
+  fileId: string,
+  sentence: string,
+  now: Date,
+): Promise<void> {
+  const drop = await readDrop(tx, dropId);
+  if (drop === undefined || drop.state === 'withdrawn') throw new ContentDropNotFound();
+  if (!mayRedo(drop)) throw new ContentDropSettled();
+  const [file] = await tx
+    .select()
+    .from(contentDropFiles)
+    .where(and(eq(contentDropFiles.id, fileId), eq(contentDropFiles.dropId, dropId)));
+  if (file?.replacedAt !== null) throw new ContentDropFileNotFound();
+  if (file.redoSentence !== null) return;
+  // A medium still on its way has nothing to say yet.
+  if (file.state === 'awaiting' || file.state === 'received') throw new ContentDropFileSettled();
+  await tx
+    .update(contentDropFiles)
+    .set({ redoSentence: sentence, redoAt: now, redoBy: userId, updatedAt: now })
+    .where(eq(contentDropFiles.id, fileId));
+  await tx.insert(auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId,
+    action: 'content_drop_file.redo',
+    entity: 'content_drop_file',
+    entityId: fileId,
+    details: { dropId, sentence },
+  });
+}
+
+/**
+ * The file she sends in place of a medium the team asked again, or of one refused (trou 7 du 21/11), by her own
+ * policies (`creator_redo_replace`, `creator_redo_insert`, migration 0258): the old file keeps its row out of every view
+ * (its medium goes as a withdrawn drop's), the new one takes its place and slot and waits for its bytes. The drop does
+ * not move here: its receipt settles it again, and takes « Copié dans Reveal » off a script (`follow`). The same file
+ * replayed answers the drop as it is.
+ */
+async function replaceFileIn(
+  tx: Transaction,
+  creatorId: string,
+  userId: string,
+  dropId: string,
+  fileId: string,
+  body: ReplaceDropFileBody,
+  now: Date,
+): Promise<ContentDrop> {
+  const drop = await readDrop(tx, dropId);
+  if (drop?.creatorId !== creatorId || drop.state === 'withdrawn') throw new ContentDropNotFound();
+  const [old] = await tx
+    .select()
+    .from(contentDropFiles)
+    .where(and(eq(contentDropFiles.id, fileId), eq(contentDropFiles.dropId, dropId)));
+  if (old === undefined) throw new ContentDropFileNotFound();
+  const [taken] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, body.id));
+  if (taken !== undefined) {
+    // Her phone replaying the same replacement: the drop as it is.
+    if (taken.dropId === dropId && old.replacedAt !== null && taken.position === old.position) {
+      if (taken.mime !== body.mime || taken.bytes !== body.bytes) throw new ContentDropIdConflict();
+      return viewOf(tx, drop);
+    }
+    throw new ContentDropIdConflict();
+  }
+  if (old.replacedAt !== null) throw new ContentDropFileNotFound();
+  if (!mayRedo(drop)) throw new ContentDropSettled();
+  // Only what the team asked again, or what the cleaning refused: a kept medium is not swapped on a whim.
+  if (old.redoSentence === null && old.state !== 'refused') throw new ContentDropFileSettled();
+  const refusal = replacementRefusal(
+    DropCategorySchema.parse(drop.category),
+    { kind: DropMediaKindSchema.parse(old.kind), slotKey: old.slotKey },
+    body,
+  );
+  if (refusal !== null) throw new ContentDropFormatUnprocessable([{ fileId: body.id, sentence: refusal }]);
+  // Locked through her update policy: two replacements of one file run one after the other, the second finds it gone.
+  const [locked] = await tx
+    .select({ id: contentDropFiles.id })
+    .from(contentDropFiles)
+    .where(and(eq(contentDropFiles.id, old.id), sql`${contentDropFiles.replacedAt} is null`))
+    .for('update');
+  if (locked === undefined) throw new ContentDropFileNotFound();
+  await tx
+    .update(contentDropFiles)
+    .set({ replacedAt: now, updatedAt: now })
+    .where(eq(contentDropFiles.id, old.id));
+  await tx.insert(contentDropFiles).values({
+    id: body.id,
+    creatorId,
+    dropId,
+    position: old.position,
+    kind: kindOfMime(body.mime),
+    mime: body.mime,
+    bytes: body.bytes,
+    slotKey: old.slotKey,
+    minSeconds: old.minSeconds,
+    maxSeconds: old.maxSeconds,
+  });
+  await tx.insert(auditLog).values({
+    id: newId(AuditEntryIdSchema),
+    userId,
+    action: 'content_drop_file.replace',
+    entity: 'content_drop_file',
+    entityId: old.id,
+    details: { dropId, by: body.id },
+  });
+  return viewOf(tx, drop);
+}
+
 export function createDrizzleCreatorContentStore(db: Database): CreatorContentStore {
   return {
+    replaceFile: (userId, dropId, fileId, body, now) =>
+      withCreatorAccount(db, userId, (tx, creatorId) =>
+        replaceFileIn(tx, creatorId, userId, dropId, fileId, body, now),
+      ),
     content: (userId) => withCreatorAccount(db, userId, (tx) => contentIn(tx, true)),
     drop: (userId, body) =>
       withCreatorAccount(db, userId, (tx, creatorId) => dropIn(tx, creatorId, userId, body)),
@@ -470,6 +679,7 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
     );
   if (files.some((file) => file.erasedAt !== null))
     throw new ContentDropExportUnprocessable('original_erased');
+  if (await redoPendingIn(tx, dropId)) throw new ContentDropExportUnprocessable('redo_pending');
   return {
     scriptNumber: row.scriptNumber,
     versionId: request.structureVersionId,
@@ -488,6 +698,26 @@ async function sentScriptIn(tx: Transaction, dropId: string): Promise<SentScript
           ],
     ),
   };
+}
+
+/**
+ * Whether a live medium of the drop waits for her replacement, or the one she sent in its place is not settled yet (trou 7
+ * du 21/11): its archive waits too.
+ */
+async function redoPendingIn(tx: Transaction, dropId: string): Promise<boolean> {
+  const [pending] = await tx
+    .select({ id: contentDropFiles.id })
+    .from(contentDropFiles)
+    .where(
+      and(
+        eq(contentDropFiles.dropId, dropId),
+        // Asked again, or sent in its place and not settled yet: the archive would miss it.
+        sql`${contentDropFiles.replacedAt} is null
+          and (${contentDropFiles.redoSentence} is not null or ${contentDropFiles.state} in ('awaiting', 'received'))`,
+      ),
+    )
+    .limit(1);
+  return pending !== undefined;
 }
 
 /** Her originals of a script go this long after its archive is confirmed copied into Reveal (ADR 0044 § 2). */
@@ -546,6 +776,7 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
     .orderBy(contentDropFiles.position, contentDropFiles.id);
   if (files.some((file) => file.erasedAt !== null))
     throw new ContentDropExportUnprocessable('original_erased');
+  if (await redoPendingIn(tx, dropId)) throw new ContentDropExportUnprocessable('redo_pending');
   return {
     category: IdeaDropCategorySchema.parse(row.category),
     createdAt: row.createdAt,
@@ -642,6 +873,11 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
     drop: (creatorId, userId, body) => asTeam(creatorId, userId, (tx) => dropIn(tx, creatorId, userId, body)),
     withdraw: (creatorId, userId, dropId, now) =>
       asTeam(creatorId, userId, (tx) => withdrawIn(tx, userId, dropId, 'agency', now)),
+
+    redo: (creatorId, userId, dropId, sentence, now) =>
+      asTeam(creatorId, userId, (tx) => withdrawIn(tx, userId, dropId, 'agency', now, sentence)),
+    redoFile: (creatorId, userId, dropId, fileId, sentence, now) =>
+      asTeam(creatorId, userId, (tx) => redoFileIn(tx, userId, dropId, fileId, sentence, now)),
     correct: (creatorId, userId, dropId, category: DropCategory, now) =>
       asTeam(creatorId, userId, async (tx) => {
         const seen = await readDrop(tx, dropId);
@@ -701,7 +937,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
             known.reason === body.reason &&
             known.structureId === body.structureId;
           if (!same) throw new ContentRequestIdConflict();
-          return requestOf(known, null);
+          return requestOf(known, UNANSWERED);
         }
         // Never for a day already past where she lives (recette MED-10): it would be late as it is born.
         const [creator] = await tx
@@ -747,7 +983,7 @@ export function createDrizzleAgencyContentStore(db: Database): AgencyContentStor
         }
         const [row] = await tx.select().from(contentRequests).where(eq(contentRequests.id, body.id));
         if (row === undefined) throw new ContentRequestNotFound();
-        return requestOf(row, null);
+        return requestOf(row, UNANSWERED);
       }),
     cancel: (creatorId, userId, requestId, now) =>
       asTeam(creatorId, userId, async (tx) => {
@@ -827,7 +1063,6 @@ async function scriptDropsIn(tx: Transaction): Promise<ScriptDropEntry[]> {
 }
 
 /** The drop's sentence when none of its files could be kept (ADR 0055 § 6: blocked, in amber, with its reason). */
-const NOTHING_KEPT = 'Aucun fichier de ce dépôt n’a pu être gardé';
 
 /** The states each outcome moves a file from: a file already past them is left as it is (a replayed job). */
 const MOVES_FROM: Readonly<Record<FileOutcome['state'], readonly DropFileState[]>> = {
@@ -952,12 +1187,14 @@ const CONVERSION_QUEUE = 'content_drops:convert';
 /**
  * The drop follows its live files, as the admin role, the drop locked by the caller: received with
  * `content_drop_received` once none waits for its bytes (and `content_drops.drop_received` for a drop answering a
- * request), then ready when every file is settled and one was kept, blocked when all were refused. A drop still being
- * filled (SC-02 lot b) moves only once she sends it.
+ * request), then ready when every file is settled and one was kept, blocked when all were refused; settled again the
+ * same way once the medium she sent in place of another (`settled`, the file the receipt just settled) is. A drop still
+ * being filled (SC-02 lot b) moves only once she sends it.
  */
 export async function follow(
   tx: Transaction,
   drop: DropRow,
+  settled: string | null,
   now: Date,
   correlationId: string,
 ): Promise<void> {
@@ -989,17 +1226,56 @@ export async function follow(
         )`,
       );
   }
-  if (state === 'received' && !states.includes('awaiting') && !states.includes('received')) {
+  if (SETTLES_AGAIN.has(state) && !states.includes('awaiting') && !states.includes('received')) {
     const kept = states.some((one) => one === 'kept' || one === 'duplicate');
+    // A script copied into Reveal whose replaced medium is settled is to copy again: « Copié dans Reveal » starts over,
+    // which only the server's role may say (`guard_content_drop_export`, migration 0258).
+    const reset =
+      drop.exportedAt !== null &&
+      drop.category === 'script' &&
+      settled !== null &&
+      (await isReplacement(tx, settled));
+    if (reset) await tx.execute(sql`select set_config('app.export_reset', 'on', true)`);
     await tx
       .update(contentDrops)
-      .set(
-        kept
-          ? { state: 'ready', updatedAt: now }
-          : { state: 'blocked', blockedReason: NOTHING_KEPT, updatedAt: now },
-      )
+      .set({
+        ...(kept
+          ? { state: 'ready', blockedReason: null }
+          : { state: 'blocked', blockedReason: NOTHING_KEPT }),
+        ...(reset ? { exportedAt: null, exportedBy: null } : {}),
+        updatedAt: now,
+      })
       .where(eq(contentDrops.id, drop.id));
   }
+}
+
+/**
+ * The states a drop is settled from again once no file waits: received the first time, ready or blocked when she sent a
+ * medium in place of one (trou 7 du 21/11).
+ */
+const SETTLES_AGAIN: ReadonlySet<string> = new Set(['received', 'ready', 'blocked']);
+
+/**
+ * A file sent in place of one asked again or refused (trou 7 du 21/11): the same drop holds such a replaced file at its
+ * place, as her insert policy wants it. A file she swapped while filling a script is not one.
+ */
+async function isReplacement(tx: Transaction, fileId: string): Promise<boolean> {
+  const [file] = await tx.select().from(contentDropFiles).where(eq(contentDropFiles.id, fileId));
+  if (file === undefined) return false;
+  const [old] = await tx
+    .select({ id: contentDropFiles.id })
+    .from(contentDropFiles)
+    .where(
+      and(
+        eq(contentDropFiles.dropId, file.dropId),
+        eq(contentDropFiles.position, file.position),
+        sql`${contentDropFiles.slotKey} is not distinct from ${file.slotKey}`,
+        sql`${contentDropFiles.replacedAt} is not null`,
+        sql`(${contentDropFiles.redoSentence} is not null or ${contentDropFiles.state} = 'refused')`,
+      ),
+    )
+    .limit(1);
+  return old !== undefined;
 }
 
 /**
@@ -1122,7 +1398,7 @@ export function createDrizzleReceiptStore(adminDb: Database): ReceiptStore {
             .where(eq(contentDropFiles.id, fileId));
         }
 
-        await follow(tx, drop, now, correlationId);
+        await follow(tx, drop, fileId, now, correlationId);
       }),
 
     enqueue: (task, file, correlationId, runAt) =>
