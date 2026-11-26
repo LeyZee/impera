@@ -133,23 +133,53 @@ const SELF_HARM = [
 ];
 
 /**
+ * A number from 10 to 17 that is not a thing (ADR 0168 § 4): not an hour, a sum, a measure, a rank, a count of
+ * objects, nor years of something else (« 15h », « 15 € », « 15 cm », « 15/20 », « 15 photos », « 16 anni di
+ * esperienza »).
+ */
+const TEEN_NOT_A_THING =
+  '\\b1[0-7]\\b' +
+  '(?![.,:/\\-]?\\d)(?!\\s*(?:h\\b|h\\d|%|€|\\$|£|°|x\\b|e\\b|eme\\b|er\\b|th\\b|st\\b|' +
+  '(?:min|mins|minut\\w*|sec\\w*|s|cm|mm|m|km|kg|g|l|ml|cl|euros?|eur|dollars?|usd|bucks|pounds?|zl\\w*|' +
+  'reais|lei|kr|chf|hours?|heures?|ore|horas?|uhr|stunden?|godz\\w*|jours?|days?|giorni|dias|tage|fois|times|' +
+  'volte|veces|mal|pages?|photos?|pics?|videos?|messages?|followers?|likes?)\\b))' +
+  // Years of something else, not his age: « 16 anni di esperienza », « 15 años de casado ».
+  `(?!\\s*${UNIT}\\s*(?:${NOT_AGE_ANY}))`;
+
+/**
  * A bare number from 10 to 17 in a message whose language the guards do not read (ADR 0168 § 4, closed by default):
- * without a word of his language to say it is an age, it is one until a human says otherwise. Not a number that is an
- * hour, a sum, a measure, a rank or a range (« 15h », « 15 € », « 15 cm », « à 15 min », « 15/20 »).
+ * without a word of his language to say it is an age, it is one until a human says otherwise.
  */
 const BARE_TEEN = new RegExp(
   '(?<![\\d.,:/+\\-x#€$£])' +
     '(?<!\\b(?:a|at|alle|alla|a las|las|um|vers|top|no|nr|n|num|numero|page|p|dans|in|tra|fra|en|entre|between|' +
     'after|apres|dopo|despues|until|avant|before)\\s)' +
-    '\\b1[0-7]\\b' +
-    '(?![.,:/\\-]?\\d)(?!\\s*(?:h\\b|h\\d|%|€|\\$|£|°|x\\b|e\\b|eme\\b|er\\b|th\\b|st\\b|' +
-    '(?:min|mins|minut\\w*|sec\\w*|s|cm|mm|m|km|kg|g|l|ml|cl|euros?|eur|dollars?|usd|bucks|pounds?|zl\\w*|' +
-    'reais|lei|kr|chf|hours?|heures?|ore|horas?|uhr|stunden?|godz\\w*|jours?|days?|giorni|dias|tage|fois|times|' +
-    'volte|veces|mal|pages?|photos?|pics?|videos?|messages?|followers?|likes?)\\b))' +
-    // Years of something else, not his age: « 16 anni di esperienza », « 15 años de casado ».
-    `(?!\\s*${UNIT}\\s*(?:${NOT_AGE_ANY}))`,
+    TEEN_NOT_A_THING,
   'u',
 );
+
+/** Not a count of people, pets or money after « j'ai » or « presque » (« j'ai 15 potes », « tengo 15 amigos », « yo 15 dolares »). */
+const NOT_COUNTED =
+  '(?!\\s*(?:amis?|potes?|copains?|copines?|chats?|chiens?|enfants?|gosses?|amici|figli|gatti|cani|amigos|hijos|' +
+  'gatos|perros|friends|kids|cats|dogs|dolares|pesos|libras|sterline)\\b)';
+
+/**
+ * His age without its unit, read whatever his kept language (ADR 0168 § 4): after a first-person word of a covered
+ * language (« j'ai 15 », « moi 16 », « ho 15 », « io 16 », « tengo 15 », « yo 16 »), a message that is only the
+ * number, alone or with a question back (« 15 », « ok 16 », « 16 et toi », « 15 e tu », « 17 y tu », « 15 and you »),
+ * or about to turn it (« bientôt 17 », « quasi 17 », « casi 17 », « almost 17 »). Not « j'ai 15 min », « j'ai 15
+ * photos », « tengo 15 euros », « presque 15h ».
+ */
+const AGE_WITHOUT_UNIT = [
+  new RegExp(`\\b(?:j'?ai|moi|ho|io|tengo|yo)\\s*:?\\s*${TEEN_NOT_A_THING}${NOT_COUNTED}`, 'u'),
+  new RegExp(
+    `^[\\s\\p{P}]*(?:(?:ok|oui|ouais|si|yes|yeah|yep|bah|euh|eh|ben)[\\s\\p{P}]*)?1[0-7]` +
+      `(?:\\s*(?:ans?|anni|anos|years?|yo))?[\\s\\p{P}]*` +
+      `(?:(?:et|e|y|and|&)\\s*(?:toi|tu|te|vous|you|u|usted)[\\s\\p{P}]*)?[\\s\\p{P}\\p{Extended_Pictographic}\\uFE0F]*$`,
+    'u',
+  ),
+  new RegExp(`\\b(?:bientot|presque|quasi|casi|almost|nearly)\\s*${TEEN_NOT_A_THING}${NOT_COUNTED}`, 'u'),
+];
 
 /**
  * Whether a bare number of a minor is read as his age (ADR 0168 § 4): his message is in a language the guards do not
@@ -179,7 +209,7 @@ export function safetySigns(
   const signs: SafetySign[] = [];
   const his = clausesOfHis(text);
   if (
-    [...MINOR_AGE, ...MINOR_WORDS].some((pattern) => pattern.test(text)) ||
+    [...MINOR_AGE, ...MINOR_WORDS, ...AGE_WITHOUT_UNIT].some((pattern) => pattern.test(text)) ||
     his.some(
       (clause) =>
         MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),

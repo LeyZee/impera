@@ -287,6 +287,61 @@ describe('a language the guards do not read (ADR 0168 § 4, closed by default)',
     },
   );
 
+  /**
+   * His age without its unit, read whatever language is kept for him (ADR 0168 § 4): after a first-person word, a
+   * message that is only the number (alone or with a question back), or about to turn it. « ok 15 bisous » says more
+   * than the number: it is left, like « je rentre le 15 » and « mdr 12 ».
+   */
+  const AGE_WITHOUT_UNIT: Record<GuardedLanguage, { caught: string[]; left: string[] }> = {
+    french: {
+      caught: [
+        '15',
+        "j'ai 15",
+        'j’ai 16',
+        'moi 16',
+        '15 et toi',
+        '16 et toi ?',
+        'ok 16',
+        'bientot 17',
+        'bientôt 17',
+        'presque 17',
+      ],
+      left: [
+        "j'ai 15 min",
+        "j'ai 15 photos",
+        "j'ai 15 potes",
+        'bientôt 16h',
+        'presque 15h',
+        'ok 15 bisous',
+        'je rentre le 15',
+        'mdr 12',
+      ],
+    },
+    italian: {
+      caught: ['ho 15', 'io 16', '15 e tu', 'quasi 17'],
+      left: ['ho 16 euro', 'io 16 ore', 'quasi 17 euro', 'ho 15 anni di esperienza'],
+    },
+    spanish: {
+      caught: ['tengo 15', 'yo 16', '17 y tu', 'casi 17'],
+      left: ['tengo 15 euros', 'tengo 15 amigos', 'yo 15 dolares', 'casi 17 horas'],
+    },
+    english: {
+      caught: ['im 15', '15 and you', 'almost 17', '16 yo'],
+      left: ['i have 15 pics', 'almost 17 hours', 'got 15 pics', 'see you at 15'],
+    },
+  };
+
+  for (const language of GUARDED_LANGUAGES) {
+    const { caught, left } = AGE_WITHOUT_UNIT[language];
+    it.each(caught)(`raises the age doubt on « %s » whatever the kept language (${language})`, (text) => {
+      for (const kept of [null, 'french', 'english', 'italian', 'spanish'] as const)
+        expect(safetySigns(text, NOW, kept), `${text} / ${kept ?? 'none'}`).toContain('minor_suspected');
+    });
+    it.each(left)(`leaves « %s » with ${language} kept`, (text) => {
+      expect(safetySigns(text, NOW, language)).not.toContain('minor_suspected');
+    });
+  }
+
   it('still reads a bare number as an age with no language kept, or one outside the coverage (closed by default)', () => {
     expect(safetySigns('mdr 12', NOW)).toContain('minor_suspected');
     expect(safetySigns('mam 15 lat', NOW, 'german')).toContain('minor_suspected');
