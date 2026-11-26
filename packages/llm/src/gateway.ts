@@ -241,6 +241,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           input.scriptStep,
           input.maxBubbles,
           input.waitingStep,
+          input.fantasy,
         ),
         canary,
       });

@@ -42,6 +42,8 @@ export const DESIRE_BRAIN_SIGNALS = [
   'discomfort',
   // He says he just came (ADR 0156 § 6): the hot moment is over.
   'just_came',
+  // He says he is about to come, he cannot hold (Charles 26/11): during a script, she slows him down; nothing ends.
+  'close_to_coming',
   // His availability (ADR 0103, amendement du 13/11): read here, held by code in `fan_availability`.
   'alone',
   'at_home',

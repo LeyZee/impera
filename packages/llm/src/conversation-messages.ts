@@ -4,9 +4,11 @@ import type {
   BrainAlert,
   BrainCustomOrder,
   BrainScript,
+  BuyerType,
   ConversationTurn,
   JudgeSituation,
   TurnMedia,
+  VoiceFantasy,
   VoiceScriptStep,
   VoiceWaitingStep,
 } from './gateway-types';
@@ -83,6 +85,14 @@ function priceLabel(price: NonNullable<VoiceScriptStep['price']>): string {
   }).format(price.amountMinor / 100);
 }
 
+/** How he buys, as the voice reads it (Charles 26/11): how to present the step, never its price. */
+const BUYER_TYPE_LABELS: Readonly<Record<Exclude<BuyerType, 'unknown'>, string>> = {
+  impulsive: 'il achète sur l’élan',
+  hesitant: 'il hésite avant d’acheter',
+  collector: 'il garde tout ce qu’elle lui envoie',
+  whale: 'il dépense beaucoup chez elle',
+};
+
 /** The script step code decided (ADR 0098 § 5), as the voice reads it: every value written by code or the agency. */
 function scriptStepBlock(step: VoiceScriptStep): string {
   const lines = [
@@ -90,6 +100,9 @@ function scriptStepBlock(step: VoiceScriptStep): string {
     step.price === null ? 'Prix : aucun, ne parle pas de prix.' : `Prix exact : ${priceLabel(step.price)}.`,
     step.instruction === null ? '' : `Consigne de l’étape : ${step.instruction}`,
     step.mediaSheet === null ? '' : `Ce que contient l’envoi : ${step.mediaSheet}`,
+    step.buyerType === undefined || step.buyerType === 'unknown'
+      ? ''
+      : `Sa façon d’acheter : ${BUYER_TYPE_LABELS[step.buyerType]} (le prix reste celui du bloc).`,
   ].filter((line) => line !== '');
   return wrapUntrusted('script_step', lines.join('\n'));
 }
@@ -104,6 +117,24 @@ function waitingStepBlock(step: VoiceWaitingStep): string {
 }
 
 /**
+ * His fantasy for the voice (Charles 26/11): each line written by code, his words in a typed block after it. The one the
+ * running script meets is to play on; one no script meets is never promised.
+ */
+function fantasyBlocks(fantasy: VoiceFantasy | undefined): string {
+  if (fantasy === undefined) return '';
+  return [
+    fantasy.playOn.length === 0
+      ? ''
+      : `Son fantasme que ce script sert : joue dessus dans le sexto.\n${wrapUntrusted('fan_fantasy', fantasy.playOn.join(' · '))}`,
+    fantasy.noScript.length === 0
+      ? ''
+      : `Ce fantasme n’a pas de script : joue-le en paroles si ça vient, sans promettre ni annoncer aucun média pour lui.\n${wrapUntrusted('fan_fantasy', fantasy.noScript.join(' · '))}`,
+  ]
+    .filter((block) => block !== '')
+    .join('\n');
+}
+
+/**
  * The brief the voice follows; her objection reply, when code chose one, and the script step code decided, each in its
  * own typed block after it. `kycMissing` stays with the brain on purpose (audit du 16/11, B4): it decides in
  * `replyBrief` when a topic is spent and what to learn next; a list of blanks given to the voice would turn getting to
@@ -115,6 +146,7 @@ export function describeBrief(
   scriptStep?: VoiceScriptStep,
   maxBubbles?: number,
   waitingStep?: VoiceWaitingStep,
+  fantasy?: VoiceFantasy,
 ): string {
   const lines = [
     `Intention du fan : ${brief.intent} (humeur : ${brief.sentiment}).`,
@@ -130,6 +162,7 @@ export function describeBrief(
     objectionReply === undefined ? '' : wrapUntrusted('objection_reply', objectionReply),
     scriptStep === undefined ? '' : scriptStepBlock(scriptStep),
     waitingStep === undefined ? '' : waitingStepBlock(waitingStep),
+    fantasyBlocks(fantasy),
     maxBubbles === undefined ? '' : bubblesLine(maxBubbles),
   ]
     .filter((block) => block !== '')
@@ -188,7 +221,17 @@ export function scriptsBlock(scripts: readonly BrainScript[], stepWaiting: boole
     : 'Aucune étape n’attend sa réponse : ne rends pas `scriptReply`.';
   if (scripts.length === 0) return `Aucun script à proposer : ne rends pas \`scriptPick\`.\n${waiting}`;
   const listed = scripts
-    .map((script) => `${script.id} :\n${wrapUntrusted('script_description', script.description)}`)
+    .map((script) =>
+      [
+        `${script.id} :`,
+        wrapUntrusted('script_description', script.description),
+        script.matches === undefined || script.matches.length === 0
+          ? ''
+          : `Colle à ce qu’il aime :\n${wrapUntrusted('script_matches', script.matches.join(' · '))}`,
+      ]
+        .filter((line) => line !== '')
+        .join('\n'),
+    )
     .join('\n');
   return `${listed}\n${waiting}`;
 }

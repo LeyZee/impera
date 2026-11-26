@@ -8,6 +8,7 @@ import type {
   ScriptStepOutcome,
 } from '@impera/contracts';
 
+import type { ScriptCarriesView } from './fantasy-match';
 import { offerDecision, sameEvening, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
 
@@ -50,6 +51,11 @@ export interface PlatformScriptView {
   readonly descriptionValidated: boolean;
   /** Something in it touches a limit of her persona. */
   readonly touchesLimits: boolean;
+  /**
+   * What it carries in the media's closed vocabulary, the union of its steps, when the catalogue gives it: read first
+   * by the fantasy score (Charles 26/11). Absent today: the description and the media sheets are read.
+   */
+  readonly carriesAll?: ScriptCarriesView;
 }
 
 type PlatformScriptFault =

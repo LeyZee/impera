@@ -879,3 +879,26 @@ export function checkExplicit(bubbles: readonly string[]): GuardViolation[] {
   }
   return violations;
 }
+
+// Words of youth, on the normalised text (Charles 26/11): never in a sexual message, whoever they describe. « Petit »
+// alone stays (« mon petit cœur » to him); the list reads French, English, Italian and Spanish.
+const YOUTH_WORDS =
+  /\b(petites?|gamines?|ados?|adolescentes?|lolitas?|jeunettes?|fillettes?|toute jeune|si jeune|jeune fille|little girls?|young girls?|teens?|teenagers?|schoolgirls?|barely legal|piccol[ae]|ragazzin[ae]|bambin[ae]|jovencitas?|nenas?)\b/;
+// Read before `normalise`, which would make « niña » the first name Nina.
+const YOUTH_WORDS_ACCENTED = /(^|[^\p{L}])(niñ[ao]s?|pequeñ[ao]s?)($|[^\p{L}])/iu;
+
+/**
+ * No word of youth in a sexual message (Charles 26/11): blocking, so her answer is written once more, then a human
+ * answers. `sexual`: the composer knows the turn is (a heated exchange, a script running); a message explicit by its
+ * own words is sexual anyway. Outside, « une petite photo » stays hers.
+ */
+export function checkYouthWords(bubbles: readonly string[], sexual: boolean): GuardViolation[] {
+  const explicit = sexual || checkExplicit(bubbles).length > 0;
+  if (!explicit) return [];
+  return bubbles.flatMap((bubble, bubbleIndex) => {
+    const match = YOUTH_WORDS.exec(normalise(bubble))?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
+    if (match === undefined) return [];
+    const violation: GuardViolation = { code: 'youth_word_in_sex', severity: 'blocking', bubbleIndex, match };
+    return [violation];
+  });
+}

@@ -59,6 +59,8 @@ const WEIGHTS: Readonly<Record<CountedSignal, number>> = {
   discomfort: -30,
   // He just came (ADR 0156 § 6): the hot moment falls at once, nothing more to sell tonight on this heat.
   just_came: -50,
+  // He is about to come (Charles 26/11): already at his peak, his score does not move; she slows him down.
+  close_to_coming: 0,
   // His availability (ADR 0103, amendement du 13/11): a fan alone and free warms a little; someone beside him or an
   // appointment cools him as much as being busy. The gate before a script reads the state code holds, not these.
   alone: 6,

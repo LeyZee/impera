@@ -6,6 +6,7 @@ import { checkNoCommitment } from '../custom-order';
 import {
   checkExplicit,
   checkVoiceOutput,
+  checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
   previousTurnsOf,
   type GuardCode,
@@ -197,6 +198,7 @@ describe('voice guards (P3-13)', () => {
       }),
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
+      ...checkYouthWords(['ta jeunette t’attend'], true).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
       ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),

@@ -46,6 +46,8 @@ export const GUARD_CODES = [
   'place_named',
   // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
   'minor_reference',
+  // Charles 26/11: in a sexual message, no word of youth for her or for anyone (« petite », « jeunette », « lolita »…).
+  'youth_word_in_sex',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

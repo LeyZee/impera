@@ -12,14 +12,35 @@ import {
 import { KycSlotSchema } from './fans';
 
 describe('the fan’s card (ADR 0085)', () => {
-  it('holds the twenty fields of § 3 in their order, each with one spec', () => {
+  it('holds the twenty-two fields of § 3 in their order, each with one spec', () => {
     expect(FAN_CARD_FIELDS.map((spec) => spec.field)).toEqual([...FanCardFieldSchema.options]);
-    expect(FAN_CARD_FIELDS).toHaveLength(20);
+    expect(FAN_CARD_FIELDS).toHaveLength(22);
     expect(fanCardFieldSpec('outfits')).toMatchObject({
       group: 'about_her',
       shape: 'list',
       learning: 'note',
     });
+  });
+
+  it('carries his desire map: fantasies, the words that work on him, his limits, what cools him (26/11)', () => {
+    const intimate = FAN_CARD_FIELDS.filter((spec) => spec.group === 'intimate').map((spec) => spec.field);
+    expect(intimate).toEqual(['desires', 'words_that_work', 'limits', 'cools_him', 'intensity', 'lead']);
+    expect(fanCardFieldSpec('words_that_work')).toMatchObject({
+      label: 'Les mots qui marchent sur lui',
+      category: 'intimate',
+      shape: 'list',
+      learning: 'note',
+    });
+    expect(fanCardFieldSpec('cools_him')).toMatchObject({
+      label: 'Ce qui le refroidit',
+      category: 'intimate',
+      shape: 'list',
+      learning: 'note',
+    });
+    const read = { field: 'words_that_work', items: ['quand elle l’appelle mon chéri'], kind: 'declared' };
+    expect(FanCardReadSchema.safeParse({ facts: [{ ...read, confidence: 0.9, message: 1 }] }).success).toBe(
+      true,
+    );
   });
 
   it('keeps the seven codes of the KYC canvas, so the facts already written fill the card', () => {
