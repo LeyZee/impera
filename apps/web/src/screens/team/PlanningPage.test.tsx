@@ -188,7 +188,7 @@ function serve(
     reportShifts?: unknown[];
     /** The context of a shift's report panel, by shift (EQP-02). */
     reportContext?: (shiftId: string) => unknown;
-    /** The team's weeks of availability (ADR 0168); unanswered (404) when left out. */
+    /** The team's weeks of availability (ADR 0171); unanswered (404) when left out. */
     availability?: unknown;
     /** The team's calendar (CR-12) for a window; unanswered (404) when left out. */
     calendar?: (from: string, to: string) => unknown;
@@ -457,7 +457,7 @@ describe('Équipe › Planning', () => {
     expect(day.value).toBe('29/10/2026');
   });
 
-  it('says who is dispo on a place to fill, the whole of it first, and their hours on a part (ADR 0168, trou 16)', async () => {
+  it('says who is dispo on a place to fill, the whole of it first, and their hours on a part (ADR 0171, trou 16)', async () => {
     const week = (memberId: string, ranges: unknown[]): unknown => ({
       memberId,
       weekId: id(301),

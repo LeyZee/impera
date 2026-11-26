@@ -7,7 +7,7 @@ import {
   type TeamMember,
 } from '@impera/contracts';
 
-/** The weekly availability as the screens read it (ADR 0168, trou 16): pure, in the member's own zone. */
+/** The weekly availability as the screens read it (ADR 0171, trou 16): pure, in the member's own zone. */
 
 const STEP_MS = AVAILABILITY_STEP_MINUTES * 60_000;
 const NBSP = ' ';
@@ -81,7 +81,7 @@ export interface Dispo {
   readonly cover: Cover;
 }
 
-/** Who can take a place (ADR 0168 § 5): the whole of it first, part of it after, and how many gave no week. */
+/** Who can take a place (ADR 0171 § 5): the whole of it first, part of it after, and how many gave no week. */
 export interface Dispos {
   readonly full: readonly Dispo[];
   readonly part: readonly Dispo[];
@@ -161,7 +161,7 @@ export interface DraftRange {
 }
 
 /**
- * The plages to send (ADR 0168 § 1): an end of « 0 h » is midnight, and a plage past midnight stops at the end of its
+ * The plages to send (ADR 0171 § 1): an end of « 0 h » is midnight, and a plage past midnight stops at the end of its
  * day and goes on the next morning. `null` for a plage whose end is its start: it says nothing.
  */
 export function rangesOfDrafts(drafts: readonly DraftRange[]): AvailabilityRange[] | null {

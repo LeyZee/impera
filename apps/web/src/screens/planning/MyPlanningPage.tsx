@@ -65,7 +65,7 @@ export type MyPlanningSearch = CalendarSearch & { readonly semaine?: string | un
 
 type Open =
   | { readonly kind: 'leave' }
-  /** « Mes dispos »: the week he can work (ADR 0168, trou 16). */
+  /** « Mes dispos »: the week he can work (ADR 0171, trou 16). */
   | { readonly kind: 'dispos' }
   /** « Dans mon téléphone »: the link that puts his shifts in his phone's calendar (CR-12; Moi › Calendrier before). */
   | { readonly kind: 'phone' }

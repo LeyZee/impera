@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { AvailabilityWeekIdSchema, TeamMemberIdSchema } from './ids';
 import { TimezoneSchema } from './persona';
 
-/** A member's weekly availability (ADR 0168, trou 16): plages of the week, in his own time zone, a week set whole. */
+/** A member's weekly availability (ADR 0171, trou 16): plages of the week, in his own time zone, a week set whole. */
 
-/** The most plages a week holds (ADR 0168 § 1). */
+/** The most plages a week holds (ADR 0171 § 1). */
 export const AVAILABILITY_RANGES_MAX = 21;
 
 /** The step of a plage, in minutes: a quarter of an hour. */

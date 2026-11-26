@@ -68,7 +68,7 @@ const memberColumns = {
 };
 
 /**
- * The weeks of availability (ADR 0168, trou 16) under `withMember`. A member reads and writes his own; the owner and an
+ * The weeks of availability (ADR 0171, trou 16) under `withMember`. A member reads and writes his own; the owner and an
  * active manager read every active member's and write one for a member (the journal says it). The policies hold the
  * same rule: a row is read by its member or the scope `owner` | `agency`, written only under the writer's own name.
  */

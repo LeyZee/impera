@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { startPayrollTeam, type PayrollTeam } from './support/payroll-team';
 
 /** Invented people only (ADR 0010). */
-describe('Équipe › Planning : les dispos de la semaine (ADR 0168, trou 16)', () => {
+describe('Équipe › Planning : les dispos de la semaine (ADR 0171, trou 16)', () => {
   let team: PayrollTeam;
   let theo: TeamMember;
   let lea: TeamMember;

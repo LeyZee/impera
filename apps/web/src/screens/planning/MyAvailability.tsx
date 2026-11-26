@@ -27,7 +27,7 @@ const DAY_MINUTES = 24 * 60;
 const WEEK = [1, 2, 3, 4, 5, 6, 7] as const;
 
 /**
- * « Mes dispos » (ADR 0168, trou 16): the week he can work, folded with his leaves and swaps. The agency reads it on
+ * « Mes dispos » (ADR 0171, trou 16): the week he can work, folded with his leaves and swaps. The agency reads it on
  * each free place; nothing is booked from it.
  */
 export function MyAvailability({ now, onEdit }: { now: Date; onEdit: () => void }): JSX.Element | null {
@@ -97,7 +97,7 @@ function nextOn(day: readonly DraftRange[], key: number, weekday: number): Draft
 }
 
 /**
- * « Mes dispos », the week set whole (ADR 0168 § 2): a line a day, its plages side by side, each at his own hour. An
+ * « Mes dispos », the week set whole (ADR 0171 § 2): a line a day, its plages side by side, each at his own hour. An
  * end at or before its start goes on to the next morning. The week's id is made when the panel opens, so a retry
  * records one week.
  */

@@ -52,7 +52,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('« Mes dispos » (ADR 0168, trou 16)', () => {
+describe('« Mes dispos » (ADR 0171, trou 16)', () => {
   it('folds his week a line a day, at his hour, and asks again after a month', async () => {
     stub();
     render(

@@ -1,4 +1,4 @@
-# 0168. Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre
+# 0171. Les dispos hebdomadaires du chatteur, et qui est dispo sur chaque place libre
 
 Statut : proposed (trous béants n° 16, correction validée par Charles le 21/11/2026 à 15 h 52 : « Dispos hebdomadaires, et qui est dispo sur chaque place libre » ; numéro provisoire, posé par Bilan au train)
 Date : 2026-11-26

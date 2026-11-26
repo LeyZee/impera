@@ -378,7 +378,7 @@ export const leaveRequests = pgTable(
 );
 
 /**
- * A member's week of availability (ADR 0168, trou 16): his plages, in the time zone he gave them in, as one list typed
+ * A member's week of availability (ADR 0171, trou 16): his plages, in the time zone he gave them in, as one list typed
  * at the border (`AvailabilityRangesSchema`). The latest row of a member is his week in force; the older ones stay,
  * added only (trigger `refuse_change`). Read by the member himself and the scope `owner` | `agency`; written by the
  * member for himself, or by the owner or an active manager for him, always under the writer's own name.

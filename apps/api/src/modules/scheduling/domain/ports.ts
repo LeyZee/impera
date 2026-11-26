@@ -856,7 +856,7 @@ export interface ReportReminderSource {
 }
 
 /**
- * A member's weeks of availability (ADR 0168, trou 16), under `withMember`: his own for any member, every active
+ * A member's weeks of availability (ADR 0171, trou 16), under `withMember`: his own for any member, every active
  * member's for the owner and an active manager. `set` writes a whole week, which replaces the one in force; the same
  * `id` sent again is the same week.
  */

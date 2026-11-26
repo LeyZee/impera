@@ -169,7 +169,7 @@ export function ShiftPanel({
         : moved.end !== endMinute
           ? `${clockOf(endMinute)} n’existe pas cette nuit-là, à cause du changement d’heure : le shift finit à ${clockOf(moved.end)}.`
           : null;
-  // Who is dispo on these hours (ADR 0168 § 5, trou 16): the whole of them first, part of them after, with what their
+  // Who is dispo on these hours (ADR 0171 § 5, trou 16): the whole of them first, part of them after, with what their
   // week covers at the agency's hour; nobody is chosen for the manager beyond the first of the list.
   const weeks = useTeamAvailability(true);
   const place =

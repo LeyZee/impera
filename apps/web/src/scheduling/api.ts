@@ -343,7 +343,7 @@ export const chooseCalendarShifts = (withShifts: boolean): Promise<Outcome<Calen
     CalendarLinkStateSchema.parse(json),
   );
 
-/** The reader's own week of availability (ADR 0168, trou 16), « Mes dispos ». */
+/** The reader's own week of availability (ADR 0171, trou 16), « Mes dispos ». */
 export function useMyAvailability(): UseQueryResult<MemberAvailability> {
   return useQuery({
     queryKey: [...SCHEDULING_KEY, 'availability', 'mine'],

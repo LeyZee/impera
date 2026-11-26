@@ -15,7 +15,7 @@ ALTER TABLE "member_availability_weeks" ADD CONSTRAINT "member_availability_week
 CREATE INDEX "member_availability_weeks_member_idx" ON "member_availability_weeks" USING btree ("member_id","created_at");--> statement-breakpoint
 CREATE POLICY "member_read" ON "member_availability_weeks" AS PERMISSIVE FOR SELECT TO public USING (nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = "member_availability_weeks"."member_id" and m.user_id = nullif(current_setting('app.user_id', true), '')));--> statement-breakpoint
 CREATE POLICY "member_insert" ON "member_availability_weeks" AS PERMISSIVE FOR INSERT TO public WITH CHECK ("member_availability_weeks"."created_by" = nullif(current_setting('app.user_id', true), '') and (nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') or exists (select 1 from team_members m where m.id = "member_availability_weeks"."member_id" and m.user_id = nullif(current_setting('app.user_id', true), ''))));--> statement-breakpoint
--- Written by hand (ADR 0168, trou 16). Drizzle does not write what follows.
+-- Written by hand (ADR 0171, trou 16). Drizzle does not write what follows.
 ALTER TABLE "member_availability_weeks" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
 -- Added only, for every role (`refuse_change` of 0000): a week set stays, the next one replaces it.
 CREATE TRIGGER "member_availability_weeks_append_only" BEFORE UPDATE OR DELETE ON "member_availability_weeks"

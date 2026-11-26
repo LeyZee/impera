@@ -337,7 +337,7 @@ export function createSchedulingRoutes(
       },
     );
 
-    // ADR 0168 (trou 16): his own week for any member; every active member's for the owner and an active manager.
+    // ADR 0171 (trou 16): his own week for any member; every active member's for the owner and an active manager.
     app.get(
       '/scheduling/availability/mine',
       { preValidation: ownerOrMember, schema: { response: { 200: MemberAvailabilitySchema } } },

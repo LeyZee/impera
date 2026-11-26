@@ -53,7 +53,7 @@ const weekOf = (
 const FROM = new Date('2026-11-24T17:00:00.000Z');
 const TO = new Date('2026-11-24T23:00:00.000Z');
 
-describe('Les dispos de la semaine (ADR 0168, trou 16)', () => {
+describe('Les dispos de la semaine (ADR 0171, trou 16)', () => {
   it('reads an instant’s day and minute in the member’s zone', () => {
     expect(weekMinuteOf(FROM, 'Europe/Paris')).toEqual({ weekday: 2, minute: 18 * 60 });
     expect(weekMinuteOf(TO, 'Indian/Antananarivo')).toEqual({ weekday: 3, minute: 2 * 60 });

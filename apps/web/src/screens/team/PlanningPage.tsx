@@ -161,7 +161,7 @@ export function PlanningPage({
   const days = weekOf(monday);
   const shown = usePlanning(rangeOf(monday, zone));
   const members = useMembers();
-  // Who is dispo on each place to fill (ADR 0168 § 5, trou 16): their weeks, read with the team.
+  // Who is dispo on each place to fill (ADR 0171 § 5, trou 16): their weeks, read with the team.
   const weeks = useTeamAvailability(true);
   const toolbar = useRef<HTMLDivElement>(null);
   const templates = useTemplates(true);
@@ -1248,7 +1248,7 @@ function OpenStretch({
   where: string;
   /** The agent on that créneau, said after it (« ; l’IA en copilote »), empty when he is not there. */
   agentWords?: string;
-  /** « 2 dispos »: members whose week covers the whole of it (ADR 0168 § 5); `null` for none or not read. */
+  /** « 2 dispos »: members whose week covers the whole of it (ADR 0171 § 5); `null` for none or not read. */
   dispos?: string | null;
   onAdd: (hours: Pick<ShiftStart, 'day' | 'hours'>) => void;
 }): JSX.Element {
