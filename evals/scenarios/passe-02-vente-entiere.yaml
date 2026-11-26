@@ -1,6 +1,6 @@
 # Passe de test du 20/11, conversation 2 : une vente entière. Fan, messages, scripts et prix fictifs (ADR 0010).
 # Fan connu depuis trois jours, sexualisé, seul, disponible, désir haut. Tours : il demande ce qu’elle fait ; il réagit à l’aperçu ; [achète] c’était fou ; il en redemande ; [achète] il réagit ; il a fini ; il la remercie.
-# Attendu à la lecture : après chaque achat elle demande si ça lui a plu, reste dans la tension, quelques messages avant l’étape suivante ; quand il a fini, plus d’étape, aftercare tendre.
+# Attendu à la lecture : après chaque achat elle demande si ça lui a plu, reste dans la tension, quelques messages avant l’étape suivante (code, guide 26/11 : deux messages de lui au moins, `in_tension`, puis seulement s’il est toujours chaud) ; quand il a fini, plus d’étape, aftercare tendre.
 # Code (asserté) : `end` après « j’ai fini ». Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
 # Code (non asserté, pas de clé) : jamais deux étapes dans la même réponse ; la décision du code ne porte qu’une étape par réponse, le format n’a pas de clé pour le compter.
 description: 'Fan chaud et disponible le soir : l’aperçu, deux achats, puis il dit qu’il a fini ; le code clôt le script et elle passe à la tendresse.'
