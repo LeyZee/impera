@@ -31,6 +31,7 @@ import {
   checkReply,
   commentForPrompt,
   mayAskQuestion,
+  declaresLove,
   nearExamples,
   QUESTION_EVERY_BOUNDS,
   asksAQuestion,
@@ -210,6 +211,7 @@ for (const pair of test) {
           repliesToHer: false,
           authorCommentedBefore: false,
           mayAsk,
+          emojiOnly: declaresLove(pair.comment),
         },
         ...(refusedBy.length > 0 ? { refusedBy } : {}),
         trace: {},
@@ -227,6 +229,7 @@ for (const pair of test) {
           ? checkReply(outcome.text, {
               recentReplies,
               mayAsk,
+              emojiOnly: declaresLove(pair.comment),
               chatGuardCodes: persona
                 .check([outcome.text])
                 .filter((violation) => violation.blocking)

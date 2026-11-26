@@ -641,9 +641,11 @@ function instagramCommentRequest(input: InstagramCommentInput): string {
     '',
     `Le commentaire :\n${wrapUntrusted('instagram_comment', comment.comment)}`,
     '',
-    comment.mayAsk
-      ? 'Tu peux finir ta réponse par une question, seulement si le commentaire ouvre vraiment une discussion.'
-      : 'Pas de question dans ta réponse cette fois.',
+    comment.emojiOnly
+      ? 'Il lui dit qu’il l’aime : si tu réponds, seulement un ou deux emojis, sans aucun mot ni question.'
+      : comment.mayAsk
+        ? 'Tu peux finir ta réponse par une question, seulement si le commentaire ouvre vraiment une discussion.'
+        : 'Pas de question dans ta réponse cette fois.',
   ];
   const near = input.nearExamples ?? [];
   if (near.length > 0)

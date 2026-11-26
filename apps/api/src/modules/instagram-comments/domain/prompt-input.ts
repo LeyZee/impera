@@ -6,6 +6,8 @@ import {
   type InstagramMediaKind,
 } from '@impera/contracts';
 
+import { declaresLove } from './love';
+
 /**
  * What the code prepares for the model (ADR 0122 § 2): the two texts cut and cleaned, and the facts beside. A handle
  * written in a comment or a caption names a third party: it is removed before the model reads anything.
@@ -58,6 +60,7 @@ export function promptInputOf(facts: CommentPromptFacts): CommentPromptInput {
     repliesToHer: facts.repliesToHer,
     authorCommentedBefore: facts.authorCommentedBefore,
     mayAsk: facts.mayAsk,
+    emojiOnly: declaresLove(facts.text),
   };
 }
 
