@@ -1,5 +1,5 @@
 {
-  "id": "3c36786d-0f8f-4eb6-b685-0e836d1154cd",
+  "id": "938aa246-a544-44e1-842d-1fd50153de96",
   "prevId": "ef6d1395-1e08-407e-9ca1-c960a0a48843",
   "version": "7",
   "dialect": "postgresql",
@@ -5122,6 +5122,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "ideas_asked_at": {
+          "name": "ideas_asked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
@@ -5252,6 +5258,14 @@
           "to": ["public"],
           "using": "\"creator_decisions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'creator_decisions' and \"creator_decisions\".\"state\" = 'open'",
           "withCheck": "\"creator_decisions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'creator_decisions' and \"creator_decisions\".\"state\" = 'withdrawn'"
+        },
+        "asking_other_ideas": {
+          "name": "asking_other_ideas",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"creator_decisions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'creator_decisions' and \"creator_decisions\".\"state\" = 'open'",
+          "withCheck": "\"creator_decisions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'creator_decisions' and \"creator_decisions\".\"state\" = 'open'"
         }
       },
       "checkConstraints": {
@@ -10794,7 +10808,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision')"
         }
       },
       "isRLSEnabled": false
@@ -19694,30 +19708,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "price_minor": {
-          "name": "price_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deposit_minor": {
-          "name": "deposit_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_by": {
-          "name": "decided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -19794,15 +19784,6 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "custom_orders_decided_by_user_id_fk": {
-          "name": "custom_orders_decided_by_user_id_fk",
-          "tableFrom": "custom_orders",
-          "tableTo": "user",
-          "columnsFrom": ["decided_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "custom_orders_fan_creator_fk": {
           "name": "custom_orders_fan_creator_fk",
           "tableFrom": "custom_orders",
@@ -19852,14 +19833,6 @@
         "custom_orders_details_check": {
           "name": "custom_orders_details_check",
           "value": "jsonb_typeof(\"custom_orders\".\"details\") = 'object'"
-        },
-        "custom_orders_price_check": {
-          "name": "custom_orders_price_check",
-          "value": "\"custom_orders\".\"price_minor\" is null or \"custom_orders\".\"price_minor\" >= 100"
-        },
-        "custom_orders_deposit_check": {
-          "name": "custom_orders_deposit_check",
-          "value": "\"custom_orders\".\"deposit_minor\" is null or (\"custom_orders\".\"price_minor\" is not null and \"custom_orders\".\"deposit_minor\" between 0 and \"custom_orders\".\"price_minor\")"
         },
         "custom_orders_card_check": {
           "name": "custom_orders_card_check",

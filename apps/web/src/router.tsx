@@ -26,6 +26,7 @@ import {
   sheetOf,
   sheetsFor,
 } from './creators/search';
+import { HelpContent, HelpPage } from './help/HelpPage';
 import { parsePaySearch } from './payroll/model';
 import { ExtensionLinkPage } from './pwa/ExtensionLinkPage';
 import { ExtensionPage } from './pwa/ExtensionPage';
@@ -983,6 +984,19 @@ const meSecurity = createRoute({
   },
 });
 
+/**
+ * Moi › Aide (demande de Charles du 21/11) : the person's guide, a chatter's, a manager's or a creator's by the rail's
+ * kind; an operator without a team reads the chatter's. The owner's is in Réglages › Aide.
+ */
+const meHelp = createRoute({
+  getParentRoute: () => me,
+  path: '/aide',
+  component: function MyHelp() {
+    const { user } = rootRoute.useRouteContext();
+    return <HelpPage user={user} />;
+  },
+});
+
 const mePreferences = createRoute({
   getParentRoute: () => me,
   path: '/preferences',
@@ -1166,6 +1180,20 @@ const backups = createRoute({
   },
   component: BackupsPage,
 });
+/** Réglages › Aide: the owner's guide, his alone like the rest of Réglages. */
+const settingsHelp = createRoute({
+  getParentRoute: () => settings,
+  path: '/aide',
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/reglages', replace: true, state: { notice: NOT_YOURS } });
+    }
+  },
+  component: function OwnerHelp() {
+    return <HelpContent audience="owner" />;
+  },
+});
 const payRules = createRoute({
   getParentRoute: () => settings,
   path: '/regles-de-paie',
@@ -1320,6 +1348,7 @@ const routeTree = rootRoute.addChildren([
     meCalendar,
     meLinks,
     meSecurity,
+    meHelp,
     mePreferences,
   ]),
   accountSecurity,
@@ -1334,6 +1363,7 @@ const routeTree = rootRoute.addChildren([
     billing,
     backups,
     settingsSecurity,
+    settingsHelp,
     devices,
     agentMode,
   ]),
