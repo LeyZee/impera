@@ -72,6 +72,8 @@ export const creatorDecisions = pgTable(
     answeredBy: text('answered_by').references(() => user.id),
     /** « Plus tard »: aside until then. */
     laterUntil: timestampTz('later_until'),
+    /** A request for other ideas being written since then: one at a time, counted before it is paid (ADR 0164 § 9). */
+    ideasAskedAt: timestampTz('ideas_asked_at'),
     /** After it the question no longer makes sense: nobody reads it, nobody answers it. */
     expiresAt: timestampTz('expires_at').notNull(),
     createdAt: createdAt(),
@@ -120,6 +122,13 @@ export const creatorDecisions = pgTable(
       for: 'update',
       using: sql`${asking(t.creatorId)} and ${t.state} = 'open'`,
       withCheck: sql`${asking(t.creatorId)} and ${t.state} = 'withdrawn'`,
+    }),
+    // Who asked may also give other answers to a question still open, which stays open (ADR 0164 § 9). The trigger
+    // `creator_decisions_other_ideas` keeps these columns to this door: a request counted, then filled or given back.
+    pgPolicy('asking_other_ideas', {
+      for: 'update',
+      using: sql`${asking(t.creatorId)} and ${t.state} = 'open'`,
+      withCheck: sql`${asking(t.creatorId)} and ${t.state} = 'open'`,
     }),
   ],
 );
