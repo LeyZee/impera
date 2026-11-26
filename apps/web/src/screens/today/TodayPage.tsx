@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState, type JSX } from 'react';
 
+import { AnnouncementsCard } from './AnnouncementsCard';
 import { TodoCard } from './TodoCard';
 import { HerLines } from './her/HerLines';
 import { ToTalkCard } from './to-talk/ToTalkCard';
@@ -23,8 +24,15 @@ import { MyProgressCard } from '@/rewards/MyProgressCard';
 import { RewardRevealGate } from '@/rewards/RewardRevealGate';
 import { ShiftChallengeCard } from '@/rewards/ShiftChallengeCard';
 import { MyAwayCard } from '@/scheduling/MyAwayCard';
-import { useMyShifts } from '@/scheduling/api';
-import { accountLine, dayStateOf, myAwayOf, progressOf, type DayState } from '@/scheduling/model';
+import { checkIn, useMyShifts, useRefreshPlanning } from '@/scheduling/api';
+import {
+  accountLine,
+  dayStateOf,
+  ERROR_MESSAGES,
+  myAwayOf,
+  progressOf,
+  type DayState,
+} from '@/scheduling/model';
 import '@/scheduling/scheduling.css';
 import {
   clockAt,
@@ -47,7 +55,7 @@ import { Failure } from '@/shell/states';
  * Aujourd'hui (ADR 0024, EQ-02, EQ-03): the chatter's shift first, where to go and until when, and « Faire mon
  * rapport » as it ends; then the reports left to do and the period's, then the next shift. Read in the chatter's own
  * time, his record's as on Planning (recette EXT-10). What waits on his invoices follows (EQ-06 lot 8d). The goal and
- * the announcements come with their own cards.
+ * the announcements he has not read (EQ-12) come with their own cards.
  */
 export function TodayPage({ user }: { user: Me }): JSX.Element {
   const mine = useMyShifts();
@@ -168,6 +176,7 @@ function Day({
           <MyAwayCard status={away} />
         )}
         {away === null && open !== null ? <ToTalkCard creatorId={open.creatorId} now={now} /> : null}
+        {user.team === null ? null : <AnnouncementsCard zone={zone} today={today} />}
         <TodoCard user={user} reports={reports} heroShiftId={heroShift?.id ?? null} onReport={onReport} />
       </div>
       {/* Where he stands, beside the work on a computer, under it on a phone (Charles, 21/11). */}
@@ -238,20 +247,42 @@ function Hero({
   // An AI outage behind twenty fans is one urgency, as Suivi shows it (« urgent panne », 06/11).
   const urgent = urgencies(queue.data?.items ?? []);
   const toStart = new Date(shift.startsAt).getTime() - now.getTime();
+  // « Je prends mon poste » (EQ-12): the shift under way or about to start is the member's to take, once. Taken, it
+  // says « En poste »; under way and not taken, it says so in amber. The report, once due, takes the light instead.
+  const taken = shift.checkedInAt;
+  const toTake = (state.kind === 'on' || state.kind === 'soon') && taken === null && report.kind !== 'due';
+  // A shift of today not open yet: the gesture is there, held, with the minute it opens (Design, 20/11): never a
+  // button that answers « pas encore » once pressed.
+  const opensAt = new Date(shift.accessStartsAt);
+  const notYet = state.kind === 'later' && dayOf(opensAt, zone) === today;
+  const tone =
+    state.kind === 'on'
+      ? taken === null
+        ? 'nv-tone--warn'
+        : 'nv-tone--ok nv-dot--live'
+      : state.kind === 'soon'
+        ? taken === null
+          ? 'nv-tone--warn'
+          : 'nv-tone--ok'
+        : '';
   return (
     <Panel className={`sc-hero sc-hero--${state.kind}${state.kind === 'later' ? ' sc-linked' : ''} nv-enter`}>
       <div className="sc-hero__top">
         <span className={`nv-status sc-state sc-state--${state.kind}`}>
           <span
             // A shift that ended is a normal state, not a warning: a neutral dot, the amber stays the report's (DASH-25).
-            className={`nv-dot ${state.kind === 'on' ? 'nv-tone--ok nv-dot--live' : state.kind === 'soon' ? 'nv-tone--warn' : ''}`}
+            className={`nv-dot ${tone}`}
           />
           {state.kind === 'on'
-            ? 'En poste'
+            ? taken === null
+              ? 'Poste à prendre'
+              : 'En poste'
             : state.kind === 'ended'
               ? 'Shift fini'
               : state.kind === 'soon'
-                ? 'Bientôt en poste'
+                ? taken === null
+                  ? 'Bientôt en poste'
+                  : 'Poste pris'
                 : 'Prochain shift'}
         </span>
         <span className="sc-hero__when nv-num">
@@ -294,6 +325,14 @@ function Hero({
           <span className="nv-gauge__fill" />
         </div>
       ) : null}
+      {notYet ? (
+        <div className="sc-hero__actions">
+          <button type="button" className="nv-btn nv-btn--soft" disabled>
+            Je prends mon poste
+          </button>
+          <p className="td-checkin__when nv-num">Tu pourras prendre ton poste à {clockAt(opensAt, zone)}.</p>
+        </div>
+      ) : null}
       {state.kind === 'later' ? (
         // A shift ahead opens Planning from the whole card: no « Tout mon planning » under the cards (CHA-23).
         <ToPlanning />
@@ -313,10 +352,11 @@ function Hero({
               Faire mon rapport
             </button>
           ) : null}
-          {/* The report, when due, takes the light; otherwise Suivi does, the shift's work being there. */}
+          {toTake ? <CheckIn shiftId={shift.id} /> : null}
+          {/* The report or the check-in, when due, takes the light; otherwise Suivi does, the shift's work being there. */}
           <Link
             to="/suivi"
-            className={`nv-btn ${report.kind === 'due' ? 'nv-btn--soft' : 'nv-btn--neon'}`}
+            className={`nv-btn ${report.kind === 'due' || toTake ? 'nv-btn--soft' : 'nv-btn--neon'}`}
             aria-label={waiting === 0 ? 'Ouvrir Suivi' : `Ouvrir Suivi, ${String(waiting)} à traiter`}
           >
             Ouvrir Suivi
@@ -340,9 +380,60 @@ function Hero({
               Rapport à partir de {clockAt(reportOpensAt(state.shift), zone)}
             </span>
           ) : null}
+          {taken !== null && (state.kind === 'on' || state.kind === 'soon') ? (
+            <span className="rp-hero__later nv-num">Poste pris à {clockAt(taken, zone)}</span>
+          ) : null}
         </div>
       )}
     </Panel>
+  );
+}
+
+/**
+ * « Je prends mon poste » (EQ-12): one tap dates the real start of the shift, the server holding the window and the
+ * member's own shift. A second tap answers the first instant; a refusal is said under the button, never in silence.
+ */
+function CheckIn({ shiftId }: { shiftId: string }): JSX.Element {
+  const refresh = useRefreshPlanning();
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const take = async (): Promise<void> => {
+    setBusy(true);
+    setSaid(null);
+    const outcome = await checkIn(shiftId);
+    if (outcome.kind === 'ok') {
+      // The card says « En poste » once the shifts are read again; the button stays held until then.
+      await refresh();
+      setBusy(false);
+      return;
+    }
+    setSaid(
+      outcome.kind === 'refused'
+        ? ERROR_MESSAGES[outcome.code]
+        : 'Le serveur ne répond pas. Réessaie dans un instant.',
+    );
+    setBusy(false);
+    if (outcome.kind === 'refused') await refresh();
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className="nv-btn nv-btn--neon"
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => {
+          void take();
+        }}
+      >
+        Je prends mon poste
+      </button>
+      {said === null ? null : (
+        <p role="alert" className="td-checkin__said">
+          {said}
+        </p>
+      )}
+    </>
   );
 }
 

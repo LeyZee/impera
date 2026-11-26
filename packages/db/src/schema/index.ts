@@ -7,6 +7,7 @@ export * from './conversations';
 export * from './creator-limits';
 export * from './creator-messages';
 export * from './creator-tasks';
+export * from './creator-decisions';
 export * from './creator-week';
 export * from './credentials';
 export * from './events';

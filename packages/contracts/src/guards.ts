@@ -42,6 +42,10 @@ export const GUARD_CODES = [
   'care_breach',
   // Charles 20/11: she slows down a fan who only compliments her (« tu y vas un peu fort »).
   'unwarranted_brake',
+  // ADR 0080 § 5.9 (21/11): a public text names a place where she lives (her persona's town or « lieu de vie »).
+  'place_named',
+  // Charles 21/11: she never names a child or a minor, joking or sexual; a hard rule, whatever the context.
+  'minor_reference',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

@@ -332,8 +332,27 @@ export const ShiftSchema = z.object({
   templateId: ShiftTemplateIdSchema.nullable(),
   /** When a person stopped it under way (it then ends at that minute, without the end margin), or `null`. */
   stoppedAt: z.iso.datetime().nullable(),
+  /**
+   * When the member said « Je prends mon poste » (EQ-12), or `null`. Cleared by the database when the shift changes
+   * member or start: a check-in belongs to the member and the hours it was made for.
+   */
+  checkedInAt: z.iso.datetime().nullable(),
 });
 export type Shift = z.infer<typeof ShiftSchema>;
+
+/**
+ * `POST /v1/scheduling/shifts/:shiftId/check-in` (any active member, on his own shift): « Je prends mon poste ». It is
+ * taken from the opening of the access window (`startsAt` − the margin) until the end, and dates the real start of the
+ * shift without moving its hours: pay, the access window and the routing of a sale keep reading the planning. A second
+ * check-in answers 200 with the first instant. 404 `shift_not_found` for a shift that is not the reader's, cancelled,
+ * or a reader who is not `active`; 409 `shift_check_in_early_conflict` before the window opens; 409
+ * `shift_ended_conflict` once it has ended or was stopped.
+ */
+export const ShiftCheckInSchema = z.object({
+  shiftId: ShiftIdSchema,
+  checkedInAt: z.iso.datetime(),
+});
+export type ShiftCheckIn = z.infer<typeof ShiftCheckInSchema>;
 
 /**
  * `POST /v1/scheduling/shifts` (owner, active manager) → 201 `ShiftSchema`. A manager plans the creators of his list
@@ -911,7 +930,8 @@ export type AnswerShiftSwapRequestBody = z.infer<typeof AnswerShiftSwapRequestBo
  * `shift_member_conflict` 409, the member already has a shift then ; `shift_account_conflict` 409, the account already
  * has a member then (both with `details.shiftId`, the shift in the way) ; `shift_ended_conflict` 409, a shift that
  * has ended, or a new one that would end at or before now ; `shift_started_conflict` 409, a change other than an
- * earlier end on a shift under way ; `shift_range_invalid` 400, an end at or before the start, a shift longer than
+ * earlier end on a shift under way ; `shift_check_in_early_conflict` 409, « Je prends mon poste » before the shift's
+ * access window opens ; `shift_range_invalid` 400, an end at or before the start, a shift longer than
  * `SHIFT_MAX_MINUTES`, or an instant that does not fall on a minute ; `planning_range_invalid` 400,
  * `to` at or before `from`, or more than `PLANNING_MAX_DAYS` (`LEAVE_QUERY_MAX_DAYS` for the leaves) ;
  * `shift_template_date_invalid` 400, a template that starts before today ; `creator_archived_conflict` 409, a shift or
@@ -943,6 +963,7 @@ export const SCHEDULING_ERROR_CODES = [
   'shift_account_conflict',
   'shift_ended_conflict',
   'shift_started_conflict',
+  'shift_check_in_early_conflict',
   'shift_range_invalid',
   'planning_range_invalid',
   'shift_template_date_invalid',

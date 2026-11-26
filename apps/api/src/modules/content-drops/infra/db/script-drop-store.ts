@@ -29,7 +29,7 @@ import type { ScriptDropStore, StartedScript } from '../../domain/ports';
 import { requiredSlotsMissing } from '../../domain/script-drops';
 
 import { enqueueSummary } from './script-summary-store';
-import { follow, pgErrorOf, readDrop, readRequest, viewOf } from './store';
+import { follow, nothingKeptGivesWay, pgErrorOf, readDrop, readRequest, viewOf } from './store';
 
 const { contentDropFiles, contentDrops } = schema;
 
@@ -72,6 +72,8 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
         // Locked, so that her refusal and her script never cross.
         if (request.state !== 'open' || (await readRequest(tx, body.requestId, true)) === undefined)
           throw new ContentDropRequestUnprocessable();
+        // A script of it where nothing could be kept no longer answers it: this one takes its place.
+        await nothingKeptGivesWay(tx, userId, body.requestId);
         try {
           await tx.insert(contentDrops).values({
             id: body.id,
@@ -170,7 +172,7 @@ export function createDrizzleScriptDropStore(db: Database, adminDb: Database): S
             entityId: dropId,
             details: { files: drop.files.length, scriptNumber },
           });
-          await follow(tx, { ...row, state: 'uploading' }, now, correlationId);
+          await follow(tx, { ...row, state: 'uploading' }, null, now, correlationId);
           // Told once its media are described (ADR 0083 § 6): the job waits for the last description.
           await enqueueSummary(tx, { creatorId, dropId, correlationId }, null);
           const after = await readDrop(tx, dropId);

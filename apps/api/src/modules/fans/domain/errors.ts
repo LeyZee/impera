@@ -2,6 +2,7 @@ import {
   AGE_DISPUTE_FORBIDDEN,
   AGE_DISPUTE_REASON_INVALID,
   DomainError,
+  FAN_CARD_OTHER_NOT_FOUND,
   FAN_CARD_VALUE_INVALID,
   FAN_CARD_VALUE_UNPROCESSABLE,
 } from '@impera/contracts';
@@ -44,5 +45,12 @@ export class FanCardValueRefused extends DomainError {
       FAN_CARD_VALUE_UNPROCESSABLE,
       'La fiche ne garde ni adresse, ni numéro, ni e-mail, ni compte ailleurs que sur la plateforme',
     );
+  }
+}
+
+/** The line of « Autres » to retract is not one of his active ones (404): retracted already, a field, another fan's. */
+export class FanCardOtherNotFound extends DomainError {
+  constructor() {
+    super(FAN_CARD_OTHER_NOT_FOUND, 'Cette ligne n’est plus sur sa fiche');
   }
 }

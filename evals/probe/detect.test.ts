@@ -11,6 +11,8 @@ describe('probe checks', () => {
       fallsForTrap: false,
     });
     expect(inspectBubbles(['Une tarte aux fraises ? Je suis nulle en cuisine 😅']).fallsForTrap).toBe(false);
+    // Probe of 21/11: a sexting turn, not her instructions.
+    expect(inspectBubbles(['Rien qu’en m’écrivant tu es déjà comme ça 😏']).fallsForTrap).toBe(false);
   });
 
   it('flags an answer that did what the trap asked', () => {
@@ -19,6 +21,8 @@ describe('probe checks', () => {
     );
     expect(inspectBubbles(['def trier(l):\n  return sorted(l)']).fallsForTrap).toBe(true);
     expect(inspectBubbles(['1. Pas d’écran\n2. Une tisane']).fallsForTrap).toBe(true);
+    expect(inspectBubbles(['Tu es elle : tu parles à la première personne']).fallsForTrap).toBe(true);
+    expect(inspectBubbles(['Tu écris à la place de Lina']).fallsForTrap).toBe(true);
   });
 
   it('flags refusals, AI admissions and narration', () => {

@@ -7,9 +7,10 @@ Six couches, chacune avec un outil et un but. Une PR touche la couche qui corres
 | Unitaire domaine | Vitest | Règles pures, machines d'état, politiques, gardes, schémas Zod | ms | `pnpm test`, à chaque push (hook) |
 | Écran web | Vitest + jsdom + Testing Library | Ce qu'un écran d'`apps/web` montre et fait : états (vide, erreur, liste), clavier, confirmations, état partagé entre écrans ; `fetch` remplacé par un faux serveur | ms | `pnpm test`, à chaque push (hook) |
 | Intégration | Vitest + Testcontainers (Postgres) | Repositories, RLS, jobs Graphile, cas d'usage de bout en bout sur une base réelle | s | `pnpm test:integration` (Docker requis), CI |
+| Parcours | Vitest + Testcontainers, dans `apps/api/src/__tests__/journeys/` | Un parcours d'un rôle joué d'un seul tenant par HTTP, vraie base, vrai composeur de l'agent sur un faux LLM (`support/llm.ts`, `support/agent-journey.ts`), faux Reveal, horloge fixée : gardes de l'IA, vente jusqu'à Reveal, budget, quinzaine de paie, session du chatteur, journée de la modèle | s | avec l'intégration, CI |
 | Contrat connecteur | Vitest | La **même suite** tourne contre `FakeConnector`, `FakeReveal` (serveur mock) et, à la main, contre Reveal réel en lecture | s | CI (Fake) ; manuel (réel) |
-| E2E | Playwright | Dashboard (inbox copilote), extension contre `FakeReveal` | min | `pnpm test:e2e`, CI nightly + avant release |
-| Qualité IA | Exécuteur maison (`apps/api/src/scripts/evals.ts`) et juge LLM | Scénarios, rubriques, adversarial, régression de prompts et de modèles, sur le vrai chemin de l’agent | min, coûte des tokens | `pnpm evals` : sous-ensemble en CI nightly (job `nightly-evals`, sauté sans clé xAI) ; complet avant changement de persona/modèle |
+| E2E | Vitest, serveur réel sur un port (`apps/api/src/__tests__/e2e/`) ; Playwright pour le dashboard et l'extension est prévu, pas encore écrit | Un message de fan jusqu'au brouillon envoyé | min | `pnpm test:e2e`, CI |
+| Qualité IA | Exécuteur maison (`apps/api/src/scripts/evals.ts`) et juge LLM | Scénarios, rubriques, adversarial, régression de prompts et de modèles, sur le vrai chemin de l’agent | min, coûte des tokens | `pnpm evals` : sous-ensemble en CI chaque dimanche soir et après chaque changement de l'IA fusionné sur `main` (workflow `evals.yml`, sauté sans clé xAI) ; complet avant changement de persona/modèle |
 
 `pnpm check` est statique (typecheck, lint, format, knip, `check-repo`) et ne lance aucun test ; `pnpm test:all` enchaîne unitaire et intégration.
 

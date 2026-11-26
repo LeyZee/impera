@@ -21,11 +21,21 @@ const TODAY = '2026-11-06';
 const NIGHT = structureOf('0192f3a0-0000-7000-8000-000000000a01', 'Soirée inventée', 'night');
 
 const content = (requests: unknown[], drops: unknown[] = []) =>
-  CreatorContentSchema.parse({ requests, drops });
+  CreatorContentSchema.parse({ requests, drops, redone: [] });
 
 describe('Créatrices › Demandes: what the screen says (MED-09)', () => {
-  it('offers what goes to Reveal, and a script: five choices, as chips', () => {
-    expect(ASKABLE_CATEGORIES).toEqual(['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm', 'script']);
+  it("offers what goes to Reveal, gifts, videos to sell and the AI's voices included, and a script", () => {
+    expect(ASKABLE_CATEGORIES).toEqual([
+      'feed_shoot',
+      'feed_video',
+      'reveal_story',
+      'mass_dm',
+      'whale_gift',
+      'sale_video',
+      'voice_beep',
+      'voice_real',
+      'script',
+    ]);
   });
 
   it('lists what is under way by its day, then what she refused or the agency cancelled, the latest first', () => {
@@ -56,6 +66,12 @@ describe('Créatrices › Demandes: what the screen says (MED-09)', () => {
       [cancelled.id, 'cancelled', false],
       [refused.id, 'refused', false],
     ]);
+  });
+
+  it('says « À refaire » of a request sent back to her, still the agency’s to cancel (trou 7 du 21/11)', () => {
+    const back = requestOf({ redo: { sentence: 'Trop sombre', at: '2026-11-05T10:00:00.000Z' } });
+    const [row] = requestGroups(content([back]), [], TODAY).current;
+    expect([row?.standing, row?.cancellable]).toEqual(['redo', true]);
   });
 
   it('says a closed request’s day without « en retard », and a script’s structure by its name', () => {

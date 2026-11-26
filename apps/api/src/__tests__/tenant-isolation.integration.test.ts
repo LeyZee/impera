@@ -53,6 +53,7 @@ const bodiesFor = (
   },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
     descriptionIds: ['00000000-0000-4000-8000-000000000000'],
   },
@@ -188,6 +189,9 @@ const NOT_TENANT: Readonly<Record<string, string>> = {
  */
 const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/alerts/triggers/:id/seen': 'a trigger of the person’s own alerts',
+  'POST /v1/team/announcements/:announcementId/read': 'an announcement to the team: announcements tests',
+  'GET /v1/team/announcements/:announcementId/readers': 'an announcement to the team: announcements tests',
+  'POST /v1/team/announcements/:announcementId/withdraw': 'an announcement to the team: announcements tests',
   'DELETE /v1/scheduling/settings/versions/:id': 'an agency planning version',
   'DELETE /v1/scheduling/swap-requests/:shiftSwapRequestId': 'swap requests: leaves-swaps tests',
   'POST /v1/scheduling/swap-requests/:shiftSwapRequestId/answer': 'swap requests: leaves-swaps tests',
@@ -214,6 +218,12 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'DELETE /v1/creator-space/tasks/:id': 'creator space: creator-tasks tests',
   'DELETE /v1/creator-space/tasks/:id/ticks/:day': 'creator space: creator-tasks tests',
   'PUT /v1/creator-space/shoot-items/:id': 'creator space: creator-week tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/answer':
+    'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/later':
+    'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/other-ideas':
+    'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
   'POST /v1/creator-space/stops/:id/withdraw':
     'creator space: creator-limits tests (another creator’s line stays)',
@@ -221,6 +231,18 @@ const RESIDUAL: Readonly<Record<string, string>> = {
     'creator space: creator-limits tests (another creator’s absence stays)',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
+  'GET /v1/creator-space/drops/:id/descriptions':
+    'creator space: content-stock tests (another creator gets 404)',
+  'POST /v1/creator-space/drops/:id/descriptions/validate':
+    'creator space: content-stock tests (another creator gets 404)',
+  'POST /v1/creator-space/drops/:id/descriptions/correct':
+    'creator space: content-stock tests (another creator’s drop is never found)',
+  'GET /v1/creator-space/drops/:id/files/:fileId/thumbnail':
+    'creator space: content-stock tests (another creator gets 404)',
+  'GET /v1/creator-space/drops/:id/files/:fileId/media':
+    'creator space: content-stock tests (same file read)',
+  'POST /v1/creator-space/drops/:id/files/:fileId/replace':
+    'creator space: content-drops tests (another creator gets 404)',
   'GET /v1/payroll/contractors/:memberId/documents/:documentId/file':
     'contractor documents: contractor tests',
   'POST /v1/payroll/contractors/:memberId/documents/:documentId/review':

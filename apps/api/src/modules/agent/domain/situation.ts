@@ -11,6 +11,8 @@ export interface Situation {
   readonly timeZone: string;
   readonly relationshipStartedAt: Date;
   readonly spentCents: number;
+  /** When he last paid her (a step, a media, a tip); `null` never; absent, not known (guide 26/11, `paysNow`). */
+  readonly lastSpentAt?: Date | null;
   /** Her night, on her clock (P3-14 `AgentHours.night`); absent, from 22:00 to 7:00. */
   readonly night?: MinuteRange;
 }

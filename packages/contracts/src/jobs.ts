@@ -19,9 +19,9 @@ import {
   SalesLineIdSchema,
   SuggestionIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
 } from './ids';
 import { PayPeriodSchema } from './pay-periods';
-import { PlatformScriptIdSchema } from './scripts';
 import { TELEGRAM_JOB_PAYLOADS } from './telegram';
 
 /**
@@ -47,6 +47,7 @@ export const JOB_NAMES = [
   'conversation.record_facts',
   'conversation.reopen',
   'conversation.release_unavailable',
+  'conversation.settle_placed',
   'connector.dispatch',
   'connector.poll',
   'connector.reconcile',
@@ -99,10 +100,9 @@ export const JOB_NAMES = [
   'content_drops.describe_backlog',
   'content_drops.make_thumbnail',
   'content_drops.thumbnail_backlog',
+  'instagram_captions.propose',
   'scripts.ask_scripts',
   'scripts.import_platform_scripts',
-  'scripts.identify_platform_script',
-  'scripts.identify_backlog',
   'providers.check_credentials',
   'connector.read_sales',
   'connector.check_sales',
@@ -133,6 +133,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'conversation.record_facts': 'Mémoire des fans',
   'conversation.reopen': 'Reprise à l’ouverture de ses heures',
   'conversation.release_unavailable': 'Conversations rendues par un membre absent',
+  'conversation.settle_placed': 'Brouillons placés dans Reveal',
   'connector.dispatch': 'Lecture des comptes Reveal',
   'connector.poll': 'Lecture d’un compte Reveal',
   'connector.reconcile': 'Vérification des envois Reveal',
@@ -183,12 +184,11 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'content_drops.describe_file': 'Description des médias déposés',
   'content_drops.summarize_script': 'Synthèse des scripts tournés',
   'content_drops.describe_backlog': 'Rattrapage des descriptions',
+  'instagram_captions.propose': 'Légendes proposées pour ses Reels',
   'content_drops.make_thumbnail': 'Vignettes des médias déposés',
   'content_drops.thumbnail_backlog': 'Rattrapage des vignettes',
   'scripts.ask_scripts': 'Demandes de scripts',
   'scripts.import_platform_scripts': 'Import des scripts Reveal',
-  'scripts.identify_platform_script': 'Identité des scripts Reveal',
-  'scripts.identify_backlog': 'Rattrapage des identités de scripts',
   'providers.check_credentials': 'Vérification des clés des services',
   'connector.read_sales': 'Lecture des ventes Reveal',
   'connector.check_sales': 'Contrôle des ventes Reveal',
@@ -253,6 +253,8 @@ export const JOB_PAYLOADS = {
         kind: z.literal('operator_note'),
         note: z.string().min(1).max(300),
         at: z.iso.datetime(),
+        /** Who left it, shown on his card (trou béant 17); absent from a job queued before 21/11. */
+        userId: UserIdSchema.optional(),
       }),
     ]),
   }),
@@ -263,6 +265,11 @@ export const JOB_PAYLOADS = {
   'conversation.reopen': z.object({ creatorId: CreatorIdSchema, correlationId: z.string().min(1) }),
   /** Each minute: the conversations still held by a member who is no longer `active` are handed back (EQ-13). */
   'conversation.release_unavailable': z.object({}),
+  /**
+   * The window of a draft placed from the copilot panel closed (ADR 0086 § 5): what left of it decides its verdict,
+   * nothing left and it expires. One per draft (`settlePlacedJobKey`); a draft decided before is left as it is.
+   */
+  'conversation.settle_placed': conversationJob.extend({ draftId: DraftIdSchema }),
   'connector.dispatch': z.object({}),
   'connector.poll': z.object({
     creatorId: CreatorIdSchema,
@@ -525,6 +532,16 @@ export const JOB_PAYLOADS = {
     correlationId: z.string().min(1),
   }),
   /**
+   * A medium of hers was described: three captions are proposed for each live Reel that holds it, on a decision card
+   * (ADR 0164 § 9). Enqueued after each description under `instagram_captions.propose:<id>`; put off by itself when the
+   * day's budget is spent. Replayable: a Reel already asked is left alone.
+   */
+  'instagram_captions.propose': z.object({
+    creatorId: CreatorIdSchema,
+    mediaAssetId: MediaAssetIdSchema,
+    correlationId: z.string().min(1),
+  }),
+  /**
    * A script she sent, told step by step with its synthesis once each of its media is described (ADR 0083 § 6).
    * Enqueued when she sends it and after each of its media is described, under `content_drops.summarize_script:<id>`;
    * waits for the last description, puts itself off when the day's budget is spent. Nothing while her switch is off.
@@ -560,26 +577,13 @@ export const JOB_PAYLOADS = {
   /**
    * The account's native scripts mirrored from the platform (ADR 0099 § 1 time 2): steps in the platform's order, prices
    * as they are, a script gone deactivated. Asked with each vault sync the owner asks, never by a cron for now;
-   * replayable, writes nothing when nothing changed.
+   * replayable, writes nothing when nothing changed but the day's totals of its steps (ADR 0129 § 12).
    */
   'scripts.import_platform_scripts': z.object({
     creatorId: CreatorIdSchema,
     platformAccountId: PlatformAccountIdSchema,
     correlationId: z.string().min(1),
   }),
-  /**
-   * A native script's identity (SC-04 lot c8), written by the brain once each of its media has a validated description,
-   * under her descriptions switch. Asked after each import that adds or changes a script, and by the hourly backlog;
-   * replayable: the same texts and descriptions with the same prompt are left alone, and a validated identity is
-   * never written over.
-   */
-  'scripts.identify_platform_script': z.object({
-    creatorId: CreatorIdSchema,
-    platformScriptId: PlatformScriptIdSchema,
-    correlationId: z.string().min(1),
-  }),
-  /** Each hour: every active native script of a creator whose switch is on, asked again; the job decides. */
-  'scripts.identify_backlog': z.object({}),
   'providers.check_credentials': z.object({}),
   /**
    * Each minute (crontab, ADR 0050 § 3): every connected sales feed reads its register after the stored cursor, the
@@ -638,6 +642,7 @@ export const JOB_MAX_ATTEMPTS = {
   'conversation.reopen': 3,
   // Each minute: the next run is the retry.
   'conversation.release_unavailable': 1,
+  'conversation.settle_placed': 3,
   'connector.dispatch': 1,
   'connector.poll': 3,
   'connector.reconcile': 3,
@@ -721,6 +726,8 @@ export const JOB_MAX_ATTEMPTS = {
   'content_drops.drop_received': 5,
   // Every model failed (an outage, a refusal): a few tries; a spent budget is not a failure, the job puts itself off.
   'content_drops.describe_file': 5,
+  // Every model failed: a few tries; a spent budget is not a failure, the job puts itself off.
+  'instagram_captions.propose': 5,
   // The same: every model failed, or its answer did not tell the script's steps; a spent budget puts it off.
   'content_drops.summarize_script': 5,
   // Each hour: the next run is the retry.
@@ -733,10 +740,6 @@ export const JOB_MAX_ATTEMPTS = {
   'scripts.ask_scripts': 1,
   // A platform that did not answer: a few tries; a failed read changes nothing for the account.
   'scripts.import_platform_scripts': 3,
-  // A brain that failed: a few tries; the budget spent waits for the hourly backlog.
-  'scripts.identify_platform_script': 3,
-  // Each hour: the next run is the retry.
-  'scripts.identify_backlog': 1,
   'providers.check_credentials': 1,
   // Each minute: the next run is the retry, from the cursor the last committed read left.
   'connector.read_sales': 1,
@@ -795,6 +798,11 @@ export function pauseEndJobKey(creatorId: string): string {
   return `conversation.reopen:pause:${creatorId}`;
 }
 
+/** The one settling of a placed draft (ADR 0086 § 5): placed again, it is not scheduled twice. */
+export function settlePlacedJobKey(draftId: string): string {
+  return `conversation.settle_placed:${draftId}`;
+}
+
 export function accountQueueNameFor(platformAccountId: string): `account:${string}` {
   return `account:${platformAccountId}`;
 }
@@ -825,5 +833,11 @@ export function resumeRunAt(index: number, now: Date): Date {
  * 20/11/2026): a closed list. Each name has row policies written for it, which compare it with `app.job`; the door
  * (`withTenantJob`) refuses any other.
  */
-export const TenantJobSchema = z.enum(['daily_stats', 'media_insights', 'link_hours', 'drop_media']);
+export const TenantJobSchema = z.enum([
+  'daily_stats',
+  'media_insights',
+  'link_hours',
+  'drop_media',
+  'creator_decisions',
+]);
 export type TenantJob = z.infer<typeof TenantJobSchema>;

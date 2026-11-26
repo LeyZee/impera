@@ -2,6 +2,7 @@ import {
   type HandoffCause,
   type Dashboard as ApiDashboard,
   type DashboardFan,
+  type CreatorId,
   type DashboardTodo,
 } from '@impera/contracts';
 
@@ -397,7 +398,7 @@ function agentState(api: ApiDashboard, now: Date, reader: DashboardReader): Agen
 /** Past 10 min a fan waits too long: his line says so in amber (DASH-11), as the fold counts him. */
 const LATE_MINUTES = 10;
 
-function todoOf(todo: DashboardTodo, timeZone: string): Todo {
+function todoOf(todo: DashboardTodo, timeZone: string, creatorId?: CreatorId): Todo {
   return {
     id: todo.id,
     tone: toneOf(todo),
@@ -409,6 +410,9 @@ function todoOf(todo: DashboardTodo, timeZone: string): Todo {
     at: `Reçu à ${clockAt(todo.at, timeZone)}`,
     // Every line is handled in Suivi, on its conversation: a draft is decided there, a handoff given back there.
     conversationId: todo.conversationId,
+    ...(todo.kind === 'custom_order' && creatorId !== undefined
+      ? { customOrder: { creatorId, fanId: todo.fanId } }
+      : {}),
   };
 }
 
@@ -566,7 +570,7 @@ export function fromApi(
     },
     agent: agentState(api, now, reader),
     todos: queueEntries(api.todos).map((entry) =>
-      entry.kind === 'one' ? todoOf(entry.todo, timeZone) : groupTodoOf(entry, timeZone),
+      entry.kind === 'one' ? todoOf(entry.todo, timeZone, api.creator.id) : groupTodoOf(entry, timeZone),
     ),
     sales: null,
     revealSales: api.revealSales === null ? null : revealSalesOf(api.revealSales),

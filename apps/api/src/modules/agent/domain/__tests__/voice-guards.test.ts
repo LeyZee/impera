@@ -11,6 +11,7 @@ import {
   type GuardCode,
   type GuardContext,
 } from '../guards';
+import { checkPlaceNames } from '../place-names';
 import { checkWelcome } from '../sexualization';
 
 const codes = (bubbles: string[], context: GuardContext = {}): GuardCode[] =>
@@ -120,9 +121,30 @@ describe('voice guards (P3-13)', () => {
     expect(
       codes(['Dors bien toi ✨'], { previousTurns: [['Hey']], sentBefore: ['Dors bien toi ✨'] }),
     ).toEqual([]);
-    // Twice is a habit, a short bubble is a « ok ».
-    expect(codes(['Coucou toi, ça va ?'], { previousTurns: previousTurns.slice(1) })).toEqual([]);
+    // The same opening as one of her last turns is a formula already used: rewritten once (passe 1, 21/11).
+    expect(severities(['Coucou toi, ça va ?'], { previousTurns: previousTurns.slice(1) })).toEqual([
+      ['repetition', 'soft'],
+    ]);
+    // A short bubble is a « ok ».
     expect(codes(['ok 😘'], { previousTurns: [['ok 😘']] })).toEqual([]);
+  });
+
+  it('warns on a formula she already used with him: four words in a row, or the same opening (passe 1, 21/11)', () => {
+    // Invented lines: the question about his week-end asked again, the same tic as an opener.
+    const lately = [['Ah oui ? et tu comptes faire quoi de ton week-end'], ['T’es sérieux là, un concert ?']];
+    expect(
+      severities(['Bon et du coup tu comptes faire quoi de ton week-end'], { previousTurns: lately }),
+    ).toEqual([['repetition', 'soft']]);
+    expect(severities(['T’es sérieux, encore lui 😅'], { previousTurns: lately })).toEqual([
+      ['repetition', 'soft'],
+    ]);
+    expect(codes(['Un concert de jazz, j’adore ça 😌'], { previousTurns: lately })).toEqual([]);
+    // Only her last turns count: an old one is not the formula of tonight.
+    const old = [
+      ['Ah oui ? et tu comptes faire quoi de ton week-end'],
+      ...Array.from({ length: 6 }, () => ['Hey']),
+    ];
+    expect(codes(['Et tu comptes faire quoi de ton week-end'], { previousTurns: old })).toEqual([]);
   });
 
   it('warns on a third closed question in a row, and not when one of them was open', () => {
@@ -167,6 +189,7 @@ describe('voice guards (P3-13)', () => {
       ...read(['a', 'b', 'c', 'd', 'x'.repeat(300)]),
       ...read(['Envoie-moi des nudes', 'sale radin', 'rien à payer', 'je te fais un petit prix']),
       ...read(['tu me déçois', '*sourit*', 'j’ai besoin d’argent']),
+      ...read(['T’es qu’un gamin toi']),
       ...read(['paye moi sur paypal', 'elle est à 5 €']),
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
       ...read(['Tu fais quoi de beau ce soir ?'], {
@@ -177,6 +200,7 @@ describe('voice guards (P3-13)', () => {
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
       ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),
+      ...checkPlaceNames(['Dimanche à Valbrume'], ['valbrume']).map((v) => v.code),
     ]);
     const known: readonly string[] = GUARD_CODES;
     expect([...emitted].filter((code) => !known.includes(code))).toEqual([]);

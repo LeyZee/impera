@@ -4,6 +4,7 @@ import type {
   CustomPriceGrid,
   DatedRanges,
   AlertTrigger,
+  CopilotTrace,
   FanFlags,
   HandoffCause,
   MediaDescription,
@@ -35,6 +36,7 @@ import {
 } from '../domain/alerts';
 import type { FanAvailabilityRecord } from '../domain/availability';
 import { helpBubble, helpLanguageOf } from '../domain/care';
+import { copilotTrace } from '../domain/copilot-trace';
 import { herDayEndsSoon } from '../domain/day-end';
 import { desireMoved, desireScore, measureDesire, type DesireReading } from '../domain/desire';
 import { followUpDecision } from '../domain/follow-up';
@@ -48,6 +50,7 @@ import {
   type HoldDecision,
 } from '../domain/hold';
 import { withoutOrders } from '../domain/injection';
+import type { MeetingAnswer } from '../domain/meeting';
 import type { PickedObjectionReply } from '../domain/objections';
 import { originNote } from '../domain/origin';
 import type { OfferLimits } from '../domain/policy';
@@ -61,6 +64,7 @@ import { handoffCauseOf } from '../domain/traps';
 import {
   composeTurn,
   type ComposedTurn,
+  type ComposeTurnInput,
   type ComposerPersona,
   type OfferInput,
   type ScriptsInput,
@@ -177,6 +181,8 @@ export interface AgentComposeInput {
   readonly care?: { readonly since: Date; readonly helpGiven: boolean };
   /** When she last answered a sale gone wrong for him (ADR 0156 § 4 and § 7), as the journal keeps it. */
   readonly saleTrouble?: SaleTroubleSeen;
+  /** What she already answered him about meeting her, and how close he is (Charles 21/11); absent, nothing given. */
+  readonly meeting?: ComposeTurnInput['meeting'];
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -269,8 +275,12 @@ type AgentComposeResult = (
   readonly saleTrouble?: SaleTroubleKind;
   /** She teased him in this draft about the run he left (`script_abandon_teased`, Charles 20/11). */
   readonly abandonTeased?: true;
+  /** What she answered in this draft to his asking to see her (Charles 21/11): the reason given, never twice. */
+  readonly meetingAnswer?: MeetingAnswer;
   /** The reply of her objection bank given to the voice (`objection_reply_used`, ADR 0090 § B). */
   readonly objectionReply?: Pick<PickedObjectionReply, 'objection' | 'replyId'>;
+  /** What the code decided with the draft, as the copilot panel reads it (ADR 0141 lot a): kept with the draft. */
+  readonly copilot?: CopilotTrace;
   /**
    * His script runs after this message (ADR 0098): the stored run moved, a run opened, a paid step offered. Without a
    * draft, only what his message and Reveal changed: a step not written was not sent.
@@ -859,11 +869,41 @@ function withSales(result: AgentComposeResult, composed: ComposedTurn): AgentCom
     ...(composed.saleTrouble?.kind === 'answer' &&
       result.kind === 'draft' && { saleTrouble: composed.saleTrouble.trouble }),
     ...(composed.abandonTeased !== undefined && result.kind === 'draft' && { abandonTeased: true }),
+    ...(composed.meetingAnswer !== undefined &&
+      result.kind === 'draft' && { meetingAnswer: composed.meetingAnswer }),
     ...(composed.customOrderTurn !== undefined && { customOrderTurn: composed.customOrderTurn }),
     ...(reply !== undefined &&
       result.kind === 'draft' && { objectionReply: { objection: reply.objection, replyId: reply.replyId } }),
   };
 }
+
+/** What her answer does with his custom order, as the copilot names the gesture (ADR 0141 § 1). */
+function customOrderMove(composed: ComposedTurn): 'decline' | 'wait' | undefined {
+  const turn = composed.customOrderTurn;
+  if (turn?.kind === 'reply' && turn.event?.type === 'custom_order_declined') return 'decline';
+  if (turn?.kind === 'reply' || composed.customOrder?.kind === 'reply') return 'wait';
+  return undefined;
+}
+
+/** The copilot's trace of a draft (ADR 0141 lot a), from what this turn already decided: no model, no new rule. */
+const copilotOf = (
+  composed: ComposedTurn,
+  scripts: { readonly catalogue: readonly PlatformScriptView[]; readonly latest: ScriptRun | null },
+): CopilotTrace => {
+  const customOrder = customOrderMove(composed);
+  return copilotTrace({
+    ...(composed.offerRefused !== undefined && { offerRefused: composed.offerRefused }),
+    ...(customOrder !== undefined && { customOrder }),
+    objectionAnswered: composed.objectionReply !== undefined,
+    ...(composed.scripts !== undefined && { scripts: composed.scripts }),
+    catalogue: scripts.catalogue,
+    latest: scripts.latest,
+    ...(composed.scriptStart !== undefined && { scriptStart: composed.scriptStart }),
+    ...(composed.desireRead !== undefined && { desireRead: composed.desireRead }),
+    care: composed.care === true,
+    rewritten: composed.rewritten === true,
+  });
+};
 
 /** A result with the notices of her alerts that went off, when there are any. */
 const withNotices = (result: AgentComposeResult, notices: readonly AlertNotice[]): AgentComposeResult =>
@@ -1169,6 +1209,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         }),
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
+        ...(input.meeting !== undefined && { meeting: input.meeting }),
         saleTrouble: {
           seen: input.saleTrouble ?? NO_SALE_TROUBLE,
           // He bought from her: Reveal's spending, or a step of hers recorded paid.
@@ -1190,9 +1231,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         composed.scripts,
         settings,
       );
+      const traced =
+        settled.kind === 'draft' ? { ...settled, copilot: copilotOf(composed, scripts) } : settled;
       const availability = composed.availability?.changed === true ? composed.availability.record : undefined;
       const withAvailability =
-        availability === undefined ? settled : { ...settled, fanAvailability: availability };
+        availability === undefined ? traced : { ...traced, fanAvailability: availability };
       if (composed.desire === undefined) return withAvailability;
       const { before, score, signals, weightsVersion } = composed.desire;
       return { ...withAvailability, desire: { before, score, signals, weightsVersion } };

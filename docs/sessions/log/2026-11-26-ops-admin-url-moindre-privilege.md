@@ -1,0 +1,7 @@
+# 2026-11-26 — Exploitation : l'URL propriétaire seulement là où tournent les migrations — done
+Fait : moindre privilège dans `docker-compose.prod.yml` : `DATABASE_ADMIN_URL` sort de l'environnement commun (`x-api-env`) ; seuls `migrate`, `backup` (déjà à part) et un nouveau service `ops` la reçoivent. `ops` est la même image que `api`, rangée sous le profil `ops` : il ne démarre pas avec la pile, chaque script `ops-*` s'y lance par `docker compose --profile ops run --rm ops node dist/scripts/<nom>.js`, et sans commande il affiche son mode d'emploi et s'arrête. Runbooks mis à jour (`deploy.md` § 1.1, 1.2, 1.3, 4.2, 5 ; `rotate-secrets.md`, `incident.md`). Test unitaire : la configuration de l'API se charge en production sans `DATABASE_ADMIN_URL`, vide comprise, et `ownerDatabaseUrl` la réclame. Job CI `images` : vérifie que `api` et `worker` n'ont pas la variable et que `ops` l'a.
+Pas fait : durcissement des conteneurs (`read_only`, `cap_drop`), hors périmètre.
+Décisions : aucune nouvelle ; ADR 0087 inchangée (le propriétaire sert aux migrations, à la sauvegarde et aux scripts `ops:*`).
+Découvertes : le chemin du compose dans Coolify (`/data/coolify/applications/<uuid>`) et le respect du profil `ops` par Coolify sont à vérifier au premier déploiement (`deploy.md` § 5 le demande). `migrate` reçoit encore tout l'environnement de l'API alors que le script ne lit que les URL de base.
+Candidats à suppression : aucun.
+Vérifié : pnpm check ✓, pnpm test ✓, compose vérifié avec `docker compose config` (avec et sans le profil `ops`).

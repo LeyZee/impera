@@ -16,7 +16,7 @@ export type AiUsageProvider = z.infer<typeof AiUsageProviderSchema>;
 /**
  * What the money went to, the way the screen names it: the four roles of the gateway (ADR 0009), the trend watch
  * apart (ADR 0060 § 7) and the owner's « Essai réel » of a service apart (ADR 0091 § 7), whatever role they used, and
- * the replies to her Instagram comments apart (ADR 0122).
+ * the replies to her Instagram comments apart (ADR 0122), as the captions proposed for her Reels (ADR 0164 § 9).
  */
 export const AiUsageUseSchema = z.enum([
   'voice',
@@ -26,6 +26,7 @@ export const AiUsageUseSchema = z.enum([
   'trend_watch',
   'probe',
   'instagram_comment',
+  'instagram_caption',
 ]);
 export type AiUsageUse = z.infer<typeof AiUsageUseSchema>;
 
@@ -205,6 +206,103 @@ export const AiUsageVoiceSchema = z.strictObject({
 });
 export type AiUsageVoice = z.infer<typeof AiUsageVoiceSchema>;
 
+/*
+ * The forecast (ADR 0091 § 8, Charles 21/11 : « des prévisionnels, le plus réalistes possible », for his cash flow):
+ * what the AI will cost this month and next, from the pace of the last full days, by line of spend and by creator,
+ * against the sales of the same days.
+ */
+
+/**
+ * What the money goes to, the way the owner reads his bill: the fans' conversations, the media she drops and the sent
+ * scripts described, her Telegram channel, Instagram (comment replies, captions and the trend watch), the playground with the
+ * quality tests, and the rest (the owner's « Essai réel »).
+ */
+export const AiSpendLineSchema = z.enum([
+  'chatting',
+  'media',
+  'telegram',
+  'instagram',
+  'playground',
+  'other',
+]);
+export type AiSpendLine = z.infer<typeof AiSpendLineSchema>;
+
+/** Low, realistic and high: the calmer and the busier of the last two weeks around the latest one. */
+export const AiForecastRangeSchema = z.strictObject({ low: eur, realistic: eur, high: eur });
+export type AiForecastRange = z.infer<typeof AiForecastRangeSchema>;
+
+const month = z.string().regex(/^\d{4}-\d{2}$/u);
+
+export const AiForecastLineSchema = z.strictObject({
+  line: AiSpendLineSchema,
+  /** The calendar month so far, today included. */
+  monthSoFarEur: eur,
+  perDay: AiForecastRangeSchema,
+  thisMonth: AiForecastRangeSchema,
+  nextMonth: AiForecastRangeSchema,
+});
+export type AiForecastLine = z.infer<typeof AiForecastLineSchema>;
+
+/** One creator's share; the playground, the tests and the « Essai réel » belong to no creator and are left out. */
+export const AiForecastCreatorSchema = z.strictObject({
+  creatorId: z.uuid(),
+  name: z.string().min(1),
+  monthSoFarEur: eur,
+  thisMonth: AiForecastRangeSchema,
+  nextMonth: AiForecastRangeSchema,
+  /** Conversations with at least one AI call a day, on average over the latest week. */
+  conversationsPerDay: z.number().nonnegative(),
+  /** Her sales net of the platform, the same way as `sales`: the month so far, its AI share, and next month's. */
+  salesMonthSoFarEur: eur.nullable(),
+  aiShareSoFar: z.number().nonnegative().nullable(),
+  salesNextMonthEur: eur.nullable(),
+});
+export type AiForecastCreator = z.infer<typeof AiForecastCreatorSchema>;
+
+/** The traffic the « what if » adds: the conversations grow, nothing else does. */
+export const AI_FORECAST_TRAFFIC_GROWTH = 0.5;
+
+export const AiForecastSchema = z.strictObject({
+  /** The full days the pace is read over (1 to 14); under 8, the band is a fixed −20 % / +25 % around it. */
+  basisDays: z.number().int().min(1).max(14),
+  thisMonth: z.strictObject({ month, monthSoFarEur: eur, ...AiForecastRangeSchema.shape }),
+  nextMonth: z.strictObject({ month, ...AiForecastRangeSchema.shape }),
+  /** Every line of spend, most expensive first (next month, realistic); a line that cost nothing is left out. */
+  lines: z.array(AiForecastLineSchema),
+  /** Most expensive first. */
+  creators: z.array(AiForecastCreatorSchema),
+  /** Conversations with at least one AI call a day, on average over the latest week, and what one such day costs. */
+  conversationsPerDay: z.number().nonnegative(),
+  eurPerConversationDay: eur.nullable(),
+  /** Realistic, with `AI_FORECAST_TRAFFIC_GROWTH` more conversations: the chatting grows, the rest stays. */
+  moreTraffic: z.strictObject({ thisMonthEur: eur, nextMonthEur: eur }),
+  /**
+   * The daily cap stops every call past it (`Plafond du jour`): the most a day can cost, and whether the realistic
+   * pace, or the one with more traffic, goes past it. Past it, the chatters take over for the rest of the day.
+   */
+  cap: z.strictObject({
+    capEur: z.number().positive(),
+    reachedAtRealistic: z.boolean(),
+    reachedWithMoreTraffic: z.boolean(),
+    nextMonthMaxEur: eur,
+  }),
+  /**
+   * The sales net of the platform (EUR lines only) over the same days, forecast the same way, and the AI's share of
+   * them; null when no sale was read.
+   */
+  sales: z
+    .strictObject({
+      /** The month so far, today included, and the AI's share of it: the real figure, no forecast. */
+      monthSoFarEur: eur,
+      aiShareSoFar: z.number().nonnegative().nullable(),
+      thisMonthEur: eur,
+      nextMonthEur: eur,
+      aiShare: z.number().nonnegative(),
+    })
+    .nullable(),
+});
+export type AiForecast = z.infer<typeof AiForecastSchema>;
+
 export const AiUsageCapStateSchema = z.enum(['ok', 'alert', 'reached']);
 export type AiUsageCapState = z.infer<typeof AiUsageCapStateSchema>;
 
@@ -259,6 +357,8 @@ export const AiUsageSchema = z.strictObject({
   credits: z.array(AiCreditsSchema),
   /** ElevenLabs' characters of the month (ADR 0091 § 7), as its last check read them; null while it is not connected. */
   voice: AiUsageVoiceSchema.nullable(),
+  /** What the AI will cost this month and next (ADR 0091 § 8); null before a first full day with a call. */
+  forecast: AiForecastSchema.nullable(),
 });
 export type AiUsage = z.infer<typeof AiUsageSchema>;
 

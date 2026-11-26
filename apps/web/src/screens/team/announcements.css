@@ -1,0 +1,179 @@
+/* Annonces (EQ-12): in Aujourd'hui and in Équipe › Annonces. One card, its items as rows under a hairline. Tokens only. */
+
+.an-card > .nv-panel__head + * {
+  margin-top: 0;
+}
+.an-list,
+.an-compose,
+.an-none {
+  margin: 0;
+  padding: 0 var(--nv-plate-pad) var(--nv-plate-pad);
+}
+.an-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+}
+.an-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  padding: var(--nv-space-4) 0;
+  transition: opacity var(--nv-dur-fast) var(--nv-ease-out);
+}
+.an-item:first-child {
+  padding-top: 0;
+}
+.an-item:last-child {
+  padding-bottom: 0;
+}
+.an-item + .an-item {
+  border-top: 1px solid var(--nv-hairline);
+}
+.an-item.is-read {
+  opacity: 0.72;
+}
+.an-item__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.an-item__meta b {
+  font-weight: 600;
+  color: var(--nv-ink);
+}
+.an-item__body {
+  margin: 0;
+  font-size: var(--nv-text-callout);
+  line-height: var(--nv-text-callout-leading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.an-item__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+/* The way to the readers and « Retirer » are plain buttons: their padding pulled back, their text on the body's line. */
+.an-reads svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--nv-dur-fast) var(--nv-ease-out);
+}
+.an-reads[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+.an-compose .nv-eyebrow {
+  margin: 0;
+}
+.an-item .an-reads {
+  margin-inline-start: calc(-1 * var(--nv-space-4));
+}
+.an-item .an-withdraw {
+  margin-inline: auto calc(-1 * var(--nv-space-4));
+}
+.an-read {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+  color: var(--nv-success);
+}
+.an-read svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.an-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin-inline-start: auto;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.an-readers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: var(--nv-space-2) 0 0;
+  border-top: 1px solid var(--nv-hairline);
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+}
+.an-readers li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+  padding: 4px 0;
+}
+.an-readers li > :last-child {
+  color: var(--nv-ink-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.an-readers li.is-waiting > :last-child {
+  color: var(--nv-ink-faint);
+}
+.an-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.an-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.an-input {
+  width: 100%;
+  min-height: 88px;
+}
+.an-compose__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.an-hint,
+.an-none {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-faint);
+}
+.an-hint {
+  margin: 0;
+}
+.an-warn {
+  margin: 0;
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  font-weight: 600;
+  color: var(--nv-warning);
+}
+
+/* Équipe › Annonces: the composer and « Envoyées » in the page's one body row, each at its own height. */
+.an-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  align-self: start;
+}

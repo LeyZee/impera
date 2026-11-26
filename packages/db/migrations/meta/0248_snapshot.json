@@ -1,6 +1,6 @@
 {
-  "id": "326493a0-6172-439f-89d8-b1e5bb1dceed",
-  "prevId": "2d64ee73-fb3f-474c-9d99-0a754a4264a9",
+  "id": "0b8a7140-0755-49b7-9ea0-605843ada82f",
+  "prevId": "408cf176-5de3-4a5d-989e-42c656dd0938",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3775,461 +3775,6 @@
         "script_runs_ended_check": {
           "name": "script_runs_ended_check",
           "value": "(\"script_runs\".\"status\" = 'open') = (\"script_runs\".\"ended_at\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.creator_absences": {
-      "name": "creator_absences",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "starts_on": {
-          "name": "starts_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ends_on": {
-          "name": "ends_on",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "cancelled_at": {
-          "name": "cancelled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancelled_by": {
-          "name": "cancelled_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "creator_absences_creator_ends_idx": {
-          "name": "creator_absences_creator_ends_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "ends_on",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "creator_absences_creator_id_creators_id_fk": {
-          "name": "creator_absences_creator_id_creators_id_fk",
-          "tableFrom": "creator_absences",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_absences_created_by_user_id_fk": {
-          "name": "creator_absences_created_by_user_id_fk",
-          "tableFrom": "creator_absences",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_absences_cancelled_by_user_id_fk": {
-          "name": "creator_absences_cancelled_by_user_id_fk",
-          "tableFrom": "creator_absences",
-          "tableTo": "user",
-          "columnsFrom": ["cancelled_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "tenant_read": {
-          "name": "tenant_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_insert": {
-          "name": "creator_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_absences\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_absences\".\"cancelled_at\" is null"
-        },
-        "creator_update": {
-          "name": "creator_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_absences\".\"cancelled_by\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "creator_absences_days_check": {
-          "name": "creator_absences_days_check",
-          "value": "\"creator_absences\".\"starts_on\" <= \"creator_absences\".\"ends_on\""
-        },
-        "creator_absences_span_check": {
-          "name": "creator_absences_span_check",
-          "value": "\"creator_absences\".\"ends_on\" - \"creator_absences\".\"starts_on\" < 60"
-        },
-        "creator_absences_note_check": {
-          "name": "creator_absences_note_check",
-          "value": "char_length(\"creator_absences\".\"note\") <= 200"
-        },
-        "creator_absences_cancel_check": {
-          "name": "creator_absences_cancel_check",
-          "value": "(\"creator_absences\".\"cancelled_at\" is null) = (\"creator_absences\".\"cancelled_by\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.creator_stops": {
-      "name": "creator_stops",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "what": {
-          "name": "what",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "withdrawn_at": {
-          "name": "withdrawn_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "withdrawn_by": {
-          "name": "withdrawn_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "creator_stops_creator_idx": {
-          "name": "creator_stops_creator_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "creator_stops_creator_id_creators_id_fk": {
-          "name": "creator_stops_creator_id_creators_id_fk",
-          "tableFrom": "creator_stops",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_stops_created_by_user_id_fk": {
-          "name": "creator_stops_created_by_user_id_fk",
-          "tableFrom": "creator_stops",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_stops_withdrawn_by_user_id_fk": {
-          "name": "creator_stops_withdrawn_by_user_id_fk",
-          "tableFrom": "creator_stops",
-          "tableTo": "user",
-          "columnsFrom": ["withdrawn_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "tenant_read": {
-          "name": "tenant_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_insert": {
-          "name": "creator_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_stops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_stops\".\"withdrawn_at\" is null"
-        },
-        "creator_update": {
-          "name": "creator_update",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_stops\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "creator_stops_what_check": {
-          "name": "creator_stops_what_check",
-          "value": "char_length(\"creator_stops\".\"what\") between 1 and 200"
-        },
-        "creator_stops_withdraw_check": {
-          "name": "creator_stops_withdraw_check",
-          "value": "(\"creator_stops\".\"withdrawn_at\" is null) = (\"creator_stops\".\"withdrawn_by\" is null)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.creator_messages": {
-      "name": "creator_messages",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "answer": {
-          "name": "answer",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "answered_by": {
-          "name": "answered_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "answered_at": {
-          "name": "answered_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "creator_messages_creator_created_idx": {
-          "name": "creator_messages_creator_created_idx",
-          "columns": [
-            {
-              "expression": "creator_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "creator_messages_creator_id_creators_id_fk": {
-          "name": "creator_messages_creator_id_creators_id_fk",
-          "tableFrom": "creator_messages",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_messages_created_by_user_id_fk": {
-          "name": "creator_messages_created_by_user_id_fk",
-          "tableFrom": "creator_messages",
-          "tableTo": "user",
-          "columnsFrom": ["created_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "creator_messages_answered_by_user_id_fk": {
-          "name": "creator_messages_answered_by_user_id_fk",
-          "tableFrom": "creator_messages",
-          "tableTo": "user",
-          "columnsFrom": ["answered_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {
-        "creator_read": {
-          "name": "creator_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
-        },
-        "creator_insert": {
-          "name": "creator_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_messages\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_messages\".\"answer\" is null"
-        },
-        "team_read": {
-          "name": "team_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"creator_messages\".\"creator_id\" = any(u.creator_ids))))"
-        },
-        "owner_answer": {
-          "name": "owner_answer",
-          "as": "PERMISSIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_messages\".\"answer\" is null",
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"creator_messages\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_messages\".\"answered_by\" = nullif(current_setting('app.user_id', true), '')"
-        }
-      },
-      "checkConstraints": {
-        "creator_messages_kind_check": {
-          "name": "creator_messages_kind_check",
-          "value": "\"creator_messages\".\"kind\" in ('question', 'idea', 'worry')"
-        },
-        "creator_messages_body_check": {
-          "name": "creator_messages_body_check",
-          "value": "char_length(\"creator_messages\".\"body\") between 1 and 1000"
-        },
-        "creator_messages_answer_check": {
-          "name": "creator_messages_answer_check",
-          "value": "char_length(\"creator_messages\".\"answer\") between 1 and 1000"
-        },
-        "creator_messages_answered_check": {
-          "name": "creator_messages_answered_check",
-          "value": "(\"creator_messages\".\"answer\" is null) = (\"creator_messages\".\"answered_by\" is null) and (\"creator_messages\".\"answer\" is null) = (\"creator_messages\".\"answered_at\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -19214,6 +18759,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "checked_in_at": {
+          "name": "checked_in_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_by": {
           "name": "created_by",
           "type": "text",
@@ -22412,6 +21963,239 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.announcement_reads": {
+      "name": "announcement_reads",
+      "schema": "",
+      "columns": {
+        "announcement_id": {
+          "name": "announcement_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "announcement_reads_member_idx": {
+          "name": "announcement_reads_member_idx",
+          "columns": [
+            {
+              "expression": "member_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "announcement_reads_announcement_id_announcements_id_fk": {
+          "name": "announcement_reads_announcement_id_announcements_id_fk",
+          "tableFrom": "announcement_reads",
+          "tableTo": "announcements",
+          "columnsFrom": ["announcement_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "announcement_reads_member_id_team_members_id_fk": {
+          "name": "announcement_reads_member_id_team_members_id_fk",
+          "tableFrom": "announcement_reads",
+          "tableTo": "team_members",
+          "columnsFrom": ["member_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "announcement_reads_announcement_id_member_id_pk": {
+          "name": "announcement_reads_announcement_id_member_id_pk",
+          "columns": ["announcement_id", "member_id"]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {
+        "member_read": {
+          "name": "member_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from announcements a where a.id = \"announcement_reads\".\"announcement_id\")) or exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), ''))"
+        },
+        "member_insert": {
+          "name": "member_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"announcement_reads\".\"read_at\" = now() and exists (select 1 from team_members m where m.id = \"announcement_reads\".\"member_id\" and m.user_id = nullif(current_setting('app.user_id', true), '') and m.status <> 'left') and exists (select 1 from announcements a where a.id = \"announcement_reads\".\"announcement_id\" and a.withdrawn_at is null)"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.announcements": {
+      "name": "announcements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "author_user_id": {
+          "name": "author_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "withdrawn_by": {
+          "name": "withdrawn_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "announcements_created_idx": {
+          "name": "announcements_created_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "announcements_creator_id_creators_id_fk": {
+          "name": "announcements_creator_id_creators_id_fk",
+          "tableFrom": "announcements",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "announcements_author_user_id_user_id_fk": {
+          "name": "announcements_author_user_id_user_id_fk",
+          "tableFrom": "announcements",
+          "tableTo": "user",
+          "columnsFrom": ["author_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "announcements_withdrawn_by_user_id_fk": {
+          "name": "announcements_withdrawn_by_user_id_fk",
+          "tableFrom": "announcements",
+          "tableTo": "user",
+          "columnsFrom": ["withdrawn_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "team_read": {
+          "name": "team_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids)) or \"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), ''))) or (nullif(current_setting('app.team_scope', true), '') = 'self' and \"announcements\".\"withdrawn_at\" is null and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids))))"
+        },
+        "team_insert": {
+          "name": "team_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"withdrawn_at\" is null and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and (\"announcements\".\"creator_id\" is null or exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"announcements\".\"creator_id\" = any(u.creator_ids)))))"
+        },
+        "team_withdraw": {
+          "name": "team_withdraw",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"announcements\".\"withdrawn_at\" is null",
+          "withCheck": "\"announcements\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '') and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and \"announcements\".\"author_user_id\" = nullif(current_setting('app.user_id', true), '')))"
+        },
+        "creator_closed": {
+          "name": "creator_closed",
+          "as": "RESTRICTIVE",
+          "for": "ALL",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        }
+      },
+      "checkConstraints": {
+        "announcements_body_check": {
+          "name": "announcements_body_check",
+          "value": "char_length(\"announcements\".\"body\") between 1 and 1000"
+        },
+        "announcements_withdrawn_check": {
+          "name": "announcements_withdrawn_check",
+          "value": "(\"announcements\".\"withdrawn_at\" is null) = (\"announcements\".\"withdrawn_by\" is null)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.commission_presets": {

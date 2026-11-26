@@ -18,6 +18,10 @@ ADR 0112 (§§ 13, 14, 20-26), ADR 0145 (coffre), ADR 0149 (fiche créatrice), m
 - [x] ADR 0161 (seulement nos scripts, Impera vers Reveal) : la carte « Ses scripts dans Reveal » quitte l'onglet ; un script reconnu s'affiche « Dans Reveal ».
 - [ ] Côté agent (fil Agent) : n'offrir qu'une copie reconnue, avec la description de notre script ; retirer alors les routes d'identité des scripts natifs ; reconnaissance sans doublon ni séquence antérieure (ADR 0161 § 6) ; ordre des descriptions (§ 7).
 - [ ] Lot 4 : vue Performances (lecture serveur puis écran).
+  - [x] 4 a : garder les totaux de Reveal par étape à chaque import (`platform_script_step_daily`, ADR 0129 § 12).
+  - [ ] 4 b : relevé quotidien automatique (accès de plus du rôle de service, avis de Sécurité).
+  - [x] 4 c : bilan d'un script sur 7, 30 ou 90 jours (fans exposés, achat par étape, argent rapporté, ligne de contrôle de Reveal) et sa route `GET …/platform-scripts/performance`.
+  - [ ] 4 d : vue sous chaque script dans « Ses scripts », captures et avis de Design.
 
 ## Critères d'acceptation
 - Domaine en unitaire ; intégration : création rejouée, conflit, compte refusé, révision périmée, manques → 422, script fermé, isolation (chatteur, compte de la créatrice, manager hors liste) ; balayages d'isolation, d'authentification et d'origine verts.

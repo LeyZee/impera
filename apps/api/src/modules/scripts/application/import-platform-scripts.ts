@@ -1,6 +1,6 @@
-import type { CreatorId, PlatformAccountId } from '@impera/contracts';
+import { calendarDayAt, type CreatorId, type Platform, type PlatformAccountId } from '@impera/contracts';
 
-import { planPlatformScripts } from '../domain/platform-scripts';
+import { planPlatformScripts, stepTotalsOf } from '../domain/platform-scripts';
 import type {
   PlatformScriptImportStore,
   PlatformScriptSource,
@@ -32,6 +32,8 @@ interface ImportDeps {
   readonly recognition: PreparedRecognitionStore;
   /** Hears a recognition that failed, with its cause, for the log: the import stays written, the next one retries. */
   readonly onRecognitionFailed?: (error: unknown) => void;
+  /** The zone of a platform's days (`connectors`); `null` for one without, whose totals are then not kept. */
+  readonly dayZone: (platform: Platform) => string | null;
 }
 
 /**
@@ -40,7 +42,8 @@ interface ImportDeps {
  * was gone, is rewritten whole and active; one gone is deactivated, never deleted. A failed read throws and changes
  * nothing for the account (the job's retry): nothing is deactivated because the platform did not answer. No identity
  * is asked any more (ADR 0161 § 5): the agent reads ours on a recognised copy. A script « prêt à copier »
- * that a native script now matches in everything is then tied to it (ADR 0112 § 23).
+ * that a native script now matches in everything is then tied to it (ADR 0112 § 23). The totals the platform gives of
+ * each step are kept for the day (ADR 0129 § 12).
  */
 export async function importPlatformScripts(
   deps: ImportDeps,
@@ -56,7 +59,10 @@ export async function importPlatformScripts(
   const listed = await deps.source(account);
   if (listed === null) return { outcome: 'skipped' };
   const plan = planPlatformScripts(await deps.store.known(account.id), listed);
-  await deps.store.apply(account, plan, now);
+  // The platform's totals of each step on its day (ADR 0129 § 12): read anyway, kept instead of lost.
+  const zone = deps.dayZone(account.platform);
+  const totals = zone === null ? null : { day: calendarDayAt(now, zone), steps: stepTotalsOf(listed) };
+  await deps.store.apply(account, plan, now, totals);
   // After the import is written, so that a script copied by hand since the last one is read first. A recognition that
   // fails (a tie written at the same moment by hand) never fails the import: the next one finds the script again.
   let recognised = 0;
