@@ -446,7 +446,11 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
       within(sheets)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Médias', 'Scripts', 'Agenda']);
+    ).toEqual(['Persona', 'Médias', 'Scripts', 'Agenda']);
+    // Her persona to read (trou béant 18): named in the address, since no tab sends a manager to Médias.
+    expect(within(sheets).getByRole('link', { name: 'Persona' }).getAttribute('href')).toContain(
+      'onglet=persona',
+    );
     expect(
       within(screen.getByRole('radiogroup', { name: 'Vue de ses médias' }))
         .getAllByRole('radio')
@@ -485,6 +489,17 @@ describe('Créatrices › Agenda, the owner’s and an active manager’s (CR-05
     });
     expect(router.state.location.search).toEqual({ creatrice: ANNA.id });
     expect(await screen.findByRole('heading', { level: 1, name: 'Trafic' })).toBeDefined();
+  });
+
+  it('lets an active manager read her persona, never change it (trou béant 18)', async () => {
+    await serve([ANNA]);
+    const router = renderAt(manager, `/creatrices?onglet=persona&creatrice=${ANNA.id}`);
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ onglet: 'persona', creatrice: ANNA.id });
+    });
+    expect(
+      await screen.findByText('Lecture seule : seuls le propriétaire et la créatrice modifient sa persona.'),
+    ).toBeDefined();
   });
 
   it('takes an operator who is not an active manager back to the persona', async () => {
@@ -621,7 +636,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Aide', 'Préférences']);
     cleanup();
 
     await serve([ANNA]);

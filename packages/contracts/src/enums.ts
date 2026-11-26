@@ -92,6 +92,7 @@ export type LlmRole = z.infer<typeof LlmRoleSchema>;
  * to a comment under one of her Instagram posts (ADR 0122), counted apart and stopped by the daily cap like any call.
  * `media` is the description of what she drops and of a sent script (ADR 0083), `telegram` a post of her channel
  * (ADR 0080): both are counted apart for the forecast (ADR 0091 § 8) and stopped by the daily cap like any call.
+ * `instagram_caption` is the captions proposed for a Reel she dropped (ADR 0164 § 9), under the same rules.
  */
 export const LlmPurposeSchema = z.enum([
   'chatting',
@@ -100,6 +101,7 @@ export const LlmPurposeSchema = z.enum([
   'instagram_comment',
   'media',
   'telegram',
+  'instagram_caption',
 ]);
 export type LlmPurpose = z.infer<typeof LlmPurposeSchema>;
 
