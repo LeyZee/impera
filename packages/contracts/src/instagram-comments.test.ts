@@ -29,6 +29,7 @@ describe('the block the model reads', () => {
     postAgeHours: 3,
     repliesToHer: false,
     authorCommentedBefore: true,
+    mayAsk: true,
   };
 
   it('accepts what the code prepares', () => {
