@@ -263,7 +263,7 @@ describe('corrections', () => {
 
 describe('her close-only words and her emoji streak (Charles 26/11)', () => {
   it('reads the demo example, invented words only', () => {
-    const persona = PersonaV2Schema.parse(personaFile('demo/v0.6.0.yaml'));
+    const persona = PersonaV2Schema.parse(personaFile('demo/v0.7.0.yaml'));
     expect(persona.agent.rules.close_only_words).toEqual([
       { words: ['Mon cœur'], min_tier: 4 },
       { words: ['Mon trésor', 'Ma moitié'], min_tier: 5 },

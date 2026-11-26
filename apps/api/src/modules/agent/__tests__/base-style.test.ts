@@ -18,7 +18,7 @@ const STYLE: AgencyStyleContent = {
 const persona = StoredPersonaSchema.parse(
   parse(
     readFileSync(
-      fileURLToPath(new URL('../../../../../../personas/demo/v0.6.0.yaml', import.meta.url)),
+      fileURLToPath(new URL('../../../../../../personas/demo/v0.7.0.yaml', import.meta.url)),
       'utf8',
     ),
   ),

@@ -17,7 +17,7 @@ const demo = (version: string) =>
 
 describe('her close-only words and emoji streak, to the guards (Charles 26/11)', () => {
   it('carries them from her persona to the guards', () => {
-    const settings = guardSettingsOf(demo('v0.6.0'));
+    const settings = guardSettingsOf(demo('v0.7.0'));
     expect(settings.closeOnlyWords).toEqual([
       { words: ['Mon cœur'], minTier: 4 },
       { words: ['Mon trésor', 'Ma moitié'], minTier: 5 },
@@ -32,7 +32,7 @@ describe('her close-only words and emoji streak, to the guards (Charles 26/11)',
   });
 
   it('takes her form from her persona first, then her agency’s base style, then the code (ADR 0171)', () => {
-    const settings = guardSettingsOf(demo('v0.6.0'), {
+    const settings = guardSettingsOf(demo('v0.7.0'), {
       capitalization: 'capital',
       mark_spacing: 'space',
       emoji_streak_max: 5,
@@ -51,6 +51,6 @@ describe('her close-only words and emoji streak, to the guards (Charles 26/11)',
   });
 
   it('never tells the model her close-only words: code applies them', () => {
-    expect(demo('v0.6.0').personaSheet).not.toContain('close_only_words');
+    expect(demo('v0.7.0').personaSheet).not.toContain('close_only_words');
   });
 });

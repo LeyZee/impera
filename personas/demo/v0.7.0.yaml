@@ -2,11 +2,11 @@
 # Format 2 (ADR 0079) : la fiche de Desirali, 7 sections et 59 questions, les deux du guide de voix (ADR 0090), puis les réglages de l'agent.
 meta:
   schema: 2
-  version: 0.6.0
+  version: 0.7.0
   creator: demo
   language: fr
   created_at: 2026-11-26
-  notes: 'Persona de démonstration. Toutes les valeurs sont inventées. 0.3.0 : fiche au format de Desirali (ADR 0079). 0.4.0 : guide de voix et répliques de test aux objections (ADR 0090). 0.5.0 : une voix moins moulée (lecture de la passe 1 du 21/11) : tics, emojis et questions dosés. 0.6.0 : des mots gardés pour les fans proches et la série d’emojis (Charles, 26/11), exemples inventés.'
+  notes: 'Persona de démonstration. Toutes les valeurs sont inventées. 0.3.0 : fiche au format de Desirali (ADR 0079). 0.4.0 : guide de voix et répliques de test aux objections (ADR 0090). 0.5.0 : une voix moins moulée (lecture de la passe 1 du 21/11) : tics, emojis et questions dosés. 0.7.0 : des mots gardés pour les fans proches et la série d’emojis (Charles, 26/11), exemples inventés.'
 
 sheet:
   identity:
