@@ -44,6 +44,8 @@ export const GUARD_CODES = [
   'unwarranted_brake',
   // ADR 0080 § 5.9 (21/11): a public text names a place where she lives (her persona's town or « lieu de vie »).
   'place_named',
+  // ADR 0168 § 4: she writes in a language outside the guards' coverage (`GUARDED_LANGUAGES`).
+  'language_not_covered',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

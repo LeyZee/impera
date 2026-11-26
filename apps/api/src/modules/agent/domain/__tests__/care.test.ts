@@ -43,14 +43,24 @@ describe('checkCare (ADR 0088 § 3)', () => {
 
 describe('the help bubble (ADR 0088 § 4)', () => {
   it('gives the 3114 to a fan who writes in French, and no number to another', () => {
-    expect(helpLanguageOf('je veux plus vivre, j’en peux plus')).toBe('fr');
-    expect(helpLanguageOf('I want to die, I can’t take it anymore')).toBe('other');
-    expect(helpLanguageOf('')).toBe('fr');
-    expect(helpBubble('fr')).toContain('3114');
-    expect(helpBubble('other')).not.toMatch(/\d/u);
+    expect(helpLanguageOf('je veux plus vivre, j’en peux plus')).toBe('french');
+    expect(helpLanguageOf('I want to die, I can’t take it anymore')).toBe('english');
+    expect(helpLanguageOf('')).toBe('french');
+    expect(helpBubble('french')).toContain('3114');
+    expect(helpBubble('english')).not.toMatch(/\d/u);
+  });
+
+  it('has one bubble per covered language, chosen by his words, else his kept language (ADR 0168 § 5)', () => {
+    expect(helpLanguageOf('non ce la faccio più, voglio morire, sono stanco di tutto')).toBe('italian');
+    expect(helpLanguageOf('ya no puedo más, quiero morir, estoy cansado de todo')).toBe('spanish');
+    expect(helpLanguageOf('basta', 'italian')).toBe('italian');
+    expect(helpLanguageOf('مرحبا كيف حالك اليوم')).toBe('english');
+    expect(helpBubble('italian')).not.toBe(helpBubble('spanish'));
   });
 
   it('passes its own guard: the code writes nothing the care mode would refuse', () => {
-    expect(checkCare([helpBubble('fr'), helpBubble('other')])).toEqual([]);
+    expect(
+      checkCare([helpBubble('french'), helpBubble('english'), helpBubble('italian'), helpBubble('spanish')]),
+    ).toEqual([]);
   });
 });

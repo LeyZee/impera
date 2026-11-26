@@ -170,6 +170,7 @@ describe('voice guards (P3-13)', () => {
       ...read(['tu me déçois', '*sourit*', 'j’ai besoin d’argent']),
       ...read(['paye moi sur paypal', 'elle est à 5 €']),
       ...read(['Je t’envoie une photo'], { hasMedia: false }),
+      ...read(['hallo schatz, was machst du heute abend?']),
       ...read(['Tu fais quoi de beau ce soir ?'], {
         previousTurns: [['Tu aimes le sport ?'], ['Tu fais quoi de beau ce soir ?']],
       }),

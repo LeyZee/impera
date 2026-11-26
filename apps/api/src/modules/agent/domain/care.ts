@@ -1,7 +1,8 @@
-import { normalise } from '@impera/contracts';
+import { isGuardedLanguage, normalise, type GuardedLanguage, type Language } from '@impera/contracts';
 
 import { SUGGESTIVE_EMOJIS } from './desire';
 import type { GuardViolation } from './guards';
+import { detectLanguage } from './language';
 
 /**
  * The care mode (ADR 0088): a fan in distress, who speaks of hurting himself or tells of a real abuse, is answered by
@@ -36,6 +37,11 @@ const CARE_FORBIDDEN: readonly RegExp[] = [
   // A sexual word.
   // Seduction without a sexual word (recette AGR-08): « je suis toute à toi ce soir », a giggle, a moan.
   /\b(?:toute? a toi|rien qu'a toi|tu me rends (?:folle|fou)|hihi+|hehe+|mm+h+)\b/u,
+  // ADR 0168 § 4: English, Italian, Spanish.
+  /\b(?:price|pay|paid|buy|unlock|tips?|prezzo|pagare|pagami|comprare|sblocca|mancia|precio|pagar|pagame|comprar|desbloquea|propina)\b/u,
+  /\b(?:pics?|pictures?|video|content|foto|contenuto|contenido|esclusiv[oa]|exclusiv[oa])\b/u,
+  /\b(?:meet|meet up|see each other|come over|vederci|incontrarci|ci vediamo|vernos|nos vemos)\b/u,
+  /\b(?:sexy|horny|naked|nudes?|cock|dick|pussy|all yours|eccitat\w*|nuda|nudo|cazzo|figa|tutta tua|caliente|cachond\w*|desnud\w*|polla|toda tuya)\b/u,
   /\b(?:sexe|sexy|sexuel\w*|bite|queue|chatte|seins?|nichons?|cul|fesses|sucer|suce|baiser|baise|jouir|orgasme|excite\w*|bander|bande dur|branle\w*|mouille\w*|coquin\w*|lingerie|nue?s?|a poil|chaud(?:e|es)? pour|envie de toi)\b/u,
 ];
 
@@ -60,29 +66,38 @@ export function checkCare(bubbles: readonly string[]): GuardViolation[] {
   return violations;
 }
 
-/** The language of the help bubble: only French has its number; any other gets the fixed sentence. */
-export type HelpLanguage = 'fr' | 'other';
+/** The language of the help bubble (ADR 0168 § 5): one of the languages the guards cover, one bubble each. */
+export type HelpLanguage = GuardedLanguage;
 
-// A few words only English writes; a fan who writes none of them is read as French, Reveal's public.
-const ENGLISH_WORDS =
-  /\b(?:i|i'm|im|my|me|you|your|the|and|want|feel|don't|dont|can't|cant|life|anymore|myself|die|kill|alone)\b/gu;
-
-/** The language his own words are in, for the help bubble: English when they read mostly so, French otherwise. */
-export function helpLanguageOf(fanText: string): HelpLanguage {
-  const text = normalise(fanText);
-  const words = text.split(/\s+/u).filter((w) => w !== '');
-  if (words.length === 0) return 'fr';
-  const english = text.match(ENGLISH_WORDS)?.length ?? 0;
-  return english * 3 >= words.length ? 'other' : 'fr';
+/**
+ * The language of the help bubble: the one his words are in when code reads it and the guards cover it; else his kept
+ * language when covered; else French when his words say nothing (Reveal's public), English when they are in another
+ * language.
+ */
+export function helpLanguageOf(fanText: string, kept: Language | null = null): HelpLanguage {
+  const read = detectLanguage(fanText);
+  if (read !== null && read !== 'unknown' && isGuardedLanguage(read)) return read;
+  if (kept !== null && isGuardedLanguage(kept)) return kept;
+  return read === null ? 'french' : 'english';
 }
+
+/** The help bubble of each language, written here, never by a model. Only French names a number it knows to be right. */
+const HELP_BUBBLES: Readonly<Record<HelpLanguage, string>> = {
+  french:
+    'Et si les idées noires reviennent, tu peux appeler le 3114, jour et nuit, c’est gratuit et quelqu’un t’écoutera vraiment.',
+  english:
+    'And if the dark thoughts come back, please talk to someone close to you, or call your country’s emergency number.',
+  italian:
+    'E se i pensieri brutti tornano, parlane con qualcuno di vicino a te, o chiama il numero di emergenza del tuo paese.',
+  spanish:
+    'Y si los pensamientos oscuros vuelven, habla con alguien cercano, o llama al número de emergencias de tu país.',
+};
 
 /**
  * The fixed bubble that closes the first care answer to dark thoughts, once per episode (ADR 0088 § 4): written here,
- * never by a model. In French it gives the 3114, France's national suicide prevention line; otherwise it points him to
- * someone close or his country's emergency number.
+ * never by a model. In French it gives the 3114, France's national suicide prevention line; in the other languages it
+ * points him to someone close or his country's emergency number.
  */
 export function helpBubble(language: HelpLanguage): string {
-  return language === 'fr'
-    ? 'Et si les idées noires reviennent, tu peux appeler le 3114, jour et nuit, c’est gratuit et quelqu’un t’écoutera vraiment.'
-    : 'And if the dark thoughts come back, please talk to someone close to you, or call your country’s emergency number.';
+  return HELP_BUBBLES[language];
 }

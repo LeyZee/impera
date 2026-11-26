@@ -32,6 +32,13 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Viens en privé')).toContain('public_explicit');
   });
 
+  it('refuses an explicit or seductive word in English, Italian and Spanish too (ADR 0168 § 4)', () => {
+    for (const text of ['Come in my bed', 'Ti aspetto nel mio letto', 'Te espero en mi cama', 'Sono nuda'])
+      expect(codes(text), text).toContain('public_explicit');
+    for (const text of ['Thank you so much', 'Grazie mille', 'Muchas gracias'])
+      expect(codes(text), text).toEqual([]);
+  });
+
   it('refuses a reply identical or nearly so to a recent one', () => {
     const context = { ...calm, recentReplies: ['Merci beaucoup, trop gentil de ta part'] };
     expect(codes('merci beaucoup trop gentil de ta part !', context)).toContain('repeated_reply');

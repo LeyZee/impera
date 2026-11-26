@@ -564,6 +564,12 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionDefinition>> = {
   'automatic.on': agent('a allumé l’Automatique'),
   'conversation.takeover': agent('a pris la main sur une conversation'),
   'conversation.release': agent('a rendu une conversation à l’agent'),
+  // ADR 0168 § 3: the language she writes to him in, set by a person (the language only, never a word of his).
+  'fan.language_set': action(
+    'agent',
+    z.object({ language: code }),
+    (d) => `a fixé la langue d’un fan (${d.language})`,
+  ),
   'draft.placed': action(
     'agent',
     z.object({ edited: z.boolean().optional() }),
