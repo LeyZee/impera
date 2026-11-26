@@ -58,7 +58,7 @@ import { DEFAULT_DRAWS, mergeDraws, type Draw } from './evals/draws';
 import { EVALS_CAP_EUR, evalsConfig } from './evals/judge-model';
 import { readScenario, ThresholdsSchema, type Scenario } from './evals/scenario';
 import { scriptsInputOf } from './evals/scripts-input';
-import { judgeSituationOf, scenarioFlags, scenarioMoment } from './evals/situation';
+import { judgeSituationOf, scenarioFlags, scenarioMoment, scenarioNow } from './evals/situation';
 
 const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 const EVALS = resolve(ROOT, 'evals');
@@ -181,7 +181,7 @@ async function crmPersona(): Promise<PersonaForModels> {
 
 const persona = values['persona-from-crm']
   ? await crmPersona()
-  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.5.0.yaml'), 'utf8'), 'Elena', today);
+  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.6.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
 const gateway = createLlmGateway({
   config,
@@ -276,8 +276,8 @@ function scriptOutcome(
 /** Where the scenario starts: her clock, the history written, his score, availability and scripts as stored. */
 function initialState(scenario: Scenario): DialogueState {
   const { situation } = scenario;
-  // Paris in October is UTC+2: her local time as the scenario says.
-  const now = new Date(`${today}T${situation.local_time}:00+02:00`);
+  // Her local time as the scenario says, on her clock in Paris (summer or winter time).
+  const now = scenarioNow(today, situation.local_time);
   return {
     now,
     history: scenario.history.map(({ from, text, minutes_ago }): ConversationTurn => ({

@@ -186,6 +186,8 @@ export interface AgentComposeInput {
   readonly saleTrouble?: SaleTroubleSeen;
   /** What she already answered him about meeting her, and how close he is (Charles 21/11); absent, nothing given. */
   readonly meeting?: ComposeTurnInput['meeting'];
+  /** Her last outgoing messages to all her fans, newest first: her worn phrases (passe 2 du 26/11). Absent: none read. */
+  readonly herRecent?: readonly string[];
 }
 
 /** A run that changed at this message, with its journal (ADR 0098 § 2). */
@@ -488,6 +490,9 @@ function withScripts(
   };
   return Object.keys(scriptRun).length === 0 ? base : { ...base, scriptRun };
 }
+
+/** Why a draft is held when the voice wrote only hollow bubbles. */
+const EMPTY = 'no_voice';
 
 const failureDetail = (error: LlmFailure): readonly string[] =>
   error.attempts.map((a) => `${a.model}: ${a.outcome}`);
@@ -817,6 +822,9 @@ async function quietTurn(
   if (blocking.length > 0) {
     return { kind: 'held', reason: 'guard_blocked', detail: blocking.map((v) => v.code), costUsd };
   }
+  // Her bubbles were all hollow (« . »), twice: nothing to send, a human answers (passe 2, conversation 37).
+  if (composed.bubbles.length === 0)
+    return { kind: 'held', reason: 'llm_unavailable', detail: [EMPTY], costUsd };
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
@@ -1089,6 +1097,9 @@ async function settle(
   if (blocking.length > 0) {
     return { kind: 'held', reason: 'guard_blocked', detail: blocking.map((v) => v.code), costUsd };
   }
+  // Her bubbles were all hollow (« . »), twice: nothing to send, a human answers (passe 2, conversation 37).
+  if (composed.bubbles.length === 0)
+    return { kind: 'held', reason: 'llm_unavailable', detail: [EMPTY], costUsd };
   return {
     kind: 'draft',
     bubbles: composed.bubbles,
@@ -1261,6 +1272,7 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
         ...(input.meeting !== undefined && { meeting: input.meeting }),
+        ...(input.herRecent !== undefined && { herRecent: input.herRecent }),
         saleTrouble: {
           seen: input.saleTrouble ?? NO_SALE_TROUBLE,
           // He bought from her: Reveal's spending, or a step of hers recorded paid.
