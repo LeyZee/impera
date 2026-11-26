@@ -381,6 +381,18 @@ describe('/v1/creator-space/content and the agency’s requests', () => {
     expect(agencySide.requests.find((one) => one.id === asked.id)?.state).toBe('cancelled');
   });
 
+  it('lets her withdraw a drop the cleaning blocked (grande recette du 21/11)', async () => {
+    const drop = { id: newId(ContentDropIdSchema), category: 'reveal_story', files: [video()] };
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', drop)).statusCode).toBe(200);
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'blocked', blockedReason: 'Aucun fichier de ce dépôt n’a pu être gardé' })
+      .where(eq(schema.contentDrops.id, drop.id));
+    const withdrawn = await call('DELETE', `/v1/creator-space/drops/${drop.id}`, 'nora');
+    expect(withdrawn.statusCode, withdrawn.body).toBe(204);
+    expect((await content()).drops.map((one) => one.id)).not.toContain(drop.id);
+  });
+
   it('never lets her withdraw what is already scheduled; the agency drops for her', async () => {
     const drop = { id: newId(ContentDropIdSchema), category: 'telegram_post', files: [video()] };
     const byAgency = await call('POST', `/v1/creators/${nora}/drops`, 'owner', drop);

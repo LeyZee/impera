@@ -93,3 +93,13 @@ La capture ciblée a été faite le 16/11 sur le PC de Charles et lue sur place 
 
 1. Le nom d'un dossier de script : « fais ce que tu me recommandes », avec la tenue que porte la modèle en plus du thème (§ 3).
 2. Les dossiers système « Mass DM » et « Feed » de Reveal : « si on peut directement ajouter des médias dans ces dossiers-là, alors go » (17 h 35). La capture a montré que non. Amendement de Charles (17 h 41) : « il va bien falloir qu'on les crée nous, comme ça on peut les ajouter nous et les gérer nous » (§ 3).
+
+## Avenant du 21/11/2026 : la garde du § 2 est codée par la marque du média
+
+La règle de Charles (« un média offert n'est jamais revendu, un média de script n'est jamais gratuit ») est codée sans attendre les rôles de dossier. Elle lit la **marque du média**, qui l'emporte déjà sur le dossier (§ 2) :
+
+- **Offert.** Un média est offert dès que la synchronisation du coffre lit que Reveal l'a envoyé gratuitement (son `sentForFree`). La date de cette première lecture est gardée (`media_platform_refs.sent_for_free_at`) et ne s'efface jamais, même si Reveal cesse de le dire. Un média dont le fichier part dans un dépôt gratuit de la créatrice (feed, story, Instagram, Telegram, Mass DM), non retiré, est offert aussi.
+- **Jamais revendu.** Une étape payante d'un script natif qui vend un média offert rend le script non proposable (manque `media_offered`) : l'agent ne le propose plus. Un script en préparation dont une branche payante vend un média offert ne passe pas « prêt à copier ». Une étape offerte ou un aperçu ne sont pas concernés : rien n'y est vendu.
+- **Jamais gratuit.** Un média gardé par un dépôt de script non retiré, ou vendu par une étape payante d'un script natif actif, est laissé hors de l'archive d'un dépôt gratuit, et la fiche le dit. Toute autre sortie gratuite (publication Telegram, Mass DM automatique) lit la même règle (`mediaInScript`).
+
+Les rôles de dossier (§ 1) et leur écran restent à faire : pas de nouvel écran sans le feu vert de Charles. Ce que Reveal compte exactement dans `sentForFree` (les aperçus d'un PPV payant, par exemple) sera vu à la première vraie lecture ; `FakeReveal` compte les médias joints à un message et ceux d'un PPV à 0.

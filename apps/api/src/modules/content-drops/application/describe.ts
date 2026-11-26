@@ -63,7 +63,7 @@ export async function describeFile(
   if (target.kind === 'audio') return 'not_described';
   if (await deps.describer.described(mediaAssetId)) {
     // A run that stopped between the description and the next job: the script is asked again, once.
-    await deps.summaries.enqueueFor(mediaAssetId, correlationId);
+    await deps.summaries.enqueueFor(creatorId, mediaAssetId, correlationId);
     return 'already';
   }
 
@@ -94,7 +94,7 @@ export async function describeFile(
       if ((await deps.queue.failed(target.creatorId, mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
       throw new DropDescriptionFailed(`media ${mediaAssetId}: every model failed`);
     }
-    if (outcome === 'described') await deps.summaries.enqueueFor(mediaAssetId, correlationId);
+    if (outcome === 'described') await deps.summaries.enqueueFor(creatorId, mediaAssetId, correlationId);
     return outcome;
   } finally {
     if (dir !== null) await rm(dir, { recursive: true, force: true });

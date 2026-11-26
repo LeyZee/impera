@@ -27,6 +27,7 @@ const media = (ref: string, described = true) => ({
   imported: true,
   mediaAssetId: null,
   described,
+  offered: false,
   description: described
     ? {
         id: newId(MediaDescriptionIdSchema),

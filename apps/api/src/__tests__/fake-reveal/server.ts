@@ -1281,11 +1281,18 @@ export function createFakeReveal(options: { fixture?: FixtureName } = {}): FakeR
         )
         .flatMap((m) => m.bundle?.mediaIds ?? []),
     );
+    // Sent for free: attached to one of her messages, deleted since or not, or in a bundle at 0 (what the real flag
+    // counts beyond that, the previews of a paid bundle for one, is not known: to see at the first real read).
+    const sentForFree = new Set(
+      world.state.messages
+        .filter((m) => m.direction === 'out')
+        .flatMap((m) => [...m.mediaIds, ...(m.bundle?.priceCents === 0 ? m.bundle.mediaIds : [])]),
+    );
     return out('vault.medias', {
       data: page.rows.map((m) => ({
         ...world.wireMedia(m),
         status: boughtBy.has(m.id) ? ['paid'] : [],
-        sentForFree: false,
+        sentForFree: sentForFree.has(m.id),
         description: m.description ?? null,
         suggestedMinPrice: m.suggestedMinPrice ?? null,
         suggestedMaxPrice: m.suggestedMaxPrice ?? null,
