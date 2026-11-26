@@ -134,6 +134,7 @@ Branche : task/<id>-<slug>
 | VEI-06 | Comptes de référence par Business Discovery | veille | blocked (compte pro et page Facebook de l'agence, revue Meta) | VEI-01 |
 | VEI-07 | Relevés de l'extension devenus signaux, sur la médiane du compte, et l'écart visible par l'agence | veille | todo | VEI-01, VEI-02, ADR 0082 |
 | VEI-08 | Fiche reel : la créatrice tourne un reel depuis un dessin, l'agence l'écrit avec des compteurs | veille | done | VEI-01, ADR 0082 |
+| ACC-01 | Accueils du chatteur et de la modèle, chacun bâti sur ce qu'il fait | espaces | in progress | ADR 0153, ADR 0124, ADR 0140 |
 | INS-01 | Instagram en lecture seule : branchement, relevés des médias et des stories | Instagram (ADR 0120) | in progress (lot a ; essai réel : compte pro, appli Meta) | ADR 0120, ADR 0057 |
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lots a et b) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |

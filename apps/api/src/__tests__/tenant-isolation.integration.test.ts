@@ -225,6 +225,10 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/creator-space/decisions/:id/other-ideas':
     'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
+  'POST /v1/creator-space/stops/:id/withdraw':
+    'creator space: creator-limits tests (another creator’s line stays)',
+  'POST /v1/creator-space/absences/:id/cancel':
+    'creator space: creator-limits tests (another creator’s absence stays)',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/complete': 'creator space: content-drop uploads tests',
   'GET /v1/creator-space/drops/:id/descriptions':

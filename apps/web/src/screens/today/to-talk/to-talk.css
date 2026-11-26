@@ -1,0 +1,201 @@
+/* « À qui parler maintenant » (accueil du chatteur, Charles 21/11): one card, three groups, one line a fan. */
+
+.tt-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+  padding: var(--nv-plate-pad);
+}
+.tt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nv-space-3);
+}
+.tt-head .nv-h2 {
+  margin: 0;
+}
+.tt-hint,
+.tt-empty {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tt-empty {
+  margin: 0;
+}
+.tt-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+}
+.tt-group__title.nv-h3 {
+  margin: var(--nv-space-2) 0 0;
+  color: var(--nv-ink-muted);
+}
+.tt-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 5.5rem;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: 44px;
+  margin: 0 calc(-1 * var(--nv-space-2));
+  padding: var(--nv-space-2);
+  border-radius: var(--nv-radius-md);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 160ms var(--nv-ease-spring-smooth, ease);
+}
+.tt-row:hover {
+  background: color-mix(in srgb, var(--nv-ink) 5%, transparent);
+}
+.tt-tier {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--nv-space-2);
+  border-radius: var(--nv-radius-full);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.tt-tier[data-tier] {
+  --_tier: var(--nv-ink-muted);
+  background: color-mix(in srgb, var(--_tier) 16%, transparent);
+  color: color-mix(in srgb, var(--_tier) 80%, var(--nv-ink));
+}
+.tt-tier[data-tier='new'] {
+  --_tier: var(--nv-series-2);
+}
+.tt-tier[data-tier='payer'] {
+  --_tier: var(--nv-ink-muted);
+}
+.tt-tier[data-tier='good'] {
+  --_tier: var(--nv-series-1);
+}
+.tt-tier[data-tier='very_good'] {
+  --_tier: var(--nv-series-3);
+}
+.tt-tier[data-tier='whale'] {
+  --_tier: var(--nv-data-2);
+}
+.tt-who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tt-who__top {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
+.tt-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tt-standing,
+.tt-when {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.tt-when {
+  white-space: nowrap;
+}
+.tt-when[data-long] {
+  color: var(--nv-warning);
+  font-weight: 600;
+}
+.tt-held {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-3);
+  min-height: 44px;
+  margin-top: var(--nv-space-2);
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-danger) 11%, transparent);
+  color: inherit;
+  text-decoration: none;
+}
+.tt-held__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nv-danger);
+}
+.tt-held__text {
+  flex: 1;
+  font-size: var(--nv-text-footnote);
+}
+.tt-held__see {
+  color: var(--nv-danger);
+  font-size: var(--nv-text-footnote);
+  font-weight: 650;
+}
+
+.tt-go {
+  justify-content: center;
+  width: 100%;
+}
+.tt-lead {
+  display: grid;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-4);
+  border-radius: var(--nv-radius-lg);
+  background: var(--nv-glass-fill);
+}
+.tt-lead__eyebrow {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+  font-weight: 600;
+}
+.tt-lead__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+.tt-lead__name {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  font-weight: 700;
+}
+.tt-lead__go {
+  justify-self: start;
+  margin-top: var(--nv-space-2);
+}
+
+/* On a phone: the wait under the name, the same button on the right of every line. */
+@media (max-width: 720px) {
+  .tt-row {
+    grid-template-columns: minmax(0, 1fr) 5.5rem;
+  }
+  .tt-when {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .tt-go {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .tt-lead__go {
+    justify-self: stretch;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tt-row {
+    transition: none;
+  }
+}

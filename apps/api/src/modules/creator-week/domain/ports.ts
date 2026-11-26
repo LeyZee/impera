@@ -58,6 +58,16 @@ export interface WeekFactsReader {
     readonly byCategory: Readonly<Partial<Record<DropCategory, number>>>;
     readonly answered: ReadonlySet<string>;
   }>;
+  /** The same arrivals read by her owner or an active manager (`withTenantMember`), for « Où elle en est ». */
+  teamArrivals(
+    creatorId: string,
+    userId: string,
+    window: { readonly from: Date; readonly to: Date },
+    requestIds: readonly string[],
+  ): Promise<{
+    readonly byCategory: Readonly<Partial<Record<DropCategory, number>>>;
+    readonly answered: ReadonlySet<string>;
+  }>;
 }
 
 /** Accepting one suggestion of hers by its own rules (ADR 0140 § 27). */
@@ -74,6 +84,20 @@ interface DayTicksRead {
 export interface DayTickStore {
   /** `day`, or today in her zone without it. */
   read(userId: string, day: string | null, now: Date): Promise<DayTicksRead>;
+  /**
+   * Her days from `from` to `to`, both included, read by her owner or an active manager (`withTenantMember`); anyone
+   * else is refused. A day she ticked nothing of is absent.
+   */
+  teamDays(
+    creatorId: string,
+    userId: string,
+    from: string,
+    to: string,
+    now: Date,
+  ): Promise<{
+    readonly today: string;
+    readonly days: ReadonlyMap<string, Partial<Readonly<Record<DayItem, number>>>>;
+  }>;
   /** How many of a line she did that day: today or yesterday in her zone, else `DayItemLate`; a replay changes nothing. */
   write(userId: string, day: string, item: DayItem, done: number, now: Date): Promise<void>;
 }
