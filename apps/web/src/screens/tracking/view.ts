@@ -47,13 +47,15 @@ export function fanWaits(
  * (a draft to decide, the hand a person holds, a send that failed, a fan nobody will answer), the agent while it is on
  * it, nothing to do otherwise.
  */
-export type Hand = 'yours' | 'agent' | 'quiet';
+export type Hand = 'yours' | 'agent' | 'care' | 'quiet';
 
-export const HANDS: readonly Hand[] = ['yours', 'agent', 'quiet'];
+/** `care`: nothing to do but he is in the care mode, grouped apart from the quiet ones (Design, recette du 21/11). */
+export const HANDS: readonly Hand[] = ['yours', 'agent', 'care', 'quiet'];
 
 export const HAND_TITLES: Readonly<Record<Hand, string>> = {
   yours: 'À toi',
   agent: 'L’agent s’en occupe',
+  care: 'Mode soin',
   quiet: 'Rien à faire',
 };
 
@@ -100,6 +102,16 @@ export const STOP_SITUATION: Situation = {
 };
 
 /**
+ * His care mode said by the reader's pill (ADR 0088, Design 21/11): when nothing is to be done, « Mode soin » in the
+ * care banner's calm blue, never « Rien à faire » above a banner that says why each answer waits for a person. A
+ * situation where someone acts keeps its words.
+ */
+export function withCare(situation: Situation, care: boolean): Situation {
+  if (!care || situation.hand !== 'quiet') return situation;
+  return { hand: 'care', label: 'Mode soin', pill: 'tr-status--care' };
+}
+
+/**
  * The state every line of a group says alike, said once by the group's title instead (PIL-10: « Un humain répond » on
  * thirty lines): the label when two lines or more all say it, null when one differs.
  */
@@ -109,14 +121,21 @@ export function sharedLabel(labels: readonly string[]): string | null {
   return labels.every((label) => label === first) ? first : null;
 }
 
-/** The lines split by who acts, each group in the order it came; an empty group is left out. */
+/**
+ * The lines split by who acts, each group in the order it came; an empty group is left out. A fan in the care mode
+ * with nothing to do goes under « Mode soin », never « Rien à faire » (Design 21/11), for whoever may read his care
+ * mode (`care`: never a creator, ADR 0063).
+ */
 export function groupByHand<T extends { readonly conversation: ConversationSummary }>(
   lines: readonly T[],
   selfScope = false,
+  care = true,
 ): { readonly hand: Hand; readonly lines: readonly T[] }[] {
+  const handOf = (conversation: ConversationSummary): Hand =>
+    withCare(situationOf(conversation, selfScope), care && conversation.careSince !== null).hand;
   return HANDS.map((hand) => ({
     hand,
-    lines: lines.filter((l) => situationOf(l.conversation, selfScope).hand === hand),
+    lines: lines.filter((l) => handOf(l.conversation) === hand),
   })).filter((group) => group.lines.length > 0);
 }
 

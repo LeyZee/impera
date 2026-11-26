@@ -27,6 +27,7 @@ export function FanSheet({
   desire,
   canDecide,
   canSetLimits = canDecide,
+  care = false,
   layout = 'band',
 }: {
   creatorId: string;
@@ -37,6 +38,8 @@ export function FanSheet({
   canDecide: boolean;
   /** A chatter reads his limits without changing them (ADR 0025, the server refuses it). */
   canSetLimits?: boolean;
+  /** He is in the care mode: the folded line says it first (ADR 0088). */
+  care?: boolean;
   /**
    * `band`: one folded band above the thread. `aside`: its own column beside the conversation on a wide screen, always
    * in view (Charles, 08/11): what forbids, what he is like at a glance, then the rest folded.
@@ -54,6 +57,7 @@ export function FanSheet({
       flags.data?.flags ??
       (flags.error instanceof FanFlagsRefused ? 'refused' : flags.isError ? 'down' : 'loading'),
     toLearn: canDecide ? (kyc.data?.length ?? null) : null,
+    care,
     ...(canDecide && card.data !== undefined ? { toCheck: toCheckCount(card.data.fields) } : {}),
     band:
       desire === null

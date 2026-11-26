@@ -1,4 +1,5 @@
 import type {
+  CaptionProposals,
   CommentOutcome,
   CommentPromptInput,
   DropMediaDescription,
@@ -291,6 +292,29 @@ export interface InstagramCommentInput {
   readonly trace?: Omit<CallTrace, 'purpose'>;
 }
 
+/** What three captions are written from (ADR 0164 § 9). Every text of hers or of a media is read as data. */
+export interface CaptionProposalsInput {
+  readonly creatorName: string;
+  readonly personaSheet: string;
+  /** Her past captions that did well, the most recent first; empty: none. */
+  readonly examples: readonly string[];
+  /** What the vision AI saw in the video (ADR 0083 § 2). */
+  readonly mediaDescription: string;
+  readonly durationS: number | null;
+  /** The sentence she wrote with her drop; null: none. */
+  readonly sentence: string | null;
+  /** « D'autres idées »: the hints she touched, in French, and her own line; the captions she already read. */
+  readonly otherIdeas?: {
+    readonly hints: readonly string[];
+    readonly note: string;
+    readonly seen: readonly string[];
+  };
+  /** What the guard refused in a first answer: this call is the one rewrite. Rule names only, never a text. */
+  readonly refusedBy?: readonly string[];
+  /** Always a caption call: its purpose is set by the gateway. */
+  readonly trace?: Omit<CallTrace, 'purpose'>;
+}
+
 /** A media of a step, as its description tells it; a voice note is not described by the vision AI. */
 export interface ScriptSummaryMedia {
   readonly kind: 'image' | 'video' | 'audio';
@@ -428,6 +452,11 @@ export interface LlmGateway {
    * purpose `instagram_comment` and stopped by the daily cap. The guards run after, in the code.
    */
   instagramComment(input: InstagramCommentInput): Promise<Result<LlmSuccess<CommentOutcome>, LlmFailure>>;
+  /**
+   * Captions for a Reel she dropped, each in its own style (ADR 0164 § 9, prompt `voice/instagram-caption`): journaled
+   * under the purpose `instagram_caption` and stopped by the daily cap. The guard runs after, in the code.
+   */
+  proposeCaptions(input: CaptionProposalsInput): Promise<Result<LlmSuccess<CaptionProposals>, LlmFailure>>;
   /** A sent script's steps and synthesis (ADR 0083 § 6, prompt `brain/script-summary`), under the daily cap. */
   summarizeScript(input: ScriptSummaryInput): Promise<Result<LlmSuccess<ScriptDropSummary>, LlmFailure>>;
   /** A native script's identity (SC-04 lot c8, prompt `brain/script-identity`), under the daily cap. */
@@ -478,6 +507,7 @@ export interface LlmGatewayDeps {
     readonly creatorDrop?: PromptTemplate;
     readonly channelPost?: PromptTemplate;
     readonly instagramComment?: PromptTemplate;
+    readonly instagramCaption?: PromptTemplate;
     readonly scriptSummary?: PromptTemplate;
     readonly scriptIdentity?: PromptTemplate;
     readonly fanCard?: PromptTemplate;

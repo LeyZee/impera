@@ -8,7 +8,7 @@ import { useSyncExternalStore } from 'react';
  * eleven tabs before them are read by `legacyCreatorsSearch` and redirected.
  */
 export interface CreatorsSearch {
-  readonly onglet?: 'ia' | 'medias' | 'scripts' | 'agenda' | 'alertes' | 'compte';
+  readonly onglet?: 'persona' | 'ia' | 'medias' | 'scripts' | 'agenda' | 'alertes' | 'compte';
   /** The view inside the tab; the tab's first view leaves it out. */
   readonly vue?: 'depots' | 'impera' | 'a-copier' | 'structures' | 'sur-mesure' | 'idees' | 'demandes';
   readonly creatrice?: CreatorId;
@@ -72,6 +72,7 @@ const TAB_OF: Readonly<Record<CreatorSheet, CreatorTabName>> = {
 export const tabOf = (sheet: CreatorSheet): CreatorTabName => TAB_OF[sheet];
 
 const TAB_SLUGS = {
+  persona: 'persona',
   ai: 'ia',
   media: 'medias',
   scripts: 'scripts',
@@ -125,14 +126,15 @@ const ALL_SHEETS: readonly CreatorSheet[] = [
 /**
  * The sheets a member opens: all of them for the owner; for an active manager her vault and her other drops (recette
  * créatrice 1), her sent scripts (SC-03 c2b), her agenda (CR-05 lot c, Charles, 05/11 17h22: « Ouvrir aux managers »),
- * her ideas of the day (VEI-02, ADR 0060 § 5) and what the agency asks of her (MED-09); the persona alone for anyone
+ * her ideas of the day (VEI-02, ADR 0060 § 5), what the agency asks of her (MED-09) and her persona to read, never
+ * to change (trou béant 18, Charles 21/11: « lecture seule pour le manager actif »); the persona alone for anyone
  * else. Her redirect links are no sheet: Trafic holds them. The first one is where Créatrices opens: her
  * persona for the owner, Médias for an active manager (ADR 0149 § 1).
  */
 export function sheetsFor(user: Pick<Me, 'role' | 'teamScope'>): readonly CreatorSheet[] {
   if (user.role === 'owner') return ALL_SHEETS;
   return user.teamScope === 'agency'
-    ? ['vault', 'content', 'stock', 'scripts', 'copy', 'agenda', 'ideas', 'requests']
+    ? ['vault', 'content', 'stock', 'scripts', 'copy', 'agenda', 'ideas', 'requests', 'persona']
     : ['persona'];
 }
 
@@ -179,7 +181,7 @@ export function parseCreatorsSearch(search: Record<string, unknown>): CreatorsSe
 /** The sheet an address opens; Compte (`compte`) is one page, named by its last card. */
 export function sheetOf(search: CreatorsSearch): CreatorSheet {
   const { onglet: tab, vue: view } = search;
-  if (tab === undefined) return 'persona';
+  if (tab === undefined || tab === 'persona') return 'persona';
   if (tab === 'ia') return 'hours';
   if (tab === 'medias') return view === 'depots' ? 'content' : view === 'impera' ? 'stock' : 'vault';
   if (tab === 'scripts')
@@ -211,6 +213,19 @@ export function creatorsSearch(
     ...(creatorId === null ? {} : { creatrice: creatorId }),
     ...(sheet === 'vault' && folderId !== null ? { dossier: folderId } : {}),
   };
+}
+
+/**
+ * A sheet's address for this member: her persona is named (`onglet=persona`) when this member's sheet opens elsewhere
+ * (an active manager lands on Médias, ADR 0149 § 1), since an address with no tab sends them there (trou béant 18).
+ */
+export function sheetSearch(
+  sheets: readonly CreatorSheet[],
+  sheet: CreatorSheet,
+  creatorId: CreatorId | null,
+): CreatorsSearch {
+  const search = creatorsSearch(sheet, creatorId);
+  return sheet === 'persona' && sheets[0] !== 'persona' ? { ...search, onglet: 'persona' } : search;
 }
 
 /** The tabs before the seven (ADR 0149 § 5), and the sheet each one became. */

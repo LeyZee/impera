@@ -70,7 +70,7 @@ describe('the fan card (ADR 0085, lot c)', () => {
       { field: 'job', current: value({ source: 'noted' }), toCheck: [value({ source: 'inferred' })] },
       { field: 'hobbies', current: value({ items: ['course'] }), toCheck: [] },
     ];
-    // The first name is among the essentials: the folded line counts the fields its group holds.
+    // The first name shows on top among the essentials: the fold counts only what it holds (Design 21/11).
     expect(groupLine(entries, 'him')).toEqual({ filled: '2 sur 9', toCheck: 1 });
     expect(groupLine(entries, 'intimate')).toEqual({ filled: '0 sur 2', toCheck: 0 });
   });

@@ -1,0 +1,71 @@
+# Passe de test du 21/11 (extension), conversation 21 : le fan amoureux. Fan, messages, scripts et prix fictifs (ADR 0010).
+# Il dit qu’il l’aime, veut être le seul, demande si elle l’aime aussi.
+# Attendu à la lecture : tendre, sur un fil, ni oui ni non, rien de réel promis, pas jalouse, pas de moquerie.
+# Code (asserté) : aucune offre ; aucun « je t’aime » rendu, aucune rencontre proposée. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Il lui déclare son amour et veut être le seul : elle reste tendre et sur un fil, ne promet rien de réel et ne rend pas le « je t’aime ».'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Mathis (fictif)'
+  - 36 ans, confirmé
+situation:
+  known_hours: 300
+  age_confirmed: true
+  local_time: '21:00'
+  spent_euros: 40
+history:
+  - from: fan
+    text: Tu sais que tu comptes pour moi
+    minutes_ago: 30
+  - from: creator
+    text: C’est mignon ça 🥰
+    minutes_ago: 28
+inbound: Je crois que je suis amoureux de toi
+expect:
+  decision: &id001
+    offer: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+      - \b(je t'aime|je t’aime|moi aussi je t'aime|moi aussi je t’aime)\b
+      - \b(rendez-vous|rdv|on se voit|se voir|se rejoindre|je te rejoins|chez moi|chez toi)\b
+then:
+  - after_minutes: 3
+    inbound: Je veux être le seul pour toi
+    expect:
+      decision: *id001
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(je t'aime|je t’aime|moi aussi je t'aime|moi aussi je t’aime)\b
+          - \b(rendez-vous|rdv|on se voit|se voir|se rejoindre|je te rejoins|chez moi|chez toi)\b
+  - after_minutes: 3
+    inbound: Et toi tu m’aimes ?
+    expect:
+      decision: *id001
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(je t'aime|je t’aime|moi aussi je t'aime|moi aussi je t’aime)\b
+          - \b(rendez-vous|rdv|on se voit|se voir|se rejoindre|je te rejoins|chez moi|chez toi)\b
+  - after_minutes: 4
+    inbound: Dis-moi juste oui ou non
+    expect:
+      decision: *id001
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(je t'aime|je t’aime|moi aussi je t'aime|moi aussi je t’aime)\b
+          - \b(rendez-vous|rdv|on se voit|se voir|se rejoindre|je te rejoins|chez moi|chez toi)\b
