@@ -60,6 +60,13 @@ describe('the guards of a public reply (ADR 0122 § 3)', () => {
     expect(codes('Contente que la lumière te plaise', context)).not.toContain('repeated_reply');
   });
 
+  it('lets a short thanks come back, never the very same one twice in a row', () => {
+    const context = { ...calm, recentReplies: ['Merci 🫶🏻', 'Merci beaucoup ☺️'] };
+    expect(codes('Merci 🫶🏻', context)).not.toContain('repeated_reply');
+    expect(codes('Merci beaucoup ☺️', context)).toContain('repeated_reply');
+    expect(codes('Merci beaucoup 🙏', context)).not.toContain('repeated_reply');
+  });
+
   it('refuses a mention or a hashtag anywhere in the text, full-width forms too', () => {
     expect(codes('merci!@quelquun')).toContain('comment_format');
     expect(codes('(@quelquun) merci')).toContain('comment_format');

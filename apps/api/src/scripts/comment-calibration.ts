@@ -36,6 +36,7 @@ import {
   declaresLove,
   nearExamples,
   QUESTION_EVERY_BOUNDS,
+  replyShapeOf,
   asksAQuestion,
   type GuardedAttempt,
 } from '../modules/instagram-comments/index';
@@ -192,6 +193,8 @@ for (const pair of test) {
   const recentReplies = rows
     .flatMap((row) => (row.outcome.kind === 'reply' ? [row.outcome.text] : []))
     .slice(-RECENT_REPLIES);
+  const near = nearExamples(pair.comment, examples);
+  const shape = replyShapeOf(near);
   const attempts: GuardedAttempt[] = [];
   let refusedBy: string[] = [];
   // As in production: the code's own detectors run first, and an age doubt or a distress never reaches the model.
@@ -216,7 +219,8 @@ for (const pair of test) {
         personaSheet: persona.personaSheet,
         examples: [],
         recentReplies,
-        nearExamples: nearExamples(pair.comment, examples),
+        nearExamples: near,
+        ...(shape === null ? {} : { replyShape: shape }),
         comment: {
           comment: pair.comment,
           mediaKind: pair.mediaKind,
