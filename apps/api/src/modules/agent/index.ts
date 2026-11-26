@@ -138,7 +138,13 @@ export interface DraftComposerStartOptions {
   /** His limits: nothing is written to a stopped fan, and a risk sets them itself (P3-02). */
   readonly fans?: Pick<
     FansModule,
-    'flags' | 'setFlag' | 'setFlagIfUnset' | 'clearFlag' | 'confirmDeclaredAge'
+    | 'flags'
+    | 'setFlag'
+    | 'setFlagIfUnset'
+    | 'clearFlag'
+    | 'confirmDeclaredAge'
+    | 'language'
+    | 'keepDetectedLanguage'
   >;
   /** A note of hers kept out of the prompt (it looked like an order): a chatter's real note would vanish unseen. */
   readonly onDroppedNotes?: DraftComposerDeps['onDroppedNotes'];
@@ -184,6 +190,8 @@ function composerFields(
       splitMessages: persona.splitMessages,
       ...(profileBio !== null && profileBio.trim() !== '' && { profileBio }),
       ...(examples.length > 0 && { voiceExamples: examples }),
+      ...(persona.spokenLanguages !== undefined && { spokenLanguages: persona.spokenLanguages }),
+      ...(persona.languageExamples !== undefined && { languageExamples: persona.languageExamples }),
     },
     offerLimits: persona.offerLimits,
     sexualizationLimits: persona.sexualizationLimits,

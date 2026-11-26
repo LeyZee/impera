@@ -17,6 +17,7 @@ import {
   type FanAccess,
   type RequireRole,
 } from './infra/http/flag-routes';
+import { createLanguageRoutes } from './infra/http/language-routes';
 import { createListRoutes } from './infra/http/list-routes';
 
 /** @public The evals read his card on the path a real read takes (`pnpm evals`, `evals/card`). */
@@ -33,7 +34,7 @@ export interface FansModule extends FansService {
   };
   /**
    * Mounted under `/v1` by the server: `/fans/:id/flags`, read by the dashboard and set by a chatter, and
-   * `/fans/:id/card`, his card read and corrected (ADR 0085), and `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
+   * `/fans/:id/card`, his card read and corrected (ADR 0085), `/fans/:id/language`, his kept language (ADR 0168), and `/fans/:id/kyc`, what is left to learn among `kycSlotsOf` (her active persona's canvas lines, read at each
    * request; all of them when she has none, or without it). `fanAccess` (the `conversations` module) lets a member
    * whose scope is `self` read, never write, the sheet of a fan of a creator his window opens or of a conversation he
    * holds, each read in the audit log (ADR 0025). `/fans?creatorId=…`, every fan of a creator for the agency (ADR
@@ -78,6 +79,7 @@ export function createFansModule(deps: FansDeps): FansModule {
         await app.register(createListRoutes(createFanListReader(deps.db, usdRateMicrosOf), requireRole));
         await app.register(createFlagRoutes(service, requireRole, undefined, fanAccess));
         await app.register(createCardRoutes(service, requireRole, fanAccess));
+        await app.register(createLanguageRoutes(service, requireRole, fanAccess));
         await app.register(
           createKycRoutes(
             service,

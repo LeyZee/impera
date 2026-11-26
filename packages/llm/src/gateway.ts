@@ -21,6 +21,7 @@ import { LlmRoleSchema, type ProviderId } from './config';
 import {
   alertsBlock,
   describeBrief,
+  describeLanguage,
   judgeSituationBlock,
   notesBlock,
   customOrderBlock,
@@ -235,6 +236,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
         profile_bio: profileBioBlock(input.profileBio),
         fan_notes: notesBlock(input.fanNotes),
         situation: input.situation ?? 'Pas d’information sur le moment.',
+        language: describeLanguage(input.language),
         brief: describeBrief(
           input.brief,
           input.objectionReply,

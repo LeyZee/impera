@@ -1,10 +1,13 @@
 import {
   desireNow,
+  isGuardedLanguage,
   normalise,
   type AfterSaleType,
   supplementsIn,
   type CustomPriceGrid,
   type FanFlags,
+  type Language,
+  type LanguageExamples,
   type MediaDescription,
   type ObjectionReplies,
   type OpenCustomOrder,
@@ -18,6 +21,7 @@ import type {
   LlmFailure,
   LlmGateway,
   VoiceInput,
+  VoiceLanguage,
   VoiceScriptStep,
 } from '@impera/llm';
 import { BRAIN_SCRIPTS_MAX, brainScriptId } from '@impera/llm';
@@ -65,6 +69,7 @@ import {
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
+import { decideLanguage, quietLanguage, type LanguageDecision } from '../domain/language';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -121,6 +126,42 @@ export interface ComposerPersona {
    * voice the twelve this fan may read, added to `personaSheet`, and her voice's call names them in `llm_calls`.
    */
   readonly voiceExamples?: readonly VoiceExample[];
+  /** Her languages, in her order (ADR 0168): absent, French only. */
+  readonly spokenLanguages?: readonly [Language, ...Language[]];
+  /** Her messages per language, given to the voice only in the language it writes in (ADR 0168 § 3). */
+  readonly languageExamples?: LanguageExamples;
+}
+
+const FRENCH_ONLY: readonly [Language, ...Language[]] = ['french'];
+
+/**
+ * The language of this turn, decided by code (ADR 0168 § 2): on his messages for an answer, on his kept language for a
+ * follow-up or her word after a sale.
+ */
+function languageOfTurn(persona: ComposerPersona, input: ComposeTurnInput): LanguageDecision {
+  const spoken = persona.spokenLanguages ?? FRENCH_ONLY;
+  const kept = input.keptLanguage ?? null;
+  const herLastText = input.history.findLast((turn) => turn.from === 'creator')?.text;
+  if (input.followUp !== undefined || input.aftercare !== undefined)
+    return quietLanguage(kept?.value ?? null, spoken, herLastText);
+  const earlierFanText = earlierFanTexts(input.history).at(-1);
+  return decideLanguage({
+    fanTexts: [input.fanText],
+    kept,
+    spoken,
+    ...(earlierFanText !== undefined && { earlierFanText }),
+    ...(herLastText !== undefined && { herLastText }),
+  });
+}
+
+/** The language as the voice reads it: the decided one, his she does not speak, her examples in hers. */
+function voiceLanguageOf(persona: ComposerPersona, decision: LanguageDecision): VoiceLanguage {
+  const examples = persona.languageExamples?.[decision.reply] ?? [];
+  return {
+    reply: decision.reply,
+    notSpoken: decision.notSpoken,
+    ...(examples.length > 0 && { examples }),
+  };
 }
 
 /**
@@ -146,6 +187,8 @@ export function asSent(bubbles: readonly string[], splitMessages = true): readon
 export interface ComposeTurnInput {
   /** The conversation so far, his last message(s) included, oldest first. */
   readonly history: readonly ConversationTurn[];
+  /** His kept language (`fans.language`, ADR 0168 § 3); absent or `null`, none yet. */
+  readonly keptLanguage?: { readonly value: Language; readonly source: 'detected' | 'set' } | null;
   /** His last message(s) since her last answer: what the traps read. */
   readonly fanText: string;
   readonly media: readonly MediaDescription[];
@@ -659,6 +702,13 @@ export interface ComposedTurn {
   readonly care?: true;
   /** A guard refused her first answer and the voice wrote it once more (M1): the copilot says why (ADR 0141 § 2). */
   readonly rewritten?: true;
+  /** The language code decided for this turn (ADR 0168): absent only when a media handed him to a human first. */
+  readonly language?: LanguageDecision;
+}
+
+/** The languages her output guard lets through (ADR 0168 § 4): hers that the guards cover. */
+function guardLanguages(persona: ComposerPersona): readonly Language[] {
+  return (persona.spokenLanguages ?? FRENCH_ONLY).filter(isGuardedLanguage);
 }
 
 /** Answers the team corrected in the playground, given to the voice as her examples (they take precedence). */
@@ -747,13 +797,14 @@ async function writeFollowUp(
   brief: Brief,
   droppedNotes: readonly string[],
   exampleIds: readonly string[],
+  languages: readonly Language[],
 ): Promise<ComposedTurn> {
   // A follow-up: nothing of his awaits, one bubble.
   const voiceInput: VoiceInput = voiceTraced({ ...base, brief, maxBubbles: 1 }, exampleIds);
   const voice = await gateway.voice(voiceInput);
   const written = voice.ok ? fitBubbles(voice.value.output.bubbles, 1) : [];
   const violations = [
-    ...checkVoiceOutput(written, persona.guardSettings, guardContextOf(base.history)),
+    ...checkVoiceOutput(written, persona.guardSettings, { ...guardContextOf(base.history), languages }),
     ...checkExplicit(written),
   ];
   return {
@@ -826,6 +877,8 @@ export async function composeTurn(
     input.sexualization?.ageConfirmed === true && !input.sexualization.noExplicit,
   );
   const exampleIds = examples.map((e) => e.id);
+  const language = languageOfTurn(persona, input);
+  const voiceLanguage = voiceLanguageOf(persona, language);
   // The voice's notes are the shared ones only: what is the brain's alone never reaches its prompt (ADR 0085 § 9).
   const base = {
     creatorName: persona.creatorName,
@@ -839,10 +892,24 @@ export async function composeTurn(
     history: withTimeNotes(input.history, input.situation.timeZone),
     ...(input.trace !== undefined && { trace: input.trace }),
   };
-  if (input.followUp !== undefined)
-    return writeFollowUp(gateway, persona, base, followUpBrief(input.followUp), notes.dropped, exampleIds);
-  if (input.aftercare !== undefined)
-    return writeFollowUp(gateway, persona, base, aftercareBrief(input.aftercare), notes.dropped, exampleIds);
+  if (input.followUp !== undefined || input.aftercare !== undefined) {
+    const brief =
+      input.followUp !== undefined
+        ? followUpBrief(input.followUp)
+        : input.aftercare !== undefined
+          ? aftercareBrief(input.aftercare)
+          : NEUTRAL_BRIEF;
+    const written = await writeFollowUp(
+      gateway,
+      persona,
+      { ...base, language: voiceLanguage },
+      brief,
+      notes.dropped,
+      exampleIds,
+      guardLanguages(persona),
+    );
+    return { ...written, language };
+  }
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   const choices = scriptChoices(input.scripts, input.situation);
@@ -1242,12 +1309,14 @@ export async function composeTurn(
       latencyMs: brainLatencyMs,
       isFallback: false,
       isSkipped: true,
+      language,
     };
   }
   const budget = farewell === null ? bubbleBudget(input.history) : 1;
   const voiceInput: VoiceInput = voiceTraced(
     {
       ...base,
+      language: voiceLanguage,
       brief: voiceBrief,
       maxBubbles: budget,
       ...(objectionReply !== undefined && { objectionReply: objectionReply.text }),
@@ -1264,11 +1333,10 @@ export async function composeTurn(
     const voice = await gateway.voice(asked);
     const written = voice.ok ? fitBubbles(voice.value.output.bubbles, budget) : [];
     const violations = [
-      ...checkVoiceOutput(
-        written,
-        persona.guardSettings,
-        guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor),
-      ),
+      ...checkVoiceOutput(written, persona.guardSettings, {
+        ...guardContextOf(input.history, stepSendsMedia(scripts), allowedPriceMinor),
+        languages: guardLanguages(persona),
+      }),
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined ? [] : checkNoCommitment(written)),
@@ -1326,5 +1394,6 @@ export async function composeTurn(
     ...(voice.ok && { model: voice.value.meta.model }),
     isFallback: voice.ok && voice.value.meta.isFallback,
     ...(retried !== undefined && { rewritten: true }),
+    language,
   };
 }

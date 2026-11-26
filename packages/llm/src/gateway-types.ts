@@ -5,6 +5,7 @@ import type {
   DropMediaDescription,
   FanCardRead,
   FanFlags,
+  Language,
   LlmPurpose,
   MediaDescription,
   Money,
@@ -198,8 +199,22 @@ export interface VoiceWaitingStep {
   readonly mediaSheet: string | null;
 }
 
+/**
+ * The language she writes in, decided by code (ADR 0168 § 2), never guessed by the model: a fixed instruction of the
+ * voice, with his language she does not speak (said once, her way) and her examples in that language, when she has some.
+ */
+export interface VoiceLanguage {
+  readonly reply: Language;
+  /** His language she does not speak, to tell him once; `'unknown'` when code cannot name it; `null`: nothing to say. */
+  readonly notSpoken: Language | 'unknown' | null;
+  /** Her messages written in `reply` (persona, `language_examples`): read only when she writes in that language. */
+  readonly examples?: readonly string[];
+}
+
 export interface VoiceInput extends ConversationInput {
   readonly brief: Brief;
+  /** The language of her answer (ADR 0168). Absent: the prompt says nothing more than her sheet. */
+  readonly language?: VoiceLanguage;
   /**
    * A reply of her bank to his price objection (ADR 0090 § 8), chosen by code: the voice says it in her words, in a
    * typed block after the brief. Absent, none.

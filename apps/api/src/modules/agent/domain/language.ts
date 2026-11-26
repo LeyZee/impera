@@ -211,3 +211,23 @@ export function languageWithout(
   if (hers !== null && hers !== 'unknown' && spoken.includes(hers)) return hers;
   return spoken.includes('english') ? 'english' : spoken[0];
 }
+
+/**
+ * The decision for a message of hers without his words (a follow-up, her word after a sale, a welcome): the language
+ * of `languageWithout`, nothing to say about his, and for a human only when his kept language or hers is outside the
+ * guards' coverage (ADR 0168 § 3, § 4).
+ */
+export function quietLanguage(
+  kept: Language | null,
+  spoken: readonly [Language, ...Language[]],
+  herLastText?: string,
+): LanguageDecision {
+  const reply = languageWithout(kept, spoken, herLastText);
+  return {
+    reply,
+    fan: kept,
+    notSpoken: null,
+    keep: null,
+    humanOnly: (kept !== null && !isGuardedLanguage(kept)) || !isGuardedLanguage(reply),
+  };
+}

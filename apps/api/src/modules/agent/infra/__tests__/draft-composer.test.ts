@@ -169,6 +169,8 @@ describe('createDraftComposer', () => {
         sale: null,
         saleMoment: null,
         desireTrend: null,
+        // ADR 0168: he writes French, the one language of her persona.
+        language: { reply: 'french', fan: 'french', humanOnly: false },
       },
     });
     expect(seen.traces[0]).toEqual({
@@ -2951,5 +2953,73 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     ]);
     const off = composer({ brief: answers }, undefined, limitsOf(ADULT).limits, deps(repriced));
     expect((await off.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toBeUndefined();
+  });
+});
+
+describe('the fan’s language (ADR 0168)', () => {
+  const kept: { creatorId: string; fanId: string; language: string }[] = [];
+  const limits: FanLimits = {
+    flags: () => Promise.resolve({}),
+    protect: () => Promise.resolve(),
+    confirmAge: () => Promise.resolve(),
+    language: () => Promise.resolve({ value: 'french', source: 'detected' }),
+    keepLanguage: (creatorId, fanId, language) => {
+      kept.push({ creatorId, fanId, language });
+      return Promise.resolve();
+    },
+  };
+  const compose = (text: string) => {
+    const seen: Seen = { voiceCalls: 0, traces: [], voiceInputs: [] };
+    const draftComposer = createDraftComposer({
+      gateway: gateway({}, seen),
+      persona: {
+        creatorName: 'Lina',
+        personaSheet: 'fiche',
+        guardSettings: DEFAULT_GUARD_SETTINGS,
+        spokenLanguages: ['french', 'english'],
+        languageExamples: { english: ['hey you 😘'] },
+      },
+      timeZoneOf: () => Promise.resolve('Europe/Paris'),
+      voicePrompt: '1.2.0',
+      limits,
+    });
+    const history = [
+      {
+        direction: 'outbound' as const,
+        text: 'coucou toi, tu vas bien ce soir ?',
+        at: new Date('2026-10-17T09:57:00Z'),
+      },
+      { direction: 'inbound' as const, text, at: new Date('2026-10-17T09:59:00Z') },
+    ];
+    return { seen, result: draftComposer.compose({ ...INPUT, history }) };
+  };
+
+  it('answers in his language when she speaks it, with her examples in it, and keeps it', async () => {
+    kept.length = 0;
+    const { seen, result } = compose('hey, how are you doing tonight? you look amazing');
+    const draft = await result;
+    expect(seen.voiceInputs?.[0]?.language).toEqual({
+      reply: 'english',
+      notSpoken: null,
+      examples: ['hey you 😘'],
+    });
+    expect(draft.kind === 'draft' && draft.copilot?.language).toEqual({
+      reply: 'english',
+      fan: 'english',
+      humanOnly: false,
+    });
+    expect(kept.map((k) => k.language)).toEqual(['english']);
+  });
+
+  it('stays in their language and says once she does not speak his; a human only lets it leave', async () => {
+    kept.length = 0;
+    const { seen, result } = compose('مرحبا كيف حالك اليوم يا جميلة');
+    const draft = await result;
+    expect(seen.voiceInputs?.[0]?.language).toEqual({ reply: 'french', notSpoken: 'arabic' });
+    expect(draft.kind === 'draft' && draft.copilot?.language).toEqual({
+      reply: 'french',
+      fan: 'arabic',
+      humanOnly: true,
+    });
   });
 });
