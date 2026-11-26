@@ -358,10 +358,10 @@
   color: var(--nv-ink);
 }
 /* His care mode (ADR 0088, trou béant 4): since when and what it means, then « Il va mieux », asked twice. A calm
- * blue (the series' blue, light) and a heart, seen without reading; never the amber of a person to act, the only
+ * blue (`--nv-info`, light) and a heart, seen without reading; never the amber of a person to act, the only
  * alarm on the conversation (Design, recette du 21/11). */
 .tr-care {
-  background: color-mix(in srgb, var(--nv-series-2) 13%, transparent);
+  background: color-mix(in srgb, var(--nv-info) 13%, transparent);
   color: var(--nv-ink);
 }
 .tr-care > p:first-child {
@@ -375,15 +375,18 @@
   gap: var(--nv-space-2);
 }
 .nv-status.tr-status--care {
-  --_c: var(--nv-series-2);
+  --_c: var(--nv-info);
 }
 /* On the first line of a title that wraps, as on a phone. */
 .tr-care__icon {
+  display: inline-flex;
   flex: none;
+  margin-top: 1px;
+  color: var(--nv-info);
+}
+.tr-care__icon > svg {
   width: 20px;
   height: 20px;
-  margin-top: 1px;
-  color: var(--nv-series-2);
 }
 .tr-care__confirm {
   display: flex;

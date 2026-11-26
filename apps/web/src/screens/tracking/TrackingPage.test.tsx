@@ -823,7 +823,7 @@ describe('the reader of Suivi', () => {
     const since = await screen.findByText(/^Mode soin depuis/u);
     // A state to know, in calm blue with a heart: the amber stays for a person to act (recette du 21/11).
     expect(since.closest('.tr-care')?.classList.contains('tr-hand--alert')).toBe(false);
-    expect(since.querySelector('svg.tr-care__icon')).not.toBeNull();
+    expect(since.querySelector('.tr-care__icon svg.nav-icon--heart')).not.toBeNull();
     expect(screen.getByText(/rien ne lui est vendu/u)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Il va mieux' }));
     // Nothing goes on the first click: the second says what changes.
