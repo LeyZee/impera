@@ -104,7 +104,7 @@ function composer(
   limits?: FanLimits,
   offer: Pick<
     DraftComposerDeps,
-    'offerLimits' | 'lastOfferAt' | 'sexualizationLimits' | 'scripts' | 'alertsOf'
+    'offerLimits' | 'lastOfferAt' | 'sexualizationLimits' | 'scripts' | 'alertsOf' | 'random'
   > = {},
 ) {
   const traces: unknown[] = [];
@@ -3573,5 +3573,369 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     ]);
     const off = composer({ brief: answers }, undefined, limitsOf(ADULT).limits, deps(repriced));
     expect((await off.draftComposer.compose({ ...INPUT, scriptRun: waiting })).alerts).toBeUndefined();
+  });
+});
+
+describe('createDraftComposer, the sexting calibrated by the creator (Charles 26/11)', () => {
+  const HOT: Brief = {
+    ...BRIEF,
+    intent: 'sexting',
+    sentiment: 'aroused',
+    action: 'offer',
+    replyBrief: 'Le suivre.',
+    scriptPick: 's1',
+  };
+  const ADULT: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00Z' };
+  const deps = (scripts: ScriptSource, random?: () => number) => ({
+    sexualizationLimits: { initiateAfterHours: 0, minHoursBeforeFollowing: 0, minDesireToOpen: 0 },
+    offerLimits: { cooldownHours: 10, minDesire: 0 },
+    lastOfferAt: () => Promise.resolve(null),
+    alertsOf: () => Promise.resolve({ custom: [], systemOn: new Set<never>() }),
+    scripts,
+    ...(random !== undefined && { random }),
+  });
+  // Two scripts he bought before, and a fresh one she may still open.
+  const FAITHFUL: ScriptSource = {
+    catalogue: async () => {
+      const [pack] = await PACK_SOURCE.catalogue('creator-1', 'account-1');
+      return pack === undefined
+        ? []
+        : [pack, { ...pack, scriptRef: 'script-a' }, { ...pack, scriptRef: 'script-b' }];
+    },
+    history: () =>
+      Promise.resolve({
+        scripts: [
+          { scriptRef: 'script-a', sentStepIndexes: [0], boughtStepIndexes: [0] },
+          { scriptRef: 'script-b', sentStepIndexes: [0], boughtStepIndexes: [0] },
+        ],
+      }),
+  };
+  const hints = (seen: Seen) => seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+  const says = (text: string): AgentComposeInput => ({
+    ...free(INPUT),
+    history: [{ direction: 'inbound', text, at: new Date('2026-10-17T09:59:00Z') }],
+  });
+  const never = () => 0.99;
+
+  describe('the exception « au travail »', () => {
+    const atWork: Brief = { ...HOT, desireSignals: ['busy_now', 'explicit_language'] };
+
+    it('teases a faithful fan who writes from his work, sends no step, and keeps the date per fan', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: atWork },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(FAITHFUL, never),
+      );
+      const result = await draftComposer.compose(free(INPUT));
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+      expect(hints(seen).some((hint) => hint.startsWith('il lui écrit de lui-même depuis son travail'))).toBe(
+        true,
+      );
+      expect(result.fanAvailability?.workTease).toEqual({
+        startedAt: INPUT.now,
+        bitAt: null,
+        stoppedAt: null,
+      });
+    });
+
+    it('lets a script start once he bit, despite his being at work', async () => {
+      const live: FanAvailabilityRecord = {
+        ...READY,
+        workTease: { startedAt: new Date('2026-10-17T09:50:00Z'), bitAt: null, stoppedAt: null },
+      };
+      const { draftComposer, seen } = composer(
+        { brief: atWork },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(FAITHFUL, never),
+      );
+      await draftComposer.compose({ ...INPUT, fanAvailability: live });
+      expect(seen.voiceInputs?.[0]?.scriptStep?.kind).toBe('paid');
+      expect(hints(seen).some((hint) => hint.startsWith('il a mordu à son jeu depuis son travail'))).toBe(
+        true,
+      );
+    });
+
+    it('stays the ordinary rule for a fan with no scripts bought: no tease, no step', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: atWork },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      const result = await draftComposer.compose(free(INPUT));
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+      expect(hints(seen).some((hint) => hint.includes('travail'))).toBe(false);
+      expect(result.fanAvailability?.workTease).toBeUndefined();
+    });
+  });
+
+  describe('the sexting without a sale', () => {
+    it('in a hot session drawn so: words only, no step, the session recorded', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: HOT },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(FAITHFUL, () => 0),
+      );
+      const result = await draftComposer.compose(free(INPUT));
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+      expect(
+        hints(seen).some((hint) =>
+          hint.startsWith('ce soir elle se laisse aller avec lui en mots seulement'),
+        ),
+      ).toBe(true);
+      expect(result.fanAvailability?.freeSexting).toEqual({
+        sessionAt: INPUT.now,
+        noSale: true,
+        noSaleSessions: [INPUT.now],
+      });
+    });
+
+    it('sells as usual when the draw says so, or for a fan who has not bought twice', async () => {
+      const drawnOut = composer({ brief: HOT }, undefined, limitsOf(ADULT).limits, deps(FAITHFUL, never));
+      await drawnOut.draftComposer.compose(free(INPUT));
+      expect(drawnOut.seen.voiceInputs?.[0]?.scriptStep?.kind).toBe('paid');
+      const fresh = composer(
+        { brief: HOT },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, () => 0),
+      );
+      await fresh.draftComposer.compose(free(INPUT));
+      expect(fresh.seen.voiceInputs?.[0]?.scriptStep?.kind).toBe('paid');
+    });
+
+    it('goes back to a sale when he asks for a media, her trade said in her words', async () => {
+      const session: FanAvailabilityRecord = {
+        ...READY,
+        hotAt: new Date('2026-10-17T09:40:00Z'),
+        freeSexting: {
+          sessionAt: new Date('2026-10-17T09:40:00Z'),
+          noSale: true,
+          noSaleSessions: [new Date('2026-10-17T09:40:00Z')],
+        },
+      };
+      const asks: Brief = { ...HOT, intent: 'asks_for_media' };
+      const { draftComposer, seen } = composer(
+        { brief: asks },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(FAITHFUL, () => 0),
+      );
+      const result = await draftComposer.compose({ ...INPUT, fanAvailability: session });
+      expect(
+        hints(seen).some((hint) => hint.startsWith('il réclame un média : elle peut lui expliquer')),
+      ).toBe(true);
+      expect(seen.voiceInputs?.[0]?.scriptStep?.kind).toBe('paid');
+      expect(result.fanAvailability?.freeSexting).toMatchObject({ noSale: false, noSaleSessions: [] });
+    });
+  });
+
+  describe('in the middle of the action', () => {
+    const at = new Date('2026-10-17T09:30:00Z');
+    const running = {
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [
+        { stepIndex: 0, kind: 'paid' as const, outcome: 'sent' as const, priceMinor: 1_500, sentAt: at, at },
+      ],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    };
+    const inRun = (text: string) => ({ ...says(text), scriptRun: running });
+    const playing: Brief = { ...HOT, action: 'reply', scriptReply: 'answers_step' };
+
+    it('asks him what a bare murmur means', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await draftComposer.compose(inRun('mmh'));
+      expect(hints(seen)).toContain(
+        'il n’a écrit qu’un murmure sans rien dire : demande-lui ce que ça veut dire',
+      );
+    });
+
+    it('sulks when he asks for it free, and never outside the action', async () => {
+      const inside = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await inside.draftComposer.compose(inRun('tu me la fais gratuite ?'));
+      expect(hints(inside.seen).some((hint) => hint.startsWith('il marchande ou demande du gratuit'))).toBe(
+        true,
+      );
+      // No script of hers runs: nothing to sulk about in the action.
+      const none: ScriptSource = { ...PACK_SOURCE, catalogue: () => Promise.resolve([]) };
+      const outside = composer({ brief: playing }, undefined, limitsOf(ADULT).limits, deps(none, never));
+      await outside.draftComposer.compose(says('tu me la fais gratuite ?'));
+      expect(hints(outside.seen).some((hint) => hint.startsWith('il marchande'))).toBe(false);
+    });
+
+    it('pouts a little when he came before the end of her script', async () => {
+      const came: Brief = { ...playing, desireSignals: ['just_came'] };
+      const { draftComposer, seen } = composer(
+        { brief: came },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await draftComposer.compose(inRun('j’ai joui'));
+      expect(hints(seen).some((hint) => hint.startsWith('il a joui avant la fin, sans l’attendre'))).toBe(
+        true,
+      );
+      expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
+    });
+
+    it('keeps away from what kills the sexting, another man left out only when he fantasises one', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await draftComposer.compose(inRun('continue'));
+      expect(
+        hints(seen).some(
+          (hint) =>
+            hint.startsWith('pendant le jeu, elle ne parle ni de ses animaux') &&
+            hint.endsWith('ni d’un autre homme'),
+        ),
+      ).toBe(true);
+      const wanted = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(PACK_SOURCE, never),
+      );
+      await wanted.draftComposer.compose({
+        ...inRun('continue'),
+        fan: { ...INPUT.fan, notes: ['desires : candaulisme'] },
+      });
+      expect(hints(wanted.seen).some((hint) => hint.endsWith('ni d’un autre homme'))).toBe(false);
+    });
+  });
+
+  describe('the projection on the media he sees (Charles 27/11 at 0:03)', () => {
+    const at = new Date('2026-10-17T09:30:00Z');
+    const withSheet: ScriptSource = {
+      ...PACK_SOURCE,
+      catalogue: async () =>
+        (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
+          ...script,
+          // Two steps: the run is still open once he bought the first.
+          steps: [...script.steps, ...script.steps].map((step) => ({
+            ...step,
+            mediaSheet: 'Elle en bas noirs, de dos',
+          })),
+        })),
+    };
+    // What Reveal says he bought: the run follows it.
+    const sourceOf = (bought: boolean): ScriptSource => ({
+      ...withSheet,
+      history: () =>
+        Promise.resolve({
+          scripts: [{ scriptRef: 'script-demo', sentStepIndexes: [0], boughtStepIndexes: bought ? [0] : [] }],
+        }),
+    });
+    const runOf = (outcome: 'sent' | 'bought') => ({
+      scriptRef: 'script-demo',
+      status: 'open' as const,
+      steps: [{ stepIndex: 0, kind: 'paid' as const, outcome, priceMinor: 1_500, sentAt: at, at }],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: null,
+    });
+    // One message of hers since the run started, then his.
+    const input = (outcome: 'sent' | 'bought'): AgentComposeInput => ({
+      ...free(INPUT),
+      history: [
+        { direction: 'outbound', text: 'regarde 😏', at: new Date('2026-10-17T09:40:00Z') },
+        { direction: 'inbound', text: 'tu me rends fou', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+      scriptRun: runOf(outcome),
+    });
+    const playing: Brief = { ...HOT, action: 'reply', scriptReply: 'answers_step' };
+    const projects = (seen: Seen) =>
+      hints(seen).some((hint) => hint.startsWith('ramène-le au média qu’il regarde'));
+
+    it('brings him back to the step he sees, with its description', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(sourceOf(true), never),
+      );
+      await draftComposer.compose(input('bought'));
+      expect(projects(seen)).toBe(true);
+      expect(seen.voiceInputs?.[0]?.currentStepSheet).toBe('Elle en bas noirs, de dos');
+    });
+
+    it('never before he bought the step', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: playing },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(sourceOf(false), never),
+      );
+      await draftComposer.compose(input('sent'));
+      expect(projects(seen)).toBe(false);
+      expect(seen.voiceInputs?.[0]?.currentStepSheet).toBeUndefined();
+    });
+  });
+
+  describe('a media he finds disappointing', () => {
+    const at = new Date('2026-10-17T09:30:00Z');
+    const withSheet: ScriptSource = {
+      ...PACK_SOURCE,
+      catalogue: async () =>
+        (await PACK_SOURCE.catalogue('creator-1', 'account-1')).map((script) => ({
+          ...script,
+          steps: script.steps.map((step) => ({ ...step, mediaSheet: 'Elle en bas noirs, de dos' })),
+        })),
+    };
+    const boughtRun = {
+      scriptRef: 'script-demo',
+      status: 'bought_out' as const,
+      steps: [
+        {
+          stepIndex: 0,
+          kind: 'paid' as const,
+          outcome: 'bought' as const,
+          priceMinor: 1_500,
+          sentAt: at,
+          at,
+        },
+      ],
+      ignoredMessages: 0,
+      startedAt: at,
+      endedAt: at,
+    };
+    const complains: Brief = { ...BRIEF, intent: 'complaint', action: 'reply' };
+
+    it('compares it with its description, and sulks then whines if he insists for more', async () => {
+      const once = composer({ brief: complains }, undefined, limitsOf(ADULT).limits, deps(withSheet, never));
+      await once.draftComposer.compose({ ...says('bof, je m’attendais à mieux'), scriptRun: boughtRun });
+      expect(once.seen.voiceInputs?.[0]?.boughtMediaSheet).toBe('Elle en bas noirs, de dos');
+      expect(
+        hints(once.seen).some((hint) => hint.startsWith('elle lui pose des questions sur ce qui l’a déçu')),
+      ).toBe(true);
+      expect(
+        hints(once.seen).some((hint) => hint.startsWith('il insiste pour avoir quelque chose en plus')),
+      ).toBe(false);
+
+      const more = composer({ brief: complains }, undefined, limitsOf(ADULT).limits, deps(withSheet, never));
+      await more.draftComposer.compose({ ...says('bof, tu m’en envoies une autre ?'), scriptRun: boughtRun });
+      expect(
+        hints(more.seen).some((hint) => hint.startsWith('il insiste pour avoir quelque chose en plus')),
+      ).toBe(true);
+    });
   });
 });

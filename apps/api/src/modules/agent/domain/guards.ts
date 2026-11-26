@@ -28,6 +28,11 @@ export interface GuardSettings {
    * 16/11, M3). Carried here as her other limits are, to every composer.
    */
   readonly neverDo?: readonly string[];
+  /**
+   * The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): read from her persona, never
+   * listed in the repository. One in her answer is a `degrading_word`, blocking. Absent: not checked.
+   */
+  readonly degradingWords?: readonly string[];
 }
 
 /**
@@ -81,9 +86,45 @@ const CITY =
  * A day, a time, a city or « dispo » later in the same sentence: what turns a daydream into a real proposal, so the
  * daydream's exceptions below never cover it.
  */
+// What an extra is, said by her: a media offered, a bonus, a gift, something more (Charles 26/11 at 23:44).
+const FR_EXTRA =
+  "(je t'?en (offre|donne|mets|rajoute|envoie|glisse)|je t'?(offre|offrirai|rajoute|ajoute|glisse|mets|donne|envoie) (un|une|deux|2|en plus|aussi|cadeau|gratuitement)|(un|une|en|petit|petite) (bonus|cadeau|extra|surprise|offerte?|gratuite?)\\b|en (bonus|cadeau)\\b|une? (de|en) plus\\b|offerte?s?\\b|gratuite?s?\\b|gratos\\b)";
+const FR_BUYS =
+  "\\bsi tu (la |le |les |l'|me |m'|en )?(prends|achetes|debloques|ouvres|craques|valides|payes|paies|choisis)\\b";
+const EN_EXTRA =
+  "(i'?ll (throw in|add|give you|send you|gift you|include)|(a|an|one|another) (free|bonus|extra)\\b|for free\\b|on the house\\b|as a (gift|bonus)\\b|bonus\\b|(a|one) more for free)";
+const EN_BUYS = '\\bif you (buy|get|unlock|grab|take|open|purchase)\\b';
+const IT_EXTRA =
+  '(te ne (regalo|mando|aggiungo)|ti (regalo|aggiungo|mando) (un|una|anche|in piu)|in (regalo|omaggio)\\b|omaggio\\b|bonus\\b|gratis\\b)';
+const IT_BUYS = "\\bse (lo |la |li |le |l')?(compri|prendi|sblocchi|apri|acquisti)\\b";
+const ES_EXTRA =
+  '(te (regalo|doy|mando|pongo|anado) (otr[oa]|un[oa]?|de regalo|gratis|extra)|de regalo\\b|gratis\\b|bonus\\b|de extra\\b)';
+const ES_BUYS = '\\bsi (lo |la |los |las )?(compras|coges|tomas|desbloqueas|abres|pillas)\\b';
+// An extra tied to a purchase, either way round (« si tu la prends je t'en offre une », « un bonus si tu l'ouvres »),
+// an order then a gift (« prends-la et je t'en offre une »), a gift with a purchase (« deux pour le prix d'une »).
+const PURCHASE_SWEETENER = new RegExp(
+  [
+    `${FR_BUYS}.{0,70}${FR_EXTRA}`,
+    `${FR_EXTRA}.{0,70}${FR_BUYS}`,
+    `\\b(prends|achete|debloque|ouvre)(-| )(la|le|les|moi|celle|celui|ca)\\b.{0,40}\\bet\\b.{0,50}${FR_EXTRA}`,
+    "\\b(bonus|cadeau|surprise|extra|offerte?|gratuite?) (pour|avec|a) (ton |chaque |l'|cet |ce |un )?achat\\b|\\b(2|deux) pour le prix d'une?\\b",
+    `${EN_BUYS}.{0,70}${EN_EXTRA}`,
+    `${EN_EXTRA}.{0,70}${EN_BUYS}`,
+    `\\b(buy|unlock|grab|get) (it|this|that|this one|that one)\\b.{0,30}\\band (i'?ll|i will|you'?ll get|get)\\b.{0,50}${EN_EXTRA}`,
+    `${IT_BUYS}.{0,70}${IT_EXTRA}`,
+    `${IT_EXTRA}.{0,70}${IT_BUYS}`,
+    `${ES_BUYS}.{0,70}${ES_EXTRA}`,
+    `${ES_EXTRA}.{0,70}${ES_BUYS}`,
+  ].join('|'),
+);
+
 const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|ce week-end|cette semaine|dispo|disponible|\\d{1,2} ?h|${CITY})\\b`;
 
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
+  // Charles 26/11 at 23:44: never an extra (a gift, a bonus, a media offered) promised to unlock or close a purchase,
+  // in French, English, Italian or Spanish. Only an extra tied to a purchase: his own gift, a surprise of hers with no
+  // purchase, her thanks for his wishlist all pass.
+  { code: 'purchase_sweetener', pattern: PURCHASE_SWEETENER },
   // Charles 21/11, a hard rule: she never names a child or a minor, to mock him or in anything sexual. Read on every
   // text, whatever the context: an innocent one is rewritten once, then goes to a human.
   {
@@ -762,6 +803,7 @@ export function checkVoiceOutput(
 ): GuardViolation[] {
   const violations: GuardViolation[] = [];
   const forbidden = settings.forbiddenTerms.map(normalise).filter((term) => term !== '');
+  const degrading = (settings.degradingWords ?? []).map(normalise).filter((term) => term !== '');
 
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
@@ -795,6 +837,11 @@ export function checkVoiceOutput(
     for (const term of forbidden) {
       if (forbiddenMatch(text, term)) {
         violations.push({ code: 'forbidden_term', severity: 'blocking', bubbleIndex, match: term });
+      }
+    }
+    for (const term of degrading) {
+      if (forbiddenMatch(text, term)) {
+        violations.push({ code: 'degrading_word', severity: 'blocking', bubbleIndex, match: term });
       }
     }
     // Compared as typed, the variation selector aside: normalising would erase an emoji.
@@ -899,6 +946,69 @@ export function checkYouthWords(bubbles: readonly string[], sexual: boolean): Gu
     const match = YOUTH_WORDS.exec(normalise(bubble))?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
     if (match === undefined) return [];
     const violation: GuardViolation = { code: 'youth_word_in_sex', severity: 'blocking', bubbleIndex, match };
+    return [violation];
+  });
+}
+
+// Written sounds of pleasure, on the normalised text (Charles 26/11): « mmmh », « aaah », « ohhh », « haaan ». A laugh
+// (« haha »), a thinking « hmm » or a plain « oh » are not.
+const MOANS =
+  /(^|[^\p{L}])(m{3,}h*|m{2,}h+|a{2,}h+|ah{2,}|a{3,}|o{2,}h+|oh{2,}|o{3,}|ha{2,}n+|han{2,}|ouh{2,}|ou{3,}h*)(?=$|[^\p{L}])/u;
+
+/**
+ * Written sounds of pleasure only at the frankest rung of her register (Charles 26/11): below it, a soft violation, the
+ * answer goes and the calibration reads it. `atPeak`: the composer's register is `very_explicit`.
+ */
+export function checkMoans(bubbles: readonly string[], atPeak: boolean): GuardViolation[] {
+  if (atPeak) return [];
+  return bubbles.flatMap((bubble, bubbleIndex) => {
+    const match = MOANS.exec(normalise(bubble))?.[2];
+    if (match === undefined) return [];
+    const violation: GuardViolation = { code: 'moan_below_peak', severity: 'soft', bubbleIndex, match };
+    return [violation];
+  });
+}
+
+/** What kills a sexting, by kind (Charles 26/11): her pets, his partner, another man, money trouble. */
+const MOOD_KILLER_KINDS = ['her_pet', 'his_partner', 'other_man', 'money'] as const;
+type MoodKiller = (typeof MOOD_KILLER_KINDS)[number];
+
+// Generic words of the four kinds, French, English, Italian, Spanish, on the normalised text. « Ma chatte » is no pet.
+const MOOD_KILLERS: Readonly<Record<MoodKiller, RegExp>> = {
+  her_pet:
+    /\b(mon (chat|chaton|chien|chiot|lapin|perroquet|hamster|cheval)|mes (chats|chatons|chiens|chiots|lapins)|ma (chienne|jument|lapine)|my (cat|kitten|dog|puppy|bunny)|il mio (gatto|cane|gattino|cagnolino)|mi (gato|gatito|perro|perrito))\b/,
+  his_partner:
+    /\b((ta|votre) (femme|copine|compagne|meuf|epouse|nana)|your (wife|girlfriend|gf|partner|missus)|(tua moglie|la tua ragazza|la tua compagna)|tu (esposa|novia|mujer|pareja))\b/,
+  other_man:
+    /\b(mon ex|mon copain|mon mec|mon petit ami|un autre (homme|mec|gars)|my ex|my boyfriend|another (man|guy)|il mio ex|il mio ragazzo|un altro (uomo|ragazzo)|mi ex|mi novio|otro (hombre|chico|tio))\b/,
+  money:
+    /\b(mon loyer|mes dettes|des dettes|a decouvert|fin de mois|problemes? d'argent|galere d'argent|mes factures|fauchee|my rent|my bills|in debt|i'?m broke|l'affitto|debiti|el alquiler|deudas)\b/,
+};
+
+/** The kind of mood killer a text touches, the first found; `otherManWanted` leaves another man out. */
+function moodKillerIn(text: string, otherManWanted = false): MoodKiller | undefined {
+  const read = normalise(text);
+  return MOOD_KILLER_KINDS.find(
+    (kind) => (kind !== 'other_man' || !otherManWanted) && MOOD_KILLERS[kind].test(read),
+  );
+}
+
+/**
+ * What kills the sexting while her script runs (Charles 26/11): she never brings up her pets, his partner, another man
+ * (unless a fantasy of his card asks for one: `otherManWanted`) or money trouble. Soft: the answer goes and the
+ * calibration reads it; the voice is told the intention beforehand.
+ */
+export function checkMoodKillers(bubbles: readonly string[], otherManWanted: boolean): GuardViolation[] {
+  return bubbles.flatMap((bubble, bubbleIndex) => {
+    const kind = moodKillerIn(bubble, otherManWanted);
+    if (kind === undefined) return [];
+    const match = MOOD_KILLERS[kind].exec(normalise(bubble))?.[0];
+    const violation: GuardViolation = {
+      code: 'mood_killer',
+      severity: 'soft',
+      bubbleIndex,
+      ...(match !== undefined && { match }),
+    };
     return [violation];
   });
 }

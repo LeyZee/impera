@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
   checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
@@ -610,5 +612,94 @@ describe('checkExplicit', () => {
     ]) {
       expect(checkExplicit([bubble])).toEqual([]);
     }
+  });
+});
+
+describe('never an extra to unlock or close a purchase (Charles 26/11 at 23:44, `purchase_sweetener`)', () => {
+  it('blocks an extra tied to a purchase, in French, English, Italian and Spanish', () => {
+    for (const bubble of [
+      'si tu prends celle-là je t’en offre une autre 😘',
+      'Si tu l’achètes je te mets un petit bonus',
+      'je rajoute une petite surprise si tu achètes',
+      'un bonus si tu l’ouvres ce soir',
+      'prends-la et je t’en offre une 😏',
+      'deux pour le prix d’une, rien que pour toi',
+      'if you buy it I’ll throw in another one',
+      'buy this one and get a free one',
+      'se lo compri te ne regalo un altro',
+      'si lo compras te regalo otro',
+    ]) {
+      expect(codes([bubble]), bubble).toContain('purchase_sweetener');
+    }
+  });
+
+  it('lets his gift, a surprise of hers with no purchase and her thanks for his wishlist pass', () => {
+    for (const bubble of [
+      'merci pour ton cadeau 🥰',
+      'je t’ai préparé une surprise pour ce soir 😏',
+      'merci pour le cadeau de ma wishlist, tu es adorable',
+      'si tu prends le temps de me répondre, ça me fait plaisir',
+      'thank you for the gift 💕',
+    ]) {
+      expect(codes([bubble]), bubble).not.toContain('purchase_sweetener');
+    }
+  });
+
+  it('blocks: rewritten once, then a human', () => {
+    expect(
+      isBlocked(checkVoiceOutput(['si tu le prends je t’en offre une autre'], DEFAULT_GUARD_SETTINGS)),
+    ).toBe(true);
+  });
+});
+
+describe('her degrading words (Charles 26/11, `degrading_word`)', () => {
+  const settings = { ...DEFAULT_GUARD_SETTINGS, degradingWords: ['motinterdit', 'autre mot'] };
+  const found = (bubbles: string[]) => checkVoiceOutput(bubbles, settings).map((v) => [v.code, v.severity]);
+
+  it('blocks a word of her persona’s list, whole words only, accents and case ignored', () => {
+    expect(found(['T’es mon MOTINTERDIT'])).toEqual([['degrading_word', 'blocking']]);
+    expect(found(['un Autre-Mot pour toi'])).toEqual([['degrading_word', 'blocking']]);
+    expect(found(['un motinterditable'])).toEqual([]);
+  });
+
+  it('checks nothing without a list: the words are never in the repository', () => {
+    expect(checkVoiceOutput(['T’es mon motinterdit'], DEFAULT_GUARD_SETTINGS)).toEqual([]);
+  });
+});
+
+describe('written sounds of pleasure only at the frankest rung (Charles 26/11, `moan_below_peak`)', () => {
+  it('flags them softly below it, lets them at its peak', () => {
+    expect(checkMoans(['mmmh continue', 'aaah'], false).map((v) => [v.code, v.severity])).toEqual([
+      ['moan_below_peak', 'soft'],
+      ['moan_below_peak', 'soft'],
+    ]);
+    expect(checkMoans(['mmmh continue'], true)).toEqual([]);
+  });
+
+  it('a laugh, a plain oh or a thinking hum are no moans', () => {
+    expect(checkMoans(['haha t’es bête', 'oh tu crois ?', 'hmm je sais pas', 'ah bon'], false)).toEqual([]);
+  });
+});
+
+describe('what kills the sexting while her script runs (Charles 26/11, `mood_killer`)', () => {
+  it('flags softly her pets, his partner, another man and money trouble', () => {
+    for (const bubble of [
+      'mon chat me regarde là 😹',
+      'et ta copine elle dort ?',
+      'mon ex faisait pareil',
+      'j’ai mon loyer à payer demain',
+      'my dog is barking',
+    ]) {
+      expect(
+        checkMoodKillers([bubble], false).map((v) => [v.code, v.severity]),
+        bubble,
+      ).toEqual([['mood_killer', 'soft']]);
+    }
+  });
+
+  it('lets another man pass when a fantasy of his asks for one, and leaves the rest', () => {
+    expect(checkMoodKillers(['imagine un autre homme qui nous regarde'], true)).toEqual([]);
+    expect(checkMoodKillers(['imagine un autre homme qui nous regarde'], false)).toHaveLength(1);
+    expect(checkMoodKillers(['ma chatte te réclame', 'continue comme ça'], false)).toEqual([]);
   });
 });

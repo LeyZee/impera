@@ -243,6 +243,7 @@ export function createLlmGateway(deps: LlmGatewayDeps): LlmGateway {
           input.waitingStep,
           input.fantasy,
           input.currentStepSheet,
+          input.boughtMediaSheet,
         ),
         canary,
       });

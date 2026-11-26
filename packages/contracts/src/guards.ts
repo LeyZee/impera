@@ -48,6 +48,14 @@ export const GUARD_CODES = [
   'minor_reference',
   // Charles 26/11: in a sexual message, no word of youth for her or for anyone (« petite », « jeunette », « lolita »…).
   'youth_word_in_sex',
+  // Charles 26/11 (sexto, lot 2): no degrading insult in her words, from the list of her persona (`degrading_words`).
+  'degrading_word',
+  // Charles 26/11: written sounds of pleasure only at the frankest rung (`very_explicit`); a regeneration below it.
+  'moan_below_peak',
+  // Charles 26/11: what kills a sexting while her script runs (her pets, his partner, another man, money trouble).
+  'mood_killer',
+  // Charles 26/11 at 23:44: never an extra (a gift, a bonus, a media offered) promised to unlock or close a purchase.
+  'purchase_sweetener',
 ] as const;
 export const GuardCodeSchema = z.enum(GUARD_CODES);
 export type GuardCode = z.infer<typeof GuardCodeSchema>;

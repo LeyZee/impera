@@ -6,6 +6,7 @@ import {
   supplementsIn,
   type CustomPriceGrid,
   type FanFlags,
+  type FanTier,
   type MediaDescription,
   type MeetingTierSettings,
   type ObjectionReplies,
@@ -65,9 +66,12 @@ import {
   withoutHerLimits,
   type DesireMap,
 } from '../domain/fantasy-match';
-import { gaugeDue, holdsBackNow } from '../domain/gauge';
+import { freeSextingTurn } from '../domain/free-sexting';
+import { gaugeDue, holdsBackNow, projectionDue } from '../domain/gauge';
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
   checkYouthWords,
   previousTurnsOf,
@@ -112,6 +116,14 @@ import {
 } from '../domain/script-run';
 import { scriptTurn, type ScriptTurn } from '../domain/script-turn';
 import {
+  cameBeforeFinale,
+  haggles,
+  insistsForMore,
+  isBareMurmur,
+  peakSeen,
+  wantsOtherMan,
+} from '../domain/sexting-moves';
+import {
   declaredAdultAge,
   checkWelcome,
   sexualizationDecision,
@@ -130,6 +142,7 @@ import {
   type StandingLimits,
 } from '../domain/standing';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
+import { heWroteFirst, workTeaseTurn, type WorkTeasePhase } from '../domain/work-tease';
 
 import { VOICE_EXAMPLES_MAX, type VoiceExample } from './calibration-record';
 
@@ -281,6 +294,16 @@ export interface ComposeTurnInput {
   };
   /** Her settings for the meeting tiers (guide 26/11), typed by the owner; absent, nobody goes past the second. */
   readonly meetingTiers?: MeetingTierSettings;
+  /**
+   * The random source of the draw of a sexting without a sale (Charles 26/11, `freeSextingTurn`): a number in [0, 1).
+   * Absent, `Math.random`; a test gives a fixed one.
+   */
+  readonly random?: () => number;
+  /**
+   * His tier in « Fans » (`fanTierOf`, the owner's thresholds), when the caller reads it: good, very good or whale makes
+   * him eligible to a sexting without a sale as two scripts bought do. Absent: his scripts alone decide.
+   */
+  readonly fanTier?: FanTier | null;
 }
 
 /** What a script decision reads (`scriptTurn`), besides the brain's reading, his heat and the policy's facts. */
@@ -405,6 +428,8 @@ const REWRITE_REASONS: Partial<Record<GuardViolation['code'], string>> = {
   repetition: 'elle reprenait une phrase ou une formule déjà employée avec lui, ouverture comprise',
   explicit_before_age: 'elle était trop explicite pour le moment',
   youth_word_in_sex: 'elle employait un mot de jeunesse dans un message sexuel',
+  degrading_word: 'elle employait une insulte dégradante qu’elle ne dit jamais',
+  purchase_sweetener: 'elle promettait un cadeau ou un extra pour qu’il achète',
   meeting_promise: 'elle acceptait une rencontre concrète',
   contact_info: 'elle donnait un contact',
   off_platform_payment: 'elle parlait de payer ailleurs',
@@ -660,12 +685,59 @@ const CUSTOM_INSTEAD_HINT =
 /** Her gauge in the middle of the action (Charles 26/11): the intention only, her words never the same. */
 const GAUGE_HINT =
   'jauge-le : fais-lui dire ou décrire dans quel état il est, avec tes mots à toi et jamais les mêmes que la dernière fois ; jamais de photo à lui demander';
+/**
+ * On a step he sees (Charles 27/11 at 0:03): she brings him back to the media in front of him and makes him project
+ * himself, every few of her messages (`projectionDue`), never a gesture the step's description does not show.
+ */
+const PROJECTION_HINT =
+  'ramène-le au média qu’il regarde (ce qu’on y voit, d’après la description de l’étape en cours) et fais-le se projeter : ce qu’il ferait, lui, avec ça ; jamais un geste absent de la description';
 /** The message right after he bought her step (Charles 26/11 at 23:09): she asks whether he liked it. */
 const AFTER_PURCHASE_HINT =
   'il vient de prendre ce qu’elle lui a envoyé : demande-lui s’il a aimé, ce que ça lui fait';
 /** A compliment that is no advance (Charles 26/11 at 23:09): she draws him out, the sexting is not opened for him. */
 const COMPLIMENT_HINT =
   'il lui fait un compliment, pas une avance : elle le reçoit avec plaisir et lui fait dire ce qui lui plaît, ce qu’il imagine';
+/**
+ * The exception « au travail » (Charles 26/11, `workTeaseTurn`), each phase an intention: her words are hers, his work
+ * and his place come from what she knows of him.
+ */
+const WORK_TEASE_HINTS: Readonly<Record<Exclude<WorkTeasePhase, 'none'>, string>> = {
+  tease:
+    'il lui écrit de lui-même depuis son travail : elle peut le chauffer sur le thème de son travail, adapté à son métier et à son lieu (elle peut lui demander s’il est seul dans un bureau ou en open space) ; elle le taquine d’abord, sans rien proposer, et s’arrête net s’il dit qu’il ne peut pas',
+  may_start:
+    'il a mordu à son jeu depuis son travail : elle reste sur le thème de son travail et de son lieu, et s’arrête net s’il dit qu’il ne peut pas',
+  stopped:
+    'il dit qu’il ne peut pas là, au travail : elle s’arrête net, légère et complice, sans insister ni rien proposer',
+};
+/** A hot session drawn without a sale (Charles 26/11, `freeSextingTurn`): words only. */
+const FREE_SEXTING_HINT =
+  'ce soir elle se laisse aller avec lui en mots seulement : aucun média, rien à vendre, aucune proposition, aucun prix';
+/** He asks for a media in a session without a sale: it goes back to a sale, her trade explained in her words. */
+const MEDIA_IS_HER_TRADE_HINT =
+  'il réclame un média : elle peut lui expliquer, à sa façon et sans reproche, que c’est son métier, qu’elle en vit et qu’elle n’offre pas ses médias';
+/** He uses a degrading word toward her (Charles 26/11): a light reframing. */
+const DEGRADING_FROM_HIM_HINT =
+  'il emploie envers elle un mot dégradant : elle le recadre légèrement, avec humour, sans casser son ego, et ne reprend jamais ce mot';
+/** He came before the end of her script (Charles 26/11): a little pout, nothing to sell. */
+const HE_CAME_EARLY_HINT =
+  'il a joui avant la fin, sans l’attendre : une petite moue, il ne l’a pas attendue alors que c’est un échange, tendre au fond, sans reproche ni chantage ; rien à vendre ce soir';
+/** He haggles or asks for it free in the middle of the action (Charles 26/11): she sulks, the price never moves. */
+const HAGGLE_HINT =
+  'il marchande ou demande du gratuit en plein jeu : elle boude, lui rappelle qu’elle n’est pas un marché, sans insulte ni mépris ; le prix ne bouge pas';
+/** A bare murmur in the middle of the action (Charles 26/11). */
+const MURMUR_HINT = 'il n’a écrit qu’un murmure sans rien dire : demande-lui ce que ça veut dire';
+/** What kills the sexting while her script runs (Charles 26/11): never brought up by her. */
+const MOOD_KILLER_HINT =
+  'pendant le jeu, elle ne parle ni de ses animaux à elle, ni de la compagne du fan, ni d’argent qui manque';
+const MOOD_KILLER_OTHER_MAN_HINT = 'ni d’un autre homme';
+/** He finds the media he bought disappointing (Charles 26/11): questions, the media's description beside it. */
+const DISAPPOINTED_MEDIA_HINT =
+  'elle lui pose des questions sur ce qui l’a déçu et compare avec ce que la description du média annonçait';
+/** He insists for something more after a disappointing media (Charles 26/11): sulk, then whine, never angry. */
+const INSISTS_FOR_MORE_HINT =
+  'il insiste pour avoir quelque chose en plus : elle boude, puis chouine un peu, sans colère ; jamais de remise, jamais de média offert';
+/** Written sounds of pleasure (Charles 26/11): only at the frankest rung. */
+const NO_MOANS_HINT = 'pas de bruits de plaisir écrits à ce stade';
 /** In the middle of the action she may write longer bubbles to tell what she feels (Charles 26/11 at 23:09). */
 const ACTION_BUBBLE_FACTOR = 2;
 /** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
@@ -1200,10 +1272,77 @@ export async function composeTurn(
           threshold,
           now: input.situation.now,
         });
-  const scriptStart =
-    availability === undefined || threshold === undefined
+  // His scripts with a paid step bought: what makes him faithful for the exceptions below (Charles 26/11).
+  const scriptsBought =
+    input.scripts?.history?.scripts.filter((sent) => sent.boughtStepIndexes.length > 0).length ?? 0;
+  // Anything sexual may be offered him: his adult age confirmed, nothing explicit not asked, no care, no trap, no risk.
+  const sexAllowed =
+    brief !== undefined &&
+    ageConfirmed &&
+    !noExplicit &&
+    !care &&
+    trap.replyBrief === undefined &&
+    !brief.risks.some((risk) => NO_SALE_RISKS.includes(risk));
+  // The exception « au travail » (Charles 26/11): a faithful fan who writes by himself from his work, once per span.
+  const work =
+    availability === undefined || brief === undefined
       ? undefined
-      : scriptStartGate(availability, heat, threshold);
+      : workTeaseTurn({
+          previous: input.availability?.workTease ?? null,
+          now: input.situation.now,
+          signals: brief.desireSignals ?? [],
+          scriptsBought,
+          heWroteFirst: heWroteFirst(input.history.map(datedOf), input.situation.now),
+          bites: sexualizes(brief, input.fanText),
+          allowed: sexAllowed,
+        });
+  // The sexting without a sale (Charles 26/11): drawn once per hot session, for a fan who pays well.
+  const free =
+    availability === undefined || brief === undefined
+      ? undefined
+      : freeSextingTurn({
+          record: input.availability?.freeSexting ?? null,
+          sessionAt: availability.hotAt,
+          scriptsBought,
+          ...(input.fanTier !== undefined && { fanTier: input.fanTier }),
+          lastSpentAt: input.situation.lastSpentAt,
+          now: input.situation.now,
+          asksForMedia: brief.intent === 'asks_for_media' || offerSignals(brief).fanAsksForPaid,
+          allowed: sexAllowed,
+          random: input.random ?? Math.random,
+        });
+  const noSale = free?.noSale === true;
+  // Once he bit at his work, his being busy no longer closes the gate: his heat and his sexualizing still do.
+  const atWorkMayStart = work?.phase === 'may_start';
+  const gateRecord: FanAvailabilityRecord | undefined =
+    availability === undefined
+      ? undefined
+      : atWorkMayStart
+        ? { ...availability, state: 'confirmed' }
+        : availability;
+  // What the conversation keeps: his availability, the work tease and the draw of the session, each when known.
+  const workRecord = work?.record ?? input.availability?.workTease ?? null;
+  const freeRecord = free?.record ?? input.availability?.freeSexting ?? null;
+  const availabilityKept: FanAvailabilityRecord | undefined =
+    availability === undefined
+      ? undefined
+      : {
+          ...availability,
+          ...(workRecord !== null && { workTease: workRecord }),
+          ...(freeRecord !== null && { freeSexting: freeRecord }),
+        };
+  const scriptStart =
+    gateRecord === undefined || threshold === undefined
+      ? undefined
+      : scriptStartGate(gateRecord, heat, threshold);
+  // She holds him back when he is about to come, until he has seen the frankest step of her script (Charles 26/11).
+  const storedRun = input.scripts?.latest ?? null;
+  const storedPeakSeen =
+    storedRun?.status === 'open' &&
+    peakSeen(
+      storedRun,
+      input.scripts?.catalogue.find((one) => one.scriptRef === storedRun.scriptRef),
+    );
   const heCame = brief?.desireSignals?.includes('just_came') === true;
   // He left in the middle of a script and comes back hot: she teases him first, and no step goes on this message.
   const tease =
@@ -1263,7 +1402,7 @@ export async function composeTurn(
           // In care, the run still follows his message and Reveal, and no step goes (ADR 0088 § 2).
           careMode: care,
           ...(scriptStart !== undefined && { startGate: scriptStart }),
-          ...(availability !== undefined && { availability: availability.state }),
+          ...(gateRecord !== undefined && { availability: gateRecord.state }),
           reply: brief?.scriptReply ?? null,
           countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
           heCame,
@@ -1280,7 +1419,11 @@ export async function composeTurn(
             customOrder === undefined &&
             objectionReply === undefined &&
             // About to come: she asks him to hold back, the next step waits until he held (Charles 26/11).
-            !holdsBackNow(brief.desireSignals) &&
+            !holdsBackNow(brief.desireSignals, storedPeakSeen) &&
+            // At his work, she teases first and stops dead when he cannot; a session without a sale sells nothing.
+            work?.phase !== 'tease' &&
+            work?.phase !== 'stopped' &&
+            !noSale &&
             sexualization?.kind !== 'steer_back',
         });
   const scriptStep = voiceStepOf(scripts);
@@ -1494,6 +1637,7 @@ export async function composeTurn(
             heIsCrude: brief.desireSignals?.includes('explicit_language') === true,
             ageConfirmed,
             noExplicit,
+            boughtBefore: input.situation.spentCents > 0,
           });
   // His fantasy (Charles 26/11), only once his adult age is confirmed and unless he asked for nothing explicit, never in
   // care: the one the script running with him meets, to play on; on a heated turn, those no script meets, never promised.
@@ -1509,20 +1653,26 @@ export async function composeTurn(
       : (fantasyMatchOf(runningScript, desireMap)?.matches ?? []);
   const noScript = fantasyAllowed && register !== null ? uncovered : [];
   // He is about to come while her script runs: she asks him to hold back, and the run goes on (Charles 26/11).
-  const holdsBack = !care && !heCame && running !== null && holdsBackNow(brief?.desireSignals);
+  const holdsBack =
+    !care &&
+    !heCame &&
+    running !== null &&
+    holdsBackNow(brief?.desireSignals, peakSeen(running, runningScript));
   // Every few of her messages while her script runs, she checks where he is (Charles 26/11); not when she brings a step
   // or holds him back.
+  const herMessagesInRun =
+    running === null
+      ? 0
+      : input.history.filter(
+          (turn) => turn.from === 'creator' && turn.at !== undefined && turn.at >= running.startedAt,
+        ).length;
   const gauge =
     fantasyAllowed &&
     running !== null &&
     !holdsBack &&
     !heCame &&
     scriptStep === undefined &&
-    gaugeDue(
-      input.history.filter(
-        (turn) => turn.from === 'creator' && turn.at !== undefined && turn.at >= running.startedAt,
-      ).length,
-    );
+    gaugeDue(herMessagesInRun);
   // Between two steps, the sexting feeds on what he has in front of him (Charles 26/11 at 22:47): the last step he can
   // see, offered or bought, never a paid step still locked.
   const currentStepSheet =
@@ -1530,6 +1680,9 @@ export async function composeTurn(
       ? undefined
       : visibleStepSheet(running, runningScript);
   const sexualTurn = register !== null || running !== null;
+  // On a step he sees, every few of her messages: back to the media in front of him, and he projects himself (0:03).
+  const projection =
+    currentStepSheet !== undefined && !holdsBack && !heCame && projectionDue(herMessagesInRun);
   // In the middle of the action: her script runs and her words are frank; longer bubbles pass (Charles 23:09).
   const inAction = running !== null && (register === 'explicit' || register === 'very_explicit');
   // The first message of his after he bought her step: she asks whether he liked it, unless the tension already does.
@@ -1550,6 +1703,25 @@ export async function composeTurn(
     customOrder === undefined;
   const fantasy: VoiceFantasy | undefined =
     playOn.length === 0 && noScript.length === 0 ? undefined : { playOn, noScript };
+  // The creator's calibration of the sexting (Charles 26/11), each an intention for the voice.
+  const cameEarly = heCame && cameBeforeFinale(storedRun);
+  const inPlay = running !== null && !care;
+  const haggling = inPlay && brief !== undefined && haggles(brief.intent, input.fanText);
+  const murmur = inPlay && isBareMurmur(input.fanText);
+  const otherManWanted = wantsOtherMan(desireMap);
+  const degradedByHim =
+    brief !== undefined &&
+    !care &&
+    (persona.guardSettings.degradingWords ?? []).some((term) => touchesTerm(input.fanText, term));
+  const workHint = work === undefined || work.phase === 'none' || care ? null : WORK_TEASE_HINTS[work.phase];
+  // His disappointment with what he bought: the media's description beside it, and his insisting for more.
+  const boughtStep = storedRun?.steps.findLast((step) => step.outcome === 'bought');
+  const boughtMediaSheet =
+    boughtStep === undefined
+      ? undefined
+      : input.scripts?.catalogue.find((one) => one.scriptRef === storedRun?.scriptRef)?.steps[
+          boughtStep.stepIndex
+        ]?.mediaSheet;
   const voiceBrief: Brief =
     heCame && !care
       ? {
@@ -1557,7 +1729,7 @@ export async function composeTurn(
           toneHints: [
             ...answered.toneHints,
             HE_CAME_HINT,
-            ...(heCameUnpaid ? [HE_CAME_UNPAID_HINT] : []),
+            ...(cameEarly ? [HE_CAME_EARLY_HINT] : heCameUnpaid ? [HE_CAME_UNPAID_HINT] : []),
             ...(farewell === null ? [] : [FAREWELL_HINTS[farewell]]),
           ],
         }
@@ -1573,6 +1745,16 @@ export async function composeTurn(
                 ...(reminds ? [UNOPENED_STEP_HINT] : []),
                 ...(meeting === undefined ? [] : [meetingHint(meeting)]),
                 ...(insulted ? [INSULT_HINT] : afterInsult ? [AFTER_INSULT_HINT] : []),
+                ...(degradedByHim ? [DEGRADING_FROM_HIM_HINT] : []),
+                ...(workHint === null ? [] : [workHint]),
+                ...(noSale ? [FREE_SEXTING_HINT] : []),
+                ...(free?.backToSale === true ? [MEDIA_IS_HER_TRADE_HINT] : []),
+                ...(haggling ? [HAGGLE_HINT] : []),
+                ...(murmur ? [MURMUR_HINT] : []),
+                ...(inPlay && register !== null
+                  ? [otherManWanted ? MOOD_KILLER_HINT : `${MOOD_KILLER_HINT}, ${MOOD_KILLER_OTHER_MAN_HINT}`]
+                  : []),
+                ...(sexualTurn && register !== 'very_explicit' ? [NO_MOANS_HINT] : []),
                 ...(warm ? [KEEP_WARM_HINT] : []),
                 ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
                 ...occasionHints,
@@ -1581,12 +1763,14 @@ export async function composeTurn(
                 ...(compliment ? [COMPLIMENT_HINT] : []),
                 ...(holdsBack ? [CLOSE_TO_COMING_HINT] : []),
                 ...(gauge ? [GAUGE_HINT] : []),
+                ...(projection ? [PROJECTION_HINT] : []),
                 ...(suggestsCustom ? [CUSTOM_INSTEAD_HINT] : []),
                 ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
                 ...(register !== null && running !== null ? [NOT_SHOWN_YET_HINT] : []),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
-                ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
+                ...(complaint ? [PURCHASE_COMPLAINT_HINT, DISAPPOINTED_MEDIA_HINT] : []),
+                ...(complaint && insistsForMore(input.fanText) ? [INSISTS_FOR_MORE_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),
                 ...(teases === null ? [] : [ABANDON_HINTS[teases]]),
               ],
@@ -1610,7 +1794,7 @@ export async function composeTurn(
       ...(saleTrouble !== undefined && { saleTrouble }),
       ...(customOrderKept !== undefined && { customOrderTurn: customOrderKept }),
       ...(scripts !== undefined && { scripts }),
-      ...availabilityOut(availability),
+      ...availabilityOut(availabilityKept),
       ...(trap.isTrap && { trap }),
       ...(droppedNotes.length > 0 && { droppedNotes }),
       ...(brief && { brief }),
@@ -1641,6 +1825,7 @@ export async function composeTurn(
       ...(waitingStep !== undefined && { waitingStep }),
       ...(fantasy !== undefined && { fantasy }),
       ...(currentStepSheet !== undefined && { currentStepSheet }),
+      ...(complaint && boughtMediaSheet !== undefined && { boughtMediaSheet }),
     },
     exampleIds,
   );
@@ -1665,6 +1850,9 @@ export async function composeTurn(
       ...(ageConfirmed && !noExplicit && !care ? [] : checkExplicit(written)),
       // No word of youth in a sexual message (Charles 26/11): heated, or her script running.
       ...checkYouthWords(written, sexualTurn),
+      // Written sounds of pleasure only at the frankest rung; what kills the sexting while her script runs (Charles 26/11).
+      ...(sexualTurn ? checkMoans(written, register === 'very_explicit') : []),
+      ...(inPlay ? checkMoodKillers(written, otherManWanted) : []),
       ...(care ? checkCare(written) : []),
       ...(customOrder === undefined && !suggestsCustom ? [] : checkNoCommitment(written)),
       // He did not go there and she does not open it: she welcomes him, never slows him down (Charles, 20/11). Once the
@@ -1694,9 +1882,9 @@ export async function composeTurn(
     ...(scripts !== undefined && { scripts }),
     // She asked only if the voice wrote: a question never written is asked again.
     ...availabilityOut(
-      availability !== undefined && asking && voice.ok
-        ? { ...availability, askedAt: input.situation.now }
-        : availability,
+      availabilityKept !== undefined && asking && voice.ok
+        ? { ...availabilityKept, askedAt: input.situation.now }
+        : availabilityKept,
     ),
     ...(trap.isTrap && { trap }),
     ...(droppedNotes.length > 0 && { droppedNotes }),

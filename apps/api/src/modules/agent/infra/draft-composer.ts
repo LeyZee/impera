@@ -6,6 +6,7 @@ import type {
   AlertTrigger,
   CopilotTrace,
   FanFlags,
+  FanTier,
   HandoffCause,
   MediaDescription,
   MediaFlag,
@@ -127,6 +128,11 @@ export interface AgentComposeInput {
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
     readonly firstMessageAt: Date | null;
+    /**
+     * His tier in « Fans » (`fanTierOf`, the owner's thresholds), when the caller reads it: good, very good or whale
+     * makes him eligible to a sexting without a sale (Charles 26/11). Absent: his scripts alone decide.
+     */
+    readonly tier?: FanTier | null;
   };
   /** His desire score as stored on the conversation (P3-12), and when it was counted; absent, he starts at 0. */
   readonly desire?: { readonly score: number; readonly at: Date };
@@ -320,6 +326,8 @@ export interface ComposerPersonaFields {
 
 export interface DraftComposerDeps {
   readonly gateway: LlmGateway;
+  /** The random source of the draw of a sexting without a sale (Charles 26/11); absent, `Math.random`. */
+  readonly random?: () => number;
   /**
    * A fixed persona, with the fields below, when nothing reads hers per creator (`personaOf`): tests and the terminal.
    * Absent beside `personaOf`: a composer that reads hers has no other persona to fall back on.
@@ -1210,6 +1218,8 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         scripts,
         ...(input.fanAvailability !== undefined && { availability: input.fanAvailability }),
         ...(input.meeting !== undefined && { meeting: input.meeting }),
+        ...(deps.random !== undefined && { random: deps.random }),
+        ...(input.fan.tier !== undefined && { fanTier: input.fan.tier }),
         saleTrouble: {
           seen: input.saleTrouble ?? NO_SALE_TROUBLE,
           // He bought from her: Reveal's spending, or a step of hers recorded paid.

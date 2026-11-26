@@ -5,6 +5,8 @@ import { checkCare } from '../care';
 import { checkNoCommitment } from '../custom-order';
 import {
   checkExplicit,
+  checkMoans,
+  checkMoodKillers,
   checkVoiceOutput,
   checkYouthWords,
   DEFAULT_GUARD_SETTINGS,
@@ -176,7 +178,12 @@ describe('voice guards (P3-13)', () => {
   });
 
   it('emits only codes of GUARD_CODES, and each one not obsolete has a case that emits it', () => {
-    const settings = { ...DEFAULT_GUARD_SETTINGS, forbiddenTerms: ['brocoli'], petNames: ['loulou'] };
+    const settings = {
+      ...DEFAULT_GUARD_SETTINGS,
+      forbiddenTerms: ['brocoli'],
+      petNames: ['loulou'],
+      degradingWords: ['motinterdit'],
+    };
     const read = (bubbles: string[], context: GuardContext = {}) =>
       checkVoiceOutput(bubbles, settings, context).map((v) => v.code);
     const emitted = new Set<string>([
@@ -199,6 +206,9 @@ describe('voice guards (P3-13)', () => {
       ...read(['Tu as un chien ?'], { previousTurns: [['Tu aimes le sport ?'], ['Tu bosses demain ?']] }),
       ...checkExplicit(['J’ai envie de te sucer']).map((v) => v.code),
       ...checkYouthWords(['ta jeunette t’attend'], true).map((v) => v.code),
+      ...read(['espèce de motinterdit', 'si tu la prends je t’en offre une autre']),
+      ...checkMoans(['mmmh'], false).map((v) => v.code),
+      ...checkMoodKillers(['mon chat me regarde'], false).map((v) => v.code),
       ...checkCare(['Je t’envoie une petite vidéo pour te remonter le moral']).map((v) => v.code),
       ...checkNoCommitment(['ok je te fais ça demain']).map((v) => v.code),
       ...checkWelcome(['Tu y vas un peu fort, non']).map((v) => v.code),

@@ -38,5 +38,9 @@ export const GUARD_LABELS: Readonly<Record<GuardCode, string>> = {
   place_named: 'le nom d’un lieu où elle vit (sa ville, son quartier)',
   minor_reference: 'un enfant ou un mineur nommé, pour rire ou dans un contexte sexuel',
   youth_word_in_sex: 'un mot de jeunesse (« petite », « jeunette »…) dans un message sexuel',
+  degrading_word: 'une insulte dégradante de sa liste (fiche persona) dans ses mots à elle',
+  moan_below_peak: 'des bruits écrits de plaisir avant le plus fort de l’action',
+  mood_killer: 'un sujet qui casse le sexto (ses animaux, la compagne du fan, un autre homme, l’argent)',
+  purchase_sweetener: 'un cadeau, un bonus ou un extra promis pour décrocher un achat',
   unwarranted_brake: 'un frein (« tu y vas un peu fort », « tu vises direct ») sur un simple compliment',
 };

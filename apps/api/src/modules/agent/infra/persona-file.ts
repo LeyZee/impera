@@ -30,6 +30,8 @@ export interface PersonaForModels {
   readonly forbiddenTerms: readonly string[];
   /** What she never does (`never_do`): a custom order that asks for one is declined, never taken (audit du 16/11, M3). */
   readonly neverDo?: readonly string[];
+  /** The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): a guard blocks them. */
+  readonly degradingWords?: readonly string[];
   /**
    * Her pace of scripts and the heat they wait for (`agent.strategies.script_launch`), applied by `offerDecision`, never by a
    * prompt.
@@ -165,6 +167,7 @@ export function personaForModels(
     personaSheet: stringify(forModels).trim(),
     forbiddenTerms: [...rules.disgusts, ...rules.never_say].filter((term) => !isPlaceholder(term)),
     neverDo: rules.never_do.filter((term) => !isPlaceholder(term)),
+    degradingWords: (rules.degrading_words ?? []).filter((term) => !isPlaceholder(term)),
     offerLimits: {
       cooldownHours: agent.strategies.script_launch.cooldown_hours,
       minDesire: scriptMinDesire,
@@ -200,5 +203,7 @@ export function guardSettingsOf(persona: PersonaForModels): GuardSettings {
     forbiddenEmojis: persona.forbiddenEmojis,
     ...(persona.neverDo !== undefined && persona.neverDo.length > 0 && { neverDo: persona.neverDo }),
     ...(persona.petNames.length > 0 && { petNames: persona.petNames }),
+    ...(persona.degradingWords !== undefined &&
+      persona.degradingWords.length > 0 && { degradingWords: persona.degradingWords }),
   };
 }

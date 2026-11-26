@@ -244,6 +244,11 @@ export interface VoiceInput extends ConversationInput {
    * paid step he has not bought. Absent, none.
    */
   readonly currentStepSheet?: string;
+  /**
+   * What the media he bought and finds disappointing shows, by its description (Charles 26/11): she compares it with
+   * what he says. Absent, none.
+   */
+  readonly boughtMediaSheet?: string;
 }
 
 /**
