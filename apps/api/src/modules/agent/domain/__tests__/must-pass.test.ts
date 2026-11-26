@@ -263,6 +263,8 @@ describe('permitted phrases that must always pass, input nets', () => {
     'vestito corto',
     'hacerte un bebé',
     'vestido rojo',
+    'daddy',
+    'appelle-moi papa',
   ])('the universal filter leaves « %s » playable', (item) => {
     expect(forbiddenThemeOf(item)).toBeNull();
   });

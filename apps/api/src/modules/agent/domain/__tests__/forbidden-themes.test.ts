@@ -20,6 +20,10 @@ describe('forbiddenThemeOf (Sécurité, #1043)', () => {
     ['avec un animal', 'animal'],
     ['perro', 'animal'],
     ['avoir une enfant', 'youth'],
+    ['pendant qu’elle dort', 'no_consent'],
+    ['qu’elle fasse semblant de dormir', 'no_consent'],
+    ['dans son sommeil', 'no_consent'],
+    ['daddy et sa fille', 'family'],
     ['jouer une fille de 15 ans au lit', 'youth'],
   ])('filters « %s » (%s)', (item, theme) => {
     expect(forbiddenThemeOf(item)).toBe(theme);
@@ -39,6 +43,8 @@ describe('forbiddenThemeOf (Sécurité, #1043)', () => {
     'give you a baby',
     'hacerte un bebé',
     'farti un figlio',
+    'daddy',
+    'appelle-moi papa',
   ])('leaves « %s »', (item) => {
     expect(forbiddenThemeOf(item)).toBeNull();
   });
