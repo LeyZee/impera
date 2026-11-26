@@ -1,12 +1,17 @@
-import { normalise } from '@impera/contracts';
+import { normalise, normaliseWords } from '@impera/contracts';
+
+import { namesYouth } from './forbidden-themes';
+import { checkExplicit } from './guards';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
  * is a minor, or that he wants to hurt himself, and a human answers him before any model reads it. The brain still
  * reads the risks it alone can see; this net only catches what is written plainly, so that a model's miss never
- * leaves the bot chatting with a minor or a fan in danger. A false alarm costs one handoff to a chatter.
+ * leaves the bot chatting with a minor or a fan in danger. A false alarm costs one handoff to a chatter. A fantasy of
+ * his that puts a child or a minor in a sexual act (`minor_fantasy`, Charles 26/11 at 23:45) is read the same way and
+ * has the same effect as a doubt on his age.
  */
-export type SafetySign = 'minor_suspected' | 'self_harm';
+export type SafetySign = 'minor_suspected' | 'minor_fantasy' | 'self_harm';
 
 // An age under 18, in digits or in words: « 16 », « seize », « dix-sept ».
 const UNDER_18 = '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix(?:[ -]?sept)?)';
@@ -79,6 +84,31 @@ const SELF_HARM = [
   /\bme (?:tirer une balle|jeter d'un pont|jeter par la fenetre|jeter sous un train)\b/u,
 ];
 
+// A sexual message of his, in neutral words (fr/en/it/es), or one explicit by the guards' own words. A role he asks
+// her to play counts: « joue une … pour moi ».
+const SEXUAL_WORDS =
+  /\b(sexe|sexuel(le)?s?|sexy|faire l amour|coucher avec|couche avec|nue?s?|excitee?s?|envie de toi|caresser|au lit|fantasmes?|fantasmer|fantasme sur|joue[rsz]? (une?|la|le)|jeu de role|sex|sexual|make love|making love|naked|nude|horny|in bed|turned on|fantasy|fantasize|fantasise|roleplay|role play|fare l amore|nud[ao]|eccitat[oa]|a letto|sesso|fantasia|gioco di ruolo|hacer el amor|desnud[oa]|excitad[oa]|en la cama|sexo|fantasias?|juego de rol)\b/u;
+// A length of time is no age: « marié depuis 15 ans », « 15 ans de mariage », « for 15 years », « hace 15 años ».
+const AGE_NUMBER =
+  '(?:1[0-7]|[1-9]|onze|douze|treize|quatorze|quinze|seize|dix sept|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)';
+const AGE_UNIT = '(?:ans?|years?|anni|anos)';
+const DURATION = new RegExp(
+  `\\b(?:depuis|il y a|pendant|fait|for|since|da|desde|hace|durante|per) ${AGE_NUMBER} ?${AGE_UNIT}\\b|\\b${AGE_NUMBER} ?${AGE_UNIT} (?:de|d|que|qu|of|ago|fa|di|en)\\b`,
+  'gu',
+);
+
+/**
+ * He puts a child or a minor in a sexual act, told, wished or asked of her as a role, of himself or of someone else: a
+ * word of youth or of a minor, a school role or an age under 18, in a sexual message. Procreation between adults
+ * (« te faire un enfant »), « ma petite » said to her, a « petite robe » or a game of age with no minor's word (« prof
+ * et étudiante ») are left. In doubt, a human: a false alarm costs a handoff.
+ */
+function minorFantasy(fanText: string): boolean {
+  const words = normaliseWords(fanText);
+  const sexual = SEXUAL_WORDS.test(words) || checkExplicit([fanText]).length > 0;
+  return sexual && namesYouth(words.replace(DURATION, ' '), fanText);
+}
+
 /**
  * The signs his own words carry, the gravest first; none when nothing is written plainly. A birth year is read
  * against `now`'s year.
@@ -95,6 +125,7 @@ export function safetySigns(fanText: string, now: Date = new Date()): SafetySign
     )
   )
     signs.push('minor_suspected');
+  if (minorFantasy(fanText)) signs.push('minor_fantasy');
   if (SELF_HARM.some((pattern) => pattern.test(text))) signs.push('self_harm');
   return signs;
 }

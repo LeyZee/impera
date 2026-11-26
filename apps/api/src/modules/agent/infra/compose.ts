@@ -66,6 +66,7 @@ import {
   withoutHerLimits,
   type DesireMap,
 } from '../domain/fantasy-match';
+import { withoutForbiddenThemes } from '../domain/forbidden-themes';
 import { freeSextingTurn } from '../domain/free-sexting';
 import { gaugeDue, holdsBackNow, projectionDue } from '../domain/gauge';
 import {
@@ -74,6 +75,7 @@ import {
   checkMoodKillers,
   checkVoiceOutput,
   checkYouthWords,
+  sumsMinorOf,
   previousTurnsOf,
   touchesTerm,
   type GuardContext,
@@ -961,6 +963,11 @@ export function guardContextOf(
       history.map((turn) => ({ fromFan: turn.from === 'fan', text: turn.text })),
     ),
     sentBefore: history.filter((turn) => turn.from === 'creator').map((turn) => turn.text),
+    // The sums he wrote since her last answer: she may say one back without agreeing to it (Charles 27/11).
+    fanAmountsMinor: history
+      .slice(history.findLastIndex((turn) => turn.from === 'creator') + 1)
+      .filter((turn) => turn.from === 'fan')
+      .flatMap((turn) => sumsMinorOf(turn.text)),
   };
 }
 
@@ -1129,9 +1136,10 @@ export async function composeTurn(
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   // His desire map, from the notes kept (Charles 26/11): the scripts closest to his fantasy come first.
-  // What her persona refuses (disgusts, never said, never done) wins over his fantasy: never played nor targeted.
+  // Youth, no consent, the family, an animal: never played, whatever her persona (Sécurité, #1043). Then what her
+  // persona refuses (disgusts, never said, never done) wins over his fantasy: never played nor targeted.
   const herRefusals = [...persona.guardSettings.forbiddenTerms, ...(persona.guardSettings.neverDo ?? [])];
-  const desireMap = withoutHerLimits(desireMapOf(notes.kept), (item) =>
+  const desireMap = withoutHerLimits(withoutForbiddenThemes(desireMapOf(notes.kept)), (item) =>
     herRefusals.some((term) => touchesTerm(item, term)),
   );
   // One script an evening (Charles 21/11 and 27/11 at 0:28): the same evening as her last one, none is listed to the

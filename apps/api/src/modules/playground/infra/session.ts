@@ -714,7 +714,7 @@ export function createPlaygroundSession(deps: PlaygroundDeps): PlaygroundSession
           .map((t) => t.text)
           .join('\n'),
       );
-      if (signs.includes('minor_suspected')) {
+      if (signs.includes('minor_suspected') || signs.includes('minor_fantasy')) {
         scripts = { ...scripts, salesFrozen: true };
         const held: PlaygroundTurn = {
           bubbles: [],

@@ -1128,6 +1128,30 @@ describe('createDraftComposer, his limits (P3-02)', () => {
     ]);
   });
 
+  it('hands a fantasy of his on minors to a human before any model, as a doubt on his age (Charles 26/11 at 23:45)', async () => {
+    const minor = limitsOf({ ageConfirmedAt: '2026-10-01T09:00:00Z' });
+    const { draftComposer, seen } = composer({}, undefined, minor.limits);
+    const held = await draftComposer.compose({
+      ...INPUT,
+      history: [
+        { direction: 'inbound', text: 'je fantasme sur une écolière', at: new Date('2026-10-17T09:59:00Z') },
+      ],
+    });
+    expect(held).toEqual({
+      kind: 'held',
+      reason: 'handoff',
+      cause: 'minor',
+      detail: ['safety_net', 'minor_fantasy'],
+      costUsd: 0,
+    });
+    // No model read it: nothing of it reaches his card, his notes or a brief, and the alert carries no word of his.
+    expect(seen.traces).toHaveLength(0);
+    expect(JSON.stringify(held)).not.toContain('écolière');
+    expect(minor.protections.map((p) => p.protection)).toEqual([
+      { unconfirmAge: true, stopContact: false, care: false, freezeSales: false, because: ['minor_fantasy'] },
+    ]);
+  });
+
   it('keeps the net when no model has a key: the minor is still a minor', async () => {
     const { draftComposer } = composer({ hasKey: false });
     const held = await draftComposer.compose({
@@ -2715,6 +2739,29 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       );
       await draftComposer.compose(withNotes(['outfits : lingerie noire']));
       expect(seen.brainInputs?.[0]?.scripts).toEqual([{ id: 's1', description: 'Pack de démonstration' }]);
+    });
+
+    it('never plays nor targets a forbidden theme of his card, whatever her persona (Sécurité, #1043)', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: HOT },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(lingerie),
+      );
+      await draftComposer.compose(
+        withNotes([
+          'desires : belle-mère · qu’elle se prépare',
+          'outfits : tenue d’écolière · lingerie noire',
+        ]),
+      );
+      expect(seen.brainInputs?.[0]?.scripts?.[0]).toEqual({
+        id: 's1',
+        description: 'Elle se prépare en lingerie noire',
+        matches: ['qu’elle se prépare', 'lingerie noire'],
+      });
+      const handed = JSON.stringify([seen.brainInputs?.[0]?.scripts, seen.voiceInputs?.[0]?.fantasy]);
+      expect(handed).not.toContain('belle-mère');
+      expect(handed).not.toContain('écolière');
     });
 
     it('never lists a script that touches one of his limits', async () => {
