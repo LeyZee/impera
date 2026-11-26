@@ -67,6 +67,8 @@
 
   /* Semantic */
   --nv-success: #5fd4ff;
+  /* A state to know, not a task nor an alarm (a fan in care mode): a calm blue. */
+  --nv-info: #3d8ce6;
   --nv-warning: #ffa340;
   --nv-danger: #ff5a45;
   --nv-sale: #e8c37a;
@@ -210,6 +212,8 @@
   --nv-aura-rose: rgba(255, 206, 218, 0.7);
 
   --nv-success: #006c99;
+  /* A state to know, not a task nor an alarm (a fan in care mode): a calm blue. */
+  --nv-info: #2a6fc9;
   --nv-warning: #9a4a00;
   --nv-danger: #c42a12;
   --nv-sale: #7a5a12;
@@ -292,6 +296,7 @@
 
   /* Pills (COH-08): three heights only. Information (a state, a tag) 22, a choice to tap 32, a counter 18. */
   --nv-pill-info: 22px;
+  --nv-pill-info-lg: 26px;
   --nv-pill-choice: 32px;
   --nv-pill-count: 18px;
 

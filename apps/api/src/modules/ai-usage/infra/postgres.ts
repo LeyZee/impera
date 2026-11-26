@@ -60,7 +60,7 @@ export function createPostgresUsageReader(adminDb: Database): UsageReader {
       const local = sql`(created_at at time zone ${timeZone})`;
       const result = await adminDb.execute(sql`
         select to_char(${local}, 'YYYY-MM-DD') as day, extract(hour from ${local})::int as hour, provider, model,
-               case when purpose in ('trend_watch', 'probe', 'instagram_comment') then purpose else role end as use,
+               case when purpose in ('trend_watch', 'probe', 'instagram_comment', 'instagram_caption') then purpose else role end as use,
                sum(${billedUsd}) as usd, count(*) as calls,
                count(*) filter (where status <> 'ok') as failed,
                count(*) filter (where is_fallback) as fallback,
@@ -103,7 +103,7 @@ export function createPostgresUsageReader(adminDb: Database): UsageReader {
         with lined as (
           select to_char(created_at at time zone ${timeZone}, 'YYYY-MM-DD') as day, creator_id, conversation_id,
                  ${billedUsd} as usd,
-                 case when purpose in ('trend_watch', 'instagram_comment') then 'instagram'
+                 case when purpose in ('trend_watch', 'instagram_comment', 'instagram_caption') then 'instagram'
                       when purpose = 'media' then 'media'
                       when purpose = 'telegram' then 'telegram'
                       when purpose = 'probe' then 'other'

@@ -1,4 +1,4 @@
-import type { NotificationInboxItem } from '@impera/contracts';
+import { NOTIFICATION_REASONS, type NotificationInboxItem } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { byDay, FAMILY_OF, familyCounts, headline } from './inbox';
@@ -67,6 +67,6 @@ describe('« Tes notifications »', () => {
   });
 
   it('gives every reason a family', () => {
-    expect(Object.keys(FAMILY_OF)).toHaveLength(11);
+    expect(Object.keys(FAMILY_OF).sort()).toEqual([...NOTIFICATION_REASONS].sort());
   });
 });

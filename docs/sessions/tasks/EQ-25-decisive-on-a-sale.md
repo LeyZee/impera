@@ -9,7 +9,7 @@ Le chatteur qui a convaincu un fan dont la vente est allée à un autre le dit d
 
 ## À faire
 - [x] ADR 0101 amendée (§§ 18 à 22, remplace la règle 7).
-- [x] Tables `pay_sale_claims` et `pay_sale_claim_answers` en ajout seul (FORCE RLS, `refuse_pay_change`, lecture seule pour le rôle de service), migration provisoire 0256 à renuméroter au train.
+- [x] Tables `pay_sale_claims` et `pay_sale_claim_answers` en ajout seul (FORCE RLS, `refuse_pay_change`, lecture seule pour le rôle de service), migration 0268 à renuméroter au train.
 - [x] `pay.endedShifts` du module `scheduling` ; magasin `sale-claim-store` ; quatre routes ; journal sans la note.
 - [x] Écrans : panneau « J'ai été décisif sur une vente » dans Commissions (choix du shift, note, suivi, retrait) ; panneau « Signalements de chatteurs » au-dessus de « Ventes en attente » (« Voir les ventes de ce shift », « Réglé », « Pas retenu »).
 - [x] Tests : intégration (droits, idempotence, bornes, quinzaine clôturée, isolation), unitaires (textes), écrans.

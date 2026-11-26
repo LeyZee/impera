@@ -5,7 +5,7 @@ import { asPersonaV2, StoredPersonaSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-import { channelWriterPersona, commentWriterPersona } from '../channel-persona';
+import { captionWriterPersona, channelWriterPersona, commentWriterPersona } from '../channel-persona';
 
 /** The fictional demo persona of the repository (ADR 0010: never a real one in a test). */
 const DEMO = StoredPersonaSchema.parse(
@@ -106,5 +106,17 @@ describe('her persona for a reply to an Instagram comment (ADR 0122 § 2)', () =
 
   it('blocks a reply that says she is an AI', () => {
     expect(persona.check(['Je suis une IA']).map((violation) => violation.code)).toContain('ai_disclosure');
+  });
+});
+
+describe('her persona for a caption of her Reels (ADR 0164 § 9)', () => {
+  const stored = { version: '0.3.0', creatorName: 'Nora', persona: DEMO };
+
+  it('blocks a caption naming where she lives', () => {
+    expect(placesOf(captionWriterPersona({ ...stored, persona: ELSEWHERE }, NOW))).toHaveLength(2);
+  });
+
+  it('lets a caption pass that names no place of hers', () => {
+    expect(placesOf(captionWriterPersona(stored, NOW))).toEqual([]);
   });
 });

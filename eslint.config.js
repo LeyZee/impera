@@ -60,6 +60,8 @@ const MODULE_DEPENDENCIES = {
   'creator-week': ['scheduling', 'creator-tasks'],
   // ADR 0164: « À décider », hers. It asks and keeps the answer; the code that asked reads it through its door.
   'creator-decisions': [],
+  // INS-05 lot b: the captions proposed for a Reel she dropped ask her through a decision (ADR 0164 § 9).
+  'instagram-captions': [],
   // CR-06: her drops and the agency's requests (ADR 0044, ADR 0055).
   'content-drops': [],
   // ADR 0104 § 12 to § 20: the game reads a member's pay and planning through the reads the composition root plugs

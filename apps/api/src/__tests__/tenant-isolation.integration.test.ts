@@ -53,6 +53,7 @@ const bodiesFor = (
   },
   'PUT /v1/fans/:id/flags': { flag: 'doNotContact', set: true, reason: 'Raison inventée pour le test' },
   'PUT /v1/fans/:id/card/:field': { items: ['Prénom inventé'] },
+  'POST /v1/fans/:id/card/others/retract': { factId: '00000000-0000-4000-8000-000000000000' },
   'POST /v1/creators/:creatorId/drops/:id/descriptions/validate': {
     descriptionIds: ['00000000-0000-4000-8000-000000000000'],
   },
@@ -220,6 +221,8 @@ const RESIDUAL: Readonly<Record<string, string>> = {
   'POST /v1/creator-space/decisions/:id/answer':
     'creator space: creator-decisions tests (another creator gets 404)',
   'POST /v1/creator-space/decisions/:id/later':
+    'creator space: creator-decisions tests (another creator gets 404)',
+  'POST /v1/creator-space/decisions/:id/other-ideas':
     'creator space: creator-decisions tests (another creator gets 404)',
   'DELETE /v1/creator-space/drops/:id': 'creator space: content-drops tests',
   'POST /v1/creator-space/drops/:id/files/:fileId/upload': 'creator space: content-drop uploads tests',
