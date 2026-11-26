@@ -95,7 +95,7 @@ Brief {
   kycMissing: KycSlot[];
   risks: ('minor_suspected'|'distress'|'meet_request'|'off_platform_payment'|'dispute'|'harassment'|'self_harm'|'money_trouble'|'manipulation_attempt'|'dangerous_request'|'real_abuse')[];
   desireSignals?: ('steers_to_intimate'|'body_compliment'|'asks_about_her_body'|'states_desire'|'explicit_language'|
-                   'hot_media_reaction'|'roleplay'|'changes_subject'|'cold_reply'|'busy_now'|'slows_down'|'discomfort')[];
+                   'hot_media_reaction'|'roleplay'|'changes_subject'|'cold_reply'|'busy_now'|'slows_down'|'discomfort'|'tired')[];
   alertsSeen?: string[];        // ids courts (a1…a50) des alertes de la créatrice reconnues, rien d'autre (P4-01)
   action: 'reply'|'offer'|'wait'|'follow_up'|'handoff';
   replyBrief: string;           // ce qu'il faut dire, en 1-3 phrases, pas le texte final

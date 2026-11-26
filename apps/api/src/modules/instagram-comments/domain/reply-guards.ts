@@ -35,7 +35,7 @@ export interface ReplyViolation {
 }
 
 export interface ReplyGuardContext {
-  /** Her replies under the same post or of the same day, the most recent ones. */
+  /** Her replies under the same post or of the same day, the most recent ones, the last one last. */
   readonly recentReplies: readonly string[];
   /** The blocking codes the chatting guards raise on this text: each one refuses the reply. */
   readonly chatGuardCodes: readonly GuardCode[];
@@ -126,6 +126,23 @@ function nearlySame(left: string, right: string): boolean {
   return shared / new Set([...wordsA, ...wordsB]).size >= 0.8;
 }
 
+/** Fewer words than this is a short thanks: she gives the same one again and again (third calibration, 26/11). */
+const SHORT_REPLY_WORDS = 3;
+
+/**
+ * A reply repeats a recent one. A short thanks may come back, as hers do, only not the very same text twice in a row;
+ * a longer reply may not come back at all, even nearly.
+ */
+function repeats(reply: string, recent: readonly string[]): boolean {
+  const words = fold(reply)
+    .split(' ')
+    .filter((word) => word !== '').length;
+  if (words < SHORT_REPLY_WORDS) {
+    return recent.at(-1)?.normalize('NFKC').trim() === reply.normalize('NFKC');
+  }
+  return recent.some((earlier) => nearlySame(earlier, reply));
+}
+
 /** What refuses `text` as a public reply, empty when it passes. */
 export function checkReply(text: string, context: ReplyGuardContext): ReplyViolation[] {
   const violations: ReplyViolation[] = [];
@@ -143,7 +160,7 @@ export function checkReply(text: string, context: ReplyGuardContext): ReplyViola
     violations.push({ code: 'unwanted_question', detail: 'question' });
   if (context.emojiOnly && !emojisOnly(reply))
     violations.push({ code: 'words_in_emoji_reply', detail: 'words' });
-  if (context.recentReplies.some((earlier) => nearlySame(earlier, reply)))
+  if (repeats(reply, context.recentReplies))
     violations.push({ code: 'repeated_reply', detail: 'recent_reply' });
   for (const code of new Set(context.chatGuardCodes)) violations.push({ code, detail: code });
   return violations;
