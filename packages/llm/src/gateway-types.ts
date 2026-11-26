@@ -291,7 +291,11 @@ export interface InstagramCommentInput {
    */
   readonly nearExamples?: readonly { readonly comment: string; readonly reply: string }[];
   /** The shape of her reply to the closest comment, decided by the code (`replyShapeOf`); absent: the prompt alone. */
-  readonly replyShape?: { readonly emojis: 0 | 1 | 2; readonly exclaims: boolean };
+  readonly replyShape?: {
+    readonly emojis: 0 | 1 | 2;
+    readonly exclaims: boolean;
+    readonly words: number;
+  };
   readonly comment: CommentPromptInput;
   /** What the guards refused in a first reply: this call is the one rewrite (§ 3). Rule names only, never a text. */
   readonly refusedBy?: readonly string[];

@@ -49,7 +49,8 @@ Lot e, sa voix calibrée sur ses vraies réponses (amendement du 26/11 de l'ADR 
 - [x] Premier calibrage sur le PC (40 commentaires, 0,83 $) : emojis variés, plus d'exclamations, questions quand le code les permet (prompt).
 - [x] Corrections de la créatrice sur la feuille à l'aveugle : jamais d'intimité en public (prompt 1.2.0), « je t'aime » reçoit des emojis seulement (`declaresLove`, garde `words_in_emoji_reply`).
 - [x] Second calibrage (période des assistants écartée, relu sur le PC) : forme de sa réponse la plus proche dite par le code (`replyShapeOf`), compliment remercié simplement, marqueur « [pseudo] » retiré (prompt 1.3.0).
-- [ ] Troisième calibrage et comparaison.
+- [x] Troisième calibrage : longueur de sa réponse la plus proche dite au modèle ; un merci court peut revenir (`repeated_reply` assoupli pour moins de trois mots).
+- [ ] Quatrième calibrage et comparaison.
 
 ## Critères d'acceptation
 - Tout passe contre `FakeInstagram` ; aucun appel réel à Meta dans un test.

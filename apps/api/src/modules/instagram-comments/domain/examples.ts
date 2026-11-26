@@ -70,6 +70,8 @@ export function nearExamples(
 export interface ReplyShape {
   readonly emojis: 0 | 1 | 2;
   readonly exclaims: boolean;
+  /** Her words in that reply, one at least: the model was twice as long as she is. */
+  readonly words: number;
 }
 
 /**
@@ -84,5 +86,6 @@ export function replyShapeOf(near: readonly CommentExample[]): ReplyShape | null
   return {
     emojis: count === 0 ? 0 : count === 1 ? 1 : 2,
     exclaims: closest.reply.normalize('NFKC').includes('!'),
+    words: Math.max(1, closest.reply.split(/\s+/u).filter((word) => /[\p{L}\p{N}]/u.test(word)).length),
   };
 }

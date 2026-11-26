@@ -34,9 +34,10 @@ describe('her real replies as examples (Charles, 26/11)', () => {
 describe('the shape of her closest reply', () => {
   it('counts its emojis, two at most, and whether it exclaims', () => {
     const pair = (reply: string) => ({ id: 'x', comment: 'c', reply });
-    expect(replyShapeOf([pair('Merci !'), pair('🫶🏻')])).toEqual({ emojis: 0, exclaims: true });
-    expect(replyShapeOf([pair('Merci 🫶🏻')])).toEqual({ emojis: 1, exclaims: false });
-    expect(replyShapeOf([pair('😂😂😂 non ！')])).toEqual({ emojis: 2, exclaims: true });
+    expect(replyShapeOf([pair('Merci !'), pair('🫶🏻')])).toEqual({ emojis: 0, exclaims: true, words: 1 });
+    expect(replyShapeOf([pair('Merci 🫶🏻')])).toEqual({ emojis: 1, exclaims: false, words: 1 });
+    expect(replyShapeOf([pair('😂😂😂 non ！')])).toEqual({ emojis: 2, exclaims: true, words: 1 });
+    expect(replyShapeOf([pair('Trop bien vu 😂')])?.words).toBe(3);
     expect(replyShapeOf([])).toBeNull();
   });
 });

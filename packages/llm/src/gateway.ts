@@ -626,7 +626,7 @@ function captionProposalsRequest(input: CaptionProposalsInput): string {
 const EMOJI_SHAPE_WORDS = {
   0: 'aucun emoji',
   1: 'un seul emoji',
-  2: 'deux emojis, le même doublé ou deux côte à côte',
+  2: 'deux emojis',
 } as const;
 
 /** What this one comment is: the facts written by the code, the two texts in their blocks (CLAUDE.md rule 4). */
@@ -656,7 +656,7 @@ function instagramCommentRequest(input: InstagramCommentInput): string {
   const shape = input.replyShape;
   if (shape !== undefined && !comment.emojiOnly)
     lines.push(
-      `Cette fois, comme dans sa réponse la plus proche : ${EMOJI_SHAPE_WORDS[shape.emojis]}${shape.exclaims ? ', et un point d’exclamation' : ''}.`,
+      `Cette fois, comme dans sa réponse la plus proche : ${shape.words <= 3 ? 'quelques mots' : `environ ${String(shape.words)} mots`}, ${EMOJI_SHAPE_WORDS[shape.emojis]}${shape.exclaims ? ', et un point d’exclamation' : ''}.`,
     );
   const near = input.nearExamples ?? [];
   if (near.length > 0)
