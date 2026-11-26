@@ -1003,7 +1003,7 @@ describe('/v1/…/drops/:id/files/:fileId: her bytes to the media storage', () =
    */
   it('never leaves a medium held without its bytes when she gives it again while it is erased', async () => {
     const receipts = createDrizzleReceiptStore(test.service.db);
-    const retention = createDrizzleRetentionStore(test.service.db);
+    const retention = createDrizzleRetentionStore(test.service.db, app.db.db);
     const removeRaw = (key: string) =>
       s3.fetch(`${endpoint}/${bucket}/${key}`, { method: 'DELETE' }).then(() => undefined);
     const keptAgain = async (fileId: string, medium: Awaited<ReturnType<typeof mediumOf>>) => {

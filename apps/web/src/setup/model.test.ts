@@ -55,6 +55,20 @@ describe('« Mise en route » words', () => {
     expect(todo?.hint).toBe('Relie son compte Reveal pour la lire, ou règle le pourcentage.');
   });
 
+  it('says which scripts the agent has to offer, by day and by night, and sends to her sheet', () => {
+    const [both, night, none] = creatorLines(ANNA, [
+      { key: 'scripts', state: 'done', note: { kind: 'scripts', day: 1, night: 2 } },
+      { key: 'scripts', state: 'todo', note: { kind: 'scripts', day: 2, night: 0 } },
+      { key: 'scripts', state: 'todo', note: { kind: 'scripts', day: 0, night: 0 } },
+    ]);
+    expect(both?.hint).toBe('1 script de jour et 2 scripts de nuit prêts dans Reveal.');
+    expect(night?.hint).toBe('Aucun script de nuit prêt dans Reveal : l’agent n’a rien à proposer la nuit.');
+    expect(none?.hint).toBe('Aucun script prêt dans Reveal : l’agent n’a rien à proposer.');
+    expect(both?.target).toEqual({ kind: 'sheet', sheet: 'scripts', creatorId: ANNA });
+    const [grid] = creatorLines(ANNA, [{ key: 'custom_prices', state: 'todo', note: null }]);
+    expect(grid?.target).toEqual({ kind: 'sheet', sheet: 'custom', creatorId: ANNA });
+  });
+
   it('names every member step', () => {
     const lines = memberLines(
       THEO,

@@ -31,6 +31,7 @@ import {
   accountCardId,
   creatorsSearch,
   rememberCreatorTab,
+  sheetSearch,
   sheetsFor,
   tabOf,
   type CreatorSheet,
@@ -483,7 +484,7 @@ export function CreatorsPage({
                 label="Fiche de la créatrice"
                 items={tabs.map(({ name, first }) => ({
                   to: '/creatrices',
-                  search: creatorsSearch(first, selected),
+                  search: sheetSearch(sheets, first, selected),
                   current: shownTab === name,
                   label: TAB_LABELS[name],
                 }))}

@@ -21,6 +21,12 @@ export interface DescribeDeps {
   readonly describer: DropDescriber;
   /** A sent script holding the medium is told once its last media is described (§ 6). */
   readonly summaries: Pick<ScriptSummaryStore, 'enqueueFor'>;
+  /**
+   * Whoever waits for a medium to be described, told each time it is (again on a replay: the listener is replayable).
+   * It knows what it does with it; this module does not. It must stay short and replayable: it enqueues, and never
+   * calls a model here.
+   */
+  readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
   readonly versions: Pick<ScriptVersions, 'frozen'>;
   readonly scratchDir: string;
   readonly room: ScratchRoom;
@@ -63,7 +69,8 @@ export async function describeFile(
   if (target.kind === 'audio') return 'not_described';
   if (await deps.describer.described(mediaAssetId)) {
     // A run that stopped between the description and the next job: the script is asked again, once.
-    await deps.summaries.enqueueFor(mediaAssetId, correlationId);
+    await deps.summaries.enqueueFor(creatorId, mediaAssetId, correlationId);
+    await deps.onDescribed?.(target.creatorId, mediaAssetId, correlationId);
     return 'already';
   }
 
@@ -94,7 +101,10 @@ export async function describeFile(
       if ((await deps.queue.failed(target.creatorId, mediaAssetId)) >= DESCRIPTION_TRIES) return 'given_up';
       throw new DropDescriptionFailed(`media ${mediaAssetId}: every model failed`);
     }
-    if (outcome === 'described') await deps.summaries.enqueueFor(mediaAssetId, correlationId);
+    if (outcome === 'described') {
+      await deps.summaries.enqueueFor(creatorId, mediaAssetId, correlationId);
+      await deps.onDescribed?.(target.creatorId, mediaAssetId, correlationId);
+    }
     return outcome;
   } finally {
     if (dir !== null) await rm(dir, { recursive: true, force: true });

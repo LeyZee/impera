@@ -1,5 +1,5 @@
 {
-  "id": "7194b154-7875-4a33-8f5a-6755c8731e75",
+  "id": "4cc027ce-8100-45e5-a928-add6e16423c7",
   "prevId": "e8d386b2-4bce-45cf-8501-d3f9d7dc7880",
   "version": "7",
   "dialect": "postgresql",
@@ -2527,6 +2527,20 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"script_drop_summaries\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'drop_media' and \"script_drop_summaries\".\"author\" = 'brain' and \"script_drop_summaries\".\"validated_by\" is null"
         },
         "team_validate": {
           "name": "team_validate",
@@ -19674,30 +19688,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "price_minor": {
-          "name": "price_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deposit_minor": {
-          "name": "deposit_minor",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_by": {
-          "name": "decided_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -19774,15 +19764,6 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "custom_orders_decided_by_user_id_fk": {
-          "name": "custom_orders_decided_by_user_id_fk",
-          "tableFrom": "custom_orders",
-          "tableTo": "user",
-          "columnsFrom": ["decided_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "custom_orders_fan_creator_fk": {
           "name": "custom_orders_fan_creator_fk",
           "tableFrom": "custom_orders",
@@ -19832,14 +19813,6 @@
         "custom_orders_details_check": {
           "name": "custom_orders_details_check",
           "value": "jsonb_typeof(\"custom_orders\".\"details\") = 'object'"
-        },
-        "custom_orders_price_check": {
-          "name": "custom_orders_price_check",
-          "value": "\"custom_orders\".\"price_minor\" is null or \"custom_orders\".\"price_minor\" >= 100"
-        },
-        "custom_orders_deposit_check": {
-          "name": "custom_orders_deposit_check",
-          "value": "\"custom_orders\".\"deposit_minor\" is null or (\"custom_orders\".\"price_minor\" is not null and \"custom_orders\".\"deposit_minor\" between 0 and \"custom_orders\".\"price_minor\")"
         },
         "custom_orders_card_check": {
           "name": "custom_orders_card_check",

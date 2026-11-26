@@ -108,6 +108,7 @@ Branche : task/<id>-<slug>
 | CR-14 | Créneaux datés, places et fans confiés : le modèle de données de l'ADR 0049 | espaces | done | EQ-02, CR-12 |
 | CR-15 | Qui sont tes fans : les chiffres de sa base, tirés de leurs faits déclarés | espaces | todo | CR-02, ADR 0074 |
 | CR-16 | La semaine de la créatrice : deux jours de tournage, une livraison le dimanche, un agenda que le code remplit | espaces | in_progress (lot 1 en PR) | CR-05, CR-06, SC-02, ADR 0140 |
+| COF-01 | Un média offert n'est jamais revendu, un média de script n'est jamais gratuit | coffre (ADR 0145 § 2) | done | synchro du coffre, scripts natifs et préparés |
 | SC-01 | Structures de script et cartons : l'atelier de l'agence | scripts | done | ADR 0056, la persona |
 | SC-02 | « Ton prochain script » : la créatrice tourne et dépose carton par carton | scripts | todo | SC-01, CR-06, CR-05 |
 | SC-03 | Dossier de script rangé dans l'ordre, et export ZIP | scripts | todo | SC-02 |
@@ -135,7 +136,7 @@ Branche : task/<id>-<slug>
 | INS-02 | Connecteur de liens en lecture seule : clics par endroit et par heure | Instagram (ADR 0120) | in progress (lots a et b) | ADR 0120, ADR 0080 |
 | INS-03 | « Mes liens » chez la créatrice : ses liens de redirection, leur phrase d'usage, un bouton Copier | Instagram (ADR 0121) | done | ADR 0121, ADR 0120 § 3 |
 | INS-04 | Commentaires Instagram : une réponse dans sa voix, entraînée au Playground, les commentaires hostiles masqués | Instagram (ADR 0122) | in progress (lot a ; essai réel : compte pro, appli Meta, mot de Charles) | ADR 0122, INS-01 |
-| INS-05 | « À décider » : les cartes de décision de la créatrice | Instagram (ADR 0164) | in progress (lot a) |
+| INS-05 | « À décider » : les cartes de décision de la créatrice | Instagram (ADR 0164) | in progress (lot a fusionné, lot b1) |
 | CRM-01 | Connecter la clé Reveal et lire les ventes | API CRM | done | ADR 0050 fusionnée ; une clé créée par Charles pour la recette réelle seulement |
 | CRM-02 | Prouver la fiabilité sur une quinzaine passée | API CRM | in-progress | CRM-01 ; l'export du dashboard est facultatif depuis CRM-14 |
 | CRM-03 | Paie sur les ventes lues, téléphone du chatteur et mini feedback | API CRM | todo | CRM-01, l'accord de Charles après CRM-02, CR-01 (téléphone) |

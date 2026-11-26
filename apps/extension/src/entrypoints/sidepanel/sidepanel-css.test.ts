@@ -28,11 +28,12 @@ describe('the copilot panel stylesheet (Design 16/11, lot 0141-5)', () => {
     expect(css).not.toContain("data-verdict='now'");
   });
 
-  it('gives each group of the card its own colour of gauge', () => {
-    const colours = (['him', 'about_her', 'intimate'] as const).map((group) =>
-      rule(`.cp-group__meter[data-group='${group}']`),
+  it('gives each group of the card its own colour, and the amber to what he does not want (Design 21/11)', () => {
+    const colours = (['him', 'about_her', 'intimate', 'limit'] as const).map((tone) =>
+      rule(`.cp-field[data-tone='${tone}']`),
     );
-    expect(new Set(colours).size).toBe(3);
+    expect(new Set(colours).size).toBe(4);
+    expect(rule(".cp-field[data-tone='limit']")).toContain('var(--nv-warning)');
   });
 
   it('keeps the moment on one line, an ellipsis rather than a wrap', () => {
@@ -41,8 +42,8 @@ describe('the copilot panel stylesheet (Design 16/11, lot 0141-5)', () => {
     expect(text).toContain('text-overflow: ellipsis');
   });
 
-  it('sets the first name a quarter larger, and the field source on the label line', () => {
-    expect(rule('.cp-ident__name')).toContain('font-size: 1.625em');
+  it('sets the first name to be read first, and the field source on the label line', () => {
+    expect(rule('.cp-ident__name')).toContain('font-size: 2.1em');
     expect(rule('.cp-field__top')).toContain('align-items: center');
   });
 });

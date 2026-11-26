@@ -243,6 +243,11 @@ interface VaultLink {
   /** Chosen for the CRM, by its own tick or its folder's (ADR 0145 § 5): `false`, the agent does not see it. */
   readonly imported: boolean;
   /**
+   * Offered once (ADR 0145 § 2): sent for free by the platform, or kept by a live drop of hers that leaves for free
+   * (`vaultOffered`). Never sold after.
+   */
+  readonly offered: boolean;
+  /**
    * The description its media is told with (ADR 0030 § 3): the latest validated, else the latest written, by the vision
    * or by hand, for the agency to validate; never the platform's own text. `null` while it has none.
    */

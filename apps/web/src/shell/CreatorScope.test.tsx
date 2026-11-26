@@ -71,7 +71,9 @@ describe('the creator selector (ADR 0134 § 3)', () => {
   });
 
   it('applies to the Dashboard, Suivi, Fans and Créatrices', () => {
-    expect(['/', '/suivi', '/suivi/fans', '/creatrices'].every(isScoped)).toBe(true);
+    expect(['/', '/suivi', '/suivi/fans', '/creatrices', '/entrainer/corrections'].every(isScoped)).toBe(
+      true,
+    );
     expect(isScoped('/paie')).toBe(false);
   });
 

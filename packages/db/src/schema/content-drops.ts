@@ -53,9 +53,10 @@ const readsTeam: SQL = sql`${notCreatorAccount} and ${currentScope} in ('owner',
 const hers = (creatorId: PgColumn): SQL => sql`${isCreatorAccount} and ${creatorId} = ${currentCreator}`;
 const ofHerTeam = (creatorId: PgColumn): SQL => sql`${readsTeam} and ${creatorId} = ${currentCreator}`;
 /**
- * The jobs on a medium she dropped (its reduced picture, its description), in her creator and under the app role
- * (`withTenantJob(…, 'drop_media', …)`, ADR 0087 lot c): they read what the drop says of the medium, and write nothing
- * here. No account's session sets `app.job`.
+ * The jobs on what she dropped (a medium's reduced picture, its description, a sent script's synthesis), in her creator
+ * and under the app role (`withTenantJob(…, 'drop_media', …)`, ADR 0087 lot c): they read what the drop says of the
+ * medium, and write here only the brain's synthesis of a script (`script_drop_summaries`, never validated by them).
+ * No account's session sets `app.job`.
  */
 const dropMediaJob = (creatorId: PgColumn): SQL =>
   sql`${creatorId} = ${currentCreator} and nullif(current_setting('app.job', true), '') = 'drop_media'`;
@@ -208,7 +209,10 @@ export const contentDrops = pgTable(
     ),
     check(
       'content_drops_blocked_check',
-      sql`(${t.state} = 'blocked') = (${t.blockedReason} is not null)
+      // A withdrawn drop keeps why it was blocked (grande recette du 21/11): she may withdraw it, and her guard never
+      // lets her clear the reason.
+      sql`(${t.state} <> 'blocked' or ${t.blockedReason} is not null)
+        and (${t.blockedReason} is null or ${t.state} in ('blocked', 'withdrawn'))
         and coalesce(char_length(${t.blockedReason}), 1) between 1 and 200`,
     ),
     check(
@@ -446,6 +450,12 @@ export const scriptDropSummaries = pgTable(
       .where(sql`${t.author} = 'brain'`),
     index('script_drop_summaries_creator_idx').on(t.creatorId),
     pgPolicy('team_read', { for: 'select', using: ofHerTeam(t.creatorId) }),
+    // The synthesis job (SEC-16 lot c): reads what was told already, writes the brain's telling, never a validated one.
+    pgPolicy('job_read', { for: 'select', using: dropMediaJob(t.creatorId) }),
+    pgPolicy('job_insert', {
+      for: 'insert',
+      withCheck: sql`${dropMediaJob(t.creatorId)} and ${t.author} = 'brain' and ${t.validatedBy} is null`,
+    }),
     // Her team validates a synthesis; only the two columns of the stamp are granted (migration 0152).
     pgPolicy('team_validate', {
       for: 'update',

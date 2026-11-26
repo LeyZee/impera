@@ -146,6 +146,8 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
     expect(await stepsOf(bare)).toMatchObject({
       platform_account: 'todo',
       persona: 'todo',
+      scripts: 'todo',
+      custom_prices: 'todo',
       agency_rate: 'todo',
       access: 'todo',
       pay_rules: 'todo',
@@ -160,6 +162,61 @@ describe('GET /v1/dashboard/setup/creators and /members, « Mise en route »', (
       access: 'done',
       pay_rules: 'todo',
     });
+  });
+
+  it('counts her scripts the agent may offer, by day and by night, and her grid of custom prices', async () => {
+    const scriptsOf = async () =>
+      (await creators()).find((c) => c.creatorId === nora)?.steps.find((s) => s.key === 'scripts');
+    expect(await scriptsOf()).toEqual({
+      key: 'scripts',
+      state: 'todo',
+      note: { kind: 'scripts', day: 0, night: 0 },
+    });
+    /** One of ours, « jour et nuit », recognised in Reveal: `active` says whether its copy is still there. */
+    const recognised = async (ref: string, moment: string, active: boolean) => {
+      const native = randomUUID();
+      const at = new Date();
+      await test.admin.db.insert(schema.platformScripts).values({
+        id: native,
+        creatorId: nora,
+        platformAccountId: account,
+        platformScriptRef: ref,
+        name: `Script inventé ${ref}`,
+        moment: null,
+        fingerprint: 'f'.repeat(64),
+        active,
+        deactivatedAt: active ? null : at,
+        syncedAt: at,
+        versionAt: at,
+      });
+      await test.admin.db.insert(schema.preparedScripts).values({
+        id: randomUUID(),
+        creatorId: nora,
+        platformAccountId: account,
+        state: 'matched',
+        content: { name: `Script inventé ${ref}`, moment, steps: [] },
+        matchedPlatformScriptId: native,
+        matchedAt: at,
+        createdBy: ownerId,
+        updatedBy: ownerId,
+      });
+    };
+    await recognised('sequence_gone', 'night', false);
+    await recognised('sequence_day', 'day', true);
+    expect(await scriptsOf()).toEqual({
+      key: 'scripts',
+      state: 'todo',
+      note: { kind: 'scripts', day: 1, night: 0 },
+    });
+    await recognised('sequence_both', 'both', true);
+    expect(await scriptsOf()).toEqual({
+      key: 'scripts',
+      state: 'done',
+      note: { kind: 'scripts', day: 2, night: 1 },
+    });
+    expect((await stepsOf(nora))['custom_prices']).toBe('todo');
+    await test.admin.db.insert(schema.customPriceGrids).values({ creatorId: nora, version: 1, grid: {} });
+    expect((await stepsOf(nora))['custom_prices']).toBe('done');
   });
 
   it('takes her Reveal account linked to the sales feed for the percentage, then optional (ADR 0054 § 7)', async () => {
