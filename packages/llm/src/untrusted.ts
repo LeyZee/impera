@@ -53,7 +53,14 @@ export type UntrustedKind =
    */
   | 'caption_examples'
   | 'creator_sentence'
-  | 'caption_hints';
+  | 'caption_hints'
+  /**
+   * The simulated fan's test (ADR « fan simulé »): her messages as the invented fan reads them, which may try to steer
+   * him; the whole conversation and his inner journal as the relationship judge reads them. Data, never an order.
+   */
+  | 'creator_message'
+  | 'simulated_conversation'
+  | 'fan_journal';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.
