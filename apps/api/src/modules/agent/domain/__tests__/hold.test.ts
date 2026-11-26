@@ -50,6 +50,29 @@ describe('holdDecision', () => {
     expect(waitRetryAt(new Date('2026-10-27T20:00:00Z'))).toEqual(new Date('2026-10-27T20:20:00Z'));
   });
 
+  it('answers an insult herself, even when the brain asks for a human (ADR 0158 § 19, eval passe-08)', () => {
+    // « Grosse conne va » read as an insult with a handoff suggested: she answers, nobody is called.
+    expect(holdDecision({ risks: ['insult'], action: 'handoff' })).toEqual({ kind: 'answer' });
+    expect(protectionWhileAnswering(['insult'])).toEqual(protectionFor([]));
+    expect(protectionFor(['insult']).stopContact).toBe(false);
+    // A threat with it still calls a human.
+    expect(holdDecision({ risks: ['insult', 'harassment'], action: 'handoff' })).toEqual({
+      kind: 'handoff',
+      detail: ['insult', 'harassment'],
+    });
+    // An insult never hides a graver risk: a possible minor is handed over whatever else.
+    expect(holdDecision({ risks: ['insult', 'minor_suspected'], action: 'reply' })).toEqual({
+      kind: 'handoff',
+      detail: ['minor_suspected'],
+    });
+  });
+
+  it('keeps nothing on a fan « à sec » until his pay: no freeze, no human (eval passe-11a)', () => {
+    expect(holdDecision({ risks: ['no_budget'], action: 'reply' })).toEqual({ kind: 'answer' });
+    expect(protectionWhileAnswering(['no_budget']).freezeSales).toBe(false);
+    expect(protectionWhileAnswering(['money_trouble']).freezeSales).toBe(true);
+  });
+
   it('answers otherwise, a meeting request included (the voice declines it)', () => {
     expect(holdDecision({ risks: ['meet_request'], action: 'reply' })).toEqual({ kind: 'answer' });
   });
