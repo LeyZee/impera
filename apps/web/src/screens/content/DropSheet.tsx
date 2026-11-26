@@ -26,6 +26,7 @@ import {
   mediaLabel,
   mimeOf,
   moved,
+  movedTo,
   pickedHeadRefusal,
   sameFile,
   weightOf,
@@ -75,6 +76,9 @@ export function DropSheet({
   onDropped: (drop: ContentDrop, files: ReadonlyMap<ContentDropFileId, File>) => void;
 }): JSX.Element {
   const picker = useRef<HTMLInputElement>(null);
+  const rows = useRef<HTMLUListElement>(null);
+  // The file she holds by its grip, while she drags it (Charles, 26/11: the order she sees is the order published).
+  const [held, setHeld] = useState<ContentDropFileId | null>(null);
   const [chosen, setChosen] = useState<readonly Chosen[]>([]);
   const [sentence, setSentence] = useState('');
   const [busy, setBusy] = useState(false);
@@ -244,13 +248,59 @@ export function DropSheet({
         )}
 
         {chosen.length === 0 ? null : (
-          <ul className="ct-chosen">
+          <ul className="ct-chosen" ref={rows}>
             {chosen.map((item, index) => {
               const kind = item.mime === null ? null : kindOfMime(item.mime);
               const label = mediaLabel(kind, item.ms);
               const named = `${label.split(' · ')[0] ?? label} ${String(index + 1)}`;
               return (
-                <li key={item.id} className="ct-chosen__item">
+                <li
+                  key={item.id}
+                  className={held === item.id ? 'ct-chosen__item ct-chosen__item--held' : 'ct-chosen__item'}
+                >
+                  {chosen.length > 1 ? (
+                    <span
+                      className="ct-chosen__grip"
+                      aria-hidden="true"
+                      onPointerDown={(event) => {
+                        if (busy) return;
+                        // Held, never a text selected on the way.
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        setHeld(item.id);
+                      }}
+                      onPointerMove={(event) => {
+                        if (held !== item.id) return;
+                        // The row under her finger, or the last one past the end.
+                        const lines = [...(rows.current?.querySelectorAll('.ct-chosen__item') ?? [])];
+                        const under = lines.findIndex(
+                          (line) => event.clientY < line.getBoundingClientRect().bottom,
+                        );
+                        const to = under === -1 ? lines.length - 1 : under;
+                        setChosen((list) =>
+                          movedTo(
+                            list,
+                            list.findIndex((one) => one.id === item.id),
+                            to,
+                          ),
+                        );
+                      }}
+                      onPointerUp={() => {
+                        setHeld(null);
+                      }}
+                      onPointerCancel={() => {
+                        setHeld(null);
+                      }}
+                    >
+                      <svg viewBox="0 0 12 18" width="12" height="18">
+                        {[3, 9].flatMap((x) =>
+                          [3, 9, 15].map((y) => (
+                            <circle key={`${String(x)}-${String(y)}`} cx={x} cy={y} r="1.6" />
+                          )),
+                        )}
+                      </svg>
+                    </span>
+                  ) : null}
                   <span className="ct-chosen__visual">
                     <Thumb file={item.file} kind={kind} />
                     <span className="ct-chosen__rank nv-num" aria-hidden="true">
@@ -315,6 +365,12 @@ export function DropSheet({
             })}
           </ul>
         )}
+        {chosen.length > 1 ? (
+          <p className="ct-note">
+            Vérifie l’ordre : c’est celui-ci qui sera publié. Glisse une vignette par sa poignée pour la
+            déplacer.
+          </p>
+        ) : null}
         {countRefusal === null ? null : <p className="ct-warn">{countRefusal}</p>}
         {total > HEAVY_BYTES ? (
           <p className="ct-note">

@@ -386,6 +386,30 @@
   padding: var(--nv-space-2) 0;
   border-bottom: 1px solid var(--nv-hairline);
 }
+.ct-chosen:has(.ct-chosen__item--held) {
+  user-select: none;
+}
+.ct-chosen__item--held {
+  background: var(--nv-fill-soft);
+  border-radius: var(--nv-radius-md);
+}
+/* Her grip to drag a file: a finger's room, the page never scrolls under it. */
+.ct-chosen__grip {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 44px;
+  color: var(--nv-ink-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.ct-chosen__grip svg {
+  fill: currentColor;
+}
+.ct-chosen__item--held .ct-chosen__grip {
+  cursor: grabbing;
+}
 .ct-chosen__visual {
   position: relative;
   flex: none;
