@@ -176,9 +176,21 @@ export function DropSheet({
             {readyTypes.isPending ? (
               <p className="ct-note">Un instant…</p>
             ) : readyTypes.isError ? (
-              <p className="ct-warn">Les types ne se chargent pas : vérifie ta connexion et réessaie.</p>
+              <div className="nv-note nv-note--warn">
+                <p className="nv-note__title">Les types ne se chargent pas</p>
+                <p className="ct-note">Vérifie ta connexion, puis réessaie.</p>
+                <button
+                  type="button"
+                  className="nv-btn nv-btn--soft nv-btn--sm"
+                  onClick={() => {
+                    void readyTypes.refetch();
+                  }}
+                >
+                  Réessayer
+                </button>
+              </div>
             ) : readyTypes.data.types.length === 0 ? (
-              <p className="ct-note">
+              <p className="nv-note">
                 L’agence n’a pas encore créé de types de vidéo : tu pourras déposer dès qu’elle l’aura fait.
               </p>
             ) : (
@@ -326,12 +338,21 @@ export function DropSheet({
           </p>
         )}
         <div className="ct-form__actions">
-          <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
-            Annuler
-          </button>
-          <button type="button" className="nv-btn nv-btn--neon" disabled={!ready || busy} onClick={send}>
-            {busy ? 'Un instant…' : 'Envoyer'}
-          </button>
+          {/* No type to give: nothing to send, one way out (relecture Design, 26/11). */}
+          {untypable && !readyTypes.isPending ? (
+            <button type="button" className="nv-btn nv-btn--soft" onClick={onClose}>
+              Fermer
+            </button>
+          ) : (
+            <>
+              <button type="button" className="nv-btn nv-btn--plain" disabled={busy} onClick={onClose}>
+                Annuler
+              </button>
+              <button type="button" className="nv-btn nv-btn--neon" disabled={!ready || busy} onClick={send}>
+                {busy ? 'Un instant…' : 'Envoyer'}
+              </button>
+            </>
+          )}
         </div>
         {/* Why « Envoyer » stays grey, beside it: the refused line may be out of sight in a long list (CRE-16). */}
         {typed && readyVideoId === null && chosen.length > 0 && refused === 0 ? (

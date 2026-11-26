@@ -507,8 +507,32 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     const dialog = screen.getByRole('dialog');
     expect(await within(dialog).findByText(/L’agence n’a pas encore créé de types de vidéo/u)).toBeDefined();
     expect(within(dialog).queryByRole('radiogroup')).toBeNull();
-    // Nothing to pick while no type can be given.
+    // Nothing to pick while no type can be given, and one way out.
     expect(within(dialog).queryByRole('button', { name: 'Choisir dans ma galerie' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Envoyer' })).toBeNull();
+    expect(within(dialog).getByText('Fermer').className).toContain('nv-btn--soft');
+  });
+
+  it('offers to try again when the types do not load', async () => {
+    let tries = 0;
+    serve(
+      { requests: [], drops: [] },
+      {
+        'GET /v1/creator-space/ready-videos': () => {
+          tries += 1;
+          // Its own retry once, then her tap.
+          return tries <= 2
+            ? new Response('null', { status: 503 })
+            : Response.json({ types: [{ id: 'rv_0000000a', label: 'Type A' }] });
+        },
+      },
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Vidéos à vendre/u }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Réessayer' }, { timeout: 4000 }));
+    expect(await within(dialog).findByRole('radio', { name: 'Type A' })).toBeDefined();
+    expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toBeDefined();
   });
 
   it('asks no type for any other drop', async () => {

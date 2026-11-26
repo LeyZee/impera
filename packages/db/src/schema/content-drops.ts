@@ -204,7 +204,7 @@ export const contentDrops = pgTable(
     redoSentence: text('redo_sentence'),
     /**
      * The type of a video to sell (ADR 0163 § 7): the id of a line of the owner's « Vidéos déjà tournées », never its
-     * name. Given at the drop, by her or the team; a category corrected away from it clears it.
+     * name. Given at the drop, and only there: no category is corrected to or from a typed video.
      */
     readyVideoId: text('ready_video_id'),
     createdAt: createdAt(),

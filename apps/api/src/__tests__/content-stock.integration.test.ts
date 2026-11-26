@@ -455,5 +455,13 @@ describe('Coffre Impera: /v1/creators/:id/stock and /v1/creator-space/stock', ()
       category: 'feed_video',
     });
     expect(moved.statusCode, moved.body).toBe(422);
+    // Nor does a drop become a video to sell by a correction: it would have no type.
+    const plain = video(null, 'feed_video');
+    expect((await call('POST', '/v1/creator-space/drops', 'nora', plain)).statusCode).toBe(200);
+    const intoSale = await call('PATCH', `/v1/creators/${nora}/drops/${plain.id}`, 'owner', {
+      category: 'sale_video',
+    });
+    expect(intoSale.statusCode, intoSale.body).toBe(422);
+    expect(intoSale.json()).toMatchObject({ error: { code: 'content_drop_ready_video_unprocessable' } });
   });
 });

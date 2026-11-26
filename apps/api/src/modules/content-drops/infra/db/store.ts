@@ -931,6 +931,11 @@ export function createDrizzleAgencyContentStore(
         // A video to sell carries its type (ADR 0163 § 7): withdrawn and dropped again, never moved to another use.
         if (row.readyVideoId !== null)
           throw new ContentDropReadyVideoUnprocessable('Une vidéo à vendre garde sa catégorie');
+        // Nor does a drop become one by a correction: it would have no type, so the AI could never sell it.
+        if (category === 'sale_video')
+          throw new ContentDropReadyVideoUnprocessable(
+            'Une vidéo à vendre se dépose avec son type : retire ce dépôt et dépose-la à nouveau',
+          );
         // Her own choice is kept; a correction back to it clears the mark.
         const herChoice = row.correctedFrom ?? row.category;
         const back = herChoice === category;
