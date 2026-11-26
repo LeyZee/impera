@@ -105,6 +105,8 @@ export { applyScriptRunEvent, paidWaiting, type ScriptRun } from './domain/scrip
 export { channelWriterPersona } from './infra/channel-persona';
 /** @public Her public panels and guards for a reply to an Instagram comment (ADR 0122 § 2), the `instagram-comments` port. */
 export { commentWriterPersona } from './infra/channel-persona';
+/** @public Her public panels and guards for the caption of a Reel (ADR 0164 § 9), the `instagram-captions` port. */
+export { captionWriterPersona } from './infra/channel-persona';
 /** @public Réglages › Alertes tries an alert on an example message (`POST /v1/alerts/test`, P4-01). */
 export { createAlertTester, type AlertTester } from './infra/alert-test';
 /** @public The persona module refuses a version whose sample replies a hard guard would block (P5-01). */

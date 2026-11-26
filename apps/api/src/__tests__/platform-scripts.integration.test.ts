@@ -1,7 +1,12 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+  calendarDayAt,
+  ContentDropFileIdSchema,
+  ContentDropIdSchema,
+  ConversationIdSchema,
   CreatorIdSchema,
+  FanIdSchema,
   MediaAssetIdSchema,
   newId,
   PLATFORM_SCRIPT_NAME_MAX,
@@ -13,6 +18,9 @@ import {
   PreparedScriptIdSchema,
   SCRIPT_IDENTITY_SCHEMA_VERSION,
   ScriptIdentityIdSchema,
+  SCRIPT_STATS_MIN_FANS,
+  ScriptRunIdSchema,
+  ScriptPerformanceListSchema,
   TeamMemberIdSchema,
   type CreatorId,
   type DescriptionReviewReason,
@@ -368,6 +376,7 @@ describe('the native scripts imported from the platform', () => {
         imported: true,
         mediaAssetId: null,
         described: false,
+        offered: false,
         description: null,
       },
     ]);
@@ -379,6 +388,7 @@ describe('the native scripts imported from the platform', () => {
         imported: false,
         mediaAssetId: null,
         described: false,
+        offered: false,
         description: null,
       },
     ]);
@@ -424,6 +434,7 @@ describe('the native scripts imported from the platform', () => {
         imported: true,
         mediaAssetId: asset,
         described: true,
+        offered: false,
         description: { id: validated, detailed: 'Une photo inventée.', reviewReasons: [], validated: true },
       },
     ]);
@@ -1015,6 +1026,86 @@ describe('the native scripts imported from the platform', () => {
     expect(await scripts().reads.discountedScripts(nora, { userId: ids.owner, role: 'owner' })).toEqual([]);
   });
 
+  it('never sells a media offered once: sent for free by Reveal, or out in a free drop of hers (ADR 0145 § 2)', async () => {
+    const before = await ownerView('sequence_4');
+    const paid = before?.steps.find((step) => step.priceMinor > 0 && step.media.length > 0);
+    const ref = paid?.media[0]?.ref;
+    if (ref === undefined) throw new Error('fixture changed');
+    expect(before?.gaps).not.toContain('media_offered');
+    const link = and(
+      eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+      eq(schema.mediaPlatformRefs.platformMediaId, ref),
+    );
+    const managerGaps = async () =>
+      (await scripts().reads.platformScripts(nora, { userId: ids.manager, role: 'operator' }))?.find(
+        (each) => each.ref === 'sequence_4',
+      )?.gaps;
+    // Read by the vault sync as sent for free: the script is no longer proposable, for the owner as for a manager.
+    await test.admin.db.update(schema.mediaPlatformRefs).set({ sentForFreeAt: new Date() }).where(link);
+    const offered = await ownerView('sequence_4');
+    expect(offered).toMatchObject({ proposable: false });
+    expect(offered?.gaps).toContain('media_offered');
+    expect(offered?.steps.find((step) => step.ref === paid?.ref)?.media[0]?.offered).toBe(true);
+    expect(await managerGaps()).toContain('media_offered');
+    await test.admin.db.update(schema.mediaPlatformRefs).set({ sentForFreeAt: null }).where(link);
+    expect((await ownerView('sequence_4'))?.gaps).not.toContain('media_offered');
+    // Its file kept by a Mass DM of hers, not withdrawn: offered too, until she withdraws it.
+    const [row] = await test.admin.db
+      .select({ asset: schema.mediaPlatformRefs.mediaAssetId })
+      .from(schema.mediaPlatformRefs)
+      .where(link);
+    let asset = row?.asset ?? null;
+    if (asset === null) {
+      asset = newId(MediaAssetIdSchema);
+      await test.admin.db.insert(schema.mediaAssets).values({
+        id: asset,
+        creatorId: nora,
+        kind: 'image',
+        origin: 'creator',
+        storageKey: `test/${asset}`,
+        mime: 'image/jpeg',
+        bytes: 1000,
+        sha256: asset,
+      });
+      await test.admin.db.update(schema.mediaPlatformRefs).set({ mediaAssetId: asset }).where(link);
+    }
+    const dropId = newId(ContentDropIdSchema);
+    await test.admin.db.insert(schema.contentDrops).values({
+      id: dropId,
+      creatorId: nora,
+      category: 'mass_dm',
+      state: 'ready',
+      createdBy: ids.nora,
+    });
+    await test.admin.db.insert(schema.contentDropFiles).values({
+      id: newId(ContentDropFileIdSchema),
+      creatorId: nora,
+      dropId,
+      position: 0,
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: 1000,
+      state: 'kept',
+      mediaAssetId: asset,
+    });
+    expect((await ownerView('sequence_4'))?.gaps).toContain('media_offered');
+    expect(await managerGaps()).toContain('media_offered');
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: ids.nora })
+      .where(eq(schema.contentDrops.id, dropId));
+    expect((await ownerView('sequence_4'))?.gaps).not.toContain('media_offered');
+    // And the other way: sold by a paid step of an active script of hers, it never leaves in a free drop.
+    const inScript = async (id: string) =>
+      z
+        .array(z.object({ x: z.boolean() }))
+        .parse(
+          (await test.admin.db.execute(sql`select ${schema.mediaInScript(sql`${id}::uuid`)} as x`)).rows,
+        )[0]?.x;
+    expect(await inScript(asset)).toBe(true);
+    expect(await inScript(newId(MediaAssetIdSchema))).toBe(false);
+  });
+
   it('recognises a script copied into Reveal by hand once everything matches, and closes it (ADR 0112 § 23)', async () => {
     const [row] = await test.admin.db
       .select()
@@ -1113,5 +1204,119 @@ describe('the native scripts imported from the platform', () => {
     expect(await importOf(noraAccount, nora, new Date('2026-11-16T11:00:00Z'))).toMatchObject({
       recognised: 0,
     });
+  });
+
+  it('measures her active scripts recognised as ours over the period, for the team only (ADR 0129, sous-lot 4c)', async () => {
+    const [row] = await test.admin.db
+      .select()
+      .from(schema.platformScripts)
+      .where(eq(schema.platformScripts.platformScriptRef, 'sequence_1'));
+    if (row === undefined) throw new Error('imported');
+    const [first] = await test.admin.db
+      .select()
+      .from(schema.platformScriptSteps)
+      .where(eq(schema.platformScriptSteps.platformScriptId, row.id))
+      .orderBy(schema.platformScriptSteps.position)
+      .limit(1);
+    if (first === undefined) throw new Error('steps');
+    const now = Date.now();
+    const dayOf = (ago: number) => calendarDayAt(new Date(now - ago * 86_400_000), PARIS);
+    // Reveal's readings of its first step, relative to today: ten days ago, then today.
+    await test.admin.db
+      .delete(schema.platformScriptStepDaily)
+      .where(eq(schema.platformScriptStepDaily.creatorId, nora));
+    for (const [ago, sent, purchased, paidMinor] of [
+      [10, 10, 2, 1000],
+      [0, 13, 3, 1500],
+    ] as const) {
+      await test.admin.db.insert(schema.platformScriptStepDaily).values({
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        platformStepRef: first.platformStepRef,
+        day: dayOf(ago),
+        sent,
+        purchased,
+        paidMinor,
+        currency: 'EUR',
+        readAt: new Date(now - ago * 86_400_000),
+      });
+    }
+    // Two fans got its first step from the agent yesterday: one bought it, one refused it; a third, 40 days ago.
+    const runOf = async (fanRef: string, ago: number, outcome: 'bought' | 'refused', creatorId = nora) => {
+      const accountId = creatorId === nora ? noraAccount : inesAccount;
+      const fanId = newId(FanIdSchema);
+      const conversationId = newId(ConversationIdSchema);
+      const at = new Date(now - ago * 86_400_000).toISOString();
+      await test.admin.db.insert(schema.fans).values({
+        id: fanId,
+        creatorId,
+        platformAccountId: accountId,
+        platformFanId: fanRef,
+        displayName: 'Fan inventé',
+      });
+      await test.admin.db.insert(schema.conversations).values({
+        id: conversationId,
+        creatorId,
+        platformAccountId: accountId,
+        fanId,
+        platformConversationId: `conv-${fanRef}`,
+      });
+      await test.admin.db.insert(schema.scriptRuns).values({
+        id: newId(ScriptRunIdSchema),
+        creatorId,
+        conversationId,
+        scriptRef: 'sequence_1',
+        status: outcome === 'bought' ? 'open' : 'refused',
+        steps: [{ stepIndex: 0, kind: 'paid', outcome, priceMinor: first.priceMinor, sentAt: at, at }],
+        startedAt: new Date(at),
+        endedAt: outcome === 'bought' ? null : new Date(at),
+      });
+    };
+    await runOf('perf-1', 1, 'bought');
+    await runOf('perf-2', 1, 'refused');
+    await runOf('perf-3', 40, 'bought');
+    // One of Inès's under the same reference, yesterday: never counted for Nora.
+    await runOf('perf-ines', 1, 'bought', ines);
+
+    const read = async (who: 'owner' | 'manager' | 'chatter' | 'nora', days: number, creatorId = nora) =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/creators/${creatorId}/platform-scripts/performance?days=${String(days)}`,
+        headers: { cookie: await signIn(server, `${who}@example.test`, PASSWORD), origin: DASHBOARD_ORIGIN },
+      });
+    const response = await read('owner', 7);
+    expect(response.statusCode).toBe(200);
+    const list = ScriptPerformanceListSchema.parse(response.json());
+    expect(list).toMatchObject({ days: 7, minFans: SCRIPT_STATS_MIN_FANS });
+    // Only ours: the script recognised from Impera, never a native one of another tool (ADR 0161).
+    expect(list.scripts.map((line) => line.id)).toEqual([row.id]);
+    expect(list.scripts[0]).toMatchObject({
+      fans: 2,
+      revenueMinor: first.priceMinor,
+      revenuePerFanMinor: null,
+      revealSince: dayOf(7),
+    });
+    expect(list.scripts[0]?.steps[0]).toMatchObject({
+      rank: 0,
+      sent: 2,
+      bought: 1,
+      purchaseRate: null,
+      reveal: { sent: 3, purchased: 1, paidMinor: 500 },
+    });
+    // Over 90 days, the third fan counts too.
+    expect(ScriptPerformanceListSchema.parse((await read('owner', 90)).json()).scripts[0]?.fans).toBe(3);
+    expect((await read('owner', 12)).statusCode).toBe(400);
+    // An active manager of her list reads it; a chatter and her own account never, nor anyone about Inès's.
+    expect((await read('manager', 30)).statusCode).toBe(200);
+    expect((await read('chatter', 30)).statusCode).toBe(404);
+    expect([403, 404]).toContain((await read('nora', 30)).statusCode);
+    // Inès's: the owner reads none of Nora's there, and the manager, who has not got her on his list, is refused at the door.
+    const inesList = await read('owner', 30, ines);
+    expect(inesList.statusCode).toBe(200);
+    expect(ScriptPerformanceListSchema.parse(inesList.json()).scripts).toEqual([]);
+    expect((await read('manager', 30, ines)).statusCode).toBe(403);
+    expect(
+      await withCreatorAccount(app.db.db, ids.nora, (tx) => tx.select().from(schema.scriptRuns)),
+    ).toEqual([]);
   });
 });

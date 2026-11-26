@@ -7,6 +7,7 @@ import {
   type FanCardField,
   type FanCardFieldSpec,
   type FanCardGroup,
+  type FanCardValue,
   type FanCardView,
   type RejectReason,
 } from '@impera/contracts';
@@ -29,15 +30,12 @@ import {
   entryOf,
   ESSENTIALS,
   groupChecks,
-  groupLine,
   groupShare,
   IDENTITY,
   IDENTITY_WORDS,
-  identitySources,
   identityText,
   PANEL_GROUPS,
   restOf,
-  sourceLine,
   specOf,
   toCheckCount,
   toDiscover,
@@ -52,6 +50,12 @@ import { icon, type IconName } from '../../lib/icons';
  * One screen of the copilot side panel (ADR 0086). Pure: the same state draws the same nodes; main.ts follows the tab
  * and reads the CRM. Text always goes in as text: a value of the card, his words, are data, never markup.
  */
+/**
+ * The tabs under the draft (Charles 21/11, piste C, with Design's corrections): what is essential, him, her as he sees
+ * her, what is intimate, the sale. One shows at a time; keys 1 to 5 pick them in this order.
+ */
+export type PanelTab = 'essentials' | FanCardGroup | 'sale';
+
 export type PanelScreen =
   | { readonly kind: 'loading' }
   | { readonly kind: 'signed_out' }
@@ -76,14 +80,13 @@ export type PanelScreen =
       readonly opensCreators: boolean;
       /** Null while it is read the first time. */
       readonly card: FanCardView | 'forbidden' | 'down' | null;
-      readonly openGroups: ReadonlySet<FanCardGroup>;
+      /** The tab shown; one that is not there (no sale any more) falls back to « L’essentiel ». */
+      readonly tab: PanelTab;
       /** A value noted after this moment is marked « nouveau » (§ 10, EXT-14); null marks nothing. */
       readonly newSince: string | null;
       readonly draft: DraftPart;
       /** What the agent computed (ADR 0141, lot a); null from a server that does not send it yet. */
       readonly assist: CopilotAssist | null;
-      /** The sale line's detail, closed by default (§ 14). */
-      readonly saleOpen: boolean;
       /** « N à découvrir », closed by default (Design 16/11, lot 0141-3). */
       readonly discoverOpen: boolean;
       /** The band past its first three badges (§ 14). */
@@ -128,8 +131,7 @@ export type DraftPart =
 
 export interface PanelActions {
   readonly openCrm: () => void;
-  readonly toggleGroup: (group: FanCardGroup, open: boolean) => void;
-  readonly toggleSale: (open: boolean) => void;
+  readonly pickTab: (tab: PanelTab) => void;
   readonly toggleDiscover: (open: boolean) => void;
   /** « +N »: the signals past the first three badges. */
   readonly showSignals: () => void;
@@ -237,31 +239,48 @@ const isNew = (observedAt: string, marks: Marks): boolean =>
 
 const newMark = (): HTMLElement => h('span', { class: 'cp-field__new' }, 'nouveau');
 
+/** A value is a chip up to twenty characters, otherwise a bullet (Design 21/11): a short word reads at a glance. */
+const CHIP_MAX = 20;
+
+/** A field's colour: its group's, the amber for what he does not want (Design 21/11). */
+const toneOf = (spec: FanCardFieldSpec): string => (spec.field === 'limits' ? 'limit' : spec.group);
+
+/** What is known of a field: one chip per item when all are short, otherwise one coloured bullet each. */
+function valuesOf(spec: FanCardFieldSpec, current: FanCardValue): HTMLElement {
+  const items = current.items.map((item) => valueText(spec.field, [item]));
+  // A guess is said by its dashed outline, as the CRM's inferred tag (Design 21/11).
+  const guessed = current.source === 'inferred' ? 'true' : undefined;
+  return items.every((text) => text.length <= CHIP_MAX)
+    ? h(
+        'ul',
+        { class: 'cp-chips' },
+        ...items.map((text) => h('li', { class: 'cp-chip', 'data-guess': guessed }, text)),
+      )
+    : h('ul', { class: 'cp-items' }, ...items.map((text) => h('li', { class: 'cp-field__value' }, text)));
+}
+
+/** Where a value comes from is said only when it is a guess (Design 21/11): what he said or a chatter noted is a fact. */
+const guessMark = (current: FanCardValue): HTMLElement | null =>
+  current.source === 'inferred' ? h('span', { class: 'cp-field__source' }, 'deviné') : null;
+
 /**
- * A field of the card in a group (EXT-04): its label as a muted overline with where the value comes from to its right,
- * then the value in ink. A source the field above already said is not said again: `said` carries the last one shown.
+ * A field of the card (EXT-04): its label in its group's colour, « nouveau » and « deviné » to its right, then what is
+ * known, his words, what waits for a check. Nothing when nothing is known nor waits.
  */
-function field(
-  spec: FanCardFieldSpec,
-  entry: FanCardEntry,
-  marks: Marks,
-  said: { last: string | null },
-): HTMLElement {
+function field(spec: FanCardFieldSpec, entry: FanCardEntry, marks: Marks): HTMLElement | null {
   const { current, toCheck } = entry;
-  const source = current === null ? null : sourceLine(current, marks.now);
-  const sayIt = source !== null && source !== said.last;
-  if (source !== null) said.last = source;
+  if (current === null && toCheck.length === 0) return null;
   return h(
     'li',
-    { class: 'cp-field', 'data-field': spec.field },
+    { class: 'cp-field', 'data-field': spec.field, 'data-tone': toneOf(spec) },
     h(
       'span',
       { class: 'cp-field__top' },
       fieldLabel(spec.field, spec.label),
       current !== null && isNew(current.observedAt, marks) ? newMark() : null,
-      sayIt ? h('span', { class: 'cp-field__source' }, source) : null,
+      current === null ? null : guessMark(current),
     ),
-    current === null ? null : h('span', { class: 'cp-field__value' }, valueText(spec.field, current.items)),
+    current === null ? null : valuesOf(spec, current),
     current === null ? null : quote(current.sourceQuote),
     ...checksOf(spec.field, toCheck),
   );
@@ -286,8 +305,8 @@ const checksOf = (
 
 /**
  * Who he is in one line, « Alpha · 34 ans · Lyon », only what is known, the first name in bold (Design 16/11, lot
- * 0141-3). Where it comes from is said once under it; while his age is contested, a red « contesté » next to his age
- * takes the place of that source, so the line never states as a fact what is in doubt.
+ * 0141-3). While his age is contested, a red « contesté » sits next to his age, so the line never states as a fact what
+ * is in doubt.
  */
 function identity(card: FanCardView, marks: Marks, ageDisputed: boolean): HTMLElement | null {
   const entries = IDENTITY.map((name) => ({ name, entry: entryOf(card.fields, name) }));
@@ -327,11 +346,6 @@ function identity(card: FanCardView, marks: Marks, ageDisputed: boolean): HTMLEl
     'li',
     { class: 'cp-field cp-ident', 'data-field': 'identity', 'aria-label': 'Prénom, âge et ville' },
     h('span', { class: 'cp-field__top' }, line, fresh ? newMark() : null),
-    ...(ageDisputed
-      ? []
-      : identitySources(card.fields, marks.now).map((text) =>
-          h('span', { class: 'cp-ident__source' }, text),
-        )),
     ...entries.map(({ name, entry }) => quote(entry.current?.sourceQuote ?? null, IDENTITY_WORDS[name])),
     ...entries.flatMap(({ name, entry }) => checksOf(name, entry.toCheck, IDENTITY_WORDS[name])),
   );
@@ -340,10 +354,7 @@ function identity(card: FanCardView, marks: Marks, ageDisputed: boolean): HTMLEl
 /** What is masked while his age is contested (ADR 0141 § 9, Agent 16/11): said the same way on both rows. */
 const MASKED = 'Masqué tant que son âge est contesté.';
 
-/**
- * A muted icon in front of each line of the card and each fold (Design 16/11, lot 0141-5): found by shape, never
- * coloured.
- */
+/** An icon in front of a line of the card, in its field's colour (Design 21/11), and the icon of each tab. */
 const FIELD_ICONS: Partial<Record<FanCardField, IconName>> = {
   desires: 'heart',
   limits: 'circleMinus',
@@ -357,8 +368,6 @@ const GROUP_ICONS: Readonly<Record<FanCardGroup, IconName>> = {
 
 const lineIcon = (name: IconName): HTMLElement =>
   h('span', { class: 'cp-line-icon', 'aria-hidden': 'true' }, icon(name, 14));
-
-const groupIcon = (group: FanCardGroup): HTMLElement => lineIcon(GROUP_ICONS[group]);
 
 /** A field's label as a muted overline, its icon in front when it has one. */
 function fieldLabel(field: FanCardField, label: string): HTMLElement {
@@ -375,20 +384,6 @@ const maskedField = (spec: FanCardFieldSpec): HTMLElement =>
     h('span', { class: 'cp-field__masked' }, MASKED),
   );
 
-/** « Intime » masked: a row that does not open, its title and why. */
-const maskedGroup = (group: FanCardGroup, title: string): HTMLElement =>
-  h(
-    'div',
-    { class: 'cp-group', 'data-group': group, 'data-masked': 'true' },
-    h(
-      'div',
-      { class: 'cp-group__row' },
-      groupIcon(group),
-      h('span', { class: 'cp-group__title' }, title),
-      h('span', { class: 'cp-group__sum' }, MASKED),
-    ),
-  );
-
 /**
  * While his age is contested, his fantasies and the intimate group are masked by the panel itself, closed by default:
  * even if a server still sent their values, none is drawn, and their checks are not counted.
@@ -396,39 +391,9 @@ const maskedGroup = (group: FanCardGroup, title: string): HTMLElement =>
 const isMasked = (masked: boolean, spec: FanCardFieldSpec): boolean => masked && spec.group === 'intimate';
 
 /**
- * A field of the brief (Design 16/11, lot 0141-3): its label as a muted overline, its source to the right, then what
- * is known as short bullets, one per item. Nothing when nothing is known: no « Pas encore su » here.
- */
-function briefField(spec: FanCardFieldSpec, entry: FanCardEntry, marks: Marks): HTMLElement | null {
-  const { current, toCheck } = entry;
-  if (current === null && toCheck.length === 0) return null;
-  return h(
-    'li',
-    { class: 'cp-field', 'data-field': spec.field },
-    h(
-      'span',
-      { class: 'cp-field__top' },
-      fieldLabel(spec.field, spec.label),
-      current !== null && isNew(current.observedAt, marks) ? newMark() : null,
-      current === null ? null : h('span', { class: 'cp-field__source' }, sourceLine(current, marks.now)),
-    ),
-    current === null
-      ? null
-      : h(
-          'ul',
-          { class: 'cp-items' },
-          ...current.items.map((item) =>
-            h('li', { class: 'cp-field__value' }, valueText(spec.field, [item])),
-          ),
-        ),
-    current === null ? null : quote(current.sourceQuote),
-    ...checksOf(spec.field, toCheck),
-  );
-}
-
-/**
- * Him, in brief (Design 16/11, lot 0141-3): a short card of what is known and helps to answer, first name, age and
- * town, what he likes, what he does not want, what happens in his life. What is not known waits behind « à découvrir ».
+ * « L’essentiel » (Design 16/11, lot 0141-3; Charles 21/11, piste C): a short card of what is known and helps to answer,
+ * first name, age and town, his fantasies, what happens in his life. What he does not want is pinned over every tab;
+ * what is not known waits behind « à découvrir ».
  */
 function briefCard(card: FanCardView, marks: Marks, masked: boolean, ageDisputed: boolean): HTMLElement {
   const checks = toCheckCount(
@@ -439,14 +404,16 @@ function briefCard(card: FanCardView, marks: Marks, masked: boolean, ageDisputed
   );
   const rows = [
     identity(card, marks, ageDisputed),
-    ...ESSENTIALS.filter((name) => !IDENTITY.some((part) => part === name)).map((name) => {
-      const spec = specOf(name);
-      if (spec === undefined) return null;
-      // « Ses fantasmes » is masked; « Ce qu'il ne veut pas » stays read: it protects him (Agent 16/11).
-      return spec.field === 'desires' && isMasked(masked, spec)
-        ? maskedField(spec)
-        : briefField(spec, entryOf(card.fields, name), marks);
-    }),
+    ...ESSENTIALS.filter((name) => name !== 'limits' && !IDENTITY.some((part) => part === name)).map(
+      (name) => {
+        const spec = specOf(name);
+        if (spec === undefined) return null;
+        // « Ses fantasmes » is masked; « Ce qu'il ne veut pas » stays read, pinned: it protects him (Agent 16/11).
+        return spec.field === 'desires' && isMasked(masked, spec)
+          ? maskedField(spec)
+          : field(spec, entryOf(card.fields, name), marks);
+      },
+    ),
   ].filter((node): node is HTMLElement => node !== null);
   return h(
     'section',
@@ -454,7 +421,7 @@ function briefCard(card: FanCardView, marks: Marks, masked: boolean, ageDisputed
     h(
       'header',
       { class: 'cp-brief__head' },
-      h('h1', { class: 'cp-overline' }, 'Fiche du fan'),
+      h('h1', { class: 'cp-overline' }, 'L’essentiel'),
       checks === 0 ? null : h('span', { class: 'cp-head__check' }, `${String(checks)} à vérifier`),
     ),
     rows.length === 0
@@ -503,69 +470,47 @@ function discoverFold(
 }
 
 /**
- * How far his card is filled in for a group (Design 21/11): a fine gauge of the design system under its line, one
- * colour per group, that fills as it comes in. The count beside the title says it in words.
+ * What he does not want, pinned in amber over every tab (Design 21/11): it protects him, so it is read whatever the tab,
+ * and even while his age is contested (Agent 16/11). Nothing when nothing is known nor waits for a check.
  */
-function groupMeter(entries: FanCardView['fields'], group: FanCardGroup): HTMLElement {
-  const { known, total } = groupShare(entries, group);
-  const reached = h('span', {});
-  reached.style.setProperty('--_w', `${String(total === 0 ? 0 : Math.round((known / total) * 100))}%`);
+function limitsPin(card: FanCardView, marks: Marks): HTMLElement | null {
+  const spec = specOf('limits');
+  const { current, toCheck } = entryOf(card.fields, 'limits');
+  if (spec === undefined || (current === null && toCheck.length === 0)) return null;
   return h(
-    'span',
-    { class: 'nv-meter cp-group__meter', 'data-group': group, 'aria-hidden': 'true' },
-    reached,
+    'section',
+    { class: 'cp-limits', 'data-field': 'limits', 'aria-label': spec.label },
+    h('span', { class: 'cp-limits__icon', 'aria-hidden': 'true' }, icon('circleMinus', 16)),
+    h(
+      'div',
+      { class: 'cp-limits__body' },
+      current === null
+        ? null
+        : h(
+            'p',
+            { class: 'cp-limits__text' },
+            h('b', {}, 'Il ne veut pas : '),
+            current.items.map((item) => valueText('limits', [item])).join(' · '),
+            isNew(current.observedAt, marks) ? newMark() : null,
+            guessMark(current),
+          ),
+      current === null ? null : quote(current.sourceQuote),
+      ...checksOf('limits', toCheck),
+    ),
   );
 }
 
-/** The groups « Lui », « Elle, vue par lui », « Intime », folded at the very bottom with their counts. */
-function groupFolds(
-  card: FanCardView,
-  openGroups: ReadonlySet<FanCardGroup>,
-  marks: Marks,
-  actions: PanelActions,
-  masked: boolean,
-): HTMLElement[] {
-  return PANEL_GROUPS.map(({ group, title }) => {
-    if (masked && group === 'intimate') return maskedGroup(group, title);
-    const groupSaid: { last: string | null } = { last: null };
-    const toCheck = groupChecks(card.fields, group);
-    // A group shows what is known or waits for a check; what is not known is named under « à découvrir ».
-    const shown = restOf(group).filter((spec) => {
-      const entry = entryOf(card.fields, spec.field);
-      return entry.current !== null || entry.toCheck.length > 0;
-    });
-    const details = h(
-      'details',
-      { class: 'cp-group', 'data-group': group, open: openGroups.has(group) },
-      h(
-        'summary',
-        {},
-        groupIcon(group),
-        h('span', { class: 'cp-group__title' }, title),
-        h(
-          'span',
-          { class: 'cp-group__sum' },
-          groupLine(card.fields, group),
-          // Where the count on top sends him (V-EXT-07).
-          toCheck === 0 ? null : h('span', { class: 'cp-group__check' }, ` · ${String(toCheck)} à vérifier`),
-        ),
-        // The fold says it opens (V-EXT-06).
-        h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
-        groupMeter(card.fields, group),
-      ),
-      h(
-        'ul',
-        { class: 'cp-fields' },
-        ...(shown.length === 0
-          ? [h('li', { class: 'cp-field cp-field--unknown' }, 'Rien de su pour l’instant.')]
-          : shown.map((spec) => field(spec, entryOf(card.fields, spec.field), marks, groupSaid))),
-      ),
-    );
-    details.addEventListener('toggle', () => {
-      actions.toggleGroup(group, details.open);
-    });
-    return details;
-  });
+/** A group's tab (« Lui », « Elle, vue par lui », « Intime »): what is known or waits for a check, field by field. */
+function groupPane(card: FanCardView, group: FanCardGroup, marks: Marks, masked: boolean): HTMLElement[] {
+  if (masked && group === 'intimate')
+    return [h('p', { class: 'cp-pane__none', 'data-masked': 'true' }, MASKED)];
+  // What is not known is named under « à découvrir », on the first tab.
+  const rows = restOf(group)
+    .map((spec) => field(spec, entryOf(card.fields, spec.field), marks))
+    .filter((node): node is HTMLElement => node !== null);
+  return rows.length === 0
+    ? [h('p', { class: 'cp-pane__none' }, 'Rien de su pour l’instant.')]
+    : [h('ul', { class: 'cp-fields' }, ...rows)];
 }
 
 /** A badge of the band: its icon and one or two words, the whole said in words to a screen reader. */
@@ -691,18 +636,15 @@ function momentNode(moment: MomentLine): HTMLElement {
   );
 }
 
+/** The sale to show: none under a cut, nor while « où on en est » is read the first time (§ 9). */
+const saleOf = (assist: CopilotAssist | null, cut: CopilotCut | null): CopilotAssist['sale'] =>
+  cut === null ? (assist?.sale ?? null) : null;
+
 /**
- * The sale in one line under the core (ADR 0141 § 3, § 14; Design 16/11, lot 0141-3): one dot per step, the script and
- * its step, the next step and its price. A click opens the detail: refused steps, objections served, an open order.
+ * The « Vente » tab (ADR 0141 § 3, § 14; Charles 21/11, piste C): one dot per step, the script and its step, the next
+ * step and its price, then the detail: the moment's conditions, refused steps, objections served, an open order.
  */
-function saleFold(
-  assist: CopilotAssist | null,
-  cut: CopilotCut | null,
-  open: boolean,
-  actions: PanelActions,
-): HTMLElement | null {
-  const sale = assist?.sale ?? null;
-  if (sale === null || cut !== null) return null;
+function salePane(assist: CopilotAssist | null, sale: NonNullable<CopilotAssist['sale']>): HTMLElement {
   // Under « Ne rien vendre » the line does not announce the next step and its price; the detail still says it.
   const lineSaysNext = assist?.nextMove?.kind !== 'no_sale';
   const rows = saleRows(sale, { withNext: !lineSaysNext });
@@ -737,12 +679,12 @@ function saleFold(
             ),
           ),
         );
-  const details = h(
-    'details',
-    { class: 'cp-sale', 'data-group': 'sale', open },
+  return h(
+    'section',
+    { class: 'cp-sale', 'aria-label': 'Où en est la vente' },
     h(
-      'summary',
-      { 'aria-label': `Où en est la vente : ${saleLine(sale, { withNext: lineSaysNext })}` },
+      'p',
+      { class: 'cp-sale__head' },
       dots.length === 0
         ? null
         : h(
@@ -751,7 +693,6 @@ function saleFold(
             ...dots.map((state) => h('span', { class: 'cp-step', 'data-step': state })),
           ),
       h('span', { class: 'cp-sale__line' }, saleLine(sale, { withNext: lineSaysNext })),
-      h('span', { class: 'cp-group__chevron', 'aria-hidden': 'true' }, icon('chevronRight', 16)),
     ),
     h(
       'ul',
@@ -788,13 +729,10 @@ function saleFold(
           )),
     ),
   );
-  details.addEventListener('toggle', () => {
-    actions.toggleSale(details.open);
-  });
-  return details;
 }
 
-function cardPart(
+/** « L’essentiel »: his card in brief and what is left to discover, or why the card is not there. */
+function essentialsPane(
   screen: Extract<PanelScreen, { kind: 'conversation' }>,
   actions: PanelActions,
   masked: boolean,
@@ -823,10 +761,191 @@ function cardPart(
   const marks = { now: screen.now, newSince: screen.newSince };
   const ageDisputed = screen.standing?.ageDisputed === true;
   const discover = discoverFold(screen.card, masked, screen.discoverOpen, actions);
+  return [briefCard(screen.card, marks, masked, ageDisputed), ...(discover === null ? [] : [discover])];
+}
+
+/** What the panel reads of a conversation screen to draw its lower part. */
+interface Reading {
+  readonly cut: CopilotCut | null;
+  /** Nothing of the agent's view while « où on en est » is read the first time: it may hold a cut (§ 9). */
+  readonly assist: CopilotAssist | null;
+  readonly sale: CopilotAssist['sale'];
+  /** While his age is contested, what is intimate is masked, by the panel itself too (§ 9). */
+  readonly masked: boolean;
+  /** His card when it is on and read; null otherwise (off, read the first time, refused, down). */
+  readonly card: FanCardView | null;
+}
+
+function readingOf(screen: Extract<PanelScreen, { kind: 'conversation' }>): Reading {
+  const cut = screen.standing === null ? null : cutOf(screen.assist, screen.standing);
+  const assist = screen.standing === null ? null : screen.assist;
+  return {
+    cut,
+    assist,
+    sale: saleOf(assist, cut),
+    masked: cut === 'age_doubt',
+    card: screen.cardOn && typeof screen.card === 'object' && screen.card !== null ? screen.card : null,
+  };
+}
+
+const TABS: readonly PanelTab[] = ['essentials', 'him', 'about_her', 'intimate', 'sale'];
+const tabOf = (value: string | undefined): PanelTab | undefined => TABS.find((tab) => tab === value);
+const isGroup = (tab: PanelTab): tab is FanCardGroup => tab !== 'essentials' && tab !== 'sale';
+
+/** A tab: its icon, its word, its count, what waits for a check behind it, and all of it in words. */
+interface TabSpec {
+  readonly tab: PanelTab;
+  readonly icon: IconName;
+  /** The word, shown only on the open tab (Design 21/11). */
+  readonly word: string;
+  readonly count: string | null;
+  readonly checks: number;
+  /** What a screen reader says of the tab. */
+  readonly said: string;
+}
+
+/** The tabs a conversation shows, in order: the card's four when it is read, the sale's when one runs. */
+function tabsOf(reading: Reading): TabSpec[] {
+  const { card, sale, masked } = reading;
+  const checkWords = (checks: number): string => (checks === 0 ? '' : `, ${String(checks)} à vérifier`);
+  // Its limits are counted on the pin, his fantasies not while they are masked.
+  const essentialChecks =
+    card === null
+      ? 0
+      : toCheckCount(
+          card.fields.filter(
+            ({ field: name }) =>
+              ESSENTIALS.includes(name) && name !== 'limits' && !(masked && name === 'desires'),
+          ),
+        );
+  // « L’essentiel » is always first: with the card off, it holds why, and the sale keeps its tab beside it.
+  const specs: TabSpec[] = [
+    {
+      tab: 'essentials',
+      icon: 'star',
+      word: 'L’essentiel',
+      count: null,
+      checks: essentialChecks,
+      said: `L’essentiel${checkWords(essentialChecks)}`,
+    },
+  ];
+  if (card !== null) {
+    for (const { group, title } of PANEL_GROUPS) {
+      const hidden = masked && group === 'intimate';
+      const known = hidden ? 0 : groupShare(card.fields, group).known;
+      const checks = hidden ? 0 : groupChecks(card.fields, group);
+      specs.push({
+        tab: group,
+        icon: GROUP_ICONS[group],
+        word: TAB_WORDS[group],
+        count: known === 0 ? null : String(known),
+        checks,
+        said: hidden
+          ? `${title}, masqué`
+          : `${title}, ${known === 0 ? 'rien de su' : `${String(known)} su${known > 1 ? 's' : ''}`}${checkWords(checks)}`,
+      });
+    }
+  }
+  if (sale !== null) {
+    const step =
+      sale.script === null ? null : `${String(sale.script.stepIndex + 1)}/${String(sale.script.stepCount)}`;
+    specs.push({
+      tab: 'sale',
+      icon: 'pay',
+      word: 'Vente',
+      count: step,
+      checks: 0,
+      said:
+        sale.script === null
+          ? 'Vente'
+          : `Vente, étape ${String(sale.script.stepIndex + 1)} sur ${String(sale.script.stepCount)}`,
+    });
+  }
+  return specs;
+}
+
+/** A group's word on its tab: short, the whole title is said to a screen reader. */
+const TAB_WORDS: Readonly<Record<FanCardGroup, string>> = {
+  him: 'Lui',
+  about_her: 'Elle',
+  intimate: 'Intime',
+};
+
+/** The tabs a screen shows, in order: main.ts maps keys 1 to 5 on them. None off a conversation. */
+export function panelTabs(screen: PanelScreen): readonly PanelTab[] {
+  if (screen.kind !== 'conversation') return [];
+  const specs = tabsOf(readingOf(screen));
+  return specs.length > 1 ? specs.map(({ tab }) => tab) : [];
+}
+
+/**
+ * The tab bar under the draft (Charles 21/11, piste C; Design's corrections): an icon and a count per tab, the word
+ * only on the open one, its key in a corner. A tab waiting for a check carries an amber dot.
+ */
+function tabBar(specs: readonly TabSpec[], current: PanelTab): HTMLElement {
+  return h(
+    'div',
+    { class: 'cp-tabs', role: 'tablist', 'aria-label': 'Fiche du fan' },
+    ...specs.map((spec, index) => {
+      const on = spec.tab === current;
+      return h(
+        'button',
+        {
+          type: 'button',
+          class: 'cp-tab',
+          role: 'tab',
+          id: `cp-tab-${spec.tab}`,
+          'data-tab': spec.tab,
+          'aria-selected': on ? 'true' : 'false',
+          'aria-controls': 'cp-pane',
+          'aria-label': spec.said,
+          tabindex: on ? 0 : -1,
+        },
+        icon(spec.icon, 18),
+        on ? h('span', { class: 'cp-tab__word' }, spec.word) : null,
+        spec.count === null ? null : h('span', { class: 'cp-tab__count' }, spec.count),
+        spec.checks === 0 ? null : h('span', { class: 'cp-tab__check' }),
+        h('span', { class: 'cp-tab__key', 'aria-hidden': 'true' }, String(index + 1)),
+      );
+    }),
+  );
+}
+
+/**
+ * Under the draft (Charles 21/11, piste C): the tabs, what he does not want pinned over every tab, then the open tab
+ * alone, which scrolls. A tab that is not there any more (the sale ended) falls back to « L’essentiel ».
+ */
+function lowerPart(
+  screen: Extract<PanelScreen, { kind: 'conversation' }>,
+  reading: Reading,
+  actions: PanelActions,
+): HTMLElement[] {
+  const specs = tabsOf(reading);
+  const tab = specs.some((spec) => spec.tab === screen.tab) ? screen.tab : 'essentials';
+  const marks = { now: screen.now, newSince: screen.newSince };
+  const { card, sale, masked } = reading;
+  const content =
+    tab === 'sale' && sale !== null
+      ? [salePane(reading.assist, sale)]
+      : isGroup(tab) && card !== null
+        ? groupPane(card, tab, marks, masked)
+        : essentialsPane(screen, actions, masked);
+  const tabbed = specs.length > 1;
+  const pin = card === null ? null : limitsPin(card, marks);
   return [
-    briefCard(screen.card, marks, masked, ageDisputed),
-    ...(discover === null ? [] : [discover]),
-    ...groupFolds(screen.card, screen.openGroups, marks, actions, masked),
+    ...(tabbed ? [tabBar(specs, tab)] : []),
+    ...(pin === null ? [] : [pin]),
+    h(
+      'div',
+      {
+        class: 'cp-scroll',
+        id: 'cp-pane',
+        'data-shown': tab,
+        role: tabbed ? 'tabpanel' : undefined,
+        'aria-labelledby': tabbed ? `cp-tab-${tab}` : undefined,
+      },
+      ...content,
+    ),
   ];
 }
 
@@ -1156,6 +1275,27 @@ function draftPart(
 function wire(root: ParentNode, actions: PanelActions): void {
   root.querySelector('[data-action="crm"]')?.addEventListener('click', actions.openCrm);
   root.querySelector('[data-action="more-signals"]')?.addEventListener('click', actions.showSignals);
+  const tabs = [...root.querySelectorAll<HTMLElement>('.cp-tab')];
+  tabs.forEach((node, index) => {
+    const tab = tabOf(node.dataset['tab']);
+    if (tab === undefined) return;
+    node.addEventListener('click', () => {
+      actions.pickTab(tab);
+    });
+    // A tab list: the arrows, Home and End pick a tab, and the focus follows it.
+    node.addEventListener('keydown', (event) => {
+      const to = {
+        ArrowRight: index + 1,
+        ArrowLeft: index - 1,
+        Home: 0,
+        End: tabs.length - 1,
+      }[event.key];
+      if (to === undefined) return;
+      event.preventDefault();
+      const next = tabOf(tabs[(to + tabs.length) % tabs.length]?.dataset['tab']);
+      if (next !== undefined) actions.pickTab(next);
+    });
+  });
   const on = (gesture: string, run: () => void): void => {
     root.querySelector(`[data-gesture="${gesture}"]`)?.addEventListener('click', run);
   };
@@ -1207,6 +1347,8 @@ function focusOf(root: HTMLElement): string | null {
     const group = active.closest<HTMLElement>('[data-group]')?.dataset['group'];
     return group === undefined ? null : `[data-group="${group}"] > summary`;
   }
+  // A tab picked with the arrows draws the bar again: the focus goes to the tab now open.
+  if (active.dataset['tab'] !== undefined) return '.cp-tab[aria-selected="true"]';
   for (const name of ['gesture', 'reason', 'action'] as const) {
     const value = active.dataset[name];
     if (value !== undefined) return `[data-${name}="${value}"]`;
@@ -1241,24 +1383,18 @@ const bubblesOf = (draft: DraftPart): string =>
 
 export function render(root: HTMLElement, screen: PanelScreen, actions: PanelActions): void {
   // The card scrolls; the band and the core above it stay in view (Design 16/11, lot 0141-3).
-  const scroller = root.querySelector('.cp-scroll');
+  const scroller = root.querySelector<HTMLElement>('.cp-scroll');
   const scroll = scroller?.scrollTop ?? 0;
   const focused = focusOf(root);
   if (screen.kind === 'conversation') {
-    // Nothing of the sale while « où on en est » is read the first time: it may hold a cut (§ 9).
-    const cut = screen.standing === null ? null : cutOf(screen.assist, screen.standing);
-    const assist = screen.standing === null ? null : screen.assist;
-    const fold = saleFold(assist, cut, screen.saleOpen, actions);
-    // While his age is contested, what is intimate is masked, by the panel itself too (§ 9, closed by default).
-    const ageCut = cut === 'age_doubt';
-    // Under the core: the sale line, then him in brief, what is left to discover, the folded groups. With a long
-    // draft, the sale line is what goes under the fold, never the button.
-    const body = h(
-      'div',
-      { class: 'cp-scroll' },
-      ...(fold === null ? [] : [fold]),
-      ...cardPart(screen, actions, ageCut),
-    );
+    const reading = readingOf(screen);
+    const { cut, assist } = reading;
+    // Under the core: the tabs, what he does not want, the open tab. With a long draft, the tab is what goes under the
+    // fold, never the button.
+    const under = lowerPart(screen, reading, actions);
+    const body = under[under.length - 1];
+    // The same tab drawn again keeps its place (§ 10); another tab opens at its top.
+    const kept = scroller !== null && scroller.dataset['shown'] === body?.dataset['shown'] ? scroll : 0;
     const withheld = withheldOf(screen.standing);
     // The core, right under the band: what to do, the draft and its copy, read without scrolling. A cut is said once:
     // by the draft when its own line already says it, otherwise by the sentence in the gesture's place, and the draft
@@ -1282,9 +1418,9 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       // its text and its caret while the rest is drawn again (recette du 16/11, EXT-01).
       for (const child of [...root.children]) if (child !== shown) child.remove();
       shown.before(band, ...pinned);
-      shown.after(body);
-      body.scrollTop = scroll;
-      for (const node of [band, body, ...pinned]) wire(node, actions);
+      shown.after(...under);
+      if (body !== undefined) body.scrollTop = kept;
+      for (const node of [band, ...under, ...pinned]) wire(node, actions);
       refocus(root, focused);
       return;
     }
@@ -1302,11 +1438,11 @@ export function render(root: HTMLElement, screen: PanelScreen, actions: PanelAct
       )
         for (const node of [draft, ...pinned]) node.dataset['fresh'] = 'true';
     }
-    root.replaceChildren(band, ...pinned, ...(draft === null ? [] : [draft]), body);
-    // Kept open groups keep their place: the panel draws over itself, without scrolling back up (§ 10).
-    body.scrollTop = scroll;
-    const kept = root.querySelector<HTMLInputElement>('.cp-draft__note');
-    if (kept !== null) kept.value = note;
+    root.replaceChildren(band, ...pinned, ...(draft === null ? [] : [draft]), ...under);
+    // The panel draws over itself, without scrolling back up (§ 10).
+    if (body !== undefined) body.scrollTop = kept;
+    const typed = root.querySelector<HTMLInputElement>('.cp-draft__note');
+    if (typed !== null) typed.value = note;
   } else {
     root.replaceChildren(
       h(

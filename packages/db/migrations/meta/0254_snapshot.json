@@ -1,5 +1,5 @@
 {
-  "id": "4c869bad-45d6-4d2a-8b7f-a8d7a71da3d7",
+  "id": "fce21862-b0a7-414a-9871-0c85bdde57a5",
   "prevId": "4cc027ce-8100-45e5-a928-add6e16423c7",
   "version": "7",
   "dialect": "postgresql",
@@ -2060,7 +2060,7 @@
         },
         "content_drops_blocked_check": {
           "name": "content_drops_blocked_check",
-          "value": "(\"content_drops\".\"state\" = 'blocked') = (\"content_drops\".\"blocked_reason\" is not null)\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
+          "value": "(\"content_drops\".\"state\" <> 'blocked' or \"content_drops\".\"blocked_reason\" is not null)\n        and (\"content_drops\".\"blocked_reason\" is null or \"content_drops\".\"state\" in ('blocked', 'withdrawn'))\n        and coalesce(char_length(\"content_drops\".\"blocked_reason\"), 1) between 1 and 200"
         },
         "content_drops_correction_check": {
           "name": "content_drops_correction_check",
@@ -9630,6 +9630,12 @@
         "preview_blurhash": {
           "name": "preview_blurhash",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sent_for_free_at": {
+          "name": "sent_for_free_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -18055,103 +18061,6 @@
         "shift_feedbacks_said_check": {
           "name": "shift_feedbacks_said_check",
           "value": "\"shift_feedbacks\".\"nothing_to_report\" = (\"shift_feedbacks\".\"comment\" is null and \"shift_feedbacks\".\"incident\" is null and jsonb_array_length(\"shift_feedbacks\".\"signals\") = 0)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.shift_incident_steps": {
-      "name": "shift_incident_steps",
-      "schema": "",
-      "columns": {
-        "shift_feedback_id": {
-          "name": "shift_feedback_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "creator_id": {
-          "name": "creator_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "step": {
-          "name": "step",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "said_by": {
-          "name": "said_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "said_at": {
-          "name": "said_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "shift_incident_steps_shift_feedback_id_shift_feedbacks_id_fk": {
-          "name": "shift_incident_steps_shift_feedback_id_shift_feedbacks_id_fk",
-          "tableFrom": "shift_incident_steps",
-          "tableTo": "shift_feedbacks",
-          "columnsFrom": ["shift_feedback_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "shift_incident_steps_creator_id_creators_id_fk": {
-          "name": "shift_incident_steps_creator_id_creators_id_fk",
-          "tableFrom": "shift_incident_steps",
-          "tableTo": "creators",
-          "columnsFrom": ["creator_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "shift_incident_steps_said_by_user_id_fk": {
-          "name": "shift_incident_steps_said_by_user_id_fk",
-          "tableFrom": "shift_incident_steps",
-          "tableTo": "user",
-          "columnsFrom": ["said_by"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "shift_incident_steps_shift_feedback_id_step_pk": {
-          "name": "shift_incident_steps_shift_feedback_id_step_pk",
-          "columns": ["shift_feedback_id", "step"]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {
-        "feedback_read": {
-          "name": "feedback_read",
-          "as": "PERMISSIVE",
-          "for": "SELECT",
-          "to": ["public"],
-          "using": "\"shift_incident_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and exists (select 1 from shift_feedbacks f where f.id = \"shift_incident_steps\".\"shift_feedback_id\")"
-        },
-        "agency_insert": {
-          "name": "agency_insert",
-          "as": "PERMISSIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "\"shift_incident_steps\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and (nullif(current_setting('app.team_scope', true), '') = 'owner' or (nullif(current_setting('app.team_scope', true), '') = 'agency' and exists (select 1 from \"user\" u where u.id = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"creator_id\" = any(u.creator_ids)))) and \"shift_incident_steps\".\"said_by\" = nullif(current_setting('app.user_id', true), '') and \"shift_incident_steps\".\"said_at\" = now() and exists (select 1 from shift_feedbacks f where f.id = \"shift_incident_steps\".\"shift_feedback_id\" and f.creator_id = \"shift_incident_steps\".\"creator_id\" and f.incident is not null and not exists (select 1 from team_members m where m.id = f.member_id and m.user_id = nullif(current_setting('app.user_id', true), '')))"
-        }
-      },
-      "checkConstraints": {
-        "shift_incident_steps_step_check": {
-          "name": "shift_incident_steps_step_check",
-          "value": "\"shift_incident_steps\".\"step\" in ('seen', 'resolved')"
         }
       },
       "isRLSEnabled": false

@@ -122,7 +122,7 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Trophées', 'Dossier', 'Sécurité', 'Aide', 'Préférences']);
   });
 
   it('gives a manager on leave no « Trophées » tab, which his routes would not open (recette 16/11, CHT-05)', async () => {
@@ -133,6 +133,6 @@ describe('Moi › Profil (recette 05/11, CHAT-30)', () => {
       within(tabs)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Dossier', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Dossier', 'Sécurité', 'Aide', 'Préférences']);
   });
 });

@@ -1,5 +1,5 @@
 # INS-05 « À décider » : les cartes de décision de la créatrice
-Statut : in progress (lot a fait : contrat, table, routes, carte dans « Aujourd'hui » ; rien ne s'affiche tant qu'aucun code ne demande)
+Statut : in progress (lot a fusionné ; lot b1 fait : trois légendes proposées pour un Reel déposé ; restent la notification, « D'autres idées », l'écran du propriétaire)
 Phase : Instagram (ADR 0164)
 Dépend de : ADR 0164 acceptée ; ADR 0042 (espace de la créatrice) ; captures « cartes-de-decision-2 » validées par Charles le 21/11/2026
 Branche : claude/project-thread-u073g5
@@ -21,7 +21,7 @@ Lot a, le mécanisme :
 
 Lot b, les légendes :
 - [ ] Notification d'une question nouvelle, sous les plafonds de `notifications`.
-- [ ] Premier code qui demande : trois légendes proposées pour une vidéo déposée, depuis la description du média ; son choix gardé.
+- [x] Premier code qui demande (lot b1) : trois légendes proposées pour une vidéo déposée, depuis la description du média ; son choix gardé. Module `instagram-captions`, tâche `instagram_captions.propose`, usage IA `instagram_caption`.
 - [ ] « D'autres idées » : route, indications en puces et en mots, trois demandes au plus ; appels au modèle comptés dans la conso IA.
 - [ ] Écran du propriétaire pour répondre à sa place (captures d'abord).
 
@@ -35,4 +35,4 @@ Lot c, la publication (attend le compte professionnel et l'application Meta) :
 - Aucune donnée réelle dans les tests.
 
 ## Résultat
-Lot a : voir l'entrée de journal du 21/11/2026.
+Lot a : voir l'entrée de journal du 21/11/2026 (cartes de décision). Lot b1 : entrée « légendes proposées » du même jour.

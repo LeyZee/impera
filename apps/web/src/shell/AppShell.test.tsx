@@ -248,6 +248,7 @@ describe('Réglages › Sauvegardes', () => {
       'Alertes',
       'Sauvegardes',
       'Sécurité',
+      'Aide',
     ]);
     expect(router.state.location.pathname).toBe('/reglages/sauvegardes');
   });
@@ -1067,16 +1068,13 @@ describe('an address of Entraîner with no screen yet', () => {
     );
   });
 
-  it.each(['/entrainer/corrections', '/entrainer/tests'])(
-    'leads %s to the Playground, and says why',
-    async (path) => {
-      const router = renderApp(owner, path);
-      await waitFor(() => {
-        expect(router.state.location.pathname).toBe('/entrainer/playground');
-      });
-      expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
-    },
-  );
+  it.each(['/entrainer/tests'])('leads %s to the Playground, and says why', async (path) => {
+    const router = renderApp(owner, path);
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/entrainer/playground');
+    });
+    expect(await screen.findByText('Cet écran arrive bientôt : tu es sur le Playground.')).toBeDefined();
+  });
 
   it('says nothing on its own address, which opens the Playground as its first tab', async () => {
     const router = renderApp(owner, '/entrainer');

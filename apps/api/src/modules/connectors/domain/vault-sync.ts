@@ -25,6 +25,8 @@ export interface VaultRefFields {
   readonly suggestedMaxMinor: number | null;
   /** The platform's blurred preview (`BlurhashSchema`): a few colours, never the image. */
   readonly previewBlurhash: string | null;
+  /** Offered by the platform (sent for free) at a read, this one or an earlier one: once set, it stays (ADR 0145 § 2). */
+  readonly sentForFree: boolean;
 }
 
 /** A stored row: the fields, and whether the platform had stopped listing it. */
@@ -69,6 +71,7 @@ export function vaultRefsOf(read: readonly VaultMedia[]): VaultRefFields[] {
       suggestedMinMinor: media.suggestedPriceMinor?.min ?? null,
       suggestedMaxMinor: media.suggestedPriceMinor?.max ?? null,
       previewBlurhash: media.blurhash,
+      sentForFree: media.sentForFree,
     });
   }
   return rows;
@@ -86,6 +89,7 @@ const FIELDS = [
   'suggestedMinMinor',
   'suggestedMaxMinor',
   'previewBlurhash',
+  'sentForFree',
 ] as const satisfies readonly (keyof VaultRefFields)[];
 
 const sameFields = (a: VaultRefFields, b: VaultRefFields): boolean =>
@@ -97,8 +101,11 @@ const sameFields = (a: VaultRefFields, b: VaultRefFields): boolean =>
  * nothing. Only a whole read may remove: a partial one (one folder) is never given here.
  */
 export function planVaultSync(read: readonly VaultMedia[], stored: readonly StoredVaultRef[]): VaultSyncPlan {
-  const rows = vaultRefsOf(read);
   const kept = new Map(stored.map((row) => [row.platformMediaId, row]));
+  // A media once offered stays offered, whatever the platform says later (ADR 0145 § 2): a read never takes it back.
+  const rows = vaultRefsOf(read).map((row) =>
+    kept.get(row.platformMediaId)?.sentForFree === true ? { ...row, sentForFree: true } : row,
+  );
   const listed = new Set(rows.map((row) => row.platformMediaId));
   return {
     upserts: rows.filter((row) => {

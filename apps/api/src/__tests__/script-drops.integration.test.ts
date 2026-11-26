@@ -443,12 +443,41 @@ describe('/v1/creator-space/content/script-drops', () => {
         .set({ state: 'kept', mediaAssetId: medium?.id ?? null })
         .where(eq(schema.contentDropFiles.id, file.id));
     }
-    const due = await createDrizzleRetentionStore(test.service.db).dueOriginals(
-      new Date('2026-11-06T12:00:00Z'),
-    );
-    expect(due.filter((one) => one.creatorId === nora).map((one) => [one.mediaAssetId, one.reason])).toEqual([
-      [media.gone, 'withdrawn'],
-    ]);
+    const retention = createDrizzleRetentionStore(test.service.db, app.db.db);
+    const now = new Date('2026-11-06T12:00:00Z');
+    const due = (await retention.dueOriginals(now)).filter((one) => one.creatorId === nora);
+    expect(due.map((one) => [one.mediaAssetId, one.reason])).toEqual([[media.gone, 'withdrawn']]);
+    // Each erasure in its own creator (SEC-16): named with another's id, hers is not found, nothing removed nor said.
+    const [gone] = due;
+    if (gone === undefined) throw new Error('the replaced original is not due');
+    const removed: string[] = [];
+    const remove = (key: string) => Promise.resolve(void removed.push(key));
+    expect(await retention.erase({ ...gone, creatorId: ines }, now, 'test', remove)).toBe(false);
+    await retention.eraseFailed({ ...gone, creatorId: ines }, now, 'test');
+    // The live one, still held by her script, stays even when asked by name: the job reads her drops.
+    expect(
+      await retention.erase({ ...gone, mediaAssetId: media.live, reason: 'due' }, now, 'test', remove),
+    ).toBe(false);
+    expect(removed).toEqual([]);
+    const held = await test.admin.db
+      .select({ id: schema.mediaAssets.id })
+      .from(schema.mediaAssets)
+      .where(and(eq(schema.mediaAssets.creatorId, nora), sql`${schema.mediaAssets.erasedAt} is null`));
+    expect(held.map((one) => one.id).toSorted()).toEqual([media.gone, media.live].toSorted());
+    const said = await test.admin.db
+      .select({ id: schema.domainEvents.id })
+      .from(schema.domainEvents)
+      .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${media.gone}`);
+    expect(said).toEqual([]);
+    // In her own creator it goes, bytes then row, and is said once.
+    expect(await retention.erase(gone, now, 'test', remove)).toBe(true);
+    expect(removed).toEqual([gone.storageKey]);
+    expect(await retention.erase(gone, now, 'test', remove)).toBe(false);
+    const erased = await test.admin.db
+      .select({ type: schema.domainEvents.type, creatorId: schema.domainEvents.creatorId })
+      .from(schema.domainEvents)
+      .where(sql`${schema.domainEvents.payload}->>'mediaAssetId' = ${media.gone}`);
+    expect(erased).toEqual([{ type: 'content_media_erased', creatorId: nora }]);
     // The library's version she shoots stays frozen.
     const [version] = await test.admin.db
       .select({ frozen: sql<boolean>`${schema.scriptStructureVersions.frozenAt} is not null` })
@@ -620,6 +649,61 @@ describe('/v1/creator-space/content/script-drops', () => {
       code: 'content_drop_export_unprocessable',
       details: { reason: 'original_erased' },
     });
+  });
+
+  it('never puts a medium of her script in the archive of a free drop: left out, and the sheet says so (ADR 0145 § 2)', async () => {
+    const [script] = await test.admin.db
+      .select({ by: schema.contentDrops.createdBy })
+      .from(schema.contentDrops)
+      .where(eq(schema.contentDrops.id, dropId));
+    const [medium] = await test.admin.db
+      .select({ id: schema.mediaAssets.id })
+      .from(schema.contentDropFiles)
+      .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, schema.contentDropFiles.mediaAssetId))
+      .where(
+        and(
+          eq(schema.contentDropFiles.dropId, dropId),
+          eq(schema.contentDropFiles.state, 'kept'),
+          sql`${schema.contentDropFiles.replacedAt} is null`,
+          sql`${schema.mediaAssets.erasedAt} is null`,
+        ),
+      )
+      .limit(1);
+    if (script === undefined || medium === undefined) throw new Error('fixture changed');
+    // The same photo sent again for a Mass DM: the cleaning finds it a duplicate of her script's.
+    const massDm = newId(ContentDropIdSchema);
+    await test.admin.db.insert(schema.contentDrops).values({
+      id: massDm,
+      creatorId: nora,
+      category: 'mass_dm',
+      state: 'ready',
+      createdBy: script.by,
+    });
+    await test.admin.db.insert(schema.contentDropFiles).values({
+      id: newId(ContentDropFileIdSchema),
+      creatorId: nora,
+      dropId: massDm,
+      position: 0,
+      kind: 'image',
+      mime: 'image/jpeg',
+      bytes: 10,
+      state: 'duplicate',
+      mediaAssetId: medium.id,
+    });
+    const exported = await call('GET', `/v1/creators/${nora}/drops/${massDm}/export`, 'owner');
+    expect(exported.statusCode, exported.body).toBe(200);
+    const archive = unzipSync(new Uint8Array(exported.rawPayload));
+    const names = Object.keys(archive);
+    expect(names).toHaveLength(1);
+    expect(names[0]).toMatch(/\/00-fiche\.txt$/u);
+    expect(new TextDecoder().decode(archive[names[0] ?? ''])).toContain(
+      'Un média est laissé de côté : il est vendu dans un de ses scripts, il ne part jamais offert.',
+    );
+    // Withdrawn after: the later tests count her drops waiting for a description.
+    await test.admin.db
+      .update(schema.contentDrops)
+      .set({ state: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: script.by })
+      .where(eq(schema.contentDrops.id, massDm));
   });
 
   it('confirms her script copied into Reveal once, by the team: her originals of it go 30 days later (SC-03 c)', async () => {
