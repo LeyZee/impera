@@ -69,6 +69,8 @@ function liveDrops(
             : eq(contentDropFiles.mediaAssetId, by.mediaAssetId),
           inArray(contentDropFiles.state, ['kept', 'duplicate']),
           sql`${contentDropFiles.replacedAt} is null`,
+          // A medium her team marked « À refaire » is no longer hers to caption: she replaces it where it is.
+          sql`${contentDropFiles.redoSentence} is null`,
           sql`${contentDrops.state} not in ('filling', 'blocked', 'withdrawn')`,
         ),
       );
