@@ -52,7 +52,7 @@ const configSchema = z
     DATABASE_SERVICE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
     /**
      * Owner role: the migrations, the backup and the `ops:*` scripts run by hand (`ownerDatabaseUrl`). Neither the
-     * API nor the worker connects with it, so it may be left out of their environment.
+     * API nor the worker connects with it: docker-compose.prod.yml leaves it out of their environment.
      */
     DATABASE_ADMIN_URL: z.preprocess(
       (value) => (value === '' ? undefined : value),

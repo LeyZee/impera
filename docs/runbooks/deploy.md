@@ -132,7 +132,7 @@ Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (
 9. **Le budget de connexions.** En mode session, chaque connexion d'un de nos processus garde une connexion de Supavisor, le pooler de Supabase. Sa « Pool Size » (Database → Settings → Connection pooling) vaut **pour chaque couple rôle et base** : chacun de nos trois rôles a donc ce plafond à lui. S'y ajoute le plafond global de la taille de calcul (`max_connections`, affiché au même endroit), que partagent nos trois rôles et les services de Supabase. Chaque processus écrit son budget au démarrage (« database connection budget of this process » : `app` et `rateLimit` en `nirvana_app`, `service` en `impera_service`). Les trois règles :
    - **`nirvana_app`** : (`DATABASE_POOL_MAX` + `RATE_LIMIT_POOL_MAX`) × 2 (`api` et `worker`) ≤ Pool Size. Défauts : (10 + 3) × 2 = 26.
    - **`impera_service`** : `DATABASE_SERVICE_POOL_MAX` de `api` + celui de `worker` ≤ Pool Size. Graphile Worker tourne sur le pool de service du worker : il lui faut `WORKER_CONCURRENCY` + 3 (une connexion par job en cours, une pour `LISTEN`, de la marge), d'où `WORKER_DATABASE_SERVICE_POOL_MAX`, 8 par défaut pour une concurrence de 5 (`docker-compose.prod.yml`). Défauts : 5 + 8 = 13.
-   - **`nirvana_admin`** : `migrate` et `backup`, 2 chacun au plus, et le SQL Editor quand on s'en sert.
+   - **`nirvana_admin`** : `migrate` et `backup`, 2 chacun au plus, un script `ops` le temps qu'il tourne (§ 5), et le SQL Editor quand on s'en sert.
    - **Au total** : 26 + 13 + 4 avec les défauts, soit 43, sous `max_connections` moins ce que Supabase garde pour lui (la page des réglages le dit).
 
    Si un plafond ne tient pas, baisser d'abord `DATABASE_POOL_MAX` et `RATE_LIMIT_POOL_MAX` (§ 1.3), jamais le pool de service du worker sous `WORKER_CONCURRENCY` + 3 (baisser alors `WORKER_CONCURRENCY` avec lui). Monter la taille de calcul est une décision d'argent qui revient à Charles.
@@ -144,7 +144,7 @@ Ordre : le serveur (§ 1.0), la base (§ 1.1), Coolify (§ 1.2), les variables (
 1. Coolify → Projet « Impera » → Ressource → **Docker Compose**, depuis le dépôt GitHub `LeyZee/impera`, branche `main`, fichier `docker-compose.prod.yml`, avec une clé de déploiement en **lecture seule** limitée à ce dépôt (le dépôt est public : la clé ne sert qu'à ne pas dépendre d'un compte).
 2. Domaine : sur le service **`web` seulement**, port 8080 (`https://app.<domaine>`). Aucun domaine sur `api`, `worker`, `migrate`, `backup`. Le domaine définitif est choisi **avant** : il fixe les clés d'accès et l'adresse intégrée à l'extension.
 3. Cocher « Include Source Commit in Build » : `SOURCE_COMMIT` devient le tag de l'image et `RELEASE` (Sentry, battement du worker).
-4. **Le certificat de Supabase** : Storages → montage de fichier sur `api`, `worker`, `migrate` et `backup`, chemin `/data/supabase-ca.crt`, contenu = le fichier de § 1.1 étape 4 (public, ce n'est pas un secret).
+4. **Le certificat de Supabase** : Storages → montage de fichier sur `api`, `worker`, `migrate`, `ops` et `backup`, chemin `/data/supabase-ca.crt`, contenu = le fichier de § 1.1 étape 4 (public, ce n'est pas un secret).
 5. **Pas de déploiement automatique sur webhook** : le tableau de bord de Coolify est fermé, aucun webhook public ne l'atteint. Charles déclenche chaque déploiement (Deploy), ou laisse Coolify interroger le dépôt s'il le propose. **Aucun déploiement d'aperçu pour les PR** (Preview Deployments désactivés) : le dépôt est public, et une PR d'un inconnu construite sur le serveur verrait les secrets du build.
 6. **Journal d'accès du proxy.** Le jeton d'un lien de calendrier est dans le chemin (`/v1/calendar-feed/<jeton>.ics`), et quiconque lit ce chemin lit les shifts de son titulaire. L'API ne le journalise pas, et le `nginx` de `web` non plus ; le Traefik de Coolify ne doit pas le garder non plus.
    - Coolify → Servers → le serveur : **laisser « Traffic analytics » désactivé**. Activé, Coolify écrit un journal d'accès JSON (`/traefik/access.log`, chemin, User-Agent et Referer gardés). Tant qu'il est actif, Coolify retire aussi toute option `--accesslog…` ajoutée à la main : on ne peut alors pas en ôter le chemin.
@@ -166,7 +166,7 @@ Toutes dans Coolify → Environment Variables, marquées « secret » quand c'es
 
 | Variable | Valeur |
 |---|---|
-| `DATABASE_URL`, `DATABASE_SERVICE_URL`, `DATABASE_ADMIN_URL` | § 1.1 |
+| `DATABASE_URL`, `DATABASE_SERVICE_URL`, `DATABASE_ADMIN_URL` | § 1.1. Le compose ne donne `DATABASE_ADMIN_URL` qu'à `migrate`, `ops` (§ 5) et `backup` : l'API et le worker ne se connectent jamais en propriétaire, et ne la reçoivent pas |
 | `SESSION_ENCRYPTION_KEYS` | `v1:` + `openssl rand -base64 32` |
 | `CREDENTIALS_ENCRYPTION_KEYS` | `v1:` + une **autre** sortie de `openssl rand -base64 32` |
 | `AUTH_SECRET` | `openssl rand -base64 32` |
@@ -254,10 +254,10 @@ Une fois, avant toute donnée réelle qu'on ne pourrait pas recréer, et dans to
 
 ### 4.2 Vérifier la copie des clés de l'application
 
-La copie de `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` gardée avec la clé privée doit ouvrir les données (ADR 0028 § 7). À faire après le § 4.1, après chaque rotation (`rotate-secrets.md`) et avec chaque essai trimestriel. Coolify → `api` → Terminal :
+La copie de `SESSION_ENCRYPTION_KEYS` et `CREDENTIALS_ENCRYPTION_KEYS` gardée avec la clé privée doit ouvrir les données (ADR 0028 § 7). À faire après le § 4.1, après chaque rotation (`rotate-secrets.md`) et avec chaque essai trimestriel. Le script lit en propriétaire : il se lance dans le service `ops` (§ 5), jamais dans le terminal de `api`.
 
 ```sh
-node dist/scripts/ops-check-keys.js
+docker compose --profile ops run --rm ops node dist/scripts/ops-check-keys.js
 ```
 
 Coller les deux valeurs **de la copie gardée** quand la commande les demande (rien ne s'affiche à la frappe ; elle ne lit pas celles du serveur). Elle ouvre en mémoire chaque session de plateforme, chaque clé de service IA et chaque jeton de bot Telegram, sur une connexion que la base garde en lecture seule, sans rien appeler ni rien afficher de déchiffré. Attendu : « La copie des clés ouvre toutes les données chiffrées. » Sinon, elle nomme ce qui ne s'ouvre pas (compte, service, bot) : remettre la copie à jour depuis Coolify, puis relancer.
@@ -322,14 +322,18 @@ Avant le premier dépôt réel d'une créatrice (CR-06 b, ADR 0055 § 3). Son t�
 
 ## 5. Coupe-circuit
 
-Couper d'abord, comprendre ensuite (`incident.md`). Depuis le dashboard : Supervision → « Tout arrêter ». Sans dashboard, Coolify → `api` → Terminal :
+Couper d'abord, comprendre ensuite (`incident.md`). Depuis le dashboard : Supervision → « Tout arrêter ». Sans dashboard, par le service `ops` (ci-dessous) :
 
 ```sh
-node dist/scripts/ops-kill-switch.js --on --scope global --reason "<raison>"
-node dist/scripts/ops-kill-switch.js --off --scope global --reason "<raison>"
+docker compose --profile ops run --rm ops node dist/scripts/ops-kill-switch.js --on --scope global --reason "<raison>"
+docker compose --profile ops run --rm ops node dist/scripts/ops-kill-switch.js --off --scope global --reason "<raison>"
 ```
 
-Les autres commandes d'exploitation des runbooks (`pnpm ops:revoke-sessions`, `pnpm ops:reset-second-factor`, `pnpm ops:reencrypt-sessions`, `pnpm ops:reencrypt-credentials`, `pnpm ops:check-keys`, `pnpm db:rebuild-projections`) ont leur équivalent dans l'image : `node dist/scripts/<nom>.js` (`ops-revoke-sessions`, `ops-reset-second-factor`, `ops-reencrypt-sessions`, `ops-reencrypt-credentials`, `ops-check-keys`, `rebuild-projections`), mêmes arguments.
+**Les scripts du propriétaire passent par le service `ops`.** Moindre privilège : seuls `migrate`, `ops` et `backup` reçoivent `DATABASE_ADMIN_URL` ; l'API et le worker ne l'ont pas, si bien qu'un script `ops-*` lancé dans le terminal de `api` s'arrête sur « DATABASE_ADMIN_URL is missing ». `ops` est la même image que `api`, rangée sous le profil `ops` : il ne démarre pas avec le déploiement (et s'il démarrait, il afficherait son mode d'emploi et s'arrêterait), chaque commande a son conteneur, supprimé à la fin (`--rm`). Coolify → Servers → le serveur → Terminal, dans le dossier de l'application (`cd /data/coolify/applications/<uuid>`, l'uuid est celui de l'adresse de la ressource dans Coolify, où se trouvent le compose et le `.env` qu'il a écrits), puis `docker compose --profile ops run --rm ops node dist/scripts/<nom>.js <arguments>`. Le chemin et le profil se vérifient au premier déploiement, avec `docker compose --profile ops run --rm ops` seul, qui doit afficher le mode d'emploi.
+
+La CI vérifie le compose, pas la façon dont Coolify injecte les variables : selon ses réglages, il peut donner toutes les variables saisies à tous les services. Au premier déploiement, et après chaque changement des variables dans Coolify, vérifier dans le terminal de `api` puis dans celui de `worker` que `printenv DATABASE_ADMIN_URL` n'affiche rien. S'il affiche une valeur, retirer la variable des services concernés dans Coolify avant d'ouvrir le service.
+
+Les commandes d'exploitation des runbooks qui demandent le propriétaire (`pnpm ops:kill-switch`, `pnpm ops:revoke-sessions`, `pnpm ops:reset-second-factor`, `pnpm ops:reencrypt-sessions`, `pnpm ops:reencrypt-credentials`, `pnpm ops:check-keys`) ont ainsi leur équivalent en production : `node dist/scripts/<nom>.js` dans `ops` (`ops-kill-switch`, `ops-revoke-sessions`, `ops-reset-second-factor`, `ops-reencrypt-sessions`, `ops-reencrypt-credentials`, `ops-check-keys`), mêmes arguments. Les autres (`create-owner`, `create-creator`, `persona-validate`, `persona-load`, `rebuild-projections`, pour `pnpm db:rebuild-projections`) n'en ont pas besoin et restent dans Coolify → `api` → Terminal.
 
 Si Supabase ne répond plus, le limiteur de débit laisse passer les requêtes ordinaires (un `warn` « rate limit store unavailable » par requête dans les journaux de `api`), mais la connexion au dashboard répond 503 `service_unavailable` jusqu'au retour de la base (`security.md`). Ce n'est pas une panne de l'API : regarder `/ready` et la page d'état de Supabase.
 
