@@ -1,5 +1,6 @@
 import {
   CreatePreparedScriptBodySchema,
+  CreatePreparedVersionBodySchema,
   CreatorIdSchema,
   DomainError,
   PreparedScriptIdSchema,
@@ -18,8 +19,10 @@ import { z } from 'zod';
 import {
   changePreparedState,
   createPreparedScript,
+  createPreparedVersion,
   listPreparedScripts,
   preparedScript,
+  resyncPreparedVersion,
   savePreparedScript,
   type ChangePreparedOutcome,
   type PreparedScriptView,
@@ -35,6 +38,12 @@ const ScriptParamsSchema = z.object({ creatorId: CreatorIdSchema, scriptId: Prep
 const refusal = (code: PreparedScriptErrorCode, message: string) => new DomainError(code, message);
 
 const notFound = () => refusal('prepared_script_not_found', 'Script introuvable');
+
+const versionConflict = () =>
+  refusal(
+    'prepared_script_version_conflict',
+    'Ce script a déjà une version dans cette langue, ou il est lui-même une version',
+  );
 
 function refusalOf(outcome: Exclude<ChangePreparedOutcome, 'updated'>): DomainError {
   switch (outcome) {
@@ -70,6 +79,8 @@ function dtoOf(view: PreparedScriptView): PreparedScriptDto {
     creatorId: view.creatorId,
     platformAccountId: view.platformAccountId,
     state: view.state,
+    language: view.language,
+    versionOf: view.versionOf,
     revision: view.revision,
     content: view.content,
     gaps: [...view.gaps],
@@ -141,8 +152,61 @@ export function createPreparedScriptRoutes(
           throw refusal('prepared_script_conflict', 'Cet identifiant est déjà pris par un autre script');
         if (outcome === 'account_invalid')
           throw refusal('prepared_script_account_invalid', 'Ce compte n’est pas un des siens');
+        if (outcome === 'version_conflict') throw versionConflict();
         const view = await one(userId, creatorId, request.body.id);
         return reply.code(outcome === 'created' ? 201 : 200).send(view);
+      },
+    );
+
+    // Its version in another language (ADR 0169), under the client's id: replayed (200) or created (201).
+    app.post(
+      '/creators/:creatorId/prepared-scripts/:scriptId/versions',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: ScriptParamsSchema,
+          body: CreatePreparedVersionBodySchema,
+          response: { 200: PreparedScriptViewSchema, 201: PreparedScriptViewSchema },
+        },
+      },
+      async (request, reply) => {
+        const userId = userIdOf(request.user);
+        const { creatorId, scriptId } = request.params;
+        const outcome = await createPreparedVersion({ store }, userId, creatorId, scriptId, request.body);
+        if (outcome === 'not_found') throw notFound();
+        if (outcome === 'conflict')
+          throw refusal('prepared_script_conflict', 'Cet identifiant est déjà pris par un autre script');
+        if (outcome === 'account_invalid')
+          throw refusal('prepared_script_account_invalid', 'Ce compte n’est pas un des siens');
+        if (outcome === 'version_conflict') throw versionConflict();
+        const view = await one(userId, creatorId, request.body.id);
+        return reply.code(outcome === 'created' ? 201 : 200).send(view);
+      },
+    );
+
+    // « Reprendre la structure » (ADR 0169): a version set right on its script, its texts kept.
+    app.post(
+      '/creators/:creatorId/prepared-scripts/:scriptId/resync',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: ScriptParamsSchema,
+          body: PreparedScriptStateBodySchema,
+          response: { 200: PreparedScriptViewSchema },
+        },
+      },
+      async (request) => {
+        const userId = userIdOf(request.user);
+        const { creatorId, scriptId } = request.params;
+        const outcome = await resyncPreparedVersion(
+          { store },
+          userId,
+          creatorId,
+          scriptId,
+          request.body.basedOnRevision,
+        );
+        if (outcome !== 'updated') throw refusalOf(outcome);
+        return one(userId, creatorId, scriptId);
       },
     );
 

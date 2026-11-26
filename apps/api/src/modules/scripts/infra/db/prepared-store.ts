@@ -10,6 +10,7 @@ import {
   PreparedScriptContentSchema,
   PreparedScriptIdSchema,
   PreparedScriptStateSchema,
+  ScriptLanguageSchema,
   type CreatorId,
   type PreparedScriptContent,
 } from '@impera/contracts';
@@ -93,6 +94,15 @@ async function vaultOf(
   );
 }
 
+/** A version's script, under the caller's RLS: the content it must keep but for its texts (ADR 0169). */
+async function sourceOf(tx: Transaction, id: string): Promise<PreparedScriptContent | null> {
+  const [row] = await tx
+    .select({ content: preparedScripts.content })
+    .from(preparedScripts)
+    .where(eq(preparedScripts.id, id));
+  return row === undefined ? null : PreparedScriptContentSchema.parse(row.content);
+}
+
 async function storedOf(tx: Transaction, row: Row): Promise<StoredPreparedScript> {
   const content = PreparedScriptContentSchema.parse(row.content);
   return {
@@ -102,6 +112,9 @@ async function storedOf(tx: Transaction, row: Row): Promise<StoredPreparedScript
     state: PreparedScriptStateSchema.parse(row.state),
     revision: row.revision,
     content,
+    language: ScriptLanguageSchema.parse(row.language),
+    versionOf: row.versionOf === null ? null : PreparedScriptIdSchema.parse(row.versionOf),
+    source: row.versionOf === null ? null : await sourceOf(tx, row.versionOf),
     matchedPlatformScriptId:
       row.matchedPlatformScriptId === null ? null : PlatformScriptIdSchema.parse(row.matchedPlatformScriptId),
     createdAt: row.createdAt,
@@ -161,6 +174,8 @@ export function createDrizzlePreparedScriptStore(db: Database): PreparedScriptSt
           const same =
             existing.creatorId === creatorId &&
             existing.platformAccountId === input.platformAccountId &&
+            existing.language === input.language &&
+            existing.versionOf === input.versionOf &&
             isDeepStrictEqual(PreparedScriptContentSchema.parse(existing.content), input.content);
           return same ? 'replayed' : 'conflict';
         }
@@ -171,6 +186,35 @@ export function createDrizzlePreparedScriptStore(db: Database): PreparedScriptSt
             and(eq(platformAccounts.id, input.platformAccountId), eq(platformAccounts.creatorId, creatorId)),
           );
         if (account === undefined) return 'account_invalid';
+        if (input.versionOf !== null) {
+          // Of a script of hers on the same account, itself no version, in another language, and the first in this one.
+          const [source] = await tx
+            .select({
+              accountId: preparedScripts.platformAccountId,
+              language: preparedScripts.language,
+              versionOf: preparedScripts.versionOf,
+            })
+            .from(preparedScripts)
+            .where(and(eq(preparedScripts.id, input.versionOf), eq(preparedScripts.creatorId, creatorId)))
+            .for('update');
+          if (source === undefined) return 'not_found';
+          if (
+            source.accountId !== input.platformAccountId ||
+            source.versionOf !== null ||
+            source.language === input.language
+          )
+            return 'version_conflict';
+          const [twin] = await tx
+            .select({ id: preparedScripts.id })
+            .from(preparedScripts)
+            .where(
+              and(
+                eq(preparedScripts.versionOf, input.versionOf),
+                eq(preparedScripts.language, input.language),
+              ),
+            );
+          if (twin !== undefined) return 'version_conflict';
+        }
         try {
           // In a savepoint: an id another creator holds is hidden by her RLS, and found only by the key.
           await tx.transaction((savepoint) =>
@@ -179,6 +223,8 @@ export function createDrizzlePreparedScriptStore(db: Database): PreparedScriptSt
               creatorId,
               platformAccountId: input.platformAccountId,
               content: input.content,
+              language: input.language,
+              versionOf: input.versionOf,
               createdBy: userId,
               updatedBy: userId,
             }),
@@ -193,7 +239,12 @@ export function createDrizzlePreparedScriptStore(db: Database): PreparedScriptSt
           action: 'prepared_script.created',
           entity: 'prepared_script',
           entityId: input.id,
-          details: { creatorId, steps: input.content.steps.length },
+          details: {
+            creatorId,
+            steps: input.content.steps.length,
+            language: input.language,
+            versionOf: input.versionOf,
+          },
         });
         return 'created';
       }),

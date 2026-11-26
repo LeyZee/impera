@@ -11,6 +11,7 @@ import {
   PlatformScriptMomentSchema,
   PreparedScriptContentSchema,
   PreparedScriptIdSchema,
+  ScriptLanguageSchema,
   ScriptIdentityAuthorSchema,
   ScriptIdentityContentSchema,
   ScriptIdentityIdSchema,
@@ -44,6 +45,7 @@ import type {
   StoredPlatformScript,
   StoredStepMedia,
 } from '../../domain/ports';
+import { versionGaps } from '../../domain/script-versions';
 
 const scripts = schema.platformScripts;
 const steps = schema.platformScriptSteps;
@@ -336,6 +338,8 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
     .select({
       id: schema.preparedScripts.id,
       content: schema.preparedScripts.content,
+      language: schema.preparedScripts.language,
+      versionOf: schema.preparedScripts.versionOf,
       nativeId: schema.preparedScripts.matchedPlatformScriptId,
     })
     .from(schema.preparedScripts)
@@ -347,13 +351,35 @@ export async function storedOf(tx: Transaction, rows: readonly ScriptRow[]): Pro
     )
     // Nothing keeps two of ours from naming the same native script: the last recognised wins, always the same one.
     .orderBy(schema.preparedScripts.matchedAt, schema.preparedScripts.id);
+  // A version is offered only while it keeps its script's steps, media and prices (ADR 0169): its script, read here.
+  const sourceIds = [...new Set(oursRows.flatMap((row) => (row.versionOf === null ? [] : [row.versionOf])))];
+  const sources = new Map(
+    sourceIds.length === 0
+      ? []
+      : (
+          await tx
+            .select({ id: schema.preparedScripts.id, content: schema.preparedScripts.content })
+            .from(schema.preparedScripts)
+            .where(inArray(schema.preparedScripts.id, sourceIds))
+        ).map((row) => [row.id, PreparedScriptContentSchema.parse(row.content)]),
+  );
+  const faithful = oursRows.filter((row) => {
+    if (row.versionOf === null) return true;
+    const source = sources.get(row.versionOf);
+    const content = PreparedScriptContentSchema.parse(row.content);
+    return (
+      source !== undefined && !versionGaps(source, content).some((gap) => gap.code === 'version_differs')
+    );
+  });
   const ours = new Map(
-    oursRows.map((row): [string | null, OurCopy] => {
+    faithful.map((row): [string | null, OurCopy] => {
       const content = PreparedScriptContentSchema.parse(row.content);
       return [
         row.nativeId,
         {
           preparedScriptId: PreparedScriptIdSchema.parse(row.id),
+          language: ScriptLanguageSchema.parse(row.language),
+          versionOf: row.versionOf === null ? null : PreparedScriptIdSchema.parse(row.versionOf),
           description: content.description,
           moment: content.moment,
           steps: content.steps.map((step) => ({
@@ -512,7 +538,7 @@ export function createDrizzlePlatformScriptReadStore(
         return stored ?? null;
       }),
 
-    performanceOf: (creatorId, userId) =>
+    performanceOf: (creatorId, userId, fromDay) =>
       asTeam(db, creatorId, userId, async (tx) => {
         // Her active scripts recognised as ours (ADR 0161: the native ones of another tool are not measured).
         const ours = await tx
@@ -560,12 +586,14 @@ export function createDrizzlePlatformScriptReadStore(
                   paidMinor: daily.paidMinor,
                 })
                 .from(daily)
-                .where(eq(daily.creatorId, creatorId))
+                .where(and(eq(daily.creatorId, creatorId), sql`${daily.day} >= ${fromDay}`))
                 .orderBy(daily.day);
         const readings = new Map<string, DailyReading[]>();
         for (const row of readingRows) {
           const key = readingKey(row.platformAccountId, row.ref);
-          readings.set(key, [...(readings.get(key) ?? []), row]);
+          const known = readings.get(key);
+          if (known === undefined) readings.set(key, [row]);
+          else known.push(row);
         }
         const measured = ours.flatMap((one): MeasuredScript[] => {
           const own = stepRows.filter((row) => row.scriptId === one.id);

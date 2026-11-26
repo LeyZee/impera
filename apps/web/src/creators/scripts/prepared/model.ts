@@ -157,6 +157,9 @@ const GAP_TEXTS: Readonly<Record<PreparedScriptGap['code'], string>> = {
   media_twice: 'le même média est vendu deux fois',
   disgust: 'un texte touche une de ses limites',
   condition_text_missing: 'la phrase que l’IA vérifie est vide',
+  version_name_same: 'une version doit porter un autre nom que son script, sinon Reveal ne la reconnaît pas',
+  version_differs: 'les étapes, médias ou prix ne sont plus ceux du script d’origine : reprends sa structure',
+  version_mentions_price: 'un texte cite un prix ou une devise : Reveal affiche le sien',
 };
 
 /** « Étape 2, branche 1 : aucun média », and for a limit, the entry of her persona touched, as she wrote it. */

@@ -171,3 +171,5 @@ Date : AAAA-MM-JJ
 | 0160 | Durée des sessions selon le rôle : le propriétaire 48 heures sans activité, la créatrice 7 jours, les autres 12 heures | accepted (amende 0046 § 6) |
 | 0161 | Seulement nos scripts : Impera prépare, Reveal reçoit, jamais l'inverse | accepted (amende 0099 §§ 1 et 5, 0098 § 6, 0112 §§ 20 et 23) |
 | 0164 | « À décider » : une question à la fois posée à la créatrice, deux ou trois réponses, le propriétaire en secours | accepted |
+| 0167 | Impera crée dans Reveal, sans jamais modifier ni supprimer : dossiers, médias et scripts | accepted (ouvre 0099 § 6 ; étend 0145 et 0161 § 1) |
+| 0169 | Un script porte sa langue ; sa version dans une autre langue est un script lié, aux mêmes médias et aux mêmes prix | accepted (précise 0112 §§ 20-23 et 0161 §§ 4-5) |

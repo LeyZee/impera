@@ -405,6 +405,8 @@ describe('the scripts in preparation', () => {
     const scripts = await app.modules.scripts.forJobs.accountScripts(nora, noraAccount);
     expect(scripts.find((each) => each.id === copy)?.ours).toEqual({
       preparedScriptId: ours,
+      language: 'french',
+      versionOf: null,
       description: 'Un soir de pluie inventé.',
       moment: 'night',
       steps: [
@@ -413,6 +415,162 @@ describe('the scripts in preparation', () => {
       ],
     });
     expect(scripts.find((each) => each.id === foreign)?.ours).toBeNull();
+  });
+
+  it('makes a version in another language: the same steps, media and prices, its texts to translate (ADR 0169)', async () => {
+    const source = newId(PreparedScriptIdSchema);
+    expect(
+      (
+        await call('owner', 'POST', base(nora), {
+          id: source,
+          platformAccountId: noraAccount,
+          content: CONTENT,
+        })
+      ).statusCode,
+    ).toBe(201);
+    const versions = `${base(nora)}/${source}/versions`;
+    const english = newId(PreparedScriptIdSchema);
+    const made = await call('manager', 'POST', versions, {
+      id: english,
+      language: 'english',
+      name: 'Rainy night',
+    });
+    expect(made.statusCode).toBe(201);
+    const view = PreparedScriptViewSchema.parse(made.json());
+    expect(view).toMatchObject({ language: 'english', versionOf: source, state: 'editing', revision: 1 });
+    expect(
+      view.content.steps.map((step) => step.branches.map((one) => [one.key, one.priceMinor, one.media])),
+    ).toEqual(CONTENT.steps.map((step) => step.branches.map((one) => [one.key, one.priceMinor, one.media])));
+    expect(view.content.steps[0]?.branches[0]?.offerText).toBe('');
+    expect(view.gaps.map((gap) => gap.code)).toContain('offer_text_missing');
+    // The same send replays; a second in English, one in French, or a version of a version is refused.
+    expect(
+      (await call('manager', 'POST', versions, { id: english, language: 'english', name: 'Rainy night' }))
+        .statusCode,
+    ).toBe(200);
+    for (const [path, language] of [
+      [versions, 'english'],
+      [versions, 'french'],
+      [`${base(nora)}/${english}/versions`, 'italian'],
+    ] as const) {
+      const refused = await call('owner', 'POST', path, {
+        id: newId(PreparedScriptIdSchema),
+        language,
+        name: 'Notte inventata',
+      });
+      expect(refused.statusCode, `${path} ${language}`).toBe(409);
+      expect(codeOf(refused.body)).toBe('prepared_script_version_conflict');
+    }
+    // Nobody but the team makes one, and never of a script of another creator.
+    const body = { id: newId(PreparedScriptIdSchema), language: 'italian', name: 'Notte inventata' };
+    expect((await call('chatter', 'POST', versions, body)).statusCode).toBe(404);
+    expect((await call('nora', 'POST', versions, body)).statusCode).toBe(403);
+    expect((await call('owner', 'POST', `${base(ines)}/${source}/versions`, body)).statusCode).toBe(404);
+    // The base holds it too: a version of a script of another creator, or a second in a language, never enters.
+    const insert = (over: Partial<typeof schema.preparedScripts.$inferInsert>) =>
+      test.admin.db.insert(schema.preparedScripts).values({
+        id: newId(PreparedScriptIdSchema),
+        creatorId: nora,
+        platformAccountId: noraAccount,
+        content: CONTENT,
+        createdBy: ids.owner,
+        updatedBy: ids.owner,
+        ...over,
+      });
+    await expect(
+      insert({ creatorId: ines, platformAccountId: inesAccount, versionOf: source, language: 'italian' }),
+    ).rejects.toMatchObject({ cause: { code: '23503' } });
+    await expect(insert({ versionOf: source, language: 'english' })).rejects.toMatchObject({
+      cause: { code: '23505' },
+    });
+    // Its script changed (a price): the version differs until « Reprendre la structure », its texts kept.
+    const translated = {
+      ...view.content,
+      description: 'A rainy night.',
+      steps: view.content.steps.map((step) => ({
+        ...step,
+        branches: step.branches.map((one) => ({ ...one, teaser: 'Made up', offerText: 'Made up offer' })),
+      })),
+    };
+    expect(
+      (await call('owner', 'PUT', `${base(nora)}/${english}`, { basedOnRevision: 1, content: translated }))
+        .statusCode,
+    ).toBe(200);
+    const repriced = {
+      ...CONTENT,
+      steps: CONTENT.steps.map((step, at) =>
+        at === 1 ? { ...step, branches: step.branches.map((one) => ({ ...one, priceMinor: 1800 })) } : step,
+      ),
+    };
+    expect(
+      (await call('owner', 'PUT', `${base(nora)}/${source}`, { basedOnRevision: 1, content: repriced }))
+        .statusCode,
+    ).toBe(200);
+    const differs = PreparedScriptViewSchema.parse(
+      (await call('owner', 'GET', `${base(nora)}/${english}`)).json(),
+    );
+    expect(differs.gaps.map((gap) => gap.code)).toContain('version_differs');
+    const resynced = await call('owner', 'POST', `${base(nora)}/${english}/resync`, { basedOnRevision: 2 });
+    expect(resynced.statusCode).toBe(200);
+    const right = PreparedScriptViewSchema.parse(resynced.json());
+    expect(right.gaps.map((gap) => gap.code)).not.toContain('version_differs');
+    expect(right.content.steps[1]?.branches[0]).toMatchObject({
+      priceMinor: 1800,
+      offerText: 'Made up offer',
+    });
+    // A script of its own has no structure to take back.
+    expect(
+      (await call('owner', 'POST', `${base(nora)}/${source}/resync`, { basedOnRevision: 2 })).statusCode,
+    ).toBe(404);
+  });
+
+  it('gives the agent a recognised version with its language and family, only while it keeps its script (ADR 0169)', async () => {
+    const source = newId(PreparedScriptIdSchema);
+    const english = newId(PreparedScriptIdSchema);
+    const content = { ...CONTENT, name: 'Soirée famille inventée' };
+    await call('owner', 'POST', base(nora), { id: source, platformAccountId: noraAccount, content });
+    await call('owner', 'POST', `${base(nora)}/${source}/versions`, {
+      id: english,
+      language: 'english',
+      name: 'Family night',
+    });
+    const native = newId(z.uuid());
+    await test.admin.db.insert(schema.platformScripts).values({
+      id: native,
+      creatorId: nora,
+      platformAccountId: noraAccount,
+      platformScriptRef: `sequence_${native}`,
+      name: 'Family night',
+      fingerprint: `empreinte-${native}`,
+      syncedAt: new Date(),
+      versionAt: new Date(),
+    });
+    await test.admin.db
+      .update(schema.preparedScripts)
+      .set({ state: 'matched', matchedPlatformScriptId: native, matchedAt: new Date() })
+      .where(eq(schema.preparedScripts.id, english));
+    const oursOf = async () =>
+      (await app.modules.scripts.forJobs.accountScripts(nora, noraAccount)).find((each) => each.id === native)
+        ?.ours;
+    expect(await oursOf()).toMatchObject({
+      preparedScriptId: english,
+      language: 'english',
+      versionOf: source,
+    });
+    // Its script given another media since: the version is no longer offered.
+    await test.admin.db
+      .update(schema.preparedScripts)
+      .set({
+        content: {
+          ...content,
+          steps: content.steps.map((step) => ({
+            ...step,
+            branches: step.branches.map((one) => ({ ...one, media: [{ ref: 'media_09' }] })),
+          })),
+        },
+      })
+      .where(eq(schema.preparedScripts.id, source));
+    expect(await oursOf()).toBeNull();
   });
 
   it('is read by the owner and the managers of her list only; anyone else is refused', async () => {

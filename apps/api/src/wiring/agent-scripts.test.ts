@@ -98,6 +98,8 @@ const oursOf = (
   moment: 'day' | 'night' | 'both' = 'night',
 ) => ({
   preparedScriptId: PreparedScriptIdSchema.parse(newId(PreparedScriptIdSchema)),
+  language: 'french' as const,
+  versionOf: null,
   description,
   moment,
   steps: steps.map((each) => ({ branches: [{ priceMinor: each.priceMinor, currency: 'EUR' as const }] })),

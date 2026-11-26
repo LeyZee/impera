@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { CreatorIdSchema, PlatformAccountIdSchema } from './ids';
 import { CurrencySchema } from './money';
+import { LANGUAGES } from './persona';
 import {
   BranchConditionSchema,
   PLATFORM_SCRIPT_NAME_MAX,
@@ -90,6 +91,13 @@ export const PreparedScriptContentSchema = z.strictObject({
 });
 export type PreparedScriptContent = z.infer<typeof PreparedScriptContentSchema>;
 
+/**
+ * The language a script's texts are written in (ADR 0169, langue du fan): the names of her persona's « Langues
+ * parlées », so that the agent matches it to the fan's without a table. French by default.
+ */
+export const ScriptLanguageSchema = z.enum(LANGUAGES);
+export type ScriptLanguage = z.infer<typeof ScriptLanguageSchema>;
+
 /** `editing` → `ready_to_copy` (« Prêt à copier ») → `matched` (recognised by an import, closed). */
 export const PREPARED_SCRIPT_STATES = ['editing', 'ready_to_copy', 'matched'] as const;
 export const PreparedScriptStateSchema = z.enum(PREPARED_SCRIPT_STATES);
@@ -119,6 +127,12 @@ export const PREPARED_SCRIPT_GAP_CODES = [
   'disgust',
   /** A condition in text that is empty. */
   'condition_text_missing',
+  /** A version in another language named as its source: an import would match neither (langue du fan, lot 2). */
+  'version_name_same',
+  /** A version whose steps, branches, media, prices, conditions or rhythm are no longer its source's. */
+  'version_differs',
+  /** A version's text says a price or a currency: Reveal shows its own. */
+  'version_mentions_price',
 ] as const;
 export const PreparedScriptGapCodeSchema = z.enum(PREPARED_SCRIPT_GAP_CODES);
 export type PreparedScriptGapCode = z.infer<typeof PreparedScriptGapCodeSchema>;
@@ -165,6 +179,9 @@ export const PreparedScriptViewSchema = z.object({
   creatorId: CreatorIdSchema,
   platformAccountId: PlatformAccountIdSchema,
   state: PreparedScriptStateSchema,
+  language: ScriptLanguageSchema,
+  /** The script it is a version of in another language (ADR 0169); `null` for a script of its own. */
+  versionOf: PreparedScriptIdSchema.nullable(),
   /** Raised by each save: a save names the revision it was made on. */
   revision: z.number().int().min(1),
   content: PreparedScriptContentSchema,
@@ -185,8 +202,20 @@ export const CreatePreparedScriptBodySchema = z.strictObject({
   id: PreparedScriptIdSchema,
   platformAccountId: PlatformAccountIdSchema,
   content: PreparedScriptContentSchema,
+  language: ScriptLanguageSchema.default('french'),
 });
 export type CreatePreparedScriptBody = z.infer<typeof CreatePreparedScriptBodySchema>;
+
+/**
+ * `POST …/prepared-scripts/:scriptId/versions`: its version in another language (ADR 0169), under the client's id. The
+ * server makes its content from the script's: the same steps, media and prices, the texts to translate.
+ */
+export const CreatePreparedVersionBodySchema = z.strictObject({
+  id: PreparedScriptIdSchema,
+  language: ScriptLanguageSchema,
+  name: text(PLATFORM_SCRIPT_NAME_MAX).trim().min(1),
+});
+export type CreatePreparedVersionBody = z.infer<typeof CreatePreparedVersionBodySchema>;
 
 /** `PUT …/prepared-scripts/:scriptId`: saved on `basedOnRevision`; a script « prêt à copier » goes back to editing. */
 export const SavePreparedScriptBodySchema = z.strictObject({
@@ -212,5 +241,7 @@ export const PREPARED_SCRIPT_ERROR_CODES = [
   'prepared_script_gaps_unprocessable',
   /** The account is not one of hers. */
   'prepared_script_account_invalid',
+  /** A version of a version, or in the language of its script, or a second one in that language (ADR 0169). */
+  'prepared_script_version_conflict',
 ] as const;
 export type PreparedScriptErrorCode = (typeof PREPARED_SCRIPT_ERROR_CODES)[number];

@@ -54,6 +54,8 @@ export const viewOf = (extra: Partial<PreparedScriptView> = {}): PreparedScriptV
   creatorId: CREATOR,
   platformAccountId: ACCOUNT,
   state: 'editing',
+  language: 'french',
+  versionOf: null,
   revision: 1,
   content: CONTENT,
   gaps: [],
