@@ -21,6 +21,9 @@ interface Deps {
 
 const DAY_MS = 86_400_000;
 
+/** The days read before the period: the last reading before it is the base its counts start from. */
+const BASE_DAYS = 7;
+
 /**
  * The performance of her active scripts over the last `days` (ADR 0129, sous-lot 4c): the owner and the active managers
  * of her list only (§ 17); `null` for anyone else, as for a creator who does not exist. The runs started in the period
@@ -35,11 +38,12 @@ export async function creatorScriptPerformance(
 ): Promise<ScriptPerformanceList | null> {
   if (reader.role !== 'owner' && reader.role !== 'operator') return null;
   const since = new Date(now.getTime() - days * DAY_MS);
-  const input = await deps.store.performanceOf(creatorId, reader.userId);
+  const zone = deps.dayZone('reveal') ?? 'UTC';
+  const fromDay = calendarDayAt(new Date(since.getTime() - BASE_DAYS * DAY_MS), zone);
+  const input = await deps.store.performanceOf(creatorId, reader.userId, fromDay);
   if (input === null) return null;
   const runs = await deps.runsSince(creatorId, reader.userId, since);
   if (runs === null) return null;
-  const zone = deps.dayZone('reveal') ?? 'UTC';
   const period = { from: calendarDayAt(since, zone), to: calendarDayAt(now, zone) };
   const lines = input.scripts.map((script) =>
     scriptPerformanceOf(
