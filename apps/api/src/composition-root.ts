@@ -46,6 +46,7 @@ import { createCreatorDecisionsModule, type CreatorDecisionsModule } from './mod
 import type { CreatorTasksModule } from './modules/creator-tasks';
 import type { CreatorWeekModule } from './modules/creator-week';
 import type { FansModule } from './modules/fans';
+import type { InstagramCaptionsModule } from './modules/instagram-captions';
 import { invoiceReadsForContractors, invoiceRequeue, type InvoicingModule } from './modules/invoicing';
 import type { MediaModule } from './modules/media';
 import type { NotificationsModule } from './modules/notifications';
@@ -85,6 +86,7 @@ import { wireCreatorTasks } from './wiring/creator-tasks';
 import { wireCreatorWeek } from './wiring/creator-week';
 import { wireCustomOrders } from './wiring/custom-orders';
 import { wireFans } from './wiring/fans';
+import { wireInstagramCaptions } from './wiring/instagram-captions';
 import { wireInvoicing } from './wiring/invoicing';
 import { wireMcp } from './wiring/mcp';
 import { wireMedia, wireVaultDescriptions } from './wiring/media';
@@ -120,6 +122,8 @@ interface Modules {
   readonly creatorWeek: CreatorWeekModule;
   /** « À décider », hers (ADR 0164): its door for the code that asks, called by the tests. */
   readonly creatorDecisions: CreatorDecisionsModule;
+  /** The captions proposed for her Reels (ADR 0164 § 9): its job, called by the tests. */
+  readonly instagramCaptions: InstagramCaptionsModule;
   readonly supervision: SupervisionModule;
   readonly providers: ProvidersModule;
   readonly team: TeamModule;
@@ -212,6 +216,8 @@ export interface AppOptions {
   readonly scriptBrain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
   /** Tests plug a voice with a fixed post here, for her channel's posts (ADR 0080 § 5); the app's gateway otherwise. */
   readonly channelVoice?: Pick<LlmGateway, 'channelPost'>;
+  /** Tests only: another voice than the gateway's for the captions of her Reels (ADR 0164 § 9). */
+  readonly captionVoice?: Pick<LlmGateway, 'proposeCaptions'>;
   /** The worker serves no HTTP, so it starts no playground (its sessions live in the API's memory). */
   readonly withPlayground?: boolean;
   /** Tests plug the invoices' two buckets here, to read what the jobs wrote; the configuration's otherwise. */
@@ -429,6 +435,16 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     vision: options.dropVision ?? llm.gateway,
     brain: options.scriptBrain ?? llm.gateway,
     ...(options.dropStorage !== undefined && { storage: options.dropStorage }),
+    // Late bound: the captions read her described drops, and her drops tell them of each description.
+    onDescribed: (creatorId, mediaAssetId, correlationId) =>
+      instagramCaptions.module.described(creatorId, mediaAssetId, correlationId),
+  });
+  const instagramCaptions = wireInstagramCaptions(shared, {
+    gateway: options.captionVoice ?? llm.gateway,
+    contentDrops: contentDrops.module,
+    activePersona: persona.activePersona,
+    asking: creatorDecisions.asking,
+    ...(options.decisionsClock !== undefined && { clock: options.decisionsClock }),
   });
   // Her vault's files read by the connectors, described as her drops are, reduced by the drops' pictures (ADR 0113).
   const vaultDescriptions = wireVaultDescriptions(shared, {
@@ -567,6 +583,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     creatorTasks: creatorTasks.module,
     creatorWeek: creatorWeek.module,
     creatorDecisions,
+    instagramCaptions: instagramCaptions.module,
     supervision: supervision.module,
     providers: providers.module,
     playground: playground.module,
@@ -590,6 +607,7 @@ export async function createApp(config: Config, logger: Logger, options: AppOpti
     ...invoicing.tasks,
     ...notifications.tasks,
     ...contentDrops.tasks,
+    ...instagramCaptions.tasks,
     ...vaultDescriptions.tasks,
     ...scripts.tasks,
     ...creatorTasks.tasks,

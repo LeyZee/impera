@@ -26,6 +26,7 @@ function media(id: string, createdAt: string, extra: Partial<VaultMedia> = {}): 
     description: null,
     suggestedPriceMinor: null,
     blurhash: null,
+    sentForFree: false,
     ...extra,
   };
 }
@@ -98,6 +99,20 @@ describe('vault sync plan (ADR 0099 § 2 to 4)', () => {
     );
     expect(planVaultSync(withoutM1, afterRemoval).removals).toEqual([]);
     expect(planVaultSync(read, afterRemoval).upserts.map((row) => row.platformMediaId)).toEqual(['m1']);
+  });
+
+  it('writes a media read as offered, and never takes the mark back once stored (ADR 0145 § 2)', () => {
+    const offered = read.map((m) => (m.ref.id === 'm2a' ? { ...m, sentForFree: true } : m));
+    expect(
+      planVaultSync(offered, stored(read)).upserts.map((row) => [row.platformMediaId, row.sentForFree]),
+    ).toEqual([['m2a', true]]);
+    // A later read that no longer says it: nothing written, the stored mark stays.
+    expect(planVaultSync(read, stored(offered))).toEqual({ upserts: [], removals: [] });
+    // Written for another reason (moved), it is written still offered.
+    const moved = read.map((m) => (m.ref.id === 'm2a' ? { ...m, folder: null } : m));
+    expect(planVaultSync(moved, stored(offered)).upserts).toEqual([
+      expect.objectContaining({ platformMediaId: 'm2a', folderRef: null, sentForFree: true }),
+    ]);
   });
 
   it('keeps a media listed twice once, where it was listed first', () => {

@@ -11,7 +11,7 @@ const screen = (now: string, text = ''): PanelScreen => ({
   cardOn: true,
   opensCreators: false,
   card: { fanId: FanIdSchema.parse('0199f2a0-0000-7000-8000-000000000003'), fields: [], others: [] },
-  openGroups: new Set(['him']),
+  tab: 'him',
   newSince: null,
   draft: {
     kind: 'ready',
@@ -23,7 +23,6 @@ const screen = (now: string, text = ''): PanelScreen => ({
     done: null,
   },
   assist: null,
-  saleOpen: false,
   discoverOpen: false,
   signalsOpen: false,
   now: new Date(now),
@@ -36,7 +35,7 @@ describe('what makes the panel draw again', () => {
     expect(drawnKey(screen('2026-11-08T18:00:55Z'))).toBe(base);
     expect(drawnKey(screen('2026-11-08T18:01:00Z'))).not.toBe(base);
     expect(drawnKey(screen('2026-11-08T18:00:05Z', 'coucou toi'))).toBe(base);
-    expect(base).toContain('"openGroups":["him"]');
+    expect(base).toContain('"tab":"him"');
   });
 
   // EXT-23: « Refusé… » vanished in less than 5 s with the draft.

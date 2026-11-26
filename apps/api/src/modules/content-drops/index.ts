@@ -31,6 +31,7 @@ import type {
 import { createFileCleaner } from './infra/cleaning/cleaner';
 import { createScratchRoom } from './infra/cleaning/room';
 import { createThumbnailer } from './infra/cleaning/thumbnail';
+import { dropsOfMedium, type DropOfMedium } from './infra/db/described-drops';
 import { createDrizzleDescriptionBacklog } from './infra/db/description-backlog';
 import { createDrizzleDescriptionQueue } from './infra/db/description-queue';
 import { createDrizzleDescriptionReview } from './infra/db/description-review-store';
@@ -97,6 +98,11 @@ export interface ContentDropsModule {
    * not answer throws.
    */
   picture(ask: PictureAsk): Promise<string | null>;
+  /**
+   * The live drops of hers that hold a medium, with its latest description (ADR 0164 § 9): what a listener of
+   * `onDescribed` reads. Empty while the medium has no description, or when nothing describes.
+   */
+  describedDrops(creatorId: string, mediaAssetId: string): Promise<readonly DescribedDrop[]>;
   /** That picture removed when no media came to carry it (ADR 0113 § 1); nothing when no storage is set. */
   unpicture(key: string): Promise<void>;
   /**
@@ -129,6 +135,11 @@ export interface ContentDropsModule {
   };
 }
 
+/** A live drop and what the vision AI saw in its medium. */
+interface DescribedDrop extends DropOfMedium {
+  readonly description: string;
+}
+
 export type { DropStorage, IdeaContentRequest, ScriptVersions } from './domain/ports';
 /** @public Her drops and requests as the creator's game counts them (ADR 0107), for the composition root. */
 export { dropsForGameUnscoped, type DropsForGame } from './infra/db/game-reads';
@@ -149,6 +160,12 @@ export interface ContentDropsDeps {
   readonly describer?: DropDescriber;
   /** The brain that tells her sent scripts (ADR 0083 § 6); without it, or without the describer, nothing is told. */
   readonly brain?: Pick<LlmGateway, 'summarizeScript' | 'promptHashes'>;
+  /**
+   * Told each time a medium of hers is described, again on a replay (ADR 0164 § 9). Wired by the composition root;
+   * this module knows nothing of who listens. The listener stays short and replayable: it enqueues, and never calls
+   * a model here.
+   */
+  readonly onDescribed?: (creatorId: string, mediaAssetId: string, correlationId: string) => Promise<void>;
   /** Tests only: another storage than the bucket's (a fake, or a bucket reached another way). */
   readonly storage?: DropStorage;
   /** Where the job writes a file while it cleans it; the system's temporary folder by default. */
@@ -192,6 +209,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
                 queue: createDrizzleDescriptionQueue(deps.db),
                 describer: deps.describer,
                 summaries,
+                ...(deps.onDescribed !== undefined && { onDescribed: deps.onDescribed }),
                 versions: deps.scriptVersions,
                 scratchDir,
                 room: receipt.room,
@@ -239,7 +257,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       thumbnailBacklog: (correlationId) => thumbnails.backlog(correlationId),
       eraseOriginals: (correlationId) =>
         eraseOriginals(
-          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb) },
+          { storage, receipts, retention: createDrizzleRetentionStore(deps.adminDb, deps.db) },
           clock(),
           correlationId,
         ),
@@ -255,6 +273,12 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
         { storage: storage === NO_STORAGE ? null : storage, thumbnailer: createThumbnailer(), scratchDir },
         ask,
       ),
+    describedDrops: async (creatorId, mediaAssetId) => {
+      const description = (await deps.describer?.detailed([mediaAssetId]))?.get(mediaAssetId);
+      if (description === undefined) return [];
+      const drops = await dropsOfMedium(deps.db, creatorId, mediaAssetId);
+      return drops.map((drop) => ({ ...drop, description: description.detailed }));
+    },
     unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
     scriptRequests: {

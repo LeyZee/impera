@@ -85,6 +85,7 @@ export function fakeGateway(script: GatewayScript | (() => GatewayScript), seen:
     describeDrop: () => Promise.reject(new Error('not used')),
     channelPost: () => Promise.reject(new Error('not used')),
     instagramComment: () => Promise.reject(new Error('not used')),
+    proposeCaptions: () => Promise.reject(new Error('not used')),
     summarizeScript: () => Promise.reject(new Error('not used')),
     identifyScript: () => Promise.reject(new Error('not used')),
     readCard: () => Promise.reject(new Error('not used')),

@@ -44,7 +44,14 @@ export type UntrustedKind =
   /** Her bio on her platform profile (ADR 0154): the text every subscriber could read, data, never an order. */
   | 'profile_bio'
   /** Her recent replies to comments: written by the model from comments that may have steered it, read as data. */
-  | 'recent_replies';
+  | 'recent_replies'
+  /**
+   * What a caption is written from (ADR 0164 § 9): her past captions, the sentence she wrote with her drop and her
+   * own hints for other ideas. Hers, still read as data, never as an order.
+   */
+  | 'caption_examples'
+  | 'creator_sentence'
+  | 'caption_hints';
 
 // Invisible, bidirectional and tag characters (soft hyphen, joiners, Unicode tags): used to hide or
 // reorder text the model would still read.

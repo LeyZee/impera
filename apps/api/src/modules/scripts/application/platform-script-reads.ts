@@ -47,6 +47,8 @@ interface PlatformStepMediaView {
   /** The media it is once its file is read; `null` before, or absent from the vault. */
   readonly mediaAssetId: string | null;
   readonly described: boolean;
+  /** Offered once (ADR 0145 § 2): never sold by a paid step. */
+  readonly offered: boolean;
   /** The description the agency reviews: the latest validated, else the latest written; `null` while none. */
   readonly description: ShownDescription | null;
 }
@@ -127,6 +129,7 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
     imported: media.vault?.imported ?? false,
     mediaAssetId: media.vault?.mediaAssetId ?? null,
     described: (media.vault?.descriptionId ?? null) !== null,
+    offered: media.vault?.offered ?? false,
     description: media.vault?.shown ?? null,
   });
   // By rank, then the branches of a rank in the agency's order (ADR 0112 § 6): how the screen and the agent read them.
@@ -153,7 +156,9 @@ function viewOf(script: StoredPlatformScript): PlatformScriptView {
   const gaps = platformScriptGaps(
     steps.map((step) => ({
       discounted: step.discount !== null,
+      paid: step.priceMinor > 0,
       media: [...step.media, ...step.previewMedia],
+      sold: step.media,
     })),
     identity?.validatedAt != null,
     branchGaps(branchSteps, script.branches),

@@ -55,6 +55,7 @@ export {
   type BrainScript,
   type BrainInput,
   type CallMeta,
+  type CaptionProposalsInput,
   type ChannelPostInput,
   type ChannelPostResult,
   type InstagramCommentInput,

@@ -48,6 +48,11 @@ export interface FactProposal {
   readonly observedAt: Date;
   /** Only for what stops being true (« en vacances jusqu'à lundi »); retention is the purge's (security.md). */
   readonly expiresAt?: Date | null;
+  /**
+   * A person wrote it (a chatter's note left at the hand-back, trou béant 17): it is kept `noted`, in their name,
+   * whatever `kind` says, so the card names its author and no guess replaces it.
+   */
+  readonly notedBy?: UserId;
 }
 
 /**
@@ -156,11 +161,12 @@ export function planFacts(
       category: field === null ? proposal.category : fanCardFieldSpec(field).category,
       key,
       value,
-      kind: proposal.kind,
+      kind: proposal.notedBy === undefined ? proposal.kind : 'noted',
       confidence: proposal.confidence,
       sourceMessageId: proposal.sourceMessageId,
       observedAt: proposal.observedAt,
       expiresAt: proposal.expiresAt ?? null,
+      ...(proposal.notedBy !== undefined && { notedBy: proposal.notedBy }),
     };
     const id = slot(fact);
     const before = current.get(id);
