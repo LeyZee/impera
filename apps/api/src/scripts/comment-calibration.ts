@@ -4,8 +4,8 @@
  * public sheet, her closest pairs among the others, the room for a question, the guards and their one rewrite).
  * Nothing is sent to Instagram. Run on the PC only, with her active persona read from the CRM: her words stay in the
  * output folder, under `.scratch/`, which git ignores. The console and `chiffres.json` hold numbers only.
- * Usage: `pnpm comment-calibration --pairs <file.jsonl> [--count 40] [--seed 1] [--creator <id>] [--key-from-crm]
- * [--cap-eur 3] [--out .scratch/calibration-commentaires]`, one pair `{"comment": "…", "reply": "…"}` per line.
+ * Usage: `pnpm comment-calibration --corpus <Corpus.jsonl> [--count 40] [--seed 1] [--creator <id>] [--key-from-crm]
+ * [--cap-eur 3] [--out .scratch/calibration-commentaires]`, her prepared corpus, one comment and her replies per line.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { commentWriterPersona } from '../modules/agent/index';
 import {
   afterGuards,
+  captionForPrompt,
   checkReply,
   commentForPrompt,
   mayAskQuestion,
@@ -37,7 +38,8 @@ import {
 
 import {
   blindLines,
-  CalibrationPairSchema,
+  CorpusLineSchema,
+  pairOfCorpusLine,
   setAside,
   shapeOf,
   type CalibrationPair,
@@ -52,7 +54,7 @@ const RECENT_REPLIES = 5;
 const { values } = parseArgs({
   args: process.argv.slice(2).filter((arg) => arg !== '--'),
   options: {
-    pairs: { type: 'string' },
+    corpus: { type: 'string' },
     count: { type: 'string', default: '40' },
     seed: { type: 'string', default: '1' },
     creator: { type: 'string' },
@@ -73,34 +75,36 @@ const capEur = z.coerce.number().positive().max(MAX_CAP_EUR).safeParse(values['c
 if (!count.success) fail('--count : un nombre de 1 à 200.');
 if (!seed.success) fail('--seed : un entier positif.');
 if (!capEur.success) fail(`--cap-eur : un montant en euros, ${String(MAX_CAP_EUR)} au plus.`);
-if (values.pairs === undefined) fail('--pairs : le fichier de ses paires, une par ligne.');
+if (values.corpus === undefined) fail('--corpus : son fichier Corpus.jsonl.');
 const out = resolve(ROOT, values.out);
 // Her words go to a folder git ignores, never anywhere else.
 if (!out.startsWith(resolve(ROOT, '.scratch'))) fail('--out : un dossier sous .scratch/, que git ignore.');
 
-/** Her pairs, handles removed as the import removes them; a line that does not read is counted, never shown. */
+/** Her pairs, handles removed; a line that does not read is counted, never shown. */
 function readPairs(path: string): CalibrationPair[] {
   const pairs: CalibrationPair[] = [];
   let unread = 0;
-  for (const line of readFileSync(resolve(ROOT, path), 'utf8').split('\n')) {
-    if (line.trim() === '') continue;
+  for (const text of readFileSync(resolve(ROOT, path), 'utf8').split('\n')) {
+    if (text.trim() === '') continue;
     let parsed: unknown;
     try {
-      parsed = JSON.parse(line);
+      parsed = JSON.parse(text);
     } catch {
       unread += 1;
       continue;
     }
-    const pair = CalibrationPairSchema.safeParse(parsed);
-    if (!pair.success) {
-      unread += 1;
-      continue;
-    }
-    const comment = commentForPrompt(pair.data.comment);
-    if (comment !== '') pairs.push({ comment, reply: pair.data.reply });
+    const line = CorpusLineSchema.safeParse(parsed);
+    const pair = line.success ? pairOfCorpusLine(line.data) : null;
+    if (pair === null) unread += 1;
+    else
+      pairs.push({
+        ...pair,
+        comment: commentForPrompt(pair.comment),
+        caption: captionForPrompt(pair.caption),
+      });
   }
   console.log(
-    `Paires lues : ${String(pairs.length)}${unread > 0 ? `, ${String(unread)} lignes illisibles` : ''}`,
+    `Paires lues : ${String(pairs.length)}${unread > 0 ? `, ${String(unread)} lignes écartées` : ''}`,
   );
   return pairs;
 }
@@ -136,10 +140,10 @@ async function herPersona(now: Date): Promise<ReturnType<typeof commentWriterPer
 }
 
 const now = new Date();
-const pairs = readPairs(values.pairs);
+const pairs = readPairs(values.corpus);
 if (pairs.length <= count.data) fail('il faut plus de paires que --count : le reste sert d’exemples.');
 const { test, bank } = setAside(pairs, count.data, seed.data);
-const examples = bank.map((pair, index) => ({ id: String(index), ...pair }));
+const examples = bank.map((pair, index) => ({ id: String(index), comment: pair.comment, reply: pair.reply }));
 const persona = await herPersona(now);
 
 const credentials = readProviderCredentials(
@@ -182,8 +186,8 @@ for (const pair of test) {
       nearExamples: nearExamples(pair.comment, examples),
       comment: {
         comment: pair.comment,
-        mediaKind: 'reel',
-        caption: '',
+        mediaKind: pair.mediaKind,
+        caption: pair.caption,
         postAgeHours: 2,
         repliesToHer: false,
         authorCommentedBefore: false,

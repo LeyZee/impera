@@ -6,12 +6,45 @@ import { z } from 'zod';
  * What may leave it are the counts below, which hold no text.
  */
 
-/** A pair « comment, her reply », as the import keeps it: handles already removed. */
-export const CalibrationPairSchema = z.strictObject({
-  comment: z.string().trim().min(1).max(2_000),
-  reply: z.string().trim().min(1).max(2_000),
+/**
+ * One line of her prepared corpus (« Voix de … », Corpus.jsonl): a fan's comment under one of her posts and all she
+ * answered to it. Every key is always there. Handles (`destinataire`, @mentions) are removed before anything else.
+ */
+export const CorpusLineSchema = z.strictObject({
+  id: z.string().regex(/^[RP]\d{4}$/u),
+  date: z.iso.date(),
+  support: z.enum(['Reel', 'Photo ou carrousel']),
+  publication: z.string(),
+  commentaire: z.string(),
+  reponses: z
+    .array(z.strictObject({ date: z.iso.date(), destinataire: z.string(), texte: z.string() }))
+    .min(1),
 });
-export type CalibrationPair = z.infer<typeof CalibrationPairSchema>;
+export type CorpusLine = z.infer<typeof CorpusLineSchema>;
+
+/** A pair « comment, her reply », as the calibration reads it: handles removed, her caption beside. */
+export interface CalibrationPair {
+  readonly comment: string;
+  readonly reply: string;
+  readonly mediaKind: 'reel' | 'photo';
+  readonly caption: string;
+}
+
+const MENTION = /@[\p{L}\p{N}_.]+/gu;
+const tidy = (text: string): string => text.replace(MENTION, ' ').replace(/\s+/gu, ' ').trim();
+
+/** Her first reply to each comment: the one the blind test compares with; a comment left empty by the cleaning is dropped. */
+export function pairOfCorpusLine(line: CorpusLine): CalibrationPair | null {
+  const comment = tidy(line.commentaire);
+  const reply = tidy(line.reponses[0]?.texte ?? '');
+  if (comment === '' || reply === '') return null;
+  return {
+    comment,
+    reply,
+    mediaKind: line.support === 'Reel' ? 'reel' : 'photo',
+    caption: tidy(line.publication),
+  };
+}
 
 /** A deterministic shuffle (mulberry32): the same seed sets the same pairs aside, so two runs compare. */
 function shuffled<T>(items: readonly T[], seed: number): T[] {
