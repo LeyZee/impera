@@ -957,6 +957,8 @@ div.db-fan {
 .db-decisions {
   display: grid;
   gap: var(--nv-space-3);
+  /* The measure of her own card (Design, 26/11): two answers never stretch across a wide screen. */
+  max-inline-size: 640px;
 }
 .db-decisions__head {
   display: grid;

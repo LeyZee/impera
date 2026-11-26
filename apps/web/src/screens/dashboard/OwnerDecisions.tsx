@@ -10,23 +10,31 @@ import { DecisionStack } from '@/screens/today/DecisionStack';
 import '@/screens/today/creator-today.css';
 
 /**
- * « Elle n'a pas encore répondu » (INS-05, ADR 0164): in the owner's « À faire » zone, the questions that wait on her
+ * « Elle n'a pas encore répondu » (INS-05, ADR 0164): on top when one ends soon, else under the day's goal, the questions that wait on her
  * creators, the one that ends first on top, answered in her place with her own card. The number first, then the pile;
  * nothing when nothing waits. « Plus tard » and « D'autres idées » stay hers: the owner only answers.
  */
 export function OwnerDecisions({
   creators,
   showWho,
+  at,
 }: {
   /** One creator on her Dashboard, all of them on « Toutes ». */
   creators: readonly CreatorSummary[];
   /** On « Toutes »: whose question it is, on each. */
   showWho: boolean;
+  /**
+   * Where this one stands: on top, shown only while a question ends soon; under « Objectif du jour », shown only while
+   * none does. The page places both, the card shows in one (Design, 26/11).
+   */
+  at: 'top' | 'under-day';
 }): JSX.Element | null {
   const { decisions } = useOwnerDecisions(creators);
   const client = useQueryClient();
   const now = useNow();
   if (decisions.length === 0) return null;
+  const endsSoon = decisions.some((one) => dueOf(one.decision.expiresAt, now).soon);
+  if (endsSoon !== (at === 'top')) return null;
   const byId = new Map(decisions.map((one) => [one.decision.id, one.creator]));
   const creatorOf = (id: CreatorDecisionId): CreatorSummary | undefined => byId.get(id);
   return (

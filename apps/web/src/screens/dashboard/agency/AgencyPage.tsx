@@ -57,10 +57,16 @@ export function AgencyPage({
       {/* The fans who wait, before anything else (grande recette 21/11, point 2): red the grave, amber the rest. */}
       <UrgentCard opensTracking={opensTracking} />
       <TodoCard forOwner={forOwner} reviewsReports={reviewsReports} />
-      {/* What her creators have not answered yet, the owner answering in their place (INS-05): nothing if nothing waits. */}
-      {forOwner ? <OwnerDecisions creators={creators.data ?? []} showWho /> : null}
+      {/* What her creators have not answered yet, the owner answering in their place (INS-05): here while one ends
+          soon, else under the day's goal; nothing if nothing waits. */}
+      {forOwner ? <OwnerDecisions creators={creators.data ?? []} showWho at="top" /> : null}
       {/* What the owner steers with, each card tied to a decision (pilotage 21/11), then the period's figures. */}
-      <SteeringPanel creatorId={null} opensTracking={opensTracking} tip={tip} />
+      <SteeringPanel
+        creatorId={null}
+        opensTracking={opensTracking}
+        tip={tip}
+        afterDay={forOwner ? <OwnerDecisions creators={creators.data ?? []} showWho at="under-day" /> : null}
+      />
       <AgencyInsightsPanel
         index={4}
         selection={selection}

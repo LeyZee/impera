@@ -56,7 +56,7 @@ function serve(lists: Record<string, unknown[]>): { method: string; path: string
 function renderCard(showWho: boolean, creators = [NORA, INES]): void {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <OwnerDecisions creators={creators} showWho={showWho} />
+      <OwnerDecisions creators={creators} showWho={showWho} at="under-day" />
     </QueryClientProvider>,
   );
 }
@@ -89,6 +89,36 @@ describe('« Elle n’a pas encore répondu », the owner answering in her place
         },
       ]);
     });
+  });
+
+  it('stands on top while a question ends soon, under the day’s goal otherwise: never in both', async () => {
+    const both = (): void => {
+      render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <div data-testid="top">
+            <OwnerDecisions creators={[NORA]} showWho={false} at="top" />
+          </div>
+          <div data-testid="goal">Objectif du jour</div>
+          <div data-testid="under-day">
+            <OwnerDecisions creators={[NORA]} showWho={false} at="under-day" />
+          </div>
+        </QueryClientProvider>,
+      );
+    };
+    const soon = new Date(Date.now() + 40 * 60_000).toISOString();
+    serve({ [NORA.id]: [question(1, soon), question(2, '2099-01-01T10:00:00Z')] });
+    both();
+    await screen.findByRole('heading', { level: 2, name: '2 questions sans réponse' });
+    expect(screen.getByTestId('top').textContent).toContain('2 questions sans réponse');
+    expect(screen.getByTestId('under-day').textContent).toBe('');
+    cleanup();
+    vi.unstubAllGlobals();
+
+    serve({ [NORA.id]: [question(2, '2099-01-01T10:00:00Z')] });
+    both();
+    await screen.findByRole('heading', { level: 2, name: '1 question sans réponse' });
+    expect(screen.getByTestId('under-day').textContent).toContain('1 question sans réponse');
+    expect(screen.getByTestId('top').textContent).toBe('');
   });
 
   it('shows nothing when nothing waits', async () => {
