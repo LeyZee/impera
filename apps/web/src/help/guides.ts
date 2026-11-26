@@ -362,6 +362,41 @@ export const HELP: Readonly<Record<HelpAudience, HelpBook>> = {
         ],
       },
       {
+        id: 'brancher-un-agent-ia',
+        icon: 'shield',
+        title: 'Brancher un agent IA',
+        summary: 'Claude sur ton PC lit tes chiffres',
+        minutes: '5 min',
+        why: 'Ton agent répond à « fais-moi le point du jour » avec les vrais chiffres, le planning et les brouillons en attente, sans que tu ouvres chaque écran.',
+        steps: [
+          {
+            do: 'Réglages › Agents connectés : « Connecter un agent », donne-lui un nom, choisis « Toute l’agence » ou une créatrice, coche seulement ce qu’il doit lire.',
+            see: 'les interrupteurs allumés en vert, rien n’est coché d’avance.',
+          },
+          {
+            do: '« Créer le jeton », puis confirme ton mot de passe et ton code.',
+            see: 'le jeton et la ligne pour Claude Code, montrés une seule fois.',
+          },
+          {
+            do: '« Copier la commande », colle-la dans un terminal du PC où tourne Impera, puis ouvre Claude Code et demande-lui le point du jour.',
+            see: 'ton agent dans la liste, avec « dernier appel il y a … ».',
+          },
+        ],
+        rule: [
+          'Un agent ne fait que lire : il n’écrit à aucun fan, n’approuve rien, ne touche ni aux prix ni à la paie.',
+          'Aucun montant par chatteur ni aucune part ne sort, quoi que tu coches.',
+          'Tant qu’Impera tourne sur ton PC, seul un agent sur ce PC le joint.',
+        ],
+        never: [
+          'Coller un jeton dans un fil de discussion, un e-mail ou un fichier partagé.',
+          'Cocher « Messages et brouillons » ou « Texte des scripts » pour un agent dont tu ne connais pas le fournisseur.',
+        ],
+        stuck: [
+          'Jeton perdu ou montré par erreur : « Révoquer », puis crée-en un autre.',
+          'L’agent dit « non autorisé » : le jeton a expiré ou a été révoqué ; crée-en un nouveau.',
+        ],
+      },
+      {
         id: 'reconnecter-reveal',
         icon: 'puzzle',
         title: 'Reconnecter Reveal',

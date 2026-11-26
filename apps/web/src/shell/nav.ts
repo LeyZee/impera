@@ -230,6 +230,7 @@ const SCREENS = {
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Plateformes',
   '/reglages/consommation-ia': 'Consommation IA',
+  '/reglages/agents-connectes': 'Agents connectés',
   '/reglages/alertes': 'Alertes',
   '/reglages/telegram': 'Bots Telegram',
   '/reglages/regles-de-paie': 'Règles de paie',

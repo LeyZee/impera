@@ -1,0 +1,181 @@
+/*
+ * Réglages › Agents connectés. Built on the design-system tokens and nv-* classes; only what the package has no class
+ * for lives here, prefixed `ag-`. One card per subject: the agents, the new one, the token just made. Never a bar on a
+ * side; the state is a dot, the warnings amber.
+ */
+
+/* The agents, one row each: a dot for its state, its name and its reach, then what it reads. */
+.ag-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ag-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--nv-space-1) var(--nv-space-3);
+  align-items: start;
+  padding: var(--nv-space-4) 0;
+  border-top: 1px solid var(--nv-hairline);
+}
+.ag-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.ag-row:last-child {
+  padding-bottom: 0;
+}
+.ag-row > .nv-dot {
+  margin-top: 7px;
+}
+.ag-row__name {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.ag-row__meta {
+  margin: 2px 0 0;
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+.ag-row__meta [data-soon] {
+  color: var(--nv-warning);
+}
+.ag-row .nv-tags {
+  margin-top: var(--nv-space-2);
+}
+.ag-row__end {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--nv-space-2);
+}
+@media (max-width: 560px) {
+  .ag-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .ag-row__end {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+/* The steps of a new agent: a numbered title, then its choice. */
+.ag-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-6);
+}
+.ag-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-3);
+}
+.ag-step__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0;
+  font-weight: 600;
+}
+.ag-step__num {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--nv-radius-full);
+  background: var(--nv-select-strong);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The ready sets: three tiles, one tap ticks their reads. */
+.ag-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--nv-space-3);
+}
+@media (max-width: 720px) {
+  .ag-presets {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ag-preset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border: 1px solid var(--nv-hairline);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+.ag-preset:hover {
+  background: var(--nv-select);
+}
+.ag-preset[aria-checked='true'] {
+  border-color: var(--nv-ink);
+  background: var(--nv-select-strong);
+}
+.ag-preset:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.ag-preset__title {
+  font-weight: 600;
+}
+.ag-preset__detail {
+  font-size: var(--nv-text-footnote);
+  color: var(--nv-ink-muted);
+}
+
+/* The reads, by group; the sensitive group says so in amber. */
+.ag-group + .ag-group {
+  margin-top: var(--nv-space-3);
+}
+.ag-group__title {
+  display: flex;
+  align-items: center;
+  gap: var(--nv-space-2);
+  margin: 0 0 2px;
+}
+.ag-group__sensitive {
+  color: var(--nv-warning);
+  font-size: var(--nv-text-footnote);
+}
+
+/* The token just made: two numbered moves, each with what to copy. */
+.ag-code {
+  display: block;
+  padding: var(--nv-space-3) var(--nv-space-4);
+  border-radius: var(--nv-radius-md);
+  font-family: var(--nv-font-mono, ui-monospace, monospace);
+  font-size: var(--nv-text-footnote);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.ag-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--nv-space-4);
+}
+@media (max-width: 720px) {
+  .ag-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ag-pair > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  min-width: 0;
+}
