@@ -6,7 +6,9 @@ import {
   type CreatorDecisionKind,
   type DecisionAnswer,
 } from '@impera/contracts';
-import { useState, type JSX } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
+
+import { initialOf } from '@/lib/utils';
 
 interface Hint {
   /** How the server names it. */
@@ -21,6 +23,16 @@ interface Hint {
 const HINTS: Partial<Record<CreatorDecisionKind, readonly Hint[]>> = {
   caption: CAPTION_HINTS.map((key) => ({ key, label: CAPTION_HINT_LABELS[key] })),
 };
+
+export interface DecisionWho {
+  readonly name: string;
+  readonly avatarUrl?: string;
+}
+
+export interface DecisionDue {
+  readonly label: string;
+  readonly soon: boolean;
+}
 
 /** Three other answers for a decision, from what she asked for. */
 export type OtherIdeas = (
@@ -39,13 +51,23 @@ export function DecisionStack({
   onAnswer,
   onLater,
   onOtherIdeas,
+  who,
+  due,
+  notice,
 }: {
   decisions: readonly CreatorDecision[];
   /** Keeps her answer; what she reads back. */
   onAnswer: (decision: CreatorDecision, key: string) => Promise<string>;
-  onLater: (decision: CreatorDecision) => Promise<void>;
+  /** Absent where « Plus tard » has no route (the owner answering in her place): no button then. */
+  onLater?: (decision: CreatorDecision) => Promise<void>;
   /** Absent while nothing proposes other ideas: the gesture then never shows. */
   onOtherIdeas?: OtherIdeas;
+  /** Whose question it is, in the head, when the reader is not her (the owner on « Toutes »). */
+  who?: (decision: CreatorDecision) => DecisionWho | undefined;
+  /** When the current question ends, as a tag at the right of the head; amber when it is close, never red. */
+  due?: (decision: CreatorDecision) => DecisionDue | undefined;
+  /** Between the head and the question: the owner's « Tu réponds à la place de … ». */
+  notice?: (decision: CreatorDecision) => ReactNode;
 }): JSX.Element | null {
   const [done, setDone] = useState(0);
   const [noted, setNoted] = useState<{ readonly id: string; readonly text: string } | null>(null);
@@ -56,6 +78,8 @@ export function DecisionStack({
   const [current] = waiting;
   if (noted === null && current === undefined) return null;
   const total = done + waiting.length + (noted === null ? 0 : 1);
+  const shownWho = current === undefined || noted !== null ? undefined : who?.(current);
+  const shownDue = current === undefined || noted !== null ? undefined : due?.(current);
   const run = (gesture: () => Promise<void>): void => {
     if (busy) return;
     setBusy(true);
@@ -80,12 +104,35 @@ export function DecisionStack({
           <span id="sc-ask-eyebrow" className="sc-ask__eyebrow">
             À décider
           </span>
+          {shownWho === undefined ? null : (
+            <span className="sc-ask__who">
+              <span className="nv-avatar nv-avatar--sm" aria-hidden="true">
+                {shownWho.avatarUrl === undefined ? (
+                  initialOf(shownWho.name)
+                ) : (
+                  <img src={shownWho.avatarUrl} alt="" decoding="async" />
+                )}
+              </span>
+              {shownWho.name}
+            </span>
+          )}
           {total > 1 ? (
             <span className="sc-ask__count nv-num">
               {String(done + 1)} sur {String(total)}
             </span>
           ) : null}
+          {shownDue === undefined ? null : (
+            <span
+              className={
+                shownDue.soon ? 'nv-tag nv-tag--tint sc-ask__due' : 'nv-tag nv-tag--declared sc-ask__due'
+              }
+              style={shownDue.soon ? { '--_c': 'var(--nv-warning)' } : undefined}
+            >
+              {shownDue.label}
+            </span>
+          )}
         </header>
+        {noted === null && current !== undefined && notice !== undefined ? notice(current) : null}
         {noted !== null ? (
           <div className="sc-ask__noted nv-enter" role="status">
             <Check />
@@ -110,9 +157,13 @@ export function DecisionStack({
                 setNoted({ id: current.id, text: await onAnswer(current, key) });
               });
             }}
-            onLater={() => {
-              run(() => onLater(current));
-            }}
+            {...(onLater === undefined
+              ? {}
+              : {
+                  onLater: () => {
+                    run(() => onLater(current));
+                  },
+                })}
             {...(onOtherIdeas === undefined
               ? {}
               : {
@@ -136,7 +187,7 @@ function Question({
   decision: CreatorDecision;
   failed: boolean;
   onAnswer: (key: string) => void;
-  onLater: () => void;
+  onLater?: () => void;
   onOtherIdeas?: (hints: readonly string[], wish: string) => Promise<readonly DecisionAnswer[]>;
 }): JSX.Element {
   const [answers, setAnswers] = useState<readonly DecisionAnswer[]>(decision.answers);
@@ -148,6 +199,7 @@ function Question({
   const [wish, setWish] = useState('');
   const offered = HINTS[decision.kind] ?? [];
   const wished = hints.length > 0 || wish.trim() !== '';
+  const more = onOtherIdeas !== undefined && offered.length > 0 && left > 0 && !asking && !thinking;
   const ask = (): void => {
     if (onOtherIdeas === undefined || !wished) return;
     setThinking(true);
@@ -269,23 +321,27 @@ function Question({
           </button>
         </div>
       ) : null}
-      <footer className="sc-ask__foot">
-        {onOtherIdeas !== undefined && offered.length > 0 && left > 0 && !asking && !thinking ? (
-          <button
-            type="button"
-            className="nv-btn nv-btn--plain sc-ask__more"
-            onClick={() => {
-              setAsking(true);
-            }}
-          >
-            <Again />
-            D’autres idées
-          </button>
-        ) : null}
-        <button type="button" className="nv-btn nv-btn--plain sc-ask__later" onClick={onLater}>
-          Plus tard
-        </button>
-      </footer>
+      {more || onLater !== undefined ? (
+        <footer className="sc-ask__foot">
+          {more ? (
+            <button
+              type="button"
+              className="nv-btn nv-btn--plain sc-ask__more"
+              onClick={() => {
+                setAsking(true);
+              }}
+            >
+              <Again />
+              D’autres idées
+            </button>
+          ) : null}
+          {onLater === undefined ? null : (
+            <button type="button" className="nv-btn nv-btn--plain sc-ask__later" onClick={onLater}>
+              Plus tard
+            </button>
+          )}
+        </footer>
+      ) : null}
     </>
   );
 }

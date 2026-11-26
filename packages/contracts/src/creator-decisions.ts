@@ -80,6 +80,8 @@ export const CreatorDecisionSchema = z.strictObject({
   answers: z.array(DecisionAnswerSchema).min(DECISION_ANSWERS_MIN).max(DECISION_ANSWERS_MAX),
   /** How many times she may still ask for other ideas; 0 hides the gesture. */
   otherIdeasLeft: z.number().int().min(0).max(DECISION_OTHER_IDEAS_MAX),
+  /** When the question ends, unanswered: the owner reads it as a tag when answering in her place. */
+  expiresAt: z.iso.datetime(),
 });
 export type CreatorDecision = z.infer<typeof CreatorDecisionSchema>;
 
