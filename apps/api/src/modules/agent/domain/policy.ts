@@ -31,6 +31,8 @@ export interface OfferContext {
   readonly flags: FanFlags;
   /** Hers, read from her persona (`PersonaForModels.offerLimits`). */
   readonly limits: OfferLimits;
+  /** Her time zone: the same evening never ends before her next day. Absent, only her cooldown counts. */
+  readonly timeZone?: string;
 }
 
 export type OfferBlock =
@@ -55,10 +57,27 @@ export const NO_SALE_RISKS: readonly string[] = [
 const HOUR_MS = 3_600_000;
 
 /**
- * « Jamais deux scripts le même soir » (ADR 0158 § 42): his asking lifts the cooldown, but not within this span of the
- * last script offered. The same span as the session of a refusal (`REFUSAL_SESSION_MS`).
+ * « Jamais deux scripts le même soir » (ADR 0158 § 42, guide 26/11): the same evening lasts at least her cooldown
+ * between two scripts, and never ends before the next day where she lives. His asking lifts neither.
  */
-const SAME_EVENING_MS = 6 * HOUR_MS;
+export function sameEvening(
+  now: Date,
+  at: Date,
+  cooldownHours: number,
+  timeZone: string | undefined,
+): boolean {
+  if (now.getTime() - at.getTime() < cooldownHours * HOUR_MS) return true;
+  return timeZone !== undefined && localDay(now, timeZone) === localDay(at, timeZone);
+}
+
+function localDay(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
 
 export function offerDecision(context: OfferContext): OfferDecision {
   const { flags, limits } = context;
@@ -73,18 +92,15 @@ export function offerDecision(context: OfferContext): OfferDecision {
   if (flags.salesFrozen !== undefined && !noBudget) return { allowed: false, reason: 'sales_frozen' };
   // A script is explicit content: never before he is confirmed an adult.
   if (flags.ageConfirmedAt === undefined) return { allowed: false, reason: 'age_unconfirmed' };
-  const sinceLastOffer =
-    context.lastOfferAt === null ? null : context.now.getTime() - context.lastOfferAt.getTime();
-  // He came back to paid content himself: no waiting on the cooldown or on his budget, except the same evening.
-  if (context.fanAsksForPaid) {
-    return sinceLastOffer !== null && sinceLastOffer < SAME_EVENING_MS
-      ? { allowed: false, reason: 'cooldown' }
-      : { allowed: true };
-  }
-  if (noBudget) return { allowed: false, reason: 'no_budget' };
-  if (sinceLastOffer !== null && sinceLastOffer < limits.cooldownHours * HOUR_MS) {
+  // Never two scripts the same evening, his asking or not.
+  if (
+    context.lastOfferAt !== null &&
+    sameEvening(context.now, context.lastOfferAt, limits.cooldownHours, context.timeZone)
+  )
     return { allowed: false, reason: 'cooldown' };
-  }
+  // He came back to paid content himself: no waiting on his budget nor his heat.
+  if (context.fanAsksForPaid) return { allowed: true };
+  if (noBudget) return { allowed: false, reason: 'no_budget' };
   // His heat replaces « he sexualizes now » (P3-12): a single flirty line is not a hot fan.
   if (context.desire < limits.minDesire) return { allowed: false, reason: 'low_desire' };
   return { allowed: true };
@@ -95,12 +111,12 @@ export function offerDecision(context: OfferContext): OfferDecision {
  * offered tonight; she steers him to a custom request instead, never a yes nor a price before the creator agrees.
  */
 export function asksMoreSameEvening(
-  context: Pick<OfferContext, 'now' | 'lastOfferAt' | 'fanAsksForPaid'>,
+  context: Pick<OfferContext, 'now' | 'lastOfferAt' | 'fanAsksForPaid' | 'limits' | 'timeZone'>,
 ): boolean {
   return (
     context.fanAsksForPaid &&
     context.lastOfferAt !== null &&
-    context.now.getTime() - context.lastOfferAt.getTime() < SAME_EVENING_MS
+    sameEvening(context.now, context.lastOfferAt, context.limits.cooldownHours, context.timeZone)
   );
 }
 

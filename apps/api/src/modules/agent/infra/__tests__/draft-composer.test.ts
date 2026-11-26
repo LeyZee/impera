@@ -290,7 +290,7 @@ describe('createDraftComposer', () => {
     const again = composer({ brief: meet });
     const teased = await again.draftComposer.compose({
       ...INPUT,
-      meeting: { given: ['too_early'], teased: false, closeness: 'none' },
+      meeting: { given: ['too_early'], teased: false },
     });
     expect(teased).toMatchObject({ kind: 'draft', meetingAnswer: { kind: 'tease' } });
   });
@@ -356,6 +356,21 @@ describe('createDraftComposer', () => {
     // A new fan, his age not confirmed: told to calm down, nothing sexual.
     const photo = await hintsFor({ ...BRIEF, intent: 'sexting', occasion: 'unsolicited_explicit' });
     expect(photo.some((hint) => hint.includes('se calmer'))).toBe(true);
+  });
+
+  it('tells a fan who complains of a purchase he may ask Reveal for a refund, never content in exchange (guide 26/11)', async () => {
+    const complaint: Brief = { ...BRIEF, intent: 'complaint', risks: [] };
+    const { draftComposer, seen } = composer({ brief: complaint });
+    await draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, spentMinor: 1_500 } });
+    const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    expect(
+      hints.some(
+        (hint) =>
+          hint.includes('ce qu’il attendait') &&
+          hint.includes('remboursement à Reveal') &&
+          hint.includes('jamais un contenu'),
+      ),
+    ).toBe(true);
   });
 
   it('stays suggestive, never crude, outside the action (Charles 21/11)', async () => {

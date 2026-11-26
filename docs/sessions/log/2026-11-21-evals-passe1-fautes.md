@@ -42,3 +42,16 @@ Vérifié : tests ciblés (agent, scripts, bac à sable, llm, evals) ✓, typech
 - Rythme : budget de bulles 2 par défaut (une petite bulle qui rit), 3 s'il a écrit long en deux messages, jamais au-delà de son `maxBubbles` ; plus d'indice « finis sur une question » ; pas de question si sa dernière réponse en posait une ; voix « elle suit son rythme ».
 - Correctifs : sexto gratuit seulement pour un payeur (inchangé) ; jamais deux scripts le même soir, intention « elle vient de jouir, c'était génial, elle n'a besoin de rien de plus mais aimerait le faire jouir lui », puis une cam ou une vidéo faite pour lui, sans oui ni prix ; aucune vidéo réservée (Charles ~20:20). Pas de clip vocal pour « IA ? » ni pour la preuve tant que le coffre n'en a pas : des mots seulement, rien de promis.
 - Reste : relais réel de la preuve à la créatrice (aujourd'hui intention de voix seulement), réglage `standingLimits` non branché dans `draft-composer`.
+
+## Réponses du guide relayées par Audit IA (26/11)
+
+- « Il a joui » termine le script du soir (amendement de l'ADR 0156 § 6) ; sans achat, intention « un peu vexée », aucune étape.
+- Même soir : `sameEvening` (au moins le délai entre deux scripts, jamais avant le lendemain chez elle) remplace les 6 h, pour l'offre, sa demande et le rappel d'étape non ouverte. Sa demande ne lève plus jamais ce délai.
+- Registre cru : seulement l'action engagée, d'un cran à la fois ; permis aussi dans le sexto gratuit en mots du payeur à sec.
+- Paliers de rencontre jugés par le code : constantes nommées (3 jours, 3 semaines payeur, 2 mois payeur) ; jamais au-delà du palier 2 sans achat.
+- Time-waster dynamique (`fanStanding`) : scripts reçus sans y entrer, dépense récente (fenêtre réglable), avéré après une durée réglable ; preuve refusée seulement à l'avéré. Valeurs = réglages d'agence (ADR 0135 § 1), absentes du dépôt.
+- Entre deux étapes payantes : au moins deux messages de lui (`in_tension`), puis seulement s'il est toujours chaud.
+- Fan qui ne sexualise pas : une ouverture par soir (`triedThisEvening`), un cran à la fois.
+- Plainte d'achat : d'abord ce qui n'a pas plu, puis le remboursement possible chez Reveal sans attendre qu'il le demande, jamais un contenu en compensation, puis un humain si ça revient.
+- Reste : `lastSpentAt` et `standingLimits` à brancher dans `draft-composer` (fiche du fan, réglages créatrice) ; `triedThisEvening` à lire du journal ; le retour du script par une autre variante d'accroche après « il a joui sans payer » ; persistance des raisons de rencontre.
+- Découverte : l'ADR 0135 § 1 lit une dépense à vie ; la fenêtre de deux mois demandée le 26/11 est un réglage optionnel ici (sans lui, la règle de l'ADR) et demande un amendement de l'ADR 0135 pour devenir la règle.

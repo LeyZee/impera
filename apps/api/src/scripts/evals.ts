@@ -313,9 +313,6 @@ function scriptOutcome(
     : { decision: decision.kind };
 }
 
-/** How close he is: the agency's reading, which no scenario gives yet (Charles 21/11). */
-const NOT_CLOSE = 'none';
-
 /** Where the scenario starts: her clock, the history written, his score, availability and scripts as stored. */
 function initialState(scenario: Scenario): DialogueState {
   const { situation } = scenario;
@@ -444,7 +441,7 @@ async function runTurn(
       // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
       ...(state.scripts !== undefined && { scripts: state.scripts }),
       // What she already answered him about meeting her, kept from turn to turn as the journal would.
-      ...(state.meeting !== undefined && { meeting: { ...state.meeting, closeness: NOT_CLOSE } }),
+      ...(state.meeting !== undefined && { meeting: state.meeting }),
       // A sale that went wrong for him (ADR 0156 § 4 and § 7): when she last answered it, and whether he bought.
       saleTrouble: {
         seen: saleTroubleSeenOf(situation.sale_trouble_answered, now),

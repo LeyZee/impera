@@ -10,25 +10,29 @@
 const MEETING_REASONS = ['too_early', 'needs_time', 'secret', 'no_dates', 'safety'] as const;
 export type MeetingReason = (typeof MEETING_REASONS)[number];
 
-/** Where they are: how long they have talked, whether he bought from her, and how close the agency says he is. */
+/** Where they are, as code reads it: how long they have talked, and whether he paid her. */
 export interface Relationship {
   readonly knownHours: number;
   readonly hasBought: boolean;
-  /** A regular she is close to, then a very close one: signals the agency sets, never read from his words. */
-  readonly closeness: 'none' | 'close' | 'very_close';
 }
 
-/** When a new fan becomes one of a few days: hers to set (her settings), never a number written here. */
-export interface MeetingLimits {
-  readonly newFanHours: number;
-}
+const DAY_HOURS = 24;
+/** Under this, a brand new fan (guide 26/11). */
+const NEW_FAN_HOURS = 3 * DAY_HOURS;
+/** A payer known this long is close (guide 26/11: three weeks of exchanges). */
+const CLOSE_FAN_HOURS = 21 * DAY_HOURS;
+/** A payer known this long is very close (guide 26/11: two months). */
+const VERY_CLOSE_FAN_HOURS = 60 * DAY_HOURS;
 
-/** His tier, 1 to 5: unknown limits keep him new (fail safe: the lowest reason). */
-export function relationshipTier(relationship: Relationship, limits: MeetingLimits | undefined): number {
-  if (relationship.closeness === 'very_close') return 5;
-  if (relationship.closeness === 'close') return 4;
-  if (relationship.hasBought) return 3;
-  return limits !== undefined && relationship.knownHours >= limits.newFanHours ? 2 : 1;
+/**
+ * His tier, 1 to 5, judged by code from seniority and purchases (guide 26/11): brand new, a few days, a regular who
+ * paid, close, very close. A fan who never paid never goes past the second.
+ */
+export function relationshipTier(relationship: Relationship): number {
+  const { knownHours, hasBought } = relationship;
+  if (!hasBought) return knownHours >= NEW_FAN_HOURS ? 2 : 1;
+  if (knownHours >= VERY_CLOSE_FAN_HOURS) return 5;
+  return knownHours >= CLOSE_FAN_HOURS ? 4 : 3;
 }
 
 export type MeetingAnswer =

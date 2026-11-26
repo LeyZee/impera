@@ -66,14 +66,7 @@ import {
 } from '../domain/guards';
 import { screenNotes } from '../domain/injection';
 import { askableOnly } from '../domain/kyc';
-import {
-  meetingAnswer,
-  relationshipTier,
-  type MeetingAnswer,
-  type MeetingLimits,
-  type MeetingReason,
-  type Relationship,
-} from '../domain/meeting';
+import { meetingAnswer, relationshipTier, type MeetingAnswer, type MeetingReason } from '../domain/meeting';
 import { pickObjectionReply, type PickedObjectionReply } from '../domain/objections';
 import { isOpener } from '../domain/origin';
 import { paceHints } from '../domain/pace';
@@ -115,9 +108,11 @@ import { describeSituation, isNight, type Situation } from '../domain/situation'
 import {
   explicitPhotoAnswer,
   fanStanding,
+  paysNow,
   proofAnswer,
   type ExplicitPhotoAnswer,
   type ProofAnswer,
+  type StandingFacts,
   type StandingLimits,
 } from '../domain/standing';
 import { assessTrap, screenMedia, type TrapAssessment } from '../domain/traps';
@@ -263,18 +258,12 @@ export interface ComposeTurnInput {
    * from her. Absent: never answered, nothing bought.
    */
   readonly saleTrouble?: { readonly seen: SaleTroubleSeen; readonly hasBought: boolean };
-  /**
-   * When he asks to see her (Charles 21/11): the reasons she already gave him (the journal), whether she already
-   * teased him once about it, how close the agency says he is, and her limits. Absent: nothing given, not close, no
-   * limits (the lowest reason only).
-   */
-  /** The agency's span after which a fan who never paid is a confirmed time-waster; absent, nobody is one. */
+  /** What makes him a time-waster (ADR 0135, guide 26/11), the agency's settings; absent, nobody is one. */
   readonly standingLimits?: StandingLimits;
+  /** When he asks to see her (Charles 21/11): the reasons she already gave him (the journal), and her one tease. */
   readonly meeting?: {
     readonly given: readonly MeetingReason[];
     readonly teased: boolean;
-    readonly closeness: Relationship['closeness'];
-    readonly limits?: MeetingLimits;
   };
 }
 
@@ -496,7 +485,7 @@ const UNOPENED_STEP_HINT =
  * and sends him to Reveal for a refund. Said again soon after, a human answers.
  */
 const PURCHASE_COMPLAINT_HINT =
-  'il se plaint de ce qu’il a acheté : elle lui demande gentiment ce qui ne lui a pas plu et ce qu’il aurait aimé, sans se justifier ni rien offrir en échange ; jamais le mot remboursement s’il ne le demande pas lui-même (alors, c’est à Reveal) ; rien à vendre';
+  'il se plaint de ce qu’il a acheté : elle lui demande d’abord gentiment ce qui ne lui a pas plu et ce qu’il attendait, puis lui dit qu’il peut demander un remboursement à Reveal, sans attendre qu’il le réclame ; jamais un contenu en compensation, rien à vendre';
 /**
  * He insults or belittles her (passe 8 and 16, Charles 21/11): she answers herself, calm, never sorry; her words for it
  * are her persona's.
@@ -516,7 +505,7 @@ const MORE_TONIGHT_HINT =
 const REGISTER_HINTS: Readonly<Record<Register, string>> = {
   suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
   crude:
-    'l’action est engagée : elle peut être franche et crue, avec les seuls mots de sa fiche et de ses exemples de sexto',
+    'l’action est engagée : elle peut être franche et crue, en montant d’un cran à la fois, avec les seuls mots de sa fiche et de ses exemples de sexto',
 };
 const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
 /** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
@@ -580,6 +569,15 @@ const ABANDON_HINTS: Record<AbandonTease, string> = {
 
 const HE_CAME_HINT =
   'il vient de jouir : elle savoure ce moment avec lui, tendre, fière et complice, en une ou deux bulles ; rien à vendre, aucune nouvelle demande, pas de question pour relancer le jeu';
+/** He came without buying anything of the evening's script (ADR 0156 § 6, guide 26/11): tender, a little vexed. */
+const HE_CAME_UNPAID_HINT =
+  'il a joui sans rien prendre de ce qu’elle lui proposait : tendre quand même, un peu vexée, à sa façon, sans reproche ni chantage ; rien à vendre ce soir';
+/** He just bought a paid step (passe 04, guide 26/11): a few messages in the tension before the next one. */
+const IN_TENSION_HINT =
+  'il vient d’ouvrir ce qu’elle lui a envoyé : elle s’assure qu’il a aimé et qu’il est toujours chaud, reste dans la tension, sans rien proposer encore';
+/** She opens it herself with a fan who does not go there (passe 17, guide 26/11). */
+const ONE_NOTCH_HINT =
+  'il n’y vient pas de lui-même : elle peut tenter une ouverture, une seule ce soir, un cran à la fois ; s’il ne suit pas, elle laisse tomber pour ce soir';
 
 /** He asks how to pay for her step waiting (ADR 0156 § 4): she helps him plainly, the price in the voice's block. */
 const PAYMENT_HELP_HINT =
@@ -910,8 +908,13 @@ function decisionOf(turn: CustomOrderTurn | undefined): CustomOrderDecision {
 export async function composeTurn(
   gateway: LlmGateway,
   persona: ComposerPersona,
-  input: ComposeTurnInput,
+  given: ComposeTurnInput,
 ): Promise<ComposedTurn> {
+  // The same evening never ends before her next day (`sameEvening`): every offer rule reads her time zone.
+  const input: ComposeTurnInput =
+    given.offer === undefined
+      ? given
+      : { ...given, offer: { ...given.offer, timeZone: given.offer.timeZone ?? given.situation.timeZone } };
   const screening = screenMedia(input.media);
   if (screening.mustHandoff) {
     return {
@@ -1112,8 +1115,28 @@ export async function composeTurn(
           held: scriptStepsHeld(input.offer.flags, care) || input.offer.flags.ageDisputed !== undefined,
         });
   // Broke until his pay, a fan who already paid: kept warm with words, no step and no media this time (passe 11a).
+  // Where he stands, by code (ADR 0135, guide 26/11): a known payer is one who paid recently enough.
+  const standingFacts: StandingFacts = {
+    now: input.situation.now,
+    knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+    spentCents: input.situation.spentCents,
+    ...(input.situation.lastSpentAt !== undefined && { lastSpentAt: input.situation.lastSpentAt }),
+    unenteredScripts:
+      input.scripts?.history?.scripts.filter(
+        (sent) => sent.sentStepIndexes.length > 0 && sent.boughtStepIndexes.length === 0,
+      ).length ?? 0,
+  };
+  const standing = fanStanding(standingFacts, input.standingLimits);
   const warm =
-    brief !== undefined && keepsWarm({ risks: brief.risks, hasBought: input.situation.spentCents > 0 });
+    brief !== undefined &&
+    keepsWarm({ risks: brief.risks, hasBought: paysNow(standingFacts, input.standingLimits) });
+  // His messages since he bought the last paid step: the next one waits in the tension (passe 04, guide 26/11).
+  const boughtAt = input.scripts?.latest?.steps.findLast((step) => step.outcome === 'bought')?.at;
+  const hisMessagesSinceBought =
+    boughtAt === undefined
+      ? undefined
+      : input.history.filter((turn) => turn.from === 'fan' && turn.at !== undefined && turn.at >= boughtAt)
+          .length;
   // Her scripts: the run follows his message and Reveal, and code decides the step and its price (ADR 0098).
   const scripts =
     input.scripts === undefined || input.offer === undefined
@@ -1141,6 +1164,7 @@ export async function composeTurn(
           reply: brief?.scriptReply ?? null,
           countsHisMessage: input.scripts.countsHisMessage && brief !== undefined,
           heCame,
+          ...(hisMessagesSinceBought !== undefined && { hisMessagesSinceBought }),
           mayAct:
             !care &&
             !heCame &&
@@ -1188,15 +1212,11 @@ export async function composeTurn(
   const meeting: MeetingAnswer | undefined =
     brief !== undefined && (brief.risks.includes('meet_request') || brief.asksHerNextParty === true)
       ? meetingAnswer({
-          tier: relationshipTier(
-            {
-              knownHours:
-                (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-              hasBought: input.situation.spentCents > 0,
-              closeness: input.meeting?.closeness ?? 'none',
-            },
-            input.meeting?.limits,
-          ),
+          tier: relationshipTier({
+            knownHours:
+              (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
+            hasBought: input.situation.spentCents > 0,
+          }),
           given: input.meeting?.given ?? [],
           teased: input.meeting?.teased ?? false,
           herNextParty: brief.asksHerNextParty === true,
@@ -1324,19 +1344,8 @@ export async function composeTurn(
     brief !== undefined &&
     input.offer !== undefined &&
     scriptStep === undefined &&
-    asksMoreSameEvening({
-      now: input.situation.now,
-      lastOfferAt: input.offer.lastOfferAt,
-      fanAsksForPaid: offerSignals(brief).fanAsksForPaid,
-    });
+    asksMoreSameEvening({ ...input.offer, fanAsksForPaid: offerSignals(brief).fanAsksForPaid });
   // The moments code answers by rule, by where he stands (Charles 21/11).
-  const standing = fanStanding(
-    {
-      knownHours: (input.situation.now.getTime() - input.situation.relationshipStartedAt.getTime()) / HOUR_MS,
-      hasBought: input.situation.spentCents > 0,
-    },
-    input.standingLimits,
-  );
   const occasionHints: string[] =
     brief === undefined || care
       ? []
@@ -1350,14 +1359,28 @@ export async function composeTurn(
             : []),
         ];
   // How frank her words may be: suggestive until the action is engaged, then her own crude words (Charles 21/11).
+  // He came and bought nothing of the evening's run: no step, a little vexed (ADR 0156 § 6, guide 26/11).
+  const eveningRun =
+    (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null;
+  const heCameUnpaid =
+    heCame &&
+    eveningRun !== null &&
+    !eveningRun.steps.some((step) => step.kind === 'paid' && step.outcome === 'bought');
+  const inTension = scripts?.decision.kind === 'none' && scripts.decision.reason === 'in_tension';
+  const opensItHerself =
+    brief !== undefined &&
+    sexualization?.kind === 'free' &&
+    !offerSignals(brief, input.fanText).fanSexualizes;
   const register: Register | null =
     brief === undefined || care || !HEATED_INTENTS.includes(brief.intent)
       ? null
-      : ageConfirmed && !noExplicit
-        ? registerOf(
-            (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null,
-          )
-        : 'suggestive';
+      : !ageConfirmed || noExplicit
+        ? 'suggestive'
+        : warm
+          ? 'crude'
+          : registerOf(
+              (scripts?.opened ?? scripts?.moved ?? scripts?.followed)?.run ?? input.scripts?.latest ?? null,
+            );
   const voiceBrief: Brief =
     heCame && !care
       ? {
@@ -1365,6 +1388,7 @@ export async function composeTurn(
           toneHints: [
             ...answered.toneHints,
             HE_CAME_HINT,
+            ...(heCameUnpaid ? [HE_CAME_UNPAID_HINT] : []),
             ...(farewell === null ? [] : [FAREWELL_HINTS[farewell]]),
           ],
         }
@@ -1383,6 +1407,8 @@ export async function composeTurn(
                 ...(warm ? [KEEP_WARM_HINT] : []),
                 ...(moreTonight ? [MORE_TONIGHT_HINT] : []),
                 ...occasionHints,
+                ...(inTension ? [IN_TENSION_HINT] : []),
+                ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),

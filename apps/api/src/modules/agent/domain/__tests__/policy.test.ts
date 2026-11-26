@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   asksMoreSameEvening,
   keepsWarm,
+  sameEvening,
   maySulk,
   offerableScripts,
   offerDecision,
@@ -78,9 +79,13 @@ describe('offerDecision', () => {
     expect(offerDecision({ ...base, risks: ['meet_request'] })).toEqual({ allowed: true });
   });
 
-  it('lifts the cooldown, the no-budget stop and his score when he asks for paid content himself, never a risk', () => {
+  it('lifts the no-budget stop and his score when he asks for paid content himself, never a risk nor the evening', () => {
     const asks = { ...base, fanAsksForPaid: true, desire: 0 };
-    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(7) })).toEqual({ allowed: true });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(11) })).toEqual({ allowed: true });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(7) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
     expect(offerDecision({ ...asks, hasNoBudget: true })).toEqual({ allowed: true });
     expect(offerDecision({ ...asks, risks: ['money_trouble'] })).toEqual({ allowed: false, reason: 'risk' });
   });
@@ -96,7 +101,12 @@ describe('offerDecision', () => {
       allowed: false,
       reason: 'cooldown',
     });
-    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(6) })).toEqual({ allowed: true });
+    // Not 6 h any more (guide 26/11): her cooldown at least, and never before her next day.
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(9) })).toEqual({
+      allowed: false,
+      reason: 'cooldown',
+    });
+    expect(offerDecision({ ...asks, lastOfferAt: hoursAgo(11) })).toEqual({ allowed: true });
   });
 
   it('sells nothing to a fan « à sec » until his pay, and lifts it when he asks himself (eval passe-11a)', () => {
@@ -252,14 +262,25 @@ describe('offerSignals', () => {
   });
 });
 
-describe('his asking for more the evening of his script (passe 18, Charles 21/11)', () => {
-  const now = new Date('2026-10-17T23:00:00Z');
-  it('counts only his own asking within the evening of the last script', () => {
-    const at = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
-    expect(asksMoreSameEvening({ now, lastOfferAt: at(1), fanAsksForPaid: true })).toBe(true);
-    expect(asksMoreSameEvening({ now, lastOfferAt: at(1), fanAsksForPaid: false })).toBe(false);
-    expect(asksMoreSameEvening({ now, lastOfferAt: at(7), fanAsksForPaid: true })).toBe(false);
-    expect(asksMoreSameEvening({ now, lastOfferAt: null, fanAsksForPaid: true })).toBe(false);
+describe('the same evening (passe 18, guide 26/11): at least her cooldown, never before her next day', () => {
+  const limits = { cooldownHours: 10, minDesire: 0 };
+  const now = new Date('2026-10-17T21:00:00Z'); // 23:00 in Paris
+  const at = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
+  it('counts only his own asking within the same evening', () => {
+    const ask = (lastOfferAt: Date | null, fanAsksForPaid: boolean) =>
+      asksMoreSameEvening({ now, lastOfferAt, fanAsksForPaid, limits, timeZone: 'Europe/Paris' });
+    expect(ask(at(1), true)).toBe(true);
+    expect(ask(at(1), false)).toBe(false);
+    expect(ask(at(7), true)).toBe(true);
+    expect(ask(null, true)).toBe(false);
+  });
+
+  it('lasts her cooldown, and past it still until her next day', () => {
+    expect(sameEvening(now, at(9), 10, undefined)).toBe(true);
+    expect(sameEvening(now, at(11), 10, undefined)).toBe(false);
+    // 11 h ago in Paris was 12:00 the same day: still the same day there.
+    expect(sameEvening(now, at(11), 10, 'Europe/Paris')).toBe(true);
+    expect(sameEvening(now, at(24), 10, 'Europe/Paris')).toBe(false);
   });
 });
 

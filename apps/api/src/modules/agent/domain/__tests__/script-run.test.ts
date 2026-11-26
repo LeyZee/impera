@@ -384,6 +384,24 @@ describe('nextScriptStep', () => {
     });
   });
 
+  it('keeps him a few messages in the tension after he bought, before the next paid step (passe 04, guide 26/11)', () => {
+    const bought = play([
+      sent(0, -4),
+      sent(1, -3),
+      sent(2, -2),
+      { type: 'step_bought', stepIndex: 2, at: at(-1) },
+    ]);
+    const latest = { run: bought, script: NIGHT };
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 1 })).toEqual({
+      kind: 'none',
+      reason: 'in_tension',
+    });
+    expect(nextScriptStep({ ...base, latest, hisMessagesSinceBought: 2 })).toEqual({
+      kind: 'send_step',
+      step: toSend(NIGHT, 3),
+    });
+  });
+
   it('holds the next step of a cold session, a held fan, or a paid step the policy refuses', () => {
     const teased = play([sent(0, -2)]);
     const latest = { run: teased, script: NIGHT };

@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { meetingAnswer, relationshipTier, type MeetingReason, type Relationship } from '../meeting';
 
-const limits = { newFanHours: 48 };
+const DAY = 24;
 const fan = (over: Partial<Relationship> = {}): Relationship => ({
   knownHours: 2,
   hasBought: false,
-  closeness: 'none',
   ...over,
 });
 const turn = (tier: number, given: MeetingReason[] = [], teased = false) => ({
@@ -16,17 +15,17 @@ const turn = (tier: number, given: MeetingReason[] = [], teased = false) => ({
   herNextParty: false,
 });
 
-describe('relationshipTier (Charles 21/11, il demande à la voir)', () => {
-  it('reads where they are, never his insisting', () => {
-    expect(relationshipTier(fan(), limits)).toBe(1);
-    expect(relationshipTier(fan({ knownHours: 72 }), limits)).toBe(2);
-    expect(relationshipTier(fan({ hasBought: true }), limits)).toBe(3);
-    expect(relationshipTier(fan({ hasBought: true, closeness: 'close' }), limits)).toBe(4);
-    expect(relationshipTier(fan({ closeness: 'very_close' }), limits)).toBe(5);
+describe('relationshipTier (guide 26/11): seniority and purchases, never his insisting', () => {
+  it('reads brand new, a few days, a regular who paid, close, very close', () => {
+    expect(relationshipTier(fan())).toBe(1);
+    expect(relationshipTier(fan({ knownHours: 3 * DAY }))).toBe(2);
+    expect(relationshipTier(fan({ hasBought: true }))).toBe(3);
+    expect(relationshipTier(fan({ hasBought: true, knownHours: 21 * DAY }))).toBe(4);
+    expect(relationshipTier(fan({ hasBought: true, knownHours: 60 * DAY }))).toBe(5);
   });
 
-  it('keeps him new while her limits are unknown (fail safe)', () => {
-    expect(relationshipTier(fan({ knownHours: 500 }), undefined)).toBe(1);
+  it('never takes a fan who never paid past the second tier', () => {
+    expect(relationshipTier(fan({ knownHours: 365 * DAY }))).toBe(2);
   });
 });
 
