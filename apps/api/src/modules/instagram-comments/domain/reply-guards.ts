@@ -78,6 +78,25 @@ const SEDUCTION = [
   'fantasmes',
   'te montrer plus',
   'voir plus de moi',
+  // ADR 0168 § 4: English, Italian, Spanish.
+  'horny',
+  'naughty',
+  'in my bed',
+  'in private',
+  'in dm',
+  'babe',
+  'show you more',
+  'eccitata',
+  'eccitato',
+  'nel mio letto',
+  'in privato',
+  'tesoro',
+  'mutandine',
+  'cachonda',
+  'caliente',
+  'en mi cama',
+  'en privado',
+  'lenceria',
 ];
 
 function fold(text: string): string {

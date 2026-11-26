@@ -1,4 +1,4 @@
-import { CreatorIdSchema, FanIdSchema, type FanFlags } from '@impera/contracts';
+import { CreatorIdSchema, FanIdSchema, type FanFlags, type Language } from '@impera/contracts';
 
 import type { FansModule } from '../../fans';
 import type { Protection } from '../domain/hold';
@@ -16,14 +16,37 @@ export interface FanLimits {
   ): Promise<void>;
   /** He stated an adult age himself (Charles, 27/10): confirmed by the policy, unless it already is or was taken back. */
   confirmAge(creatorId: string, fanId: string, correlationId: string, at: Date): Promise<void>;
+  /** His kept language (ADR 0168 § 3), `null` before any. Absent: none is read. */
+  language?(
+    creatorId: string,
+    fanId: string,
+  ): Promise<{ readonly value: Language; readonly source: 'detected' | 'set' } | null>;
+  /** Code read his language on his message: kept unless a person set it. Absent: none is kept. */
+  keepLanguage?(creatorId: string, fanId: string, language: Language): Promise<void>;
 }
 
 /** The `fans` module behind the port; the policy is the author (`system`), the risks are the reason. */
 export function createFanLimits(
-  fans: Pick<FansModule, 'flags' | 'setFlag' | 'setFlagIfUnset' | 'clearFlag' | 'confirmDeclaredAge'>,
+  fans: Pick<
+    FansModule,
+    | 'flags'
+    | 'setFlag'
+    | 'setFlagIfUnset'
+    | 'clearFlag'
+    | 'confirmDeclaredAge'
+    | 'language'
+    | 'keepDetectedLanguage'
+  >,
 ): FanLimits {
   return {
     flags: (creatorId, fanId) => fans.flags(CreatorIdSchema.parse(creatorId), FanIdSchema.parse(fanId)),
+    language: async (creatorId, fanId) => {
+      const kept = await fans.language(CreatorIdSchema.parse(creatorId), FanIdSchema.parse(fanId));
+      return kept === null ? null : { value: kept.value, source: kept.source };
+    },
+    async keepLanguage(creatorId, fanId, language) {
+      await fans.keepDetectedLanguage(CreatorIdSchema.parse(creatorId), FanIdSchema.parse(fanId), language);
+    },
     async protect(creatorId, fanId, protection, correlationId, at) {
       const creator = CreatorIdSchema.parse(creatorId);
       const fan = FanIdSchema.parse(fanId);
