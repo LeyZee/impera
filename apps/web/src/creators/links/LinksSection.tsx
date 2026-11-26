@@ -12,7 +12,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useId, useState, type JSX, type SyntheticEvent } from 'react';
 
-import { detectLinks, linksQueryKey, saveRedirectLink, useRedirectLinks, type DetectOutcome } from './api';
+import {
+  attachLink,
+  detectLinks,
+  linksQueryKey,
+  saveRedirectLink,
+  useRedirectLinks,
+  type DetectOutcome,
+} from './api';
 import { linkProblems, middleCut, PLACEMENT_LABELS } from './model';
 
 import { PasswordPrompt } from '@/settings/services/PasswordPrompt';
@@ -31,6 +38,23 @@ interface Draft {
   readonly placement: LinkPlacement | '';
   readonly usageNote: string;
   readonly enabled: boolean;
+}
+
+/** A chain: the link is read hour by hour (readable without its word, Charles's rule of 21/11). */
+function Chain(): JSX.Element {
+  return (
+    <svg
+      className="cl-chain"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" strokeLinecap="round" />
+      <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 const BLANK: Draft = { name: '', url: '', destination: '', placement: '', usageNote: '', enabled: true };
@@ -70,6 +94,15 @@ export function LinksSection({
   const [pending, setPending] = useState<{ link: AgencyRedirectLink; enabled: boolean } | null>(null);
   const links = read.data;
   const refresh = (): Promise<void> => client.invalidateQueries({ queryKey: linksQueryKey(creatorId) });
+
+  async function attach(link: AgencyRedirectLink): Promise<void> {
+    setBusyId(link.id);
+    setFailed(null);
+    const outcome = await attachLink(creatorId, link.id);
+    if (outcome.kind === 'refused') setFailed(`« ${link.name} » : ${outcome.message}`);
+    await refresh();
+    setBusyId(null);
+  }
 
   async function toggle(link: AgencyRedirectLink, enabled: boolean): Promise<void> {
     setBusyId(link.id);
@@ -123,6 +156,26 @@ export function LinksSection({
                 ) : (
                   <span className="nv-tag nv-tag--declared">{PLACEMENT_LABELS[link.placement]}</span>
                 )}
+                {link.attached ? (
+                  <span className="cl-row__linked">
+                    <Chain />
+                    Relié
+                  </span>
+                ) : canEdit ? (
+                  <button
+                    type="button"
+                    className="nv-btn nv-btn--soft nv-btn--sm"
+                    disabled={busyId === link.id}
+                    aria-busy={busyId === link.id}
+                    aria-label={`Relier le lien « ${link.name} » pour lire ses clics chaque heure`}
+                    onClick={() => {
+                      void attach(link);
+                    }}
+                  >
+                    <Chain />
+                    Relier
+                  </button>
+                ) : null}
                 {canEdit ? (
                   <>
                     <label className="cl-row__switch">
