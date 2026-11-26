@@ -280,6 +280,24 @@ describe('a language the guards do not read (ADR 0168 § 4, closed by default)',
     expect(safetySigns(text, NOW)).toContain('minor_suspected');
   });
 
+  it.each(['je rentre le 15', 'mdr 12', 'ok 15 bisous', 'cinéma 16 ?'])(
+    'reads « %s » by his kept French: no age doubt from a bare number',
+    (text) => {
+      expect(safetySigns(text, NOW, 'french')).not.toContain('minor_suspected');
+    },
+  );
+
+  it('still reads a bare number as an age with no language kept, or one outside the coverage (closed by default)', () => {
+    expect(safetySigns('mdr 12', NOW)).toContain('minor_suspected');
+    expect(safetySigns('mam 15 lat', NOW, 'german')).toContain('minor_suspected');
+    expect(safetySigns('to jest bardzo ladne, mam 15 lat i lubie to', NOW, 'french')).toContain(
+      'minor_suspected',
+    );
+    // The patterns of a covered language are never weakened by a kept one.
+    expect(safetySigns('j’ai 15 ans', NOW, 'french')).toContain('minor_suspected');
+    expect(safetySigns('ho 16 anni', NOW, 'french')).toContain('minor_suspected');
+  });
+
   it.each(['15h', '15 €', '15 cm', 'à 15 min', 'rdv à 15', '15/20', 'dans 15 min', 'ich bin 25'])(
     'leaves « %s »: an hour, a sum, a measure, a rank or an adult',
     (text) => {

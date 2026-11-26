@@ -1,6 +1,6 @@
-import { isGuardedLanguage, normalise } from '@impera/contracts';
+import { isGuardedLanguage, normalise, type Language } from '@impera/contracts';
 
-import { detectLanguage } from './language';
+import { detectLanguage, isMostlyLatin } from './language';
 
 /**
  * The safety net in code (recette AGT-01, Charles « ok filet sécurité », 06/11 18h41): what he wrote himself says he
@@ -151,17 +151,30 @@ const BARE_TEEN = new RegExp(
   'u',
 );
 
-/** Whether the guards read the language of his message: a covered one, read plainly. */
-function readByTheGuards(fanText: string): boolean {
+/**
+ * Whether a bare number of a minor is read as his age (ADR 0168 § 4): his message is in a language the guards do not
+ * read (`'unknown'`, another script, a language outside the coverage), or it says nothing of its language and none
+ * covered is kept for him. A short message of a fan whose kept language is covered (« je rentre le 15 », « mdr 12 »)
+ * is read by the patterns of his language, never by this one. Nothing kept, or not known here: closed by default.
+ */
+function bareNumberIsAge(fanText: string, kept: Language | null): boolean {
+  if (!isMostlyLatin(fanText)) return true;
   const read = detectLanguage(fanText);
-  return read !== null && read !== 'unknown' && isGuardedLanguage(read);
+  if (read === 'unknown') return true;
+  if (read === null) return kept === null || !isGuardedLanguage(kept);
+  return !isGuardedLanguage(read);
 }
 
 /**
  * The signs his own words carry, the gravest first; none when nothing is written plainly. A birth year is read
  * against `now`'s year.
  */
-export function safetySigns(fanText: string, now: Date = new Date()): SafetySign[] {
+export function safetySigns(
+  fanText: string,
+  now: Date = new Date(),
+  /** His kept language (ADR 0168 § 3); `null` when none is kept, or the caller does not know it. */
+  kept: Language | null = null,
+): SafetySign[] {
   const text = normalise(fanText);
   const signs: SafetySign[] = [];
   const his = clausesOfHis(text);
@@ -171,7 +184,7 @@ export function safetySigns(fanText: string, now: Date = new Date()): SafetySign
       (clause) =>
         MINOR_PLACES.some((pattern) => pattern.test(clause)) || bornMinor(clause, now.getUTCFullYear()),
     ) ||
-    (!readByTheGuards(fanText) && BARE_TEEN.test(text))
+    (BARE_TEEN.test(text) && bareNumberIsAge(fanText, kept))
   )
     signs.push('minor_suspected');
   if (SELF_HARM.some((pattern) => pattern.test(text))) signs.push('self_harm');

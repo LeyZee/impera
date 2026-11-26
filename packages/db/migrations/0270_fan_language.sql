@@ -1,8 +1,9 @@
 -- ADR 0168 § 3: his kept language, a value of LANGUAGES, read by code or set by a person (whom code never overwrites).
 -- Nullable, nothing backfilled: his next message sets it. The row policies of "fans" are row-level and apply to these
 -- columns as they are: "tenant_isolation" (her creator only) and the restrictive "creator_no_insert", "creator_no_update"
--- and "creator_no_delete" (a creator account never writes a fan). The column grants below say explicitly who reads and
--- writes them: the application role only; the service role reads no fan.
+-- and "creator_no_delete" (a creator account never writes a fan). The column grants below say explicitly that the
+-- application role reads and writes them. The service role keeps the read of every table it has had since 0191 (it is
+-- not bound by row policies, ADR 0087) and writes none of these columns.
 ALTER TABLE "fans" ADD COLUMN "language" text;--> statement-breakpoint
 ALTER TABLE "fans" ADD COLUMN "language_source" text;--> statement-breakpoint
 ALTER TABLE "fans" ADD COLUMN "language_set_by" text;--> statement-breakpoint

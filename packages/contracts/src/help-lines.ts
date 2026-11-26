@@ -27,8 +27,8 @@ export const HelpLinesSchema = z
   .refine((lines) => new Set(lines.map((line) => line.country)).size === lines.length, 'country repeated');
 
 /**
- * The verified lines, empty on purpose (Charles, 26/11: « numéro si pays connu »): a row is added in its own PR, once Charles
- * has checked the number himself on the official page, with its source and the date. Until then the help bubble gives no
- * national number outside the French one of ADR 0088 § 4.
+ * The verified lines, empty on purpose (Charles, 26/11: « numéro si pays connu »): a row is added in its own PR, once
+ * Charles has checked the number himself on the official page, with its source and the date. Until then the help
+ * bubble gives no number, in any language: it sends him to someone close or his country's emergency number.
  */
 export const HELP_LINES: readonly HelpLine[] = HelpLinesSchema.parse([]);

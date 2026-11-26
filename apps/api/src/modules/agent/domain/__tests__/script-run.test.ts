@@ -215,6 +215,13 @@ describe('his language (ADR 0168 § 8)', () => {
     expect(ids('french', history(['lingerie-en', [0]]))).toEqual(['script-night']);
   });
 
+  it('opens no script at all when code reads his language as one it does not know', () => {
+    expect(permittedScripts(catalogue, { moment: 'night', history: NO_HISTORY, language: null })).toEqual([]);
+    expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-fr', language: null })).toMatchObject({
+      kind: 'none',
+    });
+  });
+
   it('decides no start without a version in his language', () => {
     expect(nextScriptStep({ ...base, catalogue, brainPick: 'lingerie-fr', language: 'italian' })).toEqual({
       kind: 'none',

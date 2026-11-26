@@ -331,8 +331,12 @@ export interface ScriptsInput {
   readonly teased?: number;
 }
 
-/** His language for her scripts (ADR 0168 § 8): the one this message keeps, else his kept one, else French. */
-function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): Language {
+/**
+ * His language for her scripts (ADR 0168 § 8): the one this message keeps, else his kept one, else French. `null`
+ * when code reads his language as one it does not know: no script opens, never one in a language he may not read.
+ */
+function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): Language | null {
+  if (language.fan === 'unknown') return null;
   return language.keep ?? input.keptLanguage?.value ?? 'french';
 }
 
@@ -340,7 +344,7 @@ function scriptLanguageOf(language: LanguageDecision, input: ComposeTurnInput): 
 function scriptChoices(
   scripts: ScriptsInput | undefined,
   situation: Situation,
-  language: Language,
+  language: Language | null,
 ): readonly { readonly id: string; readonly script: PlatformScriptView }[] {
   if (scripts?.history === undefined || scripts.history === null) return [];
   return permittedScripts(scripts.catalogue, {

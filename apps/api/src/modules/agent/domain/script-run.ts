@@ -355,10 +355,14 @@ export function permittedScripts(
   options: {
     readonly moment: DayPart;
     readonly history: ScriptHistoryView;
-    /** His language (ADR 0168 § 8): only a script written in it opens. Absent: French. */
-    readonly language?: Language;
+    /**
+     * His language (ADR 0168 § 8): only a script written in it opens. Absent: French. `null`, a language code does
+     * not read: no script opens.
+     */
+    readonly language?: Language | null;
   },
 ): PlatformScriptView[] {
+  if (options.language === null) return [];
   const played = playedScriptRefs(options.history);
   const familyByRef = new Map(catalogue.map((script) => [script.scriptRef, familyOf(script)]));
   const playedFamilies = new Set([...played].map((ref) => familyByRef.get(ref) ?? ref));
@@ -425,8 +429,11 @@ export interface NextScriptStepInput {
   readonly startGate?: ScriptStart;
   /** His availability as code holds it: « non » pauses an open run, no step and no refusal counted (§ 12). */
   readonly availability?: FanAvailabilityState;
-  /** His language (ADR 0168 § 8): no script opens without a version in it. Absent: French. */
-  readonly language?: Language;
+  /**
+   * His language (ADR 0168 § 8): no script opens without a version in it. Absent: French. `null`, a language code does
+   * not read: no script opens.
+   */
+  readonly language?: Language | null;
   /**
    * His messages since he bought the last paid step (passe 04, guide): the next paid step waits for a few of them,
    * kept in the tension. Absent, not counted: no wait (the evals and tests that predate it).
