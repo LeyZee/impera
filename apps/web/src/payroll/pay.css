@@ -1543,3 +1543,61 @@
     overflow: hidden;
   }
 }
+
+/* ───────────── « J'ai été décisif sur une vente » (ADR 0101 §§ 18 to 22, trou 15) ───────────── */
+
+/* The member's note, quoted as he wrote it: a datum, the validator reads it before he looks for the sale. */
+.py-claim__note {
+  margin: var(--nv-space-1) 0 0;
+  padding: var(--nv-space-2) var(--nv-space-3);
+  border-radius: var(--nv-radius-sm);
+  background: var(--nv-fill-soft);
+  color: var(--nv-ink);
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* Where a claim stands: amber while it waits, the success colour settled, red not retained, quiet withdrawn. */
+.py-claim__state {
+  --_c: var(--nv-warning);
+}
+.py-claim__state[data-state='settled'] {
+  --_c: var(--nv-success);
+}
+.py-claim__state[data-state='not_retained'] {
+  --_c: var(--nv-danger);
+}
+.py-claim__state[data-state='withdrawn'] {
+  --_c: var(--nv-ink-faint);
+}
+.py-claims__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nv-space-2) var(--nv-space-3);
+}
+.py-claims__icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* One shift a line: the day and hours read in a column, never cut. */
+.py-claims__shifts {
+  flex-direction: column;
+  align-items: stretch;
+}
+.py-claims__shifts .nv-chip {
+  justify-content: flex-start;
+  height: auto;
+  min-height: 36px;
+  white-space: normal;
+  text-align: left;
+}
+.py-give__anchor {
+  scroll-margin-top: calc(env(safe-area-inset-top, 0px) + var(--nv-space-6));
+}
