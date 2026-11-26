@@ -8,7 +8,7 @@ import type {
   ScriptStepOutcome,
 } from '@impera/contracts';
 
-import { offerDecision, type OfferBlock, type OfferContext } from './policy';
+import { offerDecision, sameEvening, type OfferBlock, type OfferContext } from './policy';
 import type { DayPart } from './situation';
 
 /**
@@ -378,7 +378,18 @@ export interface NextScriptStepInput {
   readonly startGate?: ScriptStart;
   /** His availability as code holds it: « non » pauses an open run, no step and no refusal counted (§ 12). */
   readonly availability?: FanAvailabilityState;
+  /**
+   * His messages since he bought the last paid step (passe 04, guide): the next paid step waits for a few of them,
+   * kept in the tension. Absent, not counted: no wait (the evals and tests that predate it).
+   */
+  readonly hisMessagesSinceBought?: number;
 }
+
+/**
+ * Between two paid steps, at least this many messages of his in the tension (guide: two to four), and after each
+ * step she checks he liked it and is still hot; the next one goes only while his desire holds (`hotSession`).
+ */
+const MIN_MESSAGES_BETWEEN_PAID_STEPS = 2;
 
 type NoScriptReason =
   | OfferBlock
@@ -389,6 +400,8 @@ type NoScriptReason =
   | 'scripts_exhausted'
   | 'no_pick'
   | 'cold_session'
+  /** He just bought a paid step: a few messages in the tension before the next one (passe 04). */
+  | 'in_tension'
   | 'price_mismatch';
 
 export type ScriptStepDecision =
@@ -447,8 +460,15 @@ export function nextScriptStep(input: NextScriptStepInput): ScriptStepDecision {
   if (status === 'open') return nextInOpenRun(input, run, script);
   if (run.endedAt?.getTime() === input.now.getTime()) {
     const last = current(run);
-    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message.
-    if (status === 'stalled' && last?.kind === 'paid' && last.outcome === 'sent')
+    // A paid step he never opened before the session cooled: she reminds him of it, once, at this message. Only when
+    // he comes back another evening (ADR 0158, « revient le lendemain »): his heat falling the same evening (he came,
+    // he says thanks) is no reason to tease him about it (eval passe-13).
+    if (
+      status === 'stalled' &&
+      last?.kind === 'paid' &&
+      last.outcome === 'sent' &&
+      !sameEvening(input.now, last.sentAt, input.offer.limits.cooldownHours, input.offer.timeZone)
+    )
       return { kind: 'end', status, unopened: last };
     if (status !== 'refused') return { kind: 'end', status };
     if (last !== undefined) return { kind: 'after_refusal', step: last };
@@ -472,6 +492,13 @@ function nextInOpenRun(
   if (step === null) return { kind: 'none', reason: 'no_script' };
   if (!input.hotSession) return { kind: 'none', reason: 'cold_session' };
   if (scriptStepsHeld(input.offer.flags, input.careMode)) return { kind: 'none', reason: 'held' };
+  if (
+    step.kind === 'paid' &&
+    last?.outcome === 'bought' &&
+    input.hisMessagesSinceBought !== undefined &&
+    input.hisMessagesSinceBought < MIN_MESSAGES_BETWEEN_PAID_STEPS
+  )
+    return { kind: 'none', reason: 'in_tension' };
   if (step.kind === 'paid') {
     // The cooldown is between two scripts, not between two steps of the same one: the staircase climbs in one session.
     const decision = offerDecision({ ...input.offer, lastOfferAt: null });
