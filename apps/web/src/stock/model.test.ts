@@ -8,7 +8,7 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { daysLabel, figuresOf, headlineOf, mediaCountOf, unitsOf } from './model';
+import { daysLabel, figuresOf, headlineOf, mediaCountOf, ringSub, unitsOf } from './model';
 
 const NOW = new Date('2026-11-21T12:00:00+01:00');
 
@@ -92,5 +92,19 @@ describe('Coffre Impera model', () => {
     expect(headline.tone).toBe('warn');
     expect(headline.title).toContain('Reveal');
     expect(headline.lead).toContain('3 vidéos');
+  });
+});
+
+describe('ringSub', () => {
+  it('counts a minimum against its target, and a bonus without one', () => {
+    expect(ringSub(category({ category: 'script', mode: 'count', stockUnits: 4, target: 4 }))).toBe(
+      '4 sur 4 prêts',
+    );
+    expect(ringSub(category({ category: 'voice_beep', mode: 'count', stockUnits: 1, target: 1 }))).toBe(
+      '1 sur 1 prêt',
+    );
+    expect(ringSub(category({ category: 'sale_video', mode: 'bonus', stockUnits: 3, target: null }))).toBe(
+      `${unitsOf('sale_video', 3)} en stock`,
+    );
   });
 });

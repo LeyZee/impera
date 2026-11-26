@@ -22,7 +22,7 @@ L'agence (PC) et la créatrice (téléphone) voient d'un coup d'œil ce qu'il re
 - [x] Captures nuit/jour, PC/téléphone, relues par Design (`recette/2026-11-21/coffre-impera-2/`).
 - [ ] « À remplacer » (ADR 0163 § 6) : pastille ambre, compteur et filtre, « À refaire » côté agence, « Remplacer » côté elle, une fois les routes du module des dépôts fusionnées ; captures avant fusion.
 - [x] Meter à marque, Ring et couleurs de catégorie du design system à la place des dessins locaux.
-- [ ] Jetons `--nv-content-11` à `13` (vidéos à vendre, deux vocaux) à la place des mélanges provisoires, quand Design les livre.
+- [x] Jetons `--nv-content-11` à `13` (vidéos à vendre, deux vocaux) à la place des mélanges provisoires.
 - [x] Catégories « Vocal du bip », « Vocal bien réelle », « Vidéos à vendre » (contrats, base, demandes, coffre).
 - [x] Ce que l'agent pioche et note (`content-drops` › `reserved`) : un vocal une fois par fan, un cadeau jamais deux fois, seulement validé ; index unique partiel sur `media_sends` (`reserved-media.integration.test.ts`).
 - [ ] Type de vidéo à vendre choisi au dépôt, quand les lignes « Vidéos déjà tournées » de Sur mesure sont sur main.

@@ -47,6 +47,7 @@ export * from './fan-list';
 export * from './fan-card';
 export * from './fans';
 export * from './guards';
+export * from './meeting-tiers';
 export * from './ids';
 export * from './invitation-links';
 export * from './invoices';

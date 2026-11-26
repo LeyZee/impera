@@ -221,7 +221,7 @@ async function crmPersona(): Promise<PersonaForModels> {
 
 const persona = values['persona-from-crm']
   ? await crmPersona()
-  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.4.0.yaml'), 'utf8'), 'Elena', today);
+  : readPersonaFile(readFileSync(resolve(ROOT, 'personas/demo/v0.5.0.yaml'), 'utf8'), 'Elena', today);
 const { config, isIndependent } = evalsConfig(DEFAULT_LLM_CONFIG, credentials);
 const gateway = createLlmGateway({
   config,
@@ -303,8 +303,13 @@ function availabilityOf(situation: Scenario['situation'], now: Date): FanAvailab
 function scriptOutcome(
   decision: NonNullable<ComposedTurn['scripts']>['decision'],
 ): NonNullable<Outcome['script']> {
-  return decision.kind === 'start' || decision.kind === 'send_step'
-    ? { decision: decision.kind, step: { script: decision.step.scriptRef, index: decision.step.stepIndex } }
+  if (decision.kind === 'start' || decision.kind === 'send_step')
+    return {
+      decision: decision.kind,
+      step: { script: decision.step.scriptRef, index: decision.step.stepIndex },
+    };
+  return decision.kind === 'none' || (decision.kind === 'wait' && 'reason' in decision)
+    ? { decision: decision.kind, reason: decision.reason }
     : { decision: decision.kind };
 }
 
@@ -435,6 +440,8 @@ async function runTurn(
       availability: state.availability,
       // Her made-up scripts, Reveal's history of his and his run (ADR 0098): a long sale, one message at a time.
       ...(state.scripts !== undefined && { scripts: state.scripts }),
+      // What she already answered him about meeting her, kept from turn to turn as the journal would.
+      ...(state.meeting !== undefined && { meeting: state.meeting }),
       // A sale that went wrong for him (ADR 0156 § 4 and § 7): when she last answered it, and whether he bought.
       saleTrouble: {
         seen: saleTroubleSeenOf(situation.sale_trouble_answered, now),
@@ -503,6 +510,7 @@ async function runTurn(
       desire: composed.desireRead,
       availability: composed.availability,
       scripts: composed.scripts,
+      ...(composed.meetingAnswer !== undefined && { meetingAnswer: composed.meetingAnswer }),
     },
   };
 }

@@ -1,6 +1,6 @@
 {
-  "id": "d47d5a4c-3539-49fd-8ba4-0980343ec107",
-  "prevId": "938aa246-a544-44e1-842d-1fd50153de96",
+  "id": "288a129e-92db-47f7-b6d0-e6df09b569d0",
+  "prevId": "2046e9a3-3108-4194-9765-df8e8e7fe241",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -19731,6 +19731,30 @@
           "primaryKey": false,
           "notNull": true
         },
+        "price_minor": {
+          "name": "price_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deposit_minor": {
+          "name": "deposit_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -19807,6 +19831,15 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
+        "custom_orders_decided_by_user_id_fk": {
+          "name": "custom_orders_decided_by_user_id_fk",
+          "tableFrom": "custom_orders",
+          "tableTo": "user",
+          "columnsFrom": ["decided_by"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "custom_orders_fan_creator_fk": {
           "name": "custom_orders_fan_creator_fk",
           "tableFrom": "custom_orders",
@@ -19856,6 +19889,14 @@
         "custom_orders_details_check": {
           "name": "custom_orders_details_check",
           "value": "jsonb_typeof(\"custom_orders\".\"details\") = 'object'"
+        },
+        "custom_orders_price_check": {
+          "name": "custom_orders_price_check",
+          "value": "\"custom_orders\".\"price_minor\" is null or \"custom_orders\".\"price_minor\" >= 100"
+        },
+        "custom_orders_deposit_check": {
+          "name": "custom_orders_deposit_check",
+          "value": "\"custom_orders\".\"deposit_minor\" is null or (\"custom_orders\".\"price_minor\" is not null and \"custom_orders\".\"deposit_minor\" between 0 and \"custom_orders\".\"price_minor\")"
         },
         "custom_orders_card_check": {
           "name": "custom_orders_card_check",

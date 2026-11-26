@@ -41,7 +41,7 @@ export const STOCK_USES: Readonly<Record<DropCategory, string>> = {
   whale_gift: 'Courts, inédits, jamais de nu. Offerts aux gros fans, jamais revendus.',
   voice_beep: 'Sa vraie voix, « laisse-moi un message après le bip », pour le fan qui la croit un robot.',
   voice_real: 'Un ou deux vocaux « je suis bien réelle », la preuve quand le doute reste.',
-  sale_video: 'Sextapes et vidéos de côté, vendues hors scripts au prix de la grille.',
+  sale_video: 'Des vidéos de côté, vendues hors scripts au prix de la grille.',
   instagram_post: 'Au moins deux posts par jour.',
   instagram_reel: 'Un Reel d’essai par jour, pour aller chercher de nouveaux abonnés.',
   instagram_story: 'Quatre par jour, dont une avec l’appel vers Reveal.',
@@ -61,7 +61,7 @@ export const STOCK_RULES: Partial<Readonly<Record<DropCategory, string>>> = {
   sale_video: 'Jamais offerte, jamais revendue au même fan',
 };
 
-/** Each category's colour: the design system's ten content hues, in their fixed order (Charles, 21/11). */
+/** Each category's colour: the design system's thirteen content hues, in their fixed order (Charles, 21/11). */
 export const STOCK_COLOURS: Readonly<Record<DropCategory, string>> = {
   feed_video: 'var(--nv-content-1)',
   feed_shoot: 'var(--nv-content-2)',
@@ -69,10 +69,10 @@ export const STOCK_COLOURS: Readonly<Record<DropCategory, string>> = {
   mass_dm: 'var(--nv-content-4)',
   script: 'var(--nv-content-5)',
   whale_gift: 'var(--nv-content-6)',
-  // Three more hues asked of Design (--nv-content-11 to 13); mixed from the ten meanwhile.
-  voice_beep: 'color-mix(in oklab, var(--nv-content-3) 50%, var(--nv-content-8))',
-  voice_real: 'color-mix(in oklab, var(--nv-content-9) 50%, var(--nv-content-5))',
-  sale_video: 'color-mix(in oklab, var(--nv-content-7) 50%, var(--nv-content-2))',
+  // The two voices in one family of sand, light then deep; what is sold as a video in green.
+  voice_beep: 'var(--nv-content-12)',
+  voice_real: 'var(--nv-content-13)',
+  sale_video: 'var(--nv-content-11)',
   instagram_post: 'var(--nv-content-7)',
   instagram_reel: 'var(--nv-content-8)',
   instagram_story: 'var(--nv-content-9)',
@@ -347,4 +347,12 @@ export function herFocusOf(stock: ContentStock): HerFocus {
     category: first.category,
     bonus: rest.slice(0, 2),
   };
+}
+
+/** Under her ring: what she holds, against the minimum asked when one is asked. */
+export function ringSub(category: StockCategory): string {
+  // A bonus asks nothing of her: no « sur », only what she has.
+  if (category.mode !== 'count' || category.target === null)
+    return `${unitsOf(category.category, category.stockUnits)} en stock`;
+  return `${String(category.stockUnits)} sur ${String(category.target)} ${category.stockUnits > 1 ? 'prêts' : 'prêt'}`;
 }

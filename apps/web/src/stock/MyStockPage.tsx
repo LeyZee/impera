@@ -3,7 +3,7 @@ import { useState, type JSX } from 'react';
 
 import { StockCategoryView, type StockOpened } from './StockCategoryView';
 import { useStock, type StockDoor } from './api';
-import { HER_CATEGORIES, STOCK_COLOURS, STOCK_NAMES, fillOf, herFocusOf, unitsOf } from './model';
+import { HER_CATEGORIES, STOCK_COLOURS, STOCK_NAMES, fillOf, herFocusOf, ringSub, unitsOf } from './model';
 
 import { useNow } from '@/scheduling/useNow';
 import { Ring } from '@/shell/figures/figures';
@@ -140,12 +140,6 @@ function ringValue(category: StockCategory): string {
   if (category.mode !== 'days') return String(category.stockUnits);
   const days = Math.floor(category.daysAhead ?? 0);
   return days >= 14 ? '14+' : `${String(days)} j`;
-}
-
-function ringSub(category: StockCategory): string {
-  return category.mode === 'days'
-    ? `${unitsOf(category.category, category.stockUnits)} en stock`
-    : `${String(category.stockUnits)} sur ${String(category.target ?? 0)} prêts`;
 }
 
 function bonusLine(category: StockCategory): string {

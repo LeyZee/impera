@@ -1,8 +1,9 @@
-import { railKindOf, type Me } from '@impera/contracts';
+import type { Me } from '@impera/contracts';
 import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { french, Guide, withKeys } from './Guide';
+import { AUDIENCE_COLOUR, audienceOf } from './beside';
 import { HELP, type HelpAudience } from './guides';
 
 import { playsTheGame } from '@/rewards/api';
@@ -11,17 +12,6 @@ import { NavIcon, type NavIconName } from '@/shell/NavIcon';
 import { Page, PageHeader } from '@/shell/layout';
 
 import './help.css';
-
-/**
- * The person's colour, the only one of the page (choix de Charles du 21/11) : or pour le propriétaire, bleu pour le
- * manager, violet pour le chatteur, rose pour la modèle, taken from the content hues so both themes hold.
- */
-export const AUDIENCE_COLOUR: Readonly<Record<HelpAudience, string>> = {
-  owner: 'var(--nv-content-6)',
-  manager: 'var(--nv-content-1)',
-  chatter: 'var(--nv-content-5)',
-  creator: 'var(--nv-content-2)',
-};
 
 /** The pages of help that already exist, each for whom it serves. */
 const PAGES: readonly {
@@ -156,7 +146,6 @@ export function HelpContent({ audience }: { audience: HelpAudience }): JSX.Eleme
 
 /** Moi › Aide: a chatter's, a manager's or a creator's guide, under Moi's tabs. */
 export function HelpPage({ user }: { user: Me }): JSX.Element {
-  const kind = railKindOf(user);
   return (
     <Page width="narrow">
       <PageHeader
@@ -171,7 +160,7 @@ export function HelpPage({ user }: { user: Me }): JSX.Element {
           />
         }
       />
-      <HelpContent audience={kind === 'creator' || kind === 'manager' ? kind : 'chatter'} />
+      <HelpContent audience={audienceOf(user)} />
     </Page>
   );
 }
