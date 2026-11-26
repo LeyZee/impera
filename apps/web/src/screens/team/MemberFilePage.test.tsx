@@ -180,8 +180,9 @@ describe('Équipe › Membres › Dossier', () => {
       [BENIN_DRAFT.name, 'true'],
       [BENIN_REGIME.name, 'false'],
     ]);
-    expect(within(dialog()).getByText(/^Pas encore validé par le comptable/u).className).toBe(
-      'tm-hint cf-amber',
+    // A note, never a gate (Charles, 21/11/2026): said plainly, never in amber.
+    expect(within(dialog()).getByText('Validation du comptable non notée, facultative.').className).toBe(
+      'tm-hint',
     );
     fireEvent.click(within(choices).getByRole('radio', { name: BENIN_REGIME.name }));
     expect(within(choices).getByRole('radio', { name: BENIN_REGIME.name }).getAttribute('aria-checked')).toBe(
