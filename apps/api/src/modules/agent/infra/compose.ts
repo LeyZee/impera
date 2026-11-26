@@ -112,6 +112,7 @@ import {
   type SexualizationLimits,
 } from '../domain/sexualization';
 import { describeSituation, isNight, type Situation } from '../domain/situation';
+import type { SpenderRegister } from '../domain/spender-register';
 import {
   explicitPhotoAnswer,
   fanStanding,
@@ -227,6 +228,11 @@ export interface ComposeTurnInput {
    * cannot decide and she offers nothing: a brain's « offer » is written as a plain answer.
    */
   readonly offer?: OfferInput;
+  /**
+   * How close she is with him, chosen by code from his tier (ADR 0132 § 7, `spenderRegisterOf`); absent, warm as with
+   * everyone. The brain never reads his tier.
+   */
+  readonly spenderRegister?: SpenderRegister;
   /**
    * When she may go sexual (`sexualizationDecision`): her limits, and whether his age is confirmed. Absent, it is
    * as if his age were unknown: she does not open it, and steers back a fan who does.
@@ -579,6 +585,16 @@ const REGISTER_HINTS: Readonly<Record<Register, string>> = {
   suggestive: 'jamais crue hors de l’action : un peu chaude, joueuse, frivole, suggestive',
   crude:
     'l’action est engagée : elle peut être franche et crue, en montant d’un cran à la fois, avec les seuls mots de sa fiche et de ses exemples de sexto',
+};
+/**
+ * Closer with those who count (ADR 0132 § 7, Charles 26/11): words of conduct only, never a price, a pace or a
+ * permission; the guards still hold (no « je t'aime », no couple, no reproach on an absence).
+ */
+const SPENDER_REGISTER_HINTS: Readonly<Record<Exclude<SpenderRegister, 'warm'>, string>> = {
+  close:
+    'il compte pour elle : elle se souvient de ce qu’il lui a raconté et y revient quand le moment s’y prête, prend de ses nouvelles, peut lui dire qu’il lui a manqué ; jamais un reproche sur une absence, jamais pressante',
+  girlfriend:
+    'avec lui elle est comme une petite amie complice : tendre, attentionnée, plus intime et plus présente qu’avec les autres ; elle lui montre qu’il compte, qu’elle pense à lui, se souvient de sa vie et prend de ses nouvelles ; le « nous » est celui de leur conversation, jamais celui d’un couple ; jamais pressante, jamais un reproche sur une absence, jamais « je t’aime »',
 };
 const HEATED_INTENTS: readonly string[] = ['flirt', 'sexting', 'media_reaction'];
 /** He asks whether she is an AI (Charles 21/11): she laughs it off; `ai_disclosure` still blocks any avowal. */
@@ -1546,6 +1562,9 @@ export async function composeTurn(
                 ...(inTension ? [IN_TENSION_HINT] : []),
                 ...(opensItHerself ? [ONE_NOTCH_HINT] : []),
                 ...(register === null ? [] : [REGISTER_HINTS[register]]),
+                ...(care || input.spenderRegister === undefined || input.spenderRegister === 'warm'
+                  ? []
+                  : [SPENDER_REGISTER_HINTS[input.spenderRegister]]),
                 ...(waitingStep === undefined ? [] : [PAYMENT_HELP_HINT]),
                 ...(complaint ? [PURCHASE_COMPLAINT_HINT] : []),
                 ...(refusal === null ? [] : [REFUSAL_HINTS[refusal]]),

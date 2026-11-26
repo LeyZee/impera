@@ -114,7 +114,7 @@ export function createFollowUpJob({ uow, clock, fans, composer, followUps, reply
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
+        stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
       };
     });
     if (read === null || composer === undefined) return;

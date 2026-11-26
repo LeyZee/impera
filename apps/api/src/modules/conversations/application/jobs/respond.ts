@@ -430,7 +430,7 @@ export function createRespondJob({ uow, clock, voice, fans, composer, replyHours
       return {
         conversation,
         history: await tx.messages.history(conversation.id, HISTORY_LIMIT),
-        stats: await tx.messages.fanStats(conversation.fanId),
+        stats: await tx.messages.fanStats(conversation.fanId, clock.now()),
         sales: await tx.events.salesState(conversation.id),
         scriptRun,
         scriptAbandon: await scriptAbandonOf(tx, conversation.id, scriptRun),

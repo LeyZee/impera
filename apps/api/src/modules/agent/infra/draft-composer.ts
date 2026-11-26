@@ -7,6 +7,7 @@ import type {
   CopilotTrace,
   DraftTranslation,
   FanFlags,
+  FanTier,
   HandoffCause,
   Language,
   MediaDescription,
@@ -62,6 +63,7 @@ import { NO_SALE_TROUBLE, type SaleTroubleKind, type SaleTroubleSeen } from '../
 import type { PlatformScriptView, ScriptHistoryView, ScriptRun } from '../domain/script-run';
 import type { ScriptJournalEvent, ScriptTurn } from '../domain/script-turn';
 import type { SexualizationLimits } from '../domain/sexualization';
+import { spenderRegisterOf } from '../domain/spender-register';
 import { handoffCauseOf } from '../domain/traps';
 
 import {
@@ -130,6 +132,10 @@ export interface AgentComposeInput {
     readonly brainNotes?: readonly string[];
     readonly spentMinor: number;
     readonly firstMessageAt: Date | null;
+    /** His tier from her sales register (`fanTierOf`); absent or `null`, she is warm as with everyone (ADR 0132). */
+    readonly tier?: FanTier | null;
+    /** His last purchase in her sales register (ADR 0128 § 1); absent, not read. */
+    readonly lastPurchaseAt?: Date | null;
   };
   /** His desire score as stored on the conversation (P3-12), and when it was counted; absent, he starts at 0. */
   readonly desire?: { readonly score: number; readonly at: Date };
@@ -674,6 +680,13 @@ function ageInDoubt(input: AgentComposeInput, lastFanAt: Date | undefined): Agen
   return { ...held, desire: { before, score, signals, weightsVersion } };
 }
 
+/** The later of two dates, either unknown (`undefined`) or never (`null`). */
+function latestKnown(a: Date | null | undefined, b: Date | null | undefined): Date | null | undefined {
+  if (a === undefined) return b;
+  if (b === undefined || b === null) return a;
+  return a === null || b > a ? b : a;
+}
+
 /** His last purchase, or `undefined` when it cannot be read: the pause is then not applied (ADR 0128 § 1). */
 async function lastPurchaseOf(
   deps: DraftComposerDeps,
@@ -697,7 +710,7 @@ async function offerInput(
     return undefined;
   try {
     const lastOfferAt = await deps.lastOfferAt(input.creatorId, input.fanId);
-    const lastPurchaseAt = await lastPurchaseOf(deps, input);
+    const lastPurchaseAt = latestKnown(await lastPurchaseOf(deps, input), input.fan.lastPurchaseAt);
     return {
       now: input.now,
       lastOfferAt,
@@ -1238,6 +1251,11 @@ export function createDraftComposer(deps: DraftComposerDeps): AgentDraftComposer
         ...(input.fan.brainNotes !== undefined &&
           input.fan.brainNotes.length > 0 && { brainNotes: input.fan.brainNotes.join('\n') }),
         ...(offer !== undefined && { offer }),
+        spenderRegister: spenderRegisterOf(input.fan.tier, {
+          fragile: stop.flags?.fragile === true,
+          care: careForced,
+          moneyTrouble: stop.flags?.salesFrozen?.reason === 'money_trouble',
+        }),
         ...(withHer.sexualizationLimits !== undefined && {
           sexualization: {
             limits: withHer.sexualizationLimits,

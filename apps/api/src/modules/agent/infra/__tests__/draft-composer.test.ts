@@ -427,6 +427,25 @@ describe('createDraftComposer', () => {
     );
   });
 
+  it('is closer with those who count: girlfriend with a whale, close with a very good payer (ADR 0132, Charles 26/11)', async () => {
+    const hintsFor = async (tier: 'whale' | 'very_good' | 'good' | null) => {
+      const run = composer({ brief: BRIEF });
+      await run.draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, spentMinor: 2_000, tier } });
+      return run.seen.voiceInputs?.[0]?.brief.toneHints ?? [];
+    };
+    const whale = await hintsFor('whale');
+    expect(whale.some((hint) => hint.includes('petite amie complice'))).toBe(true);
+    const veryGood = await hintsFor('very_good');
+    expect(veryGood.some((hint) => hint.includes('il compte pour elle'))).toBe(true);
+    expect(veryGood.some((hint) => hint.includes('petite amie'))).toBe(false);
+    for (const tier of ['good', null] as const) {
+      const hints = await hintsFor(tier);
+      expect(hints.some((hint) => hint.includes('petite amie') || hint.includes('il compte pour elle'))).toBe(
+        false,
+      );
+    }
+  });
+
   it('answers by rule his asking if she is an AI, his love, his partner, his proof and his photo (Charles 21/11)', async () => {
     const hintsFor = async (brief: Brief, input: AgentComposeInput = INPUT) => {
       const { draftComposer, seen } = composer({ brief });

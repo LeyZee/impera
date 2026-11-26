@@ -1,6 +1,7 @@
 import type {
   Actor,
   FanStanding,
+  FanTier,
   FanTiersSetting,
   AfterSaleType,
   AlertTrigger,
@@ -216,7 +217,8 @@ interface MessageRepository {
   /** The conversation's last `limit` messages, oldest first: what the engine reads. */
   history(conversationId: ConversationId, limit: number): Promise<readonly HistoryMessage[]>;
   /** What the fan bought and since when he writes, across the creator's conversations. */
-  fanStats(fanId: FanId): Promise<FanStats>;
+  /** His spend and first message; his tier and last purchase from her sales register (ADR 0132, 0128) at `now`. */
+  fanStats(fanId: FanId, now: Date): Promise<FanStats>;
 }
 
 /** The voice prompt version and the model that wrote a draft: what the live rate is read by (ADR 0019). */
@@ -649,6 +651,10 @@ interface FanStats {
   /** Paid messages (PPV bought), in minor units. */
   readonly spentMinor: number;
   readonly firstMessageAt: Date | null;
+  /** His tier from her sales register and her thresholds (`fanTierOf`); absent when it cannot be read. */
+  readonly tier?: FanTier | null;
+  /** His last purchase in her sales register (ADR 0128 § 1); `null` never; absent, not read. */
+  readonly lastPurchaseAt?: Date | null;
 }
 
 interface FanContext extends FanStats {
