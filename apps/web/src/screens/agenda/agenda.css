@@ -1571,16 +1571,27 @@
   box-shadow: inset 0 0 0 1px var(--nv-hairline);
   pointer-events: none;
 }
+/* Lighter than a task, never read as a warning: a tint, fine hatches, a soft outline (Design, 26/11). */
 .ag-wk__dispo[data-opens-to='cam'] {
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ag-c) 16%, transparent) 0 6px,
-    transparent 6px 12px
-  );
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 45%, transparent);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--ag-c) 22%, transparent) 6px 7px
+    ),
+    color-mix(in srgb, var(--ag-c) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ag-c) 40%, transparent);
 }
 .ag-wk__dispo[data-opens-to='cam'] span {
+  display: grid;
   color: var(--nv-ink);
+}
+.ag-wk__dispo[data-opens-to='cam'] b {
+  font-weight: 600;
+}
+.ag-wk__dispo[data-opens-to='cam'] small {
+  font-size: inherit;
+  color: var(--nv-ink-muted);
 }
 .ag-wk__dispo span {
   position: absolute;

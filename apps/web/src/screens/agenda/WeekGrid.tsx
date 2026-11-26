@@ -371,7 +371,17 @@ export function WeekGrid({
                     height: height(window.start, Math.min(window.end, hours.last * 60)),
                   }}
                 >
-                  <span>{window.opensTo === 'cam' ? '📹 Cam' : 'Dispo'}</span>
+                  {window.opensTo === 'cam' ? (
+                    // An opening, not a cam booked: her words and its hours, as the tasks beside it (Design, 26/11).
+                    <span>
+                      <b>Dispo cam</b>
+                      <small className="nv-num">
+                        {clockOf(window.start)} – {clockOf(window.end % 1440)}
+                      </small>
+                    </span>
+                  ) : (
+                    <span>Dispo</span>
+                  )}
                 </div>
               ))}
               <Column
