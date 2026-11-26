@@ -319,6 +319,39 @@ describe('the scripts in preparation', () => {
     });
   });
 
+  it('never lets a paid step sell a media offered once (ADR 0145 § 2)', async () => {
+    const id = newId(PreparedScriptIdSchema);
+    expect(
+      (await call('owner', 'POST', base(nora), { id, platformAccountId: noraAccount, content: CONTENT }))
+        .statusCode,
+    ).toBe(201);
+    const offered = (ref: string, at: Date | null) =>
+      test.admin.db
+        .update(schema.mediaPlatformRefs)
+        .set({ sentForFreeAt: at })
+        .where(
+          and(
+            eq(schema.mediaPlatformRefs.platformAccountId, noraAccount),
+            eq(schema.mediaPlatformRefs.platformMediaId, ref),
+          ),
+        );
+    const gaps = async () =>
+      PreparedScriptViewSchema.parse((await call('manager', 'GET', `${base(nora)}/${id}`)).json()).gaps.map(
+        (gap) => [gap.code, gap.step],
+      );
+    // The offered step's media, sent for free: nothing sold, nothing said.
+    await offered('media_01', new Date());
+    expect(await gaps()).toEqual([]);
+    // The paid step's: never sold again, « prêt à copier » refused.
+    await offered('media_02', new Date());
+    expect(await gaps()).toEqual([['media_offered', 1]]);
+    const refused = await call('owner', 'POST', `${base(nora)}/${id}/ready`, { basedOnRevision: 1 });
+    expect(refused.statusCode).toBe(422);
+    await offered('media_01', null);
+    await offered('media_02', null);
+    expect(await gaps()).toEqual([]);
+  });
+
   it('closes a script an import recognised: no save, no state changed', async () => {
     const id = newId(PreparedScriptIdSchema);
     await call('owner', 'POST', base(nora), { id, platformAccountId: noraAccount, content: CONTENT });

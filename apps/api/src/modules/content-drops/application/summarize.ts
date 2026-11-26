@@ -37,11 +37,12 @@ const withMedium = (
  */
 export async function summarizeScript(
   deps: SummarizeDeps,
+  creatorId: string,
   dropId: string,
   now: Date,
   correlationId: string,
 ): Promise<SummarizeOutcome> {
-  const target = await deps.store.target(dropId);
+  const target = await deps.store.target(creatorId, dropId);
   if (target === null) return 'gone';
   if (!target.files.every(withMedium)) return 'waiting';
   const files = target.files.filter(withMedium);
@@ -49,7 +50,7 @@ export async function summarizeScript(
   const descriptions = await deps.describer.detailed(seen);
   if (seen.some((id) => !descriptions.has(id))) return 'waiting';
   const mediaHash = mediaHashOf(files, descriptions);
-  if (await deps.store.summarized(dropId, mediaHash, deps.summarizer.promptHash)) return 'already';
+  if (await deps.store.summarized(creatorId, dropId, mediaHash, deps.summarizer.promptHash)) return 'already';
 
   const version = await deps.versions.frozen(target.versionId);
   if (version === null) return 'gone';

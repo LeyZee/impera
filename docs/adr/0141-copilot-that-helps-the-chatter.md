@@ -1,6 +1,6 @@
 # 0141. Un copilote qui aide vraiment le chatteur : quoi faire, pourquoi, où en est la vente, et des accroches à la demande
 
-Statut : accepted (« ok 0141 » de Charles, 16/11/2026 à 15 h 54 ; choix « Gratuit + accroches » sur carte à 15 h 44 ; relu par Agent, Sécurité et Design le 16/11) ; amendé le 21/11/2026 (§ 7 : réécrire avec une consigne, choix de Charles sur carte à 15 h 49)
+Statut : accepted (« ok 0141 » de Charles, 16/11/2026 à 15 h 54 ; choix « Gratuit + accroches » sur carte à 15 h 44 ; relu par Agent, Sécurité et Design le 16/11) ; amendé le 21/11/2026 (§ 7 : réécrire avec une consigne, choix de Charles sur carte à 15 h 49) ; § 14 amendé par l'ADR 0086 le 21/11/2026 (la vente devient un onglet, choix « C, onglets » de Charles sur carte)
 Date : 2026-11-16
 Précise : ADR 0086 § 3 (ce que montre le panneau) et § 10 (un copilote qui fait gagner du temps) ; l'ordre du panneau est amendé dans l'ADR 0086 (amendement du 16/11/2026, brouillon au-dessus de la fiche). S'appuie sur ADR 0021 (rester en personnage), 0025 (accès pendant le shift), 0063 (la créatrice ne voit pas la fiche), 0098 (le cerveau choisit parmi ce que le code permet), 0112 (scripts à branches). Ne remplace aucun ADR.
 

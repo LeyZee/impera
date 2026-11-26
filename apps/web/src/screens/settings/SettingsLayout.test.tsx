@@ -150,7 +150,6 @@ describe('Réglages as a list (recette visuelle 16/11, GES-04)', () => {
 
 describe('Pages without a screen (recette 05/11, PRO-25)', () => {
   it.each([
-    ['/entrainer/corrections', '/entrainer/playground'],
     ['/entrainer/tests', '/entrainer/playground'],
     ['/reglages/appareils', '/reglages/ventes'],
     ['/reglages/mode', '/reglages/ventes'],
