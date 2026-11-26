@@ -167,6 +167,17 @@ describe.each<Theme>(['dark', 'light'])('%s theme', (theme) => {
     }
   });
 
+  it.each([1, 2, 5, 6])(
+    'a guide in content-%i: its icon reads on its tinted tile, and void on the full tile (nv-guide)',
+    (index) => {
+      const [r, g, b] = token(theme, `content-${String(index)}`);
+      for (const bottom of [ground.void, ground.surfaceRaised]) {
+        expect(contrast([r, g, b, 1], over(bottom, [r, g, b, 0.16]))).toBeGreaterThanOrEqual(AA_NON_TEXT);
+        expect(contrast(token(theme, 'void'), [r, g, b, 1])).toBeGreaterThanOrEqual(AA_NON_TEXT);
+      }
+    },
+  );
+
   it('the thirteen categories of content are thirteen different colours', () => {
     const all = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((index) =>
       token(theme, `content-${String(index)}`),

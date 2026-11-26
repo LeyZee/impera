@@ -225,6 +225,7 @@ const SCREENS = {
   '/moi/factures': 'Factures',
   '/moi/calendrier': 'Calendrier',
   '/moi/securite': 'Sécurité',
+  '/moi/aide': 'Aide',
   '/moi/preferences': 'Préférences',
   '/reglages/modeles-ia': 'Modèles IA',
   '/reglages/ventes': 'Plateformes',
@@ -235,6 +236,7 @@ const SCREENS = {
   '/reglages/facturation': 'Facturation',
   '/reglages/sauvegardes': 'Sauvegardes',
   '/reglages/securite': 'Sécurité',
+  '/reglages/aide': 'Aide',
 } as const;
 export type ScreenPath = keyof typeof SCREENS;
 

@@ -167,8 +167,16 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect((await get(bea, owner)).json<PersonaOverview>().versions).toHaveLength(0);
   });
 
-  it('lets a chatter read the persona of her creators only, and never change it', async () => {
-    expect((await get(anna, operator)).statusCode).toBe(200);
+  it('gives a chatter the short sheet of her creators only, never the whole persona, and never lets her change it', async () => {
+    expect((await get(anna, operator)).statusCode).toBe(403);
+    const short = (creatorId: string) =>
+      server.inject({
+        method: 'GET',
+        url: `/v1/creators/${creatorId}/persona/chatter`,
+        headers: { cookie: operator },
+      });
+    expect((await short(anna)).statusCode).toBe(200);
+    expect((await short(bea)).statusCode).toBe(403);
     expect((await get(bea, operator)).statusCode).toBe(403);
     expect(
       (await post(anna, operator, { persona: withVersion(demo(), '0.3.0'), basedOn: null })).statusCode,
@@ -393,7 +401,7 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     );
   });
 
-  it('lets only the owner read her objection replies, a chatter reads her versions without them (ADR 0090 § B)', async () => {
+  it('lets only the owner read her objection replies, a chatter never reads her versions (ADR 0090 § B, ADR 0153)', async () => {
     const banked = PersonaV2Schema.parse(
       parse(
         readFileSync(
@@ -411,8 +419,8 @@ describe('persona versions (GET /v1/creators/:id/persona, POST …/persona/versi
     expect(Object.keys(bank)).not.toHaveLength(0);
     const asOwner = (await get(anna, owner)).json<PersonaOverview>().latest;
     expect(asOwner?.draft.agent.objection_replies).toEqual(bank);
-    const asChatter = (await get(anna, operator)).json<PersonaOverview>().latest;
-    expect(asChatter?.draft.agent.objection_replies).toEqual({});
-    expect(JSON.stringify(asChatter)).not.toContain('Réplique de test');
+    const asChatter = await get(anna, operator);
+    expect(asChatter.statusCode).toBe(403);
+    expect(asChatter.body).not.toContain('Réplique de test');
   });
 });

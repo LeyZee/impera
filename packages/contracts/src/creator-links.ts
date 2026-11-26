@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { LINK_PLACEMENTS, LinkPlacementSchema, LinkRefSchema, type LinkPlacement } from './link-stats';
+import {
+  LINK_PLACEMENTS,
+  LinkHourTotalSchema,
+  LinkPlacementSchema,
+  LinkRefSchema,
+  type LinkPlacement,
+} from './link-stats';
 import {
   RedirectLinkIdSchema,
   RedirectLinkSchema,
@@ -138,3 +144,23 @@ export type LinkProposal = z.infer<typeof LinkProposalSchema>;
 /** What « Détecter ses liens » answers: the proposals, to be confirmed one by one. Nothing was written. */
 export const LinkProposalsResponseSchema = z.strictObject({ proposals: z.array(LinkProposalSchema) });
 export type LinkProposalsResponse = z.infer<typeof LinkProposalsResponseSchema>;
+
+/** How far back Trafic reads her links hour by hour: today against yesterday (INS-02 lot e3). */
+export const LINK_HOURS_SHOWN = 48;
+
+/** One hour of one of her links as the agency reads it: robots already removed, their number beside. */
+export const AgencyLinkHourSchema = LinkHourTotalSchema.extend({
+  linkId: RedirectLinkIdSchema,
+  /** The hour is over and its figures will not move. */
+  closed: z.boolean(),
+});
+export type AgencyLinkHour = z.infer<typeof AgencyLinkHourSchema>;
+
+/**
+ * `GET /v1/creators/:creatorId/redirect-links/hours`: the last `LINK_HOURS_SHOWN` hours of each of her links that the
+ * service counts, oldest first; an hour the service has not counted yet is absent, never a zero made up.
+ */
+export const AgencyLinkHoursResponseSchema = z.strictObject({
+  hours: z.array(AgencyLinkHourSchema).max(LINK_HOURS_SHOWN * 50),
+});
+export type AgencyLinkHoursResponse = z.infer<typeof AgencyLinkHoursResponseSchema>;

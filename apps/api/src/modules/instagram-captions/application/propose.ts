@@ -34,7 +34,7 @@ function kept(
 }
 
 /** Three captions for one Reel, with one rewrite when the guards left fewer; `budget`, or fewer than a choice needs. */
-async function captionsFor(
+export async function captionsFor(
   deps: Pick<ProposeDeps, 'writer'>,
   persona: CaptionPersona,
   request: CaptionRequest,

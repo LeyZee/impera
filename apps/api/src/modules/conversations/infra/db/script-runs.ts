@@ -5,7 +5,16 @@ import {
   ScriptRunStepsSchema,
   type ScriptRunStep,
 } from '@impera/contracts';
-import { and, eq, schema, sql, type Transaction as DbTransaction } from '@impera/db';
+import {
+  and,
+  eq,
+  onCreatorList,
+  schema,
+  sql,
+  withTenantMember,
+  type Database,
+  type Transaction as DbTransaction,
+} from '@impera/db';
 
 import type { ScriptRunState, StoredScriptRun, Transaction } from '../../domain/ports';
 
@@ -99,4 +108,38 @@ export function bindScriptRuns(tx: DbTransaction, creatorId: string): Transactio
       return updated.length === 1;
     },
   };
+}
+
+/** A run as the measure of a script reads it (ADR 0129, sous-lot 4c): which script, when, and its steps. */
+export interface MeasuredScriptRun {
+  readonly scriptRef: string;
+  readonly startedAt: Date;
+  readonly steps: readonly ScriptRunStep[];
+}
+
+/**
+ * Her runs started from `since`, as a person of the agency reads them (ADR 0129 § 17): the owner, or an active manager
+ * of her list, in his transaction and under her RLS; the oldest first. `null` for anyone else. Read only: what the
+ * performance of her scripts counts, handed to the scripts module by the composition root.
+ */
+export function scriptRunsForTeam(
+  db: Database,
+  creatorId: string,
+  userId: string,
+  since: Date,
+): Promise<readonly MeasuredScriptRun[] | null> {
+  return withTenantMember(db, creatorId, userId, async (tx, scope) => {
+    if (scope !== 'owner' && scope !== 'agency') return null;
+    if (scope === 'agency' && !(await onCreatorList(tx, userId, creatorId))) return null;
+    const rows = await tx
+      .select({ scriptRef: scriptRuns.scriptRef, startedAt: scriptRuns.startedAt, steps: scriptRuns.steps })
+      .from(scriptRuns)
+      .where(and(eq(scriptRuns.creatorId, creatorId), sql`${scriptRuns.startedAt} >= ${since}`))
+      .orderBy(scriptRuns.startedAt, scriptRuns.id);
+    return rows.map((row) => ({
+      scriptRef: row.scriptRef,
+      startedAt: row.startedAt,
+      steps: ScriptRunStepsSchema.parse(row.steps),
+    }));
+  });
 }
