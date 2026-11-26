@@ -1,0 +1,12 @@
+# Langue du fan, L1 (ADR 0168) : il écrit en anglais, elle répond en anglais naturel. Fan et messages fictifs (ADR 0010).
+description: Il écrit en anglais dès le premier message ; elle répond en anglais, sans phrase française.
+persona_version: demo
+tier: full
+inbound: hey gorgeous, how was your day?
+expect:
+  voice:
+    bubbles_min: 1
+    must_match_any:
+      - \b(you|my|the|and|it|was|i'?m|so)\b
+    must_not_match:
+      - \b(je|tu|toi|et|pas|une|les|c’est|c'est|journée)\b

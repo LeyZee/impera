@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { PlatformSchema } from './enums';
+import { DraftTranslationSchema } from './fan-language';
 import { ConversationIdSchema, CreatorIdSchema, DraftIdSchema, FanIdSchema } from './ids';
 import { RejectReasonSchema } from './playground';
 import { FanStandingSchema } from './to-talk';
@@ -61,6 +62,11 @@ export const CopilotDraftSchema = z.strictObject({
   createdAt: z.iso.datetime(),
   /** When a chatter put it in the platform's field (`a` or `e`), null before: it stays pending until reconciled. */
   placedAt: z.iso.datetime().nullable(),
+  /**
+   * Its French for the chatter when she writes to him in another language (ADR 0168 § 9); `null` in French, or when
+   * the voice gave none that fits. Shown, never sent.
+   */
+  translation: DraftTranslationSchema.nullable().default(null),
 });
 
 /**

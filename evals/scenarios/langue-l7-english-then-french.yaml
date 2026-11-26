@@ -1,0 +1,26 @@
+# Langue du fan, L7 (ADR 0168) : trois tours en anglais, puis il écrit en français ; elle passe au français. Fan et
+# messages fictifs (ADR 0010).
+description: Après trois tours en anglais, il passe au français ; elle le suit en français.
+persona_version: demo
+tier: full
+history:
+  - from: fan
+    text: hey there, you look amazing
+  - from: creator
+    text: Aww thank you, that's so sweet of you
+  - from: fan
+    text: where are you from?
+  - from: creator
+    text: South of France, and you?
+  - from: fan
+    text: i live near the sea too, i love it
+  - from: creator
+    text: Lucky you, the sea is my happy place
+inbound: en fait je suis français aussi, je préfère qu’on parle français
+expect:
+  voice:
+    bubbles_min: 1
+    must_match_any:
+      - \b(je|tu|toi|et|c’est|c'est|aussi|trop)\b
+    must_not_match:
+      - \b(you|the|and|that's|too)\b
