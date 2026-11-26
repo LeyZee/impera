@@ -6,11 +6,15 @@ import {
   PlatformScriptIdSchema,
   PlatformScriptListSchema,
   PlatformScriptViewSchema,
+  ScriptPerformanceListSchema,
+  ScriptPerformanceQuerySchema,
   SetScriptBranchesBodySchema,
   ValidatePlatformScriptDescriptionsBodySchema,
   type CreatorId,
   type PlatformScriptViewDto,
   type ScriptErrorCode,
+  type ScriptPerformanceDays,
+  type ScriptPerformanceList,
   type UserRole,
 } from '@impera/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
@@ -147,6 +151,11 @@ export function createPlatformScriptRoutes(
   reviews: ScriptIdentityReviewStore,
   branches: ScriptBranchStore,
   requireRole: RequireRole,
+  performance: (
+    creatorId: CreatorId,
+    reader: PlatformScriptsReader,
+    days: ScriptPerformanceDays,
+  ) => Promise<ScriptPerformanceList | null>,
 ): FastifyPluginAsyncZod {
   const listed = async (creatorId: CreatorId, reader: PlatformScriptsReader) => {
     const scripts = await creatorPlatformScripts({ store: reads }, reader, creatorId);
@@ -199,6 +208,25 @@ export function createPlatformScriptRoutes(
         if (outcome === 'not_found') throw new PlatformScriptNotFound();
         if (outcome === 'stale') throw new ScriptBranchesStale();
         return one(creatorId, scriptId, reader);
+      },
+    );
+
+    // The performance of her active scripts over 7, 30 or 90 days (ADR 0129, sous-lot 4c): read only, the owner and
+    // the active managers of her list, the same 404 for anyone else.
+    app.get(
+      '/creators/:creatorId/platform-scripts/performance',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: CreatorParamsSchema,
+          querystring: ScriptPerformanceQuerySchema,
+          response: { 200: ScriptPerformanceListSchema },
+        },
+      },
+      async (request) => {
+        const list = await performance(request.params.creatorId, readerOf(request.user), request.query.days);
+        if (list === null) throw new PlatformScriptNotFound();
+        return list;
       },
     );
 

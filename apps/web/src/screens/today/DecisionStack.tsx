@@ -1,8 +1,26 @@
-import type { CreatorDecision, DecisionAnswer } from '@impera/contracts';
+import {
+  CAPTION_HINT_LABELS,
+  CAPTION_HINTS,
+  DECISION_WISH_MAX,
+  type CreatorDecision,
+  type CreatorDecisionKind,
+  type DecisionAnswer,
+} from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
-/** What she may ask of other ideas in one touch; her own words come beside them. */
-const HINTS = ['Plus courte', 'Plus drôle', 'Plus coquine', 'Avec une question', 'Parle du décor'] as const;
+interface Hint {
+  /** How the server names it. */
+  readonly key: string;
+  readonly label: string;
+}
+
+/**
+ * What she may ask of other ideas in one touch, by kind of decision; her own words come beside them. A kind without
+ * hints never shows the gesture.
+ */
+const HINTS: Partial<Record<CreatorDecisionKind, readonly Hint[]>> = {
+  caption: CAPTION_HINTS.map((key) => ({ key, label: CAPTION_HINT_LABELS[key] })),
+};
 
 /** Three other answers for a decision, from what she asked for. */
 export type OtherIdeas = (
@@ -128,12 +146,14 @@ function Question({
   const [missed, setMissed] = useState(false);
   const [hints, setHints] = useState<readonly string[]>([]);
   const [wish, setWish] = useState('');
+  const offered = HINTS[decision.kind] ?? [];
+  const wished = hints.length > 0 || wish.trim() !== '';
   const ask = (): void => {
-    if (onOtherIdeas === undefined) return;
+    if (onOtherIdeas === undefined || !wished) return;
     setThinking(true);
     setAsking(false);
     setMissed(false);
-    onOtherIdeas(hints, wish)
+    onOtherIdeas(hints, wish.trim())
       .then((other) => {
         setAnswers(other);
         setLeft((count) => count - 1);
@@ -216,19 +236,19 @@ function Question({
         <div className="sc-ask__wish nv-enter">
           <p className="sc-ask__wish-title">Qu’est-ce que tu voudrais ?</p>
           <div className="sc-ask__hints" role="group" aria-label="Ce que tu voudrais">
-            {HINTS.map((hint) => (
+            {offered.map((hint) => (
               <button
-                key={hint}
+                key={hint.key}
                 type="button"
                 className="nv-chip"
-                aria-pressed={hints.includes(hint)}
+                aria-pressed={hints.includes(hint.key)}
                 onClick={() => {
                   setHints((now) =>
-                    now.includes(hint) ? now.filter((one) => one !== hint) : [...now, hint],
+                    now.includes(hint.key) ? now.filter((one) => one !== hint.key) : [...now, hint.key],
                   );
                 }}
               >
-                {hint}
+                {hint.label}
               </button>
             ))}
           </div>
@@ -237,20 +257,20 @@ function Question({
             <input
               className="nv-field__control"
               value={wish}
-              maxLength={200}
+              maxLength={DECISION_WISH_MAX}
               placeholder="Parle de la soirée de samedi"
               onChange={(event) => {
                 setWish(event.target.value);
               }}
             />
           </label>
-          <button type="button" className="nv-btn nv-btn--soft sc-ask__btn" onClick={ask}>
+          <button type="button" className="nv-btn nv-btn--soft sc-ask__btn" disabled={!wished} onClick={ask}>
             Proposer trois autres
           </button>
         </div>
       ) : null}
       <footer className="sc-ask__foot">
-        {onOtherIdeas !== undefined && left > 0 && !asking && !thinking ? (
+        {onOtherIdeas !== undefined && offered.length > 0 && left > 0 && !asking && !thinking ? (
           <button
             type="button"
             className="nv-btn nv-btn--plain sc-ask__more"

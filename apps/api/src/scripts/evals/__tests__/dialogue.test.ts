@@ -83,6 +83,29 @@ describe('a whole conversation replayed without a keyboard (passes de test du 20
     expect(held.desire).toBe(40);
   });
 
+  it('keeps the reason she gave him about meeting her, and her one tease, only once her answer went out', () => {
+    const left = { heard: [], desire: undefined, availability: undefined, scripts: undefined };
+    const gave = afterTurn(start(), {
+      ...left,
+      bubbles: ['Pas si vite toi'],
+      meetingAnswer: { kind: 'reason', reason: 'too_early' },
+    });
+    expect(gave.meeting).toEqual({ given: ['too_early'], teased: false });
+    const teased = afterTurn(gave, {
+      ...left,
+      bubbles: ['Tu lâches rien hein'],
+      meetingAnswer: { kind: 'tease' },
+    });
+    expect(teased.meeting).toEqual({ given: ['too_early'], teased: true });
+    // Held by a guard or a human: nothing was said to him, nothing is kept.
+    const held = afterTurn(start(), {
+      ...left,
+      bubbles: [],
+      meetingAnswer: { kind: 'reason', reason: 'too_early' },
+    });
+    expect(held.meeting).toBeUndefined();
+  });
+
   it('moves the clock and marks the last paid step bought when Reveal says he bought it, never otherwise', () => {
     const later = beforeTurn(start(), 600, 'buys_step');
     expect(later.now).toEqual(new Date(NOW.getTime() + 600 * 60_000));

@@ -4,7 +4,7 @@ Quand une vidéo qu'elle a déposée comme **Reel Insta** vient d'être décrite
 
 **Peut dépendre de.** Aucun autre module : la composition (`wiring/instagram-captions.ts`) lui branche les dépôts décrits (`content-drops`), sa persona publique et ses gardes (`agent`), la voix (`LlmGateway.proposeCaptions`) et la porte `asking` de `creator-decisions`.
 
-**État.** Lot b : la proposition. « D'autres idées », la notification et l'écran du propriétaire viennent ensuite (fiche INS-05). Ses anciennes légendes ne sont pas encore lues : les exemples restent vides.
+**État.** Lot b : la proposition, puis « D'autres idées » (`otherIdeas`, appelé par `creator-decisions`) : trois autres légendes pour le même Reel, depuis ses indications (dites au modèle dans les mots de son écran) et sa ligne, mêmes gardes, jamais une légende qu'elle lit déjà. La notification et l'écran du propriétaire viennent ensuite (fiche INS-05). Ses anciennes légendes ne sont pas encore lues : les exemples restent vides.
 
 ## Tâche `instagram_captions.propose`
 

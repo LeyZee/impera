@@ -105,11 +105,14 @@ describe('« À décider », hers (ADR 0164)', () => {
     );
     render(<DecisionStack decisions={[caption]} {...quiet} onOtherIdeas={onOtherIdeas} />);
     fireEvent.click(screen.getByRole('button', { name: 'D’autres idées' }));
+    // Neither a hint nor a word yet: nothing to ask.
+    fireEvent.click(screen.getByRole('button', { name: 'Proposer trois autres' }));
+    expect(onOtherIdeas).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Plus drôle' }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Parle de samedi' } });
     fireEvent.click(screen.getByRole('button', { name: 'Proposer trois autres' }));
     expect(await screen.findByText('Le miroir a dit oui.')).toBeTruthy();
-    expect(onOtherIdeas).toHaveBeenCalledWith(caption, ['Plus drôle'], 'Parle de samedi');
+    expect(onOtherIdeas).toHaveBeenCalledWith(caption, ['funnier'], 'Parle de samedi');
     expect(screen.queryByText('Robe noire ou robe rouge ?')).toBeNull();
   });
 });

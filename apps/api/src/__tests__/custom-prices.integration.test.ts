@@ -31,6 +31,7 @@ function filled(): CustomPriceGrid {
       { id: 'sup_00000001', label: 'Test A', offered: true, percent: 10 },
       { id: 'sup_00000002', label: 'Test B', offered: false, percent: null },
     ],
+    readyVideos: [{ id: 'rv_00000001', label: 'Type A', offered: true, minMinor: 1_000, maxMinor: 2_000 }],
   };
 }
 

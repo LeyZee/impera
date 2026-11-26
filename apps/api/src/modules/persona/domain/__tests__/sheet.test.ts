@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { asPersonaV2, ChatterPersonaSheetSchema, StoredPersonaSchema } from '@impera/contracts';
+import {
+  asPersonaV2,
+  ChatterPersonaSchema,
+  ChatterPersonaSheetSchema,
+  StoredPersonaSchema,
+} from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
@@ -32,6 +37,21 @@ describe('chatterSheetOf (ADR 0153)', () => {
       'limits',
       'intimate',
     ]);
+  });
+
+  it('refuses any key outside its list, at every level: a field forgotten never leaks (Charles, 21/11)', () => {
+    expect(ChatterPersonaSheetSchema.safeParse({ ...sheet, strategies: {} }).success).toBe(false);
+    expect(
+      ChatterPersonaSheetSchema.safeParse({ ...sheet, her: { ...sheet.her, birth_date: '2000-01-01' } })
+        .success,
+    ).toBe(false);
+    expect(
+      ChatterPersonaSchema.safeParse({
+        creatorId: '00000000-0000-4000-8000-000000000000',
+        sheet,
+        versions: [],
+      }).success,
+    ).toBe(false);
   });
 
   it('gives her age on the day, never her birth date', () => {
