@@ -1380,6 +1380,13 @@
       "when": 1795289305453,
       "tag": "0255_llm_purpose_instagram_caption",
       "breakpoints": true
+    },
+    {
+      "idx": 194,
+      "version": "7",
+      "when": 1795705429948,
+      "tag": "0257_creator_decisions_other_ideas",
+      "breakpoints": true
     }
   ]
 }

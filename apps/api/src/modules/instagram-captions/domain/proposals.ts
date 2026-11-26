@@ -1,12 +1,17 @@
 import {
+  CAPTION_HINT_LABELS,
   CAPTION_PROPOSALS,
   CAPTION_STYLE_LABELS,
+  CaptionHintSchema,
   DECISION_OTHER_IDEAS_MAX,
   type CaptionStyle,
+  type DecisionAnswer,
   type NewCreatorDecision,
 } from '@impera/contracts';
+import { z } from 'zod';
 
 import { captionFaults, type CaptionFault } from './caption-guard';
+import { CaptionHintUnknown } from './errors';
 
 /** A caption as the model wrote it: its style and its text. */
 export interface WrittenCaption {
@@ -49,6 +54,34 @@ export function keepCaptions(written: readonly WrittenCaption[]): KeptCaptions {
   return { kept, refusedBy: [...refusedBy] };
 }
 
+/** The rows of a caption card, the words fixed here: each answer is named by its style, which her choices are read back under. */
+export function captionAnswers(captions: readonly WrittenCaption[]): DecisionAnswer[] {
+  return captions.map((caption) => ({
+    key: caption.style,
+    label: CAPTION_STYLE_LABELS[caption.style],
+    text: caption.text,
+    noted: 'C’est noté. Cette légende partira avec ton Reel.',
+  }));
+}
+
+/** The drop a caption decision is about, from how it was named; `null` for another subject. */
+export function dropOfSubject(subject: string): string | null {
+  return subject.startsWith('drop:') ? subject.slice('drop:'.length) : null;
+}
+
+/** The hints she touched, as the model reads them: her screen's words. A hint this module does not know is refused. */
+export function hintWords(hints: readonly string[]): string[] {
+  const known = z.array(CaptionHintSchema).safeParse(hints);
+  if (!known.success) throw new CaptionHintUnknown();
+  return known.data.map((hint) => CAPTION_HINT_LABELS[hint]);
+}
+
+/** What is left of other captions once those she already read are taken out, whatever their case or punctuation. */
+export function unseen(captions: readonly WrittenCaption[], seen: readonly string[]): WrittenCaption[] {
+  const read = new Set(seen.map(folded));
+  return captions.filter((caption) => !read.has(folded(caption.text)));
+}
+
 /** How the decision of a drop's caption is named: asked twice, written once (ADR 0162 § 3). */
 export function captionSubject(dropId: string): string {
   return `drop:${dropId}`;
@@ -70,13 +103,7 @@ export function captionDecision(
     question: 'Quelle légende pour ton Reel ?',
     context: 'Trois idées écrites à partir de ta vidéo. Tu choisis, je m’occupe du reste.',
     layout: 'rows',
-    answers: captions.map((caption) => ({
-      // The answer is named by its style: her choices, style by style, are read back under it.
-      key: caption.style,
-      label: CAPTION_STYLE_LABELS[caption.style],
-      text: caption.text,
-      noted: 'C’est noté. Cette légende partira avec ton Reel.',
-    })),
+    answers: captionAnswers(captions),
     otherIdeasLeft: DECISION_OTHER_IDEAS_MAX,
     expiresAt: expiresAt.toISOString(),
   };

@@ -1,6 +1,7 @@
 import {
   AnsweredDecisionSchema,
   CreatorDecisionsSchema,
+  OtherIdeasSchema,
   type CreatorDecision,
   type CreatorDecisionId,
 } from '@impera/contracts';
@@ -46,4 +47,14 @@ export async function answerDecision(id: CreatorDecisionId, answer: string): Pro
 /** « Plus tard »: aside for a while. */
 export async function putDecisionAside(id: CreatorDecisionId): Promise<void> {
   await post(`/${id}/later`);
+}
+
+/** « D'autres idées »: the decision with its other answers, from the hints she touched and her own words. */
+export async function askOtherIdeas(
+  id: CreatorDecisionId,
+  hints: readonly string[],
+  note: string,
+): Promise<CreatorDecision> {
+  const response = await post(`/${id}/other-ideas`, { hints, note });
+  return OtherIdeasSchema.parse(await response.json()).decision;
 }
