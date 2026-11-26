@@ -16,7 +16,7 @@ export type AiUsageProvider = z.infer<typeof AiUsageProviderSchema>;
 /**
  * What the money went to, the way the screen names it: the four roles of the gateway (ADR 0009), the trend watch
  * apart (ADR 0060 § 7) and the owner's « Essai réel » of a service apart (ADR 0091 § 7), whatever role they used, and
- * the replies to her Instagram comments apart (ADR 0122).
+ * the replies to her Instagram comments apart (ADR 0122), as the captions proposed for her Reels (ADR 0164 § 9).
  */
 export const AiUsageUseSchema = z.enum([
   'voice',
@@ -26,6 +26,7 @@ export const AiUsageUseSchema = z.enum([
   'trend_watch',
   'probe',
   'instagram_comment',
+  'instagram_caption',
 ]);
 export type AiUsageUse = z.infer<typeof AiUsageUseSchema>;
 
@@ -213,7 +214,7 @@ export type AiUsageVoice = z.infer<typeof AiUsageVoiceSchema>;
 
 /**
  * What the money goes to, the way the owner reads his bill: the fans' conversations, the media she drops and the sent
- * scripts described, her Telegram channel, Instagram (comment replies and the trend watch), the playground with the
+ * scripts described, her Telegram channel, Instagram (comment replies, captions and the trend watch), the playground with the
  * quality tests, and the rest (the owner's « Essai réel »).
  */
 export const AiSpendLineSchema = z.enum([

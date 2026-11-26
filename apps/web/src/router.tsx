@@ -101,6 +101,7 @@ import { AlertHistoryPage } from './screens/tracking/history/AlertHistoryPage';
 import { parseTrackingSearch } from './screens/tracking/view';
 import { TrafficPage } from './screens/traffic/TrafficPage';
 import { ChannelPostPage } from './screens/train/ChannelPostPage';
+import { CorrectionsPage } from './screens/train/CorrectionsPage';
 import { PlaygroundPage } from './screens/train/PlaygroundPage';
 import { TrainLayout } from './screens/train/TrainLayout';
 import { StructuresPage } from './scripts/StructuresPage';
@@ -278,7 +279,9 @@ const creators = createRoute({
     }
     const sheets = sheetsFor(context.user);
     const first = sheets[0];
-    if (first !== undefined && !sheets.includes(sheetOf(search))) {
+    // No tab named opens the persona; a member whose sheet opens elsewhere (an active manager) lands there instead.
+    const landsElsewhere = search.onglet === undefined && first !== 'persona';
+    if (first !== undefined && (landsElsewhere || !sheets.includes(sheetOf(search)))) {
       // A word brought by an earlier guard (Structures sends here) goes on with this second step. A sheet asked by name
       // and refused says why, as any page that is not one's (PIL-26); no sheet asked lands on the first one, silently.
       const notice = location.state.notice ?? (search.onglet === undefined ? undefined : NOT_YOURS);
@@ -1045,19 +1048,26 @@ const channelPost = createRoute({
   },
   component: ChannelPostPage,
 });
-/*
- * Corrections and Tests have no screen yet, hence no tab (ADR 0024): their addresses lead to the Playground rather than
- * to an « à venir » page under its header (recette 05/11, PRO-25), and say so on arrival (recette visuelle 16/11,
- * PIL-17). Each comes back with its screen.
- */
+// Corrections (trou béant 12) are the owner's, like her channel's posts (ADR 0092 § 8): a manager finds the Playground.
 const corrections = createRoute({
   getParentRoute: () => train,
   path: '/corrections',
-  beforeLoad: () => {
-    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
-    throw redirect({ to: '/entrainer/playground', replace: true, state: { notice: NOT_BUILT_YET } });
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'owner') {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router redirects by throwing.
+      throw redirect({ to: '/entrainer/playground', replace: true });
+    }
+  },
+  component: function Corrections() {
+    const { user } = rootRoute.useRouteContext();
+    return <CorrectionsPage scoped={useScopedCreator(scopesCreators(user))} />;
   },
 });
+/*
+ * Tests have no screen yet, hence no tab (ADR 0024): its address leads to the Playground rather than to an « à venir »
+ * page under its header (recette 05/11, PRO-25), and says so on arrival (recette visuelle 16/11, PIL-17). It comes back
+ * with its screen.
+ */
 const tests = createRoute({
   getParentRoute: () => train,
   path: '/tests',

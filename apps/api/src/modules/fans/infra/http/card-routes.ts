@@ -3,6 +3,7 @@ import {
   FanCardFieldSchema,
   FanCardViewSchema,
   FanIdSchema,
+  RetractFanCardOtherBodySchema,
   SetFanCardFieldBodySchema,
   type CreatorId,
   type FanCardView,
@@ -114,6 +115,31 @@ export function createCardRoutes(
           creatorId,
           fanId,
           await fans.editCard(creatorId, fanId, field, request.body, author),
+        );
+      },
+    );
+
+    // « Retirer » on a line of « Autres » (trou béant 17): the same readers as a field, the same author line.
+    app.post(
+      '/fans/:id/card/others/retract',
+      {
+        preValidation: requireRole('owner', 'operator'),
+        schema: {
+          params: CardParamsSchema,
+          querystring: CreatorQuerySchema,
+          body: RetractFanCardOtherBodySchema,
+          response: { 200: FanCardViewSchema },
+        },
+      },
+      async (request) => {
+        const { creatorId } = request.query;
+        const fanId = request.params.id;
+        const author = await readerFor(request, creatorId, fanId, access, 'card');
+        return cardView(
+          access,
+          creatorId,
+          fanId,
+          await fans.retractOther(creatorId, fanId, request.body.factId, author),
         );
       },
     );
