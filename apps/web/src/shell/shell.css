@@ -1843,6 +1843,11 @@
   .nv-stage:has(> .nv-install) .nv-page--fill {
     height: calc(100dvh - var(--nv-stage-top) - var(--nv-tabbar-room) - var(--nv-install-room, 0px));
   }
+  /* The card takes its height off the page's too: a page still as tall as the stage pushed its last lines under the
+     tab bar, by the card's height less the room kept for the bar (pages of Moi, 26/11). */
+  .nv-stage:has(> .nv-install) .nv-page:not(.nv-page--fill) {
+    min-height: calc(100% - var(--nv-install-room, 0px));
+  }
 }
 
 /*

@@ -41,3 +41,21 @@ describe('nv-tag--lg', () => {
     expect(dot).toContain('width: 7px;');
   });
 });
+
+describe('nv-note', () => {
+  it('keeps its words in ink and tints its ground with the tone, without a side bar', () => {
+    const rule = /\.nv-note \{([^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(rule).toContain('color: var(--nv-ink);');
+    expect(rule).not.toMatch(/border-(left|inline-start)/u);
+    expect(css).toMatch(
+      /\.nv-note--warn,\s*\.nv-note--danger \{\s*background: color-mix\(in srgb, var\(--_c\) 12%, transparent\);/u,
+    );
+  });
+});
+
+describe('nv-tile', () => {
+  it('sits on its own ground token, visible on a plate in both themes', () => {
+    const rule = /\n\.nv-tile \{([^}]*background[^}]*)\}/u.exec(css)?.[1] ?? '';
+    expect(rule).toContain('background: var(--nv-tile-fill);');
+  });
+});
