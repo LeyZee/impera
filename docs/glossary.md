@@ -556,6 +556,7 @@ Le code (identifiants, tables, événements) est en anglais. Les docs, l'interfa
 | Carte | `nv-plate`, `Panel`, jeton `--nv-plate-pad` | Un bloc de contenu posé sur une plaque, un seul rayon (26) et une seule marge intérieure (20px, 16px au téléphone) ; une carte ne se pose pas dans une carte (docs/design, recette visuelle du 16/11). |
 | Pastille | `nv-status`, `nv-tag`, `nv-chip`, `nv-count`, jetons `--nv-pill-*` | Une capsule de texte court, de trois sortes seulement : d'information (22px), de choix (32px), compteur (18px). |
 | Titre de section | `nv-h2`, `nv-h3` | Le titre d'une section (22/28) ou d'un bloc dans une carte (17/22), en minuscules, jamais en capitales espacées ; le surtitre au-dessus est `nv-eyebrow`. |
+| Aide, guide | `HelpContent`, `HELP`, `HelpGuide`, classe `nv-guide` | Moi › Aide (Réglages › Aide pour le propriétaire) : le guide de la personne, rangé par rôle (propriétaire, manager, chatteur, modèle), d'une seule couleur, la sienne. Un guide est un geste difficile replié : pourquoi, les étapes avec « Tu dois voir », puis « À savoir », « Jamais », « Si ça coince ». Le texte n'écrit que ce qui est à l'écran sur main ; une règle métier vit dans le code qui l'applique. Style validé par Charles le 21/11. |
 
 ## Noms à ne pas utiliser
 
