@@ -2195,6 +2195,7 @@ describe('createDraftComposer, his custom order kept box by box (ADR 0159 § A.2
           : line,
     ),
     supplements: [{ id: SUPPLEMENT, label: 'Supplément de test', offered: true, percent: 20 }],
+    readyVideos: [],
   };
   const adult: FanFlags = { ageConfirmedAt: '2026-10-01T09:00:00.000Z' };
   const asking = (
