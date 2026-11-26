@@ -289,7 +289,7 @@ export function FeedbacksPanel({
           </p>
         ) : (
           <>
-            {/* Three tiles of the system: the colour on the figure alone (Design, 21/11). */}
+            {/* Four tiles of the system: the colour on the figure alone (Design, 21/11). */}
             <div className="nv-tiles rp-fbs__tiles">
               <p className={`nv-tile${incidents > 0 ? ' nv-tone--bad' : ''}`}>
                 <span className="nv-tile__value rp-fbs__value">{incidents}</span>

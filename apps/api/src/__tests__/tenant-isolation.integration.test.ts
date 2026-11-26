@@ -79,6 +79,7 @@ const bodiesFor = (
   'POST /v1/scheduling/shift-reports/:shiftReportId/reject': { version: 1, note: 'Note inventée' },
   'PATCH /v1/scheduling/shifts/:shiftId': { memberId: ids.member },
   'POST /v1/team/members/:memberId/notes': { body: 'Note inventée' },
+  'POST /v1/scheduling/shift-feedback/:shiftFeedbackId/incident': { step: 'seen' },
   'PUT /v1/scheduling/shifts/:shiftId/feedback': {
     id: newId(ShiftFeedbackIdSchema),
     nothingToReport: true,
@@ -155,6 +156,7 @@ type Seeded =
   | 'member'
   | 'shift'
   | 'report'
+  | 'feedback'
   | 'user'
   | 'template';
 
@@ -261,6 +263,7 @@ function seededFor(path: string, name: string): Seeded | undefined {
     memberId: 'member',
     shiftId: 'shift',
     shiftReportId: 'report',
+    shiftFeedbackId: 'feedback',
     userId: 'user',
     templateId: 'template',
   };
@@ -449,6 +452,19 @@ describe('no route lets the people of one creator reach another one (audit des t
       .from(schema.shiftReports)
       .where(eq(schema.shiftReports.id, report));
     if (shift === undefined) throw new Error('B’s shift was not seeded');
+    // A feedback of B's shift with its incident (trous béants n° 1): one of another creator answers as unknown.
+    const feedback = newId(ShiftFeedbackIdSchema);
+    await admin.insert(schema.shiftFeedbacks).values({
+      id: feedback,
+      creatorId: bea,
+      platformAccountId: beas,
+      shiftId: shift.id,
+      memberId: chatterOfB.id,
+      period: PERIOD,
+      nothingToReport: false,
+      incident: 'Incident inventé',
+      createdBy: chatterOfB.userId,
+    });
     const accountOfB = await account('bea-compte@example.test', 'creator', [bea]);
     const template = newId(ShiftTemplateIdSchema);
     await admin.insert(schema.shiftTemplates).values({
@@ -471,6 +487,7 @@ describe('no route lets the people of one creator reach another one (audit des t
       member: chatterOfB.id,
       shift: shift.id,
       report,
+      feedback,
       user: accountOfB.userId,
       template,
     };

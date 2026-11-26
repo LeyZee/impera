@@ -1644,7 +1644,12 @@ a.sc-sheet__report:focus-visible,
 /* A period's feedbacks: three figures first, then the signals by category as one coloured bar. */
 /* Three figures side by side, a phone too: short words under big numbers. */
 .nv-tiles.rp-fbs__tiles {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 560px) {
+  .nv-tiles.rp-fbs__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .rp-fbs__tiles .nv-tile {
   margin: 0;
@@ -1653,7 +1658,7 @@ a.sc-sheet__report:focus-visible,
   font-size: var(--nv-text-title-2);
   line-height: var(--nv-text-title-2-leading);
 }
-.rp-fbs__tiles :is(.nv-tone--bad, .nv-tone--ok) .rp-fbs__value {
+.rp-fbs__tiles :is(.nv-tone--bad, .nv-tone--warn, .nv-tone--ok) .rp-fbs__value {
   color: var(--_c);
 }
 .rp-sigs {
