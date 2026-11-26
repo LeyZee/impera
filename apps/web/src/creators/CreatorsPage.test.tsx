@@ -636,7 +636,7 @@ describe('her persona, in her Moi (CR-02, ADR 0042 § 8)', () => {
       within(moi)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Préférences']);
+    ).toEqual(['Profil', 'Persona', 'Mes liens', 'Trophées', 'Sécurité', 'Aide', 'Préférences']);
     cleanup();
 
     await serve([ANNA]);

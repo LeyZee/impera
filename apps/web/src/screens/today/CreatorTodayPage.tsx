@@ -4,7 +4,13 @@ import { Link } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { DecisionStack } from './DecisionStack';
-import { answerDecision, DECISIONS_KEY, putDecisionAside, useDecisions } from './decisions-api';
+import {
+  answerDecision,
+  askOtherIdeas,
+  DECISIONS_KEY,
+  putDecisionAside,
+  useDecisions,
+} from './decisions-api';
 
 import { useCreatorOnDuty } from '@/scheduling/api';
 import '@/scheduling/scheduling.css';
@@ -96,6 +102,13 @@ function Decisions(): JSX.Element | null {
           await putDecisionAside(decision.id);
         } finally {
           await again();
+        }
+      }}
+      onOtherIdeas={async (decision, hints, wish) => {
+        try {
+          return (await askOtherIdeas(decision.id, hints, wish)).answers;
+        } finally {
+          void again();
         }
       }}
     />

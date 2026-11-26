@@ -526,7 +526,7 @@ async function redoFileIn(
 
 /**
  * The file she sends in place of a medium the team asked again, or of one refused (trou 7 du 21/11), by her own
- * policies (`creator_redo_replace`, `creator_redo_insert`, migration 0258): the old file keeps its row out of every view
+ * policies (`creator_redo_replace`, `creator_redo_insert`, migration 0268): the old file keeps its row out of every view
  * (its medium goes as a withdrawn drop's), the new one takes its place and slot and waits for its bytes. The drop does
  * not move here: its receipt settles it again, and takes « Copié dans Reveal » off a script (`follow`). The same file
  * replayed answers the drop as it is.
@@ -1229,7 +1229,7 @@ export async function follow(
   if (SETTLES_AGAIN.has(state) && !states.includes('awaiting') && !states.includes('received')) {
     const kept = states.some((one) => one === 'kept' || one === 'duplicate');
     // A script copied into Reveal whose replaced medium is settled is to copy again: « Copié dans Reveal » starts over,
-    // which only the server's role may say (`guard_content_drop_export`, migration 0258).
+    // which only the server's role may say (`guard_content_drop_export`, migration 0268).
     const reset =
       drop.exportedAt !== null &&
       drop.category === 'script' &&

@@ -49,4 +49,4 @@ Le rapport du 21/11 : un dépôt raté ne pouvait que disparaître de son écran
 
 ## Notes de session
 
-- 21/11 : migration 0258 (numéro de Bilan, prevId provisoire jusqu'au passage de #996 et #980).
+- 26/11 : migration 0268 (numéro de Bilan), prevId sur 0267 une fois #988 sur main.

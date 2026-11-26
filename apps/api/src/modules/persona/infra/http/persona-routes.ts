@@ -57,6 +57,26 @@ function chatterReaderFor(
   throw new CreatorForbidden();
 }
 
+/**
+ * Her whole sheet, the agency's (Charles, 21/11, Sécurité): the owner and an active manager only, the manager on the
+ * creators of his list. Any other operator reads the short sheet (`…/persona/chatter`), never the whole one.
+ */
+class PersonaFullForbidden extends DomainError {
+  constructor() {
+    super(
+      'persona_full_forbidden',
+      'Réservé au propriétaire et aux managers actifs : ta fiche est la fiche courte',
+    );
+  }
+}
+
+/** The owner, or an active manager (scope `agency`, ADR 0024) whose list holds her: who reads her whole sheet. */
+function fullReaderFor(request: FastifyRequest, creatorId: CreatorId): CurrentUser {
+  const user = actorFor(request, creatorId);
+  if (user.role === 'owner' || request.membership?.teamScope === 'agency') return user;
+  throw new PersonaFullForbidden();
+}
+
 /** Today's date in UTC: her age to the day, never her birth date (ADR 0153). */
 const isoToday = (now: Date): string => now.toISOString().slice(0, 10);
 
@@ -84,13 +104,13 @@ export function createPersonaRoutes(
       '/creators/:creatorId/persona',
       {
         // The agency's sheet, its strategies and its history: never the creator's (recette CREA-01), who reads hers
-        // at `…/persona/mine`.
+        // at `…/persona/mine`, nor a chatter's, who reads the short one at `…/persona/chatter` (Charles, 21/11).
         preValidation: requireRole('owner', 'operator'),
         schema: { params: CreatorParamsSchema, response: { 200: PersonaOverviewSchema } },
       },
       async (request) => {
         const { creatorId } = request.params;
-        const user = actorFor(request, creatorId);
+        const user = fullReaderFor(request, creatorId);
         const overview = await store.overview(creatorId);
         return user.role === 'owner' ? overview : withoutObjectionReplies(overview);
       },
@@ -177,7 +197,9 @@ export function createPersonaRoutes(
       },
       async (request) => {
         const { creatorId } = request.params;
-        const user = actorFor(request, creatorId);
+        // Any reader but the creator herself is checked as for her whole sheet (Charles, 21/11, Sécurité).
+        const user =
+          request.user?.role === 'creator' ? actorFor(request, creatorId) : fullReaderFor(request, creatorId);
         const list =
           user.role === 'creator'
             ? await corrections.mine(user.id)

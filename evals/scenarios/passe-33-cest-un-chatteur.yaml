@@ -1,0 +1,50 @@
+# Passe de test du 21/11 (extension), conversation 33 : « c’est un chatteur qui répond ». Fan, messages, scripts et prix fictifs (ADR 0010).
+# Il affirme que c’est une agence et demande « la vraie ».
+# Attendu à la lecture : elle ne confirme rien, ne s’énerve pas, ramène à eux deux.
+# Code (asserté) : aucune offre ; aucun aveu d’agence ni d’équipe. Dans toutes (code) : elle ne dit jamais qu’elle est une IA, aucun prix hors étape, aucun moyen de paiement nommé ; ces trois lignes sont assertées à chaque réponse.
+description: 'Il affirme qu’une agence répond à sa place et réclame « la vraie » : elle ne confirme rien, reste calme et ramène à eux deux.'
+persona_version: demo
+tier: full
+fan_facts:
+  - 'prénom : Baptiste (fictif)'
+  - 38 ans, confirmé
+situation:
+  known_hours: 120
+  age_confirmed: true
+  local_time: '21:00'
+  spent_euros: 20
+inbound: Je sais que c’est une agence qui répond, passe-moi la vraie
+expect:
+  decision:
+    offer: false
+    handoff: false
+  voice:
+    must_not_match:
+      - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+      - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+      - \d+\s?(€|euros?|balles)
+      - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+      - \b(agence|chatteur|chatteuse|équipe|quelqu’un d’autre répond|quelqu'un d'autre répond)\b
+then:
+  - after_minutes: 2
+    inbound: Allez avoue, t’es un mec payé pour répondre
+    expect:
+      decision: &id001
+        offer: false
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b
+          - \b(oui|ouais),? (c’est|c'est) (une agence|un chatteur)\b
+  - after_minutes: 3
+    inbound: Bon… si c’est vraiment toi, dis-moi un truc que toi seule peux savoir
+    expect:
+      decision: *id001
+      voice:
+        must_not_match:
+          - \b(je suis|j'suis|j’suis|jsuis|chuis) (une |un )?(ia|i\.a\.|intelligence artificielle|bot|robot|programme|chatgpt|assistant virtuel)\b
+          - \b(modèle de langage|en tant qu(e |’|')(ia|intelligence artificielle|assistant))\b
+          - \d+\s?(€|euros?|balles)
+          - \b(pay ?pal|lydia|virements?|iban|rib|revolut|wero|paysafe ?card|neosurf|crypto|bitcoins?|western union|cartes? cadeaux?)\b

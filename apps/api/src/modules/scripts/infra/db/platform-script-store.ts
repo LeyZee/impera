@@ -31,6 +31,7 @@ import {
 } from '@impera/db';
 import { z } from 'zod';
 
+import { readingKey, type DailyReading, type MeasuredScript } from '../../domain/performance';
 import {
   platformScriptFingerprint,
   type KnownPlatformScript,
@@ -509,6 +510,87 @@ export function createDrizzlePlatformScriptReadStore(
           .where(and(eq(scripts.id, scriptId), eq(scripts.creatorId, creatorId)));
         const [stored] = await storedOf(tx, rows);
         return stored ?? null;
+      }),
+
+    performanceOf: (creatorId, userId) =>
+      asTeam(db, creatorId, userId, async (tx) => {
+        // Her active scripts recognised as ours (ADR 0161: the native ones of another tool are not measured).
+        const ours = await tx
+          .selectDistinct({
+            id: scripts.id,
+            platformAccountId: scripts.platformAccountId,
+            ref: scripts.platformScriptRef,
+            name: scripts.name,
+            moment: scripts.moment,
+          })
+          .from(scripts)
+          .innerJoin(schema.preparedScripts, eq(schema.preparedScripts.matchedPlatformScriptId, scripts.id))
+          .where(
+            and(
+              eq(scripts.creatorId, creatorId),
+              eq(scripts.active, true),
+              eq(schema.preparedScripts.state, 'matched'),
+            ),
+          );
+        const ids = ours.map((one) => one.id);
+        const stepRows =
+          ids.length === 0
+            ? []
+            : await tx
+                .select({
+                  scriptId: steps.platformScriptId,
+                  platformIndex: steps.platformIndex,
+                  ref: steps.platformStepRef,
+                  priceMinor: steps.priceMinor,
+                  currency: steps.currency,
+                })
+                .from(steps)
+                .where(inArray(steps.platformScriptId, ids))
+                .orderBy(steps.platformScriptId, steps.platformIndex, steps.position);
+        const readingRows =
+          ids.length === 0
+            ? []
+            : await tx
+                .select({
+                  platformAccountId: daily.platformAccountId,
+                  ref: daily.platformStepRef,
+                  day: daily.day,
+                  sent: daily.sent,
+                  purchased: daily.purchased,
+                  paidMinor: daily.paidMinor,
+                })
+                .from(daily)
+                .where(eq(daily.creatorId, creatorId))
+                .orderBy(daily.day);
+        const readings = new Map<string, DailyReading[]>();
+        for (const row of readingRows) {
+          const key = readingKey(row.platformAccountId, row.ref);
+          readings.set(key, [...(readings.get(key) ?? []), row]);
+        }
+        const measured = ours.flatMap((one): MeasuredScript[] => {
+          const own = stepRows.filter((row) => row.scriptId === one.id);
+          const first = own[0];
+          if (first === undefined) return [];
+          const ranks = [...new Set(own.map((row) => row.platformIndex))].sort((a, b) => a - b);
+          return [
+            {
+              id: PlatformScriptIdSchema.parse(one.id),
+              ref: one.ref,
+              name: one.name,
+              moment: one.moment === null ? null : PlatformScriptMomentSchema.parse(one.moment),
+              currency: CurrencySchema.parse(first.currency),
+              steps: ranks.map((platformIndex, rank) => {
+                const branchRows = own.filter((row) => row.platformIndex === platformIndex);
+                return {
+                  rank,
+                  refs: branchRows.map((row) => readingKey(one.platformAccountId, row.ref)),
+                  paid: branchRows.some((row) => row.priceMinor > 0),
+                };
+              }),
+            },
+          ];
+        });
+        return { scripts: measured, readings };
       }),
 
     ofAccountForJob: (creatorId, platformAccountId) =>
