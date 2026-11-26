@@ -1,8 +1,10 @@
 import type {
   PutShiftFeedbackBodySchema,
+  ShiftDigest,
   ShiftFeedback,
   ShiftFeedbackId,
   ShiftFeedbackList,
+  ShiftFeedbackPending,
   ShiftFeedbackQuery,
   ShiftFeedbackRead,
   ShiftId,
@@ -11,7 +13,13 @@ import type {
 } from '@impera/contracts';
 import type { z } from 'zod';
 
-import type { Actor, CreatorDirectory, ShiftFeedbackStore, StoredShiftFeedback } from '../domain/ports';
+import type {
+  Actor,
+  CreatorDirectory,
+  ShiftFeedbackStore,
+  StoredShiftDigest,
+  StoredShiftFeedback,
+} from '../domain/ports';
 
 import { toPlanningAccount, toPlanningMember } from './dto';
 
@@ -21,6 +29,8 @@ import { toPlanningAccount, toPlanningMember } from './dto';
  */
 export interface ShiftFeedbackService {
   read(actor: UserId, shiftId: ShiftId): Promise<ShiftFeedbackRead>;
+  /** The feedback the actor still owes, at most one (retour léger, 26/11). */
+  pending(actor: UserId): Promise<ShiftFeedbackPending>;
   /** `created` is false when the same feedback was already recorded (the route answers 200). */
   put(
     actor: Actor,
@@ -41,6 +51,22 @@ const toDto = (feedback: StoredShiftFeedback): ShiftFeedback => ({
   incidentResolvedAt: feedback.incidentResolvedAt?.toISOString() ?? null,
 });
 
+/** The figures as the contract says them: the register's sales with their currency, or what kept it silent. */
+const toDigest = (digest: StoredShiftDigest): ShiftDigest => ({
+  sales:
+    digest.sales.feed === 'read' && digest.currency !== null
+      ? {
+          feed: 'read',
+          count: digest.sales.saleCount,
+          grossInclVatMinor: digest.sales.grossInclVatMinor,
+          currency: digest.currency,
+        }
+      : { feed: digest.sales.feed === 'read' ? 'none' : digest.sales.feed },
+  drafts: digest.drafts,
+  handoffs: digest.handoffs,
+  fans: digest.fans.map((fan) => ({ ...fan, lastAt: fan.lastAt.toISOString() })),
+});
+
 export function createShiftFeedbackService(
   store: ShiftFeedbackStore,
   creators: CreatorDirectory,
@@ -48,8 +74,23 @@ export function createShiftFeedbackService(
 ): ShiftFeedbackService {
   return {
     read: async (actor, shiftId) => {
-      const feedback = await store.read(actor, shiftId);
-      return { feedback: feedback === null ? null : toDto(feedback) };
+      const { feedback, digest } = await store.read(actor, shiftId, now());
+      return { feedback: feedback === null ? null : toDto(feedback), digest: toDigest(digest) };
+    },
+    pending: async (actor) => {
+      const owed = await store.owed(actor, now());
+      return {
+        pending:
+          owed === null
+            ? null
+            : {
+                shiftId: owed.id,
+                creatorId: owed.creatorId,
+                platformAccountId: owed.platformAccountId,
+                startsAt: owed.startsAt.toISOString(),
+                endsAt: owed.endsAt.toISOString(),
+              },
+      };
     },
     put: async (actor, shiftId, body) => {
       const { feedback, created } = await store.create(actor, shiftId, body, now());
@@ -61,6 +102,7 @@ export function createShiftFeedbackService(
         actor,
         listed.map((creator) => creator.id),
         query.period ?? null,
+        now(),
       );
       const names = new Map(listed.map((creator) => [creator.id, creator]));
       return {
@@ -71,6 +113,11 @@ export function createShiftFeedbackService(
         })),
         accounts: read.accounts.map((account) => toPlanningAccount(account, names)),
         members: read.members.map(toPlanningMember),
+        missing: read.missing.map((one) => ({
+          ...one,
+          startsAt: one.startsAt.toISOString(),
+          endsAt: one.endsAt.toISOString(),
+        })),
       };
     },
     step: async (actor, feedbackId, step) => toDto(await store.step(actor, feedbackId, step)),

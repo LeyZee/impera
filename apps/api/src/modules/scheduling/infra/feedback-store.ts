@@ -1,15 +1,24 @@
 import {
+  ConversationIdSchema,
   CreatorIdSchema,
+  DraftReasonSchema,
   JOB_MAX_ATTEMPTS,
+  JOB_PAYLOADS,
+  SHIFT_REPORT_OPENS_BEFORE_END_MINUTES,
   PayPeriodSchema,
   PlatformAccountIdSchema,
   ReportSignalSchema,
   ShiftFeedbackIdSchema,
   ShiftIdSchema,
   TeamMemberIdSchema,
+  UserIdSchema,
   type CreatorId,
+  type PayPeriod,
+  type PlatformAccountId,
   type ShiftFeedbackId,
   type ShiftId,
+  type TeamMemberId,
+  type UserId,
 } from '@impera/contracts';
 import {
   and,
@@ -20,6 +29,7 @@ import {
   schema,
   sql,
   SNAPSHOT_READ,
+  withAdmin,
   withMember,
   withTenantMember,
   type Database,
@@ -35,15 +45,25 @@ import {
   ShiftIncidentForbidden,
   ShiftNotFound,
 } from '../domain/errors';
+import {
+  assertFeedbackFits,
+  assertFeedbackNotExpired,
+  missingFeedbacks,
+  type LastOpenedShift,
+} from '../domain/feedback-due';
 import type {
   ShiftFeedbackInput,
   ShiftFeedbackListRead,
   ShiftFeedbackStore,
   StoredAccount,
+  StoredMissingFeedback,
+  StoredShift,
+  StoredShiftDigest,
   StoredShiftFeedback,
 } from '../domain/ports';
-import { assertFeedbackDue, isAgency, shiftPeriod } from '../domain/reports';
+import { assertFeedbackDue, earningsSourceFor, isAgency, shiftPeriod } from '../domain/reports';
 
+import type { ShiftSalesReader } from './report-check';
 import {
   agencyTimeZone,
   audit,
@@ -75,6 +95,7 @@ const feedbackColumns = {
   comment: shiftFeedbacks.comment,
   incident: shiftFeedbacks.incident,
   signals: shiftFeedbacks.signals,
+  draftReason: shiftFeedbacks.draftReason,
   createdAt: shiftFeedbacks.createdAt,
   incidentSeenAt: seenAt,
   incidentResolvedAt: resolvedAt,
@@ -91,6 +112,7 @@ const StoredShiftFeedbackSchema = z.object({
   comment: z.string().nullable(),
   incident: z.string().nullable(),
   signals: z.array(ReportSignalSchema),
+  draftReason: DraftReasonSchema.nullable(),
   createdAt: z.date(),
   // Read through a subquery: Postgres gives the instant back as text there.
   incidentSeenAt: z.coerce.date().nullable(),
@@ -138,15 +160,231 @@ function sameAs(
     stored.nothingToReport === sent.nothingToReport &&
     stored.comment === sent.comment &&
     stored.incident === sent.incident &&
+    stored.draftReason === sent.draftReason &&
     JSON.stringify(stored.signals) === JSON.stringify(sent.signals)
   );
+}
+
+/**
+ * What the conversations say of a shift (ADR 0170 § 1): the `conversations` module's
+ * `conversationReadsForShifts.activity`, given by the composition root and read in the caller's transaction, under
+ * the shift's creator entered. The planning never opens the conversations itself.
+ */
+export type ShiftActivityReader = (
+  tx: Transaction,
+  query: {
+    readonly platformAccountId: PlatformAccountId;
+    readonly userId: UserId;
+    readonly from: Date;
+    readonly to: Date;
+  },
+) => Promise<Omit<StoredShiftDigest, 'sales' | 'currency'>>;
+
+const instant = z.union([z.date(), z.string()]).transform((value) => new Date(value));
+const LastRowSchema = z.object({
+  id: ShiftIdSchema,
+  creator_id: CreatorIdSchema,
+  platform_account_id: PlatformAccountIdSchema,
+  member_id: TeamMemberIdSchema,
+  starts_at: instant,
+  ends_at: instant,
+  has_feedback: z.boolean(),
+});
+
+/**
+ * Each member's last shift whose feedback has opened at `now` (retour léger, 26/11), on every creator: read as the
+ * admin role, bounded to the members named, whom the caller takes from his own row or from the shifts his policies
+ * show. A cancelled shift is not theirs to report; a shift swapped away belongs to the colleague who took it.
+ */
+async function lastOpenedUnscoped(
+  adminDb: Database,
+  memberIds: readonly TeamMemberId[],
+  now: Date,
+): Promise<Map<TeamMemberId, LastOpenedShift>> {
+  if (memberIds.length === 0) return new Map();
+  return withAdmin(adminDb, async (tx) => {
+    const result = await tx.execute(sql`
+      select distinct on (s.member_id)
+             s.id, s.creator_id, s.platform_account_id, s.member_id, s.starts_at, s.ends_at,
+             exists (select 1 from shift_feedbacks f where f.shift_id = s.id) as has_feedback
+        from shifts s
+       where s.member_id in (${sql.join(
+         memberIds.map((one) => sql`${one}::uuid`),
+         sql`, `,
+       )}) and s.cancelled_at is null
+         and greatest(s.ends_at - make_interval(mins => ${SHIFT_REPORT_OPENS_BEFORE_END_MINUTES}), s.starts_at)
+             <= ${now.toISOString()}::timestamptz
+       order by s.member_id, s.ends_at desc, s.id desc`);
+    const rows = result.rows.map((raw) => LastRowSchema.parse(raw));
+    const timeZone = await agencyTimeZone(tx);
+    const accounts = [...new Set(rows.map((row) => row.platform_account_id))];
+    const rules =
+      accounts.length === 0
+        ? []
+        : await tx
+            .select({
+              platformAccountId: accountPayRules.platformAccountId,
+              fromPeriod: accountPayRules.fromPeriod,
+              currency: accountPayRules.currency,
+              earningsSource: accountPayRules.earningsSource,
+            })
+            .from(accountPayRules)
+            .where(inArray(accountPayRules.platformAccountId, accounts));
+    return new Map(
+      rows.map((row) => {
+        const source = earningsSourceFor(
+          rules
+            .filter((one) => one.platformAccountId === row.platform_account_id)
+            .map((one) => RulesRowSchema.parse(one)),
+          shiftPeriod(row.starts_at, timeZone),
+        );
+        return [
+          row.member_id,
+          {
+            id: row.id,
+            creatorId: row.creator_id,
+            platformAccountId: row.platform_account_id,
+            memberId: row.member_id,
+            startsAt: row.starts_at,
+            endsAt: row.ends_at,
+            takesFeedback: source === 'detected',
+            hasFeedback: row.has_feedback,
+          },
+        ];
+      }),
+    );
+  });
+}
+
+/** One member's last opened shift at `now`, or null. */
+async function lastOpenedOf(
+  adminDb: Database,
+  memberId: TeamMemberId,
+  now: Date,
+): Promise<LastOpenedShift | null> {
+  return (await lastOpenedUnscoped(adminDb, [memberId], now)).get(memberId) ?? null;
 }
 
 /**
  * The mini feedback through `withTenantMember` in the shift's creator (ADR 0050 § 10): the policies decide who reads
  * (the member, the owner, an active manager) and who writes (the member alone). No amount: no lock of pay.
  */
-export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database): ShiftFeedbackStore {
+export function createDrizzleShiftFeedbackStore(
+  db: Database,
+  adminDb: Database,
+  reads: { readonly shiftSalesOf: ShiftSalesReader; readonly activityOf: ShiftActivityReader },
+): ShiftFeedbackStore {
+  /** The shift's figures (ADR 0170 § 1), in the shift's creator entered: its hours, its member, its account. */
+  async function digestIn(tx: Transaction, shift: StoredShift, now: Date): Promise<StoredShiftDigest> {
+    const [member] = await tx
+      .select({ userId: teamMembers.userId })
+      .from(teamMembers)
+      .where(eq(teamMembers.id, shift.memberId));
+    const window = { from: shift.startsAt, to: shift.endsAt };
+    const activity =
+      member === undefined
+        ? { drafts: { asIs: 0, edited: 0, rejected: 0 }, handoffs: 0, fans: [] }
+        : await reads.activityOf(tx, {
+            platformAccountId: shift.platformAccountId,
+            userId: UserIdSchema.parse(member.userId),
+            ...window,
+          });
+    const rules = await tx
+      .select({
+        fromPeriod: accountPayRules.fromPeriod,
+        currency: accountPayRules.currency,
+        earningsSource: accountPayRules.earningsSource,
+      })
+      .from(accountPayRules)
+      .where(eq(accountPayRules.platformAccountId, shift.platformAccountId));
+    const period = shiftPeriod(shift.startsAt, await agencyTimeZone(tx));
+    const inForce = rules
+      .map((one) => RulesRowSchema.parse(one))
+      .filter((one) => one.fromPeriod <= period)
+      .toSorted((a, b) => b.fromPeriod.localeCompare(a.fromPeriod))[0];
+    const sales =
+      inForce === undefined
+        ? ({ feed: 'none' } as const)
+        : await reads.shiftSalesOf(tx, {
+            platformAccountId: shift.platformAccountId,
+            memberId: shift.memberId,
+            currency: inForce.currency,
+            ...window,
+            now,
+          });
+    return { ...activity, sales, currency: inForce?.currency ?? null };
+  }
+
+  async function shiftIn(tx: Transaction, shiftId: ShiftId): Promise<StoredShift & { cancelled: boolean }> {
+    const [row] = await tx
+      .select({ ...shiftColumns, cancelledAt: shifts.cancelledAt })
+      .from(shifts)
+      .where(eq(shifts.id, shiftId));
+    if (row === undefined) throw new ShiftNotFound();
+    return { ...toShift(row), cancelled: row.cancelledAt !== null };
+  }
+
+  /**
+   * The shifts of `period` on the creators the agency reader sees that were left « sans retour » (retour léger, 26/11):
+   * ended, on an account whose pay reads the sales for the period, without feedback, and not their member's last.
+   */
+  async function missingIn(
+    tx: Transaction,
+    actor: UserId,
+    creatorIds: readonly CreatorId[],
+    period: PayPeriod,
+    now: Date,
+  ): Promise<StoredMissingFeedback[]> {
+    const timeZone = await agencyTimeZone(tx);
+    const candidates: StoredMissingFeedback[] = [];
+    for (const creatorId of creatorIds) {
+      const [scopeRow] = (
+        await tx.execute(sql`select nullif(current_setting('app.team_scope', true), '') as scope`)
+      ).rows;
+      const scope = z.object({ scope: z.string().nullable() }).parse(scopeRow).scope;
+      if (scope === 'agency' && !(await onCreatorList(tx, actor, creatorId))) continue;
+      await enterCreator(tx, creatorId, creatorIds);
+      const rows = await tx
+        .select(shiftColumns)
+        .from(shifts)
+        .where(
+          and(
+            sql`${shifts.cancelledAt} is null`,
+            sql`${shifts.endsAt} <= ${now.toISOString()}::timestamptz`,
+            sql`not exists (select 1 from shift_feedbacks f where f.shift_id = ${shifts.id})`,
+          ),
+        );
+      const ruleRows = await tx
+        .select({
+          platformAccountId: accountPayRules.platformAccountId,
+          fromPeriod: accountPayRules.fromPeriod,
+          currency: accountPayRules.currency,
+          earningsSource: accountPayRules.earningsSource,
+        })
+        .from(accountPayRules);
+      for (const shift of rows.map(toShift)) {
+        if (shiftPeriod(shift.startsAt, timeZone) !== period) continue;
+        const rules = ruleRows
+          .filter((one) => one.platformAccountId === shift.platformAccountId)
+          .map((one) => RulesRowSchema.parse(one));
+        if (earningsSourceFor(rules, period) !== 'detected') continue;
+        candidates.push({
+          shiftId: shift.id,
+          creatorId: shift.creatorId,
+          platformAccountId: shift.platformAccountId,
+          memberId: shift.memberId,
+          startsAt: shift.startsAt,
+          endsAt: shift.endsAt,
+        });
+      }
+    }
+    const last = await lastOpenedUnscoped(adminDb, [...new Set(candidates.map((one) => one.memberId))], now);
+    const lastIds = new Map([...last].map(([member, shift]) => [member, shift.id]));
+    return missingFeedbacks(candidates, lastIds).toSorted(
+      (a, b) => b.startsAt.getTime() - a.startsAt.getTime(),
+    );
+  }
+
   async function inShiftCreator<T>(shiftId: ShiftId, userId: string, fn: (tx: Transaction) => Promise<T>) {
     const creatorId = await creatorOfUnscoped(adminDb, shifts, shiftId);
     if (creatorId === null) throw new ShiftNotFound();
@@ -165,14 +403,21 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
   }
 
   return {
-    read: (actor, shiftId) =>
+    read: (actor, shiftId, now) =>
       inShiftCreator(shiftId, actor, async (tx) => {
         // The shift as his policies show it: one he does not see answers as an unknown id, never `null`, which would
         // tell him it exists (isolation sweep of the 06/11).
-        const [seen] = await tx.select({ id: shifts.id }).from(shifts).where(eq(shifts.id, shiftId));
-        if (seen === undefined) throw new ShiftNotFound();
+        const shift = await shiftIn(tx, shiftId);
         const found = await feedbackWhere(tx, shiftFeedbacks.shiftId, shiftId);
-        return found?.feedback ?? null;
+        return { feedback: found?.feedback ?? null, digest: await digestIn(tx, shift, now) };
+      }),
+
+    owed: (actor, now) =>
+      withMember(db, actor, async (tx) => {
+        const memberId = await ownMemberId(tx, actor);
+        if (memberId === null) return null;
+        const last = await lastOpenedOf(adminDb, memberId, now);
+        return last !== null && last.takesFeedback && !last.hasFeedback ? last : null;
       }),
 
     create: (actor, shiftId, sent, now) =>
@@ -186,12 +431,8 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
         const sentBefore = await replay();
         if (sentBefore !== null) return sentBefore;
 
-        const [row] = await tx
-          .select({ ...shiftColumns, cancelledAt: shifts.cancelledAt })
-          .from(shifts)
-          .where(eq(shifts.id, shiftId));
-        if (row?.cancelledAt !== null) throw new ShiftNotFound();
-        const shift = toShift(row);
+        const shift = await shiftIn(tx, shiftId);
+        if (shift.cancelled) throw new ShiftNotFound();
         if (shift.memberId !== (await ownMemberId(tx, actor.userId))) throw new ShiftFeedbackForbidden();
         const period = shiftPeriod(shift.startsAt, await agencyTimeZone(tx));
         const rules = await tx
@@ -210,6 +451,9 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
         );
         if ((await feedbackWhere(tx, shiftFeedbacks.shiftId, shiftId)) !== null)
           throw new ShiftFeedbackExists();
+        // Only his last opened shift takes one (retour léger, 26/11); a linked fan and the closed answer fit its figures.
+        assertFeedbackNotExpired(shiftId, await lastOpenedOf(adminDb, shift.memberId, now));
+        assertFeedbackFits(sent, await digestIn(tx, shift, now));
 
         try {
           await tx.transaction((savepoint) =>
@@ -236,12 +480,26 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
         await audit(tx, actor, 'shift_feedback.create', { kind: 'shift_feedback', id: sent.id }, { period });
         // An incident tells the owner and the managers at once, once it commits (trous béants n° 1): one job per feedback.
         if (sent.incident !== null) await enqueueIncidentNotice(tx, sent.id, shift.creatorId);
+        // A signal linked to a fan goes into his card, « par un chatteur » (ADR 0170 § 4): the note « Rendre la main »
+        // writes, through the conversations' own job, once it commits.
+        for (const [index, signal] of sent.signals.entries()) {
+          if (signal.conversationId === null) continue;
+          await enqueueFanNote(tx, {
+            feedbackId: sent.id,
+            index,
+            creatorId: shift.creatorId,
+            conversationId: signal.conversationId,
+            note: signal.text,
+            at: now,
+            userId: actor.userId,
+          });
+        }
         const made = await feedbackWhere(tx, shiftFeedbacks.id, sent.id);
         if (made === null) throw new ShiftNotFound();
         return { feedback: made.feedback, created: true };
       }),
 
-    list: (actor, creatorIds, period) =>
+    list: (actor, creatorIds, period, now) =>
       withMember(
         db,
         actor,
@@ -249,7 +507,8 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
           const reader = { userId: actor, scope, memberId: await ownMemberId(tx, actor) };
           // Anyone else than the agency reads their own, as the reports.
           const own = isAgency(reader) ? null : reader.memberId;
-          if (!isAgency(reader) && own === null) return { feedbacks: [], accounts: [], members: [] };
+          if (!isAgency(reader) && own === null)
+            return { feedbacks: [], accounts: [], members: [], missing: [] };
           const feedbacks: (StoredShiftFeedback & { shiftStartsAt: Date; shiftEndsAt: Date })[] = [];
           const accounts: StoredAccount[] = [];
           for (const creatorId of creatorIds) {
@@ -283,12 +542,36 @@ export function createDrizzleShiftFeedbackStore(db: Database, adminDb: Database)
               accounts.push(...found.map((row) => StoredAccountSchema.parse(row)));
             }
           }
-          const memberIds = [...new Set(feedbacks.map((one) => one.memberId))];
+          const missing =
+            period === null || !isAgency(reader) ? [] : await missingIn(tx, actor, creatorIds, period, now);
+          const missingAccounts = [...new Set(missing.map((one) => one.platformAccountId))].filter(
+            (id) => !accounts.some((account) => account.id === id),
+          );
+          for (const creatorId of [...new Set(missing.map((one) => one.creatorId))]) {
+            const ids = missingAccounts.filter((id) =>
+              missing.some((one) => one.platformAccountId === id && one.creatorId === creatorId),
+            );
+            if (ids.length === 0) continue;
+            await enterCreator(tx, creatorId, creatorIds);
+            const found = await tx
+              .select(accountColumns)
+              .from(platformAccounts)
+              .where(inArray(platformAccounts.id, ids));
+            accounts.push(...found.map((row) => StoredAccountSchema.parse(row)));
+          }
+          const memberIds = [
+            ...new Set([...feedbacks.map((one) => one.memberId), ...missing.map((one) => one.memberId)]),
+          ];
           const members =
             memberIds.length === 0
               ? []
               : await tx.select(memberColumns).from(teamMembers).where(inArray(teamMembers.id, memberIds));
-          return { feedbacks: feedbacks.toSorted(byUrgency), accounts, members: members.map(toMember) };
+          return {
+            feedbacks: feedbacks.toSorted(byUrgency),
+            accounts,
+            members: members.map(toMember),
+            missing,
+          };
         },
         SNAPSHOT_READ,
       ),
@@ -340,6 +623,39 @@ async function enqueueIncidentNotice(
       payload => ${JSON.stringify({ shiftFeedbackId, creatorId })}::jsonb,
       max_attempts => ${JOB_MAX_ATTEMPTS['scheduling.notify_incident']}::int,
       job_key => ${`scheduling.notify_incident:${shiftFeedbackId}`},
+      job_key_mode => 'preserve_run_at'
+    )`,
+  );
+}
+
+/**
+ * `conversation.record_facts` for a signal linked to a fan (ADR 0170 § 4): the conversations' own job writes it as an
+ * `operator_note` fact, the note « Rendre la main » writes, with its author; once per feedback and signal.
+ */
+async function enqueueFanNote(
+  tx: Transaction,
+  input: {
+    readonly feedbackId: ShiftFeedbackId;
+    readonly index: number;
+    readonly creatorId: CreatorId;
+    readonly conversationId: string;
+    readonly note: string;
+    readonly at: Date;
+    readonly userId: UserId;
+  },
+): Promise<void> {
+  const payload = JOB_PAYLOADS['conversation.record_facts'].parse({
+    creatorId: input.creatorId,
+    conversationId: ConversationIdSchema.parse(input.conversationId),
+    correlationId: `shift-feedback:${input.feedbackId}:${String(input.index)}`,
+    source: { kind: 'operator_note', note: input.note, at: input.at.toISOString(), userId: input.userId },
+  });
+  await tx.execute(
+    sql`select public.enqueue_job(
+      task => 'conversation.record_facts',
+      payload => ${JSON.stringify(payload)}::jsonb,
+      max_attempts => ${JOB_MAX_ATTEMPTS['conversation.record_facts']}::int,
+      job_key => ${`conversation.record_facts:shift-feedback:${input.feedbackId}:${String(input.index)}`},
       job_key_mode => 'preserve_run_at'
     )`,
   );

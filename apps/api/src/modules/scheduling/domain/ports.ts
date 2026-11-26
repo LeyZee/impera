@@ -1,4 +1,5 @@
 import type {
+  ConversationId,
   CreatorAgencyRateList,
   AccountPayRulesId,
   CreatorAgencyRateId,
@@ -7,6 +8,7 @@ import type {
   CreatorPlanned,
   CreatorSummary,
   Currency,
+  DraftReason,
   EarningsSource,
   LeaveRequestId,
   LeaveRequestStatus,
@@ -18,6 +20,7 @@ import type {
   ReportGapThreshold,
   ReportSignal,
   SchedulingSettings,
+  ShiftDraftCounts,
   SchedulingSettingsInput,
   ShiftFeedbackId,
   ShiftIncidentStep,
@@ -39,6 +42,8 @@ import type {
 
 import type { CreatorAgent } from './calendar';
 import type { FeedEvent } from './calendar-feed';
+import type { LastOpenedShift } from './feedback-due';
+import type { ShiftSalesRead } from './report-check';
 import type { ReportReminderFacts } from './report-reminders';
 import type { RatedRulesRow, Reader } from './reports';
 import type { PlannedCreators, WorkingMember } from './shifts';
@@ -811,6 +816,7 @@ export interface StoredShiftFeedback {
   readonly comment: string | null;
   readonly incident: string | null;
   readonly signals: readonly ReportSignal[];
+  readonly draftReason: DraftReason | null;
   readonly createdAt: Date;
   /** « Vu » on its incident (or « Réglé » said first); null without an incident or until then. */
   readonly incidentSeenAt: Date | null;
@@ -826,6 +832,18 @@ export interface ShiftFeedbackListRead {
   })[];
   readonly accounts: readonly StoredAccount[];
   readonly members: readonly StoredMember[];
+  /** The shifts of the period left without their feedback (retour léger, 26/11); the agency's only. */
+  readonly missing: readonly StoredMissingFeedback[];
+}
+
+/** A shift counted « sans retour »: a later shift of its member opened its feedback first. */
+export interface StoredMissingFeedback {
+  readonly shiftId: ShiftId;
+  readonly creatorId: CreatorId;
+  readonly platformAccountId: PlatformAccountId;
+  readonly memberId: TeamMemberId;
+  readonly startsAt: Date;
+  readonly endsAt: Date;
 }
 
 /** What the member says at the end of the shift: the contract's body, checked. */
@@ -835,12 +853,33 @@ export interface ShiftFeedbackInput {
   readonly comment: string | null;
   readonly incident: string | null;
   readonly signals: readonly ReportSignal[];
+  readonly draftReason: DraftReason | null;
+}
+
+/** A shift's figures (ADR 0170 § 1), as the stores read them. */
+export interface StoredShiftDigest {
+  readonly sales: ShiftSalesRead;
+  readonly currency: Currency | null;
+  readonly drafts: ShiftDraftCounts;
+  readonly handoffs: number;
+  readonly fans: readonly {
+    readonly conversationId: ConversationId;
+    readonly name: string;
+    readonly messages: number;
+    readonly lastAt: Date;
+  }[];
 }
 
 /** The mini feedback through `withTenantMember` in the shift's creator: the policies decide who reads and writes. */
 export interface ShiftFeedbackStore {
-  /** The shift's member, the owner or an active manager: its feedback, `null` before it is made. */
-  read(actor: UserId, shiftId: ShiftId): Promise<StoredShiftFeedback | null>;
+  /** The shift's member, the owner or an active manager: its feedback, `null` before it is made, and its figures. */
+  read(
+    actor: UserId,
+    shiftId: ShiftId,
+    now: Date,
+  ): Promise<{ feedback: StoredShiftFeedback | null; digest: StoredShiftDigest }>;
+  /** The feedback the actor owes (retour léger, 26/11): his last opened shift, when it takes one and has none. */
+  owed(actor: UserId, now: Date): Promise<LastOpenedShift | null>;
   /** The shift's member alone; `created` is false when the same feedback was already recorded. */
   create(
     actor: Actor,
@@ -856,6 +895,7 @@ export interface ShiftFeedbackStore {
     actor: UserId,
     creatorIds: readonly CreatorId[],
     period: PayPeriod | null,
+    now: Date,
   ): Promise<ShiftFeedbackListRead>;
   /** « Vu » or « Réglé » on an incident, by the owner or an active manager, never on their own; said once. */
   step(actor: Actor, feedbackId: ShiftFeedbackId, step: ShiftIncidentStep): Promise<StoredShiftFeedback>;

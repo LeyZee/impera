@@ -95,6 +95,7 @@ const feedback = (n: number, patch: Record<string, unknown> = {}): Record<string
   comment: null,
   incident: null,
   signals: [],
+  draftReason: null,
   incidentSeenAt: null,
   incidentResolvedAt: null,
   createdAt: '2026-10-26T22:00:00.000Z',
@@ -143,6 +144,7 @@ let period: FakeReport[];
 /** The mini feedbacks: the incidents still open, and the period's (ADR 0050 § 10, trous béants n° 1). */
 let openIncidents: Record<string, unknown>[];
 let periodFeedbacks: Record<string, unknown>[];
+let missingFeedbacks: Record<string, unknown>[];
 /** The pay rules of the period for the shift corrected. */
 let rules: unknown;
 /** What a `POST` answers: the same for each, or from what it was sent. */
@@ -170,6 +172,7 @@ function serve(): void {
             feedbacks: url.searchParams.has('period') ? periodFeedbacks : openIncidents,
             accounts: [ACCOUNT],
             members: MEMBERS,
+            missing: url.searchParams.has('period') ? missingFeedbacks : [],
           });
         case '/v1/settings/sales-feeds/reveal/team/counts':
           return revealOpen ? json({ newCount: 0, removalCount: 0, abnormalRead: false }) : json(null, 403);
@@ -274,6 +277,7 @@ beforeEach(() => {
   period = [];
   openIncidents = [];
   periodFeedbacks = [];
+  missingFeedbacks = [];
   rules = null;
   answer = { status: 200, body: { results: [] } };
   serve();
@@ -901,5 +905,26 @@ describe('Équipe › Rapports against the platform (ADR 0073)', () => {
     expect(text(panel)).toContain('Contenu manquant');
     expect(text(panel)).toContain('Demande d’un fan');
     expect(text(panel)).toContain('« Soirée calme »');
+    expect(text(panel)).toContain('0sans retour');
+  });
+
+  it('counts the shifts left without their feedback, never caught up (retour léger, 26/11)', async () => {
+    periodFeedbacks = [feedback(1, { nothingToReport: true, draftReason: 'too_long' })];
+    missingFeedbacks = [
+      {
+        shiftId: id(190),
+        creatorId: id(1),
+        platformAccountId: id(11),
+        memberId: BASILE,
+        startsAt: '2026-10-24T16:00:00.000Z',
+        endsAt: '2026-10-24T22:00:00.000Z',
+      },
+    ];
+    renderPage();
+    const panel = (await screen.findByText('1 retour')).closest('section');
+    if (panel === null) throw new Error('no panel');
+    expect(text(panel)).toContain('1sans retour');
+    expect(text(panel)).toContain('Sans retour');
+    expect(text(panel)).toContain('surtout : trop longs');
   });
 });

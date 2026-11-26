@@ -1458,6 +1458,12 @@ a.sc-sheet__report:focus-visible,
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.rp-signal__fan {
+  font-size: var(--nv-text-caption);
+  line-height: var(--nv-text-caption-leading);
+  color: var(--nv-ink-faint);
+  white-space: nowrap;
+}
 
 /* The form's signals: a category picked among four coloured pills, then its sentence. */
 .rp-remontees {
@@ -1711,4 +1717,58 @@ a.sc-sheet__report:focus-visible,
 }
 .rp-fb__incident[data-stage='resolved'] {
   --_c: var(--nv-success);
+}
+
+/* His shift in figures and « Lier à un fan » (ADR 0170 §§ 1 and 2): read-only tiles on the row ground of #1025. */
+.rp-figs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nv-space-2);
+}
+.rp-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: var(--nv-tile-fill);
+  min-width: 0;
+}
+.rp-fig b {
+  font-size: var(--nv-text-title-2);
+  line-height: var(--nv-text-title-2-leading);
+  color: var(--nv-ink);
+}
+.rp-fig span {
+  font-size: var(--nv-text-footnote);
+  line-height: var(--nv-text-footnote-leading);
+  color: var(--nv-ink-muted);
+}
+.rp-option-tick {
+  margin-left: auto;
+  display: inline-grid;
+  flex: none;
+}
+.rp-option-check {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--nv-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rp-fans {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-2);
+  align-items: stretch;
+}
+.rp-fans > .nv-btn {
+  align-self: flex-start;
+}
+@media (max-width: 520px) {
+  .rp-figs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

@@ -38,6 +38,7 @@ import {
   SlotVersionParamsSchema,
   ShiftFeedbackIdSchema,
   ShiftFeedbackListSchema,
+  ShiftFeedbackPendingSchema,
   ShiftFeedbackQuerySchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
@@ -468,6 +469,16 @@ export function createSchedulingRoutes(
         const made = await feedback.put(actorOf(request), request.params.shiftId, request.body);
         return reply.code(made.created ? 201 : 200).send(made.feedback);
       },
+    );
+
+    // The one feedback a member still owes (retour léger, 26/11): « Je prends mon poste » asks for it first.
+    app.get(
+      '/scheduling/shift-feedback/pending',
+      {
+        preValidation: ownerOrMember,
+        schema: { response: { 200: ShiftFeedbackPendingSchema } },
+      },
+      (request) => feedback.pending(userOf(request)),
     );
 
     // Équipe › Rapports (trous béants n° 1): a period's feedbacks, or the incidents still open, theirs first.

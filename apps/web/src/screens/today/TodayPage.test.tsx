@@ -412,6 +412,30 @@ describe('Aujourd’hui, « Je prends mon poste » (EQ-12)', () => {
     );
   });
 
+  it('opens the feedback of his last shift first when the check-in waits for it (retour léger, 26/11)', async () => {
+    serveCheckIn(
+      () => ({ current: null, next: mine(2, '2026-10-28T00:10:00Z', '2026-10-28T06:00:00Z'), ended: null }),
+      {
+        status: 409,
+        body: {
+          error: {
+            code: 'shift_check_in_feedback_due_conflict',
+            message: 'Retour d’abord',
+            details: { shiftId: id(150) },
+            requestId: 'r-2',
+          },
+        },
+      },
+    );
+    renderPage();
+    await screen.findByRole('heading', { name: 'Nora Vidal', level: 2 });
+    screen.getByRole('button', { name: 'Je prends mon poste' }).click();
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Fais d’abord le retour de ton shift précédent : 30 secondes, puis ton poste s’ouvre.',
+    );
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
   it('holds the gesture on a shift of today not open yet, and says the minute it opens, in grey', async () => {
     // 00:00Z is 1 h in Paris: a shift at 10 h opens at 9 h 45, the same day.
     serveCheckIn(

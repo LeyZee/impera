@@ -53,7 +53,10 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
   let basileCookie: string;
   let noraCookie: string;
 
-  /** Basile's shifts: yesterday on Inès's read account, yesterday on Anna's declared one, one ending later, one cancelled. */
+  /**
+   * Basile's shifts: yesterday on Inès's read account (his last ended one, the only one taking a feedback: retour
+   * léger, 26/11), the day before on Anna's declared one, one ending later, one cancelled.
+   */
   let onRead: ShiftId;
   let onDeclared: ShiftId;
   let later: ShiftId;
@@ -119,13 +122,14 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
     startsAt: Date,
     endsAt: Date,
     isCancelled = false,
+    memberId = basile.id,
   ): Promise<ShiftId> => {
     const id = newId(ShiftIdSchema);
     await test.admin.db.insert(schema.shifts).values({
       id,
       creatorId,
       platformAccountId,
-      memberId: basile.id,
+      memberId,
       startsAt,
       endsAt,
       cancelledAt: isCancelled ? endsAt : null,
@@ -188,8 +192,8 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
     onDeclared = await shiftOn(
       anna,
       annaMain,
-      parisInstant(parisDay(-1), 780),
-      parisInstant(parisDay(-1), 900),
+      parisInstant(parisDay(-2), 780),
+      parisInstant(parisDay(-2), 900),
     );
     later = await shiftOn(ines, inesMain, new Date(now + 60 * MINUTE), new Date(now + 180 * MINUTE));
     cancelled = await shiftOn(
@@ -211,8 +215,8 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
     expect(
       ShiftFeedbackReadSchema.parse(
         (await call('GET', `/scheduling/shifts/${onRead}/feedback`, basileCookie)).json(),
-      ),
-    ).toEqual({ feedback: null });
+      ).feedback,
+    ).toBeNull();
     const id = newId(ShiftFeedbackIdSchema);
     const body = {
       id,
@@ -286,13 +290,17 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
   });
 
   it('tells the agency of an incident at once, and follows it « Vu » then « Réglé »', async () => {
+    // Another chatter's last shift: Basile's own last one has its feedback already.
+    const { member: theo, cookie: theoCookie } = await addMember('theo@example.test', 'Théo', 'chatter');
     const incidentShift = await shiftOn(
       ines,
       inesMain,
       parisInstant(parisDay(-3), 600),
       parisInstant(parisDay(-3), 720),
+      false,
+      theo.id,
     );
-    const made = await put(basileCookie, incidentShift, { incident: 'Le fan menace de signaler le compte' });
+    const made = await put(theoCookie, incidentShift, { incident: 'Le fan menace de signaler le compte' });
     expect(made.statusCode, made.body).toBe(201);
     const incident = ShiftFeedbackSchema.parse(made.json());
     expect(incident).toMatchObject({ incidentSeenAt: null, incidentResolvedAt: null });
@@ -314,7 +322,7 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
       expect(open.statusCode, open.body).toBe(200);
       const list = ShiftFeedbackListSchema.parse(open.json());
       expect(list.feedbacks.map((line) => line.id)).toEqual([incident.id]);
-      expect(list.members.map((member) => member.id)).toContain(basile.id);
+      expect(list.members.map((member) => member.id)).toContain(theo.id);
       expect(list.accounts.map((account) => account.id)).toContain(inesMain);
     }
     // A period: every feedback of it, the open incident first.
@@ -348,7 +356,7 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
     }
 
     // Neither the chatter who wrote it nor the creator says « Vu »; a feedback without incident has none.
-    const own = await step(basileCookie, incident.id, 'seen');
+    const own = await step(theoCookie, incident.id, 'seen');
     expect([own.statusCode, codeOf(own)]).toEqual([403, 'shift_incident_forbidden']);
     expect((await step(creator, incident.id, 'seen')).statusCode).toBe(403);
     const quiet = ShiftFeedbackReadSchema.parse(
@@ -371,7 +379,7 @@ describe('Équipe › Mini feedback de fin de shift (/v1/scheduling, ADR 0050 §
 
     // The chatter reads where it stands; the agency's list of open incidents is empty again.
     const mine = ShiftFeedbackReadSchema.parse(
-      (await call('GET', `/scheduling/shifts/${incidentShift}/feedback`, basileCookie)).json(),
+      (await call('GET', `/scheduling/shifts/${incidentShift}/feedback`, theoCookie)).json(),
     ).feedback;
     expect(mine).toMatchObject({ incidentSeenAt: seenAt, incidentResolvedAt: resolved.incidentResolvedAt });
     const after = ShiftFeedbackListSchema.parse(

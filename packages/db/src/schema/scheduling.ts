@@ -1,5 +1,6 @@
 import {
   CurrencySchema,
+  DRAFT_REASONS,
   REPORT_GAP_THRESHOLD_DEFAULT,
   SHIFT_FEEDBACK_SIGNALS_MAX,
   SHIFT_INCIDENT_STEPS,
@@ -674,6 +675,8 @@ export const shiftFeedbacks = pgTable(
     comment: text('comment'),
     incident: text('incident'),
     signals: jsonb('signals').notNull().default([]),
+    /** Why he corrected so many drafts (ADR 0170 § 1), the closed choice; null when it was not asked or left out. */
+    draftReason: text('draft_reason'),
     createdBy: text('created_by')
       .notNull()
       .references(() => user.id),
@@ -686,6 +689,7 @@ export const shiftFeedbacks = pgTable(
       foreignColumns: [shifts.id, shifts.creatorId, shifts.platformAccountId, shifts.memberId],
     }),
     uniqueIndex('shift_feedbacks_shift_unique').on(t.shiftId),
+    enumCheck('shift_feedbacks', t.draftReason, DRAFT_REASONS),
     index('shift_feedbacks_member_period_idx').on(t.memberId, t.period),
     check('shift_feedbacks_period_check', sql`extract(day from ${t.period}) in (1, 16)`),
     check(

@@ -1,15 +1,21 @@
 import {
+  DRAFT_REASONS,
+  draftReasonAsked,
   newId,
   REPORT_SIGNAL_CATEGORIES,
   SHIFT_FEEDBACK_SIGNALS_MAX,
   ShiftFeedbackIdSchema,
+  type ConversationId,
+  type DraftReason,
   type ReportSignalCategory,
+  type ShiftDigest,
   type ShiftFeedback,
   type ShiftReportContext,
 } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
 import {
+  DRAFT_REASON_WORDS,
   FEEDBACK_ERRORS,
   incidentStage,
   sendFeedback,
@@ -19,20 +25,25 @@ import {
   useShiftFeedback,
   type IncidentStage,
 } from './feedback';
-import { periodLine } from './model';
+import { amountText, periodLine } from './model';
 
 import { clockAt, dayMonth, dayOf } from '@/scheduling/time';
 import { useNow } from '@/scheduling/useNow';
 import { Steps } from '@/shell/figures/figures';
 import { Failure } from '@/shell/states';
+import '@/scheduling/exchanges.css';
 
 const TEXT_MAX = 1000;
 const SIGNAL_MAX = 280;
+/** The fans « Lier à un fan » shows at first; the others behind one tap. */
+const FANS_SHOWN = 4;
 
 interface SignalDraft {
   readonly key: string;
   readonly category: ReportSignalCategory | null;
   readonly text: string;
+  /** « Lier à un fan » (ADR 0170 § 2): a fan of his shift, picked, never typed. */
+  readonly fan: ConversationId | null;
 }
 
 /**
@@ -94,7 +105,7 @@ export function FeedbackPanel({
       </div>
     );
   }
-  return <Form data={data} onClose={onClose} />;
+  return <Form data={data} digest={read.data.digest} zone={zone} onClose={onClose} />;
 }
 
 /** When a step was said: « à 14:32 » the same day, « le mar. 25 oct. à 14:32 » another. */
@@ -152,6 +163,9 @@ export function SignalChips({ feedback }: { feedback: Pick<ShiftFeedback, 'signa
           <li key={index} className="rp-signal" data-kind={category.kind}>
             <span className="nv-tag nv-tag--tint rp-signal__cat">{category.label}</span>
             <span className="rp-signal__text">{signal.text}</span>
+            {signal.conversationId === null ? null : (
+              <span className="rp-signal__fan">dans la fiche du fan</span>
+            )}
           </li>
         );
       })}
@@ -204,7 +218,85 @@ function Sent({
   );
 }
 
-function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void }): JSX.Element {
+const CHECK = (
+  <svg className="rp-option-check" viewBox="0 0 16 16" aria-hidden="true">
+    <path d="m3.5 8.5 3 3 6-7" />
+  </svg>
+);
+
+/** One choice of a closed list, the planning's `sc-option` with its tick. */
+function Choice({
+  title,
+  sub,
+  on,
+  lead,
+  onPick,
+}: {
+  title: string;
+  sub?: string;
+  on: boolean;
+  lead?: JSX.Element;
+  onPick: () => void;
+}): JSX.Element {
+  return (
+    <button type="button" role="radio" className="sc-option" aria-checked={on} onClick={onPick}>
+      {lead}
+      <span className="sc-option__text">
+        <span className="sc-option__title">{title}</span>
+        {sub === undefined ? null : <span className="sc-option__sub">{sub}</span>}
+      </span>
+      <span className="rp-option-tick">{on ? CHECK : null}</span>
+    </button>
+  );
+}
+
+/** His shift in figures (ADR 0170 § 1): read by Impera, nothing to type. */
+function ShiftFigures({ digest }: { digest: ShiftDigest }): JSX.Element {
+  const { sales, drafts } = digest;
+  const figures: readonly (readonly [string, string, string])[] = [
+    sales.feed === 'read'
+      ? [
+          'sales',
+          String(sales.count),
+          `${sales.count === 1 ? 'vente' : 'ventes'} · ${amountText(sales.grossInclVatMinor, sales.currency)}`,
+        ]
+      : ['sales', '–', 'ventes non relevées'],
+    ['as-is', String(drafts.asIs), drafts.asIs === 1 ? 'brouillon tel quel' : 'brouillons tels quels'],
+    [
+      'edited',
+      String(drafts.edited + drafts.rejected),
+      drafts.edited + drafts.rejected === 1 ? 'brouillon corrigé ou jeté' : 'brouillons corrigés ou jetés',
+    ],
+    ['handoffs', String(digest.handoffs), digest.handoffs === 1 ? 'passation' : 'passations'],
+  ];
+  return (
+    <div>
+      <p className="nv-field__label">
+        Ton shift en chiffres <span className="sc-optional">lu par Impera, rien à saisir</span>
+      </p>
+      <div className="rp-figs">
+        {figures.map(([key, value, words]) => (
+          <div key={key} className="rp-fig">
+            <b className="nv-num">{value}</b>
+            <span>{words}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Form({
+  data,
+  digest,
+  zone,
+  onClose,
+}: {
+  data: ShiftReportContext;
+  digest: ShiftDigest;
+  zone: string;
+  onClose: () => void;
+}): JSX.Element {
   const id = useId();
   const refresh = useRefreshFeedbacks();
   const [feedbackId] = useState(() => newId(ShiftFeedbackIdSchema));
@@ -212,6 +304,10 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
   const [incidentOn, setIncidentOn] = useState(false);
   const [incident, setIncident] = useState('');
   const [signals, setSignals] = useState<readonly SignalDraft[]>([]);
+  const [reason, setReason] = useState<DraftReason | null>(null);
+  const asked = draftReasonAsked(digest.drafts);
+  const changed = digest.drafts.edited + digest.drafts.rejected;
+  const allDrafts = changed + digest.drafts.asIs;
   const [touched, setTouched] = useState(false);
   const [sending, setSending] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -242,8 +338,11 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
       comment: comment.trim() === '' ? null : comment.trim(),
       incident: incidentOn ? incident.trim() : null,
       signals: kept.flatMap((one) =>
-        one.category === null ? [] : [{ category: one.category, text: one.text.trim() }],
+        one.category === null
+          ? []
+          : [{ category: one.category, text: one.text.trim(), conversationId: one.fan }],
       ),
+      draftReason: asked ? reason : null,
     });
     setSending(false);
     if (outcome.kind === 'ok') {
@@ -269,10 +368,28 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
         void submit();
       }}
     >
-      <p className="tm-hint">
-        Pas de montant : la paie de ce compte lit les ventes relevées. Un mot pour l’agence, ou rien à
-        signaler.
-      </p>
+      <ShiftFigures digest={digest} />
+
+      {asked ? (
+        <div>
+          <p className="nv-field__label" id={`${id}-reason`}>
+            Tu as corrigé ou jeté {changed} brouillons sur {allDrafts}. Surtout parce qu’ils étaient…{' '}
+            <span className="sc-optional">facultatif</span>
+          </p>
+          <div className="sc-options" role="radiogroup" aria-labelledby={`${id}-reason`}>
+            {DRAFT_REASONS.map((one) => (
+              <Choice
+                key={one}
+                title={DRAFT_REASON_WORDS[one]}
+                on={reason === one}
+                onPick={() => {
+                  setReason((before) => (before === one ? null : one));
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="nv-field tm-field">
         <label className="nv-field__label" htmlFor={`${id}-comment`}>
@@ -341,7 +458,7 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
 
       <div className="rp-remontees">
         <p className="nv-field__label">
-          Ce qui manque pour la semaine <span className="sc-optional">facultatif</span>
+          Ce qui remonte <span className="sc-optional">facultatif</span>
         </p>
         {signals.map((one, index) => (
           <div key={one.key} className="rp-remontee nv-enter">
@@ -385,6 +502,17 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
                 Retirer
               </button>
             </div>
+            {digest.fans.length === 0 ? null : (
+              <FanPick
+                fans={digest.fans}
+                zone={zone}
+                picked={one.fan}
+                label={`Lier la remontée ${String(index + 1)} à un fan de ton shift`}
+                onPick={(fan) => {
+                  change(one.key, { fan });
+                }}
+              />
+            )}
           </div>
         ))}
         {touched && signalProblem !== null ? <p className="tm-hint tm-hint--error">{signalProblem}</p> : null}
@@ -395,7 +523,7 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
             onClick={() => {
               setSignals((before) => [
                 ...before,
-                { key: newId(ShiftFeedbackIdSchema), category: null, text: '' },
+                { key: newId(ShiftFeedbackIdSchema), category: null, text: '', fan: null },
               ]);
             }}
           >
@@ -404,7 +532,9 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
           </button>
         ) : null}
         <p className="tm-hint">
-          Une demande de fan, un script ou un contenu qui manque. Jamais le nom d’un fan.
+          Ce qu’Impera ne voit pas : un souci hors du chat, l’agent qui déraille, une idée. Jamais le nom d’un
+          fan dans le texte : lie-le plutôt, ce qui le touche va dans sa fiche, marqué «&nbsp;par un
+          chatteur&nbsp;».
         </p>
       </div>
 
@@ -429,6 +559,60 @@ function Form({ data, onClose }: { data: ShiftReportContext; onClose: () => void
         </button>
       </div>
     </form>
+  );
+}
+
+/** The fans of his shift, the last written to first: one picked, or none (a second tap lets go). */
+function FanPick({
+  fans,
+  zone,
+  picked,
+  label,
+  onPick,
+}: {
+  fans: ShiftDigest['fans'];
+  zone: string;
+  picked: ConversationId | null;
+  label: string;
+  onPick: (fan: ConversationId | null) => void;
+}): JSX.Element {
+  const [all, setAll] = useState(false);
+  const shown = all ? fans : fans.slice(0, FANS_SHOWN);
+  return (
+    <div className="rp-fans">
+      <p className="nv-field__label">
+        Lier à un fan de ton shift <span className="sc-optional">facultatif</span>
+      </p>
+      <div className="sc-options" role="radiogroup" aria-label={label}>
+        {shown.map((fan) => (
+          <Choice
+            key={fan.conversationId}
+            title={fan.name}
+            sub={`${String(fan.messages)} ${fan.messages === 1 ? 'message' : 'messages'}, le dernier à ${clockAt(fan.lastAt, zone)}`}
+            on={picked === fan.conversationId}
+            lead={
+              <span className="nv-avatar nv-avatar--sm" aria-hidden="true">
+                {fan.name.trim().charAt(0).toUpperCase() || '•'}
+              </span>
+            }
+            onPick={() => {
+              onPick(picked === fan.conversationId ? null : fan.conversationId);
+            }}
+          />
+        ))}
+      </div>
+      {fans.length > FANS_SHOWN && !all ? (
+        <button
+          type="button"
+          className="nv-btn nv-btn--plain nv-btn--sm"
+          onClick={() => {
+            setAll(true);
+          }}
+        >
+          Voir les {fans.length} fans du shift
+        </button>
+      ) : null}
+    </div>
   );
 }
 

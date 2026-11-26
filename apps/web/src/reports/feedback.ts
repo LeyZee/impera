@@ -4,6 +4,7 @@ import {
   ShiftFeedbackListSchema,
   ShiftFeedbackReadSchema,
   ShiftFeedbackSchema,
+  type DraftReason,
   type PayPeriod,
   type PutShiftFeedbackBody,
   type ReportSignalCategory,
@@ -117,6 +118,10 @@ export const FEEDBACK_ERRORS: Readonly<Record<FeedbackRefusalCode, string>> = {
   shift_feedback_forbidden: 'Ce retour est celui du membre du shift.',
   shift_feedback_not_found: 'Ce retour n’existe plus, ou ne porte pas d’incident : la liste est relue.',
   shift_incident_forbidden: 'Ton propre incident se suit par quelqu’un d’autre.',
+  shift_feedback_fan_conflict: 'Ce fan n’est plus dans la liste de ton shift : choisis-en un autre.',
+  shift_feedback_reason_conflict: 'La question sur les brouillons ne se pose plus pour ce shift.',
+  shift_feedback_expired_conflict:
+    'Ce retour a expiré : un shift plus récent a pris sa place. Il compte comme « sans retour ».',
   role_forbidden: 'Ton rôle ne permet pas ce geste.',
   request_invalid: 'Ces mots ne conviennent pas : vérifie les textes.',
 };
@@ -128,7 +133,18 @@ export const SIGNAL_CATEGORIES: Readonly<
   fan_request: { label: 'Demande d’un fan', kind: 1 },
   missing_script: { label: 'Script manquant', kind: 2 },
   missing_content: { label: 'Contenu manquant', kind: 3 },
+  agent: { label: 'L’agent', kind: 2 },
+  idea: { label: 'Une idée', kind: 1 },
   other: { label: 'Autre', kind: 4 },
+};
+
+/** The closed question on the corrected drafts (ADR 0170 § 1), each answer as the chatter reads it. */
+export const DRAFT_REASON_WORDS: Readonly<Record<DraftReason, string>> = {
+  too_long: 'Trop longs',
+  not_her_voice: 'Pas dans sa façon d’écrire',
+  sale_too_early: 'Une vente proposée trop tôt',
+  forgot_fan: 'Il oubliait ce que le fan avait dit',
+  other: 'Autre chose',
 };
 
 /** Where an incident stands: sent, « Vu », « Réglé ». `null` without an incident. */

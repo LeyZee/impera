@@ -38,7 +38,7 @@ import {
   createDrizzleCreatorShiftsFeed,
   createDrizzleCreatorOnDuty,
 } from './infra/creator-on-duty';
-import { createDrizzleShiftFeedbackStore } from './infra/feedback-store';
+import { createDrizzleShiftFeedbackStore, type ShiftActivityReader } from './infra/feedback-store';
 import { ownValidatedShiftsForGame, type ValidatedShiftForGame } from './infra/game-reads';
 import { createDrizzleIncidentNoticeReads } from './infra/incident-notice-reads';
 import { createDrizzleLeaveStore } from './infra/leave-store';
@@ -243,6 +243,11 @@ export interface SchedulingDeps {
    * read in the reports' own transaction.
    */
   readonly shiftSalesOf: ShiftSalesReader;
+  /**
+   * What the conversations say of a shift (ADR 0170 § 1): the `conversations` module's
+   * `conversationReadsForShifts.activity`, read in the feedback's own transaction for its figures.
+   */
+  readonly shiftActivityOf: ShiftActivityReader;
   /** A creator's agenda in her calendar link's feed (CR-05 lot c2): the `creator-tasks` module's `feedOf`. */
   readonly creatorAgendaFeed: CreatorAgendaFeed;
   /**
@@ -268,8 +273,14 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
     deps.enqueuePayRecalculation,
     deps.shiftSalesOf,
   );
+  const feedbackStore = createDrizzleShiftFeedbackStore(deps.db, deps.adminDb, {
+    shiftSalesOf: deps.shiftSalesOf,
+    activityOf: deps.shiftActivityOf,
+  });
   const services = {
-    scheduling: createSchedulingService(planning, admin, deps.creators, now),
+    scheduling: createSchedulingService(planning, admin, deps.creators, now, (actor, at) =>
+      feedbackStore.owed(actor, at),
+    ),
     calendar: createCalendarService(calendarReads, deps.creators, now),
     calendarLinks: createCalendarLinkService(
       createDrizzleCalendarLinkStore(deps.adminDb),
@@ -291,11 +302,7 @@ export function createSchedulingModule(deps: SchedulingDeps): SchedulingModule {
       now,
     ),
     reports: createShiftReportService(reportStore, deps.creators, now),
-    feedback: createShiftFeedbackService(
-      createDrizzleShiftFeedbackStore(deps.db, deps.adminDb),
-      deps.creators,
-      now,
-    ),
+    feedback: createShiftFeedbackService(feedbackStore, deps.creators, now),
     payRules: createPayRulesService(
       createDrizzlePayRulesStore(deps.db, deps.adminDb, {
         switchFactsOf: deps.switchFactsOf,

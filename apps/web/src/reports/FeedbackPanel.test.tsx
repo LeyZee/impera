@@ -47,12 +47,31 @@ const sent = (patch: Record<string, unknown>): Record<string, unknown> => ({
   comment: null,
   incident: null,
   signals: [],
+  draftReason: null,
   incidentSeenAt: null,
   incidentResolvedAt: null,
   createdAt: '2026-10-27T22:05:00.000Z',
   ...patch,
 });
 
+/** Two invented fans of the shift (ADR 0010): never a real pseudo. */
+const FAN_A = '0195f0c0-0000-7000-8000-00000000f0a1';
+const digestOf = (patch: Record<string, unknown> = {}): Record<string, unknown> => ({
+  sales: { feed: 'read', count: 3, grossInclVatMinor: 8600, currency: 'EUR' },
+  drafts: { asIs: 9, edited: 0, rejected: 0 },
+  handoffs: 2,
+  fans: [
+    { conversationId: FAN_A, name: 'Fan Alpha', messages: 12, lastAt: '2026-10-27T22:41:00.000Z' },
+    {
+      conversationId: '0195f0c0-0000-7000-8000-00000000f0a2',
+      name: 'Fan Bêta',
+      messages: 5,
+      lastAt: '2026-10-27T20:10:00.000Z',
+    },
+  ],
+  ...patch,
+});
+let digest: Record<string, unknown>;
 let stored: Record<string, unknown> | null;
 const writes: { method: string; path: string; body: Record<string, unknown> }[] = [];
 
@@ -70,7 +89,8 @@ function serve(): void {
         stored = sent({ ...body });
         return json(stored, 201);
       }
-      if (url.pathname === `/v1/scheduling/shifts/${SHIFT}/feedback`) return json({ feedback: stored });
+      if (url.pathname === `/v1/scheduling/shifts/${SHIFT}/feedback`)
+        return json({ feedback: stored, digest });
       return json(null, 404);
     }),
   );
@@ -88,6 +108,7 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-10-28T00:00:00Z'));
   stored = null;
+  digest = digestOf();
   writes.length = 0;
   serve();
 });
@@ -151,5 +172,44 @@ describe('Mon retour de fin de shift (ADR 0050 § 10, trous béants n° 1)', () 
     expect(within(steps).getAllByRole('listitem')[1]?.getAttribute('aria-current')).toBe('step');
     expect(screen.getByText('L’agence l’a vu et s’en occupe.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Rien à signaler' })).toBe(null);
+  });
+
+  it('shows his shift in figures, read by Impera, and asks why only when he corrected many drafts', async () => {
+    renderPanel();
+    await screen.findByRole('button', { name: 'Rien à signaler' });
+    expect(screen.getByText('ventes · 86,00 €')).toBeTruthy();
+    expect(screen.getByText('passations')).toBeTruthy();
+    expect(screen.queryByRole('radiogroup', { name: /brouillons sur/u })).toBe(null);
+    cleanup();
+
+    digest = digestOf({ drafts: { asIs: 9, edited: 12, rejected: 2 } });
+    renderPanel();
+    const question = await screen.findByRole('radiogroup', { name: /14 brouillons sur 23/u });
+    fireEvent.click(within(question).getByRole('radio', { name: 'Pas dans sa façon d’écrire' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rien à signaler' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(writes[0]?.body).toMatchObject({ nothingToReport: true, draftReason: 'not_her_voice' });
+  });
+
+  it('links a signal to a fan of his shift, picked in the list, never typed', async () => {
+    renderPanel();
+    await screen.findByRole('button', { name: 'Rien à signaler' });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter une remontée' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Demande d’un fan' }));
+    fireEvent.change(screen.getByLabelText('Ce que signale la remontée 1'), {
+      target: { value: 'Une vidéo en tenue de sport' },
+    });
+    const fans = screen.getByRole('radiogroup', { name: 'Lier la remontée 1 à un fan de ton shift' });
+    fireEvent.click(within(fans).getByRole('radio', { name: /Fan Alpha/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Envoyer mon retour' }));
+    await waitFor(() => {
+      expect(writes).toHaveLength(1);
+    });
+    expect(writes[0]?.body).toMatchObject({
+      signals: [{ category: 'fan_request', text: 'Une vidéo en tenue de sport', conversationId: FAN_A }],
+      draftReason: null,
+    });
   });
 });

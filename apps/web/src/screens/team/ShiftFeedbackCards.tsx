@@ -12,6 +12,7 @@ import './team.css';
 
 import { IncidentTrack, RpIcon, SignalChips, StagePill } from '@/reports/FeedbackPanel';
 import {
+  DRAFT_REASON_WORDS,
   FEEDBACK_ERRORS,
   incidentStage,
   SIGNAL_CATEGORIES,
@@ -37,7 +38,7 @@ function Whose({
   list,
   zone,
 }: {
-  line: ShiftFeedbackLine;
+  line: Pick<ShiftFeedbackLine, 'memberId' | 'platformAccountId' | 'shiftStartsAt' | 'shiftEndsAt'>;
   list: ShiftFeedbackList;
   zone: string;
 }): JSX.Element {
@@ -271,6 +272,7 @@ export function FeedbacksPanel({
   }
   const incidents = list.feedbacks.filter((one) => one.incident !== null).length;
   const quiet = list.feedbacks.filter((one) => one.nothingToReport).length;
+  const { missing } = list;
   return (
     <Panel
       className="rp-fbs"
@@ -280,7 +282,7 @@ export function FeedbacksPanel({
       }
     >
       <div className="rp-sec">
-        {list.feedbacks.length === 0 ? (
+        {list.feedbacks.length === 0 && missing.length === 0 ? (
           <p className="tm-hint">
             Sur la quinzaine {periodLine(period)}, aucun retour : ils se font sur les comptes dont la paie lit
             les ventes relevées.
@@ -300,6 +302,11 @@ export function FeedbacksPanel({
               <p className="nv-tile nv-tone--ok">
                 <span className="nv-tile__value rp-fbs__value">{quiet}</span>
                 <span className="nv-tile__label">sans souci</span>
+              </p>
+              {/* A shift whose feedback expired (retour léger, 26/11): counted, never caught up. */}
+              <p className={`nv-tile${missing.length > 0 ? ' nv-tone--warn' : ''}`}>
+                <span className="nv-tile__value rp-fbs__value">{missing.length}</span>
+                <span className="nv-tile__label">sans retour</span>
               </p>
             </div>
             <SignalDonut list={list} />
@@ -328,10 +335,31 @@ export function FeedbacksPanel({
                       </p>
                     )}
                     {line.comment === null ? null : <p className="rp-fb__comment">« {line.comment} »</p>}
+                    {line.draftReason === null ? null : (
+                      <p className="rp-fb__comment">
+                        Brouillons de l’agent corrigés, surtout :{' '}
+                        {DRAFT_REASON_WORDS[line.draftReason].toLowerCase()}
+                      </p>
+                    )}
                     <SignalChips feedback={line} />
                   </li>
                 );
               })}
+              {missing.map((one) => (
+                <li key={one.shiftId} className="rp-fb nv-enter">
+                  <div className="rp-incident-line__top">
+                    <Whose
+                      line={{ ...one, shiftStartsAt: one.startsAt, shiftEndsAt: one.endsAt }}
+                      list={list}
+                      zone={zone}
+                    />
+                    <span className="nv-status rp-stage-pill" data-stage="seen">
+                      <span className="nv-status__dot" />
+                      Sans retour
+                    </span>
+                  </div>
+                </li>
+              ))}
             </ul>
           </>
         )}
