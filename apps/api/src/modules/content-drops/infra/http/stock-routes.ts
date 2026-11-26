@@ -6,6 +6,7 @@ import {
   CreatorIdSchema,
   DomainError,
   DropDescriptionsReviewSchema,
+  ReadyVideoTypesSchema,
   ValidateDropDescriptionsBodySchema,
 } from '@impera/contracts';
 import { NotACreatorAccount } from '@impera/db';
@@ -65,6 +66,19 @@ export function createStockRoutes(
       { ...creatorOnly, schema: { response: { 200: ContentStockSchema } } },
       (request) =>
         asCreator(async () => contentStockOf(await stock.forCreator(signedIn(request.user)), clock())),
+    );
+
+    // The types a video to sell may take at the drop (ADR 0163 § 7): names only, never a price.
+    app.get(
+      '/creators/:creatorId/ready-videos',
+      { ...team, schema: { params: CreatorParamsSchema, response: { 200: ReadyVideoTypesSchema } } },
+      (request) => stock.readyTypesForTeam(request.params.creatorId, signedIn(request.user)),
+    );
+
+    app.get(
+      '/creator-space/ready-videos',
+      { ...creatorOnly, schema: { response: { 200: ReadyVideoTypesSchema } } },
+      (request) => asCreator(() => stock.readyTypesForCreator(signedIn(request.user))),
     );
 
     app.get(

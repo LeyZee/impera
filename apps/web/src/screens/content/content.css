@@ -345,6 +345,12 @@
 .ct-pick {
   width: 100%;
 }
+/* The types of a video to sell, as chips that wrap on a phone. */
+.ct-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nv-space-2);
+}
 .ct-chosen {
   list-style: none;
   margin: 0;

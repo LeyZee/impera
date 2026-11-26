@@ -452,6 +452,71 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
   });
 
+  it('asks the type of a video to sell among the agency’s, and sends it with the drop (ADR 0163 § 7)', async () => {
+    const calls = serve(
+      { requests: [], drops: [] },
+      {
+        'GET /v1/creator-space/ready-videos': () =>
+          Response.json({
+            types: [
+              { id: 'rv_0000000a', label: 'Type A' },
+              { id: 'rv_0000000b', label: 'Type B' },
+            ],
+          }),
+      },
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Vidéos à vendre/u }));
+    const dialog = screen.getByRole('dialog');
+    const types = await within(dialog).findByRole('radiogroup', { name: 'Quel type de vidéo ?' });
+    expect(
+      within(types)
+        .getAllByRole('radio')
+        .map((one) => one.textContent),
+    ).toEqual(['Type A', 'Type B']);
+    const input = dialog.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [fileWithHead('IMG_0042.MOV', 'mov', 0, 'video/quicktime')]);
+    // No type, no send: the reason beside the grey button.
+    await waitFor(() => {
+      expect(within(dialog).getByText('Choisis le type de la vidéo pour envoyer.')).toBeDefined();
+    });
+    expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', true);
+    fireEvent.click(within(types).getByRole('radio', { name: 'Type B' }));
+    expect(within(types).getByRole('radio', { name: 'Type B' }).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => {
+      expect(within(dialog).getByRole('button', { name: 'Envoyer' })).toHaveProperty('disabled', false);
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Envoyer' }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.method === 'POST')).toBe(true);
+    });
+    expect(calls.find((call) => call.method === 'POST')?.body).toMatchObject({
+      category: 'sale_video',
+      readyVideoId: 'rv_0000000b',
+    });
+  });
+
+  it('says so when the agency has no type of video yet, and never sends untyped', async () => {
+    serve(
+      { requests: [], drops: [] },
+      { 'GET /v1/creator-space/ready-videos': () => Response.json({ types: [] }) },
+    );
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Vidéos à vendre/u }));
+    const dialog = screen.getByRole('dialog');
+    expect(await within(dialog).findByText(/L’agence n’a pas encore créé de types de vidéo/u)).toBeDefined();
+    expect(within(dialog).queryByRole('radiogroup')).toBeNull();
+  });
+
+  it('asks no type for any other drop', async () => {
+    const calls = serve({ requests: [], drops: [] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
+    expect(within(screen.getByRole('dialog')).queryByRole('radiogroup')).toBeNull();
+    expect(calls.some((call) => call.url.endsWith('/ready-videos'))).toBe(false);
+  });
+
   it('replaces a medium the team asked again where it is, and says what does not fit (trou 7 du 21/11)', async () => {
     const asked = fileOf({
       position: 0,

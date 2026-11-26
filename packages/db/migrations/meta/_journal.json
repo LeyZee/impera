@@ -1408,6 +1408,13 @@
       "when": 1795717780662,
       "tag": "0269_content_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 201,
+      "version": "7",
+      "when": 1795719353152,
+      "tag": "0270_sale_video_type",
+      "breakpoints": true
     }
   ]
 }

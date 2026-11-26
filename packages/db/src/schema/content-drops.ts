@@ -202,12 +202,21 @@ export const contentDrops = pgTable(
      * (`guard_content_drop_redo`). Null for any other drop, withdrawn by her or not.
      */
     redoSentence: text('redo_sentence'),
+    /**
+     * The type of a video to sell (ADR 0163 § 7): the id of a line of the owner's « Vidéos déjà tournées », never its
+     * name. Given at the drop, by her or the team; a category corrected away from it clears it.
+     */
+    readyVideoId: text('ready_video_id'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     enumCheck('content_drops', t.category, DROP_CATEGORIES),
     enumCheck('content_drops', t.correctedFrom, DROP_CATEGORIES),
+    check(
+      'content_drops_ready_video_check',
+      sql`${t.readyVideoId} is null or (${t.category} = 'sale_video' and ${t.readyVideoId} ~ '^rv_[0-9a-f]{8}$')`,
+    ),
     enumCheck('content_drops', t.state, DROP_STATES),
     check(
       'content_drops_sentence_check',
