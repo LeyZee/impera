@@ -139,7 +139,7 @@ export interface HerWeekFrame {
   readonly lines: readonly (WeekFrameLine & { readonly done: boolean })[];
 }
 
-interface HerWeekRead {
+export interface HerWeekRead {
   readonly creatorId: string;
   readonly timeZone: string;
   readonly today: string;
@@ -155,6 +155,8 @@ export interface WeekAgendaStore {
   suggestWeek(creatorId: string, userId: string, frames: WeekFrames): Promise<void>;
   /** Her frames of the week starting `week` (her Monday), in her own account. */
   herWeek(userId: string, week: string, now: Date): Promise<HerWeekRead>;
+  /** The same frames read by her owner or an active manager (`withTenantMember`); anyone else is refused. */
+  teamWeek(creatorId: string, userId: string, week: string, now: Date): Promise<HerWeekRead>;
   /** A line shot, or taken back; the day's task ticked when every line is, the tick taken back with a line. */
   tickLine(userId: string, lineId: string, done: boolean, now: Date): Promise<void>;
 }

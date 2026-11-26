@@ -76,6 +76,11 @@ export const CommentPromptInputSchema = z.strictObject({
   postAgeHours: z.number().int().nonnegative(),
   repliesToHer: z.boolean(),
   authorCommentedBefore: z.boolean(),
+  /**
+   * The code allows a question in this reply (her replies ask one now and then, never on every one): decided by the
+   * code from her day's replies, never by the model.
+   */
+  mayAsk: z.boolean(),
 });
 export type CommentPromptInput = z.infer<typeof CommentPromptInputSchema>;
 
@@ -122,6 +127,7 @@ export const COMMENT_GUARD_CODES = [
   'instagram_text',
   'public_explicit',
   'repeated_reply',
+  'unwanted_question',
 ] as const;
 export const CommentGuardCodeSchema = z.enum(COMMENT_GUARD_CODES);
 export type CommentGuardCode = z.infer<typeof CommentGuardCodeSchema>;

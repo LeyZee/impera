@@ -44,6 +44,8 @@ export interface CommentPromptFacts {
   readonly now: Date;
   readonly repliesToHer: boolean;
   readonly authorCommentedBefore: boolean;
+  /** From `mayAskQuestion`, on her replies of the day. */
+  readonly mayAsk: boolean;
 }
 
 export function promptInputOf(facts: CommentPromptFacts): CommentPromptInput {
@@ -55,6 +57,7 @@ export function promptInputOf(facts: CommentPromptFacts): CommentPromptInput {
     postAgeHours: Math.max(0, hours),
     repliesToHer: facts.repliesToHer,
     authorCommentedBefore: facts.authorCommentedBefore,
+    mayAsk: facts.mayAsk,
   };
 }
 

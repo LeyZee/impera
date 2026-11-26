@@ -89,6 +89,7 @@ function viewOf(creatorId: CreatorId, read: CopilotRead, now: Date): CopilotDraf
     conversationId: read.conversationId,
     fanId: read.fanId,
     switches: read.switches,
+    standing: read.standing,
   };
   if (!read.switches.drafts) return { state: 'off', conversation };
   if (read.draft !== null)

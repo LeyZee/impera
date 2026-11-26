@@ -300,6 +300,11 @@ export interface InstagramCommentInput {
   readonly examples: readonly string[];
   /** Her most recent replies, so that she does not write the same one twice; empty: none. */
   readonly recentReplies: readonly string[];
+  /**
+   * Her real replies to the comments that read closest to this one, picked by the code (Charles, 26/11): in the
+   * message, not the system, so the cached system stays the same from one comment to the next; empty: none.
+   */
+  readonly nearExamples?: readonly { readonly comment: string; readonly reply: string }[];
   readonly comment: CommentPromptInput;
   /** What the guards refused in a first reply: this call is the one rewrite (§ 3). Rule names only, never a text. */
   readonly refusedBy?: readonly string[];

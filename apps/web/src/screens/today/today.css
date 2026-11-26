@@ -31,6 +31,81 @@
   padding: 4px var(--nv-plate-pad) var(--nv-plate-pad);
 }
 
+/* Accueil du chatteur (Charles, 21/11): the work on the left, where he stands on the right; one column on a phone. */
+.sc-today--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nv-space-4);
+  align-items: start;
+}
+.sc-today__main,
+.sc-today__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-4);
+  min-width: 0;
+}
+@media (min-width: 1024px) {
+  .sc-today--split {
+    grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr);
+  }
+}
+
+/* « Elle, en trois lignes »: her limits and her voice inside the shift's hero. */
+.sc-her {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nv-space-1);
+  padding: var(--nv-space-3);
+  border-radius: var(--nv-radius-md);
+  background: color-mix(in srgb, var(--nv-ink) 4%, transparent);
+}
+.sc-her__title {
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-caption);
+  font-weight: 650;
+}
+.sc-her__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--nv-text-footnote);
+}
+/* What she told the agency herself (Charles, 21/11): newer than her sheet, so in ink and bold, never red. */
+.sc-her__lines [data-told] {
+  color: var(--nv-ink);
+  font-weight: 600;
+}
+
+/* The shift's gauge says what it measures (Design, 21/11), in the series colour, never the neon. */
+.sc-hero__gauge-label {
+  display: flex;
+  justify-content: space-between;
+  color: var(--nv-ink-muted);
+  font-size: var(--nv-text-footnote);
+}
+.sc-hero__gauge-label b {
+  color: var(--nv-ink);
+}
+.sc-hero__gauge.nv-gauge {
+  --_g: var(--nv-series-2);
+}
+
+/* « Ma quinzaine » in the narrow column (avis Design, accueils-2): the figure and its words the full width, the ring and
+   its tier on their own line under them, as on a phone; never a sentence broken on four lines beside the ring. */
+.sc-today__side .mf-card__body {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--nv-space-3);
+}
+.sc-today__side .mf-tier {
+  flex-direction: row;
+  align-items: center;
+  text-align: left;
+}
 /* A refused « Je prends mon poste », on its own line under all the actions: amber, never red (it is not an urgency). */
 .td-checkin__said {
   flex-basis: 100%;

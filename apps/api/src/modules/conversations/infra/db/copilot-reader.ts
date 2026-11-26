@@ -22,6 +22,7 @@ import {
 import type { CopilotLive } from '../../domain/copilot-assist';
 import type { CopilotReader } from '../../domain/ports';
 
+import { fanStanding } from './fan-standing';
 import { openedLately, writeOpening } from './openings';
 import { readCopilotTrace, readDraftTranslation, toStoredEvent } from './rows';
 
@@ -89,7 +90,7 @@ async function journalOf(
 }
 
 /** The copilot panel's read (ADR 0086), in one tenant transaction: RLS scopes every statement to the creator. */
-export function createDrizzleCopilotReader(db: Database): CopilotReader {
+export function createDrizzleCopilotReader(db: Database, now: () => Date = () => new Date()): CopilotReader {
   return {
     read: (creatorId, { platform, platformConversationId }, trace) =>
       withTenant(db, creatorId, async (tx) => {
@@ -154,18 +155,20 @@ export function createDrizzleCopilotReader(db: Database): CopilotReader {
                 .limit(1)
             : [draft];
         const state = ConversationStateSchema.parse(conversation.state);
-        const now = new Date();
+        const at = now();
         const live: CopilotLive = {
           trace: readCopilotTrace(traced?.policyTrace),
           flags: await flagsOf(tx, conversation.fanId),
           careSince: conversation.careSince,
           careClosedAt: conversation.careClosedAt,
           held: state === 'human',
-          ...(await journalOf(tx, id, { ...conversation, now })),
+          ...(await journalOf(tx, id, { ...conversation, now: at })),
         };
+        const fanId = FanIdSchema.parse(conversation.fanId);
         return {
           conversationId: id,
-          fanId: FanIdSchema.parse(conversation.fanId),
+          fanId,
+          standing: await fanStanding(tx, creatorId, fanId, at),
           writing: WRITING_STATES.has(state),
           switches: switchesOf(creator?.settings),
           draft:

@@ -24,7 +24,7 @@ async function failure(promise: Promise<unknown>): Promise<string> {
 }
 
 /**
- * His kept language (ADR 0168 § 3, migration 0270): read and written in his creator only, never by a creator account,
+ * His kept language (ADR 0168 § 3, migration 0273): read and written in his creator only, never by a creator account,
  * whole or absent, a person's name exactly when a person set it. Invented creators and fans only (ADR 0010).
  */
 describe('the fan’s kept language (ADR 0168): his creator’s, whole, and the person who set it', () => {

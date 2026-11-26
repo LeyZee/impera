@@ -1,6 +1,6 @@
 {
-  "id": "3658a752-f82a-42a8-9ba4-7673459b7434",
-  "prevId": "2046e9a3-3108-4194-9765-df8e8e7fe241",
+  "id": "1a70179f-f05c-4a56-a600-5214e2d33ce5",
+  "prevId": "ccf6c1f5-a726-4861-9ea3-f750a4cb34c4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1543,6 +1543,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "redo_sentence": {
+          "name": "redo_sentence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_at": {
+          "name": "redo_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_by": {
+          "name": "redo_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1654,6 +1672,15 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
+        "content_drop_files_redo_by_user_id_fk": {
+          "name": "content_drop_files_redo_by_user_id_fk",
+          "tableFrom": "content_drop_files",
+          "tableTo": "user",
+          "columnsFrom": ["redo_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "content_drop_files_drop_fk": {
           "name": "content_drop_files_drop_fk",
           "tableFrom": "content_drop_files",
@@ -1689,6 +1716,21 @@
           "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'filling'\n      )",
           "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
         },
+        "creator_redo_replace": {
+          "name": "creator_redo_replace",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_sentence\" is not null or \"content_drop_files\".\"state\" = 'refused') and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is not null"
+        },
+        "creator_redo_insert": {
+          "name": "creator_redo_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and \"content_drop_files\".\"replaced_at\" is null\n        and \"content_drop_files\".\"redo_sentence\" is null and \"content_drop_files\".\"media_asset_id\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      ) and exists (\n        select 1 from content_drop_files old where old.drop_id = \"content_drop_files\".\"drop_id\" and old.creator_id = \"content_drop_files\".\"creator_id\"\n          and old.position = \"content_drop_files\".\"position\" and old.slot_key is not distinct from \"content_drop_files\".\"slot_key\"\n          and old.replaced_at is not null and (old.redo_sentence is not null or old.state = 'refused')\n      )"
+        },
         "team_read": {
           "name": "team_read",
           "as": "PERMISSIVE",
@@ -1709,6 +1751,14 @@
           "for": "INSERT",
           "to": ["public"],
           "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"state\" = 'awaiting' and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\" and d.state = 'uploading'\n      )"
+        },
+        "team_redo": {
+          "name": "team_redo",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null and exists (\n        select 1 from content_drops d where d.id = \"content_drop_files\".\"drop_id\" and d.creator_id = \"content_drop_files\".\"creator_id\"\n          and d.state in ('received', 'ready', 'blocked') and (d.exported_at is null or d.category = 'script')\n      )",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' and nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency') and \"content_drop_files\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"content_drop_files\".\"replaced_at\" is null\n        and (\"content_drop_files\".\"redo_by\" is null or \"content_drop_files\".\"redo_by\" = nullif(current_setting('app.user_id', true), ''))"
         }
       },
       "checkConstraints": {
@@ -1730,7 +1780,11 @@
         },
         "content_drop_files_slot_check": {
           "name": "content_drop_files_slot_check",
-          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))\n        and (\"content_drop_files\".\"replaced_at\" is null or \"content_drop_files\".\"slot_key\" is not null)"
+          "value": "(\"content_drop_files\".\"slot_key\" is null or char_length(\"content_drop_files\".\"slot_key\") between 4 and 40)\n        and (\"content_drop_files\".\"min_seconds\" is null) = (\"content_drop_files\".\"max_seconds\" is null)\n        and (\"content_drop_files\".\"min_seconds\" is null or (\"content_drop_files\".\"slot_key\" is not null and \"content_drop_files\".\"min_seconds\" between 1 and \"content_drop_files\".\"max_seconds\"))"
+        },
+        "content_drop_files_redo_check": {
+          "name": "content_drop_files_redo_check",
+          "value": "(\"content_drop_files\".\"redo_sentence\" is null) = (\"content_drop_files\".\"redo_at\" is null) and (\"content_drop_files\".\"redo_at\" is null) = (\"content_drop_files\".\"redo_by\" is null)\n        and coalesce(char_length(\"content_drop_files\".\"redo_sentence\"), 1) between 1 and 200"
         },
         "content_drop_files_bytes_check": {
           "name": "content_drop_files_bytes_check",
@@ -1845,6 +1899,12 @@
         "withdrawn_at": {
           "name": "withdrawn_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "redo_sentence": {
+          "name": "redo_sentence",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -2044,11 +2104,11 @@
       "checkConstraints": {
         "content_drops_category_check": {
           "name": "content_drops_category_check",
-          "value": "\"content_drops\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_drops\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_drops_corrected_from_check": {
           "name": "content_drops_corrected_from_check",
-          "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_drops\".\"corrected_from\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_drops_state_check": {
           "name": "content_drops_state_check",
@@ -2069,6 +2129,10 @@
         "content_drops_withdrawn_check": {
           "name": "content_drops_withdrawn_check",
           "value": "(\"content_drops\".\"state\" = 'withdrawn') = (\"content_drops\".\"withdrawn_at\" is not null)\n        and (\"content_drops\".\"withdrawn_at\" is null) = (\"content_drops\".\"withdrawn_by\" is null)"
+        },
+        "content_drops_redo_check": {
+          "name": "content_drops_redo_check",
+          "value": "\"content_drops\".\"redo_sentence\" is null or (\"content_drops\".\"state\" = 'withdrawn' and char_length(\"content_drops\".\"redo_sentence\") between 1 and 200)"
         },
         "content_drops_script_check": {
           "name": "content_drops_script_check",
@@ -2323,7 +2387,7 @@
       "checkConstraints": {
         "content_requests_category_check": {
           "name": "content_requests_category_check",
-          "value": "\"content_requests\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_requests\".\"category\" in ('feed_shoot', 'feed_video', 'script', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_requests_origin_check": {
           "name": "content_requests_origin_check",
@@ -3789,6 +3853,296 @@
         "script_runs_ended_check": {
           "name": "script_runs_ended_check",
           "value": "(\"script_runs\".\"status\" = 'open') = (\"script_runs\".\"ended_at\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_absences": {
+      "name": "creator_absences",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelled_by": {
+          "name": "cancelled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "creator_absences_creator_ends_idx": {
+          "name": "creator_absences_creator_ends_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ends_on",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_absences_creator_id_creators_id_fk": {
+          "name": "creator_absences_creator_id_creators_id_fk",
+          "tableFrom": "creator_absences",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_absences_created_by_user_id_fk": {
+          "name": "creator_absences_created_by_user_id_fk",
+          "tableFrom": "creator_absences",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_absences_cancelled_by_user_id_fk": {
+          "name": "creator_absences_cancelled_by_user_id_fk",
+          "tableFrom": "creator_absences",
+          "tableTo": "user",
+          "columnsFrom": ["cancelled_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "tenant_read": {
+          "name": "tenant_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_absences\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_absences\".\"cancelled_at\" is null"
+        },
+        "creator_update": {
+          "name": "creator_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_absences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_absences\".\"cancelled_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "creator_absences_days_check": {
+          "name": "creator_absences_days_check",
+          "value": "\"creator_absences\".\"starts_on\" <= \"creator_absences\".\"ends_on\""
+        },
+        "creator_absences_span_check": {
+          "name": "creator_absences_span_check",
+          "value": "\"creator_absences\".\"ends_on\" - \"creator_absences\".\"starts_on\" < 60"
+        },
+        "creator_absences_note_check": {
+          "name": "creator_absences_note_check",
+          "value": "char_length(\"creator_absences\".\"note\") <= 200"
+        },
+        "creator_absences_cancel_check": {
+          "name": "creator_absences_cancel_check",
+          "value": "(\"creator_absences\".\"cancelled_at\" is null) = (\"creator_absences\".\"cancelled_by\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.creator_stops": {
+      "name": "creator_stops",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "creator_id": {
+          "name": "creator_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "what": {
+          "name": "what",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "withdrawn_at": {
+          "name": "withdrawn_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "withdrawn_by": {
+          "name": "withdrawn_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "creator_stops_creator_idx": {
+          "name": "creator_stops_creator_idx",
+          "columns": [
+            {
+              "expression": "creator_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "creator_stops_creator_id_creators_id_fk": {
+          "name": "creator_stops_creator_id_creators_id_fk",
+          "tableFrom": "creator_stops",
+          "tableTo": "creators",
+          "columnsFrom": ["creator_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_stops_created_by_user_id_fk": {
+          "name": "creator_stops_created_by_user_id_fk",
+          "tableFrom": "creator_stops",
+          "tableTo": "user",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "creator_stops_withdrawn_by_user_id_fk": {
+          "name": "creator_stops_withdrawn_by_user_id_fk",
+          "tableFrom": "creator_stops",
+          "tableTo": "user",
+          "columnsFrom": ["withdrawn_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "tenant_read": {
+          "name": "tenant_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
+        },
+        "creator_insert": {
+          "name": "creator_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_stops\".\"created_by\" = nullif(current_setting('app.user_id', true), '') and \"creator_stops\".\"withdrawn_at\" is null"
+        },
+        "creator_update": {
+          "name": "creator_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
+          "withCheck": "current_setting('app.account_role', true) = 'creator' and \"creator_stops\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and \"creator_stops\".\"withdrawn_by\" = nullif(current_setting('app.user_id', true), '')"
+        }
+      },
+      "checkConstraints": {
+        "creator_stops_what_check": {
+          "name": "creator_stops_what_check",
+          "value": "char_length(\"creator_stops\".\"what\") between 1 and 200"
+        },
+        "creator_stops_withdraw_check": {
+          "name": "creator_stops_withdraw_check",
+          "value": "(\"creator_stops\".\"withdrawn_at\" is null) = (\"creator_stops\".\"withdrawn_by\" is null)"
         }
       },
       "isRLSEnabled": false
@@ -5991,30 +6345,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
-        },
-        "language": {
-          "name": "language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "language_source": {
-          "name": "language_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "language_set_by": {
-          "name": "language_set_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "language_set_at": {
-          "name": "language_set_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -6049,15 +6379,6 @@
           "tableFrom": "fans",
           "tableTo": "platform_accounts",
           "columnsFrom": ["platform_account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "fans_language_set_by_user_id_fk": {
-          "name": "fans_language_set_by_user_id_fk",
-          "tableFrom": "fans",
-          "tableTo": "user",
-          "columnsFrom": ["language_set_by"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -6107,20 +6428,7 @@
           "using": "current_setting('app.account_role', true) is distinct from 'creator'"
         }
       },
-      "checkConstraints": {
-        "fans_language_check": {
-          "name": "fans_language_check",
-          "value": "\"fans\".\"language\" in ('french', 'english', 'italian', 'spanish', 'german', 'portuguese', 'dutch', 'arabic')"
-        },
-        "fans_language_source_check": {
-          "name": "fans_language_source_check",
-          "value": "\"fans\".\"language_source\" in ('detected', 'set')"
-        },
-        "fans_language_whole_check": {
-          "name": "fans_language_whole_check",
-          "value": "(\"fans\".\"language\" is null and \"fans\".\"language_source\" is null and \"fans\".\"language_set_at\" is null and \"fans\".\"language_set_by\" is null) or (\"fans\".\"language\" is not null and \"fans\".\"language_source\" is not null and \"fans\".\"language_set_at\" is not null and (\"fans\".\"language_source\" = 'set') = (\"fans\".\"language_set_by\" is not null))"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.media_insight_snapshots": {
@@ -9542,26 +9850,27 @@
           "using": "\"media_descriptions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid",
           "withCheck": "\"media_descriptions\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid"
         },
-        "creator_no_insert": {
-          "name": "creator_no_insert",
-          "as": "RESTRICTIVE",
-          "for": "INSERT",
-          "to": ["public"],
-          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
-        "creator_no_update": {
-          "name": "creator_no_update",
-          "as": "RESTRICTIVE",
-          "for": "UPDATE",
-          "to": ["public"],
-          "using": "current_setting('app.account_role', true) is distinct from 'creator'"
-        },
         "creator_no_delete": {
           "name": "creator_no_delete",
           "as": "RESTRICTIVE",
           "for": "DELETE",
           "to": ["public"],
           "using": "current_setting('app.account_role', true) is distinct from 'creator'"
+        },
+        "creator_no_insert": {
+          "name": "creator_no_insert",
+          "as": "RESTRICTIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' or (\"media_descriptions\".\"author\" = 'human' and \"media_descriptions\".\"model\" = 'human'\n        and \"media_descriptions\".\"validated_by\" = nullif(current_setting('app.user_id', true), '') and \"media_descriptions\".\"validated_at\" is not null and exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id\n       where f.media_asset_id = \"media_descriptions\".\"media_asset_id\" and d.creator_id = \"media_descriptions\".\"creator_id\"\n         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate'))\n        and not (cardinality(\"media_descriptions\".\"review_reasons\") > 0 or jsonb_array_length(coalesce(\"media_descriptions\".\"content\" -> 'flags', '[]'::jsonb)) > 0) and not exists (select 1 from media_descriptions w\n       where w.media_asset_id = \"media_descriptions\".\"media_asset_id\" and w.validated_at is null\n         and (cardinality(w.review_reasons) > 0\n              or jsonb_array_length(coalesce(w.content -> 'flags', '[]'::jsonb)) > 0)))"
+        },
+        "creator_no_update": {
+          "name": "creator_no_update",
+          "as": "RESTRICTIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "current_setting('app.account_role', true) is distinct from 'creator' or (\"media_descriptions\".\"validated_at\" is null and exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id\n       where f.media_asset_id = \"media_descriptions\".\"media_asset_id\" and d.creator_id = \"media_descriptions\".\"creator_id\"\n         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate')) and not (cardinality(\"media_descriptions\".\"review_reasons\") > 0 or jsonb_array_length(coalesce(\"media_descriptions\".\"content\" -> 'flags', '[]'::jsonb)) > 0))",
+          "withCheck": "current_setting('app.account_role', true) is distinct from 'creator' or (\"media_descriptions\".\"validated_by\" = nullif(current_setting('app.user_id', true), '') and exists (select 1 from content_drop_files f join content_drops d on d.id = f.drop_id\n       where f.media_asset_id = \"media_descriptions\".\"media_asset_id\" and d.creator_id = \"media_descriptions\".\"creator_id\"\n         and d.state <> 'withdrawn' and f.state in ('kept', 'duplicate')))"
         }
       },
       "checkConstraints": {
@@ -9949,6 +10258,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_sends_free_once_idx": {
+          "name": "media_sends_free_once_idx",
+          "columns": [
+            {
+              "expression": "fan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "media_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_sends\".\"price_minor\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -25272,7 +25603,7 @@
       "checkConstraints": {
         "content_ideas_category_check": {
           "name": "content_ideas_category_check",
-          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post')"
+          "value": "\"content_ideas\".\"category\" in ('feed_shoot', 'feed_video', 'mass_dm', 'reveal_story', 'instagram_story', 'instagram_reel', 'instagram_post', 'telegram_post', 'whale_gift', 'voice_beep', 'voice_real', 'sale_video')"
         },
         "content_ideas_suggestion_check": {
           "name": "content_ideas_suggestion_check",
