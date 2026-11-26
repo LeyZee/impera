@@ -112,6 +112,7 @@ import { scopesCreators } from './shell/CreatorScope';
 import { ErrorPage } from './shell/ErrorPage';
 import { NotFoundPage } from './shell/NotFoundPage';
 import { ACCOUNT_SECURITY, canOpen, railOf, sectionOf, securityPathOf } from './shell/nav';
+import { MyStockPage } from './stock/MyStockPage';
 
 /** What every screen can read: who is signed in, and how to sign out. Given by `App` once the session is known. */
 export interface RouterContext {
@@ -548,12 +549,22 @@ const content = createRoute({
       <>
         <ContentPage
           onOpenScript={(dropId) => void navigate({ to: '/contenu/script/$dropId', params: { dropId } })}
+          onOpenStock={() => void navigate({ to: '/contenu/coffre' })}
           asked={demande ?? null}
           onAsked={() => void navigate({ to: '/contenu', replace: true })}
         />
         <CreatorRewardRevealGate user={user} />
       </>
     );
+  },
+});
+/** Mon coffre (ADR 0162 § 5): what she dropped, by use, with what the AI understood of each medium. */
+const contentStock = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/contenu/coffre',
+  component: function ContentStock() {
+    const navigate = contentStock.useNavigate();
+    return <MyStockPage onDrop={() => void navigate({ to: '/contenu' })} />;
   },
 });
 /** Her script, card by card (SC-02 lot b2): a drop of hers, by its id; any other address goes back to Contenu. */
@@ -1325,6 +1336,7 @@ const routeTree = rootRoute.addChildren([
   agenda,
   sales,
   content,
+  contentStock,
   contentScript,
   myPlanning,
   team.addChildren([

@@ -232,14 +232,16 @@ export class ScriptSummaryCorrectionUnprocessable extends DomainError {
 
 /** A row named that is no longer the one shown (a newer came), or a row to see alone sent in a batch. */
 export class DropDescriptionReviewConflict extends DomainError {
-  constructor(reason: 'not_shown' | 'alone' | 'summary_stale') {
+  constructor(reason: 'not_shown' | 'alone' | 'summary_stale' | 'agency') {
     super(
       DROP_DESCRIPTION_REVIEW_CONFLICT,
-      reason === 'alone'
-        ? 'Une description à vérifier se valide seule, pas avec « Tout valider »'
-        : reason === 'summary_stale'
-          ? 'Cette synthèse n’est plus la dernière du script : recharge-le'
-          : 'Une description plus récente est arrivée entre-temps : recharge le script',
+      reason === 'agency'
+        ? 'L’agence doit d’abord relire cette description'
+        : reason === 'alone'
+          ? 'Une description à vérifier se valide seule, pas avec « Tout valider »'
+          : reason === 'summary_stale'
+            ? 'Cette synthèse n’est plus la dernière du script : recharge-le'
+            : 'Une description plus récente est arrivée entre-temps : recharge le script',
       { details: { reason } },
     );
   }
