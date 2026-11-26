@@ -1137,6 +1137,16 @@ describe('instagramComment (ADR 0122 § 2)', () => {
     expect(system).not.toContain('Merciii');
   });
 
+  it('gives the shape of her closest reply', async () => {
+    const xai = scripted([{ text: JSON.stringify(reply) }]);
+    const { gateway } = setup({ xai });
+
+    await gateway.instagramComment({ ...base, replyShape: { emojis: 0, exclaims: true } });
+
+    const prompt = JSON.stringify(xai.doGenerateCalls[0]?.prompt.filter((m) => m.role === 'user'));
+    expect(prompt).toContain('aucun emoji, et un point d’exclamation');
+  });
+
   it('asks for emojis only when he says he loves her, and no question', async () => {
     const xai = scripted([{ text: JSON.stringify({ kind: 'reply', text: '🫶🏻', reason: 'amour' }) }]);
     const { gateway } = setup({ xai });

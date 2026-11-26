@@ -28,7 +28,7 @@ describe('the calibration of her replies to comments (Charles, 26/11)', () => {
       publication: 'Dimanche @amie',
       commentaire: '＠elle trop belle',
       reponses: [
-        { date: '2025-03-14', destinataire: 'quelquun', texte: '@quelquun Merciii 🫶🏻' },
+        { date: '2025-03-14', destinataire: 'quelquun', texte: '@quelquun [pseudo] Merciii 🫶🏻' },
         { date: '2025-03-15', destinataire: 'quelquun', texte: 'Encore merci' },
       ],
     });
