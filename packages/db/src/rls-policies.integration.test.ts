@@ -28,6 +28,8 @@ const POLICY_EXCEPTIONS: Readonly<Record<string, string>> = {
   'invoice_lines.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_pdf_copies.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
   'invoice_pdfs.member_read': 'EXISTS on invoices, itself under RLS by member and team scope',
+  'pay_sale_claim_answers.member_read':
+    'EXISTS on pay_sale_claims, itself under RLS by creator, member and team scope (trou 15, Sécurité #1026)',
   'mcp_grants.owner_insert':
     'agency-level, the owner alone in his own name (app.team_scope, app.user_id): creator_id is the creator an agent access is bound to, not a tenant (migration 0193)',
   'mcp_grants.owner_read':
