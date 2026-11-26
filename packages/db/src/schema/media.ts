@@ -500,6 +500,10 @@ export const mediaSends = pgTable(
     enumCheck('media_sends', t.currency, CurrencySchema.options),
     check('media_sends_price_minor_check', sql`${t.priceMinor} is null or ${t.priceMinor} >= 0`),
     index('media_sends_fan_media_idx').on(t.fanId, t.mediaAssetId),
+    // A medium given for free goes once to a fan (ADR 0163 § 7): the agent's note of a voice or a gift, replayable.
+    uniqueIndex('media_sends_free_once_idx')
+      .on(t.fanId, t.mediaAssetId)
+      .where(sql`${t.priceMinor} is null`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],

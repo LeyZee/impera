@@ -11,6 +11,7 @@ import {
   type StockStanding,
 } from '@impera/contracts';
 
+import { PROVEN_GIFT_INTENSITIES } from '../domain/reserved';
 import { STOCK_ORDER, stockCategory, type StockCounts } from '../domain/stock';
 
 /** A medium of hers as the store reads it, before it is checked (CLAUDE.md rule 6: Zod at the border). */
@@ -33,8 +34,6 @@ export interface StockRow {
 const WEEK_MS = 7 * 24 * 3600 * 1000;
 /** A gift is never nude (ADR 0163 § 2): what the vision or a person said explicit or hard is not a gift. */
 const NOT_A_GIFT: ReadonlySet<string> = new Set(['explicit', 'hardcore']);
-/** A gift counts only once its description proves it is not nude: undescribed, it waits outside the count. */
-const PROVEN_GIFT: ReadonlySet<string> = new Set(['soft', 'suggestive']);
 
 function standingOf(dropState: string, outAt: Date | null): StockStanding {
   if (outAt !== null || DropStateSchema.parse(dropState) === 'published') return 'out';
@@ -49,7 +48,9 @@ export function contentStockOf(rows: readonly StockRow[], now: Date): ContentSto
   const unproven = new Set(
     rows
       .filter(
-        (row) => row.category === 'whale_gift' && (row.intensity === null || !PROVEN_GIFT.has(row.intensity)),
+        (row) =>
+          row.category === 'whale_gift' &&
+          (row.intensity === null || !PROVEN_GIFT_INTENSITIES.has(row.intensity)),
       )
       .map((row) => row.fileId),
   );

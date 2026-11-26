@@ -37,6 +37,7 @@ import {
   createDrizzleCreatorDescriptionReview,
   createDrizzleDescriptionReview,
 } from './infra/db/description-review-store';
+import { createDrizzleReservedMedia, type ReservedMediaStore } from './infra/db/reserved-media';
 import { createDrizzleRetentionStore } from './infra/db/retention-store';
 import { createDrizzleScriptDropStore } from './infra/db/script-drop-store';
 import { createDrizzleScriptSummaryStore } from './infra/db/script-summary-store';
@@ -125,6 +126,11 @@ export interface ContentDropsModule {
     /** The steps of a script of hers, the agency's words; `null` for a drop that is not a script of hers. */
     scriptSteps(creatorId: string, reader: ContentReader, dropId: string): Promise<ScriptSteps | null>;
   };
+  /**
+   * What the AI sends from her coffre (ADR 0163 § 7), for the agent: a voice or a whale gift not sent to this fan yet,
+   * and the send noted once the platform confirmed it (replayable). Never a medium's key nor its address.
+   */
+  readonly reserved: ReservedMediaStore;
   /** The scripts the cadence asks of her (SC-02), written by the scripts' job as the owner's role, replayable. */
   readonly scriptRequests: {
     ask(request: ScriptContentRequest): Promise<void>;
@@ -276,6 +282,7 @@ export function createContentDropsModule(deps: ContentDropsDeps): ContentDropsMo
       ),
     unpicture: (key) => (storage === NO_STORAGE ? Promise.resolve() : storage.remove(key)),
     requestFromIdea: (request) => requestFromIdea(deps.adminDb, request),
+    reserved: createDrizzleReservedMedia(deps.db),
     scriptRequests: {
       ask: (request) => requestScript(deps.adminDb, request),
       last: (creatorId) => lastScriptRequest(deps.adminDb, creatorId),

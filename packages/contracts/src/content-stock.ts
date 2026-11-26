@@ -1,7 +1,15 @@
 import { z } from 'zod';
 
 import { DropCategorySchema, DropMediaKindSchema } from './content-drops';
-import { ContentDropFileIdSchema, ContentDropIdSchema } from './ids';
+import {
+  ContentDropFileIdSchema,
+  ContentDropIdSchema,
+  ConversationIdSchema,
+  CreatorIdSchema,
+  FanIdSchema,
+  MediaAssetIdSchema,
+  MessageIdSchema,
+} from './ids';
 
 /*
  * Coffre Impera (ADR 0163): what she dropped, by use, with what is in stock, scheduled and out, against the rhythm the
@@ -83,3 +91,38 @@ export type ContentStock = z.infer<typeof ContentStockSchema>;
 
 /** How many media the read returns at most: the newest. */
 export const STOCK_MEDIA_LIMIT = 600;
+
+/**
+ * What the AI sends from her coffre, never sold (ADR 0163 § 7): her two voices and the whale gifts. The agent picks one
+ * for a fan, sends it, then notes it sent; the coffre never sends anything itself.
+ */
+export const RESERVED_CATEGORIES = ['voice_beep', 'voice_real', 'whale_gift'] as const;
+export const ReservedCategorySchema = z.enum(RESERVED_CATEGORIES);
+export type ReservedCategory = z.infer<typeof ReservedCategorySchema>;
+
+/** The agent's ask: a medium of this category of hers, not sent to this fan yet. */
+export const ReservedMediaAskSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  category: ReservedCategorySchema,
+  fanId: FanIdSchema,
+});
+export type ReservedMediaAsk = z.input<typeof ReservedMediaAskSchema>;
+
+/** The medium picked: what the agent sends, never its key nor its address. */
+export const ReservedMediaSchema = z.strictObject({
+  mediaAssetId: MediaAssetIdSchema,
+  kind: DropMediaKindSchema,
+});
+export type ReservedMedia = z.infer<typeof ReservedMediaSchema>;
+
+/** A send the agent saw confirmed, to note: free, once for a fan and a medium. */
+export const ReservedMediaSentSchema = z.strictObject({
+  creatorId: CreatorIdSchema,
+  mediaAssetId: MediaAssetIdSchema,
+  fanId: FanIdSchema,
+  conversationId: ConversationIdSchema,
+  /** The message that carried it, when the platform gave one back. */
+  messageId: MessageIdSchema.nullable(),
+  sentAt: z.date(),
+});
+export type ReservedMediaSent = z.input<typeof ReservedMediaSentSchema>;

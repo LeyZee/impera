@@ -21,11 +21,12 @@ Charles veut une vue « Coffre Impera », distincte du coffre de Reveal, qui cou
 7. **Ce que l'IA tire du coffre** (Charles, 21/11 au soir). Trois catégories de dépôt de plus, que l'agence peut demander dans sa to-do :
    - « Vocal du bip » (un vocal) et « Vocal bien réelle » (un ou deux) : sa vraie voix, que l'IA envoie quand un fan la croit un robot, puis si le doute reste ; chacun au plus une fois par fan, jamais vendu ;
    - « Vidéos à vendre » : des vidéos de côté, vendues hors scripts, jamais offertes. Chacune porte un type, une ligne de la grille tarifaire que le propriétaire crée et nomme lui-même ; le code tire le prix dans la fourchette de la ligne et le fige. L'IA n'en propose que hors séance ou quand les scripts jouables sont finis, jamais le soir même d'un script, jamais à un fan fragile, sans relance après un refus, et jamais deux fois la même au même fan.
+   - Ce que l'agent pioche, et comment c'est noté : le module des dépôts lui donne un média d'une catégorie qu'il envoie (les deux vocaux, les cadeaux baleines), gardé, jamais remplacé, dont la description est validée par l'agence, un cadeau prouvé « doux » ou « suggestif ». Un vocal ne part qu'une fois à un fan, quel que soit son fichier ; un cadeau jamais deux fois le même. Une fois l'envoi confirmé, l'agent le note (`media_sends`, prix vide), une seule fois par fan et par média (index unique partiel), rejouable. La lecture passe par la porte du travail qui lit ses médias déposés (`drop_media`), sous son locataire : ses dépôts ne s'ouvrent jamais à un locataire nu.
    L'IA lit la catégorie d'un média, jamais le nom d'un dossier. Pour le fan qui a tout acheté et en redemande le soir même, l'IA ne pioche rien : c'est la règle de l'agent.
 8. **Ce qui n'est pas fait ici.** « Ce qui part quand » (le planning de publication) attend le moteur de publication ; « À remplacer » côté serveur appartient au module des dépôts, la propagation aux scripts au module des scripts.
 
 ## Conséquences
 
-- Une table de plus n'est pas nécessaire : une migration ajoute la catégorie `whale_gift` et les politiques qui laissent la créatrice relire ses descriptions.
+- Une table de plus n'est pas nécessaire : une migration ajoute les catégories (`whale_gift`, les deux vocaux, les vidéos à vendre), les politiques qui laissent la créatrice relire ses descriptions, et l'index qui fait d'un envoi gratuit un envoi unique par fan et par média.
 - Les routes de l'espace créatrice entrent dans le balayage d'isolation des locataires.
 - Les couleurs par catégorie (dix) dépassent les quatre couleurs de série du design system : le fil Design les ajoute en jetons.

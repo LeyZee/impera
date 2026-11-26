@@ -1,5 +1,5 @@
 {
-  "id": "b8bdd217-8b25-4e72-accf-21f09a4aae98",
+  "id": "d03c35bf-9772-49af-9157-f4f7370b7c49",
   "prevId": "fce21862-b0a7-414a-9871-0c85bdde57a5",
   "version": "7",
   "dialect": "postgresql",
@@ -9890,6 +9890,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "media_sends_free_once_idx": {
+          "name": "media_sends_free_once_idx",
+          "columns": [
+            {
+              "expression": "fan_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "media_asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"media_sends\".\"price_minor\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
