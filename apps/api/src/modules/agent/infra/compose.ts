@@ -65,6 +65,7 @@ import {
   withoutHerLimits,
   type DesireMap,
 } from '../domain/fantasy-match';
+import { withoutForbiddenThemes } from '../domain/forbidden-themes';
 import { gaugeDue, holdsBackNow } from '../domain/gauge';
 import {
   checkExplicit,
@@ -1052,9 +1053,10 @@ export async function composeTurn(
   const brainOnly = screenNotes(input.brainNotes ?? '');
   const droppedNotes = [...notes.dropped, ...brainOnly.dropped];
   // His desire map, from the notes kept (Charles 26/11): the scripts closest to his fantasy come first.
-  // What her persona refuses (disgusts, never said, never done) wins over his fantasy: never played nor targeted.
+  // Youth, no consent, the family, an animal: never played, whatever her persona (Sécurité, #1043). Then what her
+  // persona refuses (disgusts, never said, never done) wins over his fantasy: never played nor targeted.
   const herRefusals = [...persona.guardSettings.forbiddenTerms, ...(persona.guardSettings.neverDo ?? [])];
-  const desireMap = withoutHerLimits(desireMapOf(notes.kept), (item) =>
+  const desireMap = withoutHerLimits(withoutForbiddenThemes(desireMapOf(notes.kept)), (item) =>
     herRefusals.some((term) => touchesTerm(item, term)),
   );
   const { choices, uncovered } = scriptChoices(input.scripts, input.situation, desireMap);

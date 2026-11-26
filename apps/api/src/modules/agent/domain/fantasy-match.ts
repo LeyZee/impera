@@ -1,5 +1,7 @@
 import { normaliseWords, type OutfitColour, type OutfitPieceType, type OutfitStyle } from '@impera/contracts';
 
+import { withoutForbiddenThemes } from './forbidden-themes';
+
 /**
  * The script closest to his fantasy (Charles 26/11, amendment of ADR 0098 § 6): the code reads his desire map on the
  * card (what he fantasises about, the outfits he likes, the words that work on him, his limits, what cools him) and
@@ -325,8 +327,10 @@ export interface FantasyMatch<T> {
 /** What of his map a script shares, and its score; `null` when it touches one of his limits. */
 export function fantasyMatchOf(
   script: ScriptTextView,
-  map: DesireMap,
+  his: DesireMap,
 ): Omit<FantasyMatch<never>, 'script'> | null {
+  // A forbidden theme is never a script's target, whoever calls (Sécurité, #1043).
+  const map = withoutForbiddenThemes(his);
   const words = scriptWords(script);
   if (map.limits.some((limit) => hits(limit, words))) return null;
   const desires = map.desires.filter((item) => hits(item, words));
@@ -347,8 +351,9 @@ export function fantasyMatchOf(
  */
 export function rankByFantasy<T extends ScriptTextView>(
   scripts: readonly T[],
-  map: DesireMap,
+  his: DesireMap,
 ): { readonly ranked: readonly FantasyMatch<T>[]; readonly uncovered: readonly string[] } {
+  const map = withoutForbiddenThemes(his);
   const scored = scripts.flatMap((script, index) => {
     const match = fantasyMatchOf(script, map);
     return match === null ? [] : [{ ...match, script, index }];

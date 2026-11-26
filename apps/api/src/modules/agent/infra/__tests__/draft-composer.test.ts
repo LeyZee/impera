@@ -2717,6 +2717,29 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
       expect(seen.brainInputs?.[0]?.scripts).toEqual([{ id: 's1', description: 'Pack de démonstration' }]);
     });
 
+    it('never plays nor targets a forbidden theme of his card, whatever her persona (Sécurité, #1043)', async () => {
+      const { draftComposer, seen } = composer(
+        { brief: HOT },
+        undefined,
+        limitsOf(ADULT).limits,
+        deps(lingerie),
+      );
+      await draftComposer.compose(
+        withNotes([
+          'desires : belle-mère · qu’elle se prépare',
+          'outfits : tenue d’écolière · lingerie noire',
+        ]),
+      );
+      expect(seen.brainInputs?.[0]?.scripts?.[0]).toEqual({
+        id: 's1',
+        description: 'Elle se prépare en lingerie noire',
+        matches: ['qu’elle se prépare', 'lingerie noire'],
+      });
+      const handed = JSON.stringify([seen.brainInputs?.[0]?.scripts, seen.voiceInputs?.[0]?.fantasy]);
+      expect(handed).not.toContain('belle-mère');
+      expect(handed).not.toContain('écolière');
+    });
+
     it('never lists a script that touches one of his limits', async () => {
       const { draftComposer, seen } = composer(
         { brief: HOT },

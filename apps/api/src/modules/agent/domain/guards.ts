@@ -83,14 +83,14 @@ const CITY =
  */
 const CONCRETE = `[^.!?]*\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|ce soir|ce week-end|cette semaine|dispo|disponible|\\d{1,2} ?h|${CITY})\\b`;
 
+/** A child or a minor named, on the normalised text: the `minor_reference` guard, and the desire map's filter. */
+export const MINOR_REFERENCE =
+  /\b(enfants?|gamine?s?|(?<!beau )gosses?|momes?|fillettes?|petite fille|petit garcon|mineure?s?|ados|ado|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?)\b/;
+
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   // Charles 21/11, a hard rule: she never names a child or a minor, to mock him or in anything sexual. Read on every
   // text, whatever the context: an innocent one is rewritten once, then goes to a human.
-  {
-    code: 'minor_reference',
-    pattern:
-      /\b(enfants?|gamine?s?|(?<!beau )gosses?|momes?|fillettes?|petite fille|petit garcon|mineure?s?|ados|ado|adolescente?s?|collegien(ne)?s?|lyceen(ne)?s?|ecolier(e)?s?|kids?|child(ren)?|teens?|teenagers?|minors?|schoolgirls?|little girls?)\b/,
-  },
+  { code: 'minor_reference', pattern: MINOR_REFERENCE },
   {
     code: 'ai_disclosure',
     // « je suis modèle photo », « je suis assistante dentaire » are jobs: the article is required for those words.
@@ -882,10 +882,10 @@ export function checkExplicit(bubbles: readonly string[]): GuardViolation[] {
 
 // Words of youth, on the normalised text (Charles 26/11): never in a sexual message, whoever they describe. « Petit »
 // alone stays (« mon petit cœur » to him); the list reads French, English, Italian and Spanish.
-const YOUTH_WORDS =
+export const YOUTH_WORDS =
   /\b(petites?|gamines?|ados?|adolescentes?|lolitas?|jeunettes?|fillettes?|toute jeune|si jeune|jeune fille|little girls?|young girls?|teens?|teenagers?|schoolgirls?|barely legal|piccol[ae]|ragazzin[ae]|bambin[ae]|jovencitas?|nenas?)\b/;
 // Read before `normalise`, which would make « niña » the first name Nina.
-const YOUTH_WORDS_ACCENTED = /(^|[^\p{L}])(niñ[ao]s?|pequeñ[ao]s?)($|[^\p{L}])/iu;
+export const YOUTH_WORDS_ACCENTED = /(^|[^\p{L}])(niñ[ao]s?|pequeñ[ao]s?)($|[^\p{L}])/iu;
 
 /**
  * No word of youth in a sexual message (Charles 26/11): blocking, so her answer is written once more, then a human
