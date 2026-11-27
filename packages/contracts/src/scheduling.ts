@@ -592,9 +592,6 @@ export const OnDutySchema = z.object({
 });
 export type OnDuty = z.infer<typeof OnDutySchema>;
 
-/** Past this, a planned member not on post is said in « À faire » (recette MAN-02); the planning says it at once. */
-export const LATE_CHECK_IN_MINUTES = 10;
-
 export const OnDutyListSchema = z.object({ onDuty: z.array(OnDutySchema) });
 
 /**

@@ -7,7 +7,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TodoCard } from './TodoCard';
@@ -83,6 +83,7 @@ const NOTHING = {
   '/v1/payroll/payout-destinations': { destinations: [] },
   '/v1/team/members': { members: MEMBERS },
   '/v1/scheduling/on-duty': { onDuty: [] },
+  '/v1/scheduling/not-taken-delay': { minutes: 10 },
 };
 
 describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
@@ -150,7 +151,7 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     renderCard(true);
     await screen.findByText('Dashboard');
     await vi.waitFor(() => {
-      expect(reads).toHaveLength(9);
+      expect(reads).toHaveLength(10);
     });
     expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
     cleanup();
@@ -226,10 +227,35 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     expect(reads.filter((read) => !read.startsWith('/v1/scheduling/shift-reports'))).toEqual([
       '/v1/creator-messages/waiting',
       '/v1/scheduling/on-duty',
+      '/v1/scheduling/not-taken-delay',
     ]);
   });
 
-  it('says a planned member not on post after ten minutes, in amber, leading to the planning (recette MAN-02)', async () => {
+  const started = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+  const lateShift = (id: string, minutes: number, checkedInAt: string | null) => ({
+    creatorId: '0199f2a0-0000-4000-8000-000000000001',
+    platformAccountId: '0199f2a0-0000-4000-8000-000000000011',
+    member: { id: THEO.id, displayName: 'Théo', color: null },
+    shiftId: id,
+    startsAt: started(minutes),
+    endsAt: started(-120),
+    checkedInAt,
+  });
+
+  it('says nothing of a late member while the agency has set no delay of « chatteur pas là » (ADR 0094 § 1)', async () => {
+    serve({
+      ...NOTHING,
+      '/v1/scheduling/not-taken-delay': { minutes: null },
+      '/v1/scheduling/on-duty': { onDuty: [lateShift('0199f2a0-0000-4000-8000-000000000101', 90, null)] },
+    });
+    renderCard(false, true);
+    await waitFor(() => {
+      expect(reads).toContain('/v1/scheduling/not-taken-delay');
+    });
+    expect(screen.queryByRole('heading', { name: 'À faire' })).toBeNull();
+  });
+
+  it('says a planned member not on post past the agency’s delay, in amber, leading to the planning (recette MAN-02)', async () => {
     const started = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
     const shift = (id: string, minutes: number, checkedInAt: string | null) => ({
       creatorId: '0199f2a0-0000-4000-8000-000000000001',

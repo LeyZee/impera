@@ -1,4 +1,4 @@
-import { LATE_CHECK_IN_MINUTES, type OnDuty, type ShiftReport } from '@impera/contracts';
+import type { OnDuty, ShiftReport } from '@impera/contracts';
 
 import type { BackupBanner } from './backups';
 import type { PaperworkLine } from './paperwork';
@@ -105,13 +105,15 @@ export function firstPayoutItem(gaps: FirstPayoutGaps | null): TodoItem | null {
 }
 
 /**
- * A planned member who has not taken his post (recette MAN-02), once `LATE_CHECK_IN_MINUTES` have passed: one amber
- * line each, leading to the planning, where it is said from the first minute.
+ * A planned member who has not taken his post (recette MAN-02), once the agency's delay of « chatteur pas là » has
+ * passed (Réglages › Alertes, ADR 0094 § 1): one amber line each, leading to the planning, where it is said from the
+ * first minute. None while the agency has set no delay: the signal is off.
  */
-export function lateItems(onDuty: readonly OnDuty[], now: Date): TodoItem[] {
+export function lateItems(onDuty: readonly OnDuty[], now: Date, delayMinutes: number | null): TodoItem[] {
+  if (delayMinutes === null) return [];
   return onDuty.flatMap((one): TodoItem[] => {
     const late = lateCheckIn(one, now);
-    if (late === null || late < LATE_CHECK_IN_MINUTES * 60_000) return [];
+    if (late === null || late < delayMinutes * 60_000) return [];
     return [
       {
         key: `late-${one.shiftId}`,

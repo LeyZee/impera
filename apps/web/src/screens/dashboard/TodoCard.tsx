@@ -12,6 +12,7 @@ import { useReports } from '@/reports/api';
 import { useOnDuty } from '@/scheduling/api';
 import { useNow } from '@/scheduling/useNow';
 import { useWaitingMessages } from '@/screens/today/to-agency/api';
+import { useNotTakenDelay } from '@/settings/alerts/api';
 import { useFirstPayoutGaps } from '@/setup/FirstPayoutCard';
 
 /**
@@ -39,6 +40,8 @@ export function TodoCard({
   const firstPayout = useFirstPayoutGaps(forOwner);
   // Who is planned now and has not taken his post (recette MAN-02): the owner's and the reviewer's.
   const onDuty = useOnDuty(forOwner || reviewsReports);
+  // After the agency's delay of « chatteur pas là » (ADR 0094 § 1), none while it is not set.
+  const delay = useNotTakenDelay(forOwner || reviewsReports);
   // The most pressing lines first; the rest one tap away, so the figures stay close on a busy day.
   const [isOpen, setIsOpen] = useState(false);
 
@@ -49,7 +52,7 @@ export function TodoCard({
       : [],
     reviewsReports && open.data !== undefined ? reportItems(open.data.reports, now) : [],
     firstPayoutItem(firstPayout),
-    lateItems(onDuty.data ?? [], now),
+    lateItems(onDuty.data ?? [], now, delay.data?.minutes ?? null),
   );
   if (items.length === 0 && written.length === 0) return null;
   const count = items.length + written.length;
