@@ -732,8 +732,12 @@ function OnDutyStrip({
             const body = (
               <>
                 <span
-                  className="sc-swatch"
-                  style={one.member.color === null ? undefined : { '--sc-color': one.member.color }}
+                  className={late === null ? 'sc-swatch' : 'sc-swatch sc-swatch--late'}
+                  style={
+                    late !== null || one.member.color === null
+                      ? undefined
+                      : { '--sc-color': one.member.color }
+                  }
                   aria-hidden="true"
                 />
                 <span className="sc-duty__who">{one.member.displayName}</span>
@@ -1393,8 +1397,13 @@ function ShiftChip({
       data-incident={incident ? 'true' : undefined}
       data-away={unheld === null ? undefined : 'true'}
       data-repeat={shift.templateId === null ? undefined : 'true'}
-      data-color={member?.color === null || member === null ? undefined : 'true'}
-      style={member?.color === null || member === null ? undefined : { '--sc-color': member.color }}
+      data-late={late === null ? undefined : 'true'}
+      data-color={late !== null || member?.color === null || member === null ? undefined : 'true'}
+      style={
+        late !== null || member?.color === null || member === null
+          ? undefined
+          : { '--sc-color': member.color }
+      }
       aria-label={`${name}, ${rangeAt(shift.startsAt, shift.endsAt, zone)}${chip.continued || earlier ? ', commencé la veille' : ''}${overnight ? ', jusqu’au lendemain' : ''}${onShift ? (late === null ? `, en poste, ${leftOf(shift, now)}` : `, ${lateWords(late)}`) : ''}${flagged ? ', pendant un congé à valider' : ''}${incident ? ', incident signalé' : ''}${unheld === null || phase === 'past' ? '' : `, ${unheldLabel(unheld).toLowerCase()}, à pourvoir`}`}
       onClick={() => {
         onShow(shift.id);

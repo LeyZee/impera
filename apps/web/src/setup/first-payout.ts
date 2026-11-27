@@ -89,6 +89,28 @@ export function firstPayoutGaps(
   };
 }
 
+/**
+ * The one line « À faire » says under its title (Design, 27/11): the first gap with whose it is, then how many are left
+ * for each, so that no gap reads as another's (« L’agence : le mandat … · 2 pour Théo »).
+ */
+export function firstPayoutSummary(gaps: FirstPayoutGaps): string | null {
+  const owned = [
+    ...gaps.agency.map((gap) => ({ owner: 'L’agence', gap })),
+    ...gaps.members.flatMap((member) => member.gaps.map((gap) => ({ owner: member.name, gap }))),
+  ];
+  const [first, ...rest] = owned;
+  if (first === undefined) return null;
+  const counts = new Map<string, number>();
+  for (const one of rest) counts.set(one.owner, (counts.get(one.owner) ?? 0) + 1);
+  const lead = `${first.owner} : ${first.gap.charAt(0).toLowerCase()}${first.gap.slice(1)}`;
+  return [
+    lead,
+    ...[...counts].map(
+      ([owner, count]) => `${String(count)} pour ${owner === 'L’agence' ? 'l’agence' : owner}`,
+    ),
+  ].join(' · ');
+}
+
 /** How many things are left, the agency's and every member's. */
 export const gapCount = (gaps: FirstPayoutGaps): number =>
   gaps.agency.length + gaps.members.reduce((sum, member) => sum + member.gaps.length, 0);

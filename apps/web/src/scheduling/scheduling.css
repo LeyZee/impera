@@ -1438,9 +1438,20 @@ button.sc-duty__one:active {
   color: var(--nv-warning);
   font-weight: 600;
 }
-/* On a phone the late words stay whole: the creator's name gives way (ellipsis) before them. */
+/* On a phone the late words stay whole: the creator's name gives way (ellipsis) before them, and nothing of the strip
+   is wider than the screen (Design, 27/11). */
+.sc-duty,
+.sc-duty__list > li {
+  min-width: 0;
+  max-width: 100%;
+}
 .sc-duty__one:has(.sc-duty__late) {
   overflow: hidden;
+}
+/* A delay is a warning, not an urgency: its dot and the shift's edge are amber like its words (Design, 27/11). */
+.sc-swatch--late,
+.sc-chip[data-late='true'] {
+  --sc-color: var(--nv-warning);
 }
 .sc-duty__one:has(.sc-duty__late) .sc-duty__where {
   min-width: 0;

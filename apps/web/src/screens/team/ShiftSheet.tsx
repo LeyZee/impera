@@ -210,9 +210,11 @@ export function ShiftSheet({
       <div className="tm-dialog__body">
         <div className="sc-sheet__when">
           <span
-            className="sc-swatch"
+            className={late === null ? 'sc-swatch' : 'sc-swatch sc-swatch--late'}
             style={
-              shown?.color === undefined || shown.color === null ? undefined : { '--sc-color': shown.color }
+              late !== null || shown?.color === undefined || shown.color === null
+                ? undefined
+                : { '--sc-color': shown.color }
             }
             aria-hidden="true"
           />

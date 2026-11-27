@@ -266,7 +266,7 @@ describe('CommissionsPage', () => {
     renderPage();
     const hero = await screen.findByRole('region', { name: 'Ce que tu vas toucher' });
     await waitFor(() => {
-      expect(text(hero)).toContain('Où te verser est vide');
+      expect(text(hero)).toContain('Tu n’as pas encore dit où te verser');
     });
     expect(text(hero)).toContain('Ton versement ne partira pas tant que tu ne l’as pas rempli.');
     expect(within(hero).getByRole('link', { name: 'Ouvrir mon dossier' }).getAttribute('href')).toBe(

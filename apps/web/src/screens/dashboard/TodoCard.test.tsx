@@ -195,8 +195,8 @@ describe('« À faire » on the Dashboard (pilotage 12/11, W3)', () => {
     });
     expect(line.getAttribute('href')).toBe('/paie/quinzaine');
     expect(line.closest('li')?.dataset['tone']).toBe('warn');
-    expect(line.textContent).toContain('Le mandat de facturation n’est pas publié');
-    expect(line.textContent).toContain('Pour Théo');
+    // The first gap with whose it is, then how many are left for whom (Design, 27/11).
+    expect(line.textContent).toContain('L’agence : le mandat de facturation n’est pas publié · 2 pour Théo');
   });
 
   it('gives the reviewer of the reports their lines only, without reading the owner’s lists (ADR 0073)', async () => {

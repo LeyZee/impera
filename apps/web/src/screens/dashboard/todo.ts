@@ -5,7 +5,7 @@ import type { PaperworkLine } from './paperwork';
 
 import { awaitsDecision, gapWaits, hasGap } from '@/reports/model';
 import { lateCheckIn, lateWords } from '@/scheduling/model';
-import { gapCount, type FirstPayoutGaps } from '@/setup/first-payout';
+import { firstPayoutSummary, gapCount, type FirstPayoutGaps } from '@/setup/first-payout';
 
 /**
  * « À faire » on the Dashboard of the owner and of an active manager (pilotage 12/11, W3): what waits on the reader,
@@ -87,16 +87,14 @@ export function reportItems(reports: readonly ShiftReport[], now: Date): TodoIte
 export function firstPayoutItem(gaps: FirstPayoutGaps | null): TodoItem | null {
   if (gaps === null) return null;
   const count = gapCount(gaps);
-  if (count === 0) return null;
+  const summary = firstPayoutSummary(gaps);
+  if (summary === null) return null;
   return {
     key: 'first-payout',
     tone: 'warn',
     title: `Avant ton premier versement : ${plural(count, 'chose', 'choses')} à régler`,
     // The whole line leads to Paie, where each member opens his file: no link inside a link.
-    detail: [
-      ...gaps.agency,
-      ...(gaps.members.length === 0 ? [] : [`Pour ${gaps.members.map((member) => member.name).join(', ')}`]),
-    ],
+    detail: [summary],
     to: '/paie/quinzaine',
     where: 'Paie',
     members: [],

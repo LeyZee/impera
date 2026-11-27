@@ -1,7 +1,7 @@
 import { TeamMemberIdSchema, type MemberSetup } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { firstPayoutGaps, gapCount, PAYOUT_MISSING } from './first-payout';
+import { firstPayoutGaps, firstPayoutSummary, gapCount, PAYOUT_MISSING } from './first-payout';
 
 const BASILE = TeamMemberIdSchema.parse('00000000-0000-4000-8000-0000000000b1');
 const CELIA = TeamMemberIdSchema.parse('00000000-0000-4000-8000-0000000000c1');
@@ -81,5 +81,26 @@ describe('« Avant ton premier versement » (recette PARC-01)', () => {
     const gaps = firstPayoutGaps([paid(BASILE, null)], null, nameOf);
     expect(gaps).toEqual({ agency: [], members: [] });
     expect(gapCount(gaps)).toBe(0);
+    expect(firstPayoutSummary(gaps)).toBeNull();
+  });
+
+  it('says in one line the first gap with whose it is, then how many are left for whom (Design, 27/11)', () => {
+    expect(
+      firstPayoutSummary({
+        agency: ['Le mandat de facturation n’est pas publié'],
+        members: [
+          { memberId: BASILE, name: 'Basile', gaps: ['Préfixe de factures à poser', PAYOUT_MISSING] },
+        ],
+      }),
+    ).toBe('L’agence : le mandat de facturation n’est pas publié · 2 pour Basile');
+    expect(
+      firstPayoutSummary({
+        agency: [],
+        members: [
+          { memberId: BASILE, name: 'Basile', gaps: ['Préfixe de factures à poser', PAYOUT_MISSING] },
+          { memberId: CELIA, name: 'Célia', gaps: [PAYOUT_MISSING] },
+        ],
+      }),
+    ).toBe('Basile : préfixe de factures à poser · 1 pour Basile · 1 pour Célia');
   });
 });

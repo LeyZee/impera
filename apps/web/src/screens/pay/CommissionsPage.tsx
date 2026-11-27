@@ -479,10 +479,10 @@ function EmptyPayoutNotice({ statement }: { statement: CommissionStatement }): J
   const payout = useOwnPayout(statement.memberId, due);
   if (!due || payout.data?.method !== null) return null;
   return (
-    <div className="rp-notice py-hold nv-enter" data-tone="warn" role="status">
-      <p className="rp-notice__title">Où te verser est vide</p>
-      <p className="rp-notice__text">Ton versement ne partira pas tant que tu ne l’as pas rempli.</p>
-      <Link to="/moi/dossier" className="nv-btn nv-btn--soft nv-btn--sm py-hold__go">
+    <div className="nv-note nv-note--warn py-payout-note nv-enter" role="status">
+      <p className="nv-note__title">Tu n’as pas encore dit où te verser</p>
+      <p className="py-payout-note__text">Ton versement ne partira pas tant que tu ne l’as pas rempli.</p>
+      <Link to="/moi/dossier" className="nv-btn nv-btn--soft nv-btn--sm py-payout-note__go">
         Ouvrir mon dossier
       </Link>
     </div>
