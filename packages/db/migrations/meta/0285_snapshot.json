@@ -1,5 +1,5 @@
 {
-  "id": "12971f98-6231-466e-bb3c-aa2f27a508ad",
+  "id": "fadb9004-0ea6-458f-847c-e91c541c5624",
   "prevId": "94396237-6b57-418a-9c47-7f32572d1b79",
   "version": "7",
   "dialect": "postgresql",
@@ -11770,7 +11770,7 @@
         },
         "notification_deliveries_reason_check": {
           "name": "notification_deliveries_reason_check",
-          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change', 'agency_alert', 'agency_urgent')"
+          "value": "\"notification_deliveries\".\"reason\" in ('sale', 'own_shift_start', 'own_shift_end', 'reminder', 'routine', 'streak', 'team', 'agency_share', 'creator_alert', 'safety_alert', 'owner_change', 'decision', 'payout_change')"
         }
       },
       "isRLSEnabled": false
@@ -22956,6 +22956,28 @@
           "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'",
           "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner' and \"script_cadences\".\"updated_by\" = nullif(current_setting('app.user_id', true), '')"
         },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
+        },
+        "job_insert": {
+          "name": "job_insert",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": ["public"],
+          "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts' and \"script_cadences\".\"updated_by\" is null"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'",
+          "withCheck": "\"script_cadences\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
+        },
         "creator_closed": {
           "name": "creator_closed",
           "as": "RESTRICTIVE",
@@ -23320,6 +23342,28 @@
           "to": ["public"],
           "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.team_scope', true), '') = 'owner'"
         },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
+        },
+        "job_delete": {
+          "name": "job_delete",
+          "as": "PERMISSIVE",
+          "for": "DELETE",
+          "to": ["public"],
+          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
+        },
+        "job_update": {
+          "name": "job_update",
+          "as": "PERMISSIVE",
+          "for": "UPDATE",
+          "to": ["public"],
+          "using": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'",
+          "withCheck": "\"script_structure_queue\".\"creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid and nullif(current_setting('app.job', true), '') = 'ask_scripts'"
+        },
         "creator_closed": {
           "name": "creator_closed",
           "as": "RESTRICTIVE",
@@ -23447,6 +23491,13 @@
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
         },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.job', true), '') = 'ask_scripts' and exists (select 1 from script_structures s where s.id = \"script_structure_versions\".\"structure_id\"\n        and (s.reserved_creator_id is null or s.reserved_creator_id = nullif(current_setting('app.creator_id', true), '')::uuid))"
+        },
         "owner_insert": {
           "name": "owner_insert",
           "as": "PERMISSIVE",
@@ -23560,6 +23611,13 @@
           "for": "SELECT",
           "to": ["public"],
           "using": "nullif(current_setting('app.team_scope', true), '') in ('owner', 'agency')"
+        },
+        "job_read": {
+          "name": "job_read",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": ["public"],
+          "using": "nullif(current_setting('app.job', true), '') = 'ask_scripts' and (\"script_structures\".\"reserved_creator_id\" is null or \"script_structures\".\"reserved_creator_id\" = nullif(current_setting('app.creator_id', true), '')::uuid)"
         },
         "owner_insert": {
           "name": "owner_insert",

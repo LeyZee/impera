@@ -24,7 +24,7 @@ Telegram ne sert plus qu'au canal de chaque créatrice ; tout ce qu'il disait à
 - [x] Écrans : Réglages › Bots Telegram en trois étapes, Réglages › Alertes et l'onglet Alertes sans Telegram, bandeau de nuit du Dashboard retiré, étape « Alertes de nuit » de la Mise en route, Moi › Sécurité sans chat privé.
 - [x] Guides de l'app (`apps/web/src/help/guides.ts`) : les quatre passages Telegram réécrits.
 - [x] ADR 0176, amendements, index, glossaire, README des modules, runbooks.
-- [x] ADR 0176 confirmée par Bilan ; migration 0285 (numéro définitif donné par Bilan au tour de fusion).
+- [x] ADR 0176 confirmée par Bilan ; migration 0286 (numéro définitif donné par Bilan au tour de fusion).
 - [ ] Relectures : Sécurité (mot de passe oublié, portée des alertes), Design (écrans).
 
 ## Critères d'acceptation

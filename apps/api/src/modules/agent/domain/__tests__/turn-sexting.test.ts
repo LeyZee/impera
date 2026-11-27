@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { desireMapOf } from '../fantasy-match';
+import { maySuggestCustom } from '../policy';
 import type { PlatformScriptView, ScriptRun } from '../script-run';
 import type { TurnReading } from '../turn-briefs';
 import type { OfferInput, ScriptsInput } from '../turn-scripts';
@@ -122,6 +123,7 @@ describe('the sexting at a turn', () => {
       boughtOut: false,
       hasScriptStep: false,
       customOrder: false,
+      customAllowed: true,
       desireMap: desireMapOf('desires : lingerie rouge'),
       uncovered: [],
       degradingWords: [],
@@ -152,6 +154,7 @@ describe('the sexting at a turn', () => {
       boughtOut: false,
       hasScriptStep: false,
       customOrder: false,
+      customAllowed: true,
       desireMap: desireMapOf('desires : lingerie rouge'),
       uncovered: ['pirates'],
       degradingWords: [],
@@ -182,11 +185,103 @@ describe('the sexting at a turn', () => {
         boughtOut: false,
         hasScriptStep: false,
         customOrder: false,
+        customAllowed: true,
         desireMap: desireMapOf('desires : pirates'),
         uncovered: ['pirates'],
         degradingWords: [],
       });
     expect(momentOf(asks).suggestsCustom).toBe(true);
     expect(momentOf({ ...asks, risks: ['no_budget'] }).suggestsCustom).toBe(false);
+  });
+
+  describe('mid-script, once he bought a step (Charles 27/11)', () => {
+    // Her run, the first paid step only offered: nothing bought yet.
+    const UNPAID: ScriptRun = {
+      ...BOUGHT,
+      steps: [
+        {
+          stepIndex: 0,
+          kind: 'free',
+          outcome: 'opened',
+          priceMinor: null,
+          sentAt: minutesAgo(30),
+          at: minutesAgo(29),
+        },
+        {
+          stepIndex: 1,
+          kind: 'paid',
+          outcome: 'sent',
+          priceMinor: 1_500,
+          sentAt: minutesAgo(20),
+          at: minutesAgo(20),
+        },
+      ],
+    };
+    const momentOf = (
+      brief: TurnReading,
+      fanText: string,
+      latest: ScriptRun = BOUGHT,
+      customOrder = false,
+      desires: readonly string[] = ['pirates'],
+    ) =>
+      sextingMomentOf({
+        brief,
+        fanText,
+        history: HISTORY,
+        situation: SITUATION,
+        scriptsIn: { ...SCRIPTS, latest },
+        scripts: undefined,
+        run: runOf(brief),
+        heat: 90,
+        care: false,
+        trapped: false,
+        ageConfirmed: true,
+        noExplicit: false,
+        sexualization: { kind: 'free' },
+        boughtOut: false,
+        // Her next step goes with this answer: the script stays.
+        hasScriptStep: true,
+        customOrder,
+        customAllowed: maySuggestCustom({ risks: brief.risks, flags: OFFER.flags }),
+        desireMap: desireMapOf(`desires : ${desires.join(' · ')}`),
+        uncovered: desires,
+        degradingWords: [],
+      });
+
+    it('steers him to something made for him when he wants a fantasy the script does not serve', () => {
+      const moment = momentOf(HOT, 'Tu peux faire la pirate pour moi ?');
+      expect(moment.customMidScript).toBe(true);
+      expect(moment.running?.scriptRef).toBe('script-a');
+    });
+
+    it('steers him to a cam or a video made for him when he wants one', () => {
+      expect(momentOf(HOT, 'Je suis trop chaud, j’ai trop envie d’une cam').customMidScript).toBe(true);
+      expect(momentOf(HOT, 'Je voudrais voir autre chose que tes vidéos').customMidScript).toBe(true);
+    });
+
+    it('suggests nothing before he bought a step of the run', () => {
+      expect(momentOf(HOT, 'J’ai trop envie d’une cam', UNPAID).customMidScript).toBe(false);
+      expect(momentOf(HOT, 'Tu peux faire la pirate pour moi ?', UNPAID).suggestsCustom).toBe(false);
+    });
+
+    it('suggests nothing when he says he has no money now', () => {
+      expect(momentOf({ ...HOT, risks: ['no_budget'] }, 'J’ai trop envie d’une cam').customMidScript).toBe(
+        false,
+      );
+    });
+
+    it('leaves his own asking for a service to the custom order', () => {
+      const asks: TurnReading = { ...HOT, intent: 'asks_for_service' };
+      expect(momentOf(asks, 'J’ai trop envie d’une cam', BOUGHT, true).customMidScript).toBe(false);
+    });
+
+    it('reads nothing of the sexting alone, nor of a fantasy the running script meets', () => {
+      expect(momentOf(HOT, 'Mmh t’es trop bonne').customMidScript).toBe(false);
+      const meets = momentOf(HOT, 'La lingerie rouge me rend fou', BOUGHT, false, [
+        'lingerie rouge',
+        'pirates',
+      ]);
+      expect(meets.customMidScript).toBe(false);
+    });
   });
 });

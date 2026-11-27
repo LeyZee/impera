@@ -30,6 +30,10 @@ const KIND_LABEL: Readonly<Record<DashboardTodo['kind'], string>> = {
   fragile_proposed: 'Le marquer fragile ?',
 };
 
+/** A line's name; an outage over says so (IA-07): never « IA indisponible » above « L’IA répond de nouveau ». */
+const kindLabelOf = (todo: DashboardTodo): string =>
+  todo.kind === 'llm_unavailable' && todo.voiceBack === true ? 'IA de retour' : KIND_LABEL[todo.kind];
+
 const plural = (n: number, one: string, many: string): string => `${String(n)} ${n > 1 ? many : one}`;
 
 /** « 7,40 € »: the AI spend is small, its cents matter. */
@@ -393,7 +397,7 @@ function todoOf(todo: DashboardTodo, timeZone: string, creatorId?: CreatorId): T
   return {
     id: todo.id,
     tone: toneOf(todo),
-    kind: KIND_LABEL[todo.kind],
+    kind: kindLabelOf(todo),
     title: todo.title,
     why: frenchSpaces(todo.why),
     waiting: `depuis ${lengthOf(todo.waitingMinutes * 60_000)}`,

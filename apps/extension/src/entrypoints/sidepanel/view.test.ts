@@ -53,6 +53,7 @@ function draw(screen: PanelScreen): { root: HTMLElement; actions: PanelActions }
     openCrm: vi.fn(),
     pickTab: vi.fn(),
     toggleDiscover: vi.fn(),
+    toggleTranslation: vi.fn(),
     showSignals: vi.fn(),
     place: vi.fn(),
     copyNext: vi.fn(),
@@ -104,6 +105,8 @@ type PanelScreenStanding = Extract<PanelScreen, { kind: 'conversation' }>['stand
 const ready = (patch: Partial<Extract<DraftPart, { kind: 'ready' }>> = {}): DraftPart => ({
   kind: 'ready',
   bubbles: ['coucou toi 😘', 'tu rentres quand de ta garde ?'],
+  translation: null,
+  translationOpen: false,
   placed: false,
   pending: true,
   mode: 'idle',
@@ -1327,5 +1330,53 @@ describe('colour and the moment to sell (ADR 0141 § 4 bis; Design 16/11, lot 01
     ).root;
     expect(root.querySelector('[data-field="desires"] .cp-line-icon svg')).not.toBeNull();
     expect(root.querySelectorAll('.cp-tab > svg')).toHaveLength(4);
+  });
+});
+
+// ADR 0168 § 9: a draft that is not in French comes with its French, read by the chatter and never sent.
+describe('the French of a draft in another language', () => {
+  const spanish = {
+    bubbles: ['hola guapo 😘', '¿qué haces esta noche?'],
+    translation: ['coucou beau gosse 😘', 'tu fais quoi ce soir ?'],
+  };
+
+  it('shows none under a draft in French', () => {
+    const { root } = draw(onCard(card({}), [], { draft: ready() }));
+    expect(root.querySelector('.cp-translation')).toBeNull();
+  });
+
+  it('folds it under the bubbles, one French line per bubble, outside what is placed', () => {
+    const { root, actions } = draw(onCard(card({}), [], { draft: ready(spanish) }));
+    const fold = root.querySelector<HTMLDetailsElement>('.cp-draft .cp-translation');
+    expect(fold?.open).toBe(false);
+    expect(fold?.querySelector('summary')?.textContent).toBe('Traduction en français');
+    expect(
+      [...(fold?.querySelectorAll('.cp-translation__lines > li') ?? [])].map((n) => n.textContent),
+    ).toEqual(spanish.translation);
+    expect(fold?.previousElementSibling?.classList.contains('cp-bubbles')).toBe(true);
+    expect([...root.querySelectorAll('.cp-bubble')].map((n) => n.textContent)).toEqual(spanish.bubbles);
+    if (fold === null) throw new Error('no fold');
+    fold.open = true;
+    fold.dispatchEvent(new Event('toggle'));
+    expect(actions.toggleTranslation).toHaveBeenCalledWith(true);
+  });
+
+  it('stays as he left it, and stays while he says why he refuses', () => {
+    const open = draw(onCard(card({}), [], { draft: ready({ ...spanish, translationOpen: true }) })).root;
+    expect(open.querySelector<HTMLDetailsElement>('.cp-translation')?.open).toBe(true);
+    const rejecting = draw(onCard(card({}), [], { draft: ready({ ...spanish, mode: 'rejecting' }) })).root;
+    expect(rejecting.querySelector('.cp-translation')).not.toBeNull();
+  });
+
+  it('is gone next to a text it no longer translates: retouched, used, or of another length', () => {
+    const editing = ready({ ...spanish, mode: 'editing', text: 'hola' });
+    expect(draw(onCard(card({}), [], { draft: editing })).root.querySelector('.cp-translation')).toBeNull();
+    const used = ready({
+      ...spanish,
+      done: { outcome: 'placed', bubbles: ['hola'], copied: 1, copyFailed: false, sent: 'sent' },
+    });
+    expect(draw(onCard(card({}), [], { draft: used })).root.querySelector('.cp-translation')).toBeNull();
+    const uneven = ready({ ...spanish, translation: ['coucou'] });
+    expect(draw(onCard(card({}), [], { draft: uneven })).root.querySelector('.cp-translation')).toBeNull();
   });
 });

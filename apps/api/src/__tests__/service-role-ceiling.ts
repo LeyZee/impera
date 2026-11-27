@@ -47,7 +47,7 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   // +1 for « chatteur pas là » (ADR 0094 § 1, lot b): its job reads the agency's delay and every creator's shifts begun
   // that long ago, never taken, to publish one event per shift; it writes nothing but the outbox.
   'modules/scheduling': 32,
-  'modules/scripts': 16,
+  'modules/scripts': 11,
   'modules/supervision': 2,
   // +1 for a departure at its hour (ADR 0166 § 2): the owners in office, read only, so that a departure never depends
   // on the owner who set it still being one.
@@ -57,9 +57,10 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/trends': 8,
   // +2 for a live worker freeing its own locks on jobs whose completion was lost (recette COUV-14): Graphile's tables,
   // closed to the app role, as the release of dead workers' locks; −1: the agency's time zone read through one door
-  // for every reader (recette 27/11); -1 on 27/11/2026 (ADR 0176): no « mot de passe oublié » asked from the sign-in
-  // page.
-  root: 52,
+  // for every reader (recette 27/11). +2 for `pnpm ops:release-ai-account` (OPS-22): an operator command lists every
+  // platform account and forgets one's session, across creators like the other ops commands of `ops.ts`.
+  // -1 on 27/11/2026 (ADR 0176): no « mot de passe oublié » asked from the sign-in page.
+  root: 54,
   scripts: 1,
   // -2 on 27/11/2026 (ADR 0176): no sales nor alerts wired to Telegram.
   wiring: 5,

@@ -8,7 +8,7 @@ import {
   type CreatorId,
   type ScriptStage,
 } from '@impera/contracts';
-import { and, eq, schema } from '@impera/db';
+import { and, eq, schema, withTenant, withTenantJob } from '@impera/db';
 import { createTestDb, type TestDb } from '@impera/db/testing';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { z } from 'zod';
@@ -250,6 +250,82 @@ describe('her script cadence (SC-02, ADR 0056 § 2)', () => {
       ['2026-11-26', fine.id],
     ]);
     expect((await cadence(owner, lina)).outcome).toBe('reused');
+  });
+
+  it('takes the asked structure out of her queue and moves the others up, in her creator only (SEC-16)', async () => {
+    const zoe = (await app.modules.persona.creators.create({ displayName: 'Zoé', timezone: 'Europe/Paris' }))
+      .id;
+    await activateDemoPersona(app, zoe);
+    const [first, second, third] = [
+      await create(structure('Première de trois')),
+      await create(structure('Deuxième de trois')),
+      await create(structure('Troisième de trois')),
+    ];
+    await setQueue(zoe, [first.id, second.id, third.id]);
+    const before = await queued(lina);
+    await run('2026-11-21T10:00:00Z');
+    expect((await requests(zoe)).map((row) => row.structureId)).toEqual([first.id]);
+    const left = await test.admin.db
+      .select({
+        position: schema.scriptStructureQueue.position,
+        structureId: schema.scriptStructureQueue.structureId,
+      })
+      .from(schema.scriptStructureQueue)
+      .where(eq(schema.scriptStructureQueue.creatorId, zoe))
+      .orderBy(schema.scriptStructureQueue.position);
+    expect(left).toEqual([
+      { position: 1, structureId: second.id },
+      { position: 2, structureId: third.id },
+    ]);
+    expect((await cadence(owner, zoe)).outcome).toBe('asked');
+    expect(await queued(lina)).toEqual(before);
+
+    // The job in another creator neither reads nor moves her queue, and writes nothing on her cadence.
+    const elsewhere = await withTenantJob(app.db.db, lina, 'ask_scripts', async (tx) => ({
+      read: await tx
+        .select({ position: schema.scriptStructureQueue.position })
+        .from(schema.scriptStructureQueue)
+        .where(eq(schema.scriptStructureQueue.creatorId, zoe)),
+      removed: await tx
+        .delete(schema.scriptStructureQueue)
+        .where(eq(schema.scriptStructureQueue.creatorId, zoe))
+        .returning({ position: schema.scriptStructureQueue.position }),
+      written: await tx
+        .update(schema.scriptCadences)
+        .set({ days: 90 })
+        .where(eq(schema.scriptCadences.creatorId, zoe))
+        .returning({ creatorId: schema.scriptCadences.creatorId }),
+    }));
+    expect(elsewhere).toEqual({ read: [], removed: [], written: [] });
+    // Nor a structure kept for her, nor its versions: the library is read from the job's own creator.
+    const kept = await create({ ...structure('Gardée pour Zoé'), reservedCreatorId: zoe });
+    const library = (creatorId: string) =>
+      withTenantJob(app.db.db, creatorId, 'ask_scripts', async (tx) => ({
+        structures: (
+          await tx
+            .select({ id: schema.scriptStructures.id })
+            .from(schema.scriptStructures)
+            .where(eq(schema.scriptStructures.id, kept.id))
+        ).length,
+        versions: (
+          await tx
+            .select({ id: schema.scriptStructureVersions.id })
+            .from(schema.scriptStructureVersions)
+            .where(eq(schema.scriptStructureVersions.structureId, kept.id))
+        ).length,
+      }));
+    expect(await library(lina)).toEqual({ structures: 0, versions: 0 });
+    expect(await library(zoe)).toEqual({ structures: 1, versions: 1 });
+    // And no session without the job's name moves a queue, even in her creator.
+    const unnamed = await withTenant(app.db.db, zoe, (tx) =>
+      tx
+        .update(schema.scriptStructureQueue)
+        .set({ position: 9 })
+        .where(eq(schema.scriptStructureQueue.creatorId, zoe))
+        .returning({ position: schema.scriptStructureQueue.position }),
+    );
+    expect(unnamed).toEqual([]);
+    expect(await queued(zoe)).toEqual([second.id, third.id]);
   });
 
   it('asks nothing of an archived creator (ADR 0071 § 2)', async () => {

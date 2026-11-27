@@ -1,6 +1,7 @@
 import { createApp } from './composition-root';
 import { loadConfig } from './config';
 import { logCrashes } from './crash';
+import { createHeartbeatPing } from './heartbeat-ping';
 import { createLogger } from './logger';
 import { reportCrashes } from './observability/crash-reports';
 import { startErrorReporting } from './observability/error-reporter';
@@ -22,6 +23,10 @@ const worker = await startWorker(app, {
   logger,
   concurrency: config.WORKER_CONCURRENCY,
   release: config.RELEASE,
+  // A watcher outside the machine learns that this worker lives; silent, it writes to the owner (OPS-22).
+  ...(config.WORKER_HEARTBEAT_URL === undefined
+    ? {}
+    : { heartbeatPing: createHeartbeatPing(config.WORKER_HEARTBEAT_URL, logger) }),
 });
 
 graceful.stopWith(async () => {
