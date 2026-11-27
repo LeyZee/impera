@@ -167,9 +167,21 @@ export function withoutProcreation(words: string): string {
   return words.replace(PROCREATION, ' ');
 }
 
-/** A child or a minor named in a text, procreation between adults left out: the word, or `undefined`. */
+// A piece of clothing between adults (Charles 27/11): « ma jupe d'écolière », « un uniforme scolaire », « a school
+// uniform ». The outfit passes, in her answer and on his desire map; her or him as a minor never does (« je suis une
+// écolière », « je joue la lycéenne », an age under 18, « j'ai l'air d'avoir 15 ans », a pupil's setting). Read on the
+// normalised text, apostrophes as written or as spaces.
+const SCHOOL_OUTFIT =
+  /\b(jupes?|jupettes?|uniformes?|tenues?|chemisiers?|chaussettes?|socquettes?|cravates?|blazers?|kilts?|robes?|ensembles?|costumes?)( plissees?)? (?:d'? ?|de |style |facon |type )(ecolieres?|ecoliers?|collegiennes?|lyceennes?)\b|\buniformes? (scolaires?|d'? ?ecole)\b|\b(school ?girl |school )(uniforms?|outfits?|skirts?)\b|\b(divisa|uniforme) (scolastica|escolar|de colegiala)\b|\bfalda (de colegiala|escolar)\b/g;
+
+/** A text without the school outfits it names: the clothing passes, the rest of the text is read as before. */
+export function withoutSchoolOutfit(text: string): string {
+  return text.replace(SCHOOL_OUTFIT, ' ');
+}
+
+/** A child or a minor named in a text, procreation between adults and a school outfit left out: the word, or `undefined`. */
 function minorNamed(bubble: string): string | undefined {
-  return MINOR_REFERENCE.exec(withoutProcreation(normaliseWords(bubble)))?.[0];
+  return MINOR_REFERENCE.exec(withoutSchoolOutfit(withoutProcreation(normaliseWords(bubble))))?.[0];
 }
 
 // A means of paying outside Reveal (recette MOT-04). « Wise » counts only as a means: « that's wise » is innocent.
@@ -1234,7 +1246,7 @@ export function checkYouthWords(bubbles: readonly string[], sexual: boolean): Gu
   const ownWords = checkExplicit(bubbles).length > 0;
   if (!sexual && !ownWords) return [];
   return bubbles.flatMap((bubble, bubbleIndex) => {
-    const text = normalise(bubble);
+    const text = withoutSchoolOutfit(normalise(bubble));
     const match =
       YOUTH_WORDS.exec(text)?.[0] ?? YOUTH_AGE.exec(text)?.[0] ?? YOUTH_WORDS_ACCENTED.exec(bubble)?.[2];
     const youth: GuardViolation[] =

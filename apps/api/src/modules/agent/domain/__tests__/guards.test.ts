@@ -403,6 +403,22 @@ describe('voice guards', () => {
     expect(codes(['comme une gamine'])).toContain('minor_reference');
   });
 
+  it('lets a school outfit between adults through, never her or him as a minor (Charles 27/11)', () => {
+    for (const text of [
+      'je mets ma jupe d’écolière pour toi',
+      'mon uniforme scolaire te plaît ?',
+      'my school uniform is on',
+    ])
+      expect(checkYouthWords([text], true), text).toEqual([]);
+    for (const text of [
+      'je suis une écolière',
+      'je joue la lycéenne',
+      'j’ai l’air d’avoir 15 ans',
+      'en jupe d’écolière, je suis une écolière sage',
+    ])
+      expect(isBlocked(checkYouthWords([text], true)), text).toBe(true);
+  });
+
   it('lets her mock the size of a picture he sent cold, never against a child’s body (Charles 26/11)', () => {
     for (const text of ['c’est mignon, t’as zoomé ? 😂', 'range ça, je cherche encore 😅'])
       expect(checkVoiceOutput([text], DEFAULT_GUARD_SETTINGS), text).toEqual([]);
