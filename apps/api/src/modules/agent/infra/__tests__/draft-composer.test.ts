@@ -605,19 +605,59 @@ describe('createDraftComposer', () => {
     expect(photo.some((hint) => hint.includes('se calmer'))).toBe(true);
   });
 
-  it('tells a fan who complains of a purchase he may ask Reveal for a refund, never content in exchange (guide 26/11)', async () => {
+  it('never brings up a refund to a fan who complains of a purchase, only when he asks (ADR 0158 § 48, avenant du 27/11)', async () => {
     const complaint: Brief = { ...BRIEF, intent: 'complaint', risks: [] };
     const { draftComposer, seen } = composer({ brief: complaint });
-    await draftComposer.compose({ ...INPUT, fan: { ...INPUT.fan, spentMinor: 1_500 } });
+    const bought = { ...INPUT, fan: { ...INPUT.fan, spentMinor: 1_500 } };
+    await draftComposer.compose({
+      ...bought,
+      history: [{ direction: 'inbound', text: 'Déçu, c’était trop court', at: INPUT.now }],
+    });
     const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
     expect(
-      hints.some(
-        (hint) =>
-          hint.includes('ce qu’il attendait') &&
-          hint.includes('remboursement à Reveal') &&
-          hint.includes('jamais un contenu'),
-      ),
+      hints.some((hint) => hint.includes('ce qu’il attendait') && hint.includes('jamais un contenu')),
     ).toBe(true);
+    expect(hints.some((hint) => hint.includes('rembours'))).toBe(false);
+    await draftComposer.compose({
+      ...bought,
+      history: [{ direction: 'inbound', text: 'Déçu, je veux être remboursé', at: INPUT.now }],
+    });
+    const asked = seen.voiceInputs?.[1]?.brief.toneHints ?? [];
+    expect(asked.some((hint) => hint.includes('ça se fait sur Reveal'))).toBe(true);
+    // He refuses one: no refund talk.
+    await draftComposer.compose({
+      ...bought,
+      history: [{ direction: 'inbound', text: 'je veux pas de remboursement, c’était court', at: INPUT.now }],
+    });
+    expect(seen.voiceInputs?.[2]?.brief.toneHints.some((hint) => hint.includes('rembours'))).toBe(false);
+  });
+
+  it('writes again an answer that speaks of a refund he did not ask, and blocks it if it still does (avenant du 27/11)', async () => {
+    const complaint: Brief = { ...BRIEF, intent: 'complaint', risks: [] };
+    const bought = {
+      ...INPUT,
+      fan: { ...INPUT.fan, spentMinor: 1_500 },
+      history: [{ direction: 'inbound' as const, text: 'Déçu, c’était trop court', at: INPUT.now }],
+    };
+    const { draftComposer, seen } = composer({
+      brief: complaint,
+      voice: { bubbles: ['Tu peux demander un remboursement à Reveal'] },
+    });
+    const draft = await draftComposer.compose(bought);
+    expect(seen.voiceInputs).toHaveLength(2);
+    expect(seen.voiceInputs?.[1]?.brief.toneHints.at(-1)).toContain(
+      'remboursement alors qu’il n’en demande pas',
+    );
+    expect(draft).toMatchObject({ kind: 'held' });
+    // He asked: « ça se fait sur Reveal » goes.
+    const asks = await composer({
+      brief: complaint,
+      voice: { bubbles: ['Le remboursement, ça se fait sur Reveal'] },
+    }).draftComposer.compose({
+      ...bought,
+      history: [{ direction: 'inbound', text: 'je veux un remboursement', at: INPUT.now }],
+    });
+    expect(asks).toMatchObject({ kind: 'draft' });
   });
 
   it('stays suggestive, never crude, outside the action (Charles 21/11)', async () => {
@@ -4067,14 +4107,19 @@ describe('createDraftComposer, her scripts (ADR 0098)', () => {
     const first = await draftComposer.compose(bought);
     expect(first).toMatchObject({ kind: 'draft', saleTrouble: 'purchase_complaint' });
     const hints = seen.voiceInputs?.[0]?.brief.toneHints ?? [];
-    expect(hints.some((hint) => hint.includes('ce qui ne lui a pas plu') && hint.includes('Reveal'))).toBe(
-      true,
-    );
+    expect(hints.some((hint) => hint.includes('ce qui ne lui a pas plu'))).toBe(true);
     const again = await draftComposer.compose({
       ...bought,
       saleTrouble: { paymentHelpAt: null, complaintAt: new Date(INPUT.now.getTime() - 3_600_000) },
     });
     expect(again).toMatchObject({ kind: 'held', cause: 'sale_trouble', detail: ['purchase_complaint'] });
+    // Asking for a refund does not keep a repeated complaint from a human (avenant du 27/11 to 0158 § 48).
+    const asksAgain = await draftComposer.compose({
+      ...bought,
+      history: [{ direction: 'inbound', text: 'Toujours déçu, je veux être remboursé', at: INPUT.now }],
+      saleTrouble: { paymentHelpAt: null, complaintAt: new Date(INPUT.now.getTime() - 3_600_000) },
+    });
+    expect(asksAgain).toMatchObject({ kind: 'held', cause: 'sale_trouble', detail: ['purchase_complaint'] });
     // A complaint with nothing bought is no purchase complaint.
     const nothing = await draftComposer.compose(INPUT);
     expect(nothing.kind === 'draft' ? nothing.saleTrouble : 'held').toBeUndefined();

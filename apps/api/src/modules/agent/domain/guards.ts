@@ -11,6 +11,7 @@ import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
 import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
 import { INTIMATE_PARTS } from './intimate-words';
 import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
+import { refundInDraft } from './refund';
 
 /**
  * Guards on the voice output, before anything can be sent (docs/architecture/ai-engine.md, « Les gardes »).
@@ -112,6 +113,11 @@ export interface GuardContext {
    * covered language passes; a language outside the coverage never does.
    */
   readonly languages?: readonly Language[];
+  /**
+   * He asked for a refund or his money back in his last turns (`askedRefundLately`, ADR 0158 § 48, avenant du 27/11):
+   * she may then say it is done on Reveal. Absent, a refund she mentions is not read; a refund she promises always is.
+   */
+  readonly fanAskedRefund?: boolean;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -1448,7 +1454,21 @@ export function checkVoiceOutput(
       ...checkForm(bubbles, settings.form ?? DEFAULT_FORM_SETTINGS),
     );
   violations.push(...closeOnlyWords(bubbles, settings, context.meetingTier));
+  violations.push(...refundViolations(bubbles, context.fanAskedRefund));
   return violations;
+}
+
+/**
+ * A refund in her answer (ADR 0158 § 48, avenant du 27/11): one she gives or decides herself blocks, whatever he asked
+ * (money outside policy); one he did not ask for is soft, read in context: written once more, then blocked if still
+ * there (`BLOCKED_AFTER_REWRITE`). Asked, « ça se fait sur Reveal » passes.
+ */
+function refundViolations(bubbles: readonly string[], fanAskedRefund: boolean | undefined): GuardViolation[] {
+  const found = refundInDraft(bubbles, fanAskedRefund ?? true);
+  if (found === null) return [];
+  return found.kind === 'promise'
+    ? [{ code: 'refund_promise', severity: 'blocking', match: found.match }]
+    : [{ code: 'refund_unasked', severity: 'soft', match: found.match }];
 }
 
 /** « cœur » and « coeur » are one word: no Unicode normal form unties the ligature. */
@@ -1519,7 +1539,20 @@ export function isBlocked(violations: readonly GuardViolation[]): boolean {
 }
 
 /** The soft guards that ask for one more writing of her answer (passe 1, 21/11; emojis, 26/11). */
-export const REWRITTEN_SOFT: readonly GuardCode[] = ['repetition', 'emoji_misuse'];
+export const REWRITTEN_SOFT: readonly GuardCode[] = ['repetition', 'emoji_misuse', 'refund_unasked'];
+
+/**
+ * The soft guards that block once her answer was written again and still holds one (ADR 0158 § 48, avenant du 27/11):
+ * a refund he did not ask for is read in context first, never sent.
+ */
+const BLOCKED_AFTER_REWRITE: readonly GuardCode[] = ['refund_unasked'];
+
+/** Her last writing: what `BLOCKED_AFTER_REWRITE` still finds blocks it (no rewrite comes after it). */
+export function asLastWriting(violations: readonly GuardViolation[]): GuardViolation[] {
+  return violations.map((v): GuardViolation =>
+    BLOCKED_AFTER_REWRITE.includes(v.code) ? { ...v, severity: 'blocking' } : v,
+  );
+}
 
 /** Blocked, a formula she already used with him or her emojis misused: her answer is written once more, then goes (passe 1, 21/11). */
 export function wantsRewrite(violations: readonly GuardViolation[]): boolean {

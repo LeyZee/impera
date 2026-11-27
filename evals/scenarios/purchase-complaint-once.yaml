@@ -1,6 +1,6 @@
-# Plainte sur un achat (ADR 0156 § 7, ADR 0158 § 48) : il a payé l'étape et il est déçu ; elle s'excuse simplement, lui demande ce qui ne lui a pas plu, ne promet ni remboursement ni cadeau et ne propose rien d'autre. Fan, messages, script et prix fictifs (ADR 0010).
+# Plainte sur un achat (ADR 0156 § 7, ADR 0158 § 48 et son avenant du 27/11) : il a payé l'étape et il est déçu, sans demander à être remboursé ; elle lui demande ce qui ne lui a pas plu, ne parle pas de remboursement d'elle-même (le mot seul est refusé ici), ne promet ni cadeau ni autre chose et ne propose rien d'autre. Fan, messages, script et prix fictifs (ADR 0010).
 description: >-
-  Il a acheté l’étape et se plaint qu’elle est trop courte ; le cerveau lit une plainte, elle répond une fois elle-même, sans remboursement promis ni nouvelle vente.
+  Il a acheté l’étape et se plaint qu’elle est trop courte ; le cerveau lit une plainte, elle répond une fois elle-même, sans parler de remboursement ni de nouvelle vente.
 persona_version: demo
 tier: full
 fan_facts:
