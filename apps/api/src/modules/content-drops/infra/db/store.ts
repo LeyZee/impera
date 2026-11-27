@@ -796,6 +796,12 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
          limit 1)`,
       // « Un média de script n'est jamais gratuit » (ADR 0145 § 2): the plan leaves it out.
       inScript: schema.mediaInScript(sql`${schema.mediaAssets.id}`),
+      durationMs: schema.mediaAssets.durationMs,
+      // Each file sent before it at its place, set aside since (« À refaire », refused): its version.
+      version: sql<number>`(
+        select count(*)::int + 1 from content_drop_files earlier
+         where earlier.drop_id = ${contentDropFiles.dropId} and earlier.position = ${contentDropFiles.position}
+           and earlier.replaced_at is not null)`,
     })
     .from(contentDropFiles)
     .innerJoin(schema.mediaAssets, eq(schema.mediaAssets.id, contentDropFiles.mediaAssetId))
@@ -810,11 +816,27 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
   if (files.some((file) => file.erasedAt !== null))
     throw new ContentDropExportUnprocessable('original_erased');
   if (await redoPendingIn(tx, dropId)) throw new ContentDropExportUnprocessable('redo_pending');
+  const timezone = creator?.timezone ?? 'UTC';
+  // Its rank among her drops of that category on that day of hers, withdrawn ones counted: a name never changes.
+  // Compared to its own row in the base, never to a JS Date: the base keeps microseconds, a Date only milliseconds,
+  // and the drop would then fall out of its own count.
+  const [rank] = await tx
+    .execute<{ rank: number }>(
+      sql`
+    select count(*)::int as rank from content_drops d
+      join content_drops me on me.id = ${row.id}::uuid
+     where d.creator_id = me.creator_id and d.category = me.category
+       and (d.created_at at time zone ${timezone})::date = (me.created_at at time zone ${timezone})::date
+       and (d.created_at, d.id) <= (me.created_at, me.id)
+  `,
+    )
+    .then((result) => result.rows);
   return {
     category: IdeaDropCategorySchema.parse(row.category),
     createdAt: row.createdAt,
+    dayRank: Math.max(1, rank?.rank ?? 1),
     // Her row is read under the same policies: the drop would not be either without it.
-    timezone: creator?.timezone ?? 'UTC',
+    timezone,
     sentence: row.sentence,
     files: files.map((file) => ({
       kind: DropMediaKindSchema.parse(file.kind),
@@ -823,6 +845,8 @@ async function sentDropIn(tx: Transaction, dropId: string): Promise<SentDrop> {
       storageKey: file.storageKey,
       description: file.description,
       inScript: file.inScript,
+      durationMs: file.durationMs,
+      version: file.version,
     })),
   };
 }

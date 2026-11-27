@@ -10,6 +10,7 @@ import {
   ConversationIdSchema,
   CreatorIdSchema,
   CreatorTaskIdSchema,
+  MemberDepartureIdSchema,
   DraftIdSchema,
   EventIdSchema,
   FanIdSchema,
@@ -76,6 +77,7 @@ export const JOB_NAMES = [
   'scheduling.remind_reports',
   'scheduling.notify_incident',
   'team.apply_roles',
+  'team.member_departure',
   'owners.watch',
   'payroll.recalculate',
   'payroll.recalculate_open',
@@ -166,6 +168,7 @@ export const JOB_LABELS: Readonly<Record<JobName, string>> = {
   'scheduling.remind_reports': 'Rappels du rapport de fin de shift',
   'scheduling.notify_incident': 'Incident de fin de shift signalé à l’agence',
   'team.apply_roles': 'Rôles de l’équipe',
+  'team.member_departure': 'Départ d’un membre',
   'owners.watch': 'Propriétaires : préavis de retrait et alertes',
   'payroll.recalculate': 'Calcul de la paie',
   'payroll.recalculate_open': 'Calcul de la paie en cours',
@@ -396,6 +399,11 @@ export const JOB_PAYLOADS = {
   'scheduling.notify_incident': z.object({ shiftFeedbackId: z.uuid(), creatorId: z.uuid() }),
   /** Each member's record takes the role in force today (`member_roles`), a role dated for today taking effect. */
   'team.apply_roles': z.object({}),
+  /**
+   * At the hour a departure ends (ADR 0166 § 2): applied once, replayed it does nothing more. By the owner who set it,
+   * or by an owner in office if he no longer is one; `scheduledBy` is checked against the departure before anything.
+   */
+  'team.member_departure': z.object({ departureId: MemberDepartureIdSchema, scheduledBy: UserIdSchema }),
   /**
    * The owners (ADR 0096): a removal whose 72 hours of notice ended, uncancelled, is applied, and each change among the
    * owners or sign-in of one on a new device is told to the others in the app. Replayable: a removal is applied once, a
@@ -717,6 +725,7 @@ export const JOB_MAX_ATTEMPTS = {
   'scheduling.remind_reports': 1,
   'scheduling.notify_incident': 3,
   'team.apply_roles': 1,
+  'team.member_departure': 5,
   // Every minute: the next run is the retry.
   'owners.watch': 1,
   // A recalculation is replayable and writes nothing when nothing changed; the hourly one catches up anyway.

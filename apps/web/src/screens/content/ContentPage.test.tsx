@@ -490,6 +490,36 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(drop?.body).toMatchObject({ files: [{ bytes: 14 }, { bytes: 12 }, { bytes: 13 }] });
   });
 
+  it('lets her drag a file by its grip to its place, under « Ordre de publication » (Charles, 26/11)', async () => {
+    serve({ requests: [], drops: [] });
+    show();
+    fireEvent.click(await screen.findByRole('button', { name: /Séance boudoir/u }));
+    const dialog = screen.getByRole('dialog');
+    const input = dialog.querySelector('input[type="file"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no picker');
+    pick(input, [
+      fileWithHead('IMG_1.HEIC', 'heic'),
+      fileWithHead('IMG_2.HEIC', 'heic', 1),
+      fileWithHead('IMG_3.HEIC', 'heic', 2),
+    ]);
+    // « Ordre de publication » names the list, the 1, 2, 3 on its thumbnails.
+    expect(within(dialog).getByRole('list', { name: 'Ordre de publication' })).toBeDefined();
+    expect(within(dialog).getByText('Glisse une vignette par sa poignée pour la déplacer.')).toBeDefined();
+    // jsdom lays nothing out: each row 50 px high, one under the other.
+    const rows = [...dialog.querySelectorAll<HTMLElement>('.ct-chosen__item')];
+    rows.forEach((row, index) => {
+      row.getBoundingClientRect = () => DOMRect.fromRect({ x: 0, y: index * 50, width: 300, height: 50 });
+    });
+    Element.prototype.setPointerCapture = vi.fn();
+    const grip = rows[0]?.querySelector('.ct-chosen__grip');
+    if (!(grip instanceof HTMLElement)) throw new Error('no grip');
+    fireEvent.pointerDown(grip, { pointerId: 1, clientY: 10 });
+    fireEvent.pointerMove(grip, { pointerId: 1, clientY: 120 });
+    fireEvent.pointerUp(grip, { pointerId: 1, clientY: 120 });
+    const names = [...dialog.querySelectorAll('.ct-chosen__file')].map((name) => name.textContent);
+    expect(names).toEqual([' · IMG_2.HEIC', ' · IMG_3.HEIC', ' · IMG_1.HEIC']);
+  });
+
   it('asks the type of a video to sell among the agency’s, and sends it with the drop (ADR 0163 § 7)', async () => {
     const calls = serve(
       { requests: [], drops: [] },
