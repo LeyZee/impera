@@ -59,7 +59,7 @@ pnpm evals              # évaluations sur le vrai chemin de l’agent (clé xAI
 1. `pnpm check` vert, `git status` propre, aucun fichier parasite (voir hygiene.md).
 2. Fiche de tâche mise à jour (statut, ce qui reste).
 3. Entrée de journal dans son propre fichier `docs/sessions/log/<date>-<slug>.md` (format dans `docs/sessions/README.md`) ; le dossier est l'index, `docs/sessions/LOG.md` ne prend plus de ligne.
-4. Branche rebasée sur `origin/main`, PR ouverte par la session en brouillon avec le template `.github/pull_request_template.md`, passée en « prête » quand tout est vert. `main` ne change que par une PR verte fusionnée, jamais par un push direct (hook `protect-main`).
+4. Branche rebasée sur `origin/main`, PR ouverte par la session en brouillon avec le template `.github/pull_request_template.md`, passée en « prête » quand tout est vert. `main` ne change que par une PR verte fusionnée, jamais par un push direct (hook `protect-main`). *(Avenant du 27/11/2026 : `main` est ramené dans la branche par une fusion (`git merge origin/main`), jamais par un rebase.)*
 
 > Avenant du 27/11/2026 (audit des contradictions) : dans le projet Impera Studio, une session est un fil ; sa branche est celle que la session reçoit (souvent `claude/…`), une PR par fil, et c'est le fil Bilan qui fusionne, jamais Charles. Une fiche de tâche s'applique quand elle existe. Une branche n'est jamais supprimée (règle de Charles) ; fermer une PR est permis.
 

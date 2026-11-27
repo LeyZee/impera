@@ -37,7 +37,7 @@ Chaque commit écrit par une session se termine par ses deux lignes d'attributio
 ## Sessions en parallèle
 
 - Plusieurs fiches peuvent avancer en même temps, chacune sur sa branche. Charles attribue les fiches ; deux sessions ne prennent jamais la même.
-- Avant d'ouvrir ou de mettre à jour une PR : `git fetch origin main && git rebase origin/main`. Pas de commit de fusion.
+- Avant d'ouvrir ou de mettre à jour une PR : ~~`git fetch origin main && git rebase origin/main`. Pas de commit de fusion.~~ Avenant du 27/11/2026 : `git fetch origin main && git merge origin/main`, jamais de rebase ni de réécriture d'une branche déjà poussée.
 - Chaque session écrit son journal dans son propre fichier `docs/sessions/log/<date>-<id>.md` (voir `docs/sessions/README.md`) ; `docs/sessions/LOG.md` n'est qu'un index. Un fichier par session, zéro conflit.
 
 ## Revue
