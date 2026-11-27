@@ -53,7 +53,8 @@ export function Thumb({
         />
       )}
       {/* A video tells itself from a photo at a glance: a play mark on its first image (recette CRE-16). */}
-      {kind === 'video' ? (
+      {/* With its length known, the length alone says « video »; the play mark stays when it is not (Design, 27/11). */}
+      {kind === 'video' && ms === null ? (
         <svg className="ct-thumb__play" viewBox="0 0 20 20">
           <circle cx="10" cy="10" r="10" />
           <path d="M8 6.2v7.6L14 10z" />

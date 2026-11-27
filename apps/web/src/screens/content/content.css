@@ -479,23 +479,23 @@
   height: 20px;
 }
 .ct-thumb__play circle {
-  fill: color-mix(in srgb, var(--nv-void) 62%, transparent);
+  fill: var(--nv-media-scrim);
 }
 .ct-thumb__play path {
-  fill: var(--nv-ink);
+  fill: var(--nv-media-ink);
 }
 /* A video's length on its corner, as in her phone's gallery (Charles, 27/11). */
 .ct-thumb__length {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
-  padding: 0 3px;
+  right: 3px;
+  bottom: 3px;
+  padding: 0 4px;
   border-radius: var(--nv-radius-xs);
-  background: color-mix(in srgb, var(--nv-void) 62%, transparent);
-  color: var(--nv-ink);
-  font-size: 9px;
+  background: var(--nv-media-scrim);
+  color: var(--nv-media-ink);
+  font-size: var(--nv-text-caption);
   font-weight: 600;
-  line-height: 13px;
+  line-height: var(--nv-text-caption-leading);
 }
 .ct-thumb img,
 .ct-thumb video {
