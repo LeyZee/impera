@@ -27,6 +27,8 @@ const facts = (patch: Partial<CreatorOverviewFacts> = {}): CreatorOverviewFacts 
   autoConversations: 0,
   hasActivePersona: true,
   expiredSessions: [],
+  scripts: { day: 1, night: 1 },
+  draftsOn: true,
   requests: [],
   names: new Map([
     [THEO, 'Théo'],
@@ -77,6 +79,27 @@ describe('the cards of the list of Créatrices', () => {
     const older: Record<string, unknown> = { ...at({}) };
     delete older['hasActivePersona'];
     expect(CreatorOverviewSchema.parse(older).hasActivePersona).toBe(true);
+  });
+
+  it('says what her agent actually does, never « Copilote » without scripts or drafts (recette 27/11, G18)', () => {
+    const at = (patch: Partial<CreatorOverviewFacts>) =>
+      CreatorOverviewSchema.parse(
+        creatorOverview({
+          creatorId: CREATOR,
+          facts: facts(patch),
+          now: NOW,
+          sales: undefined,
+          rate: null,
+          onShift: [],
+        }),
+      ).agentStatus;
+    expect(at({})).toBe('copilot');
+    expect(at({ scripts: { day: 0, night: 0 }, draftsOn: false })).toBe('no_scripts');
+    expect(at({ draftsOn: false })).toBe('drafts_off');
+    expect(at({ hasActivePersona: false })).toBe('no_persona');
+    expect(at({ scope: 'self', scripts: null })).toBe('copilot');
+    expect(at({ switches: { global: false, creator: true }, pausedUntil: NOW })).toBe('paused');
+    expect(at({ switches: { global: false, creator: true } })).toBe('stopped');
   });
 
   it('tells every reader where her session expired (recette REV-05)', () => {
@@ -186,6 +209,7 @@ describe('the cards of the list of Créatrices', () => {
       resumesAs: 'copilot',
       hasActivePersona: true,
       expiredSessions: [],
+      agentStatus: 'stopped',
       sales: null,
       onShift: null,
       requests: null,

@@ -120,21 +120,35 @@ export function revealLate(
 const GRAVE: ReadonlySet<WaitingConversation['kind']> = new Set(['minor', 'non_consent', 'distress']);
 
 /**
- * A fan held because no model answered, once a voice model answers again (IA-07): the outage is over, his line says to
- * give him back to the agent. It goes once nobody is held for it any more.
+ * A fan held because no model answered, once a model answered a real call after he was handed over (IA-07, recette
+ * 27/11 A9): the outage is over, his line says to give him back to the agent. It goes once nobody is held for it any more.
  */
 const VOICE_BACK_WHY = 'L’IA répond de nouveau : rends la main à ces fans.';
 
 /**
+ * Whether a fan held for an outage since `since` may be told the AI is back (recette 27/11, A9): the models answer now
+ * (none down, a key), and one of them answered a real call after he was handed over. Never from the time gone by nor
+ * from a retry: an outage with no call since still is one, even when the last failure is old.
+ */
+function aiBackSince(voice: VoiceHealth | undefined, since: Date): boolean {
+  return (
+    answers(voice) &&
+    voice?.down === undefined &&
+    voice?.lastAnsweredAt !== undefined &&
+    voice.lastAnsweredAt.getTime() > since.getTime()
+  );
+}
+
+/**
  * « À traiter », the gravest first, then the longest waiting. On Arrêt (choix de Charles, 28/10) it keeps the grave
  * lines only: nothing leaves in her name, the chatters hold the hand in Reveal, but a possible minor, a question of
- * consent or a fan in distress still waits for a human. The other lines come back with the agent. `voiceAnswers`: a
- * voice model answers now (the gateway's health, `VoiceHealth`), so a fan held for an outage is told back (IA-07).
+ * consent or a fan in distress still waits for a human. The other lines come back with the agent. `voice`: the
+ * gateway's health, so a fan held for an outage is told back once a model answered after him (IA-07, `aiBackSince`).
  */
 export function todos(
   waiting: readonly WaitingConversation[],
   now: Date,
-  agent: { readonly stopped: boolean; readonly voiceAnswers?: boolean } = { stopped: false },
+  agent: { readonly stopped: boolean; readonly voice?: VoiceHealth } = { stopped: false },
 ): DashboardTodo[] {
   return waiting
     .filter((w) => !agent.stopped || GRAVE.has(w.kind))
@@ -143,7 +157,7 @@ export function todos(
         Number(GRAVE.has(b.kind)) - Number(GRAVE.has(a.kind)) || a.since.getTime() - b.since.getTime(),
     )
     .map((w) => {
-      const back = w.kind === 'llm_unavailable' && agent.voiceAnswers === true;
+      const back = w.kind === 'llm_unavailable' && aiBackSince(agent.voice, w.since);
       return {
         id: `${w.kind}-${w.conversationId}`,
         tone: GRAVE.has(w.kind) ? 'bad' : 'warn',
@@ -180,7 +194,7 @@ export function creatorQueue(
   return {
     creatorId,
     name: facts.creator.name,
-    todos: todos(facts.waiting, now, { stopped: modeOf(facts) === 'stop', voiceAnswers: answers(voice) }),
+    todos: todos(facts.waiting, now, { stopped: modeOf(facts) === 'stop', ...(voice && { voice }) }),
   };
 }
 
@@ -188,7 +202,7 @@ export function creatorQueue(
  * « À traiter » of several creators in one list (SUIVI-09): each line names its creator, the gravest first across
  * them all, then the longest waiting; and each creator's count, in the order given (DASH-03).
  */
-export function queueAcross(queues: readonly CreatorQueue[]): TodosAcrossCreators {
+export function queueAcross(queues: readonly CreatorQueue[], voice?: VoiceHealth): TodosAcrossCreators {
   const items = queues
     .flatMap((queue) =>
       queue.todos.map((todo) => ({ ...todo, creatorId: queue.creatorId, creatorName: queue.name })),
@@ -204,7 +218,23 @@ export function queueAcross(queues: readonly CreatorQueue[]): TodosAcrossCreator
       todos: queue.todos.length,
       grave: queue.todos.filter((todo) => todo.tone === 'bad').length,
     })),
+    aiOutage: aiOutageOf(voice, items),
   };
+}
+
+/**
+ * The outage said above « À traiter » (recette 27/11, A9, PARC-04): a model the agent needs is down, since its first
+ * failed call after its last success. Down for want of a key with nobody held for it, the Dashboard says the key and
+ * nothing is said here.
+ */
+export function aiOutageOf(
+  voice: VoiceHealth | undefined,
+  items: readonly DashboardTodo[],
+): TodosAcrossCreators['aiOutage'] {
+  if (voice?.down === undefined) return null;
+  const { since } = voice.down;
+  if (since === null && !items.some((todo) => todo.kind === 'llm_unavailable')) return null;
+  return { since: since === null ? null : since.toISOString() };
 }
 
 /** Arrêt wins; otherwise Automatique as soon as one conversation runs on its own. */
@@ -241,6 +271,13 @@ function guardsToday(handoffs: DashboardFacts['handoffsToday']): Record<HandoffC
 export interface VoiceHealth {
   readonly ok: boolean;
   readonly keyMissing: boolean;
+  /** The latest real call a model of the agent (voice or brain) answered today (recette 27/11, A9). Absent: none. */
+  readonly lastAnsweredAt?: Date;
+  /**
+   * A model of the agent (voice or brain) is down now: its last call failed and no fallback answered, or it has no key.
+   * `since`: its first failed call after its last success, `null` when no call says it. Absent while they answer.
+   */
+  readonly down?: { readonly since: Date | null };
 }
 
 /** The Dashboard of one creator, from the facts of the database and the day's budget. */
@@ -319,10 +356,7 @@ export function assembleDashboard(input: {
       alertAt: input.budget.alertAtEur,
       costPerEuroSold: null,
     },
-    todos: todos(facts.waiting, window.now, {
-      stopped: modeOf(facts) === 'stop',
-      voiceAnswers: answers(input.voice),
-    }),
+    todos: todos(facts.waiting, window.now, { stopped: modeOf(facts) === 'stop', voice: input.voice }),
     fans: facts.fans.map((fan) => ({
       id: FanIdSchema.parse(fan.id),
       name: fanNameOf(fan.name),

@@ -613,7 +613,7 @@ describe('TrackingPage', () => {
     expect(screen.queryByRole('button', { name: /Voir les/u })).toBeNull();
   });
 
-  it('gives the agent its hand back for every fan of an outage at once (recette 27/11, G14)', async () => {
+  it('gives the agent its hand back for every fan of an outage at once, once it is over (recette 27/11, G14)', async () => {
     const [first] = apiDashboard().todos;
     if (first === undefined) throw new Error('the fake dashboard has a todo');
     const down = (n: number): DashboardTodo => ({
@@ -623,6 +623,7 @@ describe('TrackingPage', () => {
       id: `down-${String(n)}`,
       waitingMinutes: 30 + n,
       conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000010${String(n)}`),
+      voiceBack: true,
     });
     const posted = serve({
       ...ONE,
@@ -634,6 +635,72 @@ describe('TrackingPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Rendre la main à l’agent (3)' }));
     expect(await screen.findByText('Main rendue à 3 fans.')).toBeDefined();
     expect(posted.map(({ action }) => action)).toEqual(['release', 'release', 'release']);
+  });
+
+  it('says the outage while it lasts, never « IA de retour », and offers no hand back (recette 27/11, A9, PARC-04)', async () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const items = [1, 2].map((n) => ({
+      ...first,
+      tone: 'warn' as const,
+      kind: 'llm_unavailable' as const,
+      id: `down-${String(n)}`,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000010${String(n)}`),
+      creatorId: LEA.id,
+      creatorName: LEA.displayName,
+    }));
+    serve({
+      ...ONE,
+      conversations: { [LEA.id]: { items: [conversation('1')], nextCursor: null } },
+      // 13:05 UTC is 14 h 05 in Paris, her zone.
+      todos: { status: 200, body: { items, creators: [], aiOutage: { since: '2026-11-27T13:05:00.000Z' } } },
+    });
+    renderPage();
+    expect(await screen.findByText(/^IA indisponible depuis 14\sh\s05, un humain répond\.$/u)).toBeDefined();
+    const queue = await screen.findByRole('list', { name: 'À traiter' });
+    expect(within(queue).getAllByRole('listitem')[0]?.textContent).toContain('IA indisponible · 2 fans');
+    expect(screen.queryByText(/IA de retour/u)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Rendre la main à l’agent \(/u })).toBeNull();
+  });
+
+  it('narrows the list to the fans of a group on a click, and gives it back whole (recette 27/11, G14, PRO-10)', async () => {
+    const [first] = apiDashboard().todos;
+    if (first === undefined) throw new Error('the fake dashboard has a todo');
+    const back = (n: number): DashboardTodo => ({
+      ...first,
+      tone: 'warn',
+      kind: 'llm_unavailable',
+      id: `back-${String(n)}`,
+      title: `Fan ${String(n)}`,
+      conversationId: ConversationIdSchema.parse(`0192f3a0-0000-7000-8000-00000000000${String(n)}`),
+      voiceBack: true,
+    });
+    serve({
+      ...ONE,
+      conversations: {
+        [LEA.id]: { items: [conversation('1'), conversation('2'), conversation('3')], nextCursor: null },
+      },
+      dashboard: { status: 200, body: apiDashboard({ todos: [back(1), back(2)] }) },
+    });
+    renderPage();
+    const list = await screen.findByRole('group', { name: 'Conversations' });
+    await waitFor(() => {
+      expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    });
+    const group = screen.getByRole('button', { name: /^IA de retour\s*· 2 fans/u });
+    fireEvent.click(group);
+    expect(group.getAttribute('aria-pressed')).toBe('true');
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent),
+    ).toEqual([expect.stringContaining('Fan 1'), expect.stringContaining('Fan 2')]);
+    expect(screen.getByText(/Seulement les 2 fans de « IA de retour »/u)).toBeDefined();
+    // Nothing opens: the list is narrowed, the reader stays where it was.
+    expect(screen.getByText(/Choisis une conversation à gauche/u)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Tout afficher' }));
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3);
+    expect(group.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('never offers it to a chatter, who gives back only his own hand', async () => {

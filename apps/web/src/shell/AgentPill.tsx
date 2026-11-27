@@ -1,9 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link, useRouterState } from '@tanstack/react-router';
 import type { JSX } from 'react';
 
 import { pillOf } from '@/agent/mode';
+import { pillStatusLabel } from '@/agent/state';
 import { useAgentMode } from '@/agent/useAgentMode';
 import { useCreators } from '@/creators/api';
+import { creatorsOverviewQuery } from '@/creators/overview/api';
 
 const TITLE = {
   unavailable: 'Le serveur ne répond pas : mode de l’agent inconnu. Ouvrir le Dashboard.',
@@ -29,7 +32,23 @@ export function AgentPill(): JSX.Element {
   const view = useAgentMode(shown);
   const live = view.source === 'live' ? view : null;
   const stalled = live?.stalled ?? null;
-  const pill = pillOf(live?.mode ?? null, stalled === null);
+  // What runs for her, from her card (recette 27/11, PRO-15): never « Copilote » for an agent that writes nothing. A
+  // reader without the list of Créatrices, or an older server, gets her mode as before.
+  const overview = useQuery({ ...creatorsOverviewQuery, enabled: live !== null });
+  const status = overview.data?.find((card) => card.creatorId === live?.creatorId)?.agentStatus;
+  const said = live === null || live.mode === 'stop' ? null : pillStatusLabel(status);
+  const modePill = pillOf(live?.mode ?? null, stalled === null);
+  const pill =
+    said === null
+      ? modePill
+      : {
+          label: said,
+          tone:
+            status === 'no_persona' || status === 'no_scripts' || status === 'session_expired'
+              ? ('warn' as const)
+              : ('unknown' as const),
+          live: false,
+        };
   const several = (useCreators().data?.length ?? 0) >= 2;
   const mode = view.source === 'loading' ? '…' : view.source === 'empty' ? 'Sans créatrice' : pill.label;
   const label = live !== null && several ? `${live.creatorName} · ${mode}` : mode;

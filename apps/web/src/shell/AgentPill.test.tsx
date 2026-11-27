@@ -190,6 +190,34 @@ describe('AgentPill', () => {
     }
   });
 
+  it('says what runs for her, never « Copilote » for a creator without a persona (recette 27/11, PRO-15)', async () => {
+    serveDashboard((url) =>
+      url.pathname === '/v1/dashboard/creators'
+        ? {
+            status: 200,
+            body: {
+              creators: [
+                {
+                  creatorId: CREATOR.id,
+                  mode: 'copilot',
+                  hasActivePersona: false,
+                  agentStatus: 'no_persona',
+                  sales: null,
+                  onShift: null,
+                  requests: null,
+                },
+              ],
+            },
+          }
+        : live('copilot'),
+    );
+    const pill = await renderPill();
+    await waitFor(() => {
+      expect(pill.textContent).toBe('en attente de persona');
+    });
+    expect(pill.getAttribute('data-tone')).toBe('warn');
+  });
+
   it('cuts a long name inside the pill, the title keeping it whole (recette 05/11, PRO-12)', async () => {
     serveDashboard(live('copilot'));
     const pill = await renderPill();

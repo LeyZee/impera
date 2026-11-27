@@ -31,11 +31,13 @@
 .ai-switch .nv-dot.ai-switch__dot--on {
   --_c: var(--nv-agent);
 }
-.ai-switch .nv-dot.ai-switch__dot--out {
+.ai-switch .nv-dot.ai-switch__dot--out,
+.ai-switch .nv-dot.ai-switch__dot--drafts_off {
   --_c: var(--nv-ink-faint);
 }
 .ai-switch .nv-dot.ai-switch__dot--paused,
 .ai-switch .nv-dot.ai-switch__dot--expired,
+.ai-switch .nv-dot.ai-switch__dot--no_scripts,
 .ai-switch .nv-dot.ai-switch__dot--off,
 .ai-switch .nv-dot.ai-switch__dot--global {
   --_c: var(--nv-warning);

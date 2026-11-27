@@ -8,6 +8,7 @@ import {
   type TeamMemberId,
 } from '@impera/contracts';
 
+import { agentStatusOf } from './agent-status';
 import { modeOf } from './dashboard';
 import type { CreatorOverviewFacts, OnShiftReading, RevealSalesReading } from './dashboard-ports';
 import type { UsdRate } from './fan-ranking';
@@ -44,6 +45,17 @@ export function creatorOverview(input: {
     hasActivePersona: facts.hasActivePersona,
     // Every reader is told: nothing is read or sent there until the session is captured again (recette REV-05).
     expiredSessions: [...facts.expiredSessions],
+    // What runs, said once for her header, her card and the menu's pill (recette 27/11, G18).
+    agentStatus: agentStatusOf({
+      mode,
+      globalStop: facts.switches.global,
+      paused: facts.switches.creator && facts.pausedUntil !== null,
+      sessionExpired: facts.expiredSessions.length > 0,
+      hasActivePersona: facts.hasActivePersona,
+      scripts: facts.scripts,
+      hoursOpen: facts.hoursNow.open,
+      draftsOn: facts.draftsOn,
+    }),
   };
   if (facts.scope === 'self')
     return { creatorId, mode, ...agent, sales: null, onShift: null, requests: null };

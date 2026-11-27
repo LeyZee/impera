@@ -48,4 +48,13 @@ describe('computeHealth', () => {
     });
     expect(voiceHealth([comment(30), comment(20), comment(10), call(5, 'ok')])?.state).toBe('ok');
   });
+
+  it('dates an outage from the first failure after the last success (recette 27/11, A9)', () => {
+    const down = voiceHealth([call(60, 'ok'), call(30, 'unavailable'), call(10, 'timeout')]);
+    expect(down?.state).toBe('down');
+    expect(down?.downSince).toEqual(new Date(NOW.getTime() - 30 * 60_000));
+    expect(down?.lastSuccessAt).toEqual(new Date(NOW.getTime() - 60 * 60_000));
+    expect(voiceHealth([call(30, 'unavailable'), call(10, 'ok')])?.downSince).toBeUndefined();
+    expect(voiceHealth([call(20, 'unavailable')])?.downSince).toEqual(new Date(NOW.getTime() - 20 * 60_000));
+  });
 });

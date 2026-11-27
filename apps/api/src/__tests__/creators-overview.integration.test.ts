@@ -252,6 +252,8 @@ describe('GET /v1/dashboard/creators, the cards of the list of Créatrices', () 
         expiredSessions: [],
         hoursNow: { open: true, changesAt: null },
         resumesAs: 'copilot',
+        // No persona: what runs is said before her mode (recette 27/11, G18).
+        agentStatus: 'no_persona',
         sales: null,
         onShift: null,
         requests: null,

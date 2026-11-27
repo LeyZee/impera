@@ -1,4 +1,4 @@
-import { agentHoursNow, DropCategorySchema, PlatformSchema } from '@impera/contracts';
+import { agentHoursNow, CreatorSettingsSchema, DropCategorySchema, PlatformSchema } from '@impera/contracts';
 import { sql, withTenantMember, type Database } from '@impera/db';
 import { z } from 'zod';
 
@@ -6,7 +6,21 @@ import type { CreatorOverviewView } from '../../domain/dashboard-ports';
 
 import { herHours } from './her-hours';
 
-const CreatorSchema = z.object({ timezone: z.string().min(1), agent_hours: z.unknown() });
+const CreatorSchema = z.object({
+  timezone: z.string().min(1),
+  agent_hours: z.unknown(),
+  settings: z.unknown(),
+});
+const ScriptsSchema = z.object({
+  day: z.coerce.number().int().nonnegative(),
+  night: z.coerce.number().int().nonnegative(),
+});
+
+/** Her « Brouillons de l'IA » (ADR 0086 § 6); settings that no longer read give the default, off. */
+function draftsOnOf(settings: unknown): boolean {
+  const parsed = CreatorSettingsSchema.safeParse(settings ?? {});
+  return (parsed.success ? parsed.data : CreatorSettingsSchema.parse({})).copilot.drafts;
+}
 const SwitchSchema = z.object({
   scope: z.string(),
   active: z.boolean(),
@@ -32,7 +46,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
     read: (creatorId, userId) =>
       withTenantMember(db, creatorId, userId, async (tx, scope) => {
         const creator = await tx.execute(
-          sql`select timezone, agent_hours from creators where id = ${creatorId}::uuid and archived_at is null`,
+          sql`select timezone, agent_hours, settings from creators where id = ${creatorId}::uuid and archived_at is null`,
         );
         const [her] = z.array(CreatorSchema).parse(creator.rows);
         if (her === undefined) return undefined;
@@ -72,6 +86,7 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
         const pausedUntil = stopped.find((s) => s.scope === 'creator' && s.active)?.active_until ?? null;
         const hours = await herHours(tx, creatorId, her.timezone, her.agent_hours);
         const hoursNow = agentHoursNow(hours.hours, hours.timeZone, new Date(), hours.exceptions);
+        const draftsOn = draftsOnOf(her.settings);
         if (scope === 'self') {
           return {
             timezone: her.timezone,
@@ -82,10 +97,25 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
             autoConversations: counts?.auto ?? 0,
             hasActivePersona: counts?.persona ?? false,
             expiredSessions,
+            // Her scripts are the agency's to read (RLS `team_read`): unknown here, never « none ».
+            scripts: null,
+            draftsOn,
             requests: [],
             names: new Map(),
           };
         }
+        // Ours, recognised in Reveal and still active there (ADR 0161), as « Mise en route » counts them (setup-reader).
+        const [scripts] = z.array(ScriptsSchema).parse(
+          (
+            await tx.execute(
+              sql`select count(*) filter (where ps.content ->> 'moment' in ('day', 'both')) as day,
+                         count(*) filter (where ps.content ->> 'moment' in ('night', 'both')) as night
+                  from prepared_scripts ps
+                  join platform_scripts p on p.id = ps.matched_platform_script_id and p.creator_id = ps.creator_id
+                  where ps.creator_id = ${creatorId}::uuid and ps.state = 'matched' and p.active`,
+            )
+          ).rows,
+        );
         // Open, and answered by no drop not withdrawn: what she still owes (ADR 0055 § 4).
         const requests = z.array(RequestSchema).parse(
           (
@@ -110,6 +140,8 @@ export function createCreatorsOverviewReader(db: Database): CreatorOverviewView 
           autoConversations: counts?.auto ?? 0,
           hasActivePersona: counts?.persona ?? false,
           expiredSessions,
+          scripts: scripts ?? { day: 0, night: 0 },
+          draftsOn,
           requests: requests.map((row) => ({ category: row.category, dueOn: row.due_on })),
           names: new Map(members.map((row) => [row.id, row.display_name] as const)),
         };

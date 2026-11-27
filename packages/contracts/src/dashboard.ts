@@ -26,6 +26,27 @@ export const AgentModeSchema = z.enum(['auto', 'copilot', 'stop']);
 export type AgentMode = z.infer<typeof AgentModeSchema>;
 
 /**
+ * What her agent actually does now, decided by the server from what runs (recette 27/11, G18): one word per state, the
+ * first that holds in this order. `global_stop`, `paused`, `stopped`: an Arrêt. `session_expired`: a Reveal session to
+ * capture again. `no_persona`: no active persona, it writes nothing. `no_scripts`: no script ready in Reveal, it has
+ * nothing to offer. `off_hours`: out of her hours. `drafts_off`: Copilote with the drafts off in the extension, the
+ * chatters write alone. `copilot`, `auto`: it runs in that mode.
+ */
+export const AgentStatusSchema = z.enum([
+  'global_stop',
+  'paused',
+  'stopped',
+  'session_expired',
+  'no_persona',
+  'no_scripts',
+  'off_hours',
+  'drafts_off',
+  'copilot',
+  'auto',
+]);
+export type AgentStatus = z.infer<typeof AgentStatusSchema>;
+
+/**
  * `PUT /v1/agent/mode`: Arrêt sets her kill switch, Copilote lifts it and brings every conversation back to the
  * copilot, Automatique lifts it and puts every conversation in automatic, or is refused (409 `agent_mode_conflict`,
  * `details.missing`) while ADR 0019 keeps it locked. The answer is the mode now in force, as `GET /v1/dashboard`
@@ -96,8 +117,8 @@ export const DashboardTodoSchema = z.object({
   conversationId: ConversationIdSchema,
   fanId: FanIdSchema,
   /**
-   * An `llm_unavailable` line once a voice model answers again (IA-07): no longer an outage, a person gives these fans
-   * back to the agent. Absent otherwise.
+   * An `llm_unavailable` line once a model answered a real call after he was handed over (IA-07, recette 27/11 A9): no
+   * longer an outage, a person gives these fans back to the agent. Absent otherwise, and all through the outage.
    */
   voiceBack: z.literal(true).optional(),
 });
@@ -123,9 +144,18 @@ export type CreatorTodoCount = z.infer<typeof CreatorTodoCountSchema>;
  * `GET /v1/dashboard/todos`: « À traiter » of every creator the person follows (every creator for the owner, those of
  * the account otherwise), the gravest first then the longest waiting, and the count of each creator in her order.
  */
+/**
+ * No model answers the agent now (recette 27/11, A9, PARC-04): since when, from the first call that failed after the last
+ * one that answered; `since` is `null` when no call says it (no key at all). `null` while the models answer.
+ */
+export const AiOutageSchema = z.object({ since: at.nullable() });
+export type AiOutage = z.infer<typeof AiOutageSchema>;
+
 export const TodosAcrossCreatorsSchema = z.object({
   items: z.array(CreatorTodoSchema),
   creators: z.array(CreatorTodoCountSchema),
+  /** Said above « À traiter » while it lasts: « IA indisponible depuis 14 h 05, un humain répond ». */
+  aiOutage: AiOutageSchema.nullable().default(null),
 });
 export type TodosAcrossCreators = z.infer<typeof TodosAcrossCreatorsSchema>;
 

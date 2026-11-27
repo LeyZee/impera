@@ -1,6 +1,7 @@
 import type { ConversationMode, ConversationState, ConversationSummary } from '@impera/contracts';
 
 import { DESIRE_BAND_LABELS } from '@/agent/desire';
+import { clockAt } from '@/scheduling/time';
 
 /** The labels of `nv-status--<state>` (docs/design/README.md, « Pastilles d'état »). */
 export const STATE_LABELS: Readonly<Record<ConversationState, string>> = {
@@ -236,6 +237,28 @@ export function searchLines<T extends { readonly conversation: ConversationSumma
   const wanted = folded(query);
   if (wanted === '') return lines;
   return lines.filter((l) => folded(l.conversation.fanDisplayName).includes(wanted));
+}
+
+/**
+ * The list narrowed to the fans behind a group of « À traiter » (recette 27/11, G14, PRO-10): a click on « IA de retour
+ * · 20 fans » shows these twenty, in the list's own order and search.
+ */
+export function onlyConversations<T extends { readonly conversation: ConversationSummary }>(
+  lines: readonly T[],
+  conversationIds: readonly string[],
+): readonly T[] {
+  const wanted = new Set(conversationIds);
+  return lines.filter((l) => wanted.has(l.conversation.id));
+}
+
+/**
+ * The outage said above « À traiter » (recette 27/11, A9, PARC-04): since when, in the zone given (hers, or the
+ * reader's when her creators do not share one), and who answers meanwhile.
+ */
+export function outageWords(outage: { readonly since: string | null }, timeZone: string): string {
+  return outage.since === null
+    ? 'IA indisponible, un humain répond.'
+    : `IA indisponible depuis ${clockAt(outage.since, timeZone)}, un humain répond.`;
 }
 
 /** How « Toutes les conversations » is ordered: the most recent first unless the reader asks for the hottest. */

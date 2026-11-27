@@ -1,7 +1,7 @@
-import { CreatorOverviewSchema } from '@impera/contracts';
+import { AgentStatusSchema, CreatorOverviewSchema } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { agentStateOf, pauseChoices, withPersona, type AgentStateInput } from './state';
+import { agentStateOf, pauseChoices, pillStatusLabel, withPersona, type AgentStateInput } from './state';
 
 const PARIS = 'Europe/Paris';
 /** Thursday 19/11/2026, 16:30 in Paris (UTC+1). */
@@ -129,5 +129,58 @@ describe('pauseChoices (ADR 0148 § 1)', () => {
     // She opens at 21:00 tonight: 1 h does nothing, tomorrow 9:00 does.
     expect(pauseChoices(PARIS, NOW, '2026-11-19T20:00:00Z').map((choice) => choice.key)).toEqual(['morning']);
     expect(pauseChoices(PARIS, NOW, '2026-11-20T10:00:00Z')).toEqual([]);
+  });
+});
+
+describe('what runs, as the server says it (recette 27/11, G18, PRO-03, PRO-15)', () => {
+  it('never says « IA active · Copilote » beside « aucun script prêt » or drafts off', () => {
+    expect(agentStateOf(input({ agentStatus: 'no_scripts' }), PARIS, NOW)).toEqual({
+      kind: 'no_scripts',
+      label: 'IA en attente de scripts',
+      detail: 'aucun script prêt dans Reveal : l’agent n’a rien à proposer',
+      tone: 'warn',
+    });
+    expect(agentStateOf(input({ agentStatus: 'drafts_off' }), PARIS, NOW)).toEqual({
+      kind: 'drafts_off',
+      label: 'IA prête · brouillons éteints',
+      detail: 'les chatteurs écrivent seuls dans Reveal',
+      tone: 'calm',
+    });
+  });
+
+  it('follows the server over the fields, and the fields when it says nothing', () => {
+    expect(agentStateOf(input({ hasActivePersona: true, agentStatus: 'no_persona' }), PARIS, NOW).kind).toBe(
+      'idle',
+    );
+    expect(agentStateOf(input({ agentStatus: null, hasActivePersona: false }), PARIS, NOW).kind).toBe('idle');
+    expect(agentStateOf(input({ agentStatus: 'copilot' }), PARIS, NOW).label).toBe('IA active · Copilote');
+  });
+
+  it('gives every state of the closed set its own words, « IA active » only for a mode that runs', () => {
+    const kinds = AgentStatusSchema.options.map((status) => {
+      const state = agentStateOf(input({ agentStatus: status }), PARIS, NOW);
+      expect(state.label.startsWith('IA active')).toBe(status === 'copilot' || status === 'auto');
+      return state.kind;
+    });
+    expect(kinds).toEqual([
+      'global',
+      'paused',
+      'off',
+      'expired',
+      'idle',
+      'no_scripts',
+      'out',
+      'drafts_off',
+      'on',
+      'on',
+    ]);
+  });
+
+  it('gives the menu’s pill a word for what holds, none while a mode runs (PRO-15)', () => {
+    expect(pillStatusLabel('no_persona')).toBe('en attente de persona');
+    expect(pillStatusLabel('no_scripts')).toBe('en attente de scripts');
+    expect(pillStatusLabel('drafts_off')).toBe('brouillons éteints');
+    expect(pillStatusLabel('copilot')).toBeNull();
+    expect(pillStatusLabel(null)).toBeNull();
   });
 });

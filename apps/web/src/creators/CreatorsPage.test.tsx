@@ -232,6 +232,36 @@ describe('Créatrices, the creator in the address (recette 28/10)', () => {
     expect(screen.getByRole('link', { name: 'Anna' })).toBeDefined();
   });
 
+  it('says what her agent actually does, not « IA active · Copilote » without a script (recette 27/11, G18, PRO-03)', async () => {
+    await serve([ANNA]);
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {
+      const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      if (url === '/v1/creators') return json({ creators: [ANNA] });
+      if (url === '/v1/dashboard/creators') {
+        return json({
+          creators: [
+            {
+              creatorId: ANNA.id,
+              mode: 'copilot',
+              agentStatus: 'no_scripts',
+              sales: null,
+              onShift: null,
+              requests: null,
+            },
+          ],
+        });
+      }
+      if (url === '/v1/dashboard/todos') return json({ items: [], creators: [] });
+      return json({});
+    });
+    renderAt(operator, '/creatrices');
+    const anna = await cardOf('Anna');
+    await waitFor(() => {
+      expect(within(anna).getByText('IA en attente de scripts')).toBeDefined();
+    });
+    expect(within(anna).queryByText('IA active · Copilote')).toBeNull();
+  });
+
   it('says on a card only what the server gives: no figures for a reader whose scope is his own', async () => {
     await serve([ANNA]);
     vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {

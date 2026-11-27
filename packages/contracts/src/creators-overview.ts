@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { AgentHoursNowSchema } from './agent-hours';
 import { DropCategorySchema } from './content-drops';
-import { AgentModeSchema, ResumeModeSchema } from './dashboard';
+import { AgentModeSchema, AgentStatusSchema, ResumeModeSchema } from './dashboard';
 import { PlatformSchema } from './enums';
 import { CreatorIdSchema, TeamMemberIdSchema } from './ids';
 
@@ -78,6 +78,11 @@ export const CreatorOverviewSchema = z.object({
    * until the session is captured again from the extension. Every reader gets it; empty from an older server.
    */
   expiredSessions: z.array(PlatformSchema).default([]),
+  /**
+   * What her agent actually does now, decided by the server (`agentStatusOf`, recette 27/11 G18): her header, her card
+   * and the menu's pill say it, never the mode alone. `null` from an older server: the mode is said then.
+   */
+  agentStatus: AgentStatusSchema.nullable().default(null),
   /** Null when no account is linked to the register, and for a reader whose scope is his own. */
   sales: CreatorOverviewSalesSchema.nullable(),
   /** Null for a reader whose scope is his own; empty when nobody is on shift. */
