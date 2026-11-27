@@ -41,6 +41,7 @@ import {
   InvoicePdfPlaceSchema,
   PayoutBlockSchema,
 } from './invoices';
+import { MeetingReasonSchema } from './meeting-tiers';
 import { CurrencySchema } from './money';
 import { BankedObjectionKindSchema, ObjectionReplyIdSchema } from './objections';
 import { PayPeriodSchema } from './pay-periods';
@@ -273,6 +274,7 @@ export const EVENT_TYPES = [
   'scripts_exhausted',
   'sale_trouble',
   'script_abandon_teased',
+  'meeting_answered',
   'offer_proposed',
   'session_state_changed',
   'budget_threshold_crossed',
@@ -485,6 +487,14 @@ export const EVENT_PAYLOADS = {
    * it once on a hot message of his: one per tease, on the run he left, so that she never says it more than due.
    */
   script_abandon_teased: scriptPayload,
+  /**
+   * He asked to see her and her draft gave him a reason, or the one tease once every reason of his tier was given
+   * (`reason: null`), Charles 21/11: the journal `meeting` reads, so that she never gives the same reason twice.
+   */
+  meeting_answered: z.strictObject({
+    conversationId: ConversationIdSchema,
+    reason: MeetingReasonSchema.nullable(),
+  }),
   /**
    * Something sold outside the scripts was put forward by the agent (ADR 0150 §§ 12–14): what she offers around her
    * practice (`practice_offer`, ADR 0143 § 10). `custom_order` and `service_request` are read from their own events.
@@ -851,6 +861,7 @@ export const EventBodySchema = z.discriminatedUnion('type', [
   typedEvent('scripts_exhausted'),
   typedEvent('sale_trouble'),
   typedEvent('script_abandon_teased'),
+  typedEvent('meeting_answered'),
   typedEvent('offer_proposed'),
   typedEvent('session_state_changed'),
   typedEvent('budget_threshold_crossed'),

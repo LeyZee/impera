@@ -262,6 +262,10 @@ export const messages = pgTable(
     index('messages_account_fan_recent_idx')
       .on(t.platformAccountId, t.platformCreatedAt.desc())
       .where(sql`${t.direction} = 'inbound'`),
+    // Her last messages to all her fans, newest first: her worn phrases (passe 2 du 26/11, `herRecent`).
+    index('messages_creator_outbound_recent_idx')
+      .on(t.creatorId, t.platformCreatedAt.desc())
+      .where(sql`${t.direction} = 'outbound'`),
     tenantPolicy(t.creatorId),
     ...creatorReadsOnly(),
   ],

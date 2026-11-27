@@ -1,4 +1,4 @@
-import type { MeetingTierSettings } from '@impera/contracts';
+import { MEETING_REASONS, type MeetingReason, type MeetingTierSettings } from '@impera/contracts';
 
 /**
  * He asks to see her (Charles, 21/11 à 19 h 50, Paris): never a yes, never a dry no. She gives one reason per message,
@@ -8,9 +8,7 @@ import type { MeetingTierSettings } from '@impera/contracts';
  * meeting do not move: no date, no place, no city.
  */
 
-/** The reasons, in the order of the relationship: each tier allows its own and every one below it. */
-const MEETING_REASONS = ['too_early', 'needs_time', 'secret', 'no_dates', 'safety'] as const;
-export type MeetingReason = (typeof MEETING_REASONS)[number];
+export type { MeetingReason };
 
 /** Where they are, as code reads it: how long they have talked, and whether he paid her. */
 export interface Relationship {
