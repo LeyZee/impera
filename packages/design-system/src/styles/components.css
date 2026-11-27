@@ -3437,6 +3437,30 @@
   background: var(--nv-tile-fill-strong);
   transform: translateY(-1px);
 }
+/* A tile that filters, a button: it presses like a chip, and its choice reads as one (ink fill), never by a local ring. */
+button.nv-tile {
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.nv-tile:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--nv-dur-instant);
+}
+button.nv-tile:focus-visible {
+  outline: 2px solid var(--nv-focus);
+  outline-offset: 2px;
+}
+.nv-tile[aria-pressed='true'],
+.nv-tile[aria-pressed='true']:hover {
+  color: var(--nv-void);
+  background: var(--nv-ink);
+}
+.nv-tile[aria-pressed='true'] :is(.nv-tile__label, .nv-tile__sub) {
+  color: inherit;
+}
 .nv-tile__label {
   display: flex;
   align-items: center;

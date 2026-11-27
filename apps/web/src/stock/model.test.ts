@@ -8,7 +8,16 @@ import {
 } from '@impera/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { daysLabel, figuresOf, headlineOf, mediaCountOf, ringSub, unitsOf } from './model';
+import {
+  daysLabel,
+  figuresOf,
+  fillOf,
+  headlineOf,
+  herFocusOf,
+  mediaCountOf,
+  ringSub,
+  unitsOf,
+} from './model';
 
 const NOW = new Date('2026-11-21T12:00:00+01:00');
 
@@ -98,13 +107,78 @@ describe('Coffre Impera model', () => {
 describe('ringSub', () => {
   it('counts a minimum against its target, and a bonus without one', () => {
     expect(ringSub(category({ category: 'script', mode: 'count', stockUnits: 4, target: 4 }))).toBe(
-      '4 sur 4 prêts',
+      '4 prêts sur 4',
     );
     expect(ringSub(category({ category: 'voice_beep', mode: 'count', stockUnits: 1, target: 1 }))).toBe(
-      '1 sur 1 prêt',
+      '1 prêt sur 1',
+    );
+    expect(ringSub(category({ category: 'script', mode: 'count', stockUnits: 0, target: 3 }))).toBe(
+      '0 prêt sur 3',
     );
     expect(ringSub(category({ category: 'sale_video', mode: 'bonus', stockUnits: 3, target: null }))).toBe(
       `${unitsOf('sale_video', 3)} en stock`,
+    );
+  });
+});
+
+describe('her coffre says what Aujourd’hui says (recette du 27/11, MOD-01, MOD-02)', () => {
+  const day = (videoDone: number) => ({
+    day: '2026-11-27',
+    today: '2026-11-27',
+    lines: [
+      {
+        item: 'reveal_video' as const,
+        platform: 'reveal' as const,
+        label: 'Ta vidéo du jour sur Reveal',
+        sheet: 'Une phrase.',
+        target: 1,
+        done: videoDone,
+        essential: true,
+        source: 'drop' as const,
+      },
+    ],
+  });
+  const stock: ContentStock = {
+    asOf: NOW.toISOString(),
+    categories: [
+      category({ category: 'feed_video', stockUnits: 0, daysAhead: 0, lacking: 7, status: 'empty' }),
+      category({
+        category: 'feed_shoot',
+        perWeek: 3,
+        stockUnits: 1,
+        daysAhead: 2,
+        lacking: 2,
+        status: 'short',
+      }),
+      category({ category: 'script', mode: 'count', stockUnits: 0, target: 3, lacking: 3, perWeek: null }),
+    ],
+    media: [],
+  };
+
+  it('asks her video of the day first, while her coffre has none for today', () => {
+    const focus = herFocusOf(stock, day(0), 0);
+    expect(focus).toMatchObject({ when: 'today', title: 'Ta vidéo du jour', category: 'feed_video' });
+    expect(focus.bonus.map((one) => one.category)).toEqual(['feed_shoot']);
+  });
+
+  it('then speaks of her week, never of her day as done', () => {
+    const focus = herFocusOf(stock, day(1), 0);
+    expect(focus).toMatchObject({ when: 'week', category: 'feed_video' });
+    expect(`${focus.title} ${focus.lead}`).not.toMatch(/journée/u);
+  });
+
+  it('claims no script of her while the agency asks none', () => {
+    const asked = herFocusOf({ ...stock, categories: stock.categories.slice(2) }, day(1), 0);
+    expect(asked.category).toBeNull();
+    expect(herFocusOf({ ...stock, categories: stock.categories.slice(2) }, day(1), 1).category).toBe(
+      'script',
+    );
+  });
+
+  it('draws a ring without a target empty at nothing, never full (MOD-11)', () => {
+    expect(fillOf(category({ category: 'sale_video', mode: 'bonus', stockUnits: 0, target: null }))).toBe(0);
+    expect(fillOf(category({ category: 'sale_video', mode: 'bonus', stockUnits: 2, target: null }))).toBe(
+      100,
     );
   });
 });
