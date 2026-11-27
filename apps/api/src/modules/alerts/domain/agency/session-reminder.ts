@@ -14,7 +14,9 @@ import {
  * stops reading and answering. Every owner is told:
  * - at the agency's hour (18 h by default, Réglages › Alertes), for each account whose token will not last the night;
  * - once more an hour later, if nothing changed;
- * - 2 h before a token dies, unless the agency's hour itself falls in those 2 h (the daily ritual already rang).
+ * - 2 h before a token dies, only when no daily ring told of it: a token the hour found with less than 20 h left was
+ *   already told (and its expiry within the night always is), so the warning is left to tokens synced shortly before
+ *   the hour, which die before the next one. With the hour at 18 h, it falls between 12 h and 16 h, never at night.
  * Each ring is once per account and day, or per token: a run again rings nothing new.
  */
 
@@ -150,8 +152,9 @@ export function sessionRemindersDue(input: {
     if (clock.state === 'expired' || expiresAt === null) continue;
     const left = expiresAt.getTime() - now.getTime();
     if (left <= 0 || left > SESSION_REMINDER_BEFORE_EXPIRY_MS) continue;
-    // The agency's hour within the 2 h before it dies: the daily ring is the warning, not a second one.
-    if (minutesSince(expiresAt, minute, timeZone) * MINUTE_MS <= SESSION_REMINDER_BEFORE_EXPIRY_MS) continue;
+    // The last agency hour before it dies found it with less than 20 h left: the daily ring told of it (it rings at
+    // that hour, or did the evening before). A warning held through the quiet hours would come after the token's end.
+    if (minutesSince(expiresAt, minute, timeZone) * MINUTE_MS < SESSION_REMINDER_FRESH_MS) continue;
     due.push({
       clock,
       kind: 'before_expiry',

@@ -77,15 +77,17 @@ describe('the daily reminder to reconnect (décision du 27/11/2026)', () => {
 });
 
 describe('the warning 2 h before a token dies', () => {
-  const morning = clock({ expiresAt: new Date('2026-11-28T09:00:00Z') });
+  // Synced at 15 h in Paris, before the hour: 18 h found it with 21 h left, and it dies at 15 h the next day.
+  const early = clock({ expiresAt: new Date('2026-11-28T14:00:00Z') });
 
-  it('rings within the 2 h, once per token', () => {
-    expect(due('2026-11-28T06:55:00Z', [morning])).toEqual([]);
-    const [ring] = due('2026-11-28T07:00:00Z', [morning]);
+  it('rings within the 2 h for a token no daily ring told of, once per token', () => {
+    expect(due('2026-11-27T17:00:00Z', [early])).toEqual([]);
+    expect(due('2026-11-28T11:55:00Z', [early])).toEqual([]);
+    const [ring] = due('2026-11-28T12:00:00Z', [early]);
     expect(ring?.kind).toBe('before_expiry');
-    expect(ring?.objectKey).toBe(`session_reminder:${accountId}:expiry:2026-11-28T09:00:00.000Z`);
-    expect(ring?.message.body).toMatch(/^La session Reveal de l’IA expire à 10 h\./u);
-    expect(due('2026-11-28T08:30:00Z', [morning])[0]?.objectKey).toBe(ring?.objectKey);
+    expect(ring?.objectKey).toBe(`session_reminder:${accountId}:expiry:2026-11-28T14:00:00.000Z`);
+    expect(ring?.message.body).toMatch(/^La session Reveal de l’IA expire à 15 h\./u);
+    expect(due('2026-11-28T13:30:00Z', [early])[0]?.objectKey).toBe(ring?.objectKey);
   });
 
   it('is not said twice when the daily hour falls in those 2 h: the ritual already rang', () => {
@@ -94,8 +96,16 @@ describe('the warning 2 h before a token dies', () => {
     expect(due('2026-11-28T17:00:00Z', [ritual]).map((ring) => ring.kind)).toEqual(['daily']);
   });
 
+  it('never rings at night for a token dying at night: the evening’s ring told of it, held rings would come late', () => {
+    const night = clock({ expiresAt: new Date('2026-11-28T02:00:00Z') });
+    expect(due('2026-11-27T17:00:00Z', [night]).map((ring) => ring.kind)).toEqual(['daily']);
+    expect(due('2026-11-28T00:30:00Z', [night])).toEqual([]);
+    const morning = clock({ expiresAt: new Date('2026-11-28T09:00:00Z') });
+    expect(due('2026-11-28T07:00:00Z', [morning])).toEqual([]);
+  });
+
   it('says nothing of a token already dead, nor of one without an expiry', () => {
-    expect(due('2026-11-28T09:30:00Z', [morning])).toEqual([]);
+    expect(due('2026-11-28T14:30:00Z', [early])).toEqual([]);
     expect(due('2026-11-28T08:00:00Z', [clock({ expiresAt: null })])).toEqual([]);
   });
 });

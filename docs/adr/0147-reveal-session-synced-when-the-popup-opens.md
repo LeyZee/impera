@@ -57,7 +57,7 @@ Décision de Charles du 27/11/2026 (« oki parfait pour le 3 », audit de robust
 
 - À l'heure de l'agence réglée dans Réglages › Alertes › Pilotage (« Reconnexion Reveal », 18 h par défaut, jamais éteinte), chaque propriétaire reçoit une notification pour chaque compte dont le jeton ne tiendra pas jusqu'au lendemain : moins de 20 h devant lui, expiré, ou sans échéance lisible.
 - Une heure après, si rien n'a bougé, la notification revient une fois.
-- 2 h avant la fin d'un jeton, une relance part, sauf si l'heure du rappel tombe dans ces 2 h : le rappel du jour suffit alors.
+- 2 h avant la fin d'un jeton, une relance part, seulement si aucun rappel du jour ne l'a signalé : un jeton synchronisé peu avant l'heure, qui meurt avant la suivante. Avec 18 h, elle tombe entre 12 h et 16 h, jamais la nuit. Un jeton qui meurt la nuit a toujours été signalé par le rappel de la veille au soir, puisqu'une relance retenue pendant les heures calmes arriverait trop tard.
 - Ces notifications sont des alertes de l'agence (`agency_alert`, ADR 0176 § 3) : hors plafond du jour, retenues pendant les heures calmes. Une session qui expire la nuit ne réveille personne tant que Charles n'a pas tranché ce point.
 - Le message dit le geste avec le compte du « bot », jamais le sien (P2-02). Rien ne part sans notifications activées sur au moins un appareil d'un propriétaire.
 - La connexion automatique à Reveal par le serveur reste écartée (Alternatives rejetées). Elle se rediscute après une à deux semaines de vrai fonctionnement, sur le mot écrit de Charles.

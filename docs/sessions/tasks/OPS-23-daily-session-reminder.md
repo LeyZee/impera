@@ -13,7 +13,7 @@ ADR 0147 et son avenant du 27/11, ADR 0176 § 3, `docs/runbooks/session-expired.
 ## À faire
 - [x] Réglage `scheduling_settings.session_reminder_minute` (migration 0290, numéro donné par Bilan) : 18 h par défaut, jamais éteint ; `GET/PUT /v1/scheduling/session-reminder` (lu par l'agence, écrit par le propriétaire, audité).
 - [x] `connectors.sessions.clocks()` : chaque compte qui tient une session, avec l'échéance lue dans le jeton, jamais la session.
-- [x] Règle pure `sessionRemindersDue` : à l'heure, pour un jeton à moins de 20 h, expiré ou sans échéance lisible ; une fois de plus une heure après ; 2 h avant la fin d'un jeton, sauf si l'heure du rappel tombe dans ces 2 h.
+- [x] Règle pure `sessionRemindersDue` : à l'heure, pour un jeton à moins de 20 h, expiré ou sans échéance lisible ; une fois de plus une heure après ; 2 h avant la fin d'un jeton qu'aucun rappel du jour n'a signalé (synchronisé peu avant l'heure, il meurt avant la suivante) : avec 18 h, entre 12 h et 16 h, jamais la nuit (réserve de Bilan : une relance retenue en heures calmes arriverait après la fin du jeton).
 - [x] Job `alerts.remind_sessions` toutes les 5 minutes, à chaque propriétaire, motif `agency_alert` (hors plafond, retenu en heures calmes), clé par compte et jour ou par jeton.
 - [x] Carte « Reconnexion Reveal » dans Réglages › Alertes › Pilotage.
 - [x] Avenant à l'ADR 0147, runbooks `session-expired.md` et `alerts.md`, glossaire.
