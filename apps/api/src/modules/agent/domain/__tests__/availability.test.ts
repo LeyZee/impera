@@ -44,7 +44,8 @@ describe('readAvailability', () => {
   });
 
   it('goes to « non » on someone beside him, an appointment or work, whatever he said with it', () => {
-    for (const negative of ['someone_nearby', 'leaving_soon', 'busy_now']) {
+    // « Je suis crevé » too (passe 2 du 26/11, conversation 40).
+    for (const negative of ['someone_nearby', 'leaving_soon', 'busy_now', 'tired']) {
       expect(readAvailability(turn({ signals: ['alone', 'free_now', negative] }))).toMatchObject({
         state: 'no',
         signal: negative,

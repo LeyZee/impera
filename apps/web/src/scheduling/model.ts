@@ -57,6 +57,8 @@ export const ERROR_MESSAGES: Readonly<Record<SchedulingRefusalCode, string>> = {
   shift_started_conflict: 'Ce shift a commencé : tu peux seulement le finir plus tôt ou l’arrêter.',
   shift_check_in_early_conflict:
     'Ton poste n’est pas encore ouvert : il s’ouvre un peu avant le début du shift.',
+  shift_check_in_feedback_due_conflict:
+    'Fais d’abord le retour de ton shift précédent : 30 secondes, puis ton poste s’ouvre.',
   shift_range_invalid: 'Ces heures ne vont pas : la fin vient après le début, et un shift dure 24 h au plus.',
   planning_range_invalid: 'Cette période ne se lit pas d’un coup.',
   shift_template_date_invalid: 'Un modèle de shift commence aujourd’hui au plus tôt.',

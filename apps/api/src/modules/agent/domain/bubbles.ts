@@ -1,7 +1,8 @@
 /**
  * How many bubbles she may send, and how long each takes her to type (Charles, 16/11 à 0 h 09 : « trois bulles…
- * mais il faut pas qu'elle les envoie en même temps… Trois rarement »). Decided by code, never by the voice: one by
- * default, two when he wrote long, three only when he wrote long in three messages or more. The typing
+ * mais il faut pas qu'elle les envoie en même temps… Trois rarement »). Decided by code, never by the voice: up to
+ * two by default, so a small laugh bubble may follow (Charles 21/11: never one bubble every time), three only when he
+ * wrote long in two messages or more. Within it, she mirrors his rhythm (the voice's rule). The typing
  * delays are the same for the real send and the playground, so the playground shows the rhythm the fan will see.
  */
 export type BubbleBudget = 1 | 2 | 3;
@@ -23,22 +24,41 @@ function fanBurst(history: readonly { readonly from: 'fan' | 'creator'; readonly
 /** The bubbles she may write this turn; one when nothing of his awaits (a follow-up). */
 export function bubbleBudget(
   history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[],
+  herMax = 3,
+): BubbleBudget {
+  const budget = budgetFor(history);
+  return herMax <= 1 ? 1 : herMax === 2 && budget === 3 ? 2 : budget;
+}
+
+/** The bubbles his messages call for, before her own maximum. */
+function budgetFor(
+  history: readonly { readonly from: 'fan' | 'creator'; readonly text: string }[],
 ): BubbleBudget {
   // On what he wrote, never on how many times he pressed send: « ok » then « 😂 » is one short answer (audit du
-  // 16/11, B1). Three only when he wrote long in three messages or more.
+  // 16/11, B1). Three only when he wrote long in two messages or more.
   const burst = fanBurst(history);
   const length = burst.reduce((sum, text) => sum + text.trim().length, 0);
-  if (length < LONG_MESSAGE_CHARS) return 1;
-  return burst.length >= 3 ? 3 : 2;
+  if (burst.length === 0) return 1;
+  if (length < LONG_MESSAGE_CHARS) return 2;
+  return burst.length >= 2 ? 3 : 2;
 }
 
 /**
- * Her bubbles within the budget: the first ones, what goes past it is left out. Glued to the last one, they would
+ * Her bubbles within the budget, hollow ones dropped first: the first ones, what goes past it is left out. Glued to the last one, they would
  * make one bubble without punctuation, sometimes with two questions, which no one writes; a reply a little short is
  * human. The guards read what leaves, so nothing they should see escapes them.
  */
 export function fitBubbles(bubbles: readonly string[], budget: BubbleBudget): readonly string[] {
-  return bubbles.length <= budget ? bubbles : bubbles.slice(0, budget);
+  const kept = bubbles.filter(saysSomething);
+  return kept.length <= budget ? kept : kept.slice(0, budget);
+}
+
+/**
+ * A bubble says something when it holds a letter, a digit or an emoji: « . », « … » or an empty one never leaves
+ * (passe 2 du 26/11, conversation 37). Dropped before the budget and the guards; none left, the voice writes again.
+ */
+export function saysSomething(bubble: string): boolean {
+  return /[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(bubble);
 }
 
 /** The pause before she starts typing a bubble, then her typing speed on a phone, then the longest wait. */

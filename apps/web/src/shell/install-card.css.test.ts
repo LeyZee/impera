@@ -24,4 +24,9 @@ describe('the install card on a phone (recette 11/11, SOC-14)', () => {
       /\.nv-stage:has\(> \.nv-install\) \.nv-page--fill \{\s*height: calc\([^;]*var\(--nv-install-room, 0px\)\);/u,
     );
   });
+  it('takes its height off an ordinary page too, so the last lines stay above the tab bar', () => {
+    expect(css).toMatch(
+      /\.nv-stage:has\(> \.nv-install\) \.nv-page:not\(\.nv-page--fill\) \{\s*min-height: calc\(100% - var\(--nv-install-room, 0px\)\);/u,
+    );
+  });
 });

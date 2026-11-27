@@ -1,0 +1,6 @@
+# 2026-11-21 — Persona : la fiche entière au propriétaire et au manager actif, la fiche courte aux autres — done
+Fait : `GET /v1/creators/:creatorId/persona` (sa fiche entière, celle de l'agence) n'est plus lu que par le propriétaire et un manager actif (portée `agency`) sur les créatrices de sa liste ; tout autre opérateur, chatteur compris et même sans fiche d'équipe, reçoit 403 `persona_full_forbidden` et lit la fiche courte de l'ADR 0153 (`…/persona/chatter`, schéma strict). Amendement daté de l'ADR 0153, README du module, test d'intégration des rôles, test de stricte du schéma court.
+Pas fait : rien côté écran (l'onglet Persona du manager en lecture seule est dans #998) ; l'extension et le copilote ne lisaient pas la fiche entière.
+Décisions : Charles, carte du fil Sécurité du 21/11 17 h 55 UTC, « Oui, fiche courte pour le chatteur ».
+Découvertes : un chatteur au shift (portée `self`) était déjà refusé par la liste vidée de ses créatrices ; la fuite réelle était l'opérateur sans fiche d'équipe. `POST /v1/playground/persona` laisse un formateur choisir une version : à vérifier par Sécurité s'il expose la fiche entière à un non-manager.
+Vérifié : typecheck ✓, tests du module persona ✓ ; intégration écrite, jouée en CI (pas de Docker ici).

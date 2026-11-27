@@ -20,6 +20,8 @@ describe('createFanLimits, a freeze for money', () => {
       },
       clearFlag: () => Promise.reject(new Error('not used')),
       confirmDeclaredAge: () => Promise.reject(new Error('not used')),
+      language: () => Promise.reject(new Error('not used')),
+      keepDetectedLanguage: () => Promise.reject(new Error('not used')),
     });
     await limits.protect(
       newId(CreatorIdSchema),

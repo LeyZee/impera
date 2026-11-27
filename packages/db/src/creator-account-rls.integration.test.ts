@@ -176,7 +176,10 @@ const CREATOR_DECISIONS: Readonly<
   fans: 'readsOnly',
   fan_facts: 'readsOnly',
   fan_summaries: 'readsOnly',
-  media_descriptions: 'readsOnly',
+  media_descriptions: {
+    exception:
+      'she validates and corrects the description of a medium of her own drops (ADR 0162 § 4): restrictive policies carved for it',
+  },
   media_assets: 'readsOnly',
   media_sends: 'readsOnly',
   media_platform_refs: 'readsOnly',

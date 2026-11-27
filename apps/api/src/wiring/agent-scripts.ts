@@ -1,9 +1,12 @@
 import {
   CreatorIdSchema,
   FanIdSchema,
+  LanguageSchema,
   PlatformAccountIdSchema,
+  type Language,
   type SentScriptStep,
 } from '@impera/contracts';
+import { z } from 'zod';
 
 import type { AgentScriptView, ScriptHistoryView, ScriptSource } from '../modules/agent';
 import type { ConnectorsModule } from '../modules/connectors';
@@ -33,6 +36,23 @@ function stillOurs(script: HerScript, ours: NonNullable<HerScript['ours']>): boo
 }
 
 /**
+ * The language of our script and the one it is a version of (ADR 0168 § 8), read where the copy carries them: absent
+ * or unreadable, French and none (a script before its versions). Read through Zod: the fields come with the scripts'
+ * versions in other languages.
+ */
+const VersionSchema = z.object({
+  language: LanguageSchema.optional().catch(undefined),
+  versionOf: z.string().min(1).nullable().optional().catch(undefined),
+});
+
+function versionOf(ours: NonNullable<HerScript['ours']>): { language: Language; family: string } {
+  const read = VersionSchema.safeParse(ours);
+  const language = read.success ? (read.data.language ?? 'french') : 'french';
+  const source = read.success ? (read.data.versionOf ?? null) : null;
+  return { language, family: source ?? ours.preparedScriptId };
+}
+
+/**
  * Active and with no gap of P6-01 but its identity: a recognised copy has no identity to validate, ours stands for it
  * (ADR 0161 § 5), and no screen asks one any more (§ 2). Every other gap still keeps it from being offered.
  */
@@ -54,8 +74,11 @@ export function agentScriptViewOf(script: HerScript): AgentScriptView | null {
   if (script.steps.some((step) => step.branches > 1)) return null;
   if (!stillOurs(script, ours)) return null;
   const media = script.steps.flatMap((step) => [...step.media, ...step.previewMedia]);
+  const { language, family } = versionOf(ours);
   return {
     scriptRef: script.ref,
+    language,
+    family,
     // Day and night (ADR 0112 § 27): no moment imposed, offered at either.
     moment: ours.moment === 'both' ? null : ours.moment,
     description: ours.description,
@@ -104,7 +127,7 @@ interface AgentScriptsDeps {
 
 /** The fan on the platform: his account and his platform id. A fan of another account is refused (fail closed). */
 async function platformFanOf(
-  deps: AgentScriptsDeps,
+  deps: Pick<AgentScriptsDeps, 'fans'>,
   creatorId: string,
   fanId: string,
 ): Promise<{ readonly platformAccountId: string; readonly platformFanId: string }> {
@@ -153,5 +176,16 @@ export function createLastOfferAt(
     const scripts = await deps.scripts.accountScripts(CreatorIdSchema.parse(creatorId), accountId);
     if (!scripts.some((script) => agentScriptViewOf(script) !== null)) return null;
     return deps.reads.lastOfferAt(accountId, fan.platformFanId);
+  };
+}
+
+/** When he last bought a priced bundle of hers (ADR 0128 § 1), read like `createLastOfferAt`. */
+export function createLastPurchaseAt(deps: {
+  readonly reads: Pick<ConnectorsModule['platformReads'], 'lastPurchaseAt'>;
+  readonly fans: Pick<FansModule, 'getFan'>;
+}): (creatorId: string, fanId: string) => Promise<Date | null> {
+  return async (creatorId, fanId) => {
+    const fan = await platformFanOf(deps, creatorId, fanId);
+    return deps.reads.lastPurchaseAt(PlatformAccountIdSchema.parse(fan.platformAccountId), fan.platformFanId);
   };
 }

@@ -1,6 +1,7 @@
 import { JOB_PAYLOADS } from '@impera/contracts';
+import { parseEncryptionKeys, type EncryptionKey } from '@impera/db';
 
-import { invoiceBucket, type Config } from '../config';
+import { invoiceBucket, secretOrNull, type Config } from '../config';
 import { defineTask } from '../jobs';
 import {
   createContractorsModule,
@@ -12,6 +13,7 @@ import {
   type InvoiceObjectStore,
   type InvoiceRequeue,
 } from '../modules/contractors';
+import type { NotificationsModule } from '../modules/notifications';
 import type { SchedulingModule } from '../modules/scheduling';
 
 import type { Routes, Shared, TasksNamed } from './shared';
@@ -36,12 +38,21 @@ function invoiceBuckets(config: Config): InvoiceBuckets {
   };
 }
 
+/** CREDENTIALS_ENCRYPTION_KEYS, which seal « Où te verser » (ADR 0165 § 2); `null` when unset. */
+function credentialKeysOf(config: Config): EncryptionKey[] | null {
+  const keys = secretOrNull(config.CREDENTIALS_ENCRYPTION_KEYS);
+  return keys === null ? null : parseEncryptionKeys(keys, 'CREDENTIALS_ENCRYPTION_KEYS');
+}
+
 /**
  * The jobs the contractors' file carries (ADR 0047 § 1): their names stay `payroll.*`, since tasks already queued carry
  * them, and each has exactly one task, this file's.
  */
 export type ContractorJob =
-  'payroll.remind_documents' | 'payroll.purge_refused_documents' | 'payroll.lock_payout_certificate';
+  | 'payroll.remind_documents'
+  | 'payroll.purge_refused_documents'
+  | 'payroll.lock_payout_certificate'
+  | 'payroll.notify_payout_change';
 
 export interface WiredContractors {
   readonly module: ContractorsModule;
@@ -64,6 +75,8 @@ export function wireContractors(
     /** What the file reads of the invoices and of pay (ARC-07). */
     readonly invoices: ContractorInvoiceReads;
     readonly pay: ContractorPayReads;
+    /** Push, to tell a member his « Où te verser » changed (ADR 0165 § 5); `null` while push is off. */
+    readonly notify: NotificationsModule['notify'];
     /** Tests plug the two buckets here, to read what the jobs wrote; the configuration's otherwise. */
     readonly invoiceBuckets?: InvoiceBuckets;
     /** Tests set the clock here (`payrollClock`); the system's otherwise. */
@@ -80,6 +93,7 @@ export function wireContractors(
     invoices: deps.invoices,
     pay: deps.pay,
     buckets,
+    credentialKeys: credentialKeysOf(config),
     ...(deps.now !== undefined && { now: deps.now }),
   });
   return {
@@ -120,7 +134,38 @@ export function wireContractors(
           );
         },
       ),
+      'payroll.notify_payout_change': defineTask(
+        'payroll.notify_payout_change',
+        JOB_PAYLOADS['payroll.notify_payout_change'],
+        logger,
+        async (payload, context) => {
+          const notify = deps.notify;
+          if (notify === null) {
+            context.logger.warn('payroll: push is off, the payout change stays in the audit log');
+            return;
+          }
+          const outcome = await notify(
+            {
+              userId: payload.userId,
+              reason: 'payout_change',
+              objectKey: payload.versionId,
+              timeZone: payload.timeZone,
+              message: {
+                title: 'Où te verser a changé',
+                body: 'Si ce n’est pas toi, préviens ton responsable tout de suite.',
+                url: '/moi',
+                tag: 'payout_change',
+              },
+            },
+            new Date(),
+          );
+          context.logger.info({ outcome }, 'payroll: payout change told to the member');
+        },
+      ),
     },
-    routes: [module.routes(requireRole, shared.recentLogin)],
+    routes: [
+      module.routes(requireRole, shared.recentLogin),
+      module.payoutRoutes(requireRole, shared.recentLogin),
+    ],
   };
 }

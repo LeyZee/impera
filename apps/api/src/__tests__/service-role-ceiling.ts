@@ -32,10 +32,15 @@ export const SERVICE_ROLE_CEILING: Readonly<Record<string, number>> = {
   'modules/providers': 7,
   'modules/redirect-links': 2,
   'modules/rewards': 7,
-  'modules/scheduling': 28,
+  // +1 (EQ-23): the incident notice reads its facts and the agency's recipients across creators, under withAdmin.
+  // +1 for the light feedback (ADR 0170, 26/11): each member's last opened shift and whether it has its feedback,
+  // across creators, bounded to the members named; read only.
+  'modules/scheduling': 30,
   'modules/scripts': 16,
   'modules/supervision': 2,
-  'modules/team': 1,
+  // +1 for a departure at its hour (ADR 0166 § 2): the owners in office, read only, so that a departure never depends
+  // on the owner who set it still being one.
+  'modules/team': 2,
   'modules/telegram': 10,
   'modules/trends': 8,
   root: 52,

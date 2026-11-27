@@ -31,6 +31,8 @@ export interface Outcome {
   readonly script?: {
     readonly decision: 'none' | 'start' | 'send_step' | 'wait' | 'after_refusal' | 'end';
     readonly step?: { readonly script: string; readonly index: number };
+    /** Why nothing starts or goes (`no_pick`, `low_desire`, `cooldown`…): read in the report, never asserted. */
+    readonly reason?: string;
   };
   readonly bubbles: readonly string[];
   /** Hard guards that blocked her answer: it would not have left. */
@@ -85,7 +87,8 @@ export function checkScenario(scenario: Pick<Scenario, 'expect'>, outcome: Outco
   }
   const script = outcome.script?.decision ?? 'none';
   if (decision?.script_in !== undefined && !decision.script_in.includes(script)) {
-    failures.push(`script : ${script}, attendu parmi [${decision.script_in.join(', ')}]`);
+    const why = outcome.script?.reason === undefined ? '' : ` (${outcome.script.reason})`;
+    failures.push(`script : ${script}${why}, attendu parmi [${decision.script_in.join(', ')}]`);
   }
   const step = decision?.script_step;
   const got = outcome.script?.step;

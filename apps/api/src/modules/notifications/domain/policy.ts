@@ -119,6 +119,8 @@ const PASSES_QUIET_HOURS: ReadonlySet<NotificationReason> = new Set([
   'safety_alert',
   // A change among the owners (ADR 0096 § 2): the 72 hours of notice only help an owner who hears of it.
   'owner_change',
+  // A change of where a member is paid (ADR 0165 § 5): heard before the next transfer, or it protects nobody.
+  'payout_change',
 ]);
 
 /** The alerts of a creator's tab ring all day outside the cap, and wait for the recap at night (Charles, 19/11). */

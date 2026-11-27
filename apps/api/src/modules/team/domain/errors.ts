@@ -164,3 +164,25 @@ export class AnnouncementWithdrawForbidden extends DomainError {
     super('announcement_withdraw_forbidden', 'Seuls son auteur et le propriétaire retirent une annonce');
   }
 }
+
+/** ADR 0166 § 1: one departure waiting per member, and only a waiting one is cancelled. */
+export class MemberDepartureConflict extends DomainError {
+  constructor(message = 'Ce membre a déjà un départ prévu') {
+    super('member_departure_conflict', message);
+  }
+}
+
+export class MemberDepartureDateInvalid extends DomainError {
+  constructor(maxDays: number) {
+    super(
+      'member_departure_date_invalid',
+      `L’heure de fin est maintenant ou plus tard, dans les ${String(maxDays)} jours`,
+    );
+  }
+}
+
+export class MemberDepartureNotFound extends DomainError {
+  constructor() {
+    super('member_departure_not_found', 'Départ introuvable');
+  }
+}

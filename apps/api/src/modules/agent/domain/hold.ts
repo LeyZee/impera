@@ -15,6 +15,12 @@ const CARE_RISKS = ['distress', 'self_harm'] as const;
 const isHandoffRisk = (risk: string): boolean => HANDOFF_RISKS.some((r) => r === risk);
 
 /**
+ * Risks she answers herself, whatever action the brain suggested: an insult never calls a human nor cuts the contact
+ * (ADR 0158 § 19). The brain's handoff is honoured only when another risk comes with it.
+ */
+const ANSWERED_RISKS: readonly string[] = ['insult'];
+
+/**
  * Why a human takes over after the brain read a risk: it ranks the alert and names it in « À traiter » (recette
  * AGE-02). The gravest first: a possible minor outranks everything.
  */
@@ -50,7 +56,8 @@ export function holdDecision(
   // She answers him with care whatever the brain suggested, a handoff or a wait included (ADR 0088 § 1).
   const care = brief.risks.filter(isCareRisk);
   if (care.length > 0) return { kind: 'care', detail: care };
-  if (brief.action === 'handoff')
+  const answeredOnly = brief.risks.length > 0 && brief.risks.every((risk) => ANSWERED_RISKS.includes(risk));
+  if (brief.action === 'handoff' && !answeredOnly)
     return { kind: 'handoff', detail: brief.risks.length > 0 ? [...brief.risks] : ['brain'] };
   // He has nothing to answer yet (« attends, je reviens ») : she stays quiet, and is asked again at `waitRetryAt`.
   // The second time, she writes to ask whether he is back (P3-11).

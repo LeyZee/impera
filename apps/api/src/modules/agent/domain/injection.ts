@@ -60,6 +60,12 @@ const PATTERNS: readonly { kind: InjectionKind; pattern: RegExp }[] = [
     ),
   },
   // Spanish, Italian, German, Portuguese and more English: a trap in another language is still a trap.
+  // ADR 0168 § 4: the same tasks asked in Italian and Spanish.
+  {
+    kind: 'off_topic_task',
+    pattern:
+      /\b(?:dammi|scrivimi|dimmi|mandami) (?:la|una|tua) ricetta\b|\btraducimi\b|\btraduci (?:questo|questa|il|la|in)\b|\bscrivi(?:mi)? (?:un|del|il) (?:codice|programma|tema|saggio)\b|\bfammi (?:i compiti|il compito|un riassunto)\b|\b(?:dame|escribeme|dime|mandame) (?:la|una|tu) receta\b|\btraduceme\b|\btraduce (?:esto|este|esta|el|la|al)\b|\bescribe(?:me)? (?:un|el) (?:codigo|programa|ensayo|resumen)\b|\bhazme (?:los deberes|la tarea|un resumen)\b/,
+  },
   {
     kind: 'override',
     pattern:
