@@ -664,6 +664,8 @@ describe('never an extra to unlock or close a purchase (Charles 26/11 at 23:44, 
       'buy this one and get a free one',
       'se lo compri te ne regalo un altro',
       'si lo compras te regalo otro',
+      'achète et t’auras une surprise',
+      'pour tout achat une photo en plus',
     ]) {
       expect(codes([bubble]), bubble).toContain('purchase_sweetener');
     }
@@ -945,6 +947,41 @@ describe('a meeting she may only imagine (Charles 27/11)', () => {
     expect(meetingCommitment('ok', 'imagine un chalet tous les deux')).toBeUndefined();
     expect(meetingCommitment('ok mais non, pas en vrai', 'samedi à Lyon ?')).toBeUndefined();
     expect(meetingCommitment('haha t’es fou', 'samedi à Lyon ?')).toBeUndefined();
+  });
+
+  it('lets online, a dream or « ici » through over the whole sentence, and her everyday plans (Sécurité, #1043)', () => {
+    for (const bubble of [
+      'je viens chez toi dans mes rêves',
+      'on se voit demain ici mon cœur',
+      'on se retrouve ce soir sur reveal',
+      'on se voit ce soir en live ?',
+      'tu viens me voir demain sur mon live ?',
+      'je passe à paris demain pour un shooting',
+      'je réserve une table pour mon anniv avec mes copines',
+      'je cale mon réveil à 7h',
+      'on organise un live samedi',
+    ])
+      expect(codes([bubble]), bubble).not.toContain('meeting_promise');
+    for (const bubble of [
+      'on se voit samedi',
+      'je viens te voir samedi',
+      'je réserve l’hôtel',
+      'on pourrait organiser ça',
+      'un verre toi et moi demain',
+      'je réserve une table pour nous deux samedi',
+      'on s’organise ?',
+      'on se voit samedi à lyon, ici il pleut',
+    ])
+      expect(codes([bubble]), bubble).toContain('meeting_promise');
+  });
+
+  it('reads his message as a proposal only when he asks or says « on », never in a dream or online', () => {
+    expect(meetingCommitment('ok trop bien', 'samedi je suis à lyon pour le taf')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'on se voit dans tes rêves ce soir ?')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'on se voit ce soir en live ?')).toBeUndefined();
+    expect(meetingCommitment('avec plaisir', 'samedi à lyon ?')).toBeDefined();
+    expect(meetingCommitment('ok', 'on se voit samedi')).toBeDefined();
+    expect(meetingCommitment('ok mais non', 'samedi à lyon ?')).toBeUndefined();
   });
 });
 

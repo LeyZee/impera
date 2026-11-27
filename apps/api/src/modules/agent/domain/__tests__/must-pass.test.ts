@@ -149,6 +149,15 @@ describe('permitted phrases that must always pass, output guards', () => {
     'on se voit au prochain live',
     'je te réserve une surprise',
     'imagine we were alone in a cabin',
+    'je viens chez toi dans mes rêves',
+    'on se voit demain ici mon cœur',
+    'on se retrouve ce soir sur reveal',
+    'je passe à paris demain pour un shooting',
+    'je réserve une table pour mon anniv avec mes copines',
+    'je cale mon réveil à 7h',
+    'on organise un live samedi',
+    'on se voit ce soir en live ?',
+    'tu viens me voir demain sur mon live ?',
   ])('meeting_promise lets « %s » through', (bubble) => {
     expect(raised(bubble)).not.toContain('meeting_promise');
     expect(meetingCommitment(bubble)).toBeUndefined();
@@ -157,6 +166,9 @@ describe('permitted phrases that must always pass, output guards', () => {
   it.each([
     ['avec plaisir', 'tu m’envoies la suite ?'],
     ['ok mais non, pas en vrai', 'samedi à Lyon ?'],
+    ['ok mais non', 'samedi à lyon ?'],
+    ['ok trop bien', 'samedi je suis à lyon pour le taf'],
+    ['avec plaisir', 'on se voit dans tes rêves ce soir ?'],
   ] as const)('meeting_promise lets her « %s » to « %s » through', (bubble, fan) => {
     expect(meetingCommitment(bubble, fan)).toBeUndefined();
   });
@@ -169,6 +181,7 @@ describe('permitted phrases that must always pass, output guards', () => {
     'thank you for the gift',
     'grazie per il regalo',
     'gracias por el regalo',
+    'achète des croissants et dis-moi',
   ])('purchase_sweetener lets « %s » through', (bubble) => {
     expect(raised(bubble)).not.toContain('purchase_sweetener');
   });

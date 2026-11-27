@@ -118,7 +118,9 @@ const PURCHASE_SWEETENER = new RegExp(
   [
     `${FR_BUYS}.{0,70}${FR_EXTRA}`,
     `${FR_EXTRA}.{0,70}${FR_BUYS}`,
-    `\\b(prends|achete|debloque|ouvre)(-| )(la|le|les|moi|celle|celui|ca)\\b.{0,40}\\bet\\b.{0,50}${FR_EXTRA}`,
+    `\\b(prends|achete|debloque|ouvre)((-| )(la|le|les|moi|celle|celui|ca))?\\b.{0,40}\\bet\\b.{0,50}${FR_EXTRA}`,
+    // « Pour tout achat une photo en plus » (Sécurité, #1043).
+    `\\b(pour|avec|a) (tout|chaque|ton|un|cet|ce|l') ?achat\\b.{0,50}(${FR_EXTRA}|\\ben plus\\b)`,
     "\\b(bonus|cadeau|surprise|extra|offerte?|gratuite?) (pour|avec|a) (ton |chaque |l'|cet |ce |un )?achat\\b|\\b(2|deux) pour le prix d'une?\\b",
     `${EN_BUYS}.{0,70}${EN_EXTRA}`,
     `${EN_EXTRA}.{0,70}${EN_BUYS}`,
@@ -906,15 +908,32 @@ export function sumsMinorOf(written: string): number[] {
 const MEETING_DATE =
   '\\b(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|apres-demain|ce soir|cette nuit|ce week-?end|le week-?end prochain|(la )?semaine (pro|prochaine)|le mois (pro|prochain)|dans (\\d+|deux|trois|quatre|quelques) (jours|semaines|mois)|cet ete|ces vacances|pendant les vacances|le \\d{1,2}(?= |/|$)|\\d{1,2} ?h(\\d{2})?)\\b';
 const MEETING_ABOUT =
-  '\\b(se (voir|voit|voie|verra|verrait|verrons|retrouv\\w*|rencontr\\w*|rejoin\\w*)|(te|me) (voir|rejoindre|retrouver|rencontrer)|(venir|viens|viendrai|viendrais|passer|passe|monter|descendre) (chez|a|au|te|me)|chez (toi|moi)|tous les deux|toi et moi|en vrai|irl|en personne|visiter|un (verre|cafe|resto|diner|date))\\b';
+  '\\b(se (voir|voit|voie|verra|verrait|verrons|retrouv\\w*|rencontr\\w*|rejoin\\w*)|(te|me) (voir|rejoindre|retrouver|rencontrer)|(venir|viens|viendrai|viendrais|passer|passe|monter|descendre) (chez|te|me)|chez (toi|moi)|tous les deux|toi et moi|en vrai|irl|en personne|visiter|un (verre|cafe|resto|diner|date))\\b';
 const MEETING_ONLINE =
   '\\b(live|en prive|prive|dm|mp|tchat|chat|ici|messages?|story|video|appel|facetime|au lit|sous la couette|dans (tes|mes) reves|en reve|en pensee)\\b';
+// What one organises to meet: « ça », « la rencontre », « un week-end », « notre soirée ».
+const MEETING_OBJECT =
+  "ca|tout ca|un truc|quelque chose|qqch|la rencontre|une rencontre|le voyage|notre \\w+|nos \\w+|un (rdv|rendez-vous|date|verre|diner|resto|week-?end|sejour|voyage)|une (soiree|nuit|sortie|rencontre)|pour (se voir|nous|toi et moi|qu'on)";
+// Online, in a dream or « ici », anywhere in the sentence (Sécurité, #1043): « je viens chez toi dans mes rêves »,
+// « on se voit demain ici », « on se retrouve ce soir sur reveal », « tu viens me voir demain sur mon live ? ». Not
+// when a real place stands in the same sentence.
+const MEETING_ELSEWHERE =
+  /\b(sur (reveal|ici|mon live|ton live|le live|le tchat|le chat|l'?appli|mes stories|ma story)|en (live|prive|dm|mp|reve|pensee|video|story)|au (live|lit)|(mon|le|un|ce|du|prochain) live|dans (tes|mes|nos) (reves|pensees|bras)|en revant|ici)\b/;
+const MEETING_REAL_PLACE = new RegExp(
+  `\\b(${CITY}|hotel|airbnb|gare|motel|bar|cafe|resto|restaurant|aeroport|en vrai|pour de vrai|irl|en personne)\\b`,
+);
+const elsewhere = (sentence: string): boolean =>
+  MEETING_ELSEWHERE.test(sentence) && !MEETING_REAL_PLACE.test(sentence);
 const MEETING_ORGANISED = new RegExp(
   [
     // Organising, in any mood: « on pourrait organiser ça », « je réserve l'hôtel ».
-    "\\b(on|je|tu|nous) (\\w+ )?(s'?)?(organiser|organise|organiserait|organiserai|planifier|planifie|caler|cale|prevoir|prevoit)\\b(?! (mes|tes|ses) (videos|photos|medias|journees?))",
-    '\\b(organiser|organisons|planifions|calons) (un|une|ca|notre|nos|quelque chose|qqch|un truc|la rencontre|le voyage)\\b',
-    "(?<!(sans|te|t'ai|vous) )\\b(reserve|reserves|reserver|reserverai|reserverais|reservons|reservez|booke|booker) (un|une|la|le|l'|les|des|notre|nos) ?(\\w+ )?(hotel|chambre|table|airbnb|billets?|train|vol|avion|resto|restaurant|nuits?|week-?end|gite|chalet|places?|suite)\\b",
+    // Organising counts with a meeting object or « avec toi » (Sécurité, #1043): « on pourrait organiser ça », « on
+    // s'organise ? », not « je cale mon réveil » nor « on organise un live samedi ».
+    `\\b(on|je|tu|nous) (\\w+ )?(s'?)?(organiser|organise|organiserait|organiserai|planifier|planifie|caler|cale|prevoir|prevoit)\\b(?= ?$|[,;:]| (${MEETING_OBJECT})\\b|[^.!?]*\\bavec toi\\b)`,
+    `\\b(organiser|organisons|planifions|calons) (${MEETING_OBJECT})\\b`,
+    "(?<!(sans|te|t'ai|vous) )\\b(reserve|reserves|reserver|reserverai|reserverais|reservons|reservez|booke|booker) (un|une|la|le|l'|les|des|notre|nos) ?(\\w+ )?(hotel|chambre|airbnb|nuits?|gite|chalet|suite|motel)\\b",
+    // A table, a train, a seat: only for the two of them (« je réserve une table pour mon anniv avec mes copines »).
+    "(?<!(sans|te|t'ai|vous) )\\b(reserve|reserves|reserver|reserverai|reserverais|reservons|reservez|booke|booker) (un|une|la|le|l'|les|des|notre|nos) ?(\\w+ )?(table|billets?|train|vol|avion|resto|restaurant|week-?end|places?)\\b(?=[^.!?]*\\b(avec toi|pour (nous|toi et moi|nous deux|te voir|venir)|tous les deux|toi et moi)\\b)",
     // Coming over, in any mood: « je viens te voir », « je passe chez toi », « je pourrais venir te voir ».
     `\\b(je|tu) (viens|passe|passes|monte|montes|descends|viendrai|viendrais|viendras|passerai|passerais|passeras|((peux|pourrais|vais|veux|voudrais) (venir|passer|monter|descendre))) (te|me) (voir|rejoindre|retrouver)\\b(?!${ONLINE})`,
     '\\b(je|tu) (viens|passe|passes|monte|montes|viendrai|viendrais|viendras|passerai|passerais|passeras|((peux|pourrais|vais|veux|voudrais) (venir|passer|monter))) chez (toi|moi)\\b',
@@ -933,6 +952,7 @@ const sentencesOf = (text: string): string[] => text.split(/[.!?\n]+/).filter((s
 
 /** A sentence about meeting him that a date, a real place or an organising word makes concrete. */
 function concreteMeeting(sentence: string): string | undefined {
+  if (elsewhere(sentence)) return undefined;
   const organised = MEETING_ORGANISED.exec(sentence)?.[0];
   if (organised !== undefined) return organised;
   if (new RegExp(MEETING_ONLINE).test(sentence)) return undefined;
@@ -943,16 +963,23 @@ function concreteMeeting(sentence: string): string | undefined {
 }
 
 /** His message proposes a concrete meeting: her meeting words in his mouth, or a date with a place (« samedi à Lyon ? »). */
+// A proposal of his: a question, a « on », an invitation (Sécurité, #1043). « samedi je suis à lyon pour le taf » tells.
+const PROPOSES =
+  /\?|\bon\b|\b(viens|venez|rejoins|retrouve|tu (viens|passes|veux|voudrais|pourrais))\b|^\s*(dispo|libre)\b/;
+
+/** His message proposes a concrete meeting: her meeting words in his mouth, or a date with a place (« samedi à Lyon ? »). */
 function fanProposesMeeting(text: string): boolean {
   const said = normalise(text);
-  return (
-    BLOCKING_PATTERNS.some(({ code, pattern }) => code === 'meeting_promise' && pattern.test(said)) ||
-    sentencesOf(said).some(
+  if (!PROPOSES.test(said)) return false;
+  return said
+    .split(/(?<=[.!?\n])/)
+    .filter((sentence) => sentence.trim() !== '' && !elsewhere(sentence))
+    .some(
       (sentence) =>
+        BLOCKING_PATTERNS.some(({ code, pattern }) => code === 'meeting_promise' && pattern.test(sentence)) ||
         concreteMeeting(sentence) !== undefined ||
         (new RegExp(MEETING_DATE).test(sentence) && new RegExp(`\\b${CITY}\\b`).test(sentence)),
-    )
-  );
+    );
 }
 
 /**
@@ -970,12 +997,23 @@ export function meetingCommitment(text: string, fanLastMessage?: string): string
   return MEETING_ASSENT.exec(said.replace(/^[^\p{L}]+/u, ''))?.[0];
 }
 
+/** A `meeting_promise` pattern, read sentence by sentence: online, in a dream or « ici », the sentence passes. */
+function meetingMatch(pattern: RegExp, text: string): string | undefined {
+  for (const sentence of sentencesOf(text)) {
+    if (elsewhere(sentence)) continue;
+    const match = pattern.exec(sentence)?.[0];
+    if (match !== undefined) return match;
+  }
+  return undefined;
+}
+
 function blockingMatch(
   code: GuardCode,
   pattern: RegExp,
   text: string,
   context: GuardContext,
 ): string | undefined {
+  if (code === 'meeting_promise') return meetingMatch(pattern, text);
   if (code !== 'price_outside_offer') return pattern.exec(text)?.[0];
   for (const match of text.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
     // « €12.50 » matches as « €1 »: the sum is read on, past the match.
