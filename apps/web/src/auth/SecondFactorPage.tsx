@@ -2,14 +2,18 @@ import type { SecondFactorSetup } from '@impera/contracts';
 import { useLayoutEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
 
 import { BackupCodesList, CopyButton } from './BackupCodesList';
+import { PasskeyOffer } from './PasskeyOffer';
 import { PublicBrand } from './PublicBrand';
 import { chosenPassword, forgetChosenPassword } from './chosen-password';
+import { deviceHoldsPasskeys, passkeyOffered } from './passkeys';
 import { confirmActivation, startActivation, type ActivationStart, type CodeResult } from './session';
 
 type Step =
   | { readonly kind: 'password' }
   | { readonly kind: 'scan'; readonly setup: SecondFactorSetup }
-  | { readonly kind: 'codes'; readonly backupCodes: readonly string[] };
+  | { readonly kind: 'codes'; readonly backupCodes: readonly string[] }
+  /** Face ID offered right away (recette 27/11, P2): the app to install was the hard part, the gesture is the easy one. */
+  | { readonly kind: 'offer' };
 
 const START_MESSAGES: Record<Exclude<ActivationStart['kind'], 'ok'>, string> = {
   wrong_password: 'Ce n’est pas le bon mot de passe.',
@@ -113,6 +117,20 @@ export function SecondFactorPage({
     const field = formElement.elements.namedItem('code');
     if (field instanceof HTMLInputElement) field.value = '';
     setError(CODE_MESSAGES[result]);
+  }
+
+  /** After the backup codes: the offer of a key, once per device and only on a device that holds keys. */
+  async function codesKept(): Promise<void> {
+    if (!passkeyOffered() && (await deviceHoldsPasskeys())) setStep({ kind: 'offer' });
+    else onActivated();
+  }
+
+  if (step.kind === 'offer') {
+    return (
+      <main className="nv-aura grid min-h-dvh place-items-center px-4 py-10">
+        <PasskeyOffer page="Validation en deux étapes" onDone={onActivated} />
+      </main>
+    );
   }
 
   return (
@@ -221,7 +239,10 @@ export function SecondFactorPage({
         );
       }
       case 'codes':
-        return <BackupCodes codes={step.backupCodes} onDone={onActivated} />;
+        return <BackupCodes codes={step.backupCodes} onDone={() => void codesKept()} />;
+      case 'offer':
+        // Drawn on its own page above.
+        return <></>;
     }
   }
 }

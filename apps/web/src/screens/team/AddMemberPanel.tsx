@@ -369,7 +369,7 @@ export function AddMemberPanel({
                   ))}
                 </ol>
               ) : (
-                <p>Envoie-lui son lien : il y choisira son mot de passe.</p>
+                <p>Envoie-lui son lien : son mot de passe se choisit dessus.</p>
               )}
             </div>
             <button type="button" className="tm-close" aria-label="Fermer" disabled={busy} onClick={close}>

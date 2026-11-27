@@ -66,7 +66,10 @@ describe('SecondFactorPage', () => {
     expect(open).toHaveProperty('disabled', true);
     fireEvent.click(screen.getByLabelText('J’ai mis ces codes en lieu sûr.'));
     fireEvent.click(open);
-    expect(onActivated).toHaveBeenCalled();
+    // No Face ID in this browser: no offer of a key, Impera opens.
+    await waitFor(() => {
+      expect(onActivated).toHaveBeenCalled();
+    });
     expect(calls).toEqual([
       '/v1/auth/two-factor/enable {"password":"staple battery horse"}',
       '/v1/auth/two-factor/verify-totp {"code":"123456"}',
