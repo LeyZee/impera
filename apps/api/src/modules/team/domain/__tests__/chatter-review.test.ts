@@ -24,6 +24,7 @@ describe('chatter review', () => {
     expect(occurrenceCounts('firm', seen(10, 'pending'), day(1))).toBe(false);
     expect(occurrenceCounts('firm', seen(10, 'dropped'), day(1))).toBe(false);
     expect(occurrenceCounts('firm', seen(10, 'upheld'), day(1))).toBe(true);
+    expect(occurrenceCounts('firm', { ...seen(10), author: 'deduced' }, day(1))).toBe(false);
   });
 
   it('takes its tone from the level and the explanation, never from the model', () => {

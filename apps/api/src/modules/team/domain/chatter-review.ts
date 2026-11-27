@@ -16,18 +16,23 @@ export type ContestState = 'none' | 'pending' | 'upheld' | 'dropped';
 export interface FaultOccurrence {
   readonly at: Date;
   readonly contest: ContestState;
+  /**
+   * Who wrote the message (ADR 0170 § 7): the Reveal member tied to the chatter, or only deduced from the shift on
+   * the account at that time. A deduced author is shown, never counted.
+   */
+  readonly author: 'member' | 'deduced';
 }
 
 /**
- * Whether an occurrence counts toward a case (§ 29): never a piece of advice, never while contested or once
- * dropped, and only after the fault was first explained to him in a review.
+ * Whether an occurrence counts toward a case (§ 29): never a piece of advice, never on a deduced author, never while
+ * contested or once dropped, and only after the fault was first explained to him in a review.
  */
 export function occurrenceCounts(
   level: FaultLevel,
   occurrence: FaultOccurrence,
   explainedAt: Date | null,
 ): boolean {
-  if (level === 'advice') return false;
+  if (level === 'advice' || occurrence.author === 'deduced') return false;
   if (occurrence.contest === 'pending' || occurrence.contest === 'dropped') return false;
   return explainedAt !== null && occurrence.at.getTime() > explainedAt.getTime();
 }
