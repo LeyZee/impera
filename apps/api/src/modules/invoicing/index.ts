@@ -45,7 +45,7 @@ import { createDrizzleSettlementStore } from './infra/settlement-store';
  */
 export { invoiceRequeue } from './infra/invoice-queue';
 /** Whether a member's invoice could go out today, and what stops it (« Mise en route », pilotage plan W1). */
-export { invoiceGaps, invoiceReadiness, type BillingGap } from './infra/readiness';
+export { invoiceGaps, type BillingGap } from './infra/readiness';
 /** What the contractors' file reads of the invoices, plugged into it by the composition root (ARC-07). */
 export { invoiceReadsForContractors } from './infra/contractor-reads';
 /**

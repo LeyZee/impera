@@ -46,7 +46,7 @@ export interface SupervisionDeps extends Omit<
   readonly adminDb: Database;
   /** Whether an urgent alert reaches a group for each creator; `null` when Telegram is off. */
   readonly telegramReach: TelegramReach;
-  /** What stops each member's first invoice (invoicing's `invoiceReadiness`), for his « Facturation » step. */
+  /** What stops each member's first invoice (invoicing's `invoiceGaps`), for his « Facturation » step. */
   readonly billingReadiness: BillingReadiness;
   /** The connectors' `salesFeedTotals.totalsOf` (CRM-04), for the sales panel. */
   readonly salesTotalsOf: SalesTotalsOf;

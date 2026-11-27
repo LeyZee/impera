@@ -14,23 +14,12 @@ import { issueGaps, type IssueFacts } from '../domain/billing';
 export type BillingGap = Exclude<InvoiceNotIssuedReason, 'no_invoice_to_credit'>;
 
 /**
- * Whether an invoice of `memberId` could go out on `day` if his fortnight brought something to invoice, and its
- * transfer be recorded (« Mise en route », pilotage plan W1): `null` when both could, otherwise what stops them, the
- * very reason the validation (`issueDecision`) or the transfer (`payoutDecision`) would give. Read in the caller's
- * transaction (an admin one); the file alone reads its tables, through `contractorReadsForInvoicing`.
- */
-export async function invoiceReadiness(
-  tx: Transaction,
-  memberId: string,
-  day: string,
-): Promise<BillingGap | null> {
-  return (await invoiceGaps(tx, memberId, day))[0] ?? null;
-}
-
-/**
- * Every gap at once (recette PARC-01), the first being `invoiceReadiness`'s: what the validation would refuse in turn
- * (`issueGaps`), then, under a tax treaty, the residence certificate the transfer waits for. Read as things stand now,
- * never as a past run said it (recette PARC-05).
+ * What stops an invoice of `memberId` from going out on `day` if his fortnight brought something to invoice, and its
+ * transfer from being recorded (« Mise en route », pilotage plan W1), every gap at once (recette PARC-01): empty when
+ * both could; otherwise, first, the very reason the validation (`issueDecision`) would give, then what it would refuse
+ * in turn (`issueGaps`), then, under a tax treaty, the residence certificate the transfer (`payoutDecision`) waits for.
+ * Read as things stand now, never as a past run said it (recette PARC-05), in the caller's transaction (an admin one);
+ * the file alone reads its tables, through `contractorReadsForInvoicing`.
  */
 export async function invoiceGaps(tx: Transaction, memberId: string, day: string): Promise<BillingGap[]> {
   const mandate = await fileReads.mandateOf(tx, memberId);

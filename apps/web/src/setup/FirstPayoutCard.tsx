@@ -35,7 +35,7 @@ export function FirstPayoutCard({ gaps }: { gaps: FirstPayoutGaps }): JSX.Elemen
   return (
     <section className="nv-plate su-card nv-enter" aria-labelledby="fp-title">
       <header className="su-head">
-        <h2 id="fp-title" className="su-title">
+        <h2 id="fp-title" className="nv-h3">
           Avant ton premier versement
         </h2>
         <p className="su-count nv-num">
