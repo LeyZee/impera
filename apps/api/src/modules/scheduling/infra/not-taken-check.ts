@@ -1,5 +1,5 @@
 import { EVENT_PAYLOADS, EventIdSchema, newId } from '@impera/contracts';
-import { eq, schema, sql, withAdmin, type Database } from '@impera/db';
+import { eq, inArray, schema, sql, withAdmin, type Database } from '@impera/db';
 
 import { NOT_TAKEN_LOOKBACK_MS, notTakenShifts } from '../domain/not-taken';
 import { DEFAULT_SCHEDULING_SETTINGS } from '../domain/shifts';
@@ -56,6 +56,11 @@ export function createDrizzleNotTakenCheck(adminDb: Database): {
             await tx
               .select({ id: schema.platformAccounts.id, platform: schema.platformAccounts.platform })
               .from(schema.platformAccounts)
+              .where(
+                inArray(schema.platformAccounts.id, [
+                  ...new Set(due.map((shift) => shift.platformAccountId)),
+                ]),
+              )
           ).map((account) => [account.id, account.platform]),
         );
         let published = 0;
