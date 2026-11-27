@@ -44,19 +44,18 @@ function wordsOf(name: string): readonly string[] {
     .filter((word) => /[\p{L}\p{N}]/u.test(word));
 }
 
-/** The first letter or digit of a word (« 🌸Lou » → « L »). */
-function letterOf(word: string): string {
-  return /[\p{L}\p{N}]/u.exec(word)?.[0] ?? '';
-}
+const graphemes = new Intl.Segmenter('fr', { granularity: 'grapheme' });
 
-/** Two letters from the name (« Charles Altman » → « CA »), or the e-mail's first letter when there is no name. */
-export function initialsOf(me: Pick<Me, 'name' | 'email'>): string {
-  const words = wordsOf(me.name);
-  const letters = words.length > 1 ? [words[0], words[words.length - 1]] : [words[0] ?? me.email];
-  return letters
-    .map((word) => letterOf(word ?? ''))
-    .join('')
-    .toLocaleUpperCase('fr-FR');
+/**
+ * The avatar's sign, the CRM rail's own (apps/web/src/lib/utils.ts, `initialOf`, EXT-08): the first letter, digit or
+ * emoji of the name, whole and in capitals, past the signs before it (« Charles Altman » → « C »); the e-mail's first
+ * letter when the name holds none.
+ */
+export function initialOf(me: Pick<Me, 'name' | 'email'>): string {
+  const sign = /^[\p{L}\p{N}\p{Extended_Pictographic}]/u;
+  const first = (text: string) =>
+    [...graphemes.segment(text.trim())].find(({ segment }) => sign.test(segment))?.segment;
+  return (first(me.name) ?? first(me.email) ?? '?').toLocaleUpperCase('fr-FR');
 }
 
 /** The first name the greeting uses: the first word of the name that holds a letter, or nothing. */

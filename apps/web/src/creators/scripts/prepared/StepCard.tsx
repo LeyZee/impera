@@ -21,6 +21,8 @@ export interface StepActions {
   readonly onRhythm: (rhythm: number) => void;
   readonly onAddBranch: () => void;
   readonly onRemoveBranch: (key: string) => void;
+  /** A branch's price as typed is not a price (refused) or is one again: the editor says it is not saved (PRO1-08). */
+  readonly onPriceRefused: (key: string, refused: boolean) => void;
   readonly onPickMedia: (key: string) => void;
   readonly onCondition: (key: string) => void;
   readonly onMove: (by: -1 | 1) => void;
@@ -265,6 +267,7 @@ function BranchCard({
   const label = conditionLabel(branch.condition, content);
   // The price as typed, kept while it is not a price yet (« 12, »): the content keeps the last one that was.
   const [price, setPrice] = useState(priceText(branch.priceMinor));
+  const refused = parsePrice(price) === null;
   const change = (next: (one: PreparedBranch) => PreparedBranch): void => {
     actions.onBranch(branch.key, next);
   };
@@ -413,16 +416,23 @@ function BranchCard({
             inputMode="decimal"
             placeholder="Offert"
             value={price}
-            aria-invalid={parsePrice(price) === null ? 'true' : undefined}
+            aria-invalid={refused ? 'true' : undefined}
+            aria-describedby={refused ? `${id}-price-hint` : undefined}
             onChange={(event) => {
               const text = event.target.value;
               setPrice(text);
               const minor = parsePrice(text);
+              actions.onPriceRefused(branch.key, minor === null);
               if (minor !== null) change((one) => ({ ...one, priceMinor: minor }));
             }}
           />
           <span>€</span>
         </label>
+        {refused ? (
+          <p id={`${id}-price-hint`} className="se-price-hint" role="alert">
+            Un prix comme 12 ou 12,50
+          </p>
+        ) : null}
         {count > 1 ? (
           <RemoveButton
             label="Retirer la branche"

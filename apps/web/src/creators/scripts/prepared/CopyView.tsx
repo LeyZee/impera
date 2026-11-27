@@ -1,7 +1,7 @@
 import type { CreatorId, PreparedScriptView } from '@impera/contracts';
 import { useState, type JSX } from 'react';
 
-import type { EditorMedia } from './media';
+import { placeLine, type EditorMedia } from './media';
 import { conditionLabel, differenceText, priceLabel, priceText } from './model';
 import { MediaTile } from './parts';
 
@@ -159,6 +159,11 @@ function CopyScript({
                     />
                   ))}
                 </span>
+                <ol className="se-copy__places">
+                  {branch.media.map((one) => (
+                    <li key={one.ref}>{placeLine(media.get(one.ref)) ?? 'Plus dans son coffre Reveal'}</li>
+                  ))}
+                </ol>
               </span>
               <span />
             </div>

@@ -62,6 +62,18 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
     });
   });
 
+  it('says there is no bot in place of « Lier mon Telegram » when the page knows it, before any code (CHAT-07)', async () => {
+    vi.mocked(fetchPrivateLink).mockResolvedValue(UNLINKED);
+    const onAddBot = vi.fn();
+    render(<PrivateChat owner onAddBot={onAddBot} botReady={false} frame={frame} />);
+    expect(await screen.findByText(/Aucun bot Telegram ne fonctionne/u)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Lier mon Telegram' })).toBeNull();
+    expect(screen.queryByLabelText(/mot de passe/iu)).toBeNull();
+    expect(requestLinkCode).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Bots et groupes' }));
+    expect(onAddBot).toHaveBeenCalled();
+  });
+
   it('gives a code, opens the bot with it, and says « C’est fait » once the bot linked the chat', async () => {
     vi.mocked(fetchPrivateLink).mockResolvedValue(UNLINKED);
     vi.mocked(requestLinkCode).mockResolvedValue(CODE);
@@ -75,6 +87,7 @@ describe('« Mon chat privé » (SEC-05 lot 2)', () => {
     expect(screen.getByText('/start ABCDEFGH23')).toBeTruthy();
     expect(screen.getByText(/Valable jusqu’à/u)).toBeTruthy();
     expect(screen.getByText('En attente du bot…')).toBeTruthy();
+    expect(screen.getByText(/se met à jour, jusqu’à une minute après/u)).toBeTruthy();
 
     vi.mocked(fetchPrivateLink).mockResolvedValue(LINKED);
     comeBack();

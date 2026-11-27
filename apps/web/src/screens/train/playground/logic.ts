@@ -104,11 +104,20 @@ export function fanMessageCount(state: PlaygroundState): number {
 
 /** What the playground's rate says, and what it does not (ADR 0010, 0019). */
 export const FICTIONAL =
-  'Ce taux calibre la voix sur la persona fictive du Playground, pas sur celle d’une créatrice.';
+  'Ce taux calibre la voix sur la persona fictive d’Entraîner, pas sur celle d’une créatrice.';
 
 /** With a creator's version: her answers are tried before a real fan reads them, and the ratings are hers (PRO-21). */
 export const PLAYED =
   'Ses réponses avec cette version, avant qu’un vrai fan ne les lise. Les notes vont à cette créatrice ; le taux reste celui de la voix.';
+
+/**
+ * No persona in force, for one creator or for all (`null`): the owner activates one in Créatrices › Persona; a manager,
+ * who has no such tab, is told who does it (MAN-01).
+ */
+export function noPersonaText(creatorName: string | null, asOwner: boolean): string {
+  const who = creatorName === null ? 'Aucune créatrice n’a de' : `${creatorName} n’a pas de`;
+  return `${who} persona en vigueur : ${asOwner ? 'active-en une dans Créatrices › Persona' : 'le propriétaire en active une'}.`;
+}
 
 /** Whom the answers speak as: « Persona fictive : Elena », or her name and the version played (PRO-21). */
 export function personaLabel(state: PlaygroundState): string {

@@ -1,14 +1,22 @@
 import {
   VAULT_EXCERPT_MAX,
   type CreatorId,
+  type MediaDescriptionId,
   type PlatformAccountId,
   type VaultChoicesChange,
   type VaultChoicesView,
   type VaultDescribeAnswer,
   type VaultDescribeAsk,
+  type VaultDescriptionReview,
 } from '@impera/contracts';
 
-import { VaultAccountNotFound, VaultChoiceForbidden, VaultDescribeOverCap } from '../domain/errors';
+import {
+  VaultAccountNotFound,
+  VaultChoiceForbidden,
+  VaultDescribeOverCap,
+  VaultDescriptionNotFound,
+  VaultDescriptionStale,
+} from '../domain/errors';
 import {
   capLeftCents,
   confirms,
@@ -22,6 +30,9 @@ import {
 export interface VaultChoiceMedia extends DescribeCandidate {
   readonly platformAccountId: PlatformAccountId;
   readonly detailed: string | null;
+  /** That description's id and whether a person validated it; `null` and `false` while it has none. */
+  readonly descriptionId: MediaDescriptionId | null;
+  readonly validated: boolean;
 }
 
 /** What a request decides, in the store's transaction: the media to ask, or none. */
@@ -67,6 +78,17 @@ export interface VaultChoiceStore {
     },
     decide: (known: ReadonlyMap<string, DescribeCandidate>) => AskDecision<T>,
   ): Promise<T | { readonly replayed: number } | 'forbidden' | 'unknown_account'>;
+  /**
+   * A media's latest description validated as it is, or rewritten and validated, from its sheet: by the owner or an
+   * active manager of her list, each with a line in the audit trail. `stale` when the one named is no longer its
+   * latest; `not_found` when the media or its description is not hers.
+   */
+  review(
+    creatorId: CreatorId,
+    userId: string,
+    platformMediaId: string,
+    review: VaultDescriptionReview,
+  ): Promise<'validated' | 'already' | 'corrected' | 'stale' | 'not_found' | 'forbidden'>;
 }
 
 export interface VaultChoiceDeps {
@@ -96,6 +118,9 @@ export async function readVaultChoices(
       imported: media.imported,
       description: descriptionStateOf(media),
       excerpt: excerptOf(media.detailed, VAULT_EXCERPT_MAX),
+      descriptionId: media.descriptionId,
+      detailed: media.detailed,
+      validated: media.validated,
     })),
   };
 }
@@ -164,4 +189,23 @@ export async function askVaultDescriptions(
   if (outcome === 'over_cap') throw new VaultDescribeOverCap();
   if ('replayed' in outcome) return { status: 'asked', count: outcome.replayed };
   return outcome;
+}
+
+/**
+ * « Valider la description » and « Corriger » on a media's sheet (ADR 0145 § 5): a script made of her vault asks a
+ * description a person validated for each of its media, so the sheet is where it is given. Validating twice is no
+ * error; a description changed meanwhile is refused, never another one validated in its place.
+ */
+export async function reviewVaultDescription(
+  deps: Pick<VaultChoiceDeps, 'store'>,
+  creatorId: CreatorId,
+  userId: string,
+  platformMediaId: string,
+  review: VaultDescriptionReview,
+): Promise<VaultChoicesView> {
+  const outcome = await deps.store.review(creatorId, userId, platformMediaId, review);
+  if (outcome === 'forbidden') throw new VaultChoiceForbidden('read');
+  if (outcome === 'not_found') throw new VaultDescriptionNotFound();
+  if (outcome === 'stale') throw new VaultDescriptionStale();
+  return readVaultChoices(deps, creatorId, userId);
 }

@@ -7,7 +7,7 @@ import {
 } from '@impera/contracts';
 import { useId, useState, type JSX } from 'react';
 
-import { euros, FORMAT_LABELS, lineName, minutesOf, quoteSentence } from './model';
+import { euros, FORMAT_LABELS, lineName, minutesOf, quoteSentence, roundingLine } from './model';
 import { Card, UnitInput } from './parts';
 
 /** A line of the sum, as she will read it: « Vidéo pour lui 100 € », « <supplement> +50 % 50 € ». */
@@ -42,6 +42,8 @@ export function Calculator({ grid, stale }: { grid: CustomPriceGrid; stale: bool
     ...(minutesCount && typeof minutes === 'number' ? { minutes } : {}),
   };
   const quote = quoteCustomOrder(grid, ask);
+  // The total is rounded to the euro: the detail says by how much, so it adds up (CODE-05).
+  const rounding = quote.kind === 'price' ? roundingLine(quote.totalMinor, quote.lines) : null;
   return (
     <Card
       title="Calculateur"
@@ -125,6 +127,12 @@ export function Calculator({ grid, stale }: { grid: CustomPriceGrid; stale: bool
                   </li>
                 );
               })}
+              {rounding === null ? null : (
+                <li className="smp-calc__line">
+                  <span>Arrondi</span>
+                  <span className="smp-calc__amount">{rounding}</span>
+                </li>
+              )}
             </ul>
           ) : null}
         </div>

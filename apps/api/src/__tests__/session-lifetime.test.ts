@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { lifetimeOf, LONGEST_IDLE_MS, sessionEnd } from '../session-lifetime';
+import { ACTIVITY_REFRESH_MS, lifetimeOf, LONGEST_IDLE_MS, sessionEnd } from '../session-lifetime';
 
 const NOW = new Date('2026-11-20T12:00:00Z');
 const MINUTE = 60 * 1000;
@@ -34,6 +34,22 @@ describe('session lifetime by role (SEC-17)', () => {
       const session = (ms: number) => ({ role, createdAt: ago(ms + HOUR), lastActiveAt: ago(ms) });
       expect(sessionEnd(session(idle - HOUR), NOW)).toBeNull();
       expect(sessionEnd(session(idle + HOUR), NOW)).toBe('idle');
+    }
+  });
+
+  it('reads an operator’s inactivity within the minute: active 11 h 59 ago kept, idle 12 h 01 closed (PRO2-10)', () => {
+    expect(ACTIVITY_REFRESH_MS).toBeLessThanOrEqual(MINUTE);
+    for (const role of ['operator', 'unknown'] as const) {
+      // His last request `idle` ago; its refresh written up to one refresh earlier (the worst case) or then.
+      const at = (idle: number, late: number) => ({
+        role,
+        createdAt: ago(idle + HOUR),
+        lastActiveAt: ago(idle + late),
+      });
+      expect(sessionEnd(at(12 * HOUR - MINUTE, ACTIVITY_REFRESH_MS - 1), NOW)).toBeNull();
+      expect(sessionEnd(at(12 * HOUR - MINUTE, 0), NOW)).toBeNull();
+      expect(sessionEnd(at(12 * HOUR + MINUTE, 0), NOW)).toBe('idle');
+      expect(sessionEnd(at(12 * HOUR + MINUTE, ACTIVITY_REFRESH_MS - 1), NOW)).toBe('idle');
     }
   });
 

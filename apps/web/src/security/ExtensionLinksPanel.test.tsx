@@ -99,6 +99,9 @@ describe('Relier l’extension', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain('Chrome du bureau');
     expect(rows[0]?.textContent).toContain('rien reçu encore');
+    // The long day of the rest of the app, never « 01/11/2026 » (CHAT-12).
+    expect(rows[0]?.textContent).toContain('Relié le 1er novembre');
+    expect(rows[1]?.textContent).toContain('Relié le 2 novembre');
     expect(rows[1]?.textContent).toContain('dernier envoi il y a 12 min');
   });
 

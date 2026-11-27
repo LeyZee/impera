@@ -70,6 +70,8 @@ const NextBodySchema = z.strictObject({
 /** What the world reads of a call: its key, and the schema the answer must fit. Anything else is left alone. */
 const GenerationBodySchema = z.object({
   model: z.string().min(1),
+  /** The messages; only a script's synthesis reads them, for the keys of its steps. */
+  input: z.unknown().optional(),
   text: z
     .object({
       format: z.object({ type: z.string(), schema: z.record(z.string(), z.unknown()).optional() }).optional(),
@@ -161,6 +163,21 @@ export function instanceOf(schema: unknown): unknown {
     }
   };
   return build(schema, 0);
+}
+
+/** A step's key as the synthesis request names it, « (clé intro:) » (`ScriptStepKeySchema`). */
+const STEP_KEY = /\(clé ([a-z0-9][a-z0-9-]{0,31}:[ABC]?)\)/gu;
+
+/**
+ * A script's synthesis that the code takes (recette MED-13): each step of the request, once, in its order. The plainest
+ * instance cannot invent the script's own keys, so every synthesis failed and stayed « La synthèse s'écrit ».
+ */
+export function scriptSummaryOf(input: unknown): unknown {
+  const keys = [...new Set([...JSON.stringify(input ?? null).matchAll(STEP_KEY)].map((match) => match[1]))];
+  return {
+    shootingContext: 'rien à signaler',
+    steps: keys.map((step) => ({ step, overview: 'rien à signaler', summary: 'rien à signaler' })),
+  };
 }
 
 const propertiesOf = (schema: unknown): Readonly<Record<string, unknown>> =>
@@ -278,6 +295,7 @@ export function registerGeneration(
     const properties = propertiesOf(schema);
     const isVoice = 'bubbles' in properties;
     const isBrain = 'replyBrief' in properties;
+    const isScriptSummary = 'shootingContext' in properties;
 
     // The call-wide scripts are used by the next call, whatever its role; a trap by the next reply in her voice.
     const scripted = next;
@@ -300,6 +318,8 @@ export function registerGeneration(
         output = {
           bubbles: trap ?? NEUTRAL_REPLIES[voiceReplies % NEUTRAL_REPLIES.length] ?? ['coucou toi 😊'],
         };
+      } else if (isScriptSummary) {
+        output = scriptSummaryOf(body.data.input);
       } else if (isBrain && typeof base === 'object' && base !== null) {
         // The brain only names the risk it reads; what it changes is the policy's, in code.
         const risks = scripted === 'risk' ? [risk] : [];

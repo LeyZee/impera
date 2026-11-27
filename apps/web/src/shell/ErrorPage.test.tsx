@@ -66,7 +66,7 @@ describe('ErrorPage (recette 16/11, CHT-06)', () => {
     );
     expect(await screen.findByRole('heading', { name: 'Cette page n’a pas pu s’afficher' })).toBeDefined();
     expect(screen.queryByText(/Something went wrong/u)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Revenir à Aujourd’hui' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Retour : Aujourd’hui' }).getAttribute('href')).toBe(
       '/aujourdhui',
     );
     // The error is told to the API once (OPS-18), with the route's template.

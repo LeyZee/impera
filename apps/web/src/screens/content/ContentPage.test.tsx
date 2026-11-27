@@ -7,6 +7,7 @@ import {
 } from '@impera/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -93,10 +94,11 @@ afterEach(() => {
 });
 
 describe('Contenu, the creator’s (CR-06 d)', () => {
-  it('hides every empty section but « Envoyer autre chose », whose tiles are Reveal’s, without Script', async () => {
+  it('hides every empty section but « Envoyer un contenu », whose tiles are Reveal’s, without Script', async () => {
     serve({ requests: [], drops: [] });
     show();
-    expect(await screen.findByRole('heading', { level: 2, name: 'Envoyer autre chose' })).toBeDefined();
+    // Nothing asked: « autre chose » than nothing would read wrong (MOD-09).
+    expect(await screen.findByRole('heading', { level: 2, name: 'Envoyer un contenu' })).toBeDefined();
     expect(screen.queryByRole('heading', { name: 'À tourner' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'En route' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Publié' })).toBeNull();
@@ -105,6 +107,24 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(tiles).toHaveLength(8);
     expect(tiles.some((name) => name.includes('Script'))).toBe(false);
     expect(tiles.some((name) => name.includes('Insta'))).toBe(false);
+    // Each of Reveal's tiles carries the Agenda's mark and colour of its kind, never an emoji (choice of 21/11); the
+    // kinds the Agenda has no colour for keep theirs.
+    const marks = [...document.querySelectorAll('.ct-tile .ct-kind')].map((mark) =>
+      mark.getAttribute('data-need'),
+    );
+    expect(marks.slice(0, 4)).toEqual(['feed_shoot', 'feed_video', 'reveal_story', 'mass_dm']);
+    expect(marks.slice(4)).toEqual([null, null, null, null]);
+    // Theirs sits on the same plate as the drawn marks, in neutral (Design, 27/11).
+    const plates = [...document.querySelectorAll('.ct-tile .ct-kind')].map((mark) =>
+      mark.classList.contains('wk-kind'),
+    );
+    expect(plates).toEqual(Array.from({ length: 8 }, () => true));
+    expect(document.querySelector('.ct-tile .ct-kind svg.wk-icon')).not.toBeNull();
+    expect(
+      document.querySelector<HTMLElement>('.ct-tile .ct-kind')?.style.getPropertyValue('--wk-feed_shoot'),
+    ).toBe('var(--wk-sw-rose)');
+    const reveal = [...document.querySelectorAll('.ct-tile')].slice(0, 4).map((tile) => tile.textContent);
+    expect(reveal.join(' ')).not.toMatch(/📸|🎬|✨|💌/u);
   });
 
   it('lists her requests, the nearest first, a late one in amber', async () => {
@@ -183,8 +203,26 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
         <ContentPage onOpenScript={openScript} asked={request.id} onAsked={onAsked} />
       </QueryClientProvider>,
     );
+    const sheet = await screen.findByRole('dialog');
+    // Forgotten as the sheet closes, not as it opens: drawn again meanwhile, the page opens it again (MOD-03).
+    expect(onAsked).not.toHaveBeenCalled();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Fermer' }));
+    expect(onAsked).toHaveBeenCalledOnce();
+  });
+
+  it('opens the sheet again when the page is drawn anew before it was closed (MOD-03)', async () => {
+    const request = requestOf({ dueOn: '2026-11-04', reason: 'La séance promise' });
+    serve({ requests: [request], drops: [] });
+    const page = (): JSX.Element => (
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ContentPage onOpenScript={openScript} asked={request.id} onAsked={vi.fn()} />
+      </QueryClientProvider>
+    );
+    render(page());
+    await screen.findByRole('dialog');
+    cleanup();
+    render(page());
     expect(await screen.findByRole('dialog')).toBeDefined();
-    expect(onAsked).toHaveBeenCalled();
   });
 
   it('begins a script asked with its version card by card, and opens it (SC-02 lot b2)', async () => {
@@ -338,7 +376,7 @@ describe('Contenu, the creator’s (CR-06 d)', () => {
     expect(within(section).getByText(/Un fichier choisi n’est pas de ce dépôt/u)).toBeDefined();
     // Still to go up: « En route » comes before « Déposer » (CRE-09).
     const titles = [...document.querySelectorAll('h2')].map((title) => title.textContent);
-    expect(titles.indexOf('En route')).toBeLessThan(titles.indexOf('Envoyer autre chose'));
+    expect(titles.indexOf('En route')).toBeLessThan(titles.findIndex((one) => one.startsWith('Envoyer')));
   });
 
   it('tells a server that refuses from a cut network, with « Réessayer » (CRE-10)', async () => {
