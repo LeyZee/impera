@@ -36,7 +36,13 @@ const cut = (text: string, max: number): string => (text.length <= max ? text : 
 
 /** The push of an agency alert: « Urgent · » first when it rings at night, her name when it is about her. */
 export function agencyMessage(signal: Signal, notice: Notice, creatorName: string | null): PushMessage {
-  const subject = SUBJECTS[signal.kind];
+  const subject =
+    (signal.kind === 'connection_down' || signal.kind === 'connection_back') &&
+    signal.service === 'reveal_read'
+      ? signal.kind === 'connection_down'
+        ? 'Lecture Reveal coupée'
+        : 'Lecture Reveal rétablie'
+      : SUBJECTS[signal.kind];
   const title = [notice.topic === 'urgent' ? 'Urgent' : null, creatorName, subject]
     .filter((part) => part !== null)
     .join(' · ');
@@ -44,6 +50,8 @@ export function agencyMessage(signal: Signal, notice: Notice, creatorName: strin
     title: cut(title, PUSH_TITLE_MAX),
     body: cut(notice.body, PUSH_BODY_MAX),
     url: notice.link?.path ?? '/',
+    ...(notice.tag !== undefined && { tag: notice.tag }),
+    ...(notice.silent === true && { silent: true }),
   };
 }
 

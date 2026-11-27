@@ -242,4 +242,8 @@ export interface Notice {
   readonly title: string;
   readonly body: string;
   readonly link: { readonly label: string; readonly path: string } | null;
+  /** Shown without sound nor vibration (a service back). */
+  readonly silent?: true;
+  /** A later notice of the same tag replaces this one on the screen (an outage, then its end). */
+  readonly tag?: string;
 }

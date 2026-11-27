@@ -1,4 +1,5 @@
 # 2026-11-27 — OPS-23 Rappel quotidien de reconnexion Reveal — review
 Fait : réglage `session_reminder_minute` (migration 0290, 18 h par défaut) et sa route ; `connectors.sessions.clocks()` ; règle `sessionRemindersDue` (heure de l'agence, une heure après, 2 h avant la fin d'un jeton) ; job `alerts.remind_sessions` toutes les 5 minutes vers chaque propriétaire en `agency_alert` ; carte « Reconnexion Reveal » dans Réglages › Alertes › Pilotage ; avenant à l'ADR 0147, runbooks, glossaire.
-Découvertes : l'échéance du jeton n'est gardée que dans la session chiffrée, le rappel la relit à chaque passage (quelques comptes, sans coût) ; les notifications de l'agence restent muettes la nuit tant que Charles n'a pas répondu sur le réveil.
-Reste : relecture Design de la carte, fusion par Bilan.
+Fait aussi : alerte « Lecture Reveal coupée » aux propriétaires, même la nuit (coupe-circuit du relevé ouvert, avec sa cause, ou session expirée), et « rétablie » sans son.
+Découvertes : l'échéance du jeton n'est gardée que dans la session chiffrée, le rappel la relit à chaque passage (quelques comptes, sans coût) ; l'état de la lecture est celui du service, pas d'un compte (plusieurs créatrices : à préciser par compte avec le voyant du Dashboard) ; le jour, une session expirée sonne deux fois chez les propriétaires (onglet de la créatrice et lecture coupée).
+Reste : relecture Design de la carte, maquette du voyant, fusion par Bilan.

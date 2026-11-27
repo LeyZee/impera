@@ -374,6 +374,7 @@ const CONNECTION_NAMES: Readonly<Record<ConnectionService, string>> = {
   google: 'la connexion Google',
   elevenlabs: 'la connexion ElevenLabs',
   reveal_crm: 'la connexion à l’API CRM de Reveal',
+  reveal_read: 'la lecture de Reveal',
 };
 
 const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
@@ -385,18 +386,39 @@ const CONNECTION_EFFECT: Readonly<Record<ConnectionService, string>> = {
   google: 'Les médias ne sont plus décrits.',
   elevenlabs: 'Les vocaux ne sont plus générés.',
   reveal_crm: 'Les ventes ne sont plus relevées.',
+  reveal_read: 'L’IA ne lit plus les messages des fans et ne leur répond plus.',
 };
 
 const CONNECTION_REASON: Readonly<Record<ConnectionDownReason, string>> = {
   refused: 'la clé est refusée. Reconnecte-la.',
   low_credit: 'le crédit est bas ou épuisé. Recharge-le.',
   unreachable: 'le service ne répond plus.',
+  format_changed: 'ses réponses ont changé de forme.',
+  session_expired: 'la session a expiré.',
+};
+
+/**
+ * The AI's read of Reveal stopped, by its cause (décision du 27/11/2026): what happened, what it stops, the gesture
+ * when there is one. Within a push's body.
+ */
+const READ_DOWN_TEXT: Readonly<Record<ConnectionDownReason, string>> = {
+  format_changed:
+    'Reveal a changé sa façon de répondre : l’IA ne lit plus les fans et ne leur répond plus. La lecture doit être adaptée côté Impera.',
+  unreachable:
+    'Reveal ne répond plus depuis plusieurs minutes : l’IA ne lit plus les fans et ne leur répond plus.',
+  session_expired:
+    'La session Reveal de l’IA a expiré : elle ne lit plus les fans. Dans le profil Chrome de l’IA, reconnecte le « bot », puis « Synchroniser ».',
+  refused:
+    'Reveal refuse la session de l’IA : elle ne lit plus les fans. Reconnecte le « bot », puis « Synchroniser ».',
+  low_credit: 'La lecture de Reveal est coupée : l’IA ne lit plus les fans et ne leur répond plus.',
 };
 
 const connectionLink = (service: ConnectionService): { label: string; path: string } =>
-  service === 'reveal_crm'
-    ? { label: 'Ouvrir les ventes', path: '/reglages/ventes' }
-    : { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' };
+  service === 'reveal_read'
+    ? { label: 'Ouvrir le Dashboard', path: '/' }
+    : service === 'reveal_crm'
+      ? { label: 'Ouvrir les ventes', path: '/reglages/ventes' }
+      : { label: 'Ouvrir les modèles IA', path: '/reglages/modeles-ia' };
 
 /** One thread per service (P3-12). */
 const connectionThreadKey = (service: ConnectionService): string => `connection:${service}`;
@@ -665,7 +687,19 @@ export function classify(signal: Signal): Notice | null {
         body: `Compte sans personne chez ${PLATFORM_NAMES[signal.platform]} : le créneau ${slotText(signal)} a commencé sans chatteur, et l’IA n’est pas en Automatique. Des fans ont écrit dans les dernières 24 h.`,
         link: { label: 'Ouvrir le planning', path: '/equipe/planning' },
       };
+    // The AI's read of Reveal stopped: it rings even at night, the agent answers all night (Charles, 27/11/2026).
     case 'connection_down':
+      if (signal.service === 'reveal_read') {
+        return {
+          kind: 'notice',
+          topic: 'urgent',
+          threadKey: connectionThreadKey(signal.service),
+          title: 'URGENT',
+          body: READ_DOWN_TEXT[signal.reason],
+          link: connectionLink(signal.service),
+          tag: connectionThreadKey(signal.service),
+        };
+      }
       return {
         kind: 'notice',
         topic: 'important',
@@ -674,9 +708,20 @@ export function classify(signal: Signal): Notice | null {
         body: `${capitalized(CONNECTION_NAMES[signal.service])} est en panne : ${CONNECTION_REASON[signal.reason]} ${CONNECTION_EFFECT[signal.service]}`,
         link: connectionLink(signal.service),
       };
-    // Back: nothing rings, the Dashboard says it.
+    // Back: nothing rings, the Dashboard says it. The read of Reveal says it in silence, in place of its outage.
     case 'connection_back':
-      return null;
+      return signal.service === 'reveal_read'
+        ? {
+            kind: 'notice',
+            topic: 'info',
+            threadKey: connectionThreadKey(signal.service),
+            title: 'Info',
+            body: 'La lecture de Reveal est rétablie : l’IA lit et répond de nouveau.',
+            link: connectionLink(signal.service),
+            silent: true,
+            tag: connectionThreadKey(signal.service),
+          }
+        : null;
     case 'security_alert':
       return {
         kind: 'notice',

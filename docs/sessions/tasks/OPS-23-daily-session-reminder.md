@@ -17,13 +17,15 @@ ADR 0147 et son avenant du 27/11, ADR 0176 § 3, `docs/runbooks/session-expired.
 - [x] Job `alerts.remind_sessions` toutes les 5 minutes, à chaque propriétaire, motif `agency_alert` (hors plafond, retenu en heures calmes), clé par compte et jour ou par jeton.
 - [x] Carte « Reconnexion Reveal » dans Réglages › Alertes › Pilotage.
 - [x] Avenant à l'ADR 0147, runbooks `session-expired.md` et `alerts.md`, glossaire.
+- [x] Lecture Reveal coupée (réponse de Charles du 27/11, 17 h 47 : elle peut le réveiller) : `connection_state_changed` service `reveal_read`, causes `format_changed`, `unreachable`, `session_expired`, en `agency_urgent` ; « rétablie » sans son à la première lecture réussie après un arrêt. Avenant (2) à l'ADR 0147.
+- [ ] Voyant « Lecture Reveal » qui pulse sur le Dashboard : maquette d'abord (Nuit/Jour, PC/téléphone), OK de Design, puis « ok maquette » de Charles ; code après.
 
 ## Critères d'acceptation
 - Tests unitaires de la règle (heure, relance, veille d'expiration, jour d'un rappel après minuit, textes et longueurs), du job (tous les propriétaires, un échec n'arrête pas les autres), de `clocks()` (sans session ni valeur de session) et de la carte.
 - Test d'intégration : 18 h par défaut, écriture par le propriétaire seul, bornes, ligne d'audit.
 
 ## Hors périmètre
-Réveiller la nuit pour une session qui expire (question posée à Charles, sans réponse) ; la connexion automatique à Reveal par le serveur (à reparler après une à deux semaines réelles, sur son mot écrit).
+Qu'un agent IA de Charles se reconnecte à Reveal (déconseillé, à reparler après l'ouverture) ; la connexion automatique à Reveal par le serveur (à reparler après une à deux semaines réelles, sur son mot écrit).
 
 ## Notes de session
 - Plafond du rôle de service : `modules/scheduling` passe à 33 (+1), la lecture de l'heure et du fuseau de l'agence par le job.

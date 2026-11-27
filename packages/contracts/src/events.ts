@@ -316,17 +316,34 @@ export const SALES_FEED_MISMATCH_DAYS_MAX = 500;
 
 /**
  * The services whose outage `connection_state_changed` tells (Telegram P3-12): the AI providers of Réglages › Modèles
- * IA and the sales register of Reveal. Venice, a fallback, is not watched; `meta` enters with its publisher (PUB-02).
+ * IA, the sales register of Reveal, and the AI's read of Reveal's messages (`reveal_read`, décision de Charles du
+ * 27/11/2026: the agent goes mute when it no longer reads). Venice, a fallback, is not watched; `meta` enters with its
+ * publisher (PUB-02).
  */
-export const CONNECTION_SERVICES = ['xai', 'mistral', 'google', 'elevenlabs', 'reveal_crm'] as const;
+export const CONNECTION_SERVICES = [
+  'xai',
+  'mistral',
+  'google',
+  'elevenlabs',
+  'reveal_crm',
+  'reveal_read',
+] as const;
 export const ConnectionServiceSchema = z.enum(CONNECTION_SERVICES);
 export type ConnectionService = z.infer<typeof ConnectionServiceSchema>;
 
 /**
  * Why a service is down: its key refused (401/403, a permission or a model withdrawn), its credit low or spent, or no
- * answer for long enough (`unreachable`). No source tells an expired key from a refused one: both are `refused`.
+ * answer for long enough (`unreachable`). No source tells an expired key from a refused one: both are `refused`. The
+ * read of a platform adds two of its own: its answers no longer have the shape the connector knows
+ * (`format_changed`), or the AI's session on it died (`session_expired`).
  */
-export const ConnectionDownReasonSchema = z.enum(['refused', 'low_credit', 'unreachable']);
+export const ConnectionDownReasonSchema = z.enum([
+  'refused',
+  'low_credit',
+  'unreachable',
+  'format_changed',
+  'session_expired',
+]);
 export type ConnectionDownReason = z.infer<typeof ConnectionDownReasonSchema>;
 
 /** What a publisher saw of a service; the outbox keeps only the transitions (`publishConnectionState`). */
