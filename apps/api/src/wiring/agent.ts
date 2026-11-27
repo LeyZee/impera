@@ -132,7 +132,15 @@ export function wireAgent(
         ? null
         : {
             check: (bubbles, { history, care, hasMedia }) =>
-              hers.check(bubbles, guardContextOf(history, hasMedia === true), care === true),
+              hers.check(
+                bubbles,
+                // Under care, none of her accounts leaves (ADR 0143 § 16).
+                {
+                  ...guardContextOf(history, hasMedia === true),
+                  ...(care === true && { ownAccountsOpen: { closed: true } }),
+                },
+                care === true,
+              ),
           };
     },
   };

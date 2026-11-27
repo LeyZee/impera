@@ -11,6 +11,7 @@ import {
   type Language,
   type LanguageExamples,
   type ObjectionReplies,
+  type OwnAccounts,
   type PersonaSheet,
   type PersonaStrategies,
   type StoredPersona,
@@ -22,6 +23,7 @@ import { DEFAULT_MIN_DESIRE_TO_OPEN, DEFAULT_SCRIPT_MIN_DESIRE } from '../domain
 import { resolveForm } from '../domain/form';
 import { DEFAULT_GUARD_SETTINGS, type GuardSettings } from '../domain/guards';
 import { askableSlots } from '../domain/kyc';
+import type { OwnAccountHandles } from '../domain/own-accounts';
 import { DEFAULT_AFTER_PURCHASE_HOURS } from '../domain/policy';
 import type { OfferLimits } from '../domain/policy';
 import type { SexualizationLimits } from '../domain/sexualization';
@@ -37,6 +39,11 @@ export interface PersonaForModels {
   readonly neverDo?: readonly string[];
   /** The degrading insults she never writes (`agent.rules.degrading_words`, Charles 26/11): a guard blocks them. */
   readonly degradingWords?: readonly string[];
+  /**
+   * Her own accounts the agent may give (`agent.rules.own_accounts`, Charles 27/11): read by the guard and the voice
+   * only on the turn code opens them, never in her sheet for the models. Absent: none.
+   */
+  readonly ownAccounts?: OwnAccountHandles;
   /**
    * Her pace of scripts and the heat they wait for (`agent.strategies.script_launch`), applied by `offerDecision`, never by a
    * prompt.
@@ -202,6 +209,7 @@ export function personaForModels(
     forbiddenTerms: [...rules.disgusts, ...rules.never_say].filter((term) => !isPlaceholder(term)),
     neverDo: rules.never_do.filter((term) => !isPlaceholder(term)),
     degradingWords: (rules.degrading_words ?? []).filter((term) => !isPlaceholder(term)),
+    ...ownAccountsOf(rules.own_accounts),
     offerLimits: {
       cooldownHours: agent.strategies.script_launch.cooldown_hours,
       minDesire: scriptMinDesire,
@@ -248,6 +256,16 @@ function spokenOf(languages: readonly Language[]): readonly [Language, ...Langua
   return first === undefined ? ['french'] : [first, ...rest];
 }
 
+/** Her own accounts as the owner typed them, each only when typed: none at all, no field. */
+function ownAccountsOf(typed: OwnAccounts | undefined): { ownAccounts?: OwnAccountHandles } {
+  const instagram = typed?.instagram ?? null;
+  const tiktok = typed?.tiktok ?? null;
+  if (instagram === null && tiktok === null) return {};
+  return {
+    ownAccounts: { ...(instagram !== null && { instagram }), ...(tiktok !== null && { tiktok }) },
+  };
+}
+
 /** Her form settings as her persona sets them: only those she set, so a lower layer decides the rest. */
 function formOf(behavior: VoiceFormSettings): VoiceFormSettings {
   const { capitalization, strip_final_period, mark_spacing, emoji_streak_max } = behavior;
@@ -274,6 +292,7 @@ export function guardSettingsOf(persona: PersonaForModels, baseStyle: VoiceFormS
     ...(persona.degradingWords !== undefined &&
       persona.degradingWords.length > 0 && { degradingWords: persona.degradingWords }),
     ...(persona.stageDirections && { stageDirections: true }),
+    ...(persona.ownAccounts !== undefined && { ownAccounts: persona.ownAccounts }),
     ...(persona.closeOnlyWords !== undefined && { closeOnlyWords: persona.closeOnlyWords }),
     form,
     ...(emojiStreakMax !== undefined && { emojiStreakMax }),

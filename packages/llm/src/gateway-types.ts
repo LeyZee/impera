@@ -265,11 +265,20 @@ export interface VoiceInput extends ConversationInput {
    */
   readonly boughtMediaSheet?: string;
   /**
+   * Her own accounts code opens this turn (Charles 27/11): her Instagram when he asked for it (her wishlist, a cam), her
+   * TikTok when he spoke of her lives, in a typed block after the brief. Never the handle (Sécurité, 27/11): the voice
+   * writes the account's fixed token, code puts the handle in its place. Absent or empty, none.
+   */
+  readonly openAccounts?: readonly HerAccountPlatform[];
+  /**
    * The agency's base style (ADR 0173), its public then its private part, in typed blocks before her sheet, which
    * wins where they differ. Absent or both empty: no section.
    */
   readonly agencyStyle?: AgencyStyleText;
 }
+
+/** One of her own accounts, by its platform only: its handle never enters a prompt. */
+export type HerAccountPlatform = 'instagram' | 'tiktok';
 
 /** The two texts of the agency's base style (ADR 0173), as the owner wrote them. */
 export interface AgencyStyleText {

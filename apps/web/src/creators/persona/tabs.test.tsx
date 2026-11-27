@@ -154,6 +154,17 @@ describe('Règles strictes (ADR 0079 § 4)', () => {
     );
     expect(screen.getByLabelText('Émojis qu’elle n’utilise jamais')).toBeDefined();
   });
+
+  it('types her own Instagram and TikTok, and empties one back to none (Charles 27/11)', async () => {
+    const { agent } = await parsePersonaYaml(demoYaml);
+    const onChange = vi.fn<(value: PersonaV2['agent']['rules']) => void>();
+    render(<RulesTab value={agent.rules} onChange={onChange} issues={[]} />);
+    fireEvent.change(screen.getByLabelText('Son Instagram'), { target: { value: '@exemple.fictif' } });
+    expect(onChange.mock.lastCall?.[0].own_accounts).toEqual({ instagram: '@exemple.fictif' });
+    fireEvent.change(screen.getByLabelText('Son TikTok'), { target: { value: '  ' } });
+    expect(onChange.mock.lastCall?.[0].own_accounts).toEqual({ tiktok: null });
+    expect(screen.getByText(/pour voir sa wishlist en story à la une, ou pour une cam/u)).toBeDefined();
+  });
 });
 
 describe('Réponses aux objections de prix (ADR 0090 § B)', () => {

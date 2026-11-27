@@ -11,6 +11,12 @@ import { checkEmojis, DEFAULT_EMOJI_STREAK_MAX } from './emojis';
 import { checkForm, DEFAULT_FORM_SETTINGS, type FormSettings } from './form';
 import { INTIMATE_PARTS } from './intimate-words';
 import { detectLanguage, isMostlyLatin, latinWordCount, OUTPUT_UNKNOWN_FROM_WORDS } from './language';
+import {
+  maskOwnHandles,
+  withoutOwnAccounts,
+  type OwnAccountHandles,
+  type OwnAccountsOpen,
+} from './own-accounts';
 import { refundInDraft } from './refund';
 
 /**
@@ -60,6 +66,12 @@ export interface GuardSettings {
   readonly emojiStreakMax?: number;
   /** The form of her bubbles, resolved (`resolveForm`); absent, the code's default. */
   readonly form?: FormSettings;
+  /**
+   * Her own accounts (`agent.rules.own_accounts`, Charles 27/11): read from her persona at each draft, never listed in
+   * the repository. Exactly one of them passes the contact guards, and only where `GuardContext.ownAccountsOpen` opens
+   * it. Absent: none passes.
+   */
+  readonly ownAccounts?: OwnAccountHandles;
 }
 
 /**
@@ -118,6 +130,12 @@ export interface GuardContext {
    * she may then send him to Reveal. Absent, he did not ask (closed by default, Sécurité on #1073).
    */
   readonly fanAskedRefund?: boolean;
+  /**
+   * Which of her own accounts his messages since her last answer open (Charles 27/11): Instagram when he asks for her
+   * Insta, her wishlist or a cam; TikTok when he speaks of her lives (her answer speaking of a live opens it too).
+   * Absent, only her answer can open TikTok, and Instagram stays closed.
+   */
+  readonly ownAccountsOpen?: OwnAccountsOpen;
 }
 
 export const DEFAULT_GUARD_SETTINGS: GuardSettings = {
@@ -303,6 +321,24 @@ const SEARCH_TWO_WORDS = '\\b(cherche|tape|search|type|cerca|busca|scrivi)( moi)
 // A network or another platform, where he could find or pay her elsewhere.
 const NETWORK =
   '(snap(chat)?|whatsapp|insta(gram)?|telegram|tik ?tok|twitter|facebook|messenger|fansly|discord|kik|only ?fans|mym( ?fans)?|linktree|beacons|allmylinks|patreon|fanvue|loyalfans)';
+// What still points elsewhere once her own handle is taken out: another handle, a name to search, « tu me trouves ».
+const OTHER_HANDLE = new RegExp(`${HANDLE}|${SEARCH_TWO_WORDS}|\\btu me trouve(s|ras)?\\b`);
+
+/**
+ * Her bubbles as the contact guards read them (Charles 27/11): her own handle taken out where code opens it, unless
+ * something else still points elsewhere; then her bubbles as written, read as before.
+ */
+function contactBubblesOf(
+  bubbles: readonly string[],
+  settings: GuardSettings,
+  context: GuardContext,
+): readonly string[] {
+  const exempted = withoutOwnAccounts(bubbles, settings.ownAccounts, context.ownAccountsOpen);
+  if (exempted === bubbles) return bubbles;
+  return OTHER_HANDLE.test(normalise(exempted.join(' '))) || OTHER_HANDLE.test(unmask(exempted.join(' ')))
+    ? bubbles
+    : exempted;
+}
 
 const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
   // Charles 26/11 at 23:44: never an extra (a gift, a bonus, a media offered) promised to unlock or close a purchase,
@@ -435,6 +471,9 @@ const BLOCKING_PATTERNS: readonly { code: GuardCode; pattern: RegExp }[] = [
     ),
   },
   { code: 'contact_info', pattern: /\b(https?:\/\/|www\.)\S+/ },
+  // A token the voice writes for one of her accounts (« {{son_instagram}} ») that code did not replace: the account is
+  // closed now or has no handle typed (Sécurité, 27/11). Never sent as is; any other « {{…}} » neither.
+  { code: 'contact_info', pattern: /\{\{[^{}]{0,40}\}\}/ },
   { code: 'contact_info', pattern: /\b[\w.+-]+ ?@ ?[\w-]+ ?\. ?[\w.]+\b/ },
   { code: 'contact_info', pattern: /(\+?\d[\s.,/-]{0,2}){9,}/ },
   // A street address, in numbers and a street (Charles 27/11): « 12 rue des Lilas », « 4 bis avenue Foch ». « Mon
@@ -1279,18 +1318,25 @@ function wholeMessage(
   forbidden: readonly string[],
   found: readonly GuardViolation[],
   context: GuardContext,
+  /** Her bubbles as the contact guards read them: her own handle out where code opens it. */
+  contactBubbles: readonly string[] = bubbles,
 ): GuardViolation[] {
-  const joined = bubbles.join(' ');
-  // Also glued (« je suis un b » then « ot ») and without emoji (« 06 12 34 🙈 56 78 »).
-  const glued = bubbles.join('');
-  const readings = [joined, glued, joined.replace(/\p{Extended_Pictographic}|\uFE0F/gu, '')].flatMap(
-    (text) => [normalise(text), unmask(text)],
-  );
+  const readingsOf = (of: readonly string[]): string[] => {
+    const joined = of.join(' ');
+    // Also glued (« je suis un b » then « ot ») and without emoji (« 06 12 34 🙈 56 78 »).
+    const glued = of.join('');
+    return [joined, glued, joined.replace(/\p{Extended_Pictographic}|\uFE0F/gu, '')].flatMap((text) => [
+      normalise(text),
+      unmask(text),
+    ]);
+  };
+  const readings = readingsOf(bubbles);
+  const contactReadings = contactBubbles === bubbles ? readings : readingsOf(contactBubbles);
   const violations: GuardViolation[] = [];
   const has = (code: GuardCode) => [...found, ...violations].some((v) => v.code === code);
   for (const { code, pattern } of BLOCKING_PATTERNS) {
     if (has(code)) continue;
-    const match = readings
+    const match = (code === 'contact_info' ? contactReadings : readings)
       .map((text) => blockingMatch(code, pattern, text, context))
       .find((m) => m !== undefined);
     if (match !== undefined) violations.push({ code, severity: 'blocking', match });
@@ -1323,10 +1369,18 @@ export function checkVoiceOutput(
   const degrading = (settings.degradingWords ?? []).map(normalise).filter((term) => term !== '');
 
   const message = normalise(bubbles.join(' '));
+  const contactBubbles = contactBubblesOf(bubbles, settings, context);
   bubbles.forEach((bubble, bubbleIndex) => {
     const text = normalise(bubble);
+    const contactText = normalise(contactBubbles[bubbleIndex] ?? bubble);
     for (const { code, pattern } of BLOCKING_PATTERNS) {
-      const match = blockingMatch(code, pattern, text, context, message);
+      const match = blockingMatch(
+        code,
+        pattern,
+        code === 'contact_info' ? contactText : text,
+        context,
+        message,
+      );
       if (match !== undefined) violations.push({ code, severity: 'blocking', bubbleIndex, match });
     }
     const committed = violations.some((v) => v.bubbleIndex === bubbleIndex && v.code === 'meeting_promise')
@@ -1436,7 +1490,7 @@ export function checkVoiceOutput(
       )
         violations.push({ code: 'minor_reference', severity: 'blocking', bubbleIndex, match: named });
     });
-  violations.push(...wholeMessage(bubbles, forbidden, violations, context));
+  violations.push(...wholeMessage(bubbles, forbidden, violations, context, contactBubbles));
   const language = languageMatch(bubbles, context.languages);
   if (language !== undefined)
     violations.push({ code: 'language_not_covered', severity: 'blocking', match: language });
@@ -1455,7 +1509,10 @@ export function checkVoiceOutput(
     );
   violations.push(...closeOnlyWords(bubbles, settings, context.meetingTier));
   violations.push(...refundViolations(bubbles, context.fanAskedRefund));
-  return violations;
+  // Her handles never leave in a match, which drafts and journals keep (Sécurité, 27/11): their tokens instead.
+  return violations.map((v) =>
+    v.match === undefined ? v : { ...v, match: maskOwnHandles(v.match, settings.ownAccounts) },
+  );
 }
 
 /**
