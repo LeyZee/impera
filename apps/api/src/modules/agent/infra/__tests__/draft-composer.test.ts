@@ -23,6 +23,7 @@ import type { AlertSettings } from '../../domain/alerts';
 import { helpBubble } from '../../domain/care';
 import { DEFAULT_GUARD_SETTINGS } from '../../domain/guards';
 import type { Protection } from '../../domain/hold';
+import type { ScriptRun } from '../../domain/script-run';
 import { FRENCH_ONLY, NO_EMOJI_HINT } from '../compose';
 import {
   createDraftComposer,
@@ -73,6 +74,16 @@ const PACK_SOURCE: ScriptSource = {
     ]),
   history: () => Promise.resolve({ scripts: [] }),
 };
+
+/** Her invented script run, its one paid step in the state given, last changed at `at`. */
+const runWith = (outcome: 'bought' | 'sent' | 'refused', at: Date): ScriptRun => ({
+  scriptRef: 'script-demo',
+  status: outcome === 'bought' ? 'bought_out' : outcome === 'refused' ? 'refused' : 'open',
+  steps: [{ stepIndex: 0, kind: 'paid', outcome, priceMinor: 1_500, sentAt: at, at }],
+  ignoredMessages: 0,
+  startedAt: at,
+  endedAt: outcome === 'sent' ? null : at,
+});
 
 const INPUT: AgentComposeInput = {
   creatorId: 'creator-1',
@@ -1703,13 +1714,9 @@ describe('createDraftComposer, the offer policy', () => {
 
   it('offers nothing more the evening he had his script, and steers him to a cam or a custom video (passe 18, Charles 21/11)', async () => {
     const asks: Brief = { ...OFFER, intent: 'asks_for_media', sentiment: 'positive' };
-    const tonight = composer(
-      { brief: asks },
-      undefined,
-      limitsOf(ADULT).limits,
-      policy(new Date(INPUT.now.getTime() - 3 * 3_600_000)),
-    );
-    await tonight.draftComposer.compose(INPUT);
+    const threeHoursAgo = new Date(INPUT.now.getTime() - 3 * 3_600_000);
+    const tonight = composer({ brief: asks }, undefined, limitsOf(ADULT).limits, policy(threeHoursAgo));
+    await tonight.draftComposer.compose({ ...INPUT, scriptRun: runWith('bought', threeHoursAgo) });
     expect(written(tonight.seen)?.action).toBe('reply');
     expect(
       written(tonight.seen)?.toneHints.some(
@@ -1717,14 +1724,20 @@ describe('createDraftComposer, the offer policy', () => {
       ),
     ).toBe(true);
 
+    // Her script only offered or refused tonight: nothing bought, the turn follows its normal flow.
+    for (const outcome of ['sent', 'refused'] as const) {
+      const offered = composer({ brief: asks }, undefined, limitsOf(ADULT).limits, policy(threeHoursAgo));
+      await offered.draftComposer.compose({ ...INPUT, scriptRun: runWith(outcome, threeHoursAgo) });
+      expect(
+        written(offered.seen)?.toneHints.some((hint) => hint.includes('le faire jouir lui')),
+        outcome,
+      ).toBe(false);
+    }
+
     // The next day, his asking is a new evening: no steer.
-    const nextDay = composer(
-      { brief: asks },
-      undefined,
-      limitsOf(ADULT).limits,
-      policy(new Date(INPUT.now.getTime() - 20 * 3_600_000)),
-    );
-    await nextDay.draftComposer.compose(INPUT);
+    const yesterday = new Date(INPUT.now.getTime() - 20 * 3_600_000);
+    const nextDay = composer({ brief: asks }, undefined, limitsOf(ADULT).limits, policy(yesterday));
+    await nextDay.draftComposer.compose({ ...INPUT, scriptRun: runWith('bought', yesterday) });
     expect(written(nextDay.seen)?.toneHints.some((hint) => hint.includes('le faire jouir lui'))).toBe(false);
   });
 
@@ -4420,9 +4433,12 @@ describe('createDraftComposer, the sexting calibrated by the creator (Charles 26
         },
       );
 
+    // He bought her script earlier this evening.
+    const boughtTonight = runWith('bought', new Date('2026-10-17T08:30:00Z'));
+
     it('lists no script when he asks for more the same evening, and leads him to the custom path', async () => {
       const { draftComposer, seen } = tonight(PACK_SOURCE);
-      await draftComposer.compose(says('encore une ?'));
+      await draftComposer.compose({ ...says('encore une ?'), scriptRun: boughtTonight });
       expect(seen.brainInputs?.[0]?.scripts).toBeUndefined();
       expect(seen.voiceInputs?.[0]?.scriptStep).toBeUndefined();
       expect(
@@ -4434,7 +4450,9 @@ describe('createDraftComposer, the sexting calibrated by the creator (Charles 26
 
     it('commits to nothing there: a yes or a date goes to a human', async () => {
       const { draftComposer } = tonight(PACK_SOURCE, ['ok je te fais ça demain']);
-      expect((await draftComposer.compose(says('encore une ?'))).kind).toBe('held');
+      expect((await draftComposer.compose({ ...says('encore une ?'), scriptRun: boughtTonight })).kind).toBe(
+        'held',
+      );
     });
 
     it('lists her scripts on another evening', async () => {

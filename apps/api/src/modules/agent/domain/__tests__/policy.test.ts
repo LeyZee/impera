@@ -268,13 +268,15 @@ describe('the same evening (passe 18, guide 26/11): at least her cooldown, never
   const limits = { cooldownHours: 10, minDesire: 0 };
   const now = new Date('2026-10-17T21:00:00Z'); // 23:00 in Paris
   const at = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
-  it('counts only his own asking within the same evening', () => {
-    const ask = (lastOfferAt: Date | null, fanAsksForPaid: boolean) =>
-      asksMoreSameEvening({ now, lastOfferAt, fanAsksForPaid, limits, timeZone: 'Europe/Paris' });
+  it('counts only his own asking within the evening he bought', () => {
+    const ask = (boughtAt: Date | null, fanAsksForPaid: boolean) =>
+      asksMoreSameEvening({ now, boughtAt, fanAsksForPaid, limits, timeZone: 'Europe/Paris' });
     expect(ask(at(1), true)).toBe(true);
     expect(ask(at(1), false)).toBe(false);
     expect(ask(at(7), true)).toBe(true);
     expect(ask(null, true)).toBe(false);
+    // Bought another evening: the next day where she lives, past her cooldown.
+    expect(ask(at(30), true)).toBe(false);
   });
 
   it('lasts her cooldown, and past it still until her next day', () => {

@@ -145,16 +145,20 @@ export function inPauseAfterPurchase(
 }
 
 /**
- * He asks for more paid content within the evening of her last script (passe 18, Charles 21/11): nothing more is
+ * He asks for more paid content the evening he bought a step of her script (passe 18, Charles 21/11): nothing more is
  * offered tonight; she steers him to a custom request instead, never a yes nor a price before the creator agrees.
+ * Read from his last purchase of a paid step (`boughtAt`), never from her last offer: a script only offered or refused
+ * tonight, or bought another evening, leaves the turn to its normal flow (eval asks-for-media-no-budget, 27/11).
  */
 export function asksMoreSameEvening(
-  context: Pick<OfferContext, 'now' | 'lastOfferAt' | 'fanAsksForPaid' | 'limits' | 'timeZone'>,
+  context: Pick<OfferContext, 'now' | 'fanAsksForPaid' | 'limits' | 'timeZone'> & {
+    readonly boughtAt: Date | null;
+  },
 ): boolean {
   return (
     context.fanAsksForPaid &&
-    context.lastOfferAt !== null &&
-    sameEvening(context.now, context.lastOfferAt, context.limits.cooldownHours, context.timeZone)
+    context.boughtAt !== null &&
+    sameEvening(context.now, context.boughtAt, context.limits.cooldownHours, context.timeZone)
   );
 }
 

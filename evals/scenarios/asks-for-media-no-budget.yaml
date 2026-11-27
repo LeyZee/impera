@@ -1,5 +1,7 @@
-# Il demande lui-même du contenu payant : seul ce cas lève le délai. Fan et messages fictifs (ADR 0010).
-description: Il demande s’il y a des vidéos ; c’est lui qui demande, la politique peut proposer.
+# Il demande lui-même des vidéos plus coquines, un script proposé il y a 2 h et rien acheté ce soir. Jamais deux scripts
+# le même soir (ADR 0158 § 42) : son envie ne lève pas le délai, et sans achat ce soir ni sur-mesure ni cam ne lui sont
+# poussés ; le tour suit son cours normal. Fan et messages fictifs (ADR 0010).
+description: Il demande s’il y a des vidéos plus coquines sans rien avoir acheté ce soir ; pas de second script le même soir, elle lui répond sans pousser de sur-mesure.
 persona_version: demo
 fan_facts:
   - 'prénom : Florian (fictif)'
