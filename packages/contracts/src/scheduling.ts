@@ -174,6 +174,18 @@ export const SlotVersionSchema = z
 export type SlotVersion = z.infer<typeof SlotVersionSchema>;
 
 /**
+ * « Chatteur pas là » (ADR 0094 § 1, lot b), an agency setting (`GET` for the owner and an active manager, `PUT
+ * /v1/scheduling/not-taken-delay` for the owner, Réglages › Alertes): how many minutes after a shift's start its member,
+ * not having taken it, is told to the owner and the managers. `null`: the signal is off. Never written in the code.
+ */
+export const NOT_TAKEN_DELAY_MINUTES_MIN = 5;
+export const NOT_TAKEN_DELAY_MINUTES_MAX = 240;
+export const NotTakenDelaySchema = z.strictObject({
+  minutes: z.number().int().min(NOT_TAKEN_DELAY_MINUTES_MIN).max(NOT_TAKEN_DELAY_MINUTES_MAX).nullable(),
+});
+export type NotTakenDelay = z.infer<typeof NotTakenDelaySchema>;
+
+/**
  * The owner's planning settings (`GET`, `PUT /v1/scheduling/settings`). `versions` are the créneaux' versions, oldest
  * first: the one in force at the start of what is read (`at` for `GET`, the window of a planning or calendar read),
  * then those that take effect after it, within that window (every one ahead for `GET`). A week can so hold two

@@ -131,6 +131,25 @@ describe('which alert of her tab an event is (ADR 0150 § B)', () => {
     expect(classifyEvent('account_uncovered', { ...payload, fan: 'x' })).toBeNull();
   });
 
+  it('tells a shift its chatter has not taken, with no conversation (ADR 0094 § 1, lot b)', () => {
+    const payload = {
+      creatorId: '01900000-0000-7000-8000-0000000000c1',
+      platform: 'reveal',
+      platformAccountId: '01900000-0000-7000-8000-0000000000a1',
+      shiftId: '01900000-0000-7000-8000-0000000000b1',
+      memberId: '01900000-0000-7000-8000-0000000000d1',
+      memberName: 'Kofi',
+      startsAt: '2026-11-20T13:00:00.000Z',
+      endsAt: '2026-11-20T19:00:00.000Z',
+      timeZone: 'Europe/Paris',
+    };
+    expect(classifyEvent('shift_not_taken', payload)).toEqual({
+      code: 'shift_not_taken',
+      conversationId: null,
+    });
+    expect(classifyEvent('shift_not_taken', { ...payload, memberName: '' })).toBeNull();
+  });
+
   it('skips what is none of the tab’s, and a payload that does not read', () => {
     expect(classifyEvent('handoff_requested', { conversationId: CONVERSATION, cause: 'guard' })).toBeNull();
     expect(classifyEvent('handoff_requested', { cause: 'minor' })).toBeNull();

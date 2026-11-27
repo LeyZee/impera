@@ -4,6 +4,7 @@ import {
   type CreateShiftReportBodySchema,
   type CreatorId,
   type RejectShiftReportBody,
+  type NotTakenDelay,
   type ReportGapThreshold,
   type ShiftId,
   type ShiftReport,
@@ -47,6 +48,8 @@ export interface ShiftReportService {
   /** The threshold of a report against the platform (ADR 0073 § 3), read by the owner and an active manager. */
   reportGap(actor: UserId): Promise<ReportGapThreshold>;
   saveReportGap(actor: Actor, threshold: ReportGapThreshold): Promise<ReportGapThreshold>;
+  notTakenDelay(actor: UserId): Promise<NotTakenDelay>;
+  saveNotTakenDelay(actor: Actor, delay: NotTakenDelay): Promise<NotTakenDelay>;
   /**
    * `scheduling.check_reports` (ADR 0073 § 4): each submitted report whose complete check is within the threshold,
    * validated in the name of the automatic check, one transaction each, under the lock and at the version it was
@@ -141,6 +144,13 @@ export function createShiftReportService(
     },
 
     saveReportGap: (actor, threshold) => store.saveReportGap(actor, threshold),
+
+    notTakenDelay: async (actor) => {
+      if (!isAgency(await store.reader(actor))) throw new ShiftReportForbidden();
+      return store.notTakenDelay(actor);
+    },
+
+    saveNotTakenDelay: (actor, delay) => store.saveNotTakenDelay(actor, delay),
 
     checkReports: async () => {
       const due = await store.checkCandidatesUnscoped(now());

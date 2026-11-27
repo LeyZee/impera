@@ -62,8 +62,8 @@ describe('« Mise en route » words', () => {
       { key: 'scripts', state: 'todo', note: { kind: 'scripts', day: 0, night: 0 } },
     ]);
     expect(both?.hint).toBe('1 script de jour et 2 scripts de nuit prêts dans Reveal.');
-    expect(night?.hint).toBe('Aucun script de nuit prêt dans Reveal : l’agent n’a rien à proposer la nuit.');
-    expect(none?.hint).toBe('Aucun script prêt dans Reveal : l’agent n’a rien à proposer.');
+    expect(night?.hint).toBe('Aucun script de nuit prêt dans Reveal : l’agent n’a rien à vendre la nuit.');
+    expect(none?.hint).toBe('Aucun script prêt dans Reveal : l’agent discute, mais n’a rien à vendre.');
     expect(both?.target).toEqual({ kind: 'sheet', sheet: 'scripts', creatorId: ANNA });
     const [grid] = creatorLines(ANNA, [{ key: 'custom_prices', state: 'todo', note: null }]);
     expect(grid?.target).toEqual({ kind: 'sheet', sheet: 'custom', creatorId: ANNA });
