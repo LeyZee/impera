@@ -63,5 +63,7 @@ jobs:
       - run: pnpm evals
         if: env.HAS_XAI_KEY == 'true'
         env:
+          # Four conversations at once (`--concurrency`), reported in their files' order; the cap holds (evals/README.md).
+          EVALS_CONCURRENCY: '4'
           LLM_XAI_API_KEY: ${{ secrets.LLM_XAI_API_KEY }}
           LLM_MISTRAL_API_KEY: ${{ secrets.LLM_MISTRAL_API_KEY }}
